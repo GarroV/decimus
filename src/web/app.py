@@ -298,8 +298,6 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Touch ID на этом устройстве (D485): после входа паролем или Google браузер без
             # метки сам просит сохранить ключ; здесь — только допуск и адреса, решает passkey.js.
             "passkey_here": _passkey_here(account, conf),
-            # Вход ключом с формы входа: кнопка и автозапуск только если ключи включены.
-            "passkeys_enabled": conf.webauthn_enabled,
         }
 
 

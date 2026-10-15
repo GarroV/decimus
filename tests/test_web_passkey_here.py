@@ -123,23 +123,18 @@ def test_автосохранение_пробует_один_раз_на_вхо
     assert "data-passkey-here-later" not in js
 
 
-def test_форма_входа_несёт_автозапуск_ключа_и_запасную_кнопку(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_на_форме_входа_нет_ключа_доступа(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Вход — Google или пароль; Touch ID только вторым шагом после пароля (D515)."""
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="admin")
     app = собрать(tenant=ТЕНАНТ, webauthn_rp_id="localhost", webauthn_origin="http://localhost")
-    выкл = собрать(tenant=ТЕНАНТ)
 
     with app.test_client() as client:
         страница = client.get("/login").get_data(as_text=True)
-    with выкл.test_client() as client:
-        без_ключей = client.get("/login").get_data(as_text=True)
 
-    assert "data-passkey-autostart" in страница
-    assert 'data-options-url="/login/passkey/options"' in страница
-    assert 'data-verify-url="/login/passkey/verify"' in страница
-    assert "Войти по Touch ID" in страница
-    assert "data-passkey-login" not in без_ключей
+    assert "data-passkey-login" not in страница
+    assert "data-passkey-autostart" not in страница
+    assert "Touch ID" not in страница
+    assert "passkey.js" not in страница
 
 
 def test_вторая_ступень_стоит_у_пароля_и_не_стоит_у_google() -> None:
