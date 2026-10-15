@@ -87,11 +87,28 @@
 /* история в панели пиццерии */
 .cn-history .ov-row { padding-left: 0; padding-right: 0; }
 
-/* ── колонка стран: отбор «Девелопер» раскрывается внутри колонки ───── */
-.cn-devpick { padding: 0 var(--space-4) var(--space-3); }
-.cn-devpick .pick { display: block; }
-.cn-devpick .ov-chip { display: flex; width: 100%; justify-content: space-between; }
-.cn-devpick .pick__menu { position: static; width: 100%; min-width: 0; margin-top: var(--space-2); box-shadow: none; }
+/* ── колонка: блок отбора как на «Проверках» (`.rg-filters`, D510) ────
+   Колонка не прокручивается сама и не липнет — прокручивается только список
+   пиццерий. Выбранная страна не заливается цветом: здесь это тема экрана, а не
+   включённый фильтр, и заливка делала из неё синюю «пилюлю». */
+.cn-rail { position: static; max-height: none; overflow: visible; }
+.cn-filters {
+  display: grid; gap: var(--space-3); margin-bottom: var(--space-4); padding: var(--space-5);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-block);
+}
+.cn-filters .pick { display: block; }
+.cn-filters .ov-chip { display: flex; width: 100%; justify-content: space-between; }
+.cn-filters .ov-chip.is-on { background: transparent; border-color: var(--line); color: var(--ink-2); }
+.cn-filters .pick__menu { position: static; width: 100%; min-width: 0; margin-top: var(--space-2); box-shadow: none; }
+/* Список пиццерий — не выше 15 строк (`--cn-urow` — высота строки, одна на все:
+   строка с буквой выше строки без неё), дальше
+   прокрутка внутри (D510): в стране бывает 30+ точек. */
+.cn-rail { --cn-urow: 50px; }
+.cn-ulist .cn-uline { min-height: var(--cn-urow); align-content: center; }
+.cn-ulist {
+  position: relative; display: grid; gap: 0; align-content: start;
+  max-height: calc(15 * var(--cn-urow)); overflow-y: auto; overscroll-behavior: contain;
+}
 
 /* ── узкий экран ────────────────────────────────────────────────────── */
 @media (max-width: 1023px) {
@@ -114,8 +131,7 @@
 
 /* Колонка «Страны» (D504): девелопер и страна — выпадающими списками, под ними
    пиццерии страны строками; буква последней проверки — справа. */
-.cn-devpick + .cn-devpick { margin-top: var(--space-2); }
-.cn-units-head { margin-top: var(--space-5); }
+.cn-units-head { margin-top: var(--space-2); }
 .cn-uline .mx-rail__name { display: flex; flex-direction: column; min-width: 0; }
 .cn-uline .mx-rail__name small { color: var(--ink-3); font-size: var(--fs-meta); }
 .cn-uline .grade { flex: 0 0 auto; }

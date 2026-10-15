@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-country.css') }}">
   <script src="{{ url_for('static', filename='split.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='country.js') }}" defer></script>
 {% endblock %}
 
 {% block body %}
@@ -34,15 +35,18 @@
    видна только колонка. На экране страны колонка там прячется, и назад ведёт
    ссылка «‹ Страны». #}
 <div class="mx-shell cn-shell{% if view is none and not combined or picking %} mx-shell--pick{% endif %}">
-  <aside class="mx-rail" aria-label="{{ t('country.rail.title') }}">
-    <div class="mx-rail__head mx-rail__head--list">
-      <span>{{ t('country.rail.title') }}</span>
+  <aside class="mx-rail cn-rail" aria-label="{{ t('country.rail.title') }}">
+    {# Девелопер и страна — выпадающими списками в блоке отбора, как на «Проверках»
+       (D504, D510); под ним пиццерии страны. #}
+    {# Партнёр с одной страной (D508): выбирать нечего — блока отбора нет. #}
+    {% if not single_country %}
+    <div class="cn-filters">
+      <div class="mx-rail__head">{{ t('country.rail.title') }}</div>
+      {% if dev_pick %}{{ pick(dev_pick) }}{% endif %}
+      {% if country_pick is defined and country_pick.options %}{{ pick(country_pick) }}{% else %}
+        <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>{% endif %}
     </div>
-    {# Девелопер и страна — выпадающими списками, под ними пиццерии страны (D504). #}
-    {% if dev_pick %}<div class="cn-devpick">{{ pick(dev_pick) }}</div>{% endif %}
-    {% if single_country %}{# партнёр с одной страной: выбирать нечего (D508) #}
-    {% elif country_pick is defined and country_pick.options %}<div class="cn-devpick">{{ pick(country_pick) }}</div>{% else %}
-      <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>{% endif %}
+    {% endif %}
     {% if units is defined and not combined %}
       <div class="mx-rail__head mx-rail__head--list cn-units-head">
         <span>{{ t('country.units.title') }}</span><span class="mx-rail__count">{{ units.open_rows|length }}</span>
@@ -57,7 +61,10 @@
       {% if units.profiles_failed or units.ratings_failed or units.maps_failed %}
         <p class="cn-quiet">{{ t('country.units.profiles_failed') if units.profiles_failed else t('country.units.ratings_failed') if units.ratings_failed else t('country.units.maps_failed') }}</p>
       {% endif %}
-      {% for row in units.open_rows %}{{ unit_line(row) }}{% else %}<div class="ov-card__empty">{{ t('country.units.empty') }}</div>{% endfor %}
+      {# Не выше 15 строк, дальше прокрутка внутри списка (D510). #}
+      <div class="cn-ulist" data-cn-ulist>
+        {% for row in units.open_rows %}{{ unit_line(row) }}{% else %}<div class="ov-card__empty">{{ t('country.units.empty') }}</div>{% endfor %}
+      </div>
       {% if units.closed_rows %}
         <details class="cn-closed"{% if open_row and open_row.is_closed %} open{% endif %}>
           <summary>{{ t('country.units.closed', n=units.closed_rows|length) }}</summary>
