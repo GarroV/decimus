@@ -28,6 +28,7 @@ from src.domain.unit_name import fold_unit_name
 
 from .base import (
     AMBIGUOUS,
+    directory_id,
     parse_base_collection,
     parse_base_rko_violations,
     parse_base_rs_violations,
@@ -213,7 +214,7 @@ class _Writer:
 
     def from_directory(self, ref: UnitRef, row_no: int) -> str | None:
         """Пиццерия, которой ещё нет среди известных, но есть в справочнике ссылок."""
-        dodo_id = self.directory.get(fold_unit_name(ref.name))
+        dodo_id = directory_id(self.directory, ref.name)
         if dodo_id is None or ref.country is None:
             return None
         taken = dodo_id != AMBIGUOUS and any(

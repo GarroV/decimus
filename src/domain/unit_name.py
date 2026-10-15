@@ -98,6 +98,28 @@ def fold_unit_name(name: str) -> str:
     return " ".join(bare.split()).casefold()
 
 
+#: Написания, которыми одну и ту же букву передают по-разному («Могилёв» — Mogilev и
+#: Mogilyov, «Харьков» — Kharkov и Harkov); порядок важен: длинные раньше коротких.
+_VARIANTS = (
+    ("shch", "sh"), ("tch", "ch"), ("yo", "e"), ("ye", "e"), ("yu", "u"), ("ya", "a"),
+    ("kh", "h"), ("ts", "c"), ("y", "i"), ("j", "i"), ("w", "v"),
+)  # fmt: skip
+
+
+def unit_name_skeleton(name: str) -> str:
+    """Ключ поиска имени точки на другом алфавите: «Новополоцк-1» и «Novopolotsk-1» сходятся.
+
+    Кириллица читается латиницей, разночтения («yo»/«e», «kh»/«h») сводятся к одному
+    виду, остаются буквы и цифры. Ключ грубее `fold_unit_name` и годится только для
+    поиска в справочнике, где совпавший вторым ходом id перепроверяется на однозначность;
+    номер точки в нём сохраняется, поэтому «-1» не становится «-2».
+    """
+    text = fold_unit_name(name).translate(_CYRILLIC)
+    for variant, short in _VARIANTS:
+        text = text.replace(variant, short)
+    return "".join(c for c in text if c.isalnum())
+
+
 def _key(text: str) -> str:
     """Ключ сверки: без регистра, диакритики и всего, что не буква."""
     return "".join(c for c in _ascii(text.casefold()) if c.isalpha())
