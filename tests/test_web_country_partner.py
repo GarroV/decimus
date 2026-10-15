@@ -145,7 +145,7 @@ def test_партнёр_видит_экран_своей_страны_со_сп�
 
 def test_у_партнёра_нет_выбора_страны_и_девелопера(партнёр: FlaskClient) -> None:
     страница = партнёр.get("/country/GE").get_data(as_text=True)
-    assert "cn-devpick" not in страница
+    assert 'class="pick"' not in страница and "cn-filters" not in страница
     # Девелопер — понятие УК: ни выбора, ни строки в шапке, даже если справочник их отдаёт.
     assert "Иван" not in страница
     # Старая карточка точки партнёру не нужна: путь к пиццерии один.
@@ -156,7 +156,8 @@ def test_партнёр_с_несколькими_странами_выбира�
     партнёр_двух_стран: FlaskClient,
 ) -> None:
     страница = партнёр_двух_стран.get("/country/GE").get_data(as_text=True)
-    assert страница.count("cn-devpick") == 1  # только страна, без девелопера
+    колонка = страница.split("</aside>", 1)[0]
+    assert колонка.count('class="pick"') == 1  # только страна, без девелопера
     assert "/country/AM" in страница
 
 
@@ -180,7 +181,7 @@ def test_чужая_страна_отвечает_как_несуществую�
 def test_вход_без_страны_ведёт_в_единственную_страну_партнёра(партнёр: FlaskClient) -> None:
     ответ = партнёр.get("/country?dev=Иван")
     assert ответ.status_code == 200  # `dev` у партнёра игнорируется, а не сводит страны
-    assert "cn-devpick" not in ответ.get_data(as_text=True)
+    assert 'class="pick"' not in ответ.get_data(as_text=True)
     assert партнёр.get("/country").headers["Location"].endswith("/country/GE")
 
 
@@ -218,6 +219,6 @@ def test_у_уК_ничего_не_изменилось(
     with собрать(tenant="HQ").test_client() as client:
         assert войти(client).status_code == 302
         страница = client.get("/country/GE?unit=u-1").get_data(as_text=True)
-        assert страница.count("cn-devpick") == 2  # девелопер и страна
+        assert страница.split("</aside>", 1)[0].count('class="pick"') == 2  # девелопер и страна
         assert "/units/u-1" in страница
         assert client.get("/country/RS").status_code == 200
