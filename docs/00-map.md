@@ -229,6 +229,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_registry.py` | Тексты раздела «Проверки» в раскладке «список слева, карточка справа» |
 | `src/web/texts_second_factor.py` | Тексты второй ступени входа (D463): «Подтвердите вход» и «Вход и защита» |
 | `src/web/texts_settings.py` | Тексты экрана «Настройки» (D447): подключения, Google, язык, пароль |
+| `src/web/texts_trips.py` | Тексты поездок «Календаря» (D505, D506): сетка, карточка, план, отказы |
 | `src/web/texts_units.py` | Тексты заведения пиццерии из веб-админки (#437, D233, D240) |
 | `src/web/texts_users.py` | Тексты экрана «Пользователи» вместе с карточкой человека (#585, переделка экрана) |
 | `src/web/texts_walk.py` | Тексты мини-аппа обхода (#418) — сливаются в общий каталог `texts.TEXTS` |
@@ -271,7 +272,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 17 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, … (+9) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
-| `src/web/templates/calendar/` | 1 | index.html |
+| `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 4 | _panel.html, _parts.html, _summary.html, index.html |
 | `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
 | `src/web/templates/journal/` | 1 | page.html |
@@ -463,6 +464,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0071_finding_reading.sql` | #855 (D495): показание термометра, которое аудитор подтвердил или исправил (#836), — факт проверки и обязано пережить сдачу |
 | `0072_ratings_clusters_four.sql` | Четыре кластера стран вместо двух (D502): CEE — Европа, TR — Турция (большой отдельный проект), CAUCASUS — Кавказ, OTHER — остальные страны |
 | `0073_inspection_by_process.sql` | D507: «Где сеть теряет проценты» на главной читается по процессам (блокам методики), а не по зонам |
+| `0074_trips.sql` | Поездки на «Календаре» (D497, D505, D506): кто едет, куда, с какого по какое число и план по дням — время, что происходит, пиццерия, заметка |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
