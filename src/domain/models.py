@@ -247,6 +247,29 @@ class ZoneScore:
 
 
 @dataclass(frozen=True)
+class ProcessScore:
+    """Итог по одному процессу (блоку методики): записи по уровням и вклад в потерю.
+
+    `loss` — доля процесса в вычете итога (D120/D121, D507), в той же шкале, что
+    и `ZoneScore.loss`; по всем процессам проверки они складываются в
+    `Score.deductions`. `scored` ложно у процесса, где методика нарушений не
+    предусматривает: он не «чистый», а «нечему быть нарушением».
+    """
+
+    code: str
+    name_ru: str
+    name_en: str
+    scored: bool
+    d1: int
+    d2: int
+    d3: int
+    loss: float
+
+    def name(self, lang: str) -> str:
+        return pick_text(self.name_ru, self.name_en, lang)
+
+
+@dataclass(frozen=True)
 class Score:
     """Оценка проверки — целиком из `audit.py score`, ни одной цифры своей."""
 
@@ -257,6 +280,10 @@ class Score:
     counts: dict[str, int]
     deductions: float
     by_zone: dict[str, ZoneScore]
+    #: Разбивка по процессам из ответа движка (`by_process`), D507. Ключ — код
+    #: процесса, как у движка. По умолчанию пусто, чтобы тот, кто собирает
+    #: оценку руками, не обязан был её знать.
+    by_process: dict[str, ProcessScore] = field(default_factory=dict)
 
     def label(self, lang: str) -> str:
         return pick_text(self.label_ru, self.label_en, lang)

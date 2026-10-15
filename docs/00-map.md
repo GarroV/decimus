@@ -462,6 +462,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0070_model_key.sql` | Раньше ключ жил только в окружении процессов (`OPENAI_API_KEY`), и сменить его значило править `.env` на площадке |
 | `0071_finding_reading.sql` | #855 (D495): показание термометра, которое аудитор подтвердил или исправил (#836), — факт проверки и обязано пережить сдачу |
 | `0072_ratings_clusters_four.sql` | Четыре кластера стран вместо двух (D502): CEE — Европа, TR — Турция (большой отдельный проект), CAUCASUS — Кавказ, OTHER — остальные страны |
+| `0073_inspection_by_process.sql` | D507: «Где сеть теряет проценты» на главной читается по процессам (блокам методики), а не по зонам |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -765,6 +766,7 @@ Telegram, ни HTTP, ни SQL.
 | Файл | Что делает |
 |---|---|
 | `tools/api_token.py` | Сервисные токены внешнего API: выпустить, перечислить, отозвать (D356, D388) |
+| `tools/backfill_by_process.py` | Разбивка по процессам для проверок, принятых до миграции 0073 — разовый доливщик (D507) |
 | `tools/backfill_previews.py` | Сжатые копии для кадров, выгруженных до D219 — разовый доливщик |
 | `tools/bench_dataset.py` | Оснастка задачи T035: офлайн-набор кадров для замера точности разбора |
 | `tools/bench_run.py` | T035: замер точности разбора на боевых данных — число, а не мнение |
@@ -827,8 +829,7 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin tree front -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `front/` | 7 | .deploy.env.example, deploy.sh, wrangler.admin.jsonc, wrangler.admin.template.jsonc, wrangler.mcp.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
-| `front/.wrangler/cache/` | 1 | wrangler-account.json |
+| `front/` | 5 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
 | `front/src/` | 1 | index.js |
 <!-- map:end -->
 

@@ -16,7 +16,7 @@ from .config import check_environment
 from .edition import pin
 from .engine import run_audit
 from .errors import EngineError
-from .models import Score, ZoneScore
+from .models import ProcessScore, Score, ZoneScore
 from .state import assert_checklist_version
 
 #: Ключи разбивки по зоне, которые не являются счётчиками записей. Всё
@@ -40,6 +40,19 @@ def _zone(code: str, raw: Mapping[str, Any]) -> ZoneScore:
         # У движка это поле называется `score` — «сколько от доли зоны осталось».
         left=float(raw.get("score") or 0.0),
         zeroed=bool(raw.get("zeroed")),
+    )
+
+
+def _process(raw: Mapping[str, Any]) -> ProcessScore:
+    return ProcessScore(
+        code=str(raw.get("code") or ""),
+        name_ru=str(raw.get("name_ru") or ""),
+        name_en=str(raw.get("name_en") or ""),
+        scored=bool(raw.get("scored")),
+        d1=int(raw.get("D1") or 0),
+        d2=int(raw.get("D2") or 0),
+        d3=int(raw.get("D3") or 0),
+        loss=float(raw.get("loss") or 0.0),
     )
 
 
@@ -79,6 +92,7 @@ def parse_score(raw: Mapping[str, Any]) -> Score:
     """
     counts: Mapping[str, Any] = raw.get("counts") or {}
     zones: Mapping[str, Any] = raw.get("zones") or {}
+    processes: Mapping[str, Any] = raw.get("by_process") or {}
     # Счётчики берутся как есть: у движка в них попадает и `D0` —
     # информационные записи, которые на процент не влияют, но в отчёте нужны.
     return Score(
@@ -89,4 +103,5 @@ def parse_score(raw: Mapping[str, Any]) -> Score:
         counts={level: int(number) for level, number in counts.items()},
         deductions=float(raw.get("deductions") or 0.0),
         by_zone={code: _zone(code, value) for code, value in zones.items()},
+        by_process={key: _process(value) for key, value in processes.items()},
     )

@@ -59,7 +59,7 @@ drop_inspection(chat_id: int) -> bool                # убрать провер
 | `Zone` | `code`, `title_ru`, `title_en`, `share_pct` | `title(lang)` |
 | `Finding` | `n`, `code`, `level`, `zone`, `text`, `comment`, `photos`, `zone_unusual`, `source` | — |
 | `Inspection` | `chat_id`, `unit`, `kind`, `date`, `ui_lang`, `speech_lang`, `report_lang`, `checklist_version`, `tenant`, `city`, `partner`, `contact`, `auditor`, `findings` | `finding(n)` |
-| `Score` | `pct`, `grade`, `counts`, `deductions`, `by_zone` | `label(lang)` |
+| `Score` | `pct`, `grade`, `counts`, `deductions`, `by_zone`, `by_process` (D507) | `label(lang)` |
 | `ZoneScore` | `code`, `share`, `counts`, `loss`, `left`, `zeroed` | `name(lang)` |
 
 **Язык — параметр, поэтому формулировки отдаются методом с языком, а не полем.** Неизвестный язык — отказ, а не молчаливый откат на русский: иначе партнёр получит отчёт, в котором часть текста внезапно не на его языке, и заметит это только он.
