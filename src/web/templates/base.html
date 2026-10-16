@@ -205,13 +205,27 @@
   #}
   {% if account %}
     {% include "_account_menu.html" %}
+    {#- Не больше пяти пунктов (D518, #686): девять разделов на 390px обрезали
+        подписи. Сверх пяти — первые четыре и «Ещё» со списком остальных. -#}
+    {%- set tabs = sections|selectattr('built')|list -%}
+    {%- set main_tabs = tabs if tabs|length <= tabbar_max else tabs[:tabbar_max - 1] -%}
+    {%- set more_tabs = [] if tabs|length <= tabbar_max else tabs[tabbar_max - 1:] -%}
+    {%- macro tab(item, cls) -%}
+      <a class="{{ cls }}{% if item.key == current_key %} is-current{% endif %}"
+         href="{{ url(item.path) }}?lang={{ lang }}"
+         {% if item.key == current_key %}aria-current="page"{% endif %}
+         title="{{ t('section.' ~ item.key ~ '.title') }}">{{ icon(item.icon) }}<span>{{ t('section.' ~ item.key ~ '.title') }}</span></a>
+    {%- endmacro %}
     <nav class="tabbar" aria-label="{{ t('nav.sections') }}">
-      {% for item in sections %}
-        <a class="tabbar__item{% if item.key == current_key %} is-current{% endif %}{% if not item.built %} is-wip{% endif %}"
-           href="{{ url(item.path) }}?lang={{ lang }}"
-           {% if item.key == current_key %}aria-current="page"{% endif %}
-           title="{{ t('nav.wip') if not item.built else t('section.' ~ item.key ~ '.title') }}">{{ icon(item.icon) }}<span>{{ t('section.' ~ item.key ~ '.title') }}</span></a>
-      {% endfor %}
+      {% for item in main_tabs %}{{ tab(item, 'tabbar__item') }}{% endfor %}
+      {% if more_tabs %}
+      <details class="tabbar__more">
+        <summary class="tabbar__item{% if current_key in more_tabs|map(attribute='key') %} is-current{% endif %}">{{ icon('dots') }}<span>{{ t('nav.more') }}</span></summary>
+        <div class="tabbar__sheet">
+          {% for item in more_tabs %}{{ tab(item, 'tabbar__row') }}{% endfor %}
+        </div>
+      </details>
+      {% endif %}
     </nav>
   {% endif %}
 </body>
