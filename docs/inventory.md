@@ -442,6 +442,7 @@
 | `0072_ratings_clusters_four.sql` | — |
 | `0073_inspection_by_process.sql` | — |
 | `0074_trips.sql` | `trips`, `trip_steps` |
+| `0075_email_unique_live.sql` | — |
 <!-- map:end -->
 
 ## Makefile
