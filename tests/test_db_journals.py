@@ -241,11 +241,16 @@ def test_роль_приложения_не_читает_и_не_правит_т
     from src.db.config import check_environment
 
     with psycopg.connect(check_environment().dsn) as conn, conn.cursor() as cur:
+        # Оба журнала — одной матрицей (сверка 16.10.2026): защита одного не должна
+        # молча отсутствовать у соседа, заведённого той же миграцией `0067`.
         for sql in (
-            "select * from login_journal",
-            "select * from action_journal",
+            *(
+                f"{действие} {таблица}"
+                for таблица in ("login_journal", "action_journal")
+                for действие in ("select * from", "delete from", "truncate")
+            ),
             "update login_journal set result = 'ok'",
-            "delete from action_journal",
+            "update action_journal set outcome = 'ok'",
         ):
             with pytest.raises(psycopg.errors.InsufficientPrivilege):
                 cur.execute(sql)
