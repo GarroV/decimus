@@ -47,7 +47,8 @@ class База:
         self.метки[state] = token
         return True
 
-    def finish_link(self, token: str, *, state: str, email: str) -> str:
+    def finish_link(self, token: str, *, state: str, email: str, subject: str) -> str:
+        assert subject, "привязка без номера аккаунта Google"
         self.finish.append((token, state, email))
         if self.метки.get(state) != token or state in self.погашены:
             return "state"
@@ -93,6 +94,7 @@ class Обмен:
             nonce=self.подменить_nonce if self.подменить_nonce is not None else self.nonce,
             name=self.имя,
             picture=self.фото,
+            subject="110169484474386276334",
         )
 
 

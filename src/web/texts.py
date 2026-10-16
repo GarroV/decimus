@@ -273,6 +273,13 @@ TEXTS: dict[str, dict[str, str]] = {
     # дверь ради красоты схемы нельзя.
     "auth.google": {"ru": "Войти через Google", "en": "Sign in with Google"},
     "auth.or": {"ru": "или", "en": "or"},
+    # Почта учётки пришла с другого аккаунта Google (аудит 12.10, F-027).
+    "auth.google_other": {
+        "ru": "Этот аккаунт Google не тот, которым учётка входила раньше. Войдите "
+        "прежним аккаунтом Google или попросите администратора заново привязать почту.",
+        "en": "This Google account is not the one this account signed in with before. "
+        "Sign in with that Google account or ask an administrator to link the email again.",
+    },
     "auth.failed": {
         "ru": "Логин или пароль не подошли.",
         "en": "That login and password did not match.",

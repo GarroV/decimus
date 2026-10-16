@@ -305,6 +305,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0075_email_unique_live.sql": (
         "sql1:845d35a99171ce01bdbbb39d5895ebfdc65dcd30b793dd99d0a98b796600fa35"
     ),
+    # Номер аккаунта Google за учёткой (аудит 12.10, F-027).
+    "0076_google_sub.sql": (
+        "sql1:1c02fc44d14632b3564a58efbf0aed67bcdcdc0d2af121c3987ec3bb9c6874c1"
+    ),
 }
 
 

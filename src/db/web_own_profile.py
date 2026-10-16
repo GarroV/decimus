@@ -35,7 +35,7 @@ _LINK_RESULTS: frozenset[str] = frozenset({"ok", "session", "state", "linked", "
 _UNLINK_RESULTS: frozenset[str] = frozenset({"ok", "none", "denied"})
 
 _BEGIN_SQL = "select begin_own_google_link(%s, %s, %s)"
-_FINISH_SQL = "select finish_own_google_link(%s, %s, %s)"
+_FINISH_SQL = "select finish_own_google_link(%s, %s, %s, %s)"
 _UNLINK_SQL = "select unlink_own_google(%s, %s)"
 _SET_LANG_SQL = "select set_own_web_lang(%s, %s)"
 _SET_GOOGLE_PROFILE_SQL = "select set_own_google_profile(%s, %s, %s, %s)"
@@ -88,9 +88,18 @@ def begin_google_link(token: str, *, state: str, ttl_seconds: int) -> bool:
     return bool(_one(_BEGIN_SQL, (token, state, ttl_seconds), "начать привязку почты Google"))
 
 
-def finish_google_link(token: str, *, state: str, email: str) -> LinkResult:
-    """Погасить метку и привязать почту своей учётке. Исход — код, не исключение."""
-    итог = str(_one(_FINISH_SQL, (token, state, normalize_email(email)), "привязать почту Google"))
+def finish_google_link(token: str, *, state: str, email: str, subject: str) -> LinkResult:
+    """Погасить метку и привязать почту своей учётке. Исход — код, не исключение.
+
+    `subject` — номер аккаунта Google (`sub`, F-027): пишется за учёткой вместе с
+    почтой, дальше вход сверяет его. Тот же аккаунт у другой живой учётки — `taken`.
+    """
+    номер = subject.strip()
+    if not номер:
+        raise ValueError("привязка без номера аккаунта Google")
+    итог = str(
+        _one(_FINISH_SQL, (token, state, normalize_email(email), номер), "привязать почту Google")
+    )
     if итог not in _LINK_RESULTS:
         raise AccessError(f"функция привязки вернула незнакомый исход {итог!r}")
     return итог  # type: ignore[return-value]

@@ -66,7 +66,12 @@ def test_сам_человек_привязывает_почту_заморож�
     сессия = open_session(учётка).token
     assert web_own_profile.begin_google_link(сессия, state="метка", ttl_seconds=600)
 
-    assert web_own_profile.finish_google_link(сессия, state="метка", email=ПОЧТА) == "ok"
+    assert (
+        web_own_profile.finish_google_link(
+            сессия, state="метка", email=ПОЧТА, subject="sub-" + ПОЧТА
+        )
+        == "ok"
+    )
 
 
 def test_разморозка_с_занятой_почтой_отказывает_с_причиной(замороженная_с_почтой: str) -> None:

@@ -18,6 +18,7 @@ from web_harness import Сессия, Учётка, подменить_двер�
 from src.web import auth
 from src.web import inspections as data
 from src.web.google_auth import GoogleAuthError, GoogleIdentity, GoogleSettings
+from src.web.texts import t
 
 ТЕНАНТ = "rs"
 ПОЧТА_СВОЯ = "director@dodobrands.io"
@@ -40,6 +41,7 @@ class Обмен:
         self.домен = "dodobrands.io"
         self.имя = ""
         self.фото = ""
+        self.номер = "110169484474386276334"
         self.звали = 0
 
     def __call__(self, settings: GoogleSettings, *, code: str) -> GoogleIdentity:
@@ -52,6 +54,7 @@ class Обмен:
             hosted_domain=self.домен,
             name=self.имя,
             picture=self.фото,
+            subject=self.номер,
         )
 
 
@@ -75,6 +78,25 @@ def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     monkeypatch.setattr(auth, "open_session", lambda account, **_: Сессия())
     with собрать(tenant=ТЕНАНТ).test_client() as client:
         yield client
+
+
+class Сверка:
+    """Двойник сверки номера аккаунта Google с учёткой (F-027). Помнит вызовы."""
+
+    def __init__(self, ответ: str = "ok") -> None:
+        self.ответ = ответ
+        self.звали: list[tuple[str, str]] = []
+
+    def __call__(self, email: str, subject: str) -> str:
+        self.звали.append((email, subject))
+        return self.ответ
+
+
+@pytest.fixture
+def сверка(monkeypatch: pytest.MonkeyPatch) -> Сверка:
+    двойник = Сверка()
+    monkeypatch.setattr(auth, "claim_google_sub", двойник)
+    return двойник
 
 
 def метка_захода(client: FlaskClient) -> str:
@@ -575,3 +597,43 @@ def test_выход_не_стирает_куку_подсказки(клиент
     ответ = клиент.post(auth.LOGOUT_PATH)
 
     assert auth.GOOGLE_HINT_COOKIE not in "".join(ответ.headers.getlist("Set-Cookie"))
+
+
+# --- номер аккаунта Google (аудит 12.10, F-027) ---------------------------------
+
+
+def test_вход_сверяет_номер_аккаунта_google_с_учёткой(
+    клиент: FlaskClient, обмен: Обмен, сверка: Сверка
+) -> None:
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert ответ.status_code == 302
+    assert сверка.звали == [(ПОЧТА_СВОЯ, обмен.номер)]
+
+
+def test_другой_аккаунт_google_с_той_же_почтой_не_пускает_и_говорит_почему(
+    клиент: FlaskClient, обмен: Обмен, сверка: Сверка
+) -> None:
+    """Почта та же, а аккаунт Google другой: учётку не отдают и объясняют словами."""
+    сверка.ответ = "other"
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert ответ.status_code == 401
+    assert auth.COOKIE_NAME not in ответ.headers.get("Set-Cookie", "")
+    assert t("auth.google_other", "ru") in ответ.get_data(as_text=True)
+
+
+def test_без_номера_аккаунта_google_не_пускает(
+    клиент: FlaskClient, обмен: Обмен, сверка: Сверка
+) -> None:
+    обмен.номер = ""
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert ответ.status_code == 401
+    assert сверка.звали == [], "учётку сверяли без номера аккаунта"
