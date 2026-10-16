@@ -104,6 +104,7 @@ from .origin import refuse_foreign_origin
 from .sections import (
     CONTROL_HOME,
     SECTIONS,
+    TABBAR_MAX,
     check_registry,
     current_section,
     refused_for,
@@ -267,6 +268,7 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # ссылка, ведущая в отказ, выглядит как поломка продукта, а
             # проверка внутри шаблона расходится с заслоном на экране молча.
             "sections": visible_sections(account),
+            "tabbar_max": TABBAR_MAX,
             # Текущий раздел — по началу адреса, а не по точному совпадению:
             # карточка проверки `/inspections/<id>` живёт в «Проверках», и
             # панель слева обязана это показывать, как Swarm (D164).

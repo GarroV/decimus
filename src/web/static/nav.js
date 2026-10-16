@@ -139,6 +139,21 @@
     go(location.href, false);
   });
 
+  // «Ещё» нижней панели (D518) закрывается касанием мимо него и клавишей Esc —
+  // как любое всплывающее меню; сам `details` умеет только открыть и закрыть
+  // по своему заголовку.
+  function closeMore(except) {
+    document.querySelectorAll(".tabbar__more[open]").forEach(function (more) {
+      if (more !== except) more.removeAttribute("open");
+    });
+  }
+  document.addEventListener("click", function (e) {
+    closeMore(e.target.closest ? e.target.closest(".tabbar__more") : null);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeMore(null);
+  });
+
   // После скриптов экрана: они могут поправить адрес (`replaceState`).
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("main.shell__main script[src]").forEach(function (s) {
