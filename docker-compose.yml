@@ -124,7 +124,6 @@ x-demo-env: &demo-env
   # на боевом токене: подстановка `:-` даёт пустое значение вместо того, чтобы
   # унаследовать боевое из `env_file`.
   TELEGRAM_BOT_TOKEN: ${DEMO_TELEGRAM_BOT_TOKEN:-}
-  ALLOWED_TELEGRAM_IDS: ${DEMO_ALLOWED_TELEGRAM_IDS:-}
   # База демо — отдельная и по умолчанию никакая. Боевую демо не трогает ни
   # при каких обстоятельствах (D059).
   DATABASE_URL: ${DEMO_DATABASE_URL:-}

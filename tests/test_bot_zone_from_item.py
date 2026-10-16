@@ -29,7 +29,6 @@ from typing import Any
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     callback_query,
     candidate,
@@ -50,7 +49,7 @@ from src.domain import get_state, only_zone, start_inspection
 # `asyncio` и на них — три предупреждения на КАЖДОМ прогоне. Предупреждение,
 # которое видно всегда, перестаёт читаться, и следующее настоящее уедет вместе с
 # ним. Тот же приём в `test_bot_kind_code.py`.
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 def начата() -> None:

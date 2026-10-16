@@ -31,7 +31,6 @@ from typing import Any
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     Calls,
     candidate,
@@ -53,7 +52,7 @@ from src.recognize.models import Suggestion
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Кадр, которым тест закрывает альбом: кадр чужой группы закрывает предыдущий
 #: альбом немедленно. Тем же приёмом закрывает альбом `test_bot_batch_frames`.

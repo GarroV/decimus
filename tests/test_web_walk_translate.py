@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from bot_harness import bound_only
 from test_web_walk import АУДИТОР, ТОКЕН, _приложение
 from test_web_walk_write import Клиент
 
-from src.db.bot_links import NEVER_BOUND
 from src.domain import get_state, start_inspection
 from src.recognize import translate
 from src.recognize.client import ModelAnswer
@@ -72,12 +72,8 @@ def завести(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> Callabl
             speech_lang=speech_lang,
         )
         monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
-        monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
-        return Клиент(
-            _приложение(
-                monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=f"{АУДИТОР},777"
-            ).test_client()
-        )
+        monkeypatch.setattr(walk_access.bot_links, "standing", bound_only(АУДИТОР, 777))
+        return Клиент(_приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client())
 
     return _завести
 
@@ -196,12 +192,8 @@ def test_пустой_ответ_модели_это_отказ_а_не_пуст
 def test_без_проверки_переводить_некуда(
     domain_env: Path, monkeypatch: pytest.MonkeyPatch, модель: Модель
 ) -> None:
-    monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
-    клиент = Клиент(
-        _приложение(
-            monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=f"{АУДИТОР},777"
-        ).test_client()
-    )
+    monkeypatch.setattr(walk_access.bot_links, "standing", bound_only(АУДИТОР, 777))
+    клиент = Клиент(_приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client())
 
     ответ = _перевести(клиент, text="нагар")
 

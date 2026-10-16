@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from bot_harness import AUDITOR_ID, CHAT_ID, callback_query, feed, make_bot, text_message
+from bot_harness import CHAT_ID, callback_query, feed, make_bot, text_message
 
 from src.bot.app import build_dispatcher
 from src.bot.config import UI_LANG_VAR, BotSettings, load_bot_settings
@@ -49,7 +49,6 @@ requires_docker = pytest.mark.skipif(
 def settings() -> BotSettings:
     return BotSettings(
         token="unused-in-tests",
-        allowed_ids=frozenset({AUDITOR_ID}),
         mode="polling",
         auditor_names={},
     )
@@ -86,7 +85,6 @@ def test_unknown_language_stops_the_bot_at_startup() -> None:
     """Отказ приходит на старте, а не на первом сообщении аудитора."""
     env = {
         "TELEGRAM_BOT_TOKEN": "111111:AAA",
-        "ALLOWED_TELEGRAM_IDS": "4242",
         UI_LANG_VAR: "sr",
     }
     with pytest.raises(BotConfigError, match="sr"):
@@ -96,7 +94,6 @@ def test_unknown_language_stops_the_bot_at_startup() -> None:
 def test_known_language_starts_the_bot() -> None:
     env = {
         "TELEGRAM_BOT_TOKEN": "111111:AAA",
-        "ALLOWED_TELEGRAM_IDS": "4242",
         UI_LANG_VAR: "en",
     }
     assert load_bot_settings(env).ui_lang == "en"

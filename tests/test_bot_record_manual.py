@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     candidate,
     feed,
@@ -61,7 +60,7 @@ from src.recognize.manual import ManualCandidate
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Настоящие коды методики для зоны "hot_kitchen" (проверено прогоном
 #: `manual_candidates("hot_kitchen")`) — двадцать пунктов, три полные

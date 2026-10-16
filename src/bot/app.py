@@ -191,9 +191,7 @@ def build_dispatcher(
     dispatcher.message.outer_middleware(person)
     dispatcher.callback_query.outer_middleware(person)
 
-    access = AccessMiddleware(
-        settings.allowed_ids, bindings if bindings is not None else BindingCache(), roster
-    )
+    access = AccessMiddleware(bindings if bindings is not None else BindingCache(), roster)
     dispatcher.message.outer_middleware(access)
     dispatcher.callback_query.outer_middleware(access)
     # После доступа: внешние мидлвари идут в порядке регистрации, а заслону
@@ -364,9 +362,8 @@ def log_startup(settings: BotSettings) -> None:
     каталог с кодом расходятся молча (T246, #201).
     """
     logger.info(
-        "бот поднят в режиме %s, разрешённых ID: %s, сборка: %s",
+        "бот поднят в режиме %s, сборка: %s",
         settings.mode,
-        len(settings.allowed_ids),
         build_version(),
     )
 

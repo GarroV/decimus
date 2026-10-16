@@ -20,7 +20,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     candidate,
     feed,
@@ -36,7 +35,7 @@ from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.domain import start_inspection
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 def events(chat_id: int = CHAT_ID) -> list[dict[str, object]]:

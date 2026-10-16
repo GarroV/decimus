@@ -342,7 +342,7 @@ def install(
         if lang not in UI_LANGS:
             lang = ui_lang
         try:
-            space = HQ_TENANT if conf.bot_token is None else space_of(who, conf)
+            space = HQ_TENANT if conf.bot_token is None else space_of(who)
             if space is None:
                 return jsonify({"error": "unauthorized"}), 401
             wizard = _Wizard(who, lang, ui_lang, space, conf, bot)

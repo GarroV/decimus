@@ -21,7 +21,6 @@ from typing import Any
 import pytest
 from aiogram.exceptions import TelegramBadRequest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     feed,
     make_bot,
@@ -39,7 +38,7 @@ from src.domain import Finding, get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Однозначная фраза синтетической карты (см. `tests/test_bot_words_before_frame.py`):
 #: строка «Печь» произнесена целиком, колонка выбрана словом «грязная» → CLN05.

@@ -103,7 +103,6 @@ def _клиент(monkeypatch: pytest.MonkeyPatch) -> Any:
     return _приложение(
         monkeypatch,
         TELEGRAM_BOT_TOKEN=ТОКЕН,
-        ALLOWED_TELEGRAM_IDS=f"{АУДИТОР},{КОЛЛЕГА}",
     ).test_client()
 
 
@@ -173,14 +172,13 @@ def test_действий_круга_больше_нет(база: База, mon
 def test_без_привязки_к_учётке_токен_не_выпускается(
     база: База, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Сотрудник УК по списку окружения, без учётки: бот его пускает, токена нет (аудит 12.10)."""
+    """Без учётки мини-апп не пускает вовсе (D517), и токена тем более нет (аудит 12.10)."""
     del база.учётки[АУДИТОР]
     client = _клиент(monkeypatch)
 
     ответ = _действие(client, АУДИТОР, op="mcp_issue")
 
-    assert ответ.status_code == 422 and база.выпущено == []
-    assert "учётк" in ответ.get_json()["message"], "отказ объясняет, что нужна учётка"
+    assert ответ.status_code == 401 and база.выпущено == []
 
 
 def test_старая_подпись_не_выпускает_токен(база: База, monkeypatch: pytest.MonkeyPatch) -> None:

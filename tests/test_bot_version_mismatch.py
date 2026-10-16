@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from bot_harness import AUDITOR_ID, CHAT_ID, callback_query, feed, make_bot, text_message
+from bot_harness import CHAT_ID, callback_query, feed, make_bot, text_message
 
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
@@ -53,7 +53,6 @@ pytestmark = pytest.mark.asyncio
 
 SETTINGS = BotSettings(
     token="unused-in-tests",
-    allowed_ids=frozenset({AUDITOR_ID}),
     mode="polling",
     auditor_names={},
 )

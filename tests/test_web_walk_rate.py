@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from bot_harness import bound_only
 from test_web_walk import АУДИТОР, ТОКЕН, _приложение
 from test_web_walk_write import Клиент
 
-from src.db.bot_links import NEVER_BOUND
 from src.domain import start_inspection
 from src.web import walk, walk_access, walk_rate
 
@@ -17,10 +17,8 @@ from src.web import walk, walk_access, walk_rate
 def клиент(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> Клиент:
     start_inspection(АУДИТОР, unit="Белград-1", kind="planned", report_lang="ru", ui_lang="ru")
     monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
-    monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
-    приложение = _приложение(
-        monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=str(АУДИТОР)
-    )
+    monkeypatch.setattr(walk_access.bot_links, "standing", bound_only(АУДИТОР))
+    приложение = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН)
     return Клиент(приложение.test_client())
 
 

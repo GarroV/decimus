@@ -17,6 +17,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 import pytest
+from bot_harness import bound_only, bound_to_hq
 from flask import Flask
 from web_harness import СЕКРЕТ
 
@@ -187,10 +188,8 @@ def test_данные_по_подписи_и_без_истории(domain_env: P
         raise DbError("нет базы")
 
     monkeypatch.setattr(walk.queries, "previous_findings", база_молчит)
-    monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
-    client = _приложение(
-        monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=str(АУДИТОР)
-    ).test_client()
+    monkeypatch.setattr(walk_access.bot_links, "standing", bound_only(АУДИТОР))
+    client = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client()
 
     ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
 
@@ -218,9 +217,7 @@ def test_выключенный_обход_не_отвечает(monkeypatch: py
 
 
 def test_страница_пускает_в_рамку_только_telegram(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _приложение(
-        monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=str(АУДИТОР)
-    ).test_client()
+    client = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client()
 
     ответ = client.get(walk.PAGE_PATH)
 
@@ -236,9 +233,7 @@ def test_страница_пускает_в_рамку_только_telegram(mon
 
 def test_камера_открыта_только_обходу(monkeypatch: pytest.MonkeyPatch) -> None:
     """Своя камера мини-аппа (D514) — без `camera=(self)` getUserMedia откажет."""
-    client = _приложение(
-        monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=str(АУДИТОР)
-    ).test_client()
+    client = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client()
 
     обход = client.get(walk.PAGE_PATH).headers["Permissions-Policy"]
     вход = client.get("/login").headers["Permissions-Policy"]
@@ -260,9 +255,7 @@ def _подписанный_клиент(
         return положение
 
     monkeypatch.setattr(walk_access.bot_links, "standing", standing)
-    return _приложение(
-        monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=str(АУДИТОР)
-    ).test_client()
+    return _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client()
 
 
 def test_снятый_доступ_не_открывает_даже_свою_проверку(
@@ -273,12 +266,11 @@ def test_снятый_доступ_не_открывает_даже_свою_п�
     assert ответ.status_code == 401, "отключённый человек видел бы обход и историю точки"
 
 
-def test_без_привязки_пускает_тот_кого_пустил_бот(
-    domain_env: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_без_привязки_не_пускает(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """D517: вход только по привязке — без учётки не пускают ни бот, ни мини-апп."""
     client = _подписанный_клиент(domain_env, monkeypatch, NEVER_BOUND)
     ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
-    assert ответ.status_code == 200
+    assert ответ.status_code == 401
 
 
 def test_чужой_с_настоящей_подписью_не_проходит(
@@ -330,7 +322,7 @@ def test_вне_круга_тестеров_обход_закрыт_и_на_чт
 
 def test_тестер_из_круга_обход_видит(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WALK_USERS", f"{АУДИТОР + 1}, {АУДИТОР}")
-    client = _подписанный_клиент(domain_env, monkeypatch, NEVER_BOUND)
+    client = _подписанный_клиент(domain_env, monkeypatch, bound_to_hq(АУДИТОР))
     ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
     assert ответ.status_code == 200
 

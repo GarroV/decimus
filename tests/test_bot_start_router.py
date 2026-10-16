@@ -43,7 +43,6 @@ pytestmark = pytest.mark.asyncio
 def settings(names: dict[int, str] | None = None) -> BotSettings:
     return BotSettings(
         token="unused-in-tests",
-        allowed_ids=frozenset({AUDITOR_ID}),
         mode="polling",
         auditor_names=names or {},
     )

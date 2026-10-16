@@ -1,7 +1,8 @@
 """Доступ бота по привязке к учётке (D286), совместимость для действующих (вопрос 2).
 
-Пространство человека — из привязки его Telegram ID к учётке; ID из окружения
-и связки `roster.json` — сотрудник УК, но только пока привязки нет.
+Пространство человека — из привязки его Telegram ID к учётке; связки
+`roster.json` — сотрудник УК, но только пока привязки нет. Список ID из
+окружения дверью больше не служит (D517) — `tests/test_bot_legacy_door_closed.py`.
 """
 
 from __future__ import annotations
@@ -20,9 +21,8 @@ from src.bot.access import (
     SPACE_KEY,
     AccessMiddleware,
     BindingCache,
-    is_allowed,
 )
-from src.bot.roster import Roster
+from src.bot.roster import Roster, RosterEntry
 from src.bot.texts import t
 from src.db.bot_links import NEVER_BOUND, Binding, Standing
 from src.db.errors import AccessError
@@ -79,27 +79,35 @@ def _пространство(кэш: BindingCache, tg: int) -> str | None:
     return None if положение is None or положение.binding is None else положение.binding.tenant
 
 
+def _связки(*ids: int) -> Roster:
+    return Roster({tg: RosterEntry(telegram_id=tg, name=None) for tg in ids})
+
+
 def _ответы(session: RecordingSession) -> list[str]:
     return [c.text for c in session.calls if isinstance(c, SendMessage)]
 
 
 async def test_no_user_is_rejected() -> None:
     """Обновление без отправителя (например, служебное) — не пропускаем."""
-    assert is_allowed(None, frozenset({111})) is False
+    bot, _ = make_bot()
+    служебное = Message(
+        message_id=1, date=datetime.now(UTC), chat=Chat(id=1, type="private"), text="x"
+    ).as_(bot)
+    assert await _пустить(AccessMiddleware(_кэш({}), None), служебное) is None
 
 
 async def test_привязанный_работает_в_пространстве_учётки() -> None:
-    mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "GE")}), None)
+    mw = AccessMiddleware(_кэш({501: _привязка(501, "GE")}), None)
     assert await _пустить(mw, _msg(501)[0]) == "GE"
 
 
 async def test_контроль_с_привязкой_в_бот_не_пускается_и_слышит_почему() -> None:
-    """F-024, D420: контроль проверок не касается — ни ботом, ни по списку окружения.
+    """F-024, D420: контроль проверок не касается — ни ботом, ни по прежнему списку окружения.
 
     До фикса привязка пускала любую живую учётку пространства, и контроль УК
     становился полноценным аудитором УК.
     """
-    mw = AccessMiddleware(frozenset({501}), _кэш({501: _привязка(501, "HQ", role="control")}), None)
+    mw = AccessMiddleware(_кэш({501: _привязка(501, "HQ", role="control")}), None)
     message, session = _msg(501, "/start")
 
     assert await _пустить(mw, message) is None, "контроль дошёл до обработчика"
@@ -108,18 +116,18 @@ async def test_контроль_с_привязкой_в_бот_не_пуска�
 
 @pytest.mark.parametrize("роль", ["developer", "admin", "superadmin"])
 async def test_полевые_роли_бот_пускает(роль: str) -> None:
-    mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "HQ", role=роль)}), None)
+    mw = AccessMiddleware(_кэш({501: _привязка(501, "HQ", role=роль)}), None)
     assert await _пустить(mw, _msg(501)[0]) == HQ_TENANT
 
 
 async def test_незнакомая_роль_закрыта() -> None:
     """Новая роль, не внесённая в `FIELD_ROLES` (например, будущий «гость», D429), — отказ."""
-    mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "HQ", role="guest")}), None)
+    mw = AccessMiddleware(_кэш({501: _привязка(501, "HQ", role="guest")}), None)
     assert await _пустить(mw, _msg(501)[0]) is None
 
 
 async def test_незнакомому_бот_молчит() -> None:
-    mw = AccessMiddleware(frozenset(), _кэш({}), None)
+    mw = AccessMiddleware(_кэш({}), None)
     message, session = _msg(999)
     assert await _пустить(mw, message) is None
     assert session.calls == [], "постороннему бот ничего не отвечает"
@@ -132,7 +140,7 @@ async def test_ссылка_привязывает_незнакомого_и_о�
         погашено.append((token, telegram_id))
         return _привязка(telegram_id, "GE")
 
-    mw = AccessMiddleware(frozenset(), _кэш({}), None, redeem=погасить)
+    mw = AccessMiddleware(_кэш({}), None, redeem=погасить)
     message, session = _msg(501, "/start link-abc")
     assert await _пустить(mw, message) is None, "ссылка обработчику не передаётся"
     assert погашено == [("abc", 501)]
@@ -140,7 +148,7 @@ async def test_ссылка_привязывает_незнакомого_и_о�
 
 
 async def test_негодная_ссылка_не_пускает_и_не_объясняет_причину() -> None:
-    mw = AccessMiddleware(frozenset(), _кэш({}), None, redeem=lambda *_a, **_k: None)
+    mw = AccessMiddleware(_кэш({}), None, redeem=lambda *_a, **_k: None)
     message, session = _msg(501, "/start link-abc")
     assert await _пустить(mw, message) is None
     assert len(_ответы(session)) == 1
@@ -150,13 +158,10 @@ async def test_обычный_старт_не_гасит_ссылок() -> None:
     def погасить(*_a: object, **_k: object) -> Binding | None:
         raise AssertionError("обычный /start не ссылка привязки")
 
-    mw = AccessMiddleware(frozenset({111}), _кэш({}), None, redeem=погасить)
+    mw = AccessMiddleware(
+        _кэш({111: _привязка(111, "HQ", role="developer")}), None, redeem=погасить
+    )
     assert await _пустить(mw, _msg(111, "/start")[0]) == HQ_TENANT
-
-
-async def test_совместимость_пускает_действующих_аудиторов_уК(tmp_path: Path) -> None:
-    mw = AccessMiddleware(frozenset({111}), _кэш({}), Roster.load(tmp_path))
-    assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
 
 
 async def test_связки_по_приглашениям_пускают_как_уК(tmp_path: Path) -> None:
@@ -166,20 +171,19 @@ async def test_связки_по_приглашениям_пускают_как_
         '{"version": 1, "entries": [{"telegram_id": 222, "username": "apetrov"}]}',
         encoding="utf-8",
     )
-    mw = AccessMiddleware(frozenset({111}), _кэш({}), Roster.load(tmp_path))
+    mw = AccessMiddleware(_кэш({}), Roster.load(tmp_path))
     assert await _пустить(mw, _msg(222)[0]) == HQ_TENANT
+    assert await _пустить(mw, _msg(111)[0]) is None, "кого нет в связках, тот посторонний"
 
 
 async def test_привязка_главнее_совместимости() -> None:
-    """Review Focus 3: ID из окружения, привязанный к учётке партнёра, работает как партнёр."""
-    mw = AccessMiddleware(frozenset({111}), _кэш({111: _привязка(111, "GE")}), None)
+    """Review Focus 3: ID из связок, привязанный к учётке партнёра, работает как партнёр."""
+    mw = AccessMiddleware(_кэш({111: _привязка(111, "GE")}), _связки(111))
     assert await _пустить(mw, _msg(111)[0]) == "GE"
 
 
 async def test_старый_код_тенанта_учётки_читается_как_уК() -> None:
-    mw = AccessMiddleware(
-        frozenset(), _кэш({501: _привязка(501, "default", role="developer")}), None
-    )
+    mw = AccessMiddleware(_кэш({501: _привязка(501, "default", role="developer")}), None)
     assert await _пустить(mw, _msg(501)[0]) == HQ_TENANT
 
 
@@ -203,8 +207,8 @@ async def test_погашенная_ссылка_сбрасывает_кэш() -
         ответы[telegram_id] = _привязка(telegram_id, "GE")
         return ответы[telegram_id]
 
-    mw = AccessMiddleware(frozenset({111}), кэш, None, redeem=погасить)
-    assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
+    mw = AccessMiddleware(кэш, None, redeem=погасить)
+    assert await _пустить(mw, _msg(111)[0]) is None
     await _пустить(mw, _msg(111, "/start link-abc")[0])
     assert await _пустить(mw, _msg(111)[0]) == "GE"
 
@@ -239,41 +243,31 @@ async def test_долгий_отказ_базы_прежнего_ответа_н
     живая[0] = False
     сейчас[0] += BINDING_STALE_MAX
     assert кэш.standing_of(501) is None
-    mw = AccessMiddleware(frozenset({501}), кэш, None)
+    mw = AccessMiddleware(кэш, _связки(501))
     assert await _пустить(mw, _msg(501)[0]) is None, "и совместимость не подхватывает"
 
 
 async def test_при_отказе_базы_совместимость_не_пускает_несверенного() -> None:
     """Был ли этот ID привязан и отвязан — без базы не узнать, поэтому отказ."""
-    mw = AccessMiddleware(frozenset({111}), _кэш_с_отказом([datetime.now(UTC)], [False]), None)
+    mw = AccessMiddleware(_кэш_с_отказом([datetime.now(UTC)], [False]), _связки(111))
     assert await _пустить(mw, _msg(111)[0]) is None
 
 
-@pytest.mark.parametrize("откуда", ["окружение", "связки"])
-async def test_бывшая_привязка_закрывает_путь_совместимости(откуда: str, tmp_path: Path) -> None:
+async def test_бывшая_привязка_закрывает_путь_совместимости() -> None:
     """Ревью #340, п.5: отвязанный или с отключённой учёткой не пускается как УК."""
-    path = tmp_path / "access" / "roster.json"
-    path.parent.mkdir(parents=True)
-    path.write_text(
-        '{"version": 1, "entries": [{"telegram_id": 111, "username": "apetrov"}]}',
-        encoding="utf-8",
-    )
-    разрешённые = frozenset({111}) if откуда == "окружение" else frozenset()
     кэш = BindingCache(standing=lambda _tg: Standing(binding=None, ever_bound=True))
-    mw = AccessMiddleware(разрешённые, кэш, Roster.load(tmp_path))
+    mw = AccessMiddleware(кэш, _связки(111))
     assert await _пустить(mw, _msg(111)[0]) is None
 
 
 async def test_каждый_пуск_по_совместимости_пишется_в_журнал(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    mw = AccessMiddleware(frozenset({111}), _кэш({}), None)
+    mw = AccessMiddleware(_кэш({}), _связки(111))
     with caplog.at_level("WARNING", logger="src.bot.access"):
         assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
         assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
     строки = [r.getMessage() for r in caplog.records if "совместимости" in r.getMessage()]
     assert (
-        строки
-        == [f"путь совместимости: Telegram ID {log_id(111)} пущен как УК (ALLOWED_TELEGRAM_IDS)"]
-        * 2
+        строки == [f"путь совместимости: Telegram ID {log_id(111)} пущен как УК (roster.json)"] * 2
     )
