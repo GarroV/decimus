@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
+.PHONY: bootstrap check test test-honest porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units units-canon demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -434,6 +434,11 @@ web-unlock:  ## запрет на вход после перебора: посм
 #   make units ARGS="list --country GE"
 units:  ## справочник пиццерий: загрузка с сайтов стран и заведение руками
 	$(VENV)/python tools/units.py $(ARGS)
+
+# Справочник к номерам Dodo IS и канону «Город-N» (D233, D517). Сухой прогон по
+# умолчанию: всё в транзакции и откат; `ARGS="--apply"` пишет.
+units-canon:  ## справочник пиццерий к «Город-N» по номерам Dodo IS: сухой прогон (ARGS="--apply" пишет)
+	$(VENV)/python tools/unit_canon.py $(ARGS)
 
 # Учётка ДЕМО-СТЕНДА, без которой `make web-up` перестал бы быть одной
 # командой: после T323 стенд без учётки встречает формой входа, войти в

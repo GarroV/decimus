@@ -12,8 +12,17 @@
 - канон занят другой точкой — дубль печатается и не трогается: удалять точки
   роли приложения нельзя, а бот ищет каноническое имя и на дубль больше не
   попадает; строку убирает администратор (#440);
-- имени «Город-N» из написанного не вывести (район, адрес) — печатается и не
-  трогается: номер точки в наших данных не содержится, выдумывать его нельзя.
+- имени «Город-N» из написанного не вывести (район, адрес: «Bishkek — 7 Manas Ave»,
+  «Gwarimpa») — номер берётся из открытого API Dodo IS (D517, #909):
+  `publicapi.dodois.io/{страна}/api/v1/unitinfo/all`. Точка ищется по
+  `units.code` (UUID Dodo IS), иначе по алиасу и по адресу (правила и ступени —
+  `src/domain/unit_match.py`). Найденная ровно одна: точка переименовывается в
+  номер («Bishkek-8»), прежнее имя становится синонимом, `code` := UUID. Не
+  найдена, найдено несколько, одну точку API нашли две записи или API страны не
+  ответил — печатается списком с причиной и не трогается: номер угадывать
+  нельзя, ошибка склеила бы историю двух пиццерий;
+
+Закрытые точки Dodo IS (`State = 0`) тоже находятся: проверки у них есть.
 
 Сухой прогон выполняет ВСЁ то же самое и откатывает транзакцию: так видны и
 план, и отказы базы (права, ограничения) до того, как что-либо записано.
@@ -22,9 +31,15 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from collections import Counter
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.error import URLError
+from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -34,17 +49,32 @@ from src.db.config import check_environment
 from src.db.directory import DEFAULT_TENANT
 from src.db.space import SYSTEM_SPACE, acting_space, apply_space
 from src.db.units import normalize_unit_name
+from src.domain.unit_match import (
+    DodoUnit,
+    Match,
+    claimed_twice,
+    match_unit,
+    official_name,
+    parse_dodo_units,
+)
 from src.domain.unit_name import canonical_unit
+from tools.units import САЙТЫ
+
+#: Открытый список точек страны в Dodo IS: без ключа, по коду страны строчными.
+DODO_API = "https://publicapi.dodois.io/{cc}/api/v1/unitinfo/all"
+API_ATTEMPTS = 3
+API_TIMEOUT_SEC = 60
 
 _UNITS_SQL = """
-select u.id, u.name, u.country, u.city,
+select u.id, u.name, u.country, u.city, u.code,
        (select count(*) from inspections i where i.unit_id = u.id)
 from units u where u.tenant_code = %s order by u.name
 """
 
 _RENAME_SQL = """
 update units set name = %(name)s, name_normalized = %(key)s,
-    country = coalesce(country, %(country)s), city = coalesce(city, %(city)s)
+    country = coalesce(country, %(country)s), city = coalesce(city, %(city)s),
+    code = coalesce(code, %(code)s)
 where id = %(id)s
 """
 
@@ -60,42 +90,159 @@ def _alias(cur: psycopg.Cursor[Any], tenant: str, unit_id: Any, alias: str) -> N
     cur.execute(_ALIAS_SQL, (tenant, normalize_unit_name(alias), unit_id, alias))
 
 
-def plan_and_apply(cur: psycopg.Cursor[Any], tenant: str) -> list[str]:
+@dataclass(frozen=True)
+class Entry:
+    """Строка отчёта: вид нужен итогу, текст — человеку."""
+
+    kind: str
+    text: str
+
+
+RENAMED = "переименована"
+RENAMED_API = "переименована по Dodo IS"
+DUPLICATE = "дубль"
+AMBIGUOUS = "неоднозначно"
+NOT_FOUND = "не найдена"
+NO_API = "нет API"
+
+#: Что из отчёта — отказ, а не работа: его печатает итог отдельной строкой.
+REFUSALS = (DUPLICATE, AMBIGUOUS, NOT_FOUND, NO_API)
+
+FetchApi = Callable[[str], list[DodoUnit]]
+
+
+def fetch_dodo_units(country: str) -> list[DodoUnit]:
+    """Пиццерии страны из API Dodo IS; отказ после повторов — исключение, не пустой список."""
+    cc = country.lower()
+    last: Exception | None = None
+    for _ in range(API_ATTEMPTS):
+        try:
+            request = Request(  # noqa: S310
+                DODO_API.format(cc=cc), headers={"Accept": "application/json"}
+            )
+            with urlopen(request, timeout=API_TIMEOUT_SEC) as answer:  # noqa: S310
+                payload = json.loads(answer.read())
+            return parse_dodo_units(country, payload)
+        except (URLError, OSError, ValueError) as exc:
+            last = exc
+    raise RuntimeError(f"API Dodo IS {cc}: {last}")
+
+
+def _load_api(
+    countries: set[str], fetch: FetchApi
+) -> tuple[dict[str, list[DodoUnit]], dict[str, str]]:
+    """Точки по странам и причины, по которым страна не загрузилась."""
+    loaded: dict[str, list[DodoUnit]] = {}
+    failed: dict[str, str] = {}
+    for country in sorted(countries):
+        if country not in САЙТЫ:
+            failed[country] = "страны нет в словаре tools/units.py"
+            continue
+        try:
+            loaded[country] = fetch(country)
+        except RuntimeError as exc:
+            failed[country] = str(exc)
+    return loaded, failed
+
+
+def _is_unit_number(unit: tuple[Any, ...]) -> bool:
+    """Имя уже «Город-N» с известным городом: номер из API ему не нужен."""
+    канон = canonical_unit(unit[1])
+    return канон is not None and канон.city is not None
+
+
+def plan_and_apply(
+    cur: psycopg.Cursor[Any], tenant: str, fetch: FetchApi = fetch_dodo_units
+) -> list[Entry]:
     """Привести справочник к канону в открытой транзакции; вернуть строки отчёта."""
     cur.execute(_UNITS_SQL, (tenant,))
     строки = cur.fetchall()
     по_ключу = {normalize_unit_name(r[1]): r for r in строки}
-    отчёт: list[str] = []
-    for unit_id, name, _country, _city, проверок in строки:
+    по_коду = {r[4]: r for r in строки if r[4]}
+    без_номера = [r for r in строки if not _is_unit_number(r)]
+    api, не_загружены = _load_api({r[2] for r in без_номера if r[2]}, fetch)
+    совпадения = claimed_twice(
+        {r[0]: match_unit(r[1], r[4], api.get(r[2], [])) for r in без_номера if r[2] in api}
+    )
+    отчёт: list[Entry] = []
+    for unit_id, name, country, _city, _code, проверок in строки:
         канон = canonical_unit(name)
-        if канон is None or канон.city is None:
-            # Район, адрес или незнакомый город: «Al Barsha 1» — не город с
-            # номером, и канон из него вышел бы выдуманным.
-            отчёт.append(f"  не «Город-N», не тронута: {name}")
+        if канон is not None and канон.city is not None:
+            if канон.name == name:
+                continue
+            имя, город, uuid, страна, вид = канон.name, канон.city, None, канон.country, RENAMED
+        elif unit_id in совпадения:
+            найдено: Match = совпадения[unit_id]
+            if найдено.unit is None:
+                причина = найдено.reason
+                вид_отказа = (
+                    AMBIGUOUS
+                    if ("неоднозначно" in причина or "две записи" in причина)
+                    else NOT_FOUND
+                )
+                отчёт.append(
+                    Entry(вид_отказа, f"  не тронута ({проверок} пров.): {name} — {причина}")
+                )
+                continue
+            имя, город = official_name(найдено.unit)
+            uuid, страна, вид = найдено.unit.uuid, найдено.unit.country, RENAMED_API
+        else:
+            if country in не_загружены:
+                отчёт.append(
+                    Entry(
+                        NO_API, f"  не тронута ({проверок} пров.): {name} — {не_загружены[country]}"
+                    )
+                )
+            else:
+                отчёт.append(
+                    Entry(
+                        NOT_FOUND,
+                        f"  не тронута ({проверок} пров.): {name} — страна записи не задана",
+                    )
+                )
             continue
-        if канон.name == name:
-            continue
-        занята = по_ключу.get(normalize_unit_name(канон.name))
+        занята = по_ключу.get(normalize_unit_name(имя))
         if занята is not None and занята[0] != unit_id:
             # Удалять точки роли приложения нельзя, и так задумано. Бот ищет
             # каноническое имя, поэтому на дубль он больше не попадает; строку
             # убирает администратор (#440).
-            отчёт.append(f"  дубль ({проверок} пров.), оставлен: {name} → уже есть {канон.name}")
+            отчёт.append(
+                Entry(DUPLICATE, f"  дубль ({проверок} пров.), оставлен: {name} → уже есть {имя}")
+            )
+            continue
+        if uuid is not None and uuid in по_коду and по_коду[uuid][0] != unit_id:
+            отчёт.append(
+                Entry(
+                    DUPLICATE,
+                    f"  дубль ({проверок} пров.), оставлен: {name} → UUID Dodo IS уже у {по_коду[uuid][1]}",
+                )
+            )
             continue
         cur.execute(
             _RENAME_SQL,
             {
                 "id": unit_id,
-                "name": канон.name,
-                "key": normalize_unit_name(канон.name),
-                "country": канон.country,
-                "city": канон.city,
+                "name": имя,
+                "key": normalize_unit_name(имя),
+                "country": страна,
+                "city": город,
+                "code": uuid,
             },
         )
         _alias(cur, tenant, unit_id, name)
-        по_ключу[normalize_unit_name(канон.name)] = (unit_id, канон.name, None, None, проверок)
-        отчёт.append(f"  переименована ({проверок} пров.): {name} → {канон.name}")
+        по_ключу[normalize_unit_name(имя)] = (unit_id, имя, None, None, uuid, проверок)
+        if uuid is not None:
+            по_коду[uuid] = по_ключу[normalize_unit_name(имя)]
+        отчёт.append(Entry(вид, f"  переименована ({проверок} пров.): {name} → {имя}"))
     return отчёт
+
+
+def summary(отчёт: list[Entry]) -> str:
+    """Одна строка итога: сколько переименовано и сколько оставлено с причиной."""
+    считано = Counter(e.kind for e in отчёт)
+    переименовано = считано[RENAMED] + считано[RENAMED_API]
+    отказы = ", ".join(f"{вид} {считано[вид]}" for вид in REFUSALS)
+    return f"изменений: {переименовано} (из них по Dodo IS {считано[RENAMED_API]}); не тронуто: {отказы}"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -111,11 +258,14 @@ def main(argv: list[str] | None = None) -> int:
             conn.commit()
         else:
             conn.rollback()
-    print("\n".join(отчёт) or "  всё уже по канону")
-    изменено = sum(1 for s in отчёт if "переименована" in s)
+    порядок = {RENAMED: 0, RENAMED_API: 1, DUPLICATE: 2, AMBIGUOUS: 3, NOT_FOUND: 4, NO_API: 5}
+    print(
+        "\n".join(e.text for e in sorted(отчёт, key=lambda e: порядок[e.kind]))
+        or "  всё уже по канону"
+    )
     режим = "записано" if args.apply else "сухой прогон, ничего не записано"
-    print(f"изменений: {изменено}; {режим}")
-    return 0
+    print(f"{summary(отчёт)}; {режим}")
+    return 1 if any(e.kind == NO_API for e in отчёт) else 0
 
 
 if __name__ == "__main__":
