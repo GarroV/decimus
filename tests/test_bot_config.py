@@ -9,7 +9,7 @@ from src.bot.errors import BotConfigError
 
 
 def test_list_of_ids_is_not_required_any_more() -> None:
-    """D517: `ALLOWED_TELEGRAM_IDS` больше не вход — бот поднимается без него."""
+    """D520: `ALLOWED_TELEGRAM_IDS` больше не вход — бот поднимается без него."""
     settings = load_bot_settings({"TELEGRAM_BOT_TOKEN": "123:abc"})
     assert not hasattr(settings, "allowed_ids")
 

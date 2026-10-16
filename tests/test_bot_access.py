@@ -2,7 +2,7 @@
 
 Пространство человека — из привязки его Telegram ID к учётке; связки
 `roster.json` — сотрудник УК, но только пока привязки нет. Список ID из
-окружения дверью больше не служит (D517) — `tests/test_bot_legacy_door_closed.py`.
+окружения дверью больше не служит (D520) — `tests/test_bot_legacy_door_closed.py`.
 """
 
 from __future__ import annotations

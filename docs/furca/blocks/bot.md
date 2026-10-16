@@ -32,7 +32,7 @@ BindingCache(resolve=bot_links.resolve, ttl=60 s)   # .space_of(tg) -> str | Non
 AccessMiddleware(bindings, roster, redeem=bot_links.redeem)
                                        # /start link-<токен> → привязка и ответ в тот же чат;
                                        # привязка → её пространство; roster.json → HQ,
-                                       # только если привязки нет (список ID из окружения снят, D517)
+                                       # только если привязки нет (список ID из окружения снят, D520)
 ChatSpaceMiddleware(read_tenant=chat_tenant)   # после доступа: апдейт к проверке чата
                                        # чужого пространства не доходит до обработчика
 # src/bot/roster.py — связки по приглашениям до D286, только чтение (совместимость)

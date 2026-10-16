@@ -267,7 +267,7 @@ def test_снятый_доступ_не_открывает_даже_свою_п�
 
 
 def test_без_привязки_не_пускает(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """D517: вход только по привязке — без учётки не пускают ни бот, ни мини-апп."""
+    """D520: вход только по привязке — без учётки не пускают ни бот, ни мини-апп."""
     client = _подписанный_клиент(domain_env, monkeypatch, NEVER_BOUND)
     ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
     assert ответ.status_code == 401

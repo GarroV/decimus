@@ -42,7 +42,7 @@ from src.recognize.models import Candidate, Suggestion
 def bound_to_hq(telegram_id: int) -> Standing:
     """Положение «привязан к живой учётке УК с полевой ролью» — свой человек стенда.
 
-    Вход в бота и мини-апп — только по привязке (D517): прежний список
+    Вход в бота и мини-апп — только по привязке (D520): прежний список
     `ALLOWED_TELEGRAM_IDS` снят, и тесту без базы своего человека задаёт это.
     """
     return Standing.live(
