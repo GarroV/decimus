@@ -14,8 +14,10 @@
   попадает; строку убирает администратор (#440);
 - имени «Город-N» из написанного не вывести (район, адрес: «Bishkek — 7 Manas Ave»,
   «Gwarimpa») — номер берётся из открытого API Dodo IS (D517, #909):
-  `publicapi.dodois.io/{страна}/api/v1/unitinfo/all`. Точка ищется по
-  `units.code` (UUID Dodo IS), иначе по алиасу и по адресу (правила и ступени —
+  `publicapi.dodois.io/{страна}/api/v1/unitinfo/all`. Номер и UUID
+  берутся из свода пиццерий `agg.units` (первый источник), API — для адреса и
+  для точек, которых в своде нет. Точка ищется по `units.code`, иначе по
+  алиасу и по адресу (правила и ступени —
   `src/domain/unit_match.py`). Найденная ровно одна: точка переименовывается в
   номер («Bishkek-8»), прежнее имя становится синонимом, `code` := UUID. Не
   найдена, найдено несколько, одну точку API нашли две записи или API страны не
@@ -54,6 +56,7 @@ from src.domain.unit_match import (
     Match,
     claimed_twice,
     match_unit,
+    merge_registry,
     official_name,
     parse_dodo_units,
 )
@@ -70,6 +73,8 @@ select u.id, u.name, u.country, u.city, u.code,
        (select count(*) from inspections i where i.unit_id = u.id)
 from units u where u.tenant_code = %s order by u.name
 """
+
+_REGISTRY_SQL = "select dodo_id, country_code, name, working from agg.units"
 
 _RENAME_SQL = """
 update units set name = %(name)s, name_normalized = %(key)s,
@@ -151,6 +156,25 @@ def _is_unit_number(unit: tuple[Any, ...]) -> bool:
     return канон is not None and канон.city is not None
 
 
+def _candidates(
+    cur: psycopg.Cursor[Any], countries: set[str], fetch: FetchApi
+) -> tuple[dict[str, list[DodoUnit]], dict[str, str]]:
+    """Точки по странам: свод `agg.units` первым, API Dodo IS — адрес и недостающее."""
+    api, не_загружены = _load_api(countries, fetch)
+    cur.execute(_REGISTRY_SQL)
+    свод: dict[str, list[tuple[str, str, str, bool]]] = {}
+    for uuid, country, name, working in cur.fetchall():
+        свод.setdefault(country, []).append((uuid, country, name, working))
+    return (
+        {c: merge_registry(свод.get(c, []), api.get(c, [])) for c in countries},
+        не_загружены,
+    )
+
+
+def _refusal(name: str, проверок: int, причина: str) -> str:
+    return f"  не тронута ({проверок} пров.): {name} — {причина}"
+
+
 def plan_and_apply(
     cur: psycopg.Cursor[Any], tenant: str, fetch: FetchApi = fetch_dodo_units
 ) -> list[Entry]:
@@ -160,9 +184,9 @@ def plan_and_apply(
     по_ключу = {normalize_unit_name(r[1]): r for r in строки}
     по_коду = {r[4]: r for r in строки if r[4]}
     без_номера = [r for r in строки if not _is_unit_number(r)]
-    api, не_загружены = _load_api({r[2] for r in без_номера if r[2]}, fetch)
+    кандидаты, не_загружены = _candidates(cur, {r[2] for r in без_номера if r[2]}, fetch)
     совпадения = claimed_twice(
-        {r[0]: match_unit(r[1], r[4], api.get(r[2], [])) for r in без_номера if r[2] in api}
+        {r[0]: match_unit(r[1], r[4], кандидаты[r[2]]) for r in без_номера if r[2]}
     )
     отчёт: list[Entry] = []
     for unit_id, name, country, _city, _code, проверок in строки:
@@ -175,48 +199,29 @@ def plan_and_apply(
             найдено: Match = совпадения[unit_id]
             if найдено.unit is None:
                 причина = найдено.reason
-                вид_отказа = (
-                    AMBIGUOUS
-                    if ("неоднозначно" in причина or "две записи" in причина)
-                    else NOT_FOUND
-                )
-                отчёт.append(
-                    Entry(вид_отказа, f"  не тронута ({проверок} пров.): {name} — {причина}")
-                )
+                if country in не_загружены and "не найдена" in причина:
+                    отчёт.append(Entry(NO_API, _refusal(name, проверок, не_загружены[country])))
+                    continue
+                сомнительно = "неоднозначно" in причина or "две записи" in причина
+                вид_отказа = AMBIGUOUS if сомнительно else NOT_FOUND
+                отчёт.append(Entry(вид_отказа, _refusal(name, проверок, причина)))
                 continue
             имя, город = official_name(найдено.unit)
             uuid, страна, вид = найдено.unit.uuid, найдено.unit.country, RENAMED_API
         else:
-            if country in не_загружены:
-                отчёт.append(
-                    Entry(
-                        NO_API, f"  не тронута ({проверок} пров.): {name} — {не_загружены[country]}"
-                    )
-                )
-            else:
-                отчёт.append(
-                    Entry(
-                        NOT_FOUND,
-                        f"  не тронута ({проверок} пров.): {name} — страна записи не задана",
-                    )
-                )
+            отчёт.append(Entry(NOT_FOUND, _refusal(name, проверок, "страна записи не задана")))
             continue
         занята = по_ключу.get(normalize_unit_name(имя))
         if занята is not None and занята[0] != unit_id:
             # Удалять точки роли приложения нельзя, и так задумано. Бот ищет
             # каноническое имя, поэтому на дубль он больше не попадает; строку
             # убирает администратор (#440).
-            отчёт.append(
-                Entry(DUPLICATE, f"  дубль ({проверок} пров.), оставлен: {name} → уже есть {имя}")
-            )
+            текст = f"  дубль ({проверок} пров.), оставлен: {name} → уже есть {имя}"
+            отчёт.append(Entry(DUPLICATE, текст))
             continue
         if uuid is not None and uuid in по_коду and по_коду[uuid][0] != unit_id:
-            отчёт.append(
-                Entry(
-                    DUPLICATE,
-                    f"  дубль ({проверок} пров.), оставлен: {name} → UUID Dodo IS уже у {по_коду[uuid][1]}",
-                )
-            )
+            текст = f"  дубль ({проверок} пров.), оставлен: {name} → UUID уже у {по_коду[uuid][1]}"
+            отчёт.append(Entry(DUPLICATE, текст))
             continue
         cur.execute(
             _RENAME_SQL,
@@ -242,7 +247,8 @@ def summary(отчёт: list[Entry]) -> str:
     считано = Counter(e.kind for e in отчёт)
     переименовано = считано[RENAMED] + считано[RENAMED_API]
     отказы = ", ".join(f"{вид} {считано[вид]}" for вид in REFUSALS)
-    return f"изменений: {переименовано} (из них по Dodo IS {считано[RENAMED_API]}); не тронуто: {отказы}"
+    по_dodo = считано[RENAMED_API]
+    return f"изменений: {переименовано} (из них по Dodo IS {по_dodo}); не тронуто: {отказы}"
 
 
 def main(argv: list[str] | None = None) -> int:
