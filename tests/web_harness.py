@@ -246,7 +246,7 @@ def подменить_двери(
     monkeypatch.setattr(auth, "reach_of", охват_без_базы)
     # Сверка номера аккаунта Google (F-027) пишет в базу; экранные наборы её не
     # поднимают — аккаунт всегда «тот же». Наборы про сверку подменяют сами.
-    monkeypatch.setattr(auth, "claim_google_sub", lambda _email, _subject: "ok")
+    monkeypatch.setattr(auth, "claim_google_sub", lambda _email, _subject, **_k: "ok")
     # Вторая ступень (D463): наборы экранов её не поднимают — способа входа ни у кого нет,
     # сессия выдаётся сразу. Наборы про ступень (`test_web_second_step`) ходят в настоящую базу.
     monkeypatch.setattr(second_factor, "has_any", lambda _user_id: False)

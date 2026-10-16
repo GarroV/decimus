@@ -637,11 +637,13 @@ def install(app: Flask, conf: Settings) -> None:
             return отказ_входа(забыть_подсказку=True)
         # Тот ли это аккаунт Google (F-027): почта совпала, но почта у аккаунта
         # Google не постоянна. Первый вход записывает номер аккаунта за учёткой,
-        # следующие сверяют. После проверки домена — номер аккаунта не из домена
-        # компании за учёткой УК записан быть не должен.
+        # следующие сверяют. Здесь — только сверка, без записи: записывает номер
+        # лишь ветка, которая в этом же запросе открывает сессию (ниже). Вход,
+        # который дальше не пустили (вторая ступень), номер не занимает — иначе
+        # недопущенный аккаунт с той же почтой занял бы учётку у хозяина.
         if not кто.subject:
             return отказ_входа(забыть_подсказку=True)
-        сверка = claim_google_sub(кто.email, кто.subject)
+        сверка = claim_google_sub(кто.email, кто.subject, record=False)
         if сверка != "ok":
             journals.record_login(
                 method=METHOD_GOOGLE,
@@ -658,10 +660,23 @@ def install(app: Flask, conf: Settings) -> None:
                 return отказ_входа(забыть_подсказку=True, другой_аккаунт=True)
             return отказ_входа(забыть_подсказку=True)
 
-        note_success(tenant=рубеж, login=account.login)
         вторая = second_step.begin(account, method=METHOD_GOOGLE, next_path=вернуться)
         if вторая is not None:
+            note_success(tenant=рубеж, login=account.login)
             return запомнить_подсказку(очистить_метку(вторая), кто.email)
+        # Последняя проверка перед сессией — она же запись номера. Между сверкой
+        # выше и этой строкой номер мог занять параллельный вход: тогда отказ.
+        записано = claim_google_sub(кто.email, кто.subject, record=True)
+        if записано != "ok":
+            journals.record_login(
+                method=METHOD_GOOGLE,
+                result=RESULT_REFUSED,
+                user_id=account.id,
+                ip=откуда,
+                user_agent=браузер,
+            )
+            return отказ_входа(забыть_подсказку=True, другой_аккаунт=записано == "other")
+        note_success(tenant=рубеж, login=account.login)
         session = open_session(
             account,
             ip=откуда,
@@ -769,7 +784,8 @@ def install(app: Flask, conf: Settings) -> None:
         if not reauth.google_confirms(account, кто, state=метка, hq_domains=hq_domains):
             return мимо
         # Тот же аккаунт Google, что держит учётку (F-027), а не только та же почта.
-        if not кто.subject or claim_google_sub(кто.email, кто.subject) != "ok":
+        # Сессия уже есть и прошла вход целиком — номер можно и записать.
+        if not кто.subject or claim_google_sub(кто.email, кто.subject, record=True) != "ok":
             return мимо
         return _обновить_сессию(account, назад)
 

@@ -307,7 +307,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # Номер аккаунта Google за учёткой (аудит 12.10, F-027).
     "0076_google_sub.sql": (
-        "sql1:1c02fc44d14632b3564a58efbf0aed67bcdcdc0d2af121c3987ec3bb9c6874c1"
+        "sql1:a75768f446388cdf4ab6310bbd6dcbeb2e1fd920b93f05e6c09f9f050a278496"
     ),
 }
 

@@ -12,9 +12,12 @@
 -- 2. Триггер `web_users_forget_google_sub`: сменилась почта — номер снимается
 --    (у новой почты свой аккаунт), если та же команда не записала номер сама.
 --    Касается и админа на экране «Пользователи», и снятия почты в «Настройках».
--- 3. `claim_google_sub(почта, номер)` — сверка при входе: номер не записан —
---    записать за живой учёткой с этой почтой; записан тот же — `ok`; другой —
---    `other`, учётку не отдают. Функция владельца: роль приложения строку
+-- 3. `claim_google_sub(почта, номер, записать)` — сверка при входе: номер не
+--    записан — записать за живой учёткой с этой почтой; записан тот же — `ok`;
+--    другой (или этот аккаунт уже держит другую живую учётку) — `other`, учётку
+--    не отдают. `записать = false` — только сверка, без записи: ею вход
+--    проверяет аккаунт ДО остальных шагов, а записывает номер лишь тогда, когда
+--    в этом же запросе открывает сессию — недопущенный вход номер не занимает. Функция владельца: роль приложения строку
 --    `web_users` не правит, а выбирает функция только учётку той почты, которую
 --    Google подтвердил в этом же входе.
 -- 4. `finish_own_google_link` (`0061`, `0075`) получает номер аккаунта и пишет
@@ -51,7 +54,7 @@ create trigger web_users_forget_google_sub
     before update of email on web_users
     for each row execute function web_users_forget_google_sub();
 
-create function claim_google_sub(p_email text, p_sub text)
+create function claim_google_sub(p_email text, p_sub text, p_record boolean)
     returns text
     language plpgsql
     security definer
@@ -74,6 +77,12 @@ begin
     if прежний is not null then
         return case when прежний = p_sub then 'ok' else 'other' end;
     end if;
+    if not p_record then
+        return case when exists (select 1 from public.web_users
+                                  where google_sub = p_sub and id <> чей
+                                    and disabled_at is null)
+                    then 'other' else 'ok' end;
+    end if;
     -- Вложенный блок: тот же аккаунт уже держит другую живую учётку — не пускать.
     begin
         update public.web_users set google_sub = p_sub where id = чей;
@@ -84,8 +93,8 @@ begin
 end;
 $$;
 
-revoke all on function claim_google_sub(text, text) from public;
-grant execute on function claim_google_sub(text, text) to dodo_audit_app;
+revoke all on function claim_google_sub(text, text, boolean) from public;
+grant execute on function claim_google_sub(text, text, boolean) to dodo_audit_app;
 
 drop function finish_own_google_link(text, text, text);
 

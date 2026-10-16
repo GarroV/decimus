@@ -86,9 +86,11 @@ class Сверка:
     def __init__(self, ответ: str = "ok") -> None:
         self.ответ = ответ
         self.звали: list[tuple[str, str]] = []
+        self.записи: list[bool] = []
 
-    def __call__(self, email: str, subject: str) -> str:
+    def __call__(self, email: str, subject: str, *, record: bool = True) -> str:
         self.звали.append((email, subject))
+        self.записи.append(record)
         return self.ответ
 
 
@@ -610,7 +612,26 @@ def test_вход_сверяет_номер_аккаунта_google_с_учёт�
     ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
 
     assert ответ.status_code == 302
-    assert сверка.звали == [(ПОЧТА_СВОЯ, обмен.номер)]
+    assert set(сверка.звали) == {(ПОЧТА_СВОЯ, обмен.номер)}
+    assert сверка.записи == [False, True], "номер записан до проверок или не записан вовсе"
+
+
+def test_вход_без_сессии_номер_аккаунта_не_записывает(
+    клиент: FlaskClient, обмен: Обмен, сверка: Сверка, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Дальше первого шага не пустили (вторая ступень) — номер аккаунта не занят.
+
+    Иначе чужой аккаунт с той же почтой занимал бы учётку, не пройдя вход: хозяин
+    после этого получал бы «другой аккаунт», а запись сделал бы недопущенный.
+    """
+    monkeypatch.setattr(
+        auth.second_step, "begin", lambda *_a, **_k: Response(status=302, headers={"Location": "/"})
+    )
+    метка = метка_захода(клиент)
+
+    клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert сверка.записи == [False], "номер аккаунта записан входом, который сессию не открыл"
 
 
 def test_другой_аккаунт_google_с_той_же_почтой_не_пускает_и_говорит_почему(

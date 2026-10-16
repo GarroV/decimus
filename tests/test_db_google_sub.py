@@ -62,42 +62,42 @@ def _номер(dsn: str, login: str = "anna") -> str | None:
 def test_первый_вход_записывает_номер_аккаунта(с_почтой: str) -> None:
     assert _номер(с_почтой) is None, "у действующей учётки номер заполняется при входе"
 
-    assert claim_google_sub(ПОЧТА, АККАУНТ) == "ok"
+    assert claim_google_sub(ПОЧТА, АККАУНТ, record=True) == "ok"
 
     assert _номер(с_почтой) == АККАУНТ
 
 
 def test_следующий_вход_тем_же_аккаунтом_пускает(с_почтой: str) -> None:
-    claim_google_sub(ПОЧТА, АККАУНТ)
+    claim_google_sub(ПОЧТА, АККАУНТ, record=True)
 
-    assert claim_google_sub(ПОЧТА, АККАУНТ) == "ok"
+    assert claim_google_sub(ПОЧТА, АККАУНТ, record=True) == "ok"
 
 
 def test_другой_аккаунт_с_той_же_почтой_не_пускает(с_почтой: str) -> None:
-    claim_google_sub(ПОЧТА, АККАУНТ)
+    claim_google_sub(ПОЧТА, АККАУНТ, record=True)
 
-    assert claim_google_sub(ПОЧТА, ДРУГОЙ) == "other"
+    assert claim_google_sub(ПОЧТА, ДРУГОЙ, record=True) == "other"
     assert _номер(с_почтой) == АККАУНТ, "чужой аккаунт переписал номер учётки"
 
 
 def test_незнакомая_и_замороженная_почта_не_сверяется(с_почтой: str) -> None:
-    assert claim_google_sub("kto-ugodno@gmail.com", АККАУНТ) == "missing"
+    assert claim_google_sub("kto-ugodno@gmail.com", АККАУНТ, record=True) == "missing"
     freeze_account("anna", tenant=ТЕНАНТ)
-    assert claim_google_sub(ПОЧТА, АККАУНТ) == "missing"
+    assert claim_google_sub(ПОЧТА, АККАУНТ, record=True) == "missing"
     assert _номер(с_почтой) is None
 
 
 def test_смена_почты_админом_снимает_номер(с_почтой: str) -> None:
-    claim_google_sub(ПОЧТА, АККАУНТ)
+    claim_google_sub(ПОЧТА, АККАУНТ, record=True)
 
     set_email("anna", tenant=ТЕНАНТ, email="anna-new@example.com")
 
     assert _номер(с_почтой) is None
-    assert claim_google_sub("anna-new@example.com", ДРУГОЙ) == "ok"
+    assert claim_google_sub("anna-new@example.com", ДРУГОЙ, record=True) == "ok"
 
 
 def test_та_же_почта_повторно_номер_не_снимает(с_почтой: str) -> None:
-    claim_google_sub(ПОЧТА, АККАУНТ)
+    claim_google_sub(ПОЧТА, АККАУНТ, record=True)
 
     set_email("anna", tenant=ТЕНАНТ, email=ПОЧТА)
 
@@ -115,7 +115,7 @@ def test_привязка_в_настройках_записывает_номе�
 
     assert итог == "ok"
     assert _номер(обе_роли) == АККАУНТ
-    assert claim_google_sub(ПОЧТА, ДРУГОЙ) == "other"
+    assert claim_google_sub(ПОЧТА, ДРУГОЙ, record=True) == "other"
     assert web_own_profile.unlink_google(сессия, current=ПАРОЛЬ) == "ok"
     assert _номер(обе_роли) is None
 
@@ -124,7 +124,7 @@ def test_один_аккаунт_google_не_держит_две_живые_уч
     """Тот же аккаунт уже у другой живой учётки — привязка отвечает «занята»."""
     create_account("anna", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     set_email("anna", tenant=ТЕНАНТ, email=ПОЧТА)
-    claim_google_sub(ПОЧТА, АККАУНТ)
+    claim_google_sub(ПОЧТА, АККАУНТ, record=True)
     create_account("boris", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     учётка = authenticate("boris", ПАРОЛЬ)
     assert учётка is not None
@@ -136,4 +136,25 @@ def test_один_аккаунт_google_не_держит_две_живые_уч
     )
 
     assert итог == "taken"
+    assert _номер(обе_роли, "boris") is None
+
+
+def test_сверка_без_записи_номер_не_занимает(с_почтой: str) -> None:
+    """Сверка до остальных шагов входа (`record=False`) ничего не пишет."""
+    assert claim_google_sub(ПОЧТА, ДРУГОЙ, record=False) == "ok"
+
+    assert _номер(с_почтой) is None, "недопущенный вход занял номер аккаунта"
+    assert claim_google_sub(ПОЧТА, АККАУНТ, record=True) == "ok"
+    assert claim_google_sub(ПОЧТА, ДРУГОЙ, record=False) == "other"
+
+
+def test_сверка_без_записи_видит_аккаунт_у_другой_учётки(обе_роли: str) -> None:
+    create_account("anna", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("anna", tenant=ТЕНАНТ, email=ПОЧТА)
+    claim_google_sub(ПОЧТА, АККАУНТ, record=True)
+    create_account("boris", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("boris", tenant=ТЕНАНТ, email="boris@example.com")
+
+    assert claim_google_sub("boris@example.com", АККАУНТ, record=False) == "other"
+    assert claim_google_sub("boris@example.com", АККАУНТ, record=True) == "other"
     assert _номер(обе_роли, "boris") is None

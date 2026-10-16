@@ -941,10 +941,10 @@ def find_by_email(email: str) -> Account | None:
 #: Исходы сверки номера аккаунта Google: тот же или записан впервые — `ok`;
 #: за учёткой другой аккаунт — `other`; живой учётки с этой почтой нет — `missing`.
 GoogleSubVerdict = Literal["ok", "other", "missing"]
-_CLAIM_GOOGLE_SUB_SQL = "select claim_google_sub(%s, %s)"
+_CLAIM_GOOGLE_SUB_SQL = "select claim_google_sub(%s, %s, %s)"
 
 
-def claim_google_sub(email: str, subject: str) -> GoogleSubVerdict:
+def claim_google_sub(email: str, subject: str, *, record: bool) -> GoogleSubVerdict:
     """Тот ли аккаунт Google держит учётку с этой почтой (аудит 12.10, F-027).
 
     Почта у аккаунта Google не постоянна, номер (`sub`) — постоянен. Первый вход
@@ -952,6 +952,10 @@ def claim_google_sub(email: str, subject: str) -> GoogleSubVerdict:
     функция владельца (`0076`): роль приложения строку `web_users` не правит, а
     выбрать чужую учётку функция не даёт — только ту, чья почта подтверждена
     Google в этом же входе. Смена почты снимает номер (триггер `0076`).
+
+    `record=False` — только сверка, номер не пишется: так вход проверяет аккаунт
+    до остальных шагов, а записывает (`record=True`) лишь там, где тут же
+    открывает сессию. Иначе вход, который дальше не пустили, занял бы номер.
     """
     номер = subject.strip()
     if not номер:
@@ -961,7 +965,7 @@ def claim_google_sub(email: str, subject: str) -> GoogleSubVerdict:
     except ValueError:
         return "missing"
     with _connected("сверить аккаунт Google") as conn, conn.cursor() as cur:
-        cur.execute(_CLAIM_GOOGLE_SUB_SQL, (приведённая, номер))
+        cur.execute(_CLAIM_GOOGLE_SUB_SQL, (приведённая, номер, record))
         строка = cur.fetchone()
     итог = None if строка is None else str(строка[0])
     if итог == "ok":
