@@ -54,7 +54,7 @@ async def test_rejected_stranger_warning_has_no_raw_telegram_id(
         from_user=User(id=STRANGER_ID, is_bot=False, first_name="Т"),
         text="привет",
     ).as_(bot)
-    mw = AccessMiddleware(frozenset(), BindingCache(standing=lambda _tg: NEVER_BOUND), None)
+    mw = AccessMiddleware(BindingCache(standing=lambda _tg: NEVER_BOUND), None)
 
     async def handler(_e: TelegramObject, _data: dict[str, Any]) -> None:
         raise AssertionError("посторонний дошёл до обработчика")
