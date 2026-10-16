@@ -1103,7 +1103,7 @@ DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 наката разом не повторят одну миграцию, откуда бы их ни запустили.
 
 [`scripts/prod-update.sh`](../scripts/prod-update.sh) делает по порядку:
-`git pull --ff-only` → сборка с `BUILD_SHA` (вместе с профилем `backup`) →
+`git pull --ff-only` → проверка утечки методики (`tools/methodology_leak.py data --tracked-only`, D517: цитата останавливает раскатку, обход `LEAK_CHECK=0`) → сборка с `BUILD_SHA` (вместе с профилем `backup`) →
 база и MinIO с ожиданием здоровья → корзина (`run --rm storage-init`) →
 накат миграций → `up -d --wait` → смоук (`/login` 200, MCP без токена 401,
 админка не пишет в `state`, сервис обхода пишет, `/tg/walk` 200 — §8.14).
