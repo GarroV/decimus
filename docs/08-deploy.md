@@ -1282,7 +1282,7 @@ SNI и Host, по которым Caddy выбирает сайт, — его DNS
 участвуют. Туннель — контейнер `cloudflared` в `/srv/edge`
 (`GarroV/vps-infra: edge/compose.yml`), токен — `/srv/edge/tunnel.env` (600,
 вне git); наружу он ничего не публикует и видит только Caddy. **Другого пути
-нет (D518, 16.10.2026):** туннель лёг — Worker отвечает 502 `upstream
+нет (D521, 16.10.2026):** туннель лёг — Worker отвечает 502 `upstream
 unavailable, please retry` и пишет `tunnel failed` (журналы Worker'ов выключены,
 строку видно только в `npx wrangler tail <имя>`); привязки `EDGE` нет — 503. Сайты
 decimus в Caddy (`GarroV/vps-infra: edge/sites/decimus.caddy`) отдают продукт
@@ -1342,7 +1342,7 @@ wrangler.admin.jsonc`, после первого запуска `deploy.sh`) и 
 (`GarroV/vps-infra: edge/sites/decimus.caddy`). Ключ лежит в двух местах и больше
 нигде: секрет `FRONT_KEY` у обоих Worker'ов и `/srv/edge/sites/decimus-front.snippet`
 на VPS (в git не попадает). **Смена ключа без простоя** (так сменён 16.10.2026,
-D518): новый ключ генерируется в файл (`openssl rand -hex 32`), значение нигде не
+D521): новый ключ генерируется в файл (`openssl rand -hex 32`), значение нигде не
 печатается; в сниппете на время смены стоят оба ключа (две строки `header
 X-Decimus-Front-Key …` в одном именованном сопоставителе — Caddy сравнивает их по
 «или»), `caddy reload`; затем `npx wrangler secret put FRONT_KEY -c
