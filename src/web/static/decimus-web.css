@@ -873,16 +873,10 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
     padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
     background: var(--surface-2);
     border-top: 1px solid var(--line);
-    overflow-x: auto;
-    scrollbar-width: none;
   }
-  .tabbar::-webkit-scrollbar { display: none; }
-  /* Недостроенного в нижней полосе нет (D217): карта продукта целиком — в
-     боковом меню компьютера (D138). */
-  .tabbar__item.is-wip { display: none; }
-  /* Пункты делят ширину поровну и сжимаются: с шестым пунктом («Экшн-планы»)
-     последний уезжал за край экрана телефона (сверка экшн-планов, 04.10.2026).
-     Длинная подпись обрезается многоточием, полное имя — в `title`. */
+  /* Пункты делят ширину поровну. Их не больше пяти (D518, #686): остальное —
+     под «Ещё», поэтому прокрутки у панели нет, а многоточие осталось только
+     страховкой для длинного перевода; полное имя — в `title`. */
   .tabbar__item {
     flex: 1 1 0;
     min-width: 0;
@@ -903,6 +897,39 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   .tabbar__item > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .tabbar__item:hover { text-decoration: none; color: var(--ink); }
   .tabbar__item.is-current { background: var(--accent-soft); color: var(--accent); }
+  /* «Ещё» (D518): нативный `details` — открывается без скрипта, клавиатурой и
+     читалкой; список встаёт над панелью у правого края. Переход по ссылке
+     заменяет панель целиком (`nav.js`), и список закрывается сам. */
+  .tabbar__more { flex: 1 1 0; min-width: 0; display: flex; }
+  .tabbar__more > summary { list-style: none; cursor: pointer; }
+  .tabbar__more > summary::-webkit-details-marker { display: none; }
+  .tabbar__more[open] > summary { color: var(--ink); }
+  .tabbar__sheet {
+    position: absolute;
+    right: var(--space-3);
+    bottom: calc(100% + var(--space-2));
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-2);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-block);
+    box-shadow: var(--sh-pop);
+  }
+  .tabbar__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--tap-min);
+    padding: 0 var(--space-3);
+    border-radius: var(--r-control);
+    color: var(--ink-2);
+    font-weight: var(--w-medium);
+  }
+  .tabbar__row svg { width: 18px; height: 18px; flex: none; }
+  .tabbar__row:hover { text-decoration: none; color: var(--ink); background: var(--surface-2); }
+  .tabbar__row.is-current { background: var(--accent-soft); color: var(--accent); }
 }
 
 /* ═══ СТРОКА РЕЕСТРА ═════════════════════════════════════════════════════
