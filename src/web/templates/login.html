@@ -41,6 +41,10 @@
       <div class="note note--warn login__note" role="alert">
         <div><div class="note__title">{{ t('auth.use_google') }}</div></div>
       </div>
+    {% elif google_other %}
+      <div class="note note--error login__note" role="alert">
+        <div><div class="note__title">{{ t('auth.google_other') }}</div></div>
+      </div>
     {% elif failed %}
       <div class="note note--error login__note" role="alert">
         <div><div class="note__title">{{ t('auth.failed') }}</div></div>

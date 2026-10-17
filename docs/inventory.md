@@ -442,6 +442,7 @@
 | `0073_inspection_by_process.sql` | — |
 | `0074_trips.sql` | `trips`, `trip_steps` |
 | `0075_email_unique_live.sql` | — |
+| `0076_google_sub.sql` | — |
 <!-- map:end -->
 
 ## Makefile

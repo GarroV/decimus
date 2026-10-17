@@ -34,6 +34,7 @@ def токен(**переопределения: object) -> str:
         "exp": time.time() + 600,
         "email": ПОЧТА,
         "email_verified": True,
+        "sub": "110169484474386276334",
     }
     нагрузка.update(переопределения)
     середина = base64.urlsafe_b64encode(json.dumps(нагрузка).encode()).decode().rstrip("=")
@@ -85,6 +86,19 @@ def test_токен_без_почты_отвергается() -> None:
     середина = base64.urlsafe_b64encode(json.dumps(без_почты).encode()).decode().rstrip("=")
     with pytest.raises(GoogleAuthError):
         identity_from_id_token(f"з.{середина}.п", client_id=НАШ_КЛИЕНТ)
+
+
+def test_номер_аккаунта_google_читается_из_токена() -> None:
+    """F-027: `sub` — постоянный номер аккаунта Google; почта у аккаунта может смениться."""
+    кто = identity_from_id_token(токен(sub=" 42 "), client_id=НАШ_КЛИЕНТ)
+
+    assert кто.subject == "42"
+
+
+@pytest.mark.parametrize("номер", [None, "", "   ", 42])
+def test_токен_без_номера_аккаунта_отвергается(номер: object) -> None:
+    with pytest.raises(GoogleAuthError):
+        identity_from_id_token(токен(sub=номер), client_id=НАШ_КЛИЕНТ)
 
 
 def test_мусор_вместо_токена_отвергается() -> None:

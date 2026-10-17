@@ -110,6 +110,11 @@ class GoogleIdentity:
     #: Адрес фото из токена (`picture`) — сырой, НЕ проверенный как адрес: перед
     #: скачиванием его проверяет `google_profile` (https и хост Google).
     picture: str = ""
+    #: Постоянный номер аккаунта Google (`sub`). Почта у аккаунта может смениться
+    #: или достаться другому человеку, номер — нет: первый вход записывает его за
+    #: учёткой, следующие сверяют (аудит 12.10, F-027, `db.web_access.claim_google_sub`).
+    #: Пусто — только у двойников в тестах: разбор токена без `sub` отказывает.
+    subject: str = ""
 
 
 def load_google_settings(env: Mapping[str, str] | None = None) -> GoogleSettings | None:
@@ -237,6 +242,10 @@ def identity_from_id_token(raw: str, *, client_id: str, now: float | None = None
     if подтверждена is not True:
         raise GoogleAuthError("почта в аккаунте Google не подтверждена")
 
+    номер = нагрузка.get("sub")
+    if not isinstance(номер, str) or not номер.strip():
+        raise GoogleAuthError("в токене нет номера аккаунта Google")
+
     домен = нагрузка.get("hd")
     метка = нагрузка.get("nonce")
     return GoogleIdentity(
@@ -246,6 +255,7 @@ def identity_from_id_token(raw: str, *, client_id: str, now: float | None = None
         nonce=метка if isinstance(метка, str) else "",
         name=_display_name(нагрузка),
         picture=_picture(нагрузка),
+        subject=номер.strip(),
     )
 
 
