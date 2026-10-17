@@ -720,6 +720,11 @@ docker ps --filter label=backup.pgdump=true --format "{{.Names}}"   # ждём d
 D061). Служба в сборке `storage-live`, том `storage-data`, порты только на
 петлю — наружу файлы выдаёт админка, а не хранилище.
 
+> **История.** С 30.09.2026 кадры живут в MinIO на MUSPELHEIM (D257, D259,
+> D293), служба `storage-live` и `tools/storage_env.*` удалены из репозитория
+> (#396): закреплённый образ MinIO больше не скачивается. Порядок ниже —
+> как было, для чтения старых журналов.
+
 **Не путать с соседней службой `storage`:** та мок, держит объекты в памяти и
 умирает вместе с контейнером. Она для прогонов и смоука, и боевым хранилищем
 быть не может.
@@ -1104,7 +1109,7 @@ DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 
 [`scripts/prod-update.sh`](../scripts/prod-update.sh) делает по порядку:
 `git pull --ff-only` → проверка утечки методики (`tools/methodology_leak.py data --tracked-only`, D517: цитата останавливает раскатку, обход `LEAK_CHECK=0`) → сборка с `BUILD_SHA` (вместе с профилем `backup`) →
-база и MinIO с ожиданием здоровья → корзина (`run --rm storage-init`) →
+база с ожиданием здоровья →
 накат миграций → `up -d --wait` → смоук (`/login` 200, MCP без токена 401,
 админка не пишет в `state`, сервис обхода пишет, `/tg/walk` 200 — §8.14).
 Один и тот же порядок для первого подъёма и для каждого обновления: накат
@@ -1216,7 +1221,7 @@ docker run --rm -v decimus_storage-data:/v -v "$PWD":/in alpine:3.22 tar -xzf /i
 | Второй проект `decimus-web` с пустой базой (#352) | не воссоздаётся: веб в проекте `decimus`, база одна |
 | Звенья `web-link`, `link`, туннель | выключены, наружу — Caddy |
 | `scripts/deploy.sh` (PowerShell через ssh) | `scripts/prod-update.sh` на сервере |
-| `tools/storage_env.ps1` | `tools/storage_env.sh .env` — дописывает ключи хранилища, секрет не печатает |
+| `tools/storage_env.ps1` | не нужен: хранилище кадров на MUSPELHEIM, ключи заводит `muspelheim-infra` (оба скрипта удалены, #396) |
 | `C:\backups\pg_backup.ps1` | дамп площадки по метке |
 | Задача планировщика для `state-backup` | cron (§8.5) |
 | Деплой-скрипт с паролем в открытом виде (#395) | не переносится; учётку сменить (§8.7) |

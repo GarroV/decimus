@@ -92,21 +92,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.period.d30": {"ru": "30 дней", "en": "30 days"},
     "overview.period.d90": {"ru": "90 дней", "en": "90 days"},
     "overview.period.y1": {"ru": "год", "en": "a year"},
-    "overview.breakdown.title": {"ru": "Разбивка по городам", "en": "Breakdown by city"},
-    "overview.breakdown.hint": {
-        "ru": "клик — город на экране страны",
-        "en": "click — the city on the country screen",
-    },
-    "overview.breakdown.city": {"ru": "Город", "en": "City"},
-    "overview.breakdown.units": {"ru": "Точек", "en": "Units"},
-    "overview.breakdown.average": {"ru": "Средняя", "en": "Average"},
     "overview.breakdown.grades": {"ru": "Буквы", "en": "Grades"},
-    "overview.breakdown.critical": {"ru": "D3", "en": "D3"},
-    "overview.breakdown.nocity": {"ru": "Без города", "en": "No city"},
-    "overview.breakdown.empty": {
-        "ru": "За выбранный период проверок нет — разбивать нечего.",
-        "en": "No inspections in the selected period — nothing to break down.",
-    },
     "overview.sort": {"ru": "Сортировка", "en": "Sort"},
     "overview.sort.score": {"ru": "худшие сверху", "en": "worst first"},
     "overview.sort.delta": {"ru": "по движению", "en": "by movement"},
@@ -1518,7 +1504,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Even out the shares of all zones",
     },
     "methodology.zones.add.submit": {"ru": "Завести", "en": "Add"},
-    "methodology.zones.note": {"ru": "Зачем правка", "en": "Why this edit"},
+    "methodology.zones.note": {"ru": "Зачем правим", "en": "Why this edit"},
     "methodology.empty.title": {"ru": "Пунктов нет", "en": "No items"},
     "methodology.empty.text": {
         "ru": "В этой версии методики нет ни одного пункта.",
@@ -1586,7 +1572,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Выключить пункт — отдельная кнопка, а не вид строки: так это видно в журнале.",
         "en": "Switching an item off is a button, not a row kind: that way the journal shows it.",
     },
-    "methodology.field.version_name": {"ru": "Имя набора", "en": "Set name"},
+    "methodology.field.version_name": {
+        "ru": "Название версии методики",
+        "en": "Methodology version name",
+    },
     "methodology.field.version_name.hint": {
         "ru": (
             "У этой методики имени ещё нет, а идентификатор версии складывается из имени, "
