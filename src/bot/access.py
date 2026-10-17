@@ -18,11 +18,13 @@
    F-024). Роль читается тем же запросом, что и привязка, —
    смена роли в вебе действует не позже `BINDING_TTL`. Контролю бот отвечает
    словами, почему не пускает: человек свой, и молчание выглядело бы поломкой.
-3. Совместимость до снятия (вопрос 2): `ALLOWED_TELEGRAM_IDS` и связки
-   `roster.json`, собранные до D286, — сотрудник УК. Только если привязки НЕ
-   БЫЛО НИКОГДА: привязанный к учётке партнёра работает как партнёр, даже если
-   его ID есть в окружении, а отвязанный или с отключённой учёткой не пускается
-   вовсе (ревью #340, п.5). Каждый пуск по совместимости — строка в журнале.
+3. Совместимость до снятия (вопрос 2): связки `roster.json`, собранные по
+   приглашениям до D286, — сотрудник УК. Только если привязки НЕ БЫЛО НИКОГДА:
+   привязанный к учётке партнёра работает как партнёр, а отвязанный или с
+   отключённой учёткой не пускается вовсе (ревью #340, п.5). Каждый пуск по
+   совместимости — строка в журнале. Список `ALLOWED_TELEGRAM_IDS` дверью
+   больше не служит (D520, аудит 13.10 F-112): ID из окружения без учётки
+   получает то же молчание, что посторонний.
 
 База привязок молчит — последний ответ годен не дольше `BINDING_STALE_MAX`,
 дальше отказ всем, кого нечем сверить (п.6).
@@ -92,11 +94,6 @@ BINDING_TTL = timedelta(seconds=60)
 BINDING_STALE_MAX = timedelta(minutes=10)
 
 
-def is_allowed(user_id: int | None, allowed_ids: frozenset[int]) -> bool:
-    """Разрешён ли этот Telegram ID окружением. Отсутствие ID — нет."""
-    return user_id is not None and user_id in allowed_ids
-
-
 def _utc_now() -> datetime:
     return datetime.now(UTC)
 
@@ -162,12 +159,10 @@ class AccessMiddleware(BaseMiddleware):
 
     def __init__(
         self,
-        allowed_ids: frozenset[int],
         bindings: BindingCache | None,
         roster: Roster | None,
         redeem: Callable[..., Binding | None] = bot_links.redeem,
     ) -> None:
-        self._allowed_ids = allowed_ids
         self._bindings = bindings
         self._roster = roster
         self._redeem = redeem
@@ -191,7 +186,7 @@ class AccessMiddleware(BaseMiddleware):
             logger.info("Telegram ID %s: роли учётки поле закрыто — отказ", log_id(user_id))
             await _refuse_role(event)
             return None
-        space = space_from(user_id, положение, allowed_ids=self._allowed_ids, roster=self._roster)
+        space = space_from(user_id, положение, roster=self._roster)
         if space is None:
             logger.warning("отклонено обновление от постороннего Telegram ID %s", log_id(user_id))
             return None
@@ -235,7 +230,6 @@ def space_from(
     user_id: int,
     положение: Standing | None,
     *,
-    allowed_ids: frozenset[int],
     roster: Roster | None,
 ) -> str | None:
     """Пространство человека — или `None`: бот его не пускает.
@@ -259,19 +253,10 @@ def space_from(
         return None
     # Совместимость (вопрос 2): кто пускался до D286 — сотрудник УК. Только
     # если привязки не было никогда — это проверено выше.
-    откуда = _compat_source(user_id, allowed_ids, roster)
-    if откуда is None:
+    if roster is None or not roster.knows(user_id):
         return None
-    logger.warning("путь совместимости: Telegram ID %s пущен как УК (%s)", log_id(user_id), откуда)
+    logger.warning("путь совместимости: Telegram ID %s пущен как УК (roster.json)", log_id(user_id))
     return HQ_TENANT
-
-
-def _compat_source(user_id: int, allowed_ids: frozenset[int], roster: Roster | None) -> str | None:
-    if is_allowed(user_id, allowed_ids):
-        return "ALLOWED_TELEGRAM_IDS"
-    if roster is not None and roster.knows(user_id):
-        return "roster.json"
-    return None
 
 
 def _link_token(event: TelegramObject) -> str | None:

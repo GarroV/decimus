@@ -25,7 +25,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     build_report,
     candidate,
@@ -52,7 +51,7 @@ from src.recognize.models import UNKNOWN_ZONE
 
 pytestmark = [pytest.mark.asyncio, requires_data]
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Однозначная фраза синтетической карты: строка «Печь» произнесена целиком,
 #: колонка выбрана словом «грязная» → CLN05, единственный класс D1.

@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from bot_harness import AUDITOR_ID, CHAT_ID, feed, make_bot, photo_message
+from bot_harness import CHAT_ID, feed, make_bot, photo_message
 from bot_harness import callback_query as callback
 
 from src import domain
@@ -35,7 +35,7 @@ from src.bot.view import zone_title
 
 pytestmark = [pytest.mark.asyncio]
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 def кнопки_под(session: Any, начало: str) -> list[str]:

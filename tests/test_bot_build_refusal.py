@@ -26,7 +26,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from bot_harness import AUDITOR_ID, CHAT_ID, build_report, feed, make_bot, text_message
+from bot_harness import CHAT_ID, build_report, feed, make_bot, text_message
 from bot_harness import callback_query as callback
 
 from src.bot.app import build_dispatcher
@@ -36,7 +36,7 @@ from src.domain import add_finding, start_inspection
 
 pytestmark = [pytest.mark.asyncio]
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Слова, которых человеку на точке в чате быть не должно ни в каком отказе.
 #: Половина — внутренности рендерера, половина — способ их починить, и то и

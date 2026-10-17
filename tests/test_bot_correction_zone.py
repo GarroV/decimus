@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     bot_message,
     candidate,
@@ -52,7 +51,7 @@ from src.domain import Finding, get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Однозначная фраза синтетической карты: строка «Стеллаж» плюс колонка
 #: «грязная» → CLN01, и зона названа тут же словами («в тепловом участке»).

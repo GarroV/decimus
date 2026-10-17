@@ -35,7 +35,6 @@ from typing import Any
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     Calls,
     bot_message,
@@ -57,7 +56,7 @@ from src.recognize.models import Suggestion
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Разные пункты одной зоны: пара «пункт + зона» занимается один раз, и три
 #: одинаковых кандидата дали бы отказ движка вместо трёх записей — то есть тест

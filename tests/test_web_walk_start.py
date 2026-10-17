@@ -14,12 +14,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from bot_harness import bound_only
 from test_web_walk import АУДИТОР, ТОКЕН, _приложение, подписать
 
 from src.bot.material import Comment, MaterialStore
 from src.bot.pending import PendingStore, Proposal
 from src.bot.unit_pick import UnitMatch
-from src.db.bot_links import NEVER_BOUND
 from src.db.errors import AccessError
 from src.domain import get_state, handed_over, run_id, start_inspection
 from src.domain.bot_checklists import BotChecklist
@@ -59,12 +59,12 @@ class Клиент:
 @pytest.fixture
 def клиент(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> Клиент:
     monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
-    monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
+    monkeypatch.setattr(walk_access.bot_links, "standing", bound_only(АУДИТОР, 777))
     # Справочника точек нет: название принимается каноничным, как при его отказе.
     monkeypatch.setattr(walk_start, "match_unit", lambda *_a, **_k: НЕТ_СПРАВОЧНИКА)
     monkeypatch.setattr(walk_start, "suggest_units", lambda *_a, **_k: [])
     monkeypatch.setattr(walk_start, "suggest_index", lambda **_k: {"units": []})
-    монк = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=f"{АУДИТОР},777")
+    монк = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН)
     return Клиент(монк.test_client())
 
 

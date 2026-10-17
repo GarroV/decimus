@@ -9,8 +9,8 @@
 
 Отдельного списка допущенных здесь нет — и это решение, а не пропуск. Подпись
 доказывает, кто открыл, а показывается ровно проверка ЕГО чата: завести её
-мог только бот, а бот уже решил, пускать ли человека (`ALLOWED_TELEGRAM_IDS`
-плюс привязанные через веб учётки, `src/bot/access.py`). Свой список здесь
+мог только бот, а бот уже решил, пускать ли человека (привязанные через веб
+учётки, `src/bot/access.py`). Свой список здесь
 разъехался бы с ботом при первой же привязке. Чужой без проверки увидит
 «проверка не начата» — и ничего больше.
 
@@ -30,8 +30,6 @@ from typing import Any
 
 from aiogram.utils.web_app import safe_parse_webapp_init_data
 
-from src.bot.config import ALLOWED_IDS_VAR, parse_allowed_ids
-from src.bot.errors import BotConfigError
 from src.domain.walk_users import parse_walk_users
 
 #: Сколько живёт подпись. Telegram выдаёт свежую при каждом открытии, а
@@ -117,10 +115,6 @@ class WalkSettings:
     preview_chat: int | None
     #: Круг тестеров (`WALK_USERS`, тот же, что у кнопки бота). `None` — все.
     users: frozenset[int] | None = None
-    #: Кого пускает бот без привязки (`ALLOWED_TELEGRAM_IDS`). С токеном
-    #: мини-апп пускает ровно тех, кого бот (D372): кнопку меню видит каждый,
-    #: кто открыл бота, а не только те, кому бот прислал сообщение с кнопкой.
-    allowed_ids: frozenset[int] = frozenset()
 
     @property
     def enabled(self) -> bool:
@@ -148,19 +142,10 @@ def load_walk_settings(env: Mapping[str, str] | None = None) -> WalkSettings:
                 f"{PREVIEW_CHATS[0]}–{PREVIEW_CHATS[1]}. Просмотр без подписи пишет в "
                 "проверку (D312) и на настоящий чат не открывается"
             )
-    allowed = frozenset[int]()
-    # Пустой список — пускает только привязка учётки; обязательным его делает
-    # бот, у которого без списка нет ни одного своего.
-    if token is not None and (src.get(ALLOWED_IDS_VAR) or "").strip():
-        try:
-            allowed = parse_allowed_ids(src.get(ALLOWED_IDS_VAR) or "")
-        except BotConfigError as exc:
-            raise ValueError(str(exc)) from exc
     return WalkSettings(
         bot_token=token,
         preview_chat=preview,
         users=parse_walk_users(src),
-        allowed_ids=allowed,
     )
 
 
