@@ -697,12 +697,27 @@ def unfreeze_account(login: str, *, tenant: str, only_roles: tuple[str, ...] | N
 
     Сессии, подключения Claude, токены и привязка бота остаются закрытыми:
     человек входит заново, привязывает бота и подключает Claude сам.
+
+    Почта замороженной не держится (F-031, `0075`): пока учётка заморожена, её
+    адрес могли отдать другой живой учётке. Тогда разморозка отказывает
+    `EmailTakenError` и учётка остаётся замороженной — двух живых учёток на
+    одну почту не бывает, и решать, чья она, должен человек, а не порядок строк.
     """
     with _managing("разморозить учётку") as conn, conn.cursor() as cur:
-        cur.execute(
-            _UNFREEZE_USER_SQL,
-            {"tenant": tenant, "login": login.strip().lower(), "roles": _roles_param(only_roles)},
-        )
+        try:
+            cur.execute(
+                _UNFREEZE_USER_SQL,
+                {
+                    "tenant": tenant,
+                    "login": login.strip().lower(),
+                    "roles": _roles_param(only_roles),
+                },
+            )
+        except psycopg.errors.UniqueViolation as занято:
+            raise EmailTakenError(
+                "почта этой учётки за время заморозки привязана к другой живой учётке: "
+                "снимите её у одной из двух, затем разморозьте"
+            ) from занято
         return cur.rowcount > 0
 
 

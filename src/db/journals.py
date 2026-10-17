@@ -44,7 +44,15 @@ _RECORD_LOGIN_SQL = """
 
 #: Какой исход у неудачной попытки с этим логином: нет такого, заморожен или неверный пароль.
 _LOGIN_STATE_SQL = "select id, disabled_at is not null from web_users where login = %s"
-_EMAIL_STATE_SQL = "select id, disabled_at is not null from web_users where email = %s"
+#: Почта уникальна только среди живых (F-031, `0075`): у замороженной и живой
+#: учётки она может совпасть, и тогда исход входа — про живую.
+_EMAIL_STATE_SQL = """
+    select id, disabled_at is not null
+      from web_users
+     where email = %s
+     order by disabled_at is not null, id
+     limit 1
+"""
 
 _RECORD_ACTION_SQL = """
     insert into action_journal

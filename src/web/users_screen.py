@@ -27,7 +27,7 @@ from flask import Flask, render_template, request
 from flask import Response as FlaskResponse
 
 from src.db import bot_links, second_factor
-from src.db.errors import DbError
+from src.db.errors import DbError, EmailTakenError
 from src.domain.log_ids import log_id
 from src.domain.tenants import canonical_tenant
 
@@ -353,6 +353,10 @@ def _install_add_freeze(app: Flask, users_path: str) -> None:
             разморожено = accounts.unfreeze(
                 цель.login, tenant=цель.tenant, only_roles=_touchable_roles(круг, цель.tenant)
             )
+        except EmailTakenError:
+            # Почту замороженной за это время отдали живой учётке (F-031):
+            # отказ по существу, а не «база не ответила».
+            return render(Show(flash=_flash("users.unfreeze.email_taken", ok=False)), 409)
         except DbError as exc:
             note_target_mismatch(exc)
             return render(Show(flash=_flash("users.unfreeze.failed", ok=False)), 400)

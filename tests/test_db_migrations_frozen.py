@@ -301,6 +301,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # Поездки «Календаря», строго своего пространства (D505, D506).
     "0074_trips.sql": ("sql1:fd024426495e15fd8c0e9d94d16a2892c7584c107be94c988a5eb393c92c71bf"),
+    # Почта уникальна только среди живых учёток (аудит 12.10, F-031).
+    "0075_email_unique_live.sql": (
+        "sql1:845d35a99171ce01bdbbb39d5895ebfdc65dcd30b793dd99d0a98b796600fa35"
+    ),
 }
 
 
