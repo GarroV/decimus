@@ -110,27 +110,6 @@ class Selection:
 
 
 @dataclass(frozen=True)
-class CityRow:
-    """Строка разбивки: город, его точки и что с ними за период.
-
-    Средняя считается по записанным процентам ровно так же, как по сети: по
-    всем проверкам города, какой бы методикой каждая ни была оценена (D365).
-    """
-
-    city: str
-    country: str
-    units: int
-    inspections: int
-    average: float | None
-    grades: tuple[tuple[str, int], ...]
-    critical: int
-    #: Движение средней против такого же периода перед этим. `None` — не с
-    #: чем сравнивать, и тогда на экране прочерк, а не ноль: ноль читался бы
-    #: как «ничего не изменилось».
-    delta: float | None = None
-
-
-@dataclass(frozen=True)
 class PointRow:
     """Точка выборки: её последняя проверка и куда она движется.
 
@@ -175,7 +154,6 @@ class Overview:
     unchecked: int = 0
     selection: Selection = Selection()
     countries: tuple[tuple[str, int], ...] = ()
-    breakdown: tuple[CityRow, ...] = ()
     points: tuple[PointRow, ...] = ()
     #: `{название точки: идентификатор}` — чтобы строка таблицы вела в карточку
     #: точки. Экран берёт ВСЁ одним снимком: отдельный поход в базу из
@@ -345,51 +323,6 @@ def window_before(period: str, *, today: date) -> tuple[date | None, date | None
         return None, None
     конец = today - timedelta(days=дней + 1)
     return конец - timedelta(days=дней), конец
-
-
-def _by_city(
-    rows: tuple[InspectionRow, ...], *, geo: dict[str, tuple[str, str]]
-) -> dict[tuple[str, str], list[InspectionRow]]:
-    """Разложить ряд по городам. Отдельно — потому что то же нужно прошлому окну."""
-    разложено: dict[tuple[str, str], list[InspectionRow]] = {}
-    for row in rows:
-        country, city = geo.get(row.unit_name, ("", ""))
-        разложено.setdefault((country, city), []).append(row)
-    return разложено
-
-
-def _breakdown(
-    rows: tuple[InspectionRow, ...],
-    *,
-    geo: dict[str, tuple[str, str]],
-    counts: dict[str, dict[str, int]],
-    before: tuple[InspectionRow, ...] = (),
-) -> tuple[CityRow, ...]:
-    """Разбивка выборки по городам, крупные города сверху.
-
-    Точка без города попадает в отдельную строку с пустым названием, а не
-    выбрасывается: «в разбивке 40 точек, а в сети 150» — это вопрос к
-    справочнику, и экран обязан его задать, а не спрятать.
-    """
-    по_городам = _by_city(rows, geo=geo)
-    было_по_городам = _by_city(before, geo=geo)
-    строки = [
-        CityRow(
-            city=city,
-            country=country,
-            units=len({row.unit_name for row in ряд}),
-            inspections=len(ряд),
-            average=_average(tuple(ряд)),
-            grades=_grades(tuple(ряд)),
-            critical=sum(counts.get(row.id, {}).get(CRITICAL, 0) for row in ряд),
-            delta=_difference(
-                _average(tuple(ряд)), _average(tuple(было_по_городам.get((country, city), ())))
-            ),
-        )
-        for (country, city), ряд in по_городам.items()
-    ]
-    строки.sort(key=lambda с: (-с.units, -с.inspections, с.city))
-    return tuple(строки)
 
 
 def _points(
@@ -593,14 +526,8 @@ def load(
     rows, обрезан = _slice(
         reach=охват, limit=limit, selection=selection, date_from=date_from, date_to=date_to
     )
-    # Прошлое окно читается ТОЛЬКО ради движения и только когда период задан:
-    # у «всего времени» предыдущего окна не существует, и лишний поход в базу
-    # на каждом открытии экрана был бы платой ни за что.
-    было, было_обрезано = (
-        _slice(reach=охват, limit=limit, selection=selection, date_from=было_от, date_to=было_до)
-        if было_от is not None
-        else ((), False)
-    )
+    # Прошлое окно читается ТОЛЬКО сводкой ради движения средней и только когда
+    # период задан: у «всего времени» предыдущего окна не существует.
     сводка = _summary(reach=охват, selection=selection, date_from=date_from, date_to=date_to)
     сводка_было = (
         _summary(reach=охват, selection=selection, date_from=было_от, date_to=было_до)
@@ -652,9 +579,8 @@ def load(
         unchecked=max(всего_точек - сводка.units, 0),
         selection=selection,
         countries=страны,
-        breakdown=_breakdown(rows, geo=geo, counts=counts, before=было),
         points=sorted_points(точки, selection.sort),
-        truncated=обрезан or было_обрезано,
+        truncated=обрезан,
         inspections_total=сводка.inspections,
         units_checked=сводка.units,
         critical_total=sum(1 for классы in counts.values() if классы.get(CRITICAL)),

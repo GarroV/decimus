@@ -105,30 +105,30 @@ REFUSAL_TEXTS: dict[str, dict[str, str]] = {
     },
     # --- имена и коды ---------------------------------------------------------
     "refusal.set_name_has_date": {
-        "ru": "Имя набора «{name}» кончается датой. Дату версии ставит хранилище само — "
-        "назовите набор без даты, например «imf».",
-        "en": "Set name “{name}” ends with a date. The store adds the version date itself — "
+        "ru": "Название версии «{name}» кончается датой. Дату версии ставит хранилище само — "
+        "назовите версию без даты, например «imf».",
+        "en": "Version name “{name}” ends with a date. The store adds the version date itself — "
         "name the set without a date, for example “imf”.",
     },
     "refusal.set_name_invalid": {
-        "ru": "Имя набора «{name}» не годится: ожидаются строчные латинские буквы, цифры, "
+        "ru": "Название версии «{name}» не годится: ожидаются строчные латинские буквы, цифры, "
         "дефис и подчёркивание, до 32 знаков (например «imf»).",
-        "en": "Set name “{name}” is not valid: use lowercase Latin letters, digits, hyphens "
+        "en": "Version name “{name}” is not valid: use lowercase Latin letters, digits, hyphens "
         "and underscores, up to 32 characters (for example “imf”).",
     },
     "refusal.set_name_missing": {
-        "ru": "У методики нет имени набора: она ещё никем не издана. Правка даёт версию с "
-        "датой, а дата без имени набора — не идентификатор. Назовите набор в поле имени "
-        "набора, например «imf»; дальше имя подхватится само.",
-        "en": "The methodology has no set name: nobody has issued it yet. An edit produces a "
-        "dated version, and a date without a set name is not an identifier. Enter a set name, "
+        "ru": "У методики нет названия версии: она ещё никем не издана. Правка даёт версию с "
+        "датой, а дата без названия — не идентификатор. Впишите название в поле "
+        "«Название версии методики», например «imf»; дальше оно подхватится само.",
+        "en": "The methodology has no version name: nobody has issued it yet. An edit produces a "
+        "dated version, and a date without a name is not an identifier. Enter a version name, "
         "for example “imf”; it will be picked up automatically after that.",
     },
     "refusal.bad_version": {
         "ru": "«{version}» не может быть именем версии. Версия выглядит как "
-        "«imf-2026-09-03-3f5a91b2c7d0» — имя набора, дата и отпечаток данных.",
+        "«imf-2026-09-03-3f5a91b2c7d0» — название версии, дата и отпечаток данных.",
         "en": "“{version}” cannot be a version name. A version looks like "
-        "“imf-2026-09-03-3f5a91b2c7d0” — set name, date and data fingerprint.",
+        "“imf-2026-09-03-3f5a91b2c7d0” — version name, date and data fingerprint.",
     },
     "refusal.bad_code": {
         "ru": "«{code}» не похоже на код: ожидаются латинские буквы, цифры и подчёркивание "
@@ -161,11 +161,11 @@ REFUSAL_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Новой версии не будет, и правка не записана: методика после неё совпадает с "
         "версией {version}, которая уже есть. Это возврат к её состоянию — от основы "
         "{base_version} правка отличается. Чтобы движок считал по этому состоянию, опубликуйте "
-        "{version}; чтобы записать его отдельной версией, назовите другой набор.",
+        "{version}; чтобы записать его отдельной версией, назовите версию иначе.",
         "en": "No new version, and the edit is not recorded: after it the methodology matches "
         "version {version}, which already exists. This is a return to its state — the edit "
         "differs from base {base_version}. To have the engine score by this state, publish "
-        "{version}; to record it as a separate version, use another set name.",
+        "{version}; to record it as a separate version, use another version name.",
     },
     "refusal.edit_refused": {
         "ru": "Правка отклонена, новой версии не появилось. Движок сказал: {engine}",
