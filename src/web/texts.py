@@ -1518,7 +1518,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Even out the shares of all zones",
     },
     "methodology.zones.add.submit": {"ru": "Завести", "en": "Add"},
-    "methodology.zones.note": {"ru": "Зачем правка", "en": "Why this edit"},
+    "methodology.zones.note": {"ru": "Зачем правим", "en": "Why this edit"},
     "methodology.empty.title": {"ru": "Пунктов нет", "en": "No items"},
     "methodology.empty.text": {
         "ru": "В этой версии методики нет ни одного пункта.",
@@ -1586,7 +1586,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Выключить пункт — отдельная кнопка, а не вид строки: так это видно в журнале.",
         "en": "Switching an item off is a button, not a row kind: that way the journal shows it.",
     },
-    "methodology.field.version_name": {"ru": "Имя набора", "en": "Set name"},
+    "methodology.field.version_name": {
+        "ru": "Название версии методики",
+        "en": "Methodology version name",
+    },
     "methodology.field.version_name.hint": {
         "ru": (
             "У этой методики имени ещё нет, а идентификатор версии складывается из имени, "
