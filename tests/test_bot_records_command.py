@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     feed,
     make_bot,
@@ -36,7 +35,7 @@ from src.domain import add_finding, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Имя команды. Проверяется как строка, а не как константа модуля: аудитор
 #: набирает и читает именно её, и переименование обязано ломать тест.

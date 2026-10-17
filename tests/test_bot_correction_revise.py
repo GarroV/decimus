@@ -22,7 +22,6 @@ from typing import Any
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     bot_message,
     feed,
@@ -43,7 +42,7 @@ from src.recognize.revise import Revision
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Однозначная фраза на синтетической карте: CLN05, класс D1, зона — горячий цех.
 OVEN = "печь грязная"

@@ -40,7 +40,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     feed,
     make_bot,
@@ -60,7 +59,7 @@ from src.domain import add_finding, get_item, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Семь полей информационной части (D070). Вида проверки (`INF02`) и
 #: фотофиксации (`INF09`–`INF11`) здесь нет намеренно.

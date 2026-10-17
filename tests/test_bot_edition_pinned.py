@@ -27,7 +27,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     candidate,
     feed,
@@ -46,7 +45,7 @@ from src.bot.texts import UI_LANGS
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Название, которого в методике заведомо нет: им переиздание и подменяет старое.
 НОВОЕ_ИМЯ = "Зона нового издания"

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     callback_query,
     feed,
@@ -32,7 +31,7 @@ from src.domain.errors import EngineError
 
 pytestmark = [pytest.mark.asyncio]
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Название зоны `cold_kitchen` на русском (`tests/methodology/zones.csv`) —
 #: тем же значением, что и код зоны в постановке задачи. Тест сравнивает с

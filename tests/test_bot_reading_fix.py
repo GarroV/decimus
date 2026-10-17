@@ -15,7 +15,6 @@ from typing import Any
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     callback_query,
     candidate,
@@ -34,7 +33,7 @@ from src.domain import get_state, start_inspection
 from src.recognize.errors import ModelUnavailable
 from src.recognize.models import Suggestion
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Слова без объекта карты: быстрый путь молчит, и материал уходит модели.
 WORDS = "посмотри что тут"

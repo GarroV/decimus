@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     bot_message,
     candidate,
@@ -30,7 +29,7 @@ from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.domain import get_state, start_inspection
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 @pytest.mark.parametrize(
