@@ -24,7 +24,7 @@
 from __future__ import annotations
 
 import pytest
-from bot_harness import AUDITOR_ID, CHAT_ID, feed, make_bot, press_build, text_message
+from bot_harness import CHAT_ID, feed, make_bot, press_build, text_message
 
 from src.bot.app import announce_commands, build_dispatcher
 from src.bot.config import BotSettings
@@ -34,7 +34,7 @@ from src.domain import add_finding, get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Имя команды строкой: аудитор набирает и читает именно её, и переименование
 #: обязано ломать тест, а не тихо переехать вместе с константой.

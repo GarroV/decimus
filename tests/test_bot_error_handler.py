@@ -24,7 +24,6 @@ from aiogram import Bot
 from aiogram.methods import TelegramMethod
 from aiogram.types import CallbackQuery, Message
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     RecordingSession,
     feed,
@@ -43,7 +42,7 @@ from src.domain.engine import state_file
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Так выглядит состояние, побывавшее в обрыве записи: файл есть, JSON — нет.
 МУСОР = "{это не json"

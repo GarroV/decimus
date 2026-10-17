@@ -19,7 +19,6 @@ from datetime import date
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     bot_message,
     candidate,
@@ -47,7 +46,7 @@ from src.domain.models import Inspection
 
 pytestmark = [pytest.mark.asyncio]
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 ПРОШЛЫЙ_РАЗ = date(2026, 9, 1)
 

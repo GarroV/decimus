@@ -273,7 +273,6 @@
 |---|---|---|
 | `ACTION_PLAN_DUE_DAYS` | `src/db/config.py` | да |
 | `ADMIN_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/oauth_smoke.py` | да |
-| `ALLOWED_TELEGRAM_IDS` | `src/bot/config.py` | да |
 | `API_TOKEN_BY` | `tools/api_token.py` | да |
 | `ATTACHMENT_MAX_MB` | `src/db/config.py` | да |
 | `AUDITOR_NAMES` | `src/bot/config.py` | да |

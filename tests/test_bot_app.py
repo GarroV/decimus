@@ -24,13 +24,13 @@ import pytest
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.types import MenuButtonDefault
-from bot_harness import AUDITOR_ID, FAKE_TOKEN
+from bot_harness import FAKE_TOKEN
 
 from src.bot import app
 from src.bot.config import BotSettings
 from src.domain.errors import ConfigError
 
-SETTINGS = BotSettings(token=FAKE_TOKEN, allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token=FAKE_TOKEN, mode="polling")
 
 
 class PollingSpy:

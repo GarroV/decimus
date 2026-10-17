@@ -23,7 +23,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     candidate,
     feed,
@@ -46,7 +45,7 @@ from src.domain import Finding, get_state, start_inspection
 
 pytestmark = [pytest.mark.asyncio, requires_data]
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Однозначная фраза синтетической карты: быстрый путь на ней срабатывает.
 БЫСТРАЯ = "печь грязная"

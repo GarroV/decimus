@@ -353,17 +353,25 @@ def _сведение_комментария_не_уходит_в_сеть(monke
 
 
 @pytest.fixture(autouse=True)
-def _бот_без_базы_не_знает_привязок(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Опознание бота по привязке без базы отвечает «привязки не было» (ревью #340, п.6).
+def _бот_без_базы_знает_своих(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Опознание бота по привязке без базы: свой человек стенда привязан к учётке УК.
 
-    Отказ базы привязок бот читает как отказ в доступе, и тест бота без базы
-    иначе не дошёл бы ни до одного обработчика. «Не было привязки» — ответ,
-    при котором действует прежний пропуск из окружения, как и до D286. Тест,
-    которому нужна привязка, передаёт свою `BindingCache(standing=…)`.
+    Отказ базы привязок бот читает как отказ в доступе (ревью #340, п.6), и
+    тест бота без базы иначе не дошёл бы ни до одного обработчика. До D520
+    своего пускал список `ALLOWED_TELEGRAM_IDS` при ответе «привязки не было»;
+    списка больше нет, вход — только привязка, поэтому по умолчанию любой ID,
+    кроме постороннего (`bot_harness.STRANGER_ID`), привязан к живой учётке УК
+    с полевой ролью. Тест, которому нужна другая привязка, передаёт свою
+    `BindingCache(standing=…)`.
     """
-    from src.db.bot_links import NEVER_BOUND
+    from bot_harness import STRANGER_ID, bound_to_hq
 
-    monkeypatch.setattr("src.bot.access._standing_from_db", lambda _tg: NEVER_BOUND)
+    from src.db.bot_links import NEVER_BOUND, Standing
+
+    def standing(tg: int) -> Standing:
+        return NEVER_BOUND if tg == STRANGER_ID else bound_to_hq(tg)
+
+    monkeypatch.setattr("src.bot.access._standing_from_db", standing)
 
 
 @pytest.fixture(autouse=True)

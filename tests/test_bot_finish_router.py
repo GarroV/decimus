@@ -19,7 +19,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     build_report,
     feed,
@@ -39,7 +38,7 @@ from src.report.errors import PdfNotBuilt, ReportError
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 def проверить_pdf(файл: Path) -> None:
