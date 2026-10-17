@@ -144,13 +144,17 @@ async def test_проведённая_ботом_проверка_лежит_в_
 async def test_повторная_сборка_отчёта_не_плодит_вторую_проверку(
     domain_env: Path, db_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Аудитор пересобрал отчёт — в базе по-прежнему одна проверка."""
+    """Аудитор нажал сборку ещё раз — в базе по-прежнему одна проверка.
+
+    Сданная проверка запечатана (T201, D080): вторая сборка отвечает отказом,
+    второго документа и второй строки в истории нет."""
     await проверка_через_бота(monkeypatch)
 
     bot, session = make_bot()
     await build_report(build_dispatcher(SETTINGS), bot)
 
-    assert отправленные_документы(session), "второй отчёт не собрался — сравнивать нечего"
+    assert not отправленные_документы(session), "сданную проверку пересобрали заново"
+    assert t("sealed.blocked", "ru") in session.texts
     accept_pushed()  # D199
     assert len(db.list_inspections(reach=own_reach("default"))) == 1
 

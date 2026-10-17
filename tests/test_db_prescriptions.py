@@ -76,13 +76,18 @@ def склад() -> Хранилище:
     return Хранилище()
 
 
-def _принятая(unit: str = "Batumi-1", tenant: str = "HQ") -> str:
+def _принятая(
+    unit: str = "Batumi-1",
+    tenant: str = "HQ",
+    finding: tuple[str, str, str] = ("PRD02", "D2", "cold_kitchen"),
+) -> str:
     from src.db.push import push_inspection
     from src.domain import add_finding, start_inspection
 
     чат = next(_чаты)
     start_inspection(чат, unit=unit, kind="planned", report_lang="ru", tenant=tenant)
-    add_finding(чат, code="PRD02", level="D2", zone="cold_kitchen", text="запись")
+    code, level, zone = finding
+    add_finding(чат, code=code, level=level, zone=zone, text="запись")
     ident = push_inspection(чат)
     accept_inspection(ident, tenant=tenant, actor="garva")
     return ident
@@ -372,7 +377,9 @@ def test_отклонённое_основание_не_даёт_отправи�
 def test_перенос_основания_в_другую_страну_не_даёт_отправить(
     сеть: dict[str, str],
 ) -> None:
-    основание = _принятая()
+    # D1: принятая с D2/D3 сама заводит экшн-план (D272), а проверку с планом
+    # в другую страну не переносят вовсе — до предписания дело бы не дошло.
+    основание = _принятая(finding=("CLN05", "D1", "hot_kitchen"))
     ident = _черновик(inspection_ids=(основание,))
     move_inspection(
         основание,
