@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     bot_message,
     candidate,
@@ -53,7 +52,7 @@ from src.recognize.errors import RecognizeError
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Однозначная фраза боевого вида на синтетической карте: строка «Печь»
 #: произнесена целиком, колонка выбрана словом «грязная» → CLN05, класс один.

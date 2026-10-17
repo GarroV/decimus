@@ -35,7 +35,7 @@ from src.domain import get_state
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 async def пройти_мастер(lang: str, unit: str = "Белград 2") -> object:

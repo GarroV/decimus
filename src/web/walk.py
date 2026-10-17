@@ -369,7 +369,7 @@ def identify(
             return jsonify({"error": "role", "message": текст.get(lang) or текст[ui_lang]}), 403
         # Стенд без бота сверять не с чем — там всё от имени УК, как начало
         # проверки (`walk_start`).
-        space = HQ_TENANT if conf.bot_token is None else walk_access.space_of(chat_id, conf)
+        space = HQ_TENANT if conf.bot_token is None else walk_access.space_of(chat_id)
         if space is None:
             # Бот этого человека не пускает (не привязан, доступ снят) — и
             # мини-апп тоже, хоть подпись и настоящая (D372).

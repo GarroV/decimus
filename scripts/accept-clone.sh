@@ -16,7 +16,6 @@ TELEGRAM_BOT_TOKEN=stub-not-a-real-token
 OPENAI_API_KEY=stub-not-a-real-key
 AUDIT_DATA_DIR=./data
 STATE_DIR=./.state
-ALLOWED_TELEGRAM_IDS=
 BOT_MODE=polling
 TZ=Europe/Belgrade
 POSTGRES_DB=dodo_audit_service

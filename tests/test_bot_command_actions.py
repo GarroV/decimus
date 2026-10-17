@@ -19,7 +19,7 @@ from src.bot.config import BotSettings
 from src.db.bot_links import Binding, Standing
 from src.domain.permissions import ACTION_CODES, role_may
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 def _команды(router: Router) -> set[str]:

@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from datetime import datetime, timezone
 from itertools import count
 from typing import Any
@@ -34,8 +34,34 @@ from aiogram.types import (
     Voice,
 )
 
+from src.db.bot_links import NEVER_BOUND, Binding, Standing
 from src.recognize.manual import ManualCandidate
 from src.recognize.models import Candidate, Suggestion
+
+
+def bound_to_hq(telegram_id: int) -> Standing:
+    """Положение «привязан к живой учётке УК с полевой ролью» — свой человек стенда.
+
+    Вход в бота и мини-апп — только по привязке (D520): прежний список
+    `ALLOWED_TELEGRAM_IDS` снят, и тесту без базы своего человека задаёт это.
+    """
+    return Standing.live(
+        Binding(
+            telegram_id=telegram_id,
+            user_id=f"stand-{telegram_id}",
+            login=f"stand-{telegram_id}",
+            tenant="HQ",
+            bound_at=datetime.now(timezone.utc),
+            role="developer",
+        )
+    )
+
+
+def bound_only(*telegram_ids: int) -> Callable[[int], Standing]:
+    """Опознание, при котором свои — ровно эти ID, остальные не привязаны никогда."""
+    свои = frozenset(telegram_ids)
+    return lambda tg: bound_to_hq(tg) if tg in свои else NEVER_BOUND
+
 
 FAKE_TOKEN = "111111:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 AUDITOR_ID = 4242

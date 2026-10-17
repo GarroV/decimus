@@ -40,7 +40,7 @@ def test_веб_ставит_пространство_вошедшего_и_сн
 
 @pytest.mark.asyncio
 async def test_бот_ставит_пространство_человека_и_в_потоках() -> None:
-    mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "GE")}), None)
+    mw = AccessMiddleware(_кэш({501: _привязка(501, "GE")}), None)
     увидено: list[str | None] = []
 
     async def handler(_e: TelegramObject, _data: dict[str, Any]) -> None:

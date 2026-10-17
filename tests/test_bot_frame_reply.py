@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     bot_message,
     build_report,
@@ -60,7 +59,7 @@ from src.domain import Finding, drop_inspection, get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Однозначная фраза на синтетической методике набора: строка карты произнесена
 #: целиком, колонка выбрана словом → ровно один код с единственным классом.

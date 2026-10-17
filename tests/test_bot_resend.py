@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 import pytest
-from bot_harness import AUDITOR_ID, CHAT_ID, feed, make_bot, text_message
+from bot_harness import CHAT_ID, feed, make_bot, text_message
 
 from src.bot.app import announce_commands, build_dispatcher
 from src.bot.config import BotSettings
@@ -27,7 +27,7 @@ from src.bot.routers.resend import RESEND_COMMAND
 from src.bot.texts import TEXTS, UI_LANGS, t
 from src.domain import add_finding, get_state, start_inspection
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Имя команды строкой: аудитор набирает именно её.
 COMMAND = "/resend"

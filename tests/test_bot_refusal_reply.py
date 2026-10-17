@@ -31,7 +31,6 @@ from typing import Any
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     bot_message,
     feed,
@@ -51,7 +50,7 @@ from src.domain import Finding, get_state
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Кадр, который прислали и ещё не объяснили словами: он ждёт в очереди и к
 #: отказу отношения не имеет. Именно он уезжал в чужую запись.

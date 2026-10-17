@@ -22,7 +22,6 @@ from typing import Any
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     build_report,
     callback_query,
@@ -47,7 +46,6 @@ pytestmark = pytest.mark.asyncio
 
 SETTINGS = BotSettings(
     token="unused-in-tests",
-    allowed_ids=frozenset({AUDITOR_ID}),
     mode="polling",
     auditor_names={},
 )

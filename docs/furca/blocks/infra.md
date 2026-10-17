@@ -17,12 +17,12 @@ make demo                              # демо-набор на английс
 ```
 
 Переменные: `TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, `AUDIT_DATA_DIR`,
-`ALLOWED_TELEGRAM_IDS`, `STATE_DIR`, `BOT_MODE` (`polling` | `webhook`), `TZ`,
+`STATE_DIR`, `BOT_MODE` (`polling` | `webhook`), `TZ`,
 `BACKUP_DIR`, `BACKUP_KEEP_DAYS` (выгрузка состояния, #233).
 
 Демо-стенд (T102, решение D059) берёт их из **того же** `.env` тем же
 механизмом. Своё у него только то, что обязано отличаться:
-`DEMO_TELEGRAM_BOT_TOKEN`, `DEMO_ALLOWED_TELEGRAM_IDS`, `DEMO_DATABASE_URL`,
+`DEMO_TELEGRAM_BOT_TOKEN`, `DEMO_DATABASE_URL`,
 `DEMO_STATE_DIR`. Единственный канонический список с описаниями —
 `.env.example`; здесь только имена, чтобы два списка не разъехались.
 

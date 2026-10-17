@@ -1281,11 +1281,14 @@ Cloudflare Worker'ов. Это постоянный вход, своего до�
 SNI и Host, по которым Caddy выбирает сайт, — его DNS и доступность в пути не
 участвуют. Туннель — контейнер `cloudflared` в `/srv/edge`
 (`GarroV/vps-infra: edge/compose.yml`), токен — `/srv/edge/tunnel.env` (600,
-вне git); наружу он ничего не публикует и видит только Caddy. Если туннель
-лёг, Worker отправляет тот же запрос прежним путём через интернет и пишет в
-лог `tunnel failed, falling back to public path` (`npx wrangler tail <имя>`).
-Проверено 08.10: пробный Worker при живом туннеле — ни одного отката, при
-погашенном `cloudflared` — откат и ответ 200.
+вне git); наружу он ничего не публикует и видит только Caddy. **Другого пути
+нет (D521, 16.10.2026):** туннель лёг — Worker отвечает 502 `upstream
+unavailable, please retry` и пишет `tunnel failed` (журналы Worker'ов выключены,
+строку видно только в `npx wrangler tail <имя>`); привязки `EDGE` нет — 503. Сайты
+decimus в Caddy (`GarroV/vps-infra: edge/sites/decimus.caddy`) отдают продукт
+только запросу из сети туннеля с верным ключом фронта, всё прочее получает 403 —
+в том числе прямой заход на имя сайта из интернета. До 16.10 при упавшем туннеле
+запрос без тела уходил на сервер через интернет.
 
 | Что в Cloudflare | Имя | ID |
 |---|---|---|
@@ -1338,8 +1341,16 @@ wrangler.admin.jsonc`, после первого запуска `deploy.sh`) и 
 ставит его в `X-Forwarded-For` только при верном ключе
 (`GarroV/vps-infra: edge/sites/decimus.caddy`). Ключ лежит в двух местах и больше
 нигде: секрет `FRONT_KEY` у обоих Worker'ов и `/srv/edge/sites/decimus-front.snippet`
-на VPS (в git не попадает). Сменить ключ — записать новый в оба места, затем
-`docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` в `/srv/edge`.
+на VPS (в git не попадает). **Смена ключа без простоя** (так сменён 16.10.2026,
+D521): новый ключ генерируется в файл (`openssl rand -hex 32`), значение нигде не
+печатается; в сниппете на время смены стоят оба ключа (две строки `header
+X-Decimus-Front-Key …` в одном именованном сопоставителе — Caddy сравнивает их по
+«или»), `caddy reload`; затем `npx wrangler secret put FRONT_KEY -c
+wrangler.admin.jsonc < файл` и то же для `wrangler.mcp.jsonc` (значение — со
+стандартного ввода, не аргументом); затем в сниппете остаётся только новый ключ и
+снова `caddy reload` (`docker compose exec caddy caddy reload --config
+/etc/caddy/Caddyfile` в `/srv/edge`). Проверка — админка и MCP через Worker
+отвечают, прямой заход на сайт Caddy — 403.
 Проверено 29.09: через фронт, напрямую и с подделанным ключом счётчик видит
 настоящий адрес посетителя.
 
@@ -1401,8 +1412,8 @@ Funnel не зависит: `https://decimus-stand.vasiliy-garro.workers.dev`. �
 5. **`WEB_BOT_USERNAME`** у веба — имя бота без `@`. Без неё «Настройки»
    не показывают «Привязать бота» и называют переменную.
 6. **Из окружения бота убрать `BOT_INVITES` и `BOT_MCP_TENANT`** — они больше
-   не читаются. `ALLOWED_TELEGRAM_IDS` остаётся: это совместимость, люди УК без
-   привязки работают по нему.
+   не читаются. `ALLOWED_TELEGRAM_IDS` тоже снят (D520, 16.10.2026): вход только
+   по привязке, строку из `.env` площадки можно удалить.
 
 ### 8.11. Язык бота, выбранный человеком (D303, #411)
 

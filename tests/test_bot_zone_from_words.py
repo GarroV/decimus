@@ -23,7 +23,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     candidate,
     feed,
@@ -39,7 +38,7 @@ from src.bot.config import BotSettings
 from src.bot.texts import t
 from src.domain import get_state, start_inspection
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 def начата() -> None:

@@ -29,7 +29,6 @@ from typing import Any
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     bot_message,
     candidate,
@@ -54,7 +53,7 @@ from src.recognize.errors import ModelUnavailable
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Однозначная фраза синтетической карты: строка «Печь» плюс колонка «грязная»
 #: → CLN05. Ведёт запись быстрым путём, без модели.

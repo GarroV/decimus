@@ -32,7 +32,6 @@ from __future__ import annotations
 import pytest
 from aiogram import Bot, Dispatcher
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     build_report,
     callback_query,
@@ -63,7 +62,7 @@ from src.domain import get_state, start_inspection
 #: модульная отметка на синхронном тесте — предупреждение на каждом прогоне.
 async_test = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Однозначная фраза на синтетической карте (см. `tests/methodology`): и пункт,
 #: и зону даёт сама карта — объект «Печь» стоит в ней с заполненной зоной
