@@ -15,12 +15,12 @@
 //  3. Location с адресом сервера переписывается на адрес фронта, чтобы
 //     переход не уводил человека обратно на заблокированный домен.
 //
-// До сервера Worker идёт туннелем (привязка EDGE — Workers VPC, D304): запрос
-// попадает прямо в Caddy на VPS, и имя служебный домен в пути больше не участвует —
-// ни его DNS, ни его доступность. Имя остаётся только SNI и Host, по которым
-// Caddy выбирает сайт. Если туннель лёг, запрос без тела (GET, HEAD, OPTIONS)
-// уходит прежним путём через интернет; запрос с телом не повторяется — он мог
-// уже дойти до сервера, и повтор доставил бы его дважды (#783).
+// До сервера Worker идёт ТОЛЬКО туннелем (привязка EDGE — Workers VPC, D304,
+// D521): запрос попадает прямо в Caddy на VPS, и имя служебного домена в пути
+// не участвует — ни его DNS, ни его доступность. Имя остаётся только SNI и
+// Host, по которым Caddy выбирает сайт. Публичного запасного пути нет: туннель
+// лёг или привязки нет — отказ 502/503, а не запрос через интернет. Caddy со
+// своей стороны принимает сайты decimus только из туннеля.
 
 const FRONT_KEY_HEADER = "X-Decimus-Front-Key";
 const CLIENT_IP_HEADER = "X-Decimus-Client-IP";
@@ -56,9 +56,10 @@ export async function handle(request, config, ctx) {
 }
 
 export async function forward(request, config) {
-  if (!config.ORIGIN_HOST || !config.FRONT_KEY) {
+  if (!config.ORIGIN_HOST || !config.FRONT_KEY || !config.EDGE) {
     // Без настроек не пересылаем вовсе: запрос без ключа выглядел бы на
-    // сервере прямым, и счётчик входов свалил бы всех в один адрес.
+    // сервере прямым, и счётчик входов свалил бы всех в один адрес; без
+    // туннеля идти некуда — публичного пути нет (D521).
     return new Response("front is not configured", { status: 503 });
   }
   const front = new URL(request.url);
@@ -85,34 +86,20 @@ export async function forward(request, config) {
   headers.delete("Host");
 
   const hasBody = !["GET", "HEAD"].includes(request.method);
-  // Запасной путь — только для запросов, которые безопасно повторить (#783).
-  // Исключение туннеля не говорит, дошёл ли запрос до сервера: обрыв на чтении
-  // ответа после записи — тоже исключение. Повтор POST по публичному пути
-  // доставил бы форму, импорт или сдачу дважды, поэтому запрос с телом
-  // получает отказ 502, а повторить его решает человек.
-  const replayable = ["GET", "HEAD", "OPTIONS"].includes(request.method);
-  const fallback = request;
-  const send = (via, from) =>
-    via(upstream, {
+  let response;
+  try {
+    response = await config.EDGE.fetch(upstream, {
       method: request.method,
       headers,
-      body: hasBody ? from.body : undefined,
+      body: hasBody ? request.body : undefined,
       redirect: "manual",
     });
-  let response;
-  if (config.EDGE) {
-    try {
-      response = await send((u, init) => config.EDGE.fetch(u, init), request);
-    } catch (error) {
-      if (!replayable) {
-        console.error("tunnel failed, request with body not replayed", String(error));
-        return new Response("upstream unavailable, please retry", { status: 502 });
-      }
-      console.error("tunnel failed, falling back to public path", String(error));
-    }
-  }
-  if (!response) {
-    response = await send(fetch, fallback);
+  } catch (error) {
+    // Повтора нет ни у какого запроса: исключение туннеля не говорит, дошёл ли
+    // запрос до сервера, а публичного пути больше нет (D521). Повторить решает
+    // человек.
+    console.error("tunnel failed", String(error));
+    return new Response("upstream unavailable, please retry", { status: 502 });
   }
 
   const location = response.headers.get("Location");

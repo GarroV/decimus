@@ -85,3 +85,38 @@ test("пересылка: ключ фронта, закреплённый хос
   const refused = await forward(asked("/"), { ORIGIN_HOST: "", FRONT_KEY: "" });
   assert.equal(refused.status, 503);
 });
+
+// Только туннель (аудит 12.10, F-006/013/090): запроса мимо привязки EDGE нет ни
+// при её отсутствии, ни при отказе туннеля — ключ фронта не уходит в интернет.
+function noPublicFetch() {
+  const calls = [];
+  const saved = globalThis.fetch;
+  globalThis.fetch = async (...args) => (calls.push(args), new Response("public"));
+  return { calls, restore: () => (globalThis.fetch = saved) };
+}
+
+test("без привязки EDGE запрос не уходит публичным путём", async () => {
+  const net = noPublicFetch();
+  try {
+    const answer = await forward(asked("/login"), { ORIGIN_HOST: "origin.test", FRONT_KEY: "key" });
+    assert.equal(answer.status, 503);
+    assert.equal(net.calls.length, 0, "запрос ушёл через интернет");
+  } finally {
+    net.restore();
+  }
+});
+
+test("туннель лёг: и GET получает отказ, а не публичный путь", async () => {
+  const net = noPublicFetch();
+  const broken = { fetch: async () => { throw new Error("tunnel down"); } };
+  try {
+    for (const method of ["GET", "HEAD", "POST"]) {
+      const init = method === "POST" ? { method, body: "x" } : { method };
+      const answer = await forward(asked("/login", init), { ORIGIN_HOST: "origin.test", FRONT_KEY: "key", EDGE: broken });
+      assert.equal(answer.status, 502, `${method}: не отказ`);
+    }
+    assert.equal(net.calls.length, 0, "запрос ушёл через интернет");
+  } finally {
+    net.restore();
+  }
+});
