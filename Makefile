@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
+.PHONY: bootstrap check test test-honest porcha porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -126,6 +126,12 @@ test-honest: export DATABASE_RETRACTION_PASSWORD = $(TEST_RETRACTION_PASSWORD)
 test-honest:  ## прогон тестов без кеша байткода — для проверки тестов порчей (`ARGS=tests/<файл>.py`)
 	AUDIT_REQUIRE_DATA=$(if $(strip $(ARGS)),,1) PYTHONDONTWRITEBYTECODE=1 $(VENV)/pytest --no-cov $(ARGS)
 	@if [ -z "$(strip $(ARGS))" ]; then $(VENV)/python scripts/check_run_complete.py reports/junit.xml; fi
+
+# Порча ядра одной командой (#268): вычет движка, ставка в data/scoring.json,
+# множитель повтора, правило формулировки. Каждая порча обязана уронить свой
+# тест; восстановление копией с проверкой md5. Нужны data/ и examples/.
+porcha:  ## порча ядра: испорченный расчёт обязан уронить прогон (без базы, нужны data/ и examples/)
+	$(VENV)/python tools/porcha_core.py
 
 porcha-permissions:  ## порча матрицы прав: каждая сломанная защита обязана уронить свой тест (без базы)
 	$(VENV)/python tools/porcha_permissions.py
