@@ -4,24 +4,22 @@ from __future__ import annotations
 
 DEMO_TEXTS: dict[str, dict[str, str]] = {
     # ── Лендинг (D525) ──────────────────────────────────────────────────
-    "landing.title": {"ru": "Выездные проверки пиццерий", "en": "Field inspections for pizzerias"},
+    "landing.title": {"ru": "Хаб оценки качества", "en": "Quality assessment hub"},
     "landing.kicker": {
-        "ru": "Decimus · выездные проверки Dodo",
-        "en": "Decimus · Dodo field audits",
+        "ru": "Decimus · оценка качества Dodo",
+        "en": "Decimus · Dodo quality assessment",
     },
-    "landing.hero.a": {"ru": "Обход пиццерии — голосом.", "en": "Walk the pizzeria — by voice."},
+    "landing.hero.a": {
+        "ru": "Хаб оценки качества сети.",
+        "en": "A quality assessment hub for the network.",
+    },
     "landing.hero.em": {
-        "ru": "Оценка, отчёт и письмо партнёру — сами.",
-        "en": "Score, report and partner letter — done for you.",
+        "ru": "Проверка, оценка, отчёт и исправления — в одном месте.",
+        "en": "Inspection, score, report and follow-up — in one place.",
     },
     "landing.lead": {
-        "ru": "Аудитор идёт по зонам с телефоном, говорит и фотографирует. Decimus "
-        "раскладывает замечания по чек-листу, считает оценку по методике и собирает отчёт. "
-        "Управляющая компания видит всю сеть, партнёр — свои пиццерии и что исправить.",
-        "en": "The auditor walks the zones with a phone, speaking and taking photos. Decimus "
-        "files the findings against the checklist, scores them by the methodology and builds "
-        "the report. Head office sees the whole network, the partner sees their pizzerias "
-        "and what to fix.",
+        "ru": "Проверяющий ведёт проверку с телефона: фиксирует замечания фото и коротким комментарием. Decimus привязывает их к пунктам чек-листа, считает оценку по методике и готовит отчёт. Управляющая компания видит всю сеть, партнёр — свои точки и что нужно исправить.",
+        "en": "The inspector runs the inspection from a phone, recording findings with a photo and a short comment. Decimus links them to checklist items, scores them by the methodology and prepares the report. Head office sees the whole network, the partner sees their own locations and what needs fixing.",
     },
     "landing.login": {"ru": "Войти", "en": "Sign in"},
     "landing.demo": {"ru": "Открыть демо", "en": "Open the demo"},
@@ -67,8 +65,8 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     },
     "landing.s2.title": {"ru": "Обход", "en": "Walk"},
     "landing.s2.body": {
-        "ru": "Зона за зоной в Telegram: голосом, фото и списком «что было в прошлый раз».",
-        "en": "Zone by zone in Telegram: voice, photos and a list of what was found last time.",
+        "ru": "Зона за зоной в Telegram: фото, короткий комментарий и что было в прошлый раз.",
+        "en": "Zone by zone in Telegram: a photo, a short comment and what was found last time.",
     },
     "landing.s3.title": {"ru": "Подтверждение", "en": "Confirm"},
     "landing.s3.body": {
@@ -79,40 +77,36 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     },
     "landing.s4.title": {"ru": "Отчёт", "en": "Report"},
     "landing.s4.body": {
-        "ru": "Проценты, буква и разбивка по зонам, PDF и письмо партнёру. Повтор прошлого "
-        "замечания стоит дороже.",
-        "en": "Percentage, grade and zone breakdown, a PDF and a letter to the partner. "
-        "A repeated finding costs more.",
+        "ru": "Проценты, буква и разбивка по зонам, PDF и черновик письма партнёру. Повтор прошлого замечания стоит дороже.",
+        "en": "Percentage, grade and zone breakdown, a PDF and a draft letter to the partner. A repeated finding costs more.",
     },
     "landing.s5.title": {"ru": "Исправление", "en": "Fix"},
     "landing.s5.body": {
-        "ru": "Серьёзные нарушения сами становятся планом действий со сроком; партнёр "
-        "отвечает фото, УК принимает.",
-        "en": "Serious findings become an action plan with a deadline; the partner answers "
-        "with a photo, head office signs off.",
+        "ru": "По серьёзным нарушениям запрашивается план действий со сроком: партнёр присылает план, УК принимает или возвращает.",
+        "en": "Serious findings trigger a request for an action plan with a deadline: the partner sends the plan, head office accepts or returns it.",
     },
     "landing.who.kicker": {"ru": "Кому что даёт", "en": "Who gets what"},
     "landing.who.title": {
         "ru": "Одна проверка — три точки зрения",
         "en": "One inspection, three views",
     },
-    "landing.who.auditor": {"ru": "Аудитору", "en": "Auditors"},
+    "landing.who.auditor": {"ru": "Проверяющему", "en": "Inspectors"},
     "landing.who.auditor.1": {
         "ru": "Проверка в телефоне, без бумаги и ноутбука",
         "en": "The inspection on a phone, no paper or laptop",
     },
     "landing.who.auditor.2": {
-        "ru": "Голос превращается в замечание с пунктом и зоной",
-        "en": "Voice turns into a finding with item and zone",
+        "ru": "Комментарий становится замечанием с пунктом и зоной",
+        "en": "A comment becomes a finding with item and zone",
     },
     "landing.who.auditor.3": {
-        "ru": "Отчёт и письмо собираются сами",
-        "en": "The report and letter build themselves",
+        "ru": "Отчёт и черновик письма готовы — остаётся проверить и отправить",
+        "en": "The report and draft letter are ready — just review and send",
     },
     "landing.who.hq": {"ru": "Управляющей компании", "en": "Head office"},
     "landing.who.hq.1": {
-        "ru": "Вся сеть на одном экране: страны, пиццерии, динамика",
-        "en": "The whole network on one screen: countries, pizzerias, trends",
+        "ru": "Вся сеть на одном экране: страны, точки, динамика",
+        "en": "The whole network on one screen: countries, locations, trends",
     },
     "landing.who.hq.2": {
         "ru": "Рейтинги стандартов и клиентского опыта вместо таблиц",
@@ -124,16 +118,16 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     },
     "landing.who.partner": {"ru": "Партнёру", "en": "Partners"},
     "landing.who.partner.1": {
-        "ru": "Свои пиццерии и их история проверок",
-        "en": "Their pizzerias and inspection history",
+        "ru": "Свои точки и их история проверок",
+        "en": "Their locations and inspection history",
     },
     "landing.who.partner.2": {
         "ru": "Что исправить и к какому сроку",
         "en": "What to fix and by when",
     },
     "landing.who.partner.3": {
-        "ru": "Ответ фотографией прямо в системе",
-        "en": "Answer with a photo right in the system",
+        "ru": "План действий и ответ на предписание — прямо в системе",
+        "en": "Action plan and response to a notice — right in the system",
     },
     "landing.who.try": {"ru": "Посмотреть в демо", "en": "See it in the demo"},
     "landing.more.kicker": {"ru": "Ещё внутри", "en": "Also inside"},
@@ -147,15 +141,15 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Подключите Claude и спрашивайте про сеть словами: в рамках своей роли.",
         "en": "Connect Claude and ask about the network in plain words, within your role.",
     },
-    "landing.more.history": {"ru": "История пиццерии", "en": "Pizzeria history"},
+    "landing.more.history": {"ru": "История точки", "en": "Location history"},
     "landing.more.history.body": {
-        "ru": "Все прошлые проверки и повторы — перед глазами аудитора на месте.",
-        "en": "Every past inspection and repeat — in front of the auditor on site.",
+        "ru": "Все прошлые проверки и повторы — перед глазами проверяющего на месте.",
+        "en": "Every past inspection and repeat — in front of the inspector on site.",
     },
     "landing.more.lang": {"ru": "Язык — параметр", "en": "Language is a setting"},
     "landing.more.lang.body": {
-        "ru": "Интерфейс, речь аудитора и отчёт — каждый на своём языке.",
-        "en": "Interface, the auditor's speech and the report — each in its own language.",
+        "ru": "Интерфейс, язык проверки и отчёт — каждый на своём языке.",
+        "en": "Interface, inspection language and report — each in its own language.",
     },
     "landing.mock.repeat": {"ru": "Повтор", "en": "Repeat"},
     "landing.mock.item2": {
@@ -165,20 +159,16 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     "landing.mock.photos": {"ru": "Фото: 3", "en": "Photos: 3"},
     "landing.net.kicker": {"ru": "Сеть на одном экране", "en": "The network on one screen"},
     "landing.net.title": {
-        "ru": "Где всё хорошо, где проседает и кто должен исправить",
-        "en": "Where it's fine, where it slips and who has to fix it",
+        "ru": "Где качество держится, где проседает и кто должен исправить",
+        "en": "Where quality holds, where it slips and who has to fix it",
     },
     "landing.net.lead": {
-        "ru": "Страны, пиццерии и динамика оценок — для управляющей компании целиком, для "
-        "партнёра в границах его пиццерий. Серьёзные нарушения сами превращаются в план "
-        "действий со сроком, и видно, кто его задерживает.",
-        "en": "Countries, pizzerias and score trends — the whole network for head office, "
-        "their own pizzerias for each partner. Serious findings turn into an action plan "
-        "with a deadline on their own, and you can see who is holding it up.",
+        "ru": "Страны, точки и динамика оценок — для управляющей компании целиком, для партнёра в границах его точек. По серьёзным нарушениям автоматически запрашивается план действий со сроком, и видно, кто его задерживает.",
+        "en": "Countries, locations and score trends — the whole network for head office, their own locations for each partner. Serious findings automatically trigger an action plan request with a deadline, and you can see who is holding it up.",
     },
     "landing.net.p1": {
-        "ru": "Тренд по каждой пиццерии, а не одна цифра",
-        "en": "A trend for every pizzeria, not one number",
+        "ru": "Тренд по каждой точке, а не одна цифра",
+        "en": "A trend for every location, not one number",
     },
     "landing.net.p2": {
         "ru": "Повторы прошлых замечаний видны сразу",
@@ -188,7 +178,7 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Планы действий со сроками и ответами партнёра",
         "en": "Action plans with deadlines and the partner's answers",
     },
-    "landing.net.head.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "landing.net.head.unit": {"ru": "Точка", "en": "Location"},
     "landing.net.head.score": {"ru": "Оценка", "en": "Score"},
     "landing.net.head.trend": {"ru": "Динамика", "en": "Trend"},
     "landing.net.plan": {"ru": "Ждут плана партнёра", "en": "Awaiting the partner's plan"},
