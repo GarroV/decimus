@@ -205,7 +205,7 @@
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
 | `add_checklist_item` | checklist | Add a checklist item | `src/mcp/checklist_tools.py` |
-| `add_photo_cue` | checklist | Add one cue row to the word map, storing a new methodology version beside the one in force — the version in force does… | `src/mcp/checklist_tools.py` |
+| `add_photo_cue` | checklist | Add one cue row to the synonym dictionary, storing a new methodology version beside the one in force — the version in… | `src/mcp/checklist_tools.py` |
 | `add_zone` | checklist | Add a physical zone (e.g | `src/mcp/checklist_tools.py` |
 | `apply_checklist` | checklist | Apply a checklist to production: inspections are scored against it from now on | `src/mcp/checklists_tools.py` |
 | `checklist_item` | checklist | Read one checklist item together with its D1/D2/D3 criteria — the only source of what makes a finding D1 versus D2… | `src/mcp/checklist_tools.py` |
@@ -215,13 +215,13 @@
 | `checklists` | checklist | List the checklists visible to this tenant: code, names, state (draft / active / retired) and which one is applied to… | `src/mcp/checklists_tools.py` |
 | `create_checklist` | checklist | Create a new checklist from the blank: an empty item list, one zone at 100 per cent and blank scoring rates | `src/mcp/checklists_tools.py` |
 | `edit_checklist_item` | checklist | Edit fields of an existing checklist item | `src/mcp/checklist_tools.py` |
-| `edit_photo_cue` | checklist | Change one cue row of the word map — its codes, its phrase, or both — storing a new methodology version beside the one… | `src/mcp/checklist_tools.py` |
+| `edit_photo_cue` | checklist | Change one cue row of the synonym dictionary — its codes, its phrase, or both — storing a new methodology version… | `src/mcp/checklist_tools.py` |
 | `learned_phrases` | checklist | Show the synonym map: the wordings auditors actually used on site that the product has learned, and the checklist item… | `src/mcp/phrases.py` |
-| `photo_cue_suggestions` | checklist | Report where the model has been systematically wrong, and propose what to add to the word map because of it | `src/mcp/checklist_tools.py` |
-| `photo_cues` | checklist | Read the word map of one methodology version: the sections and the cue rows inside them, each a phrase an auditor might… | `src/mcp/checklist_tools.py` |
+| `photo_cue_suggestions` | checklist | Report where the model has been systematically wrong, and propose what to add to the synonym dictionary because of it | `src/mcp/checklist_tools.py` |
+| `photo_cues` | checklist | Read the synonym dictionary of one methodology version: the sections and the cue rows inside them, each a phrase an… | `src/mcp/checklist_tools.py` |
 | `publish_checklist_version` | checklist | Make a stored checklist version the one the audit engine scores inspections by | `src/mcp/checklist_tools.py` |
 | `remove_checklist_item` | checklist | Disable a checklist item | `src/mcp/checklist_tools.py` |
-| `remove_photo_cue` | checklist | Remove one cue row from the word map, storing a new methodology version beside the one in force | `src/mcp/checklist_tools.py` |
+| `remove_photo_cue` | checklist | Remove one cue row from the synonym dictionary, storing a new methodology version beside the one in force | `src/mcp/checklist_tools.py` |
 | `remove_zone` | checklist | Remove a physical zone | `src/mcp/checklist_tools.py` |
 | `rename_checklist` | checklist | Change a checklist's names | `src/mcp/checklists_tools.py` |
 | `rename_zone` | checklist | Rename a zone: change the Russian and/or English name the auditor sees on site and the partner reads in the report | `src/mcp/checklist_tools.py` |
@@ -232,7 +232,7 @@
 | `scoring` | checklist | Read the deduction rates of a checklist edition: the starting percentage, the price of each violation class and the… | `src/mcp/checklist_tools.py` |
 | `set_checklist_bot_access` | checklist | Open a checklist to auditors in the Telegram bot, or close it | `src/mcp/checklists_tools.py` |
 | `set_checklist_state` | checklist | Set a checklist's state: draft, active or retired | `src/mcp/checklists_tools.py` |
-| `set_photo_cue_zone` | checklist | Set the object's zone on one cue row of the word map, storing a new methodology version beside the one in force | `src/mcp/checklist_tools.py` |
+| `set_photo_cue_zone` | checklist | Set the object's zone on one cue row of the synonym dictionary, storing a new methodology version beside the one in… | `src/mcp/checklist_tools.py` |
 | `set_route` | checklist | Set the walking route: the order in which the auditor goes through the pizzeria | `src/mcp/checklist_tools.py` |
 | `set_scoring` | checklist | Set the deduction rates of the checklist: starting percentage, the price of a D1 and of a D2 violation, and how much… | `src/mcp/checklist_tools.py` |
 | `set_zone_shares` | checklist | Set the share (weight in the score) of zones that already exist | `src/mcp/checklist_tools.py` |
