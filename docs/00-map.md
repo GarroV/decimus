@@ -278,7 +278,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 4 | _panel.html, _parts.html, _summary.html, index.html |
-| `src/web/templates/demo/` | 2 | app.html, pick.html |
+| `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
 | `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
 | `src/web/templates/journal/` | 1 | page.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
@@ -841,7 +841,7 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin tree front -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `front/` | 5 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
+| `front/` | 6 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.demo.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
 | `front/src/` | 2 | index.js, proxy.js |
 | `front/test/` | 1 | proxy.test.mjs |
 <!-- map:end -->

@@ -334,7 +334,7 @@ def install(app: Flask, conf: Settings) -> None:
 
     _install_bot(app, base, conf)
     _install_google(app, base, conf)
-    ui_lang.install(app, f"{base}/lang")
+    ui_lang.install(app, f"{base}/lang", demo=conf.demo)
     _install_account_menu(app, base, conf)
     _install_claude_token(app, base, conf)
     _install_sign_out_everywhere(app, base)

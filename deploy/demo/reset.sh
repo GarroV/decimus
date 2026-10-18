@@ -14,8 +14,9 @@ compose=(docker compose -p "$project" -f docker-compose.yml -f docker-compose.pr
 exec 9>"/tmp/$project-reset.lock"
 flock -n 9 || { echo "сброс демо уже идёт" >&2; exit 0; }
 
-"${compose[@]}" stop web walk || true
-"${compose[@]}" rm -sf db storage
+# Удалить, а не остановить: остановленный контейнер держит том, и `volume rm`
+# отказывает («volume is in use») — сброс падал со второго запуска.
+"${compose[@]}" rm -sf web walk db storage
 for volume in pgdata state methodology; do
     docker volume rm -f "${project}_${volume}" >/dev/null
 done

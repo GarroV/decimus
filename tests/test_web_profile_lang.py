@@ -15,7 +15,7 @@ from web_harness import СВОЙ, ТОКЕН, Учётка, войти, подм
 
 from src.db import web_own_profile
 from src.db.errors import AccessError
-from src.web import auth
+from src.web import auth, ui_lang
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 
@@ -40,10 +40,14 @@ def языки(monkeypatch: pytest.MonkeyPatch) -> Языки:
 
 
 def _стенд(
-    monkeypatch: pytest.MonkeyPatch, *, web_lang: str | None = None, role: str = "admin"
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    web_lang: str | None = None,
+    role: str = "admin",
+    demo: bool = False,
 ) -> Iterator[FlaskClient]:
     подменить_двери(monkeypatch, tenant="HQ", role=role)
-    with собрать(tenant="HQ", ui_lang="ru").test_client() as client:
+    with собрать(tenant="HQ", ui_lang="ru", demo=demo).test_client() as client:
         assert войти(client).status_code == 302
         monkeypatch.setattr(
             auth,
@@ -146,3 +150,16 @@ def test_пилюля_вошедшего_сохраняет_а_до_входа_�
         вход = client.get(auth.LOGIN_PATH).get_data(as_text=True)
 
     assert 'class="langpill" method="get"' in вход
+
+
+def test_в_демо_язык_живёт_в_браузере_а_не_в_общей_учётке(
+    monkeypatch: pytest.MonkeyPatch, языки: Языки
+) -> None:
+    """Учётки ролей демо общие (D524): выбор одного посетителя не меняет язык остальным."""
+    for client in _стенд(monkeypatch, demo=True, web_lang="ru"):
+        ответ = client.post("/settings/lang", data={"lang": "en"}, headers=ЗАГОЛОВКИ)
+
+        assert ответ.status_code == 302 and языки.записано == []
+        assert "Interface language" in client.get("/settings").get_data(as_text=True)
+        client.delete_cookie(ui_lang.DEMO_LANG_COOKIE)
+        assert "Язык интерфейса" in client.get("/settings").get_data(as_text=True)
