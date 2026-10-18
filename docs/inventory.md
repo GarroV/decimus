@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 158 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 159 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -179,6 +179,7 @@
 | `/users/spaces/add` | POST | `add_space` | `src/web/users_screen.py` |
 | `/users/spaces/countries` | POST | `space_countries` | `src/web/users_screen.py` |
 | `/users/unfreeze` | POST | `unfreeze_user` | `src/web/users_screen.py` |
+| `/welcome` | GET | `landing` | `src/web/landing.py` |
 
 **Мини-апп обхода (`src/web/walk_app.py: create_walk_app`)** — 11 маршрутов
 
@@ -293,6 +294,7 @@
 | `DATABASE_URL` | `src/db/config.py`, `src/mcp/config.py` | да |
 | `DB_POOL_MAX` | `src/db/pool.py` | да |
 | `DB_POOL_TIMEOUT_S` | `src/db/pool.py` | да |
+| `DEMO_PHOTOS_DIR` | `tools/seed_open_demo.py` | да |
 | `DEMO_STATE_DIR` | `tools/seed_demo.py` | да |
 | `DODO_MCP_TOKEN` | `tools/mcp_outside.py` | да |
 | `DODO_MCP_URL` | `tools/mcp_outside.py` | да |
@@ -347,6 +349,8 @@
 | `WEBAUTHN_ORIGIN` | `src/web/config.py` | да |
 | `WEBAUTHN_RP_ID` | `src/web/config.py` | да |
 | `WEB_BOT_USERNAME` | `src/web/config.py` | да |
+| `WEB_DEMO` | `src/domain/demo.py` | да |
+| `WEB_DEMO_URL` | `src/domain/demo.py` | да |
 | `WEB_HOST` | `src/web/config.py` | да |
 | `WEB_HSTS` | `src/web/config.py` | да |
 | `WEB_LISTEN_NETWORK` | `src/web/config.py` | да |

@@ -126,10 +126,19 @@ NO_STORE_PREFIXES = ("/users", "/settings")
 CACHEABLE_ENDPOINTS = frozenset({"settings_avatar"})
 
 
-def install(app: Flask, *, hsts: bool) -> None:
-    """Повесить заголовки на каждый ответ приложения."""
+def install(app: Flask, *, hsts: bool, demo: bool = False) -> None:
+    """Повесить заголовки на каждый ответ приложения.
+
+    `demo` — стенд открытого демо (D524): мини-апп обхода показывается там в
+    рамке телефона на своей же странице `/demo/app`, поэтому рамке разрешён и
+    свой домен. На проде рамка — только Telegram.
+    """
     заголовки = dict(BASE_HEADERS)
     обход = dict(WALK_HEADERS)
+    if demo:
+        обход["Content-Security-Policy"] = WALK_CONTENT_SECURITY_POLICY.replace(
+            "frame-ancestors ", "frame-ancestors 'self' ", 1
+        )
     if hsts:
         заголовки["Strict-Transport-Security"] = f"max-age={HSTS_MAX_AGE}"
         обход["Strict-Transport-Security"] = f"max-age={HSTS_MAX_AGE}"

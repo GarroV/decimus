@@ -158,7 +158,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,model_key_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,model_key_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -167,12 +167,14 @@ Flask-приложение управляющей компании и партн
 | `src/web/auth.py` | Вход в админку: форма, сессия в подписанной куке, выход (T323, D155) |
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
 | `src/web/connections_screen.py` | Вкладка «Подключения» экрана «Пользователи»: ключи API сервисов (D425, #568) |
+| `src/web/demo_entry.py` | Вход в открытое демо (D524): выбор роли и сессия без пароля — только на стенде демо |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
 | `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
 | `src/web/google_profile.py` | Имя и фото из Google в учётку (D468): скачать фото один раз и записать |
 | `src/web/guard.py` | Заслон прав веба: каждый маршрут спрашивает матрицу (`src/domain/permissions.py`) |
 | `src/web/journal.py` | Журналы входов и действий на стороне веба (D462, `0067`) |
 | `src/web/journal_screen.py` | Экраны журналов (D462): «Журнал» главного админа и «Мои входы» человека |
+| `src/web/landing.py` | Посадочная страница продукта (D524): что такое Decimus, «Войти» и «Открыть демо» |
 | `src/web/model_key_screen.py` | Блок «Ключ модели» на вкладке «Подключения»: вставить, проверить, убрать (D491) |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
@@ -216,6 +218,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Пиццерии» (D467, D504): колонка, шапка, плитки, пиццерии, панель |
+| `src/web/texts_demo.py` | Тексты открытого демо и лендинга (D524): выбор роли, плашка, посадочная страница |
 | `src/web/texts_grade.py` | Тексты «почему такая буква» и «расшифровка оценки» на карточке проверки (D490) |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры |
@@ -271,10 +274,11 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 17 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, … (+9) |
+| `src/web/templates/` | 18 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, … (+10) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 4 | _panel.html, _parts.html, _summary.html, index.html |
+| `src/web/templates/demo/` | 2 | app.html, pick.html |
 | `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
 | `src/web/templates/journal/` | 1 | page.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
@@ -670,6 +674,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/checklist_store.py` | Раскладка хранилища методик — та её часть, которую читает бот (#455) |
 | `src/domain/client_ip.py` | Чей это адрес у сервера MCP: клиент за общим прокси (D462, журнал действий) |
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
+| `src/domain/demo.py` | Открытое демо: учётки ролей и переключатели — контракт между посевом и входом |
 | `src/domain/edition.py` | Издание методики, на котором идёт проверка, и его снимок рядом с состоянием |
 | `src/domain/engine.py` | Вызов движка подпроцессом — единственный способ, которым блок его трогает |
 | `src/domain/errors.py` | Отказы блока `domain` |
@@ -798,6 +803,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/process_hint_measure.py` | T166 (D077): сколько раз признак «<описание>, это <процесс>» срабатывает зря |
 | `tools/regress_check.py` | Регрессионный якорь: цифры на боевых данных не должны меняться |
 | `tools/seed_demo.py` | Идемпотентный сид демо-набора (задачи T074, T100; блок infra) |
+| `tools/seed_open_demo.py` | Посев открытого демо (D524): выдуманная сеть пиццерий на отдельном стенде |
 | `tools/seed_ratings_demo.py` | Демо-рейтинги для веб-админки (`make web-demo`): английский, вымышленные пиццерии |
 | `tools/seed_walk_stand.py` | Стенд мини-аппа обхода (#418): середина проверки и прошлая проверка той же точки |
 | `tools/seed_web_demo.py` | Демо-история в базе: то, что показывает веб-админка |

@@ -25,6 +25,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from src.domain.demo import DEMO_URL_VAR, DEMO_VAR
 from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, MCP_PUBLIC_URL_VAR, parse_public_url
 from src.domain.tenants import canonical_tenant
 
@@ -122,6 +123,11 @@ class Settings:
     bot_username: str | None = None
     #: Слать `Strict-Transport-Security` (`WEB_HSTS=1`). По умолчанию нет.
     hsts: bool = False
+    #: Стенд открытого демо (`WEB_DEMO=1`, D524): вход `/demo` без пароля и плашка.
+    #: На проде переменной нет, и `/demo` отвечает 404.
+    demo: bool = False
+    #: Адрес демо для кнопки лендинга (`WEB_DEMO_URL`). `None` — кнопки нет.
+    demo_url: str | None = None
     #: Адрес сервиса мини-аппа обхода (`WEB_WALK_UPSTREAM`): `http://хост:порт`.
     #: `None` — адреса обхода админкой не отдаются.
     walk_upstream: str | None = None
@@ -302,6 +308,29 @@ def _parse_listen_network(raw: str) -> bool:
     )
 
 
+def _parse_demo(raw: str) -> bool:
+    """Стенд ли демо. Пусто и `0` — нет, `1` — да, остальное — отказ запуска.
+
+    Опечатка не смеет значить «да»: это вход без пароля.
+    """
+    value = raw.strip()
+    if value in ("", "0"):
+        return False
+    if value == "1":
+        return True
+    raise WebConfigError(f"Значение {DEMO_VAR}={value} не понято: ожидается 1 или пусто/0")
+
+
+def _parse_demo_url(raw: str) -> str | None:
+    """Адрес демо для лендинга: только `https://…` без кавычек и пробелов."""
+    value = raw.strip()
+    if not value:
+        return None
+    if not value.startswith("https://") or any(c in value for c in " \"'<>"):
+        raise WebConfigError(f"{DEMO_URL_VAR}={value} — ожидается адрес https://…")
+    return value.rstrip("/")
+
+
 def _parse_hsts(raw: str) -> bool:
     """Включён ли HSTS. Пусто и `0` — нет, `1` — да, остальное — отказ запуска.
 
@@ -475,6 +504,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         url_prefix=_parse_url_prefix(src.get(WEB_URL_PREFIX_VAR) or ""),
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
         hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),
+        demo=_parse_demo(src.get(DEMO_VAR) or ""),
+        demo_url=_parse_demo_url(src.get(DEMO_URL_VAR) or ""),
         walk_upstream=_parse_walk_upstream(src.get(WEB_WALK_UPSTREAM_VAR) or ""),
         admin_public_url=admin_public_url,
         mcp_public_url=_parse_public(src, MCP_PUBLIC_URL_VAR),

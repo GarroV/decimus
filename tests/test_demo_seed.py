@@ -25,6 +25,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import json
 import os
 import re
@@ -94,14 +95,36 @@ def test_demo_state_dir_is_ignored_by_git() -> None:
 
 
 def test_demo_dataset_has_no_cyrillic() -> None:
+    """Демо английское, а русский живёт только в колонках `*_ru` (D524).
+
+    Демо переключается на русский тем же переключателем языка, что продукт, —
+    поэтому чек-лист и зоны несут русские названия в своих колонках. Всё прочее
+    (критерии, словарь синонимов, ставки, английские колонки) — английское.
+    """
     offenders: dict[str, list[str]] = {}
     for path in sorted(DEMO_DATA.rglob("*")):
         if not path.is_file():
             continue
-        lines = cyrillic_in(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        if path.suffix == ".csv":
+            rows = list(csv.DictReader(io.StringIO(text)))
+            text = "\n".join(
+                value for row in rows for key, value in row.items() if not key.endswith("_ru")
+            )
+        lines = cyrillic_in(text)
         if lines:
             offenders[path.name] = lines[:3]
-    assert not offenders, f"демо обязано быть английским целиком, а кириллица есть: {offenders}"
+    assert not offenders, f"кириллица вне колонок *_ru: {offenders}"
+
+
+def test_demo_dataset_russian_columns_are_filled() -> None:
+    """Переключатель языка в демо без перевода показывал бы английский под RU."""
+    for name in ("checklist.csv", "zones.csv"):
+        with (DEMO_DATA / name).open(encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                for key, value in row.items():
+                    if key.endswith("_ru"):
+                        assert cyrillic_in(value), f"{name}: {key} без перевода — {value!r}"
 
 
 def test_demo_zone_shares_sum_to_100() -> None:

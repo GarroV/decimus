@@ -1,0 +1,36 @@
+{#
+  Выбор роли в открытом демо (D524). Есть только на стенде демо (`WEB_DEMO=1`).
+  Каждая карточка — форма POST: вход меняет состояние (кука), а по GET его
+  открыли бы предзагрузчики ссылок и превью мессенджеров.
+#}{% extends "base.html" %}
+{% block title %}{{ t('demo.title') }}{% endblock %}
+
+{% block body %}
+  <main class="landing demo-pick">
+    <section class="landing__hero">
+      <p class="landing__kicker">{{ t('landing.kicker') }}</p>
+      <h1 class="landing__title">{{ t('demo.title') }}</h1>
+      <p class="landing__lead">{{ t('demo.lead') }}</p>
+      {% if not_ready %}
+        <div class="note note--warn" role="alert"><div><div class="note__title">{{ t('demo.not_ready') }}</div></div></div>
+      {% endif %}
+    </section>
+    <section class="landing__grid">
+      {% for role in roles %}
+        <form class="landing__feature demo-pick__role" method="post" action="{{ url_for('demo_enter', key=role.key) }}?lang={{ lang }}">
+          <h2 class="landing__ftitle">{{ t('demo.role.' ~ role.key) }}</h2>
+          <p class="demo-pick__who">{{ role.name }}</p>
+          <p class="landing__fbody">{{ t('demo.role.' ~ role.key ~ '.what') }}</p>
+          <button class="btn btn--primary demo-pick__go" type="submit">{{ t('demo.enter') }}</button>
+        </form>
+      {% endfor %}
+      {% if walk_href %}
+        <div class="landing__feature demo-pick__role">
+          <h2 class="landing__ftitle">{{ t('demo.app') }}</h2>
+          <p class="landing__fbody">{{ t('demo.app.what') }}</p>
+          <a class="btn demo-pick__go" href="{{ walk_href }}?lang={{ lang }}">{{ t('demo.app.open') }}</a>
+        </div>
+      {% endif %}
+    </section>
+  </main>
+{% endblock %}

@@ -1,0 +1,32 @@
+{#
+  Посадочная страница (D524): неопознанный посетитель на корне админки видит,
+  что это за продукт, и две двери — «Войти» и «Открыть демо». Кнопки демо нет,
+  если адрес демо не задан (`demo_href` пуст).
+#}{% extends "base.html" %}
+{% block title %}{{ t('landing.title') }}{% endblock %}
+
+{% block body %}
+  <main class="landing">
+    <section class="landing__hero">
+      <p class="landing__kicker">{{ t('landing.kicker') }}</p>
+      <h1 class="landing__title">{{ t('landing.title') }}</h1>
+      <p class="landing__lead">{{ t('landing.lead') }}</p>
+      <div class="landing__actions">
+        {% if demo_href %}
+          <a class="btn btn--primary landing__cta" href="{{ demo_href }}?lang={{ lang }}">{{ t('landing.demo') }}</a>
+        {% endif %}
+        <a class="btn landing__cta" href="{{ url_for('login') }}?lang={{ lang }}">{{ t('landing.login') }}</a>
+      </div>
+      {% if demo_href %}<p class="landing__note">{{ t('landing.demo.note') }}</p>{% endif %}
+    </section>
+    <section class="landing__grid" aria-label="{{ t('landing.title') }}">
+      {% for n, mark in (('1', 'mic'), ('2', 'percent'), ('3', 'map'), ('4', 'check')) %}
+        <article class="landing__feature">
+          <span class="landing__num" aria-hidden="true">0{{ n }}</span>
+          <h2 class="landing__ftitle">{{ t('landing.f' ~ n ~ '.title') }}</h2>
+          <p class="landing__fbody">{{ t('landing.f' ~ n ~ '.body') }}</p>
+        </article>
+      {% endfor %}
+    </section>
+  </main>
+{% endblock %}

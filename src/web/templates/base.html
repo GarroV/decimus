@@ -71,6 +71,13 @@
   <script data-shell src="{{ url_for('static', filename='nav.js') }}" defer></script>
 </head>
 <body>
+  {% if demo_mode %}
+    {# Стенд открытого демо (D524): на каждой странице видно, что данные выдуманные. #}
+    <div class="demo-bar" role="note">
+      <span>{{ t('demo.banner') }}</span>
+      <a href="{{ url_for('demo_pick') }}?lang={{ lang }}">{{ t('demo.banner.switch') }}</a>
+    </div>
+  {% endif %}
   {% if not account %}
     {#
       До входа панели нет: разделы неопознанному человеку не показываются, а

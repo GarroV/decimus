@@ -977,6 +977,22 @@ def claim_google_sub(email: str, subject: str, *, record: bool) -> GoogleSubVerd
     raise AccessError(f"сверка аккаунта Google вернула незнакомый исход {итог!r}")
 
 
+def find_by_login(login: str) -> Account | None:
+    """Логин → действующая учётка без сверки пароля. Только для входа в демо (D524).
+
+    Вход без пароля открыт одним маршрутом `/demo` и только на стенде демо
+    (`WEB_DEMO=1`); продукт этой функцией не опознаёт никого.
+    """
+    with _connected("найти учётку") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_USER_SQL, (login.strip().lower(),))
+        row = cur.fetchone()
+    if row is None:
+        return None
+    return Account(
+        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[4]), email=row[5]
+    )
+
+
 def find_by_id(user_id: str) -> Account | None:
     """Номер учётки → учётка. Нет такой или отключена — `None`.
 

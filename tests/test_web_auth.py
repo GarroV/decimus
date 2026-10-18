@@ -9,7 +9,7 @@ from flask import Response
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, ПАРОЛЬ, СВОЙ, ТОКЕН, войти, подменить_двери, собрать
 
-from src.web import auth
+from src.web import auth, landing
 from src.web import inspections as data
 
 ТЕНАНТ = "default"
@@ -60,13 +60,17 @@ def test_каждый_маршрут_админки_закрыт_без_опоз
     for метод, путь in маршруты(стенд):
         ответ = стенд.open(путь, method=метод, headers={"Origin": СВОЙ})
         assert ответ.status_code == 302, f"{метод} {путь} открылся без входа"
-        assert auth.LOGIN_PATH in (ответ.headers.get("Location") or ""), (
-            f"{метод} {путь} увёл не на форму входа"
-        )
+        куда = ответ.headers.get("Location") or ""
+        # Корень неопознанному — посадочная страница со входом (D524), остальное — форма.
+        ждём = landing.PATH if (метод, путь) == ("GET", "/") else auth.LOGIN_PATH
+        assert ждём in куда, f"{метод} {путь} увёл не туда: {куда}"
 
 
 def test_неопознанный_видит_форму_входа_а_не_пустую_страницу(стенд: FlaskClient) -> None:
-    ответ = стенд.get("/", follow_redirects=True)
+    # Корень ведёт на посадочную страницу, на ней — дверь на форму входа (D524).
+    корень = стенд.get("/", follow_redirects=True).get_data(as_text=True)
+    assert f'href="{auth.LOGIN_PATH}' in корень
+    ответ = стенд.get(auth.LOGIN_PATH)
     страница = ответ.get_data(as_text=True)
     assert ответ.status_code == 200
     assert 'name="password"' in страница

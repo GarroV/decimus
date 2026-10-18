@@ -43,6 +43,11 @@ For every other item the class is the only one on its list, so there is nothing 
 | outdated price on menu board | DEM04 |
 | expired promo poster | DEM04 |
 | old sticker on price display | DEM04 |
+| dirty floor along the aisle | DEM13 |
+| debris behind the counter | DEM13 |
+| scuffed wall panel | DEM14 |
+| crumbs on the bench | DEM15 |
+| test order pizza | DEM18 |
 
 ## Kitchen line
 
@@ -54,6 +59,13 @@ For every other item the class is the only one on its list, so there is nothing 
 | food residue on cutting board | DEM06 |
 | raw meat residue on prep surface | DEM06 |
 | unsanitized board between orders | DEM06 |
+| burnt-on residue on the oven belt | DEM11 |
+| greasy oven hood | DEM11 |
+| food left in the mixer bowl | DEM12 |
+| grime on the cup sealer | DEM12 |
+| oven display temperature | DEM16 |
+| fridge thermometer reading | DEM17 |
+| freezer display | DEM17 |
 
 ## Storage / dry goods
 
@@ -76,3 +88,5 @@ For every other item the class is the only one on its list, so there is nothing 
 | empty soap dispenser | DEM10 |
 | no paper towels at the sink | DEM10 |
 | blocked handwashing sink | DEM10 |
+| dusty corner on the floor | DEM13 |
+| dirt on the skirting board | DEM14 |

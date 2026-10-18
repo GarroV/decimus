@@ -2024,3 +2024,78 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
   .head-line { gap: var(--space-5); }
   .head-line__lead { flex: 1 1 100%; }
 }
+
+/* ── Лендинг и выбор роли демо (D524) ────────────────────────────
+   Одна колонка по центру: крупный заголовок, абзац, две кнопки, ниже —
+   четыре карточки возможностей сеткой (на телефоне в столбик). */
+
+.landing { max-width: 1040px; margin: 0 auto; padding: var(--space-9) var(--space-5) var(--space-10); }
+.landing__hero { max-width: 720px; margin: var(--space-9) auto var(--space-9); text-align: center; }
+.landing__kicker {
+  font-size: var(--fs-meta); font-weight: var(--w-semibold); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--accent);
+}
+.landing__title {
+  margin-top: var(--space-4);
+  font-size: var(--fs-display); line-height: 1.1; font-weight: var(--w-semibold); color: var(--ink);
+  text-wrap: balance;
+}
+.landing__lead {
+  margin-top: var(--space-6);
+  font-size: var(--fs-lead); line-height: 1.55; color: var(--ink-2); text-wrap: pretty;
+}
+.landing__actions {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+.landing__cta { height: 48px; padding-inline: var(--space-8); font-size: var(--fs-lead); }
+.landing__cta:hover { text-decoration: none; }
+.landing__note { margin-top: var(--space-4); font-size: var(--fs-meta); color: var(--ink-3); }
+.landing__grid {
+  display: grid; gap: var(--space-5);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.landing__feature {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-7);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-block); box-shadow: var(--sh-card);
+}
+.landing__num { font-family: var(--font-num); font-size: var(--fs-meta); color: var(--accent); }
+.landing__ftitle { font-size: var(--fs-title); font-weight: var(--w-semibold); color: var(--ink); }
+.landing__fbody { font-size: var(--fs-body); line-height: 1.5; color: var(--ink-2); }
+
+.demo-pick__who { font-size: var(--fs-meta); color: var(--ink-3); }
+.demo-pick__go { margin-top: auto; justify-content: center; }
+.demo-pick__role .landing__fbody { flex: 1; }
+
+/* Плашка демо: узкая полоса над всем, на каждой странице стенда демо. */
+.demo-bar {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent-soft); color: var(--ink);
+  font-size: var(--fs-meta); text-align: center;
+}
+.demo-bar a { font-weight: var(--w-semibold); }
+
+@media (max-width: 720px) {
+  .landing { padding-top: var(--space-5); }
+  .landing__hero { margin-top: var(--space-5); }
+  .landing__title { font-size: var(--fs-title); font-size: clamp(28px, 8vw, 40px); }
+  .landing__cta { width: 100%; justify-content: center; }
+}
+
+/* Приложение в рамке телефона: экран 390×780, рамка — тень и скругление. */
+.demo-app { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-9); }
+.demo-app__aside { max-width: 380px; display: flex; flex-direction: column; gap: var(--space-5); align-items: flex-start; }
+.demo-app__aside .landing__title { margin-top: 0; }
+.demo-app__phone {
+  width: 390px; max-width: 100%; height: 780px; max-height: 85vh;
+  padding: 12px; border-radius: 44px; background: var(--ink);
+  box-shadow: var(--sh-modal);
+}
+.demo-app__screen { width: 100%; height: 100%; border: 0; border-radius: 32px; background: var(--surface); }
+@media (max-width: 720px) {
+  .demo-app__phone { padding: 0; border-radius: 0; background: none; box-shadow: none; height: 80vh; }
+  .demo-app__screen { border-radius: var(--r-block); border: 1px solid var(--line); }
+}

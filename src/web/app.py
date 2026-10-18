@@ -231,7 +231,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     # адреса обхода передаются отдельному сервису со своим томом на запись.
     walk_proxy.install(app, upstream=conf.walk_upstream, ui_lang=conf.ui_lang)
     _register_errors(app, conf)
-    security_headers.install(app, hsts=conf.hsts)
+    security_headers.install(app, hsts=conf.hsts, demo=conf.demo)
     return app
 
 
