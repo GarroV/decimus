@@ -7,6 +7,16 @@
 from __future__ import annotations
 
 COUNTRY_TEXTS: dict[str, dict[str, str]] = {
+    "country.search": {"ru": "Поиск страны или пиццерии", "en": "Search country or pizzeria"},
+    "country.rail.average": {"ru": "средняя {avg}", "en": "average {avg}"},
+    "country.rail.no_inspections": {
+        "ru": "проверок за период нет",
+        "en": "no inspections in the period",
+    },
+    "country.rail.group": {
+        "ru": "сводка по группе · стран: {n}",
+        "en": "group summary · countries: {n}",
+    },
     "country.dev.label": {"ru": "Девелопер", "en": "Developer"},
     "country.dev.all": {"ru": "Все", "en": "All"},
     "country.dev.countries": {"ru": "Стран: {n}", "en": "Countries: {n}"},
@@ -25,11 +35,12 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     },
     "country.facts.units": {"ru": "Пиццерий: {total}", "en": "Pizzerias: {total}"},
     "country.figures.title": {"ru": "Ключевые цифры", "en": "Key figures"},
-    "country.tile.average": {"ru": "Средняя оценка", "en": "Average score"},
+    "country.tile.average": {"ru": "Средняя", "en": "Average"},
     "country.tile.inspections": {"ru": "по проверкам: {n}", "en": "over {n} inspections"},
     "country.tile.checked": {"ru": "Проверено", "en": "Inspected"},
     "country.tile.of": {"ru": "{checked} из {total}", "en": "{checked} of {total}"},
     "country.tile.units": {"ru": "пиццерий", "en": "pizzerias"},
+    "country.tile.critical": {"ru": "Критические", "en": "Critical"},
     "country.tile.letters": {"ru": "Буквы", "en": "Grades"},
     "country.tile.rs.hint": {
         "ru": "Среднее РС по пиццериям страны (как на «Рейтингах»)",
@@ -58,8 +69,9 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
         "en": "Where the country loses most",
     },
     "country.units.title": {"ru": "Пиццерии", "en": "Pizzerias"},
-    "country.pick.label": {"ru": "Страна", "en": "Country"},
-    "country.pick.all": {"ru": "Все страны", "en": "All countries"},
+    "country.units.last": {"ru": "последняя {date}", "en": "latest {date}"},
+    "country.units.never": {"ru": "не проверяли", "en": "never inspected"},
+    "country.units.not_in_period": {"ru": "за период нет", "en": "none in the period"},
     "country.units.empty": {
         "ru": "В стране нет ни одной пиццерии.",
         "en": "There are no pizzerias in this country.",

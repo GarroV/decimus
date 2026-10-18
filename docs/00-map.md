@@ -120,7 +120,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/calendar_screen.py` | Раздел «Календарь» (D497): сетка месяца с проверками и поездками (D505, D506) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
 | `src/web/country.py` | Экран «Пиццерии» (прежде «Страна»): снимок страны и история пиццерии (D260, D262, D512) |
-| `src/web/country_page.py` | Сборка экрана «Пиццерии» (D467, D504): слева девелопер, страна и пиццерии, справа блоки |
+| `src/web/country_page.py` | Сборка экрана «Пиццерии» (D467, D474, D504, D527): колонка выбора слева, рабочая область справа |
 | `src/web/country_summary.py` | Сводка экрана «Пиццерии» (D467): цифры периода и девелоперы стран |
 | `src/web/country_units.py` | Таблица «Пиццерии» экрана «Пиццерии» (D467): одна строка на пиццерию |
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
@@ -274,10 +274,10 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 20 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _plan.html, _prescription.html, … (+12) |
-| `src/web/templates/actions/` | 3 | index.html, prescription_form.html, refused.html |
+| `src/web/templates/` | 22 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, … (+14) |
+| `src/web/templates/actions/` | 9 | _filters.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, index.html, prescription_form.html, … (+1) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
-| `src/web/templates/country/` | 4 | _panel.html, _parts.html, _summary.html, index.html |
+| `src/web/templates/country/` | 6 | _panel.html, _parts.html, _summary.html, index.html, index.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
 | `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
 | `src/web/templates/journal/` | 1 | page.html |
@@ -294,7 +294,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 51 | SOURCE.md, apple-touch-icon.png, country.js, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-journal.css, decimus-login.css, … (+43) |
+| `src/web/static/` | 54 | SOURCE.md, actions.js, apple-touch-icon.png, country.js, decimus-actions.css, decimus-country.css, decimus-domain.css, decimus-home.css, … (+46) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 

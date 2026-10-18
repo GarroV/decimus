@@ -475,9 +475,10 @@ def _register_overview(app: Flask, conf: Settings) -> None:
 def _register_country(app: Flask, conf: Settings) -> None:
     """Раздел «Пиццерии»: работа с одной страной (D260, D262, D467).
 
-    Рабочая зона — шапка и сегменты («Сводка», «Пиццерии»); сборка в
-    `country_page`. Срез живёт в адресе, как на «Главной»: «Грузия, пиццерии,
-    октябрь, Батуми-1 раскрыта» отправляют коллеге, и он видит ровно это.
+    Слева колонка стран и пиццерий, справа шапка, плитки и «Где болит» (шаблон
+    «выбор слева — рабочая область справа», D474); сборка в `country_page`.
+    Срез живёт в адресе, как на «Главной»: «Грузия, пиццерии, октябрь, Батуми-1
+    раскрыта» отправляют коллеге, и он видит ровно это.
     """
 
     @app.get(section("country").path, endpoint="country_index")
@@ -488,12 +489,10 @@ def _register_country(app: Flask, conf: Settings) -> None:
         переход = country_page.index_redirect(bool(request.args.get("lang")), язык)
         if переход is not None:
             return переход
-        # Рабочая зона не пустует, как в «Методике»: без страны в адресе справа
-        # сразу первая страна колонки (самая большая). Экран помечен выбором —
-        # на телефоне первым идёт список стран, а не эта страна.
+        # Рабочая зона не пустует: без страны в адресе справа сразу первая
+        # страна колонки (самая большая), в колонке она выделена.
         return country_page.render(
             code=None,
-            picking=False,
             lang=язык,
             limit=REGISTRY_LIMIT,
             item_titles=_item_titles(conf, язык),
@@ -507,7 +506,6 @@ def _register_country(app: Flask, conf: Settings) -> None:
         # сужает выборку в пустоту, и экран говорит об этом словами, а не 500.
         return country_page.render(
             code=code,
-            picking=False,
             lang=язык,
             limit=REGISTRY_LIMIT,
             item_titles=_item_titles(conf, язык),

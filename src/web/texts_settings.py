@@ -7,6 +7,51 @@
 
 from __future__ import annotations
 
+#: Инструкция для проекта Claude (Projects → Instructions) — один текст на весь экран.
+#: Инструменты — по `docs/inventory.md` («Инструменты MCP»); добавили группу
+#: инструментов — допишите строку здесь. Одна строка кортежа — одна строка текста.
+_INSTRUCTIONS_RU = "\n".join(
+    (
+        "Ты работаешь с Decimus — системой выездных проверок пиццерий — через MCP-сервер decimus.",
+        "Что доступно, решает роль человека; чего инструмент не отдаёт, того нет в данных — "
+        "не выдумывай.",
+        "Проверки: list_inspections, get_inspection, findings_by_unit, unit_history, "
+        "network_summary, inspection_letter (письмо партнёру).",
+        "Оценку не считай сам: проценты, букву и разбивку по зонам бери из ответа get_inspection.",
+        "Рейтинги РС и РКО: ratings_summary, ratings_units; сбор оценок в агрегаторах: "
+        "aggregators_status.",
+        "Методика: checklist_source и checklist_source_item (пункт с критериями D1/D2/D3); "
+        "правка чек-листов — только если роль позволяет.",
+        "Старые проверки: import_create_inspection и остальные import_* — это черновик, "
+        "принимает его человек.",
+        "Пункты, зоны и пиццерии называй как в ответе инструмента, коды не переводи.",
+        "Ничего не фиксируй в отчёте и не отправляй без подтверждения человека. "
+        "Отвечай на языке вопроса.",
+    )
+)
+_INSTRUCTIONS_EN = "\n".join(
+    (
+        "You work with Decimus, the pizzeria field-inspection system, through the decimus "
+        "MCP server.",
+        "What is available depends on the person's role; if a tool does not return it, it is "
+        "not in the data — do not invent it.",
+        "Inspections: list_inspections, get_inspection, findings_by_unit, unit_history, "
+        "network_summary, inspection_letter (partner letter).",
+        "Never compute a score yourself: take the percentage, the grade and the zone "
+        "breakdown from the get_inspection response.",
+        "SS and CX ratings: ratings_summary, ratings_units; delivery-aggregator collection: "
+        "aggregators_status.",
+        "Methodology: checklist_source and checklist_source_item (an item with its D1/D2/D3 "
+        "criteria); editing checklists only if the role allows it.",
+        "Past inspections: import_create_inspection and the other import_* tools make a "
+        "draft, and a person accepts it.",
+        "Name items, zones and pizzerias as the tool does, do not translate codes.",
+        "Never record anything in a report or send anything without a person's "
+        "confirmation. Answer in the language of the question.",
+    )
+)
+
+
 SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     "section.settings.title": {"ru": "Настройки", "en": "Settings"},
     "settings.sub": {
@@ -17,16 +62,36 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     },
     "settings.claude.title": {"ru": "Claude (MCP)", "en": "Claude (MCP)"},
     "settings.claude.lead": {
-        "ru": "Подключите Claude к данным Decimus: Claude Desktop — командой с личным токеном, "
-        "Claude Code — строкой ниже. Читает и правит Claude в пределах вашей роли.",
-        "en": "Connect Claude to Decimus data: Claude Desktop with a command and a personal "
-        "token, Claude Code with the line below. Claude acts within the rights of your role.",
+        "ru": "Подключите Claude к данным Decimus одной командой в терминале. Что доступно, "
+        "решает ваша роль.",
+        "en": "Connect Claude to Decimus data with one command in a terminal. What you can "
+        "do depends on your role.",
     },
-    "settings.claude.desktop": {"ru": "Claude Desktop", "en": "Claude Desktop"},
-    "settings.claude.code": {
-        "ru": "Claude Code и другие клиенты",
-        "en": "Claude Code and other clients",
+    "settings.claude.get": {"ru": "Получить команду установки", "en": "Get the install command"},
+    "settings.claude.reissue": {
+        "ru": "Перевыпустить команду установки",
+        "en": "Reissue the install command",
     },
+    "settings.claude.reissue_confirm": {
+        "ru": "Прежний токен перестанет работать — переустановите Claude по новой команде.",
+        "en": "The previous token stops working — reinstall Claude with the new command.",
+    },
+    "settings.claude.reissue_yes": {"ru": "Да, перевыпустить", "en": "Yes, reissue"},
+    "settings.claude.run": {
+        "ru": "Вставьте в терминал на Mac и перезапустите Claude (⌘Q). Команда видна один "
+        "раз, токен личный.",
+        "en": "Paste it into a terminal on your Mac and restart Claude (⌘Q). The command is "
+        "shown once; the token is personal.",
+    },
+    "settings.claude.address": {
+        "ru": "Или коннектором в claude.ai и Claude Code — адрес:",
+        "en": "Or as a connector in claude.ai and Claude Code — the address:",
+    },
+    "settings.claude.copy": {"ru": "Скопировать команду", "en": "Copy the command"},
+    "settings.claude.copy_again": {"ru": "Скопировать ещё раз", "en": "Copy again"},
+    "settings.claude.copied": {"ru": "Скопировано", "en": "Copied"},
+    "settings.claude.instr": {"ru": "Инструкции для проекта", "en": "Project instructions"},
+    "settings.claude.instr_text": {"ru": _INSTRUCTIONS_RU, "en": _INSTRUCTIONS_EN},
     "settings.bot.title": {"ru": "Бот в Telegram", "en": "Telegram bot"},
     "settings.bot.read_only": {
         "ru": "Бот для вашей роли не подключается: проверок в поле она не ведёт.",
@@ -149,13 +214,8 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     },
     "settings.lang.title": {"ru": "Язык интерфейса", "en": "Interface language"},
     "settings.lang.note": {
-        "ru": "Язык этого сайта хранится в вашем профиле — и выбор здесь, и переключатель в "
-        "меню сохраняют его. Ссылка с ?lang= в адресе меняет язык только для себя. Бот и "
-        "мини-апп помнят язык отдельно (команда /lang, настройки мини-аппа).",
-        "en": "The language of this site is kept in your profile — both the choice here and "
-        "the switcher in the menu save it. A link with ?lang= changes the language just "
-        "for itself. The bot and the mini-app keep their language separately "
-        "(/lang, mini-app settings).",
+        "ru": "Сохраняется в профиле. У бота и мини-аппа — свой язык.",
+        "en": "Saved in your profile. The bot and the mini-app keep their own.",
     },
     "settings.password.google": {
         "ru": "Вход паролем для этой учётки закрыт: вы входите через Google. Вернуть вход "

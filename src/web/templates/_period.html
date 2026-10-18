@@ -10,11 +10,13 @@
 
   Адреса стрелок и быстрых выборов собраны заранее в обработчике (`registry_view`).
   hidden — словарь параметров, которые форма обязана сохранить (язык, отбор).
+  arrows — рисовать ли стрелки ← → (по умолчанию да); «Календарь» (D477) зовёт с
+  `arrows=False`: у него одна кнопка-пилюля с меню, без стрелок.
 #}
-{% macro period_picker(period, title, prev, next, quick, action, hidden) %}
+{% macro period_picker(period, title, prev, next, quick, action, hidden, arrows=True) %}
   <div class="speriod" role="group" aria-label="{{ t('registry.period.label') }}">
-    {% if prev %}<a class="speriod__arrow" href="{{ prev }}" aria-label="{{ t('registry.period.prev') }}">{{ icon('cleft') }}</a>
-    {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cleft') }}</span>{% endif %}
+    {% if arrows %}{% if prev %}<a class="speriod__arrow" href="{{ prev }}" aria-label="{{ t('registry.period.prev') }}">{{ icon('cleft') }}</a>
+    {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cleft') }}</span>{% endif %}{% endif %}
     <details class="pick speriod__pick" name="pick">
       <summary class="spill speriod__title">{{ icon('cal') }}<span>{{ title }}</span></summary>
       <div class="pick__menu speriod__menu">
@@ -39,7 +41,7 @@
         </form>
       </div>
     </details>
-    {% if next %}<a class="speriod__arrow" href="{{ next }}" aria-label="{{ t('registry.period.next') }}">{{ icon('cright') }}</a>
-    {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cright') }}</span>{% endif %}
+    {% if arrows %}{% if next %}<a class="speriod__arrow" href="{{ next }}" aria-label="{{ t('registry.period.next') }}">{{ icon('cright') }}</a>
+    {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cright') }}</span>{% endif %}{% endif %}
   </div>
 {% endmacro %}

@@ -8,12 +8,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import datetime
 
 import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, ТОКЕН, Учётка, войти, подменить_двери, собрать
 
-from src.web import auth
+from src.web import auth, users_mcp
 from src.web.google_auth import GoogleSettings
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
@@ -150,7 +151,7 @@ def test_адрес_mcp_берётся_из_настройки_стенда(monk
     ):
         страница = client.get("/settings?tile=claude").get_data(as_text=True)
 
-        assert "claude mcp add --transport http decimus https://mcp.example/mcp" in страница
+        assert "https://mcp.example/mcp" in страница
 
 
 def _с_почтой(monkeypatch: pytest.MonkeyPatch, *, google: bool) -> Iterator[FlaskClient]:
@@ -347,3 +348,50 @@ def test_исход_действия_раскрывает_свою_плитку(
         )
         == "signout"
     )
+
+
+def test_плитка_claude_как_в_swarm_кнопка_инструкции_без_подразделов(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D476: «Получить команду установки», «Инструкции для проекта» с готовым текстом,
+    без подразделов Claude Desktop / Claude Code."""
+    monkeypatch.setattr(users_mcp, "own_status", lambda _id: users_mcp.TokenStatus(known=True))
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
+        страница = client.get("/settings?tile=claude").get_data(as_text=True)
+
+        assert "Получить команду установки" in страница
+        assert "Инструкции для проекта" in страница
+        assert "decimus" in страница and "get_inspection" in страница, "текст инструкции"
+        assert 'class="ssec__sub"' not in страница, "подразделы Claude Desktop / Claude Code убраны"
+        assert "Claude Desktop" not in страница
+
+        по_английски = client.get("/settings?tile=claude&lang=en").get_data(as_text=True)
+        assert "Get the install command" in по_английски
+        assert "Never compute a score yourself" in по_английски
+
+
+def test_в_левой_колонке_группы_разделены_чертами(monkeypatch: pytest.MonkeyPatch) -> None:
+    """D478: рабочая, вспомогательная, техническая — две черты между тремя группами."""
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
+        страница = client.get("/settings").get_data(as_text=True)
+        список = страница[страница.index('class="sidenav__list"') :]
+        список = список[: список.index('class="sidenav__foot"')]
+
+        assert список.count('class="sidenav__sep"') == 2
+
+
+def test_перевыпуск_команды_claude_идёт_через_подтверждение(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Токен уже есть: вместо «Получить» — «Перевыпустить» за подтверждением (гасит прежний)."""
+    monkeypatch.setattr(
+        users_mcp,
+        "own_status",
+        lambda _id: users_mcp.TokenStatus(known=True, expires_at=datetime(2027, 1, 1)),
+    )
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
+        страница = client.get("/settings?tile=claude").get_data(as_text=True)
+
+        assert "Перевыпустить команду установки" in страница
+        assert "Получить команду установки" not in страница
+        assert 'class="sconfirm"' in страница

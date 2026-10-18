@@ -1,10 +1,15 @@
-"""Сборка экрана «Пиццерии» (D467, D504): слева девелопер, страна и пиццерии, справа блоки.
+"""Сборка экрана «Пиццерии» (D467, D474, D504, D527): колонка выбора слева, рабочая область справа.
 
-Слева выпадающие списки девелопера и страны и под ними пиццерии выбранной
-страны (D504); справа — блоки страны, у каждого своя рамка и заголовок.
+Каркас — общий шаблон «выбор слева — рабочая область справа»
+(`templates/_pick_page.html`, `docs/12-web-admin.md`). Слева поиск, отбор
+«Девелопер» и страны списком (код, средняя за период, пиццерий); под выбранной
+страной — её пиццерии (D504). Справа — шапка с периодом, плитки ключевых цифр и
+«Где болит»; сведения и история пиццерии — в панели справа (D527: строка списка
+открывается на этом же экране, а не отдельной страницей).
 Состояние живёт в адресе: период `from` / `to`,
-`unit=<ключ>` (панель пиццерии справа), `dev=<девелопер>` (отбор стран) — ссылку
-на открытое отправляют коллеге, и он видит ровно это; без скриптов всё — ссылки.
+`unit=<ключ>` (панель пиццерии), `dev=<девелопер>` (отбор стран), `q=<поиск>` —
+ссылку на открытое отправляют коллеге, и он видит ровно это; без скриптов всё —
+ссылки и обычная форма поиска.
 
 Ничего не считает: цифры — снимок «Обзора» с отбором по стране
 (`country.py`), рейтинги — `home_ratings_block` теми же функциями, что у
@@ -23,7 +28,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -46,7 +50,7 @@ from . import (
 )
 from . import country as country_data
 from . import overview as overview_data
-from .geo_names import country_title
+from .geo_names import city_title, country_title
 from .sections import section
 from .texts import t
 from .unit_add import can_add_here
@@ -58,6 +62,9 @@ PARTNERS_SHOWN = 2
 
 #: Длина кода девелопера из адреса — как у поля справочника (`ratings.countries`).
 DEVELOPER_MAX = 120
+
+#: Длина поискового запроса по колонке (страны и пиццерии).
+SEARCH_MAX = 60
 
 
 def _url(endpoint: str, **params: Any) -> str:
@@ -92,7 +99,6 @@ def _ratings(code: str, period: registry_period.Period, today: date) -> tuple[An
 def render(
     *,
     code: str | None,
-    picking: bool,
     lang: str,
     limit: int,
     item_titles: dict[str, str],
@@ -117,12 +123,24 @@ def render(
     dev = request.args.get("dev", "").strip()[:DEVELOPER_MAX]
     if dev not in devs:
         dev = ""
+    query = request.args.get("q", "").strip()[:SEARCH_MAX]
     в_колонке = tuple((c, n) for c, n in страны if not dev or c in devs[dev])
     combined = code is None and bool(dev)
     if code is None and not combined:
         if not в_колонке:
-            return render_template("country/index.html", view=None, choices=страны)
-        code, picking = в_колонке[0][0], True
+            return render_template(
+                "country/index.html",
+                view=None,
+                combined=False,
+                rail=(),
+                group_row=None,
+                dev_pick=None,
+                query=query,
+                search_hidden={},
+                single_country=False,
+                pick_open=False,
+            )
+        code = в_колонке[0][0]
     period = registry_period.read(request.args, today=today)
     before = registry_period.shift(period, -1)
 
@@ -131,6 +149,7 @@ def render(
         params = {
             **period.params(),
             "dev": dev,
+            "q": query,
             "unit": request.args.get("unit", "").strip()[:80] if not combined else "",
             "lang": lang,
             **changes,
@@ -140,30 +159,11 @@ def render(
         return _url("country", code=code or "-", **params)
 
     def to_country(target: str) -> str:
-        """Выбор страны: тот же период и девелопер, но без раскрытой пиццерии."""
-        keep = {
-            **period.params(),
-            "dev": dev,
-            "lang": lang,
-        }
-        return _url("country", code=target, **keep)
+        """Строка колонки: тот же период, девелопер и поиск, но без раскрытой пиццерии."""
+        return _url("country", code=target, **period.params(), dev=dev, q=query, lang=lang)
 
-    # Страна — выпадающим списком под девелопером (D504). «Все страны» —
-    # сводка девелопера, поэтому этот вариант есть только при выбранном девелопере.
-    country_pick = pick(
-        label=t("country.pick.label", lang),
-        empty_title=t("country.pick.all", lang),
-        current="" if combined else (code or ""),
-        values=tuple((c, n) for c, n in в_колонке),
-        href=lambda значение: (
-            to_country(значение)
-            if значение
-            else _url("country_index", dev=dev, lang=lang, **period.params())
-        ),
-        title=lambda c: country_title(c, lang) or c,
-    )
-    if not dev:
-        country_pick = replace(country_pick, options=country_pick.options[1:])
+    stats = country_data.rail_stats(reach=reach, dates=_dates(period))
+    rail = _rail(в_колонке, query, lang, stats, to_country, current=None if combined else code)
     dev_pick = (
         pick(
             label=t("country.dev.label", lang),
@@ -171,7 +171,7 @@ def render(
             current=dev,
             values=tuple((name, len(members)) for name, members in devs.items()),
             href=lambda значение: (
-                _url("country_index", dev=значение, lang=lang, **period.params())
+                _url("country_index", dev=значение, q=query, lang=lang, **period.params())
                 if значение or combined
                 else select(dev="")
             ),
@@ -182,25 +182,33 @@ def render(
     )
     common: dict[str, Any] = {
         "choices": страны,
-        "country_pick": country_pick,
+        "rail": rail,
         "dev": dev,
         "dev_pick": dev_pick,
         "devs_failed": devs_failed,
-        "picking": picking or request.args.get("pick") == "1",
+        "query": query,
+        "search_hidden": {
+            k: v for k, v in (*period.params().items(), ("dev", dev), ("lang", lang)) if v
+        },
+        "group_row": (
+            {
+                "title": dev,
+                "units": sum(n for _c, n in в_колонке),
+                "count": len(devs[dev]),
+                "href": _url("country_index", dev=dev, q=query, lang=lang, **period.params()),
+                "on": combined,
+            }
+            if dev
+            else None
+        ),
         "period": period,
         "period_title": registry_view.period_title(period, lang),
         "period_prev": registry_view.period_link(period, -1, select),
         "period_next": registry_view.period_link(period, 1, select),
         "period_quick": registry_view.period_quick(period, today, lang, select),
-        "period_hidden": {k: v for k, v in (("dev", dev), ("lang", lang)) if v},
+        "period_hidden": {k: v for k, v in (("dev", dev), ("q", query), ("lang", lang)) if v},
         "select_url": select,
         "all_time_url": select(**{"from": "", "to": "", "period": registry_period.ALL}),
-        # «‹ Страны» на телефоне: колонка той же страны — с её пиццериями (D504).
-        "rail_back_url": (
-            _url("country_index", dev=dev, lang=lang, pick="1")
-            if combined
-            else _url("country", code=code or "-", dev=dev, lang=lang, pick="1", **period.params())
-        ),
         "item_titles": item_titles,
         "grade_tone": view.grade_tone,
         "level_tone": view.level_tone,
@@ -220,8 +228,63 @@ def render(
     return render_template(
         "country/index.html",
         **common,
-        **_one_country(code or "", dev_of.get(code or "", ""), period, before, limit, today, lang),
+        **_one_country(
+            code or "",
+            dev_of.get(code or "", ""),
+            select,
+            query,
+            period,
+            before,
+            limit,
+            today,
+            lang,
+        ),
     )
+
+
+def _rail(
+    countries: tuple[tuple[str, int], ...],
+    query: str,
+    lang: str,
+    stats: dict[str, tuple[float | None, int]],
+    to_country: Callable[[str], str],
+    *,
+    current: str | None,
+) -> tuple[dict[str, Any], ...]:
+    """Строки колонки стран: код, название, пиццерий, средняя и проверок за период.
+
+    Поиск — по названию на языке экрана и по коду, без учёта регистра; выбранная
+    страна остаётся в колонке при любом запросе — под ней её пиццерии.
+    """
+    needle = query.casefold()
+    rows = []
+    for code, units in countries:
+        title = country_title(code, lang) or code
+        if (
+            needle
+            and code != current
+            and needle not in title.casefold()
+            and needle not in code.casefold()
+        ):
+            continue
+        average, inspections = stats.get(code, (None, 0))
+        rows.append(
+            {
+                "code": code,
+                "title": title,
+                "units": units,
+                "average": average,
+                "inspections": inspections,
+                "href": to_country(code),
+                "on": code == current,
+            }
+        )
+    return tuple(rows)
+
+
+def _unit_matches(row: country_units.UnitRow, needle: str, lang: str) -> bool:
+    """Поиск по колонке: название пиццерии или её город."""
+    return needle in row.name.casefold() or needle in (city_title(row.city, lang) or "").casefold()
 
 
 def _dates(period: registry_period.Period) -> tuple[date | None, date | None]:
@@ -267,6 +330,8 @@ def _combined(
 def _one_country(
     code: str,
     developer: str,
+    select: Callable[..., str],
+    query: str,
     period: registry_period.Period,
     before: registry_period.Period | None,
     limit: int,
@@ -293,6 +358,14 @@ def _one_country(
     история: tuple[InspectionRow, ...] = ()
     if открытая is not None and открытая.unit_id:
         история = country_units.history(reach=reach, name=открытая.name, fallback=вид.history)
+    needle = query.casefold()
+    in_rail = tuple(
+        r
+        for r in units.rows
+        if not needle
+        or (открытая is not None and r.key == открытая.key)
+        or _unit_matches(r, needle, lang)
+    )
     plans = _country_plans(вид.code)
     rx = prescriptions.country_block(вид.code)
     return {
@@ -306,6 +379,11 @@ def _one_country(
         "partners_shown": PARTNERS_SHOWN,
         "developer": developer,
         "open_row": открытая,
+        "rail_open": tuple(r for r in in_rail if not r.is_closed),
+        "rail_closed": tuple(r for r in in_rail if r.is_closed),
+        "pick_open": открытая is not None,
+        "pick_back": select(unit=""),
+        "pick_title": открытая.name if открытая is not None else "",
         "history": история,
         "can_add_units": can_add_here(вид.code),
         "plans_count": len(plans["plans"]) if plans["plans_known"] else None,

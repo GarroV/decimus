@@ -1,145 +1,128 @@
 {#
-  Экран «Пиццерии» (D512; раньше «Страна»; D260, D262, D296, D467, D504) — статистика по стране (D500):
-  слева выпадающие списки «Девелопер» и «Страна», под ними пиццерии страны
-  (сведения и история — в панели справа); справа блоки страны — ключевые цифры
-  периода, рейтинги и карты, «Где болит». Состояние в адресе (`from`/`to`,
-  `unit`, `dev`), без скриптов всё работает ссылками.
+  Экран «Пиццерии» (D512; раньше «Страна»; D260, D262, D296, D467, D474, D504, D527) —
+  статистика по стране (D500). Каркас — общий шаблон «выбор слева — рабочая область
+  справа» (`_pick_page.html`): слева поиск, отбор «Девелопер» (только УК) и страны
+  списком (код, средняя за период, пиццерий); у выбранной страны под строкой — её
+  пиццерии (сведения и история — в панели справа, как в «Проверках»); справа —
+  шапка с периодом, плитки ключевых цифр, рейтинги и «Где болит».
+  Партнёр (D508) видит то же, но только свои страны; с одной страной выбирать
+  нечего — в колонке только её пиццерии. Состояние в адресе (`from`/`to`, `unit`,
+  `dev`, `q`), без скриптов всё работает ссылками и обычной формой поиска.
 
   Ни одного вычисления: всё приходит из `src/web/country_page.py`. Предписаний и
   экшн-планов здесь нет — счётчики в шапке ведут в «Действия» с отбором по стране.
 
-  Отбор «Девелопер» без страны в адресе — сводка по всем его странам и строка на
-  каждую (`combined`).
-#}{% extends "base.html" %}
+  Отбор «Девелопер» без страны в адресе — сводка по всем его странам (`combined`):
+  в колонке строка «сводка по группе», справа общие цифры и строка на каждую страну.
+  Строки сводки не ссылки (D527): страну выбирают в колонке слева.
+#}{% extends "_pick_page.html" %}
 {% from "_pick.html" import pick %}
+{% from "_pick_ui.html" import pick_item, pick_search, pick_head, pick_sub, pick_block, pick_empty with context %}
 {% from "_period.html" import period_picker with context %}
 {% from "country/_parts.html" import letters with context %}
 {% from "country/_summary.html" import key_figures, nothing, hurt with context %}
 {% from "country/_panel.html" import unit_panel with context %}
 {% block title %}{{ t('section.country.title') }}{% endblock %}
-{# Широкая раскладка, как у «Методики» (D496): колонка у левого края, а не по центру. #}
-{% block page_class %} page--wide{% endblock %}
-{% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+{% block pick_assets %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-country.css') }}">
-  <script src="{{ url_for('static', filename='split.js') }}" defer></script>
   <script src="{{ url_for('static', filename='country.js') }}" defer></script>
 {% endblock %}
 
-{% block body %}
-{# Раскладка как у «Методики» (владелец 30.09.2026): слева колонка стран,
-   справа — выбранная страна. Классы колонки общие с «Методикой» (`mx-shell`,
-   `mx-rail`). Рабочая зона не пустует: без страны в адресе в ней первая страна
-   колонки, а экран помечен выбором (`mx-shell--pick`) — на узком экране тогда
-   видна только колонка. На экране страны колонка там прячется, и назад ведёт
-   ссылка «‹ Пиццерии» (D512: слова «Страны» в ней больше нет). #}
-<div class="mx-shell cn-shell{% if view is none and not combined or picking %} mx-shell--pick{% endif %}">
-  <aside class="mx-rail cn-rail" aria-label="{{ t('country.filter.title') }}">
-    {# Девелопер и страна — выпадающими списками в блоке отбора, как на «Проверках»
-       (D504, D510); под ним пиццерии страны. #}
-    {# Партнёр с одной страной (D508): выбирать нечего — блока отбора нет. #}
-    {% if not single_country %}
-    <div class="cn-filters">
-      <div class="mx-rail__head">{{ t('country.filter.title') }}</div>
-      {% if dev_pick %}{{ pick(dev_pick) }}{% endif %}
-      {% if country_pick is defined and country_pick.options %}{{ pick(country_pick) }}{% else %}
-        <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>{% endif %}
-    </div>
-    {% endif %}
-    {% if units is defined and not combined %}
-      <div class="mx-rail__head mx-rail__head--list cn-units-head">
-        <span>{{ country_name or t('country.units.title') }}</span><span class="mx-rail__count">{{ units.open_rows|length }}</span>
-      </div>
-      {% macro unit_line(row) %}
-        <a class="mx-rail__row mx-rail__row--line cn-uline{% if open_row and row.key == open_row.key %} is-on{% endif %}" data-drawer-open
-           href="{{ select_url(unit=row.key) }}"{% if open_row and row.key == open_row.key %} aria-current="true"{% endif %}>
-          <span class="mx-rail__name">{{ row.name }}<small>{{ city_title(row.city) or '' }}{% if row.stage in ('pipeline', 'paused') %} · {{ t('unit.stage.' ~ row.stage) }}{% endif %}</small></span>
-          {% if row.last %}<span class="grade tag {{ grade_tone(row.last.grade) }}">{{ row.last.grade or '—' }}</span>{% endif %}
-        </a>
-      {% endmacro %}
-      {% if units.profiles_failed or units.ratings_failed or units.maps_failed %}
-        <p class="cn-quiet">{{ t('country.units.profiles_failed') if units.profiles_failed else t('country.units.ratings_failed') if units.ratings_failed else t('country.units.maps_failed') }}</p>
-      {% endif %}
-      {# Не выше 15 строк, дальше прокрутка внутри списка (D510). #}
-      <div class="cn-ulist" data-cn-ulist>
-        {% for row in units.open_rows %}{{ unit_line(row) }}{% else %}<div class="ov-card__empty">{{ t('country.units.empty') }}</div>{% endfor %}
-      </div>
-      {% if units.closed_rows %}
-        <details class="cn-closed"{% if open_row and open_row.is_closed %} open{% endif %}>
-          <summary>{{ t('country.units.closed', n=units.closed_rows|length) }}</summary>
-          {% for row in units.closed_rows %}{{ unit_line(row) }}{% endfor %}
-        </details>
-      {% endif %}
-    {% endif %}
-  </aside>
-  <div class="mx-main">
-{% if view is none and not combined %}
-  <div class="cn-head">
-    <div class="cn-head__main">
-      <div class="ov-head__kicker">{{ t('country.kicker') }}</div>
-      <h1 class="ov-head__title">{{ t('country.choose.title') }}</h1>
-    </div>
-  </div>
-{% else %}
-  {# Только на узком экране (`.cn-back`): колонка со списком там прячется, и без ссылки к пиццериям не попасть. #}
-  <a class="cn-back" href="{{ rail_back_url }}">‹ {{ t('country.units.title') }}</a>
+{% block pick_label %}{{ t('country.filter.title') }}{% endblock %}
 
-  {# ── Шапка: кто это, сколько пиццерий, период, счётчики ─────────────── #}
-  <section class="ov-card cn-headcard">
-    <div class="cn-head">
-      <div class="cn-head__main">
-        <div class="ov-head__kicker">{{ t('country.dev.label') if combined else t('country.kicker') }}</div>
-        <h1 class="ov-head__title">{{ dev if combined else (country_name or '—') }}</h1>
-        <div class="cn-facts">
-          {% if combined %}
-            <span>{{ t('country.dev.countries', n=dev_rows|length) }}</span>
-          {% else %}
-            {% if developer %}<span>{{ t('country.facts.developer', name=developer) }}</span>{% endif %}
-            {% if partners %}
-              <span>{% if partners|length == 1 %}{{ t('country.facts.partner', name=partners[0]) }}
-                {% elif partners|length <= partners_shown %}{{ t('country.facts.partners', names=partners|join(', ')) }}
-                {% else %}{{ t('country.facts.partners_more', names=partners[:partners_shown]|join(', '), n=partners|length - partners_shown) }}{% endif %}</span>
-            {% endif %}
-            {% set open_n = units.rows|selectattr('stage', 'equalto', 'open')|list|length %}
-            {% set pipe_n = units.rows|selectattr('stage', 'equalto', 'pipeline')|list|length %}
-            {% set closed_n = units.closed_rows|length %}
-            <span>{{ t('country.facts.units', total=units.rows|length) }}
-              <span class="cn-facts__muted">· {{ t('country.register.hint', open=open_n, pipeline=pipe_n, closed=closed_n) }}</span></span>
-          {% endif %}
-        </div>
-      </div>
-      {% if not combined %}
-      <div class="cn-actions">
-        {% if can_add_units and not read_only %}
-          <a class="btn btn--sm btn--primary" href="{{ url('/country/' ~ view.code ~ '/units/new') }}?lang={{ lang }}">＋ {{ t('unitnew.open') }}</a>
+{% block pick_tools %}
+  {{ pick_search(url(current_path), query, t('country.search'), search_hidden) }}
+  {% if dev_pick %}{{ pick(dev_pick) }}{% endif %}
+{% endblock %}
+
+{% macro unit_line(row) %}
+  {% set last_note = (t('country.units.last', date=row.last_ever or row.last.when) ~ ('' if row.last else ' · ' ~ t('country.units.not_in_period')))
+                     if (row.last_ever or row.last) else t('country.units.never') %}
+  {% call pick_item(select_url(unit=row.key), row.name,
+                    (city_title(row.city) or '') ~ ((' · ' ~ t('unit.stage.' ~ row.stage)) if row.stage in ('pipeline', 'paused') else '') ~ ' · ' ~ last_note,
+                    on=(open_row and row.key == open_row.key), drawer=true, sub=true) %}
+    {% if row.last %}<span class="pk-item__tag grade tag {{ grade_tone(row.last.grade) }}">{{ row.last.grade or '—' }}</span>{% endif %}
+  {% endcall %}
+{% endmacro %}
+
+{% block pick_list %}
+  {% if group_row %}
+    {{ pick_item(group_row.href, group_row.title, t('country.rail.group', n=group_row.count), group_row.units, group_row.on, code='Σ') }}
+  {% endif %}
+  {% for row in rail %}
+    {% if not single_country %}
+      {{ pick_item(row.href, row.title,
+                   (t('country.rail.average', avg='%.1f'|format(row.average)) if row.average is not none else t('country.rail.no_inspections')),
+                   row.units, row.on, code=row.code) }}
+    {% endif %}
+    {% if row.on and units is defined and not combined %}
+      {% if units.profiles_failed or units.ratings_failed or units.maps_failed %}
+        <p class="pk-note">{{ t('country.units.profiles_failed') if units.profiles_failed else t('country.units.ratings_failed') if units.ratings_failed else t('country.units.maps_failed') }}</p>
+      {% endif %}
+      {% call pick_sub() %}
+        {% for r in rail_open %}{{ unit_line(r) }}{% else %}<p class="pk-note">{{ t('country.units.empty') }}</p>{% endfor %}
+        {% if rail_closed %}
+          <details class="pk-closed"{% if open_row and open_row.is_closed %} open{% endif %}>
+            <summary>{{ t('country.units.closed', n=rail_closed|length) }}</summary>
+            {% for r in rail_closed %}{{ unit_line(r) }}{% endfor %}
+          </details>
         {% endif %}
-        <a class="btn btn--sm" href="{{ url(actions_path) }}?tab=plans{% if plans_act_country %}&amp;country={{ view.code }}{% endif %}&amp;lang={{ lang }}"
-           title="{{ t('country.plans.act') if plans_act_country else t('country.plans.mine') }}">
-          {{ t('country.plans.title') }}<span class="cn-count{% if plans_count %} is-on{% endif %}">{{ '—' if plans_count is none else plans_count }}</span></a>
-        <a class="btn btn--sm" href="{{ url(actions_path) }}?tab=prescriptions{% if rx_act_hq %}&amp;country={{ view.code }}{% endif %}&amp;lang={{ lang }}"
-           title="{{ t('country.rx.act') if rx_act_hq else t('country.rx.mine') }}">
-          {{ t('country.rx.title') }}<span class="cn-count{% if rx_count %} is-on{% endif %}">{{ '—' if rx_count is none else rx_count }}</span></a>
-      </div>
+      {% endcall %}
+    {% endif %}
+  {% else %}
+    <p class="pk-empty pk-empty--rail">{{ t('country.choose.empty') }}</p>
+  {% endfor %}
+{% endblock %}
+
+{% block pick_work %}
+{% if view is none and not combined %}
+  {% call pick_empty() %}{{ t('country.choose.empty') }}{% endcall %}
+{% else %}
+  {% call pick_head(t('country.dev.label') if combined else t('country.kicker'), dev if combined else (country_name or '—')) %}
+    <div class="pk-head__facts">
+      {% if combined %}
+        <span>{{ t('country.dev.countries', n=dev_rows|length) }}</span>
+      {% else %}
+        {% if developer %}<span>{{ t('country.facts.developer', name=developer) }}</span>{% endif %}
+        {% if partners %}
+          <span>{% if partners|length == 1 %}{{ t('country.facts.partner', name=partners[0]) }}
+            {% elif partners|length <= partners_shown %}{{ t('country.facts.partners', names=partners|join(', ')) }}
+            {% else %}{{ t('country.facts.partners_more', names=partners[:partners_shown]|join(', '), n=partners|length - partners_shown) }}{% endif %}</span>
+        {% endif %}
+        {% set open_n = units.rows|selectattr('stage', 'equalto', 'open')|list|length %}
+        {% set pipe_n = units.rows|selectattr('stage', 'equalto', 'pipeline')|list|length %}
+        {% set closed_n = units.closed_rows|length %}
+        <span>{{ t('country.facts.units', total=units.rows|length) }}
+          <span class="is-muted">· {{ t('country.register.hint', open=open_n, pipeline=pipe_n, closed=closed_n) }}</span></span>
       {% endif %}
     </div>
-    <div class="cn-period">
+    {% if not combined %}
+    <div class="pk-head__actions">
+      {% if can_add_units and not read_only %}
+        <a class="btn btn--sm btn--primary" href="{{ url('/country/' ~ view.code ~ '/units/new') }}?lang={{ lang }}">＋ {{ t('unitnew.open') }}</a>
+      {% endif %}
+      <a class="btn btn--sm" href="{{ url(actions_path) }}?tab=plans{% if plans_act_country %}&amp;country={{ view.code }}{% endif %}&amp;lang={{ lang }}"
+         title="{{ t('country.plans.act') if plans_act_country else t('country.plans.mine') }}">
+        {{ t('country.plans.title') }}<span class="cn-count{% if plans_count %} is-on{% endif %}">{{ '—' if plans_count is none else plans_count }}</span></a>
+      <a class="btn btn--sm" href="{{ url(actions_path) }}?tab=prescriptions{% if rx_act_hq %}&amp;country={{ view.code }}{% endif %}&amp;lang={{ lang }}"
+         title="{{ t('country.rx.act') if rx_act_hq else t('country.rx.mine') }}">
+        {{ t('country.rx.title') }}<span class="cn-count{% if rx_count %} is-on{% endif %}">{{ '—' if rx_count is none else rx_count }}</span></a>
+    </div>
+    {% endif %}
+    <div class="pk-head__period">
       {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), period_hidden) }}
     </div>
-  </section>
+  {% endcall %}
 
   {# Срез длиннее предела ряда (#470): сказать вслух, а не обрезать молча. #}
   {% if truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=limit) }}</div></div></div>{% endif %}
 
   {% if combined %}
-    {# ── Сводка девелопера: общие цифры его стран и строка на каждую ──── #}
+    {# ── Сводка девелопера: общие цифры его стран и строка на каждую (D527: без переходов) ── #}
     {{ nothing(summary) }}
     {{ key_figures(summary, none, false) }}
-    <section class="ov-card cn-block">
-      <div class="ov-card__head">
-        <div class="ov-card__title">{{ t('country.rail.title') }}</div>
-        <div class="ov-card__hint">{{ period_title }}</div>
-      </div>
+    {% call pick_block(t('country.rail.title'), period_title, dev_rows|length) %}
       <div class="ov-table cn-countries">
         <div class="ov-table__head">
           <span>{{ t('country.col.country') }}</span>
@@ -149,41 +132,25 @@
           <span>{{ t('country.tile.letters') }}</span>
         </div>
         {% for r in dev_rows %}
-          <a class="ov-table__row" href="{{ r.href }}">
+          <div class="ov-table__row">
             <span class="cn-unit__name"><b>{{ country_title(r.code) or r.code }}</b></span>
             <span class="ov-num">{{ t('country.tile.of', checked=r.summary.units_checked, total=r.summary.units_total) }}</span>
             <span class="ov-num">{{ r.summary.inspections }}</span>
             <span class="ov-num ov-num--strong">{{ '—' if r.summary.average is none else '%.1f'|format(r.summary.average) }}</span>
             <span>{{ letters(r.summary.grades) }}</span>
-          </a>
+          </div>
         {% endfor %}
       </div>
-    </section>
-    <p class="cn-quiet">{{ t('country.dev.note') }}</p>
+    {% endcall %}
+    {% call pick_empty() %}{{ t('country.dev.note') }}{% endcall %}
   {% else %}
-    {# ── Блоки страны (D504): пиццерии — слева, здесь итоги. ── #}
-    <div class="split"><div class="split__list">
-      {{ nothing(summary) }}
-      {{ key_figures(summary, column, true) }}
-      {% if ratings_failed %}<p class="cn-quiet">{{ t('home.ratings.failed') }}</p>{% endif %}
-      {% if summary.has_inspections %}{{ hurt(data) }}{% endif %}
-    </div></div>
-
-    {# ── Панель пиццерии справа: каркас — как в «Проверках» (`_split_page.html`) ─ #}
-    {% if open_row %}
-      <div class="sdrawer" data-drawer>
-        <a class="sdrawer__scrim" href="{{ select_url(unit='') }}" data-drawer-close tabindex="-1" aria-hidden="true"></a>
-        <aside class="sdrawer__panel" role="dialog" aria-modal="true" aria-labelledby="sdrawer-title">
-          <header class="sdrawer__head">
-            <h2 class="sdrawer__title" id="sdrawer-title">{{ open_row.name }}</h2>
-            <a class="sdrawer__close" href="{{ select_url(unit='') }}" data-drawer-close aria-label="{{ t('split.close') }}">{{ icon('x') }}</a>
-          </header>
-          <div class="sdrawer__body">{{ unit_panel(open_row, history) }}</div>
-        </aside>
-      </div>
-    {% endif %}
+    {{ nothing(summary) }}
+    {{ key_figures(summary, column, true) }}
+    {% if ratings_failed %}{% call pick_empty() %}{{ t('home.ratings.failed') }}{% endcall %}{% endif %}
+    {% if summary.has_inspections %}{{ hurt(data) }}{% endif %}
   {% endif %}
 {% endif %}
-  </div>
-</div>
 {% endblock %}
+
+{# Панель пиццерии справа: каркас — как в «Проверках» (`drawer` из `_split_ui.html`). #}
+{% block pick_panel %}{% if open_row and not combined %}{{ unit_panel(open_row, history) }}{% endif %}{% endblock %}

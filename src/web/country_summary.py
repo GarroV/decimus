@@ -34,6 +34,8 @@ class Summary:
     #: показывается: прошлые окна считались отдельно, и сумма их средних — не среднее.
     average_delta: float | None
     grades: tuple[tuple[str, int], ...]
+    #: Проверок с критическим нарушением (`Overview.critical_total`).
+    critical: int = 0
 
     @property
     def has_inspections(self) -> bool:
@@ -56,6 +58,7 @@ def summarize(snapshots: Sequence[Overview]) -> Summary:
         average=round(weighted / inspections, 1) if inspections else None,
         average_delta=one.average_delta if one else None,
         grades=tuple(sorted(grades.items())),
+        critical=sum(s.critical_total for s in snapshots),
     )
 
 

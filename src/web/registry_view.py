@@ -99,3 +99,27 @@ def period_quick(
             "on": period == прошлый,
         },
     )
+
+
+def period_quick_months(
+    period: Period, today: date, lang: str, select: Callable[..., str]
+) -> tuple[dict[str, object], ...]:
+    """Быстрые выборы календаря (D477): прошлый, этот и следующий месяц.
+
+    «Всё время» тут не предлагается: сеткой его не нарисовать. Адреса явные, с датами.
+    """
+    этот = registry_period.month_of(today)
+    прошлый = registry_period.month_of(today.replace(day=1) - timedelta(days=1))
+    следующий = registry_period.month_of((today.replace(day=28) + timedelta(days=4)).replace(day=1))
+    return tuple(
+        {
+            "title": t(ключ, lang),
+            "href": select(period="", **месяц.params()),
+            "on": period == месяц,
+        }
+        for ключ, месяц in (
+            ("registry.period.last_month", прошлый),
+            ("registry.period.this_month", этот),
+            ("calendar.period.next_month", следующий),
+        )
+    )

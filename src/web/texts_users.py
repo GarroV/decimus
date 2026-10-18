@@ -524,31 +524,7 @@ _MCP: dict[str, dict[str, str]] = {
         "ru": "Не удалось узнать, есть ли токен: база не ответила.",
         "en": "Could not check the token: the database did not answer.",
     },
-    "users.mcp.how": {
-        "ru": "Команда настраивает Claude Desktop на Mac одной строкой в терминале. Что "
-        "доступно в Claude, решает ваша роль; заморозка учётки или смена роли гасят "
-        "токен сразу.",
-        "en": "The command sets up Claude Desktop on a Mac with one line in a terminal. "
-        "What you can do in Claude depends on your role; a frozen account or a role "
-        "change ends the token at once.",
-    },
-    "users.mcp.issue": {"ru": "Получить команду", "en": "Get the command"},
-    "users.mcp.again": {"ru": "Выпустить новый токен", "en": "Issue a new token"},
-    "users.mcp.again_note": {
-        "ru": "Новый токен гасит прежний: старая настройка перестанет работать.",
-        "en": "A new token cancels the old one: the previous setup stops working.",
-    },
     "users.mcp.revoke": {"ru": "Отозвать токен", "en": "Revoke the token"},
-    "users.mcp.command": {
-        "ru": "Выполните в терминале на Mac с Claude Desktop. Команда видна один раз — "
-        "не пересылайте её никому:",
-        "en": "Run it in a terminal on the Mac with Claude Desktop. The command is shown "
-        "once — do not forward it to anyone:",
-    },
-    "users.mcp.restart": {
-        "ru": "Затем полностью перезапустите Claude (Cmd+Q).",
-        "en": "Then fully restart Claude (Cmd+Q).",
-    },
     "users.mcp.replaced": {
         "ru": "Прежний токен отозван — старая настройка больше не работает.",
         "en": "The previous token is revoked — the old setup no longer works.",

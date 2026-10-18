@@ -143,7 +143,7 @@ def test_партнёр_видит_экран_своей_страны_со_сп�
     ответ = партнёр.get("/country/GE?unit=u-1")
     assert ответ.status_code == 200
     страница = ответ.get_data(as_text=True)
-    assert "Батуми-1" in страница and "cn-uline" in страница
+    assert "Батуми-1" in страница and "pk-item--sub" in страница
     # Панель пиццерии: сведения и история проверок, проверка раскрывается в свой разбор.
     assert "data-drawer" in страница and "ООО Ромашка" in страница
     assert f"/inspections/{_вид().snapshot.inspections[0].id}" in страница
@@ -151,7 +151,10 @@ def test_партнёр_видит_экран_своей_страны_со_сп�
 
 def test_у_партнёра_нет_выбора_страны_и_девелопера(партнёр: FlaskClient) -> None:
     страница = партнёр.get("/country/GE").get_data(as_text=True)
-    assert 'class="pick"' not in страница and "cn-filters" not in страница
+    assert 'class="pick"' not in страница
+    # Страна одна: строки выбора страны нет, в колонке только её пиццерии (D508).
+    колонка = страница.split("</aside>", 1)[0]
+    assert "pk-item__code" not in колонка and "pk-item--sub" in колонка
     # Девелопер — понятие УК: ни выбора, ни строки в шапке, даже если справочник их отдаёт.
     assert "Иван" not in страница
     # Старая карточка точки партнёру не нужна: путь к пиццерии один.
@@ -163,8 +166,8 @@ def test_партнёр_с_несколькими_странами_выбира�
 ) -> None:
     страница = партнёр_двух_стран.get("/country/GE").get_data(as_text=True)
     колонка = страница.split("</aside>", 1)[0]
-    assert колонка.count('class="pick"') == 1  # только страна, без девелопера
-    assert "/country/AM" in страница
+    assert 'class="pick"' not in колонка  # девелопера у партнёра нет
+    assert колонка.count("pk-item__code") == 2 and "/country/AM" in колонка
 
 
 @pytest.mark.parametrize("адрес", ["/country/RS", "/country/rs?unit=u-9", "/country/%3Cs%3E"])
@@ -230,6 +233,7 @@ def test_у_уК_ничего_не_изменилось(
     with собрать(tenant="HQ").test_client() as client:
         assert войти(client).status_code == 302
         страница = client.get("/country/GE?unit=u-1").get_data(as_text=True)
-        assert страница.split("</aside>", 1)[0].count('class="pick"') == 2  # девелопер и страна
+        колонка = страница.split("</aside>", 1)[0]
+        assert колонка.count("pk-item__code") == 2  # обе страны списком
         assert "/units/u-1" in страница
         assert client.get("/country/RS").status_code == 200

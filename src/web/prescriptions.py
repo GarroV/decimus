@@ -197,6 +197,7 @@ def screen_context(lang: str) -> dict[str, Any]:
         }
         return url_for("actions", **{к: з for к, з in параметры.items() if з})
 
+    новый_адрес = {k: v for k, v in (("country", страна), ("lang", lang)) if v}
     return {
         "rows": очереди.get(очередь, в_стране),
         "countries": страны,
@@ -217,7 +218,7 @@ def screen_context(lang: str) -> dict[str, Any]:
         "total": len(в_стране),
         "select_url": отбор,
         "hq": уК,
-        "new_url": url_for("rx_new", **{k: v for k, v in (("country", страна), ("lang", lang)) if v}),
+        "new_url": url_for("rx_new", **новый_адрес),
         **_common(),
     }
 

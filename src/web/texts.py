@@ -227,8 +227,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "country.kicker": {"ru": "Пиццерии", "en": "Pizzerias"},
     "country.filter.title": {"ru": "Отбор", "en": "Filter"},
     "country.rail.title": {"ru": "Страны", "en": "Countries"},
-    "country.choose.title": {"ru": "Выберите страну", "en": "Choose a country"},
-    "country.choose.units": {"ru": "точек: {n}", "en": "units: {n}"},
     "country.choose.empty": {
         "ru": "В справочнике нет ни одной пиццерии со страной.",
         "en": "No pizzeria in the directory has a country.",
