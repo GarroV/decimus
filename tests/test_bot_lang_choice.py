@@ -27,7 +27,7 @@ from src.bot.lang_choice import CACHE_TTL, RETRY_AFTER, LangChoices
 from src.bot.texts import t
 from src.domain import get_state
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 # --- порядок выбора ------------------------------------------------------------
@@ -226,9 +226,7 @@ async def test_выбор_одного_не_меняет_язык_другому
 ) -> None:
     """Выбор — за человеком, а не за ботом целиком."""
     другой = AUDITOR_ID + 1
-    settings = BotSettings(
-        token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID, другой}), mode="polling"
-    )
+    settings = BotSettings(token="unused-in-tests", mode="polling")
     bot, session = make_bot()
     dp = build_dispatcher(settings)
     await _choose(dp, bot, "en")
@@ -315,9 +313,7 @@ async def test_зависшая_база_одного_не_держит_оста
         return None
 
     monkeypatch.setattr(lang_choice, "_load_from_db", читать)
-    settings = BotSettings(
-        token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID, другой}), mode="polling"
-    )
+    settings = BotSettings(token="unused-in-tests", mode="polling")
     bot, session = make_bot()
     dp = build_dispatcher(settings)
     начало = time.monotonic()

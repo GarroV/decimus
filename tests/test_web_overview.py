@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -38,7 +39,6 @@ from src.web.texts import t as _t
     inspections=(),
     grades=(),
     average=None,
-    zone_losses=(),
     systemic=(),
     attention=(),
 )
@@ -73,15 +73,15 @@ def снимок(**поля: object) -> ov.Overview:
         "units_total": 150,
         "inspections": (строка("Белград-1", 71.5, "D"), строка("Тбилиси-2", 95.5, "B")),
         "average": 83.5,
-        "zone_losses": (
-            ov.ZoneLoss(
-                code="kitchen",
-                name_ru="Кухня",
-                name_en="Kitchen",
-                loss=18.0,
+        "process_losses": (
+            ov.ProcessLoss(
+                code="CLEAN",
+                name_ru="Чистота",
+                name_en="Cleanliness",
+                loss=11.0,
                 inspections=2,
                 units=2,
-                share=72.0,
+                share=100.0,
             ),
         ),
         "systemic": (ov.Systemic(code="K-041", level="D1", records=5, units=4),),
@@ -135,15 +135,38 @@ def test_поводы_смотреть_сегодня_попадают_на_эк
     assert "критических нарушений: 2" in страница
 
 
-def test_потери_по_зонам_показаны_именем_зоны_а_не_кодом(
+def test_потери_на_главной_по_процессам_а_не_по_зонам(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """D507: карточка «Где сеть теряет проценты» — блоки методики; зоны с главной ушли."""
     # Act
     страница = показать(стенд, monkeypatch, снимок())
 
-    # Assert — имя из снимка проверки, потеря — числом со знаком.
-    assert "Кухня" in страница
-    assert "−18.0" in страница
+    # Assert — имя из снимка проверки, потеря — числом со знаком; зоны не показаны.
+    assert "Чистота" in страница
+    assert "−11.0" in страница
+    assert "Кухня" not in страница
+    assert "−18.0" not in страница
+
+
+def test_колонка_слабого_направления_называет_процесс_или_прочерк(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D511: в таблице «Пиццерии» — «Слабое направление», а не «Слабая зона»."""
+    # Arrange — у одной точки направление записано, у другой (историческая) его нет
+    с_направлением = replace(
+        точка("Белград-1", "RS", "beograd"),
+        worst_process_ru="Пищевая безопасность",
+        worst_process_en="Food safety",
+    )
+    без = точка("Белград-2", "RS", "beograd")
+
+    # Act
+    страница = показать(стенд, monkeypatch, снимок(points=(с_направлением, без)))
+
+    # Assert
+    assert "Слабое направление" in страница and "Слабая зона" not in страница
+    assert "Пищевая безопасность" in страница
 
 
 def test_системные_нарушения_названы_кодом_пункта(
@@ -161,7 +184,7 @@ def test_системные_нарушения_названы_кодом_пун�
 def test_средняя_в_плитке_показывается_всегда_когда_есть(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Смена методики плитку не гасит (D352): средняя есть — она на экране."""
+    """Смена методики плитку не гасит (D365): средняя есть — она на экране."""
     # Act
     страница = показать(стенд, monkeypatch, снимок(average_delta=-1.5))
 
@@ -182,7 +205,7 @@ def test_пустые_блоки_верхнего_ряда_говорят_об_�
     assert t_ru("home.attention.title") not in страница
     # D471: четыре карточки верхнего ряда есть всегда — без данных с пустым состоянием.
     assert t_ru("home.top.none") in страница
-    assert t_ru("home.zones.none") in страница
+    assert t_ru("home.processes.none") in страница
     assert t_ru("overview.systemic.title") not in страница
     assert t_ru("home.country.all") not in страница
     assert t_ru("home.inspections.none") in страница
@@ -241,17 +264,18 @@ def test_порядок_блоков_главной(стенд: FlaskClient, mon
     страница = показать(стенд, monkeypatch, с_оценками())
 
     # Assert
-    порядок = [
-        страница.index(t_ru(ключ))
-        for ключ in (
-            "home.attention.title",
-            "home.inspections.title",
-            "home.rb.rs",
-            "home.top.title",
-            "overview.zones.title",
-            "home.units.title",
-        )
-    ]
+    # Каждый заголовок ищется после предыдущего: «Пиццерии» стоит ещё и в меню
+    # (D512), и первое вхождение слова — не заголовок таблицы.
+    порядок: list[int] = []
+    for ключ in (
+        "home.attention.title",
+        "home.inspections.title",
+        "home.rb.rs",
+        "home.top.title",
+        "overview.processes.title",
+        "home.units.title",
+    ):
+        порядок.append(страница.index(t_ru(ключ), порядок[-1] if порядок else 0))
     assert порядок == sorted(порядок)
 
 
@@ -319,37 +343,8 @@ def test_окно_периода_считается_от_сегодня_а_не_
     assert (начало, конец) == (date(2026, 8, 25), date(2026, 9, 24))
 
 
-def test_разбивка_усредняет_город_из_разных_изданий_и_исторической() -> None:
-    """Оценка каждой проверки верна по своей методике (D352): средняя города
-    и её движение считаются по всем проверкам, в том числе исторической."""
-    # Arrange — сейчас два издания, раньше историческая по старой методике.
-    ряд = (
-        проверка("Белград-1", 90.0, "A", версия="2026.09", когда=date(2026, 9, 20)),
-        проверка("Белград-2", 70.0, "D", версия="2026.06", когда=date(2026, 9, 18)),
-    )
-    раньше = (
-        проверка(
-            "Белград-1",
-            85.0,
-            "",
-            версия="legacy:Qvalon 133",
-            когда=date(2026, 8, 1),
-            происхождение=ORIGIN_LEGACY,
-        ),
-    )
-    гео = {"Белград-1": ("RS", "Белград"), "Белград-2": ("RS", "Белград")}
-
-    # Act
-    разбивка = ov._breakdown(ряд, geo=гео, counts={}, before=раньше)
-
-    # Assert
-    assert len(разбивка) == 1
-    assert разбивка[0].average == 80.0
-    assert разбивка[0].delta == -5.0
-
-
 def test_движение_точки_считается_против_проверки_другого_издания() -> None:
-    """Смена издания движение точки не гасит (D352): обе оценки верны."""
+    """Смена издания движение точки не гасит (D365): обе оценки верны."""
     # Arrange — у точки две проверки, и они посчитаны разными изданиями.
     ряд = (
         проверка("Белград-1", 71.5, "D", версия="2026.09", когда=date(2026, 9, 20)),
@@ -396,23 +391,6 @@ def test_движение_оценки_считается_когда_издан�
     assert точки[0].delta == -18.5
 
 
-def test_точка_без_города_в_разбивке_не_пропадает() -> None:
-    """Иначе «в разбивке 40 точек, а в сети 150» становится необъяснимым.
-
-    Пропавшая строка выглядит как отсутствие проблемы; строка «Без города» —
-    как вопрос к справочнику, и это верное прочтение.
-    """
-    # Arrange
-    ряд = (проверка("Белград-1", 71.5, "D", версия="2026.09", когда=date(2026, 9, 20)),)
-
-    # Act
-    разбивка = ov._breakdown(ряд, geo={}, counts={})
-
-    # Assert
-    assert [строка_.city for строка_ in разбивка] == [""]
-    assert разбивка[0].units == 1
-
-
 def test_проблемные_точки_отбираются_по_причине_а_не_по_низу_списка() -> None:
     """«Шесть худших» — это всегда шесть строк, даже когда в сети всё хорошо.
 
@@ -455,7 +433,7 @@ def test_причина_попадания_в_проблемные_записа�
 def test_средняя_и_движение_сети_считаются_по_разным_изданиям_и_исторической(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """D352: смена методики не гасит ни среднюю, ни её движение.
+    """D365: смена методики не гасит ни среднюю, ни её движение.
 
     Сводка среза из базы — уже без разбивки по изданиям: в окне сейчас
     проверки двух изданий, в прошлом окне — историческая без буквы.
@@ -594,12 +572,12 @@ class ЗаписнаяБаза:
         self._записать("class_counts", kw)
         return {}
 
-    def worst_zones(self, **kw: object) -> dict[str, tuple[str, str, str, float]]:
-        self._записать("worst_zones", kw)
+    def worst_processes(self, **kw: object) -> dict[str, tuple[str, str, str, float]]:
+        self._записать("worst_processes", kw)
         return {}
 
-    def zone_losses(self, **kw: object) -> list[tuple[str, str, str, float, int, int]]:
-        self._записать("zone_losses", kw)
+    def process_losses(self, **kw: object) -> list[tuple[str, str, str, float, int, int]]:
+        self._записать("process_losses", kw)
         return []
 
     def systemic_findings(self, **kw: object) -> list[tuple[str, str, int, int, str, str]]:
@@ -634,8 +612,8 @@ def test_отбор_сужает_и_те_блоки_что_считаются_з
         "list_inspections",
         "slice_summary",
         "class_counts",
-        "worst_zones",
-        "zone_losses",
+        "worst_processes",
+        "process_losses",
         "systemic_findings",
     }
     for имя, kwargs in база.звонки.items():
@@ -664,20 +642,20 @@ def test_пустой_отбор_не_сужает_агрегаты(monkeypatch:
         assert kwargs.get("grade") == "", имя
 
 
-def test_при_выбранной_стране_города_только_её() -> None:
-    # Arrange — 24.09.2026 при выбранной Турции в списке стояли Тбилиси и Батуми.
+def test_страны_чипа_все_и_крупные_первыми() -> None:
+    # Arrange
     гео = {
         "Tbilisi-1": ("GE", "tbilisi"),
         "Tbilisi-2": ("GE", "tbilisi"),
         "Antalya-1": ("TR", "antalya"),
+        "Nowhere-1": ("", ""),
     }
 
     # Act
-    страны, города = ov._geo_choices(гео, selection=ov.Selection(country="TR"))
+    страны = ov._country_choices(гео)
 
-    # Assert — страны все (иначе на другую не переключиться), города — турецкие.
+    # Assert — страны все (иначе на другую не переключиться), без пустой.
     assert страны == (("GE", 2), ("TR", 1))
-    assert города == (("antalya", 1),)
 
 
 def test_точки_справочника_считаются_в_выбранном_месте() -> None:
@@ -730,8 +708,8 @@ def точка(unit: str, country: str, city: str) -> ov.PointRow:
         grade="B",
         pct=90.0,
         delta=None,
-        worst_zone_ru="",
-        worst_zone_en="",
+        worst_process_ru="",
+        worst_process_en="",
         critical=0,
     )
 

@@ -67,7 +67,7 @@ PHRASES_PER_MISS = 10
 #: N предложений» без неё читается как «N слов добавлено».
 NOT_APPLIED = (
     "Nothing was changed: proposals are not applied automatically (decision D077) — "
-    "the word map is a management-company document, and a wrong word added here "
+    "the synonym dictionary is a management-company document, and a wrong word added here "
     "would reach a partner's report through the fast path without anyone confirming it."
 )
 
@@ -76,7 +76,7 @@ NOT_APPLIED = (
 #: быстрого пути раздел порогов пропускает вовсе, а критерии — это текст, по
 #: которому человек решает, а не таблица соответствий.
 LEVEL_NOTE = (
-    "Classes live in the thresholds section of the word map and in criteria.md; "
+    "Classes live in the thresholds section of the synonym dictionary and in criteria.md; "
     "this tool proposes no edit to either."
 )
 
@@ -88,7 +88,7 @@ CAVEATS = (
     "before that, and records where the auditor said nothing at all — a photo read on its own, "
     "an item picked by button — carry none. Those are counted as without_words beside every "
     "miss and are never shown as an empty phrase.",
-    "Fast-path records carry no confidence at all — matching against the word map never "
+    "Fast-path records carry no confidence at all — matching against the synonym dictionary never "
     "measures one — and they are the records made without the auditor confirming the item. "
     "They are therefore always included, whatever min_confidence says.",
 )
@@ -369,8 +369,9 @@ def _code_note(suggested: str, recorded: str, rows: int, heard: bool) -> str:
     """
     if rows == 0:
         основа = (
-            f"There is no cue row in the word map leading to {suggested}: the code came from "
-            f"the model itself, not from the map, so there is no row here to correct."
+            f"There is no cue row in the synonym dictionary leading to {suggested}: "
+            f"the code came from the model itself, not from the dictionary, "
+            f"so there is no row here to correct."
         )
         if not heard:
             return (

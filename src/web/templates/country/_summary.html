@@ -63,9 +63,9 @@
   {% endif %}
 {% endmacro %}
 
-{# «Где болит»: системные нарушения и потери по зонам — одним блоком, только при проверках. #}
+{# «Где болит»: системные нарушения и потери по направлениям — одним блоком, только при проверках. #}
 {% macro hurt(data) %}
-  {% if data.systemic or data.zone_losses %}
+  {% if data.systemic or data.process_losses %}
   <section class="ov-card cn-block">
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('country.hurt.title') }}</div>
@@ -91,11 +91,11 @@
         {% endfor %}
       </div>
       {% endif %}
-      {% if data.zone_losses %}
+      {% if data.process_losses %}
       <div class="cn-hurt__col">
-        <div class="cn-sub">{{ t('country.hurt.zones') }}</div>
-        {% for zone in data.zone_losses %}
-          <div class="ov-row" title="{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}">
+        <div class="cn-sub">{{ t('country.hurt.processes') }}</div>
+        {% for zone in data.process_losses %}
+          <div class="ov-row" title="{{ t('overview.processes.spread', units=zone.units, inspections=zone.inspections) }}">
             <span class="ov-row__name">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>
             <span class="ov-bar">
               <span class="ov-bar__part" style="flex:{{ zone.share }};background:var(--err)"></span>

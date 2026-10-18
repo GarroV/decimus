@@ -1,0 +1,14 @@
+// ШАБЛОН конфига фронта открытого демо: https://decimus-demo.vasiliy-garro.workers.dev (D524, §8.21)
+// Адреса инфраструктуры в репозиторий не кладутся (D431): рабочий
+// `wrangler.demo.jsonc` собирает `./deploy.sh demo` из этого шаблона и
+// неотслеживаемого `front/.deploy.env`. Ключ фронта Caddy демо не проверяет (как стенд),
+// но Worker без него не пересылает: секрет FRONT_KEY свой, случайный (§8.21).
+{
+  "name": "decimus-demo",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "observability": { "enabled": false },
+  "vpc_services": [{ "binding": "EDGE", "service_id": "<VPC_SERVICE_ID>" }],
+  "vars": { "ORIGIN_HOST": "<DEMO_ORIGIN_HOST>" }
+}

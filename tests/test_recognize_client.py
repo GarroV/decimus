@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 from openai import OpenAIError
 
-from src.recognize.client import ask_model
+from src.recognize.client import MAX_OUTPUT_TOKENS, ask_model
 from src.recognize.config import RecognizeSettings
 from src.recognize.errors import ModelUnavailable
 
@@ -49,6 +49,7 @@ class _FakeUsage:
 class _FakeResponse:
     output_text: str
     usage: _FakeUsage | None = None
+    status: str = "completed"
 
 
 @dataclass
@@ -179,6 +180,8 @@ def test_model_из_аргумента_перекрывает_настройки
     assert fake_responses.calls[0]["model"] == "gpt-4o-mini"
     # Кадры и записи у OpenAI не хранятся: без этого Responses держит их у себя.
     assert fake_responses.calls[0]["store"] is False
+    # Потолок выхода стоит на каждом разборе (#784).
+    assert fake_responses.calls[0]["max_output_tokens"] == MAX_OUTPUT_TOKENS
 
 
 def test_отказ_провайдера_это_ModelUnavailable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -212,6 +215,20 @@ def test_ответ_не_объект_это_ModelUnavailable(monkeypatch: pytes
 
     # Act / Assert
     with pytest.raises(ModelUnavailable, match="не объект"):
+        ask_model(
+            instructions="сис", question="вопрос", schema=_SCHEMA, photo=None, settings=_settings()
+        )
+
+
+def test_обрезанный_потолком_ответ_это_ModelUnavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange: модель упёрлась в потолок выхода (#784) — ответ неполный
+    fake_responses = _FakeResponses(
+        answer=_FakeResponse(output_text='{"records": [', status="incomplete")
+    )
+    _patch_client(monkeypatch, _FakeClient(responses=fake_responses))
+
+    # Act / Assert
+    with pytest.raises(ModelUnavailable, match="обрезан"):
         ask_model(
             instructions="сис", question="вопрос", schema=_SCHEMA, photo=None, settings=_settings()
         )

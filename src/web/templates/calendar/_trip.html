@@ -1,0 +1,139 @@
+{#
+  Карточка поездки в панели справа (D506): кто едет, страна, даты, статус,
+  заметка и план по дням. Каркас и детали — как у карточки проверки и людей
+  (`_split_page.html`, `.ssec`, `.sform`, `.sprops`). Править может админ
+  пространства или сам исполнитель (`trip_editable`); остальным — только чтение.
+  Всё приходит готовым из `calendar_screen.py`.
+#}
+{% from "_split_ui.html" import confirm %}
+
+{% macro value(name, fallback) %}{{ trip_form.get(name, fallback) if trip_form else fallback }}{% endmacro %}
+
+{% macro trip_fields(current) %}
+  {% if trip_self_only %}
+    <p class="ssec__note">{{ t('trip.who.self') }}</p>
+  {% else %}
+    <label><span class="sform__label">{{ t('trip.who') }}</span>
+      <input class="sinput" name="executor" list="trip-people" required maxlength="120" autocomplete="off"
+             value="{{ value('executor', current.executor_name if current else '') }}">
+    </label>
+    <datalist id="trip-people">{% for login in trip_people %}<option value="{{ login }}">{% endfor %}</datalist>
+    <p class="ssec__note">{{ t('trip.who.hint') }}</p>
+  {% endif %}
+  <label><span class="sform__label">{{ t('trip.country') }}</span>
+    {% set chosen = value('country', current.country if current and current.country else '') %}
+    <select class="sinput" name="country">
+      <option value="">{{ t('trip.country.none') }}</option>
+      {% for code in trip_countries %}<option value="{{ code }}"{% if code == chosen %} selected{% endif %}>{{ country_title(code) }}</option>{% endfor %}
+    </select>
+  </label>
+  <div class="trip-dates">
+    <label><span class="sform__label">{{ t('trip.from') }}</span>
+      <input class="sinput" type="date" name="from" required value="{{ value('from', current.date_from.isoformat() if current else '') }}"></label>
+    <label><span class="sform__label">{{ t('trip.to') }}</span>
+      <input class="sinput" type="date" name="to" required value="{{ value('to', current.date_to.isoformat() if current else '') }}"></label>
+  </div>
+  {% if current %}
+    {% set st = value('status', current.status) %}
+    <label><span class="sform__label">{{ t('trip.status') }}</span>
+      <select class="sinput" name="status">
+        {% for code in trip_statuses %}<option value="{{ code }}"{% if code == st %} selected{% endif %}>{{ t('trip.status.' ~ code) }}</option>{% endfor %}
+      </select>
+    </label>
+  {% endif %}
+  <label><span class="sform__label">{{ t('trip.note') }}</span>
+    <textarea class="sinput trip-note" name="note" rows="3" maxlength="2000">{{ value('note', current.note if current else '') }}</textarea></label>
+{% endmacro %}
+
+{% macro step_line(step, day) %}
+  {% set grade = trip_done.get((step.unit_name, day)) if step.unit_name else none %}
+  <li class="trip-step">
+    <span class="trip-step__at">{{ step.at.strftime('%H:%M') if step.at else '—' }}</span>
+    <span class="trip-step__main">
+      <b>{{ t('trip.kind.' ~ step.kind) }}{% if step.unit_name %} · {{ step.unit_name }}{% endif %}</b>
+      {% if grade %}<span class="trip-step__done">{{ t('trip.step.done', grade=grade) }}</span>{% endif %}
+      {% if step.body %}<small>{{ step.body }}</small>{% endif %}
+    </span>
+    {% if trip_editable %}
+      <form method="post" action="{{ trip_action(trip.id, 'steps', step.id, 'delete') }}">
+        <button class="sbtn sbtn--ghost trip-step__del" type="submit">{{ t('trip.step.delete') }}</button>
+      </form>
+    {% endif %}
+  </li>
+{% endmacro %}
+
+{% macro trip_panel() %}
+  {% if trip_failure %}
+    <div class="note note--error" role="alert"><div class="note__text">{{ trip_failure }}</div></div>
+  {% endif %}
+  {% if trip_missing %}
+    <p class="ssec__note">{{ t('trip.not_found') }}</p>
+  {% elif trip_new %}
+    <section class="ssec">
+      <form method="post" action="{{ trip_action() }}" class="sform">
+        {{ trip_fields(none) }}
+        <button class="sbtn sbtn--primary" type="submit">{{ t('trip.create') }}</button>
+      </form>
+      <p class="ssec__note">{{ t('trip.plan.after_create') }}</p>
+    </section>
+  {% elif trip %}
+    <section class="ssec">
+      {% if trip_editable %}
+        <form method="post" action="{{ trip_action(trip.id) }}" class="sform">
+          {{ trip_fields(trip) }}
+          <button class="sbtn sbtn--primary" type="submit">{{ t('trip.save') }}</button>
+        </form>
+      {% else %}
+        <dl class="sprops">
+          <div><dt>{{ t('trip.who') }}</dt><dd>{{ trip.executor_name }}</dd></div>
+          <div><dt>{{ t('trip.country') }}</dt><dd>{{ country_title(trip.country) if trip.country else '—' }}</dd></div>
+          <div><dt>{{ t('trip.from') }} — {{ t('trip.to') }}</dt><dd>{{ trip.date_from.isoformat() }} — {{ trip.date_to.isoformat() }}</dd></div>
+          <div><dt>{{ t('trip.status') }}</dt><dd>{{ t('trip.status.' ~ trip.status) }}</dd></div>
+          {% if trip.note %}<div><dt>{{ t('trip.note') }}</dt><dd>{{ trip.note }}</dd></div>{% endif %}
+        </dl>
+        <p class="ssec__note">{{ t('trip.readonly') }}</p>
+      {% endif %}
+    </section>
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('trip.plan') }}</h3>
+      {% set days_with_steps = trip.days | select('in', trip.steps | map(attribute='day') | list) | list %}
+      {% for day in days_with_steps %}
+        <h4 class="trip-day">{{ t('calendar.wd.' ~ day.isoweekday()) }}, {{ day.isoformat() }}</h4>
+        <ul class="trip-steps">{% for step in trip.steps_on(day) %}{{ step_line(step, day) }}{% endfor %}</ul>
+      {% else %}
+        <p class="ssec__note">{{ t('trip.plan.empty') }}</p>
+      {% endfor %}
+      {% if trip_editable %}
+        <form method="post" action="{{ trip_action(trip.id, 'steps') }}" class="sform trip-add">
+          <div class="trip-dates">
+            <label><span class="sform__label">{{ t('trip.step.day') }}</span>
+              <select class="sinput" name="day">
+                {% for day in trip.days %}<option value="{{ day.isoformat() }}"{% if trip_form.get('day') == day.isoformat() %} selected{% endif %}>{{ t('calendar.wd.' ~ day.isoweekday()) }}, {{ day.isoformat() }}</option>{% endfor %}
+              </select></label>
+            <label><span class="sform__label">{{ t('trip.step.at') }}</span>
+              <input class="sinput" type="time" name="at" value="{{ trip_form.get('at', '') }}"></label>
+          </div>
+          <label><span class="sform__label">{{ t('trip.step.kind') }}</span>
+            <select class="sinput" name="kind">
+              {% for code in trip_kinds %}<option value="{{ code }}"{% if trip_form.get('kind') == code %} selected{% endif %}>{{ t('trip.kind.' ~ code) }}</option>{% endfor %}
+            </select></label>
+          <label><span class="sform__label">{{ t('trip.step.unit') }}</span>
+            <select class="sinput" name="unit">
+              <option value="">{{ t('trip.step.unit.none') }}</option>
+              {% for unit in trip_units %}<option value="{{ unit.id }}"{% if trip_form.get('unit') == unit.id %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}
+            </select></label>
+          <label><span class="sform__label">{{ t('trip.step.body') }}</span>
+            <input class="sinput" name="body" maxlength="500" autocomplete="off" placeholder="{{ t('trip.step.body.hint') }}" value="{{ trip_form.get('body', '') }}"></label>
+          <button class="sbtn" type="submit">{{ t('trip.step.add') }}</button>
+        </form>
+      {% endif %}
+    </section>
+
+    {% if trip_editable %}
+      <section class="ssec ssec--danger">
+        {{ confirm('trip-delete', t('trip.delete'), t('trip.delete.text'), t('trip.delete.yes'), trip_action(trip.id, 'delete'), ()) }}
+      </section>
+    {% endif %}
+  {% endif %}
+{% endmacro %}

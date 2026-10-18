@@ -48,6 +48,7 @@ from src.db.web_access import (
     Account,
     OpenedSession,
     authenticate,
+    claim_google_sub,
     close_session,
     find_by_email,
     open_session,
@@ -61,11 +62,14 @@ from src.domain.journal import (
     RESULT_RATE_LIMITED,
     RESULT_REFUSED,
 )
+from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import (
+    demo_entry,
     google_link,
     google_profile,
+    landing,
     oauth,
     passkey_login,
     reauth,
@@ -143,7 +147,8 @@ COOKIE_SALT = "web-session"
 #: вошедшего; сами они держатся PKCE и одноразовым кодом. Согласие
 #: (`oauth_authorize`) здесь НЕ стоит — оно требует входа.
 OPEN_ENDPOINTS = (
-    frozenset({"login", "static", "google_start", "google_callback"})
+    frozenset({"login", "static", "google_start", "google_callback", landing.ENDPOINT})
+    | demo_entry.ENDPOINTS
     | walk_auth.ENDPOINTS
     | swarm_api.ENDPOINTS
     | oauth.ENDPOINTS
@@ -315,6 +320,8 @@ def install(app: Flask, conf: Settings) -> None:
 
     second_step.install(app, conf, remember=remember, stand=рубеж)
     passkey_login.install(app, conf, remember=remember, stand=рубеж)
+    demo_entry.install(app, conf, remember=remember)
+    landing.install(app, conf)
 
     @app.errorhandler(SecondStepRequiredError)
     def _second_step_required(_: SecondStepRequiredError) -> Response:
@@ -337,6 +344,9 @@ def install(app: Flask, conf: Settings) -> None:
         token = token_of_request()
         account = resolve_session(token) if token else None
         if account is None:
+            if request.method == "GET" and request.endpoint == "home":
+                # Корень неопознанному — посадочная страница, а не голая форма (D524).
+                return redirect(url_for(landing.ENDPOINT, lang=request.args.get("lang")))
             if request.method == "GET":
                 # Сессия истекла на открытой странице (согласие OAuth, карточка в
                 # панели реестра): на вход и обратно сюда, а не на главную (D465).
@@ -633,11 +643,48 @@ def install(app: Flask, conf: Settings) -> None:
                 user_agent=браузер,
             )
             return отказ_входа(забыть_подсказку=True)
+        # Тот ли это аккаунт Google (F-027): почта совпала, но почта у аккаунта
+        # Google не постоянна. Первый вход записывает номер аккаунта за учёткой,
+        # следующие сверяют. Здесь — только сверка, без записи: записывает номер
+        # лишь ветка, которая в этом же запросе открывает сессию (ниже). Вход,
+        # который дальше не пустили (вторая ступень), номер не занимает — иначе
+        # недопущенный аккаунт с той же почтой занял бы учётку у хозяина.
+        if not кто.subject:
+            return отказ_входа(забыть_подсказку=True)
+        сверка = claim_google_sub(кто.email, кто.subject, record=False)
+        if сверка != "ok":
+            journals.record_login(
+                method=METHOD_GOOGLE,
+                result=RESULT_REFUSED,
+                user_id=account.id,
+                ip=откуда,
+                user_agent=браузер,
+            )
+            if сверка == "other":
+                current_app.logger.warning(
+                    "вход через Google: почта учётки %s пришла с другого аккаунта Google",
+                    log_id(account.id),
+                )
+                return отказ_входа(забыть_подсказку=True, другой_аккаунт=True)
+            return отказ_входа(забыть_подсказку=True)
 
-        note_success(tenant=рубеж, login=account.login)
         вторая = second_step.begin(account, method=METHOD_GOOGLE, next_path=вернуться)
         if вторая is not None:
+            note_success(tenant=рубеж, login=account.login)
             return запомнить_подсказку(очистить_метку(вторая), кто.email)
+        # Последняя проверка перед сессией — она же запись номера. Между сверкой
+        # выше и этой строкой номер мог занять параллельный вход: тогда отказ.
+        записано = claim_google_sub(кто.email, кто.subject, record=True)
+        if записано != "ok":
+            journals.record_login(
+                method=METHOD_GOOGLE,
+                result=RESULT_REFUSED,
+                user_id=account.id,
+                ip=откуда,
+                user_agent=браузер,
+            )
+            return отказ_входа(забыть_подсказку=True, другой_аккаунт=записано == "other")
+        note_success(tenant=рубеж, login=account.login)
         session = open_session(
             account,
             ip=откуда,
@@ -744,6 +791,10 @@ def install(app: Flask, conf: Settings) -> None:
             return мимо
         if not reauth.google_confirms(account, кто, state=метка, hq_domains=hq_domains):
             return мимо
+        # Тот же аккаунт Google, что держит учётку (F-027), а не только та же почта.
+        # Сессия уже есть и прошла вход целиком — номер можно и записать.
+        if not кто.subject or claim_google_sub(кто.email, кто.subject, record=True) != "ok":
+            return мимо
         return _обновить_сессию(account, назад)
 
     def _выполнить_намерение(действие: str) -> Any:
@@ -793,7 +844,9 @@ def install(app: Flask, conf: Settings) -> None:
             hq_domains=hq_domains,
         )
 
-    def отказ_входа(*, забыть_подсказку: bool = False) -> tuple[str, int]:
+    def отказ_входа(
+        *, забыть_подсказку: bool = False, другой_аккаунт: bool = False
+    ) -> tuple[str, int]:
         """Один и тот же отказ на все осечки возврата.
 
         Разные ответы на «метка не та», «код не тот» и «почты нет в списке»
@@ -803,8 +856,15 @@ def install(app: Flask, conf: Settings) -> None:
         `забыть_подсказку` — отказ в ДОПУСКЕ (почты нет в списке, не тот домен,
         не подтверждена): куку-подсказку стираем, чтобы в следующий раз Google
         показал выбор аккаунта, а не вёл по кругу в тот же отказ.
+
+        `другой_аккаунт` — единственное исключение из «одного отказа» (F-027):
+        почта учётки пришла с другого аккаунта Google. Человек с этой почтой и
+        так знает, что учётка на неё заведена, а без объяснения он не поймёт,
+        почему его не пускают, и не дойдёт до админа.
         """
-        страница = render_template("login.html", failed=True, locked_minutes=None)
+        страница = render_template(
+            "login.html", failed=True, google_other=другой_аккаунт, locked_minutes=None
+        )
         ответ = make_response(страница, 401)
         ответ.delete_cookie(GOOGLE_STATE_COOKIE, path="/")
         if забыть_подсказку:

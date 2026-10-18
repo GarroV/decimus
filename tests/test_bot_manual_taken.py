@@ -34,7 +34,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     feed,
     make_bot,
@@ -54,7 +53,7 @@ from src.domain import add_finding, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Комментарий, по которому модель не отвечает ничего, — тогда открывается
 #: ручной перечень. Однозначным его делать нельзя: быстрый путь записал бы

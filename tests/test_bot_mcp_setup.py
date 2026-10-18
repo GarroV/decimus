@@ -85,7 +85,6 @@ TOKENS = f"uk={TOKEN}"
 
 SETTINGS = BotSettings(
     token="unused-in-tests",
-    allowed_ids=frozenset({AUDITOR_ID, SECOND_ID, OUTSIDER_ID}),
     mode="polling",
     auditor_names={},
 )

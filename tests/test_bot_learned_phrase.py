@@ -21,7 +21,6 @@ from typing import Any
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     Calls,
     callback_query,
@@ -44,7 +43,7 @@ from src.domain import get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Пункт синтетической методики с ОДНОЙ зоной и одним классом: накопленный
 #: синоним применяется сразу, спрашивать нечего.

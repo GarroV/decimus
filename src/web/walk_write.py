@@ -57,13 +57,14 @@ from src.domain import (
     is_upload_ref,
     save_upload,
     set_info,
+    set_reading,
     upload_file,
     while_open,
 )
 from src.domain.errors import DomainError, EngineError, ValidationError
 from src.domain.info_fields import FIELDS, KIND_DATE, KIND_TEXT, KIND_YES_NO
 from src.domain.log_ids import log_id
-from src.domain.models import Inspection, Suggestion
+from src.domain.models import READING_MAX_C, READING_MIN_C, Inspection, Suggestion
 from src.domain.uploads import MAX_UPLOAD_BYTES, UploadQuotaError, own_upload
 from src.recognize.models import UNKNOWN_ZONE
 
@@ -205,6 +206,26 @@ def _suggested(value: Any) -> tuple[Suggestion | None, bool]:
         return None, model
 
 
+def reading_of(body: dict[str, Any]) -> float | None:
+    """Показание термометра из тела запроса, °C: число в пределах термометра либо `null`.
+
+    Отсутствующий ключ и `null` здесь одно («замера нет»); различает их тот, кто
+    зовёт: правка снимает показание только по явному `null`. Булево, строка и
+    число вне пределов — отказ словами экрана, а не молчаливое «нет замера»:
+    аудитор ввёл число и должен узнать, что оно не принято (#836).
+    """
+    value = body.get("reading_c")
+    if value is None:
+        return None
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int | float)
+        or not READING_MIN_C <= value <= READING_MAX_C
+    ):
+        raise WalkRefused("walk.err.reading")
+    return float(value)
+
+
 def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     code = _code(body, "code")
     level = _code(body, "level", _LEVEL)
@@ -233,6 +254,7 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         photos=photos,
         words=words,
         suggested=suggested,
+        reading_c=reading_of(body),
     )
     if words and learns:
         # Запомнить сказанное синонимом выбранного пункта (D119) — как бот после
@@ -265,13 +287,19 @@ def _edit(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         raise WalkRefused("walk.err.repeat_level")
     if repeat is None and current.repeat and level not in REPEAT_LEVELS:
         repeat = False
-    edit_finding(
-        chat_id,
-        n,
-        zone_by_person="zone" in fields,
-        repeat=repeat if isinstance(repeat, bool) else None,
-        **fields,
-    )
+    reading = reading_of(body) if "reading_c" in body else None
+    if fields or isinstance(repeat, bool):
+        edit_finding(
+            chat_id,
+            n,
+            zone_by_person="zone" in fields,
+            repeat=repeat if isinstance(repeat, bool) else None,
+            **fields,
+        )
+    if "reading_c" in body:
+        # Показание лежит мимо движка (#836): число аудитор правит отдельно от
+        # формулировки, и правка одного не должна требовать другого.
+        set_reading(chat_id, n, reading)
 
 
 def _finding_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:

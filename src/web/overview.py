@@ -12,7 +12,7 @@
 сети — единственное вычисляемое число, и оно берётся по всем проверкам среза,
 как они записаны: оценка каждой проверки верна по методике, которой её
 поставили, и смена методики (издание, ценовая форма, историческая проверка)
-средние, движение и разбивки не гасит (D352).
+средние, движение и разбивки не гасит (D365).
 """
 
 from __future__ import annotations
@@ -27,6 +27,10 @@ from src.db.reach import Reach
 #: Сколько поводов показывать в каждом списке. Экран — не отчёт: длинный
 #: список поводов не помогает выбрать, куда смотреть, он эту задачу и создаёт.
 TOP = 6
+
+#: Сколько процессов (блоков методики) читать для карточки потерь на главной (D507):
+#: их в методике единицы, и урезать их до `TOP` значило бы терять блоки молча.
+PROCESS_TOP = 12
 #: С какого числа точек нарушение пункта считается системным. Пункт на одной
 #: точке — это одна точка, и её уже показывают «Проблемные точки».
 SYSTEMIC_MIN_UNITS = 2
@@ -36,8 +40,8 @@ CRITICAL = "D3"
 
 
 @dataclass(frozen=True)
-class ZoneLoss:
-    """Потеря по зоне за период — сложенная, а не пересчитанная."""
+class ProcessLoss:
+    """Потеря по процессу (блоку методики) за период — сложенная, а не пересчитанная (D507)."""
 
     code: str
     name_ru: str
@@ -106,32 +110,11 @@ class Selection:
 
 
 @dataclass(frozen=True)
-class CityRow:
-    """Строка разбивки: город, его точки и что с ними за период.
-
-    Средняя считается по записанным процентам ровно так же, как по сети: по
-    всем проверкам города, какой бы методикой каждая ни была оценена (D352).
-    """
-
-    city: str
-    country: str
-    units: int
-    inspections: int
-    average: float | None
-    grades: tuple[tuple[str, int], ...]
-    critical: int
-    #: Движение средней против такого же периода перед этим. `None` — не с
-    #: чем сравнивать, и тогда на экране прочерк, а не ноль: ноль читался бы
-    #: как «ничего не изменилось».
-    delta: float | None = None
-
-
-@dataclass(frozen=True)
 class PointRow:
     """Точка выборки: её последняя проверка и куда она движется.
 
     `delta` — разница с предыдущей проверкой ТОЙ ЖЕ точки, какой бы методикой
-    каждая из двух ни была оценена: обе оценки верны по своей методике (D352).
+    каждая из двух ни была оценена: обе оценки верны по своей методике (D365).
     """
 
     unit: str
@@ -142,8 +125,8 @@ class PointRow:
     grade: str
     pct: float
     delta: float | None
-    worst_zone_ru: str
-    worst_zone_en: str
+    worst_process_ru: str
+    worst_process_en: str
     critical: int
     #: Почему точка попала в проблемные — КОДОМ причины, не готовой фразой:
     #: причина одна, а языков у продукта два. Пусто — точка не проблемная.
@@ -158,10 +141,11 @@ class Overview:
     inspections: tuple[InspectionRow, ...]
     grades: tuple[tuple[str, int], ...]
     average: float | None
-    zone_losses: tuple[ZoneLoss, ...]
     systemic: tuple[Systemic, ...]
     attention: tuple[Attention, ...]
     problems: tuple[PointRow, ...] = ()
+    #: Потери по процессам (D507) — карточка «Где сеть теряет проценты» на главной.
+    process_losses: tuple[ProcessLoss, ...] = ()
     #: Движение средней против такого же периода перед этим. `None` — не с чем
     #: сравнивать.
     average_delta: float | None = None
@@ -170,8 +154,6 @@ class Overview:
     unchecked: int = 0
     selection: Selection = Selection()
     countries: tuple[tuple[str, int], ...] = ()
-    cities: tuple[tuple[str, int], ...] = ()
-    breakdown: tuple[CityRow, ...] = ()
     points: tuple[PointRow, ...] = ()
     #: `{название точки: идентификатор}` — чтобы строка таблицы вела в карточку
     #: точки. Экран берёт ВСЁ одним снимком: отдельный поход в базу из
@@ -253,7 +235,7 @@ def _summary(
 def _difference(сейчас: float | None, раньше: float | None) -> float | None:
     """Насколько средняя сдвинулась. `None` — одной из двух средних нет.
 
-    Смена методики между окнами движение не гасит (D352): каждая оценка верна
+    Смена методики между окнами движение не гасит (D365): каждая оценка верна
     по своей методике, и средняя из них — тоже ответ, а не разница ставок.
     """
     if сейчас is None or раньше is None:
@@ -343,51 +325,6 @@ def window_before(period: str, *, today: date) -> tuple[date | None, date | None
     return конец - timedelta(days=дней), конец
 
 
-def _by_city(
-    rows: tuple[InspectionRow, ...], *, geo: dict[str, tuple[str, str]]
-) -> dict[tuple[str, str], list[InspectionRow]]:
-    """Разложить ряд по городам. Отдельно — потому что то же нужно прошлому окну."""
-    разложено: dict[tuple[str, str], list[InspectionRow]] = {}
-    for row in rows:
-        country, city = geo.get(row.unit_name, ("", ""))
-        разложено.setdefault((country, city), []).append(row)
-    return разложено
-
-
-def _breakdown(
-    rows: tuple[InspectionRow, ...],
-    *,
-    geo: dict[str, tuple[str, str]],
-    counts: dict[str, dict[str, int]],
-    before: tuple[InspectionRow, ...] = (),
-) -> tuple[CityRow, ...]:
-    """Разбивка выборки по городам, крупные города сверху.
-
-    Точка без города попадает в отдельную строку с пустым названием, а не
-    выбрасывается: «в разбивке 40 точек, а в сети 150» — это вопрос к
-    справочнику, и экран обязан его задать, а не спрятать.
-    """
-    по_городам = _by_city(rows, geo=geo)
-    было_по_городам = _by_city(before, geo=geo)
-    строки = [
-        CityRow(
-            city=city,
-            country=country,
-            units=len({row.unit_name for row in ряд}),
-            inspections=len(ряд),
-            average=_average(tuple(ряд)),
-            grades=_grades(tuple(ряд)),
-            critical=sum(counts.get(row.id, {}).get(CRITICAL, 0) for row in ряд),
-            delta=_difference(
-                _average(tuple(ряд)), _average(tuple(было_по_городам.get((country, city), ())))
-            ),
-        )
-        for (country, city), ряд in по_городам.items()
-    ]
-    строки.sort(key=lambda с: (-с.units, -с.inspections, с.city))
-    return tuple(строки)
-
-
 def _points(
     rows: tuple[InspectionRow, ...],
     *,
@@ -412,7 +349,7 @@ def _points(
     for имя, row in последние.items():
         country, city = geo.get(имя, ("", ""))
         было = предыдущие.get(имя)
-        зона = worst.get(row.id, ("", "", "", 0.0))
+        процесс = worst.get(row.id, ("", "", "", 0.0))
         точки.append(
             PointRow(
                 unit=имя,
@@ -423,8 +360,8 @@ def _points(
                 grade=row.grade,
                 pct=row.pct,
                 delta=round(row.pct - было.pct, 1) if было is not None else None,
-                worst_zone_ru=зона[1],
-                worst_zone_en=зона[2],
+                worst_process_ru=процесс[1],
+                worst_process_en=процесс[2],
                 critical=counts.get(row.id, {}).get(CRITICAL, 0),
             )
         )
@@ -509,26 +446,16 @@ def _units_in(geo: dict[str, tuple[str, str]], *, selection: Selection) -> int |
     )
 
 
-def _geo_choices(
-    geo: dict[str, tuple[str, str]], *, selection: Selection
-) -> tuple[tuple[tuple[str, int], ...], tuple[tuple[str, int], ...]]:
-    """Варианты чипов «страна» и «город» с числом точек, самые крупные первыми.
+def _country_choices(geo: dict[str, tuple[str, str]]) -> tuple[tuple[str, int], ...]:
+    """Варианты чипа «страна» с числом точек, самые крупные первыми.
 
-    Города — только выбранной страны: список, где рядом с Анталией стоит
-    Тбилиси при выбранной Турции, предлагает заведомо пустую выборку.
+    Страны — все, а не только выбранная: иначе на другую не переключиться.
     """
     страны: dict[str, int] = {}
-    города: dict[str, int] = {}
-    for country, city in geo.values():
+    for country, _city in geo.values():
         if country:
             страны[country] = страны.get(country, 0) + 1
-        if city and (not selection.country or country == selection.country):
-            города[city] = города.get(city, 0) + 1
-
-    def по_весу(счёт: dict[str, int]) -> tuple[tuple[str, int], ...]:
-        return tuple(sorted(счёт.items(), key=lambda п: (-п[1], п[0])))
-
-    return по_весу(страны), по_весу(города)
+    return tuple(sorted(страны.items(), key=lambda п: (-п[1], п[0])))
 
 
 def _slice(
@@ -595,18 +522,12 @@ def load(
     ид_точек = queries.unit_ids(reach=охват)
     последние = queries.unit_last_inspections(reach=охват, date_from=date_from, date_to=date_to)
     counts = queries.class_counts(reach=охват, date_from=date_from, date_to=date_to, **узко)
-    worst = queries.worst_zones(reach=охват, date_from=date_from, date_to=date_to, **узко)
+    worst = queries.worst_processes(reach=охват, date_from=date_from, date_to=date_to, **узко)
     rows, обрезан = _slice(
         reach=охват, limit=limit, selection=selection, date_from=date_from, date_to=date_to
     )
-    # Прошлое окно читается ТОЛЬКО ради движения и только когда период задан:
-    # у «всего времени» предыдущего окна не существует, и лишний поход в базу
-    # на каждом открытии экрана был бы платой ни за что.
-    было, было_обрезано = (
-        _slice(reach=охват, limit=limit, selection=selection, date_from=было_от, date_to=было_до)
-        if было_от is not None
-        else ((), False)
-    )
+    # Прошлое окно читается ТОЛЬКО сводкой ради движения средней и только когда
+    # период задан: у «всего времени» предыдущего окна не существует.
     сводка = _summary(reach=охват, selection=selection, date_from=date_from, date_to=date_to)
     сводка_было = (
         _summary(reach=охват, selection=selection, date_from=было_от, date_to=было_до)
@@ -614,11 +535,11 @@ def load(
         else _НИЧЕГО
     )
     точки = _points(rows, geo=geo, counts=counts, worst=worst)
-    losses = queries.zone_losses(
-        reach=охват, date_from=date_from, date_to=date_to, limit=TOP, **узко
+    по_процессам = queries.process_losses(
+        reach=охват, date_from=date_from, date_to=date_to, limit=PROCESS_TOP, **узко
     )
-    всего = sum(строка[3] for строка in losses) or 1.0
-    страны, города = _geo_choices(geo, selection=selection)
+    всего_по_процессам = sum(строка[3] for строка in по_процессам) or 1.0
+    страны = _country_choices(geo)
     в_месте = _units_in(geo, selection=selection)
     всего_точек = queries.units_total(reach=охват) if в_месте is None else в_месте
     return Overview(
@@ -628,17 +549,17 @@ def load(
         inspections=rows,
         grades=сводка.grades,
         average=сводка.average,
-        zone_losses=tuple(
-            ZoneLoss(
+        process_losses=tuple(
+            ProcessLoss(
                 code=code,
                 name_ru=ru,
                 name_en=en,
                 loss=loss,
                 inspections=insp,
                 units=units,
-                share=round(loss / всего * 100, 1),
+                share=round(loss / всего_по_процессам * 100, 1),
             )
-            for code, ru, en, loss, insp, units in losses
+            for code, ru, en, loss, insp, units in по_процессам
         ),
         systemic=tuple(
             Systemic(code=code, level=level, records=records, units=units, text=text, lang=lang)
@@ -658,10 +579,8 @@ def load(
         unchecked=max(всего_точек - сводка.units, 0),
         selection=selection,
         countries=страны,
-        cities=города,
-        breakdown=_breakdown(rows, geo=geo, counts=counts, before=было),
         points=sorted_points(точки, selection.sort),
-        truncated=обрезан or было_обрезано,
+        truncated=обрезан,
         inspections_total=сводка.inspections,
         units_checked=сводка.units,
         critical_total=sum(1 for классы in counts.values() if классы.get(CRITICAL)),

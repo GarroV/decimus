@@ -31,7 +31,6 @@ from pathlib import Path
 import pytest
 from aiogram.types import CallbackQuery, Message
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     Calls,
     feed,
@@ -54,7 +53,7 @@ from src.domain.engine import state_file
 
 pytestmark = [pytest.mark.asyncio]
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Под root права ничего не запрещают: `chmod 000` читается как обычный файл, и
 #: форма порчи перестаёт быть порчей. Молча зеленеть на этом нельзя.

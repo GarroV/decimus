@@ -37,7 +37,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     build_report,
     feed,
@@ -53,7 +52,7 @@ from src.domain import add_finding, start_inspection
 from src.domain.errors import ConfigError
 from src.domain.translation import is_foreign, untranslated
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Пункт, которому в копии методики портится английская колонка процесса.
 #: Класс у него единственный (`D2`), зона `cold_kitchen` — запись кладётся

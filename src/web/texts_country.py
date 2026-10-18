@@ -1,4 +1,4 @@
-"""Тексты экрана «Страна» (D467): шапка, сегменты, плитки, таблица пиццерий, панель.
+"""Тексты экрана «Пиццерии» (D467, D504): колонка, шапка, плитки, пиццерии, панель.
 
 Отдельным модулем, а не строками в `texts.py`: тот уже длиннее предела файла.
 Сливаются в общий каталог (`texts.TEXTS`) — `t()` знает один словарь.
@@ -7,9 +7,6 @@
 from __future__ import annotations
 
 COUNTRY_TEXTS: dict[str, dict[str, str]] = {
-    "country.seg.label": {"ru": "Разделы страны", "en": "Country sections"},
-    "country.seg.summary": {"ru": "Сводка", "en": "Summary"},
-    "country.seg.units": {"ru": "Пиццерии", "en": "Pizzerias"},
     "country.dev.label": {"ru": "Девелопер", "en": "Developer"},
     "country.dev.all": {"ru": "Все", "en": "All"},
     "country.dev.countries": {"ru": "Стран: {n}", "en": "Countries: {n}"},
@@ -56,22 +53,16 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Нарушено сразу в нескольких пиццериях",
         "en": "Violated in several pizzerias at once",
     },
-    "country.hurt.zones": {
+    "country.hurt.processes": {
         "ru": "Где страна теряет больше всего",
         "en": "Where the country loses most",
     },
     "country.units.title": {"ru": "Пиццерии", "en": "Pizzerias"},
-    "country.units.hint": {
-        "ru": "Проверка — последняя за выбранный период. Нажмите строку: сведения и история.",
-        "en": "Inspection — the latest in the selected period. Click a row: details and history.",
-    },
+    "country.pick.label": {"ru": "Страна", "en": "Country"},
+    "country.pick.all": {"ru": "Все страны", "en": "All countries"},
     "country.units.empty": {
         "ru": "В стране нет ни одной пиццерии.",
         "en": "There are no pizzerias in this country.",
-    },
-    "country.units.not_checked": {
-        "ru": "за период не проверяли",
-        "en": "not inspected in the period",
     },
     "country.units.closed": {"ru": "Закрытые: {n}", "en": "Closed: {n}"},
     "country.units.profiles_failed": {

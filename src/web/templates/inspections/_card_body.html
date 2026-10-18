@@ -39,6 +39,8 @@
         </select></label>
       <label><span class="field-label">{{ t('revise.text') }}</span>
         <textarea class="input" name="text" required maxlength="1000" rows="2" lang="{{ finding.lang }}">{{ finding.text or '' }}</textarea></label>
+      <label><span class="field-label">{{ t('revise.reading') }}</span>
+        <input class="input" name="reading_c" inputmode="decimal" maxlength="8" value="{{ '%g' % finding.reading_c if finding.reading_c is not none else '' }}"></label>
       <p class="field-note">{{ t('revise.hint') }}</p>
       <button class="btn" type="submit">{{ t('revise.submit') }}</button>
     </form>
@@ -198,6 +200,7 @@
               {{ t('card.findings.note') if finding.code == 'NOTE' else (t('card.findings.no_item') if finding.code == 'LEGACY' else finding.code) }} · {{ zone_names.get(finding.zone, finding.zone) if finding.zone else t('card.findings.no_zone') }}
               {%- if finding.zone_unusual %} · {{ t('card.findings.zone_unusual') }}{% endif %}
               {%- if mixed_speech %} · {{ t('card.findings.speech_lang', lang=finding.lang) }}{% endif %}
+              {%- if finding.reading_c is not none %} · {{ t('card.findings.reading', value='%g' % finding.reading_c) }}{% endif %}
             </span>
           </span>
         {% if shots %}

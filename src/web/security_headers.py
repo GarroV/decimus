@@ -66,6 +66,10 @@ OAUTH_CONTENT_SECURITY_POLICY = CONTENT_SECURITY_POLICY.replace(
 #: внедрённый код не должен суметь попросить от её имени.
 PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=()"
 
+#: Мини-апп обхода снимает нарушение своей камерой (D514): на Android телеграм
+#: не открывает камеру по `capture`. Камера — только своему адресу, без рамок.
+WALK_PERMISSIONS_POLICY = "camera=(self), microphone=(), geolocation=()"
+
 #: Год — срок, который браузеры и списки предзагрузки считают рабочим.
 #: Без `includeSubDomains`: стенд живёт на имени площадки, чьи соседние имена
 #: не наши.
@@ -108,6 +112,7 @@ BASE_HEADERS: dict[str, str] = {
 WALK_HEADERS: dict[str, str] = {
     **{ключ: значение for ключ, значение in BASE_HEADERS.items() if ключ != "X-Frame-Options"},
     "Content-Security-Policy": WALK_CONTENT_SECURITY_POLICY,
+    "Permissions-Policy": WALK_PERMISSIONS_POLICY,
 }
 
 
@@ -121,10 +126,19 @@ NO_STORE_PREFIXES = ("/users", "/settings")
 CACHEABLE_ENDPOINTS = frozenset({"settings_avatar"})
 
 
-def install(app: Flask, *, hsts: bool) -> None:
-    """Повесить заголовки на каждый ответ приложения."""
+def install(app: Flask, *, hsts: bool, demo: bool = False) -> None:
+    """Повесить заголовки на каждый ответ приложения.
+
+    `demo` — стенд открытого демо (D524): мини-апп обхода показывается там в
+    рамке телефона на своей же странице `/demo/app`, поэтому рамке разрешён и
+    свой домен. На проде рамка — только Telegram.
+    """
     заголовки = dict(BASE_HEADERS)
     обход = dict(WALK_HEADERS)
+    if demo:
+        обход["Content-Security-Policy"] = WALK_CONTENT_SECURITY_POLICY.replace(
+            "frame-ancestors ", "frame-ancestors 'self' ", 1
+        )
     if hsts:
         заголовки["Strict-Transport-Security"] = f"max-age={HSTS_MAX_AGE}"
         обход["Strict-Transport-Security"] = f"max-age={HSTS_MAX_AGE}"

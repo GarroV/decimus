@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     candidate,
     feed,
@@ -36,7 +35,7 @@ from src.domain import Finding, get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Однозначные слова синтетической карты: строка «Печь» плюс колонка «грязная»
 #: → CLN05 с единственным классом D1. Запись по ним появляется без нажатия

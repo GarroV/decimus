@@ -27,7 +27,6 @@ def _клиент(monkeypatch: pytest.MonkeyPatch) -> Any:
     return _приложение(
         monkeypatch,
         TELEGRAM_BOT_TOKEN=ТОКЕН,
-        ALLOWED_TELEGRAM_IDS=f"{АУДИТОР},{КОЛЛЕГА}",
     ).test_client()
 
 

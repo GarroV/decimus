@@ -11,6 +11,11 @@ from dataclasses import dataclass, field
 
 from .errors import ValidationError
 
+#: Код чек-листа по умолчанию — один на весь продукт (#347). Здесь, а не в
+#: `edition.py`: модели не тянут за собой ни движок, ни хранилище, и импорт из
+#: базы и домена не замыкается в кольцо. `edition.DEFAULT_CODE` — это он же.
+DEFAULT_CHECKLIST_CODE = "bizdev"
+
 #: Откуда взялась запись (решение D044). Со слов аудитора — за формулировку
 #: отвечает он; распознано по кадру — не отвечает никто, и при предвычитке
 #: отчёта такие записи аудитор перечитывает в первую очередь.
@@ -105,6 +110,11 @@ NOTE_CODE = "NOTE"
 #: удваиваются и прошлым нарушением не считаются.
 NON_DEDUCTING = frozenset({"D0", ADVICE_LEVEL})
 
+#: Пределы показания термометра, °C (#836): от морозильной камеры до жарочного
+#: шкафа. Вне них число — мусор распознавания или опечатка, а не измерение.
+READING_MIN_C = -60.0
+READING_MAX_C = 500.0
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -154,6 +164,11 @@ class Finding:
     suggested_level: str = ""
     suggested_zone: str = ""
     suggested_confidence: float | None = None
+    #: Температура на фото термометра, °C (#836): прочитана моделью и подтверждена
+    #: или исправлена аудитором. Пусто — замера у записи нет. Лежит в блоке
+    #: `domain` проверки рядом со словами; на оценку не влияет — класс ставит
+    #: человек по порогам методики.
+    reading_c: float | None = None
 
 
 @dataclass(frozen=True)
@@ -194,7 +209,7 @@ class Inspection:
     city: str = ""
     #: Код чек-листа, по которому идёт проверка (волна 3). До неё чек-лист был
     #: один, и проверки без кода — это он.
-    checklist_code: str = "bizdev"
+    checklist_code: str = DEFAULT_CHECKLIST_CODE
     partner: str = ""
     contact: str = ""
     auditor: str = ""
@@ -232,6 +247,29 @@ class ZoneScore:
 
 
 @dataclass(frozen=True)
+class ProcessScore:
+    """Итог по одному процессу (блоку методики): записи по уровням и вклад в потерю.
+
+    `loss` — доля процесса в вычете итога (D120/D121, D507), в той же шкале, что
+    и `ZoneScore.loss`; по всем процессам проверки они складываются в
+    `Score.deductions`. `scored` ложно у процесса, где методика нарушений не
+    предусматривает: он не «чистый», а «нечему быть нарушением».
+    """
+
+    code: str
+    name_ru: str
+    name_en: str
+    scored: bool
+    d1: int
+    d2: int
+    d3: int
+    loss: float
+
+    def name(self, lang: str) -> str:
+        return pick_text(self.name_ru, self.name_en, lang)
+
+
+@dataclass(frozen=True)
 class Score:
     """Оценка проверки — целиком из `audit.py score`, ни одной цифры своей."""
 
@@ -242,6 +280,10 @@ class Score:
     counts: dict[str, int]
     deductions: float
     by_zone: dict[str, ZoneScore]
+    #: Разбивка по процессам из ответа движка (`by_process`), D507. Ключ — код
+    #: процесса, как у движка. По умолчанию пусто, чтобы тот, кто собирает
+    #: оценку руками, не обязан был её знать.
+    by_process: dict[str, ProcessScore] = field(default_factory=dict)
 
     def label(self, lang: str) -> str:
         return pick_text(self.label_ru, self.label_en, lang)

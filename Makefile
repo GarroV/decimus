@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
+.PHONY: bootstrap check test test-honest porcha porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -27,7 +27,10 @@ bootstrap:  ## окружение прогона с нуля: `.venv` и зав�
 # Отдельная цель `test` остаётся мягкой намеренно: гонять набор без базы по
 # ходу работы — законно, врать про полноту — нет.
 check: export AUDIT_REQUIRE_DATA = 1
-check: fmt lint types test dead bounds  ## все гейты качества разом: формат, линт, типы, тесты, мёртвый код, границы модулей; требует базы
+# Быстрые гейты стоят до `test`: make останавливается на первой упавшей цели, и
+# при `dead`/`bounds` после минутного `test` красный тест означал, что они не
+# выполнялись вовсе — забытое имя находили посторонние через недели (#266).
+check: fmt lint types dead bounds test  ## все гейты качества разом: формат, линт, типы, мёртвый код, границы модулей, тесты; требует базы
 
 fmt:  ## проверка формата (`ruff format --check`)
 	$(VENV)/ruff format --check .
@@ -124,6 +127,12 @@ test-honest:  ## прогон тестов без кеша байткода — 
 	AUDIT_REQUIRE_DATA=$(if $(strip $(ARGS)),,1) PYTHONDONTWRITEBYTECODE=1 $(VENV)/pytest --no-cov $(ARGS)
 	@if [ -z "$(strip $(ARGS))" ]; then $(VENV)/python scripts/check_run_complete.py reports/junit.xml; fi
 
+# Порча ядра одной командой (#268): вычет движка, ставка в data/scoring.json,
+# множитель повтора, правило формулировки. Каждая порча обязана уронить свой
+# тест; восстановление копией с проверкой md5. Нужны data/ и examples/.
+porcha:  ## порча ядра: испорченный расчёт обязан уронить прогон (без базы, нужны data/ и examples/)
+	$(VENV)/python tools/porcha_core.py
+
 porcha-permissions:  ## порча матрицы прав: каждая сломанная защита обязана уронить свой тест (без базы)
 	$(VENV)/python tools/porcha_permissions.py
 
@@ -167,12 +176,6 @@ regress:  ## движок на эталонных данных: цифры не 
 demo:  ## наполнить синтетический англоязычный демо-набор, боевых данных не касается
 	$(VENV)/python tools/seed_demo.py
 
-# Снос демо-стенда. Существует потому, что напрашивающаяся симметричная
-# команда `docker compose --profile demo down -v` сносит ВМЕСТЕ С ДЕМО боевой
-# бот и удаляет том `state` — состояние всех идущих проверок партнёров.
-# Сервис без `profiles:` активен при любом `--profile`, а `-v` удаляет все
-# именованные тома проекта. Поэтому здесь поимённо и без `-v`, а том демо
-# удаляется отдельной строкой.
 # Замер потолка нагрузки (T101, D058). Владелец назвал нагрузку главным риском,
 # но целевого числа не задал — поэтому сначала измеряем потолок, потом решаем.
 # Проверка способна упасть: со снятой блокировкой движка теряет записи альбома.
@@ -216,6 +219,12 @@ processhint:  ## замер признака «<описание>, это <пр�
 zonewords:  ## замер узнавания зоны, названной не в именительном падеже
 	STATE_DIR=$${STATE_DIR:-/tmp/zonewords-state} $(VENV)/python tools/zone_words_measure.py
 
+# Снос демо-стенда. Существует потому, что напрашивающаяся симметричная
+# команда `docker compose --profile demo down -v` сносит ВМЕСТЕ С ДЕМО боевой
+# бот и удаляет том `state` — состояние всех идущих проверок партнёров.
+# Сервис без `profiles:` активен при любом `--profile`, а `-v` удаляет все
+# именованные тома проекта. Поэтому здесь поимённо и без `-v`, а том демо
+# удаляется отдельной строкой.
 demo-down:  ## снести только демо-стенд (не боевой бот и не том состояния)
 	docker compose --profile demo rm -sf demo demo-seed
 	-docker volume rm $$(docker compose --profile demo config --format json \
@@ -262,7 +271,16 @@ image:  ## сборка образов бота и MCP-сервера с ном�
 # с нуля. Идемпотентно: на поднятом стенде и накатанной схеме не делает ничего.
 # Строка подключения при этом берётся из .env и должна указывать на этот же
 # порт — см. POSTGRES_PORT и DATABASE_URL в .env.example.
+#
+# На Маке стенды не поднимаются (решение владельца 28.09.2026, #427): стенды —
+# на MUSPELHEIM. Цель отказывает сама, а не полагается на память; осознанный
+# обход по прямой просьбе владельца — `ALLOW_MAC_STAND=1`.
 db-up:  ## поднять Postgres рядом с ботом, дождаться готовности и накатить схему
+	@if [ "$$(uname -s)" = Darwin ] && [ "$(ALLOW_MAC_STAND)" != 1 ]; then \
+	  echo "make db-up: на Маке стенды не поднимаются (28.09.2026, #427) — стенд на MUSPELHEIM (ssh muspelheim)." >&2; \
+	  echo "Обход только по прямой просьбе владельца: ALLOW_MAC_STAND=1 make db-up" >&2; \
+	  exit 1; \
+	fi
 	docker compose --profile db up -d --wait db
 	$(MAKE) migrate
 

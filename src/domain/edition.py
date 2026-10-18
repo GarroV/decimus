@@ -52,6 +52,7 @@ from typing import Any
 from .config import DATA_FILES, Settings
 from .engine import DOMAIN_KEY, state_file
 from .errors import ChecklistVersionMismatch
+from .models import DEFAULT_CHECKLIST_CODE
 from .version import VERSION_FILE, compose, edition_of, is_one_segment
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ SHELF_DIR = "methodology"
 #: (`pin`), и объявление там замкнуло бы импорт в кольцо. Дом у значения
 #: один: раскладка хранилища (`src/domain/checklist_store.py`) и двери выше
 #: его переиздают, а не объявляют заново (#455).
-DEFAULT_CODE = "bizdev"
+DEFAULT_CODE = DEFAULT_CHECKLIST_CODE
 
 #: Что входит в снимок. `DATA_FILES` — сама методика (то же, из чего считается
 #: отпечаток), плюс файл издания: без него снимок опознавался бы как `local-…`

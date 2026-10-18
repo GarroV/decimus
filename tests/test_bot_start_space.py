@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -34,7 +33,7 @@ def _партнёр() -> BindingCache:
 
 
 def _диспетчер() -> Dispatcher:
-    return build_dispatcher(replace(settings(), allowed_ids=frozenset()), bindings=_партнёр())
+    return build_dispatcher(settings(), bindings=_партнёр())
 
 
 async def test_справочник_сверяется_в_пространстве_аудитора(

@@ -260,17 +260,27 @@ def test_кластер_IMF_делит_страны_по_справочнику(
     страны = (
         CountryRow("RS", "Сербия", "Serbia", None, True, "CEE"),
         CountryRow("NG", "Нигерия", "Nigeria", None, True, "OTHER"),
+        CountryRow("TR", "Турция", "Turkey", None, True, "TR"),
+        CountryRow("GE", "Грузия", "Georgia", None, True, "CAUCASUS"),
     )
     found = Choices((), страны, ())
     период = ReportPeriod("month", "2026-09", date(2026, 9, 1), date(2026, 9, 30))
     факты = [Fact("a", "a", "RS", "rs", 1, date(2026, 9, 2), 90.0),
-             Fact("b", "b", "NG", "rs", 1, date(2026, 9, 2), 70.0)]  # fmt: skip
+             Fact("b", "b", "NG", "rs", 1, date(2026, 9, 2), 70.0),
+             Fact("c", "c", "TR", "rs", 1, date(2026, 9, 2), 80.0),
+             Fact("d", "d", "GE", "rs", 1, date(2026, 9, 2), 60.0)]  # fmt: skip
 
-    imf = group_lines(Selection("imf", None, период), found, ("RS", "NG"), (факты, []))
+    # Четыре кластера (D502), в порядке CEE, Турция, Кавказ, остальные.
+    imf = group_lines(Selection("imf", None, период), found, ("RS", "NG", "TR", "GE"), (факты, []))
     assert [(g.key, g.countries, g.rs) for g in imf] == [
         ("CEE", ("RS",), 90.0),
+        ("TR", ("TR",), 80.0),
+        ("CAUCASUS", ("GE",), 60.0),
         ("OTHER", ("NG",), 70.0),
     ]
+    # Кластер без стран в охвате строкой не идёт.
+    только_сербия = group_lines(Selection("imf", None, период), found, ("RS",), (факты, []))
+    assert [g.key for g in только_сербия] == ["CEE"]
 
     кластер = Selection("cluster", "OTHER", период)
     assert group_countries(кластер, страны) == ("NG",)
@@ -317,3 +327,38 @@ def test_у_пиццерии_top_bottom_изменение_к_прошлому_�
     assert новые[0].delta is None
     без_прошлого, _ = top_bottom(ТЕКУЩИЙ, "rs", threshold=85)
     assert без_прошлого[0].delta is None
+
+
+def test_строки_стран_совпадают_с_прямым_расчётом_до_бита() -> None:
+    """Средние считаются один раз на набор (~0,3 с на «Рейтингах»), числа — те же."""
+    import random
+
+    from src.ratings.summary import Fact, delta, group_average, score_lines
+
+    случай = random.Random(14)  # noqa: S311 — данные теста, не криптография
+    страны = ["AA", "BB", "CC"]
+
+    def набор(period: int) -> list[Fact]:
+        return [
+            Fact(
+                unit=f"u{i}",
+                unit_name=f"U{i}",
+                country=страны[i % 3],
+                rating_type=тип,
+                period_id=period,
+                begin_on=date(2026, 9, 1),
+                score=round(случай.uniform(60, 100), 2),
+            )
+            for i in range(40)
+            for тип in ("rs", "rko")
+            for _ in range(случай.randint(1, 3))
+        ]
+
+    сейчас, было = набор(2), набор(1)
+    строки, итог = score_lines(сейчас, было, страны)
+    for строка, группа in [*((с, [с.country]) for с in строки), (итог, страны)]:
+        rs = group_average(сейчас, "rs", группа)
+        rko = group_average(сейчас, "rko", группа)
+        assert (строка.rs, строка.rko) == (rs, rko)
+        assert строка.rs_delta == delta(rs, group_average(было, "rs", группа))
+        assert строка.rko_delta == delta(rko, group_average(было, "rko", группа))

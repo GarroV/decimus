@@ -87,14 +87,17 @@ def _countries(facts: Sequence[Fact]) -> dict[str, str]:
     return {fact.unit: fact.country for fact in facts}
 
 
+def _group_mean(
+    averages: dict[str, float], where: dict[str, str], countries: Sequence[str]
+) -> float | None:
+    values = [avg for unit, avg in averages.items() if where[unit] in countries]
+    return fmean(values) if values else None
+
+
 def group_average(
     facts: Sequence[Fact], rating_type: str, countries: Sequence[str]
 ) -> float | None:
-    where = _countries(facts)
-    values = [
-        avg for unit, avg in unit_averages(facts, rating_type).items() if where[unit] in countries
-    ]
-    return fmean(values) if values else None
+    return _group_mean(unit_averages(facts, rating_type), _countries(facts), countries)
 
 
 def country_average(facts: Sequence[Fact], rating_type: str, country: str) -> float | None:
@@ -143,25 +146,45 @@ class CountryLine:
     rko_delta: float | None
 
 
-def _line(
-    code: str, current: Sequence[Fact], previous: Sequence[Fact], countries: Sequence[str]
-) -> CountryLine:
-    rs = group_average(current, RS, countries)
-    rko = group_average(current, RKO, countries)
+@dataclass(frozen=True)
+class _Means:
+    """Средние по пиццериям одного набора фактов, посчитанные один раз.
+
+    Строка на каждую страну и итог раньше пересчитывали средние всего набора
+    заново — 100 проходов по фактам на экран «Рейтинги» (~0,3 с, замер
+    14.10.2026). Средняя группы та же: те же значения в том же порядке.
+    """
+
+    rs: dict[str, float]
+    rko: dict[str, float]
+    where: dict[str, str]
+
+    @classmethod
+    def of(cls, facts: Sequence[Fact]) -> _Means:
+        return cls(unit_averages(facts, RS), unit_averages(facts, RKO), _countries(facts))
+
+    def group(self, rating_type: str, countries: Sequence[str]) -> float | None:
+        return _group_mean(self.rs if rating_type == RS else self.rko, self.where, countries)
+
+
+def _line(code: str, current: _Means, previous: _Means, countries: Sequence[str]) -> CountryLine:
+    rs = current.group(RS, countries)
+    rko = current.group(RKO, countries)
     return CountryLine(
         code,
         rs,
         rko,
-        delta(rs, group_average(previous, RS, countries)),
-        delta(rko, group_average(previous, RKO, countries)),
+        delta(rs, previous.group(RS, countries)),
+        delta(rko, previous.group(RKO, countries)),
     )
 
 
 def score_lines(
     current: Sequence[Fact], previous: Sequence[Fact], countries: Sequence[str]
 ) -> tuple[tuple[CountryLine, ...], CountryLine]:
-    lines = tuple(_line(code, current, previous, [code]) for code in countries)
-    return lines, _line("", current, previous, countries)
+    сейчас, было = _Means.of(current), _Means.of(previous)
+    lines = tuple(_line(code, сейчас, было, [code]) for code in countries)
+    return lines, _line("", сейчас, было, countries)
 
 
 @dataclass(frozen=True)

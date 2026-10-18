@@ -39,7 +39,6 @@ from typing import Any
 import pytest
 from aiogram import Bot
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     FAKE_TOKEN,
     RecordingSession,
@@ -61,7 +60,7 @@ from src.report.photos import misses_text, resolve_photos
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Первое поле информационной части (D070). Кадр в тестах прикладывается к нему.
 ПЕРВОЕ = "INF01"

@@ -24,6 +24,7 @@ from collections.abc import Mapping
 from .errors import WebTextError
 from .texts_connections import CONNECTIONS_TEXTS
 from .texts_country import COUNTRY_TEXTS
+from .texts_demo import DEMO_TEXTS
 from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_journal import JOURNAL_TEXTS
@@ -37,6 +38,7 @@ from .texts_refusals import REFUSAL_TEXTS
 from .texts_registry import REGISTRY_TEXTS
 from .texts_second_factor import SECOND_FACTOR_TEXTS
 from .texts_settings import SETTINGS_TEXTS
+from .texts_trips import TRIP_TEXTS
 from .texts_units import UNIT_TEXTS
 from .texts_users import USERS_TEXTS
 from .texts_walk import WALK_TEXTS
@@ -62,6 +64,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.lang.ru": {"ru": "Русский", "en": "Русский"},
     "nav.lang.en": {"ru": "English", "en": "English"},
     "nav.sections": {"ru": "Разделы", "en": "Sections"},
+    "nav.more": {"ru": "Ещё", "en": "More"},
     "split.back": {"ru": "Назад", "en": "Back"},
     "split.close": {"ru": "Закрыть", "en": "Close"},
     "nav.search": {"ru": "Поиск пиццерии", "en": "Find a pizzeria"},
@@ -90,21 +93,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.period.d30": {"ru": "30 дней", "en": "30 days"},
     "overview.period.d90": {"ru": "90 дней", "en": "90 days"},
     "overview.period.y1": {"ru": "год", "en": "a year"},
-    "overview.breakdown.title": {"ru": "Разбивка по городам", "en": "Breakdown by city"},
-    "overview.breakdown.hint": {
-        "ru": "клик — город на экране страны",
-        "en": "click — the city on the country screen",
-    },
-    "overview.breakdown.city": {"ru": "Город", "en": "City"},
-    "overview.breakdown.units": {"ru": "Точек", "en": "Units"},
-    "overview.breakdown.average": {"ru": "Средняя", "en": "Average"},
     "overview.breakdown.grades": {"ru": "Буквы", "en": "Grades"},
-    "overview.breakdown.critical": {"ru": "D3", "en": "D3"},
-    "overview.breakdown.nocity": {"ru": "Без города", "en": "No city"},
-    "overview.breakdown.empty": {
-        "ru": "За выбранный период проверок нет — разбивать нечего.",
-        "en": "No inspections in the selected period — nothing to break down.",
-    },
     "overview.sort": {"ru": "Сортировка", "en": "Sort"},
     "overview.sort.score": {"ru": "худшие сверху", "en": "worst first"},
     "overview.sort.delta": {"ru": "по движению", "en": "by movement"},
@@ -120,7 +109,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.points.grade": {"ru": "Буква", "en": "Grade"},
     "overview.points.score": {"ru": "Оценка", "en": "Score"},
     "overview.points.delta": {"ru": "Δ", "en": "Δ"},
-    "overview.points.zone": {"ru": "Слабая зона", "en": "Weakest zone"},
+    "overview.points.process": {"ru": "Слабое направление", "en": "Weakest direction"},
     "overview.points.date": {"ru": "Проверена", "en": "Inspected"},
     "overview.points.empty": {
         "ru": "В этой выборке нет ни одной проверенной точки. Снимите часть отбора.",
@@ -204,15 +193,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "critical findings: {detail}",
     },
     "overview.why.low_grade": {"ru": "оценка {detail} %", "en": "score {detail}%"},
-    "overview.zones.title": {
+    "overview.processes.title": {
         "ru": "Где сеть теряет проценты",
         "en": "Where the network loses points",
     },
-    "overview.zones.hint": {
-        "ru": "Сумма потерь по зонам — что лечить системно",
-        "en": "Losses summed by zone — what to fix systemically",
+    "overview.processes.hint": {
+        "ru": "Сумма потерь по блокам методики — кого учить и что править",
+        "en": "Losses summed by methodology block — whom to train and what to fix",
     },
-    "overview.zones.spread": {
+    "overview.processes.spread": {
         "ru": "точек: {units} · проверок: {inspections}",
         "en": "units: {units} · inspections: {inspections}",
     },
@@ -235,7 +224,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Проверок в выборке нет — показывать нечего.",
         "en": "No inspections in this selection — nothing to show.",
     },
-    "country.kicker": {"ru": "Страна", "en": "Country"},
+    "country.kicker": {"ru": "Пиццерии", "en": "Pizzerias"},
+    "country.filter.title": {"ru": "Отбор", "en": "Filter"},
     "country.rail.title": {"ru": "Страны", "en": "Countries"},
     "country.choose.title": {"ru": "Выберите страну", "en": "Choose a country"},
     "country.choose.units": {"ru": "точек: {n}", "en": "units: {n}"},
@@ -249,7 +239,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
     "section.plans.title": {"ru": "Экшн-планы", "en": "Action plans"},
     "section.orders.title": {"ru": "Предписания", "en": "Compliance notices"},
-    "section.country.title": {"ru": "Страна", "en": "Country"},
+    "section.country.title": {"ru": "Пиццерии", "en": "Pizzerias"},
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
     # Слово владельца (D286): вкладка, где заводят людей и привязывают бота.
@@ -271,6 +261,13 @@ TEXTS: dict[str, dict[str, str]] = {
     # дверь ради красоты схемы нельзя.
     "auth.google": {"ru": "Войти через Google", "en": "Sign in with Google"},
     "auth.or": {"ru": "или", "en": "or"},
+    # Почта учётки пришла с другого аккаунта Google (аудит 12.10, F-027).
+    "auth.google_other": {
+        "ru": "Этот аккаунт Google не тот, которым учётка входила раньше. Войдите "
+        "прежним аккаунтом Google или попросите администратора заново привязать почту.",
+        "en": "This Google account is not the one this account signed in with before. "
+        "Sign in with that Google account or ask an administrator to link the email again.",
+    },
     "auth.failed": {
         "ru": "Логин или пароль не подошли.",
         "en": "That login and password did not match.",
@@ -373,13 +370,14 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Проверок по этой точке ещё не было",
         "en": "This unit has not been audited yet",
     },
-    "unit.weak": {"ru": "Слабые блоки последней проверки", "en": "Weak zones of the last audit"},
-    "unit.weak.empty": {
-        "ru": "В последней проверке потерь по зонам не записано",
-        "en": "The last audit recorded no zone losses",
+    "unit.weak": {
+        "ru": "Слабые направления последней проверки",
+        "en": "Weak directions of the last audit",
     },
-    "unit.weak.zeroed": {"ru": "зона обнулена", "en": "zone zeroed"},
-    "unit.weak.share": {"ru": "доля {share}%", "en": "share {share}%"},
+    "unit.weak.empty": {
+        "ru": "В последней проверке потерь по направлениям не записано",
+        "en": "The last audit recorded no losses by direction",
+    },
     "unit.findings": {"ru": "Записи последней проверки", "en": "Records of the last audit"},
     "unit.findings.empty": {"ru": "Записей нет", "en": "No records"},
     "unit.repeats": {"ru": "Повторяющиеся нарушения", "en": "Repeating violations"},
@@ -527,6 +525,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "revise.level": {"ru": "Класс", "en": "Class"},
     "revise.zone": {"ru": "Зона", "en": "Zone"},
     "revise.text": {"ru": "Формулировка", "en": "Wording"},
+    "revise.reading": {"ru": "Температура, °C", "en": "Temperature, °C"},
     "revise.hint": {
         "ru": "После сохранения оценка пересчитывается движком по методике этой проверки.",
         "en": "Saving recalculates the score with the engine, using this inspection's checklist.",
@@ -626,6 +625,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.findings.col.zone": {"ru": "Зона", "en": "Zone"},
     "card.findings.col.text": {"ru": "Формулировка", "en": "Wording"},
     "card.findings.zone_unusual": {"ru": "зона нетипична", "en": "unusual zone"},
+    "card.findings.reading": {"ru": "{value} °C", "en": "{value} °C"},
     "card.findings.advice": {"ru": "Рекомендация", "en": "Recommendation"},
     "card.findings.note": {"ru": "Общая заметка", "en": "General note"},
     # Историческая проверка (D332): записи старого отчёта без пункта, класса, зоны.
@@ -1498,7 +1498,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Even out the shares of all zones",
     },
     "methodology.zones.add.submit": {"ru": "Завести", "en": "Add"},
-    "methodology.zones.note": {"ru": "Зачем правка", "en": "Why this edit"},
+    "methodology.zones.note": {"ru": "Зачем правим", "en": "Why this edit"},
     "methodology.empty.title": {"ru": "Пунктов нет", "en": "No items"},
     "methodology.empty.text": {
         "ru": "В этой версии методики нет ни одного пункта.",
@@ -1566,7 +1566,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Выключить пункт — отдельная кнопка, а не вид строки: так это видно в журнале.",
         "en": "Switching an item off is a button, not a row kind: that way the journal shows it.",
     },
-    "methodology.field.version_name": {"ru": "Имя набора", "en": "Set name"},
+    "methodology.field.version_name": {
+        "ru": "Название версии методики",
+        "en": "Methodology version name",
+    },
     "methodology.field.version_name.hint": {
         "ru": (
             "У этой методики имени ещё нет, а идентификатор версии складывается из имени, "
@@ -1623,6 +1626,7 @@ TEXTS: dict[str, dict[str, str]] = {
 # рейтинги (спека 2026-10-08) — так же.
 _ЧАСТИ = (
     TEXTS,
+    DEMO_TEXTS,
     OAUTH_TEXTS,
     CONNECTIONS_TEXTS,
     COUNTRY_TEXTS,
@@ -1632,6 +1636,7 @@ _ЧАСТИ = (
     MODEL_KEY_TEXTS,
     PLAN_TEXTS,
     PRESCRIPTION_TEXTS,
+    TRIP_TEXTS,
     RATINGS_TEXTS,
     REFUSAL_TEXTS,
     REGISTRY_TEXTS,
@@ -1653,6 +1658,7 @@ TEXTS = {
     **TEXTS,
     **CONNECTIONS_TEXTS,
     **COUNTRY_TEXTS,
+    **DEMO_TEXTS,
     **GRADE_TEXTS,
     **HOME_TEXTS,
     **JOURNAL_TEXTS,
@@ -1661,6 +1667,7 @@ TEXTS = {
     **OAUTH_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,
+    **TRIP_TEXTS,
     **RATINGS_TEXTS,
     **REFUSAL_TEXTS,
     **REGISTRY_TEXTS,

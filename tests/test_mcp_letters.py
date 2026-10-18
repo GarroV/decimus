@@ -718,3 +718,53 @@ def test_нет_формулировки_и_не_тот_язык_это_разн
         "про находку без слов сказано так же, как про находку не на том языке"
     )
     assert "substituted" in status, "про подмену вопросом методики не сказано"
+
+
+# --- кэш готового письма (#696) ---------------------------------------------
+
+
+def test_повторный_показ_не_зовёт_движок(
+    хранилище: letters.Papers, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    вызовы: list[list[str]] = []
+    настоящий = letters._run
+
+    def считать(script: Path, args: list[str], **k: Path) -> tuple[int, str, str]:
+        вызовы.append(args)
+        return настоящий(script, args, **k)
+
+    monkeypatch.setattr(letters, "_run", считать)
+    первое = letters.build(_проверка(), lang="ru", papers=хранилище)
+    после_первого = len(вызовы)
+    второе = letters.build(_проверка(), lang="ru", papers=хранилище)
+
+    assert после_первого > 0
+    assert len(вызовы) == после_первого, "тот же вход собран движком второй раз"
+    assert второе == первое
+
+
+def test_правка_записи_собирает_письмо_заново(
+    хранилище: letters.Papers, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    вызовы: list[list[str]] = []
+    настоящий = letters._run
+
+    def считать(script: Path, args: list[str], **k: Path) -> tuple[int, str, str]:
+        вызовы.append(args)
+        return настоящий(script, args, **k)
+
+    monkeypatch.setattr(letters, "_run", считать)
+    letters.build(_проверка(), lang="ru", papers=хранилище)
+    после_первого = len(вызовы)
+    правленая = _проверка()
+    правленая = InspectionDetail(
+        inspection=правленая.inspection,
+        deductions=правленая.deductions,
+        counts=правленая.counts,
+        by_zone=правленая.by_zone,
+        findings=(replace(_находка(), text="Другая формулировка"),),
+    )
+    ответ = letters.build(правленая, lang="ru", papers=хранилище)
+
+    assert len(вызовы) > после_первого, "правка записи отдала старое письмо из кэша"
+    assert "Другая формулировка" in str(ответ["letter"])

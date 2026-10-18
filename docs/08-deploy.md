@@ -381,8 +381,10 @@ git pull
 $env:BUILD_SHA=(git rev-parse --short HEAD)   # без него образ ответит «сборка: неизвестна»
 docker compose build
 
-# 4. Поднять с новым образом (звено пересоздаётся вместе с сервером — см. §4.6)
+# 4. Поднять с новым образом. Звено само НЕ пересоздаётся: оно в профиле funnel,
+#    и обычный `up -d` оставит его в сетевом пространстве удалённого сервера (#304, §4.6)
 docker compose up -d
+docker compose --profile funnel up -d --force-recreate mcp link
 
 # 5. Накатить
 docker compose run --rm --no-deps migrate
@@ -718,6 +720,11 @@ docker ps --filter label=backup.pgdump=true --format "{{.Names}}"   # ждём d
 D061). Служба в сборке `storage-live`, том `storage-data`, порты только на
 петлю — наружу файлы выдаёт админка, а не хранилище.
 
+> **История.** С 30.09.2026 кадры живут в MinIO на MUSPELHEIM (D257, D259,
+> D293), служба `storage-live` и `tools/storage_env.*` удалены из репозитория
+> (#396): закреплённый образ MinIO больше не скачивается. Порядок ниже —
+> как было, для чтения старых журналов.
+
 **Не путать с соседней службой `storage`:** та мок, держит объекты в памяти и
 умирает вместе с контейнером. Она для прогонов и смоука, и боевым хранилищем
 быть не может.
@@ -765,6 +772,26 @@ python tools/backfill_previews.py --apply    # «сделано копий: X, �
 (`purged_at`) и невыгруженные (`storage_path` пуст) не трогает: копию делать
 не из чего. Нечитаемый кадр называется в выводе, остальные идут дальше, а код
 возврата 1 говорит, что был хотя бы один отказ.
+
+#### 4.9.1.1. Разбивка по процессам для проверок до миграции 0073 (D507)
+
+Карточка «Где сеть теряет проценты» на «Главной» читает `inspections.by_process`,
+которую слив пишет с миграции `0073`. Проверки, принятые раньше, её не имеют и в
+карточку не входят, пока их не долить: `tools/backfill_by_process.py` прогоняет
+движок по записанной проверке её же методикой (`rescore`) и пишет только эту
+колонку. Идёт под администратором истории (`DATABASE_RETRACTION_URL`); сторож
+`inspections_by_process_guarded` пускает запись только из NULL. Процент и букву
+доливщик не переписывает: расхождение с движком (или вклады процессов не
+сходятся с вычетом) — проверка пропускается с сообщением, код возврата 1.
+Историческим (`origin = 'legacy'`, D332) разбивка не кладётся.
+
+```bash
+# внутри образа: tools/ и методика в нём есть
+python tools/backfill_by_process.py            # сухой прогон: «проверок без разбивки: N»
+python tools/backfill_by_process.py --apply    # «записано: X, пропущено: Y»
+```
+
+Повторяемо: второй прогон берёт только проверки без разбивки.
 
 На проде прогнан 28.09.2026: 88 из 88, 0 отказов (`progress.md`). Кадры,
 которым копию сделать не из чего, карточка показывает пометкой «Фото
@@ -978,7 +1005,7 @@ Remove-Item -Recurse -Force C:\projects\decimus
 | Окружение | `/srv/decimus/.env`, права `600`; ключи — [`.env.example`](../.env.example) |
 | Методика | `/srv/decimus/data` (bind только на чтение, `AUDIT_DATA_DIR`) |
 | Проект compose | `decimus` → сеть `decimus_default`, тома `decimus_pgdata`, `decimus_state`, `decimus_frames`, `decimus_methodology` |
-| Кадры | **с 30.09.2026 — MinIO на MUSPELHEIM** (`C:\projects\decimus-frames`, канон — `GarroV/muspelheim-infra`), бот и админка ходят на `S3_ENDPOINT_URL=http://<TAILNET_IP>:9020` через tailnet. Бэкапа у кадров нет (D259, #456). Пока MUSPELHEIM спит, фото на сдаче не выгружаются, а в админке не открываются; сдача при этом не встаёт, а кадры доливает сам бот, когда хранилище вернулось (§4.9.2, #459). Старое хранилище на VPS — служба `storage-live` и том `decimus_storage-data` — снято 30.09 (D293): `prod-update.sh` его не поднимает и корзину не заводит |
+| Кадры | **с 30.09.2026 — MinIO на MUSPELHEIM** (`C:\projects\decimus-frames`, канон — `GarroV/muspelheim-infra`), бот и админка ходят на `S3_ENDPOINT_URL=http://<TAILNET_IP>:9020` через tailnet под пользователем MinIO `decimus-app` с доступом только к корзине `inspection-frames` (политика `decimus-frames-rw`); root-ключи MinIO лежат только на MUSPELHEIM и в окружение прода не попадают (#458). Бэкапа у кадров нет (D259, #456). Пока MUSPELHEIM спит, фото на сдаче не выгружаются, а в админке не открываются; сдача при этом не встаёт, а кадры доливает сам бот, когда хранилище вернулось (§4.9.2, #459). Старое хранилище на VPS — служба `storage-live` и том `decimus_storage-data` — снято 30.09 (D293): `prod-update.sh` его не поднимает и корзину не заводит |
 
 ### 8.1. Подключение к прокси — надстройка площадки
 
@@ -1081,8 +1108,8 @@ DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 наката разом не повторят одну миграцию, откуда бы их ни запустили.
 
 [`scripts/prod-update.sh`](../scripts/prod-update.sh) делает по порядку:
-`git pull --ff-only` → сборка с `BUILD_SHA` (вместе с профилем `backup`) →
-база и MinIO с ожиданием здоровья → корзина (`run --rm storage-init`) →
+`git pull --ff-only` → проверка утечки методики (`tools/methodology_leak.py data --tracked-only`, D517: цитата останавливает раскатку, обход `LEAK_CHECK=0`) → сборка с `BUILD_SHA` (вместе с профилем `backup`) →
+база с ожиданием здоровья →
 накат миграций → `up -d --wait` → смоук (`/login` 200, MCP без токена 401,
 админка не пишет в `state`, сервис обхода пишет, `/tg/walk` 200 — §8.14).
 Один и тот же порядок для первого подъёма и для каждого обновления: накат
@@ -1194,7 +1221,7 @@ docker run --rm -v decimus_storage-data:/v -v "$PWD":/in alpine:3.22 tar -xzf /i
 | Второй проект `decimus-web` с пустой базой (#352) | не воссоздаётся: веб в проекте `decimus`, база одна |
 | Звенья `web-link`, `link`, туннель | выключены, наружу — Caddy |
 | `scripts/deploy.sh` (PowerShell через ssh) | `scripts/prod-update.sh` на сервере |
-| `tools/storage_env.ps1` | `tools/storage_env.sh .env` — дописывает ключи хранилища, секрет не печатает |
+| `tools/storage_env.ps1` | не нужен: хранилище кадров на MUSPELHEIM, ключи заводит `muspelheim-infra` (оба скрипта удалены, #396) |
 | `C:\backups\pg_backup.ps1` | дамп площадки по метке |
 | Задача планировщика для `state-backup` | cron (§8.5) |
 | Деплой-скрипт с паролем в открытом виде (#395) | не переносится; учётку сменить (§8.7) |
@@ -1259,18 +1286,37 @@ Cloudflare Worker'ов. Это постоянный вход, своего до�
 SNI и Host, по которым Caddy выбирает сайт, — его DNS и доступность в пути не
 участвуют. Туннель — контейнер `cloudflared` в `/srv/edge`
 (`GarroV/vps-infra: edge/compose.yml`), токен — `/srv/edge/tunnel.env` (600,
-вне git); наружу он ничего не публикует и видит только Caddy. Если туннель
-лёг, Worker отправляет тот же запрос прежним путём через интернет и пишет в
-лог `tunnel failed, falling back to public path` (`npx wrangler tail <имя>`).
-Проверено 08.10: пробный Worker при живом туннеле — ни одного отката, при
-погашенном `cloudflared` — откат и ответ 200.
+вне git); наружу он ничего не публикует и видит только Caddy. **Другого пути
+нет (D521, 16.10.2026):** туннель лёг — Worker отвечает 502 `upstream
+unavailable, please retry` и пишет `tunnel failed` (журналы Worker'ов выключены,
+строку видно только в `npx wrangler tail <имя>`); привязки `EDGE` нет — 503. Сайты
+decimus в Caddy (`GarroV/vps-infra: edge/sites/decimus.caddy`) отдают продукт
+только запросу из сети туннеля с верным ключом фронта, всё прочее получает 403 —
+в том числе прямой заход на имя сайта из интернета. До 16.10 при упавшем туннеле
+запрос без тела уходил на сервер через интернет.
 
 | Что в Cloudflare | Имя | ID |
 |---|---|---|
 | Туннель | `vps-edge` | `<TUNNEL_ID>` |
 | VPC-сервис | `vps-edge-caddy` (хост `caddy`, проверка сертификата выключена — участок туннель→Caddy внутри docker-сети) | `<VPC_SERVICE_ID>` |
 
-Код — `front/src/index.js`. Настройки — шаблоны `front/wrangler.admin.template.jsonc`
+**Кэш статики на краю (#698).** Запрос до сервера идёт привязкой `EDGE` (туннель), а такой
+подзапрос мимо кэша Cloudflare: статика с `Cache-Control: public, max-age=31536000, immutable`
+всё равно доходила до VPS (TTFB CSS 210–440 мс, `cf-cache-status` в ответе не было). Теперь
+`GET /static/*` админки уходит в отдельную точку входа Worker'а `StaticCache` (`front/src/index.js`,
+маршрут — `front/src/proxy.js`) с включённым кэшем Worker'а (Workers Caching; работает и на
+`workers.dev`, решает по `Cache-Control` ответа; нужен Wrangler 4.107.0+). Запрос уходит туда
+без Cookie и Authorization; страницы под логином идут прежним путём и в кэш не попадают
+(у `default` кэш выключен). Включается переменной `STATIC_CACHE=1` в шаблоне админки; у `mcp` и
+стенда её нет. Сервер отдаёт `immutable` только на адрес с верным отпечатком (`src/web/assets.py`),
+поэтому чужой `?v=` не кэшируется. Проверка после выкладки Worker'а (`./deploy.sh admin`):
+дважды `curl -sI 'https://decimus.vasiliy-garro.workers.dev/static/decimus-web.css?v=<отпечаток из страницы>'`;
+на втором ответе ждём падение TTFB (`-w '%{time_starttransfer}'`) и ответ без захода на VPS
+(в логе Caddy нет второго запроса). Заголовка `cf-cache-status` Workers Caching может не
+показывать: смотреть по времени ответа и по логу Caddy.
+
+Код — `front/src/index.js` и `front/src/proxy.js`; проверка маршрутизации — `node --test
+front/test/proxy.test.mjs` (входит в `tests/test_front_worker.py`). Настройки — шаблоны `front/wrangler.admin.template.jsonc`
 и `front/wrangler.mcp.template.jsonc`: адреса инфраструктуры в репозиторий не
 кладутся (D431, `tests/test_no_infra_identifiers.py`), в шаблонах стоят заглушки
 `<VPC_SERVICE_ID>`, `<ORIGIN_HOST>`, `<MCP_ORIGIN_HOST>`. Wrangler подстановку
@@ -1300,8 +1346,16 @@ wrangler.admin.jsonc`, после первого запуска `deploy.sh`) и 
 ставит его в `X-Forwarded-For` только при верном ключе
 (`GarroV/vps-infra: edge/sites/decimus.caddy`). Ключ лежит в двух местах и больше
 нигде: секрет `FRONT_KEY` у обоих Worker'ов и `/srv/edge/sites/decimus-front.snippet`
-на VPS (в git не попадает). Сменить ключ — записать новый в оба места, затем
-`docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` в `/srv/edge`.
+на VPS (в git не попадает). **Смена ключа без простоя** (так сменён 16.10.2026,
+D521): новый ключ генерируется в файл (`openssl rand -hex 32`), значение нигде не
+печатается; в сниппете на время смены стоят оба ключа (две строки `header
+X-Decimus-Front-Key …` в одном именованном сопоставителе — Caddy сравнивает их по
+«или»), `caddy reload`; затем `npx wrangler secret put FRONT_KEY -c
+wrangler.admin.jsonc < файл` и то же для `wrangler.mcp.jsonc` (значение — со
+стандартного ввода, не аргументом); затем в сниппете остаётся только новый ключ и
+снова `caddy reload` (`docker compose exec caddy caddy reload --config
+/etc/caddy/Caddyfile` в `/srv/edge`). Проверка — админка и MCP через Worker
+отвечают, прямой заход на сайт Caddy — 403.
 Проверено 29.09: через фронт, напрямую и с подделанным ключом счётчик видит
 настоящий адрес посетителя.
 
@@ -1363,8 +1417,8 @@ Funnel не зависит: `https://decimus-stand.vasiliy-garro.workers.dev`. �
 5. **`WEB_BOT_USERNAME`** у веба — имя бота без `@`. Без неё «Настройки»
    не показывают «Привязать бота» и называют переменную.
 6. **Из окружения бота убрать `BOT_INVITES` и `BOT_MCP_TENANT`** — они больше
-   не читаются. `ALLOWED_TELEGRAM_IDS` остаётся: это совместимость, люди УК без
-   привязки работают по нему.
+   не читаются. `ALLOWED_TELEGRAM_IDS` тоже снят (D520, 16.10.2026): вход только
+   по привязке, строку из `.env` площадки можно удалить.
 
 ### 8.11. Язык бота, выбранный человеком (D303, #411)
 
@@ -1696,3 +1750,22 @@ D391) — так же: миграций нет, право — уже выдан
    `select tab, checked_at, outcome from ratings.sheet_sync order by tab`. Закрыли таблицу по
    ссылке — через заход лист показывает `сбой` с причиной, данные остались прежними.
 5. **Писем и уведомлений нет.**
+
+### 8.21. Открытое демо (D524)
+
+Отдельный стенд на VPS: `/srv/decimus-demo` (клон `main`), проект compose
+`decimus-demo` — своя база, своё хранилище кадров (`storage`, s3mock из сборки), свои
+тома. С продом общая только сеть `edge-decimus` к Caddy. Бота и MCP на стенде нет.
+
+| Что | Где |
+|---|---|
+| Сборка | `docker-compose.yml` + `docker-compose.prod.yml` + `deploy/demo/compose.demo.yaml` |
+| Настройки | `/srv/decimus-demo/.env` (вне git): свои пароли ролей базы, `WEB_SECRET_KEY`, `AUDIT_DATA_DIR=./demo/data`, `S3_*` на `http://storage:9090`, `WEB_TRUSTED_PROXY_ADDR` — подсеть `edge-decimus` |
+| Кадры для посева | `/srv/decimus-demo-photos` — снимки Белграда-1 и -2 без метаданных (вне git: репозиторий публичный) |
+| Сброс | `deploy/demo/reset.sh`: тома `pgdata`, `state`, `methodology` заново → миграции → `tools/seed_open_demo.py` → подъём, около минуты. Cron пользователя `garva`: `17 * * * *`, лог `~/decimus-demo-reset.log` |
+| Обновление кода | `deploy/demo/update.sh`: `git pull`, сборка, сброс |
+| Caddy | `vps-infra` `edge/sites/decimus-demo.caddy` (`<DEMO_ORIGIN_HOST>` → `decimus-demo-web:8267`): сайт без ключа фронта, заголовки фронта срезаются (как у стенда §8.11) |
+| Адрес | https://decimus-demo.vasiliy-garro.workers.dev — Worker `decimus-demo` (`front/deploy.sh demo`, шаблон `front/wrangler.demo.template.jsonc`, `DEMO_ORIGIN_HOST` в `front/.deploy.env`). Секрет `FRONT_KEY` свой, случайный (без него Worker отвечает 503): `openssl rand -hex 32 \| npx wrangler secret put FRONT_KEY --name decimus-demo` |
+
+На проде `WEB_DEMO_URL` — адрес Worker'а демо: по нему кнопка «Открыть демо» на
+посадочной странице.

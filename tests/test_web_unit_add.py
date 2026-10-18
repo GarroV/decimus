@@ -118,9 +118,11 @@ def test_вход_на_экране_страны_только_у_уК(monkeypatc
     for client in стенд(monkeypatch, tenant="HQ", role="admin"):
         страница = открыть(client, monkeypatch, данные(), "/country/GE")
         assert "/country/GE/units/new" in страница
-    # Партнёру «Страна» закрыта целиком (D370): ни экрана, ни входа на нём.
+    # Партнёру экран страны открыт (D508), а входа «Добавить пиццерию» на нём нет —
+    # ни кнопки, ни самой формы.
     for client in стенд(monkeypatch, tenant="GE", role="admin"):
-        assert client.get("/country/GE").status_code == 404
+        assert "/country/GE/units/new" not in открыть(client, monkeypatch, данные(), "/country/GE")
+        assert client.get("/country/GE/units/new").status_code == 404
 
 
 # --- что уходит в базу -------------------------------------------------------

@@ -23,7 +23,6 @@ from __future__ import annotations
 import pytest
 from aiogram import Bot, Dispatcher
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     RecordingSession,
     callback_query,
@@ -45,7 +44,7 @@ from src.domain import get_state
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Пункты меню, которые видит каждый аудитор. `/start` сюда не входит: у него
 #: в мастере свой смысл — он и раньше работал, потому что зарегистрирован в том

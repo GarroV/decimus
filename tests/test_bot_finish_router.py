@@ -19,7 +19,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     build_report,
     feed,
@@ -32,13 +31,14 @@ from bot_harness import callback_query as callback
 from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
+from src.bot.routers import finish as finish_module
 from src.bot.texts import t
 from src.domain import SOURCE_PHOTO, add_finding, attach_photo, get_state, score, start_inspection
 from src.report.errors import PdfNotBuilt, ReportError
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 def проверить_pdf(файл: Path) -> None:
@@ -446,3 +446,48 @@ async def test_language_outside_the_countrys_list_is_refused(
     assert session.last_text == t("finish.report_lang_gone", "ru")
     unchanged = get_state(CHAT_ID)
     assert unchanged is not None and unchanged.report_lang == "ru"
+
+
+async def test_запись_во_время_сборки_не_принимается(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#546: печать ставится ДО сборки — запись, пришедшая пока собирается PDF,
+    получает отказ, а не уходит в историю мимо отданного отчёта."""
+    started()
+    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+    настоящая = finish_module.build_pdf
+    во_время: list[bool] = []
+
+    def сборка(*a: object, **k: object) -> Path:
+        во_время.append(sidecar.handed_over(CHAT_ID))
+        return настоящая(*a, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr("src.bot.routers.finish.build_pdf", сборка)
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await feed(dp, bot, text_message("/finish"))
+    await build_report(dp, bot)
+
+    assert во_время == [True], "во время сборки проверка ещё принимала записи"
+    assert len(session.documents) == 1
+
+
+async def test_несобранный_отчёт_снимает_печать(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#546: печать до сборки снимается, если отчёт не собрался — проверка снова в работе."""
+    started()
+    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+
+    def отказ(*_a: object, **_k: object) -> Path:
+        raise PdfNotBuilt("рендерер недоступен")
+
+    monkeypatch.setattr("src.bot.routers.finish.build_pdf", отказ)
+    bot, _session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await feed(dp, bot, text_message("/finish"))
+    await build_report(dp, bot)
+
+    assert not sidecar.handed_over(CHAT_ID), "несобранный отчёт оставил проверку запечатанной"

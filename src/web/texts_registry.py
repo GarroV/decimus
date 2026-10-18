@@ -58,10 +58,11 @@ _BAR: dict[str, dict[str, str]] = {
     "registry.search": {"ru": "Пиццерия", "en": "Pizzeria"},
     "registry.search.apply": {"ru": "Найти", "en": "Search"},
     "registry.filter.reset": {"ru": "Сбросить", "en": "Reset"},
+    "registry.filters.title": {"ru": "Отбор", "en": "Filters"},
     "registry.accepted.title": {"ru": "Принятые", "en": "Accepted"},
     "registry.accepted.hint": {
-        "ru": "Период и отбор действуют только на принятые проверки, новые — сверху.",
-        "en": "The period and filters apply to accepted inspections only, newest first.",
+        "ru": "Период и отбор действуют на «Где не проведено» и принятые проверки, новые — сверху.",
+        "en": "The period and filters apply to Not inspected yet and accepted, newest first.",
     },
 }
 
@@ -102,7 +103,7 @@ _PANEL: dict[str, dict[str, str]] = {
 
 # «Где нужно проверить» (D399; с «Главной» на «Проверки» в D418, оттуда в «Календарь» в D466).
 _TOCHECK: dict[str, dict[str, str]] = {
-    "registry.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
+    "registry.tocheck.title": {"ru": "Где не проведено", "en": "Not inspected yet"},
     "registry.tocheck.hint": {
         "ru": "Нет проверок за период: ни разу не проверенные — первыми, затем ждущие дольше.",
         "en": "No inspections in the period: never inspected first, then waiting longest.",
@@ -110,9 +111,9 @@ _TOCHECK: dict[str, dict[str, str]] = {
     "registry.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
     "registry.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
     "registry.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
-    "calendar.tocheck.empty": {
-        "ru": "За этот период проверять нечего: у каждой точки охвата есть проверка.",
-        "en": "Nothing to inspect in this period: every unit in reach has an inspection.",
+    "registry.tocheck.empty": {
+        "ru": "За этот период везде проверено.",
+        "en": "Every unit has an inspection in this period.",
     },
     "registry.tocheck.failed": {
         "ru": "Список не загрузился: база не ответила. Обновите страницу.",
@@ -120,4 +121,28 @@ _TOCHECK: dict[str, dict[str, str]] = {
     },
 }
 
-REGISTRY_TEXTS: dict[str, dict[str, str]] = {**_MONTHS, **_PERIOD, **_BAR, **_PANEL, **_TOCHECK}
+# Сетка «Календаря» (D497): дни недели с понедельника, клетка дня, пустой месяц.
+_CALENDAR: dict[str, dict[str, str]] = {
+    "calendar.wd.1": {"ru": "Пн", "en": "Mon"},
+    "calendar.wd.2": {"ru": "Вт", "en": "Tue"},
+    "calendar.wd.3": {"ru": "Ср", "en": "Wed"},
+    "calendar.wd.4": {"ru": "Чт", "en": "Thu"},
+    "calendar.wd.5": {"ru": "Пт", "en": "Fri"},
+    "calendar.wd.6": {"ru": "Сб", "en": "Sat"},
+    "calendar.wd.7": {"ru": "Вс", "en": "Sun"},
+    "calendar.count": {"ru": "проверок: {count}", "en": "inspections: {count}"},
+    "calendar.more": {"ru": "ещё {count}", "en": "{count} more"},
+    "calendar.empty": {
+        "ru": "За этот период проверок нет.",
+        "en": "No inspections in this period.",
+    },
+}
+
+REGISTRY_TEXTS: dict[str, dict[str, str]] = {
+    **_MONTHS,
+    **_PERIOD,
+    **_BAR,
+    **_PANEL,
+    **_TOCHECK,
+    **_CALENDAR,
+}

@@ -8,17 +8,12 @@
 #}{% extends "login_base.html" %}
 {% block title %}{{ t('auth.title') }}{% endblock %}
 
-{% block head %}
-  {{ super() }}
-  <script src="{{ url_for('static', filename='passkey.js') }}" defer></script>
-{% endblock %}
-
 {% block body %}
   {#
     Экран входа (D492) — одна колонка по центру, как вход Swarm: знак, название,
-    строка подзаголовка; главная кнопка Google, «или», логин и пароль; ключ доступа
-    тихой кнопкой; внизу две мелкие строки. Логика входа (D450, D479, D484, D485)
-    не менялась — только вид.
+    строка подзаголовка; главная кнопка Google, «или», логин и пароль; внизу две
+    мелкие строки. Touch ID — вторым шагом после пароля (D515). Логика входа не
+    менялась — только вид.
 
     Кнопки Google нет вовсе, если реквизиты приложения не заданы: стенд без них
     работает паролем, как работал, а мёртвая кнопка выглядела бы поломкой. Тогда
@@ -49,6 +44,10 @@
     {% elif use_google %}
       <div class="note note--warn login__note" role="alert">
         <div><div class="note__title">{{ t('auth.use_google') }}</div></div>
+      </div>
+    {% elif google_other %}
+      <div class="note note--error login__note" role="alert">
+        <div><div class="note__title">{{ t('auth.google_other') }}</div></div>
       </div>
     {% elif failed %}
       <div class="note note--error login__note" role="alert">
@@ -100,21 +99,11 @@
     </form>
 
     {#
-      Вход ключом доступа (D485): браузер с меткой «ключ тут есть» на открытии страницы сам
-      просит Touch ID (`passkey.js`), остальные видят запасную кнопку. Осечка автозапуска тихая.
+      Кнопки «Войти по Touch ID» здесь нет (D515): вход — через Google или
+      логином и паролем, Touch ID спрашивается вторым шагом после пароля.
+      Автозапуск ключа на этой странице всплывал поверх «не подошло» от
+      прошлой попытки и выглядел как отказ.
     #}
-    {% if passkeys_enabled %}
-      <div class="login__passkey" data-passkey-login data-passkey-autostart
-           data-options-url="{{ url('/login/passkey/options') }}"
-           data-verify-url="{{ url('/login/passkey/verify') }}{% if next_path %}?next={{ next_path|urlencode }}{% endif %}"
-           data-msg-failed="{{ t('sf.login.passkey_failed') }}"
-           data-msg-unavailable="{{ t('sf.step.passkey_unavailable') }}">
-        <button class="btn btn--ghost" type="button" data-passkey-button>{{ t('sf.login.passkey') }}</button>
-        <div class="note note--warn" role="alert" data-passkey-message hidden>
-          <div><div class="note__title" data-passkey-message-text></div></div>
-        </div>
-      </div>
-    {% endif %}
     </div>
 
     <footer class="login__foot">

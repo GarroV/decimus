@@ -26,7 +26,6 @@ import asyncio
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     Calls,
     RecordingSession,
@@ -48,7 +47,7 @@ from src.domain import SOURCE_COMMENT, Finding, get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Та же однозначная фраза, что в tests/test_bot_fastpath.py: строка «Печь» на
 #: боевой карте покрыта целиком, колонка выбрана словом «грязная» → CLN05, D1.

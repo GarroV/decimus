@@ -201,7 +201,10 @@ def test_маршрут_с_действием_только_УК_партнёру
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Граница — по коду матрицы, а не по пути: префикс раздела тут ни при чём."""
+    from src.web import inspections as data
+
     подменить_двери(monkeypatch, tenant=ПАРТНЁР, role="admin")
+    monkeypatch.setattr(data, "load_dated", lambda **_: ())
     app = собрать(tenant=ПАРТНЁР)
     app.add_url_rule("/zzz-hq", endpoint="zzz_hq", view_func=guard.action("unit.create")(_ок))
     with app.test_client() as client:
@@ -217,5 +220,15 @@ def test_разделы_только_УК_партнёру_закрыты_по_�
         for rule in app.url_map.iter_rules()
         if not guard.open_to_tenant(app, rule.endpoint, rule.rule, ПАРТНЁР)
     }
-    assert {"country", "country_index", "actions", "unit_new", "unit_create"} <= закрытые
-    assert not закрытые & {"overview", "registry", "card", "ratings", "settings_page", "home"}
+    assert {"actions", "unit_new", "unit_create"} <= закрытые
+    # «Страна» (D508) открыта партнёру; заведение пиццерии под ней — по-прежнему нет.
+    assert not закрытые & {
+        "country",
+        "country_index",
+        "overview",
+        "registry",
+        "card",
+        "ratings",
+        "settings_page",
+        "home",
+    }

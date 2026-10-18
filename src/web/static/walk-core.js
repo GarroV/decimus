@@ -39,6 +39,34 @@
     return !!(tg && tg.initData && tg.isVersionAtLeast && tg.isVersionAtLeast(version));
   };
 
+  /* Личное значение: CloudStorage Telegram (6.9+), иначе localStorage. Ответа
+     облака нет за CLOUD_WAIT_MS — берётся localStorage, а не вечное «…» (#636). */
+  var CLOUD_WAIT_MS = 2500;
+
+  function localGet(key) {
+    try { return window.localStorage.getItem(key); } catch (e) { return null; }
+  }
+
+  W.storedGet = function (key, done) {
+    if (!(W.supports("6.9") && tg.CloudStorage)) { done(localGet(key)); return; }
+    var settled = false;
+    var finish = function (value) {
+      if (settled) { return; }
+      settled = true;
+      done(value);
+    };
+    var timer = setTimeout(function () { finish(localGet(key)); }, CLOUD_WAIT_MS);
+    try {
+      tg.CloudStorage.getItem(key, function (err, value) {
+        clearTimeout(timer);
+        finish(err ? null : value);
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      finish(localGet(key));
+    }
+  };
+
   W.tx = function (key, params) {
     var d = W.state.data;
     var s = (d && d.texts && d.texts[key]) || key;
@@ -70,7 +98,9 @@
   var ICONS = {
     camera: ["M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z",
       "M12 16.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8z"],
-    check: ["M5 12.5l4.5 4.5L19 7.5"]
+    check: ["M5 12.5l4.5 4.5L19 7.5"],
+    gallery: ["M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z",
+      "M3 16l5-5 4 4 3-3 6 6", "M15.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"]
   };
 
   W.icon = function (name, cls) {

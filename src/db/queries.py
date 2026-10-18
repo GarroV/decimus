@@ -25,9 +25,11 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
 
+from src.domain.models import DEFAULT_CHECKLIST_CODE
 from src.domain.tenants import canonical_tenant
 
 from .errors import DbError, StorageError
@@ -74,19 +76,18 @@ MAX_LIMIT = 1000
 # и тем же независимо от аргументов, а его план — проверяемым.
 _LIST_ALL_TEMPLATE = """
 select
-    i.id, i.tenant_code, u.name, i.chat_id, i.kind, i.inspection_date,
+    i.id, i.tenant_code, u.name as unit_name, i.chat_id, i.kind, i.inspection_date,
     i.report_lang, i.checklist_version, i.pct, i.grade,
-    (select count(*) from findings f where f.inspection_id = i.id),
+    (select count(*) from findings f where f.inspection_id = i.id) as findings_count,
     -- Город: записанный в проверке, а пустой — город пиццерии из справочника
     -- кодом (#460): мастер бота города больше не спрашивает (D233).
-    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, ''), i.partner, i.contact,
+    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
-    -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
-    -- между колонками сдвинула бы всё правее неё молча.
+    -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
     i.checklist_code,
-    -- Этап приёмки (D199, 0034) — тоже в конец и по той же причине.
+    -- Этап приёмки (D199, 0034).
     i.status, i.accepted_at, i.accepted_by,
-    -- Происхождение (0042, D334) — в конец по той же причине.
+    -- Происхождение (0042, D334).
     i.origin
 from inspections i
 join units u on u.id = i.unit_id
@@ -108,19 +109,18 @@ limit %(limit)s
 # точками справочника — и одноимённые склеились бы в одну историю.
 _LIST_BY_UNIT_TEMPLATE = """
 select
-    i.id, i.tenant_code, u.name, i.chat_id, i.kind, i.inspection_date,
+    i.id, i.tenant_code, u.name as unit_name, i.chat_id, i.kind, i.inspection_date,
     i.report_lang, i.checklist_version, i.pct, i.grade,
-    (select count(*) from findings f where f.inspection_id = i.id),
+    (select count(*) from findings f where f.inspection_id = i.id) as findings_count,
     -- Город: записанный в проверке, а пустой — город пиццерии из справочника
     -- кодом (#460): мастер бота города больше не спрашивает (D233).
-    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, ''), i.partner, i.contact,
+    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
-    -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
-    -- между колонками сдвинула бы всё правее неё молча.
+    -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
     i.checklist_code,
-    -- Этап приёмки (D199, 0034) — тоже в конец и по той же причине.
+    -- Этап приёмки (D199, 0034).
     i.status, i.accepted_at, i.accepted_by,
-    -- Происхождение (0042, D334) — в конец по той же причине.
+    -- Происхождение (0042, D334).
     i.origin
 from inspections i
 join units u on u.id = i.unit_id
@@ -152,19 +152,18 @@ _QUEUE_BY_UNIT_SQL = _LIST_BY_UNIT_TEMPLATE.replace("__STAGE__", _QUEUE_STAGE)
 # Числа отдаются как лежат — ни одного действия над ними.
 _GET_INSPECTION_SQL = """
 select
-    i.id, i.tenant_code, u.name, i.chat_id, i.kind, i.inspection_date,
+    i.id, i.tenant_code, u.name as unit_name, i.chat_id, i.kind, i.inspection_date,
     i.report_lang, i.checklist_version, i.pct, i.grade,
-    (select count(*) from findings f where f.inspection_id = i.id),
+    (select count(*) from findings f where f.inspection_id = i.id) as findings_count,
     -- Город: записанный в проверке, а пустой — город пиццерии из справочника
     -- кодом (#460): мастер бота города больше не спрашивает (D233).
-    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, ''), i.partner, i.contact,
+    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
-    -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
-    -- между колонками сдвинула бы всё правее неё молча.
+    -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
     i.checklist_code,
     i.status, i.accepted_at, i.accepted_by,
     i.origin,
-    i.deductions, i.counts, i.by_zone,
+    i.deductions, i.counts, i.by_zone, i.by_process,
     i.reported_status, i.legacy_method
 from inspections i
 join units u on u.id = i.unit_id
@@ -185,16 +184,16 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
 # бы снять и увидеть красное, то есть проверить его работу стало бы нечем.
 _FINDINGS_OF_INSPECTION_SQL = """
 select
-    f.id, f.inspection_id, u.name, i.inspection_date, f.n, f.code, f.level,
-    f.zone, f.zone_unusual, f.source, f.words, i.speech_lang,
+    f.id, f.inspection_id, u.name as unit_name, i.inspection_date, f.n, f.code, f.level,
+    f.zone, f.zone_unusual, f.source, f.words, i.speech_lang as lang,
     f.suggested_code, f.suggested_level, f.suggested_zone, f.suggested_confidence,
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
-        and t.field = 'text' and t.lang = i.speech_lang),
+        and t.field = 'text' and t.lang = i.speech_lang) as text,
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
-        and t.field = 'comment' and t.lang = i.speech_lang),
-    f.repeat
+        and t.field = 'comment' and t.lang = i.speech_lang) as comment,
+    f.repeat, f.reading_c
 from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.id = i.unit_id
@@ -206,16 +205,16 @@ order by f.n
 # охват — единственный заслон, и он проверяется снятием (тест на утечку).
 _FINDINGS_BY_UNIT_SQL = """
 select
-    f.id, f.inspection_id, u.name, i.inspection_date, f.n, f.code, f.level,
-    f.zone, f.zone_unusual, f.source, f.words, i.speech_lang,
+    f.id, f.inspection_id, u.name as unit_name, i.inspection_date, f.n, f.code, f.level,
+    f.zone, f.zone_unusual, f.source, f.words, i.speech_lang as lang,
     f.suggested_code, f.suggested_level, f.suggested_zone, f.suggested_confidence,
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
-        and t.field = 'text' and t.lang = i.speech_lang),
+        and t.field = 'text' and t.lang = i.speech_lang) as text,
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
-        and t.field = 'comment' and t.lang = i.speech_lang),
-    f.repeat
+        and t.field = 'comment' and t.lang = i.speech_lang) as comment,
+    f.repeat, f.reading_c
 from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.id = i.unit_id
@@ -241,9 +240,7 @@ order by position
 """
 
 
-def _detail_parts(
-    колонки: dict[str, int], row: Any
-) -> tuple[float, dict[str, Any], dict[str, Any]]:
+def _detail_parts(row: Mapping[str, Any]) -> tuple[float, dict[str, Any], dict[str, Any]]:
     """Разбивка оценки из строки карточки — по именам колонок, а не по их номерам.
 
     Позиционный разбор здесь уже ломался молча: колонка, приписанная в конец
@@ -255,72 +252,81 @@ def _detail_parts(
     Отсутствие колонки — отказ, а не ноль: разбивка уезжает в документ
     партнёру, и нулевые вычеты в нём выглядят как безупречная проверка.
     """
-    недостающие = [имя for имя in ("deductions", "counts", "by_zone") if имя not in колонки]
+    недостающие = [имя for имя in ("deductions", "counts", "by_zone") if имя not in row]
     if недостающие:
         raise StorageError(
             f"В ответе базы нет колонок разбивки оценки: {', '.join(недостающие)}. "
             f"Карточка проверки без них — это документ партнёру с пустыми вычетами"
         )
     return (
-        float(row[колонки["deductions"]]),
-        dict(row[колонки["counts"]]),
-        dict(row[колонки["by_zone"]]),
+        float(row["deductions"]),
+        dict(row["counts"]),
+        dict(row["by_zone"]),
     )
 
 
-def _row_to_inspection(row: Any) -> InspectionRow:
-    """Строка курсора → `InspectionRow`.
+def _named(cur: Any, rows: Sequence[Any]) -> list[dict[str, Any]]:
+    """Строки курсора → словари по именам колонок из `cur.description` (#338).
 
-    Тип строки психкопг не даёт статически по позиции колонки — `row: Any`
-    здесь ровно на этой границе, а не расползается по модулю: дальше в коде
-    типы снова конкретные.
+    Работает с любым курсором, в том числе с чужим (`_read_detail` в
+    транзакции правки), поэтому фабрика строк у соединения не меняется.
+    """
+    имена = [опис.name for опис in cur.description or ()]
+    return [dict(zip(имена, строка, strict=True)) for строка in rows]
+
+
+def _row_to_inspection(row: Mapping[str, Any]) -> InspectionRow:
+    """Строка курсора → `InspectionRow`, по ИМЕНАМ колонок (`_named`).
+
+    Позиционный разбор ломался молча: колонка, вставленная в середину списка,
+    сдвигала всё правее неё (T345, #338). Имя отдаёт драйвер, и пропавшая
+    колонка падает `KeyError`, а не читается соседней.
     """
     return InspectionRow(
-        id=str(row[0]),
-        tenant_code=str(row[1]),
-        unit_name=str(row[2]),
-        chat_id=int(row[3]),
-        kind=str(row[4]),
-        inspection_date=row[5],
-        report_lang=str(row[6]),
-        checklist_version=str(row[7]),
-        pct=float(row[8]),
-        grade=str(row[9]),
-        findings_count=int(row[10]),
-        pushed_at=row[11].isoformat(),
+        id=str(row["id"]),
+        tenant_code=str(row["tenant_code"]),
+        unit_name=str(row["unit_name"]),
+        chat_id=int(row["chat_id"]),
+        kind=str(row["kind"]),
+        inspection_date=row["inspection_date"],
+        report_lang=str(row["report_lang"]),
+        checklist_version=str(row["checklist_version"]),
+        pct=float(row["pct"]),
+        grade=str(row["grade"]),
+        findings_count=int(row["findings_count"]),
+        pushed_at=row["pushed_at"].isoformat(),
         # Шапка письма (T176). Колонки объявлены `not null default ''`, но
         # `or ""` здесь не украшение: историю за прошлые годы зальют программно
         # из чужой выгрузки (D035), и `None` в подписи письма партнёру
         # напечатался бы словом «None».
-        auditor=str(row[12] or ""),
-        city=str(row[13] or ""),
-        partner=str(row[14] or ""),
-        contact=str(row[15] or ""),
+        auditor=str(row["auditor"] or ""),
+        city=str(row["city"] or ""),
+        partner=str(row["partner"] or ""),
+        contact=str(row["contact"] or ""),
         # Пометка снятия (T210, T233). Обычной роли снятая проверка не видна
         # вовсе — её прячет построчная политика, а не эти строки, — поэтому у
         # обычного чтения оба поля всегда пусты. Заполненными они приходят
         # только администратору истории (`include_retracted=True`), и он видит
         # проверку ИМЕННО как снятую, а не как обычную.
-        retracted=row[16] is not None,
-        retraction_reason=str(row[17] or ""),
-        # Код чек-листа приезжает последним и потому не двигает ничего выше
-        # (T345). `or "bizdev"` — для строк, залитых до миграции программно:
+        retracted=row["retracted_at"] is not None,
+        retraction_reason=str(row["retraction_reason"] or ""),
+        # Код чек-листа (T345). `or "bizdev"` — для строк, залитых до миграции программно:
         # пустой код у записанной проверки означал бы «не знаем, по чему
         # проверяли», а такого состояния у неё не бывает.
-        checklist_code=str(row[18] or "bizdev"),
+        checklist_code=str(row["checklist_code"] or DEFAULT_CHECKLIST_CODE),
         # Этап приёмки (D199): `draft` теперь не миг внутри транзакции слива, а
         # проверка, ждущая вычитки. Принятые до появления этапа отметки о
         # приёмке не имеют — пустая строка, а не выдуманное время.
-        on_review=row[19] == "draft",
-        accepted_at=row[20].isoformat() if row[20] is not None else "",
-        accepted_by=str(row[21] or ""),
+        on_review=row["status"] == "draft",
+        accepted_at=row["accepted_at"].isoformat() if row["accepted_at"] is not None else "",
+        accepted_by=str(row["accepted_by"] or ""),
         # Происхождение (0042, D334): колонка `not null default 'field'`.
-        origin=str(row[22]),
+        origin=str(row["origin"]),
     )
 
 
-def _row_to_finding(row: Any) -> FindingRow:
-    """Строка курсора → `FindingRow`. Порядок колонок — как в запросах выше.
+def _row_to_finding(row: Mapping[str, Any]) -> FindingRow:
+    """Строка курсора → `FindingRow`, по именам колонок (`_named`, #338).
 
     `source` склеивает NULL и пустую строку: и то, и другое означает «источник
     не записан», и двух разных видов у этого не бывает. Так же склеены и слова
@@ -331,37 +337,41 @@ def _row_to_finding(row: Any) -> FindingRow:
     написал».
     """
     return FindingRow(
-        id=str(row[0]),
-        inspection_id=str(row[1]),
-        unit_name=str(row[2]),
-        inspection_date=row[3],
-        n=int(row[4]),
-        code=str(row[5]),
-        level=str(row[6]),
-        zone=str(row[7]),
-        zone_unusual=bool(row[8]),
-        source=str(row[9] or ""),
+        id=str(row["id"]),
+        inspection_id=str(row["inspection_id"]),
+        unit_name=str(row["unit_name"]),
+        inspection_date=row["inspection_date"],
+        n=int(row["n"]),
+        code=str(row["code"]),
+        level=str(row["level"]),
+        zone=str(row["zone"]),
+        zone_unusual=bool(row["zone_unusual"]),
+        source=str(row["source"] or ""),
         # Сырые слова аудитора (T185) отдаются дословно — обрезка здесь меняла
         # бы показание о моменте, по которому управляющая компания сверяет
         # промах модели. На языке `lang` ниже: своего языка у них нет, они
         # сказаны на языке речи той проверки, в которой записаны.
-        words=str(row[10] or ""),
-        lang=str(row[11]),
+        words=str(row["words"] or ""),
+        lang=str(row["lang"]),
         # Предложение модели (T164). `None` во всех четырёх — модель не
         # предлагала ничего; пустая строка сюда не доезжает, её склеивает с
         # `None` ещё слив. Уверенность приходит из `numeric` десятичной дробью
         # (`Decimal`), и `float` здесь — не округление, а приведение к тому же
         # типу, которым её отдал распознаватель.
-        suggested_code=row[12],
-        suggested_level=row[13],
-        suggested_zone=row[14],
-        suggested_confidence=None if row[15] is None else float(row[15]),
-        text=row[16],
-        comment=row[17],
+        suggested_code=row["suggested_code"],
+        suggested_level=row["suggested_level"],
+        suggested_zone=row["suggested_zone"],
+        suggested_confidence=None
+        if row["suggested_confidence"] is None
+        else float(row["suggested_confidence"]),
+        text=row["text"],
+        comment=row["comment"],
         # Пометка повтора (#359). Умолчание колонки — `false`, то есть «не
         # отмечено»: у записанной проверки состояния «неизвестно, был ли
         # повтор» не бывает.
-        repeat=bool(row[18]),
+        repeat=bool(row["repeat"]),
+        # Показание термометра (#855): `numeric` приходит `Decimal`-ом.
+        reading_c=None if row["reading_c"] is None else float(row["reading_c"]),
     )
 
 
@@ -509,7 +519,7 @@ def list_inspections(
                 _QUEUE_BY_UNIT_SQL if on_review else _LIST_BY_UNIT_SQL,
                 {**params, "unit": normalize_unit_name(unit)},
             )
-        rows = cur.fetchall()
+        rows = _named(cur, cur.fetchall())
     return [_row_to_inspection(row) for row in rows]
 
 
@@ -567,35 +577,34 @@ def _read_detail(
         _GET_INSPECTION_SQL,
         {**reach.params(), "id": ident, "include_on_review": include_on_review},
     )
-    row = cur.fetchone()
-    колонки = {опис.name: место for место, опис in enumerate(cur.description or ())}
-    if row is None:
+    найдено = cur.fetchone()
+    if найдено is None:
         return None
+    (row,) = _named(cur, [найдено])
     # Находки читаются тем же соединением и в той же транзакции: между
     # двумя подключениями проверка могла бы измениться, и шапка разъехалась
     # бы с телом документа.
     cur.execute(_FINDINGS_OF_INSPECTION_SQL, {"id": ident})
-    findings = cur.fetchall()
+    findings = _named(cur, cur.fetchall())
     # Информационная часть — тем же соединением и той же транзакцией, по
     # той же причине: собранный заново документ обязан быть одним
     # документом, а не шапкой одной проверки и сроком другой.
     cur.execute(_INFO_OF_INSPECTION_SQL, {"id": ident})
     info = cur.fetchall()
-    # Разбивка берётся ПО ИМЕНИ колонки, а не по её номеру. Номер здесь уже
-    # ломался молча: приписка `checklist_code` в конец списка колонок (T345)
-    # сдвинула разбивку на единицу, и чтение карточки стало падать разбором
-    # «could not convert string to float: 'bizdev'». Имена отдаёт сам драйвер
-    # (`cur.description`), поэтому следующая приписка ничего не сдвинет.
-    deductions, counts, by_zone = _detail_parts(колонки, row)
+    # Разбивка берётся ПО ИМЕНИ колонки, а не по её номеру: приписка
+    # `checklist_code` (T345) однажды сдвинула её на единицу, и чтение карточки
+    # падало разбором «could not convert string to float: 'bizdev'».
+    deductions, counts, by_zone = _detail_parts(row)
     return InspectionDetail(
         inspection=_row_to_inspection(row),
         deductions=deductions,
         counts=counts,
         by_zone=by_zone,
+        by_process=dict(row["by_process"]) if row.get("by_process") else None,
         findings=tuple(_row_to_finding(строка) for строка in findings),
         info=tuple(InfoRow(code=str(строка[0]), text=str(строка[1])) for строка in info),
-        reported_status=str(row[колонки["reported_status"]] or ""),
-        legacy_method=str(row[колонки["legacy_method"]] or ""),
+        reported_status=str(row["reported_status"] or ""),
+        legacy_method=str(row["legacy_method"] or ""),
     )
 
 
@@ -625,7 +634,7 @@ def findings_by_unit(*, reach: Reach, unit: str, limit: int = DEFAULT_LIMIT) -> 
             _FINDINGS_BY_UNIT_SQL,
             {**охват.params(), "unit": normalize_unit_name(name), "limit": rows_limit},
         )
-        rows = cur.fetchall()
+        rows = _named(cur, cur.fetchall())
     return [_row_to_finding(row) for row in rows]
 
 
@@ -656,17 +665,17 @@ def _narrowing(city: str, country: str, grade: str) -> dict[str, str | None]:
     }
 
 
-_ZONE_LOSSES_SQL = """
+_PROCESS_LOSSES_SQL = """
 select
-    zone.key as code,
-    max(zone.value ->> 'name_ru') as name_ru,
-    max(zone.value ->> 'name_en') as name_en,
-    sum((zone.value ->> 'loss')::numeric) as loss,
+    proc.key as code,
+    max(proc.value ->> 'name_ru') as name_ru,
+    max(proc.value ->> 'name_en') as name_en,
+    sum((proc.value ->> 'loss')::numeric) as loss,
     count(distinct i.id) as inspections,
     count(distinct i.unit_id) as units
 from inspections i
      join units u on u.id = i.unit_id
-     cross join lateral jsonb_each(i.by_zone) as zone
+     cross join lateral jsonb_each(i.by_process) as proc
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.status = 'finalized'
@@ -675,10 +684,15 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(city)s::text is null or u.city = %(city)s)
   and (%(country)s::text is null or u.country = %(country)s)
   and (%(grade)s::text is null or i.grade = %(grade)s)
-  and jsonb_typeof(zone.value) = 'object'
-  and (zone.value ->> 'loss') is not null
-group by zone.key
-order by loss desc, zone.key
+  and jsonb_typeof(proc.value) = 'object'
+  and (proc.value ->> 'loss') is not null
+  -- Процесс, где вычеты невозможны («Информация», D511), на экранах не стоит.
+  -- Ключа нет в снимке, записанном до его появления, — тогда процесс считается
+  -- оцениваемым: молча спрятать его было бы хуже.
+  and coalesce((proc.value ->> 'scored')::boolean, true)
+group by proc.key
+having sum((proc.value ->> 'loss')::numeric) > 0
+order by loss desc, proc.key
 limit %(limit)s
 """
 
@@ -711,7 +725,7 @@ with записи as (
       and f.code <> 'LEGACY' and f.level <> 'NC'
       -- Записи исторической вовсе не идут в системные нарушения: код пункта из
       -- старой методики значит там другое, чем в нынешнем чек-листе. Её ОЦЕНКА
-      -- при этом в средних остаётся (D352) — исключается только статистика пунктов.
+      -- при этом в средних остаётся (D365) — исключается только статистика пунктов.
       and i.origin <> 'legacy'
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
@@ -743,7 +757,7 @@ limit %(limit)s
 # сумма процентов — по ВСЕМУ срезу, а не по прочитанному ряду с пределом. Числа
 # движка складываются, но не выводятся: процент и буква взяты такими, какими он
 # их записал. Проверки разных методик складываются вместе: оценка каждой верна
-# по своей методике (D352).
+# по своей методике (D365).
 _SLICE_SUMMARY_SQL = """
 with срез as (
     select i.unit_id, i.grade, i.pct
@@ -773,7 +787,7 @@ where u.tenant_code = 'HQ'
 """
 
 
-def zone_losses(
+def process_losses(
     *,
     reach: Reach,
     date_from: date | None = None,
@@ -783,22 +797,24 @@ def zone_losses(
     grade: str = "",
     limit: int = DEFAULT_LIMIT,
 ) -> list[tuple[str, str, str, float, int, int]]:
-    """Потери по зонам: `(код, имя ru, имя en, вычет, проверок, точек)`.
+    """Потери по процессам (блокам методики): `(код, имя ru, имя en, вычет, проверок, точек)`.
 
-    Имя зоны берётся из того же снимка `by_zone`, а не из нынешней методики:
-    проверка заморожена вместе с формулировками своей версии, и подпись из
-    сегодняшнего справочника подменила бы название, под которым зону смотрели.
+    Код — ключ разбивки `by_process`, как его положил движок (код процесса, а
+    у процесса без кода — его название). Имя берётся из того же снимка, а не из
+    нынешней методики, по той же причине, что у зон.
 
-    Вычет берётся из `by_zone`, куда его положил движок, и только сложением.
-    Зона, у которой в снимке нет числа вычета, в ответ не попадает: нулём её
-    подменять нельзя — «зона без потерь» и «зона, про которую эта проверка
-    ничего не записала» на экране читаются одинаково, а значат разное.
+    Вычет берётся из `by_process` и только сложением. Проверка без разбивки
+    (не долита, историческая) и процесс без числа в ответ не попадают: нулём их
+    подменять нельзя — «процесс без потерь» и «про процесс ничего не записано»
+    на экране читаются одинаково, а значат разное. Не попадают и процессы без
+    возможных вычетов (`scored: false`) и с нулевой суммой потерь: список
+    «где теряем» не показывает того, где не теряют (D511).
     """
     охват = _require_reach(reach)
     _require_window(date_from, date_to)
-    with _reading("потери по зонам") as conn, conn.cursor() as cur:
+    with _reading("потери по процессам") as conn, conn.cursor() as cur:
         cur.execute(
-            _ZONE_LOSSES_SQL,
+            _PROCESS_LOSSES_SQL,
             {
                 **охват.params(),
                 "date_from": date_from,
@@ -1209,16 +1225,16 @@ def unit_last_inspections(
         ]
 
 
-_WORST_ZONES_SQL = """
+_WORST_PROCESSES_SQL = """
 select distinct on (i.id)
     i.id,
-    zone.key as code,
-    zone.value ->> 'name_ru' as name_ru,
-    zone.value ->> 'name_en' as name_en,
-    (zone.value ->> 'loss')::numeric as loss
+    proc.key as code,
+    proc.value ->> 'name_ru' as name_ru,
+    proc.value ->> 'name_en' as name_en,
+    (proc.value ->> 'loss')::numeric as loss
 from inspections i
      join units u on u.id = i.unit_id
-     cross join lateral jsonb_each(i.by_zone) as zone
+     cross join lateral jsonb_each(i.by_process) as proc
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.status = 'finalized'
@@ -1227,13 +1243,15 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(city)s::text is null or u.city = %(city)s)
   and (%(country)s::text is null or u.country = %(country)s)
   and (%(grade)s::text is null or i.grade = %(grade)s)
-  and jsonb_typeof(zone.value) = 'object'
-  and (zone.value ->> 'loss') is not null
-order by i.id, (zone.value ->> 'loss')::numeric desc, zone.key
+  and jsonb_typeof(proc.value) = 'object'
+  and (proc.value ->> 'loss') is not null
+  and (proc.value ->> 'loss')::numeric > 0
+  and coalesce((proc.value ->> 'scored')::boolean, true)
+order by i.id, (proc.value ->> 'loss')::numeric desc, proc.key
 """
 
 
-def worst_zones(
+def worst_processes(
     *,
     reach: Reach,
     date_from: date | None = None,
@@ -1242,21 +1260,18 @@ def worst_zones(
     country: str = "",
     grade: str = "",
 ) -> dict[str, tuple[str, str, str, float]]:
-    """Самая дорогая зона каждой проверки: `{id: (код, имя ru, имя en, вычет)}`.
+    """Самый дорогой процесс каждой проверки: `{id: (код, имя ru, имя en, вычет)}`.
 
-    Имя зоны — из снимка самой проверки, а не из нынешней методики: проверка
-    заморожена вместе со своими формулировками, и подпись из сегодняшнего
-    справочника подменила бы название, под которым зону смотрели.
-
-    Зона выбирается по НАИБОЛЬШЕМУ вычету, а не по числу находок: экран
-    отвечает на вопрос «где потеряно больше всего процентов», и три мелких
-    замечания в одной зоне не перевешивают одного дорогого в другой.
+    Выбор по наибольшему из записанных движком чисел `loss` — это отбор, а не
+    подсчёт (D511). Имя — из снимка самой проверки. Проверки без разбивки
+    (историческая, не долитая) и без единого процесса с потерей в ответе нет:
+    экран пишет для них «—», а не выдумывает направление.
     """
     охват = _require_reach(reach)
     _require_window(date_from, date_to)
-    with _reading("слабая зона проверки") as conn, conn.cursor() as cur:
+    with _reading("слабое направление проверки") as conn, conn.cursor() as cur:
         cur.execute(
-            _WORST_ZONES_SQL,
+            _WORST_PROCESSES_SQL,
             {
                 **охват.params(),
                 "date_from": date_from,
@@ -1288,7 +1303,7 @@ _ITEM_RECORDS = """
       and i.checklist_code = %(checklist)s
       and i.status = 'finalized'
       and i.retracted_at is null
-      -- Историческая: код пункта старой методики — не этот пункт (D332, D352).
+      -- Историческая: код пункта старой методики — не этот пункт (D332, D365).
       and i.origin <> 'legacy'
 """
 

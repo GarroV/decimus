@@ -26,6 +26,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from src.domain.client_ip import forwarded_client
+from src.domain.journal import truncate_user_agent
 from src.domain.public_urls import OAUTH_SCOPE, PROTECTED_RESOURCE_PATH
 
 from .audit import journal_write_call, log_write_call
@@ -288,6 +289,15 @@ class _Handler(BaseHTTPRequestHandler):
             if not rate.by_address.allow(str(self.client_address[0])):
                 self._send_rate_limited()
                 return
+            # Отпечаток клиента — в журнал сервера (#692): поток отказов иначе
+            # не опознать. Адрес и программа клиента, без токена и без тела;
+            # есть ли заголовок вообще — да/нет, без значения.
+            print(
+                f"[mcp] 401: адрес {self._client_ip()}, клиент "
+                f"«{truncate_user_agent(self.headers.get('User-Agent')) or '—'}», "
+                f"токен {'передан' if self.headers.get('Authorization') else 'не передан'}",
+                file=sys.stderr,
+            )
             # Ни имени арендатора, ни токена: по отказу нельзя перечислить,
             # какие партнёры вообще заведены на этом сервере.
             self._send(HTTPStatus.UNAUTHORIZED, {"error": str(отказ)})

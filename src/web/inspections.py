@@ -30,6 +30,7 @@ from src.db.errors import DatabaseTargetError, DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
 from src.db.reach import Reach
 from src.domain.models import TEXT_LANGS
+from src.domain.permissions import SIDE_HQ, side_of
 from src.report import info_titles
 from src.report.letters import LetterError
 from src.report.letters import build as build_letter
@@ -80,10 +81,31 @@ def retraction_available() -> bool:
     return True
 
 
+def sees_retracted(reach: Reach) -> bool:
+    """Читать ли снятые для этого читателя: только сторона УК и при заданном подключении.
+
+    Партнёр снятых не видит ни в реестре, ни в карточке — ни проверок УК своей
+    страны, ни причин снятия (D516, #580). Снимает проверки УК, ей и смотреть.
+    """
+    return side_of(reach.tenant) == SIDE_HQ and retraction_available()
+
+
 #: Сколько ждущих приёмки читать: очередь показывается целиком и старые сверху
 #: (D466), поэтому предел выше предела истории — иначе самые давние, ради
 #: которых очередь и стоит наверху, отрезались бы первыми.
 REVIEW_LIMIT = 1000
+#: Сколько проверок читать на сетку «Календаря» (D497): предел выдачи слоя базы,
+#: до трёх месяцев сети с запасом.
+CALENDAR_LIMIT = 1000
+
+
+def load_dated(*, reach: Reach, date_from: date, date_to: date) -> tuple[InspectionRow, ...]:
+    """Живые проверки охвата с датой обхода в окне — для сетки «Календаря» (D497)."""
+    return tuple(
+        queries.list_inspections(
+            reach=reach, limit=CALENDAR_LIMIT, date_from=date_from, date_to=date_to
+        )
+    )
 
 
 def load_registry(
@@ -99,7 +121,7 @@ def load_registry(
     выбранным месяцем.
     """
     review = tuple(queries.list_inspections(reach=reach, limit=REVIEW_LIMIT, on_review=True))
-    if retraction_available():
+    if sees_retracted(reach):
         try:
             rows = queries.list_inspections(
                 reach=reach,
@@ -141,7 +163,7 @@ def load_card(inspection_id: str, *, reach: Reach) -> InspectionDetail | None:
     Проверку на приёмке (D199) карточка показывает: это и есть экран, на
     котором её вычитывают и подтверждают.
     """
-    if retraction_available():
+    if sees_retracted(reach):
         try:
             return queries.get_inspection(
                 inspection_id, reach=reach, include_retracted=True, include_on_review=True

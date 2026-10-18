@@ -30,7 +30,7 @@ from src.recognize.models import Candidate
 
 from .texts_walk import WALK_TEXTS
 from .walk_auth import SUGGEST_ENDPOINT, SUGGEST_PATH, WalkSettings
-from .walk_write import Identify, WalkRefused, _code, _refs, _text
+from .walk_write import Identify, WalkRefused, _code, _refs, _text, reading_of
 from .walk_zone import resolve_item_zone
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,9 @@ def _card(c: Candidate, offer: Offer, ask: _Ask) -> dict[str, Any]:
         "zone": c.zone,
         "wording": c.wording,
         "confidence": round(c.confidence, 2),
+        # Показание термометра, прочитанное моделью (#836): форма показывает его
+        # числовым полем, и аудитор его правит.
+        "reading_c": c.reading_c,
         "resolution": {
             "zone": found.zone,
             "source": found.source,
@@ -140,6 +143,9 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
                 ui_lang=inspection.ui_lang,
                 speech_lang=inspection.speech_lang,
                 report_lang=inspection.report_lang,
+                # Исправленная температура: тот же поиск, с утверждением «реально
+                # N °C» (#836). Пусто — обычный поиск.
+                reading_c=reading_of(body),
             )
         except WalkRefused as exc:
             return refused(str(exc), lang)

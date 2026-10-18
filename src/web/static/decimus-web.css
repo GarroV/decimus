@@ -767,6 +767,8 @@ a.ov-table__row:focus-visible, a.ov-row:focus-visible, a.ins-row:focus-visible, 
 /* Непостроенный раздел: тише остальных, но открывается и виден. */
 .sidenav__item.is-wip { color: var(--ink-empty); }
 .sidenav__item.is-wip:hover { color: var(--ink-3); }
+/* Граница групп меню (D499), как в Swarm: проверки · статистика · администрирование. */
+.sidenav__sep { flex: none; height: 1px; margin: var(--space-3) var(--space-5); background: var(--line); }
 /* Вложенная страница раздела: пункт подсвечен, но это ссылка на раздел. */
 a.sidenav__current { cursor: pointer; }
 a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
@@ -804,16 +806,10 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
     padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
     background: var(--surface-2);
     border-top: 1px solid var(--line);
-    overflow-x: auto;
-    scrollbar-width: none;
   }
-  .tabbar::-webkit-scrollbar { display: none; }
-  /* Недостроенного в нижней полосе нет (D217): карта продукта целиком — в
-     боковом меню компьютера (D138). */
-  .tabbar__item.is-wip { display: none; }
-  /* Пункты делят ширину поровну и сжимаются: с шестым пунктом («Экшн-планы»)
-     последний уезжал за край экрана телефона (сверка экшн-планов, 04.10.2026).
-     Длинная подпись обрезается многоточием, полное имя — в `title`. */
+  /* Пункты делят ширину поровну. Их не больше пяти (D518, #686): остальное —
+     под «Ещё», поэтому прокрутки у панели нет, а многоточие осталось только
+     страховкой для длинного перевода; полное имя — в `title`. */
   .tabbar__item {
     flex: 1 1 0;
     min-width: 0;
@@ -834,6 +830,39 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   .tabbar__item > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .tabbar__item:hover { text-decoration: none; color: var(--ink); }
   .tabbar__item.is-current { background: var(--accent-soft); color: var(--accent); }
+  /* «Ещё» (D518): нативный `details` — открывается без скрипта, клавиатурой и
+     читалкой; список встаёт над панелью у правого края. Переход по ссылке
+     заменяет панель целиком (`nav.js`), и список закрывается сам. */
+  .tabbar__more { flex: 1 1 0; min-width: 0; display: flex; }
+  .tabbar__more > summary { list-style: none; cursor: pointer; }
+  .tabbar__more > summary::-webkit-details-marker { display: none; }
+  .tabbar__more[open] > summary { color: var(--ink); }
+  .tabbar__sheet {
+    position: absolute;
+    right: var(--space-3);
+    bottom: calc(100% + var(--space-2));
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-2);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-block);
+    box-shadow: var(--sh-pop);
+  }
+  .tabbar__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: var(--tap-min);
+    padding: 0 var(--space-3);
+    border-radius: var(--r-control);
+    color: var(--ink-2);
+    font-weight: var(--w-medium);
+  }
+  .tabbar__row svg { width: 18px; height: 18px; flex: none; }
+  .tabbar__row:hover { text-decoration: none; color: var(--ink); background: var(--surface-2); }
+  .tabbar__row.is-current { background: var(--accent-soft); color: var(--accent); }
 }
 
 /* ═══ СТРОКА РЕЕСТРА ═════════════════════════════════════════════════════
@@ -1340,6 +1369,11 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .mx-rail__row.is-on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 .mx-rail__name { font-size: var(--fs-dense); line-height: var(--lh-dense); overflow-wrap: anywhere; }
 .mx-rail__meta { font-size: var(--fs-micro); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+/* Строка колонки в одну линию (D496): название слева, число справа. Для длинных
+   списков (страны), где вторая строка удваивала высоту колонки. */
+.mx-rail__row--line { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: var(--space-4); padding-block: var(--space-2); }
+.mx-rail__count { font-size: var(--fs-micro); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.mx-rail__row.is-on .mx-rail__count { color: var(--ink-2); }
 .mx-rail__bot-mark {
   display: inline-flex; vertical-align: -2px; margin-left: var(--space-2); color: var(--ok);
 }
@@ -1705,7 +1739,9 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .sidenav__chev { display: inline-flex; margin-left: auto; color: var(--ink-3); }
 .sidenav__chev svg { width: 14px; height: 14px; transform: rotate(-90deg); transition: transform var(--t-state) var(--ease); }
 .sidenav__me[aria-expanded="true"] .sidenav__chev svg { transform: rotate(90deg); }
-@media (max-width: 1099px) { .sidenav__chev { display: none; } }
+/* Свёрнутая панель (<1100px, 56px): имя и стрелка скрыты, и блок-ссылка с `flex: 1`
+   оставался во всю ширину с аватаром у левого края без полей (#477). Центруем. */
+@media (max-width: 1099px) { .sidenav__chev { display: none; } .sidenav__me { justify-content: center; } }
 
 /* Фото из Google вместо инициалов (D468): круг обрезает картинку. */
 .avatar { overflow: hidden; }
@@ -1915,4 +1951,309 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 @media (max-width: 520px) {
   .head-line { gap: var(--space-5); }
   .head-line__lead { flex: 1 1 100%; }
+}
+
+/* ── Лендинг и выбор роли демо (D524) ────────────────────────────
+   Одна колонка по центру: крупный заголовок, абзац, две кнопки, ниже —
+   четыре карточки возможностей сеткой (на телефоне в столбик). */
+
+.landing { max-width: 1040px; margin: 0 auto; padding: var(--space-9) var(--space-5) var(--space-10); }
+.landing__hero { max-width: 720px; margin: var(--space-9) auto var(--space-9); text-align: center; }
+.landing__kicker {
+  font-size: var(--fs-meta); font-weight: var(--w-semibold); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--accent);
+}
+.landing__title {
+  margin-top: var(--space-4);
+  font-size: var(--fs-display); line-height: 1.1; font-weight: var(--w-semibold); color: var(--ink);
+  text-wrap: balance;
+}
+.landing__lead {
+  margin-top: var(--space-6);
+  font-size: var(--fs-lead); line-height: 1.55; color: var(--ink-2); text-wrap: pretty;
+}
+.landing__actions {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+.landing__cta { height: 48px; padding-inline: var(--space-8); font-size: var(--fs-lead); }
+.landing__cta:hover { text-decoration: none; }
+.landing__note { margin-top: var(--space-4); font-size: var(--fs-meta); color: var(--ink-3); }
+.landing__grid {
+  display: grid; gap: var(--space-5);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.landing__feature {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-7);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-block); box-shadow: var(--sh-card);
+}
+.landing__num { font-family: var(--font-num); font-size: var(--fs-meta); color: var(--accent); }
+.landing__ftitle { font-size: var(--fs-title); font-weight: var(--w-semibold); color: var(--ink); }
+.landing__fbody { font-size: var(--fs-body); line-height: 1.5; color: var(--ink-2); }
+
+.demo-pick__who { font-size: var(--fs-meta); color: var(--ink-3); }
+.demo-pick__go { margin-top: auto; justify-content: center; }
+.demo-pick__role .landing__fbody { flex: 1; }
+
+/* Плашка демо: узкая полоса над всем, на каждой странице стенда демо. */
+.demo-bar {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent-soft); color: var(--ink);
+  font-size: var(--fs-meta); text-align: center;
+}
+.demo-bar a { font-weight: var(--w-semibold); }
+
+@media (max-width: 720px) {
+  .landing { padding-top: var(--space-5); }
+  .landing__hero { margin-top: var(--space-5); }
+  .landing__title { font-size: var(--fs-title); font-size: clamp(28px, 8vw, 40px); }
+  .landing__cta { width: 100%; justify-content: center; }
+}
+
+/* Приложение в рамке телефона: экран 390×780, рамка — тень и скругление. */
+.demo-app { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-9); min-width: 0; }
+.demo-app__aside { max-width: 380px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-5); align-items: flex-start; }
+.demo-app__aside .landing__title { margin-top: 0; }
+.demo-app__phone {
+  width: min(390px, 100%); height: 780px; max-height: 85vh; box-sizing: border-box;
+  padding: 12px; border-radius: 44px; background: var(--ink);
+  box-shadow: var(--sh-modal);
+}
+.demo-app__screen { width: 100%; height: 100%; border: 0; border-radius: 32px; background: var(--surface); }
+@media (max-width: 720px) {
+  .demo-app__phone { padding: 0; border-radius: 0; background: none; box-shadow: none; height: 80vh; }
+  .demo-app__screen { border-radius: var(--r-block); border: 1px solid var(--line); }
+}
+
+/* ── Посадочная страница (D525): продающая, по образцу Motherlode ─────────
+   Направление — «полевой отчёт»: крупный редакционный заголовок, код пункта и
+   буква оценки как в настоящем отчёте. Оранжевый Dodo — сигнал (запись, точка,
+   выделение), фиолетовый Dodo — финальная плита. Макеты — разметка, не снимки:
+   переводятся вместе со страницей и не протухают при смене интерфейса. */
+.page--landing { max-width: none; padding: 0; gap: 0; }
+.lp { --lp-wrap: 1120px; --lp-pad: var(--space-9); overflow-x: clip; }
+.lp > section { padding: var(--space-12) max(var(--lp-pad), calc((100% - var(--lp-wrap)) / 2)); }
+.lp-top__login, .lp-top__demo { flex: none; width: auto; white-space: nowrap; }
+
+.lp-kicker {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  font-size: var(--fs-meta); font-weight: var(--w-semibold); letter-spacing: var(--tracking-micro);
+  text-transform: uppercase; color: var(--ink-2);
+}
+.lp-kicker__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand-orange); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-orange) 20%, transparent); }
+
+/* Герой: текст слева, макет справа. */
+.lp-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-11); align-items: center; }
+.lp-hero__title {
+  margin-top: var(--space-6); font-size: clamp(34px, 4.6vw, 56px); line-height: 1.05;
+  font-weight: var(--w-bold); letter-spacing: -0.02em; color: var(--ink); text-wrap: balance;
+}
+.lp-hero__title em { display: block; margin-top: var(--space-2); font-style: normal; color: var(--accent); }
+.lp-hero__lead { margin-top: var(--space-7); max-width: 54ch; font-size: var(--fs-lead); line-height: 1.6; color: var(--ink-2); }
+.lp-hero__actions { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-8); }
+.lp-cta { height: 52px; padding-inline: var(--space-8); font-size: var(--fs-lead); gap: var(--space-3); }
+.lp-cta svg { width: 18px; height: 18px; transition: transform var(--t-state) var(--ease); }
+.lp-cta:hover { text-decoration: none; }
+.lp-cta:hover svg { transform: translateX(3px); }
+.lp-note { margin-top: var(--space-4); font-size: var(--fs-dense); color: var(--ink-2); }
+.lp-proof { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-8); padding: 0; list-style: none; }
+.lp-proof li {
+  display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5);
+  border-radius: var(--r-pill); background: var(--surface); border: 1px solid var(--line);
+  font-size: var(--fs-dense); color: var(--ink-2);
+}
+.lp-proof svg { width: 16px; height: 16px; color: var(--accent); }
+
+/* Макет героя: телефон обхода слева, отчёт и плашка плана — колонкой справа,
+   с лёгким нахлёстом на край телефона, но не на его текст. */
+.lp-mock { position: relative; display: grid; grid-template-columns: 280px minmax(0, 1fr); align-items: center; isolation: isolate; }
+.lp-mock::before {
+  content: ""; position: absolute; inset: 6% -4% 6% 10%; z-index: -1; border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--brand-purple) 22%, transparent), transparent);
+  filter: blur(8px);
+}
+.lp-phone {
+  position: relative; z-index: 1; padding: var(--space-7) var(--space-6);
+  border-radius: 36px; background: var(--surface); border: 8px solid var(--ink);
+  box-shadow: var(--sh-modal); display: flex; flex-direction: column; gap: var(--space-4);
+  transform: rotate(-2deg);
+}
+.lp-phone__head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
+.lp-phone__unit { font-weight: var(--w-semibold); color: var(--ink); }
+.lp-phone__prog { font-size: var(--fs-meta); color: var(--ink-2); }
+.lp-phone__bar { height: 6px; border-radius: var(--r-pill); background: var(--surface-3); overflow: hidden; }
+.lp-phone__bar i { display: block; height: 100%; background: var(--ok); border-radius: inherit; }
+.lp-phone__zone { font-size: var(--fs-title); font-weight: var(--w-semibold); color: var(--ink); }
+.lp-voice { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4); border-radius: var(--r-block); background: var(--surface-2); }
+.lp-voice__mic { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--brand-orange); color: #fff; flex: none; }
+.lp-voice__mic svg { width: 18px; height: 18px; }
+.lp-voice__wave { display: flex; align-items: center; gap: 3px; height: 28px; }
+.lp-voice__wave i { width: 3px; border-radius: 2px; background: var(--ink-3); animation: lp-wave 1.4s var(--ease) infinite alternate; }
+.lp-voice__wave i:nth-child(3n) { animation-delay: .2s; }
+.lp-voice__wave i:nth-child(3n+1) { animation-delay: .45s; }
+@keyframes lp-wave { from { transform: scaleY(.45); } to { transform: scaleY(1); } }
+.lp-said { font-size: var(--fs-dense); line-height: 1.45; color: var(--ink-2); font-style: italic; }
+.lp-finding { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--r-control); }
+.lp-finding__code { font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--ink-2); }
+.lp-finding__item { flex: 1; min-width: 0; font-size: var(--fs-dense); color: var(--ink); }
+.lp-finding__level { padding: 2px var(--space-3); border-radius: var(--r-pill); background: var(--warn-soft); color: var(--warn-ink); font-size: var(--fs-micro); font-weight: var(--w-semibold); }
+.lp-finding__rep { display: inline-flex; align-items: center; gap: 2px; padding: 2px var(--space-3); border-radius: var(--r-pill); background: var(--err-soft); color: var(--err); font-size: var(--fs-micro); font-weight: var(--w-semibold); }
+.lp-finding__rep svg { width: 12px; height: 12px; }
+.lp-thumbs { display: flex; align-items: center; gap: var(--space-2); }
+.lp-thumbs i { width: 44px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, var(--surface-3), var(--line-strong)); }
+.lp-thumbs i:nth-child(2) { background: linear-gradient(160deg, color-mix(in srgb, var(--brand-orange) 30%, var(--surface-3)), var(--surface-3)); }
+.lp-thumbs span { margin-left: var(--space-2); font-size: var(--fs-micro); color: var(--ink-2); }
+.lp-phone__btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); height: 40px; border-radius: var(--r-control); background: var(--primary); color: var(--ink-inverse); font-weight: var(--w-semibold); }
+.lp-phone__btn svg { width: 16px; height: 16px; }
+
+.lp-mock__side { position: relative; z-index: 2; display: flex; flex-direction: column; gap: var(--space-8); margin-left: var(--space-7); }
+.lp-report {
+  width: 200px; padding: var(--space-6); border-radius: var(--r-block); background: var(--surface);
+  border: 1px solid var(--line); box-shadow: var(--sh-pop); transform: rotate(2deg);
+}
+.lp-report__label { font-size: var(--fs-meta); color: var(--ink-2); }
+.lp-report__score { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-2); }
+.lp-report__score b { font-family: var(--font-num); font-size: 32px; font-weight: var(--w-bold); color: var(--ink); font-variant-numeric: tabular-nums; }
+.lp-grade { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--ok-soft); color: var(--ok); font-weight: var(--w-bold); font-size: var(--fs-title); font-style: normal; }
+.lp-grade--b { background: var(--accent-soft); color: var(--accent); }
+.lp-grade--c { background: var(--warn-soft); color: var(--warn-ink); }
+.lp-report__zones { margin-top: var(--space-4); font-size: var(--fs-micro); color: var(--ink-2); }
+.lp-report__bars { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.lp-report__bars i { display: block; height: 6px; border-radius: var(--r-pill); background: var(--accent); }
+.lp-chip {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) var(--space-6); border-radius: var(--r-pill); background: var(--ink); color: var(--ink-inverse);
+  font-size: var(--fs-dense); font-weight: var(--w-medium); box-shadow: var(--sh-pop); transform: rotate(-2deg);
+}
+.lp-chip svg { width: 16px; height: 16px; color: var(--brand-orange); }
+
+/* Полосы. */
+.lp-band--alt { background: var(--surface-2); }
+.lp-head { max-width: 720px; margin-bottom: var(--space-10); }
+.lp-h2 { margin-top: var(--space-4); font-size: clamp(26px, 3.2vw, 38px); line-height: 1.12; font-weight: var(--w-bold); letter-spacing: -0.015em; color: var(--ink); text-wrap: balance; }
+.lp-sub { margin-top: var(--space-4); font-size: var(--fs-lead); line-height: 1.55; color: var(--ink-2); }
+
+/* Путь проверки: цепочка из пяти шагов, номер крупно — как в отчёте. */
+.lp-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-5); padding: 0; list-style: none; }
+.lp-step { position: relative; display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-4); }
+.lp-step__ico {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--accent); box-shadow: var(--sh-xs);
+  transition: transform var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
+}
+.lp-step:hover .lp-step__ico { transform: translateY(-3px); box-shadow: var(--sh-card); }
+.lp-step:nth-child(2) .lp-step__ico { background: var(--brand-orange); border-color: transparent; color: #fff; }
+.lp-step__ico svg { width: 22px; height: 22px; }
+/* Линия цепочки — от значка к следующему шагу. */
+.lp-step:not(:last-child)::after {
+  content: ""; position: absolute; top: calc(var(--space-4) + 26px); left: 60px; right: calc(var(--space-5) * -1 + 8px);
+  border-top: 2px dashed var(--line-strong);
+}
+.lp-step__n { margin-top: var(--space-3); font-family: var(--font-num); font-size: 28px; font-weight: var(--w-bold); color: var(--ink-3); line-height: 1; }
+.lp-step__title { font-size: var(--fs-title); font-weight: var(--w-semibold); color: var(--ink); }
+.lp-step__body { font-size: var(--fs-dense); line-height: 1.5; color: var(--ink-2); }
+
+/* Сеть на одном экране: текст и макет доски. */
+.lp-net { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: var(--space-11); align-items: center; }
+.lp-net__list { margin-top: var(--space-7); }
+.lp-board {
+  padding: var(--space-6); border-radius: calc(var(--r-block) * 1.5); background: var(--surface);
+  border: 1px solid var(--line); box-shadow: var(--sh-modal); transform: rotate(1deg);
+}
+.lp-board__row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 96px; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-3); border-bottom: 1px solid var(--line); }
+.lp-board__row--head { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: var(--tracking-micro); color: var(--ink-2); }
+.lp-board__unit { display: flex; align-items: center; gap: var(--space-3); min-width: 0; font-weight: var(--w-medium); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-board__flag { flex: none; padding: 1px var(--space-2); border-radius: 6px; background: var(--surface-3); font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--ink-2); }
+.lp-board__score { display: flex; align-items: center; gap: var(--space-3); font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--ink); }
+.lp-board__score .lp-grade { width: 26px; height: 26px; border-radius: 8px; font-size: var(--fs-dense); }
+.lp-spark { display: flex; align-items: flex-end; gap: 4px; height: 28px; }
+.lp-spark i { flex: 1; min-height: 3px; border-radius: 2px; background: var(--accent); opacity: .35; }
+.lp-spark i:last-child { opacity: 1; }
+.lp-board__plan {
+  display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-5); padding: var(--space-4) var(--space-5);
+  border-radius: var(--r-control); background: var(--warn-soft); color: var(--warn-ink); font-weight: var(--w-medium);
+}
+.lp-board__plan svg { width: 18px; height: 18px; }
+.lp-board__plan b { margin-left: auto; font-family: var(--font-num); font-size: var(--fs-title); }
+
+/* Кому что даёт: три карточки одной высоты, средняя приподнята. */
+.lp-who { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-6); align-items: stretch; }
+.lp-card { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-8); border-radius: var(--r-block); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--sh-xs); }
+.lp-card--hq { border-color: var(--accent-line); box-shadow: var(--sh-card); transform: translateY(-12px); }
+.lp-card__ico { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); }
+.lp-card__ico svg { width: 22px; height: 22px; }
+.lp-card__title { font-size: 20px; font-weight: var(--w-bold); color: var(--ink); }
+.lp-card__list { display: grid; gap: var(--space-4); padding: 0; list-style: none; }
+.lp-card__list li { display: flex; gap: var(--space-3); font-size: var(--fs-body); line-height: 1.45; color: var(--ink-2); }
+.lp-card__list svg { flex: none; width: 18px; height: 18px; margin-top: 2px; color: var(--ok); }
+.lp-card__link { display: inline-flex; align-items: center; gap: var(--space-2); margin-top: auto; font-weight: var(--w-semibold); color: var(--accent); }
+.lp-card__link svg { width: 16px; height: 16px; transition: transform var(--t-state) var(--ease); }
+.lp-card__link:hover { text-decoration: none; }
+.lp-card__link:hover svg { transform: translateX(3px); }
+
+/* Ещё внутри: лёгкий список в две колонки, без плиток. */
+.lp-bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8) var(--space-11); }
+.lp-tile { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: var(--space-5); row-gap: var(--space-2); }
+.lp-tile__ico { grid-row: span 2; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); color: var(--accent); }
+.lp-tile__ico svg { width: 22px; height: 22px; }
+.lp-tile__title { font-size: var(--fs-title); font-weight: var(--w-semibold); color: var(--ink); }
+.lp-tile__body { font-size: var(--fs-body); line-height: 1.5; color: var(--ink-2); }
+
+/* Финальный призыв: фиолетовая плита Dodo — одинаковая в обеих темах. */
+.lp > .lp-final {
+  margin: var(--space-6) max(var(--space-6), calc((100% - var(--lp-wrap)) / 2)) var(--space-12);
+  padding: var(--space-12) var(--space-10); border-radius: calc(var(--r-block) * 2);
+  background: radial-gradient(120% 140% at 85% 0%, var(--brand-purple) 0%, var(--brand-purple-dark) 45%, var(--brand-purple-deep) 100%);
+  color: #fff; text-align: center; display: flex; flex-direction: column; align-items: center;
+}
+.lp-final__title { font-size: clamp(28px, 3.6vw, 44px); font-weight: var(--w-bold); letter-spacing: -0.015em; color: inherit; text-wrap: balance; }
+.lp-final__body { margin-top: var(--space-5); max-width: 58ch; font-size: var(--fs-lead); line-height: 1.55; color: rgba(255, 255, 255, .86); }
+.lp-final .lp-hero__actions { justify-content: center; }
+.lp-cta--onbrand { background: #fff; color: var(--brand-purple-deep); border-color: #fff; font-weight: var(--w-semibold); }
+.lp-cta--onbrand:hover { background: rgba(255, 255, 255, .9); color: var(--brand-purple-deep); }
+.lp-final__chips { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3) var(--space-6); margin-top: var(--space-7); padding: 0; list-style: none; }
+.lp-final__chips li { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-dense); color: rgba(255, 255, 255, .9); }
+.lp-final__chips svg { width: 16px; height: 16px; color: var(--brand-orange); }
+.lp-final__login { margin-top: var(--space-7); font-size: var(--fs-dense); color: rgba(255, 255, 255, .86); text-decoration: underline; text-underline-offset: 3px; }
+.lp-final__login:hover { color: #fff; }
+
+@media (max-width: 1000px) {
+  .lp-hero, .lp-net { grid-template-columns: minmax(0, 1fr); }
+  .lp-mock { max-width: 560px; }
+  .lp-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8) var(--space-6); }
+  .lp-step::after { display: none; }
+  .lp-who { grid-template-columns: minmax(0, 1fr); }
+  .lp-card--hq { transform: none; }
+}
+@media (max-width: 720px) {
+  .lp { --lp-pad: var(--space-6); }
+  .lp > section { padding-block: var(--space-10); }
+  .lp-hero { gap: var(--space-9); }
+  .lp-top__login { display: none; }
+  .lp-top__demo { height: 36px; padding-inline: var(--space-5); }
+  body:has(.page--landing) .topbar__mark { display: none; }
+  /* Телефон во всю колонку, отчёт и план — под ним строкой, без нахлёста. */
+  .lp-mock { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: var(--space-7); }
+  .lp-phone { width: min(320px, 100%); transform: none; }
+  .lp-mock__side { margin-left: 0; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; }
+  .lp-report, .lp-chip { transform: none; }
+  .lp-report { width: auto; }
+  .lp-steps, .lp-bento { grid-template-columns: minmax(0, 1fr); }
+  /* Шаги плотной лентой: значок слева, номер и заголовок строкой, текст под ними. */
+  .lp-steps { gap: var(--space-6); }
+  .lp-step { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: var(--space-5); row-gap: var(--space-1); padding-top: 0; }
+  .lp-step__ico { grid-row: span 3; width: 44px; height: 44px; border-radius: 12px; }
+  .lp-step__n { margin-top: 0; font-size: var(--fs-meta); }
+  .lp-board { transform: none; padding: var(--space-4); }
+  .lp-board__row { grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); padding-inline: var(--space-2); font-size: var(--fs-body); }
+  .lp-board__row > :nth-child(3) { display: none; }
+  .lp-cta { width: 100%; justify-content: center; }
+  .lp > .lp-final { margin-inline: var(--space-4); padding: var(--space-10) var(--space-6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-voice__wave i { animation: none; }
+  .lp-step__ico, .lp-cta svg, .lp-card__link svg { transition: none; }
 }

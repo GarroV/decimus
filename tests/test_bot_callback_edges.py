@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import pytest
-from bot_harness import AUDITOR_ID, CHAT_ID, callback_query, feed, make_bot, text_message
+from bot_harness import CHAT_ID, callback_query, feed, make_bot, text_message
 
 from src import domain
 from src.bot.app import build_dispatcher
@@ -25,7 +25,7 @@ from src.bot.config import BotSettings
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Все коды кнопок разговора — по одному на каждый обработчик нажатия.
 #: Список перечислен руками, а не собран маской: маска молча пропустила бы

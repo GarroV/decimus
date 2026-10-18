@@ -27,7 +27,7 @@ import json
 from pathlib import Path
 
 import pytest
-from bot_harness import AUDITOR_ID, CHAT_ID, feed, make_bot, text_message
+from bot_harness import CHAT_ID, feed, make_bot, text_message
 from bot_harness import callback_query as callback
 
 from src.bot import view
@@ -36,7 +36,7 @@ from src.bot.config import BotSettings
 from src.bot.texts import t
 from src.domain import Finding, add_finding, get_state, start_inspection
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Пункт заведён только для горячего цеха, поэтому зал для него — зона, которой
 #: методика не даёт. Пара взята из `tests/test_domain_finding_invariants.py`,

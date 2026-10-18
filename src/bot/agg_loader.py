@@ -41,11 +41,15 @@ def _due() -> bool:
 def _tick(*, scheduled: bool) -> Sequence[collect.Outcome]:
     """Один заход: заявка — всегда; суточный сбор — только на часовом заходе.
     Итоги — только суточного сбора: по ним решается уведомление."""
-    if queue.fulfil(today=date.today()):
-        return ()  # заявка только что собрала всё, что просили, — расписание подождёт час
-    if scheduled and _due():
-        return collect.run_all(date.today())
-    return ()
+    with agg_store.collector_lock() as взят:
+        if not взят:  # другой процесс уже собирает (#788) — не дублировать сбор
+            logger.warning("сбор агрегаторов уже идёт в другом процессе — заход пропущен")
+            return ()
+        if queue.fulfil(today=date.today()):
+            return ()  # заявка только что собрала всё, что просили, — расписание подождёт час
+        if scheduled and _due():
+            return collect.run_all(date.today())
+        return ()
 
 
 async def notify(outcomes: Sequence[collect.Outcome]) -> bool:
