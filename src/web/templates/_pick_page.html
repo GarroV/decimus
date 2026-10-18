@@ -1,0 +1,46 @@
+{#
+  Каркас «выбор слева — рабочая область справа» (D474) — ОДИН на все разделы,
+  где слева то, что выбирают (страны, пиццерии, проекты), а справа — рабочая
+  область выбранного. Новый такой экран наследует этот файл, а не рисуется заново.
+
+  Образец — Swarm Brain, «Статистика → Команда» (`miniapp/src/components/stats/
+  StatsDesk.tsx:43`): сетка 300px | 1fr, ниже 900px — стек, список не выше 38vh
+  со своей прокруткой. Стили — `static/decimus-pick.css`, готовые части
+  (элемент списка, плитка цифры, блок) — `_pick_ui.html`. Описание и правила,
+  когда применять, — `docs/12-web-admin.md`, раздел «Каркас экрана».
+
+  Слоты:
+    pick_label  — подпись колонки для читалок экрана (aria-label);
+    pick_tools  — над списком: поиск и отбор (необязательно);
+    pick_list   — элементы списка (`pick_item` из `_pick_ui.html`);
+    pick_work   — рабочая область: шапка, плитки, блоки;
+    pick_panel  — содержимое панели выбранной строки справа;
+    pick_assets — дополнительные стили и скрипты экрана.
+  Что передаёт экран: `pick_open` — строка выбрана (панель открыта), `pick_back` —
+  адрес закрытия (тот же экран без выбора), `pick_title` — заголовок панели.
+
+  Панель — тот же механизм, что у «Проверок» и «Пользователей»: `decimus-split.css`,
+  `split.js` и макрос `drawer` из `_split_ui.html`; своей второй панели у каркаса
+  нет (D527: строка списка открывается справа, а не отдельной страницей).
+  Выбор живёт в адресе: элемент списка — обычная ссылка, без скриптов.
+#}{% extends "base.html" %}
+{% from "_split_ui.html" import drawer with context %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-pick.css') }}">
+  <script src="{{ url_for('static', filename='split.js') }}" defer></script>
+  {% block pick_assets %}{% endblock %}
+{% endblock %}
+{% block page_class %} page--pick{% endblock %}
+{% block body %}
+  <div class="pk-shell">
+    <aside class="pk-rail" aria-label="{% block pick_label %}{% endblock %}">
+      {% block pick_tools %}{% endblock %}
+      <div class="pk-rail__list">{% block pick_list %}{% endblock %}</div>
+    </aside>
+    <section class="pk-work">{% block pick_work %}{% endblock %}</section>
+  </div>
+  {% if pick_open %}
+    {% call drawer(pick_back, pick_title) %}{% block pick_panel %}{% endblock %}{% endcall %}
+  {% endif %}
+{% endblock %}

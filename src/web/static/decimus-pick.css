@@ -1,0 +1,113 @@
+/* Каркас «выбор слева — рабочая область справа» (D474): `templates/_pick_page.html`
+   и части `_pick_ui.html`. Один на все экраны с такой раскладкой; описание —
+   `docs/12-web-admin.md`, раздел «Каркас экрана».
+
+   ОБРАЗЕЦ — Swarm Brain, «Статистика → Команда» (`miniapp/src/components/stats/
+   StatsDesk.tsx:43`): сетка 300px | 1fr; ниже 900px — стек, список не выше 38vh
+   со своей прокруткой. Колонка — подложка surface-2, отступ 8px, граница;
+   элемент — скругление 8px, 10px 8px, выбранный — фон surface и кольцо 1px line,
+   остальные при наведении; название 13px medium, мета, справа счётчик
+   моноширинным 11.5px. Рабочая область — отступ 24px: шапка выбранного, плитки
+   ключевых цифр, под ними списки и таблицы.
+
+   Дизайн-система (`dodo-ds.css`, `decimus-domain.css`) здесь не правится: всё
+   собрано из её токенов, поэтому светлая и тёмная темы работают без правок. */
+
+.page--pick { max-width: 110rem; }
+
+.pk-shell { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: var(--space-7); align-items: start; }
+.pk-work { min-width: 0; display: flex; flex-direction: column; gap: var(--space-6); }
+
+/* ── колонка выбора ─────────────────────────────────────────────────── */
+.pk-rail { position: sticky; top: calc(var(--topbar-h) + var(--space-5)); min-width: 0;
+  display: flex; flex-direction: column; gap: var(--space-2);
+  max-height: calc(100vh - var(--topbar-h) - var(--space-9)); overflow-y: auto;
+  padding: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; }
+.pk-rail__list { display: flex; flex-direction: column; gap: 2px; min-height: 0; }
+
+.pk-search { margin: 0; }
+.pk-search__input { width: 100%; height: 30px; padding: 0 10px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
+.pk-search__input::placeholder { color: var(--ink-3); }
+.pk-search__input:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+
+.pk-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px;
+  color: var(--ink); text-decoration: none; min-width: 0; transition: background-color 100ms; }
+.pk-item:hover { background: color-mix(in srgb, var(--surface) 70%, transparent); text-decoration: none; color: var(--ink); }
+.pk-item.is-on { background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.pk-item:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+.pk-item__code { flex: none; min-width: 26px; padding: 2px 0; border-radius: 6px; background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line); text-align: center; font-family: var(--font-num); font-size: 10.5px;
+  font-weight: var(--w-semibold); color: var(--ink-2); letter-spacing: .02em; }
+.pk-item__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pk-item__title { font-size: 13px; line-height: 18px; font-weight: var(--w-medium, 500); overflow-wrap: anywhere; }
+.pk-item__meta { font-size: 11.5px; line-height: 16px; color: var(--ink-3); overflow-wrap: anywhere; }
+.pk-item__count { flex: none; font-family: var(--font-num); font-size: 11.5px; color: var(--ink-2);
+  font-variant-numeric: tabular-nums; }
+
+/* вложенный список под выбранным элементом: пиццерии своей страны */
+.pk-sub { display: flex; flex-direction: column; gap: 2px; margin: 0 0 var(--space-2) 14px; padding-left: 8px;
+  border-left: 1px solid var(--line); }
+.pk-item--sub { padding: 6px 8px; }
+.pk-item--sub .pk-item__title { font-size: 12.5px; }
+.pk-item__tag { flex: none; }
+.pk-closed > summary { cursor: pointer; padding: 6px 8px; font-size: var(--fs-meta); color: var(--ink-3); list-style: none; }
+.pk-closed > summary::-webkit-details-marker { display: none; }
+.pk-closed > summary::before { content: "▸ "; }
+.pk-closed[open] > summary::before { content: "▾ "; }
+.pk-closed .pk-item { color: var(--ink-3); }
+.pk-note { margin: 0; padding: 4px 8px; font-size: var(--fs-meta); color: var(--ink-3); }
+
+/* отбор «Девелопер» раскрывается внутри колонки */
+.pk-rail .pick { display: block; }
+.pk-rail .ov-chip { display: flex; width: 100%; justify-content: space-between; height: 30px; }
+.pk-rail .pick__menu { position: static; width: 100%; min-width: 0; margin-top: var(--space-2); box-shadow: none; }
+
+/* ── рабочая область ────────────────────────────────────────────────── */
+.pk-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main actions" "facts facts" "period period";
+  gap: var(--space-3) var(--space-5); align-items: start; }
+.pk-head__main { grid-area: main; min-width: 0; }
+.pk-head__facts { grid-area: facts; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6);
+  font-size: var(--fs-dense); line-height: var(--lh-dense); color: var(--ink-2); }
+.pk-head__facts .is-muted { color: var(--ink-3); }
+.pk-head__actions { grid-area: actions; display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; justify-content: flex-end; }
+.pk-head__actions .btn { text-decoration: none; width: auto; flex: none; min-height: 0; }
+.pk-head__period { grid-area: period; padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.pk-kicker { font: var(--w-semibold) 10.5px / 1 var(--font-ui); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.pk-title { margin: var(--space-2) 0 0; font-size: 22px; line-height: 28px; font-weight: var(--w-semibold);
+  letter-spacing: -.01em; color: var(--ink); overflow-wrap: anywhere; }
+
+/* плитки ключевых цифр */
+.pk-tiles { display: grid; grid-template-columns: repeat(var(--pk-cols, 4), minmax(0, 1fr)); gap: var(--space-4); }
+.pk-tile { min-width: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.pk-tile__label { font: var(--w-semibold) 10.5px / 1 var(--font-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); line-height: 12px; overflow-wrap: anywhere; }
+.pk-tile__value { margin-top: var(--space-3); display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
+  font-family: var(--font-num); font-size: 24px; line-height: 28px; font-weight: var(--w-semibold);
+  letter-spacing: -.01em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pk-tile__sub { margin-top: var(--space-2); font-size: var(--fs-meta); color: var(--ink-3); }
+
+/* блок со списком или таблицей */
+.pk-block { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.pk-block__head { display: flex; align-items: baseline; gap: var(--space-4); flex-wrap: wrap; padding: 12px 16px;
+  border-bottom: 1px solid var(--line); }
+.pk-block__title { margin: 0; font: var(--w-semibold) 11px / 1 var(--font-num); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-2); }
+.pk-block__hint { flex: 1; min-width: 0; font-size: var(--fs-meta); color: var(--ink-3); }
+.pk-block__count { margin-left: auto; font-family: var(--font-num); font-size: 11.5px; color: var(--ink-2); }
+.pk-empty { margin: 0; font-size: var(--fs-meta); color: var(--ink-3); }
+
+/* ── узкий экран: стек, колонка не выше 38vh со своей прокруткой ────── */
+@media (max-width: 899px) {
+  .pk-shell { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  .pk-rail { position: static; max-height: 38vh; }
+  .pk-head { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "actions" "facts" "period"; }
+  .pk-head__actions { justify-content: flex-start; }
+}
+@media (max-width: 479px) {
+  .pk-tiles { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+  .pk-tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .pk-tile { padding: 12px; }
+}
+
+/* список без родителя (партнёр с одной страной): пиццерии без отступа и черты */
+.pk-rail__list > .pk-sub:first-child { margin-left: 0; padding-left: 0; border-left: 0; }

@@ -24,3 +24,22 @@
     </div>
   </details>
 {% endmacro %}
+
+{#
+  Панель выбранного справа — одна на все экраны (`_split_page.html`, `_pick_page.html`):
+  затемнение и ✕ — ссылки закрытия `back` (тот же экран без выбора), `split.js`
+  добавляет Esc, открытие без перезагрузки и анимацию. Тело — вызов (`caller`).
+  Подключать `with context` (нужны `t` и `icon`).
+#}
+{% macro drawer(back, title) %}
+  <div class="sdrawer" data-drawer>
+    <a class="sdrawer__scrim" href="{{ back }}" data-drawer-close tabindex="-1" aria-hidden="true"></a>
+    <aside class="sdrawer__panel" role="dialog" aria-modal="true" aria-labelledby="sdrawer-title">
+      <header class="sdrawer__head">
+        <h2 class="sdrawer__title" id="sdrawer-title">{{ title }}</h2>
+        <a class="sdrawer__close" href="{{ back }}" data-drawer-close aria-label="{{ t('split.close') }}">{{ icon('x') }}</a>
+      </header>
+      <div class="sdrawer__body">{{ caller() }}</div>
+    </aside>
+  </div>
+{% endmacro %}
