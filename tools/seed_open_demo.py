@@ -35,6 +35,7 @@ import secrets
 import shutil
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -63,6 +64,9 @@ from src.domain.uploads import upload_file  # noqa: E402
 PHOTOS_VAR = "DEMO_PHOTOS_DIR"
 #: Первый чат демо-проверок. Диапазон заведомо вымышленный, как у прочих сидов.
 FIRST_CHAT = 999_000_000_601
+#: Чат идущей проверки, которую открывает приложение аудитора в демо
+#: (`WEB_WALK_PREVIEW_CHAT`); из вымышленного диапазона просмотра.
+WALK_CHAT = 999_000_000_701
 #: Сколько самых свежих проверок оставить на приёмке — показать очередь.
 PENDING = 2
 
@@ -596,6 +600,29 @@ def _storage_ready() -> bool:
     return True
 
 
+def _walk(photos_dir: Path | None) -> None:
+    """Идущая проверка Northgate-1 для приложения аудитора: в базу не сливается.
+
+    У точки уже есть прошлые проверки — приложение покажет «здесь было».
+    """
+    visit = Visit(
+        "Northgate-1",
+        date.today().isoformat(),
+        "planned",
+        (
+            N(
+                "DEM11",
+                "D1",
+                "kitchen",
+                "Light carbon on the conveyor rollers again.",
+                ("p09.jpg",),
+            ),
+            N("DEM13", "D1", "staff", "Debris in the corner of the courier area.", ("p26.jpg",)),
+        ),
+    )
+    _build(WALK_CHAT, visit, {u.name: u for u in UNITS}["Northgate-1"], {"DEM11"}, photos_dir)
+
+
 def seed() -> int:
     os.environ["AUDIT_DATA_DIR"] = str(seed_demo.DEMO_DATA_DIR)
     os.environ["STATE_DIR"] = str(seed_demo.demo_state_dir())
@@ -632,6 +659,8 @@ def seed() -> int:
     for ident, owner in pushed[:-PENDING]:
         actor = PARTNER_AUDITOR if owner == DEMO_PARTNER_TENANT else "Olivia Hart"
         accept_inspection(ident, tenant=owner, actor=actor)
+    _walk(photos_dir)
+    print(f"Auditor app: in-progress inspection in chat {WALK_CHAT} (WEB_WALK_PREVIEW_CHAT)")
     print(f"Open demo seeded: {len(pushed)} inspections, {len(DEMO_ROLES)} demo accounts")
     return 0
 

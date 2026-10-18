@@ -66,8 +66,10 @@ from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import (
+    demo_entry,
     google_link,
     google_profile,
+    landing,
     oauth,
     passkey_login,
     reauth,
@@ -145,7 +147,8 @@ COOKIE_SALT = "web-session"
 #: вошедшего; сами они держатся PKCE и одноразовым кодом. Согласие
 #: (`oauth_authorize`) здесь НЕ стоит — оно требует входа.
 OPEN_ENDPOINTS = (
-    frozenset({"login", "static", "google_start", "google_callback"})
+    frozenset({"login", "static", "google_start", "google_callback", landing.ENDPOINT})
+    | demo_entry.ENDPOINTS
     | walk_auth.ENDPOINTS
     | swarm_api.ENDPOINTS
     | oauth.ENDPOINTS
@@ -317,6 +320,8 @@ def install(app: Flask, conf: Settings) -> None:
 
     second_step.install(app, conf, remember=remember, stand=рубеж)
     passkey_login.install(app, conf, remember=remember, stand=рубеж)
+    demo_entry.install(app, conf, remember=remember)
+    landing.install(app, conf)
 
     @app.errorhandler(SecondStepRequiredError)
     def _second_step_required(_: SecondStepRequiredError) -> Response:
@@ -339,6 +344,9 @@ def install(app: Flask, conf: Settings) -> None:
         token = token_of_request()
         account = resolve_session(token) if token else None
         if account is None:
+            if request.method == "GET" and request.endpoint == "home":
+                # Корень неопознанному — посадочная страница, а не голая форма (D524).
+                return redirect(url_for(landing.ENDPOINT, lang=request.args.get("lang")))
             if request.method == "GET":
                 # Сессия истекла на открытой странице (согласие OAuth, карточка в
                 # панели реестра): на вход и обратно сюда, а не на главную (D465).

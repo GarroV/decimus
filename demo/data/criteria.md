@@ -137,7 +137,7 @@ D1:
 ## DEM16
 
 D0:
-- Record only: photo of the oven display with bake time and temperature.
+- Record only: a snapshot of the oven display.
 
 ## DEM17
 

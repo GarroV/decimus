@@ -34,5 +34,5 @@ def create_walk_app(
     app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
     assets.install(app)
     walk.install(app, ui_lang=conf.ui_lang, settings=walk_settings)
-    security_headers.install(app, hsts=conf.hsts)
+    security_headers.install(app, hsts=conf.hsts, demo=conf.demo)
     return app
