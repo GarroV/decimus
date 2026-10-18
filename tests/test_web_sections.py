@@ -13,7 +13,7 @@ import pytest
 from web_harness import войти, подменить_двери, собрать
 
 from src.domain.tenants import HQ_TENANT, canonical_tenant
-from src.web import action_plans, sections
+from src.web import sections
 from src.web.errors import SectionRegistryError
 from src.web.sections import (
     SECTIONS,
@@ -30,8 +30,6 @@ def test_sections_go_in_menu_groups_in_order() -> None:
     assert [(item.group, item.key) for item in SECTIONS] == [
         ("work", "overview"),
         ("work", "registry"),
-        ("work", "plans"),
-        ("work", "orders"),
         ("work", "calendar"),
         ("work", "actions"),
         ("stats", "country"),
@@ -47,8 +45,6 @@ def test_built_keys_are_the_built_screens() -> None:
         {
             "overview",
             "registry",
-            "plans",
-            "orders",
             "country",
             "ratings",
             "calendar",
@@ -89,8 +85,6 @@ def test_check_registry_accepts_exactly_the_built_sections() -> None:
         (
             "overview",
             "registry",
-            "plans",
-            "orders",
             "country",
             "ratings",
             "calendar",
@@ -114,8 +108,6 @@ def test_check_registry_refuses_a_built_calendar_left_without_a_screen() -> None
             (
                 "overview",
                 "registry",
-                "plans",
-                "orders",
                 "actions",
                 "country",
                 "ratings",
@@ -144,7 +136,7 @@ def test_check_registry_refuses_a_screen_outside_the_registry() -> None:
         check_registry(("overview", "registry", "country", "admin", "users", "settings", "выдумка"))
 
 
-# --- разделы «только УК» (D264, волна 1 #340) -------------------------------
+# --- «Действия» — один раздел у УК и партнёра (D526) -----------------------
 
 
 class _Кто:
@@ -155,10 +147,16 @@ class _Кто:
         self.tenant, self.role = tenant, role
 
 
-def test_раздел_уК_скрыт_у_партнёра() -> None:
-    assert "actions" not in {s.key for s in visible_sections(_Кто("GE"))}
-    assert "actions" in {s.key for s in visible_sections(_Кто("HQ"))}
-    assert "actions" in {s.key for s in visible_sections(_Кто("default"))}
+@pytest.mark.parametrize("пространство", ["HQ", "default", "GE"])
+def test_действия_видны_и_уК_и_партнёру_а_старых_разделов_партнёра_нет(пространство: str) -> None:
+    """D526: один раздел «Действия» у обеих сторон; `plans` и `orders` из меню ушли."""
+    ключи = {s.key for s in visible_sections(_Кто(пространство))}
+    assert "actions" in ключи
+    assert not ключи & {"plans", "orders"}
+
+
+def test_старых_разделов_партнёра_нет_в_реестре() -> None:
+    assert not {"plans", "orders"} & {s.key for s in SECTIONS}
 
 
 def test_раздела_проект_нет_пространства_на_экране_пользователей() -> None:
@@ -170,35 +168,34 @@ def test_пользователи_видны_каждому() -> None:
     assert "users" in {s.key for s in visible_sections(_Кто("GE"))}
 
 
-def test_адрес_раздела_уК_отказывает_партнёру_и_вложенный_тоже() -> None:
-    путь = section("actions").path
+# --- флаг «только УК» — механизм, которым сейчас не пользуется ни один раздел
+
+
+@pytest.fixture
+def раздел_только_уК(monkeypatch: pytest.MonkeyPatch) -> str:
+    """Раздел «Календарь» на время теста помечен «только УК» — механизм жив и проверяется."""
+    monkeypatch.setattr(
+        sections,
+        "SECTIONS",
+        tuple(replace(s, hq_only=True) if s.key == "calendar" else s for s in SECTIONS),
+    )
+    return "calendar"
+
+
+def test_адрес_раздела_только_уК_отказывает_партнёру_и_вложенному(раздел_только_уК: str) -> None:
+    путь = section(раздел_только_уК).path
     assert refused_for(путь, "GE") and refused_for(путь + "/GE", "GE")
     assert not refused_for(путь, "HQ")
     assert not refused_for(section("registry").path, "GE")
 
 
-def test_каждый_раздел_только_уК_закрыт_партнёру(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Партнёру — тот же 404, что у несуществующего адреса, на каждом разделе «только УК»."""
+def test_раздел_только_уК_отвечает_партнёру_404(
+    monkeypatch: pytest.MonkeyPatch, раздел_только_уК: str
+) -> None:
+    """Партнёру — тот же 404, что у несуществующего адреса (D264)."""
     подменить_двери(monkeypatch, tenant="GE", role="admin")
-    закрытые = [s for s in SECTIONS if s.hq_only]
-    assert закрытые, "ни один раздел не помечен — тест ничего не проверяет"
+    путь = section(раздел_только_уК).path
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
-        нет = client.get("/nothing-here-at-all")
-        for s in закрытые:
-            ответ = client.get(s.path)
-            assert ответ.status_code == 404, s.key
-            # Тот же ответ с точностью до адреса: форма языка шлёт на текущий путь.
-            свой_адрес = s.path.encode()
-            assert ответ.data.replace(свой_адрес, b"") == нет.data.replace(
-                b"/nothing-here-at-all", b""
-            ), s.key
-
-
-def test_раздел_только_уК_открыт_уК(monkeypatch: pytest.MonkeyPatch) -> None:
-    подменить_двери(monkeypatch, tenant="HQ", role="admin")
-    with собрать(tenant="HQ").test_client() as client:
-        войти(client)
-        monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: action_plans.EMPTY)
-        for s in (s for s in SECTIONS if s.hq_only):
-            assert client.get(s.path).status_code not in (403, 404), s.key
+        assert client.get("/nothing-here-at-all").status_code == 404
+        assert client.get(путь).status_code == 404

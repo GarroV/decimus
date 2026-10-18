@@ -237,8 +237,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "country.history.card": {"ru": "Карточка пиццерии", "en": "Pizzeria card"},
     "section.overview.title": {"ru": "Главная", "en": "Home"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
-    "section.plans.title": {"ru": "Экшн-планы", "en": "Action plans"},
-    "section.orders.title": {"ru": "Предписания", "en": "Compliance notices"},
     "section.country.title": {"ru": "Пиццерии", "en": "Pizzerias"},
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},

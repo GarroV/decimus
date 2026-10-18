@@ -51,7 +51,7 @@
         <li class="rx-reply">
           <div class="rx-reply__text">{{ r.comment }}</div>
           <div class="plan-versions__row">
-            {% if r.file_name %}<a class="plan-versions__file" href="{{ url(files_path ~ '/files/' ~ r.id) }}">{{ r.file_name }}</a>{% endif %}
+            {% if r.file_name %}<a class="plan-versions__file" href="{{ url(files_path ~ '/' ~ r.id) }}">{{ r.file_name }}</a>{% endif %}
             <span class="ov-cell__muted">{{ t('rx.reply.meta', by=r.replied_by, at=r.replied_at.strftime('%Y-%m-%d %H:%M')) }}</span>
           </div>
         </li>

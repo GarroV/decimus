@@ -1,0 +1,4 @@
+{#
+  Ответ на действие, отправленное из панели «Действий» фоном (`split.js`,
+  заголовок `X-Panel`): только панель, с итогом действия — не страница целиком.
+#}{% from "actions/_panel_plan.html" import plan_panel with context %}{% from "actions/_panel_rx.html" import rx_panel with context %}{% if tab == 'plans' %}{{ plan_panel(item) }}{% else %}{{ rx_panel(item) }}{% endif %}

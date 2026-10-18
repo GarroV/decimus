@@ -75,13 +75,14 @@ def _url(endpoint: str, **params: Any) -> str:
     return url_for(endpoint, **params)
 
 
-def _board_href(kind: str, *, hq: bool) -> str:
+def _board_href(kind: str) -> str:
     """Куда ведёт стикер: туда, где это дело делают."""
+    действия = section("actions").path
     куда = {
         home_board.REVIEW: section("registry").path,
-        home_board.PLANS_REVIEW: section("actions").path,
-        home_board.PLANS_DUE: section("plans").path,
-        home_board.ORDERS_DUE: section("actions" if hq else "orders").path,
+        home_board.PLANS_REVIEW: f"{действия}?tab=plans",
+        home_board.PLANS_DUE: f"{действия}?tab=plans",
+        home_board.ORDERS_DUE: f"{действия}?tab=prescriptions",
         home_board.RATINGS_STALE: url_for("ratings_imports"),
     }
     return куда[kind]
@@ -100,7 +101,7 @@ def _board(reach: Any) -> tuple[tuple[home_board.Sticker, ...], bool]:
     except DbError as exc:
         log.warning("главная: доска не прочиталась (%s)", exc.__class__.__name__)
         return (), True
-    return home_board.compose(who, counts, lambda k: _board_href(k, hq=who.hq)), False
+    return home_board.compose(who, counts, _board_href), False
 
 
 def _latest_ratings(

@@ -1,0 +1,31 @@
+{# Список предписаний: тема, страна, пиццерии, срок, состояние (D526). #}
+{% from "_prescription.html" import rx_tag, rx_replied, rx_units with context %}
+{% macro rx_list() %}
+  <div class="slist slist--actions slist--rx">
+    {% if rows %}
+      <div class="slist__head" aria-hidden="true">
+        <span>{{ t('rx.col.subject') }}</span>
+        <span>{{ t('rx.col.country') }}</span>
+        <span>{{ t('rx.col.units') }}</span>
+        <span class="is-num">{{ t('rx.col.due') }}</span>
+        <span>{{ t('rx.col.state') }}</span>
+      </div>
+      <ul class="slist__rows">
+        {% for p in rows %}
+          {% set current = split_open and picked == p.id %}
+          <li>
+            <a class="srow{% if current %} is-current{% endif %}" href="{{ select_url(id=p.id) }}"{% if current %} aria-current="true"{% endif %}>
+              <span class="srow__main"><b>{{ p.subject }}</b></span>
+              <span class="srow__cell srow__country">{{ country_title(p.country) or p.country }}</span>
+              <span class="srow__cell srow__units">{{ rx_units(p) }}</span>
+              <span class="srow__cell mono is-num srow__due{% if p.overdue(today) %} srow__err{% endif %}" data-label="{{ t('rx.col.due') }}">{{ p.due_on }}</span>
+              <span class="srow__cell srow__state">{{ rx_tag(p, today) }}{{ rx_replied(p) }}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="sempty"><p class="sempty__title">{{ t(empty_key) }}</p></div>
+    {% endif %}
+  </div>
+{% endmacro %}

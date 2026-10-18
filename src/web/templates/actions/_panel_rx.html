@@ -1,0 +1,104 @@
+{#
+  Панель предписания (D526, D527): одна у УК и партнёра. Общее — письмо,
+  основания, ответы партнёра, срок, состояние. Добавки по стороне: партнёру —
+  форма ответа; УК — Gmail и правка черновика, закрытие с комментарием. Составление
+  предписания — отдельная страница формы (`prescription_form.html`): письмо длинное.
+#}
+{% from "_prescription.html" import rx_tag, rx_replied, rx_units, letter, bases, replies, history, meta with context %}
+
+{% macro rx_panel(p) %}
+  <article class="sdetail spanel spanel--action" aria-labelledby="action-title" data-net-error="{{ t('registry.panel.net_error') }}">
+    <header class="sdetail__head">
+      <div class="sdetail__who">
+        <h2 class="sdetail__title" id="action-title">{{ p.subject }}</h2>
+        <p class="sdetail__hint">{{ country_title(p.country) or p.country }} · {{ t('rx.card.kicker') }} · {{ rx_units(p) }}</p>
+      </div>
+      <div class="spanel__score">{{ rx_tag(p, today) }}{{ rx_replied(p) }}</div>
+    </header>
+
+    {% if gmail %}
+      <div class="note {{ 'note--ok' if gmail == 'ok' else ('note--warn' if gmail in ('denied', 'unavailable', 'wrong_account') else 'note--error') }}" role="status"><div class="note__text">{{ t('rx.gmail.' ~ gmail) }}</div></div>
+    {% endif %}
+    {% if notice %}<div class="note note--ok" role="status"><div class="note__text">{{ notice }}</div></div>{% endif %}
+    {% if failure %}<div class="note note--error" role="alert"><div class="note__text">{{ failure }}</div></div>{% endif %}
+    {% if p.status == 'closed' %}
+      <div class="note note--ok"><div class="note__text">{{ t('rx.card.closed_note', comment=p.close_comment) }}</div></div>
+    {% endif %}
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('actions.panel.facts') }}</h3>
+      <dl class="sprops">
+        <div><dt>{{ t('rx.col.due') }}</dt>
+          <dd{% if p.overdue(today) %} class="srow__err"{% endif %}>{{ p.due_on }}</dd></div>
+        <div><dt>{{ t('rx.col.state') }}</dt><dd>{{ rx_tag(p, today) }}{{ rx_replied(p) }}</dd></div>
+        {% if p.issued_at %}<div><dt>{{ t('actions.panel.sent') }}</dt><dd>{{ meta(p) }}</dd></div>{% endif %}
+      </dl>
+    </section>
+
+    {% if hq and p.status == 'draft' %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('rx.card.send_title') }}</h3>
+        <p class="ssec__text">{{ t('rx.card.send_hint') }}</p>
+        <div class="sactions">
+          <form method="post" action="{{ url(rx_base ~ '/' ~ p.id ~ '/send') }}?lang={{ lang }}">
+            <button class="sbtn sbtn--primary" type="submit">{{ t('rx.card.send') }}</button>
+          </form>
+          <a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit') }}</a>
+        </div>
+      </section>
+    {% endif %}
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('rx.card.letter') }}</h3>
+      {{ letter(p) }}
+    </section>
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('rx.card.bases') }}</h3>
+      {{ bases(p, registry_path) }}
+    </section>
+
+    {% if p.status != 'draft' %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('rx.card.replies') }}</h3>
+        {{ replies(p, rx_files_path) }}
+        {% if not hq %}
+          {% if p.status == 'issued' %}
+            <form class="sform sform--gap" method="post" enctype="multipart/form-data" data-panel-form data-upload-form
+                  action="{{ url(rx_base ~ '/' ~ p.id ~ '/reply') }}?lang={{ lang }}">
+              <label><span class="sform__label">{{ t('rx.reply.comment') }}</span>
+                <textarea class="sinput sinput--area" name="comment" required maxlength="4000" rows="4"></textarea></label>
+              <label class="supload supload--compact">
+                <input class="supload__input" type="file" name="file" aria-label="{{ t('rx.reply.file_label') }}">
+                <span class="supload__icon">{{ icon('doc') }}</span>
+                <span class="supload__title">{{ t('actions.drop.title') }}</span>
+                <span class="supload__hint">{{ t('rx.reply.file', mb=max_mb) }}</span>
+                <span class="supload__name" data-upload-name data-empty="{{ t('actions.drop.none') }}">{{ t('actions.drop.none') }}</span>
+              </label>
+              <button class="sbtn sbtn--primary" type="submit">{{ t('rx.reply.submit') }}</button>
+            </form>
+          {% else %}
+            <p class="ssec__note">{{ t('rx.reply.closed') }}</p>
+          {% endif %}
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if hq and p.status == 'issued' %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('rx.card.close_title') }}</h3>
+        <p class="ssec__text">{{ t('rx.card.close_hint') }}</p>
+        <form class="sform" method="post" data-panel-form action="{{ url(rx_base ~ '/' ~ p.id ~ '/close') }}?lang={{ lang }}">
+          <label><span class="sform__label">{{ t('rx.card.close_comment') }}</span>
+            <textarea class="sinput sinput--area" name="comment" required maxlength="2000" rows="3"></textarea></label>
+          <button class="sbtn" type="submit">{{ t('rx.card.close') }}</button>
+        </form>
+      </section>
+    {% endif %}
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('rx.card.history') }}</h3>
+      {{ history(p) }}
+    </section>
+  </article>
+{% endmacro %}

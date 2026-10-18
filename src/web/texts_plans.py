@@ -1,4 +1,4 @@
-"""Тексты экшн-планов (волна 2): раздел УК, раздел партнёра, блоки страны и карточки.
+"""Тексты экшн-планов (волна 2) и раздела «Действия» (D526): вкладка, панель, блоки, карточки.
 
 Отдельным модулем, а не строками в `texts.py`: тот уже длиннее предела файла.
 Сливаются в общий каталог (`texts.TEXTS`) — `t()` знает один словарь.
@@ -57,9 +57,7 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Версия {version} загружена и ушла на приёмку.",
         "en": "Version {version} uploaded and sent for review.",
     },
-    # --- раздел партнёра ---------------------------------------------------
-    "plans.kicker": {"ru": "Ответы на проверки", "en": "Responses to inspections"},
-    "plans.title": {"ru": "Запросы экшн-плана", "en": "Action plan requests"},
+    # --- загрузка файла партнёром ----------------------------------------
     "plans.hint": {
         "ru": "Загрузите план файлом любого формата, до {mb} МБ. После возврата — новую версию.",
         "en": "Upload the plan as a file of any format, up to {mb} MB. After a return, upload a new version.",  # noqa: E501
@@ -68,21 +66,38 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "ru": "План вернули. Комментарий УК:",
         "en": "The plan was returned. Comment from the management company:",
     },
-    "plans.upload": {"ru": "Загрузить план", "en": "Upload plan"},
+    "plans.upload_title": {"ru": "Файл плана", "en": "Plan file"},
+    "plans.upload_button": {"ru": "Загрузить файл плана", "en": "Upload plan file"},
     "plans.file_label": {"ru": "Файл плана", "en": "Plan file"},
-    "plans.empty": {
-        "ru": "Запросов экшн-плана нет.",
-        "en": "There are no action plan requests.",
+    "actions.drop.title": {
+        "ru": "Перетащите файл сюда или нажмите, чтобы выбрать",
+        "en": "Drop a file here or click to choose",
     },
-    # --- раздел УК ---------------------------------------------------------
-    "actions.kicker": {"ru": "Экшн-планы", "en": "Action plans"},
+    "actions.drop.none": {"ru": "Файл не выбран", "en": "No file chosen"},
+    # --- экран «Действия» --------------------------------------------------
+    "actions.count": {"ru": "в списке: {n}", "en": "in the list: {n}"},
+    "actions.drawer.plan": {"ru": "Экшн-план", "en": "Action plan"},
+    "actions.drawer.rx": {"ru": "Предписание", "en": "Compliance notice"},
+    "actions.panel.facts": {"ru": "Сведения", "en": "Details"},
+    "actions.panel.origin": {"ru": "Запрос", "en": "Request"},
+    "actions.panel.sent": {"ru": "Отправка", "en": "Sending"},
+    "actions.panel.missing.title": {"ru": "Запись не найдена", "en": "Not found"},
+    "actions.panel.missing.text": {
+        "ru": "Её нет или она вне вашего охвата.",
+        "en": "It does not exist or is outside your scope.",
+    },
+    "actions.panel.failed.title": {"ru": "Не удалось открыть", "en": "Could not open"},
+    "actions.panel.failed.text": {
+        "ru": "База не ответила. Список остался на месте — попробуйте ещё раз.",
+        "en": "The database did not respond. The list is still there; please try again.",
+    },
     "actions.all_countries": {"ru": "Все страны", "en": "All countries"},
     "actions.queue.review": {"ru": "Ждут приёмки · {n}", "en": "Awaiting review · {n}"},
     "actions.queue.overdue": {"ru": "Просрочены · {n}", "en": "Overdue · {n}"},
     "actions.country": {"ru": "Страна", "en": "Country"},
     "actions.list.title": {"ru": "Запросы экшн-плана", "en": "Action plan requests"},
-    "actions.list.hint": {"ru": "по сроку ответа", "en": "by due date"},
     "actions.list.empty": {"ru": "Запросов нет.", "en": "No requests."},
+    "actions.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
     "actions.col.country": {"ru": "Страна", "en": "Country"},
     "actions.col.inspection": {"ru": "Проверка", "en": "Inspection"},
     "actions.col.due": {"ru": "Срок", "en": "Due"},

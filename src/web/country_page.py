@@ -71,7 +71,6 @@ def _country_plans(код: str) -> dict[str, Any]:
     return {
         "plans": открытые.rows + принятые.rows,
         "plans_known": известны,
-        "plans_act_path": section("actions" if уК else "plans").path,
         "plans_act_country": уК,
     }
 
@@ -312,7 +311,8 @@ def _one_country(
         "plans_count": len(plans["plans"]) if plans["plans_known"] else None,
         "rx_count": len(rx["rx_rows"]) if rx["rx_known"] else None,
         **{k: v for k, v in plans.items() if k.startswith("plans_act")},
-        **{k: rx[k] for k in ("rx_act_hq", "rx_hq_path", "rx_partner_path")},
+        "rx_act_hq": rx["rx_act_hq"],
+        "actions_path": section("actions").path,
         "truncated": data.truncated,
         "country_name": country_title(вид.code, lang),
     }

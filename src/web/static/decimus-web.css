@@ -1806,13 +1806,8 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 }
 
 /* ── Экшн-планы (волна 2) ──────────────────────────────────────────────
-   Таблица запросов раздела УК — та же сетка, что у точек страны; версии и
-   история — списки без маркеров, строка за строкой. */
-.ov-table--plans .ov-table__head,
-.ov-table--plans .ov-table__row {
-  grid-template-columns: minmax(9rem, 1.4fr) minmax(6rem, 1fr) 4rem 6rem 6rem minmax(9rem, 1fr);
-  min-width: 44rem;
-}
+   Версии и история плана — списки без маркеров, строка за строкой. Список
+   запросов и панель — `decimus-actions.css`. */
 .plan-versions,
 .plan-history { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
 .plan-versions__row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-3); }
@@ -1820,29 +1815,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .plan-versions__comment { font-size: var(--fs-meta); color: var(--ink-2); overflow-wrap: anywhere; }
 .plan-history { font-size: var(--fs-meta); }
 
-/* Очередь УК на телефоне — строка складывается в карточку, как реестр: точка
-   и буква сверху, срок и состояние под ними. Шесть колонок уезжали вбок, и
-   состояние — смысл очереди — читалось только прокруткой (сверка norma). */
-@media (max-width: 52rem) {
-  .ov-table--plans .ov-table__head { display: none; }
-  .ov-table--plans .ov-table__row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "name grade"
-      "country date"
-      "due state";
-    min-width: 0;
-    row-gap: var(--space-1);
-  }
-  .ov-table--plans .ov-table__row > :nth-child(1) { grid-area: name; }
-  .ov-table--plans .ov-table__row > :nth-child(2) { grid-area: country; }
-  .ov-table--plans .ov-table__row > :nth-child(3) { grid-area: grade; justify-self: end; }
-  .ov-table--plans .ov-table__row > :nth-child(4) { grid-area: date; justify-self: end; }
-  .ov-table--plans .ov-table__row > :nth-child(5) { grid-area: due; justify-self: start; }
-  .ov-table--plans .ov-table__row > :nth-child(6) { grid-area: state; justify-self: end; }
-}
-
-/* Поле файла плана — в тон кнопкам forma, а не серой кнопкой браузера. */
+/* Поле файла — в тон кнопкам forma, а не серой кнопкой браузера. */
 .input[type="file"] { padding: var(--space-2); }
 .input[type="file"]::file-selector-button {
   margin-right: var(--space-3);
@@ -1856,15 +1829,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 }
 
 /* ── Предписания (волна 3) ─────────────────────────────────────────────
-   Вкладки «Действий», таблица предписаний (та же сетка, что очередь планов),
-   письмо как написано и выбор пиццерий и оснований. */
-.rx-tabs { margin: var(--space-4) 0 var(--space-2); }
-.rx-tabs a { text-decoration: none; }
-.ov-table--rx .ov-table__head,
-.ov-table--rx .ov-table__row {
-  grid-template-columns: minmax(12rem, 2fr) minmax(6rem, 1fr) minmax(8rem, 1.2fr) 6rem minmax(8rem, 1fr);
-  min-width: 44rem;
-}
+   Письмо как написано и выбор пиццерий и оснований. */
 .rx-letter { display: grid; gap: var(--space-3); }
 .rx-letter__subject { font-weight: var(--w-semibold); overflow-wrap: anywhere; }
 .rx-letter__body,
@@ -1888,30 +1853,6 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .rx-form__body { min-height: 14rem; font: inherit; }
 .rx-form__actions { grid-column: 1 / -1; gap: var(--space-3); flex-wrap: wrap; }
 .rx-form__actions .btn { margin-top: 0; }
-
-/* Таблица предписаний на телефоне — строка складывается в карточку, как
-   очередь планов: тема сверху, страна и пиццерии под ней, срок и состояние. */
-@media (max-width: 52rem) {
-  .ov-table--rx .ov-table__head { display: none; }
-  .ov-table--rx .ov-table__row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "name name"
-      "country units"
-      "due state";
-    min-width: 0;
-    row-gap: var(--space-1);
-  }
-  .ov-table--rx .ov-table__row > :nth-child(1) { grid-area: name; }
-  .ov-table--rx .ov-table__row > :nth-child(2) { grid-area: country; }
-  .ov-table--rx .ov-table__row > :nth-child(3) { grid-area: units; justify-self: end; }
-  .ov-table--rx .ov-table__row > :nth-child(4) { grid-area: due; justify-self: start; }
-  .ov-table--rx .ov-table__row > :nth-child(5) { grid-area: state; justify-self: end; }
-}
-/* Группа чипов держится вместе при переносе: ярлык «Страна» не отрывается от своих чипов. */
-.rx-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
-/* Кнопки отправки черновика — одной ширины: форма не заводит свою коробку. */
-.rx-send form { display: contents; }
 
 /* Раздел «Рейтинги» — свои стили в decimus-rt.css, подключаются только его шаблонами (D354). */
 

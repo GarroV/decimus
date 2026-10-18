@@ -116,7 +116,7 @@ Flask-приложение управляющей компании и партн
 <!-- map:begin files src/web/{action_plans,calendar_screen,calendar_view,country,country_page,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
-| `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
+| `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
 | `src/web/calendar_screen.py` | Раздел «Календарь» (D497): сетка месяца с проверками и поездками (D505, D506) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
 | `src/web/country.py` | Экран «Пиццерии» (прежде «Страна»): снимок страны и история пиццерии (D260, D262, D512) |
@@ -138,7 +138,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/methodology.py` | Раздел «Методика»: правка состава чек-листа той же дверью, что MCP и CLI |
 | `src/web/methodology_view.py` | Экран чек-листа (D197): отбор, группировка и соседи пункта |
 | `src/web/overview.py` | Экран «Обзор сети»: что показать и чем это взято |
-| `src/web/prescriptions.py` | Предписания в вебе: раздел УК и раздел партнёра (волна 3, D266, D270, D275) |
+| `src/web/prescriptions.py` | Предписания в вебе: вкладка «Предписания» раздела «Действия» (волна 3, D266, D270, D275, D526) |
 | `src/web/ratings.py` | Раздел «Рейтинги» (спека 2026-10-08) и подраздел «Загрузки» |
 | `src/web/ratings_calendar.py` | Период раздела «Рейтинги»: «‹ 2026 Q3 ›», по щелчку — календарь «с — по» |
 | `src/web/ratings_line.py` | График средних раздела «Рейтинги» (D396): линия по периодам рейтинга |
@@ -226,7 +226,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
 | `src/web/texts_model_key.py` | Тексты блока «Ключ модели» на вкладке «Подключения» (D491) |
 | `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках» |
-| `src/web/texts_plans.py` | Тексты экшн-планов (волна 2): раздел УК, раздел партнёра, блоки страны и карточки |
+| `src/web/texts_plans.py` | Тексты экшн-планов (волна 2) и раздела «Действия» (D526): вкладка, панель, блоки, карточки |
 | `src/web/texts_prescriptions.py` | Тексты предписаний (волна 3): раздел УК, раздел партнёра, блок экрана страны |
 | `src/web/texts_ratings.py` | Тексты раздела «Рейтинги» и подраздела «Загрузки» (спека 2026-10-08) |
 | `src/web/texts_refusals.py` | Тексты отказов раздела «Методика»: хранилище методики и формы экрана (#475) |
@@ -275,7 +275,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | Каталог | Файлов | Какие |
 |---|---|---|
 | `src/web/templates/` | 20 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _plan.html, _prescription.html, … (+12) |
-| `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
+| `src/web/templates/actions/` | 3 | index.html, prescription_form.html, refused.html |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 4 | _panel.html, _parts.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
@@ -284,8 +284,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
-| `src/web/templates/plans/` | 1 | index.html |
-| `src/web/templates/prescriptions/` | 3 | card.html, index.html, not_found.html |
+| `src/web/templates/prescriptions/` | 1 | not_found.html |
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
 | `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |

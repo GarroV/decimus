@@ -1,9 +1,10 @@
-"""Экшн-планы на экране: заслоны разделов, кто что может отправить, выдача файла.
+"""Экшн-планы на экране: заслоны записи, кто что может отправить, выдача файла.
 
-Ядро здесь — заслоны (D264, D284): раздел УК отказывает партнёру на каждом
-маршруте, а не только в панели; загрузка — только партнёру; файл — по охвату
-вошедшего и только вложением. Двери блока `db` подменены: что держит база,
-проверяет `tests/test_db_action_plans.py`.
+Ядро здесь — заслоны (D264, D284, D526): раздел «Действия» один у УК и партнёра,
+а запись УК (приём, срок, запрос) отказывает партнёру на каждом маршруте;
+загрузка — только партнёру; запрос и файл — по охвату вошедшего, файл только
+вложением. Двери блока `db` подменены: что держит база, проверяет
+`tests/test_db_action_plans.py`.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from datetime import UTC, date, datetime
 from typing import Any
+from urllib.parse import parse_qsl, urlsplit
 
 import pytest
 from flask.testing import FlaskClient
@@ -24,13 +26,22 @@ ORIGIN = {"Origin": "http://localhost"}
 ФАЙЛ = "22222222-2222-2222-2222-222222222222"
 
 
+def _куда(ответ: Any) -> tuple[str, dict[str, str]]:
+    """Адрес и параметры переадресации — порядок параметров ничего не значит."""
+    разбор = urlsplit(ответ.headers["Location"])
+    return разбор.path, dict(parse_qsl(разбор.query))
+
+
 def запрос(
-    *, status: str = "on_review", files: tuple[plans.PlanFile, ...] = ()
+    *,
+    status: str = "on_review",
+    files: tuple[plans.PlanFile, ...] = (),
+    country: str = "GE",
 ) -> plans.PlanRequest:
     return plans.PlanRequest(
         id=ЗАПРОС,
         inspection_id="33333333-3333-3333-3333-333333333333",
-        country="GE",
+        country=country,
         due_on=date(2026, 10, 11),
         status=status,
         origin="auto",
@@ -112,19 +123,17 @@ def партнёр(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[F
     yield from _стенд(monkeypatch, "GE")
 
 
-# --- раздел УК закрыт партнёру на каждом маршруте ---------------------------
+# --- запись УК закрыта партнёру на каждом маршруте --------------------------
 
-МАРШРУТЫ_УК = [
-    ("get", "/actions"),
-    ("get", f"/actions/requests/{ЗАПРОС}"),
+ЗАПИСЬ_УК = [
     ("post", f"/actions/requests/{ЗАПРОС}/review"),
     ("post", f"/actions/requests/{ЗАПРОС}/due"),
     ("post", "/actions/request"),
 ]
 
 
-@pytest.mark.parametrize(("метод", "адрес"), МАРШРУТЫ_УК)
-def test_раздел_уК_отказывает_партнёру_на_каждом_маршруте(
+@pytest.mark.parametrize(("метод", "адрес"), ЗАПИСЬ_УК)
+def test_запись_уК_отказывает_партнёру_на_каждом_маршруте(
     партнёр: FlaskClient, зовы: dict[str, list[Any]], метод: str, адрес: str
 ) -> None:
     # Act
@@ -137,31 +146,27 @@ def test_раздел_уК_отказывает_партнёру_на_каждо
     assert зовы["review"] == зовы["due"] == зовы["new"] == []
 
 
-@pytest.mark.parametrize(("метод", "адрес"), МАРШРУТЫ_УК)
-def test_второй_заслон_держит_и_без_флага_в_реестре(
+@pytest.mark.parametrize(("метод", "адрес"), ЗАПИСЬ_УК)
+def test_второй_заслон_держит_и_без_границы_пространств(
     партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch, метод: str, адрес: str
 ) -> None:
-    """Флаг `hq_only` сняли и границу пространств сломали — матрица всё равно отказывает."""
+    """Границу пространств по объявлениям сняли — матрица всё равно отказывает."""
     monkeypatch.setattr("src.web.app.refused_for", lambda *_: False)
-    # Граница пространств по объявлениям матрицы (F-004) закрыла бы раньше — 404;
-    # здесь проверяется следующий слой, поэтому она тоже снята.
     monkeypatch.setattr("src.web.guard.open_to_tenant", lambda *_: True)
     ответ = getattr(партнёр, метод)(адрес, data={"verdict": "accepted"}, headers=ORIGIN)
-    # Запись без права в матрице отказывает заслоном ещё до маршрута: 403;
-    # чтение закрытого раздела — 404.
-    assert ответ.status_code == (403 if метод == "post" else 404)
+    # Запись без права в матрице отказывает заслоном ещё до маршрута: 403.
+    assert ответ.status_code == 403
 
 
-def test_панель_партнёру_зовёт_в_экшн_планы_а_не_в_действия(партнёр: FlaskClient) -> None:
-    страница = партнёр.get("/plans").get_data(as_text=True)
-    assert 'href="/plans' in страница
-    assert 'href="/actions' not in страница
-
-
-def test_панель_уК_зовёт_в_действия_а_не_в_экшн_планы(уК: FlaskClient) -> None:
-    страница = уК.get("/actions").get_data(as_text=True)
+@pytest.mark.parametrize("клиент", ["уК", "партнёр"])
+def test_меню_обеих_сторон_зовёт_в_одни_действия(
+    клиент: str, request: pytest.FixtureRequest
+) -> None:
+    """D526: одно меню — «Действия»; пунктов «Экшн-планы» и «Предписания» у партнёра нет."""
+    страница = request.getfixturevalue(клиент).get("/actions").get_data(as_text=True)
     assert 'href="/actions' in страница
-    assert 'href="/plans?' not in страница and 'href="/plans"' not in страница
+    assert 'href="/plans' not in страница
+    assert 'href="/prescriptions' not in страница
 
 
 # --- раздел УК: очередь и вердикт -----------------------------------------
@@ -189,22 +194,21 @@ def test_очередь_по_умолчанию_только_открытые(у
 def test_партнёр_переключается_на_принятые(
     партнёр: FlaskClient, зовы: dict[str, list[Any]]
 ) -> None:
-    партнёр.get("/plans?accepted=1&lang=ru")
+    партнёр.get("/actions?accepted=1&lang=ru")
     assert зовы["list"][-1]["accepted"] is True
 
 
-@pytest.mark.parametrize("адрес", ["/actions?lang=ru", "/plans?lang=ru"])
+@pytest.mark.parametrize("tenant", ["HQ", "GE"])
 def test_обрезанный_список_сказан_на_экране(
-    адрес: str, monkeypatch: pytest.MonkeyPatch, зовы: Any
+    tenant: str, monkeypatch: pytest.MonkeyPatch, зовы: Any
 ) -> None:
-    tenant = "HQ" if адрес.startswith("/actions") else "GE"
     monkeypatch.setattr(
         plans,
         "list_requests",
         lambda **_: plans.PlanList(rows=(запрос(files=(ВЕРСИЯ,)),), truncated=True),
     )
     for client in _стенд(monkeypatch, tenant):
-        страница = client.get(адрес).get_data(as_text=True)
+        страница = client.get("/actions?lang=ru").get_data(as_text=True)
         assert f"Показаны первые {plans.LIST_LIMIT}" in страница
 
 
@@ -240,22 +244,116 @@ def test_ручной_запрос_ведёт_к_запросу(уК: FlaskClien
         headers=ORIGIN,
     )
     assert ответ.status_code == 303
-    assert ответ.headers["Location"].startswith(f"/actions/requests/{ЗАПРОС}")
+    assert ответ.headers["Location"].startswith(f"/actions?tab=plans&id={ЗАПРОС}")
     assert зовы["new"][0]["due_on"] == date(2030, 1, 15)
 
 
-# --- раздел партнёра: загрузка ------------------------------------------------
+# --- панель запроса: одна у обеих сторон, добавки по стороне -------------------
 
 
-def test_уК_в_разделе_партнёра_отправляется_в_свой(уК: FlaskClient) -> None:
-    ответ = уК.get("/plans")
+def test_панель_уК_даёт_приёмку_и_срок_а_загрузки_нет(уК: FlaskClient) -> None:
+    страница = уК.get(f"/actions?tab=plans&id={ЗАПРОС}&lang=ru").get_data(as_text=True)
+    assert f"/actions/requests/{ЗАПРОС}/review" in страница
+    assert f"/actions/requests/{ЗАПРОС}/due" in страница
+    assert "/upload" not in страница
+    assert "Batumi-1" in страница
+
+
+def test_панель_партнёра_даёт_загрузку_а_приёмки_и_срока_нет(
+    партнёр: FlaskClient, зовы: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ждём = запрос(status="requested", files=(ВЕРСИЯ,))
+    monkeypatch.setattr(plans, "get_request", lambda *_a, **_k: ждём)
+    страница = партнёр.get(f"/actions?tab=plans&id={ЗАПРОС}&lang=ru").get_data(as_text=True)
+    assert f"/actions/requests/{ЗАПРОС}/upload" in страница
+    assert "Загрузить файл плана" in страница
+    assert "/review" not in страница and "/due" not in страница
+    # Поле — не голая кнопка браузера, а зона дизайн-системы.
+    assert "supload" in страница
+
+
+def test_партнёр_видит_комментарий_возврата_и_версии(
+    партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        plans, "get_request", lambda *_a, **_k: запрос(status="requested", files=(ВЕРСИЯ,))
+    )
+    страница = партнёр.get(f"/actions?tab=plans&id={ЗАПРОС}&lang=ru").get_data(as_text=True)
+    assert "нет сроков" in страница
+    assert f"/actions/plan-files/{ФАЙЛ}" in страница
+
+
+def test_партнёр_не_открывает_чужой_запрос_по_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`?id=` не обходит охват: запрос страны AM партнёру GE — «не найдена», без сведений."""
+    чужой = запрос(country="AM", files=(ВЕРСИЯ,))
+    просмотры: list[Any] = []
+
+    def получить(request_id: str, *, reach: Any) -> Any:
+        просмотры.append(reach.countries)
+        return чужой if "AM" in reach.countries else None
+
+    monkeypatch.setattr(plans, "get_request", получить)
+    monkeypatch.setattr(plans, "list_requests", lambda **_: plans.PlanList((), False))
+    for клиент in _стенд(monkeypatch, "GE"):
+        ответ = клиент.get(f"/actions?tab=plans&id={ЗАПРОС}&lang=ru")
+        страница = ответ.get_data(as_text=True)
+        assert ответ.status_code == 200
+        assert "Запись не найдена" in страница
+        assert "Batumi-1" not in страница and "план.pdf" not in страница
+    assert просмотры == [("GE",)]
+
+
+def test_старый_адрес_партнёра_переадресует_в_действия(партнёр: FlaskClient) -> None:
+    ответ = партнёр.get("/plans?accepted=1&lang=ru")
     assert ответ.status_code == 303
-    assert ответ.headers["Location"].startswith("/actions")
+    assert _куда(ответ) == ("/actions", {"tab": "plans", "accepted": "1", "lang": "ru"})
+
+
+def test_старая_карточка_запроса_уК_переадресует_в_панель(уК: FlaskClient) -> None:
+    ответ = уК.get(f"/actions/requests/{ЗАПРОС}?lang=ru")
+    assert ответ.status_code == 303
+    assert _куда(ответ) == ("/actions", {"tab": "plans", "id": ЗАПРОС, "lang": "ru"})
+
+
+def test_старая_ссылка_на_файл_ведёт_на_новый_адрес(партнёр: FlaskClient) -> None:
+    ответ = партнёр.get(f"/plans/files/{ФАЙЛ}")
+    assert ответ.status_code == 303
+    assert ответ.headers["Location"] == f"/actions/plan-files/{ФАЙЛ}"
+
+
+def test_действие_из_панели_отвечает_только_панелью(
+    уК: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    """`split.js` шлёт форму фоном (`X-Panel`): страницы целиком быть не должно."""
+    ответ = уК.post(
+        f"/actions/requests/{ЗАПРОС}/review",
+        data={"verdict": "accepted"},
+        headers={**ORIGIN, "X-Panel": "1"},
+    )
+    страница = ответ.get_data(as_text=True)
+    assert ответ.status_code == 200
+    assert 'class="sdetail spanel' in страница
+    assert "<html" not in страница
+    assert "План принят." in страница
+
+
+def test_отказ_из_панели_остаётся_200_иначе_скрипт_примет_его_за_обрыв(
+    партнёр: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    ответ = партнёр.post(
+        f"/actions/requests/{ЗАПРОС}/upload",
+        data={},
+        headers={**ORIGIN, "X-Panel": "1"},
+        content_type="multipart/form-data",
+    )
+    assert ответ.status_code == 200
+    assert "Файл не выбран." in ответ.get_data(as_text=True)
+    assert зовы["upload"] == []
 
 
 def test_уК_версию_не_загружает(уК: FlaskClient, зовы: dict[str, list[Any]]) -> None:
     ответ = уК.post(
-        f"/plans/{ЗАПРОС}/upload",
+        f"/actions/requests/{ЗАПРОС}/upload",
         data={"file": (_файл(b"x"), "p.pdf")},
         headers=ORIGIN,
         content_type="multipart/form-data",
@@ -267,7 +365,7 @@ def test_уК_версию_не_загружает(уК: FlaskClient, зовы: 
 def test_партнёр_загружает_в_своём_охвате(партнёр: FlaskClient, зовы: dict[str, list[Any]]) -> None:
     # Act
     ответ = партнёр.post(
-        f"/plans/{ЗАПРОС}/upload",
+        f"/actions/requests/{ЗАПРОС}/upload",
         data={"file": (_файл(b"%PDF plan"), "план.pdf")},
         headers=ORIGIN,
         content_type="multipart/form-data",
@@ -286,7 +384,7 @@ def test_больше_предела_отказ_словами(
     monkeypatch.setenv("ATTACHMENT_MAX_MB", "1")
     клиент = next(_стенд(monkeypatch, "GE"))
     ответ = клиент.post(
-        f"/plans/{ЗАПРОС}/upload",
+        f"/actions/requests/{ЗАПРОС}/upload",
         data={"file": (_файл(b"x" * (2 * 1024 * 1024)), "big.pdf")},
         headers=ORIGIN,
         content_type="multipart/form-data",
@@ -296,17 +394,11 @@ def test_больше_предела_отказ_словами(
     assert зовы["upload"] == []
 
 
-def test_партнёр_видит_комментарий_возврата_и_форму(партнёр: FlaskClient) -> None:
-    страница = партнёр.get("/plans?lang=ru").get_data(as_text=True)
-    assert "нет сроков" in страница
-    assert f"/plans/files/{ФАЙЛ}" in страница
-
-
 # --- выдача файла ---------------------------------------------------------
 
 
 def test_чужой_файл_отвечает_404(партнёр: FlaskClient, зовы: dict[str, list[Any]]) -> None:
-    ответ = партнёр.get(f"/plans/files/{ФАЙЛ}")
+    ответ = партнёр.get(f"/actions/plan-files/{ФАЙЛ}")
     assert ответ.status_code == 404
     assert зовы["file"][0]["reach"].countries == ("GE",)
 
@@ -316,7 +408,7 @@ def test_файл_отдаётся_только_вложением(уК: FlaskCl
     monkeypatch.setattr(plans, "file_for_download", lambda *_a, **_k: ссылка)
     monkeypatch.setattr(plans, "fetch_file", lambda *_a, **_k: b"<script>1</script>")
 
-    ответ = уК.get(f"/plans/files/{ФАЙЛ}")
+    ответ = уК.get(f"/actions/plan-files/{ФАЙЛ}")
 
     assert ответ.status_code == 200
     assert ответ.mimetype == "application/octet-stream"

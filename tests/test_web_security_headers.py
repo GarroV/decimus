@@ -297,19 +297,19 @@ def _предписание(status: str) -> rx.Prescription:
 @pytest.mark.parametrize(
     ("tenant", "статус", "адрес"),
     [
-        ("HQ", "issued", "/actions/prescriptions"),
+        ("HQ", "issued", "/actions?tab=prescriptions"),
         ("HQ", "issued", "/actions/prescriptions/new?country=GE"),
-        ("HQ", "issued", f"/actions/prescriptions/{РАСПОРЯЖЕНИЕ}"),
+        ("HQ", "issued", f"/actions?tab=prescriptions&id={РАСПОРЯЖЕНИЕ}"),
         ("HQ", "draft", f"/actions/prescriptions/{РАСПОРЯЖЕНИЕ}/edit"),
-        ("GE", "issued", "/prescriptions"),
-        ("GE", "issued", f"/prescriptions/{РАСПОРЯЖЕНИЕ}"),
+        ("GE", "issued", "/actions?tab=prescriptions"),
+        ("GE", "issued", f"/actions?tab=prescriptions&id={РАСПОРЯЖЕНИЕ}"),
     ],
 )
 def test_предписания_несут_набор_и_без_встроенного_кода(
     monkeypatch: pytest.MonkeyPatch, tenant: str, статус: str, адрес: str
 ) -> None:
-    # Arrange — раздел УК «Действия → Предписания» и раздел партнёра; оба
-    # пришли после #489 и обязаны стоять под той же политикой.
+    # Arrange — «Действия → Предписания» у УК и у партнёра (D526); пришли после
+    # #489 и обязаны стоять под той же политикой.
     _заглушить_данные(monkeypatch)
     предписание = _предписание(статус)
     monkeypatch.setattr(

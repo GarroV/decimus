@@ -61,7 +61,7 @@
       {% if data.last %}
         <a class="btn" href="{{ url(registry_path ~ '/' ~ data.last.id) }}?lang={{ lang }}">{{ t('unit.last') }}</a>
       {% endif %}
-      <a class="btn is-wip" href="{{ url(plans_path) }}?lang={{ lang }}" title="{{ t('nav.wip') }}">{{ t('overview.assign') }}</a>
+      <a class="btn is-wip" href="{{ url(actions_path) }}?lang={{ lang }}" title="{{ t('nav.wip') }}">{{ t('overview.assign') }}</a>
     </div>
   </div>
 

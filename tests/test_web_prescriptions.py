@@ -1,8 +1,9 @@
-"""Предписания на экране: заслоны разделов, кто что может отправить, выдача файла (волна 3).
+"""Предписания на экране: заслоны записи, кто что может отправить, выдача файла (волна 3).
 
-Ядро здесь — заслоны (D264, D284): раздел УК отказывает партнёру на каждом
-маршруте, а не только в панели; ответ — только партнёру; чужое предписание и
-файл — тот же 404, что несуществующие. Двери блока `db` подменены: что держит
+Ядро здесь — заслоны (D264, D284, D526): раздел «Действия» один у УК и партнёра,
+а составление, отправка и закрытие — только УК и отказывают партнёру на каждом
+маршруте; ответ — только партнёру; чужое предписание и файл — тот же ответ, что
+у несуществующих. Двери блока `db` подменены: что держит
 база, проверяет `tests/test_db_prescriptions.py`.
 """
 
@@ -11,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from datetime import UTC, date, datetime
 from typing import Any
+from urllib.parse import parse_qsl, urlsplit
 
 import pytest
 from flask.testing import FlaskClient
@@ -108,10 +110,8 @@ def партнёр(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[F
 }
 
 МАРШРУТЫ_УК = [
-    ("get", "/actions/prescriptions"),
     ("get", "/actions/prescriptions/new?country=GE"),
     ("post", "/actions/prescriptions"),
-    ("get", f"/actions/prescriptions/{ИД}"),
     ("get", f"/actions/prescriptions/{ИД}/edit"),
     ("post", f"/actions/prescriptions/{ИД}/edit"),
     ("post", f"/actions/prescriptions/{ИД}/send"),
@@ -120,7 +120,7 @@ def партнёр(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[F
 
 
 @pytest.mark.parametrize(("метод", "адрес"), МАРШРУТЫ_УК)
-def test_раздел_уК_отказывает_партнёру_на_каждом_маршруте(
+def test_запись_уК_отказывает_партнёру_на_каждом_маршруте(
     партнёр: FlaskClient, зовы: dict[str, list[Any]], метод: str, адрес: str
 ) -> None:
     ответ = getattr(партнёр, метод)(адрес, data=ФОРМА, headers=ORIGIN)
@@ -129,71 +129,108 @@ def test_раздел_уК_отказывает_партнёру_на_каждо
 
 
 @pytest.mark.parametrize(("метод", "адрес"), МАРШРУТЫ_УК)
-def test_второй_заслон_держит_и_без_флага_в_реестре(
+def test_второй_заслон_держит_и_без_границы_пространств(
     партнёр: FlaskClient,
     зовы: dict[str, list[Any]],
     monkeypatch: pytest.MonkeyPatch,
     метод: str,
     адрес: str,
 ) -> None:
-    """Флаг `hq_only` сняли и границу пространств сломали — матрица всё равно отказывает."""
+    """Границу пространств по объявлениям сняли — матрица и сам маршрут всё равно отказывают."""
     monkeypatch.setattr("src.web.app.refused_for", lambda *_: False)
     # Граница пространств по объявлениям матрицы (F-004) закрыла бы раньше — 404;
     # здесь проверяется следующий слой, поэтому она тоже снята.
     monkeypatch.setattr("src.web.guard.open_to_tenant", lambda *_: True)
     ответ = getattr(партнёр, метод)(адрес, data=ФОРМА, headers=ORIGIN)
     # Запись без права в матрице отказывает заслоном ещё до маршрута: 403;
-    # чтение закрытого раздела — 404.
+    # форма УК отвечает партнёру 404 сама — раздел открыт, форма нет.
     assert ответ.status_code == (403 if метод == "post" else 404)
     assert зовы["create"] == зовы["update"] == зовы["close"] == зовы["issue"] == []
 
 
 def test_уК_ответ_за_партнёра_не_кладёт(уК: FlaskClient, зовы: dict[str, list[Any]]) -> None:
-    ответ = уК.post(f"/prescriptions/{ИД}/reply", data={"comment": "x"}, headers=ORIGIN)
+    ответ = уК.post(f"/actions/prescriptions/{ИД}/reply", data={"comment": "x"}, headers=ORIGIN)
     assert ответ.status_code == 403
     assert зовы["reply"] == []
 
 
-def test_уК_в_разделе_партнёра_уходит_в_свой(уК: FlaskClient) -> None:
-    assert уК.get("/prescriptions").headers["Location"].startswith("/actions/prescriptions")
-    assert (
-        уК.get(f"/prescriptions/{ИД}")
-        .headers["Location"]
-        .startswith(f"/actions/prescriptions/{ИД}")
+def _куда(ответ: Any) -> tuple[str, dict[str, str]]:
+    """Адрес и параметры переадресации — порядок параметров ничего не значит."""
+    разбор = urlsplit(ответ.headers["Location"])
+    return разбор.path, dict(parse_qsl(разбор.query))
+
+
+@pytest.mark.parametrize("клиент", ["уК", "партнёр"])
+def test_старые_адреса_предписаний_переадресуют_в_действия(
+    клиент: str, request: pytest.FixtureRequest
+) -> None:
+    стенд = request.getfixturevalue(клиент)
+    assert _куда(стенд.get("/prescriptions?closed=1&lang=ru")) == (
+        "/actions",
+        {"tab": "prescriptions", "closed": "1", "lang": "ru"},
     )
+    assert _куда(стенд.get(f"/prescriptions/{ИД}")) == (
+        "/actions",
+        {"tab": "prescriptions", "id": ИД},
+    )
+    assert _куда(стенд.get(f"/actions/prescriptions/{ИД}?lang=ru")) == (
+        "/actions",
+        {"tab": "prescriptions", "id": ИД, "lang": "ru"},
+    )
+    assert _куда(стенд.get("/actions/prescriptions")) == ("/actions", {"tab": "prescriptions"})
 
 
-def test_чужое_предписание_это_404(партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_старая_ссылка_на_файл_ответа_ведёт_на_новый_адрес(партнёр: FlaskClient) -> None:
+    ответ = партнёр.get(f"/prescriptions/files/{ОТВЕТ}")
+    assert ответ.status_code == 303
+    assert ответ.headers["Location"] == f"/actions/prescription-files/{ОТВЕТ}"
+
+
+def test_чужое_предписание_не_открывается_и_не_отвечает(
+    партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`?id=` не обходит охват: чужое, черновое и несуществующее — «не найдена», без сведений."""
     monkeypatch.setattr(rx, "get_prescription", lambda *_a, **_k: None)
-    нет = партнёр.get(f"/prescriptions/{ИД}?lang=ru")
-    assert нет.status_code == 404
+    нет = партнёр.get(f"/actions?tab=prescriptions&id={ИД}&lang=ru")
+    страница = нет.get_data(as_text=True)
+    assert нет.status_code == 200
+    assert "Запись не найдена" in страница
+    assert "<script>alert(1)</script>" not in страница
+    ответ = партнёр.post(
+        f"/actions/prescriptions/{ИД}/reply?lang=ru", data={"comment": "x"}, headers=ORIGIN
+    )
     # Отказ говорит о предписании и ведёт к предписаниям, а не к проверкам.
-    assert "Предписание не найдено" in нет.get_data(as_text=True)
-    assert 'href="/prescriptions?lang=ru"' in нет.get_data(as_text=True)
-    ответ = партнёр.post(f"/prescriptions/{ИД}/reply", data={"comment": "x"}, headers=ORIGIN)
-    assert ответ.status_code in (400, 404)
+    assert ответ.status_code == 404
+    assert "Предписание не найдено" in ответ.get_data(as_text=True)
+    assert 'href="/actions?tab=prescriptions&amp;lang=ru"' in ответ.get_data(as_text=True)
 
 
 def test_чужой_файл_это_404(партнёр: FlaskClient, зовы: dict[str, list[Any]]) -> None:
-    assert партнёр.get(f"/prescriptions/files/{ОТВЕТ}").status_code == 404
+    assert партнёр.get(f"/actions/prescription-files/{ОТВЕТ}").status_code == 404
     assert зовы["file"][-1]["reach"].tenant == "GE"
 
 
-def test_панель_партнёру_зовёт_в_предписания_а_не_в_действия(партнёр: FlaskClient) -> None:
-    страница = партнёр.get("/prescriptions?lang=ru").get_data(as_text=True)
-    assert 'href="/prescriptions' in страница
-    assert 'href="/actions' not in страница
+@pytest.mark.parametrize("клиент", ["уК", "партнёр"])
+def test_меню_обеих_сторон_зовёт_в_одни_действия(
+    клиент: str, request: pytest.FixtureRequest
+) -> None:
+    """D526: одно меню — «Действия»; пункта «Предписания» у партнёра нет."""
+    страница = request.getfixturevalue(клиент).get("/actions?tab=prescriptions").get_data(
+        as_text=True
+    )
+    assert 'href="/actions' in страница
+    assert 'href="/prescriptions' not in страница and 'href="/plans' not in страница
 
 
 def test_письмо_выводится_текстом_а_не_разметкой(партнёр: FlaskClient) -> None:
-    страница = партнёр.get(f"/prescriptions/{ИД}?lang=ru").get_data(as_text=True)
+    страница = партнёр.get(f"/actions?tab=prescriptions&id={ИД}&lang=ru").get_data(as_text=True)
     assert "<script>alert(1)</script>" not in страница
     assert "&lt;script&gt;" in страница
 
 
 def test_партнёр_отвечает_своим_охватом(партнёр: FlaskClient, зовы: dict[str, list[Any]]) -> None:
     ответ = партнёр.post(
-        f"/prescriptions/{ИД}/reply?lang=ru", data={"comment": "сделали"}, headers=ORIGIN
+        f"/actions/prescriptions/{ИД}/reply?lang=ru", data={"comment": "сделали"}, headers=ORIGIN
     )
     assert ответ.status_code == 200
     assert "Ответ сохранён" in ответ.get_data(as_text=True)
@@ -205,7 +242,7 @@ def test_ответ_на_закрытое_формы_не_показывает(
     партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(rx, "get_prescription", lambda *_a, **_k: предписание(status="closed"))
-    страница = партнёр.get(f"/prescriptions/{ИД}?lang=ru").get_data(as_text=True)
+    страница = партнёр.get(f"/actions?tab=prescriptions&id={ИД}&lang=ru").get_data(as_text=True)
     assert "Отправить ответ" not in страница
     assert "ответить на него уже нельзя" in страница
 
@@ -214,10 +251,33 @@ def test_ответ_на_закрытое_формы_не_показывает(
 
 
 def test_уК_видит_очередь_и_вкладки(уК: FlaskClient) -> None:
-    страница = уК.get("/actions/prescriptions?lang=ru").get_data(as_text=True)
+    страница = уК.get("/actions?tab=prescriptions&lang=ru").get_data(as_text=True)
     assert "Предписание · Грузия" in страница
     assert "Черновики · 0" in страница and "Просрочены · 0" in страница
-    assert 'href="/actions?lang=ru"' in страница, "вкладки «Экшн-планы» нет"
+    assert "tab=plans" in страница, "вкладки «Экшн-планы» нет"
+    assert "Новое предписание" in страница
+
+
+def test_партнёр_видит_те_же_вкладки_но_без_очереди_черновиков_и_кнопки_составления(
+    партнёр: FlaskClient,
+) -> None:
+    страница = партнёр.get("/actions?tab=prescriptions&lang=ru").get_data(as_text=True)
+    assert "Предписание · Грузия" in страница
+    assert "tab=plans" in страница
+    assert "Черновики" not in страница and "Новое предписание" not in страница
+
+
+def test_панель_уК_даёт_закрытие_а_ответа_нет(уК: FlaskClient) -> None:
+    страница = уК.get(f"/actions?tab=prescriptions&id={ИД}&lang=ru").get_data(as_text=True)
+    assert f"/actions/prescriptions/{ИД}/close" in страница
+    assert "/reply" not in страница
+
+
+def test_панель_партнёра_даёт_ответ_а_закрытия_нет(партнёр: FlaskClient) -> None:
+    страница = партнёр.get(f"/actions?tab=prescriptions&id={ИД}&lang=ru").get_data(as_text=True)
+    assert f"/actions/prescriptions/{ИД}/reply" in страница
+    assert "/close" not in страница and "/send" not in страница
+    assert "supload" in страница
 
 
 def test_форма_подставляет_адресатов_страны(уК: FlaskClient) -> None:
@@ -271,7 +331,7 @@ def test_сохранить_черновик_ведёт_на_карточку(у
         "/actions/prescriptions?lang=ru", data={**ФОРМА, "then": "save"}, headers=ORIGIN
     )
     assert ответ.status_code == 303
-    assert ответ.headers["Location"].startswith(f"/actions/prescriptions/{ИД}")
+    assert ответ.headers["Location"].startswith(f"/actions?tab=prescriptions&id={ИД}")
     черновик = зовы["create"][-1]["args"][0]
     assert (черновик.country, черновик.subject, черновик.unit_ids) == ("GE", "Тема", ())
 
@@ -289,11 +349,11 @@ def test_без_реквизитов_google_экран_говорит_слова
 def test_отправленное_нельзя_открыть_на_правку(уК: FlaskClient, зовы: dict[str, list[Any]]) -> None:
     ответ = уК.get(f"/actions/prescriptions/{ИД}/edit?lang=ru")
     assert ответ.status_code == 303
-    assert ответ.headers["Location"].endswith(f"/actions/prescriptions/{ИД}?lang=ru")
+    assert _куда(ответ) == ("/actions", {"tab": "prescriptions", "id": ИД, "lang": "ru"})
 
 
 def test_у_отправленного_нет_кнопки_в_gmail_а_есть_закрыть(уК: FlaskClient) -> None:
-    страница = уК.get(f"/actions/prescriptions/{ИД}?lang=ru").get_data(as_text=True)
+    страница = уК.get(f"/actions?tab=prescriptions&id={ИД}&lang=ru").get_data(as_text=True)
     assert "Положить в Gmail" not in страница and "Изменить черновик" not in страница
     assert "Закрыть предписание" in страница
 

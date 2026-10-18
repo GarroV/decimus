@@ -74,16 +74,15 @@ SECTIONS: tuple[Section, ...] = (
     # ── Проверки (D499) ──
     Section(key="overview", path="/overview", built=True, icon="home"),
     Section(key="registry", path="/inspections", built=True, icon="task"),
-    # Экшн-планы партнёра (волна 2, D263, D265): свои запросы и загрузка файла.
-    Section(key="plans", path="/plans", built=True, partner_only=True, icon="timeline"),
-    # Предписания партнёра (волна 3, D266): пришедшие предписания, срок,
-    # статус и ответ. У УК для них вкладка в «Действиях» (D264).
-    Section(key="orders", path="/prescriptions", built=True, partner_only=True, icon="flag"),
     # Сетка месяца с проверками по дням (D497); «Где нужно проверить» снят.
     Section(key="calendar", path="/calendar", built=True, icon="cal"),
-    # Действия УК (D264): очередь экшн-планов, приём и возврат. Имя рабочее —
-    # названия разделов прорабатываются в #462.
-    Section(key="actions", path="/actions", built=True, hq_only=True, icon="check"),
+    # «Действия» (D526): экшн-планы и предписания — один раздел у УК и партнёра,
+    # вкладки «Экшн-планы» и «Предписания», выбранная строка — в панели справа
+    # (D527). Раздел открыт обеим сторонам: объём сведений и кнопки решает охват и
+    # матрица прав (`plan.*`, `prescription.*`), а не флаг раздела. Были отдельные
+    # разделы партнёра `/plans` и `/prescriptions` (D263–D266): их адреса
+    # переадресуют сюда.
+    Section(key="actions", path="/actions", built=True, icon="check"),
     # ── Статистика (D499) ──
     # «Пиццерии» (D371, D508, D512; раньше «Страна»): пункт меню — у УК и у
     # партнёра, у партнёра — в пределах своих стран (охват, `auth.current_reach`).

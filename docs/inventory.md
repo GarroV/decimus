@@ -17,25 +17,29 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 159 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 161 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
 | `/` | GET | `home` | `src/web/app.py` |
 | `/.well-known/oauth-authorization-server` | GET | `oauth_metadata` | `src/web/oauth.py` |
-| `/actions` | GET | `actions` | `src/web/action_plans.py` |
+| `/actions` | GET | `actions` | `src/web/actions_screen.py` |
+| `/actions/plan-files/<file_id>` | GET | `plan_file` | `src/web/action_plans.py` |
+| `/actions/prescription-files/<reply_id>` | GET | `order_file` | `src/web/prescriptions.py` |
 | `/actions/prescriptions` | GET | `rx_list` | `src/web/prescriptions.py` |
 | `/actions/prescriptions` | POST | `rx_create` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>` | GET | `rx_view` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/close` | POST | `rx_close` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/edit` | GET | `rx_edit` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/edit` | POST | `rx_update` | `src/web/prescriptions.py` |
+| `/actions/prescriptions/<prescription_id>/reply` | POST | `order_reply` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/send` | POST | `rx_send` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/new` | GET | `rx_new` | `src/web/prescriptions.py` |
 | `/actions/request` | POST | `actions_new` | `src/web/action_plans.py` |
 | `/actions/requests/<request_id>` | GET | `actions_request` | `src/web/action_plans.py` |
 | `/actions/requests/<request_id>/due` | POST | `actions_due` | `src/web/action_plans.py` |
 | `/actions/requests/<request_id>/review` | POST | `actions_review` | `src/web/action_plans.py` |
+| `/actions/requests/<request_id>/upload` | POST | `plans_upload` | `src/web/action_plans.py` |
 | `/admin` | GET | `methodology` | `src/web/app.py` |
 | `/admin/bot/<code>` | POST | `methodology_bot` | `src/web/app.py` |
 | `/admin/checklists` | GET | `checklists` | `src/web/app.py` |
@@ -104,12 +108,10 @@
 | `/oauth/token` | POST | `oauth_token` | `src/web/oauth.py` |
 | `/overview` | GET | `overview` | `src/web/app.py` |
 | `/plans` | GET | `plans` | `src/web/action_plans.py` |
-| `/plans/<request_id>/upload` | POST | `plans_upload` | `src/web/action_plans.py` |
-| `/plans/files/<file_id>` | GET | `plan_file` | `src/web/action_plans.py` |
+| `/plans/files/<file_id>` | GET | `plan_file_legacy` | `src/web/action_plans.py` |
 | `/prescriptions` | GET | `orders` | `src/web/prescriptions.py` |
 | `/prescriptions/<prescription_id>` | GET | `order` | `src/web/prescriptions.py` |
-| `/prescriptions/<prescription_id>/reply` | POST | `order_reply` | `src/web/prescriptions.py` |
-| `/prescriptions/files/<reply_id>` | GET | `order_file` | `src/web/prescriptions.py` |
+| `/prescriptions/files/<reply_id>` | GET | `order_file_legacy` | `src/web/prescriptions.py` |
 | `/ratings` | GET | `ratings` | `src/web/ratings.py` |
 | `/ratings/aggregators/update` | POST | `ratings_agg_update` | `src/web/ratings.py` |
 | `/ratings/countries` | POST | `ratings_developer` | `src/web/ratings.py` |
