@@ -285,6 +285,7 @@ def собрать(
     trusted_proxies: int | None = None,
     webauthn_rp_id: str | None = None,
     webauthn_origin: str | None = None,
+    demo: bool = False,
 ) -> Flask:
     """Приложение с настройками стенда набора. Публичные адреса включают OAuth (D417)."""
     app = create_app(
@@ -299,6 +300,7 @@ def собрать(
             mcp_public_url=mcp_public_url,
             webauthn_rp_id=webauthn_rp_id,
             webauthn_origin=webauthn_origin,
+            demo=demo,
             **({} if trusted_proxies is None else {"trusted_proxies": trusted_proxies}),
         )
     )
