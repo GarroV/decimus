@@ -1762,10 +1762,10 @@ D391) — так же: миграций нет, право — уже выдан
 | Сборка | `docker-compose.yml` + `docker-compose.prod.yml` + `deploy/demo/compose.demo.yaml` |
 | Настройки | `/srv/decimus-demo/.env` (вне git): свои пароли ролей базы, `WEB_SECRET_KEY`, `AUDIT_DATA_DIR=./demo/data`, `S3_*` на `http://storage:9090`, `WEB_TRUSTED_PROXY_ADDR` — подсеть `edge-decimus` |
 | Кадры для посева | `/srv/decimus-demo-photos` — снимки Белграда-1 и -2 без метаданных (вне git: репозиторий публичный) |
-| Сброс | `deploy/demo/reset.sh`: тома `pgdata`, `state`, `methodology` заново → миграции → `tools/seed_open_demo.py` → подъём. Cron раз в час |
+| Сброс | `deploy/demo/reset.sh`: тома `pgdata`, `state`, `methodology` заново → миграции → `tools/seed_open_demo.py` → подъём, около минуты. Cron пользователя `garva`: `17 * * * *`, лог `~/decimus-demo-reset.log` |
 | Обновление кода | `deploy/demo/update.sh`: `git pull`, сборка, сброс |
-| Caddy | `vps-infra` `edge/sites/decimus-demo.caddy`: сайт без ключа фронта, заголовки фронта срезаются (как у стенда §8.11) |
-| Адрес | Worker `decimus-demo` (`front/deploy.sh demo`, шаблон `front/wrangler.demo.template.jsonc`, `DEMO_ORIGIN_HOST` в `front/.deploy.env`) |
+| Caddy | `vps-infra` `edge/sites/decimus-demo.caddy` (`demo-decimus.95-111-249-216.sslip.io` → `decimus-demo-web:8267`): сайт без ключа фронта, заголовки фронта срезаются (как у стенда §8.11) |
+| Адрес | https://decimus-demo.vasiliy-garro.workers.dev — Worker `decimus-demo` (`front/deploy.sh demo`, шаблон `front/wrangler.demo.template.jsonc`, `DEMO_ORIGIN_HOST` в `front/.deploy.env`). Секрет `FRONT_KEY` свой, случайный (без него Worker отвечает 503): `openssl rand -hex 32 \| npx wrangler secret put FRONT_KEY --name decimus-demo` |
 
 На проде `WEB_DEMO_URL` — адрес Worker'а демо: по нему кнопка «Открыть демо» на
 посадочной странице.
