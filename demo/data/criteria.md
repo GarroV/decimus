@@ -93,3 +93,58 @@ D1:
 D2:
 - The handwashing sink has no soap, no paper towels, or no hot water at all
 - The handwashing sink is blocked by equipment or storage and cannot be used
+
+## DEM11
+
+D1:
+- Light carbon or crumbs on the conveyor belt or under it
+- Grease marks on the hood that wipe off
+
+D2:
+- Thick burnt-on layer on the belt, rollers or oven floor
+- Rust-coloured streaks or grease dripping near the loading window
+
+## DEM12
+
+D1:
+- Food debris or grime around fixings of one piece of equipment
+- Equipment left uncovered during a short break
+
+D2:
+- Leftover food inside a mixer bowl or on a sealer ring
+- Several pieces of equipment dirty at the same time
+
+## DEM13
+
+D1:
+- Dust and debris in a corner or along a threshold
+- Streaks along the aisle that were not mopped since morning
+
+D2:
+- Debris trapped in gaps behind equipment that cannot be reached for cleaning
+- Dirty floor across most of the zone
+
+## DEM14
+
+D1:
+- Scuffs, rub marks or dirt on a wall or skirting board
+
+## DEM15
+
+D1:
+- Crumbs left on benches or sofas in several places
+
+## DEM16
+
+D0:
+- Record only: photo of the oven display with bake time and temperature.
+
+## DEM17
+
+D0:
+- Record only: readings of refrigerated tables and freezers.
+
+## DEM18
+
+D0:
+- Record only: photos of a test order, a delivery or the display. No deduction.
