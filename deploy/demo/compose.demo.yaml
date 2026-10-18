@@ -33,8 +33,11 @@ services:
     environment:
       WEB_WALK_PREVIEW_CHAT: "999000000701"
       WEB_DEMO: "1"
+  db:
+    ports: !override []
   storage:
     profiles: !reset []
+    ports: !override []
   seed:
     build:
       context: .
