@@ -1,0 +1,33 @@
+{# Список экшн-планов: пиццерия, страна, буква, проверка, срок, состояние (D526). #}
+{% from "_plan.html" import state_tag with context %}
+{% macro plans_list() %}
+  <div class="slist slist--actions slist--plans">
+    {% if rows %}
+      <div class="slist__head" aria-hidden="true">
+        <span></span>
+        <span>{{ t('actions.col.unit') }}</span>
+        <span>{{ t('actions.col.country') }}</span>
+        <span class="is-num">{{ t('actions.col.inspection') }}</span>
+        <span class="is-num">{{ t('actions.col.due') }}</span>
+        <span>{{ t('actions.col.state') }}</span>
+      </div>
+      <ul class="slist__rows">
+        {% for r in rows %}
+          {% set current = split_open and picked == r.id %}
+          <li>
+            <a class="srow{% if current %} is-current{% endif %}" href="{{ select_url(id=r.id) }}"{% if current %} aria-current="true"{% endif %}>
+              <span class="grade tag {{ grade_tone(r.grade or '') }} srow__grade">{{ r.grade or '—' }}</span>
+              <span class="srow__main"><b>{{ r.unit_name }}</b></span>
+              <span class="srow__cell srow__country">{{ (country_title(r.country) or r.country) if r.country else '—' }}</span>
+              <span class="srow__cell mono is-num srow__date" data-label="{{ t('actions.col.inspection') }}">{{ r.inspection_date }}</span>
+              <span class="srow__cell mono is-num srow__due{% if r.overdue(today) %} srow__err{% endif %}" data-label="{{ t('actions.col.due') }}">{{ r.due_on }}</span>
+              <span class="srow__cell srow__state">{{ state_tag(r, today) }}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="sempty"><p class="sempty__title">{{ t(empty_key) }}</p></div>
+    {% endif %}
+  </div>
+{% endmacro %}

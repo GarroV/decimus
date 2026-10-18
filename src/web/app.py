@@ -60,6 +60,7 @@ from src.report.info_titles import FOUND
 
 from . import (
     action_plans,
+    actions_screen,
     assets,
     auth,
     calendar_screen,
@@ -143,8 +144,6 @@ SCREENS = (
     "users",
     "settings",
     "actions",
-    "plans",
-    "orders",
     "calendar",
 )
 
@@ -215,6 +214,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_registry(app, conf)
     calendar_screen.install(app, conf)
     letter_draft.install(app, conf)
+    actions_screen.install(app, conf)
     action_plans.install(app, conf)
     users_screen.install(app, conf)
     settings_screen.install(app, conf)
@@ -571,7 +571,7 @@ def _register_units(app: Flask, conf: Settings) -> None:
             level_tone=view.level_tone,
             overview_path=section("overview").path,
             registry_path=section("registry").path,
-            plans_path=section("plans").path,
+            actions_path=section("actions").path,
             item_titles=_item_titles(conf, lang),
         )
 
@@ -1451,10 +1451,11 @@ def _card_context(
     return dict(
         plan=план,
         plan_known=план_известен,
+        # Запрос открывается панелью «Действий» (D527) — у УК и у партнёра тем же адресом.
         plan_link=(
-            f"{section('actions').path}/requests/{план.id}"
-            if план is not None and action_plans.is_hq()
-            else section("plans").path
+            f"{section('actions').path}?tab=plans&id={план.id}"
+            if план is not None
+            else section("actions").path
         ),
         plan_today=action_plans.today(),
         plan_state_tones=action_plans.STATE_TONES,

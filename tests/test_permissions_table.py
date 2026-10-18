@@ -18,7 +18,8 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
 
 ВИДЫ_ВСЕ = {f"view.{s.key}" for s in SECTIONS if s.key not in OWN_SECTIONS}
 # «Страна» открыта и партнёру (D508): экран пиццерии, в пределах его стран.
-ВИДЫ_ПАРТНЁРА = ВИДЫ_ВСЕ - {"view.actions"}
+# «Действия» — один раздел у УК и партнёра (D526): разделов «только УК» среди видов нет.
+ВИДЫ_ПАРТНЁРА = ВИДЫ_ВСЕ
 
 РАБОТА_УК = {
     "inspection.read",

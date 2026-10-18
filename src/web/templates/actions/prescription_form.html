@@ -6,7 +6,7 @@
 {% block title %}{{ t('section.actions.title') }} · {{ t('rx.form.title_edit') if current else t('rx.form.title_new') }}{% endblock %}
 
 {% block body %}
-  <a class="cn-back" href="{{ url(rx_hq_path ~ ('/' ~ current.id if current else '')) }}?lang={{ lang }}">‹ {{ t('actions.tab.prescriptions') }}</a>
+  <a class="cn-back" href="{{ url(actions_path) }}?tab=prescriptions{% if current %}&amp;id={{ current.id }}{% endif %}&amp;lang={{ lang }}">‹ {{ t('actions.tab.prescriptions') }}</a>
   <div class="ov-head">
     <div class="ov-head__main">
       <div class="ov-head__kicker">{{ (country_title(country) or country) if country else t('rx.form.kicker') }}</div>
@@ -20,7 +20,7 @@
     <div class="ov-filters">
       <span class="ov-filters__label">{{ t('rx.form.country') }}</span>
       {% for code, _n in countries %}
-        <a class="ov-chip{% if code == country %} is-on{% endif %}" href="{{ url(rx_hq_path ~ '/new') }}?country={{ code }}&amp;lang={{ lang }}">{{ country_title(code) or code }}</a>
+        <a class="ov-chip{% if code == country %} is-on{% endif %}" href="{{ url(rx_base ~ '/new') }}?country={{ code }}&amp;lang={{ lang }}">{{ country_title(code) or code }}</a>
       {% endfor %}
     </div>
   {% endif %}
@@ -29,7 +29,7 @@
     <section class="ov-card ov-card--wide"><div class="ov-card__empty">{{ t('rx.form.pick_country') }}</div></section>
   {% else %}
     <form method="post" class="ov-card ov-card--wide rx-form"
-          action="{{ url(rx_hq_path ~ ('/' ~ current.id ~ '/edit' if current else '')) }}?lang={{ lang }}">
+          action="{{ url(rx_base ~ ('/' ~ current.id ~ '/edit' if current else '')) }}?lang={{ lang }}">
       <input type="hidden" name="country" value="{{ country }}">
       <div class="card__body form-grid">
         <fieldset class="field field--wide rx-pick">

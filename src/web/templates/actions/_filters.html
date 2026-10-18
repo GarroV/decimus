@@ -1,0 +1,26 @@
+{#
+  Полоса отбора над списком «Действий» — одна на обе вкладки. Параметры вкладки
+  (какие очереди, как зовётся архив) приходят из её `screen`: открытые / архив,
+  очереди (ждут приёмки, просрочены…), страна. Всё — ссылки: выбор живёт в адресе.
+#}
+{% macro filter_bar() %}
+  <div class="sbar sbar--actions">
+    <a class="spill spill--check{% if not archive %} is-on{% endif %}" href="{{ select_url(**{archive_param: '', 'queue': ''}) }}">{{ t(open_key) }}</a>
+    <a class="spill spill--check{% if archive %} is-on{% endif %}" href="{{ select_url(**{archive_param: '1', 'queue': ''}) }}">{{ t(archive_key) }}</a>
+    {% if not archive and queues %}
+      <span class="sbar__gap" aria-hidden="true"></span>
+      {% for key, text, n in queues %}
+        <a class="spill spill--check{% if queue == key %} is-on{% endif %}" href="{{ select_url(queue='' if queue == key else key) }}">{{ t(text, n=n) }}</a>
+      {% endfor %}
+    {% endif %}
+    {% if countries|length > 1 %}
+      <span class="sbar__gap" aria-hidden="true"></span>
+      <span class="sbar__label">{{ t('actions.country') }}</span>
+      <a class="spill spill--check{% if not country %} is-on{% endif %}" href="{{ select_url(country='') }}">{{ t('actions.all_countries') }}</a>
+      {% for code in countries %}
+        <a class="spill spill--check{% if code == country %} is-on{% endif %}" href="{{ select_url(country=code) }}">{{ country_title(code) or code }}</a>
+      {% endfor %}
+    {% endif %}
+    <span class="sbar__count">{{ rows|length }}</span>
+  </div>
+{% endmacro %}

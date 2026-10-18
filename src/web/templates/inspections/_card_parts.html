@@ -76,7 +76,7 @@
        Без запроса и без права запросить кнопки нет (D217). #}
     {% if c.plan %}
       {% set plan_label = t('card.plan.title') ~ ' · ' ~ t('plans.state.' ~ c.plan.state) ~ ((' · ' ~ t('plans.overdue')) if c.plan.overdue(c.plan_today) else '') %}
-      {{ _link(url(c.plan_link) ~ '?lang=' ~ lang, 'task', plan_label, panel, tone=('hbtn--err' if c.plan.overdue(c.plan_today) else ''), hint=t('actions.request.due', due=c.plan.due_on), short=t('card.act.plan')) }}
+      {{ _link(url(c.plan_link) ~ ('&lang=' if '?' in c.plan_link else '?lang=') ~ lang, 'task', plan_label, panel, tone=('hbtn--err' if c.plan.overdue(c.plan_today) else ''), hint=t('actions.request.due', due=c.plan.due_on), short=t('card.act.plan')) }}
     {% elif c.plan_known and not c.plan_no_country and c.may_request_plan %}
       {% call _pop('plan', 'task', t('card.plan.title'), '', panel, short=t('card.act.plan')) %}
         <p class="field-note">{{ t('card.plan.request_hint_needed') if c.plan_needed else t('card.plan.request_hint') }}</p>

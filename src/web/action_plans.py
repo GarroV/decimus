@@ -1,12 +1,13 @@
-"""Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274).
+"""Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526).
 
-Два раздела, а не один с кнопками по ролям (D264): заслон стоит на раздел
-целиком. `/actions` — только пространству УК (`hq_only` в реестре,
-`before_request`), и каждый маршрут раздела ещё раз сверяет это сам: скрытие
-пункта в панели — не защита, и забытый в реестре флаг не должен открывать
-приём планов партнёру. `/plans` — партнёру: свои страны по охвату (D284),
-загрузка версии. Скачать версию могут свои страны и УК — по охвату, чужой
-файл отвечает тем же 404, что несуществующий.
+Раздел один у УК и партнёра (D526): список и панель выбранного запроса — экран
+`actions_screen`, здесь данные вкладки и записи. Что видит и может каждый,
+решают охват и матрица прав, а не раздел: запросы читаются только в охвате
+вошедшего (D284), приём, возврат, срок и запрос — `plan.manage`, и каждый такой
+маршрут ещё раз сверяет УК сам (`_require_hq`): забытый флаг не должен открывать
+приём планов партнёру; загрузка версии — `plan.submit`, партнёру. Скачать версию
+могут свои страны и УК — по охвату, чужой файл отвечает тем же 404, что
+несуществующий.
 
 Писем, сообщений в бот и уведомлений нет (правило владельца): партнёр видит
 запрос на экране, который открывает сам.
@@ -19,7 +20,6 @@ import logging
 from collections.abc import Mapping
 from datetime import date
 from typing import Any
-from urllib.parse import urlencode
 
 from flask import Flask, abort, redirect, render_template, request, send_file, url_for
 from flask import Response as FlaskResponse
@@ -31,7 +31,8 @@ from src.db.config import load_action_plan_settings
 from src.db.errors import ActionPlanError, DbError, StorageError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import auth, guard, ui_lang
+from . import actions_screen, auth, guard, ui_lang, view
+from .actions_screen import TAB_PLANS
 from .config import Settings
 from .origin import refuse_foreign_origin
 from .sections import section
@@ -125,33 +126,32 @@ def _parse_date(raw: str) -> date | None:
 
 
 def install(app: Flask, conf: Settings) -> None:
-    """Повесить маршруты обоих разделов. Настройки читаются на сборке: мусор — отказ сразу."""
+    """Повесить маршруты вкладки. Настройки читаются на сборке: мусор — отказ сразу."""
     max_bytes = load_action_plan_settings().max_bytes
+    actions_screen.register(
+        app,
+        TAB_PLANS,
+        actions_screen.Tab(
+            screen=lambda lang: screen_context(lang),
+            panel=lambda item_id, **outcome: panel_context(item_id, max_bytes=max_bytes, **outcome),
+            missing=lambda: (render_template("inspections/not_found.html"), 404),
+        ),
+    )
     _install_hq(app, conf)
     _install_partner(app, conf, max_bytes=max_bytes)
-
-
-def _accepted() -> bool:
-    """Показать принятые вместо открытых — `?accepted=1`."""
-    return request.args.get("accepted") == "1"
+    _install_legacy(app)
 
 
 def _lang(conf: Settings) -> str:
     return ui_lang.request_lang(conf.ui_lang)
 
 
-def _common(lang: str) -> dict[str, Any]:
-    return {
-        "today": plans.today(),
-        "state_tones": STATE_TONES,
-        "actions_path": section("actions").path,
-        "plans_path": section("plans").path,
-        "registry_path": section("registry").path,
-    }
+def _files_path() -> str:
+    return section("actions").path + "/plan-files"
 
 
 def _require_hq() -> None:
-    """Второй заслон раздела УК — на самом маршруте (первый — `before_request`)."""
+    """Второй заслон записей УК — на самом маршруте (первый — матрица прав)."""
     if not is_hq():
         abort(404)
 
@@ -161,60 +161,112 @@ def _actor() -> str:
     return вошедший.login if вошедший else ""
 
 
-# ── Раздел УК ───────────────────────────────────────────────────────────────
+def _respond(
+    conf: Settings,
+    request_id: str,
+    *,
+    notice: str | None = None,
+    failure: str | None = None,
+    status: int = 200,
+) -> str | tuple[str, int]:
+    return actions_screen.respond(
+        conf, TAB_PLANS, item_id=request_id, notice=notice, failure=failure, status=status
+    )
+
+
+# ── Данные вкладки ──────────────────────────────────────────────────────────
+
+
+def screen_context(lang: str) -> dict[str, Any]:
+    """Список запросов и полоса отбора — одни у УК и партнёра, охват решает объём (D526)."""
+    страна = (request.args.get("country") or "").strip().upper()[:2]
+    очередь = (request.args.get("queue") or "").strip()
+    очередь = очередь if очередь in QUEUES else ""
+    принятые = request.args.get("accepted") == "1"
+    список = plans.list_requests(reach=auth.current_reach(), accepted=принятые)
+    сегодня = plans.today()
+    все = список.rows
+    страны = tuple(sorted({r.country for r in все if r.country}))
+    в_стране = tuple(r for r in все if not страна or r.country == страна)
+    на_приёмке = tuple(r for r in в_стране if r.status == plans.STATUS_ON_REVIEW)
+    просрочены = tuple(r for r in в_стране if r.overdue(сегодня))
+    строки = {QUEUE_REVIEW: на_приёмке, QUEUE_OVERDUE: просрочены}.get(очередь, в_стране)
+
+    def отбор(**изменения: str) -> str:
+        параметры = {
+            "tab": TAB_PLANS,
+            "country": страна,
+            "queue": очередь,
+            "accepted": "1" if принятые else "",
+            "lang": lang,
+            **изменения,
+        }
+        return url_for("actions", **{к: з for к, з in параметры.items() if з})
+
+    return {
+        "rows": строки,
+        "countries": страны,
+        "country": страна,
+        "queue": очередь,
+        "queues": (
+            (QUEUE_REVIEW, "actions.queue.review", len(на_приёмке)),
+            (QUEUE_OVERDUE, "actions.queue.overdue", len(просрочены)),
+        ),
+        "archive": принятые,
+        "archive_param": "accepted",
+        "open_key": "plans.show_open",
+        "archive_key": "plans.show_accepted",
+        "list_title_key": "actions.list.title",
+        "empty_key": "plans.accepted_empty" if принятые else "actions.list.empty",
+        "truncated": список.truncated,
+        "truncated_key": "plans.truncated",
+        "limit": plans.LIST_LIMIT,
+        "total": len(в_стране),
+        "select_url": отбор,
+        "today": сегодня,
+        "state_tones": STATE_TONES,
+        "grade_tone": view.grade_tone,
+    }
+
+
+def panel_context(
+    request_id: str,
+    *,
+    max_bytes: int,
+    notice: str | None = None,
+    failure: str | None = None,
+    gmail: str = "",
+) -> dict[str, Any]:
+    """Панель запроса: сам запрос в охвате вошедшего и то, что на нём можно делать."""
+    запрос = None
+    не_прочитан = False
+    try:
+        запрос = plans.get_request(request_id, reach=auth.current_reach())
+    except DbError as exc:
+        logger.warning("запрос экшн-плана %s не прочитан: %s", request_id, exc)
+        не_прочитан = True
+    return {
+        "item": запрос,
+        "failed": не_прочитан,
+        "notice": notice,
+        "failure": failure,
+        "gmail": "",
+        "hq": is_hq(),
+        "max_mb": max_bytes // (1024 * 1024),
+        "today": plans.today(),
+        "state_tones": STATE_TONES,
+        "grade_tone": view.grade_tone,
+        "plan_files_path": _files_path(),
+        "actions_path": section("actions").path,
+        "registry_path": section("registry").path,
+    }
+
+
+# ── Запись УК ───────────────────────────────────────────────────────────────
 
 
 def _install_hq(app: Flask, conf: Settings) -> None:
     путь = section("actions").path
-
-    @app.get(путь, endpoint="actions")
-    def actions() -> str:
-        _require_hq()
-        lang = _lang(conf)
-        страна = (request.args.get("country") or "").strip().upper()[:2]
-        очередь = (request.args.get("queue") or "").strip()
-        очередь = очередь if очередь in QUEUES else ""
-        принятые = _accepted()
-        список = plans.list_requests(reach=auth.current_reach(), accepted=принятые)
-        все = список.rows
-        сегодня = plans.today()
-        страны = tuple(sorted({r.country for r in все if r.country}))
-        в_стране = tuple(r for r in все if not страна or r.country == страна)
-        на_приёмке = tuple(r for r in в_стране if r.status == plans.STATUS_ON_REVIEW)
-        просрочены = tuple(r for r in в_стране if r.overdue(сегодня))
-        строки = {QUEUE_REVIEW: на_приёмке, QUEUE_OVERDUE: просрочены}.get(очередь, в_стране)
-
-        def отбор(**изменения: str) -> str:
-            параметры = {
-                "country": страна,
-                "queue": очередь,
-                "accepted": "1" if принятые else "",
-                "lang": lang,
-                **изменения,
-            }
-            живые = {к: з for к, з in параметры.items() if з}
-            return url_for("actions") + (f"?{urlencode(живые)}" if живые else "")
-
-        return render_template(
-            "actions/index.html",
-            rows=строки,
-            countries=страны,
-            country=страна,
-            queue=очередь,
-            on_review=len(на_приёмке),
-            overdue=len(просрочены),
-            total=len(в_стране),
-            accepted=принятые,
-            truncated=список.truncated,
-            limit=plans.LIST_LIMIT,
-            select_url=отбор,
-            **_common(lang),
-        )
-
-    @app.get(f"{путь}/requests/<request_id>", endpoint="actions_request")
-    def actions_request(request_id: str) -> str | tuple[str, int]:
-        _require_hq()
-        return _render_request(request_id, conf=conf, notice=None, failure=None)
 
     @app.post(f"{путь}/requests/<request_id>/review")
     @guard.action("plan.manage")
@@ -231,11 +283,9 @@ def _install_hq(app: Flask, conf: Settings) -> None:
                 comment=request.form.get("comment") or "",
             )
         except ActionPlanError as exc:
-            return _render_request(
-                request_id, conf=conf, notice=None, failure=t("plans.failed", lang, reason=exc)
-            )
+            return _respond(conf, request_id, failure=t("plans.failed", lang, reason=exc))
         notice = "plans.accepted" if вердикт == plans.VERDICT_ACCEPTED else "plans.returned"
-        return _render_request(request_id, conf=conf, notice=t(notice, lang), failure=None)
+        return _respond(conf, request_id, notice=t(notice, lang))
 
     @app.post(f"{путь}/requests/<request_id>/due")
     @guard.action("plan.manage")
@@ -249,10 +299,8 @@ def _install_hq(app: Flask, conf: Settings) -> None:
                 raise ActionPlanError(t("plans.bad_date", lang))
             plans.set_due(request_id, actor=_actor(), due_on=срок)
         except ActionPlanError as exc:
-            return _render_request(
-                request_id, conf=conf, notice=None, failure=t("plans.failed", lang, reason=exc)
-            )
-        return _render_request(request_id, conf=conf, notice=t("plans.due_set", lang), failure=None)
+            return _respond(conf, request_id, failure=t("plans.failed", lang, reason=exc))
+        return _respond(conf, request_id, notice=t("plans.due_set", lang))
 
     @app.post(f"{путь}/request")
     @guard.action("plan.manage")
@@ -271,41 +319,18 @@ def _install_hq(app: Flask, conf: Settings) -> None:
                 "actions/refused.html",
                 failure=t("plans.failed", lang, reason=exc),
                 inspection_id=проверка,
-                **_common(lang),
+                registry_path=section("registry").path,
             ), 400
-        return redirect(url_for("actions_request", request_id=новый, lang=lang), code=303)
+        return redirect(actions_screen.panel_link(TAB_PLANS, новый, lang=lang), code=303)
 
 
-def _render_request(
-    request_id: str, *, conf: Settings, notice: str | None, failure: str | None
-) -> str | tuple[str, int]:
-    lang = _lang(conf)
-    запрос = plans.get_request(request_id, reach=auth.current_reach())
-    if запрос is None:
-        return render_template("inspections/not_found.html"), 404
-    return render_template(
-        "actions/request.html",
-        r=запрос,
-        notice=notice,
-        failure=failure,
-        **_common(lang),
-    )
-
-
-# ── Раздел партнёра ────────────────────────────────────────────────────────
+# ── Запись партнёра и файлы ─────────────────────────────────────────────────
 
 
 def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
-    путь = section("plans").path
+    путь = section("actions").path
 
-    @app.get(путь, endpoint="plans")
-    def plans_index() -> Response | str:
-        if is_hq():
-            # У УК свой раздел (D264): здесь ему нечего загружать.
-            return redirect(url_for("actions", lang=_lang(conf)), code=303)
-        return _render_partner(conf, max_bytes=max_bytes, notice=None, failure=None)
-
-    @app.post(f"{путь}/<request_id>/upload")
+    @app.post(f"{путь}/requests/<request_id>/upload")
     @guard.action("plan.submit")
     def plans_upload(request_id: str) -> str | tuple[str, int]:
         if is_hq():
@@ -318,13 +343,11 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
         try:
             файл = request.files.get("file")
         except RequestEntityTooLarge:
-            return _render_partner(
-                conf, max_bytes=max_bytes, notice=None, failure=t("plans.too_big", lang, mb=мб)
-            ), 413
+            return _respond(
+                conf, request_id, failure=t("plans.too_big", lang, mb=мб), status=413
+            )
         if файл is None or not файл.filename:
-            return _render_partner(
-                conf, max_bytes=max_bytes, notice=None, failure=t("plans.no_file", lang)
-            ), 400
+            return _respond(conf, request_id, failure=t("plans.no_file", lang), status=400)
         try:
             версия = plans.upload_version(
                 request_id,
@@ -337,26 +360,16 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
                 max_bytes=max_bytes,
             )
         except ActionPlanError as exc:
-            return _render_partner(
-                conf,
-                max_bytes=max_bytes,
-                notice=None,
-                failure=t("plans.failed", lang, reason=exc),
-            ), 400
+            return _respond(
+                conf, request_id, failure=t("plans.failed", lang, reason=exc), status=400
+            )
         except StorageError as exc:
             # Текст хранилища называет корзину и ключ — партнёру он ни к чему.
             logger.warning("файл плана к запросу %s не лёг в хранилище: %s", request_id, exc)
-            return _render_partner(
-                conf, max_bytes=max_bytes, notice=None, failure=t("plans.storage_down", lang)
-            ), 503
-        return _render_partner(
-            conf,
-            max_bytes=max_bytes,
-            notice=t("plans.uploaded", lang, version=версия),
-            failure=None,
-        )
+            return _respond(conf, request_id, failure=t("plans.storage_down", lang), status=503)
+        return _respond(conf, request_id, notice=t("plans.uploaded", lang, version=версия))
 
-    @app.get(f"{путь}/files/<file_id>", endpoint="plan_file")
+    @app.get(f"{путь}/plan-files/<file_id>", endpoint="plan_file")
     def plan_file(file_id: str) -> FlaskResponse | tuple[str, int]:
         """Версия плана — вложением, своей стране и УК. Чужой файл — тот же 404."""
         ссылка = plans.file_for_download(file_id, reach=auth.current_reach())
@@ -380,20 +393,21 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
         return ответ
 
 
-def _render_partner(
-    conf: Settings, *, max_bytes: int, notice: str | None, failure: str | None
-) -> str:
-    lang = _lang(conf)
-    принятые = _accepted()
-    список = plans.list_requests(reach=auth.current_reach(), accepted=принятые)
-    return render_template(
-        "plans/index.html",
-        rows=список.rows,
-        accepted=принятые,
-        truncated=список.truncated,
-        limit=plans.LIST_LIMIT,
-        max_mb=max_bytes // (1024 * 1024),
-        notice=notice,
-        failure=failure,
-        **_common(lang),
-    )
+# ── Старые адреса ───────────────────────────────────────────────────────────
+
+
+def _install_legacy(app: Flask) -> None:
+    """Адреса до D526 переадресуют в «Действия»: закладки и ссылки не ломаются."""
+    путь = section("actions").path
+
+    @app.get("/plans", endpoint="plans")
+    def plans_index() -> Response:
+        return actions_screen.redirect_to_screen(TAB_PLANS)
+
+    @app.get(f"{путь}/requests/<request_id>", endpoint="actions_request")
+    def actions_request(request_id: str) -> Response:
+        return actions_screen.redirect_to_screen(TAB_PLANS, request_id)
+
+    @app.get("/plans/files/<file_id>", endpoint="plan_file_legacy")
+    def plan_file_legacy(file_id: str) -> Response:
+        return redirect(url_for("plan_file", file_id=file_id), code=303)

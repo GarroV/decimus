@@ -25,7 +25,6 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     },
     # --- список УК --------------------------------------------------------
     "rx.list.title": {"ru": "Предписания", "en": "Compliance notices"},
-    "rx.list.hint": {"ru": "по сроку", "en": "by due date"},
     "rx.list.empty": {"ru": "Предписаний нет.", "en": "No compliance notices."},
     "rx.closed_empty": {"ru": "Закрытых предписаний нет.", "en": "No closed notices."},
     "rx.show_open": {"ru": "Открытые", "en": "Open"},
@@ -159,21 +158,14 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
         "en": "There is no such notice, or it is not available to you.",
     },
     "rx.not_found.back": {"ru": "К предписаниям", "en": "To notices"},
-    # --- раздел партнёра ----------------------------------------------------
-    "rx.partner.kicker": {"ru": "От управляющей компании", "en": "From the management company"},
-    "rx.partner.title": {"ru": "Предписания", "en": "Compliance notices"},
-    "rx.partner.hint": {
-        "ru": "Что требуют устранить и до какого числа. Ответьте комментарием и, "
-        "если нужно, файлом.",
-        "en": "What must be fixed and by when. Reply with a comment and, if needed, a file.",
-    },
+    # --- ответ партнёра -----------------------------------------------------
     "rx.partner.empty": {"ru": "Предписаний нет.", "en": "There are no compliance notices."},
-    "rx.reply.title": {"ru": "Ответить", "en": "Reply"},
     "rx.reply.comment": {"ru": "Что сделано", "en": "What has been done"},
     "rx.reply.file": {
         "ru": "Файл (по желанию, до {mb} МБ)",
         "en": "File (optional, up to {mb} MB)",
     },
+    "rx.reply.file_label": {"ru": "Файл ответа", "en": "Reply file"},
     "rx.reply.submit": {"ru": "Отправить ответ", "en": "Send reply"},
     "rx.reply.done": {
         "ru": "Ответ сохранён — УК его видит.",

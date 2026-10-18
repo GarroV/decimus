@@ -8,12 +8,12 @@
   {%- if r.overdue(today) %} <span class="tag tag--micro tag--err">{{ t('plans.overdue') }}</span>{% endif %}
 {%- endmacro %}
 
-{% macro versions(r, plans_path, hide_last_comment=false) -%}
+{% macro versions(r, files_path, hide_last_comment=false) -%}
   {% if r.files %}
     <ol class="plan-versions">
       {% for f in r.files|reverse %}
         <li class="plan-versions__row">
-          <a class="plan-versions__file" href="{{ url(plans_path ~ '/files/' ~ f.id) }}">
+          <a class="plan-versions__file" href="{{ url(files_path ~ '/' ~ f.id) }}">
             {{ t('plans.version', n=f.version) }} · {{ f.file_name }}
           </a>
           <span class="ov-cell__muted">

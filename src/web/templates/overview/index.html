@@ -71,7 +71,7 @@
       {% if stickers %}
         <div class="hm-stickers">
           {% for s in stickers %}
-            <a class="hm-sticker hm-sticker--{{ loop.index0 % 4 }}" href="{{ url(s.href) }}?lang={{ lang }}">
+            <a class="hm-sticker hm-sticker--{{ loop.index0 % 4 }}" href="{{ url(s.href) }}{{ '&' if '?' in s.href else '?' }}lang={{ lang }}">
               <span class="hm-sticker__kind">{{ t('home.board.' ~ s.kind ~ '.kind') }}</span>
               <span class="hm-sticker__title">{{ t('home.board.' ~ s.kind ~ '.title', count=s.count) }}</span>
               {% if s.urgent %}<span class="hm-sticker__urgent">{{ t('home.board.overdue', count=s.urgent) }}</span>{% endif %}

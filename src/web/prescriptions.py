@@ -1,11 +1,12 @@
-"""Предписания в вебе: раздел УК и раздел партнёра (волна 3, D266, D270, D275).
+"""Предписания в вебе: вкладка «Предписания» раздела «Действия» (волна 3, D266, D270, D275, D526).
 
-`/actions/prescriptions` — сотрудник УК составляет предписание, кладёт письмо
-черновиком в свою почту Gmail и закрывает предписание с комментарием. Раздел
-закрыт не-УК дважды: `hq_only` раздела «Действия» (`before_request`) и
-`_require_hq` на каждом маршруте. `/prescriptions` — партнёр: свои страны по
-охвату (D284), ответ комментарием и файлом. Файл ответа скачивают своя страна
-и УК; чужой отвечает тем же 404, что несуществующий.
+Раздел один у УК и партнёра (D526): список и панель выбранного предписания —
+экран `actions_screen`, здесь данные вкладки и записи. Сотрудник УК составляет
+предписание (отдельная страница формы — письмо длинное), кладёт письмо
+черновиком в свою почту Gmail и закрывает предписание с комментарием; каждый
+такой маршрут сверяет УК сам (`_require_hq`) поверх матрицы прав. Партнёр: свои
+страны по охвату (D284), ответ комментарием и файлом. Файл ответа скачивают
+своя страна и УК; чужой отвечает тем же 404, что несуществующий.
 
 **Система ничего не отправляет.** Письмо ложится в черновики почты того, кто
 нажал кнопку (`google_mail.create_draft`), и уходит его рукой. Никаких
@@ -20,7 +21,6 @@ import logging
 from collections.abc import Callable, Mapping
 from datetime import date
 from typing import Any
-from urllib.parse import urlencode
 
 from flask import Flask, abort, current_app, redirect, render_template, request, send_file, url_for
 from flask import Response as FlaskResponse
@@ -32,9 +32,10 @@ from src.db import prescriptions_write as rxw
 from src.db.config import load_action_plan_settings
 from src.db.errors import DbError, IssuedDraftLostError, PrescriptionError, StorageError
 
-from . import auth, guard, ui_lang
+from . import actions_screen, auth, guard, ui_lang
 from . import country as country_data
 from .action_plans import FORM_OVERHEAD_BYTES, is_hq
+from .actions_screen import TAB_RX
 from .config import Settings
 from .geo_names import country_title
 from .google_mail import GoogleMailError, MailAccountMismatchError, create_draft
@@ -86,8 +87,7 @@ def _require_hq() -> None:
 
 def _not_found() -> tuple[str, int]:
     """Чужое, черновое для партнёра и несуществующее — один ответ, но про предписание."""
-    назад = section("actions").path + "/prescriptions" if is_hq() else section("orders").path
-    return render_template("prescriptions/not_found.html", back=назад), 404
+    return render_template("prescriptions/not_found.html", back=url_for("actions", tab=TAB_RX)), 404
 
 
 def _parse_date(raw: str) -> date | None:
@@ -97,12 +97,21 @@ def _parse_date(raw: str) -> date | None:
         return None
 
 
+def _base() -> str:
+    """Адрес предписаний: форма составления, действия УК и ответ партнёра лежат под ним."""
+    return section("actions").path + "/prescriptions"
+
+
+def _files_path() -> str:
+    return section("actions").path + "/prescription-files"
+
+
 def _common() -> dict[str, Any]:
     return {
         "today": rx.today(),
         "rx_tones": STATE_TONES,
-        "rx_hq_path": section("actions").path + "/prescriptions",
-        "rx_partner_path": section("orders").path,
+        "rx_base": _base(),
+        "rx_files_path": _files_path(),
         "actions_path": section("actions").path,
         "registry_path": section("registry").path,
     }
@@ -131,22 +140,131 @@ def country_block(code: str) -> dict[str, Any]:
         "rx_act_hq": уК,
         "today_rx": rx.today(),
         "rx_tones": STATE_TONES,
-        "rx_hq_path": section("actions").path + "/prescriptions",
-        "rx_partner_path": section("orders").path,
     }
 
 
 def install(app: Flask, conf: Settings) -> None:
-    """Повесить маршруты обоих разделов и возврат из похода в Gmail."""
+    """Повесить маршруты вкладки и возврат из похода в Gmail."""
     max_bytes = load_action_plan_settings().max_bytes
+    actions_screen.register(
+        app,
+        TAB_RX,
+        actions_screen.Tab(
+            screen=lambda lang: screen_context(lang),
+            panel=lambda item_id, **outcome: panel_context(item_id, max_bytes=max_bytes, **outcome),
+            missing=_not_found,
+        ),
+    )
     _install_hq(app, conf)
     _install_partner(app, conf, max_bytes=max_bytes)
+    _install_legacy(app)
     app.extensions.setdefault(MAIL_RETURNS_KEY, {})[MAIL_KIND] = MailReturn(
         back=_back_from_gmail, finish=_finish_gmail
     )
 
 
-# ── Раздел УК ───────────────────────────────────────────────────────────────
+# ── Данные вкладки ──────────────────────────────────────────────────────────
+
+
+def screen_context(lang: str) -> dict[str, Any]:
+    """Список предписаний и полоса отбора — одни у УК и партнёра, охват решает объём (D526)."""
+    уК = is_hq()
+    страна = country_data.normalize_code(request.args.get("country") or "")
+    # Черновики и «ответил партнёр» — разговор УК; партнёру в очереди только срок.
+    доступные = QUEUES if уК else (QUEUE_OVERDUE,)
+    очередь = (request.args.get("queue") or "").strip()
+    очередь = очередь if очередь in доступные else ""
+    закрытые = request.args.get("closed") == "1"
+    список = rx.list_prescriptions(reach=auth.current_reach(), closed=закрытые)
+    сегодня = rx.today()
+    все = список.rows
+    страны = tuple(sorted({p.country for p in все}))
+    в_стране = tuple(p for p in все if not страна or p.country == страна)
+    очереди = {
+        QUEUE_OVERDUE: tuple(p for p in в_стране if p.overdue(сегодня)),
+        QUEUE_REPLIED: tuple(p for p in в_стране if p.status == rx.STATUS_ISSUED and p.replies),
+        QUEUE_DRAFTS: tuple(p for p in в_стране if p.status == rx.STATUS_DRAFT),
+    }
+
+    def отбор(**изменения: str) -> str:
+        параметры = {
+            "tab": TAB_RX,
+            "country": страна,
+            "queue": очередь,
+            "closed": "1" if закрытые else "",
+            "lang": lang,
+            **изменения,
+        }
+        return url_for("actions", **{к: з for к, з in параметры.items() if з})
+
+    новый_адрес = {k: v for k, v in (("country", страна), ("lang", lang)) if v}
+    return {
+        "rows": очереди.get(очередь, в_стране),
+        "countries": страны,
+        "country": страна,
+        "queue": очередь,
+        "queues": tuple((q, f"rx.queue.{q}", len(очереди[q])) for q in доступные),
+        "archive": закрытые,
+        "archive_param": "closed",
+        "open_key": "rx.show_open",
+        "archive_key": "rx.show_closed",
+        "list_title_key": "rx.list.title",
+        "empty_key": ("rx.closed_empty" if закрытые else "rx.list.empty")
+        if уК
+        else ("rx.closed_empty" if закрытые else "rx.partner.empty"),
+        "truncated": список.truncated,
+        "truncated_key": "rx.truncated",
+        "limit": rx.LIST_LIMIT,
+        "total": len(в_стране),
+        "select_url": отбор,
+        "hq": уК,
+        "new_url": url_for("rx_new", **новый_адрес),
+        **_common(),
+    }
+
+
+def panel_context(
+    prescription_id: str,
+    *,
+    max_bytes: int,
+    notice: str | None = None,
+    failure: str | None = None,
+    gmail: str = "",
+) -> dict[str, Any]:
+    """Панель предписания: само предписание в охвате вошедшего и то, что на нём можно делать."""
+    предписание = None
+    не_прочитано = False
+    try:
+        предписание = rx.get_prescription(prescription_id, reach=auth.current_reach())
+    except DbError as exc:
+        logger.warning("предписание %s не прочитано: %s", prescription_id, exc)
+        не_прочитано = True
+    return {
+        "item": предписание,
+        "failed": не_прочитано,
+        "notice": notice,
+        "failure": failure,
+        "gmail": gmail if gmail in GMAIL_OUTCOMES else "",
+        "hq": is_hq(),
+        "max_mb": max_bytes // (1024 * 1024),
+        **_common(),
+    }
+
+
+def _respond(
+    conf: Settings,
+    prescription_id: str,
+    *,
+    notice: str | None = None,
+    failure: str | None = None,
+    status: int = 200,
+) -> str | tuple[str, int]:
+    return actions_screen.respond(
+        conf, TAB_RX, item_id=prescription_id, notice=notice, failure=failure, status=status
+    )
+
+
+# ── Запись УК ───────────────────────────────────────────────────────────────
 
 
 def _draft_from_form(country: str) -> rx.Draft:
@@ -165,12 +283,7 @@ def _draft_from_form(country: str) -> rx.Draft:
 
 
 def _install_hq(app: Flask, conf: Settings) -> None:
-    путь = section("actions").path + "/prescriptions"
-
-    @app.get(путь, endpoint="rx_list")
-    def rx_list() -> str:
-        _require_hq()
-        return _render_list(conf)
+    путь = _base()
 
     @app.get(f"{путь}/new", endpoint="rx_new")
     def rx_new() -> str:
@@ -213,11 +326,6 @@ def _install_hq(app: Flask, conf: Settings) -> None:
             ), 400
         return _after_save(ident, lang)
 
-    @app.get(f"{путь}/<prescription_id>", endpoint="rx_view")
-    def rx_view(prescription_id: str) -> str | tuple[str, int]:
-        _require_hq()
-        return _render_card(prescription_id, conf=conf, notice=None, failure=None)
-
     @app.get(f"{путь}/<prescription_id>/edit", endpoint="rx_edit")
     def rx_edit(prescription_id: str) -> Response | str | tuple[str, int]:
         _require_hq()
@@ -226,7 +334,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         if текущее is None:
             return _not_found()
         if текущее.status != rx.STATUS_DRAFT:
-            return redirect(url_for("rx_view", prescription_id=текущее.id, lang=lang), code=303)
+            return redirect(actions_screen.panel_link(TAB_RX, текущее.id, lang=lang), code=303)
         return _render_form(
             lang=lang,
             country=текущее.country,
@@ -275,17 +383,15 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         try:
             rxw.close(prescription_id, actor=_actor(), comment=request.form.get("comment") or "")
         except PrescriptionError as exc:
-            return _render_card(
-                prescription_id, conf=conf, notice=None, failure=t("rx.failed", lang, reason=exc)
-            )
-        return _render_card(prescription_id, conf=conf, notice=t("rx.closed", lang), failure=None)
+            return _respond(conf, prescription_id, failure=t("rx.failed", lang, reason=exc))
+        return _respond(conf, prescription_id, notice=t("rx.closed", lang))
 
 
 def _after_save(ident: str, lang: str) -> Response:
     """После сохранения: на карточку — или сразу к Google, если просили положить в Gmail."""
     if request.form.get("then") == "send":
         return _go_to_gmail(ident, lang)
-    return redirect(url_for("rx_view", prescription_id=ident, lang=lang, saved="1"), code=303)
+    return redirect(actions_screen.panel_link(TAB_RX, ident, lang=lang, saved="1"), code=303)
 
 
 def _go_to_gmail(ident: str, lang: str) -> Response:
@@ -299,7 +405,7 @@ def _go_to_gmail(ident: str, lang: str) -> Response:
 
 
 def _back_from_gmail(ident: str, lang: str, outcome: str) -> Response:
-    return redirect(url_for("rx_view", prescription_id=ident, lang=lang, gmail=outcome), code=303)
+    return redirect(actions_screen.panel_link(TAB_RX, ident, lang=lang, gmail=outcome), code=303)
 
 
 def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
@@ -430,100 +536,11 @@ def _render_form(
     )
 
 
-def _render_list(conf: Settings) -> str:
-    lang = _lang(conf)
-    страна = country_data.normalize_code(request.args.get("country") or "")
-    очередь = (request.args.get("queue") or "").strip()
-    очередь = очередь if очередь in QUEUES else ""
-    закрытые = request.args.get("closed") == "1"
-    список = rx.list_prescriptions(reach=auth.current_reach(), closed=закрытые)
-    сегодня = rx.today()
-    все = список.rows
-    страны = tuple(sorted({p.country for p in все}))
-    в_стране = tuple(p for p in все if not страна or p.country == страна)
-    очереди = {
-        QUEUE_OVERDUE: tuple(p for p in в_стране if p.overdue(сегодня)),
-        QUEUE_REPLIED: tuple(p for p in в_стране if p.status == rx.STATUS_ISSUED and p.replies),
-        QUEUE_DRAFTS: tuple(p for p in в_стране if p.status == rx.STATUS_DRAFT),
-    }
-
-    def отбор(**изменения: str) -> str:
-        параметры = {
-            "country": страна,
-            "queue": очередь,
-            "closed": "1" if закрытые else "",
-            "lang": lang,
-            **изменения,
-        }
-        живые = {к: з for к, з in параметры.items() if з}
-        return url_for("rx_list") + (f"?{urlencode(живые)}" if живые else "")
-
-    return render_template(
-        "actions/prescriptions.html",
-        rows=очереди.get(очередь, в_стране),
-        countries=страны,
-        country=страна,
-        queue=очередь,
-        counts={к: len(з) for к, з in очереди.items()},
-        closed=закрытые,
-        truncated=список.truncated,
-        limit=rx.LIST_LIMIT,
-        select_url=отбор,
-        **_common(),
-    )
-
-
-def _render_card(
-    prescription_id: str, *, conf: Settings, notice: str | None, failure: str | None
-) -> str | tuple[str, int]:
-    lang = _lang(conf)
-    предписание = rx.get_prescription(prescription_id, reach=auth.current_reach())
-    if предписание is None:
-        return _not_found()
-    исход = request.args.get("gmail") or ""
-    if notice is None and request.args.get("saved") == "1":
-        notice = t("rx.saved", lang)
-    return render_template(
-        "actions/prescription.html",
-        p=предписание,
-        notice=notice,
-        failure=failure,
-        gmail=исход if исход in GMAIL_OUTCOMES else "",
-        **_common(),
-    )
-
-
-# ── Раздел партнёра ────────────────────────────────────────────────────────
+# ── Запись партнёра и файлы ─────────────────────────────────────────────────
 
 
 def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
-    путь = section("orders").path
-
-    @app.get(путь, endpoint="orders")
-    def orders() -> Response | str:
-        if is_hq():
-            # У УК свой раздел (D264): здесь ему отвечать не на что.
-            return redirect(url_for("rx_list", lang=_lang(conf)), code=303)
-        закрытые = request.args.get("closed") == "1"
-        список = rx.list_prescriptions(reach=auth.current_reach(), closed=закрытые)
-        return render_template(
-            "prescriptions/index.html",
-            rows=список.rows,
-            closed=закрытые,
-            truncated=список.truncated,
-            limit=rx.LIST_LIMIT,
-            **_common(),
-        )
-
-    @app.get(f"{путь}/<prescription_id>", endpoint="order")
-    def order(prescription_id: str) -> Response | str | tuple[str, int]:
-        if is_hq():
-            return redirect(
-                url_for("rx_view", prescription_id=prescription_id, lang=_lang(conf)), code=303
-            )
-        return _render_partner_card(
-            prescription_id, conf=conf, max_bytes=max_bytes, notice=None, failure=None
-        )
+    путь = _base()
 
     @app.post(f"{путь}/<prescription_id>/reply", endpoint="order_reply")
     @guard.action("prescription.reply")
@@ -536,11 +553,8 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
         request.max_content_length = max_bytes + FORM_OVERHEAD_BYTES
         мб = max_bytes // (1024 * 1024)
 
-        def отказ(текст: str, код: int) -> tuple[str, int]:
-            страница = _render_partner_card(
-                prescription_id, conf=conf, max_bytes=max_bytes, notice=None, failure=текст
-            )
-            return (страница[0], код) if isinstance(страница, tuple) else (страница, код)
+        def отказ(текст: str, код: int) -> str | tuple[str, int]:
+            return _respond(conf, prescription_id, failure=текст, status=код)
 
         try:
             файл = request.files.get("file")
@@ -570,15 +584,9 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
             # Текст хранилища называет корзину и ключ — партнёру он ни к чему.
             logger.warning("файл ответа на %s не лёг в хранилище: %s", prescription_id, exc)
             return отказ(t("rx.reply.storage_down", lang), 503)
-        return _render_partner_card(
-            prescription_id,
-            conf=conf,
-            max_bytes=max_bytes,
-            notice=t("rx.reply.done", lang),
-            failure=None,
-        )
+        return _respond(conf, prescription_id, notice=t("rx.reply.done", lang))
 
-    @app.get(f"{путь}/files/<reply_id>", endpoint="order_file")
+    @app.get(f"{section('actions').path}/prescription-files/<reply_id>", endpoint="order_file")
     def order_file(reply_id: str) -> FlaskResponse | tuple[str, int]:
         """Файл ответа — вложением, своей стране и УК. Чужой файл — тот же 404."""
         ссылка = rx.file_for_download(reply_id, reach=auth.current_reach())
@@ -602,22 +610,29 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
         return ответ
 
 
-def _render_partner_card(
-    prescription_id: str,
-    *,
-    conf: Settings,
-    max_bytes: int,
-    notice: str | None,
-    failure: str | None,
-) -> str | tuple[str, int]:
-    предписание = rx.get_prescription(prescription_id, reach=auth.current_reach())
-    if предписание is None:
-        return _not_found()
-    return render_template(
-        "prescriptions/card.html",
-        p=предписание,
-        notice=notice,
-        failure=failure,
-        max_mb=max_bytes // (1024 * 1024),
-        **_common(),
-    )
+# ── Старые адреса ───────────────────────────────────────────────────────────
+
+
+def _install_legacy(app: Flask) -> None:
+    """Адреса до D526 переадресуют в «Действия»: закладки и ссылки не ломаются."""
+    путь = _base()
+
+    @app.get(путь, endpoint="rx_list")
+    def rx_list() -> Response:
+        return actions_screen.redirect_to_screen(TAB_RX)
+
+    @app.get(f"{путь}/<prescription_id>", endpoint="rx_view")
+    def rx_view(prescription_id: str) -> Response:
+        return actions_screen.redirect_to_screen(TAB_RX, prescription_id)
+
+    @app.get("/prescriptions", endpoint="orders")
+    def orders() -> Response:
+        return actions_screen.redirect_to_screen(TAB_RX)
+
+    @app.get("/prescriptions/<prescription_id>", endpoint="order")
+    def order(prescription_id: str) -> Response:
+        return actions_screen.redirect_to_screen(TAB_RX, prescription_id)
+
+    @app.get("/prescriptions/files/<reply_id>", endpoint="order_file_legacy")
+    def order_file_legacy(reply_id: str) -> Response:
+        return redirect(url_for("order_file", reply_id=reply_id), code=303)
