@@ -1750,3 +1750,22 @@ D391) — так же: миграций нет, право — уже выдан
    `select tab, checked_at, outcome from ratings.sheet_sync order by tab`. Закрыли таблицу по
    ссылке — через заход лист показывает `сбой` с причиной, данные остались прежними.
 5. **Писем и уведомлений нет.**
+
+### 8.21. Открытое демо (D524)
+
+Отдельный стенд на VPS: `/srv/decimus-demo` (клон `main`), проект compose
+`decimus-demo` — своя база, своё хранилище кадров (`storage`, s3mock из сборки), свои
+тома. С продом общая только сеть `edge-decimus` к Caddy. Бота и MCP на стенде нет.
+
+| Что | Где |
+|---|---|
+| Сборка | `docker-compose.yml` + `docker-compose.prod.yml` + `deploy/demo/compose.demo.yaml` |
+| Настройки | `/srv/decimus-demo/.env` (вне git): свои пароли ролей базы, `WEB_SECRET_KEY`, `AUDIT_DATA_DIR=./demo/data`, `S3_*` на `http://storage:9090`, `WEB_TRUSTED_PROXY_ADDR` — подсеть `edge-decimus` |
+| Кадры для посева | `/srv/decimus-demo-photos` — снимки Белграда-1 и -2 без метаданных (вне git: репозиторий публичный) |
+| Сброс | `deploy/demo/reset.sh`: тома `pgdata`, `state`, `methodology` заново → миграции → `tools/seed_open_demo.py` → подъём. Cron раз в час |
+| Обновление кода | `deploy/demo/update.sh`: `git pull`, сборка, сброс |
+| Caddy | `vps-infra` `edge/sites/decimus-demo.caddy`: сайт без ключа фронта, заголовки фронта срезаются (как у стенда §8.11) |
+| Адрес | Worker `decimus-demo` (`front/deploy.sh demo`, шаблон `front/wrangler.demo.template.jsonc`, `DEMO_ORIGIN_HOST` в `front/.deploy.env`) |
+
+На проде `WEB_DEMO_URL` — адрес Worker'а демо: по нему кнопка «Открыть демо» на
+посадочной странице.

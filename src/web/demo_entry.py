@@ -24,6 +24,42 @@ from .config import Settings
 from .origin import refuse_foreign_origin
 from .walk_auth import PAGE_PATH as WALK_PAGE_PATH
 
+#: Что в демо выключено: учётки ролей общие на всех посетителей, и один посетитель
+#: не должен сломать вход остальным — подключить второй способ (тогда вход без
+#: пароля упрётся во вторую ступень), заморозить или понизить учётку, сменить ей
+#: пароль, привязать Google или выйти «везде». Ключ модели посетитель не сохраняет:
+#: чужие ключи демо не собирает. Сброс раз в час починил бы и это, но час без демо —
+#: тоже поломка.
+LOCKED_ENDPOINTS = frozenset(
+    {
+        "freeze_user",
+        "unfreeze_user",
+        "user_role",
+        "user_email",
+        "reset_second_factor",
+        "security_backup_generate",
+        "security_passkey_delete",
+        "security_passkey_options",
+        "security_passkey_register",
+        "security_prove_code",
+        "security_relogin",
+        "security_totp_confirm",
+        "security_totp_remove",
+        "security_totp_start",
+        "settings_own_password",
+        "settings_google_link",
+        "settings_google_unlink",
+        "settings_bot_link",
+        "settings_bot_unlink",
+        "settings_claude_token",
+        "settings_claude_token_revoke",
+        "settings_sign_out_everywhere",
+        "model_key_save",
+        "model_key_check",
+        "model_key_delete",
+    }
+)
+
 #: Маршруты демо — открытые (без входа): `auth.OPEN_ENDPOINTS`.
 ENDPOINTS = frozenset({"demo_pick", "demo_enter", "demo_app"})
 
@@ -42,6 +78,12 @@ def install(
 
     if not conf.demo:
         return
+
+    @app.before_request
+    def _в_демо_выключено() -> tuple[str, int] | None:
+        if request.method == "POST" and request.endpoint in LOCKED_ENDPOINTS:
+            return render_template("demo/locked.html"), 403
+        return None
 
     приложение = conf.walk_upstream is not None
 

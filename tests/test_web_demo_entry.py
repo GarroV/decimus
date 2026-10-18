@@ -116,3 +116,25 @@ def test_плашка_демо_только_на_стенде_демо() -> None
     assert "Demo: made-up data" not in _app().test_client().get("/welcome?lang=en").get_data(
         as_text=True
     )
+
+
+def test_в_демо_общие_учётки_не_портятся(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Один посетитель не ломает вход остальным: способы входа и учётки — не трогаются."""
+    подменить_двери(monkeypatch, tenant="HQ", role="admin")
+    app = _app(demo=True)
+    адреса = {
+        r.endpoint: r.rule
+        for r in app.url_map.iter_rules()
+        if r.endpoint in demo_entry.LOCKED_ENDPOINTS and "<" not in r.rule
+    }
+    assert адреса, "выключенных действий не нашлось на карте маршрутов"
+    клиент = app.test_client()
+    for конец, путь in адреса.items():
+        ответ = клиент.post(путь, headers={"Origin": СВОЙ})
+        assert ответ.status_code == 403, f"{конец} {путь} в демо не выключен"
+
+
+def test_выключенные_в_демо_действия_есть_в_продукте() -> None:
+    """Опечатка в списке молча оставила бы действие открытым."""
+    конечные = {r.endpoint for r in _app(demo=True).url_map.iter_rules()}
+    assert demo_entry.LOCKED_ENDPOINTS <= конечные, demo_entry.LOCKED_ENDPOINTS - конечные
