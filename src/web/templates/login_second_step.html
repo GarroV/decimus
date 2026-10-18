@@ -16,17 +16,22 @@
   окно ключа один раз за загрузку; без метки окна нет, страница ведёт с поля кода
   (`login__methods--code-first`), кнопка ключа остаётся запасной. Отказ или закрытие окна
   молча оставляют кнопку; сообщение об ошибке — только после нажатия.
-#}{% extends "base.html" %}
+#}{% extends "login_base.html" %}
 {% block title %}{{ t('sf.step.title') }}{% endblock %}
 {% block head %}
+  {{ super() }}
   <script src="{{ url_for('static', filename='passkey.js') }}" defer></script>
 {% endblock %}
 
 {% block body %}
-  <div class="login">
-    <h1 class="section__title login__head">{{ t('sf.step.title') }}</h1>
-    <p class="login__lead">{{ t('sf.step.lead') }}</p>
-    <p class="login__aside">{{ t('sf.step.who', login=login) }}</p>
+  {% include "_login_lang.html" %}
+  <section class="login login--step">
+    <header class="login__brand">
+      <img class="login__mark" src="{{ url_for('static', filename='mark-small.svg') }}" alt="" width="72" height="72">
+      <h1 class="login__name login__name--step">{{ t('sf.step.title') }}</h1>
+      <p class="login__sub">{{ t('sf.step.lead') }}</p>
+      <p class="login__who">{{ t('sf.step.who', login=login) }}</p>
+    </header>
 
     {% if locked_minutes %}
       <div class="note note--error login__note" role="alert">
@@ -38,7 +43,7 @@
       </div>
     {% endif %}
 
-    <div class="login__methods">
+    <div class="login__block login__methods">
     {% if has_passkeys %}
       <div class="login__google" data-passkey-login{% if passkey_autostart %} data-passkey-autostart{% endif %}
            data-options-url="{{ url('/login/second-step/passkey/options') }}"
@@ -46,13 +51,13 @@
            data-msg-failed="{{ t('sf.step.passkey_failed') }}"
            data-msg-unavailable="{{ t('sf.step.passkey_unavailable') }}">
         <button class="btn btn--primary" type="button" data-passkey-button>{{ t('sf.step.passkey') }}</button>
-        <p class="login__aside">{{ t('sf.step.passkey_hint') }}</p>
+        <p class="login__hint">{{ t('sf.step.passkey_hint') }}</p>
         <div class="note note--warn login__note" role="alert" data-passkey-message hidden>
           <div><div class="note__title" data-passkey-message-text></div></div>
         </div>
       </div>
     {% elif passkeys_off %}
-      <p class="login__aside">{{ t('sf.step.passkey_off') }}</p>
+      <p class="login__hint">{{ t('sf.step.passkey_off') }}</p>
     {% endif %}
 
     {% if has_passkeys and has_code %}
@@ -68,11 +73,13 @@
                autofocus required>
         <button class="btn{% if not has_passkeys %} btn--primary{% endif %}" type="submit">{{ t('sf.step.submit') }}</button>
       </form>
-      <p class="login__aside">{{ t('sf.step.code_hint') }}</p>
+      <p class="login__hint">{{ t('sf.step.code_hint') }}</p>
     {% endif %}
     </div>
 
-    <p class="login__aside">{{ t('sf.step.lost') }}</p>
-    <p class="login__aside"><a href="{{ url_for('login') }}?lang={{ lang }}">{{ t('sf.step.restart') }}</a></p>
-  </div>
+    <footer class="login__foot">
+      <p>{{ t('sf.step.lost') }}</p>
+      <p><a href="{{ url_for('login') }}?lang={{ lang }}">{{ t('sf.step.restart') }}</a></p>
+    </footer>
+  </section>
 {% endblock %}

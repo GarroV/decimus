@@ -97,78 +97,11 @@
 .nowrap { white-space: nowrap; }
 .mt-gap { margin-top: var(--space-7); }
 
-/* ── Вход (T323) ─────────────────────────────────────────────────
-   Карточка, поля и кнопки — те же, что на остальных экранах; блок задаёт
-   раскладку. Без Google — узкая колонка по центру. С Google — кнопка Google
-   слева, «или» по вертикальной черте, логин и пароль справа (29.09); уже
-   720px всё встаёт в столбик, Google сверху. */
-
-.login {
-  max-width: 380px;
-  margin: var(--space-10) auto;
-  padding: var(--space-9);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-block);
-  box-shadow: var(--sh-card);
-}
-.login--split {
-  max-width: 640px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  grid-template-areas: "head head head" "note note note" "google or password" "aside aside aside";
-  column-gap: var(--space-8);
-  align-items: center;
-}
-.login__head { grid-area: head; }
-.login__lead { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-2); }
-.login__note { grid-area: note; margin-top: var(--space-7); }
-
-.login__google { grid-area: google; margin-top: var(--space-8); }
-.login__google-btn {
-  width: 100%; height: 48px;
-  font-size: var(--fs-lead); font-weight: var(--w-semibold);
-}
-.login__google-btn:hover { text-decoration: none; }
-.login__google-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.login__google-mark { width: 20px; height: 20px; flex: 0 0 auto; }
-
-.login__passkey { grid-column: 1 / -1; margin-top: var(--space-8); text-align: center; }
-.login__passkey .btn { width: 100%; justify-content: center; }
-
-.login__or {
-  grid-area: or; align-self: stretch;
-  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
-  margin-top: var(--space-8);
-  font-size: var(--fs-meta); color: var(--ink-3);
-}
-.login__or::before, .login__or::after { content: ""; flex: 1; width: 1px; background: var(--line); }
-
-.login__form { display: flex; flex-direction: column; gap: var(--space-5); margin-top: var(--space-8); }
-.login--split .login__form { grid-area: password; }
-.login__form .input { width: 100%; }
-.login__form .btn { margin-top: var(--space-2); justify-content: center; }
-.login__aside {
-  grid-area: aside;
-  font-size: var(--fs-micro); line-height: var(--lh-micro); color: var(--ink-3);
-  border-top: 1px dashed var(--line-control);
-  padding-top: var(--space-4); margin-top: var(--space-8);
-}
+/* Экраны входа — decimus-login.css (D492). */
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-}
-
-@media (max-width: 719px) {
-  .login { margin: var(--space-7) auto; padding: var(--space-8); }
-  .login--split {
-    grid-template-columns: 1fr;
-    grid-template-areas: "head" "note" "google" "or" "password" "aside";
-  }
-  .login__or { flex-direction: row; margin-top: var(--space-7); }
-  .login__or::before, .login__or::after { width: auto; height: 1px; }
-  .login--split .login__form { margin-top: var(--space-7); }
 }
 
 /* Выход — иконкой в блоке пользователя внизу панели, как у Swarm. */
@@ -1993,11 +1926,6 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .sidenav__gear svg { width: 15px; height: 15px; }
 
 /* Плашка «подключите вход в два шага» (D483): ссылка целиком, предупреждающий тон из .note--warn. */
-/* Способы второй ступени: без метки «ключ в этом браузере» (D485) сверху поле кода,
-   ключ — запасной вариант ниже. Порядок в разметке не меняется. */
-.login__methods { display: flex; flex-direction: column; }
-.login__methods--code-first > .login__or { order: 1; }
-.login__methods--code-first > .login__google { order: 2; margin-top: var(--space-5); }
 .passkey-here { display: block; width: 100%; margin-bottom: var(--space-7); text-align: left; cursor: pointer; font: inherit; }
 .passkey-here[hidden] { display: none; }
 .passkey-here:hover .note__title { text-decoration: underline; }

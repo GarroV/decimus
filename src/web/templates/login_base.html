@@ -1,0 +1,10 @@
+{#
+  Каркас экранов входа (D492): без шапки над формой — знак Decimus стоит в центре
+  самой колонки, язык — в правом верхнем углу (`_login_lang.html`). Страница на всю
+  высоту окна; раскладка и фон — `decimus-login.css`.
+#}{% extends "base.html" %}
+{% block topbar %}{% endblock %}
+{% block page_class %} page--login{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-login.css') }}">
+{% endblock %}
