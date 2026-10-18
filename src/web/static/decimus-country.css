@@ -1,80 +1,38 @@
-/* Экран «Страна» (D467): шапка-рамка, сегменты, плитки ключевых цифр, таблица
-   пиццерий. Продуктовые стили decimus: дизайн-система (`dodo-ds.css`,
-   `decimus-domain.css`) здесь не правится, всё собрано из её токенов.
-   Рамки — `.ov-card` (общие с «Обзором»), панель пиццерии — `decimus-split.css`,
-   период — `decimus-period.css`. Если для блока не хватает компонента в forma —
-   он заводится там, а здесь остаётся временной раскладкой. */
+/* Экран «Страна» (D467, D474): то, что есть только у него, — счётчики шапки,
+   движение числа, «Где болит», сводка девелопера. Каркас, колонка выбора, шапка,
+   плитки и блоки — общий шаблон `decimus-pick.css`; панель пиццерии —
+   `decimus-split.css`, период — `decimus-period.css`. Дизайн-система
+   (`dodo-ds.css`, `decimus-domain.css`) здесь не правится, всё собрано из её
+   токенов. Если для блока не хватает компонента в forma — он заводится там, а
+   здесь остаётся временной раскладкой. */
 
-.cn-shell { --cn-gap: var(--space-5); }
-.cn-shell .mx-main > * + * { margin-top: var(--cn-gap); }
-.cn-shell .mx-main > .cn-back { margin-bottom: 0; }
-.cn-shell .mx-main > .cn-back + * { margin-top: var(--space-3); }
-
-/* ── шапка ──────────────────────────────────────────────────────────── */
-.cn-headcard { padding: var(--space-6) var(--space-7); overflow: visible; }
-.cn-head { display: flex; align-items: flex-start; gap: var(--space-5); flex-wrap: wrap; }
-.cn-head__main { flex: 1; min-width: 14rem; }
-.cn-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-.cn-actions .btn { text-decoration: none; width: auto; flex: none; min-height: 0; }
-.cn-facts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); margin-top: var(--space-3);
-  font-size: var(--fs-dense); line-height: var(--lh-dense); color: var(--ink-2); }
-.cn-facts__muted { color: var(--ink-3); }
 .cn-count { margin-left: var(--space-3); font-family: var(--font-num); font-variant-numeric: tabular-nums;
   color: var(--ink-3); font-weight: var(--w-semibold); }
 .cn-count.is-on { color: var(--accent); }
-.cn-period { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line); }
-
-/* ── сегменты: переключатель вверху рабочей зоны ───────────────────── */
-
-/* ── блоки ──────────────────────────────────────────────────────────── */
-.cn-block .ov-card__head { display: flex; align-items: baseline; gap: var(--space-4); flex-wrap: wrap; }
-.cn-block .ov-card__hint { margin-top: 0; }
-.cn-quiet { margin: 0; font-size: var(--fs-meta); color: var(--ink-3); }
-.cn-quiet a { color: var(--accent); }
-.cn-sub { padding: var(--space-4) var(--space-7) var(--space-2); font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui);
-  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
-
-/* плитки ключевых цифр */
-.cn-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); }
-.cn-tile { padding: var(--space-6) var(--space-7); border-left: 1px solid var(--line-2); min-width: 0; }
-.cn-tile:first-child { border-left: 0; }
-.cn-tile__label { font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui); letter-spacing: .12em;
-  text-transform: uppercase; color: var(--ink-3); }
-.cn-tile__value { margin-top: var(--space-4); font-family: var(--font-num); font-size: 26px; line-height: 30px;
-  font-weight: var(--w-semibold); letter-spacing: -.01em; color: var(--ink); font-variant-numeric: tabular-nums;
-  display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
-.cn-tile__value--letters { font-size: var(--fs-lead); line-height: 30px; }
-.cn-tile__value--maps { flex-direction: column; align-items: flex-start; gap: var(--space-1); font-size: var(--fs-lead); line-height: 20px; }
-.cn-tile__value--maps small { margin-right: var(--space-2); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-regular); }
-.cn-tile__sub { margin-top: var(--space-2); font-size: var(--fs-meta); color: var(--ink-3); }
 .cn-delta { font-family: var(--font-num); font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink-2); }
 .cn-delta.is-up { color: var(--ok); }
 .cn-delta.is-down { color: var(--err); }
 .cn-letters { display: inline-flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; }
 .cn-letter { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-num); }
 .cn-letter b { font-size: var(--fs-lead); font-weight: var(--w-semibold); color: var(--ink); }
+.cn-tile__letters { font-size: var(--fs-lead); }
+.cn-tile__maps { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-lead); line-height: 20px; }
+.cn-tile__maps small { margin-right: var(--space-2); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-regular); }
+.cn-quiet a, .pk-empty a { color: var(--accent); }
 
-/* «Где болит»: две колонки внутри одной рамки */
-.cn-hurt { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); }
+/* «Где болит»: две колонки внутри одного блока */
+.cn-sub { padding: var(--space-4) var(--space-5) var(--space-2); font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui);
+  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.cn-hurt { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.cn-hurt__col { min-width: 0; }
 .cn-hurt__col + .cn-hurt__col { border-left: 1px solid var(--line-2); }
+.cn-hurt .ov-row { padding-left: var(--space-5); padding-right: var(--space-5); }
 
-/* ── таблица пиццерий ───────────────────────────────────────────────── */
-.cn-unit { cursor: pointer; }
-.cn-unit__name { display: flex; flex-direction: column; min-width: 0; }
-.cn-unit__name b { font-weight: var(--w-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cn-unit__name small { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cn-unit__last { display: flex; align-items: center; gap: var(--space-4); white-space: nowrap; }
-.cn-unit__maps { display: flex; flex-direction: column; align-items: flex-end; line-height: 15px; }
-.cn-unit__maps small { color: var(--ink-3); margin-right: var(--space-1); }
-.cn-closed { border-top: 1px solid var(--line); }
-.cn-closed > summary { cursor: pointer; padding: var(--space-4) var(--space-7); font-size: var(--fs-meta); color: var(--ink-3); list-style: none; }
-.cn-closed > summary::-webkit-details-marker { display: none; }
-.cn-closed > summary::before { content: "▸ "; }
-.cn-closed[open] > summary::before { content: "▾ "; }
-.cn-closed .cn-unit { color: var(--ink-3); }
+/* ── сводка девелопера: строка на страну, без горизонтальной прокрутки ─ */
+.cn-countries.ov-table { overflow: visible; }
 .cn-countries .ov-table__head, .cn-countries .ov-table__row {
-  grid-template-columns: minmax(8rem, 1.2fr) 6.5rem 6rem 6rem minmax(10rem, 1.4fr); min-width: 40rem; }
-.cn-countries .ov-table__head > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  grid-template-columns: minmax(0, 1.2fr) 8rem 7rem 6rem minmax(0, 1.2fr); min-width: 0; }
+.cn-unit__name { display: flex; flex-direction: column; min-width: 0; }
 
 /* статус пиццерии: тихая метка с точкой */
 .cn-st { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-meta); color: var(--ink-3); }
@@ -87,52 +45,6 @@
 /* история в панели пиццерии */
 .cn-history .ov-row { padding-left: 0; padding-right: 0; }
 
-/* ── колонка: блок отбора как на «Проверках» (`.rg-filters`, D510) ────
-   Колонка не прокручивается сама и не липнет — прокручивается только список
-   пиццерий. Выбранная страна не заливается цветом: здесь это тема экрана, а не
-   включённый фильтр, и заливка делала из неё синюю «пилюлю». */
-.cn-rail { position: static; max-height: none; overflow: visible; }
-.cn-filters {
-  display: grid; gap: var(--space-3); margin-bottom: var(--space-4); padding: var(--space-5);
-  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-block);
-}
-.cn-filters .pick { display: block; }
-.cn-filters .ov-chip { display: flex; width: 100%; justify-content: space-between; }
-.cn-filters .ov-chip.is-on { background: transparent; border-color: var(--line); color: var(--ink-2); }
-.cn-filters .pick__menu { position: static; width: 100%; min-width: 0; margin-top: var(--space-2); box-shadow: none; }
-/* Список пиццерий — не выше 15 строк (`--cn-urow` — высота строки, одна на все:
-   строка с буквой выше строки без неё), дальше
-   прокрутка внутри (D510): в стране бывает 30+ точек. */
-.cn-rail { --cn-urow: 50px; }
-.cn-ulist .cn-uline { min-height: var(--cn-urow); align-content: center; }
-.cn-ulist {
-  position: relative; display: grid; gap: 0; align-content: start;
-  max-height: calc(15 * var(--cn-urow)); overflow-y: auto; overscroll-behavior: contain;
-}
-
-/* ── узкий экран ────────────────────────────────────────────────────── */
-@media (max-width: 1023px) {
-  /* Без страны в адресе на узком экране — только колонка стран, как у
-     «Методики»; рабочая зона с первой страной видна лишь шире 1023px. */
-  .cn-shell.mx-shell--pick .mx-rail { display: grid; position: static; max-height: none; }
-  .cn-shell.mx-shell--pick .mx-rail__meta { display: block; }
-  .cn-shell.mx-shell--pick .mx-main { display: none; }
-}
 @media (max-width: 719px) {
-  .cn-headcard { padding: var(--space-5); }
-  .cn-tile { padding: var(--space-5); }
-  .cn-tile:nth-child(odd) { border-left: 0; }
-  .cn-tile:nth-child(n+3) { border-top: 1px solid var(--line-2); }
-  .cn-tiles { grid-template-columns: 1fr 1fr; }
   .cn-hurt__col + .cn-hurt__col { border-left: 0; border-top: 1px solid var(--line-2); }
-  .cn-sub { padding-left: var(--space-5); padding-right: var(--space-5); }
-  .cn-closed > summary { padding-left: var(--space-5); padding-right: var(--space-5); }
 }
-
-/* Колонка «Страны» (D504): девелопер и страна — выпадающими списками, под ними
-   пиццерии страны строками; буква последней проверки — справа. */
-.cn-units-head { margin-top: var(--space-2); }
-.cn-uline .mx-rail__name { display: flex; flex-direction: column; min-width: 0; }
-.cn-uline .mx-rail__name small { color: var(--ink-3); font-size: var(--fs-meta); }
-.cn-uline .grade { flex: 0 0 auto; }
-.mx-rail .cn-closed > summary { padding: var(--space-2) var(--space-3); color: var(--ink-3); cursor: pointer; font-size: var(--fs-meta); }
