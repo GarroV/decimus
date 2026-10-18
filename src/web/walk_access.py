@@ -5,9 +5,9 @@
 страницу мог только свой. Кнопка меню бота меняет это — её видит каждый, кто
 открыл бота, в том числе тот, кого бот не обслуживает. Поэтому мини-апп
 сверяет человека тем же правилом, что мидлварь доступа бота
-(`bot.access.space_from`): привязка учётки, затем список окружения и связки
-по приглашениям. Ответ — пространство человека, оно же нужно выпуску токена
-MCP и началу проверки.
+(`bot.access.space_from`): привязка учётки, затем связки по приглашениям.
+Список `ALLOWED_TELEGRAM_IDS` снят (D520). Ответ — пространство человека, оно
+же нужно выпуску токена MCP и началу проверки.
 """
 
 from __future__ import annotations
@@ -20,13 +20,11 @@ from src.bot.roster import Roster
 from src.db import bot_links
 from src.domain import check_environment
 
-from .walk_auth import WalkSettings
-
 logger = logging.getLogger(__name__)
 
 
 def _roster() -> Roster | None:
-    """Связки по приглашениям. Битый файл — без них: пускает привязка и список."""
+    """Связки по приглашениям. Битый файл — без них: пускает только привязка."""
     try:
         return Roster.load(check_environment().state_dir)
     except BotConfigError:
@@ -34,14 +32,14 @@ def _roster() -> Roster | None:
         return None
 
 
-def space_of(chat_id: int, conf: WalkSettings) -> str | None:
+def space_of(chat_id: int) -> str | None:
     """Пространство человека или `None` — бот его не пускает.
 
     База молчит — `DbError` наверх: сверить нечем, а отвечать «пускаю»
     вслепую нельзя.
     """
     положение = bot_links.standing(chat_id)
-    return space_from(chat_id, положение, allowed_ids=conf.allowed_ids, roster=_roster())
+    return space_from(chat_id, положение, roster=_roster())
 
 
 def role_is_closed(chat_id: int) -> bool:

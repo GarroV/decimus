@@ -5,27 +5,27 @@
 
   Отказ один на все причины: «нет такого логина» и «пароль не тот» выглядят
   одинаково, иначе форма сама рассказывает перебором, кто здесь заведён.
-#}{% extends "base.html" %}
+#}{% extends "login_base.html" %}
 {% block title %}{{ t('auth.title') }}{% endblock %}
-
-{% block head %}
-  <script src="{{ url_for('static', filename='passkey.js') }}" defer></script>
-{% endblock %}
 
 {% block body %}
   {#
-    Вход через Google — слева, логин и пароль — справа, без лишних слов
-    (замечание владельца 29.09: «виджет гугла и справа 2 окна ввода… лаконично»).
-    Пароль остаётся запасной дверью: гугловая почта есть не у всех, кого сюда
-    пустят, и отнимать у них вход нельзя.
+    Экран входа (D492) — одна колонка по центру, как вход Swarm: знак, название,
+    строка подзаголовка; главная кнопка Google, «или», логин и пароль; внизу две
+    мелкие строки. Touch ID — вторым шагом после пароля (D515). Логика входа не
+    менялась — только вид.
 
-    Кнопки Google нет вовсе, если реквизиты приложения не заданы: стенд без
-    них работает паролем, как работал, а мёртвая кнопка выглядела бы поломкой.
-    Тогда карточка — одна колонка с формой.
+    Кнопки Google нет вовсе, если реквизиты приложения не заданы: стенд без них
+    работает паролем, как работал, а мёртвая кнопка выглядела бы поломкой. Тогда
+    та же колонка без кнопки и без «или», форма главная.
   #}
-  <div class="login{% if google_enabled %} login--split{% endif %}">
-    <h1 class="section__title login__head">{{ t('auth.title') }}</h1>
-    {% if not google_enabled %}<p class="login__lead">{{ t('auth.lead') }}</p>{% endif %}
+  {% include "_login_lang.html" %}
+  <section class="login">
+    <header class="login__brand">
+      <img class="login__mark" src="{{ url_for('static', filename='mark-small.svg') }}" alt="" width="72" height="72">
+      <h1 class="login__name">{{ t('app.name') }}</h1>
+      <p class="login__sub">{{ t('auth.sub') }}</p>
+    </header>
 
     {#
       Запрет и «не подошло» — разные сообщения намеренно: человеку, который
@@ -45,6 +45,10 @@
       <div class="note note--warn login__note" role="alert">
         <div><div class="note__title">{{ t('auth.use_google') }}</div></div>
       </div>
+    {% elif google_other %}
+      <div class="note note--error login__note" role="alert">
+        <div><div class="note__title">{{ t('auth.google_other') }}</div></div>
+      </div>
     {% elif failed %}
       <div class="note note--error login__note" role="alert">
         <div><div class="note__title">{{ t('auth.failed') }}</div></div>
@@ -55,19 +59,17 @@
       </div>
     {% endif %}
 
+    <div class="login__block">
     {% if google_enabled %}
-      <div class="login__google">
-        <a class="btn login__google-btn" href="{{ url_for('google_start') }}?lang={{ lang }}{% if next_path %}&amp;next={{ next_path|urlencode }}{% endif %}">
-          <svg class="login__google-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-            </svg>
-          {{ t('auth.google') }}
-        </a>
-        <p class="login__aside">{{ t('auth.google_hint') }}</p>
-      </div>
+      <a class="login__google-btn" href="{{ url_for('google_start') }}?lang={{ lang }}{% if next_path %}&amp;next={{ next_path|urlencode }}{% endif %}">
+        <svg class="login__google-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        {{ t('auth.google') }}
+      </a>
       <div class="login__or" aria-hidden="true"><span>{{ t('auth.or') }}</span></div>
     {% endif %}
 
@@ -96,23 +98,17 @@
       <button class="btn{% if not google_enabled %} btn--primary{% endif %}" type="submit">{{ t('auth.submit') }}</button>
     </form>
 
-    <p class="login__aside">{{ t('auth.aside') }}</p>
     {#
-      Вход ключом доступа (D485): браузер с меткой «ключ тут есть» на открытии страницы сам
-      просит Touch ID (`passkey.js`), остальные видят запасную кнопку. Осечка автозапуска тихая.
+      Кнопки «Войти по Touch ID» здесь нет (D515): вход — через Google или
+      логином и паролем, Touch ID спрашивается вторым шагом после пароля.
+      Автозапуск ключа на этой странице всплывал поверх «не подошло» от
+      прошлой попытки и выглядел как отказ.
     #}
-    {% if passkeys_enabled %}
-      <div class="login__passkey" data-passkey-login data-passkey-autostart
-           data-options-url="{{ url('/login/passkey/options') }}"
-           data-verify-url="{{ url('/login/passkey/verify') }}{% if next_path %}?next={{ next_path|urlencode }}{% endif %}"
-           data-msg-failed="{{ t('sf.login.passkey_failed') }}"
-           data-msg-unavailable="{{ t('sf.step.passkey_unavailable') }}">
-        <button class="btn" type="button" data-passkey-button>{{ t('sf.login.passkey') }}</button>
-        <div class="note note--warn" role="alert" data-passkey-message hidden>
-          <div><div class="note__title" data-passkey-message-text></div></div>
-        </div>
-      </div>
-    {% endif %}
+    </div>
 
-  </div>
+    <footer class="login__foot">
+      <p>{{ t('auth.invite') }}</p>
+      <p>{{ t('auth.forgot') }}</p>
+    </footer>
+  </section>
 {% endblock %}

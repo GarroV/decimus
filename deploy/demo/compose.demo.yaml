@@ -1,0 +1,68 @@
+# Стенд открытого демо (D524) на VPS: /srv/decimus-demo, проект compose `decimus-demo`.
+#
+# Поверх docker-compose.yml и docker-compose.prod.yml (как прод), третьим файлом:
+#   docker compose -p decimus-demo -f docker-compose.yml -f docker-compose.prod.yml \
+#     -f deploy/demo/compose.demo.yaml ...
+# Обычно не руками, а через deploy/demo/update.sh и deploy/demo/reset.sh.
+#
+# Отличия от прода:
+# * своя база, своё хранилище кадров (s3mock из сборки) и свои тома — с продом
+#   стенд не делит ничего, кроме сети edge-decimus к общему Caddy;
+# * методика — синтетический демо-набор `demo/data` (AUDIT_DATA_DIR в .env);
+# * бота и MCP нет: в демо их показывает лендинг, а не живой Telegram;
+# * админка с WEB_DEMO=1 (вход /demo без пароля), мини-апп обхода — в режиме
+#   просмотра на идущую проверку посева, без токена Telegram;
+# * посев `seed` — одноразовый сервис, его зовёт reset.sh раз в час.
+name: decimus-demo
+
+services:
+  bot:
+    profiles: !override ["off"]
+  mcp:
+    profiles: !override ["off"]
+  web:
+    environment:
+      WEB_DEMO: "1"
+      WEB_UI_LANG: en
+    networks:
+      default:
+      edge-decimus:
+        aliases: [decimus-demo-web]
+    ports: !override []
+  walk:
+    environment:
+      WEB_WALK_PREVIEW_CHAT: "999000000701"
+      WEB_DEMO: "1"
+  db:
+    ports: !override []
+  storage:
+    profiles: !reset []
+    ports: !override []
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["seed"]
+    restart: "no"
+    env_file:
+      - ${DECIMUS_ENV_FILE:-.env}
+    command: ["python", "tools/seed_open_demo.py"]
+    environment:
+      SEED_WEB_DEMO_FORCE: "1"
+      DEMO_STATE_DIR: /app/state
+      STATE_DIR: /app/state
+      DEMO_PHOTOS_DIR: /photos
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./demo/data:/app/demo/data:ro
+      - state:/app/state
+      - ${DEMO_PHOTOS_HOST_DIR:-/srv/decimus-demo-photos}:/photos:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+
+networks:
+  edge-decimus:
+    external: true

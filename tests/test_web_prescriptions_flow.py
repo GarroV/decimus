@@ -184,8 +184,9 @@ def test_путь_предписания(как: Вход, почта: list[dict
     assert армения.get(f"/prescriptions/files/{файл.replies[0].id}").status_code == 404
     assert армения.get("/actions/prescriptions").status_code == 404
     assert армения.get(f"/actions/prescriptions/{п.id}").status_code == 404
-    # «Страна» партнёру закрыта целиком (D371): не пустая, а 404.
-    assert армения.get("/country/AM?lang=ru").status_code == 404
+    # «Пиццерии» партнёр видит в пределах своих стран (D512): своя — да, чужая — 404.
+    assert армения.get("/country/AM?lang=ru").status_code == 200
+    assert армения.get("/country/GE?lang=ru").status_code == 404
 
     # УК видит ответ, скачивает файл и закрывает с комментарием.
     уК = как("HQ")
@@ -200,10 +201,10 @@ def test_путь_предписания(как: Вход, почта: list[dict
     )
     assert "Предписание закрыто." in закрыто.get_data(as_text=True)
 
-    # На экране страны — предписание и «Закрыто». Партнёр видит «Закрыто» на
-    # карточке предписания в своём разделе: «Страна» у него закрыта (D371).
-    страна = уК.get("/country/GE?lang=ru").get_data(as_text=True)
-    assert "Предписание · Грузия" in страна and "Закрыто" in страна
+    # На карточке УК в «Действиях» — предписание и «Закрыто» («Пиццерии» его
+    # не показывают, D512). Партнёр видит «Закрыто» на карточке в своём разделе.
+    список = уК.get(f"/actions/prescriptions/{п.id}?lang=ru").get_data(as_text=True)
+    assert "Предписание · Грузия" in список and "Закрыто" in список
     грузия = как("GE")
     своё = грузия.get(f"/prescriptions/{п.id}?lang=ru").get_data(as_text=True)
     assert "Закрыто" in своё

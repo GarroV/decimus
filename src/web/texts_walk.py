@@ -63,6 +63,8 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Tap an item to record a finding against it.",
     },
     "walk.cl.was": {"ru": "было", "en": "last time"},
+    "walk.unseen.title": {"ru": "Ещё не смотрели", "en": "Not looked at yet"},
+    "walk.unseen.info": {"ru": "Замеры без баллов:", "en": "Readings, no points:"},
     "walk.cl.more": {"ru": "Показать ещё {count}", "en": "Show {count} more"},
     "walk.zone.ic.todo": {"ru": "не осмотрена", "en": "not checked yet"},
     "walk.zone.ic.started": {"ru": "в работе", "en": "in progress"},
@@ -215,6 +217,14 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.pick_zone": {"ru": "Выбрать зону", "en": "Choose area"},
     "walk.photo.hero": {"ru": "Фото нарушения", "en": "Photo of the issue"},
     "walk.photo.more": {"ru": "Ещё фото", "en": "Another photo"},
+    "walk.photo.gallery": {"ru": "Галерея", "en": "Gallery"},
+    "walk.camera.title": {"ru": "Камера", "en": "Camera"},
+    "walk.camera.shoot": {"ru": "Снять", "en": "Take photo"},
+    "walk.camera.close": {"ru": "Закрыть камеру", "en": "Close camera"},
+    "walk.camera.denied": {
+        "ru": "Камера недоступна — выберите снимок в «Галерее»",
+        "en": "Camera unavailable — pick a photo from the Gallery",
+    },
     "walk.sheet.words": {"ru": "Что не так", "en": "What is wrong"},
     "walk.sheet.words_hint": {
         "ru": "Пара слов: «нагар на крышке линии», «просрочка на сыре»",
@@ -224,6 +234,37 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.finding": {"ru": "Система ищет пункт…", "en": "Looking for the item…"},
     "walk.sheet.finding_short": {"ru": "Ищу…", "en": "Searching…"},
     "walk.sheet.found": {"ru": "Система предлагает", "en": "Suggested"},
+    # Показание термометра (#836).
+    "walk.sheet.reading": {"ru": "Температура, °C", "en": "Temperature, °C"},
+    "walk.sheet.reading_hint": {
+        "ru": (
+            "Система прочитала число с фото. Если цифры прочитаны неверно — "
+            "исправьте, предложение пересчитается."
+        ),
+        "en": (
+            "The system read this number from the photo. If the digits are wrong, "
+            "correct it and the suggestion is recalculated."
+        ),
+    },
+    "walk.sheet.reading_reset": {
+        "ru": "Искать заново без температуры",
+        "en": "Search again without the temperature",
+    },
+    "walk.sheet.recheck": {
+        "ru": "Пересчитать по температуре",
+        "en": "Recalculate for this temperature",
+    },
+    "walk.sheet.rechecking": {"ru": "Пересчитываю…", "en": "Recalculating…"},
+    "walk.sheet.reading_none": {
+        "ru": (
+            "При температуре {value} °C нарушения нет — записывать нечего. "
+            "Верните прежнее число или удалите запись."
+        ),
+        "en": (
+            "At {value} °C there is no violation, so there is nothing to record. "
+            "Restore the previous number or delete the entry."
+        ),
+    },
     "walk.sheet.found_none": {
         "ru": "Подходящего пункта система не нашла. Добавьте слов или выберите пункт вручную.",
         "en": "No matching item found. Add a few words or pick the item yourself.",
@@ -373,6 +414,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.err.empty_answer": {
         "ru": "Пустой ответ не сохраняется — просто оставьте поле незаполненным.",
         "en": "An empty answer is not saved — just leave the field blank.",
+    },
+    "walk.err.reading": {
+        "ru": "Это не похоже на температуру. Введите число в °C, например 6 или -18.",
+        "en": "That does not look like a temperature. Enter a number in °C, for example 6 or -18.",
     },
     "walk.err.repeat_level": {
         "ru": "Повтор ставится только нарушению класса D1 или D2.",

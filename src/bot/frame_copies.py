@@ -145,6 +145,8 @@ async def sweep_forever() -> None:
             removed = await asyncio.to_thread(sweep, root)
             if removed:
                 logger.info("убрано просроченных копий кадров: %s", removed)
-        except OSError:
+        except Exception:
+            # Любой отказ прохода, не только OSError (#787): задачу никто не
+            # ждёт, и необработанное исключение остановило бы уборку до рестарта.
             logger.exception("уборка копий кадров в %s не прошла", root)
         await asyncio.sleep(SWEEP_EVERY_SEC)

@@ -1,86 +1,18 @@
-// Временный фронт decimus на Cloudflare (D236, #424).
-//
-// В стране пользователя домен служебный домен заблокирован по решению властей, а
-// адрес Cloudflare — нет. Worker принимает запрос на своём адресе и пересылает
-// его на сервер как есть; ответ возвращает как есть. Своей логики у него нет.
-//
-// Три правки по дороге, и все три — чтобы сервер не заметил посредника:
-//  1. Origin/Referer со своего адреса переписываются на адрес сервера — иначе
-//     админка отбивала бы каждую форму как пришедшую с чужого сайта. Чужой
-//     Origin уходит нетронутым и получает тот же отказ, что и без фронта.
-//  2. Адрес посетителя уходит отдельным заголовком вместе с ключом фронта.
-//     Вход площадки (Caddy) верит этому адресу ТОЛЬКО при верном ключе — иначе
-//     любой мог бы назваться чужим адресом, а счётчик неудачных входов считает
-//     попытки по адресу.
-//  3. Location с адресом сервера переписывается на адрес фронта, чтобы
-//     переход не уводил человека обратно на заблокированный домен.
-//
-// До сервера Worker идёт туннелем (привязка EDGE — Workers VPC, D304): запрос
-// попадает прямо в Caddy на VPS, и имя служебный домен в пути больше не участвует —
-// ни его DNS, ни его доступность. Имя остаётся только SNI и Host, по которым
-// Caddy выбирает сайт. Если туннель лёг, тот же запрос уходит прежним путём
-// через интернет: два независимых пути вместо одной точки отказа.
+// Временный фронт decimus на Cloudflare (D236, #424): точка входа Worker'а.
+// Вся логика пересылки — в proxy.js (там же её проверка без среды Workers).
+import { WorkerEntrypoint } from "cloudflare:workers";
 
-const FRONT_KEY_HEADER = "X-Decimus-Front-Key";
-const CLIENT_IP_HEADER = "X-Decimus-Client-IP";
+import { forward, handle } from "./proxy.js";
+
+// Точка входа с включённым кэшем Worker'а (wrangler.admin.template.jsonc, #698):
+// ответ статики с `Cache-Control: public, max-age=…` отдаётся с края без
+// похода на сервер. Только статика и только без Cookie (proxy.js: handle).
+export class StaticCache extends WorkerEntrypoint {
+  fetch(request) {
+    return forward(request, this.env);
+  }
+}
 
 export default {
-  async fetch(request, env) {
-    if (!env.ORIGIN_HOST || !env.FRONT_KEY) {
-      // Без настроек не пересылаем вовсе: запрос без ключа выглядел бы на
-      // сервере прямым, и счётчик входов свалил бы всех в один адрес.
-      return new Response("front is not configured", { status: 503 });
-    }
-    const front = new URL(request.url);
-    const origin = `https://${env.ORIGIN_HOST}`;
-    // Хост сервера закреплён, а не собран из пути: `new URL("//evil.com/x", origin)`
-    // читает путь как адрес другого сайта, и запрос ушёл бы туда вместе с
-    // ключом фронта. Путь только присваивается, итог сверяется ещё раз.
-    const upstream = new URL(origin);
-    upstream.pathname = front.pathname.replace(/^\/+/, "/");
-    upstream.search = front.search;
-    if (upstream.origin !== origin) {
-      return new Response("bad request", { status: 400 });
-    }
-
-    const headers = new Headers(request.headers);
-    for (const name of ["Origin", "Referer"]) {
-      const value = headers.get(name);
-      if (value && (value === front.origin || value.startsWith(front.origin + "/"))) {
-        headers.set(name, origin + value.slice(front.origin.length));
-      }
-    }
-    headers.set(FRONT_KEY_HEADER, env.FRONT_KEY);
-    headers.set(CLIENT_IP_HEADER, request.headers.get("CF-Connecting-IP") || "");
-    headers.delete("Host");
-
-    const hasBody = !["GET", "HEAD"].includes(request.method);
-    const fallback = env.EDGE && hasBody ? request.clone() : request;
-    const send = (via, from) =>
-      via(upstream, {
-        method: request.method,
-        headers,
-        body: hasBody ? from.body : undefined,
-        redirect: "manual",
-      });
-    let response;
-    if (env.EDGE) {
-      try {
-        response = await send((u, init) => env.EDGE.fetch(u, init), request);
-      } catch (error) {
-        console.error("tunnel failed, falling back to public path", String(error));
-      }
-    }
-    if (!response) {
-      response = await send(fetch, fallback);
-    }
-
-    const location = response.headers.get("Location");
-    if (!location || !location.startsWith(origin)) {
-      return response;
-    }
-    const rewritten = new Response(response.body, response);
-    rewritten.headers.set("Location", front.origin + location.slice(origin.length));
-    return rewritten;
-  },
+  fetch: (request, config, ctx) => handle(request, config, ctx),
 };

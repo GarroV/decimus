@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from itertools import groupby
 
 import pytest
 from web_harness import войти, подменить_двери, собрать
@@ -17,7 +16,6 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.web import action_plans, sections
 from src.web.errors import SectionRegistryError
 from src.web.sections import (
-    GROUPS,
     SECTIONS,
     built_keys,
     check_registry,
@@ -27,32 +25,21 @@ from src.web.sections import (
 )
 
 
-def test_sections_are_the_nine_from_the_prototype_in_order() -> None:
-    """Девять разделов прототипа плюс «Люди» (T338): заведение учёток
-    переехало из командной строки на экран, и в прототипе его не было.
-    """
-    assert [item.key for item in SECTIONS] == [
-        "overview",
-        "registry",
-        "plans",
-        "orders",
-        "country",
-        "calendar",
-        "actions",
-        "ratings",
-        "admin",
-        "users",
-        "settings",
+def test_sections_go_in_menu_groups_in_order() -> None:
+    """Разделы по группам меню (D499): проверки, статистика, администрирование."""
+    assert [(item.group, item.key) for item in SECTIONS] == [
+        ("work", "overview"),
+        ("work", "registry"),
+        ("work", "plans"),
+        ("work", "orders"),
+        ("work", "calendar"),
+        ("work", "actions"),
+        ("stats", "country"),
+        ("stats", "ratings"),
+        ("admin", "admin"),
+        ("admin", "users"),
+        ("admin", "settings"),
     ]
-
-
-def test_groups_follow_the_registry_order_and_split_work_aux_tech() -> None:
-    """D478: группы идут подряд (рабочая, вспомогательная, техническая) — иначе
-    черта между ними встанет посреди списка."""
-    порядок = [item.group for item in SECTIONS]
-    assert [g for g, _ in groupby(порядок)] == list(GROUPS), порядок
-    assert {i.key for i in SECTIONS if i.group == "aux"} == {"ratings", "admin"}
-    assert {i.key for i in SECTIONS if i.group == "tech"} == {"users", "settings"}
 
 
 def test_built_keys_are_the_built_screens() -> None:

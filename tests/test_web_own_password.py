@@ -199,7 +199,7 @@ def test_тексты_есть_по_английски(monkeypatch: pytest.Monke
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="developer")
     with собрать(tenant=ТЕНАНТ, ui_lang="en").test_client() as client:
         войти(client)
-        страница = client.get("/settings?lang=en&tile=password").get_data(as_text=True)
+        страница = client.get("/settings?tile=password&lang=en").get_data(as_text=True)
         ответ = client.post(
             ПУТЬ + "?lang=en",
             data={"current": ПАРОЛЬ, "new": НОВЫЙ, "repeat": НОВЫЙ},

@@ -45,15 +45,12 @@ class Bar:
 
 
 @dataclass(frozen=True)
-class WeakZone:
-    """Слабый блок последней проверки."""
+class WeakProcess:
+    """Слабое направление (процесс методики) последней проверки."""
 
     code: str
     name: str
-    share: float
     loss: float
-    #: Зона обнулена нарушением класса D3: её доля сгорела целиком.
-    zeroed: bool
 
 
 #: Клетка полосы повторов. Три состояния, а не два, и разница существенная:
@@ -92,7 +89,7 @@ class UnitCard:
     #: Нижняя граница шкалы столбиков. Обрезанная ось без подписи — вранье
     #: картинкой, поэтому граница уезжает на экран и подписывается там.
     floor: float
-    weak: tuple[WeakZone, ...] = ()
+    weak: tuple[WeakProcess, ...] = ()
     last_findings: tuple[FindingRow, ...] = ()
     repeats: tuple[Repeat, ...] = ()
     #: Имена зон последней проверки по коду: записи и повторы несут код зоны,
@@ -118,7 +115,7 @@ def _bars(rows: tuple[InspectionRow, ...], *, floor: float) -> tuple[Bar, ...]:
     """Столбики от старой проверки к свежей.
 
     Все столбики одного вида, какой бы методикой ни была оценена проверка:
-    оценка каждой верна по своей методике и стоит в ряду наравне (D352).
+    оценка каждой верна по своей методике и стоит в ряду наравне (D365).
     """
     высота_поля = 100.0 - floor
     столбики = []
@@ -145,33 +142,28 @@ def _zone_names(by_zone: Mapping[str, object], *, lang: str) -> dict[str, str]:
     return имена
 
 
-def _weak(by_zone: dict[str, object], *, lang: str, limit: int = 5) -> tuple[WeakZone, ...]:
-    """Зоны последней проверки, где потеряны проценты, — тяжёлые первыми.
+def _weak(
+    by_process: Mapping[str, object] | None, *, lang: str, limit: int = 5
+) -> tuple[WeakProcess, ...]:
+    """Направления (процессы методики) последней проверки с потерей — тяжёлые первыми.
 
-    Читается снимок зоны, записанный движком: ключ потерь — `loss`. Имя поля
-    здесь не угадывается, его сторожит `tests/test_db_zone_snapshot_keys.py`:
-    экран уже показывал «потерь не записано» при записанных двадцати двух
-    процентах, потому что спрашивал несуществующий ключ (#354).
+    Читается разбивка `by_process`, записанная движком (D511): ключ потерь —
+    `loss`. Имя поля здесь не угадывается, его сторожит
+    `tests/test_db_process_screens.py`. Процесс без возможных вычетов
+    (`scored: false`) и с нулевой потерей не показывается; проверка без
+    разбивки (историческая) даёт пустой ответ — «не записано», не «нет потерь».
     """
-    зоны = []
-    for код, снимок in by_zone.items():
-        if not isinstance(снимок, dict):
+    процессы = []
+    for код, снимок in (by_process or {}).items():
+        if not isinstance(снимок, dict) or not снимок.get("scored", True):
             continue
         потеря = снимок.get("loss")
         if потеря is None:
             continue
         имя = снимок.get("name_en" if lang == "en" else "name_ru") or код
-        зоны.append(
-            WeakZone(
-                code=код,
-                name=str(имя),
-                share=float(снимок.get("share") or 0.0),
-                loss=float(потеря),
-                zeroed=bool(снимок.get("zeroed")),
-            )
-        )
-    зоны.sort(key=lambda z: (-z.loss, z.code))
-    return tuple(z for z in зоны if z.loss > 0)[:limit]
+        процессы.append(WeakProcess(code=код, name=str(имя), loss=float(потеря)))
+    процессы.sort(key=lambda p: (-p.loss, p.code))
+    return tuple(p for p in процессы if p.loss > 0)[:limit]
 
 
 def _repeats(
@@ -251,7 +243,7 @@ def load(*, reach: Reach, unit: str, lang: str = "ru", окно: int = ОКНО)
         last=последняя,
         bars=столбики,
         floor=floor,
-        weak=_weak(detail.by_zone if detail else {}, lang=lang),
+        weak=_weak(detail.by_process if detail else None, lang=lang),
         last_findings=tuple(detail.findings) if detail else (),
         repeats=_repeats(находки, окно=tuple(row.id for row in по_времени)),
         zone_names=_zone_names(detail.by_zone if detail else {}, lang=lang),

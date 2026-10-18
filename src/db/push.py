@@ -59,12 +59,12 @@ _INSERT_INSPECTION_SQL = """
 insert into inspections (
     tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
     ui_lang, speech_lang, checklist_version, checklist_code, auditor, city, partner, contact,
-    pct, grade, deductions, counts, by_zone, source_fingerprint, status
+    pct, grade, deductions, counts, by_zone, by_process, source_fingerprint, status
 ) values (
     %(tenant_code)s, %(unit_id)s, %(chat_id)s, %(kind)s, %(inspection_date)s,
     %(report_lang)s, %(ui_lang)s, %(speech_lang)s, %(checklist_version)s,
     %(checklist_code)s, %(auditor)s, %(city)s, %(partner)s, %(contact)s, %(pct)s, %(grade)s,
-    %(deductions)s, %(counts)s, %(by_zone)s, %(source_fingerprint)s, 'draft'
+    %(deductions)s, %(counts)s, %(by_zone)s, %(by_process)s, %(source_fingerprint)s, 'draft'
 )
 on conflict (source_fingerprint) where retracted_at is null do nothing
 returning id
@@ -82,12 +82,12 @@ returning id
 _INSERT_FINDING_SQL = """
 insert into findings (
     inspection_id, n, code, level, zone, zone_unusual, source, words,
-    suggested_code, suggested_level, suggested_zone, suggested_confidence, repeat
+    suggested_code, suggested_level, suggested_zone, suggested_confidence, repeat, reading_c
 ) values (
     %(inspection_id)s, %(n)s, %(code)s, %(level)s, %(zone)s, %(zone_unusual)s, %(source)s,
     %(words)s,
     %(suggested_code)s, %(suggested_level)s, %(suggested_zone)s, %(suggested_confidence)s,
-    %(repeat)s
+    %(repeat)s, %(reading_c)s
 )
 returning id
 """
@@ -146,6 +146,11 @@ def _parse_date(raw: str, *, chat_id: int) -> date:
 
 def _by_zone_payload(score: Score) -> dict[str, object]:
     return {code: asdict(zone) for code, zone in score.by_zone.items()}
+
+
+def _by_process_payload(score: Score) -> dict[str, object]:
+    """Разбивка по процессам, как её вернул движок (D507): переносится, не считается."""
+    return {key: asdict(process) for key, process in score.by_process.items()}
 
 
 def _tenant_code(inspection: Inspection) -> str:
@@ -388,6 +393,7 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
                     "deductions": result.deductions,
                     "counts": Json(dict(result.counts)),
                     "by_zone": Json(_by_zone_payload(result)),
+                    "by_process": Json(_by_process_payload(result)),
                     "source_fingerprint": fingerprint,
                 },
             )
@@ -425,6 +431,8 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
                     # запись назначил аудитор, и база обязана помнить решение,
                     # а не выводить его заново (#359).
                     "repeat": bool(getattr(finding, "repeat", False)),
+                    # Показание термометра (#836, D495): факт проверки, как повтор.
+                    "reading_c": getattr(finding, "reading_c", None),
                     **_suggestion(finding),
                 },
             )

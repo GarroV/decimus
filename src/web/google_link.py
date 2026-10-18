@@ -111,8 +111,13 @@ def finish(
             identity.hosted_domain,
         )
         return "domain"
+    if not identity.subject:
+        logger.warning("Google: привязка %s — в ответе нет номера аккаунта", кто)
+        return "state"
     try:
-        итог = web_own_profile.finish_google_link(token, state=state, email=identity.email)
+        итог = web_own_profile.finish_google_link(
+            token, state=state, email=identity.email, subject=identity.subject
+        )
     except DbError:
         logger.exception("Google: привязка %s — отказ базы", кто)
         return "db"

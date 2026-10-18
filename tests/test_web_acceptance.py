@@ -261,6 +261,7 @@ def test_администратор_исправляет_запись_своег
             "tenant": canonical_tenant(ТЕНАНТ),
             "lang": "ru",
             **ИСПРАВЛЕНИЕ,
+            "reading": "",
         }
     ]
     assert "Запись исправлена, оценка пересчитана." in ответ.get_data(as_text=True)

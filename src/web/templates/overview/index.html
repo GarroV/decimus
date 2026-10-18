@@ -2,7 +2,7 @@
   «Главная» (D378, D398, D399, D418, D471) — в первую очередь про проверки. Сверху ряд
   одинаковых карточек (одна ширина колонки, одна высота; длинное прокручивается
   внутри): «Требует внимания» (доска + «куда смотреть»), итог периода, «Рейтинги»
-  (РС, РКО и карты: CEE и остальные страны), «Топ нарушений», потери по зонам.
+  (РС, РКО и карты: по кластерам стран), «Топ нарушений», потери по процессам (блокам методики, D507).
   Ниже — таблица «Пиццерии» (она и есть список проверок: блока «Последние проверки»
   нет) и справа от неё панель фильтров: период, кластер, страна, порядок. Фильтры
   действуют на весь экран, верхний ряд тоже.
@@ -33,7 +33,7 @@
 
 {% macro empty(text) %}<div class="hm-empty">{{ text }}</div>{% endmacro %}
 
-{# Куда ведёт точка: её карточка в «Стране» (УК) или в «Пиццериях»; нет id — запасной адрес. #}
+{# Куда ведёт точка: экран пиццерии в «Стране» (УК и партнёр, D508); нет id — запасной адрес. #}
 {% macro unit_href(unit_id, country, fallback) -%}
   {%- if unit_id and country and country_url -%}{{ country_url(country, unit=unit_id) }}#unit-{{ unit_id }}
   {%- elif unit_id -%}{{ url('/units/' ~ unit_id) }}
@@ -170,7 +170,7 @@
       {% endif %}
     </section>
 
-    {# ── 4. Топ нарушений | Потери по зонам (D471): четыре карточки всегда, без
+    {# ── 4. Топ нарушений | Потери по процессам (D471, D507): четыре карточки всегда, без
           данных — пустое состояние, чтобы сетка 2×2 не ломалась. Список урезан по
           числу строк, что влезают целиком; остальное — «ещё N →» в «Проверки». #}
     <section class="hm-card">
@@ -197,22 +197,22 @@
     </section>
     <section class="hm-card">
       <header class="hm-card__head">
-        <h2 class="hm-label">{{ t('overview.zones.title') }}</h2>
-        <span class="hm-meta">{{ t('overview.zones.hint') }}</span>
+        <h2 class="hm-label">{{ t('overview.processes.title') }}</h2>
+        <span class="hm-meta">{{ t('overview.processes.hint') }}</span>
       </header>
-      {% if not data.zone_losses %}
-        {{ empty(t('home.zones.none')) }}
+      {% if not data.process_losses %}
+        {{ empty(t('home.processes.none')) }}
       {% else %}
         <ul class="hm-rows">
-          {% for zone in data.zone_losses[:zone_rows] %}
-            <li class="hm-row" title="{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}">
-              <span class="hm-row__main">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>
-              <span class="hm-bar"><span class="hm-bar__fill" style="width:{{ zone.share }}%"></span></span>
-              <span class="hm-row__num mono">−{{ '%.1f'|format(zone.loss) }}</span>
+          {% for process in data.process_losses[:process_rows] %}
+            <li class="hm-row" title="{{ t('overview.processes.spread', units=process.units, inspections=process.inspections) }}">
+              <span class="hm-row__main">{{ process.name_ru if lang == "ru" else process.name_en }}</span>
+              <span class="hm-bar"><span class="hm-bar__fill" style="width:{{ process.share }}%"></span></span>
+              <span class="hm-row__num mono">−{{ '%.1f'|format(process.loss) }}</span>
             </li>
           {% endfor %}
         </ul>
-        {% if data.zone_losses|length > zone_rows %}<a class="hm-more hm-more--end" href="{{ registry_all }}">{{ t('home.more.n', n=data.zone_losses|length - zone_rows) }} →</a>{% endif %}
+        {% if data.process_losses|length > process_rows %}<a class="hm-more hm-more--end" href="{{ registry_all }}">{{ t('home.more.n', n=data.process_losses|length - process_rows) }} →</a>{% endif %}
       {% endif %}
     </section>
   </div>
@@ -233,7 +233,7 @@
             <span class="is-num">{{ t('overview.points.grade') }}</span>
             <span class="is-num">{{ t('overview.points.score') }}</span>
             <span class="is-num">{{ t('overview.points.delta') }}</span>
-            <span>{{ t('overview.points.zone') }}</span>
+            <span>{{ t('overview.points.process') }}</span>
             <span class="is-num">{{ t('overview.points.date') }}</span>
             {# Строка таблицы — сама ссылка, вкладывать ссылки в ячейки нельзя: ведёт на «Рейтинги» заголовок колонки. #}
             <a class="is-num" href="{{ ratings_href }}" title="{{ t('home.ratings.open') }}">{{ t('home.rs.short') }}</a>
@@ -250,7 +250,7 @@
               <span class="is-num is-strong">{{ '%.1f'|format(point.pct) }}</span>
               <span class="is-num{% if point.delta is not none and point.delta < 0 %} is-err{% endif %}"
                     {% if point.delta is none %}title="{{ t('overview.points.nodelta') }}"{% endif %}>{{ '—' if point.delta is none else ('%+.1f'|format(point.delta)) }}</span>
-              <span class="hm-cell__muted">{{ (point.worst_zone_ru if lang == 'ru' else point.worst_zone_en) or '—' }}</span>
+              <span class="hm-cell__muted">{{ (point.worst_process_ru if lang == 'ru' else point.worst_process_en) or '—' }}</span>
               <span class="is-num hm-cell__muted mono">{{ point.when }}</span>
               <span class="is-num">{{ '—' if score[0] is none else '%.1f'|format(score[0]) }}</span>
               <span class="is-num">{{ '—' if score[1] is none else '%.1f'|format(score[1]) }}</span>

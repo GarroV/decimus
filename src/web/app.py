@@ -13,10 +13,12 @@ Node не требуется вовсе — стиль приезжает гот
 
 from __future__ import annotations
 
+import hashlib
 import io
 import logging
 import uuid
 from collections.abc import Callable
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any
@@ -46,6 +48,8 @@ from src.db.errors import (
 )
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
+from src.db.pool import shared_connections
+from src.db.reports import ReportRef
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 from src.domain.permissions import is_read_only
@@ -58,6 +62,7 @@ from . import (
     action_plans,
     assets,
     auth,
+    calendar_screen,
     country_page,
     edition,
     grade_explain,
@@ -99,6 +104,7 @@ from .origin import refuse_foreign_origin
 from .sections import (
     CONTROL_HOME,
     SECTIONS,
+    TABBAR_MAX,
     check_registry,
     current_section,
     refused_for,
@@ -146,17 +152,28 @@ SCREENS = (
 _MEMO_ENVIRON_KEY = "decimus.db_memo_token"
 
 
+_SHARED_DB_ENVIRON_KEY = "decimus.db_shared"
+
+
 def _open_memo() -> None:
     # Метка есть у любого запроса: на POST память явно выключена, а не «не тронута».
-    request.environ[_MEMO_ENVIRON_KEY] = request_memo.begin(
-        enabled=request.method in ("GET", "HEAD")
-    )
+    читает = request.method in ("GET", "HEAD")
+    request.environ[_MEMO_ENVIRON_KEY] = request_memo.begin(enabled=читает)
+    if читает:
+        # Одно соединение на DSN за весь запрос (#732): чтения страницы не платят
+        # выдачей и сбросом пула каждое. Возврат в пул — в `_close_memo`.
+        стек = ExitStack()
+        стек.enter_context(shared_connections())
+        request.environ[_SHARED_DB_ENVIRON_KEY] = стек
 
 
 def _close_memo(_exc: BaseException | None) -> None:
     token = request.environ.pop(_MEMO_ENVIRON_KEY, None)
     if token is not None:
         request_memo.end(token)
+    стек = request.environ.pop(_SHARED_DB_ENVIRON_KEY, None)
+    if стек is not None:
+        стек.close()
 
 
 def _install_request_memo(app: Flask) -> None:
@@ -196,7 +213,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_units(app, conf)
     unit_add.install(app, conf)
     _register_registry(app, conf)
-    _register_calendar(app, conf)
+    calendar_screen.install(app, conf)
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
     users_screen.install(app, conf)
@@ -214,7 +231,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     # адреса обхода передаются отдельному сервису со своим томом на запись.
     walk_proxy.install(app, upstream=conf.walk_upstream, ui_lang=conf.ui_lang)
     _register_errors(app, conf)
-    security_headers.install(app, hsts=conf.hsts)
+    security_headers.install(app, hsts=conf.hsts, demo=conf.demo)
     return app
 
 
@@ -251,6 +268,7 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # ссылка, ведущая в отказ, выглядит как поломка продукта, а
             # проверка внутри шаблона расходится с заслоном на экране молча.
             "sections": visible_sections(account),
+            "tabbar_max": TABBAR_MAX,
             # Текущий раздел — по началу адреса, а не по точному совпадению:
             # карточка проверки `/inspections/<id>` живёт в «Проверках», и
             # панель слева обязана это показывать, как Swarm (D164).
@@ -282,8 +300,6 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Touch ID на этом устройстве (D485): после входа паролем или Google браузер без
             # метки сам просит сохранить ключ; здесь — только допуск и адреса, решает passkey.js.
             "passkey_here": _passkey_here(account, conf),
-            # Вход ключом с формы входа: кнопка и автозапуск только если ключи включены.
-            "passkeys_enabled": conf.webauthn_enabled,
         }
 
 
@@ -363,6 +379,9 @@ class Pick:
     current: str
     current_title: str
     options: tuple[PickOption, ...]
+    #: Размерность отбора кодом (`country`, …) — чтобы экран мог вынести её
+    #: из полосы чипов в свою колонку (D498). Пусто — обычный чип.
+    key: str = ""
 
 
 def _pick(
@@ -373,6 +392,7 @@ def _pick(
     values: tuple[tuple[str, int | None], ...],
     href: Callable[[str], str],
     title: Callable[[str], str] = str,
+    key: str = "",
 ) -> Pick:
     """Собрать чип отбора. Вариант «не сужать» всегда первый.
 
@@ -385,7 +405,9 @@ def _pick(
         for value, count in values
     ]
     выбранное = next((о.title for о in опции[1:] if о.selected), empty_title)
-    return Pick(label=label, current=current, current_title=выбранное, options=tuple(опции))
+    return Pick(
+        label=label, current=current, current_title=выбранное, options=tuple(опции), key=key
+    )
 
 
 def _checklist_names(lang: str) -> dict[str, str]:
@@ -451,7 +473,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
 
 
 def _register_country(app: Flask, conf: Settings) -> None:
-    """Раздел «Страна»: работа с одной страной (D260, D262, D467).
+    """Раздел «Пиццерии»: работа с одной страной (D260, D262, D467).
 
     Рабочая зона — шапка и сегменты («Сводка», «Пиццерии»); сборка в
     `country_page`. Срез живёт в адресе, как на «Главной»: «Грузия, пиццерии,
@@ -516,7 +538,7 @@ def _register_units(app: Flask, conf: Settings) -> None:
     """
 
     @app.get("/units/<unit_id>")
-    def unit(unit_id: str) -> str | tuple[str, int]:
+    def unit(unit_id: str) -> str | tuple[str, int] | Response:
         lang = _lang(conf)
         # Справочник спрашивается целиком: точек у сети сотни, отдельный
         # запрос по идентификатору — это новая функция слоя базы ради одной
@@ -527,6 +549,12 @@ def _register_units(app: Flask, conf: Settings) -> None:
         )
         if точка is None:
             return render_template("inspections/not_found.html"), 404
+        # Партнёр (D508): к пиццерии один путь — экран «Пиццерии» с её списком
+        # проверок; старая карточка точки остаётся УК. Старые ссылки не мертвеют.
+        if auth.current_tenant() != HQ_TENANT and точка.country:
+            return redirect(
+                _url("country", code=точка.country, unit=точка.id, lang=request.args.get("lang"))
+            )
         снимок = unit_data.load(reach=auth.current_reach(), unit=точка.name, lang=lang)
         if снимок.last is None:
             # Проверок нет — география только в справочнике. Так выглядит
@@ -550,48 +578,15 @@ def _register_units(app: Flask, conf: Settings) -> None:
         )
 
 
-def _unit_href(item: to_inspect.ToCheck, *, hq: bool, lang: str) -> str:
-    """Куда ведёт точка из «Где нужно проверить»: карточка в «Стране» (УК) или в «Пиццериях»."""
-    if item.unit_id and item.country and hq:
+def _unit_href(item: to_inspect.ToCheck, *, lang: str) -> str:
+    """Куда ведёт точка из «Где не проведено»: экран пиццерии в «Пиццериях» (УК и партнёр, D508)."""
+    if item.unit_id and item.country:
         return _url("country", code=item.country, unit=item.unit_id, lang=lang) + (
             f"#unit-{item.unit_id}"
         )
     if item.unit_id:
         return _url("unit", unit_id=item.unit_id, lang=lang)
     return _url("registry", lang=lang)
-
-
-def _register_calendar(app: Flask, conf: Settings) -> None:
-    """Раздел «Календарь» (D466): пока в нём одно — «Где нужно проверить».
-
-    Блок ушёл с «Проверок» (D418 → D466): он отвечает на вопрос «куда ехать», а
-    не «что проверено». Свой период, по умолчанию текущий месяц; охват и роли —
-    как были у блока на «Проверках».
-    """
-
-    @app.get(section("calendar").path)
-    def calendar() -> str:
-        язык = _lang(conf)
-        период = registry_period.read(request.args, today=date.today())
-
-        def отбор(**изменения: str) -> str:
-            параметры = {**период.params(), "lang": язык, **изменения}
-            return _url("calendar", **{к: з for к, з in параметры.items() if з})
-
-        hq = auth.current_tenant() == HQ_TENANT
-        return render_template(
-            "calendar/index.html",
-            to_check=to_inspect.load(
-                reach=auth.current_reach(), date_from=период.start, date_to=период.end, top=None
-            ),
-            unit_href=lambda item: _unit_href(item, hq=hq, lang=язык),
-            period=период,
-            period_title=registry_view.period_title(период, язык),
-            period_prev=registry_view.period_link(период, -1, отбор),
-            period_next=registry_view.period_link(период, 1, отбор),
-            period_quick=registry_view.period_quick(период, date.today(), язык, отбор),
-            period_hidden={"lang": язык},
-        )
 
 
 def _register_registry(app: Flask, conf: Settings) -> None:
@@ -654,13 +649,29 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             sorted(registry_data.review, key=lambda row: (row.inspection_date, row.pushed_at))
         )
         ждёт_дней = {row.id: max((сегодня - row.inspection_date).days, 0) for row in на_приёмке}
+        чипы = _registry_picks(registry_data.rows, отбор_в, место, отбор, язык)
         return render_template(
             "inspections/list.html",
             registry=registry_data,
             review_rows=на_приёмке,
+            # «Где не проведено» (D501): период и отбор страны, города и поиска —
+            # те же, что у «Принятых»; список целиком, лишнее свёрнуто в шаблоне.
+            to_check=to_inspect.load(
+                reach=auth.current_reach(),
+                date_from=период.start,
+                date_to=период.end,
+                country=отбор_в.country,
+                city=отбор_в.city,
+                query=отбор_в.q,
+                top=None,
+            ),
+            to_check_top=to_inspect.TO_CHECK_TOP,
+            unit_href=lambda item: _unit_href(item, lang=язык),
             review_wait=ждёт_дней,
             rows=строки,
-            picks=_registry_picks(registry_data.rows, отбор_в, место, отбор, язык),
+            # Страна — колонкой слева (D498), остальные размерности — в блоке фильтров.
+            picks=tuple(ч for ч in чипы if ч.key != "country"),
+            country_pick=next((ч for ч in чипы if ч.key == "country"), None),
             grade_tone=view.grade_tone,
             kind_title=_kind_title,
             # Чек-лист в строке называется, только когда их в реестре больше
@@ -708,18 +719,30 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 return _card_refusal(
                     inspection_id, conf=conf, text=t("card.report.none", lang), status=404
                 )
+            # Метка версии — по ссылке на файл, а не по его байтам: совпала —
+            # хранилище не читается вовсе (#697, ~300 мс на чтение). Новый отчёт
+            # (финальный после приёмки, D203) — новая ссылка и новая метка.
+            метка = report_etag(ref)
+            if метка in request.if_none_match:
+                не_изменён = FlaskResponse(status=304)
+                не_изменён.set_etag(метка)
+                не_изменён.headers["Cache-Control"] = REPORT_CACHE_CONTROL
+                return не_изменён
             файл = data.report_bytes(ref)
         except DbError as exc:
             logger.warning("отчёт проверки %s не выдан: %s", inspection_id, exc)
             return _card_refusal(
                 inspection_id, conf=conf, text=t("card.report.failed", lang), status=503
             )
-        return send_file(
+        ответ = send_file(
             io.BytesIO(файл),
             mimetype=ref.content_type,
             as_attachment=True,
             download_name=_report_name(detail.inspection),
         )
+        ответ.set_etag(метка)
+        ответ.headers["Cache-Control"] = REPORT_CACHE_CONTROL
+        return ответ
 
     @app.get(f"{section('registry').path}/<inspection_id>/photos/<photo_id>")
     def photo(inspection_id: str, photo_id: str) -> FlaskResponse | tuple[str, int]:
@@ -937,6 +960,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 level=request.form.get("level") or "",
                 zone=request.form.get("zone") or "",
                 text=request.form.get("text") or "",
+                reading=request.form.get("reading_c") or "",
             )
         except ReviseError as exc:
             failure = t("revise.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
@@ -1273,6 +1297,7 @@ def _registry_picks(
                 values=страны,
                 href=lambda значение: select(country=значение, city=""),
                 title=lambda код: country_title(код, lang),
+                key="country",
             )
         )
     if города:
@@ -2369,6 +2394,18 @@ def _card_refusal(
     """Карточка с отказом наверху и кодом ответа отказа, а не 200."""
     страница = _render_card(inspection_id, conf=conf, notice=None, failure=text)
     return страница if isinstance(страница, tuple) else (страница, status)
+
+
+#: Отчёт держит только браузер читающего (`private`: документ партнёра не
+#: оседает в общих кэшах) и сверяет его с сервером при каждом открытии
+#: (`no-cache`): после приёмки отчёт заменяется финальным (D203).
+REPORT_CACHE_CONTROL = "private, no-cache"
+
+
+def report_etag(ref: ReportRef) -> str:
+    """Метка версии отчёта: путь в хранилище, время и размер сохранения (#697)."""
+    основа = f"{ref.storage_path}|{ref.created_at.isoformat()}|{ref.size_bytes}"
+    return hashlib.sha256(основа.encode()).hexdigest()[:32]
 
 
 def _report_name(head: InspectionRow) -> str:

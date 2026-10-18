@@ -204,33 +204,16 @@ def main() -> None:
 
         return re.sub(r"url\('(fonts/[^']+)'\)", inline, text)
 
+    # Стили и скрипты — ровно те и в том порядке, что подключает настоящая
+    # страница: список руками отстал от неё (без `walk-offline.js` макет падал
+    # на старте, без `walk-unseen.js` молча терял поведение).
+    page = (repo / "src/web/templates/walk.html").read_text()
+    walk_css = re.findall(r"(walk[a-z-]*\.css)", page)
+    walk_js = re.findall(r"(walk[a-z-]*\.js)", page)
     styles = "\n".join(
-        css(n)
-        for n in [
-            "dodo-ds.css",
-            "decimus-domain.css",
-            "walk.css",
-            "walk-record.css",
-            "walk-menu.css",
-            "walk-app.css",
-            "walk-ux.css",
-            "walk-hints.css",
-        ]
+        css(n) for n in ["dodo-ds.css", "decimus-domain.css", *dict.fromkeys(walk_css)]
     )
-    scripts = "\n".join(
-        (static / n).read_text()
-        for n in [
-            "walk-core.js",
-            "walk-photo.js",
-            "walk-translate.js",
-            "walk-menu.js",
-            "walk-sheet.js",
-            "walk-app.js",
-            "walk-finish.js",
-            "walk-hints.js",
-            "walk.js",
-        ]
-    )
+    scripts = "\n".join((static / n).read_text() for n in dict.fromkeys(walk_js))
     mock = (Path(__file__).parent / "mock.js").read_text()
     seed_js = json.dumps(seed, ensure_ascii=False).replace("</", "<\\/")
     bar_css = """

@@ -68,8 +68,9 @@ PHRASES_PER_CANDIDATE = 10
 #: исходе, включая пустой. Агент пересказывает человеку статус, и «собрано N
 #: кандидатов» без неё читается как «N слов добавлено в карту».
 NOT_APPLIED = (
-    "Nothing was changed: the word map is never topped up automatically (decision D077) — "
-    "the fast path records a finding by that map without the auditor confirming it, so a word "
+    "Nothing was changed: the synonym dictionary is never topped up automatically "
+    "(decision D077) — the fast path records a finding by that dictionary without the "
+    "auditor confirming it, so a word "
     "added here on its own would reach a partner's report with nobody having seen it."
 )
 

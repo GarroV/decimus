@@ -107,6 +107,7 @@ def propose(
     ui_lang: str,
     speech_lang: str,
     report_lang: str,
+    reading_c: float | None = None,
 ) -> Offer:
     """Найти пункт по словам и кадрам тем же порядком, что у бота.
 
@@ -114,12 +115,16 @@ def propose(
     поиску, а не ответ. `note` — сказанное дословно: при пути без модели оно
     же становится формулировкой, как у бота.
 
+    `reading_c` — температура, которую аудитор исправил после неверного чтения
+    термометра (#836). Путь тогда только один — модель: быстрый путь и выученная
+    фраза температуры не знают, и ответили бы прежним.
+
     Ошибки модели (`ModelUnavailable`, `RecognizeError`) не ловятся: что
     показать вместо предложений, решает вызывающий.
     """
     words = note.strip()
     frames = frames[:MODEL_FRAMES_MAX]
-    if words and not album_mode(words, len(frames)):
+    if reading_c is None and words and not album_mode(words, len(frames)):
         fast = fast_path(words, zone, lang=ui_lang, chat_id=chat_id).item
         if fast is not None:
             return Offer(
@@ -157,6 +162,7 @@ def propose(
         chat_id=chat_id,
         photos=tuple(frames) if which.all else (),
         sent_at=sent_at(),
+        reading_c=reading_c,
     )
     return Offer(
         via="model",

@@ -28,7 +28,6 @@ from pathlib import Path
 
 import pytest
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     feed,
     make_bot,
@@ -55,7 +54,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DEMO_DATA = ROOT / "demo" / "data"
 DEMO_CUES = DEMO_DATA / "photo-cues.md"
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Демо-комментарий, на котором быстрый путь обязан сработать. Зона названа
 #: словом «entrance» — это имя демо-зоны `facade` из `demo/data/zones.csv`, а

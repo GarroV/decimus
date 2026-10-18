@@ -13,12 +13,13 @@ from dataclasses import replace
 from typing import Any
 
 from src.domain import list_zones
+from src.domain.models import READING_MAX_C, READING_MIN_C
 
 from .client import ask_model
 from .config import DEFAULT_LANG, RecognizeSettings, load_recognize_settings
 from .cues import class_thresholds
 from .models import NONE_CODE, UNKNOWN_ZONE, Candidate, Suggestion
-from .prompt import instructions, question_text
+from .prompt import correction_line, instructions, question_text
 from .rules_check import check_wording
 from .schema import picks_for, response_schema, split_pick
 from .shortlist import shortlist
@@ -106,11 +107,25 @@ def _candidate(record: dict[str, Any]) -> Candidate | None:
         wording=wording,
         confidence=_clamp(record.get("confidence")),
         reason=reason,
+        reading_c=_reading(record.get("reading_c")),
         # Промпт запрещает додумывать масштаб, повреждение и похвалу (правила
         # 2-4), но у текста нет enum — соблюдение проверяется здесь, вторым
         # слоем, а не только просьбой в инструкции.
         flags=check_wording(wording, reason),
     )
+
+
+def _reading(value: Any) -> float | None:
+    """Показание термометра из ответа модели: число в разумных пределах либо ничего.
+
+    Булево значение числом не считается (`True` — это 1), а запредельное
+    (`1e9`, `nan`) — признак мусора, и показать его аудитору как «температуру на
+    фото» значило бы выдать мусор за измерение.
+    """
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    reading = float(value)
+    return reading if READING_MIN_C <= reading <= READING_MAX_C else None
 
 
 def _candidates(raw: Any, settings: RecognizeSettings) -> tuple[Candidate, ...]:
@@ -161,8 +176,14 @@ def classify(
     chat_id: int | None,
     photos: Sequence[bytes] = (),
     sent_at: str = "",
+    reading_c: float | None = None,
 ) -> Suggestion:
     """Предложить записи по комментарию аудитора. Решение остаётся за ним.
+
+    `reading_c` — температура, которую аудитор ИСПРАВИЛ после того, как модель
+    неверно прочла термометр (#836). Тот же запрос, того же семейства промптов,
+    с одним добавленным утверждением; в каждом ответе показание — это число
+    аудитора, а не повторное чтение кадра.
 
     `lang` — язык формулировок и текста пунктов (язык отчёта проверки).
     `settings` и `model` нужны замеру точности (T035), который гоняет один и тот
@@ -183,7 +204,7 @@ def classify(
     answer = ask_model(
         instructions=instructions(class_thresholds(chat_id=chat_id)),
         question=question_text(
-            note,
+            note if reading_c is None else f"{note.strip()}\n{correction_line(reading_c)}".strip(),
             picks,
             zones,
             zone_hint,
@@ -199,8 +220,16 @@ def classify(
         settings=cfg,
         model=model,
     )
-    return replace(
+    found = replace(
         _suggestion(answer.payload, answer.usage, cfg, used_photo=use_photo),
         shortlist=picked.codes,
         also_seen=_candidates(answer.payload.get("also_seen"), cfg) if album else (),
+    )
+    if reading_c is None:
+        return found
+    # Показание — слово аудитора: что бы модель ни вернула в поле, остаётся оно.
+    return replace(
+        found,
+        candidates=tuple(replace(c, reading_c=reading_c) for c in found.candidates),
+        also_seen=tuple(replace(c, reading_c=reading_c) for c in found.also_seen),
     )

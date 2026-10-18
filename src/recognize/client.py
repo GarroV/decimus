@@ -64,6 +64,12 @@ def _new_client(settings: RecognizeSettings) -> OpenAI:
 #: Проверка ключа — один дешёвый вызов (перечень моделей), без повторов.
 VERIFY_TIMEOUT = 15.0
 
+#: Потолок выхода одного разбора, токенов, вместе с рассуждением модели (#784).
+#: Ответ по схеме — десятки токенов (замер #221: 64), рассуждение — сотни;
+#: потолок с запасом на порядок и только против разгона стоимости. Упёрся —
+#: ответ обрезан и отказ, а не полуразобранный JSON.
+MAX_OUTPUT_TOKENS = 8000
+
 
 def verify_key(api_key: str) -> None:
     """Один вызов провайдера с этим ключом: принят — тихо, иначе отказ.
@@ -137,9 +143,14 @@ def ask_model(
             # без `store=False` Responses хранит запрос и ответ у себя. Цепочек
             # ответов (`previous_response_id`) у нас нет, хранить незачем.
             store=False,
+            max_output_tokens=MAX_OUTPUT_TOKENS,
         )
     except OpenAIError as exc:
         raise ModelUnavailable(f"Модель не ответила: {exc}") from exc
+    if getattr(response, "status", None) == "incomplete":
+        raise ModelUnavailable(
+            f"Ответ модели обрезан потолком в {MAX_OUTPUT_TOKENS} токенов — разбор не принят"
+        )
 
     raw = response.output_text
     try:

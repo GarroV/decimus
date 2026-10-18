@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from src.domain.models import DEFAULT_CHECKLIST_CODE
+
 #: Происхождение проверки (`inspections.origin`, миграции 0038 и 0042, D334).
 #:
 #: `field` — обход из бота, умолчание колонки.
@@ -92,7 +94,7 @@ class InspectionRow:
     #: Умолчание `bizdev`, а не пустая строка: до множественности чек-лист был
     #: один — методика бизнес-девелопера (D181), — и у строк, залитых до
     #: миграции, это запись того, что и так было правдой (D033).
-    checklist_code: str = "bizdev"
+    checklist_code: str = DEFAULT_CHECKLIST_CODE
     #: Снята ли проверка из истории (T210, D086, D089) и почему. Пустая
     #: причина при `retracted=False` — не «причину забыли», а «проверка живая»:
     #: схема не даёт ни снятия без причины, ни причины у живой проверки.
@@ -182,6 +184,9 @@ class FindingRow:
     #: Аудитор отметил запись как повтор нарушения предыдущей проверки: вычет
     #: за неё удвоен (D191, #359).
     repeat: bool = False
+    #: Показание термометра, °C, подтверждённое или исправленное аудитором
+    #: (#836, D495). `None` — замера у записи нет.
+    reading_c: float | None = None
 
     def corrections(self) -> tuple[str, ...]:
         """Что из предложенного моделью аудитор поправил: `code`, `level`, `zone`.
@@ -322,3 +327,6 @@ class InspectionDetail:
     #: и метка прежней методики. Пусто у всех остальных.
     reported_status: str = ""
     legacy_method: str = ""
+    #: Разбивка по процессам методики (D507), как её положил движок. `None` —
+    #: у исторической и не долитой проверки: разбивки нет, и это не «ноль потерь».
+    by_process: dict[str, Any] | None = None

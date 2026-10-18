@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 
 import pytest
-from bot_harness import AUDITOR_ID, feed, make_bot, text_message
+from bot_harness import feed, make_bot, text_message
 
 from src.bot.app import build_dispatcher, log_startup
 from src.bot.config import BotSettings
@@ -25,7 +25,7 @@ from src.bot.version import UNKNOWN_VERSION, build_version
 
 pytestmark = pytest.mark.asyncio
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 #: Команда проверяется строкой, а не константой: аудитор набирает именно её.
 COMMAND = "/version"

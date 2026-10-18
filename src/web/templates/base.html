@@ -71,7 +71,14 @@
   <script data-shell src="{{ url_for('static', filename='nav.js') }}" defer></script>
 </head>
 <body>
-  {% if not account %}
+  {% if demo_mode %}
+    {# Стенд открытого демо (D524): на каждой странице видно, что данные выдуманные. #}
+    <div class="demo-bar" role="note">
+      <span>{{ t('demo.banner') }}</span>
+      <a href="{{ url_for('demo_pick') }}?lang={{ lang }}">{{ t('demo.banner.switch') }}</a>
+    </div>
+  {% endif %}
+  {% block topbar %}{% if not account %}
     {#
       До входа панели нет: разделы неопознанному человеку не показываются, а
       код тенанта — уже сведение о стенде. Остаются марка и выбор языка.
@@ -84,10 +91,11 @@
           <span class="topbar__mark">Dodo</span>
         </div>
         <div class="topbar__spacer"></div>
+        {% block topbar_actions %}{% endblock %}
         {% include "_langpick.html" %}
       </div>
     </header>
-  {% endif %}
+  {% endif %}{% endblock %}
 
   {% if account %}
     {#
@@ -136,9 +144,9 @@
 
         <div class="sidenav__list">
           {% for item in sections %}
-            {#- Группа пункта — поле реестра `sections.py` (D478): между группами тонкая черта. -#}
-            {% if not loop.first and loop.previtem.group != item.group %}<div class="sidenav__sep" role="separator"></div>{% endif %}
             {% set title = t('section.' ~ item.key ~ '.title') %}
+            {# Граница групп меню (D499): проверки · статистика · администрирование. #}
+            {% if not loop.first and item.group != loop.previtem.group %}<span class="sidenav__sep" aria-hidden="true"></span>{% endif %}
             {% if item.path == current_path %}
               <span class="sidenav__current" aria-current="page" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span></span>
             {% elif item.key == current_key %}
@@ -152,18 +160,13 @@
           {% endfor %}
         </div>
 
-        {# Низ панели, как в Swarm (D470, D474): капсула темы и ряд одинаковых
-           квадратных значков — язык (меню со списком языков) и настройки. В узкой
-           панели капсула становится одной кнопкой по кругу, значки встают столбиком. #}
+        {# Низ панели, как в Swarm (D470): тема, язык и явная кнопка настроек одной
+           строкой. Блок учётки ниже — отдельно (D468). #}
         <div class="sidenav__foot">
-          {{ theme_pick() }}
-          <button class="sidenav__tool sidenav__themecycle" type="button" data-theme-cycle
-                  title="{{ t('nav.theme') }}" aria-label="{{ t('nav.theme') }}">
-            {% for value, name in (('system', 'monitor'), ('light', 'sun'), ('dark', 'moon')) %}<span data-theme-icon="{{ value }}">{{ icon(name) }}</span>{% endfor %}
-          </button>
-          <div class="sidenav__tools">
-            {% include "_langmenu.html" %}
-            <a class="sidenav__tool{% if current_key == 'settings' %} is-current{% endif %}" href="{{ settings_url }}"
+          <div class="sidenav__prefs">
+            {{ theme_pick() }}
+            {% include "_langpick.html" %}
+            <a class="sidenav__gear{% if current_key == 'settings' %} is-current{% endif %}" href="{{ settings_url }}"
                title="{{ t('section.settings.title') }}" aria-label="{{ t('section.settings.title') }}"
                {% if current_key == 'settings' %}aria-current="page"{% endif %}>{{ icon('sliders') }}</a>
           </div>
@@ -210,13 +213,27 @@
   #}
   {% if account %}
     {% include "_account_menu.html" %}
+    {#- Не больше пяти пунктов (D518, #686): девять разделов на 390px обрезали
+        подписи. Сверх пяти — первые четыре и «Ещё» со списком остальных. -#}
+    {%- set tabs = sections|selectattr('built')|list -%}
+    {%- set main_tabs = tabs if tabs|length <= tabbar_max else tabs[:tabbar_max - 1] -%}
+    {%- set more_tabs = [] if tabs|length <= tabbar_max else tabs[tabbar_max - 1:] -%}
+    {%- macro tab(item, cls) -%}
+      <a class="{{ cls }}{% if item.key == current_key %} is-current{% endif %}"
+         href="{{ url(item.path) }}?lang={{ lang }}"
+         {% if item.key == current_key %}aria-current="page"{% endif %}
+         title="{{ t('section.' ~ item.key ~ '.title') }}">{{ icon(item.icon) }}<span>{{ t('section.' ~ item.key ~ '.title') }}</span></a>
+    {%- endmacro %}
     <nav class="tabbar" aria-label="{{ t('nav.sections') }}">
-      {% for item in sections %}
-        <a class="tabbar__item{% if item.key == current_key %} is-current{% endif %}{% if not item.built %} is-wip{% endif %}"
-           href="{{ url(item.path) }}?lang={{ lang }}"
-           {% if item.key == current_key %}aria-current="page"{% endif %}
-           title="{{ t('nav.wip') if not item.built else t('section.' ~ item.key ~ '.title') }}">{{ icon(item.icon) }}<span>{{ t('section.' ~ item.key ~ '.title') }}</span></a>
-      {% endfor %}
+      {% for item in main_tabs %}{{ tab(item, 'tabbar__item') }}{% endfor %}
+      {% if more_tabs %}
+      <details class="tabbar__more">
+        <summary class="tabbar__item{% if current_key in more_tabs|map(attribute='key') %} is-current{% endif %}">{{ icon('dots') }}<span>{{ t('nav.more') }}</span></summary>
+        <div class="tabbar__sheet">
+          {% for item in more_tabs %}{{ tab(item, 'tabbar__row') }}{% endfor %}
+        </div>
+      </details>
+      {% endif %}
     </nav>
   {% endif %}
 </body>

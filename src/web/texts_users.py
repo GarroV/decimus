@@ -340,6 +340,12 @@ _OUTCOMES: dict[str, dict[str, str]] = {
         "ru": "Такой замороженной учётки нет — возможно, её уже разморозили.",
         "en": "No such frozen account — it may already be unfrozen.",
     },
+    "users.unfreeze.email_taken": {
+        "ru": "Не разморожено: почту этой учётки уже привязали к другой живой учётке. "
+        "Снимите почту у одной из двух, затем разморозьте.",
+        "en": "Not unfrozen: this account's email is now linked to another active account. "
+        "Remove the email from one of them, then unfreeze.",
+    },
     "users.unfreeze.failed": {
         "ru": "Не разморожено — база не ответила.",
         "en": "Not unfrozen — the database did not answer.",

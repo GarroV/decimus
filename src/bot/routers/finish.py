@@ -350,6 +350,30 @@ async def warn_untranslated(message: Message, inspection: domain.Inspection, lan
     )
 
 
+def _seal(chat_id: int, inspection: domain.Inspection) -> bool:
+    """Поставить признак сдачи (T153, #546). Не легла заметка — `False` и журнал.
+
+    Отказ не роняет сдачу: отчёт важнее заметки. Цена названа: `/start` снова
+    назовёт проверку незавершённой, а окно #546 на этот раз останется открытым.
+    """
+    try:
+        sidecar.mark_handed_over(chat_id, len(inspection.findings))
+    except BotNotesError:
+        logger.exception("отметка о сдаче проверки чата %s не записалась", log_id(chat_id))
+        return False
+    return True
+
+
+def _unseal(chat_id: int, sealed: bool) -> None:
+    """Отчёт не собрался — снять печать, поставленную перед сборкой (#546)."""
+    if not sealed:
+        return
+    try:
+        sidecar.unmark_handed_over(chat_id)
+    except BotNotesError:
+        logger.exception("печать проверки чата %s не снялась", log_id(chat_id))
+
+
 async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: bool) -> None:
     """Собрать отчёт и письмо, отдать их в чат и записать проверку в историю.
 
@@ -376,6 +400,13 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
     # Кадры записей и кадры информационной части (T179) — одним списком: карту
     # «ссылка → файл» блок `report` строит по обоим, и кадр поля, не скачанный
     # здесь, напечатался бы партнёру красной отметкой «фотография не приложена».
+    # Печать ДО сборки (#546): с этой секунды мини-апп и бот запись не принимают,
+    # и в отчёт ложится ровно то, что попадёт в историю. Отчёт не соберётся —
+    # печать снимается ниже. Проверка перечитывается уже запечатанной.
+    sealed = _seal(chat_id, inspection)
+    inspection = read_inspection(chat_id) or inspection
+    if sealed:
+        _seal(chat_id, inspection)  # число записей — уже по запечатанной
     refs = [ref for finding in inspection.findings for ref in finding.photos]
     refs += [ref for field in inspection.info.values() for ref in field.photos]
     with tempfile.TemporaryDirectory(prefix="bot-report-") as tmp:
@@ -401,6 +432,7 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
                 reply_markup=without_photos_keyboard(lang),
                 reason=exc,
             )
+            _unseal(chat_id, sealed)
             return
         except ReportError:
             # Текст движка — для того, кто чинит стенд: в нём внутренности
@@ -408,22 +440,17 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
             # библиотеки (T151). Аудитору на точке нужен не он.
             logger.exception("отчёт чата %s не собрался", log_id(chat_id))
             await stops.refuse(message, lang, step="finish.build", key="finish.pdf_failed")
+            _unseal(chat_id, sealed)
             return
 
         await message.answer_document(FSInputFile(pdf))
         # Сразу под документом, а не до сборки: предупреждение говорит о том,
         # что в этом самом файле напечатано, и читается вместе с ним.
         await warn_untranslated(message, inspection, lang)
-        # Отчёт у аудитора — с этой секунды проверка сдана (T153). Отмечается
-        # именно отдача документа, а не нажатие кнопки: несобравшийся отчёт
-        # сданной проверку не делает.
-        try:
-            sidecar.mark_handed_over(chat_id, len(inspection.findings))
-        except BotNotesError:
-            # Отчёт уже у человека, письмо и слив в историю впереди — уронить
-            # их из-за незаписанной заметки было бы хуже самой заметки. Цена
-            # известна и названа: `/start` снова назовёт проверку незавершённой.
-            logger.exception("отметка о сдаче проверки чата %s не записалась", log_id(chat_id))
+        # Отчёт у аудитора. Проверка запечатана ещё до сборки (#546); если печать
+        # тогда не легла — последняя попытка теперь, как было до #546.
+        if not sealed:
+            _seal(chat_id, inspection)
         # Накопитель непокрытых формулировок уезжает в свою историю вместе с
         # проверкой (T269, #228): собранное относится к ней, а следующая
         # обязана начинаться с пустого накопителя — иначе слова прошлой точки

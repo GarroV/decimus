@@ -202,3 +202,35 @@ def test_чужой_или_несуществующий_кадр_404(
     # Не идентификатор — 404 до базы, а не отказ разбора в ней.
     assert с_отчётом.get(f"/inspections/{ПРОВЕРКА}/photos/../../etc").status_code == 404
     assert с_отчётом.get(f"/inspections/{ПРОВЕРКА}/photos/not-a-uuid").status_code == 404
+
+
+def test_повторное_открытие_отчёта_не_читает_хранилище(
+    с_отчётом: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#697: метка совпала — 304 без чтения файла; чтение хранилища ~300 мс."""
+    первый = с_отчётом.get(f"/inspections/{ПРОВЕРКА}/report")
+    метка = первый.headers["ETag"]
+    assert первый.headers["Cache-Control"] == "private, no-cache"
+
+    def нельзя(_ref: ReportRef) -> bytes:
+        raise AssertionError("хранилище прочитано при совпавшей метке")
+
+    monkeypatch.setattr(data, "report_bytes", нельзя)
+    второй = с_отчётом.get(f"/inspections/{ПРОВЕРКА}/report", headers={"If-None-Match": метка})
+    assert второй.status_code == 304
+    assert второй.data == b""
+
+
+def test_новый_отчёт_новая_метка(с_отчётом: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Финальный отчёт после приёмки (D203) не прячется за меткой черновика."""
+    метка = с_отчётом.get(f"/inspections/{ПРОВЕРКА}/report").headers["ETag"]
+    новый = ReportRef(
+        storage_path=f"s3://inspection-frames/inspections/{ПРОВЕРКА}/reports/def.pdf",
+        content_type="application/pdf",
+        size_bytes=len(ОТЧЁТ),
+        created_at=datetime(2026, 9, 28, tzinfo=UTC),
+    )
+    monkeypatch.setattr(data, "load_report", lambda *_a, **_k: новый)
+    ответ = с_отчётом.get(f"/inspections/{ПРОВЕРКА}/report", headers={"If-None-Match": метка})
+    assert ответ.status_code == 200
+    assert ответ.data == ОТЧЁТ

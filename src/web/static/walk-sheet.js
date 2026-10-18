@@ -14,6 +14,12 @@
  * Рекомендация (D201, класс R) и общая заметка (D314, код NOTE) — без вычета,
  * текст обязателен. Замер (D0) — со стоянки «Печь и холодильники» (D315).
  *
+ * Показание термометра (#836): модель читает цифры с дисплея и путается (6 °C
+ * как 26 °C), поэтому при показании у карточки или записи в форме есть поле
+ * «Температура, °C». Изменённое число «Сохранить» не пишет, а пересчитывает
+ * предложение (тот же поиск с `reading_c`) — новое предложение ждёт «Сохранить»
+ * как любое другое.
+ *
  * Правила методики форма подсказывает, а не решает: без фото не сохранить
  * (D078), классы — только допустимые для пункта, пункт, уже записанный в этой
  * зоне, — новые фото к той записи, повтор ставит человек (D191); окончательно
@@ -54,6 +60,40 @@
   }
 
   function isMeasure() { return f.mode === "measure"; }
+
+  /* ── показание термометра (#836) ──────────────────────────────────── */
+
+  var READING_MIN = -60;
+  var READING_MAX = 500;
+
+  /** Число из поля: «6», «-18», «4,5», «6 °C»; не число или вне термометра — null. */
+  function parseReading(raw) {
+    var m = /^\s*([+\-\u2212]?\d{1,3}(?:[.,]\d{1,2})?)\s*(?:°\s*[CcСс]?)?\s*$/.exec(String(raw == null ? "" : raw));
+    if (!m) return null;
+    var v = parseFloat(m[1].replace(",", ".").replace("\u2212", "-"));
+    return v >= READING_MIN && v <= READING_MAX ? v : null;
+  }
+
+  /** У формы есть показание: поле показано, пока оно не null (пустая строка — поле есть, число стёрто). */
+  function hasReading() { return f.reading !== null && f.reading !== undefined; }
+
+  /** Число в поле отличается от того, по которому предложение уже посчитано. */
+  function readingChanged() {
+    if (!hasReading()) return false;
+    var v = f.reading.trim() === "" ? null : parseReading(f.reading);
+    return v !== f.readingBase;
+  }
+
+  /** Поле непустое, но не число: сохранять и пересчитывать нельзя. */
+  function readingInvalid() { return hasReading() && f.reading.trim() !== "" && parseReading(f.reading) === null; }
+
+  function hasNoViolation() { return f.noViolation !== null && f.noViolation !== undefined; }
+
+  function setReading(value) {
+    f.reading = value === null || value === undefined ? null : String(value);
+    f.readingBase = value === null || value === undefined ? null : value;
+    f.noViolation = null;
+  }
 
   /** Рекомендация без нарушения (D201): у пункта, без класса и вычета. */
   function isAdvice() { return f.mode === "advice"; }
@@ -129,8 +169,11 @@
     if (uploading()) return "walk.sheet.need_upload";
     // Кадр, ждущий связи, нельзя бросить за порогом записи: она ушла бы без него.
     if (waitingPhotos().length) return "walk.sheet.need_online";
+    // Число после «нарушения нет» поправлено: «Пересчитать» доступно без пункта.
+    if (f.noViolation !== null && readingChanged() && !readingInvalid()) return null;
     if (!f.zone) return recognizing() && f.code ? "walk.sheet.need_where" : "walk.sheet.need_zone";
     if (!f.code) return "walk.sheet.need_item";
+    if (readingInvalid()) return "walk.err.reading";
     if (isAdvice()) return f.text.trim() ? null : "walk.sheet.need_advice";
     if (!taken() && !f.level) return "walk.sheet.need_level";
     return null;
@@ -142,7 +185,7 @@
     if (!f.n) return !!(f.photos.length || f.text || f.comment || f.words) || f.code !== f.preset;
     var o = f.original;
     return f.text !== o.text || f.comment !== o.comment || f.level !== o.level ||
-      f.zone !== o.zone || f.code !== o.code || f.repeat !== o.repeat ||
+      f.zone !== o.zone || f.code !== o.code || f.repeat !== o.repeat || readingChanged() ||
       f.photos.some(function (p) { return p.fresh; }) || f.removed.length > 0;
   }
 
@@ -150,7 +193,7 @@
     if (f.n) return;
     W.local.set(draftKey(), {
       mode: f.mode, zone: f.zone, code: f.code, level: f.level, text: f.text,
-      comment: f.comment, repeat: f.repeat, words: f.words,
+      comment: f.comment, repeat: f.repeat, words: f.words, reading: f.reading,
       photos: readyPhotos().map(function (p) { return p.ref; }),
     });
   }
@@ -439,6 +482,8 @@
     var before = previousHere(code);
     if (before && !isAdvice() && !f.level && i.levels.indexOf(before.level) !== -1) f.level = before.level;
     if (cand && cand.wording && (!f.text.trim() || f.textAuto)) { f.text = cand.wording; f.textAuto = true; }
+    if (cand && cand.reading_c !== null && cand.reading_c !== undefined) setReading(cand.reading_c);
+    else if (cand && !f.n) setReading(null);
     W.haptic();
     changed();
     redraw.apply(null, ORDER.concat(["footer"]));
@@ -446,13 +491,19 @@
 
   /* ── система ищет пункт (D330) ─────────────────────────────────────── */
 
-  function find() {
+  function find(reading) {
     if (findBlocker() || f.finding) return;
     f.finding = true;
     f.findError = null;
-    redraw("item", "footer");
-    var asked = { words: f.words.trim(), photos: readyPhotos().map(function (p) { return p.ref; }) };
-    W.post(W.urls.suggest, { zone_hint: f.zone || f.hint || null, words: asked.words, photos: asked.photos }).then(function (res) {
+    // Простой поиск (без исправленного числа) начинает разговор заново.
+    if (typeof reading !== "number") f.noViolation = null;
+    redraw("item", "reading", "footer");
+    var asked = { words: (f.n ? (f.words || f.text) : f.words).trim(), photos: readyPhotos().map(function (p) { return p.ref; }) };
+    var body = { zone_hint: f.zone || f.hint || null, words: asked.words, photos: asked.photos };
+    // Исправленная температура (#836): тот же поиск с утверждением «реально N °C».
+    var fixed = typeof reading === "number" ? reading : null;
+    if (fixed !== null) body.reading_c = fixed;
+    W.post(W.urls.suggest, body).then(function (res) {
       if (!f) return;
       if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
       f.finding = false;
@@ -460,13 +511,26 @@
       f.question = (res.body && res.body.question) || "";
       f.via = (res.body && res.body.via) || "model";
       f.asked = JSON.stringify(asked);
-      if (f.found.length) pick(f.found[0].code, f.found[0]);
-      else { redraw("item", "footer"); }
+      if (f.found.length) {
+        if (fixed !== null) {
+          // Предложение посчитано заново: формулировка и класс — новые, число — аудитора.
+          f.textAuto = true;
+          f.text = f.found[0].wording || f.text;
+          setReading(fixed);
+        }
+        pick(f.found[0].code, f.found[0]);
+      } else if (fixed !== null) {
+        // При этой температуре нарушения нет — запись не создаётся.
+        setReading(fixed);
+        f.noViolation = fixed;
+        f.code = null; f.level = null; f.picked = null; f.zone = null;
+        redraw.apply(null, ORDER.concat(["footer"]));
+      } else { redraw("item", "footer"); }
     }).catch(function (err) {
       if (!f) return;
       f.finding = false;
       f.findError = err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network");
-      redraw("item", "footer");
+      redraw("item", "reading", "footer");
     });
   }
 
@@ -599,6 +663,37 @@
       if (t) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.taken", { n: t.n })));
       var v = isAdvice() && !f.n ? violationHere() : null;
       if (v) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.advice_has_violation", { n: v.n })));
+      return box;
+    },
+
+    reading: function () {
+      var none = f.noViolation !== null && f.noViolation !== undefined;
+      if (!hasReading() || (!f.code && !none)) return null;
+      var box = section(tx("walk.sheet.reading"), tx("walk.sheet.reading_hint"));
+      if (none) {
+        // При этом числе нарушения нет (#836): число можно вернуть и пересчитать
+        // снова либо начать поиск заново без температуры.
+        box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.reading_none", { value: String(f.noViolation) })));
+      }
+      var input = el("input", "walk-input walk-input--reading");
+      input.type = "text";
+      input.inputMode = "decimal";
+      input.autocomplete = "off";
+      input.value = f.reading;
+      input.setAttribute("aria-label", tx("walk.sheet.reading"));
+      input.addEventListener("input", function () {
+        var was = readingChanged() || readingInvalid();
+        f.reading = input.value;
+        changed();
+        if (was !== (readingChanged() || readingInvalid())) redraw("footer");
+      });
+      box.appendChild(input);
+      if (none && recognizing()) {
+        box.appendChild(W.button("walk-link", tx("walk.sheet.reading_reset"), function () {
+          setReading(null);
+          redraw.apply(null, ORDER.concat(["footer"]));
+        }));
+      }
       return box;
     },
 
@@ -735,7 +830,7 @@
         return box;
       }
       if (f.error) box.appendChild(el("p", "walk-form__error", f.error));
-      if (recognizing() && !f.code) {
+      if (recognizing() && !f.code && !hasNoViolation()) {
         var blocked = findBlocker();
         var go = W.hinted(W.button("walk-mark walk-mark--find", f.finding ? tx("walk.sheet.finding_short") : tx("walk.sheet.find"), find), "find");
         go.disabled = !!blocked || !!f.finding;
@@ -744,9 +839,13 @@
         return box;
       }
       var why = blocker();
-      var label = f.saving ? tx("walk.sheet.saving") : taken() ? tx("walk.sheet.add_photos") : tx("walk.sheet.save");
+      var recheck = readingChanged() && !readingInvalid();
+      var label = f.saving ? tx("walk.sheet.saving")
+        : f.finding ? tx("walk.sheet.rechecking")
+        : recheck ? tx("walk.sheet.recheck")
+        : taken() ? tx("walk.sheet.add_photos") : tx("walk.sheet.save");
       var save = W.hinted(W.button("walk-mark", label, save_), "save");
-      save.disabled = !!why || f.saving;
+      save.disabled = !!why || f.saving || !!f.finding;
       box.appendChild(save);
       if (why && !f.saving) box.appendChild(el("p", "walk-sheet__why", tx(why)));
       return box;
@@ -768,7 +867,7 @@
     if (manual && !fromList) list.appendChild(proposal({ code: f.code, level: f.level, zone: f.zone }));
     if (list.childNodes.length) box.appendChild(list);
     if (f.code && !f.zone && item(f.code) && !isAdvice() && !isMeasure()) box.appendChild(whereRow());
-    if (f.found && !f.found.length) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.found_none")));
+    if (f.found && !f.found.length && !hasNoViolation()) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.found_none")));
     if (f.question) box.appendChild(el("p", "walk-form__note walk-form__note--info", f.question));
     if (stale()) {
       var again = el("p", "walk-form__note walk-form__note--info");
@@ -782,7 +881,7 @@
     return box;
   }
 
-  var ORDER = ["context", "photos", "words", "item", "level", "text", "comment", "repeat", "danger"];
+  var ORDER = ["context", "photos", "words", "item", "reading", "level", "text", "comment", "repeat", "danger"];
 
   function redraw() {
     var names = Array.prototype.slice.call(arguments);
@@ -808,6 +907,12 @@
     return { code: top.code, level: top.level, zone: top.zone, confidence: top.confidence, via: f.via };
   }
 
+  /** Число для записи: пустое поле — null (замера нет). */
+  function readingValue() {
+    if (!hasReading() || f.reading.trim() === "") return null;
+    return parseReading(f.reading);
+  }
+
   function ops() {
     var refs = readyPhotos().filter(function (p) { return p.fresh; }).map(function (p) { return p.ref; });
     var t = taken();
@@ -817,7 +922,7 @@
         op: "add", zone: f.zone, code: f.code, level: isAdvice() ? ADVICE_LEVEL : f.level, text: f.text.trim(),
         comment: f.comment.trim(), repeat: !!f.repeat && repeatOffered(),
         photos: readyPhotos().map(function (p) { return p.ref; }),
-        words: f.words.trim(), suggested: suggested(),
+        words: f.words.trim(), suggested: suggested(), reading_c: readingValue(),
       }];
     }
     var o = f.original;
@@ -829,6 +934,7 @@
     if (f.text.trim() !== o.text) { edit.text = f.text.trim(); any = true; }
     if (f.comment.trim() !== o.comment) { edit.comment = f.comment.trim(); any = true; }
     if (!!f.repeat !== !!o.repeat) { edit.repeat = !!f.repeat; any = true; }
+    if (hasReading() && readingValue() !== o.reading) { edit.reading_c = readingValue(); any = true; }
     var list = refs.map(function (ref) { return { op: "attach", n: f.n, ref: ref }; });
     if (any) list.unshift(edit);
     // Снимать — после того, как новые кадры легли: запись ни на миг без фото.
@@ -837,6 +943,12 @@
 
   function save_() {
     if (blocker()) return;
+    if (readingChanged()) {
+      // Число поправлено — это не запись, а пересчёт предложения (#836): новое
+      // предложение ждёт «Сохранить». Стёртое поле — «замера нет», пересчитывать нечего.
+      var fixed = readingValue();
+      if (fixed !== null) { find(fixed); return; }
+    }
     var list = ops();
     if (!list.length) { close(true); return; }
     submit(list);
@@ -902,7 +1014,11 @@
     if (W.tg && W.supports("6.2")) W.tg.disableClosingConfirmation();
   }
 
-  function onBack() { close(false); }
+  /** «Назад» при открытом видоискателе закрывает его, а не форму. */
+  function onBack() {
+    if (W.photo && W.photo.closeCamera()) return;
+    close(false);
+  }
 
   /**
    * Открыть форму.
@@ -931,6 +1047,9 @@
       words: "",
       found: null,
       preset: opts.code || null,
+      reading: null,
+      readingBase: null,
+      noViolation: null,
     };
     if (rec) {
       f.mode = rec.level === "D0" ? "measure" : rec.level === ADVICE_LEVEL ? "advice" : "violation";
@@ -941,7 +1060,9 @@
       f.repeat = !!rec.repeat;
       f.commentOpen = !!rec.comment;
       f.photos = rec.photos.map(function (p) { return { id: ++seq, ref: p.ref, own: p.own, state: "done" }; });
-      f.original = { code: rec.code, level: rec.level, zone: opts.zone, text: rec.text, comment: rec.comment || "", repeat: !!rec.repeat };
+      f.words = rec.words || "";
+      if (rec.reading_c !== null && rec.reading_c !== undefined) setReading(rec.reading_c);
+      f.original = { code: rec.code, level: rec.level, zone: opts.zone, text: rec.text, comment: rec.comment || "", repeat: !!rec.repeat, reading: rec.reading_c === undefined ? null : rec.reading_c };
     } else {
       var draft = W.local.get(draftKey());
       if (draft && !opts.code && draft.mode === f.mode && (draft.code || draft.words || (draft.photos || []).length)) {
@@ -951,6 +1072,7 @@
         f.text = draft.text || "";
         f.comment = draft.comment || "";
         f.words = draft.words || "";
+        if (draft.reading !== null && draft.reading !== undefined) { f.reading = String(draft.reading); f.readingBase = parseReading(draft.reading); }
         f.commentOpen = !!draft.comment;
         f.repeat = !!draft.repeat;
         f.photos = (draft.photos || []).map(function (ref) { return { id: ++seq, ref: ref, own: true, state: "done", fresh: true }; });

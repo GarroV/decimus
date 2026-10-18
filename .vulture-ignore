@@ -107,7 +107,7 @@ _методика_не_протекает_из_оболочки
 _сведение_комментария_не_уходит_в_сеть
 _правка_ответом_не_уходит_в_сеть
 _чистый_кэш
-_бот_без_базы_не_знает_привязок
+_бот_без_базы_знает_своих
 
 # Фикстура pytest, подключённая по имени строкой (T151): `usefixtures` берёт её
 # из строки, и статический разбор такой связи не видит. В теле теста фикстура
@@ -153,6 +153,7 @@ on_sealed_drop
 # краснеет у каждого блока, а красное, не связанное с работой, учит не смотреть
 # на красное.
 pytest_terminal_summary
+pytest_sessionstart
 
 # Админские хендлеры круга доступа к MCP (T253). Тот же случай, что у прочих
 # кнопок и команд: имя читает декоратор `@router.message`, а зовёт диспетчер по
@@ -327,6 +328,7 @@ walk_info
 # приложения `get_send_file_max_age` — их вызывает фреймворк, не код.
 _вход_через_google_доступен
 _add_fingerprint
+_mark_immutable
 _.get_send_file_max_age
 # Хендлер aiogram выбора чек-листа на старте (D221) — зовёт диспетчер по фильтру.
 on_checklist
@@ -337,8 +339,8 @@ mtime_ns
 # «Обзор» и «Страна», карточка пиццерии, ставки методики.
 current_title
 narrowed
-worst_zone_ru
-worst_zone_en
+worst_process_ru
+worst_process_en
 breakdown
 audits_count
 bars
@@ -522,6 +524,7 @@ _учётки
 # #717): pytest вызывает их сам. `tests/conftest.py` — свой предел частоты
 # обхода у каждого теста; `tests/test_migros_link.py` — подмена ретранслятора.
 _предел_обхода_свой_у_теста
+_письма_не_протекают_между_тестами
 _ретранслятор
 
 # Маршруты-приманки `tests/test_web_guard.py`: их регистрирует декоратор Flask,
@@ -577,3 +580,48 @@ factor_count
 
 # Поле записи о ключе модели читает шаблон блока («Поставлен»): кодом оно не используется.
 set_at
+
+# Фикстура-переключатель в параметрах теста (tests/test_mcp_personal_tokens.py): значение не читается.
+без_триггера
+
+# Обработчики, которые регистрирует декоратор (`@app.post`, `@router.callback_query`,
+# `@app.errorhandler`, `@app.teardown_request`): по имени их не зовёт никто (#862).
+_снять_пространство
+_second_step_required
+do_add_finding
+do_add_photo
+do_delete_photo
+on_fix_reading
+on_reading_other
+on_reading_value
+passkey_login_options
+passkey_login_verify
+security_prove_code
+settings_continue
+
+# Поля, которые читает только шаблон (`country/_summary.html`, `country/_units.html`).
+has_inspections
+has_maps
+has_ratings
+open_rows
+closed_rows
+
+# Маршруты поездок «Календаря» (D505, D506): регистрирует `@app.post` внутри
+# `calendar_screen.install`, зовёт Flask по адресу. `steps_on` читает только
+# шаблон `calendar/_trip.html` — план поездки по дням.
+trip_create
+trip_update
+trip_delete
+trip_step_add
+trip_step_delete
+steps_on
+# Почта замороженной учётки (аудит 12.10): фикстура заводит замороженную учётку
+# с почтой и живую без неё, тесты читают их через функции доступа.
+замороженная_с_почтой
+# Открытое демо (D524): маршруты и процессор контекста, Flask зовёт их сам.
+_демо
+demo_pick
+demo_app
+demo_enter
+landing
+_в_демо_выключено

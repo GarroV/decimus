@@ -29,10 +29,10 @@ load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings
 SPACE_KEY = "space"                    # пространство человека в data; обработчик — параметр space
 BindingCache(resolve=bot_links.resolve, ttl=60 s)   # .space_of(tg) -> str | None; отказ базы —
                                        # последний ответ узнанному, None незнакомому
-AccessMiddleware(allowed_ids, bindings, roster, redeem=bot_links.redeem)
+AccessMiddleware(bindings, roster, redeem=bot_links.redeem)
                                        # /start link-<токен> → привязка и ответ в тот же чат;
-                                       # привязка → её пространство; ALLOWED_TELEGRAM_IDS и
-                                       # roster.json → HQ, только если привязки нет
+                                       # привязка → её пространство; roster.json → HQ,
+                                       # только если привязки нет (список ID из окружения снят, D520)
 ChatSpaceMiddleware(read_tenant=chat_tenant)   # после доступа: апдейт к проверке чата
                                        # чужого пространства не доходит до обработчика
 # src/bot/roster.py — связки по приглашениям до D286, только чтение (совместимость)

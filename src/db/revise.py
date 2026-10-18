@@ -43,7 +43,7 @@ from .config import check_environment
 from .errors import ReviseError
 from .models import ORIGIN_LEGACY, InspectionDetail
 from .pool import connection
-from .push import _INSERT_TRANSLATION_SQL, _by_zone_payload
+from .push import _INSERT_TRANSLATION_SQL, _by_process_payload, _by_zone_payload
 from .queries import _read_detail, _require_inspection_id, _require_tenant
 from .reach import own_reach
 
@@ -57,6 +57,8 @@ class Revision:
     zone: str
     zone_unusual: bool
     text: str
+    #: Показание термометра, °C (#855, D495); `None` — замера нет или снят.
+    reading_c: float | None = None
 
 
 # Замок строки ждущей проверки — первое действие транзакции. Под ролью
@@ -85,7 +87,8 @@ where inspection_id = %(id)s and code = %(code)s and zone = %(zone)s and id <> %
 
 _UPDATE_FINDING_SQL = """
 update findings
-set code = %(code)s, level = %(level)s, zone = %(zone)s, zone_unusual = %(zone_unusual)s
+set code = %(code)s, level = %(level)s, zone = %(zone)s, zone_unusual = %(zone_unusual)s,
+    reading_c = %(reading_c)s
 where id = %(finding)s and inspection_id = %(id)s
 """
 
@@ -95,7 +98,7 @@ where id = %(finding)s and inspection_id = %(id)s
 _UPDATE_SCORE_SQL = """
 update inspections
 set pct = %(pct)s, grade = %(grade)s, deductions = %(deductions)s,
-    counts = %(counts)s, by_zone = %(by_zone)s
+    counts = %(counts)s, by_zone = %(by_zone)s, by_process = %(by_process)s
 where id = %(id)s and tenant_code = %(tenant)s and status = 'draft' and origin <> 'legacy'
 """
 
@@ -225,6 +228,7 @@ def _apply(
                 "level": revision.level,
                 "zone": revision.zone,
                 "zone_unusual": revision.zone_unusual,
+                "reading_c": revision.reading_c,
             },
         )
         if cur.rowcount != 1:
@@ -251,6 +255,7 @@ def _write_score(cur: Any, ident: str, tenant: str, score: Score) -> None:
             "deductions": score.deductions,
             "counts": Json(dict(score.counts)),
             "by_zone": Json(_by_zone_payload(score)),
+            "by_process": Json(_by_process_payload(score)),
         },
     )
     if cur.rowcount != 1:

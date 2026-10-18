@@ -13,7 +13,7 @@
    (`home_board`) и под ними пиццерии, куда смотреть. Нечего показать — карточки
    нет вовсе; отказ доски остаётся строкой с ошибкой, не тишиной;
 2. «Проверки за период» — итог; без проверок — одной строкой;
-3. «Рейтинги» — РС, РКО и карты: CEE и остальные страны (`home_ratings_block`);
+3. «Рейтинги» — РС, РКО и карты по кластерам D502 (`home_ratings_block`);
 4. «Топ нарушений», «Потери по зонам» — без данных пустое состояние, сетка не ломается;
 5. «Пиццерии» — таблица с колонками последней оценки РС / РКО
    (`home_ratings.load_latest`; сбой — прочерки и строка в шапке блока, экран
@@ -21,7 +21,7 @@
 
 Срез живёт в панели фильтров справа от таблицы (D471) и действует на весь экран,
 верхний ряд тоже: период (календарь «с — по» со стрелками, по умолчанию текущий
-месяц, тот же `registry_period`, что у «Проверок»), кластер (CEE / «Другие
+месяц, тот же `registry_period`, что у «Проверок»), кластер (CEE / Турция / Кавказ / «Остальные
 страны» из `ratings.countries.cluster`), страна, порядок таблицы. Кластер сужает
 страны выборки; страна — одну из них. Срез в адресе, ссылкой делятся. «Город» и
 «Буква» с главной ушли: город — работа «Страны» (D260), буква видна в таблице.
@@ -44,7 +44,6 @@ from flask import render_template, request, url_for
 
 from src.db import ratings_read
 from src.db.errors import DbError
-from src.domain.tenants import HQ_TENANT
 from src.ratings import report
 
 from . import (
@@ -65,9 +64,10 @@ log = logging.getLogger(__name__)
 
 
 #: Сколько строк каждого списка влезает в карточку целиком (D471): остальное — «ещё N →».
+#: Нижний ряд карточек выше верхнего (D507): «Топ нарушений» вмещает больше строк.
 ATTENTION_ROWS = 6
-TOP_ROWS = 4
-ZONE_ROWS = 6
+TOP_ROWS = 7
+PROCESS_ROWS = 8
 
 
 def _url(endpoint: str, **params: Any) -> str:
@@ -171,7 +171,6 @@ def render(
         dates=(period.start, period.end),
         dates_before=(before.start, before.end) if before else None,
     )
-    hq = auth.current_tenant() == HQ_TENANT
 
     def select(**изменения: str) -> str:
         """Адрес главной с изменённым срезом; пустое и умолчания из адреса выпадают."""
@@ -262,7 +261,7 @@ def render(
         only_country=selection.country,
         attention_rows=ATTENTION_ROWS,
         top_rows=TOP_ROWS,
-        zone_rows=ZONE_ROWS,
+        process_rows=PROCESS_ROWS,
         registry_all=в_реестр(),
         stickers=стикеры,
         board_failed=доска_отказ,
@@ -278,7 +277,7 @@ def render(
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
         lang=lang,
-        country_url=в_страну if hq else None,
+        country_url=в_страну,
         item_titles=item_titles,
         unit_ids=snapshot.unit_ids,
     )

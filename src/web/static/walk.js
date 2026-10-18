@@ -39,13 +39,7 @@
   }
 
   function loadMarks(key, done) {
-    if (hasCloud()) {
-      tg.CloudStorage.getItem(key, function (err, value) { done(parseMarks(err ? null : value)); });
-      return;
-    }
-    var raw = null;
-    try { raw = window.localStorage.getItem(key); } catch (e) { raw = null; }
-    done(parseMarks(raw));
+    W.storedGet(key, function (raw) { done(parseMarks(raw)); });
   }
 
   function saveMarks() {
@@ -534,6 +528,8 @@
     } else if (!zone.previous.length && writable()) {
       if (zoneDone(zone)) stage.appendChild(el("p", "walk-stage__note", tx("walk.zone.clean_done")));
     }
+    var unseen = W.unseenBlock(zone, writable());
+    if (unseen) stage.appendChild(unseen);
     var list = renderChecklist(zone);
     if (list) stage.appendChild(list);
 

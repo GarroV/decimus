@@ -63,6 +63,16 @@ jobs:
       - name: Типы
         run: mypy
 
+      # Мёртвый код и границы модулей шли только в `make check`, и vulture
+      # накопил 20 находок незамеченным (#862).
+      - name: Мёртвый код
+        run: |
+          vulture
+          deptry .
+
+      - name: Границы модулей
+        run: lint-imports
+
       - name: Тесты без базы
         run: |
           pytest -q -p no:cacheprovider -n auto 2>&1 | tee pytest.log

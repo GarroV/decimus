@@ -23,7 +23,6 @@ from datetime import datetime, timezone
 import pytest
 from aiogram.types import Chat, Message
 from bot_harness import (
-    AUDITOR_ID,
     CHAT_ID,
     candidate,
     feed,
@@ -55,7 +54,7 @@ from src.recognize.models import UNKNOWN_ZONE
 
 pytestmark = [pytest.mark.asyncio]
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 def started() -> None:

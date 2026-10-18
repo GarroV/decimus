@@ -1,10 +1,9 @@
 {#
-  Экран «Страна» (D260, D262, D296, D467) — «что с этой страной»: слева колонка
-  стран (с отбором «Девелопер»), справа рабочая зона из рамок с заголовками.
-  Длинное делится на СЕГМЕНТЫ — переключатель вверху рабочей зоны: «Сводка»
-  (ключевые цифры периода и «Где болит») и «Пиццерии» (одна таблица; сведения и
-  история пиццерии — в панели справа). Состояние в адресе (`?seg=units`,
-  `from`/`to`, `unit`, `dev`), без скриптов всё работает ссылками.
+  Экран «Пиццерии» (D512; раньше «Страна»; D260, D262, D296, D467, D504) — статистика по стране (D500):
+  слева выпадающие списки «Девелопер» и «Страна», под ними пиццерии страны
+  (сведения и история — в панели справа); справа блоки страны — ключевые цифры
+  периода, рейтинги и карты, «Где болит». Состояние в адресе (`from`/`to`,
+  `unit`, `dev`), без скриптов всё работает ссылками.
 
   Ни одного вычисления: всё приходит из `src/web/country_page.py`. Предписаний и
   экшн-планов здесь нет — счётчики в шапке ведут в «Действия» с отбором по стране.
@@ -16,14 +15,16 @@
 {% from "_period.html" import period_picker with context %}
 {% from "country/_parts.html" import letters with context %}
 {% from "country/_summary.html" import key_figures, nothing, hurt with context %}
-{% from "country/_units.html" import units_table with context %}
 {% from "country/_panel.html" import unit_panel with context %}
 {% block title %}{{ t('section.country.title') }}{% endblock %}
+{# Широкая раскладка, как у «Методики» (D496): колонка у левого края, а не по центру. #}
+{% block page_class %} page--wide{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-country.css') }}">
   <script src="{{ url_for('static', filename='split.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='country.js') }}" defer></script>
 {% endblock %}
 
 {% block body %}
@@ -32,21 +33,45 @@
    `mx-rail`). Рабочая зона не пустует: без страны в адресе в ней первая страна
    колонки, а экран помечен выбором (`mx-shell--pick`) — на узком экране тогда
    видна только колонка. На экране страны колонка там прячется, и назад ведёт
-   ссылка «‹ Страны». #}
+   ссылка «‹ Пиццерии» (D512: слова «Страны» в ней больше нет). #}
 <div class="mx-shell cn-shell{% if view is none and not combined or picking %} mx-shell--pick{% endif %}">
-  <aside class="mx-rail" aria-label="{{ t('country.rail.title') }}">
-    <div class="mx-rail__head mx-rail__head--list">
-      <span>{{ t('country.rail.title') }}</span>
+  <aside class="mx-rail cn-rail" aria-label="{{ t('country.filter.title') }}">
+    {# Девелопер и страна — выпадающими списками в блоке отбора, как на «Проверках»
+       (D504, D510); под ним пиццерии страны. #}
+    {# Партнёр с одной страной (D508): выбирать нечего — блока отбора нет. #}
+    {% if not single_country %}
+    <div class="cn-filters">
+      <div class="mx-rail__head">{{ t('country.filter.title') }}</div>
+      {% if dev_pick %}{{ pick(dev_pick) }}{% endif %}
+      {% if country_pick is defined and country_pick.options %}{{ pick(country_pick) }}{% else %}
+        <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>{% endif %}
     </div>
-    {% if dev_pick %}<div class="cn-devpick">{{ pick(dev_pick) }}</div>{% endif %}
-    {% for row in rail %}
-      <a class="mx-rail__row{% if row.on %} is-on{% endif %}" href="{{ row.href }}"{% if row.on %} aria-current="page"{% endif %}>
-        <span class="mx-rail__name">{{ country_title(row.code) or row.code }}</span>
-        <span class="mx-rail__meta">{{ t('country.choose.units', n=row.units) }}</span>
-      </a>
-    {% else %}
-      <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>
-    {% endfor %}
+    {% endif %}
+    {% if units is defined and not combined %}
+      <div class="mx-rail__head mx-rail__head--list cn-units-head">
+        <span>{{ country_name or t('country.units.title') }}</span><span class="mx-rail__count">{{ units.open_rows|length }}</span>
+      </div>
+      {% macro unit_line(row) %}
+        <a class="mx-rail__row mx-rail__row--line cn-uline{% if open_row and row.key == open_row.key %} is-on{% endif %}" data-drawer-open
+           href="{{ select_url(unit=row.key) }}"{% if open_row and row.key == open_row.key %} aria-current="true"{% endif %}>
+          <span class="mx-rail__name">{{ row.name }}<small>{{ city_title(row.city) or '' }}{% if row.stage in ('pipeline', 'paused') %} · {{ t('unit.stage.' ~ row.stage) }}{% endif %}</small></span>
+          {% if row.last %}<span class="grade tag {{ grade_tone(row.last.grade) }}">{{ row.last.grade or '—' }}</span>{% endif %}
+        </a>
+      {% endmacro %}
+      {% if units.profiles_failed or units.ratings_failed or units.maps_failed %}
+        <p class="cn-quiet">{{ t('country.units.profiles_failed') if units.profiles_failed else t('country.units.ratings_failed') if units.ratings_failed else t('country.units.maps_failed') }}</p>
+      {% endif %}
+      {# Не выше 15 строк, дальше прокрутка внутри списка (D510). #}
+      <div class="cn-ulist" data-cn-ulist>
+        {% for row in units.open_rows %}{{ unit_line(row) }}{% else %}<div class="ov-card__empty">{{ t('country.units.empty') }}</div>{% endfor %}
+      </div>
+      {% if units.closed_rows %}
+        <details class="cn-closed"{% if open_row and open_row.is_closed %} open{% endif %}>
+          <summary>{{ t('country.units.closed', n=units.closed_rows|length) }}</summary>
+          {% for row in units.closed_rows %}{{ unit_line(row) }}{% endfor %}
+        </details>
+      {% endif %}
+    {% endif %}
   </aside>
   <div class="mx-main">
 {% if view is none and not combined %}
@@ -57,7 +82,8 @@
     </div>
   </div>
 {% else %}
-  <a class="cn-back" href="{{ rail_back_url }}">‹ {{ t('country.rail.title') }}</a>
+  {# Только на узком экране (`.cn-back`): колонка со списком там прячется, и без ссылки к пиццериям не попасть. #}
+  <a class="cn-back" href="{{ rail_back_url }}">‹ {{ t('country.units.title') }}</a>
 
   {# ── Шапка: кто это, сколько пиццерий, период, счётчики ─────────────── #}
   <section class="ov-card cn-headcard">
@@ -135,25 +161,12 @@
     </section>
     <p class="cn-quiet">{{ t('country.dev.note') }}</p>
   {% else %}
-    {# ── Сегменты рабочей зоны: ссылки, состояние в адресе ─────────────── #}
-    <nav class="cn-segs" aria-label="{{ t('country.seg.label') }}">
-      <div class="seg">
-        {% for s in segs %}
-          {% if s.on %}<span class="seg__current" aria-current="page">{{ s.title }}{% if s.count %}<span class="seg__count">{{ s.count }}</span>{% endif %}</span>
-          {% else %}<a class="seg__item" href="{{ s.href }}">{{ s.title }}{% if s.count %}<span class="seg__count">{{ s.count }}</span>{% endif %}</a>{% endif %}
-        {% endfor %}
-      </div>
-    </nav>
-
+    {# ── Блоки страны (D504): пиццерии — слева, здесь итоги. ── #}
     <div class="split"><div class="split__list">
-      {% if seg == 'units' %}
-        {{ units_table(units, open_row.key if open_row else '') }}
-      {% else %}
-        {{ nothing(summary) }}
-        {{ key_figures(summary, column, true) }}
-        {% if ratings_failed %}<p class="cn-quiet">{{ t('home.ratings.failed') }}</p>{% endif %}
-        {% if summary.has_inspections %}{{ hurt(data) }}{% endif %}
-      {% endif %}
+      {{ nothing(summary) }}
+      {{ key_figures(summary, column, true) }}
+      {% if ratings_failed %}<p class="cn-quiet">{{ t('home.ratings.failed') }}</p>{% endif %}
+      {% if summary.has_inspections %}{{ hurt(data) }}{% endif %}
     </div></div>
 
     {# ── Панель пиццерии справа: каркас — как в «Проверках» (`_split_page.html`) ─ #}

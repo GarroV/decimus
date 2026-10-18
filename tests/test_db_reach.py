@@ -92,8 +92,8 @@ def test_сводки_и_справочные_чтения_стоят_на_ох�
         "Yerevan-1",
     }
     assert set(queries.class_counts(reach=ge)) == {сеть["уК_батуми"], сеть["партнёр_батуми"]}
-    assert set(queries.worst_zones(reach=ge)) == {сеть["уК_батуми"], сеть["партнёр_батуми"]}
-    assert {z[4] for z in queries.zone_losses(reach=ge)} == {2}
+    assert set(queries.worst_processes(reach=ge)) == {сеть["уК_батуми"], сеть["партнёр_батуми"]}
+    assert {p[4] for p in queries.process_losses(reach=ge)} == {2}
     assert [s[3] for s in queries.systemic_findings(reach=ge)] == [1]
     assert {f.inspection_id for f in queries.findings_by_unit(reach=ge, unit="Yerevan-1")} == set()
     assert queries.units_total(reach=reach_of("HQ")) == 2

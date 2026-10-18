@@ -57,7 +57,6 @@ from src.web.texts import t
     inspections=(),
     grades=(),
     average=None,
-    zone_losses=(),
     systemic=(),
     attention=(),
 )
@@ -135,6 +134,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     """
     monkeypatch.setattr(data, "retraction_available", lambda: True)
     monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
+    monkeypatch.setattr(data, "load_dated", lambda **_: ())
     monkeypatch.setattr(overview_data, "load", lambda **_: ПУСТАЯ_СЕТЬ)
     monkeypatch.setattr(country_data, "countries", lambda **_: ())
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
@@ -673,6 +673,31 @@ def test_стили_адресуются_с_отпечатком_и_кеширу
     assert re.search(r"\?v=[0-9a-f]{12}$", адреса[0]), адреса[0]
     assert ответ.status_code == 200
     assert f"max-age={IMMUTABLE_MAX_AGE}" in ответ.headers["Cache-Control"]
+
+
+def test_стили_с_отпечатком_помечены_immutable(стенд: FlaskClient) -> None:
+    # Arrange — #698: без `immutable` браузер и край перепроверяют файл при
+    # обновлении страницы, хотя адрес с отпечатком меняется вместе с содержимым.
+    страница = стенд.get("/inspections").get_data(as_text=True)
+    адрес = re.findall(r'href="([^"]*decimus-web\.css[^"]*)"', страница)[0]
+
+    # Act
+    ответ = стенд.get(адрес)
+
+    # Assert
+    assert "public" in ответ.headers["Cache-Control"]
+    assert "immutable" in ответ.headers["Cache-Control"]
+
+
+def test_immutable_только_при_верном_отпечатке_и_не_шрифту(стенд: FlaskClient) -> None:
+    # Act
+    чужой = стенд.get("/static/decimus-web.css?v=000000000000")
+    без = стенд.get("/static/decimus-web.css")
+    шрифт = стенд.get("/static/fonts/golos-text-cyrillic.woff2")
+
+    # Assert — шрифт по голому пути может смениться со сменой дизайн-системы
+    for ответ in (чужой, без, шрифт):
+        assert "immutable" not in ответ.headers.get("Cache-Control", "")
 
 
 def test_адрес_без_отпечатка_перепроверяется(стенд: FlaskClient) -> None:

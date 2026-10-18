@@ -141,8 +141,9 @@ def test_путь_из_критерия_приёмки(как: Вход) -> None
     )
     assert "План принят." in ответ.get_data(as_text=True)
 
-    # Assert — на экране страны обе версии, комментарий и «Принят»; файл УК скачивает.
-    страница = уК.get("/country/GE?lang=ru").get_data(as_text=True)
+    # Assert — на странице запроса обе версии, комментарий и «Принят»; файл УК
+    # скачивает. Экран страны версий больше не показывает (D512: «Пиццерии»).
+    страница = уК.get(f"/actions/requests/{запрос.id}?lang=ru").get_data(as_text=True)
     assert "Версия 1" in страница and "Версия 2" in страница
     assert "нет сроков" in страница and "Принят" in страница
     итог = plans.request_of_inspection(проверка, reach=reach_of("HQ"))

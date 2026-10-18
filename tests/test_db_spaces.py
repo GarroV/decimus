@@ -163,3 +163,9 @@ def test_посев_демо_это_пространство_партнёра_с
             "group by status order by status"
         ).fetchall()
     assert dict(статусы).get("draft") == 1 and dict(статусы).get("finalized", 0) >= 1, статусы
+
+    # #774: без подключения администратора прежнее демо не сносится — это отказ
+    # с причиной, а не тихое «убрано 0» и падение на приёмке дальше.
+    без_админа = _команда("seed_web_demo.py", env={**env, "DATABASE_ADMIN_URL": ""})
+    assert без_админа.returncode != 0
+    assert "Прежнее демо не снесено" in без_админа.stderr, без_админа.stderr[-2000:]

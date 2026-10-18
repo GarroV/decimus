@@ -17,10 +17,12 @@
 .page--home .shead__main { flex: 0 0 auto; min-width: 0; }
 
 /* Верхний ряд (D471): ровно четыре карточки (итог, «Рейтинги», «Топ нарушений», потери
-   по зонам), 2×2 одной высоты — `1fr` уравнивает ряды по самому высокому. Списки внутри
-   урезаны по числу строк в шаблоне («ещё N →»), поэтому ни обрезки, ни прокрутки нет.
+   по процессам), 2×2: внутри ряда карточки одной высоты, но нижний ряд выше верхнего
+   (D507: «Топ нарушений» вмещает больше строк) — высота рядов по содержимому (`auto`).
+   Списки внутри урезаны по числу строк в шаблоне («ещё N →»), поэтому ни обрезки, ни
+   прокрутки нет.
    Телефон — одна колонка. */
-.hm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; margin-top: 12px; }
+.hm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: auto; gap: 12px; margin-top: 12px; }
 .hm-more--end { align-self: flex-end; margin-left: 0; }
 .hm-rows.hm-rows--cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); column-gap: 24px; }
 
@@ -33,7 +35,7 @@
 .hm-filters__title { margin-bottom: -4px; }
 .hm-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .hm-field__label { font-size: 11.5px; color: var(--ink-3); }
-/* Выбор отбора — как «Девелопер» на «Стране» (`.cn-devpick`): чип на всю ширину панели,
+/* Выбор отбора — как «Девелопер» на «Стране» (`.cn-filters`): чип на всю ширину панели,
    список раскрывается под ним, а не поверх таблицы. Календарь — всплывающий, как везде. */
 .hm-field > .pick:not(.speriod__pick) { display: block; }
 .hm-field .ov-chip { font-size: 12.5px; display: flex; width: 100%; justify-content: space-between; }

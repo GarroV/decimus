@@ -329,7 +329,7 @@ _CUE_CODES_PROPERTY: dict[str, object] = {
 }
 
 
-#: Одна фраза о поле `methodologies` на три инструмента ряда (D352): справка,
+#: Одна фраза о поле `methodologies` на три инструмента ряда (D365): справка,
 #: а не запрет — оценка каждой проверки верна по своей методике.
 _METHODOLOGIES_NOTE = (
     "The `methodologies` field is reference information: it groups the "
@@ -1096,7 +1096,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "Rename a zone: change the Russian and/or English name the "
             "auditor sees on site and the partner reads in the report. The "
             "zone CODE never changes — checklist items, recorded "
-            "inspections and the photo-cue map all refer to a zone by its "
+            "inspections and the synonym dictionary all refer to a zone by its "
             "code, and a rename that touched the code would break those "
             "references silently. Give one name to leave the other as it "
             "is. Zone shares are not touched (set_zone_shares does that). "
@@ -1205,7 +1205,7 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="photo_cues",
         description=(
-            "Read the word map of one methodology version: the sections and "
+            "Read the synonym dictionary of one methodology version: the sections and "
             "the cue rows inside them, each a phrase an auditor might say or "
             "a photo might show, mapped to the checklist codes it raises. "
             "This map is what lets a finding be recorded WITHOUT the auditor "
@@ -1227,7 +1227,7 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="add_photo_cue",
         description=(
-            "Add one cue row to the word map, storing a new methodology "
+            "Add one cue row to the synonym dictionary, storing a new methodology "
             "version beside the one in force — the version in force does not "
             "change and publishing stays a separate call. Every code is "
             "checked against the checklist of that same version: a cue "
@@ -1266,7 +1266,7 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="edit_photo_cue",
         description=(
-            "Change one cue row of the word map — its codes, its phrase, or "
+            "Change one cue row of the synonym dictionary — its codes, its phrase, or "
             "both — storing a new methodology version beside the one in "
             "force. The row is named by its phrase in full and word for word: "
             "no nearest match is substituted, because editing the wrong row "
@@ -1296,7 +1296,7 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="set_photo_cue_zone",
         description=(
-            "Set the object's zone on one cue row of the word map, storing a "
+            "Set the object's zone on one cue row of the synonym dictionary, storing a "
             "new methodology version beside the one in force. Separate from "
             "editing codes on purpose: filling zones is bulk work by the "
             "management company, and mixing it into a code edit would blur "
@@ -1331,7 +1331,7 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="remove_photo_cue",
         description=(
-            "Remove one cue row from the word map, storing a new methodology "
+            "Remove one cue row from the synonym dictionary, storing a new methodology "
             "version beside the one in force. Older versions are never "
             "deleted, so bringing the row back is a matter of publishing the "
             "earlier version rather than of finding a copy of the file."
@@ -1353,13 +1353,13 @@ TOOLS: tuple[ToolSpec, ...] = (
         name="photo_cue_suggestions",
         description=(
             "Report where the model has been systematically wrong, and propose "
-            "what to add to the word map because of it. Every finding stores "
+            "what to add to the synonym dictionary because of it. Every finding stores "
             "what the model proposed before the auditor fixed the record; the "
             "difference between the two is a miss, and identical misses are "
             "grouped and counted here. For each one the answer names the cue "
             "rows that lead to the wrong item code and gives a ready "
             "edit_photo_cue call. "
-            "Nothing is applied: the word map is a management-company document, "
+            "Nothing is applied: the synonym dictionary is a management-company document, "
             "and a wrong word added automatically would reach a partner's "
             "report through the fast path without anyone confirming it "
             "(decision D077). Applying a proposal is a separate call, and even "
@@ -1389,7 +1389,7 @@ TOOLS: tuple[ToolSpec, ...] = (
                     "description": (
                         "Only count a miss when the model's confidence was at "
                         "least this high. A fraction between 0 and 1, not a "
-                        "percentage. Records made by matching the word map "
+                        "percentage. Records made by matching the synonym dictionary "
                         "carry no confidence at all — that path never measures "
                         "one — and they are never filtered out by this "
                         "threshold: they are the records made without the "
@@ -1415,7 +1415,7 @@ TOOLS: tuple[ToolSpec, ...] = (
                 },
                 "version": _code_property(
                     meaning=(
-                        "Checklist version whose word map the proposals refer "
+                        "Checklist version whose synonym dictionary the proposals refer "
                         "to. Defaults to the version in force. A proposal must "
                         "point at a row that exists in that version: a row "
                         "from another version is edited by another phrase."
@@ -1444,7 +1444,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "Forms of one word are folded together by the same stemmer the "
             "product searches with, and the word is shown as that stemmer sees "
             "it; what was actually said stands verbatim beside it. "
-            "Nothing is applied and no ready call is built: the word map is a "
+            "Nothing is applied and no ready call is built: the synonym dictionary is a "
             "management-company document, and the fast path records a finding by "
             "it without the auditor confirming the item (decision D077), so a "
             "word added automatically would reach a partner's report with nobody "
@@ -1971,7 +1971,8 @@ TOOLS: tuple[ToolSpec, ...] = (
             "группам стран за период: средняя оценка группы и изменение к прошлому такому же "
             "периоду — те же числа, что на экране «Рейтинги». Звать на вопросы «как дела с "
             "рейтингами», «где просело», «как сравниваются кластеры или страны». group_by: "
-            "imf — две строки, кластеры CEE и «Другие страны»; cluster (value CEE или OTHER); "
+            "imf — четыре строки, кластеры CEE, Турция, Кавказ и «Остальные страны»; "
+            "cluster (value CEE, TR, CAUCASUS или OTHER); "
             "developer (value — имя бизнес-девелопера) — общая строка и строка на каждую "
             "страну; country (value — код страны, например RS). Период: period — месяц "
             "2026-09, квартал 2026-Q3, период РС rs:<номер> или отрезок "
@@ -1992,8 +1993,8 @@ TOOLS: tuple[ToolSpec, ...] = (
                 "value": {
                     "type": "string",
                     "description": (
-                        "Значение среза: CEE или OTHER для cluster, имя девелопера для "
-                        "developer, код страны для country. Для imf не нужно."
+                        "Значение среза: CEE, TR, CAUCASUS или OTHER для cluster, имя девелопера "
+                        "для developer, код страны для country. Для imf не нужно."
                     ),
                 },
                 "period": {

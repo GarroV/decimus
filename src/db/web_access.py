@@ -44,7 +44,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 import psycopg
 
@@ -697,12 +697,27 @@ def unfreeze_account(login: str, *, tenant: str, only_roles: tuple[str, ...] | N
 
     Сессии, подключения Claude, токены и привязка бота остаются закрытыми:
     человек входит заново, привязывает бота и подключает Claude сам.
+
+    Почта замороженной не держится (F-031, `0075`): пока учётка заморожена, её
+    адрес могли отдать другой живой учётке. Тогда разморозка отказывает
+    `EmailTakenError` и учётка остаётся замороженной — двух живых учёток на
+    одну почту не бывает, и решать, чья она, должен человек, а не порядок строк.
     """
     with _managing("разморозить учётку") as conn, conn.cursor() as cur:
-        cur.execute(
-            _UNFREEZE_USER_SQL,
-            {"tenant": tenant, "login": login.strip().lower(), "roles": _roles_param(only_roles)},
-        )
+        try:
+            cur.execute(
+                _UNFREEZE_USER_SQL,
+                {
+                    "tenant": tenant,
+                    "login": login.strip().lower(),
+                    "roles": _roles_param(only_roles),
+                },
+            )
+        except psycopg.errors.UniqueViolation as занято:
+            raise EmailTakenError(
+                "почта этой учётки за время заморозки привязана к другой живой учётке: "
+                "снимите её у одной из двух, затем разморозьте"
+            ) from занято
         return cur.rowcount > 0
 
 
@@ -920,6 +935,61 @@ def find_by_email(email: str) -> Account | None:
         return None
     return Account(
         id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]), email=row[4]
+    )
+
+
+#: Исходы сверки номера аккаунта Google: тот же или записан впервые — `ok`;
+#: за учёткой другой аккаунт — `other`; живой учётки с этой почтой нет — `missing`.
+GoogleSubVerdict = Literal["ok", "other", "missing"]
+_CLAIM_GOOGLE_SUB_SQL = "select claim_google_sub(%s, %s, %s)"
+
+
+def claim_google_sub(email: str, subject: str, *, record: bool) -> GoogleSubVerdict:
+    """Тот ли аккаунт Google держит учётку с этой почтой (аудит 12.10, F-027).
+
+    Почта у аккаунта Google не постоянна, номер (`sub`) — постоянен. Первый вход
+    записывает номер за живой учёткой с этой почтой, следующие сверяют. Пишет
+    функция владельца (`0076`): роль приложения строку `web_users` не правит, а
+    выбрать чужую учётку функция не даёт — только ту, чья почта подтверждена
+    Google в этом же входе. Смена почты снимает номер (триггер `0076`).
+
+    `record=False` — только сверка, номер не пишется: так вход проверяет аккаунт
+    до остальных шагов, а записывает (`record=True`) лишь там, где тут же
+    открывает сессию. Иначе вход, который дальше не пустили, занял бы номер.
+    """
+    номер = subject.strip()
+    if not номер:
+        raise ValueError("сверка без номера аккаунта Google")
+    try:
+        приведённая = normalize_email(email)
+    except ValueError:
+        return "missing"
+    with _connected("сверить аккаунт Google") as conn, conn.cursor() as cur:
+        cur.execute(_CLAIM_GOOGLE_SUB_SQL, (приведённая, номер, record))
+        строка = cur.fetchone()
+    итог = None if строка is None else str(строка[0])
+    if итог == "ok":
+        return "ok"
+    if итог == "other":
+        return "other"
+    if итог == "missing":
+        return "missing"
+    raise AccessError(f"сверка аккаунта Google вернула незнакомый исход {итог!r}")
+
+
+def find_by_login(login: str) -> Account | None:
+    """Логин → действующая учётка без сверки пароля. Только для входа в демо (D524).
+
+    Вход без пароля открыт одним маршрутом `/demo` и только на стенде демо
+    (`WEB_DEMO=1`); продукт этой функцией не опознаёт никого.
+    """
+    with _connected("найти учётку") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_USER_SQL, (login.strip().lower(),))
+        row = cur.fetchone()
+    if row is None:
+        return None
+    return Account(
+        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[4]), email=row[5]
     )
 
 

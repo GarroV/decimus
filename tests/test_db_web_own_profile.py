@@ -53,7 +53,12 @@ def test_привязка_своей_сессией_пишет_почту_и_з�
     другая = open_session(учётка)
 
     assert begin_google_link(своя.token, state=МЕТКА, ttl_seconds=СРОК) is True
-    assert finish_google_link(своя.token, state=МЕТКА, email=" Director@Dodobrands.io ") == "ok"
+    assert (
+        finish_google_link(
+            своя.token, state=МЕТКА, email=" Director@Dodobrands.io ", subject="sub-director"
+        )
+        == "ok"
+    )
 
     найдена = find_by_email(ПОЧТА)
     assert найдена is not None and найдена.login == "director"
@@ -69,7 +74,9 @@ def test_метка_чужой_сессии_ничего_не_привязыва
     чужая = open_session(сосед)
     begin_google_link(начавшая.token, state=МЕТКА, ttl_seconds=СРОК)
 
-    assert finish_google_link(чужая.token, state=МЕТКА, email=ПОЧТА) == "state"
+    assert (
+        finish_google_link(чужая.token, state=МЕТКА, email=ПОЧТА, subject="sub-" + ПОЧТА) == "state"
+    )
     assert find_by_email(ПОЧТА) is None
 
 
@@ -77,10 +84,15 @@ def test_повтор_метки_не_проходит(обе_роли: str) -> 
     учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     сессия = open_session(учётка)
     begin_google_link(сессия.token, state=МЕТКА, ttl_seconds=СРОК)
-    assert finish_google_link(сессия.token, state=МЕТКА, email=ПОЧТА) == "ok"
+    assert (
+        finish_google_link(сессия.token, state=МЕТКА, email=ПОЧТА, subject="sub-" + ПОЧТА) == "ok"
+    )
     assert unlink_google(сессия.token, current=ПАРОЛЬ) == "ok"
 
-    assert finish_google_link(сессия.token, state=МЕТКА, email=ПОЧТА) == "state"
+    assert (
+        finish_google_link(сессия.token, state=МЕТКА, email=ПОЧТА, subject="sub-" + ПОЧТА)
+        == "state"
+    )
     assert find_by_email(ПОЧТА) is None
 
 
@@ -88,7 +100,10 @@ def test_незаписанная_метка_не_проходит(обе_рол
     учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     сессия = open_session(учётка)
 
-    assert finish_google_link(сессия.token, state="с-потолка", email=ПОЧТА) == "state"
+    assert (
+        finish_google_link(сессия.token, state="с-потолка", email=ПОЧТА, subject="sub-" + ПОЧТА)
+        == "state"
+    )
 
 
 def test_занятая_почта_не_привязывается_и_метка_гаснет(обе_роли: str) -> None:
@@ -98,8 +113,19 @@ def test_занятая_почта_не_привязывается_и_метка
     сессия = open_session(учётка)
     begin_google_link(сессия.token, state=МЕТКА, ttl_seconds=СРОК)
 
-    assert finish_google_link(сессия.token, state=МЕТКА, email=ПОЧТА) == "taken"
-    assert finish_google_link(сессия.token, state=МЕТКА, email="other@dodobrands.io") == "state"
+    assert (
+        finish_google_link(сессия.token, state=МЕТКА, email=ПОЧТА, subject="sub-" + ПОЧТА)
+        == "taken"
+    )
+    assert (
+        finish_google_link(
+            сессия.token,
+            state=МЕТКА,
+            email="other@dodobrands.io",
+            subject="sub-" + "other@dodobrands.io",
+        )
+        == "state"
+    )
     найдена = find_by_email(ПОЧТА)
     assert найдена is not None and найдена.login == "petr"
 
@@ -112,7 +138,15 @@ def test_уже_привязанная_почта_не_перезаписыва�
     сессия = open_session(учётка)
     begin_google_link(сессия.token, state=МЕТКА, ttl_seconds=СРОК)
 
-    assert finish_google_link(сессия.token, state=МЕТКА, email="new@dodobrands.io") == "linked"
+    assert (
+        finish_google_link(
+            сессия.token,
+            state=МЕТКА,
+            email="new@dodobrands.io",
+            subject="sub-" + "new@dodobrands.io",
+        )
+        == "linked"
+    )
     assert find_by_email(ПОЧТА) is not None
 
 
@@ -122,7 +156,10 @@ def test_отключённая_учётка_не_привязывает(обе_
     begin_google_link(сессия.token, state=МЕТКА, ttl_seconds=СРОК)
     freeze_account("director", tenant=ТЕНАНТ)
 
-    assert finish_google_link(сессия.token, state=МЕТКА, email=ПОЧТА) == "session"
+    assert (
+        finish_google_link(сессия.token, state=МЕТКА, email=ПОЧТА, subject="sub-" + ПОЧТА)
+        == "session"
+    )
     assert begin_google_link(сессия.token, state="вторая", ttl_seconds=СРОК) is False
 
 

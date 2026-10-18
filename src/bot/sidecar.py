@@ -510,10 +510,16 @@ def origin_of(chat_id: int, message_id: int) -> int | None:
 def mark_handed_over(chat_id: int, findings: int) -> None:
     """Запомнить, что отчёт по этой проверке отдан аудитору (T153).
 
-    Зовётся ПОСЛЕ того, как PDF действительно ушёл в чат, а не по нажатию
-    кнопки: сданной проверку делает отданный отчёт, а не намерение его собрать.
+    Зовётся ДО сборки отчёта (#546): иначе запись из мини-аппа, пришедшая между
+    сборкой PDF и отметкой, ушла бы в историю мимо отданного файла. Отчёт не
+    собрался — признак снимается (`unmark_handed_over`), и проверка снова в работе.
     """
     _change(chat_id, lambda notes: replace(notes, handed_over_findings=findings))
+
+
+def unmark_handed_over(chat_id: int) -> None:
+    """Снять признак сдачи, поставленный перед сборкой отчёта, если он не собрался (#546)."""
+    _change(chat_id, lambda notes: replace(notes, handed_over_findings=NEVER_HANDED_OVER))
 
 
 def unclaimed(chat_id: int, used: Container[str]) -> tuple[SeenFrame, ...]:

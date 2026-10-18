@@ -33,7 +33,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from bot_harness import AUDITOR_ID, CHAT_ID, build_report, feed, make_bot, text_message
+from bot_harness import CHAT_ID, build_report, feed, make_bot, text_message
 from bot_harness import callback_query as callback
 
 from src.bot import sidecar
@@ -47,7 +47,7 @@ from src.domain.engine import option, run_audit
 # а не на диалог, и метка asyncio на нём была бы неправдой. Боевая методика
 # файлу не нужна: он идёт по синтетической через `domain_env` (T141).
 
-SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
+SETTINGS = BotSettings(token="unused-in-tests", mode="polling")
 
 
 def начать() -> None:

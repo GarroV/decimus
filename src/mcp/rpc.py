@@ -20,6 +20,7 @@ Function целиком — транспорт меняется, инструм�
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import replace
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
@@ -75,6 +76,8 @@ _TYPES: dict[str, type | tuple[type, ...]] = {
     "object": dict,
     "array": list,
 }
+
+logger = logging.getLogger(__name__)
 
 
 def _version() -> str:
@@ -475,6 +478,9 @@ def _call_tool(
         # агент однажды перескажет человеку как «сделано».
         return _tool_text(str(отказ), failed=True)
     except Exception as отказ:
+        # Журнал сервера — с трейсбеком и именем инструмента, но без аргументов:
+        # в них данные проверок (#525). Агенту по-прежнему уходит только тип.
+        logger.exception("инструмент MCP %s не выполнен", spec.name)
         # Широкий перехват намеренно: наружу уходит ТИП отказа, а не его текст
         # и не трейсбек. В тексте отказа драйвера базы может оказаться строка
         # подключения, а в трейсбеке — пути на машине; и то и другое ушло бы

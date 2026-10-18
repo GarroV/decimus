@@ -141,6 +141,9 @@ esac
 link_status=$(service_status link)
 case "$link_status" in
     "") say "звено до сервера" "ПРОВАЛ: сервиса link нет в стенде — забыт COMPOSE_PROFILES=funnel"; fail=1 ;;
+    # Порядок веток, как в `await_health`: «Up 2 days (unhealthy)» начинается
+    # с «Up», и ветка Up*, стоящая первой, засчитывала разорванное звено (#302).
+    *unhealthy*) say "звено до сервера" "ПРОВАЛ (нездоров: $link_status)$(cause link)"; fail=1 ;;
     Up*) say "звено до сервера" "OK ($link_status)" ;;
     *) say "звено до сервера" "ПРОВАЛ ($link_status)$(cause link)"; fail=1 ;;
 esac

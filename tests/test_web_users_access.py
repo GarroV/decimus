@@ -695,10 +695,17 @@ def админ_партнёра(monkeypatch: pytest.MonkeyPatch, зовы: Any) 
     yield from стенд(monkeypatch, tenant="GE", role="admin")
 
 
-def test_партнёру_страна_закрыта_и_не_в_меню(админ_партнёра: FlaskClient) -> None:
-    """D371: «Страна» — только УК; партнёр не видит её в меню и не открывает адресом."""
-    assert админ_партнёра.get("/country/GE").status_code == 404
+def test_партнёру_пиццерии_в_меню_и_чужая_страна_закрыта(админ_партнёра: FlaskClient) -> None:
+    """D512: «Пиццерии» — пункт меню и партнёра (свои страны); чужая страна — 404."""
+    assert админ_партнёра.get("/country/RS").status_code == 404
     страница = админ_партнёра.get("/users").get_data(as_text=True)
-    assert 'href="/country?lang=' not in страница
-    for свой in ("/overview", "/inspections", "/calendar", "/admin", "/users", "/ratings"):
+    for свой in (
+        "/country",
+        "/overview",
+        "/inspections",
+        "/calendar",
+        "/admin",
+        "/users",
+        "/ratings",
+    ):
         assert f'href="{свой}?lang=' in страница, свой

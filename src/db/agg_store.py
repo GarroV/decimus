@@ -11,7 +11,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
@@ -314,6 +315,33 @@ def _request(row: tuple[object, ...]) -> UpdateRequest:
         None if row[5] is None else str(row[5]),
         None if row[6] is None else str(row[6]),
     )
+
+
+#: Ключ замка сборщика (#788). Сбор держится на том, что сборщик ровно один;
+#: замок делает это правилом базы, а не надеждой: второй процесс против той же
+#: базы (перекрывшийся контейнер, ручной запуск модуля) сбор не начинает.
+COLLECTOR_LOCK_KEY = 788_0001
+
+
+@contextmanager
+def collector_lock() -> Iterator[bool]:
+    """Замок сборщика на время сбора: `True` — взят, `False` — сбор уже идёт.
+
+    Рекомендательный замок сессии Postgres: держится, пока открыто соединение,
+    и отпускается базой сам, если процесс умер посреди сбора.
+    """
+    try:
+        conn = psycopg.connect(check_environment().dsn, autocommit=True)
+    except psycopg.Error as exc:
+        raise _fail("Замок сборщика агрегаторов не взят", exc) from exc
+    with conn:
+        row = conn.execute("select pg_try_advisory_lock(%s)", (COLLECTOR_LOCK_KEY,)).fetchone()
+        got = bool(row and row[0])
+        try:
+            yield got
+        finally:
+            if got:
+                conn.execute("select pg_advisory_unlock(%s)", (COLLECTOR_LOCK_KEY,))
 
 
 def open_request() -> UpdateRequest | None:

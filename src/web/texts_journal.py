@@ -41,10 +41,6 @@ _WEB: dict[str, tuple[str, str]] = {
     ),
     "security_passkey_register": ("Подключён ключ доступа", "Passkey added"),
     "security_passkey_delete": ("Удалён ключ доступа", "Passkey removed"),
-    "passkey_expired": (
-        "Сняты ключи доступа, которыми не входили 30 дней",
-        "Passkeys unused for 30 days removed",
-    ),
     "security_totp_confirm": (
         "Подключено приложение-аутентификатор",
         "Authenticator app connected",
@@ -61,6 +57,12 @@ _WEB: dict[str, tuple[str, str]] = {
     "second_step_passkey_verify": (
         "Второй шаг входа: ключ доступа",
         "Second sign-in step: passkey",
+    ),
+    "passkey_login_options": ("Вход ключом: запрос ключа", "Passkey sign-in: key request"),
+    "passkey_login_verify": ("Вход ключом: ключ доступа", "Passkey sign-in: passkey"),
+    "security_prove_code": (
+        "Подтверждение входа кодом приложения",
+        "Sign-in confirmed with an authenticator code",
     ),
     "security_passkey_options": ("Запрос на добавление ключа доступа", "Passkey add request"),
     "security_relogin": ("Выход для повторного входа", "Sign-out to sign in again"),
@@ -104,6 +106,11 @@ _WEB: dict[str, tuple[str, str]] = {
     "reauth_confirm_password": ("Подтверждение входа паролем", "Sign-in confirmed with password"),
     "rx_close": ("Предписание закрыто", "Prescription closed"),
     "rx_create": ("Создано предписание", "Prescription created"),
+    "trip_create": ("Заведена поездка", "Trip created"),
+    "trip_update": ("Изменена поездка", "Trip updated"),
+    "trip_delete": ("Удалена поездка", "Trip deleted"),
+    "trip_step_add": ("Добавлен шаг плана поездки", "Trip plan step added"),
+    "trip_step_delete": ("Убран шаг плана поездки", "Trip plan step removed"),
     "rx_send": ("Предписание отправлено", "Prescription sent"),
     "rx_update": ("Предписание изменено", "Prescription edited"),
     "save_letter": ("Письмо сохранено", "Letter saved"),
@@ -130,8 +137,12 @@ _WEB: dict[str, tuple[str, str]] = {
     "user_role": ("Изменена роль человека", "Person's role changed"),
 }
 
-#: Действия командной строки на сервере (`tools/web_user.py`): маршрута у них нет.
+#: Действия без маршрута веба: команда с сервера (`tools/web_user.py`) и проход уборки бота.
 _CLI: dict[str, tuple[str, str]] = {
+    "passkey_expired": (
+        "Сняты ключи доступа, которыми не входили 30 дней",
+        "Passkeys unused for 30 days removed",
+    ),
     "reset_second_factor_cli": (
         "Сброшена вторая ступень входа командой с сервера",
         "Second sign-in step reset by a server command",

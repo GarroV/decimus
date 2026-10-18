@@ -244,6 +244,9 @@ def подменить_двери(
     # Экранные наборы базы не поднимают, поэтому дверь охвата подменена так
     # же, как двери опознания: УК — вся сеть, партнёр — его же код страны.
     monkeypatch.setattr(auth, "reach_of", охват_без_базы)
+    # Сверка номера аккаунта Google (F-027) пишет в базу; экранные наборы её не
+    # поднимают — аккаунт всегда «тот же». Наборы про сверку подменяют сами.
+    monkeypatch.setattr(auth, "claim_google_sub", lambda _email, _subject, **_k: "ok")
     # Вторая ступень (D463): наборы экранов её не поднимают — способа входа ни у кого нет,
     # сессия выдаётся сразу. Наборы про ступень (`test_web_second_step`) ходят в настоящую базу.
     monkeypatch.setattr(second_factor, "has_any", lambda _user_id: False)
@@ -282,6 +285,7 @@ def собрать(
     trusted_proxies: int | None = None,
     webauthn_rp_id: str | None = None,
     webauthn_origin: str | None = None,
+    demo: bool = False,
 ) -> Flask:
     """Приложение с настройками стенда набора. Публичные адреса включают OAuth (D417)."""
     app = create_app(
@@ -296,6 +300,7 @@ def собрать(
             mcp_public_url=mcp_public_url,
             webauthn_rp_id=webauthn_rp_id,
             webauthn_origin=webauthn_origin,
+            demo=demo,
             **({} if trusted_proxies is None else {"trusted_proxies": trusted_proxies}),
         )
     )

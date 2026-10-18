@@ -1,0 +1,19 @@
+{#
+  Приложение аудитора в рамке телефона (D524): мини-апп обхода в режиме
+  просмотра, без Telegram. Рядом — пара строк, что здесь можно сделать.
+#}{% extends "base.html" %}
+{% block title %}{{ t('demo.app') }}{% endblock %}
+
+{% block body %}
+  <main class="landing demo-app">
+    <section class="demo-app__aside">
+      <p class="landing__kicker">{{ t('landing.kicker') }}</p>
+      <h1 class="landing__title">{{ t('demo.app') }}</h1>
+      <p class="landing__lead">{{ t('demo.app.lead') }}</p>
+      <a class="btn" href="{{ url_for('demo_pick') }}?lang={{ lang }}">{{ t('demo.app.back') }}</a>
+    </section>
+    <div class="demo-app__phone">
+      <iframe class="demo-app__screen" src="{{ walk_src }}?lang={{ lang }}" title="{{ t('demo.app') }}"></iframe>
+    </div>
+  </main>
+{% endblock %}

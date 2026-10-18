@@ -1,23 +1,24 @@
 {#
-  «Календарь» (D466). Вопрос экрана — «где пора проверить». Пока в нём один блок,
-  «Где нужно проверить» (D399, D418; раньше стоял на «Проверках»): точки охвата
-  без проверок за выбранный период (`to_inspect.py`). Период — один на экран:
-  «с — по» со стрелками ← →, по умолчанию текущий месяц (`registry_period.py`).
-  Пусто — одна тихая строка; отказ базы — строка с ошибкой. Каркас — общий
-  `_split_page.html` без панели: выбирать тут нечего.
+  «Календарь» (D497). Сетка месяца: неделя — строка с понедельника, в клетке дня
+  — проверки с этой датой обхода, каждая ведёт в карточку на «Проверках».
+  Список «Где нужно проверить» (D466) с экрана снят — «пока скрой» владельца.
+  Период — один на экран: «с — по» со стрелками ← →, по умолчанию текущий месяц
+  (`registry_period.py`); длинный период рисуется первыми месяцами
+  (`calendar_view.MAX_MONTHS`). Раскладка — `calendar_view.py`.
+  Поездки своего пространства (D505, D506) — полосами в днях, над проверками;
+  поездка открывается панелью справа (`calendar/_trip.html`).
 #}{% extends "_split_page.html" %}
 {% from "_period.html" import period_picker with context %}
+{% from "calendar/_trip.html" import trip_panel with context %}
 {% block title %}{{ t('section.calendar.title') }}{% endblock %}
+{% block page_class %} page--wide{% endblock %}
 {% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">{% endblock %}
 
 {% block split_top %}
   <header class="shead">
     <div class="shead__main">
       <h1 class="shead__title">{{ t('section.calendar.title') }}</h1>
-      <p class="shead__sub">
-        {{ period_title }}
-        {%- if to_check.shown and not to_check.failed %} · {{ t('registry.tocheck.title') }}: {{ to_check.total }}{% endif %}
-      </p>
+      <p class="shead__sub">{{ period_title }} · {{ t('calendar.count', count=total) }} · {{ t('trip.count', count=trips_total) }}</p>
     </div>
   </header>
 {% endblock %}
@@ -27,31 +28,35 @@
     <div class="sbar sbar--registry">
       {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
                        period_hidden) }}
+      {% if can_add_trip %}<a class="sbtn sbtn--primary sbar__add" href="{{ new_trip_href }}" data-drawer-open>{{ icon('plus') }}<span>{{ t('trip.add') }}</span></a>{% endif %}
     </div>
-
-    <div class="slist slist--tocheck">
-      <div class="slist__group">
-        <span>{{ t('registry.tocheck.title') }}</span>{% if to_check.shown and not to_check.failed %}<span class="sbadge">{{ to_check.total }}</span>{% endif %}
-      </div>
-      {% if to_check.failed %}
-        <p class="slist__note">{{ t('registry.tocheck.failed') }}</p>
-      {% elif not to_check.shown %}
-        <p class="slist__note">{{ t('calendar.tocheck.empty') }}</p>
-      {% else %}
-        <p class="slist__note">{{ t('registry.tocheck.hint') }}</p>
-        <ul class="slist__rows">
-          {% for item in to_check.units %}
-            <li>
-              <a class="srow" href="{{ unit_href(item) }}">
-                <span class="srow__dot" aria-hidden="true"></span>
-                <span class="srow__main"><b>{{ item.unit }}</b><small>{{ city_title(item.city) or '' }}</small></span>
-                <span class="srow__cell mono">{% if item.last %}{{ t('registry.tocheck.last', date=item.last) }}{% else %}{{ t('registry.tocheck.never') }}{% endif %}</span>
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
-        {% if to_check.more %}<p class="slist__note">{{ t('registry.tocheck.more', count=to_check.more) }}</p>{% endif %}
-      {% endif %}
-    </div>
+    {% if trips_failed %}<p class="slist__note">{{ t('trip.read_failed') }}</p>{% endif %}
+    {% if not total %}<p class="slist__note">{{ t('calendar.empty') }}</p>{% endif %}
+    {% for month in months %}
+      <section class="cal">
+        {% if months | length > 1 %}<h2 class="cal__title">{{ t('registry.month.' ~ month.first.month) }} {{ month.first.year }}</h2>{% endif %}
+        <div class="cal__grid">
+          {% for wd in range(1, 8) %}<div class="cal__wd">{{ t('calendar.wd.' ~ wd) }}</div>{% endfor %}
+          {% for week in month.weeks %}{% for day in week %}
+            <div class="cal__day{% if not day.in_month %} is-out{% endif %}{% if day.today %} is-today{% endif %}{% if (day.rows or day.trips) and day.in_month %} has-rows{% endif %}">
+              <span class="cal__num">{{ day.day.day }}</span>
+              {% if day.in_month %}
+                {% for trip_row in day.trips %}
+                  <a class="cal__trip cal__trip--{{ trip_row.status }}" href="{{ trip_href(trip_row.id) }}" data-drawer-open
+                     title="{{ trip_row.executor_name }}{% if trip_row.country %} · {{ country_title(trip_row.country) }}{% endif %}"><span class="cal__unit">{{ trip_row.executor_name }}{% if trip_row.country %} · {{ trip_row.country }}{% endif %}</span></a>
+                {% endfor %}
+                {% for row in day.shown %}
+                  <a class="cal__item" href="{{ card_href(row) }}" title="{{ row.unit_name }} · {{ row.grade }}"><span class="cal__unit">{{ row.unit_name }}</span><b class="cal__grade">{{ row.grade }}</b></a>
+                {% endfor %}
+                {% if day.more %}<a class="cal__more" href="{{ day_href(day.day) }}">{{ t('calendar.more', count=day.more) }}</a>{% endif %}
+              {% endif %}
+            </div>
+          {% endfor %}{% endfor %}
+        </div>
+      </section>
+    {% endfor %}
   </div>
 {% endblock %}
+
+{% block split_title %}{% if trip %}{{ trip.executor_name }}{% elif trip_new %}{{ t('trip.new') }}{% else %}{{ t('trip.title') }}{% endif %}{% endblock %}
+{% block split_detail %}{{ trip_panel() }}{% endblock %}

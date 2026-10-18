@@ -9,7 +9,7 @@ import pytest
 from src.bot.config import BotConfigError, load_bot_settings
 from src.bot.keyboards import walk_keyboard
 
-ОКРУЖЕНИЕ = {"TELEGRAM_BOT_TOKEN": "1:x", "ALLOWED_TELEGRAM_IDS": "1"}
+ОКРУЖЕНИЕ = {"TELEGRAM_BOT_TOKEN": "1:x"}
 
 
 def test_без_адреса_кнопки_нет_и_бот_прежний() -> None:

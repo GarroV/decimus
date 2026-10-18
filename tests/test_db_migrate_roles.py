@@ -268,6 +268,11 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "oauth_codes": {"SELECT", "INSERT"},
     "oauth_grants": {"SELECT", "INSERT"},
     "oauth_tokens": {"SELECT", "INSERT"},
+    # Поездки «Календаря» (`0074`, D505, D506): планируют и правят люди своего
+    # пространства, шаги заменяются целиком — полный набор прав под политиками
+    # своего пространства.
+    "trips": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+    "trip_steps": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     # `schema_migrations` не отдаётся вовсе: историю схемы ведёт накат.
 }
 
@@ -389,6 +394,8 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # оценка, буква, разбивка — по-прежнему не правится никем.
     # Плюс подтверждение на приёмке (`0034`, D199): статус и отметка «кто и
     # когда»; что запечатывает только эта роль и обратного хода нет — триггер.
+    # Плюс долив разбивки по процессам (`0073`, D507): в принятой проверке
+    # колонка пишется один раз из NULL, у исторической — никогда (сторож).
     "inspections": {
         "UPDATE": {
             "retracted_at",
@@ -398,6 +405,7 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
             "status",
             "accepted_at",
             "accepted_by",
+            "by_process",
         }
     },
     # Учётки администратор истории читает ТРЕМЯ КОЛОНКАМИ (`0016`, T328), и

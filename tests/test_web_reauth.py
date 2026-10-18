@@ -224,7 +224,11 @@ def _через_google(
         auth,
         "exchange_code",
         lambda settings, *, code: GoogleIdentity(
-            email=почта, email_verified=True, hosted_domain=домен, nonce=nonce
+            email=почта,
+            email_verified=True,
+            hosted_domain=домен,
+            nonce=nonce,
+            subject="110169484474386276334",
         ),
     )
     return client.get(auth.GOOGLE_CALLBACK_PATH, query_string={"state": метка, "code": "код"})

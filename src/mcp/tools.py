@@ -383,7 +383,7 @@ def _limit_note(*, limit: int, truncated: bool, subject: str) -> str:
 def _series(rows: Sequence[InspectionRow]) -> dict[str, object]:
     """Справка о методиках ряда — отдельным полем, без приписки к `status`.
 
-    Это справка, а не предупреждение (D352): оценка каждой проверки верна по
+    Это справка, а не предупреждение (D365): оценка каждой проверки верна по
     своей методике, и строке состояния незачем звать агента остерегаться.
     """
     return methodologies.of(rows)

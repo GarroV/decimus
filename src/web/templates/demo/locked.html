@@ -1,0 +1,10 @@
+{# Действие, выключенное в демо (D524): учётки ролей общие на всех посетителей. #}{% extends "base.html" %}
+{% block title %}{{ t('demo.title') }}{% endblock %}
+{% block body %}
+  <main class="landing">
+    <section class="landing__hero">
+      <div class="note note--info" role="alert"><div><div class="note__title">{{ t('demo.locked') }}</div></div></div>
+      <p class="landing__actions"><a class="btn" href="{{ url('/') }}?lang={{ lang }}">{{ t('demo.app.back') }}</a></p>
+    </section>
+  </main>
+{% endblock %}

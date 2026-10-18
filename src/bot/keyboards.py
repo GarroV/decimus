@@ -229,6 +229,8 @@ ANALYZE_PREFIX = "rec:analyze:"
 #: Кандидат модели по его месту в показанном списке.
 PICK_PREFIX = "rec:pick:"
 SKIP_CALLBACK = "rec:skip"
+#: «Исправить температуру» под предложением с показанием термометра (#836).
+READING_CALLBACK = "rec:temp"
 #: Отдать модели тот же материал, который сверка по словам уже разобрала сама
 #: (T117, D063). После T121 кнопка стоит не рядом с предложением, а под уже
 #: сделанной записью: подтверждать нечего, но пункт бывает не тот. Место в
@@ -353,7 +355,9 @@ def analyze_keyboard(anchor_id: int, lang: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def candidates_keyboard(count: int, lang: str, *, correcting: bool = False) -> InlineKeyboardMarkup:
+def candidates_keyboard(
+    count: int, lang: str, *, correcting: bool = False, fix_reading: bool = False
+) -> InlineKeyboardMarkup:
     """Кандидаты действием плюс выход на ручной перечень и отказ.
 
     В `callback_data` едет место в показанном списке — его переводить не надо, и
@@ -367,6 +371,9 @@ def candidates_keyboard(count: int, lang: str, *, correcting: bool = False) -> I
 
     Сама формулировка на кнопку не выносится: в тексте сообщения она занимает
     две строки, а в кнопку не влезает и обрезается до неузнаваемости.
+
+    `fix_reading` добавляет «Исправить температуру», когда на кадре прочитан
+    термометр (#836).
 
     `correcting` меняет глагол на кнопках (T204): под правкой нажатие ПРАВИТ
     запись, а «Записать» обещало бы вторую строку в отчёте — ровно то, от чего
@@ -384,6 +391,12 @@ def candidates_keyboard(count: int, lang: str, *, correcting: bool = False) -> I
             callback_data=f"{PICK_PREFIX}{index}",
         )
     builder.adjust(min(count, PICK_BUTTONS_PER_ROW) or 1)
+    if fix_reading:
+        # Модель могла неверно прочитать термометр (#836): исправление стоит
+        # первым из действий под списком — оно меняет сами предложения.
+        builder.row(
+            InlineKeyboardButton(text=t("btn.fix_reading", lang), callback_data=READING_CALLBACK)
+        )
     builder.row(InlineKeyboardButton(text=t("btn.manual", lang), callback_data=MANUAL_CALLBACK))
     builder.row(InlineKeyboardButton(text=t(skip, lang), callback_data=SKIP_CALLBACK))
     return builder.as_markup()

@@ -50,7 +50,8 @@ list_inspections(*, reach: Reach, unit: str | None = None,
 get_inspection(inspection_id: str, *, reach: Reach) -> InspectionDetail | None
 findings_by_unit(*, reach: Reach, unit: str,
                  limit: int = 100) -> list[FindingRow]
-# на охвате же: zone_losses, systemic_findings, class_counts, worst_zones,
+# на охвате же: process_losses, systemic_findings, class_counts, worst_processes,
+# worst_processes,
 # units_total, unit_ids, unit_geography, edition_first_used, item_usage,
 # reports.latest_report, previews.finding_previews/preview_bytes, move.list_moves
 
@@ -633,7 +634,9 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 Наружу торчат слив, чтение и справочник точек (`src/db/__init__.py`, лениво
 через `__getattr__`), а также личные токены доступа к MCP
 (`src/db/mcp_access.py`, импортируется блоками `bot` и `mcp` напрямую, минуя
-пакет) — остальное внутренности:
+пакет) — остальное внутренности. Строки миграций ниже — выборочно, по истории
+блока; **полный перечень миграций — в `docs/00-map.md`** (генерируется `make map`
+из каталога, #564), здесь он не дублируется:
 
 | Файл | Что в нём |
 |---|---|
@@ -683,7 +686,7 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/models.py` | `InspectionRow` (с `origin`, `is_legacy`, `is_uploaded`), `FindingRow`, `InfoRow`, `InspectionDetail` (с `reported_status`, `legacy_method` исторической); происхождения `ORIGIN_*`, маркеры исторической записи `LEGACY_CODE`/`NO_CLASS`/`NO_ZONE`, `LEGACY_VERSION_PREFIX` |
 
 Расчёта оценки в блоке нет и быть не может: `push_inspection` берёт `Score` из
-`domain.score()` как есть и кладёт в `inspections.pct`/`grade`/`counts`/`by_zone`
+`domain.score()` как есть и кладёт в `inspections.pct`/`grade`/`counts`/`by_zone`/`by_process` (D507)
 без единой операции над числами. Черновик загрузки (`imports.py`) так же
 кладёт итог движка (`report.rescore.apply_command`), пересчитанный после
 каждой записи, а не свой.

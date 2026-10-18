@@ -289,6 +289,7 @@ def _id_token(**нагрузка: object) -> str:
         "exp": 4_000_000_000,
         "email": "lead@example.com",
         "email_verified": True,
+        "sub": "110169484474386276334",
         **нагрузка,
     }
     середина = base64.urlsafe_b64encode(json.dumps(полная).encode()).decode().rstrip("=")

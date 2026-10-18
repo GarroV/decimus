@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 153 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 159 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -66,7 +66,12 @@
 | `/api/v1/ratings/violations` | GET | `swarm_api_violations` | `src/web/swarm_api.py` |
 | `/auth/google/callback` | GET | `google_callback` | `src/web/auth.py` |
 | `/auth/google/mail` | GET | `google_mail_callback` | `src/web/letter_draft.py` |
-| `/calendar` | GET | `calendar` | `src/web/app.py` |
+| `/calendar` | GET | `calendar` | `src/web/calendar_screen.py` |
+| `/calendar/trips` | POST | `trip_create` | `src/web/calendar_screen.py` |
+| `/calendar/trips/<trip_id>` | POST | `trip_update` | `src/web/calendar_screen.py` |
+| `/calendar/trips/<trip_id>/delete` | POST | `trip_delete` | `src/web/calendar_screen.py` |
+| `/calendar/trips/<trip_id>/steps` | POST | `trip_step_add` | `src/web/calendar_screen.py` |
+| `/calendar/trips/<trip_id>/steps/<step_id>/delete` | POST | `trip_step_delete` | `src/web/calendar_screen.py` |
 | `/country` | GET | `country_index` | `src/web/app.py` |
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
 | `/country/<code>/units/new` | GET | `unit_new` | `src/web/unit_add.py` |
@@ -174,6 +179,7 @@
 | `/users/spaces/add` | POST | `add_space` | `src/web/users_screen.py` |
 | `/users/spaces/countries` | POST | `space_countries` | `src/web/users_screen.py` |
 | `/users/unfreeze` | POST | `unfreeze_user` | `src/web/users_screen.py` |
+| `/welcome` | GET | `landing` | `src/web/landing.py` |
 
 **Мини-апп обхода (`src/web/walk_app.py: create_walk_app`)** — 11 маршрутов
 
@@ -200,7 +206,7 @@
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
 | `add_checklist_item` | checklist | Add a checklist item | `src/mcp/checklist_tools.py` |
-| `add_photo_cue` | checklist | Add one cue row to the word map, storing a new methodology version beside the one in force — the version in force does… | `src/mcp/checklist_tools.py` |
+| `add_photo_cue` | checklist | Add one cue row to the synonym dictionary, storing a new methodology version beside the one in force — the version in… | `src/mcp/checklist_tools.py` |
 | `add_zone` | checklist | Add a physical zone (e.g | `src/mcp/checklist_tools.py` |
 | `apply_checklist` | checklist | Apply a checklist to production: inspections are scored against it from now on | `src/mcp/checklists_tools.py` |
 | `checklist_item` | checklist | Read one checklist item together with its D1/D2/D3 criteria — the only source of what makes a finding D1 versus D2… | `src/mcp/checklist_tools.py` |
@@ -210,13 +216,13 @@
 | `checklists` | checklist | List the checklists visible to this tenant: code, names, state (draft / active / retired) and which one is applied to… | `src/mcp/checklists_tools.py` |
 | `create_checklist` | checklist | Create a new checklist from the blank: an empty item list, one zone at 100 per cent and blank scoring rates | `src/mcp/checklists_tools.py` |
 | `edit_checklist_item` | checklist | Edit fields of an existing checklist item | `src/mcp/checklist_tools.py` |
-| `edit_photo_cue` | checklist | Change one cue row of the word map — its codes, its phrase, or both — storing a new methodology version beside the one… | `src/mcp/checklist_tools.py` |
+| `edit_photo_cue` | checklist | Change one cue row of the synonym dictionary — its codes, its phrase, or both — storing a new methodology version… | `src/mcp/checklist_tools.py` |
 | `learned_phrases` | checklist | Show the synonym map: the wordings auditors actually used on site that the product has learned, and the checklist item… | `src/mcp/phrases.py` |
-| `photo_cue_suggestions` | checklist | Report where the model has been systematically wrong, and propose what to add to the word map because of it | `src/mcp/checklist_tools.py` |
-| `photo_cues` | checklist | Read the word map of one methodology version: the sections and the cue rows inside them, each a phrase an auditor might… | `src/mcp/checklist_tools.py` |
+| `photo_cue_suggestions` | checklist | Report where the model has been systematically wrong, and propose what to add to the synonym dictionary because of it | `src/mcp/checklist_tools.py` |
+| `photo_cues` | checklist | Read the synonym dictionary of one methodology version: the sections and the cue rows inside them, each a phrase an… | `src/mcp/checklist_tools.py` |
 | `publish_checklist_version` | checklist | Make a stored checklist version the one the audit engine scores inspections by | `src/mcp/checklist_tools.py` |
 | `remove_checklist_item` | checklist | Disable a checklist item | `src/mcp/checklist_tools.py` |
-| `remove_photo_cue` | checklist | Remove one cue row from the word map, storing a new methodology version beside the one in force | `src/mcp/checklist_tools.py` |
+| `remove_photo_cue` | checklist | Remove one cue row from the synonym dictionary, storing a new methodology version beside the one in force | `src/mcp/checklist_tools.py` |
 | `remove_zone` | checklist | Remove a physical zone | `src/mcp/checklist_tools.py` |
 | `rename_checklist` | checklist | Change a checklist's names | `src/mcp/checklists_tools.py` |
 | `rename_zone` | checklist | Rename a zone: change the Russian and/or English name the auditor sees on site and the partner reads in the report | `src/mcp/checklist_tools.py` |
@@ -227,7 +233,7 @@
 | `scoring` | checklist | Read the deduction rates of a checklist edition: the starting percentage, the price of each violation class and the… | `src/mcp/checklist_tools.py` |
 | `set_checklist_bot_access` | checklist | Open a checklist to auditors in the Telegram bot, or close it | `src/mcp/checklists_tools.py` |
 | `set_checklist_state` | checklist | Set a checklist's state: draft, active or retired | `src/mcp/checklists_tools.py` |
-| `set_photo_cue_zone` | checklist | Set the object's zone on one cue row of the word map, storing a new methodology version beside the one in force | `src/mcp/checklist_tools.py` |
+| `set_photo_cue_zone` | checklist | Set the object's zone on one cue row of the synonym dictionary, storing a new methodology version beside the one in… | `src/mcp/checklist_tools.py` |
 | `set_route` | checklist | Set the walking route: the order in which the auditor goes through the pizzeria | `src/mcp/checklist_tools.py` |
 | `set_scoring` | checklist | Set the deduction rates of the checklist: starting percentage, the price of a D1 and of a D2 violation, and how much… | `src/mcp/checklist_tools.py` |
 | `set_zone_shares` | checklist | Set the share (weight in the score) of zones that already exist | `src/mcp/checklist_tools.py` |
@@ -268,7 +274,6 @@
 |---|---|---|
 | `ACTION_PLAN_DUE_DAYS` | `src/db/config.py` | да |
 | `ADMIN_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/oauth_smoke.py` | да |
-| `ALLOWED_TELEGRAM_IDS` | `src/bot/config.py` | да |
 | `API_TOKEN_BY` | `tools/api_token.py` | да |
 | `ATTACHMENT_MAX_MB` | `src/db/config.py` | да |
 | `AUDITOR_NAMES` | `src/bot/config.py` | да |
@@ -289,6 +294,7 @@
 | `DATABASE_URL` | `src/db/config.py`, `src/mcp/config.py` | да |
 | `DB_POOL_MAX` | `src/db/pool.py` | да |
 | `DB_POOL_TIMEOUT_S` | `src/db/pool.py` | да |
+| `DEMO_PHOTOS_DIR` | `tools/seed_open_demo.py` | да |
 | `DEMO_STATE_DIR` | `tools/seed_demo.py` | да |
 | `DODO_MCP_TOKEN` | `tools/mcp_outside.py` | да |
 | `DODO_MCP_URL` | `tools/mcp_outside.py` | да |
@@ -343,6 +349,8 @@
 | `WEBAUTHN_ORIGIN` | `src/web/config.py` | да |
 | `WEBAUTHN_RP_ID` | `src/web/config.py` | да |
 | `WEB_BOT_USERNAME` | `src/web/config.py` | да |
+| `WEB_DEMO` | `src/domain/demo.py` | да |
+| `WEB_DEMO_URL` | `src/domain/demo.py` | да |
 | `WEB_HOST` | `src/web/config.py` | да |
 | `WEB_HSTS` | `src/web/config.py` | да |
 | `WEB_LISTEN_NETWORK` | `src/web/config.py` | да |
@@ -433,6 +441,12 @@
 | `0068_second_factor.sql` | `web_passkeys`, `web_totp`, `web_backup_codes`, `web_second_steps`, `web_webauthn_challenges` |
 | `0069_passkey_login.sql` | — |
 | `0070_model_key.sql` | `vault.secrets` |
+| `0071_finding_reading.sql` | — |
+| `0072_ratings_clusters_four.sql` | — |
+| `0073_inspection_by_process.sql` | — |
+| `0074_trips.sql` | `trips`, `trip_steps` |
+| `0075_email_unique_live.sql` | — |
+| `0076_google_sub.sql` | — |
 <!-- map:end -->
 
 ## Makefile
@@ -442,7 +456,7 @@
 |---|---|
 | `make bootstrap` | окружение прогона с нуля: `.venv` и зависимости (нужен Python 3.12) |
 | `make bounds` | границы модулей: обратный импорт между блоками запрещён (`lint-imports`) |
-| `make check` | все гейты качества разом: формат, линт, типы, тесты, мёртвый код, границы модулей; требует базы |
+| `make check` | все гейты качества разом: формат, линт, типы, мёртвый код, границы модулей, тесты; требует базы |
 | `make cov` | тесты с покрытием и обязательным наличием данных (`AUDIT_REQUIRE_DATA=1`) |
 | `make cov-engine` | покрытие движка, который вызывается подпроцессом |
 | `make db-down` | снести стенд базы |
@@ -460,6 +474,7 @@
 | `make mcp` | поднять MCP-сервер рядом с собой, вне стенда |
 | `make mcp-outside` | смоук доступа к MCP с чужой машины |
 | `make migrate` | накат SQL-миграций; на накатанной базе ничего не делает |
+| `make porcha` | порча ядра: испорченный расчёт обязан уронить прогон (без базы, нужны data/ и examples/) |
 | `make porcha-permissions` | порча матрицы прав: каждая сломанная защита обязана уронить свой тест (без базы) |
 | `make porcha-second-factor` | порча второй ступени входа (D463): каждая сломанная защита обязана уронить свой тест (нужна тестовая база) |
 | `make processhint` | замер признака «<описание>, это <процесс>»: сколько раз он срабатывает зря |
