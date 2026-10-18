@@ -123,6 +123,7 @@ _TOCHECK: dict[str, dict[str, str]] = {
 
 # Сетка «Календаря» (D497): дни недели с понедельника, клетка дня, пустой месяц.
 _CALENDAR: dict[str, dict[str, str]] = {
+    "calendar.period.next_month": {"ru": "Следующий месяц", "en": "Next month"},
     "calendar.wd.1": {"ru": "Пн", "en": "Mon"},
     "calendar.wd.2": {"ru": "Вт", "en": "Tue"},
     "calendar.wd.3": {"ru": "Ср", "en": "Wed"},
