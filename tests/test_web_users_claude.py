@@ -18,7 +18,6 @@ from oauth_harness import ПамятьOAuth, _Подключение, подме
 from web_harness import СВОЙ, Учётка, войти, подменить_двери, собрать
 
 from src.web import accounts
-from src.web.users_claude import claude_code_command
 
 MCP = "https://mcp.example/mcp"
 АДМИНКА = "https://admin.example"
@@ -93,8 +92,7 @@ def test_блок_есть_в_настройках_любой_роли(
         assert ответ.status_code == 200, (tenant, role)
         assert 'id="claude-connect"' in страница
         assert MCP in страница
-        assert claude_code_command(MCP) in страница
-        assert "Коннекторы" in страница
+        assert "Коннекторы" not in страница, "шаги подключения убраны (D476): адрес одной строкой"
         assert "мое-подключение" in страница
         assert "чужое-подключение" not in страница
 
