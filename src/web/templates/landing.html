@@ -56,8 +56,15 @@
             <span class="lp-finding__item">{{ t('landing.mock.item') }}</span>
             <span class="lp-finding__level">D1</span>
           </div>
+          <div class="lp-thumbs"><i></i><i></i><i></i><span>{{ t('landing.mock.photos') }}</span></div>
+          <div class="lp-finding lp-finding--repeat">
+            <span class="lp-finding__code">DEM10</span>
+            <span class="lp-finding__item">{{ t('landing.mock.item2') }}</span>
+            <span class="lp-finding__rep">{{ icon('repeat') }} {{ t('landing.mock.repeat') }}</span>
+          </div>
           <span class="lp-phone__btn">{{ icon('check') }} {{ t('landing.mock.confirm') }}</span>
         </div>
+        <div class="lp-mock__side">
         <div class="lp-report">
           <p class="lp-report__label">{{ t('landing.mock.report') }}</p>
           <div class="lp-report__score"><b>97.5%</b><span class="lp-grade">A</span></div>
@@ -65,6 +72,7 @@
           <div class="lp-report__bars"><i style="width: 100%"></i><i style="width: 94%"></i><i style="width: 98%"></i></div>
         </div>
         <div class="lp-chip">{{ icon('clock') }} {{ t('landing.mock.plan') }}</div>
+        </div>
       </div>
     </section>
 
@@ -84,6 +92,35 @@
           </li>
         {% endfor %}
       </ol>
+    </section>
+
+    <section class="lp-band lp-net">
+      <div class="lp-net__copy">
+        <p class="lp-kicker">{{ t('landing.net.kicker') }}</p>
+        <h2 class="lp-h2">{{ t('landing.net.title') }}</h2>
+        <p class="lp-sub">{{ t('landing.net.lead') }}</p>
+        <ul class="lp-card__list lp-net__list">
+          {% for n in ('1', '2', '3') %}<li>{{ icon('check') }}<span>{{ t('landing.net.p' ~ n) }}</span></li>{% endfor %}
+        </ul>
+      </div>
+      <div class="lp-board" aria-hidden="true">
+        <div class="lp-board__row lp-board__row--head">
+          <span>{{ t('landing.net.head.unit') }}</span><span>{{ t('landing.net.head.score') }}</span><span>{{ t('landing.net.head.trend') }}</span>
+        </div>
+        {% for unit, flag, score, grade, trend in (
+             ('Northgate-1', 'RS', '97.5%', 'A', (70, 78, 84, 90, 96)),
+             ('Hillcrest-1', 'GE', '93.0%', 'B', (88, 80, 86, 84, 89)),
+             ('Old Town-1', 'AM', '84.5%', 'C', (92, 86, 80, 76, 72)),
+             ('Riverside-1', 'RS', '98.0%', 'A', (90, 94, 92, 96, 98)),
+           ) %}
+          <div class="lp-board__row">
+            <span class="lp-board__unit"><b class="lp-board__flag">{{ flag }}</b>{{ unit }}</span>
+            <span class="lp-board__score">{{ score }} <i class="lp-grade lp-grade--{{ grade | lower }}">{{ grade }}</i></span>
+            <span class="lp-spark">{% for h in trend %}<i style="height: {{ (h - 60) * 0.7 }}px"></i>{% endfor %}</span>
+          </div>
+        {% endfor %}
+        <div class="lp-board__plan">{{ icon('warn') }}<span>{{ t('landing.net.plan') }}</span><b>7</b></div>
+      </div>
     </section>
 
     <section class="lp-band lp-band--alt">
@@ -125,12 +162,15 @@
     <section class="lp-final">
       <h2 class="lp-final__title">{{ t('landing.cta.title') }}</h2>
       <p class="lp-final__body">{{ t('landing.cta.body') }}</p>
-      <div class="lp-hero__actions">
-        {% if demo %}
-          <a class="btn btn--primary lp-cta" href="{{ demo }}">{{ t('landing.demo') }} {{ icon('arrow') }}</a>
-        {% endif %}
-        <a class="btn lp-cta lp-cta--light" href="{{ url_for('login') }}?lang={{ lang }}">{{ t('landing.login') }}</a>
-      </div>
+      {% if demo %}
+        <div class="lp-hero__actions">
+          <a class="btn lp-cta lp-cta--onbrand" href="{{ demo }}">{{ t('landing.demo') }} {{ icon('arrow') }}</a>
+        </div>
+        <ul class="lp-final__chips">
+          {% for n in ('1', '2', '3') %}<li>{{ icon('check') }}{{ t('landing.cta.chip' ~ n) }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+      <a class="lp-final__login" href="{{ url_for('login') }}?lang={{ lang }}">{{ t('landing.cta.login') }}</a>
     </section>
   </div>
 {% endblock %}

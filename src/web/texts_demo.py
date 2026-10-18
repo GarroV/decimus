@@ -9,10 +9,10 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Decimus · выездные проверки Dodo",
         "en": "Decimus · Dodo field audits",
     },
-    "landing.hero.a": {"ru": "Обход пиццерии — голосом.", "en": "Walk the pizzeria — by voice."},
+    "landing.hero.a": {"ru": "Обход пиццерии — голосом.", "en": "Walk the pizzeria — by voice."},
     "landing.hero.em": {
-        "ru": "Оценка, отчёт и письмо партнёру — сами.",
-        "en": "Score, report and partner letter — done for you.",
+        "ru": "Оценка, отчёт и письмо партнёру — сами.",
+        "en": "Score, report and partner letter — done for you.",
     },
     "landing.lead": {
         "ru": "Аудитор идёт по зонам с телефоном, говорит и фотографирует. Decimus "
@@ -53,8 +53,8 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     "landing.mock.plan": {"ru": "План действий: 7 дней", "en": "Action plan: 7 days"},
     "landing.steps.kicker": {"ru": "Путь проверки", "en": "The inspection path"},
     "landing.steps.title": {
-        "ru": "От маршрута до исправления — в одной системе",
-        "en": "From route to fix — in one system",
+        "ru": "От маршрута до исправления — в одной системе",
+        "en": "From route to fix — in one system",
     },
     "landing.steps.lead": {
         "ru": "Без таблиц, пересылки фото и ручного подсчёта процентов.",
@@ -93,7 +93,7 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     },
     "landing.who.kicker": {"ru": "Кому что даёт", "en": "Who gets what"},
     "landing.who.title": {
-        "ru": "Одна проверка — три точки зрения",
+        "ru": "Одна проверка — три точки зрения",
         "en": "One inspection, three views",
     },
     "landing.who.auditor": {"ru": "Аудитору", "en": "Auditors"},
@@ -157,6 +157,45 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Интерфейс, речь аудитора и отчёт — каждый на своём языке.",
         "en": "Interface, the auditor's speech and the report — each in its own language.",
     },
+    "landing.mock.repeat": {"ru": "Повтор", "en": "Repeat"},
+    "landing.mock.item2": {
+        "ru": "Мытьё рук: мыло и полотенца",
+        "en": "Handwashing: soap and towels",
+    },
+    "landing.mock.photos": {"ru": "Фото: 3", "en": "Photos: 3"},
+    "landing.net.kicker": {"ru": "Сеть на одном экране", "en": "The network on one screen"},
+    "landing.net.title": {
+        "ru": "Где всё хорошо, где проседает и кто должен исправить",
+        "en": "Where it's fine, where it slips and who has to fix it",
+    },
+    "landing.net.lead": {
+        "ru": "Страны, пиццерии и динамика оценок — для управляющей компании целиком, для "
+        "партнёра в границах его пиццерий. Серьёзные нарушения сами превращаются в план "
+        "действий со сроком, и видно, кто его задерживает.",
+        "en": "Countries, pizzerias and score trends — the whole network for head office, "
+        "their own pizzerias for each partner. Serious findings turn into an action plan "
+        "with a deadline on their own, and you can see who is holding it up.",
+    },
+    "landing.net.p1": {
+        "ru": "Тренд по каждой пиццерии, а не одна цифра",
+        "en": "A trend for every pizzeria, not one number",
+    },
+    "landing.net.p2": {
+        "ru": "Повторы прошлых замечаний видны сразу",
+        "en": "Repeats of past findings stand out at once",
+    },
+    "landing.net.p3": {
+        "ru": "Планы действий со сроками и ответами партнёра",
+        "en": "Action plans with deadlines and the partner's answers",
+    },
+    "landing.net.head.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "landing.net.head.score": {"ru": "Оценка", "en": "Score"},
+    "landing.net.head.trend": {"ru": "Динамика", "en": "Trend"},
+    "landing.net.plan": {"ru": "Ждут плана партнёра", "en": "Awaiting the partner's plan"},
+    "landing.cta.chip1": {"ru": "Без регистрации", "en": "No sign-up"},
+    "landing.cta.chip2": {"ru": "Пять минут", "en": "Five minutes"},
+    "landing.cta.chip3": {"ru": "Сброс раз в час", "en": "Resets hourly"},
+    "landing.cta.login": {"ru": "Уже есть учётка? Войти", "en": "Already have an account? Sign in"},
     "landing.cta.title": {
         "ru": "Посмотрите сами за пять минут",
         "en": "See it for yourself in five minutes",
