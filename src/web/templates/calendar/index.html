@@ -2,7 +2,8 @@
   «Календарь» (D497). Сетка месяца: неделя — строка с понедельника, в клетке дня
   — проверки с этой датой обхода, каждая ведёт в карточку на «Проверках».
   Список «Где нужно проверить» (D466) с экрана снят — «пока скрой» владельца.
-  Период — один на экран: «с — по» со стрелками ← →, по умолчанию текущий месяц
+  Период — один на экран: одна кнопка с меню (прошлый / этот / следующий месяц и
+  «с — по»), без стрелок ← → (D477), по умолчанию текущий месяц
   (`registry_period.py`); длинный период рисуется первыми месяцами
   (`calendar_view.MAX_MONTHS`). Раскладка — `calendar_view.py`.
   Поездки своего пространства (D505, D506) — полосами в днях, над проверками;
@@ -27,7 +28,7 @@
   <div class="sbox">
     <div class="sbar sbar--registry">
       {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
-                       period_hidden) }}
+                       period_hidden, arrows=False) }}
       {% if can_add_trip %}<a class="sbtn sbtn--primary sbar__add" href="{{ new_trip_href }}" data-drawer-open>{{ icon('plus') }}<span>{{ t('trip.add') }}</span></a>{% endif %}
     </div>
     {% if trips_failed %}<p class="slist__note">{{ t('trip.read_failed') }}</p>{% endif %}
