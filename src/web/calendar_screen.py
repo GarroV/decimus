@@ -254,9 +254,7 @@ def _render(
         country_title=lambda c: country_title(c, язык) or c,
         period=период,
         period_title=registry_view.period_title(период, язык),
-        period_prev=registry_view.period_link(период, -1, отбор),
-        period_next=registry_view.period_link(период, 1, отбор),
-        period_quick=registry_view.period_quick(период, сегодня, язык, отбор),
+        period_quick=registry_view.period_quick_months(период, сегодня, язык, отбор),
         period_hidden={"lang": язык},
     ), status
 

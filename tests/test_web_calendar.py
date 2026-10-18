@@ -11,12 +11,14 @@ from collections.abc import Iterator
 from datetime import date
 
 import pytest
+from flask import render_template_string
 from flask.testing import FlaskClient
 from test_web_app import ТЕНАНТ, шапка
 from web_harness import войти, подменить_двери, собрать
 
-from src.web import calendar_view
+from src.web import calendar_view, registry_period
 from src.web import inspections as data
+from src.web.texts import t
 
 СЕГОДНЯ = date(2026, 10, 15)
 
@@ -104,6 +106,29 @@ def test_без_дат_текущий_месяц(стенд: FlaskClient, спр
 
     начало = спросили[0]["date_from"]
     assert isinstance(начало, date) and начало.day == 1
+
+
+def test_период_без_стрелок_с_месяцами_в_меню(стенд: FlaskClient) -> None:
+    """D477: стрелок ← → нет; в меню — прошлый, этот и следующий месяц, без «всё время»."""
+    страница = стенд.get("/calendar?from=2026-09-01&to=2026-09-30").get_data(as_text=True)
+
+    assert "speriod__arrow" not in страница
+    assert t("calendar.period.next_month", "ru") in страница
+    assert t("registry.period.all", "ru") not in страница
+
+
+def test_стрелки_у_других_экранов_остаются() -> None:
+    """Макрос периода по умолчанию рисует стрелки; без них — только по `arrows=False`."""
+    app = собрать(tenant=ТЕНАНТ)
+    вызов = '{{% from "_period.html" import period_picker with context %}}{{{{ period_picker(p, "x", "/a", "/b", (), "/", {{}}{}) }}}}'
+    p = registry_period.read({}, today=СЕГОДНЯ)
+
+    with app.test_request_context("/"):
+        со_стрелками = render_template_string(вызов.format(""), p=p)
+        без_стрелок = render_template_string(вызов.format(", arrows=False"), p=p)
+
+    assert "speriod__arrow" in со_стрелками
+    assert "speriod__arrow" not in без_стрелок
 
 
 def test_календарь_по_английски(стенд: FlaskClient) -> None:
