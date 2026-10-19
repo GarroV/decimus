@@ -433,3 +433,48 @@ def test_отказ_сохранения_говорит_словами(
 
 def test_модуль_настроек_знает_свои_исходы() -> None:
     assert country_settings.SAVED == "ok" and country_settings.FAILED == "failed"
+
+
+def test_в_карточке_страны_оценки_площадки_проверки_и_языки(
+    админ: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D543: РС / РКО, карты и площадки доставки по пиццерии, последняя проверка, языки отчёта."""
+    from datetime import date
+
+    from src.db import agg_store
+    from src.db.spaces import SpaceRow
+    from src.domain import report_langs
+    from src.web import country_units
+
+    строка = country_units.UnitRow(
+        key="u-1", name="Batumi-1", unit_id="u-1", stage="open", code="dodo-1",
+        rs=88.0, rko=93.3, maps={2: 4.6}, last_ever=date(2026, 9, 23),
+    )  # fmt: skip
+    monkeypatch.setattr(country_units, "load", lambda **_: country_units.UnitsData(rows=(строка,)))
+    monkeypatch.setattr(partner_spaces, "overview", lambda: (SpaceRow("HQ", "УК", (), 3),))
+    wolt = agg_store.LatestRating("GE", "wolt", "dodo-1", 9.2, 10, 120, date(2026, 10, 1))
+    monkeypatch.setattr(agg_store, "latest", lambda codes, **_: (wolt,))
+    monkeypatch.setattr(report_langs, "report_langs_for", lambda code, **_: ["en"])
+    страница = открыть(админ, monkeypatch, данные(), "/country/GE?settings=1")
+    таблица = страница[страница.index("ccard__table") :]
+    assert "88.0" in таблица and "93.3" in таблица and "4.60" in таблица
+    assert "Wolt" in таблица and "9.2" in таблица and "2026-09-23" in таблица
+    сведения = страница[страница.index("ccard__people--meta") : страница.index("ccard__table")]
+    assert "Языки отчёта" in сведения and "English" in сведения
+
+
+def test_аудиторы_страны_по_числу_проверок() -> None:
+    """D543: аудиторы периода — кто больше проверял, тот выше; пустое имя не считается."""
+    from types import SimpleNamespace
+
+    проверки = [SimpleNamespace(auditor=a) for a in ("Ана", "Бо", "Бо", "")]
+    итог = country_settings._auditors(проверки)  # type: ignore[arg-type]
+    assert [(a.name, a.inspections) for a in итог] == [("Бо", 2), ("Ана", 1)]
+
+
+def test_у_каждого_языка_методики_есть_название_для_карточки() -> None:
+    """D543: карточка зовёт язык `nav.lang.<код>`; язык методики без названия уронил бы её."""
+    from src.domain.models import TEXT_LANGS
+    from src.web.texts import TEXTS
+
+    assert [code for code in TEXT_LANGS if f"nav.lang.{code}" not in TEXTS] == []
