@@ -60,7 +60,7 @@
   {% set review_shots = c.photos.get(finding.id) %}
   {% for photo_id in (review_shots.shown if review_shots else ()) %}
     <span class="shot">
-      <a href="{{ url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id) }}" target="_blank" rel="noopener">
+      <a href="{{ url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id) }}" data-zoom>
         <img class="review-photo" src="{{ url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id) }}"
              alt="{{ t('review.photo.alt', n=finding.n) }}" loading="lazy" width="160" height="120">
       </a>
@@ -210,7 +210,7 @@
           <div class="find-row__gallery">
             {% for shot in shots %}
               {% set src = url('/inspections/' ~ head.id ~ '/photos/' ~ shot) %}
-              <a href="{{ src }}" target="_blank" rel="noopener"><img src="{{ src }}" loading="lazy" alt="{{ finding.code }} · {{ loop.index }}"></a>
+              <a href="{{ src }}" data-zoom><img src="{{ src }}" loading="lazy" alt="{{ finding.code }} · {{ loop.index }}"></a>
             {% endfor %}
           </div>
         </details>

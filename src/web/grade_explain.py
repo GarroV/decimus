@@ -28,6 +28,9 @@ from .texts import t
 
 _log = logging.getLogger(__name__)
 
+# Обычный старт оценки: строка «Старт» показывается, только если он другой (D533).
+START_PCT = 100.0
+
 
 @dataclass(frozen=True)
 class Explanation:
@@ -86,7 +89,11 @@ def _zone_names(detail: InspectionDetail, lang: str) -> dict[str, str]:
 
 
 def _breakdown_lines(raw: dict[str, Any], names: dict[str, str], lang: str) -> tuple[str, ...]:
-    out = [t("explain.start", lang, pct=number(raw["start"], lang))]
+    # Старт — 100% у каждой проверки движка, строка ничего не сообщает (D533);
+    # другой старт в `scoring.json` показываем: без него вычеты не сходятся с итогом.
+    out: list[str] = []
+    if raw["start"] != START_PCT:
+        out.append(t("explain.start", lang, pct=number(raw["start"], lang)))
     for row in raw["lines"]:
         loss = number(row["loss"], lang)
         if row["kind"] == "level":
