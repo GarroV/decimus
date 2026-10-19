@@ -647,7 +647,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             # Поиск: часть названия пиццерии, без учёта регистра.
             q=request.args.get("q", "").strip()[:80],
             # «Пиццерии без проверки» (D532): правая часть целиком — список точек.
-            unchecked=request.args.get("unchecked", "").strip() == "1",
+            unchecked=registry_view.UNCHECKED_SHOWN
+            and request.args.get("unchecked", "").strip() == "1",
         )
         гео = data.load_geography(reach=auth.current_reach())
 
@@ -664,11 +665,16 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
         выбрано = request.args.get("inspection", "").strip()[:64]
         панель = _registry_panel(выбрано, conf=conf)
-        # «На приёмке» (D466): ждущие вычитки — мимо периода и отбора, самые
-        # давние сверху; сколько ждут — днями от даты обхода.
+        # «На приёмке» (D466, D548): ждущие вычитки — мимо периода, буквы, вида и
+        # поиска, но в выбранной стране и городе: выбрана Турция — только Турция.
+        # Самые давние сверху; сколько ждут — днями от даты обхода.
         сегодня = date.today()
+        срез_места = registry_view.Filter(country=отбор_в.country, city=отбор_в.city)
         на_приёмке = tuple(
-            sorted(registry_data.review, key=lambda row: (row.inspection_date, row.pushed_at))
+            sorted(
+                (row for row in registry_data.review if срез_места.keeps(row, место(row))),
+                key=lambda row: (row.inspection_date, row.pushed_at),
+            )
         )
         ждёт_дней = {row.id: max((сегодня - row.inspection_date).days, 0) for row in на_приёмке}
         чипы = _registry_picks(registry_data.rows, отбор_в, место, отбор, язык)
@@ -717,6 +723,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             period_all=отбор(**{"from": "", "to": "", "period": registry_period.ALL}),
             select_url=отбор,
             reset_url=отбор(grade="", kind="", country="", city="", q="", unchecked=""),
+            unchecked_shown=registry_view.UNCHECKED_SHOWN,
             picked=панель.picked,
             card=панель.context,
             card_missing=панель.missing,

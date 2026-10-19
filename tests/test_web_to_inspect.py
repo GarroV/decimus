@@ -20,7 +20,7 @@ from web_harness import войти, подменить_двери, собрат�
 from src.db.errors import DbError
 from src.db.reach import Reach
 from src.web import inspections as data
-from src.web import to_inspect
+from src.web import registry_view, to_inspect
 from src.web.texts import t
 
 
@@ -30,6 +30,8 @@ def t_ru(ключ: str) -> str:
 
 @pytest.fixture
 def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
+    # D549: «Пиццерии без проверки» скрыты флагом; здесь проверяется сама функция.
+    monkeypatch.setattr(registry_view, "UNCHECKED_SHOWN", True)
     подменить_двери(monkeypatch, tenant=ТЕНАНТ)
     monkeypatch.setattr(
         data, "load_registry", lambda **_: data.Registry((шапка(unit_name="Белград-1"),), True)
@@ -218,3 +220,21 @@ def test_проверки_отказ_блока_называется_строк�
     страница = стенд.get("/inspections?unchecked=1").get_data(as_text=True)
 
     assert t_ru("registry.tocheck.failed") in страница
+
+
+def test_по_умолчанию_галочки_нет_и_адрес_её_не_включает(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D549: флаг выключен — галочки на «Проверках» нет, `unchecked=1` в адресе ничего не читает."""
+    # Arrange
+    monkeypatch.setattr(registry_view, "UNCHECKED_SHOWN", False)
+    спросили: list[dict[str, object]] = []
+    monkeypatch.setattr(to_inspect, "load", lambda **kw: спросили.append(kw) or _блок("Точка"))
+
+    # Act
+    страница = стенд.get("/inspections?unchecked=1").get_data(as_text=True)
+
+    # Assert
+    assert t_ru("registry.unchecked.label") not in страница
+    assert "Белград-1" in страница
+    assert not спросили

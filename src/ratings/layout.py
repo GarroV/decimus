@@ -14,7 +14,8 @@ from dataclasses import dataclass
 #: `ratings.layout.<код>` и ветка шаблона `ratings/index.html`.
 #: Агрегаторы — в блоке карт (11.10.2026): сохранённая строка `aggregators`
 #: выпадает в `arrange` как незнакомая.
-BLOCKS: tuple[str, ...] = ("scores", "violations", "top", "hard", "risk", "maps")
+#: «Сравнение» (D551) видит только УК: у остальных блок пропускается шаблоном.
+BLOCKS: tuple[str, ...] = ("scores", "compare", "violations", "top", "hard", "risk", "maps")
 
 
 @dataclass(frozen=True)

@@ -13,8 +13,14 @@ from datetime import date, timedelta
 from src.db.models import InspectionRow
 
 from . import registry_period
+from .dates import human_day
 from .registry_period import Period
 from .texts import t
+
+#: «Пиццерии без проверки» на «Проверках» скрыты (D549): руководство не поняло,
+#: «за период или вообще», а признак «ни разу не проверялась» живёт в карточке
+#: страны. Код, тексты и тесты остались — вернуть одной строкой.
+UNCHECKED_SHOWN = False
 
 
 @dataclass(frozen=True)
@@ -55,15 +61,37 @@ class Filter:
 
 
 def period_title(period: Period, lang: str) -> str:
-    """Подпись периода: «Октябрь 2026», «2026-10-01 — 2026-10-15» или «Всё время»."""
+    """Подпись периода: «Октябрь 2026», «1 — 15 окт 2026» или «Всё время».
+
+    Месяц — словом (#963, #978): ISO-даты в шапке и на кнопке периода читались
+    как служебная строка и не помещались в кнопку. Общее у краёв не повторяется:
+    «1 сен — 31 окт 2026», а не «1 сен 2026 — 31 окт 2026».
+    """
     if period.is_all:
         return t("registry.period.all", lang)
     месяц = period.month
     if месяц is not None:
         return f"{t(f'registry.month.{месяц.month}', lang)} {месяц.year}"
-    начало = period.start.isoformat() if period.start else "…"
-    конец = period.end.isoformat() if period.end else "…"
-    return f"{начало} — {конец}"
+    return _range_title(period.start, period.end, lang)
+
+
+#: Неразрывный пробел внутри даты: перенос в узкой кнопке — только у тире.
+_NBSP = "\u00a0"
+
+
+def _range_title(start: date | None, end: date | None, lang: str) -> str:
+    def край(day: date | None, *, year: bool = True, month: bool = True) -> str:
+        if day is None:
+            return "…"
+        if not month:
+            return str(day.day)
+        if not year:
+            return f"{day.day} {t(f'date.mon.{day.month}', lang)}".replace(" ", _NBSP)
+        return human_day(day, lang).replace(" ", _NBSP)
+
+    if start is None or end is None or start.year != end.year:
+        return f"{край(start)} — {край(end)}"
+    return f"{край(start, year=False, month=start.month != end.month)} — {край(end)}"
 
 
 def period_link(period: Period, step: int, select: Callable[..., str]) -> str | None:

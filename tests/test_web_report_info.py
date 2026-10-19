@@ -84,6 +84,9 @@ def test_нет_методики_версии_сказано_и_вопросы_�
 def test_кнопка_pdf_есть_при_сохранённом_отчёте(с_отчётом: FlaskClient) -> None:
     html = с_отчётом.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
     assert f"/inspections/{ПРОВЕРКА}/report" in html
+    # D554: значок — «скачать» (стрелка над полкой), а не лист, похожий на «документ».
+    кнопка = html.split(f"/inspections/{ПРОВЕРКА}/report", 1)[1].split("</a>", 1)[0]
+    assert "M10 3.5v9M6.5 9l3.5 3.5L13.5 9M4 16.5h12" in кнопка
 
 
 def test_кнопки_pdf_нет_без_отчёта_и_сказано_почему(без_отчёта: FlaskClient) -> None:

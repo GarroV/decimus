@@ -459,6 +459,7 @@
 | `0077_web_country_filter.sql` | — |
 | `0078_model_usage.sql` | `model_usage` |
 | `0079_units_merged_into.sql` | — |
+| `0080_ratings_layout_compare.sql` | — |
 <!-- map:end -->
 
 ## Makefile

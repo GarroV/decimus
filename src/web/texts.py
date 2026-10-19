@@ -444,11 +444,14 @@ TEXTS: dict[str, dict[str, str]] = {
     "registry.review.hint": {
         "ru": (
             "Обход закончен, но проверка ещё не вычитана. В историю сети, обзор и "
-            "карточки точек она попадёт после подтверждения."
+            "карточки точек она попадёт после подтверждения. Страна и город "
+            "отбирают и здесь, период — нет: приёмка не ждёт конца месяца."
         ),
         "en": (
             "The visit is over, but nobody has reviewed the inspection yet. It joins the "
-            "network history, the overview and unit cards once it is accepted."
+            "network history, the overview and unit cards once it is accepted. Country "
+            "and city filter this list too; the period does not: review never waits "
+            "for the month to end."
         ),
     },
     "accept.banner.title": {"ru": "Проверка на приёмке", "en": "Inspection awaiting review"},

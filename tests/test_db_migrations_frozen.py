@@ -320,6 +320,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0079_units_merged_into.sql": (
         "sql1:2bc2bc88926c72f61a50ce128343ef47f2fa1b189eab2f207ce67262874507f0"
     ),
+    # Блок «Сравнение девелоперов и стран» на «Рейтингах» (D551).
+    "0080_ratings_layout_compare.sql": (
+        "sql1:951eff64e908b971fe164528a9211c467b320c26fdd0f7cec179fb7320de29f6"
+    ),
 }
 
 

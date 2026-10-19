@@ -59,6 +59,7 @@ _BAR: dict[str, dict[str, str]] = {
     "registry.search.apply": {"ru": "Найти", "en": "Search"},
     "registry.filter.reset": {"ru": "Сбросить", "en": "Reset"},
     "registry.filters.title": {"ru": "Отбор", "en": "Filters"},
+    "registry.head.period": {"ru": "Период: {period}", "en": "Period: {period}"},
     "registry.accepted.title": {"ru": "Принятые", "en": "Accepted"},
     "registry.accepted.hint": {
         "ru": "Период и отбор действуют на принятые проверки, новые — сверху.",

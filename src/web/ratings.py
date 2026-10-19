@@ -27,7 +27,8 @@ from src.db import ratings_read as read
 from src.db import ratings_sync as sheet_state
 from src.db.errors import RatingsError
 from src.db.ratings_read import REFUSED_SETTING, RatingsEditError
-from src.domain.tenants import may_manage_ratings
+from src.domain.tenants import HQ_TENANT, may_manage_ratings
+from src.ratings import compare as rcompare
 from src.ratings import coverage, pointer, report, sheet_sync
 from src.ratings import layout as rl
 from src.ratings import maps as rmaps
@@ -239,6 +240,8 @@ def render_summary(conf: Settings) -> str:
     selection, found = report.select(request.args, today=date.today())
     summary = report.build(selection)
     names = _country_names(found.countries, lang)
+    # Сравнение девелоперов и стран — только УК (D551): партнёру чужие страны не показываем.
+    comparison = rcompare.build(selection, found) if auth.current_tenant() == HQ_TENANT else None
 
     def country_name(code: str) -> str:
         return names.get(code) or country_title(code, lang)
@@ -267,6 +270,8 @@ def render_summary(conf: Settings) -> str:
         chart=_chart(summary, names_of_groups, lang),
         clusters=report.CLUSTERS,
         summary=summary,
+        comparison=comparison,
+        score_tone=rl_chart.tone,
         choices=found,
         selection=selection,
         calendar=ratings_calendar.build(

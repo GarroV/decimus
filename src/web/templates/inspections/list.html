@@ -52,8 +52,10 @@
         {%- if filters.unchecked -%}
           {{ t('registry.unchecked.label') }} ({{ period_title }}){% if to_check.shown and not to_check.failed %}: {{ to_check.total }}{% endif %}
         {%- else -%}
-          {{ t('registry.review.title') }}: {{ review_rows|length }}
-          · {{ t('registry.accepted.title') }} ({{ period_title }}): {{ rows|length }}
+          {#- Итоги — в счётчиках блоков «На приёмке» и «Принятые»; здесь только
+              период, к которому относятся принятые (#978: строка из четырёх
+              кусков с ISO-датами не читалась и повторяла счётчики). -#}
+          {{ t('registry.head.period', period=period_title) }}
           {%- if registry.retracted_count %} · {{ t('registry.retracted_count', count=registry.retracted_count) }}{% endif %}
         {%- endif %}
       </p>
@@ -83,7 +85,9 @@
                  aria-label="{{ t('registry.search') }}" autocomplete="off" spellcheck="false">
         </label>
       </form>
-      {# «Пиццерии без проверки» (D532): без скриптов — кнопка «Применить»; со скриптом — сразу при щелчке. #}
+      {# «Пиццерии без проверки» (D532): без скриптов — кнопка «Применить»; со скриптом — сразу при щелчке.
+         Скрыто флагом `registry_view.UNCHECKED_SHOWN` (D549). #}
+      {% if unchecked_shown %}
       <form class="rg-unchecked" method="get" action="{{ url(current_path) }}" data-autosubmit>
         {{ hidden_filters(skip=('unchecked',)) }}
         {% for name, value in period.params().items() if value %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
@@ -93,6 +97,7 @@
         </label>
         <button class="sbtn" type="submit" data-autosubmit-button>{{ t('registry.unchecked.apply') }}</button>
       </form>
+      {% endif %}
       {% if filters.active %}<a class="sbtn sbtn--ghost rg-reset" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
     </div>
     {% if country_pick %}

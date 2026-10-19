@@ -273,7 +273,7 @@ def period_scores(selection: Selection, codes: Sequence[str]) -> list[Fact]:
     return _facts(read.score_facts(countries=codes, begin=period.begin, end=period.end))
 
 
-def _period_facts(
+def period_facts(
     codes: Sequence[str], period: ReportPeriod, prev: ReportPeriod | None
 ) -> tuple[list[Fact], list[Fact]]:
     """Факты периода и прошлого периода — общий вход `build` и `group_summary`."""
@@ -308,7 +308,7 @@ def group_summary(
     if scope is not None:
         codes = tuple(code for code in codes if code in scope)
     prev = previous_period(selection.period, rs_periods=found.rs_periods)
-    facts = _period_facts(codes, selection.period, prev)
+    facts = period_facts(codes, selection.period, prev)
     return GroupSummary(selection, group_lines(selection, found, codes, facts), prev)
 
 
@@ -319,7 +319,7 @@ def build_groups(
     и зоны риска. Считает тем же `group_lines`, что и `build`."""
     codes = group_countries(selection, found.countries)
     prev = previous_period(selection.period, rs_periods=found.rs_periods)
-    facts = _period_facts(codes, selection.period, prev)
+    facts = period_facts(codes, selection.period, prev)
     return group_lines(selection, found, codes, facts), prev
 
 
@@ -328,7 +328,7 @@ def build(selection: Selection) -> Summary:
     codes = group_countries(selection, found.countries)
     period = selection.period
     prev = previous_period(period, rs_periods=found.rs_periods)
-    current, previous = _period_facts(codes, period, prev)
+    current, previous = period_facts(codes, period, prev)
     lines, total = score_lines(current, previous, codes)
     groups = group_lines(selection, found, codes, (current, previous))
     limits = read.settings()
