@@ -207,7 +207,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **56** инструментов (checklist — 33, checklist_source — 2, import — 9, inspections — 6, ratings — 2, ratings_read — 3, retraction — 1).
+Всего **57** инструментов (checklist — 33, checklist_source — 2, import — 9, inspections — 6, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
@@ -255,17 +255,18 @@
 | `import_get_inspection` | import | Read an imported inspection (draft or accepted): its mode, header and findings with their numbers | `src/mcp/imports.py` |
 | `import_list_drafts` | import | List this space's imported drafts that are not accepted yet: mode (history/current), unit, date, checklist version… | `src/mcp/imports.py` |
 | `import_remove_finding` | import | Remove one finding (with its photos) from an imported draft by its number n | `src/mcp/imports.py` |
-| `findings_by_unit` | inspections | List the recorded findings of one unit (pizzeria) across all its inspections, most recent inspection first, exactly as… | `src/mcp/tools.py` |
+| `findings_by_unit` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `get_inspection` | inspections | Read one recorded inspection of the caller's tenant in full: its header, the score breakdown (percentage, letter grade… | `src/mcp/tools.py` |
 | `inspection_letter` | inspections | Rebuild the partner letter for one recorded inspection of the caller's tenant and return its text, ready for a human to… | `src/mcp/tools.py` |
-| `list_inspections` | inspections | List recorded inspections for the caller's tenant, most recent first | `src/mcp/tools.py` |
+| `list_inspections` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `network_summary` | inspections | Summarize the caller's tenant network over a date range: how many inspections and units, total findings, the… | `src/mcp/tools.py` |
-| `unit_history` | inspections | Read the recorded score history of one unit (pizzeria), most recent inspection first — a series of percentages and… | `src/mcp/tools.py` |
+| `unit_history` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `import_ratings` | ratings | Upload a ratings file into Decimus (standards and customer-experience ratings, IMF only) | `src/mcp/ratings_tools.py` |
 | `request_aggregators_update` | ratings | Запросить внеочередное обновление оценок пиццерий в агрегаторах доставки (Wolt, Glovo, Bolt Food, Yemeksepeti, Trendyol… | `src/mcp/ratings_tools.py` |
 | `aggregators_status` | ratings_read | Состояние сбора оценок в агрегаторах доставки: по каждому — когда был последний сбор, чем кончился (ok, failed или… | `src/mcp/ratings_read.py` |
-| `ratings_summary` | ratings_read | Сводка рейтингов РС (рейтинг стандартов) и РКО (рейтинг клиентского опыта) по группам стран за период: средняя оценка… | `src/mcp/ratings_read.py` |
-| `ratings_units` | ratings_read | Оценки отдельных пиццерий за период: РС и РКО (среднее по периодам рейтинга), оценка на картах Google (из 5, число… | `src/mcp/ratings_read.py` |
+| `ratings_summary` | ratings_read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
+| `ratings_unit_periods` | ratings_read | Разбивка одной пиццерии по периодам рейтинга РС и РКО — рейтингов Dodo из таблицы контроля «база рейтингов» и выгрузок… | `src/mcp/ratings_read.py` |
+| `ratings_units` | ratings_read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
 | `retract_inspection` | retraction | Retract a finalized inspection from the history | `src/mcp/retraction.py` |
 <!-- map:end -->
 
@@ -315,6 +316,7 @@
 | `GOOGLE_MAIL_REDIRECT_URI` | `src/web/google_mail.py` | да |
 | `GOOGLE_REDIRECT_URI` | `src/web/google_auth.py` | да |
 | `INSPECTION_FILE` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
+| `LANDING_SHOTS_BASE` | `tools/landing_shots.py` | да |
 | `LOG_ID_SALT` | `src/domain/log_ids.py` | да |
 | `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 1 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
@@ -369,6 +371,7 @@
 | `WEB_URL_PREFIX` | `src/web/config.py`, `tools/walk_healthcheck.py` | да |
 | `WEB_USER_PASSWORD` | `tools/web_user.py` | да |
 | `WEB_WALK_PREVIEW_CHAT` | `src/web/walk_auth.py` | да |
+| `WEB_WALK_PREVIEW_CHAT_RU` | `src/web/walk_auth.py` | да |
 | `WEB_WALK_UPSTREAM` | `src/web/config.py` | да |
 <!-- map:end -->
 
@@ -476,6 +479,7 @@
 | `make fastpath` | замер быстрого пути разбора: доля фиксаций без вызова модели; расход нулевой |
 | `make fmt` | проверка формата (`ruff format --check`) |
 | `make image` | сборка образов бота и MCP-сервера с номером сборки внутри |
+| `make landing-shots` | пересъёмка настоящих снимков для лендинга (открытое демо, ru и en) |
 | `make lint` | линт (`ruff check`) |
 | `make loadcheck` | замер потолка нагрузки: параллельные проверки и альбом одновременных записей |
 | `make loadcheck-live` | тот же замер с настоящими вызовами модели; платный, без `--yes` показывает только план |

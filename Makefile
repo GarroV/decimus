@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest porcha porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units units-normalize demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
+.PHONY: bootstrap check test test-honest porcha porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units units-normalize demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map landing-shots
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -175,6 +175,16 @@ regress:  ## движок на эталонных данных: цифры не 
 # иначе эта цель, запущенная на сервере, писала бы в настоящие проверки.
 demo:  ## наполнить синтетический англоязычный демо-набор, боевых данных не касается
 	$(VENV)/python tools/seed_demo.py
+
+# Снимки экранов для посадочной страницы (D545): скрипт сам входит на стенд
+# открытого демо, открывает настоящие экраны за «всё время», прячет плашку демо и
+# пишет WebP на оба языка в src/web/static/landing/. Стенд — `LANDING_SHOTS_BASE`
+# (по умолчанию открытое демо). Playwright — только dev-зависимость (pyproject): нет в `.venv` —
+# цель доставит её сама; браузер берётся из кеша Playwright. Правили экран, который виден на лендинге, —
+# запусти и закоммить снимки.
+landing-shots:  ## пересъёмка настоящих снимков для лендинга (открытое демо, ru и en)
+	@$(VENV)/python -c "import playwright" 2>/dev/null || $(VENV)/pip install -q -e '.[dev]'
+	$(VENV)/python tools/landing_shots.py
 
 # Замер потолка нагрузки (T101, D058). Владелец назвал нагрузку главным риском,
 # но целевого числа не задал — поэтому сначала измеряем потолок, потом решаем.

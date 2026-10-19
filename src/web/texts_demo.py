@@ -3,222 +3,217 @@
 from __future__ import annotations
 
 DEMO_TEXTS: dict[str, dict[str, str]] = {
-    # ── Лендинг (D525) ──────────────────────────────────────────────────
+    # ── Лендинг (D525, D545–D547): стопка листов ────────────────────────
     "landing.title": {"ru": "Хаб оценки качества", "en": "Quality assessment hub"},
+    # Подпись над заголовком страниц выбора роли и приложения (`demo/pick.html`, `demo/app.html`).
     "landing.kicker": {
         "ru": "Decimus · оценка качества Dodo",
         "en": "Decimus · Dodo quality assessment",
     },
-    "landing.hero.a": {
-        "ru": "Хаб оценки качества сети.",
-        "en": "A quality assessment hub for the network.",
-    },
-    "landing.hero.em": {
-        "ru": "Проверка, оценка, отчёт и исправления — в одном месте.",
-        "en": "Inspection, score, report and follow-up — in one place.",
-    },
-    "landing.lead": {
-        "ru": (
-            "Проверяющий ведёт проверку с телефона: фиксирует замечания фото и коротким "
-            "комментарием. Decimus привязывает их к пунктам чек-листа, считает оценку по методике "
-            "и готовит отчёт. Управляющая компания видит всю сеть, партнёр — свои точки и что "
-            "нужно исправить."
-        ),
-        "en": (
-            "The inspector runs the inspection from a phone, recording findings with a photo and a "
-            "short comment. Decimus links them to checklist items, scores them by the methodology "
-            "and prepares the report. Head office sees the whole network, the partner sees their "
-            "own locations and what needs fixing."
-        ),
-    },
     "landing.login": {"ru": "Войти", "en": "Sign in"},
     "landing.demo": {"ru": "Открыть демо", "en": "Open the demo"},
     "landing.demo.note": {"ru": "Без регистрации и смс", "en": "No sign-up, no SMS"},
-    "landing.how.link": {"ru": "Как это работает", "en": "How it works"},
-    # Макет на главном экране — выдуманная проверка, как в демо.
-    "landing.mock.zone": {"ru": "Кухня", "en": "Kitchen"},
-    "landing.mock.progress": {"ru": "4 из 6 зон", "en": "4 of 6 zones"},
-    "landing.mock.said": {
-        "ru": "На роликах конвейера печи остатки теста",
-        "en": "Dough residue on the oven conveyor rollers",
+    "landing.hero.title": {
+        "ru": "Хаб оценки качества сети",
+        "en": "A quality assessment hub for the network",
     },
-    "landing.mock.item": {"ru": "Печь, конвейер, вытяжка", "en": "Oven, conveyor, hood"},
-    "landing.mock.report": {"ru": "Отчёт готов", "en": "Report ready"},
-    "landing.mock.z1": {"ru": "Зал", "en": "Dining"},
-    "landing.mock.z2": {"ru": "Кухня", "en": "Kitchen"},
-    "landing.mock.z3": {"ru": "Склад", "en": "Storage"},
-    "landing.mock.add": {"ru": "Нарушение", "en": "Violation"},
-    "landing.mock.done": {"ru": "Осмотрено", "en": "Checked"},
-    "landing.steps.kicker": {"ru": "Путь проверки", "en": "The inspection path"},
-    "landing.steps.title": {
-        "ru": "От маршрута до исправления — в одной системе",
-        "en": "From route to fix — in one system",
+    "landing.hero.sub": {
+        "ru": "Проверка, оценка, отчёт и исправления — в одном месте",
+        "en": "Inspection, score, report and follow-up in one place",
     },
-    "landing.steps.lead": {
-        "ru": "Без таблиц, пересылки фото и ручного подсчёта процентов.",
-        "en": "No spreadsheets, no forwarding photos, no counting percentages by hand.",
-    },
-    "landing.s1.title": {"ru": "План", "en": "Plan"},
-    "landing.s1.body": {
-        "ru": "Маршрут и календарь поездок: кого, когда и в каком порядке проверять.",
-        "en": "Route and trip calendar: who to inspect, when and in what order.",
-    },
-    "landing.s2.title": {"ru": "Обход", "en": "Walk"},
-    "landing.s2.body": {
+    "landing.hero.lead": {
         "ru": (
-            "Обход ведёт человек: снимает кадр и пишет пару слов. Бегать по чек-листу и искать "
-            "нужный пункт не нужно."
+            "Проверяющий снимает находки на телефон и пишет к ним пару слов. Decimus ставит их "
+            "на места в чек-листе и считает оценку по методике. Управляющая компания видит всю "
+            "сеть, партнёр — свои точки и то, что нужно исправить."
         ),
         "en": (
-            "A person walks the site: takes a photo and writes a few words. No need to dig through "
-            "the checklist for the right item."
+            "The inspector photographs findings on a phone and adds a few words. Decimus places "
+            "them on the checklist and scores them by the methodology. Head office sees the whole "
+            "network; the partner sees their own locations and what needs fixing."
         ),
     },
-    "landing.s3.title": {"ru": "Чек-лист", "en": "Checklist"},
-    "landing.s3.body": {
+    "landing.plan.tab": {"ru": "План", "en": "Plan"},
+    "landing.plan.title": {
+        "ru": "Кого, когда и в каком порядке проверять",
+        "en": "Who to inspect, when, and in what order",
+    },
+    "landing.plan.body": {
         "ru": (
-            "Работу по чек-листу ведёт машина: находит пункт и класс нарушения. Проверяющий "
-            "подтверждает — без него в отчёт не попадает ничего."
+            "Календарь показывает проверки месяца с оценкой и поездки проверяющих — порядок и "
+            "маршрут видны в одном месте."
         ),
         "en": (
-            "The machine works the checklist: it finds the item and the level. The inspector "
-            "confirms — nothing reaches the report without them."
+            "The calendar shows the month's inspections with their scores and the inspectors' "
+            "trips, so the order and the route are in one place."
         ),
     },
-    "landing.s4.title": {"ru": "Отчёт", "en": "Report"},
-    "landing.s4.body": {
+    "landing.walk.tab": {"ru": "Обход", "en": "Walk"},
+    "landing.walk.title": {
+        "ru": "Обход ведёт человек. Чек-лист ведёт машина.",
+        "en": "The person walks. The machine runs the checklist.",
+    },
+    "landing.walk.body": {
         "ru": (
-            "После проверки отчёт готов за секунды — с оценкой по методике и черновиком письма "
-            "партнёру."
+            "Не нужно бегать по чек-листу и искать пункты: проверяющий снимает находку и пишет "
+            "пару слов, а Decimus подбирает пункт. В отчёт ничего не попадает, пока человек не "
+            "подтвердил запись."
         ),
         "en": (
-            "The report is ready seconds after the inspection — scored by the methodology, with a "
-            "draft letter to the partner."
+            "No hunting through the checklist for items: the inspector photographs a finding and "
+            "writes a few words, and Decimus picks the item. Nothing reaches the report until a "
+            "person confirms it."
         ),
     },
-    "landing.s5.title": {"ru": "Исправление", "en": "Fix"},
-    "landing.s5.body": {
-        "ru": "План действий и общение с партнёром — всё в одном месте.",
-        "en": "The action plan and talking to the partner — all in one place.",
+    "landing.walk.person": {"ru": "Человек", "en": "The person"},
+    "landing.walk.person.1": {
+        "ru": "Снимает находку и пишет пару слов",
+        "en": "Photographs a finding and adds a few words",
     },
-    "landing.who.kicker": {"ru": "Кому что даёт", "en": "Who gets what"},
-    "landing.who.title": {
-        "ru": "Одна проверка — три точки зрения",
-        "en": "One inspection, three views",
+    "landing.walk.person.2": {"ru": "Подтверждает каждую запись", "en": "Confirms every record"},
+    "landing.walk.person.3": {
+        "ru": "Решает, что попадёт в отчёт",
+        "en": "Decides what goes into the report",
     },
-    "landing.who.auditor": {"ru": "Проверяющему", "en": "Inspectors"},
-    "landing.who.auditor.1": {
-        "ru": "Проверка в телефоне, без бумаги и ноутбука",
-        "en": "The inspection on a phone, no paper or laptop",
+    "landing.walk.machine": {"ru": "Машина", "en": "The machine"},
+    "landing.walk.machine.1": {"ru": "Подбирает пункт чек-листа", "en": "Picks the checklist item"},
+    "landing.walk.machine.2": {
+        "ru": "Напоминает, что нашли в прошлый раз",
+        "en": "Recalls what was found last time",
     },
-    "landing.who.auditor.2": {
-        "ru": "Комментарий становится замечанием с пунктом и зоной",
-        "en": "A comment becomes a finding with item and zone",
+    "landing.walk.machine.3": {
+        "ru": "Считает оценку по методике",
+        "en": "Scores by the methodology",
     },
-    "landing.who.auditor.3": {
-        "ru": "Отчёт и черновик письма готовы — остаётся проверить и отправить",
-        "en": "The report and draft letter are ready — just review and send",
+    "landing.report.tab": {"ru": "Отчёт", "en": "Report"},
+    "landing.report.title": {
+        "ru": "Отчёт готов через секунды после проверки",
+        "en": "The report is ready seconds after the inspection",
     },
-    "landing.who.hq": {"ru": "Управляющей компании", "en": "Head office"},
-    "landing.who.hq.1": {
-        "ru": "Вся сеть на одном экране: страны, точки, динамика",
-        "en": "The whole network on one screen: countries, locations, trends",
+    "landing.report.body": {
+        "ru": (
+            "Оценка считается по методике, потери видны по зонам и по записям. Письмо партнёру "
+            "готовится черновиком: проверяет и отправляет его человек."
+        ),
+        "en": (
+            "The score follows the methodology, and losses show by zone and by record. The letter "
+            "to the partner is a draft that a person checks and sends."
+        ),
     },
-    "landing.who.hq.2": {
-        "ru": "Рейтинги стандартов и клиентского опыта вместо таблиц",
-        "en": "Standards and customer-experience ratings instead of spreadsheets",
+    "landing.actions.tab": {"ru": "Исправление", "en": "Follow-up"},
+    "landing.actions.title": {
+        "ru": "План действий и разговор с партнёром — в одном месте",
+        "en": "The action plan and the conversation with the partner, in one place",
     },
-    "landing.who.hq.3": {
-        "ru": "Методика и чек-лист правятся без программиста",
-        "en": "Methodology and checklist edited without a developer",
+    "landing.actions.body": {
+        "ru": (
+            "Партнёр видит свои проверки и план исправлений со сроком, управляющая компания "
+            "принимает план. Предписания и ответы не теряются в переписке."
+        ),
+        "en": (
+            "The partner sees their inspections and a fix plan with a due date; head office "
+            "accepts the plan. Notices and replies stay out of email threads."
+        ),
     },
-    "landing.who.partner": {"ru": "Партнёру", "en": "Partners"},
-    "landing.who.partner.1": {
-        "ru": "Свои точки и их история проверок",
-        "en": "Their locations and inspection history",
-    },
-    "landing.who.partner.2": {
-        "ru": "Что исправить и к какому сроку",
-        "en": "What to fix and by when",
-    },
-    "landing.who.partner.3": {
-        "ru": "План действий и ответ на предписание — прямо в системе",
-        "en": "Action plan and response to a notice — right in the system",
-    },
-    "landing.who.try": {"ru": "Посмотреть в демо", "en": "See it in the demo"},
-    "landing.more.kicker": {"ru": "Ещё внутри", "en": "Also inside"},
-    "landing.more.ratings": {"ru": "Рейтинги по странам", "en": "Ratings by country"},
-    "landing.more.ratings.body": {
-        "ru": "Стандарты и клиентский опыт по каждой стране — вместо Google-таблиц.",
-        "en": "Standards and customer experience for every country — instead of Google Sheets.",
-    },
-    "landing.more.claude": {"ru": "Спросить Claude", "en": "Ask Claude"},
-    "landing.more.claude.body": {
-        "ru": "Подключите Claude и спрашивайте про сеть словами: в рамках своей роли.",
-        "en": "Connect Claude and ask about the network in plain words, within your role.",
-    },
-    "landing.more.history": {"ru": "История точки", "en": "Location history"},
-    "landing.more.history.body": {
-        "ru": "Все прошлые проверки и повторы — перед глазами проверяющего на месте.",
-        "en": "Every past inspection and repeat — in front of the inspector on site.",
-    },
-    "landing.more.lang": {"ru": "Язык — параметр", "en": "Language is a setting"},
-    "landing.more.lang.body": {
-        "ru": "Интерфейс, язык проверки и отчёт — каждый на своём языке.",
-        "en": "Interface, inspection language and report — each in its own language.",
-    },
-    "landing.mock.repeat": {"ru": "Повтор", "en": "Repeat"},
-    "landing.mock.item2": {
-        "ru": "Мытьё рук: мыло и полотенца",
-        "en": "Handwashing: soap and towels",
-    },
-    "landing.mock.photos": {"ru": "Фото: 3", "en": "Photos: 3"},
-    "landing.net.kicker": {"ru": "Сеть на одном экране", "en": "The network on one screen"},
+    "landing.net.tab": {"ru": "Сеть", "en": "Network"},
     "landing.net.title": {
         "ru": "Где качество держится, где проседает и кто должен исправить",
-        "en": "Where quality holds, where it slips and who has to fix it",
+        "en": "Where quality holds, where it slips, and who has to fix it",
     },
-    "landing.net.lead": {
+    "landing.net.body": {
         "ru": (
-            "Страны, точки и динамика оценок — для управляющей компании целиком, для партнёра в "
-            "границах его точек. По серьёзным нарушениям автоматически запрашивается план действий "
-            "со сроком, и видно, кто его задерживает."
+            "Главная за любой период показывает, на каких направлениях сеть теряет проценты, "
+            "какие нарушения повторяются чаще всего и как идут дела у каждой точки."
         ),
         "en": (
-            "Countries, locations and score trends — the whole network for head office, their own "
-            "locations for each partner. Serious findings automatically trigger an action plan "
-            "request with a deadline, and you can see who is holding it up."
+            "The home screen for any period shows which directions cost the network points, "
+            "which violations repeat most, and how each location is doing."
         ),
     },
-    "landing.net.p1": {
-        "ru": "Тренд по каждой точке, а не одна цифра",
-        "en": "A trend for every location, not one number",
+    "landing.net.more.1": {
+        "ru": "Рейтинги стандартов и клиентского опыта по странам",
+        "en": "Standards and customer-experience ratings by country",
     },
-    "landing.net.p2": {
-        "ru": "Повторы прошлых замечаний видны сразу",
-        "en": "Repeats of past findings stand out at once",
+    "landing.net.more.2": {
+        "ru": "Вопросы к Claude в рамках своей роли",
+        "en": "Questions for Claude within your own role",
     },
-    "landing.net.p3": {
-        "ru": "Планы действий со сроками и ответами партнёра",
-        "en": "Action plans with deadlines and the partner's answers",
+    "landing.net.more.3": {"ru": "История каждой точки", "en": "The history of every location"},
+    "landing.net.more.4": {
+        "ru": "Язык интерфейса, проверки и отчёта — три отдельные настройки",
+        "en": "Interface, inspection and report languages as three separate settings",
     },
-    "landing.net.head.unit": {"ru": "Точка", "en": "Location"},
-    "landing.net.head.score": {"ru": "Оценка", "en": "Score"},
-    "landing.net.head.trend": {"ru": "Динамика", "en": "Trend"},
-    "landing.net.plan": {"ru": "Ждут плана партнёра", "en": "Awaiting the partner's plan"},
-    "landing.cta.chip1": {"ru": "Без регистрации", "en": "No sign-up"},
-    "landing.cta.chip2": {"ru": "Пять минут", "en": "Five minutes"},
-    "landing.cta.chip3": {"ru": "Сброс раз в час", "en": "Resets hourly"},
-    "landing.cta.login": {"ru": "Уже есть учётка? Войти", "en": "Already have an account? Sign in"},
     "landing.cta.title": {
         "ru": "Посмотрите сами за пять минут",
         "en": "See it for yourself in five minutes",
     },
     "landing.cta.body": {
-        "ru": "Демо открывается без пароля: выберите роль и пройдите проверку, отчёт и план "
-        "действий. Данные выдуманные и раз в час возвращаются к исходному виду.",
-        "en": "The demo opens without a password: pick a role and walk through an inspection, "
-        "the report and the action plan. The data is made up and resets every hour.",
+        "ru": (
+            "Пароль не нужен: выберите роль и пройдите проверку, отчёт и план действий. Данные "
+            "выдуманные и раз в час возвращаются к исходным."
+        ),
+        "en": (
+            "No password: pick a role and walk through an inspection, the report and the action "
+            "plan. The data is made up and resets every hour."
+        ),
+    },
+    "landing.cta.login": {"ru": "Уже есть учётка? Войти", "en": "Already have an account? Sign in"},
+    "landing.alt.walk": {
+        "ru": (
+            "Экран обхода в приложении проверяющего: зона «Кухонная линия» в работе, найденное в "
+            "прошлый раз и запись с фото"
+        ),
+        "en": (
+            "The walk screen in the inspector app: the Kitchen line zone in progress, what was "
+            "found last time and a record with a photo"
+        ),
+    },
+    "landing.alt.match": {
+        "ru": (
+            "Запись в приложении проверяющего: к словам «на роликах конвейера снова лёгкий "
+            "нагар» подобран пункт чек-листа, остаётся подтвердить"
+        ),
+        "en": (
+            "A record in the inspector app: the checklist item is matched to the inspector's "
+            "words, and only the confirmation is left"
+        ),
+    },
+    "landing.alt.plan": {
+        "ru": "Календарь июля: проверки по дням с буквой оценки",
+        "en": "July calendar: inspections by day with their score letters",
+    },
+    "landing.alt.report": {
+        "ru": (
+            "Карточка проверки: оценка 79 процентов, буква D, расшифровка вычетов, потери по "
+            "зонам и записи"
+        ),
+        "en": (
+            "Inspection card: a 79 percent score, letter D, the deductions breakdown, loss by "
+            "zone and records"
+        ),
+    },
+    "landing.alt.actions": {
+        "ru": "Планы действий партнёра: список пиццерий с оценкой, сроком и состоянием плана",
+        "en": "A partner's action plans: a list of pizzerias with grade, due date and plan status",
+    },
+    "landing.alt.network": {
+        "ru": (
+            "Главная управляющей компании: топ нарушений, потери сети по направлениям и таблица "
+            "пиццерий"
+        ),
+        "en": (
+            "Head office home: top violations, network losses by direction and the pizzerias table"
+        ),
+    },
+    "landing.alt.pizzerias": {
+        "ru": (
+            "Экран «Страны»: страны слева, справа выбранная пиццерия с последней проверкой и "
+            "историей"
+        ),
+        "en": (
+            "The Countries screen: countries on the left, the selected pizzeria with its latest "
+            "inspection and history"
+        ),
     },
     # ── Выбор роли ──────────────────────────────────────────────────────
     "demo.title": {"ru": "Демо Decimus", "en": "Decimus demo"},

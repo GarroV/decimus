@@ -45,6 +45,10 @@ MINT_MAX_AGE_SECONDS = 5 * 60
 
 TOKEN_VAR = "TELEGRAM_BOT_TOKEN"  # noqa: S105 — имя переменной, а не токен
 PREVIEW_VAR = "WEB_WALK_PREVIEW_CHAT"
+#: Второй чат просмотра — для браузера с русским языком (`Accept-Language: ru`):
+#: демо показывает мини-апп на русском целиком, с русской проверкой, а не
+#: английскую проверку с русскими кнопками. Без него — один чат на всех.
+PREVIEW_RU_VAR = "WEB_WALK_PREVIEW_CHAT_RU"
 
 #: Чаты, на которые открывается просмотр без подписи: вымышленный диапазон
 #: демо-сидов (`tools/seed_*`), с номером человека в Telegram не совпадёт. Второй
@@ -115,6 +119,8 @@ class WalkSettings:
     preview_chat: int | None
     #: Круг тестеров (`WALK_USERS`, тот же, что у кнопки бота). `None` — все.
     users: frozenset[int] | None = None
+    #: Чат просмотра для русскоязычного браузера (`WEB_WALK_PREVIEW_CHAT_RU`).
+    preview_chat_ru: int | None = None
 
     @property
     def enabled(self) -> bool:
@@ -125,28 +131,40 @@ def load_walk_settings(env: Mapping[str, str] | None = None) -> WalkSettings:
     """Настройки из окружения. Противоречивые — отказ на старте, а не на запросе."""
     src = os.environ if env is None else env
     token = (src.get(TOKEN_VAR) or "").strip() or None
-    preview_raw = (src.get(PREVIEW_VAR) or "").strip()
-    preview: int | None = None
-    if preview_raw:
-        if not preview_raw.lstrip("-").isdigit():
-            raise ValueError(f"{PREVIEW_VAR}: «{preview_raw}» — не номер чата")
-        if token is not None:
-            raise ValueError(
-                f"{PREVIEW_VAR} задан вместе с {TOKEN_VAR}: просмотр без подписи — только "
-                "для стенда без бота, на проде он открыл бы обход любому"
-            )
-        preview = int(preview_raw)
-        if not PREVIEW_CHATS[0] <= preview <= PREVIEW_CHATS[1]:
-            raise ValueError(
-                f"{PREVIEW_VAR}: чат {preview} не из вымышленного диапазона сидов "
-                f"{PREVIEW_CHATS[0]}–{PREVIEW_CHATS[1]}. Просмотр без подписи пишет в "
-                "проверку (D312) и на настоящий чат не открывается"
-            )
+    preview = _preview_chat(src, PREVIEW_VAR, token)
+    preview_ru = _preview_chat(src, PREVIEW_RU_VAR, token)
+    if preview_ru is not None and preview is None:
+        raise ValueError(
+            f"{PREVIEW_RU_VAR} задан без {PREVIEW_VAR}: русский чат — второй, не единственный"
+        )
     return WalkSettings(
         bot_token=token,
         preview_chat=preview,
         users=parse_walk_users(src),
+        preview_chat_ru=preview_ru,
     )
+
+
+def _preview_chat(src: Mapping[str, str], var: str, token: str | None) -> int | None:
+    """Чат просмотра из переменной `var`: пусто — нет; не из вымышленного диапазона — отказ."""
+    raw = (src.get(var) or "").strip()
+    if not raw:
+        return None
+    if not raw.lstrip("-").isdigit():
+        raise ValueError(f"{var}: «{raw}» — не номер чата")
+    if token is not None:
+        raise ValueError(
+            f"{var} задан вместе с {TOKEN_VAR}: просмотр без подписи — только "
+            "для стенда без бота, на проде он открыл бы обход любому"
+        )
+    chat = int(raw)
+    if not PREVIEW_CHATS[0] <= chat <= PREVIEW_CHATS[1]:
+        raise ValueError(
+            f"{var}: чат {chat} не из вымышленного диапазона сидов "
+            f"{PREVIEW_CHATS[0]}–{PREVIEW_CHATS[1]}. Просмотр без подписи пишет в "
+            "проверку (D312) и на настоящий чат не открывается"
+        )
+    return chat
 
 
 def chat_of(
@@ -155,13 +173,19 @@ def chat_of(
     *,
     now: float | None = None,
     max_age: int = MAX_AGE_SECONDS,
+    lang: str | None = None,
 ) -> int:
     """Чат, чью проверку показывать: номер пользователя из подписанной строки.
 
     Мини-апп открывается из личного чата с ботом, а там номер чата равен
     номеру пользователя, — по нему бот и хранит проверку (`chat_<id>`).
+
+    Просмотр без подписи: русскому браузеру (`lang == "ru"`) — русский чат, если он
+    задан, остальным — основной.
     """
     if not init_data and settings.preview_chat is not None:
+        if lang == "ru" and settings.preview_chat_ru is not None:
+            return settings.preview_chat_ru
         return settings.preview_chat
     return int(_signed_user(init_data, settings, now=now, max_age=max_age).id)
 

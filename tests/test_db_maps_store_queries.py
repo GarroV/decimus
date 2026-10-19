@@ -132,6 +132,10 @@ def test_данные_теста_отличают_запросы_от_пусто
     assert оценки[UNIT_Y] == (4.0, 33)  # свежая запись без отзывов пропущена
     assert UNIT_Z in оценки and оценки[UNIT_Z] == (4.4, 12)  # снятый b2 (999) не учтён
 
+    с_датой = maps_store.unit_scores_dated(1, until=TODAY)
+    assert {k: (v[0], v[1]) for k, v in с_датой.items()} == оценки
+    assert all(isinstance(v[2], date) and v[2] <= TODAY for v in с_датой.values())
+
 
 def test_индекс_под_выборки_на_месте(seeded: str) -> None:
     with psycopg.connect(seeded) as conn:

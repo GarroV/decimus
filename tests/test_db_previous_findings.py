@@ -63,3 +63,31 @@ def test_чужая_точка_и_чужой_арендатор_не_видны(
 
     assert previous_findings(tenant=ТЕНАНТ, unit="Белград-2") is None
     assert previous_findings(tenant="другой-арендатор", unit="Белград-1") is None
+
+
+def test_формулировка_на_языке_читающего_если_перевод_есть(
+    domain_env: Path, db_env: str, pg_dsn: str
+) -> None:
+    # Arrange
+    start_inspection(1, unit="Белград-1", kind="planned", report_lang="ru", date="2026-09-15")
+    add_finding(1, code="PRD09", level="D2", zone="fridge", text="контейнеры без даты")
+    push_inspection(1)
+    with psycopg.connect(pg_dsn) as conn:
+        conn.execute(
+            "insert into translations (entity_type, entity_id, field, lang, text) "
+            "select 'finding', id, 'text', 'en', 'containers without a date' from findings"
+        )
+
+    # Act
+    читает_по_английски = previous_findings(tenant=ТЕНАНТ, unit="Белград-1", lang="en")
+    читает_по_сербски = previous_findings(tenant=ТЕНАНТ, unit="Белград-1", lang="sr")
+    без_языка = previous_findings(tenant=ТЕНАНТ, unit="Белград-1")
+
+    # Assert
+    assert читает_по_английски is not None and без_языка is not None
+    assert читает_по_английски.findings[0].text == "containers without a date"
+    assert читает_по_сербски is not None
+    assert читает_по_сербски.findings[0].text == "контейнеры без даты", (
+        "нет перевода — язык проверки"
+    )
+    assert без_языка.findings[0].text == "контейнеры без даты"

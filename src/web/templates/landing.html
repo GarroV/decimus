@@ -3,180 +3,147 @@
   видит, что это за продукт и зачем он, и две двери — «Открыть демо» (без
   входа) и «Войти». Кнопок демо нет, если адрес демо не задан (`demo_href` пуст).
 
-  Макет на главном экране — разметка, а не снимок: выдуманная проверка из демо,
-  переводится вместе со страницей и не протухает при смене интерфейса.
+  Стопка листов (D546): каждый раздел — лист на сплошном фоне, который при
+  прокрутке наезжает на предыдущий; тот остаётся прижатым сверху (`position:
+  sticky`, стили — decimus-landing.css, `landing.js` только выставляет `top` для
+  листов выше окна). Картинки — настоящие снимки демо-стенда (D545), по одному
+  файлу на язык; их делает `make landing-shots`, размеры лежат в `sizes.json`.
+  Шапка своя: общая шапка до входа здесь не нужна.
 #}{% extends "base.html" %}
 {% block title %}{{ t('landing.title') }}{% endblock %}
 {% block page_class %} page--landing{% endblock %}
-
-{% block topbar_actions %}
-  <a class="btn btn--ghost lp-top__login" href="{{ login_href }}{{ '&' if '?' in login_href else '?' }}lang={{ lang }}">{{ t('landing.login') }}</a>
-  {% if demo_href %}
-    <a class="btn btn--primary lp-top__demo" href="{{ demo_href }}?lang={{ lang }}">{{ t('landing.demo') }}</a>
-  {% endif %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-landing.css') }}">
+  <script src="{{ url_for('static', filename='landing.js') }}" defer></script>
 {% endblock %}
+{% block topbar %}{% endblock %}
+
+{# Снимок экрана: файл по языку страницы, размеры — из sizes.json. `eager` — только первому экрану. #}
+{% macro shot(name, eager=false, extra='') %}
+  {% set key = name ~ '-' ~ lang %}
+  <img class="lp-shot {{ extra }}" src="{{ url_for('static', filename='landing/' ~ key ~ '.webp') }}"
+       width="{{ shot_sizes[key][0] }}" height="{{ shot_sizes[key][1] }}"
+       alt="{{ t('landing.alt.' ~ name) }}" decoding="async"{% if not eager %} loading="lazy"{% endif %}>
+{% endmacro %}
+
+{# Закладка листа — шаг пути. Номер только у шагов проверки: это настоящая последовательность. #}
+{% macro tab(num, key) %}
+  <p class="lp-tab">{% if num %}<span class="lp-tab__n">{{ num }}</span>{% endif %}{{ t(key) }}</p>
+{% endmacro %}
 
 {% block body %}
   {% set demo = demo_href ~ '?lang=' ~ lang if demo_href else '' %}
+  {% set login = login_href ~ ('&' if '?' in login_href else '?') ~ 'lang=' ~ lang %}
   <div class="lp">
-    <section class="lp-hero">
-      <div class="lp-hero__copy">
-        <p class="lp-kicker"><span class="lp-kicker__dot" aria-hidden="true"></span>{{ t('landing.kicker') }}</p>
-        <h1 class="lp-hero__title">{{ t('landing.hero.a') }} <em>{{ t('landing.hero.em') }}</em></h1>
-        <p class="lp-hero__lead">{{ t('landing.lead') }}</p>
-        <div class="lp-hero__actions">
+
+    <header class="lp-bar">
+      <a class="lp-bar__brand" href="{{ url('/welcome') }}?lang={{ lang }}">
+        <img src="{{ url_for('static', filename='mark-small.svg') }}" alt="" width="28" height="28">
+        <span>{{ t('app.name') }}</span>
+      </a>
+      <div class="lp-bar__acts">
+        {% include "_langpick.html" %}
+        <a class="lp-link" href="{{ login }}">{{ t('landing.login') }}</a>
+        {% if demo %}<a class="lp-cta lp-cta--sm lp-bar__demo" href="{{ demo }}">{{ t('landing.demo') }}</a>{% endif %}
+      </div>
+    </header>
+
+    <section class="lp-sheet lp-sheet--white lp-hero" aria-labelledby="lp-h1">
+      <div class="lp-cols lp-cols--hero">
+        <div class="lp-copy">
+          <h1 class="lp-display" id="lp-h1">{{ t('landing.hero.title') }}</h1>
+          <p class="lp-sub">{{ t('landing.hero.sub') }}</p>
+          <p class="lp-body">{{ t('landing.hero.lead') }}</p>
           {% if demo %}
-            <a class="btn btn--primary lp-cta" href="{{ demo }}">{{ t('landing.demo') }} {{ icon('arrow') }}</a>
-          {% endif %}
-          <a class="btn lp-cta" href="#how">{{ t('landing.how.link') }}</a>
-        </div>
-        {% if demo %}<p class="lp-note">{{ t('landing.demo.note') }}</p>{% endif %}
-      </div>
-
-      <div class="lp-mock" aria-hidden="true">
-        <div class="lp-phone">
-          <div class="lp-phone__head">
-            <span class="lp-phone__unit">Northgate-1</span>
-            <span class="lp-phone__prog">{{ t('landing.mock.progress') }}</span>
-          </div>
-          <div class="lp-phone__bar"><i style="width: 66%"></i></div>
-          {# Макет — как экран обхода в мини-аппе: зоны со значком состояния, запись
-             из кадра и пары слов, пункт подобран системой. Голосового ввода и
-             плана действий в приложении нет — их здесь нет тоже (D529). #}
-          <div class="lp-zones">
-            <span class="lp-zone is-done">{{ icon('check') }} {{ t('landing.mock.z1') }}</span>
-            <span class="lp-zone is-on">{{ t('landing.mock.z2') }} <b>2</b></span>
-            <span class="lp-zone is-todo">{{ t('landing.mock.z3') }}</span>
-          </div>
-          <p class="lp-phone__zone">{{ t('landing.mock.zone') }}</p>
-          <div class="lp-record">
-            <div class="lp-thumbs"><i></i><i></i><i></i><span>{{ t('landing.mock.photos') }}</span></div>
-            <p class="lp-said">{{ t('landing.mock.said') }}</p>
-            <div class="lp-finding">
-              <span class="lp-finding__code">DEM11</span>
-              <span class="lp-finding__item">{{ t('landing.mock.item') }}</span>
-              <span class="lp-finding__level">D1</span>
+            <div class="lp-cta-row">
+              <a class="lp-cta" href="{{ demo }}">{{ t('landing.demo') }}</a>
+              <p class="lp-note">{{ t('landing.demo.note') }}</p>
             </div>
-          </div>
-          <div class="lp-finding lp-finding--repeat">
-            <span class="lp-finding__code">DEM10</span>
-            <span class="lp-finding__item">{{ t('landing.mock.item2') }}</span>
-            <span class="lp-finding__rep">{{ icon('repeat') }} {{ t('landing.mock.repeat') }}</span>
-          </div>
-          <div class="lp-phone__acts">
-            <span class="lp-phone__btn">{{ icon('plus') }} {{ t('landing.mock.add') }}</span>
-            <span class="lp-phone__btn lp-phone__btn--ghost">{{ t('landing.mock.done') }} →</span>
-          </div>
+          {% endif %}
         </div>
-        <div class="lp-mock__side">
-        <div class="lp-report">
-          <p class="lp-report__label">{{ t('landing.mock.report') }}</p>
-          <div class="lp-report__score"><b>97.5%</b><span class="lp-grade">A</span></div>
-          <dl class="lp-report__zones">
-            <dt>{{ t('landing.mock.z1') }}</dt><dd>100%</dd>
-            <dt>{{ t('landing.mock.z2') }}</dt><dd>94%</dd>
-            <dt>{{ t('landing.mock.z3') }}</dt><dd>98%</dd>
-          </dl>
-        </div>
-        </div>
+        <div class="lp-phone">{{ shot('walk', eager=true) }}</div>
       </div>
     </section>
 
-    <section class="lp-band" id="how">
-      <div class="lp-head">
-        <p class="lp-kicker">{{ t('landing.steps.kicker') }}</p>
-        <h2 class="lp-h2">{{ t('landing.steps.title') }}</h2>
-        <p class="lp-sub">{{ t('landing.steps.lead') }}</p>
+    <section class="lp-sheet lp-sheet--beige" aria-labelledby="lp-plan">
+      {{ tab(1, 'landing.plan.tab') }}
+      <div class="lp-cols">
+        <div class="lp-copy">
+          <h2 class="lp-h2" id="lp-plan">{{ t('landing.plan.title') }}</h2>
+          <p class="lp-body">{{ t('landing.plan.body') }}</p>
+        </div>
+        <div class="lp-fig">{{ shot('plan') }}</div>
       </div>
-      <ol class="lp-steps">
-        {% for n, mark in (('1', 'cal'), ('2', 'eye'), ('3', 'check'), ('4', 'pdf'), ('5', 'mail')) %}
-          <li class="lp-step">
-            <span class="lp-step__ico">{{ icon(mark) }}</span>
-            <span class="lp-step__n">0{{ n }}</span>
-            <h3 class="lp-step__title">{{ t('landing.s' ~ n ~ '.title') }}</h3>
-            <p class="lp-step__body">{{ t('landing.s' ~ n ~ '.body') }}</p>
-          </li>
-        {% endfor %}
-      </ol>
     </section>
 
-    <section class="lp-band lp-net">
-      <div class="lp-net__copy">
-        <p class="lp-kicker">{{ t('landing.net.kicker') }}</p>
-        <h2 class="lp-h2">{{ t('landing.net.title') }}</h2>
-        <p class="lp-sub">{{ t('landing.net.lead') }}</p>
-        <ul class="lp-card__list lp-net__list">
-          {% for n in ('1', '2', '3') %}<li>{{ icon('check') }}<span>{{ t('landing.net.p' ~ n) }}</span></li>{% endfor %}
+    <section class="lp-sheet lp-sheet--white" aria-labelledby="lp-walk">
+      {{ tab(2, 'landing.walk.tab') }}
+      <div class="lp-cols lp-cols--hero lp-cols--top">
+        <div class="lp-copy">
+          <h2 class="lp-h2" id="lp-walk">{{ t('landing.walk.title') }}</h2>
+          <p class="lp-body">{{ t('landing.walk.body') }}</p>
+          <div class="lp-split lp-split--under">
+            {% for who in ('person', 'machine') %}
+              <div class="lp-split__col">
+                <h3 class="lp-split__h">{{ t('landing.walk.' ~ who) }}</h3>
+                <ul class="lp-lines">
+                  {% for n in ('1', '2', '3') %}<li>{{ t('landing.walk.' ~ who ~ '.' ~ n) }}</li>{% endfor %}
+                </ul>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="lp-phone">{{ shot('match') }}</div>
+      </div>
+    </section>
+
+    <section class="lp-sheet lp-sheet--beige" aria-labelledby="lp-report">
+      {{ tab(3, 'landing.report.tab') }}
+      <div class="lp-cols">
+        <div class="lp-copy">
+          <h2 class="lp-h2" id="lp-report">{{ t('landing.report.title') }}</h2>
+          <p class="lp-body">{{ t('landing.report.body') }}</p>
+        </div>
+        <div class="lp-fig">{{ shot('report') }}</div>
+      </div>
+    </section>
+
+    <section class="lp-sheet lp-sheet--white" aria-labelledby="lp-actions">
+      {{ tab(4, 'landing.actions.tab') }}
+      <div class="lp-cols">
+        <div class="lp-copy">
+          <h2 class="lp-h2" id="lp-actions">{{ t('landing.actions.title') }}</h2>
+          <p class="lp-body">{{ t('landing.actions.body') }}</p>
+        </div>
+        <div class="lp-fig">{{ shot('actions') }}</div>
+      </div>
+    </section>
+
+    <section class="lp-sheet lp-sheet--beige lp-net" aria-labelledby="lp-net">
+      {{ tab(None, 'landing.net.tab') }}
+      <div class="lp-copy lp-copy--wide">
+        <h2 class="lp-h2" id="lp-net">{{ t('landing.net.title') }}</h2>
+        <p class="lp-body">{{ t('landing.net.body') }}</p>
+      </div>
+      <div class="lp-fig lp-fig--full">{{ shot('network') }}</div>
+      <div class="lp-cols lp-cols--even lp-net__more">
+        <ul class="lp-lines lp-lines--rows">
+          {% for n in ('1', '2', '3', '4') %}<li>{{ t('landing.net.more.' ~ n) }}</li>{% endfor %}
         </ul>
-      </div>
-      <div class="lp-board" aria-hidden="true">
-        <div class="lp-board__row lp-board__row--head">
-          <span>{{ t('landing.net.head.unit') }}</span><span>{{ t('landing.net.head.score') }}</span><span>{{ t('landing.net.head.trend') }}</span>
-        </div>
-        {% for unit, flag, score, grade, trend in (
-             ('Northgate-1', 'RS', '97.5%', 'A', (70, 78, 84, 90, 96)),
-             ('Hillcrest-1', 'GE', '93.0%', 'B', (88, 80, 86, 84, 89)),
-             ('Old Town-1', 'AM', '84.5%', 'C', (92, 86, 80, 76, 72)),
-             ('Riverside-1', 'RS', '98.0%', 'A', (90, 94, 92, 96, 98)),
-           ) %}
-          <div class="lp-board__row">
-            <span class="lp-board__unit"><b class="lp-board__flag">{{ flag }}</b>{{ unit }}</span>
-            <span class="lp-board__score">{{ score }} <i class="lp-grade lp-grade--{{ grade | lower }}">{{ grade }}</i></span>
-            <span class="lp-spark">{% for h in trend %}<i style="height: {{ (h - 60) * 0.7 }}px"></i>{% endfor %}</span>
-          </div>
-        {% endfor %}
-        <div class="lp-board__plan">{{ icon('warn') }}<span>{{ t('landing.net.plan') }}</span><b>7</b></div>
+        <div class="lp-fig">{{ shot('pizzerias') }}</div>
       </div>
     </section>
 
-    <section class="lp-band lp-band--alt">
-      <div class="lp-head">
-        <p class="lp-kicker">{{ t('landing.who.kicker') }}</p>
-        <h2 class="lp-h2">{{ t('landing.who.title') }}</h2>
-      </div>
-      <div class="lp-who">
-        {% for who, mark in (('auditor', 'eye'), ('hq', 'graph'), ('partner', 'team')) %}
-          <article class="lp-card lp-card--{{ who }}">
-            <span class="lp-card__ico">{{ icon(mark) }}</span>
-            <h3 class="lp-card__title">{{ t('landing.who.' ~ who) }}</h3>
-            <ul class="lp-card__list">
-              {% for n in ('1', '2', '3') %}
-                <li>{{ icon('check') }}<span>{{ t('landing.who.' ~ who ~ '.' ~ n) }}</span></li>
-              {% endfor %}
-            </ul>
-            {% if demo %}<a class="lp-card__link" href="{{ demo }}">{{ t('landing.who.try') }} {{ icon('arrow') }}</a>{% endif %}
-          </article>
-        {% endfor %}
+    <section class="lp-sheet lp-sheet--purple lp-final" aria-labelledby="lp-final">
+      <div class="lp-copy lp-copy--final">
+        <h2 class="lp-display lp-display--md" id="lp-final">{{ t('landing.cta.title') }}</h2>
+        <p class="lp-body">{{ t('landing.cta.body') }}</p>
+        {% if demo %}
+          <div class="lp-cta-row"><a class="lp-cta" href="{{ demo }}">{{ t('landing.demo') }}</a></div>
+        {% endif %}
+        <p class="lp-final__login"><a class="lp-link" href="{{ login }}">{{ t('landing.cta.login') }}</a></p>
       </div>
     </section>
 
-    <section class="lp-band">
-      <div class="lp-head">
-        <p class="lp-kicker">{{ t('landing.more.kicker') }}</p>
-      </div>
-      <div class="lp-bento">
-        {% for key, mark in (('ratings', 'board'), ('claude', 'spark'), ('history', 'timeline'), ('lang', 'globe')) %}
-          <article class="lp-tile lp-tile--{{ key }}">
-            <span class="lp-tile__ico">{{ icon(mark) }}</span>
-            <h3 class="lp-tile__title">{{ t('landing.more.' ~ key) }}</h3>
-            <p class="lp-tile__body">{{ t('landing.more.' ~ key ~ '.body') }}</p>
-          </article>
-        {% endfor %}
-      </div>
-    </section>
-
-    <section class="lp-final">
-      <h2 class="lp-final__title">{{ t('landing.cta.title') }}</h2>
-      <p class="lp-final__body">{{ t('landing.cta.body') }}</p>
-      {% if demo %}
-        <div class="lp-hero__actions">
-          <a class="btn lp-cta lp-cta--onbrand" href="{{ demo }}">{{ t('landing.demo') }} {{ icon('arrow') }}</a>
-        </div>
-        <ul class="lp-final__chips">
-          {% for n in ('1', '2', '3') %}<li>{{ icon('check') }}{{ t('landing.cta.chip' ~ n) }}</li>{% endfor %}
-        </ul>
-      {% endif %}
-      <a class="lp-final__login" href="{{ login_href }}{{ '&' if '?' in login_href else '?' }}lang={{ lang }}">{{ t('landing.cta.login') }}</a>
-    </section>
   </div>
 {% endblock %}

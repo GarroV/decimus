@@ -5,9 +5,15 @@
 согласие Claude, оно идёт сразу на вход. Вошедший на `/` попадает на «Главную», как
 и раньше. Кнопка демо ведёт на `WEB_DEMO_URL`, на самом стенде демо — на его
 `/demo`; ни того ни другого — кнопки нет.
+
+Страница — стопка листов (D546): каждый раздел наезжает на предыдущий. Картинки на
+ней — настоящие снимки демо-стенда (D545), их делает `make landing-shots`.
 """
 
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 from flask import Flask, render_template, request, url_for
 
@@ -15,6 +21,11 @@ from .config import Settings
 
 ENDPOINT = "landing"
 PATH = "/welcome"
+# Папка снимков и размеры в CSS-пикселях: их пишет `tools/landing_shots.py`.
+SHOTS_DIR = "landing"
+SHOT_SIZES: dict[str, list[int]] = json.loads(
+    (Path(__file__).parent / "static" / SHOTS_DIR / "sizes.json").read_text(encoding="utf-8")
+)
 
 
 def install(app: Flask, conf: Settings) -> None:
@@ -24,7 +35,10 @@ def install(app: Flask, conf: Settings) -> None:
         # Куда человек шёл до посадочной (D544): «Войти» несёт адрес дальше, форма
         # входа сама проверяет его на свой ли сайт (`auth.safe_next`).
         return render_template(
-            "landing.html", demo_href=демо, login_href=_login_href(request.args.get("next"))
+            "landing.html",
+            demo_href=демо,
+            login_href=_login_href(request.args.get("next")),
+            shot_sizes=SHOT_SIZES,
         )
 
 
