@@ -26,10 +26,12 @@ class Filter:
     country: str = ""
     city: str = ""
     q: str = ""
+    # «Пиццерии без проверки» (D532): вместо проверок — точки без проверки за период.
+    unchecked: bool = False
 
     @property
     def active(self) -> bool:
-        return any((self.grade, self.kind, self.country, self.city, self.q))
+        return any((self.grade, self.kind, self.country, self.city, self.q, self.unchecked))
 
     def params(self) -> dict[str, str]:
         return {
@@ -38,6 +40,7 @@ class Filter:
             "city": self.city,
             "grade": self.grade,
             "kind": self.kind,
+            "unchecked": "1" if self.unchecked else "",
         }
 
     def keeps(self, row: InspectionRow, place: tuple[str, str]) -> bool:

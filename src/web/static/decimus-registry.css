@@ -24,7 +24,12 @@
 .slist--registry + .slist--registry { border-top: 1px solid var(--line); }
 /* «Где не проведено» (D501) — такой же блок во всю ширину, как «На приёмке» и
    «Принятые»: дата последней проверки стоит рядом с названием. */
-.slist--tocheck { --slist-cols: 12px minmax(0, max-content) minmax(0, 1fr); border-top: 1px solid var(--line); }
+/* Таблицей: пиццерия (город под ней) и статус фиксированной ширины — статус
+   начинается в одном месте у всех строк, шрифт обычный, без моноширинного. */
+.slist--tocheck { --slist-cols: 12px minmax(0, 1fr) 210px; border-top: 1px solid var(--line); }
+.slist--tocheck .srow { min-height: 52px; }
+.slist--tocheck .srow, .slist--tocheck .srow:visited { color: var(--ink); }
+.slist--tocheck .srow__cell { font-family: var(--font-ui); font-size: 13px; letter-spacing: normal; }
 .slist--tocheck + .slist { border-top: 1px solid var(--line); }
 .tocheck-more > summary { cursor: pointer; }
 .srow__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn-mark); }
@@ -92,6 +97,7 @@
 .rg-filters .ov-chip { display: flex; width: 100%; justify-content: space-between; }
 .rg-filters .pick__menu { position: static; width: 100%; min-width: 0; margin-top: var(--space-2); box-shadow: none; }
 .rg-filters .spill--search { display: flex; width: 100%; min-width: 0; }
+.rg-filters .spill--check { display: flex; width: 100%; min-width: 0; }
 .rg-reset { justify-self: start; }
 .rg-countries { display: grid; gap: var(--space-1); }
 .rg-country-chip { display: none; }
