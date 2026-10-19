@@ -111,7 +111,8 @@
    HTML в процентах поверх, чтобы не сплющивались вместе с viewBox. */
 .rt-line { position: relative; height: 80px; }
 .rt-line__svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.rt-line__thr { stroke: var(--line-strong); stroke-dasharray: 3 3; }
+/* Порог Top/Bottom — красной линией (D560): поверх цветных зон пунктир терялся. */
+.rt-line__thr { stroke: var(--err); stroke-width: 1.5; }
 .rt-line__path { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .rt-line__dot { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
   background: var(--surface); border: 2px solid var(--accent); cursor: default; outline: none; }
