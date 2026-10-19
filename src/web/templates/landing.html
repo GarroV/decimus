@@ -31,11 +31,6 @@
           <a class="btn lp-cta" href="#how">{{ t('landing.how.link') }}</a>
         </div>
         {% if demo %}<p class="lp-note">{{ t('landing.demo.note') }}</p>{% endif %}
-        <ul class="lp-proof">
-          <li>{{ icon('tg') }}<span>{{ t('landing.proof.1') }}</span></li>
-          <li>{{ icon('check') }}<span>{{ t('landing.proof.2') }}</span></li>
-          <li>{{ icon('globe') }}<span>{{ t('landing.proof.3') }}</span></li>
-        </ul>
       </div>
 
       <div class="lp-mock" aria-hidden="true">
@@ -45,33 +40,44 @@
             <span class="lp-phone__prog">{{ t('landing.mock.progress') }}</span>
           </div>
           <div class="lp-phone__bar"><i style="width: 66%"></i></div>
+          {# Макет — как экран обхода в мини-аппе: зоны со значком состояния, запись
+             из кадра и пары слов, пункт подобран системой. Голосового ввода и
+             плана действий в приложении нет — их здесь нет тоже (D529). #}
+          <div class="lp-zones">
+            <span class="lp-zone is-done">{{ icon('check') }} {{ t('landing.mock.z1') }}</span>
+            <span class="lp-zone is-on">{{ t('landing.mock.z2') }} <b>2</b></span>
+            <span class="lp-zone is-todo">{{ t('landing.mock.z3') }}</span>
+          </div>
           <p class="lp-phone__zone">{{ t('landing.mock.zone') }}</p>
-          <div class="lp-voice">
-            <span class="lp-voice__mic">{{ icon('mic') }}</span>
-            <span class="lp-voice__wave">{% for h in (6, 14, 22, 12, 18, 26, 10, 16, 24, 8, 20, 12, 6) %}<i style="height: {{ h }}px"></i>{% endfor %}</span>
+          <div class="lp-record">
+            <div class="lp-thumbs"><i></i><i></i><i></i><span>{{ t('landing.mock.photos') }}</span></div>
+            <p class="lp-said">{{ t('landing.mock.said') }}</p>
+            <div class="lp-finding">
+              <span class="lp-finding__code">DEM11</span>
+              <span class="lp-finding__item">{{ t('landing.mock.item') }}</span>
+              <span class="lp-finding__level">D1</span>
+            </div>
           </div>
-          <p class="lp-said">{{ t('landing.mock.said') }}</p>
-          <div class="lp-finding">
-            <span class="lp-finding__code">DEM11</span>
-            <span class="lp-finding__item">{{ t('landing.mock.item') }}</span>
-            <span class="lp-finding__level">D1</span>
-          </div>
-          <div class="lp-thumbs"><i></i><i></i><i></i><span>{{ t('landing.mock.photos') }}</span></div>
           <div class="lp-finding lp-finding--repeat">
             <span class="lp-finding__code">DEM10</span>
             <span class="lp-finding__item">{{ t('landing.mock.item2') }}</span>
             <span class="lp-finding__rep">{{ icon('repeat') }} {{ t('landing.mock.repeat') }}</span>
           </div>
-          <span class="lp-phone__btn">{{ icon('check') }} {{ t('landing.mock.confirm') }}</span>
+          <div class="lp-phone__acts">
+            <span class="lp-phone__btn">{{ icon('plus') }} {{ t('landing.mock.add') }}</span>
+            <span class="lp-phone__btn lp-phone__btn--ghost">{{ t('landing.mock.done') }} →</span>
+          </div>
         </div>
         <div class="lp-mock__side">
         <div class="lp-report">
           <p class="lp-report__label">{{ t('landing.mock.report') }}</p>
           <div class="lp-report__score"><b>97.5%</b><span class="lp-grade">A</span></div>
-          <p class="lp-report__zones">{{ t('landing.mock.zones') }}</p>
-          <div class="lp-report__bars"><i style="width: 100%"></i><i style="width: 94%"></i><i style="width: 98%"></i></div>
+          <dl class="lp-report__zones">
+            <dt>{{ t('landing.mock.z1') }}</dt><dd>100%</dd>
+            <dt>{{ t('landing.mock.z2') }}</dt><dd>94%</dd>
+            <dt>{{ t('landing.mock.z3') }}</dt><dd>98%</dd>
+          </dl>
         </div>
-        <div class="lp-chip">{{ icon('clock') }} {{ t('landing.mock.plan') }}</div>
         </div>
       </div>
     </section>
