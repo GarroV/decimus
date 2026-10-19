@@ -69,7 +69,8 @@ def register(app: Flask, key: str, tab: Tab) -> None:
 
 
 def _tab(key: str) -> Tab:
-    return current_app.extensions[_TABS_KEY][key]
+    tab: Tab = current_app.extensions[_TABS_KEY][key]
+    return tab
 
 
 def _lang(conf: Settings) -> str:
@@ -83,13 +84,13 @@ def tab_of(raw: str | None) -> str:
 
 def panel_link(tab: str, item_id: str, *, lang: str, **extra: str) -> str:
     """Адрес экрана с открытой панелью строки — куда возвращаются после действия."""
-    kept = {k: v for k, v in extra.items() if v}
+    kept: dict[str, Any] = {k: v for k, v in extra.items() if v}
     return url_for("actions", tab=tab, id=item_id, lang=lang, **kept)
 
 
 def redirect_to_screen(tab: str, item_id: str = "") -> Response:
     """Переадресация со старого адреса: тот же отбор, нужная вкладка, при `id` — панель."""
-    params = {k: request.args[k] for k in KEPT_ARGS if request.args.get(k)}
+    params: dict[str, Any] = {k: request.args[k] for k in KEPT_ARGS if request.args.get(k)}
     if item_id:
         params["id"] = item_id
     return flask_redirect(url_for("actions", tab=tab, **params), code=303)
@@ -97,7 +98,7 @@ def redirect_to_screen(tab: str, item_id: str = "") -> Response:
 
 def _tab_links(lang: str, country: str) -> dict[str, str]:
     """Адреса вкладок: отбор страны переносится, остальное у вкладок своё."""
-    kept = {k: v for k, v in {"lang": lang, "country": country}.items() if v}
+    kept: dict[str, Any] = {k: v for k, v in {"lang": lang, "country": country}.items() if v}
     return {key: url_for("actions", tab=key, **kept) for key in TABS}
 
 
@@ -168,4 +169,3 @@ def install(app: Flask, conf: Settings) -> None:
 
 def _empty_panel() -> dict[str, Any]:
     return {"item": None, "failed": False, "notice": None, "failure": None, "gmail": ""}
-

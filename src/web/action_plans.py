@@ -193,7 +193,7 @@ def screen_context(lang: str) -> dict[str, Any]:
     строки = {QUEUE_REVIEW: на_приёмке, QUEUE_OVERDUE: просрочены}.get(очередь, в_стране)
 
     def отбор(**изменения: str) -> str:
-        параметры = {
+        параметры: dict[str, Any] = {
             "tab": TAB_PLANS,
             "country": страна,
             "queue": очередь,
@@ -343,9 +343,7 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
         try:
             файл = request.files.get("file")
         except RequestEntityTooLarge:
-            return _respond(
-                conf, request_id, failure=t("plans.too_big", lang, mb=мб), status=413
-            )
+            return _respond(conf, request_id, failure=t("plans.too_big", lang, mb=мб), status=413)
         if файл is None or not файл.filename:
             return _respond(conf, request_id, failure=t("plans.no_file", lang), status=400)
         try:

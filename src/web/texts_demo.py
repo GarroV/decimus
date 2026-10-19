@@ -18,8 +18,18 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
         "en": "Inspection, score, report and follow-up — in one place.",
     },
     "landing.lead": {
-        "ru": "Проверяющий ведёт проверку с телефона: фиксирует замечания фото и коротким комментарием. Decimus привязывает их к пунктам чек-листа, считает оценку по методике и готовит отчёт. Управляющая компания видит всю сеть, партнёр — свои точки и что нужно исправить.",
-        "en": "The inspector runs the inspection from a phone, recording findings with a photo and a short comment. Decimus links them to checklist items, scores them by the methodology and prepares the report. Head office sees the whole network, the partner sees their own locations and what needs fixing.",
+        "ru": (
+            "Проверяющий ведёт проверку с телефона: фиксирует замечания фото и коротким "
+            "комментарием. Decimus привязывает их к пунктам чек-листа, считает оценку по методике "
+            "и готовит отчёт. Управляющая компания видит всю сеть, партнёр — свои точки и что "
+            "нужно исправить."
+        ),
+        "en": (
+            "The inspector runs the inspection from a phone, recording findings with a photo and a "
+            "short comment. Decimus links them to checklist items, scores them by the methodology "
+            "and prepares the report. Head office sees the whole network, the partner sees their "
+            "own locations and what needs fixing."
+        ),
     },
     "landing.login": {"ru": "Войти", "en": "Sign in"},
     "landing.demo": {"ru": "Открыть демо", "en": "Open the demo"},
@@ -55,18 +65,36 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     },
     "landing.s2.title": {"ru": "Обход", "en": "Walk"},
     "landing.s2.body": {
-        "ru": "Обход ведёт человек: снимает кадр и пишет пару слов. Бегать по чек-листу и искать нужный пункт не нужно.",
-        "en": "A person walks the site: takes a photo and writes a few words. No need to dig through the checklist for the right item.",
+        "ru": (
+            "Обход ведёт человек: снимает кадр и пишет пару слов. Бегать по чек-листу и искать "
+            "нужный пункт не нужно."
+        ),
+        "en": (
+            "A person walks the site: takes a photo and writes a few words. No need to dig through "
+            "the checklist for the right item."
+        ),
     },
     "landing.s3.title": {"ru": "Чек-лист", "en": "Checklist"},
     "landing.s3.body": {
-        "ru": "Работу по чек-листу ведёт машина: находит пункт и класс нарушения. Проверяющий подтверждает — без него в отчёт не попадает ничего.",
-        "en": "The machine works the checklist: it finds the item and the level. The inspector confirms — nothing reaches the report without them.",
+        "ru": (
+            "Работу по чек-листу ведёт машина: находит пункт и класс нарушения. Проверяющий "
+            "подтверждает — без него в отчёт не попадает ничего."
+        ),
+        "en": (
+            "The machine works the checklist: it finds the item and the level. The inspector "
+            "confirms — nothing reaches the report without them."
+        ),
     },
     "landing.s4.title": {"ru": "Отчёт", "en": "Report"},
     "landing.s4.body": {
-        "ru": "После проверки отчёт готов за секунды — с оценкой по методике и черновиком письма партнёру.",
-        "en": "The report is ready seconds after the inspection — scored by the methodology, with a draft letter to the partner.",
+        "ru": (
+            "После проверки отчёт готов за секунды — с оценкой по методике и черновиком письма "
+            "партнёру."
+        ),
+        "en": (
+            "The report is ready seconds after the inspection — scored by the methodology, with a "
+            "draft letter to the partner."
+        ),
     },
     "landing.s5.title": {"ru": "Исправление", "en": "Fix"},
     "landing.s5.body": {
@@ -151,8 +179,16 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
         "en": "Where quality holds, where it slips and who has to fix it",
     },
     "landing.net.lead": {
-        "ru": "Страны, точки и динамика оценок — для управляющей компании целиком, для партнёра в границах его точек. По серьёзным нарушениям автоматически запрашивается план действий со сроком, и видно, кто его задерживает.",
-        "en": "Countries, locations and score trends — the whole network for head office, their own locations for each partner. Serious findings automatically trigger an action plan request with a deadline, and you can see who is holding it up.",
+        "ru": (
+            "Страны, точки и динамика оценок — для управляющей компании целиком, для партнёра в "
+            "границах его точек. По серьёзным нарушениям автоматически запрашивается план действий "
+            "со сроком, и видно, кто его задерживает."
+        ),
+        "en": (
+            "Countries, locations and score trends — the whole network for head office, their own "
+            "locations for each partner. Serious findings automatically trigger an action plan "
+            "request with a deadline, and you can see who is holding it up."
+        ),
     },
     "landing.net.p1": {
         "ru": "Тренд по каждой точке, а не одна цифра",

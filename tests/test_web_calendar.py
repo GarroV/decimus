@@ -120,7 +120,10 @@ def test_период_без_стрелок_с_месяцами_в_меню(ст
 def test_стрелки_у_других_экранов_остаются() -> None:
     """Макрос периода по умолчанию рисует стрелки; без них — только по `arrows=False`."""
     app = собрать(tenant=ТЕНАНТ)
-    вызов = '{{% from "_period.html" import period_picker with context %}}{{{{ period_picker(p, "x", "/a", "/b", (), "/", {{}}{}) }}}}'
+    вызов = (
+        '{{% from "_period.html" import period_picker with context %}}'
+        '{{{{ period_picker(p, "x", "/a", "/b", (), "/", {{}}{}) }}}}'
+    )
     p = registry_period.read({}, today=СЕГОДНЯ)
 
     with app.test_request_context("/"):
