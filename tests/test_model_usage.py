@@ -346,3 +346,33 @@ def test_расшифровка_учитывается_с_токенами_ил�
     assert (first.kind, first.input_tokens, first.output_tokens) == (KIND_TRANSCRIBE, 40, 6)
     assert (second.input_tokens, second.audio_seconds) == (None, 12.0)
     assert first.model == "gpt-4o-mini-transcribe"
+
+
+def test_проверка_чата_бота_называется_пиццерией_и_датой(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    from src.bot import usage as bot_usage
+
+    state = SimpleNamespace(run_id="run-9", unit="Тбилиси-1", date="2026-10-02")
+    monkeypatch.setattr(bot_usage, "get_state", lambda _chat: state)
+
+    with bot_usage.chat_usage(5):
+        scope = current_scope()
+
+    assert (scope.inspection_ref, scope.inspection_label) == ("run-9", "Тбилиси-1 · 2026-10-02")
+    # Проверка, названная выше (веб знает номер в базе), не перетирается.
+    with usage_scope(inspection_ref="uuid-1"), bot_usage.chat_usage(5):
+        assert current_scope().inspection_ref == "uuid-1"
+
+
+def test_состояние_чата_не_читается_вызов_идёт_без_проверки(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.bot import usage as bot_usage
+
+    def broken(_chat: int) -> None:
+        raise OSError("диск")
+
+    monkeypatch.setattr(bot_usage, "get_state", broken)
+    with bot_usage.chat_usage(5):
+        assert current_scope().inspection_ref is None

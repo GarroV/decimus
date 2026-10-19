@@ -118,7 +118,8 @@ def _grouped(rows: tuple[UsageRow, ...], dim: str, prices: dict[str, Price] | No
         if r.dim != dim:
             continue
         by_key[r.key].append(r)
-        labels.setdefault(r.key, r.label)
+        if r.label or r.key not in labels:
+            labels[r.key] = r.label
     lines = [Line(k, labels[k], _sum(v, prices)) for k, v in by_key.items()]
     lines.sort(key=lambda x: (-x.sum.tokens, -x.sum.calls, x.key))
     top = max((x.sum.tokens for x in lines), default=0)
@@ -185,10 +186,15 @@ def by_day(
 
 
 def money(value: float | None) -> str:
-    """Сумма в долларах для экрана; `None` — прочерк. Малые суммы — с точностью до сотых цента."""
+    """Сумма в долларах для экрана, всегда с двумя знаками; `None` — прочерк.
+
+    Ненулевая сумма меньше цента — «< $0.01»: «$0.00» выдало бы малый расход за нулевой.
+    """
     if value is None:
         return "—"
-    return f"${value:,.2f}" if value >= 1 else f"${value:.4f}"
+    if 0 < value < 0.01:
+        return "< $0.01"
+    return f"${value:,.2f}"
 
 
 def number(value: int | float) -> str:

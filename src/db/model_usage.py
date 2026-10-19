@@ -32,9 +32,9 @@ DIM_INSPECTION = "inspection"
 _INSERT_SQL = """
     insert into model_usage
         (kind, model, input_tokens, output_tokens, audio_seconds, ok,
-         user_id, telegram_id, tenant_code, inspection_ref)
+         user_id, telegram_id, tenant_code, inspection_ref, inspection_label)
     values (%(kind)s, %(model)s, %(input)s, %(output)s, %(audio)s, %(ok)s,
-            %(user)s, %(telegram)s, %(tenant)s, %(inspection)s)
+            %(user)s, %(telegram)s, %(tenant)s, %(inspection)s, %(label)s)
 """
 _READ_SQL = "select * from model_usage_read(%s, %s, %s)"
 
@@ -71,6 +71,7 @@ def record(call: ModelCall) -> None:
                     "telegram": call.telegram_id,
                     "tenant": call.tenant,
                     "inspection": call.inspection_ref[:80] if call.inspection_ref else None,
+                    "label": call.inspection_label[:120] if call.inspection_label else None,
                 },
             )
     except Exception:

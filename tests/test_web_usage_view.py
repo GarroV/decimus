@@ -105,5 +105,9 @@ def test_люди_подпись_логин_или_telegram_или_пусто() 
 
 def test_форматы_денег_и_чисел() -> None:
     assert v.money(12.345) == "$12.35"
-    assert v.money(0.00421) == "$0.0042"
+    assert v.money(0.05) == "$0.05"
+    assert v.money(0.00421) == "< $0.01"
+    assert v.money(0.0099) == "< $0.01"
+    assert v.money(0.0) == "$0.00"
+    assert v.money(None) == "—"
     assert v.number(1234567) == "1 234 567"

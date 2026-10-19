@@ -57,6 +57,8 @@ class UsageScope:
     telegram_id: int | None = None
     tenant: str | None = None
     inspection_ref: str | None = None
+    #: «Пиццерия · дата» проверки, которой нет в базе (бот до сдачи).
+    inspection_label: str | None = None
     kind: str | None = None
 
 
@@ -81,6 +83,7 @@ def usage_scope(
     telegram_id: int | None = None,
     tenant: str | None = None,
     inspection_ref: str | None = None,
+    inspection_label: str | None = None,
     kind: str | None = None,
 ) -> Iterator[UsageScope]:
     """Всё, что внутри блока, учитывается за этим человеком и этой проверкой.
@@ -93,6 +96,7 @@ def usage_scope(
         telegram_id=telegram_id,
         tenant=tenant,
         inspection_ref=inspection_ref,
+        inspection_label=inspection_label,
         kind=kind,
     )
     mark = _SCOPE.set(scope)
@@ -108,6 +112,7 @@ def enter_scope(
     telegram_id: int | None = None,
     tenant: str | None = None,
     inspection_ref: str | None = None,
+    inspection_label: str | None = None,
     kind: str | None = None,
 ) -> object:
     """То же без блока `with` — для хуков «до/после» запроса. Метку вернуть в `leave_scope`."""
@@ -118,6 +123,7 @@ def enter_scope(
             telegram_id=telegram_id,
             tenant=tenant,
             inspection_ref=inspection_ref,
+            inspection_label=inspection_label,
             kind=kind,
         )
     )
@@ -154,6 +160,7 @@ class ModelCall:
     telegram_id: int | None = None
     tenant: str | None = None
     inspection_ref: str | None = None
+    inspection_label: str | None = None
 
 
 def build_call(
@@ -179,4 +186,5 @@ def build_call(
         telegram_id=s.telegram_id,
         tenant=s.tenant,
         inspection_ref=s.inspection_ref,
+        inspection_label=s.inspection_label,
     )

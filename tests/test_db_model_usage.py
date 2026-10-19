@@ -99,3 +99,32 @@ def test_у_роли_приложения_нет_права_читать_таб�
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         with _connected("проверка прав") as conn, conn.cursor() as cur:
             cur.execute("select * from model_usage")
+
+
+def test_проверка_названа_пиццерией_и_датой_а_бот_до_сдачи_подписью_вызова(
+    токены: dict[str, str],
+) -> None:
+    _вызов(inspection_ref="run-77", inspection_label="Тбилиси-1 · 2026-10-02")
+    _вызов(inspection_ref="run-78")
+
+    строки = {r.key: r.label for r in model_usage.read(токены["super"]) if r.dim == "inspection"}
+
+    assert строки == {"run-77": "Тбилиси-1 · 2026-10-02", "run-78": ""}
+
+
+def test_telegram_id_превращается_в_учётку_по_привязке_бота(
+    токены: dict[str, str],
+) -> None:
+    from src.db import bot_links
+
+    учётка = authenticate("dev", ПАРОЛЬ)
+    assert учётка is not None
+    bot_links.redeem(bot_links.issue_link(учётка.id).token, telegram_id=4711)
+    _вызов(telegram_id=4711)
+    _вызов(telegram_id=4712)
+
+    люди = {r.key: r.label for r in model_usage.read(токены["super"]) if r.dim == "person"}
+
+    # 4711 назван логином и сведён с учёткой; 4712 привязки не имеет и остаётся номером.
+    assert люди[учётка.id] == "dev"
+    assert люди["tg:4712"] == ""

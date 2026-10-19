@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import UTC, date, datetime, time, timedelta
 from urllib.parse import urlencode
 
@@ -76,6 +77,7 @@ def _render(conf: Settings) -> tuple[str, int]:
         failed = True
 
     total = usage_view.totals(now_rows)
+    people = usage_view.by_person(now_rows)
     before = None if before_rows is None else usage_view.totals(before_rows)
     base = f"{request.script_root}{section('users').path}"
 
@@ -101,13 +103,15 @@ def _render(conf: Settings) -> tuple[str, int]:
             days=usage_view.by_day(now_rows, start=period.start, end=period.end),
             kinds=usage_view.by_kind(now_rows),
             known_kinds=KINDS,
-            people=usage_view.by_person(now_rows),
+            people=people,
             inspections=usage_view.by_inspection(now_rows),
             kind_label=lambda line: (
                 t(f"usage.kind.{line.key}", lang) if f"usage.kind.{line.key}" in TEXTS else line.key
             ),
             person_label=lambda line: line.label or t("usage.person.unknown", lang),
-            inspection_label=lambda line: line.key,
+            inspection_label=lambda line: line.label or t("usage.inspection.unsent", lang),
+            inspection_href=lambda line: _inspection_href(line.key, lang),
+            has_system_calls=any(line.key == "" for line in people),
             money=usage_view.money,
             number=usage_view.number,
             percent=usage_view.percent,
@@ -121,6 +125,15 @@ def _render(conf: Settings) -> tuple[str, int]:
         ),
         503 if failed else 200,
     )
+
+
+def _inspection_href(key: str, lang: str) -> str | None:
+    """Ссылка на карточку проверки в вебе; у проверки бота до сдачи (`run_id`) её нет."""
+    try:
+        number = str(uuid.UUID(key))
+    except ValueError:
+        return None
+    return f"{request.script_root}{section('registry').path}/{number}?lang={lang}"
 
 
 def _is_super() -> bool:

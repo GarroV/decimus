@@ -83,7 +83,7 @@
           </ol>
         </section>
 
-        {% macro table(title, lines, label_of, note=none) %}
+        {% macro table(title, lines, label_of, note=none, href_of=none) %}
           <section class="usec">
             <h2 class="usec__title">{{ title }}</h2>
             {% if note %}<p class="usec__note">{{ note }}</p>{% endif %}
@@ -93,7 +93,7 @@
               </li>
               {% for l in lines %}
                 <li class="jrow">
-                  <span class="jcell" data-label="{{ t('usage.col.name') }}"><b>{{ label_of(l) }}</b><span class="ushare"><span class="ushare__fill" style="width: {{ (l.share * 100)|round(1) }}%"></span></span></span>
+                  <span class="jcell" data-label="{{ t('usage.col.name') }}"><b>{% set href = href_of(l) if href_of else none %}{% if href %}<a href="{{ href }}">{{ label_of(l) }}</a>{% else %}{{ label_of(l) }}{% endif %}</b><span class="ushare"><span class="ushare__fill" style="width: {{ (l.share * 100)|round(1) }}%"></span></span></span>
                   <span class="jcell mono" data-label="{{ t('usage.col.calls') }}">{{ number(l.sum.calls) }}{% if l.sum.failed %} <small>{{ t('usage.failed.short', count=l.sum.failed) }}</small>{% endif %}</span>
                   <span class="jcell mono" data-label="{{ t('usage.col.tokens') }}">{{ number(l.sum.tokens) }}</span>
                   <span class="jcell mono" data-label="{{ t('usage.col.cost') }}">{{ cost_cell(l.sum) }}</span>
@@ -103,8 +103,8 @@
           </section>
         {% endmacro %}
         {{ table(t('usage.kinds.title'), kinds, kind_label) }}
-        {{ table(t('usage.people.title'), people, person_label) }}
-        {{ table(t('usage.inspections.title'), inspections, inspection_label, t('usage.inspections.note')) }}
+        {{ table(t('usage.people.title'), people, person_label, t('usage.person.unknown_hint') if has_system_calls else none) }}
+        {{ table(t('usage.inspections.title'), inspections, inspection_label, t('usage.inspections.note'), inspection_href) }}
       {% endif %}
     {% endif %}
   </div>

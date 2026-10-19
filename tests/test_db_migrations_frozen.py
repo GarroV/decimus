@@ -314,7 +314,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
         "sql1:fde8cbaea36129227f95f3970ebd93f514c78712af89f73c1130b236c4d8d5e1"
     ),
     "0078_model_usage.sql": (
-        "sql1:5960a11469c2b6b76ed2b809ab415578fb62957b775d23fca2e20da2cbee3fd3"
+        "sql1:2db20495ce5444622a4302605e186948b5dc14d47f71517eac3c960f535d7489"
     ),
 }
 

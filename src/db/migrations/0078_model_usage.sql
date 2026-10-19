@@ -14,7 +14,10 @@
 --    `telegram_id` — Telegram ID, когда вызов пришёл из бота или мини-аппа. Внешнего ключа
 --    нет намеренно: запись расхода не должна отказать из-за строки учётки, а вызов
 --    провайдера уже оплачен. `inspection_ref` — номер проверки в базе (веб) либо личность
---    проверки чата `run_id` (бот и мини-апп: в базе проверки до сдачи ещё нет).
+--    проверки чата `run_id` (бот и мини-апп: в базе проверки до сдачи ещё нет), к нему
+--    `inspection_label` — «пиццерия · дата» из состояния проверки на момент вызова.
+--    Функция чтения сама подставляет человеку имя: учётку — по `user_id` или по привязке
+--    Telegram ID (`bot_bindings`), проверку из базы — «пиццерия · дата» через `units`.
 -- 4. Цены здесь НЕ хранятся: стоимость — оценка по `src/recognize/model_prices.json` на
 --    момент просмотра, чтобы поправка цены пересчитала и прошлое.
 --
@@ -36,7 +39,10 @@ create table model_usage (
     user_id uuid,
     telegram_id bigint,
     tenant_code text,
-    inspection_ref text check (inspection_ref is null or char_length(inspection_ref) <= 80)
+    inspection_ref text check (inspection_ref is null or char_length(inspection_ref) <= 80),
+    -- Подпись проверки на момент вызова («пиццерия · дата»), когда проверки ещё нет в базе
+    -- (бот до сдачи): по `run_id` её потом не найти, а человеку номер ничего не говорит.
+    inspection_label text check (inspection_label is null or char_length(inspection_label) <= 120)
 );
 
 create index model_usage_time_idx on model_usage (occurred_at desc);
@@ -49,8 +55,10 @@ grant insert on model_usage to dodo_audit_app;
 grant usage on sequence model_usage_id_seq to dodo_audit_app;
 
 -- Расход глазами зрителя: суммы по четырём срезам одним ответом. Срез `day` — день (UTC),
--- `kind` — вид вызова, `person` — человек, `inspection` — двадцать проверок с наибольшим
--- расходом токенов. Деньги считает приложение: у функции цен нет.
+-- `kind` — вид вызова, `person` — человек (учётка по `user_id` либо по привязке бота;
+-- пусто — вызов без человека, служебный), `inspection` — двадцать проверок с наибольшим
+-- расходом токенов, подпись «пиццерия · дата» (из базы, а для проверки бота до сдачи — снятая
+-- при вызове). Деньги считает приложение: у функции цен нет.
 create function model_usage_read(p_token text, p_from timestamptz, p_to timestamptz)
 returns table (
     dim text, key text, label text, model text, calls bigint, failed bigint,
@@ -73,8 +81,16 @@ begin
     end if;
     return query
     with base as (
-        select m.*, coalesce(m.user_id::text, 'tg:' || m.telegram_id::text, '') as who
+        select m.*, coalesce(m.user_id, bound.user_id) as who_user,
+               coalesce(m.user_id::text, bound.user_id::text, 'tg:' || m.telegram_id::text, '') as who
           from public.model_usage m
+          left join lateral (
+              select bb.user_id
+                from public.bot_bindings bb
+               where bb.telegram_id = m.telegram_id and m.user_id is null
+               order by (bb.unbound_at is null) desc, bb.bound_at desc
+               limit 1
+          ) bound on true
          where (p_from is null or m.occurred_at >= p_from)
            and (p_to is null or m.occurred_at < p_to)
     ),
@@ -104,15 +120,20 @@ begin
            coalesce(sum(b.input_tokens), 0)::bigint, coalesce(sum(b.output_tokens), 0)::bigint,
            coalesce(sum(b.audio_seconds), 0)
       from base b
-      left join public.web_users u on u.id = b.user_id
+      left join public.web_users u on u.id = b.who_user
      group by b.who, u.login, b.model
     union all
-    select 'inspection', b.inspection_ref, '', b.model,
+    select 'inspection', b.inspection_ref,
+           coalesce(max(un.name || ' · ' || to_char(i.inspection_date, 'YYYY-MM-DD')),
+                    max(b.inspection_label), ''),
+           b.model,
            count(*), count(*) filter (where not b.ok),
            coalesce(sum(b.input_tokens), 0)::bigint, coalesce(sum(b.output_tokens), 0)::bigint,
            coalesce(sum(b.audio_seconds), 0)
       from base b
       join top_inspections t on t.inspection_ref = b.inspection_ref
+      left join public.inspections i on i.id::text = b.inspection_ref
+      left join public.units un on un.id = i.unit_id
      group by b.inspection_ref, b.model;
 end $$;
 

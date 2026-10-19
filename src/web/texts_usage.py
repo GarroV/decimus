@@ -49,13 +49,21 @@ USAGE_TEXTS: dict[str, dict[str, str]] = {
         "en": "Inspections with the highest usage",
     },
     "usage.inspections.note": {
-        "ru": "Номер проверки в базе или метка проверки в боте до сдачи.",
-        "en": "The inspection id in the database, or the bot's run label before handover.",
+        "ru": "Пиццерия и дата; ссылка ведёт на карточку проверки.",
+        "en": "Pizzeria and date; the link opens the inspection.",
     },
     "usage.col.name": {"ru": "Кто / что", "en": "Who / what"},
     "usage.col.calls": {"ru": "Вызовов", "en": "Calls"},
     "usage.col.tokens": {"ru": "Токенов", "en": "Tokens"},
     "usage.col.cost": {"ru": "Оценка, $", "en": "Estimate, $"},
+    "usage.inspection.unsent": {
+        "ru": "проверка в боте, не сдана",
+        "en": "inspection in the bot, not submitted",
+    },
+    "usage.person.unknown_hint": {
+        "ru": "«Не определён» — вызов без человека: служебная работа системы.",
+        "en": "“Unknown” is a call without a person: system work.",
+    },
     "usage.person.unknown": {"ru": "не определён", "en": "unknown"},
     "usage.kind.recognize": {"ru": "Распознавание записи", "en": "Recognising a record"},
     "usage.kind.suggest": {"ru": "Подбор пункта на экране", "en": "Item suggestion on screen"},
