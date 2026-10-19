@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 165 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 166 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -39,6 +39,7 @@
 | `/actions/requests/<request_id>` | GET | `actions_request` | `src/web/action_plans.py` |
 | `/actions/requests/<request_id>/due` | POST | `actions_due` | `src/web/action_plans.py` |
 | `/actions/requests/<request_id>/review` | POST | `actions_review` | `src/web/action_plans.py` |
+| `/actions/requests/<request_id>/template.xlsx` | GET | `plan_template` | `src/web/action_plans.py` |
 | `/actions/requests/<request_id>/upload` | POST | `plans_upload` | `src/web/action_plans.py` |
 | `/admin` | GET | `methodology` | `src/web/app.py` |
 | `/admin/bot/<code>` | POST | `methodology_bot` | `src/web/app.py` |

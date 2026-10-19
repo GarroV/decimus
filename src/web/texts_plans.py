@@ -67,6 +67,62 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "en": "The plan was returned. Comment from the management company:",
     },
     "plans.upload_title": {"ru": "Файл плана", "en": "Plan file"},
+    # Шаблон плана и объяснение запроса (#976, ступень 1).
+    "plans.ask.title": {"ru": "Что ждём", "en": "What we expect"},
+    "plans.ask.text": {
+        "ru": (
+            "План исправления по нарушениям проверки — до {due}: что делаете, "
+            "кто отвечает и к какому сроку по каждому пункту. Скачайте шаблон, "
+            "заполните и загрузите ниже. Дальше УК примет план или вернёт с комментарием."
+        ),
+        "en": (
+            "A corrective plan for the inspection's violations by {due}: what you "
+            "will do, who is responsible and by when, for each item. Download the "
+            "template, fill it in and upload it below. Head office then accepts the "
+            "plan or returns it with a comment."
+        ),
+    },
+    "plans.ask.text_hq": {
+        "ru": (
+            "Партнёр присылает план исправления по нарушениям проверки до {due}. "
+            "Шаблон ему доступен в этой же панели; формат загрузки — любой."
+        ),
+        "en": (
+            "The partner sends a corrective plan for the inspection's violations "
+            "by {due}. The template is available to them in this panel; any file "
+            "format is accepted."
+        ),
+    },
+    "plans.tpl.download": {"ru": "Скачать шаблон плана", "en": "Download plan template"},
+    "plans.tpl.failed": {
+        "ru": "Шаблон не собрался: проверка не прочиталась. Обновите страницу позже.",
+        "en": "The template could not be built: the inspection did not load. Try again later.",
+    },
+    "plans.tpl.sheet": {"ru": "План исправления", "en": "Corrective plan"},
+    "plans.tpl.title": {"ru": "План исправления нарушений", "en": "Corrective action plan"},
+    "plans.tpl.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "plans.tpl.date": {"ru": "Дата проверки", "en": "Inspection date"},
+    "plans.tpl.grade": {"ru": "Итог проверки", "en": "Inspection result"},
+    "plans.tpl.plan_due": {"ru": "Прислать план до", "en": "Send the plan by"},
+    "plans.tpl.hint": {
+        "ru": (
+            "Заполните жёлтые колонки по каждому нарушению. Сроки устранения по пунктам "
+            "указаны в отчёте проверки (PDF)."
+        ),
+        "en": (
+            "Fill in the yellow columns for every violation. Fix-by dates for each item "
+            "are in the inspection report (PDF)."
+        ),
+    },
+    "plans.tpl.col.n": {"ru": "№", "en": "#"},
+    "plans.tpl.col.level": {"ru": "Класс", "en": "Class"},
+    "plans.tpl.col.zone": {"ru": "Зона", "en": "Zone"},
+    "plans.tpl.col.code": {"ru": "Пункт", "en": "Item"},
+    "plans.tpl.col.finding": {"ru": "Нарушение", "en": "Violation"},
+    "plans.tpl.col.action": {"ru": "Что делаем", "en": "Action"},
+    "plans.tpl.col.owner": {"ru": "Ответственный", "en": "Responsible"},
+    "plans.tpl.col.due": {"ru": "Срок", "en": "Due"},
+    "plans.tpl.col.done": {"ru": "Отметка об исправлении", "en": "Done (date, evidence)"},
     "plans.upload_button": {"ru": "Загрузить файл плана", "en": "Upload plan file"},
     "plans.file_label": {"ru": "Файл плана", "en": "Plan file"},
     "actions.drop.title": {

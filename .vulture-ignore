@@ -634,3 +634,11 @@ stages
 # Поля `Panel` карточки страны (D543): площадки не прочитались и аудиторы — читает шаблон.
 aggregators_failed
 auditors
+# Свойства ячеек и листа openpyxl (`src/web/plan_template.py`, #976): присваивание
+# — это и есть запись в книгу, читает их `Workbook.save`, а не наш код.
+font
+alignment
+freeze_panes
+# `plan_template_file` — выдача шаблона экшн-плана (#976), регистрирует
+# `@app.get(..., endpoint="plan_template")`.
+plan_template_file

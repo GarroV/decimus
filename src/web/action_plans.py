@@ -31,7 +31,8 @@ from src.db.config import load_action_plan_settings
 from src.db.errors import ActionPlanError, DbError, StorageError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import actions_screen, auth, guard, ui_lang, view
+from . import actions_screen, auth, guard, plan_template, review, ui_lang, view
+from . import inspections as data
 from .actions_screen import TAB_PLANS
 from .config import Settings
 from .origin import refuse_foreign_origin
@@ -42,6 +43,8 @@ logger = logging.getLogger(__name__)
 
 #: Запас тела запроса сверх файла: поля формы и рамки multipart.
 FORM_OVERHEAD_BYTES = 64 * 1024
+#: Тип ответа шаблона плана (`plan_template`): книга Excel — открывается и в Google Таблицах.
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 #: Очереди раздела УК: что ждёт приёмки и что просрочено (спека).
 QUEUE_REVIEW = "review"
@@ -139,6 +142,7 @@ def install(app: Flask, conf: Settings) -> None:
     )
     _install_hq(app, conf)
     _install_partner(app, conf, max_bytes=max_bytes)
+    _install_template(app, conf)
     _install_legacy(app)
 
 
@@ -387,6 +391,37 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
             download_name=ссылка.file_name,
         )
         # `nosniff` ставит общий крючок (`src/web/security_headers.py`).
+        ответ.headers["Cache-Control"] = "private, no-store"
+        return ответ
+
+
+# ── Шаблон плана (#976) ─────────────────────────────────────────────────────
+
+
+def _install_template(app: Flask, conf: Settings) -> None:
+    путь = section("actions").path
+
+    @app.get(f"{путь}/requests/<request_id>/template.xlsx", endpoint="plan_template")
+    def plan_template_file(request_id: str) -> FlaskResponse | tuple[str, int]:
+        """Шаблон — тем, кому виден запрос: партнёру своей страны и УК; чужой — 404."""
+        lang = _lang(conf)
+        охват = auth.current_reach()
+        try:
+            запрос = plans.get_request(request_id, reach=охват)
+            деталь = data.load_card(запрос.inspection_id, reach=охват) if запрос else None
+        except DbError as exc:
+            logger.warning("шаблон плана к запросу %s не собран: %s", request_id, exc)
+            return t("plans.tpl.failed", lang), 503
+        if запрос is None or деталь is None:
+            return "", 404
+        лист = review.load_sheet(деталь.inspection, lang=lang)
+        зоны = {z.code: z.name for z in лист.zones} if лист else {}
+        ответ = send_file(
+            io.BytesIO(plan_template.build(запрос, деталь.findings, зоны, lang)),
+            mimetype=XLSX_MIME,
+            as_attachment=True,
+            download_name=plan_template.file_name(запрос),
+        )
         ответ.headers["Cache-Control"] = "private, no-store"
         return ответ
 
