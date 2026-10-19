@@ -1,0 +1,29 @@
+/* «Расход модели» (D537) поверх каркаса журнала (`decimus-journal.css`): итоги плитками
+   ядра (`.stats`), столбики по дням и строки со срезами. Цвета — токены ядра; светлая и
+   тёмная темы работают без правок. Столбики — обычные блоки, без графической библиотеки. */
+
+.ustats { padding: var(--space-7); }
+.usec { padding: var(--space-6) var(--space-7) var(--space-4); border-top: 1px solid var(--line); }
+.usec__title { margin: 0 0 var(--space-4); font-family: var(--font-mono); font-size: 11px; line-height: 14px;
+  font-weight: var(--w-semibold); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+.usec__note { margin: calc(var(--space-2) * -1) 0 var(--space-4); font-size: 12px; color: var(--ink-3); }
+.usec .jlist { margin: 0 calc(var(--space-7) * -1); }
+
+.ubars { display: flex; align-items: flex-end; gap: 3px; height: 140px; margin: 0; padding: 0; list-style: none; }
+.ubars__item { display: flex; flex: 1 1 0; min-width: 0; height: 100%; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--space-2); }
+.ubars__bar { display: block; width: 100%; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--accent); }
+.ubars__day { font-size: 10px; line-height: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+.ulist { --jcols: minmax(0, 3fr) minmax(70px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr); }
+.ushare { display: block; height: 4px; margin-top: var(--space-2); border-radius: 2px; background: var(--line); overflow: hidden; }
+.ushare__fill { display: block; height: 100%; background: var(--accent); }
+
+@media (max-width: 860px) {
+  .ustats { padding: var(--space-5); grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .ustats .stat { padding: var(--space-5); }
+  .ulist .jcell:first-child::before { display: none; }
+  .usec { padding: var(--space-5); }
+  .usec .jlist { margin: 0 calc(var(--space-5) * -1); }
+  .ubars { gap: 1px; }
+  .ubars__day { display: none; }
+}

@@ -33,6 +33,8 @@ from src.domain.log_ids import log_id
 from src.recognize.errors import RecognizeError
 from src.recognize.translate import translate_text
 
+from .usage import chat_usage
+
 logger = logging.getLogger(__name__)
 
 #: Рекомендация партнёру (уровень `R`): её текст — свободный, а не из методики.
@@ -68,6 +70,11 @@ def translate_comments(chat_id: int, inspection: domain.Inspection) -> int:
     target = inspection.report_lang
     if target == inspection.speech_lang or mode_of(chat_id) != translate_modes.AUTO:
         return 0
+    with chat_usage(chat_id):
+        return _translate_findings(chat_id, inspection, target)
+
+
+def _translate_findings(chat_id: int, inspection: domain.Inspection, target: str) -> int:
     failed = 0
     for finding in inspection.findings:
         done: dict[str, str] = {}

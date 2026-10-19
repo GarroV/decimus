@@ -63,6 +63,7 @@ from src.domain.journal import (
     RESULT_REFUSED,
 )
 from src.domain.log_ids import log_id
+from src.domain.model_usage import enter_scope, leave_scope
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import (
@@ -238,6 +239,8 @@ REACH = "reach"
 #: Ключ в `g` метки пространства вошедшего (`src/db/space.py`): снимается на
 #: выходе из запроса, чтобы не достаться следующему на том же потоке.
 SPACE_MARK = "space_mark"
+#: Метка контекста учёта расхода модели в `g` (D537).
+USAGE_MARK = "usage_mark"
 
 
 def begin_google_link() -> Response:
@@ -367,10 +370,16 @@ def install(app: Flask, conf: Settings) -> None:
         # Пространство вошедшего — и базе (F-037): политики роли приложения
         # отдают по нему, даже если запрос маршрута забыл условие охвата.
         setattr(g, SPACE_MARK, enter_space(account.tenant))
+        # И учёту расхода модели (D537): чей вызов, в каком пространстве.
+        setattr(g, USAGE_MARK, enter_scope(user_id=account.id, tenant=account.tenant))
         return None
 
     @app.teardown_request
     def _снять_пространство(_exc: BaseException | None) -> None:
+        # Сначала учёт, потом пространство: снимаются в порядке, обратном постановке.
+        расход = g.pop(USAGE_MARK, None)
+        if расход is not None:
+            leave_scope(расход)
         метка = g.pop(SPACE_MARK, None)
         if метка is not None:
             leave_space(метка)

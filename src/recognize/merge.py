@@ -25,6 +25,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.domain.model_usage import KIND_MERGE
+
 from .client import ask_model
 from .config import DEFAULT_LANG, RecognizeSettings, load_recognize_settings
 from .errors import ModelUnavailable
@@ -78,6 +80,7 @@ def merge_wording(
         return was
     cfg = settings or load_recognize_settings()
     answer = ask_model(
+        kind=KIND_MERGE,
         instructions=INSTRUCTIONS.format(lang=_LANG_NAMES.get(lang, lang)),
         question=f"Current wording: {was or '(empty)'}\nInspector's new words: {said}",
         schema=SCHEMA,

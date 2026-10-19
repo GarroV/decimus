@@ -40,6 +40,7 @@ from . import (
     journal_screen,
     partner_spaces,
     people,
+    usage_screen,
 )
 from .access_policy import Scope
 from .config import Settings
@@ -56,7 +57,7 @@ from .users_page import (
     render,
     source,
 )
-from .users_view import TAB_CONNECTIONS, TAB_JOURNAL, TAB_SPACES
+from .users_view import TAB_CONNECTIONS, TAB_JOURNAL, TAB_SPACES, TAB_USAGE
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,8 @@ def install(app: Flask, conf: Settings) -> None:
             return connections_screen.show()
         if request.args.get("tab") == TAB_JOURNAL:
             return journal_screen.show_users(conf)
+        if request.args.get("tab") == TAB_USAGE:
+            return usage_screen.show(conf)
         return render()
 
     @app.post(f"{users_path}/bot-unlink")
