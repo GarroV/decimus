@@ -17,6 +17,7 @@ import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Any
 
 from src.db import directory, maps_store, queries, unit_profiles
 from src.db.errors import DbError
@@ -56,6 +57,15 @@ class UnitRow:
     opened: date | None = None
     closed_on: date | None = None
     status: str = ""
+    #: Другие написания названия (синонимы справочника, D538) — для карточки страны.
+    aliases: tuple[str, ...] = ()
+    restaurant_on: date | None = None
+    delivery_on: date | None = None
+    #: Площадь, м², и посадочные места из свода; `None` — в своде нет.
+    area: float | None = None
+    seats: int | None = None
+    #: Почта партнёра из свода: показывается только УК (D375).
+    partner_email: str = ""
     #: Последняя проверка ЗА ПЕРИОД экрана; `None` — за период не проверяли.
     last: PointRow | None = None
     #: Дата последней проверки ВООБЩЕ, не за период; `None` — не проверяли ни разу.
@@ -103,6 +113,24 @@ def _sort_key(row: UnitRow) -> tuple[int, float, str]:
     return (1 + _STAGE_ORDER.get(row.stage, 0), 0.0, row.name)
 
 
+def _from_profile(profile: unit_profiles.Profile) -> dict[str, Any]:
+    """Поля строки из свода пиццерий — одним местом для точки справочника и для строки свода."""
+    return {
+        "stage": profile.stage,
+        "city": profile.city or "",
+        "partner": profile.partner or "",
+        "address": profile.address or "",
+        "opened": profile.restaurant_on or profile.delivery_on,
+        "closed_on": profile.closed_on,
+        "status": profile.status,
+        "restaurant_on": profile.restaurant_on,
+        "delivery_on": profile.delivery_on,
+        "area": float(profile.total_area) if profile.total_area is not None else None,
+        "seats": profile.seats,
+        "partner_email": profile.partner_email or "",
+    }
+
+
 def build_rows(
     units: Sequence[directory.Unit],
     profiles: Sequence[unit_profiles.Profile],
@@ -128,18 +156,14 @@ def build_rows(
         if profile is not None:
             used.add(id(profile))
         rs, rko = ratings.get(unit.code or "", (None, None))
+        сведения = _from_profile(profile) if profile else {"stage": "open"}
         rows.append(
             UnitRow(
                 key=unit.id,
                 name=unit.name,
                 unit_id=unit.id,
-                stage=profile.stage if profile else "open",
-                city=(profile.city if profile else None) or unit.city or "",
-                partner=(profile.partner if profile else None) or "",
-                address=(profile.address if profile else None) or "",
-                opened=(profile.restaurant_on or profile.delivery_on) if profile else None,
-                closed_on=profile.closed_on if profile else None,
-                status=profile.status if profile else "",
+                **{**сведения, "city": сведения.get("city") or unit.city or ""},
+                aliases=tuple(a for a in unit.aliases if a != unit.name),
                 last=points.get(unit.name),
                 last_ever=last_ever.get(unit.name),
                 rs=rs,
@@ -155,13 +179,7 @@ def build_rows(
                 key=SVOD_KEY + (profile.name_normalized or profile.name),
                 name=profile.name,
                 unit_id="",
-                stage=profile.stage,
-                city=profile.city or "",
-                partner=profile.partner or "",
-                address=profile.address or "",
-                opened=profile.restaurant_on or profile.delivery_on,
-                closed_on=profile.closed_on,
-                status=profile.status,
+                **_from_profile(profile),
             )
         )
     return tuple(sorted(rows, key=_sort_key))

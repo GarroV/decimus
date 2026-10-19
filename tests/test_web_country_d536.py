@@ -258,7 +258,7 @@ def test_партнёру_отбор_не_расширяет_охват(
     assert профиль.записано[-1][1] == ("GE",)
 
 
-# ── «Настройки страны» — только администратору ─────────────────────────────
+# ── «Карточка страны» (D539): видят все, правит администратор ──────────────
 
 
 def _стенд_роли(monkeypatch: pytest.MonkeyPatch, role: str) -> Iterator[FlaskClient]:
@@ -279,20 +279,80 @@ def девелопер(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch)
     yield from _стенд_роли(monkeypatch, "developer")
 
 
-def test_кнопка_настроек_страны_у_админа(
-    админ: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    assert "Настройки страны" in открыть(админ, monkeypatch, данные(), "/country/GE")
+def _пиццерии(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Таблица страны: одна открытая точка с синонимом и адресом, одна закрытая."""
+    from datetime import date
+
+    from src.db.spaces import SpaceRow
+    from src.web import country_units
+
+    строки = (
+        country_units.UnitRow(
+            key="u-1", name="Batumi-1", unit_id="u-1", stage="open", city="batumi",
+            partner="ООО Лотос", address="Rustaveli 1", aliases=("Батуми-1",),
+            restaurant_on=date(2024, 6, 25), partner_email="lotos@example.com", seats=40,
+        ),
+        country_units.UnitRow(
+            key="u-2", name="Batumi-2", unit_id="u-2", stage="closed", partner="ООО Лотос",
+            closed_on=date(2025, 1, 10),
+        ),
+    )  # fmt: skip
+    monkeypatch.setattr(country_units, "load", lambda **_: country_units.UnitsData(rows=строки))
+    monkeypatch.setattr(partner_spaces, "overview", lambda: (SpaceRow("HQ", "УК", (), 3),))
 
 
-def test_остальным_кнопки_настроек_нет_и_панель_по_адресу_не_открывается(
+def test_карточку_страны_открывает_каждый_кому_видна_страна(
     девелопер: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    assert "Настройки страны" not in открыть(девелопер, monkeypatch, данные(), "/country/GE")
+    _пиццерии(monkeypatch)
+    assert "Карточка страны" in открыть(девелопер, monkeypatch, данные(), "/country/GE")
     страница = открыть(девелопер, monkeypatch, данные(), "/country/GE?settings=1")
+    assert "sdrawer--wide" in страница and "Rustaveli 1" in страница and "Батуми-1" in страница
+    # Сведения — текстом, без форм правки: правит только администратор.
     i = страница.find("country/GE/settings")
     assert i < 0, страница[max(0, i - 300) : i + 100]
-    assert 'class="sdrawer"' not in страница
+
+
+def test_в_карточке_страны_все_пиццерии_с_адресом_и_синонимами(
+    админ: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _пиццерии(monkeypatch)
+    страница = открыть(админ, monkeypatch, данные(), "/country/GE?settings=1")
+    таблица = страница[страница.index("ccard__table") :]
+    assert "Batumi-1" in таблица and "Rustaveli 1" in таблица and "Батуми-1" in таблица
+    assert "2024-06-25" in таблица and "мест: 40" in таблица
+    # Закрытая — в конце таблицы, с датой закрытия.
+    assert таблица.index("Batumi-1") < таблица.index("Batumi-2") and "2025-01-10" in таблица
+    assert "ООО Лотос" in страница and "пиццерий: 2" in страница
+
+
+def test_панель_проверки_остаётся_обычной_ширины(
+    админ: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    страница = открыть(админ, monkeypatch, данные(), "/country/GE?inspection=missing")
+    assert "sdrawer--wide" not in страница
+
+
+def test_у_пиццерии_больше_нет_кнопки_карточки_пиццерии(
+    админ: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _пиццерии(monkeypatch)
+    страница = открыть(админ, monkeypatch, данные(), "/country/GE?unit=u-1")
+    assert "Rustaveli 1" in страница, "пиццерия не открылась — проверять нечего"
+    assert "Карточка пиццерии" not in страница and "/units/u-1" not in страница
+
+
+def test_почта_партнёра_в_карточке_только_для_ук() -> None:
+    from src.web import country_units
+
+    строка = country_units.UnitRow(
+        key="u-1", name="Batumi-1", unit_id="u-1", stage="open",
+        partner="ООО Лотос", partner_email="lotos@example.com",
+    )  # fmt: skip
+    данные_ = country_units.UnitsData(rows=(строка,))
+    for уК, ждём in ((True, "lotos@example.com"), (False, "")):
+        панель = country_settings.load("GE", "", "", units=данные_, can_edit=False, show_email=уК)
+        assert панель.partners[0].email == ждём, (уК, панель.partners)
 
 
 def test_панель_настроек_открывается_на_этом_же_экране(
@@ -307,6 +367,7 @@ def test_панель_настроек_открывается_на_этом_же
     )
     страница = открыть(админ, monkeypatch, данные(), "/country/GE?settings=1")
     assert "data-drawer" in страница and "/country/GE/settings/developer" in страница
+    assert "sdrawer--wide" in страница
     assert "/country/GE/settings/space" in страница and "Лотос" in страница
     # Список проверок и плитки остаются на месте: экран тот же.
     assert "pk-tiles" in страница

@@ -17,7 +17,8 @@
     pick_panel  — содержимое панели выбранной строки справа;
     pick_assets — дополнительные стили и скрипты экрана.
   Что передаёт экран: `pick_open` — строка выбрана (панель открыта), `pick_back` —
-  адрес закрытия (тот же экран без выбора), `pick_title` — заголовок панели.
+  адрес закрытия (тот же экран без выбора), `pick_title` — заголовок панели,
+  `pick_wide` — широкая панель (по умолчанию обычная).
 
   Панель — тот же механизм, что у «Проверок» и «Пользователей»: `decimus-split.css`,
   `split.js` и макрос `drawer` из `_split_ui.html`; своей второй панели у каркаса
@@ -41,6 +42,6 @@
     <section class="pk-work">{% block pick_work %}{% endblock %}</section>
   </div>
   {% if pick_open %}
-    {% call drawer(pick_back, pick_title) %}{% block pick_panel %}{% endblock %}{% endcall %}
+    {% call drawer(pick_back, pick_title, wide=pick_wide|default(false)) %}{% block pick_panel %}{% endblock %}{% endcall %}
   {% endif %}
 {% endblock %}

@@ -233,7 +233,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "No pizzeria in the directory has a country.",
     },
     "country.history.latest": {"ru": "последняя", "en": "latest"},
-    "country.history.card": {"ru": "Карточка пиццерии", "en": "Pizzeria card"},
     "section.overview.title": {"ru": "Главная", "en": "Home"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
     "section.country.title": {"ru": "Страны", "en": "Countries"},

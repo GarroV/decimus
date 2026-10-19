@@ -130,7 +130,7 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     "country.badge.pipeline": {"ru": "открываются {n}", "en": "opening {n}"},
     "country.badge.closed": {"ru": "закрыты {n}", "en": "closed {n}"},
     "country.badge.total": {"ru": "{n} всего", "en": "{n} total"},
-    "country.settings.open": {"ru": "Настройки страны", "en": "Country settings"},
+    "country.settings.open": {"ru": "Карточка страны", "en": "Country card"},
     "country.back": {"ru": "К стране", "en": "Back to the country"},
     "country.unit.facts.city": {"ru": "Город", "en": "City"},
     "country.unit.facts.partner": {"ru": "Партнёр", "en": "Partner"},
@@ -150,7 +150,6 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     "country.unit.tile.trend_none": {"ru": "мало проверок", "en": "too few inspections"},
     "country.unit.tile.maps": {"ru": "Оценки на картах", "en": "Map ratings"},
     "country.unit.tile.ratings": {"ru": "Рейтинги", "en": "Ratings"},
-    "country.unit.card": {"ru": "Карточка пиццерии", "en": "Pizzeria card"},
     "country.unit.no_card": {
         "ru": "Пиццерии нет в справочнике: она есть только в своде, проверок и карточки у неё нет.",
         "en": "The pizzeria is not in the directory, only in the register: no inspections or card.",
@@ -167,7 +166,35 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Пиццерия добавлена. Проверок у неё пока нет.",
         "en": "The pizzeria was added. It has no inspections yet.",
     },
-    "country.settings.title": {"ru": "Настройки страны", "en": "Country settings"},
+    "country.settings.title": {"ru": "Карточка страны", "en": "Country card"},
+    "country.card.people": {"ru": "Партнёр и девелопер", "en": "Partner and developer"},
+    "country.card.legal": {
+        "ru": "Юрлица партнёров в своде пиццерий",
+        "en": "Partner legal entities in the pizzeria register",
+    },
+    "country.card.space": {"ru": "Партнёр в Decimus", "en": "Partner in Decimus"},
+    "country.card.edit": {"ru": "Изменить", "en": "Change"},
+    "country.card.unset": {"ru": "не задан", "en": "not set"},
+    "country.card.units_n": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
+    "country.card.units": {"ru": "Пиццерии", "en": "Pizzerias"},
+    "country.card.profiles_failed": {
+        "ru": "Свод пиццерий сейчас не прочитался: адресов, дат и площадей ниже нет.",
+        "en": "The pizzeria register could not be read: addresses, dates and sizes "
+        "are missing below.",
+    },
+    "country.card.no_units": {
+        "ru": "В стране пока нет пиццерий.",
+        "en": "No pizzerias in this country yet.",
+    },
+    "country.card.col.name": {"ru": "Название", "en": "Name"},
+    "country.card.col.address": {"ru": "Город и адрес", "en": "City and address"},
+    "country.card.col.stage": {"ru": "Стадия", "en": "Stage"},
+    "country.card.col.dates": {"ru": "Открытие", "en": "Opening"},
+    "country.card.col.size": {"ru": "Площадь", "en": "Size"},
+    "country.card.restaurant_on": {"ru": "ресторан", "en": "restaurant"},
+    "country.card.delivery_on": {"ru": "доставка", "en": "delivery"},
+    "country.card.closed_on": {"ru": "закрыта", "en": "closed"},
+    "country.card.seats": {"ru": "мест: {n}", "en": "{n} seats"},
     "country.settings.developer": {"ru": "Девелопер", "en": "Developer"},
     "country.settings.developer_hint": {
         "ru": "Имя из справочника рейтингов: по нему страны собираются в группу девелопера. "

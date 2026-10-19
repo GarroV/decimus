@@ -227,7 +227,7 @@ def test_старая_карточка_точки_ведёт_партнёра_н
 def test_у_уК_ничего_не_изменилось(
     monkeypatch: pytest.MonkeyPatch, чтения: dict[str, list[str]]
 ) -> None:
-    """УК: выбор девелопера и страны на месте, чужие страны открыты, карточка точки жива."""
+    """УК: выбор девелопера и страны на месте, чужие страны открыты."""
     подменить_двери(monkeypatch, tenant="HQ", role="admin")
     monkeypatch.setattr("src.web.auth.reach_of", lambda t: Reach(t, None, None))
     monkeypatch.setattr(cn, "countries", lambda **_: (("GE", 1), ("RS", 1)))
@@ -236,5 +236,6 @@ def test_у_уК_ничего_не_изменилось(
         страница = client.get("/country/GE?unit=u-1").get_data(as_text=True)
         колонка = страница.split("</aside>", 1)[0]
         assert колонка.count("pk-item__code") == 2  # обе страны списком
-        assert "/units/u-1" in страница
+        # D539: «Карточки пиццерии» у пиццерии нет и у УК — она открыта здесь же.
+        assert "Карточка пиццерии" not in страница
         assert client.get("/country/RS").status_code == 200

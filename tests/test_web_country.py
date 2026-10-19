@@ -169,7 +169,8 @@ def test_выбранная_точка_показывает_справа_све�
     # D536: сведения и цифры пиццерии — в рабочей области, а не в панели; панель — для проверки.
     справа = страница.split("</aside>", 1)[1]
     assert "Руставели" in справа and "ООО Ромашка" in справа and "cn-facts" in справа
-    assert "/units/u-1" in страница
+    # D539: кнопки «Карточка пиццерии» нет — пиццерия открыта здесь же.
+    assert "/units/u-1" not in справа
     assert f"inspection={вид.snapshot.inspections[0].id}" in справа
     assert "data-drawer>" not in страница and 'id="sdrawer-title"' not in страница
 

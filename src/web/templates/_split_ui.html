@@ -31,8 +31,9 @@
   добавляет Esc, открытие без перезагрузки и анимацию. Тело — вызов (`caller`).
   Подключать `with context` (нужны `t` и `icon`).
 #}
-{% macro drawer(back, title) %}
-  <div class="sdrawer" data-drawer>
+{#- `wide` — широкая панель (карточка страны, D539): сведений в ней больше, чем у проверки. -#}
+{% macro drawer(back, title, wide=False) %}
+  <div class="sdrawer{% if wide %} sdrawer--wide{% endif %}" data-drawer>
     <a class="sdrawer__scrim" href="{{ back }}" data-drawer-close tabindex="-1" aria-hidden="true"></a>
     <aside class="sdrawer__panel" role="dialog" aria-modal="true" aria-labelledby="sdrawer-title">
       <header class="sdrawer__head">
