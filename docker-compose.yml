@@ -390,7 +390,7 @@ services:
     profiles: ["web"]
     # Версия прибита, как у звена до MCP: обновление — отдельное осознанное
     # изменение, а не то, что подтянулось между двумя `up`.
-    image: alpine/socat:1.8.0.0
+    image: alpine/socat:1.8.0.0@sha256:a6be4c0262b339c53ddad723cdd178a1a13271e1137c65e27f90a08c16de02b8
     logging: *logging
     restart: unless-stopped
     network_mode: "service:web"
@@ -484,7 +484,7 @@ services:
     profiles: ["funnel"]
     # Версия прибита, как у туннеля и базы: обновление звена — отдельное
     # осознанное изменение, а не то, что подтянулось между двумя `up`.
-    image: alpine/socat:1.8.0.0
+    image: alpine/socat:1.8.0.0@sha256:a6be4c0262b339c53ddad723cdd178a1a13271e1137c65e27f90a08c16de02b8
     logging: *logging
     restart: unless-stopped
     network_mode: "service:mcp"
@@ -537,7 +537,7 @@ services:
     profiles: ["tunnel"]
     # Версия прибита, как и у Postgres: обновление туннеля — отдельное
     # осознанное изменение, а не то, что подтянулось между двумя `up`.
-    image: cloudflare/cloudflared:2026.8.3
+    image: cloudflare/cloudflared:2026.8.3@sha256:51c9cefcb4569df44e1ad403ab1d3d8065aa8e84339bcfc6aee75502e1140339
     logging: *logging
     restart: unless-stopped
     network_mode: "service:mcp"
@@ -606,7 +606,7 @@ services:
     # Версия прибита точно, как и версии пакетов: обновление базы — отдельное
     # осознанное изменение, а не то, что подтянулось само между двумя `up`.
     # 16.x — та же ветка, на которой блок разрабатывался и проверялся.
-    image: postgres:16.14-alpine
+    image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     logging: *logging
     restart: unless-stopped
 
@@ -680,7 +680,7 @@ services:
   #   make storage-down   # снести ТОЛЬКО хранилище
   storage:
     profiles: ["storage"]
-    image: adobe/s3mock:4.9.0
+    image: adobe/s3mock:4.9.0@sha256:c1beb36492706566afdea274fa19a15fe6ca519aa4d82889b13a127237b6d301
     logging: *logging
     restart: unless-stopped
 
