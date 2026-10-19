@@ -100,3 +100,30 @@ def test_обещанное_тело_которого_нет_не_держит_�
             pytest.fail("сервер ждёт обещанное тело бесконечно")
     finally:
         s.close()
+
+
+def test_отказанные_соединения_не_разъедают_предел(адрес: tuple[str, int]) -> None:
+    """Отказ не берёт слот и не должен его возвращать (F-118).
+
+    Занимаем все слоты брошенными соединениями, затем делаем отказов больше
+    предела. Если отказ отпускает чужой слот, счётчик растёт выше
+    `MAX_CONNECTIONS` и следующее соединение принимается — тогда оно висит
+    молча, а не получает закрытие.
+    """
+    держатели = [socket.create_connection(адрес, timeout=5) for _ in range(MAX_CONNECTIONS)]
+    try:
+        time.sleep(0.5)  # сервер успел принять и занять потоки
+        for _ in range(MAX_CONNECTIONS * 2):
+            s = socket.create_connection(адрес, timeout=5)
+            s.settimeout(3)
+            try:
+                try:
+                    данные = s.recv(1)
+                except TimeoutError:
+                    pytest.fail("сверх предела соединение принято: отказы разъели предел")
+                assert данные == b""
+            finally:
+                s.close()
+    finally:
+        for h in держатели:
+            h.close()
