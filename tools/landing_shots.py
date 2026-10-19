@@ -192,14 +192,15 @@ def shot_network(page: Page, lang: str) -> Path:
     """Главная УК за всё время: потери по направлениям и таблица пиццерий."""
     page.goto(f"{BASE}/overview?period=all&lang={lang}")
     settle(page)
-    # Рейтинги в демо пусты, а карточка периода — про другое: прячем их, ряд занимают
-    # «Топ нарушений» и «Где сеть теряет проценты»; фильтры к смыслу не относятся.
+    # Раскладка D557: верхний ряд — фильтры и блок рейтингов (в демо пуст), второй —
+    # период, «Топ нарушений», «Где сеть теряет проценты». Прячем верхний ряд и
+    # карточку периода: снимок — про нарушения и потери, ряд встаёт парой.
     hide_chrome(
         page,
-        ".hm-grid > section:nth-child(-n+2),.hm-filters{display:none !important}"
-        ".hm-units{grid-column:1/-1}",
+        ".hm-top,.hm-grid--3 > section:first-child{display:none !important}"
+        ".hm-grid--3{grid-template-columns:repeat(2,minmax(0,1fr)) !important}",
     )
-    clip = block_clip(page, ".hm-grid > section:nth-child(n+3)", "section.hm-units")
+    clip = block_clip(page, ".hm-grid--3 > section:nth-child(n+2)", "section.hm-units")
     return save(page, "network", lang, clip)
 
 
