@@ -29,8 +29,11 @@ Node как обязательное условие подключения и п
 
 from __future__ import annotations
 
+import hashlib
 import shlex
 from pathlib import Path
+
+from src.mcp.install import install_script
 
 #: Адрес сервера MCP, каким его видит человек со своей машины (`routers/mcp.py`).
 MCP_URL_VAR = "BOT_MCP_URL"
@@ -91,6 +94,18 @@ def _проверить(значение: str, что: str) -> str:
     return значение
 
 
+def installer_sha256() -> str:
+    """SHA-256 установщика ровно в том виде, в каком его отдаёт сервер (F-103).
+
+    Отпечаток едет в строке запуска, то есть другим путём, чем сам скрипт: тот,
+    кто подменил ответ `/setup` (или оборвал его по дороге), отпечаток в
+    переписке подделать не может, и `shasum -c` не даст запустить чужое.
+    Считается от `install_script()` — той же сборки, что отдаёт сервер, а не от
+    файла на диске: в файле стоит маркер моста, а отдаётся уже слитое.
+    """
+    return hashlib.sha256(install_script().encode("utf-8")).hexdigest()
+
+
 def setup_command(*, url: str, token: str) -> str:
     """Одна строка для терминала: скачать установщик и запустить его с токеном.
 
@@ -112,9 +127,12 @@ def setup_command(*, url: str, token: str) -> str:
     адрес = _проверить(url, "адрес MCP-сервера")
     секрет = _проверить(token, "токен доступа")
     установщик = f"{адрес.rstrip('/')}/setup"
+    отпечаток = installer_sha256()
     return (
-        f"curl -fsSL {shlex.quote(установщик)} | "
-        f"DODO_MCP_URL={shlex.quote(адрес)} DODO_MCP_TOKEN={shlex.quote(секрет)} bash"
+        f'f=$(mktemp) && curl -fsSL {shlex.quote(установщик)} -o "$f" && '
+        f'echo "{отпечаток}  $f" | shasum -a 256 -c - && '
+        f'DODO_MCP_URL={shlex.quote(адрес)} DODO_MCP_TOKEN={shlex.quote(секрет)} bash "$f"; '
+        'rm -f "$f"'
     )
 
 
