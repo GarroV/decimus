@@ -89,7 +89,7 @@
         <p class="lp-sub">{{ t('landing.steps.lead') }}</p>
       </div>
       <ol class="lp-steps">
-        {% for n, mark in (('1', 'cal'), ('2', 'mic'), ('3', 'check'), ('4', 'pdf'), ('5', 'repeat')) %}
+        {% for n, mark in (('1', 'cal'), ('2', 'eye'), ('3', 'check'), ('4', 'pdf'), ('5', 'mail')) %}
           <li class="lp-step">
             <span class="lp-step__ico">{{ icon(mark) }}</span>
             <span class="lp-step__n">0{{ n }}</span>
@@ -135,7 +135,7 @@
         <h2 class="lp-h2">{{ t('landing.who.title') }}</h2>
       </div>
       <div class="lp-who">
-        {% for who, mark in (('auditor', 'mic'), ('hq', 'graph'), ('partner', 'team')) %}
+        {% for who, mark in (('auditor', 'eye'), ('hq', 'graph'), ('partner', 'team')) %}
           <article class="lp-card lp-card--{{ who }}">
             <span class="lp-card__ico">{{ icon(mark) }}</span>
             <h3 class="lp-card__title">{{ t('landing.who.' ~ who) }}</h3>
