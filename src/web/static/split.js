@@ -24,7 +24,7 @@
   }
 
   function markCurrent(href) {
-    document.querySelectorAll(".split__list .srow").forEach(function (row) {
+    document.querySelectorAll(".split__list .srow, .pk-work .srow").forEach(function (row) {
       var on = href !== null && row.href === href;
       row.classList.toggle("is-current", on);
       if (on) row.setAttribute("aria-current", "true");
@@ -91,7 +91,7 @@
         var node = document.importNode(next, true);
         var old = drawer();
         if (old) old.replaceWith(node);
-        else document.querySelector(".split").after(node);
+        else (document.querySelector(".split") || document.querySelector(".pk-shell")).after(node);
         if (push) history.pushState({ split: true }, "", href);
         markCurrent(href);
         bind(node);

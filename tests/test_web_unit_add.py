@@ -133,7 +133,9 @@ def test_заводит_каноническое_имя_со_страной_и_�
 ) -> None:
     ответ = отправить(уК, name="Белград 6")
     assert ответ.status_code == 302
-    assert "/units/u-new" in ответ.headers["Location"] and "added=1" in ответ.headers["Location"]
+    # D536: после добавления — экран «Страны» с новой пиццерией справа, а не карточка точки.
+    место = ответ.headers["Location"]
+    assert "/country/RS" in место and "unit=u-new" in место and "added=1" in место
     assert заведено == [
         {
             "name": "Belgrade-6",
@@ -233,3 +235,97 @@ def test_дубль_вне_охвата_без_ссылки(уК_узкий: Fla
     страница = ответ.get_data(as_text=True)
     assert ответ.status_code == 409
     assert "Batumi-1" in страница and "/units/u-far" not in страница
+
+
+# --- сведения справочника при заведении (D536) -------------------------------
+
+
+@pytest.fixture
+def профили(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Справочник пиццерий: что в нём лежит и что в него записали."""
+    from datetime import date
+
+    from src.db import unit_profiles
+
+    журнал: dict[str, Any] = {"upsert": [], "codes": [], "rows": ()}
+    журнал["rows"] = (
+        unit_profiles.Profile(
+            country_code="RS", name="Belgrade-7", name_normalized="belgrade-7", stage="pipeline",
+            status="Открывается", address="Knez Mihailova 1", partner="Dodo RS",
+            restaurant_on=date(2026, 12, 1), dodo_id="a" * 32,
+        ),
+    )  # fmt: skip
+    monkeypatch.setattr(unit_add.unit_profiles, "by_country", lambda _c: журнал["rows"])
+    monkeypatch.setattr(unit_add.unit_profiles, "upsert", журнал["upsert"].append)
+    monkeypatch.setattr(
+        unit_add.unit_profiles, "set_unit_codes", lambda pairs: журнал["codes"].extend(pairs)
+    )
+    monkeypatch.setattr(unit_add.directory, "list_units", lambda **_: [])
+    return журнал
+
+
+def test_адрес_и_сведения_справочника_ложатся_при_заведении(
+    уК: FlaskClient, заведено: list[dict[str, Any]], профили: dict[str, Any]
+) -> None:
+    ответ = отправить(
+        уК,
+        name="Belgrade-6",
+        address="  Terazije   5 ",
+        partner="Dodo RS",
+        stage="pipeline",
+        opened="2026-11-15",
+        dodo_id="B" * 32,
+    )
+    assert ответ.status_code == 302 and "profile_failed" not in ответ.headers["Location"]
+    (запись,) = профили["upsert"]
+    assert запись.address == "Terazije 5" and запись.partner == "Dodo RS"
+    assert запись.stage == "pipeline" and str(запись.restaurant_on) == "2026-11-15"
+    assert запись.dodo_id == "b" * 32 and запись.country_code == "RS"
+    # Код Dodo ложится и в точку справочника: по нему экран связывает её со сводом.
+    assert профили["codes"] == [("u-new", "b" * 32)]
+
+
+def test_название_из_справочника_добирает_пустые_поля(
+    уК: FlaskClient, заведено: list[dict[str, Any]], профили: dict[str, Any]
+) -> None:
+    отправить(уК, name="Belgrade-7")
+    (запись,) = профили["upsert"]
+    assert запись.address == "Knez Mihailova 1" and запись.partner == "Dodo RS"
+    assert запись.dodo_id == "a" * 32 and запись.name_normalized == "belgrade-7"
+
+
+def test_подставить_из_справочника_заполняет_поля_формы(
+    уК: FlaskClient, профили: dict[str, Any]
+) -> None:
+    ответ = уК.get(f"{АДРЕС}?name=Belgrade-7&prefill=1")
+    страница = ответ.get_data(as_text=True)
+    assert ответ.status_code == 200
+    assert 'value="Knez Mihailova 1"' in страница and 'value="2026-12-01"' in страница
+    # Без нажатия «Подставить» поля пусты: форма ничего не угадывает сама.
+    assert "Knez Mihailova" not in уК.get(f"{АДРЕС}?name=Belgrade-7").get_data(as_text=True)
+
+
+@pytest.mark.parametrize("поля", [{"dodo_id": "не-код"}, {"stage": "closed"}, {"opened": "завтра"}])
+def test_негодные_сведения_отказ_словами_и_в_базе_ничего(
+    уК: FlaskClient, заведено: list[dict[str, Any]], профили: dict[str, Any], поля: dict[str, str]
+) -> None:
+    ответ = отправить(уК, name="Belgrade-6", **поля)
+    assert ответ.status_code == 400
+    assert заведено == [] and профили["upsert"] == []
+
+
+def test_сведения_не_легли_точка_заведена_и_экран_говорит_об_этом(
+    уК: FlaskClient,
+    заведено: list[dict[str, Any]],
+    профили: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.db.errors import RatingsError
+
+    def сбой(_p: Any) -> None:
+        raise RatingsError("база молчит")
+
+    monkeypatch.setattr(unit_add.unit_profiles, "upsert", сбой)
+    ответ = отправить(уК, name="Belgrade-6", address="Terazije 5")
+    assert ответ.status_code == 302 and "profile_failed=1" in ответ.headers["Location"]
+    assert len(заведено) == 1  # точка заведена и верна; неудача справочника её не откатывает

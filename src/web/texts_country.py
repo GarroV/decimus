@@ -1,4 +1,4 @@
-"""Тексты экрана «Пиццерии» (D467, D504): колонка, шапка, плитки, пиццерии, панель.
+"""Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели.
 
 Отдельным модулем, а не строками в `texts.py`: тот уже длиннее предела файла.
 Сливаются в общий каталог (`texts.TEXTS`) — `t()` знает один словарь.
@@ -103,5 +103,106 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     "country.panel.no_card": {
         "ru": "Карточки пиццерии нет: точки нет в справочнике, она есть только в своде.",
         "en": "No pizzeria card: the unit is not in the directory, only in the register.",
+    },
+    # ── D536: «Мои страны», шапка, пиццерия справа, проверки, настройки ──
+    "country.mine.title": {"ru": "Мои страны", "en": "My countries"},
+    "country.mine.all": {"ru": "Все страны", "en": "All countries"},
+    "country.mine.some": {"ru": "{n} из {total}", "en": "{n} of {total}"},
+    "country.mine.hint": {
+        "ru": "Отметьте страны, которые нужны вам, — остальные уйдут с экрана. Выбор сохраняется "
+        "в вашем профиле и действует на всех устройствах.",
+        "en": "Tick the countries you work with: the rest leave the screen. The choice is saved "
+        "in your profile and applies on every device.",
+    },
+    "country.mine.clusters": {"ru": "Кластеры", "en": "Clusters"},
+    "country.mine.save": {"ru": "Показывать выбранные", "en": "Show selected"},
+    "country.mine.reset": {"ru": "Все страны", "en": "All countries"},
+    "country.mine.empty": {
+        "ru": "Не отмечено ни одной страны — отбор не применится.",
+        "en": "No country ticked — the filter will not apply.",
+    },
+    "country.head.developer": {"ru": "Девелопер", "en": "Developer"},
+    "country.head.partners": {"ru": "Партнёры", "en": "Partners"},
+    "country.head.units": {"ru": "Пиццерии", "en": "Pizzerias"},
+    "country.head.none": {"ru": "не указан", "en": "not set"},
+    "country.head.none_partners": {"ru": "не указаны", "en": "not set"},
+    "country.badge.open": {"ru": "работают {n}", "en": "open {n}"},
+    "country.badge.pipeline": {"ru": "открываются {n}", "en": "opening {n}"},
+    "country.badge.closed": {"ru": "закрыты {n}", "en": "closed {n}"},
+    "country.badge.total": {"ru": "{n} всего", "en": "{n} total"},
+    "country.settings.open": {"ru": "Настройки страны", "en": "Country settings"},
+    "country.back": {"ru": "К стране", "en": "Back to the country"},
+    "country.unit.facts.city": {"ru": "Город", "en": "City"},
+    "country.unit.facts.partner": {"ru": "Партнёр", "en": "Partner"},
+    "country.unit.facts.stage": {"ru": "Стадия", "en": "Stage"},
+    "country.unit.facts.address": {"ru": "Адрес", "en": "Address"},
+    "country.unit.facts.opened": {"ru": "Открыта", "en": "Opened"},
+    "country.unit.facts.closed": {"ru": "Закрыта", "en": "Closed"},
+    "country.unit.facts.status": {"ru": "Статус", "en": "Status"},
+    "country.unit.tile.last": {"ru": "Последняя проверка", "en": "Latest inspection"},
+    "country.unit.tile.last_note": {"ru": "от {date}", "en": "on {date}"},
+    "country.unit.tile.last_none": {"ru": "не проверяли", "en": "never inspected"},
+    "country.unit.tile.trend": {"ru": "Движение", "en": "Trend"},
+    "country.unit.tile.trend_note": {
+        "ru": "против предыдущей проверки",
+        "en": "versus the previous inspection",
+    },
+    "country.unit.tile.trend_none": {"ru": "мало проверок", "en": "too few inspections"},
+    "country.unit.tile.maps": {"ru": "Оценки на картах", "en": "Map ratings"},
+    "country.unit.tile.ratings": {"ru": "Рейтинги", "en": "Ratings"},
+    "country.unit.card": {"ru": "Карточка пиццерии", "en": "Pizzeria card"},
+    "country.unit.no_card": {
+        "ru": "Пиццерии нет в справочнике: она есть только в своде, проверок и карточки у неё нет.",
+        "en": "The pizzeria is not in the directory, only in the register: no inspections or card.",
+    },
+    "country.list.title": {"ru": "Проверки", "en": "Inspections"},
+    "country.list.country_hint": {"ru": "страны за период", "en": "of the country in the period"},
+    "country.list.unit_hint": {"ru": "пиццерии, последние", "en": "of the pizzeria, latest"},
+    "country.list.empty_period": {
+        "ru": "За период проверок нет.",
+        "en": "No inspections in the period.",
+    },
+    "country.list.empty_unit": {"ru": "Проверок не было.", "en": "No inspections yet."},
+    "country.added": {
+        "ru": "Пиццерия добавлена. Проверок у неё пока нет.",
+        "en": "The pizzeria was added. It has no inspections yet.",
+    },
+    "country.settings.title": {"ru": "Настройки страны", "en": "Country settings"},
+    "country.settings.developer": {"ru": "Девелопер", "en": "Developer"},
+    "country.settings.developer_hint": {
+        "ru": "Имя из справочника рейтингов: по нему страны собираются в группу девелопера. "
+        "Пустое поле снимает девелопера.",
+        "en": "The name from the ratings directory: countries are grouped by it. "
+        "An empty field clears the developer.",
+    },
+    "country.settings.partner": {"ru": "Партнёр страны", "en": "Country partner"},
+    "country.settings.partner_hint": {
+        "ru": "Пространство партнёра, которому принадлежит страна: он видит её пиццерии "
+        "и проверки. "
+        "Страна — один партнёр; закреплённую страну отсюда не перенести.",
+        "en": "The partner space that owns the country: it sees the pizzerias and inspections. "
+        "A country belongs to one partner; an assigned country cannot be moved from here.",
+    },
+    "country.settings.partner_none": {
+        "ru": "Страна не закреплена за партнёром.",
+        "en": "The country is not assigned to a partner.",
+    },
+    "country.settings.partner_pick": {"ru": "Пространство", "en": "Space"},
+    "country.settings.partner_assign": {"ru": "Закрепить", "en": "Assign"},
+    "country.settings.partner_failed": {
+        "ru": "Пространства партнёров не прочитались.",
+        "en": "Partner spaces could not be read.",
+    },
+    "country.settings.save": {"ru": "Сохранить", "en": "Save"},
+    "country.settings.saved": {"ru": "Сохранено.", "en": "Saved."},
+    "country.settings.failed": {
+        "ru": "Не сохранилось: страны нет в справочнике, имя слишком длинное или страна уже у "
+        "другого партнёра.",
+        "en": "Not saved: the country is not in the directory, the name is too long or the "
+        "country already belongs to another partner.",
+    },
+    "country.settings.people": {
+        "ru": "Люди и пространства партнёров ведутся на экране «Пользователи».",
+        "en": "People and partner spaces are managed on the Users screen.",
     },
 }

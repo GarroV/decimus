@@ -1,0 +1,35 @@
+{#
+  «Мои страны» (D536): постоянный отбор над колонкой стран. Раскрывается на месте
+  (`<details>`, без скриптов): кластеры одной кнопкой, страны флажками по алфавиту,
+  «Все страны» снимает отбор. Форма уходит на `POST /country/filter` и возвращает
+  на этот же экран; сохранённое живёт в профиле человека. Ни одного вычисления.
+#}
+{% macro mine_filter(m) %}
+  <details class="pick cn-mine" name="pick">
+    <summary class="ov-chip{% if m.active %} is-on{% endif %}">
+      <span>{{ t('country.mine.title') }}: {{ t('country.mine.some', n=m.count, total=m.total) if m.active else t('country.mine.all') }}</span>
+      <span class="pick__caret" aria-hidden="true">▾</span>
+    </summary>
+    <form class="cn-mine__body" method="post" action="{{ m.action }}">
+      <input type="hidden" name="next" value="{{ m.next }}">
+      <p class="cn-mine__hint">{{ t('country.mine.hint') }}</p>
+      {% if m.clusters %}
+        <div class="cn-mine__clusters" role="group" aria-label="{{ t('country.mine.clusters') }}">
+          {% for c in m.clusters %}
+            <button class="speriod__chip{% if c.on %} is-on{% endif %}" type="submit" name="cluster" value="{{ c.key }}">{{ t('ratings.cluster.' ~ c.key) }} · {{ c.codes|length }}</button>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <ul class="cn-mine__list">
+        {% for r in m.rows %}
+          <li><label class="cn-mine__row"><input type="checkbox" name="countries" value="{{ r.code }}"{% if r.on %} checked{% endif %}>
+            <span class="cn-mine__code">{{ r.code }}</span><span>{{ r.title }}</span></label></li>
+        {% endfor %}
+      </ul>
+      <div class="cn-mine__actions">
+        <button class="btn btn--sm btn--primary" type="submit">{{ t('country.mine.save') }}</button>
+        <button class="btn btn--sm" type="submit" name="reset" value="1"{% if not m.active %} disabled{% endif %}>{{ t('country.mine.reset') }}</button>
+      </div>
+    </form>
+  </details>
+{% endmacro %}

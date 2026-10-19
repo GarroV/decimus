@@ -38,6 +38,7 @@ _BEGIN_SQL = "select begin_own_google_link(%s, %s, %s)"
 _FINISH_SQL = "select finish_own_google_link(%s, %s, %s, %s)"
 _UNLINK_SQL = "select unlink_own_google(%s, %s)"
 _SET_LANG_SQL = "select set_own_web_lang(%s, %s)"
+_SET_COUNTRY_FILTER_SQL = "select set_own_country_filter(%s, %s)"
 _SET_GOOGLE_PROFILE_SQL = "select set_own_google_profile(%s, %s, %s, %s)"
 
 #: Своё фото — по живой сессии, тем же условием, что у опознания. Чужой ключ
@@ -133,6 +134,17 @@ def set_web_lang(token: str, lang: str) -> bool:
     только форму, чтобы третий язык добавлялся словарём, без миграции.
     """
     return bool(_one(_SET_LANG_SQL, (token, lang), "сохранить язык сайта"))
+
+
+def set_country_filter(token: str, countries: tuple[str, ...]) -> bool:
+    """Сохранить постоянный отбор стран своей учётке (D536). `False` — сессии нет.
+
+    Пустой набор снимает отбор. Коды — две заглавные буквы; что страна в охвате
+    человека, проверяет вызывающий: база держит только форму.
+    """
+    return bool(
+        _one(_SET_COUNTRY_FILTER_SQL, (token, list(countries) or None), "сохранить отбор стран")
+    )
 
 
 def save_google_profile(

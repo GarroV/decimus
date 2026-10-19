@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 161 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 164 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -78,8 +78,11 @@
 | `/calendar/trips/<trip_id>/steps/<step_id>/delete` | POST | `trip_step_delete` | `src/web/calendar_screen.py` |
 | `/country` | GET | `country_index` | `src/web/app.py` |
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
+| `/country/<code>/settings/developer` | POST | `country_set_developer` | `src/web/country_settings.py` |
+| `/country/<code>/settings/space` | POST | `country_set_space` | `src/web/country_settings.py` |
 | `/country/<code>/units/new` | GET | `unit_new` | `src/web/unit_add.py` |
 | `/country/<code>/units/new` | POST | `unit_create` | `src/web/unit_add.py` |
+| `/country/filter` | POST | `country_filter` | `src/web/country_filter.py` |
 | `/inspections` | GET | `registry` | `src/web/app.py` |
 | `/inspections/<inspection_id>` | GET | `card` | `src/web/app.py` |
 | `/inspections/<inspection_id>/accept` | POST | `do_accept` | `src/web/app.py` |
@@ -449,6 +452,7 @@
 | `0074_trips.sql` | `trips`, `trip_steps` |
 | `0075_email_unique_live.sql` | — |
 | `0076_google_sub.sql` | — |
+| `0077_web_country_filter.sql` | — |
 <!-- map:end -->
 
 ## Makefile

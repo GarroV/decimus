@@ -1,10 +1,14 @@
 {#
-  Новая пиццерия страны (#437, D233, D240). Один вопрос: «как называется
-  новая пиццерия этой страны». Вход — кнопка «Добавить пиццерию» на экране
-  страны, только у УК. Правила имени и прав — в `src/web/unit_add.py`, здесь
-  только поле, отказ словами и подтверждение незнакомого города.
+  Новая пиццерия страны (#437, D233, D240, D536). Вопрос: «как называется новая
+  пиццерия этой страны и что о ней известно» — название, а рядом необязательные
+  сведения справочника: адрес, партнёр, код Dodo, стадия, дата открытия. Название
+  совпало со строкой справочника — «Подставить из справочника» заполняет поля её
+  сведениями. Вход — кнопка «Добавить пиццерию» на экране страны, только у УК.
+  Правила имени и прав — в `src/web/unit_add.py`, здесь только поля, отказ словами
+  и подтверждение незнакомого города.
 #}{% extends "base.html" %}
 {% block title %}{{ t('unitnew.title') }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-country.css') }}">{% endblock %}
 
 {% block body %}
   <a class="cn-back" href="{{ back }}">‹ {{ t('unitnew.back') }}</a>
@@ -33,19 +37,48 @@
 
   <section class="ov-card ov-card--wide">
     <div class="card__body">
-      <form method="post" action="{{ action }}" class="row users-add">
-        <label class="grow">
+      <form method="post" action="{{ action }}" class="un-form">
+        <label class="un-form__wide">
           <span class="field-label">{{ t('unitnew.name') }}</span>
-          <input class="input" name="name" value="{{ typed }}" required maxlength="60"
+          <input class="input" name="name" value="{{ typed }}" required maxlength="60" list="un-suggest"
                  autocomplete="off" spellcheck="false" placeholder="Belgrade-6"{% if not confirm %} autofocus{% endif %}>
+          {% if suggestions %}<datalist id="un-suggest">{% for n in suggestions %}<option value="{{ n }}">{% endfor %}</datalist>{% endif %}
         </label>
-        {% if confirm %}
-          <input type="hidden" name="confirm" value="{{ confirm }}">
-          <button class="btn btn--primary" type="submit">{{ t('unitnew.confirm.submit', name=confirm) }}</button>
-        {% else %}
-          <button class="btn btn--primary" type="submit">{{ t('unitnew.submit') }}</button>
-        {% endif %}
+        <label class="un-form__wide">
+          <span class="field-label">{{ t('unitnew.address') }}</span>
+          <input class="input" name="address" value="{{ values.get('address', '') }}" maxlength="200" autocomplete="off">
+        </label>
+        <label>
+          <span class="field-label">{{ t('unitnew.partner') }}</span>
+          <input class="input" name="partner" value="{{ values.get('partner', '') }}" maxlength="120" list="un-partners" autocomplete="off">
+          {% if partners %}<datalist id="un-partners">{% for n in partners %}<option value="{{ n }}">{% endfor %}</datalist>{% endif %}
+        </label>
+        <label>
+          <span class="field-label">{{ t('unitnew.stage') }}</span>
+          <select class="input" name="stage">
+            {% for st in stages %}<option value="{{ st }}"{% if values.get('stage', 'open') == st %} selected{% endif %}>{{ t('unit.stage.' ~ st) }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>
+          <span class="field-label">{{ t('unitnew.opened') }}</span>
+          <input class="input" type="date" name="opened" value="{{ values.get('opened', '') }}">
+        </label>
+        <label>
+          <span class="field-label">{{ t('unitnew.dodo_id') }}</span>
+          <input class="input" name="dodo_id" value="{{ values.get('dodo_id', '') }}" maxlength="32" autocomplete="off" spellcheck="false" placeholder="{{ t('unitnew.optional') }}">
+        </label>
+        <div class="un-form__wide un-form__actions">
+          {% if confirm %}
+            <input type="hidden" name="confirm" value="{{ confirm }}">
+            <button class="btn btn--primary" type="submit">{{ t('unitnew.confirm.submit', name=confirm) }}</button>
+          {% else %}
+            <button class="btn btn--primary" type="submit">{{ t('unitnew.submit') }}</button>
+            <button class="btn" type="submit" name="prefill" value="1" formmethod="get" formaction="{{ action }}"
+                    formnovalidate>{{ t('unitnew.prefill') }}</button>
+          {% endif %}
+        </div>
       </form>
+      <p class="field-note">{{ t('unitnew.extras_hint') }}</p>
       <p class="field-note">{{ t('unitnew.name_hint') }}</p>
     </div>
   </section>

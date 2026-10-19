@@ -1,4 +1,4 @@
-"""Таблица «Пиццерии» экрана «Пиццерии» (D467): одна строка на пиццерию.
+"""Строки пиццерий экрана «Страны» (D467): одна строка на пиццерию.
 
 Сводит в одну строку то, что раньше жило в двух блоках («Результаты проверок
 по пиццериям» и «Свод пиццерий»): точку справочника, строку свода (партнёр,
@@ -23,6 +23,7 @@ from src.db.errors import DbError
 from src.db.models import InspectionRow
 from src.db.reach import Reach
 from src.ratings.maps import SHOWN_PROVIDERS
+from src.ratings.svod import normalize as svod_normalize
 
 from . import home_ratings
 from .overview import PointRow
@@ -32,8 +33,8 @@ log = logging.getLogger(__name__)
 #: Ключ строки, которой нет в справочнике (есть только в своде): `svod:` + имя.
 SVOD_KEY = "svod:"
 
-#: Сколько проверок показывает панель пиццерии: последние, а не вся история.
-HISTORY_LIMIT = 20
+#: Сколько проверок пиццерии показывает экран: последние, а не вся история.
+HISTORY_LIMIT = 30
 
 #: Порядок стадий свода в таблице; стадия `closed` уходит в свёрнутый блок.
 _STAGE_ORDER = {"open": 0, "paused": 1, "pipeline": 2}
@@ -113,10 +114,17 @@ def build_rows(
     """Свести справочник, свод, проверки периода и оценки в строки."""
     last_ever = last_ever or {}
     by_code = {p.dodo_id: p for p in profiles if p.dodo_id}
+    # Точка без кода Dodo (заведённая с экрана «Страны», D536, без кода) связывается со
+    # строкой справочника названием — только если по коду пары не нашлось.
+    by_name = {p.name_normalized: p for p in profiles if p.name_normalized}
     used: set[int] = set()
     rows: list[UnitRow] = []
     for unit in units:
         profile = by_code.get(unit.code or "")
+        if profile is None and not unit.code:
+            profile = by_name.get(svod_normalize(unit.name))
+            if profile is not None and id(profile) in used:
+                profile = None
         if profile is not None:
             used.add(id(profile))
         rs, rko = ratings.get(unit.code or "", (None, None))

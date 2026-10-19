@@ -309,6 +309,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0076_google_sub.sql": (
         "sql1:a75768f446388cdf4ab6310bbd6dcbeb2e1fd920b93f05e6c09f9f050a278496"
     ),
+    # Постоянный отбор стран у человека, экран «Страны» (D536).
+    "0077_web_country_filter.sql": (
+        "sql1:fde8cbaea36129227f95f3970ebd93f514c78712af89f73c1130b236c4d8d5e1"
+    ),
 }
 
 
