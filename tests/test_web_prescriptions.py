@@ -215,8 +215,8 @@ def test_меню_обеих_сторон_зовёт_в_одни_действи�
     клиент: str, request: pytest.FixtureRequest
 ) -> None:
     """D526: одно меню — «Действия»; пункта «Предписания» у партнёра нет."""
-    страница = request.getfixturevalue(клиент).get("/actions?tab=prescriptions").get_data(
-        as_text=True
+    страница = (
+        request.getfixturevalue(клиент).get("/actions?tab=prescriptions").get_data(as_text=True)
     )
     assert 'href="/actions' in страница
     assert 'href="/prescriptions' not in страница and 'href="/plans' not in страница
