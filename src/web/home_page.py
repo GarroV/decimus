@@ -91,7 +91,7 @@ def _board_href(kind: str) -> str:
 def _board(reach: Any) -> tuple[tuple[home_board.Sticker, ...], bool]:
     """Стикеры и то, не отказала ли база (у роли без доски — пусто и без отказа)."""
     вошедший = auth.current_account()
-    if вошедший is None:
+    if вошедший is None or not home_board.SHOWN:
         return (), False
     who = home_board.Who(вошедший.role, auth.current_tenant())
     if not home_board.kinds_for(who):
