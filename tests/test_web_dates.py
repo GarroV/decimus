@@ -45,6 +45,7 @@ def test_период_словами_и_без_повтора_общего_у_к
     assert period_title(Period(date(2026, 10, 1), date(2026, 10, 15)), "ru") == (
         "1 — 15\u00a0окт\u00a02026"
     )
+
     def text(start: date, end: date | None, lang: str = "ru") -> str:
         return period_title(Period(start, end), lang).replace("\u00a0", " ")
 
