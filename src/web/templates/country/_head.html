@@ -1,0 +1,94 @@
+{#
+  Шапка экрана «Страны» (D536, D418). Первая строка — название и период рядом,
+  кнопки действий справа; ниже — сведения раздельными подписанными блоками, а
+  не одной строкой текста: «Девелопер», «Партнёры» (метками), «Пиццерии» (число и
+  значки стадий). На узком экране всё переносится строками, ничего не уезжает.
+  Ни одного вычисления — приходит готовое.
+#}
+{% from "_period.html" import period_picker with context %}
+
+{# Значок числа: стадия пиццерий страны. #}
+{% macro badge(text, tone='') %}<span class="cn-badge{% if tone %} cn-badge--{{ tone }}{% endif %}">{{ text }}</span>{% endmacro %}
+
+{# Один подписанный блок сведений: подпись над значением. #}
+{% macro fact(label) %}
+  <div class="cn-fact">
+    <dt class="cn-fact__label">{{ label }}</dt>
+    <dd class="cn-fact__value">{{ caller() }}</dd>
+  </div>
+{% endmacro %}
+
+{% macro country_head() %}
+  {% set open_n = units.rows|selectattr('stage', 'equalto', 'open')|list|length %}
+  {% set pipe_n = units.rows|selectattr('stage', 'equalto', 'pipeline')|list|length %}
+  {% set closed_n = units.closed_rows|length %}
+  <header class="cn-head">
+    <div class="cn-head__row">
+      <div class="cn-head__title">
+        <div class="pk-kicker">{{ t('country.kicker') }}</div>
+        <h1 class="pk-title">{{ country_name or '—' }}</h1>
+      </div>
+      <div class="cn-head__period">
+        {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), period_hidden) }}
+      </div>
+      <div class="cn-head__actions">
+        {% if can_add_units and not read_only %}
+          <a class="btn btn--sm btn--primary" href="{{ url('/country/' ~ view.code ~ '/units/new') }}?lang={{ lang }}">＋ {{ t('unitnew.open') }}</a>
+        {% endif %}
+        <a class="btn btn--sm" href="{{ url(actions_path) }}?tab=plans{% if plans_act_country %}&amp;country={{ view.code }}{% endif %}&amp;lang={{ lang }}"
+           title="{{ t('country.plans.act') if plans_act_country else t('country.plans.mine') }}">
+          {{ t('country.plans.title') }}<span class="cn-count{% if plans_count %} is-on{% endif %}">{{ '—' if plans_count is none else plans_count }}</span></a>
+        <a class="btn btn--sm" href="{{ url(actions_path) }}?tab=prescriptions{% if rx_act_hq %}&amp;country={{ view.code }}{% endif %}&amp;lang={{ lang }}"
+           title="{{ t('country.rx.act') if rx_act_hq else t('country.rx.mine') }}">
+          {{ t('country.rx.title') }}<span class="cn-count{% if rx_count %} is-on{% endif %}">{{ '—' if rx_count is none else rx_count }}</span></a>
+        {% if can_settings %}
+          <a class="btn btn--sm" href="{{ settings_url }}" data-drawer-open>{{ t('country.settings.open') }}</a>
+        {% endif %}
+      </div>
+    </div>
+    <dl class="cn-facts">
+      {% if is_hq %}
+        {% call fact(t('country.head.developer')) %}{% if developer %}{{ developer }}{% else %}<span class="is-muted">{{ t('country.head.none') }}</span>{% endif %}{% endcall %}
+      {% endif %}
+      {% call fact(t('country.head.partners')) %}
+        {% if partners %}<span class="cn-chips">{% for name in partners %}<span class="cn-chip">{{ name }}</span>{% endfor %}</span>
+        {% else %}<span class="is-muted">{{ t('country.head.none_partners') }}</span>{% endif %}
+      {% endcall %}
+      {% call fact(t('country.head.units')) %}
+        <b class="cn-fact__num">{{ units.rows|length }}</b>
+        <span class="cn-badges">
+          {% if open_n %}{{ badge(t('country.badge.open', n=open_n), 'ok') }}{% endif %}
+          {% if pipe_n %}{{ badge(t('country.badge.pipeline', n=pipe_n), 'warn') }}{% endif %}
+          {% if closed_n %}{{ badge(t('country.badge.closed', n=closed_n), 'err') }}{% endif %}
+        </span>
+      {% endcall %}
+    </dl>
+  </header>
+{% endmacro %}
+
+{# Шапка выбранной пиццерии: путь назад к стране, название, действия, сведения справочника. #}
+{% macro unit_head(row, back_url) %}
+  <header class="cn-head">
+    <div class="cn-head__row">
+      <div class="cn-head__title">
+        <a class="pk-kicker cn-back" href="{{ back_url }}">‹ {{ country_name or t('country.back') }}</a>
+        <h1 class="pk-title">{{ row.name }}</h1>
+      </div>
+      <div class="cn-head__period">{{ badge(t('unit.stage.' ~ row.stage), {'open': 'ok', 'pipeline': 'warn', 'paused': 'warn', 'closed': 'err'}.get(row.stage, '')) }}</div>
+      <div class="cn-head__actions">
+        {% if row.unit_id and is_hq %}
+          <a class="btn btn--sm" href="{{ url('/units/' ~ row.unit_id) }}?lang={{ lang }}">{{ t('country.unit.card') }}</a>
+        {% endif %}
+      </div>
+    </div>
+    <dl class="cn-facts">
+      {% call fact(t('country.unit.facts.city')) %}{{ city_title(row.city) or '—' }}{% endcall %}
+      {% call fact(t('country.unit.facts.partner')) %}{{ row.partner or '—' }}{% endcall %}
+      {% if row.status and row.status != t('unit.stage.' ~ row.stage) %}{% call fact(t('country.unit.facts.status')) %}{{ row.status }}{% endcall %}{% endif %}
+      {% call fact(t('country.unit.facts.address')) %}{{ row.address or '—' }}{% endcall %}
+      {% call fact(t('country.unit.facts.opened')) %}{{ row.opened or '—' }}{% endcall %}
+      {% if row.closed_on %}{% call fact(t('country.unit.facts.closed')) %}{{ row.closed_on }}{% endcall %}{% endif %}
+    </dl>
+    {% if not row.unit_id %}<p class="pk-empty">{{ t('country.unit.no_card') }}</p>{% endif %}
+  </header>
+{% endmacro %}

@@ -6,9 +6,10 @@
 
 {# Элемент списка: название, мета, справа счётчик моноширинным (или тело вызова — метка);
    выбранный — подложкой и кольцом. `drawer` — строка открывает панель справа (`split.js`);
-   `sub` — вложенный элемент (пиццерия под своей страной). #}
-{% macro pick_item(href, title, meta='', count='', on=false, code='', drawer=false, sub=false) %}
-  <a class="pk-item{% if sub %} pk-item--sub{% endif %}{% if on %} is-on{% endif %}" href="{{ href }}"{% if drawer %} data-drawer-open{% endif %}{% if on %} aria-current="true"{% endif %}>
+   `sub` — вложенный элемент (пиццерия под своей страной); `expanded` — раскрывающийся
+   элемент (страна со списком пиццерий, D536): состояние для читалок экрана. #}
+{% macro pick_item(href, title, meta='', count='', on=false, code='', drawer=false, sub=false, expanded=none) %}
+  <a class="pk-item{% if sub %} pk-item--sub{% endif %}{% if on %} is-on{% endif %}" href="{{ href }}"{% if drawer %} data-drawer-open{% endif %}{% if on %} aria-current="true"{% endif %}{% if expanded is not none %} aria-expanded="{{ 'true' if expanded else 'false' }}"{% endif %}>
     {% if code %}<span class="pk-item__code">{{ code }}</span>{% endif %}
     <span class="pk-item__main">
       <span class="pk-item__title">{{ title }}</span>

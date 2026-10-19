@@ -19,6 +19,38 @@ UNIT_TEXTS: dict[str, dict[str, str]] = {
         "the name is brought to English, e.g. «Белград 6» becomes Belgrade-6.",
     },
     "unitnew.submit": {"ru": "Добавить", "en": "Add"},
+    "unitnew.address": {"ru": "Адрес", "en": "Address"},
+    "unitnew.partner": {"ru": "Партнёр", "en": "Partner"},
+    "unitnew.stage": {"ru": "Стадия", "en": "Stage"},
+    "unitnew.opened": {"ru": "Дата открытия", "en": "Opening date"},
+    "unitnew.dodo_id": {"ru": "Код Dodo", "en": "Dodo ID"},
+    "unitnew.optional": {"ru": "необязательно", "en": "optional"},
+    "unitnew.prefill": {"ru": "Подставить из справочника", "en": "Fill in from the directory"},
+    "unitnew.extras_hint": {
+        "ru": "Кроме названия всё необязательно. Название есть в справочнике пиццерий — "
+        "«Подставить из справочника» заполнит поля его сведениями, а пустые поля при "
+        "добавлении добираются оттуда сами. Код Dodo — 32 знака 0–9 и a–f: по нему пиццерия "
+        "связывается со справочником и рейтингами.",
+        "en": "Everything but the name is optional. If the name is in the pizzeria directory, "
+        "«Fill in from the directory» fills the fields from it, and empty fields are completed "
+        "from there on adding. Dodo ID is 32 characters 0–9 and a–f: it links the pizzeria to "
+        "the directory and the ratings.",
+    },
+    "unitnew.refused.dodo_id": {
+        "ru": "Код Dodo — 32 знака: цифры и буквы a–f.",
+        "en": "Dodo ID is 32 characters: digits and letters a–f.",
+    },
+    "unitnew.refused.stage": {"ru": "Такой стадии нет.", "en": "There is no such stage."},
+    "unitnew.refused.opened": {
+        "ru": "Дата открытия — в виде ГГГГ-ММ-ДД.",
+        "en": "The opening date must look like YYYY-MM-DD.",
+    },
+    "unitnew.profile_failed": {
+        "ru": "Пиццерия добавлена, но адрес и другие сведения в справочник не легли — "
+        "добавьте их позже.",
+        "en": "The pizzeria was added, but the address and other details did not reach the "
+        "directory — add them later.",
+    },
     "unitnew.confirm.title": {
         "ru": "Города «{city}» нет в словаре сети",
         "en": "The city «{city}» is not in the network's dictionary",

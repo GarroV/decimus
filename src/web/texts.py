@@ -224,7 +224,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Проверок в выборке нет — показывать нечего.",
         "en": "No inspections in this selection — nothing to show.",
     },
-    "country.kicker": {"ru": "Пиццерии", "en": "Pizzerias"},
+    "country.kicker": {"ru": "Страна", "en": "Country"},
     "country.filter.title": {"ru": "Отбор", "en": "Filter"},
     "country.rail.title": {"ru": "Страны", "en": "Countries"},
     "country.choose.empty": {
@@ -235,7 +235,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "country.history.card": {"ru": "Карточка пиццерии", "en": "Pizzeria card"},
     "section.overview.title": {"ru": "Главная", "en": "Home"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
-    "section.country.title": {"ru": "Пиццерии", "en": "Pizzerias"},
+    "section.country.title": {"ru": "Страны", "en": "Countries"},
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
     # Слово владельца (D286): вкладка, где заводят людей и привязывают бота.

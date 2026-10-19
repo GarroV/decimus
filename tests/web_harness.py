@@ -57,6 +57,7 @@ class Учётка:
         display_name: str | None = None,
         avatar_etag: str | None = None,
         has_second_factor: bool = True,
+        country_filter: tuple[str, ...] | None = None,
     ) -> None:
         self.id = "22222222-2222-2222-2222-222222222222"
         # Номер сессии (`web_sessions.id`): на него ссылаются журналы входов и действий (D462).
@@ -73,6 +74,8 @@ class Учётка:
         # Язык сайта из профиля (`web_users.web_lang`, 0061): по умолчанию не
         # выбран — страницы говорят языком стенда.
         self.web_lang = web_lang
+        # Постоянный отбор стран (`web_users.country_filter`, 0077, D536): по умолчанию нет.
+        self.country_filter = country_filter
         # Имя и версия фото из Google (`web_users`, 0065): по умолчанию нет —
         # блок учётки показывает логин и инициалы.
         self.display_name = display_name

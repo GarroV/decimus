@@ -25,28 +25,16 @@
 {% from "_pick.html" import pick %}
 {% from "_period.html" import period_picker with context %}
 {% from "inspections/_panel.html" import inspection_panel with context %}
+{% from "inspections/_row.html" import inspection_row with context %}
 {% block title %}{{ t('section.registry.title') }}{% endblock %}
 {% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">{% endblock %}
 
 {% macro row_link(row, review=false) %}
   {% set текущая = split_open and picked == row.id %}
-  <li>
-    <a class="srow{% if текущая %} is-current{% endif %}{% if row.retracted %} is-frozen{% endif %}"
-       href="{{ select_url(inspection=row.id) }}"{% if текущая %} aria-current="true"{% endif %}>
-      <span class="grade tag {{ grade_tone(row.grade) }} srow__grade">{{ row.grade or '—' }}</span>
-      <span class="srow__main">
-        <b>{{ row.unit_name }}</b>
-        <small>
-          {{ kind_title(row.kind, lang) }} · {{ row.auditor or '—' }}
-          {%- if checklist_names is not none %} · {{ checklist_names.get(row.checklist_code, row.checklist_code) }}{% endif %}
-          {%- if review %} · <span class="srow__warn">{% if review_wait[row.id] %}{{ t('registry.review.wait', days=review_wait[row.id]) }}{% else %}{{ t('registry.review.wait_new') }}{% endif %}</span>{% endif %}
-          {%- if row.retracted %} · <span class="srow__err">{{ t('state.retracted') }}</span>{% endif %}
-        </small>
-      </span>
-      <span class="srow__cell is-num srow__score">{{ row.pct }}</span>
-      <span class="srow__cell is-num mono">{{ row.inspection_date }}</span>
-    </a>
-  </li>
+  {% call inspection_row(row, select_url(inspection=row.id), current=текущая,
+                         checklist=(checklist_names.get(row.checklist_code, row.checklist_code) if checklist_names is not none else none)) %}
+    {%- if review %} · <span class="srow__warn">{% if review_wait[row.id] %}{{ t('registry.review.wait', days=review_wait[row.id]) }}{% else %}{{ t('registry.review.wait_new') }}{% endif %}</span>{% endif %}
+  {% endcall %}
 {% endmacro %}
 
 {% macro hidden_filters(skip=()) %}

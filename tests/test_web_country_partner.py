@@ -144,9 +144,10 @@ def test_партнёр_видит_экран_своей_страны_со_сп�
     assert ответ.status_code == 200
     страница = ответ.get_data(as_text=True)
     assert "Батуми-1" in страница and "pk-item--sub" in страница
-    # Панель пиццерии: сведения и история проверок, проверка раскрывается в свой разбор.
-    assert "data-drawer" in страница and "ООО Ромашка" in страница
-    assert f"/inspections/{_вид().snapshot.inspections[0].id}" in страница
+    # Справа сведения пиццерии и ниже её проверки (D536); проверка открывается панелью
+    # на этом же экране (D527, `?inspection=`), а не отдельной страницей.
+    assert "ООО Ромашка" in страница and "cn-head" in страница
+    assert f"inspection={_вид().snapshot.inspections[0].id}" in страница
 
 
 def test_у_партнёра_нет_выбора_страны_и_девелопера(партнёр: FlaskClient) -> None:

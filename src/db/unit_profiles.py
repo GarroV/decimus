@@ -143,3 +143,45 @@ def by_code(dodo_id: str) -> Profile | None:
 
 def by_country(country_code: str) -> tuple[Profile, ...]:
     return _read(_BY_COUNTRY, (country_code,))
+
+
+_UPSERT = """
+insert into unit_profiles (country_code, name_normalized, name, dodo_id, stage, status, city,
+    address, partner, partner_email, restaurant_on, delivery_on, revenue_on, closed_on,
+    total_area, seats, extra)
+values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+on conflict (country_code, name_normalized) do update set
+    name = excluded.name,
+    dodo_id = coalesce(excluded.dodo_id, unit_profiles.dodo_id),
+    stage = excluded.stage,
+    status = excluded.status,
+    city = coalesce(excluded.city, unit_profiles.city),
+    address = coalesce(excluded.address, unit_profiles.address),
+    partner = coalesce(excluded.partner, unit_profiles.partner),
+    restaurant_on = coalesce(excluded.restaurant_on, unit_profiles.restaurant_on),
+    delivery_on = coalesce(excluded.delivery_on, unit_profiles.delivery_on),
+    loaded_at = now()
+"""
+
+
+def upsert(profile: Profile) -> None:
+    """Добавить или дополнить ОДНУ строку справочника, остальные не трогая (D536).
+
+    `save` заменяет справочник целиком из свода; эта дверь — для пиццерии, которую
+    завели с экрана «Страны»: адрес и партнёр, названные при заведении, ложатся
+    рядом со сводом. Пустое поле новой записи прежнее значение не стирает. Код
+    Dodo, уже занятый другой строкой, — отказ, а не молчаливый перенос.
+    """
+    row = (
+        profile.country_code, profile.name_normalized, profile.name, profile.dodo_id or None,
+        profile.stage, profile.status, profile.city, profile.address, profile.partner,
+        profile.partner_email, profile.restaurant_on, profile.delivery_on, profile.revenue_on,
+        profile.closed_on, profile.total_area, profile.seats, Jsonb(profile.extra),
+    )  # fmt: skip
+    try:
+        with connection(check_environment().dsn) as conn, conn.transaction():
+            conn.execute(_UPSERT, row)
+    except psycopg.Error as exc:
+        raise RatingsError(
+            f"Сведения о пиццерии не легли в справочник ({exc.__class__.__name__})"
+        ) from exc

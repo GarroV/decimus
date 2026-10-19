@@ -27,6 +27,7 @@ from src.db.web_own_profile import (  # noqa: E402
     finish_google_link,
     own_avatar,
     save_google_profile,
+    set_country_filter,
     set_web_lang,
     unlink_google,
 )
@@ -225,6 +226,27 @@ def test_язык_сайта_хранится_за_учёткой(обе_рол�
     with pytest.raises(AccessError):
         set_web_lang(сессия.token, "english")
     assert set_web_lang("нет-такой-сессии", "ru") is False
+
+
+def test_отбор_стран_хранится_за_учёткой(обе_роли: str) -> None:
+    """Отбор «Страны» (D536, 0077): пишется своей сессией, чужой учётки не касается."""
+    сессия = open_session(create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ))
+    сосед = open_session(create_account("petr", tenant=ТЕНАНТ, password=ПАРОЛЬ))
+    before = resolve_session(сессия.token)
+    assert before is not None and before.country_filter is None
+
+    assert set_country_filter(сессия.token, ("GE", "AM")) is True
+
+    after = resolve_session(сессия.token)
+    assert after is not None and after.country_filter == ("GE", "AM")
+    соседа = resolve_session(сосед.token)
+    assert соседа is not None and соседа.country_filter is None
+    assert set_country_filter(сессия.token, ()) is True
+    снят = resolve_session(сессия.token)
+    assert снят is not None and снят.country_filter is None
+    with pytest.raises(AccessError):
+        set_country_filter(сессия.token, ("georgia",))
+    assert set_country_filter("нет-такой-сессии", ("GE",)) is False
 
 
 # ── Имя и фото из Google (D468, 0065) ─────────────────────────────────
