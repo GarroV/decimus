@@ -316,6 +316,7 @@
 | `GOOGLE_MAIL_REDIRECT_URI` | `src/web/google_mail.py` | да |
 | `GOOGLE_REDIRECT_URI` | `src/web/google_auth.py` | да |
 | `INSPECTION_FILE` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
+| `LANDING_SHOTS_BASE` | `tools/landing_shots.py` | да |
 | `LOG_ID_SALT` | `src/domain/log_ids.py` | да |
 | `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 1 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
@@ -370,6 +371,7 @@
 | `WEB_URL_PREFIX` | `src/web/config.py`, `tools/walk_healthcheck.py` | да |
 | `WEB_USER_PASSWORD` | `tools/web_user.py` | да |
 | `WEB_WALK_PREVIEW_CHAT` | `src/web/walk_auth.py` | да |
+| `WEB_WALK_PREVIEW_CHAT_RU` | `src/web/walk_auth.py` | да |
 | `WEB_WALK_UPSTREAM` | `src/web/config.py` | да |
 <!-- map:end -->
 
@@ -477,6 +479,7 @@
 | `make fastpath` | замер быстрого пути разбора: доля фиксаций без вызова модели; расход нулевой |
 | `make fmt` | проверка формата (`ruff format --check`) |
 | `make image` | сборка образов бота и MCP-сервера с номером сборки внутри |
+| `make landing-shots` | пересъёмка настоящих снимков для лендинга (открытое демо, ru и en) |
 | `make lint` | линт (`ruff check`) |
 | `make loadcheck` | замер потолка нагрузки: параллельные проверки и альбом одновременных записей |
 | `make loadcheck-live` | тот же замер с настоящими вызовами модели; платный, без `--yes` показывает только план |

@@ -233,11 +233,11 @@ def texts_for(lang: str) -> dict[str, str]:
     return {key: entry[lang] for key, entry in WALK_TEXTS.items()}
 
 
-def _previous(inspection: Inspection) -> PreviousOutcome:
+def _previous(inspection: Inspection, lang: str) -> PreviousOutcome:
     """Прошлая проверка точки. База молчит — обход работает без подсказки."""
     try:
         return PreviousOutcome(
-            queries.previous_findings(tenant=inspection.tenant, unit=inspection.unit)
+            queries.previous_findings(tenant=inspection.tenant, unit=inspection.unit, lang=lang)
         )
     except DbError:
         logger.warning("Обход: история точки «%s» недоступна", inspection.unit, exc_info=True)
@@ -292,7 +292,7 @@ def walk_payload(
     payload = build_walk(
         inspection,
         list_zones(chat_id=chat_id),
-        _previous(inspection),
+        _previous(inspection, lang),
         lang=lang,
         question=questions.get,
         items=items,
@@ -317,6 +317,12 @@ def init_data_of() -> str:
     if header is not None:
         return header[:MAX_INIT_DATA]
     return request.get_data(as_text=True)[:MAX_INIT_DATA]
+
+
+def _browser_lang() -> str | None:
+    """Основной язык браузера (`Accept-Language`), строчными: `ru-RU,ru;q=0.9` → `ru`."""
+    first = request.headers.get("Accept-Language", "").split(",")[0]
+    return first.split(";")[0].split("-")[0].strip().lower() or None
 
 
 def identify(
@@ -347,7 +353,7 @@ def identify(
         # читается, пока не известно, чьё оно (ревью 07.10.2026).
         return jsonify({"error": "unauthorized"}), 401
     try:
-        chat_id = chat_of(init_data_of(), conf)
+        chat_id = chat_of(init_data_of(), conf, lang=_browser_lang())
     except WalkAccessError as exc:
         logger.info("Обход: отказ в опознании — %s", exc)
         return jsonify({"error": "unauthorized"}), 401

@@ -32,6 +32,8 @@ services:
   walk:
     environment:
       WEB_WALK_PREVIEW_CHAT: "999000000701"
+      # Русский браузер видит ту же проверку по-русски (посев: `WALK_CHAT_RU`).
+      WEB_WALK_PREVIEW_CHAT_RU: "999000000702"
       WEB_DEMO: "1"
   db:
     ports: !override []

@@ -72,8 +72,23 @@ def test_посев_открытого_демо(
         кадров = conn.execute("select count(*) from photos").fetchone()
         логины = {r[0] for r in conn.execute("select login from web_users").fetchall()}
         планов = conn.execute("select count(*) from action_plan_requests").fetchone()
+        поездок = conn.execute(
+            "select count(*), count(distinct date_trunc('month', date_from)) from trips"
+        ).fetchone()
+        шагов = conn.execute("select count(*) from trip_steps where kind = 'inspection'").fetchone()
+        русских = conn.execute(
+            "select count(*) from translations where entity_type = 'finding' and lang = 'ru'"
+        ).fetchone()
     assert статусы.get("draft") == 2 and статусы.get("finalized", 0) >= 15, статусы
     # Хранилища в тесте нет: кадры — строками без ссылки, как при лежащем (#459).
     assert кадров is not None and кадров[0] > 0, "кадры из DEMO_PHOTOS_DIR не легли к записям"
     assert {r.login for r in DEMO_ROLES} <= логины
     assert планов is not None and планов[0] > 0, "D2 на приёмке не породили планов"
+    assert поездок is not None and поездок[0] >= 10 and поездок[1] >= 5, (
+        "в календаре демо должны быть поездки по нескольким месяцам"
+    )
+    assert шагов is not None and шагов[0] == поездок[0], "у каждой поездки — осмотр точки"
+    assert русских is not None and русских[0] == 2, "прошлые записи точки обхода — по-русски"
+    assert "chats 999000000701 (WEB_WALK_PREVIEW_CHAT) and 999000000702" in посев.stdout, (
+        "русская идущая проверка не заведена"
+    )
