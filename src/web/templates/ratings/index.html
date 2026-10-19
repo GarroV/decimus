@@ -229,6 +229,32 @@
     {% for kind in no_data %}<div class="rt-note">{{ t('ratings.empty.' ~ kind) }}</div>{% endfor %}
     {% endif %}
   </section>
+  {% elif block == 'compare' and comparison %}
+  {#- Сравнение девелоперов и стран рядом (D551, #972) — только УК: за период
+      экрана по всем странам охвата, мимо среза. Лучший РС сверху; цвет числа —
+      те же пороги 80/90, что у графиков (D552). -#}
+  <section class="rt-sec" aria-labelledby="rt-compare">
+    <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-compare">{{ t('ratings.block.compare') }}</h2>
+      <span class="rt-sec__meta">{{ t('ratings.col.delta', prev=prev) }}</span></div>
+    <div class="rt-pair">
+    {% for is_dev, rows in ((true, comparison.developers), (false, comparison.countries)) %}
+      <div class="rt-card rt-scroll"><table class="rt-maps rt-cmp">
+        <thead><tr><th scope="col">{{ t('ratings.compare.developers' if is_dev else 'ratings.compare.countries') }}</th>
+          <th scope="col" class="num">{{ t('ratings.compare.units') }}</th>
+          <th scope="col" class="num">{{ t('ratings.rs') }}</th><th scope="col" class="num">Δ</th>
+          <th scope="col" class="num">{{ t('ratings.rko') }}</th><th scope="col" class="num">Δ</th></tr></thead>
+        <tbody>{% for x in rows %}<tr>
+          <th scope="row">{% if is_dev %}{{ x.key }}<small>{% for c in x.countries %}{{ country_name(c) }}{% if not loop.last %}, {% endif %}{% endfor %}</small>{% else %}{{ country_name(x.key) }}{% endif %}</th>
+          <td class="num">{{ x.units }}</td>
+          {% for v, d in ((x.rs, x.rs_delta), (x.rko, x.rko_delta)) %}
+          <td class="num rt-cmp__v{% if v is not none %} is-{{ score_tone(v) }}{% endif %}">{{ num(v) }}</td><td class="num">{{ dlt(d) }}</td>
+          {% endfor %}
+        </tr>{% else %}<tr><td colspan="6" class="rt-empty">{{ t('ratings.empty.rs_rko') }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    {% endfor %}
+    </div>
+  </section>
+
   {% elif block == 'risk' %}
   {#- Зона риска — таблица с фильтром по странам (11.10.2026; было облако имён):
       пиццерия, тип и оценки последних периодов подряд, старые первыми. -#}

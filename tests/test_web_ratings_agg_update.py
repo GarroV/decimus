@@ -16,6 +16,7 @@ from src.db import agg_store
 from src.db.agg_store import UpdateRequest
 from src.db.errors import RatingsError
 from src.db.ratings_read import CountryRow
+from src.ratings import compare as rcompare
 from src.ratings import report
 from src.ratings.aggregators import queue
 from src.ratings.periods import month_period
@@ -70,6 +71,7 @@ def страница(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         ),
     )
     monkeypatch.setattr(screen.report, "build", lambda _s: сводка)
+    monkeypatch.setattr(screen.rcompare, "build", lambda *_a: rcompare.Comparison((), ()))
     monkeypatch.setattr(screen.read, "layout_rows", lambda: (("aggregators", 0, True),))
     monkeypatch.setattr(screen.read, "period_months", lambda: ())
     monkeypatch.setattr(screen, "_maps", lambda *_a: None)

@@ -322,6 +322,12 @@
 .rt-list .is-bad { color: var(--err); font-family: var(--font-mono); font-weight: var(--w-semibold); }
 .rt-kind { color: var(--ink-2); font-weight: var(--w-semibold); }
 .rt-list tr[hidden] { display: none; }
+/* Сравнение девелоперов и стран (D551): число окрашено теми же порогами
+   80/90, что точки графиков (D552), — таблица и график говорят одним цветом. */
+.rt-cmp__v { font-family: var(--font-mono); font-weight: var(--w-semibold); }
+.rt-cmp__v.is-bad { color: var(--err); }
+.rt-cmp__v.is-mid { color: var(--warn); }
+.rt-cmp__v.is-good { color: var(--ok); }
 
 /* Фильтр по странам — внутри своего блока (interface-logic п. 7). */
 .rt-filter { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }

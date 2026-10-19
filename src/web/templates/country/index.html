@@ -73,6 +73,7 @@
         <p class="pk-note">{{ t('country.units.profiles_failed') if units.profiles_failed else t('country.units.ratings_failed') if units.ratings_failed else t('country.units.maps_failed') }}</p>
       {% endif %}
       {% call pick_sub() %}
+        {% if rail_reach[1] %}<p class="pk-note">{{ t('country.units.reach', done=rail_reach[0], total=rail_reach[1], never=rail_reach[1] - rail_reach[0]) }}</p>{% endif %}
         {% for r in rail_open %}{{ unit_line(r) }}{% else %}<p class="pk-note">{{ t('country.units.empty') }}</p>{% endfor %}
         {% if rail_closed %}
           <details class="pk-closed"{% if open_row and open_row.is_closed %} open{% endif %}>

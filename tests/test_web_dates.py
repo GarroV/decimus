@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from src.web.dates import human_day
+from src.web.registry_period import Period
+from src.web.registry_view import period_title
 from src.web.view import by_severity
 
 
@@ -35,3 +37,18 @@ def test_критичные_записи_сверху_порядок_внутр�
     порядок = [(f.level, f.n) for f in by_severity(записи)]
 
     assert порядок == [("D3", 3), ("D2", 4), ("D1", 1), ("D1", 5), ("NC", 6), ("R", 2)]
+
+
+def test_период_словами_и_без_повтора_общего_у_краёв() -> None:
+    """#978: ISO-диапазон в шапке «Проверок» и на кнопке периода не читался."""
+    # Внутри даты пробелы неразрывные: в узкой кнопке перенос только у тире.
+    assert period_title(Period(date(2026, 10, 1), date(2026, 10, 15)), "ru") == (
+        "1 — 15\u00a0окт\u00a02026"
+    )
+    def text(start: date, end: date | None, lang: str = "ru") -> str:
+        return period_title(Period(start, end), lang).replace("\u00a0", " ")
+
+    assert text(date(2026, 9, 1), date(2026, 10, 31)) == "1 сен — 31 окт 2026"
+    assert text(date(2025, 12, 20), date(2026, 1, 5), "en") == "20 Dec 2025 — 5 Jan 2026"
+    assert text(date(2026, 9, 1), None) == "1 сен 2026 — …"
+    assert period_title(Period(date(2026, 9, 1), date(2026, 9, 30)), "ru") == "Сентябрь 2026"

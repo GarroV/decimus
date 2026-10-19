@@ -76,6 +76,10 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
         "ru": "В стране нет ни одной пиццерии.",
         "en": "There are no pizzerias in this country.",
     },
+    "country.units.reach": {
+        "ru": "Проверены хоть раз: {done} из {total} · ни разу: {never}",
+        "en": "Inspected at least once: {done} of {total} · never: {never}",
+    },
     "country.units.closed": {"ru": "Закрытые: {n}", "en": "Closed: {n}"},
     "country.units.profiles_failed": {
         "ru": "Свод пиццерий не прочитался: партнёр, адрес и статус пока не показаны.",

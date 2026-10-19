@@ -10,7 +10,7 @@
 | `dodo-ds.css` | `dodo/core/dodo-ds.css` | `4641dd5` (тема капсулой, 30.09.2026) |
 | `decimus-domain.css` | `dodo/decimus/domain.css` | `f70045d` |
 | `fonts/*.woff2` (13 файлов) | `dodo/core/fonts/` | `f70045d` |
-| `icons.json` | `dodo/core/icons.json` | `151c3d4` (значок `sliders`, ветка forma#14, 13.10.2026) |
+| `icons.json` | `dodo/core/icons.json` | `e9a04dc` (значок `download`, forma#19, 19.10.2026) |
 | `mark-small.svg`, `icon-32.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | `dodo/brand/decimus/` | `bdf2787` (знак «Глитч-мрамор» 04.10.2026, ободок плитки 05.10.2026 — D186) |
 
 Знак продукта приехал 04.10.2026 (D185 в MERIDIUS, раздел от 04.10.2026 в

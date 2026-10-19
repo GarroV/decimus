@@ -83,6 +83,13 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.violations.per": {"ru": "На проверку: {x}", "en": "Per check: {x}"},
     "ratings.top": {"ru": "Выше {x}", "en": "Above {x}"},
     "ratings.bottom": {"ru": "{x} и ниже", "en": "{x} and below"},
+    "ratings.block.compare": {
+        "ru": "Сравнение девелоперов и стран",
+        "en": "Developers and countries compared",
+    },
+    "ratings.compare.developers": {"ru": "Девелопер", "en": "Developer"},
+    "ratings.compare.countries": {"ru": "Страна", "en": "Country"},
+    "ratings.compare.units": {"ru": "Пиццерий", "en": "Pizzerias"},
     "ratings.block.top": {"ru": "Top-10 и Bottom-10", "en": "Top 10 and bottom 10"},
     "ratings.block.hard": {"ru": "Хард-нарушения РС и РКО", "en": "Hard violations"},
     "ratings.hard.source": {
@@ -340,6 +347,10 @@ _IMPORTS: dict[str, dict[str, str]] = {
     },
     "ratings.layout.scores": {"ru": "Оценки по странам", "en": "Scores by country"},
     "ratings.layout.violations": {"ru": "Нарушения РКО и РС", "en": "Violations"},
+    "ratings.layout.compare": {
+        "ru": "Сравнение девелоперов и стран (видит УК)",
+        "en": "Developers and countries compared (head office only)",
+    },
     "ratings.layout.top": {"ru": "Top и Bottom", "en": "Top and bottom"},
     "ratings.layout.hard": {"ru": "Хард-нарушения", "en": "Hard violations"},
     "ratings.layout.risk": {"ru": "Пиццерии в зоне риска", "en": "Pizzerias at risk"},

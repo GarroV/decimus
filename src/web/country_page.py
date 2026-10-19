@@ -374,6 +374,17 @@ def _rail(
     return tuple(rows)
 
 
+def _reach(rows: tuple[country_units.UnitRow, ...]) -> tuple[int, int]:
+    """Сколько работающих пиццерий проверяли хоть раз и сколько их всего (D549).
+
+    Закрытые не считаются: в них проверять нечего. Строка над списком отвечает на
+    вопрос «сколько в стране ещё ни разу не видели», который раньше задавала
+    галочка реестра.
+    """
+    живые = [r for r in rows if not r.is_closed]
+    return sum(1 for r in живые if r.last_ever or r.last), len(живые)
+
+
 def _unit_matches(row: country_units.UnitRow, needle: str, lang: str) -> bool:
     """Поиск по колонке: название пиццерии или её город."""
     return needle in row.name.casefold() or needle in (city_title(row.city, lang) or "").casefold()
@@ -492,6 +503,7 @@ def _one_country(
         "open_row": открытая,
         "rail_open": tuple(r for r in in_rail if not r.is_closed),
         "rail_closed": tuple(r for r in in_rail if r.is_closed),
+        "rail_reach": _reach(units.rows),
         "pick_open": settings_open or card_open,
         "pick_back": select(inspection="", settings="", saved=""),
         "pick_title": (
