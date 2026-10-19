@@ -36,18 +36,19 @@
   {% set login = login_href ~ ('&' if '?' in login_href else '?') ~ 'lang=' ~ lang %}
   <div class="lp">
 
+    <header class="lp-bar">
+      <a class="lp-bar__brand" href="{{ url('/welcome') }}?lang={{ lang }}">
+        <img src="{{ url_for('static', filename='mark-small.svg') }}" alt="" width="28" height="28">
+        <span>{{ t('app.name') }}</span>
+      </a>
+      <div class="lp-bar__acts">
+        {% include "_langpick.html" %}
+        <a class="lp-link" href="{{ login }}">{{ t('landing.login') }}</a>
+        {% if demo %}<a class="lp-cta lp-cta--sm lp-bar__demo" href="{{ demo }}">{{ t('landing.demo') }}</a>{% endif %}
+      </div>
+    </header>
+
     <section class="lp-sheet lp-sheet--white lp-hero" aria-labelledby="lp-h1">
-      <header class="lp-bar">
-        <a class="lp-bar__brand" href="{{ url('/welcome') }}?lang={{ lang }}">
-          <img src="{{ url_for('static', filename='mark-small.svg') }}" alt="" width="28" height="28">
-          <span>{{ t('app.name') }}</span>
-        </a>
-        <div class="lp-bar__acts">
-          {% include "_langpick.html" %}
-          <a class="lp-link" href="{{ login }}">{{ t('landing.login') }}</a>
-          {% if demo %}<a class="lp-cta lp-cta--sm lp-bar__demo" href="{{ demo }}">{{ t('landing.demo') }}</a>{% endif %}
-        </div>
-      </header>
       <div class="lp-cols lp-cols--hero">
         <div class="lp-copy">
           <h1 class="lp-display" id="lp-h1">{{ t('landing.hero.title') }}</h1>
@@ -77,21 +78,22 @@
 
     <section class="lp-sheet lp-sheet--white" aria-labelledby="lp-walk">
       {{ tab(2, 'landing.walk.tab') }}
-      <div class="lp-cols lp-cols--even">
+      <div class="lp-cols lp-cols--hero lp-cols--top">
         <div class="lp-copy">
           <h2 class="lp-h2" id="lp-walk">{{ t('landing.walk.title') }}</h2>
           <p class="lp-body">{{ t('landing.walk.body') }}</p>
+          <div class="lp-split lp-split--under">
+            {% for who in ('person', 'machine') %}
+              <div class="lp-split__col">
+                <h3 class="lp-split__h">{{ t('landing.walk.' ~ who) }}</h3>
+                <ul class="lp-lines">
+                  {% for n in ('1', '2', '3') %}<li>{{ t('landing.walk.' ~ who ~ '.' ~ n) }}</li>{% endfor %}
+                </ul>
+              </div>
+            {% endfor %}
+          </div>
         </div>
-        <div class="lp-split">
-          {% for who in ('person', 'machine') %}
-            <div class="lp-split__col">
-              <h3 class="lp-split__h">{{ t('landing.walk.' ~ who) }}</h3>
-              <ul class="lp-lines">
-                {% for n in ('1', '2', '3') %}<li>{{ t('landing.walk.' ~ who ~ '.' ~ n) }}</li>{% endfor %}
-              </ul>
-            </div>
-          {% endfor %}
-        </div>
+        <div class="lp-phone">{{ shot('match') }}</div>
       </div>
     </section>
 

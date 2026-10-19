@@ -27,7 +27,7 @@ SHOTS = STATIC / landing.SHOTS_DIR
 ДЕМО = "https://demo.example/demo"
 ЯЗЫКИ = ("ru", "en")
 # Снимки страницы: имя без языка.
-СНИМКИ = ("walk", "plan", "report", "actions", "network", "pizzerias")
+СНИМКИ = ("walk", "match", "plan", "report", "actions", "network", "pizzerias")
 
 
 def _клиент(**настройки: Any) -> Any:

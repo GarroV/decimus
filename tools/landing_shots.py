@@ -39,6 +39,7 @@ LOCALES = {"ru": "ru-RU", "en": "en-US"}
 # должно, а на снимке календаря не должно быть «поездок: 0». Нашлись — съёмка падает,
 # а не пишет негодный снимок: так стенд, не обновлённый после правки посева, виден сразу.
 ENGLISH_ON_RU_WALK = ("Found last time", "Recorded now", "Not looked at yet", "Checked")
+ENGLISH_ON_RU_SHEET = ("Save", "What you see", "Photo", "Back")
 EMPTY_TRIPS = ("поездок: 0", "trips: 0")
 SCALE = 2
 WEBP_QUALITY = 86
@@ -134,6 +135,22 @@ def shot_walk(page: Page, lang: str) -> Path:
     return save(page, "walk", lang, None)
 
 
+def shot_match(page: Page, lang: str) -> Path:
+    """Запись обхода: к словам проверяющего подобран пункт чек-листа, осталось подтвердить."""
+    page.goto(f"{BASE}/tg/walk?lang={lang}")
+    settle(page)
+    hide_chrome(page)
+    page.click(".walk-rec__open")
+    page.wait_for_selector(".walk-sheet")
+    page.wait_for_timeout(500)
+    if lang == "ru":
+        text = page.inner_text(".walk-sheet")
+        leaked = [w for w in ENGLISH_ON_RU_SHEET if w in text]
+        if leaked or "Сохранить" not in text:
+            raise RuntimeError(f"русский снимок записи с английским текстом {leaked}")
+    return save(page, "match", lang, None)
+
+
 def shot_report(page: Page, lang: str) -> Path:
     """Карточка проверки: оценка, буква, потери по зонам и нарушения."""
     page.goto(f"{BASE}/overview?period=all&lang={lang}")
@@ -201,6 +218,7 @@ def shot_pizzerias(page: Page, lang: str) -> Path:
 # (роль, область окна, съёмщик)
 SHOTS: list[tuple[str, dict[str, int], Callable[[Page, str], Path]]] = [
     ("admin", PHONE, shot_walk),
+    ("admin", PHONE, shot_match),
     ("admin", DESKTOP, shot_report),
     ("admin", DESKTOP, shot_plan),
     ("partner", DESKTOP, shot_actions),

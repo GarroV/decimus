@@ -168,6 +168,16 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
             "found last time and a record with a photo"
         ),
     },
+    "landing.alt.match": {
+        "ru": (
+            "Запись в приложении проверяющего: к словам «на роликах конвейера снова лёгкий "
+            "нагар» подобран пункт чек-листа, остаётся подтвердить"
+        ),
+        "en": (
+            "A record in the inspector app: the checklist item is matched to the inspector's "
+            "words, and only the confirmation is left"
+        ),
+    },
     "landing.alt.plan": {
         "ru": "Календарь июля: проверки по дням с буквой оценки",
         "en": "July calendar: inspections by day with their score letters",

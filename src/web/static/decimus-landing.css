@@ -22,6 +22,7 @@ body:has(.lp) { background: var(--surface); }
   --lp-line: rgba(27, 32, 40, .14);
   --lp-wrap: 1240px;
   --lp-gutter: 24px;
+  --lp-bar-h: 72px;
   --lp-side: max(var(--lp-gutter), calc((100% - var(--lp-wrap)) / 2));
   /* Снимок выходит за правое поле листа, но не за край окна. */
   --lp-bleed: clamp(0px, calc((100vw - 1288px) / 2), 56px);
@@ -32,10 +33,10 @@ body:has(.lp) { background: var(--surface); }
 /* ── Лист ───────────────────────────────────────────────────────────────── */
 .lp-sheet {
   position: sticky;
-  top: 0; /* листу выше окна `landing.js` ставит отрицательный top */
+  top: var(--lp-bar-h); /* листу выше окна `landing.js` ставит меньший top */
   box-sizing: border-box;
-  min-height: 100vh;
-  min-height: 100svh;
+  min-height: calc(100vh - var(--lp-bar-h));
+  min-height: calc(100svh - var(--lp-bar-h));
   padding: 80px var(--lp-side) 96px;
   display: flex;
   flex-direction: column;
@@ -49,7 +50,7 @@ body:has(.lp) { background: var(--surface); }
 .lp-sheet--white { background: var(--surface); }
 .lp-sheet--beige { background: var(--brand-beige); }
 .lp-sheet--purple { background: var(--brand-purple-deep); color: #fff; }
-.lp-hero { padding-top: 24px; border-radius: 0; box-shadow: none; }
+.lp-hero { padding-top: 40px; border-radius: 0; box-shadow: none; }
 .lp-hero > .lp-cols { margin-block: auto; }
 
 /* Закладка — шаг пути, как закладка в папке: того же цвета, что и лист. */
@@ -68,8 +69,12 @@ body:has(.lp) { background: var(--surface); }
 }
 .lp-tab__n { margin-right: 10px; color: var(--ink-2); font-weight: var(--w-bold); }
 
-/* ── Шапка первого листа ────────────────────────────────────────────────── */
-.lp-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 56px; }
+/* ── Шапка: над листами, а не на первом: ярлык листа не наезжает на логотип ──────────────────────────────────────────────── */
+.lp-bar {
+  position: sticky; top: 0; z-index: 20; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  height: var(--lp-bar-h); padding: 0 var(--lp-side); background: var(--surface);
+}
 .lp-bar__brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-size: 18px; font-weight: var(--w-bold); text-decoration: none; }
 .lp-bar__brand img { border-radius: 8px; }
 .lp-bar__acts { display: flex; align-items: center; gap: 20px; }
@@ -80,6 +85,8 @@ body:has(.lp) { background: var(--surface); }
 .lp-cols > .lp-fig { grid-column: 6 / 13; margin-right: calc(-1 * var(--lp-bleed)); }
 .lp-cols--even > .lp-split { grid-column: 7 / 13; }
 .lp-cols--hero { align-items: center; }
+.lp-cols--top { align-items: start; }
+.lp-split--under { margin-top: 40px; }
 .lp-cols--hero > .lp-copy { grid-column: 1 / 8; }
 .lp-cols--hero > .lp-phone { grid-column: 8 / 13; }
 
@@ -136,10 +143,9 @@ body:has(.lp) { background: var(--surface); }
 
 /* ── Узкое окно: одна колонка, снимок под текстом ───────────────────────── */
 @media (max-width: 860px) {
-  .lp { --lp-gutter: 16px; --lp-bleed: 0px; }
+  .lp { --lp-gutter: 16px; --lp-bleed: 0px; --lp-bar-h: 60px; }
   .lp-sheet { padding-top: 72px; padding-bottom: 56px; border-radius: 22px 22px 0 0; }
-  .lp-hero { padding-top: 16px; }
-  .lp-bar { padding-bottom: 32px; }
+  .lp-hero { padding-top: 24px; }
   .lp-bar__demo { display: none; }
   .lp-bar__acts { gap: 14px; }
   .lp-cols { grid-template-columns: minmax(0, 1fr); row-gap: 36px; align-items: start; }
