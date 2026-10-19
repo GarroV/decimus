@@ -67,8 +67,8 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     },
     "landing.s4.title": {"ru": "Отчёт", "en": "Report"},
     "landing.s4.body": {
-        "ru": "Проценты, буква и разбивка по зонам, PDF и черновик письма партнёру. Повтор прошлого замечания стоит дороже.",
-        "en": "Percentage, grade and zone breakdown, a PDF and a draft letter to the partner. A repeated finding costs more.",
+        "ru": "После проверки отчёт готов за секунды — с оценкой по методике и черновиком письма партнёру.",
+        "en": "The report is ready seconds after the inspection — scored by the methodology, with a draft letter to the partner.",
     },
     "landing.s5.title": {"ru": "Исправление", "en": "Fix"},
     "landing.s5.body": {
