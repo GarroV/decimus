@@ -280,9 +280,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/` | 22 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, … (+14) |
 | `src/web/templates/actions/` | 9 | _filters.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, index.html, prescription_form.html, … (+1) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
-| `src/web/templates/country/` | 3 | _parts.html, _summary.html, index.html |
+| `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
-| `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
+| `src/web/templates/inspections/` | 9 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, _row.html, card.html, letter.html, list.html, … (+1) |
 | `src/web/templates/journal/` | 1 | page.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
