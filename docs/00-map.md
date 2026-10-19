@@ -295,13 +295,14 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
 | `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
+| `src/web/templates/usage/` | 1 | page.html |
 | `src/web/templates/users/` | 8 | _card.html, _connections.html, _model_key.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
 <!-- map:end -->
 
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 56 | SOURCE.md, actions.js, apple-touch-icon.png, country.js, decimus-actions.css, decimus-country.css, decimus-domain.css, decimus-home.css, … (+48) |
+| `src/web/static/` | 57 | SOURCE.md, actions.js, apple-touch-icon.png, country.js, decimus-actions.css, decimus-country.css, decimus-domain.css, decimus-home.css, … (+49) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 

@@ -189,10 +189,8 @@ def test_запись_кладёт_строку_с_полями_вызова(mon
 def test_сбой_записи_уходит_в_журнал_и_не_поднимается(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, error: Exception
 ) -> None:
-    @contextmanager
     def broken(_why: str) -> Any:
         raise error
-        yield
 
     monkeypatch.setattr(model_usage, "_connected", broken)
     with caplog.at_level(logging.ERROR):
