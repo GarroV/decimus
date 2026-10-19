@@ -65,7 +65,7 @@ docker exec <контейнер web> rm /tmp/svod.xlsx
 | Блок страны | `src/web/templates/country/index.html`, `src/web/app.py: _country_units` |
 | Тесты разбора | `tests/test_svod.py` |
 | Сверка `units` с эталоном | `src/domain/unit_match.py`, `tools/units_normalize.py`, тесты — `tests/test_domain_unit_match.py`, `tests/test_units_normalize_map.py` |
-| Правило имени (D538) | `src/domain/unit_resolve.py`, `src/db/directory.py`, миграция `0078_units_merged_into.sql`; тесты — `tests/test_domain_unit_resolve.py`, `tests/test_unit_names_one_rule.py`, `tests/test_db_units_merged_into.py` |
+| Правило имени (D538) | `src/domain/unit_resolve.py`, `src/db/directory.py`, миграция `0079_units_merged_into.sql`; тесты — `tests/test_domain_unit_resolve.py`, `tests/test_unit_names_one_rule.py`, `tests/test_db_units_merged_into.py` |
 
 ## Сверка справочника `units` с эталоном (#316, #909)
 

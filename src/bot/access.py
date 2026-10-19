@@ -51,6 +51,7 @@ from src.db.errors import DbError
 from src.db.space import acting_space
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
+from src.domain.model_usage import usage_scope
 from src.domain.permissions import role_may
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
@@ -194,7 +195,15 @@ class AccessMiddleware(BaseMiddleware):
         # Пространство человека — и базе (F-037): всё, что обработчик сделает
         # в базе (и в потоках `asyncio.to_thread`, они копируют контекст), идёт
         # от его имени.
-        with acting_space(space):
+        binding = положение.binding if положение is not None else None
+        with (
+            acting_space(space),
+            usage_scope(
+                user_id=binding.user_id if binding is not None else None,
+                telegram_id=user_id,
+                tenant=space,
+            ),
+        ):
             return await handler(event, data)
 
     async def _link(self, event: TelegramObject, метка: str, user_id: int) -> None:

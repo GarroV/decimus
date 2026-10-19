@@ -1,0 +1,111 @@
+{#
+  «Расход модели» (D537): сколько токенов и денег уходит на нейросеть. Вкладка экрана
+  «Пользователи» для главного админа и админа УК. Вопрос экрана — «сколько мы тратим и
+  на что». Один период на экран (календарь «с — по», стрелки ← →, по умолчанию текущий
+  месяц); сверху итоги с изменением к прошлому периоду, ниже срезы одной страницей:
+  по дням, по видам вызова, по людям, самые дорогие проверки. Деньги — оценка, подпись
+  «оценка» стоит у каждой суммы. Без скриптов: период — обычные ссылки и форма.
+#}{% extends "base.html" %}
+{% from "_period.html" import period_picker with context %}
+{% from "users/_tabs.html" import users_tabs with context %}
+{% macro cost_cell(s) %}{{ money(s.cost) }}{% if s.cost is not none and s.cost_partial %}*{% endif %}{% endmacro %}
+{% macro vs(value) %}
+  {% if not has_previous or value is none %}<span class="stat__delta">{{ t('usage.stat.novs') }}</span>
+  {% else %}<span class="stat__delta">{{ t('usage.stat.vs', value=percent(value)) }}</span>{% endif %}
+{% endmacro %}
+{% block title %}{{ t('section.users.title') }}{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-journal.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-usage.css') }}">
+{% endblock %}
+{% block page_class %} page--split{% endblock %}
+{% block body %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('section.users.title') }}</h1>
+      <p class="shead__sub">{{ t('usage.sub') }}</p>
+    </div>
+  </header>
+  {{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link, has_journal_tab, has_usage_tab) }}
+
+  <div class="sbox ubox">
+    <div class="sbar sbar--registry jbar">
+      {{ period_picker(period, period_title, period_prev, period_next, period_quick, period_action, period_hidden) }}
+    </div>
+
+    {% if failed %}
+      <div class="sempty"><p class="sempty__title">{{ t('usage.failed.title') }}</p><p class="sempty__text">{{ t('usage.failed.text') }}</p></div>
+    {% else %}
+      <div class="stats ustats">
+        <div class="stat">
+          <div class="stat__label">{{ t('usage.stat.calls') }}</div>
+          <div class="stat__value">{{ number(total.calls) }}</div>
+          {{ vs(delta.calls) }}
+          {% if total.failed %}<div class="stat__delta">{{ t('usage.stat.failed', count=total.failed) }}</div>{% endif %}
+        </div>
+        <div class="stat">
+          <div class="stat__label">{{ t('usage.stat.input') }}</div>
+          <div class="stat__value">{{ number(total.input_tokens) }}</div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">{{ t('usage.stat.output') }}</div>
+          <div class="stat__value">{{ number(total.output_tokens) }}</div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">{{ t('usage.stat.total') }}</div>
+          <div class="stat__value">{{ number(total.tokens) }}</div>
+          {{ vs(delta.tokens) }}
+        </div>
+        <div class="stat">
+          <div class="stat__label">{{ t('usage.stat.cost') }} · {{ t('usage.estimate') }}</div>
+          <div class="stat__value">{{ money(total.cost) }}</div>
+          {{ vs(delta.cost) }}
+          {% if total.cost is none and total.tokens %}<div class="stat__delta">{{ t('usage.stat.noprice') }}</div>
+          {% elif total.cost_partial %}<div class="stat__delta">* {{ t('usage.stat.partial') }}</div>{% endif %}
+        </div>
+      </div>
+      <p class="jcount">{{ t('usage.estimate.note') }}</p>
+
+      {% if not total.calls %}
+        <div class="sempty"><p class="sempty__title">{{ t('usage.empty.title') }}</p><p class="sempty__text">{{ t('usage.empty.text') }}</p></div>
+      {% else %}
+        <section class="usec">
+          <h2 class="usec__title">{{ t('usage.days.title') }}</h2>
+          <ol class="ubars" aria-label="{{ t('usage.days.title') }}">
+            {% for d in days %}
+              <li class="ubars__item" title="{{ d.day }}: {{ number(d.sum.tokens) }} {{ t('usage.days.unit') }}, {{ number(d.sum.calls) }} {{ t('usage.col.calls')|lower }}">
+                <span class="ubars__bar" style="height: {{ (d.height * 100)|round(1) }}%"></span>
+                <span class="ubars__day">{{ d.number }}</span>
+              </li>
+            {% endfor %}
+          </ol>
+        </section>
+
+        {% macro table(title, lines, label_of, note=none, href_of=none) %}
+          <section class="usec">
+            <h2 class="usec__title">{{ title }}</h2>
+            {% if note %}<p class="usec__note">{{ note }}</p>{% endif %}
+            <ul class="jlist ulist">
+              <li class="jrow jrow--head" aria-hidden="true">
+                <span>{{ t('usage.col.name') }}</span><span>{{ t('usage.col.calls') }}</span><span>{{ t('usage.col.tokens') }}</span><span>{{ t('usage.col.cost') }}</span>
+              </li>
+              {% for l in lines %}
+                <li class="jrow">
+                  <span class="jcell" data-label="{{ t('usage.col.name') }}"><b>{% set href = href_of(l) if href_of else none %}{% if href %}<a href="{{ href }}">{{ label_of(l) }}</a>{% else %}{{ label_of(l) }}{% endif %}</b><span class="ushare"><span class="ushare__fill" style="width: {{ (l.share * 100)|round(1) }}%"></span></span></span>
+                  <span class="jcell mono" data-label="{{ t('usage.col.calls') }}">{{ number(l.sum.calls) }}{% if l.sum.failed %} <small>{{ t('usage.failed.short', count=l.sum.failed) }}</small>{% endif %}</span>
+                  <span class="jcell mono" data-label="{{ t('usage.col.tokens') }}">{{ number(l.sum.tokens) }}</span>
+                  <span class="jcell mono" data-label="{{ t('usage.col.cost') }}">{{ cost_cell(l.sum) }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endmacro %}
+        {{ table(t('usage.kinds.title'), kinds, kind_label) }}
+        {{ table(t('usage.people.title'), people, person_label, t('usage.person.unknown_hint') if has_system_calls else none) }}
+        {{ table(t('usage.inspections.title'), inspections, inspection_label, t('usage.inspections.note'), inspection_href) }}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

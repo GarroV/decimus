@@ -313,8 +313,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0077_web_country_filter.sql": (
         "sql1:fde8cbaea36129227f95f3970ebd93f514c78712af89f73c1130b236c4d8d5e1"
     ),
+    "0078_model_usage.sql": (
+        "sql1:2db20495ce5444622a4302605e186948b5dc14d47f71517eac3c960f535d7489"
+    ),
     # Снятая точка справочника: дубль под другим написанием (D538).
-    "0078_units_merged_into.sql": (
+    "0079_units_merged_into.sql": (
         "sql1:2bc2bc88926c72f61a50ce128343ef47f2fa1b189eab2f207ce67262874507f0"
     ),
 }

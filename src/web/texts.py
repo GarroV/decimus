@@ -40,6 +40,7 @@ from .texts_second_factor import SECOND_FACTOR_TEXTS
 from .texts_settings import SETTINGS_TEXTS
 from .texts_trips import TRIP_TEXTS
 from .texts_units import UNIT_TEXTS
+from .texts_usage import USAGE_TEXTS
 from .texts_users import USERS_TEXTS
 from .texts_walk import WALK_TEXTS
 
@@ -1699,6 +1700,7 @@ _ЧАСТИ = (
     SECOND_FACTOR_TEXTS,
     SETTINGS_TEXTS,
     UNIT_TEXTS,
+    USAGE_TEXTS,
     USERS_TEXTS,
     WALK_TEXTS,
 )
@@ -1730,6 +1732,7 @@ TEXTS = {
     **SECOND_FACTOR_TEXTS,
     **SETTINGS_TEXTS,
     **UNIT_TEXTS,
+    **USAGE_TEXTS,
     **USERS_TEXTS,
     **WALK_TEXTS,
 }

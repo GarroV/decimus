@@ -215,6 +215,7 @@ def _render(*, own: bool, conf: Settings) -> FlaskResponse | tuple[str, int]:
             manages_spaces=True,
             has_connections_tab=not own,
             has_journal_tab=not own,
+            has_usage_tab=not own,
             link=lambda **параметры: (
                 f"{request.script_root}{section('users').path}"
                 + (f"?{urlencode(параметры)}" if параметры else "")

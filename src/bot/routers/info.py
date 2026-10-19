@@ -68,6 +68,7 @@ from ..lang import chat_langs, chat_voice_lang
 from ..photos import fetch_bytes
 from ..states import InfoFlow
 from ..texts import t
+from ..usage import chat_usage
 from .finish import deliver
 
 logger = logging.getLogger(__name__)
@@ -336,7 +337,10 @@ def build_info_router() -> Router:
         try:
             # Язык речи проверки уходит расшифровке подсказкой (D393, #538) —
             # так же, как при разборе кадра (`routers/record.py`).
-            heard = await asyncio.to_thread(lambda: transcribe(raw, lang=chat_voice_lang(chat_id)))
+            with chat_usage(chat_id):
+                heard = await asyncio.to_thread(
+                    lambda: transcribe(raw, lang=chat_voice_lang(chat_id))
+                )
         except RecognizeError as exc:
             await stops.refuse(
                 message, lang, step="finish.info", key="record.voice_failed", reason=f"{exc}."

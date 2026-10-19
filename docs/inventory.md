@@ -454,7 +454,8 @@
 | `0075_email_unique_live.sql` | — |
 | `0076_google_sub.sql` | — |
 | `0077_web_country_filter.sql` | — |
-| `0078_units_merged_into.sql` | — |
+| `0078_model_usage.sql` | `model_usage` |
+| `0079_units_merged_into.sql` | — |
 <!-- map:end -->
 
 ## Makefile

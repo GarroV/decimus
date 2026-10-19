@@ -27,7 +27,7 @@
     </div>
     {% if own %}<a class="sbtn" href="{{ settings_url }}?lang={{ lang }}">{{ t('journal.own.back') }}</a>{% endif %}
   </header>
-  {% if not own %}{{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link, has_journal_tab) }}{% endif %}
+  {% if not own %}{{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link, has_journal_tab, has_usage_tab) }}{% endif %}
 
   <div class="sbox jbox">
     <div class="sbar sbar--registry jbar">

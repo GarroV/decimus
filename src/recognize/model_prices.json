@@ -1,0 +1,12 @@
+{
+  "_about": "Цены провайдера в долларах США (D537). Оценка расхода на экране «Расход модели» считается по этому файлу на момент просмотра. Источник — developers.openai.com/api/docs/pricing (Standard, short context), сверено 19.10.2026. Модели без записи показываются токенами без суммы: цену не выдумываем.",
+  "models": {
+    "gpt-5.6-sol": {"input_per_1m": 4.0, "output_per_1m": 20.0},
+    "gpt-6-luna": {"input_per_1m": 0.1, "output_per_1m": 0.5},
+    "gpt-4o-mini-transcribe": {
+      "input_per_1m": 1.25,
+      "output_per_1m": 5.0,
+      "audio_per_minute": 0.003
+    }
+  }
+}

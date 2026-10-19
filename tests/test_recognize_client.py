@@ -86,6 +86,7 @@ def test_ключ_не_задан_даёт_отказ_без_обращения_
     # OpenAI-клиента, если бы отказ не случился раньше.
     with pytest.raises(ModelUnavailable, match="OPENAI_API_KEY"):
         ask_model(
+            kind="recognize",
             instructions="сис",
             question="вопрос",
             schema=_SCHEMA,
@@ -108,6 +109,7 @@ def test_успешный_ответ_разбирается_и_расход_во
 
     # Act
     answer = ask_model(
+        kind="recognize",
         instructions="сис",
         question="вопрос",
         schema=_SCHEMA,
@@ -129,7 +131,12 @@ def test_usage_отсутствует_даёт_пустой_словарь(monke
 
     # Act
     answer = ask_model(
-        instructions="сис", question="вопрос", schema=_SCHEMA, photo=None, settings=_settings()
+        kind="recognize",
+        instructions="сис",
+        question="вопрос",
+        schema=_SCHEMA,
+        photo=None,
+        settings=_settings(),
     )
 
     # Assert
@@ -145,11 +152,21 @@ def test_кадр_передан_только_когда_есть_photo(monkeypa
 
     # Act: без фото
     ask_model(
-        instructions="сис", question="вопрос", schema=_SCHEMA, photo=None, settings=_settings()
+        kind="recognize",
+        instructions="сис",
+        question="вопрос",
+        schema=_SCHEMA,
+        photo=None,
+        settings=_settings(),
     )
     # Act: с фото
     ask_model(
-        instructions="сис", question="вопрос", schema=_SCHEMA, photo=b"jpeg", settings=_settings()
+        kind="recognize",
+        instructions="сис",
+        question="вопрос",
+        schema=_SCHEMA,
+        photo=b"jpeg",
+        settings=_settings(),
     )
 
     # Assert
@@ -168,6 +185,7 @@ def test_model_из_аргумента_перекрывает_настройки
 
     # Act
     ask_model(
+        kind="recognize",
         instructions="сис",
         question="вопрос",
         schema=_SCHEMA,
@@ -192,7 +210,12 @@ def test_отказ_провайдера_это_ModelUnavailable(monkeypatch: py
     # Act / Assert
     with pytest.raises(ModelUnavailable, match="лимит запросов"):
         ask_model(
-            instructions="сис", question="вопрос", schema=_SCHEMA, photo=None, settings=_settings()
+            kind="recognize",
+            instructions="сис",
+            question="вопрос",
+            schema=_SCHEMA,
+            photo=None,
+            settings=_settings(),
         )
 
 
@@ -204,7 +227,12 @@ def test_испорченный_json_это_ModelUnavailable(monkeypatch: pytest
     # Act / Assert
     with pytest.raises(ModelUnavailable, match="строгая схема"):
         ask_model(
-            instructions="сис", question="вопрос", schema=_SCHEMA, photo=None, settings=_settings()
+            kind="recognize",
+            instructions="сис",
+            question="вопрос",
+            schema=_SCHEMA,
+            photo=None,
+            settings=_settings(),
         )
 
 
@@ -216,7 +244,12 @@ def test_ответ_не_объект_это_ModelUnavailable(monkeypatch: pytes
     # Act / Assert
     with pytest.raises(ModelUnavailable, match="не объект"):
         ask_model(
-            instructions="сис", question="вопрос", schema=_SCHEMA, photo=None, settings=_settings()
+            kind="recognize",
+            instructions="сис",
+            question="вопрос",
+            schema=_SCHEMA,
+            photo=None,
+            settings=_settings(),
         )
 
 
@@ -230,5 +263,10 @@ def test_обрезанный_потолком_ответ_это_ModelUnavailabl
     # Act / Assert
     with pytest.raises(ModelUnavailable, match="обрезан"):
         ask_model(
-            instructions="сис", question="вопрос", schema=_SCHEMA, photo=None, settings=_settings()
+            kind="recognize",
+            instructions="сис",
+            question="вопрос",
+            schema=_SCHEMA,
+            photo=None,
+            settings=_settings(),
         )

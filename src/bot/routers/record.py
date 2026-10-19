@@ -117,6 +117,7 @@ from ..shown import remember as remember_shown
 from ..shown import remember_origin, remember_repeat_ask, tell_refusal
 from ..states import ReadingFlow
 from ..texts import t
+from ..usage import chat_usage
 from ..zones import DICTIONARY, ITEM, MODEL, WORDS, ZoneConflict, allowed_zones, resolve_zone
 
 logger = logging.getLogger(__name__)
@@ -193,9 +194,10 @@ async def hear_voice(message: Message, file_id: str, lang: str) -> str | None:
         await message.answer(t("record.voice_not_downloaded", lang))
         return None
     try:
-        heard = await asyncio.to_thread(
-            lambda: transcribe(raw, lang=chat_voice_lang(message.chat.id))
-        )
+        with chat_usage(message.chat.id):
+            heard = await asyncio.to_thread(
+                lambda: transcribe(raw, lang=chat_voice_lang(message.chat.id))
+            )
     except RecognizeError as exc:
         await message.answer(t("record.voice_failed", lang, reason=f"{exc}."))
         return None

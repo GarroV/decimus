@@ -36,6 +36,7 @@ from src.recognize.fastpath import fast_path
 from src.recognize.models import Candidate, Suggestion
 
 from .phrases import recall
+from .usage import chat_usage
 
 #: Уверенность предложения, найденного без модели: слова назвали пункт прямо.
 CERTAIN = 1.0
@@ -154,16 +155,17 @@ def propose(
                 ),
             )
     which = model_frames(words, len(frames))
-    suggestion = classify(
-        words,
-        frames[0] if which.first else None,
-        zone,
-        lang=report_lang,
-        chat_id=chat_id,
-        photos=tuple(frames) if which.all else (),
-        sent_at=sent_at(),
-        reading_c=reading_c,
-    )
+    with chat_usage(chat_id):
+        suggestion = classify(
+            words,
+            frames[0] if which.first else None,
+            zone,
+            lang=report_lang,
+            chat_id=chat_id,
+            photos=tuple(frames) if which.all else (),
+            sent_at=sent_at(),
+            reading_c=reading_c,
+        )
     return Offer(
         via="model",
         candidates=suggestion.candidates,

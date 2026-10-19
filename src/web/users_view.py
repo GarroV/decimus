@@ -29,6 +29,8 @@ TAB_SPACES = "spaces"
 TAB_CONNECTIONS = "connections"
 #: Вкладка «Журнал» (D462): только главный админ, её ведёт `journal_screen`.
 TAB_JOURNAL = "journal"
+#: Вкладка «Расход модели» (D537): главный админ и админ УК, её ведёт `usage_screen`.
+TAB_USAGE = "usage"
 
 
 class _Row(Protocol):

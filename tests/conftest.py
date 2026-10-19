@@ -565,3 +565,16 @@ def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:
             f"{REQUIRE_DATA_VAR} задана — такой прогон полным не считается.", red=True
         )
         pytest.exit(f"нет {', '.join(чего_нет)}: прогон объявлен полным, но им не является", 1)
+
+
+@pytest.fixture(autouse=True)
+def model_usage_calls(monkeypatch: pytest.MonkeyPatch) -> list[object]:
+    """Учёт расхода модели (D537) не ходит в базу: вызовы собираются в список.
+
+    Тест, которому важен учёт, берёт этот список параметром; тест самой записи
+    (`tests/test_model_usage.py`) вызывает настоящую `record` — он держит её копию,
+    снятую при импорте, до этой подмены.
+    """
+    calls: list[object] = []
+    monkeypatch.setattr("src.db.model_usage.record", calls.append)
+    return calls

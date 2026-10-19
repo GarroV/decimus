@@ -25,6 +25,7 @@ from src.bot.zones import allowed_zones, zone_from_words
 from src.domain import check_environment, get_state, handed_over, upload_file
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
+from src.domain.model_usage import KIND_SUGGEST, usage_scope
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.models import Candidate
 
@@ -135,18 +136,20 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             hint_key = "zone_hint" if body.get("zone_hint") else "zone"
             zone = _code(body, hint_key) if body.get(hint_key) else None
             frames = _frames(_refs(body.get("photos"), who, inspection))
-            offer = propose(
-                words,
-                frames,
-                zone=zone,
-                chat_id=who,
-                ui_lang=inspection.ui_lang,
-                speech_lang=inspection.speech_lang,
-                report_lang=inspection.report_lang,
-                # Исправленная температура: тот же поиск, с утверждением «реально
-                # N °C» (#836). Пусто — обычный поиск.
-                reading_c=reading_of(body),
-            )
+            # Расход модели (D537): подбор на экране — свой вид вызова.
+            with usage_scope(kind=KIND_SUGGEST, telegram_id=who, tenant=inspection.tenant):
+                offer = propose(
+                    words,
+                    frames,
+                    zone=zone,
+                    chat_id=who,
+                    ui_lang=inspection.ui_lang,
+                    speech_lang=inspection.speech_lang,
+                    report_lang=inspection.report_lang,
+                    # Исправленная температура: тот же поиск, с утверждением «реально
+                    # N °C» (#836). Пусто — обычный поиск.
+                    reading_c=reading_of(body),
+                )
         except WalkRefused as exc:
             return refused(str(exc), lang)
         except ModelUnavailable as exc:

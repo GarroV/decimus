@@ -32,6 +32,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from src.domain.model_usage import KIND_REVISE
+
 from .client import ask_model
 from .config import RecognizeSettings, load_recognize_settings
 from .errors import ModelUnavailable
@@ -119,6 +121,7 @@ def revise_finding(
         raise ValueError("Правка записи: слов аудитора нет")
     cfg = settings or load_recognize_settings()
     answer = ask_model(
+        kind=KIND_REVISE,
         instructions=INSTRUCTIONS.format(lang=_LANG_NAMES.get(lang, lang)),
         question=_question(
             item_code=item_code,

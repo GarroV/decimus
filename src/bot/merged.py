@@ -47,6 +47,7 @@ from .keyboards import edit_keyboard
 from .shown import remember as remember_shown
 from .shown import remember_origin
 from .texts import t
+from .usage import chat_usage
 from .view import zone_title
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,8 @@ async def _attach(chat_id: int, n: int, file_ids: Sequence[str]) -> int:
 async def _rewrite(chat_id: int, taken: domain.Finding, words: str, report_lang: str) -> str:
     """Новый текст записи — или прежний, если свести не вышло. Сбой — в лог."""
     try:
-        text = await asyncio.to_thread(merge_wording, taken.text, words, lang=report_lang)
+        with chat_usage(chat_id):
+            text = await asyncio.to_thread(merge_wording, taken.text, words, lang=report_lang)
     except RecognizeError:
         logger.warning(
             "комментарий записи #%s в чате %s не сведён моделью — остался прежним",
