@@ -75,10 +75,11 @@ body:has(.lp) { background: var(--surface); }
 .lp-bar__acts { display: flex; align-items: center; gap: 20px; }
 
 /* ── Колонки ────────────────────────────────────────────────────────────── */
-.lp-cols { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 40px; align-items: center; }
+.lp-cols { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 40px; align-items: start; }
 .lp-cols > .lp-copy { grid-column: 1 / 6; }
 .lp-cols > .lp-fig { grid-column: 6 / 13; margin-right: calc(-1 * var(--lp-bleed)); }
 .lp-cols--even > .lp-split { grid-column: 7 / 13; }
+.lp-cols--hero { align-items: center; }
 .lp-cols--hero > .lp-copy { grid-column: 1 / 8; }
 .lp-cols--hero > .lp-phone { grid-column: 8 / 13; }
 
