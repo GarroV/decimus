@@ -13,6 +13,7 @@ from dataclasses import replace
 from typing import Any
 
 from src.domain import list_zones
+from src.domain.model_usage import KIND_RECOGNIZE
 from src.domain.models import READING_MAX_C, READING_MIN_C
 
 from .client import ask_model
@@ -202,6 +203,7 @@ def classify(
     zones = list_zones(chat_id=chat_id)
     use_photo = album or (photo is not None and needs_photo(note))
     answer = ask_model(
+        kind=KIND_RECOGNIZE,
         instructions=instructions(class_thresholds(chat_id=chat_id)),
         question=question_text(
             note if reading_c is None else f"{note.strip()}\n{correction_line(reading_c)}".strip(),

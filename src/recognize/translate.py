@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.domain.model_usage import KIND_TRANSLATE
+
 from .client import ask_model
 from .config import RecognizeSettings, load_recognize_settings
 from .errors import ModelUnavailable
@@ -61,6 +63,7 @@ def translate_text(
         return ""
     cfg = settings or load_recognize_settings()
     answer = ask_model(
+        kind=KIND_TRANSLATE,
         instructions=INSTRUCTIONS.format(lang=_LANG_NAMES.get(lang, lang)),
         question=source,
         schema=SCHEMA,

@@ -162,7 +162,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,model_key_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,model_key_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -194,6 +194,8 @@ Flask-приложение управляющей компании и партн
 | `src/web/security_screen.py` | Экран «Вход и защита» (`/settings/security`, D463): способы подтверждения входа |
 | `src/web/settings_screen.py` | Экран «Настройки» (`/settings`): настройки своего профиля — всё подключение в одном месте |
 | `src/web/ui_lang.py` | Язык сайта: из профиля учётки, `?lang=` — разовый перекрёсток (D447) |
+| `src/web/usage_screen.py` | Экран «Расход модели» (D537): сколько токенов и денег ушло на модель |
+| `src/web/usage_view.py` | Расход модели (D537): из сумм базы — то, что рисует экран «Расход модели» |
 | `src/web/users_claude.py` | Блок «Подключить Claude» в «Настройках» (D417): адрес MCP и подключения через сайт |
 | `src/web/users_mcp.py` | Личный токен Claude в «Настройках»: выпустить себе и отозвать (D447, D448) |
 | `src/web/users_page.py` | Сборка страницы «Пользователи»: список слева, карточка выбранного справа |
@@ -239,6 +241,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_settings.py` | Тексты экрана «Настройки» (D447): подключения, Google, язык, пароль |
 | `src/web/texts_trips.py` | Тексты поездок «Календаря» (D505, D506): сетка, карточка, план, отказы |
 | `src/web/texts_units.py` | Тексты заведения пиццерии из веб-админки (#437, D233, D240) |
+| `src/web/texts_usage.py` | Тексты экрана «Расход модели» (D537): вкладка «Администрирования», расход токенов |
 | `src/web/texts_users.py` | Тексты экрана «Пользователи» вместе с карточкой человека (#585, переделка экрана) |
 | `src/web/texts_walk.py` | Тексты мини-аппа обхода (#418) — сливаются в общий каталог `texts.TEXTS` |
 <!-- map:end -->
@@ -368,7 +371,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,journals,maps_store,model_key,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,api_access,journals,maps_store,model_key,model_usage,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
@@ -377,6 +380,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
 | `src/db/maps_store.py` | Оценки на картах в базе (схема `maps`, миграция 0044): запись снимка и чтение |
 | `src/db/model_key.py` | Ключ модели из базы (D491): запись, чтение, кэш на минуту |
+| `src/db/model_usage.py` | Расход модели (D537, `0078`): запись вызова и чтение сводки для экрана |
 | `src/db/oauth_store.py` | Хранилище OAuth: клиенты, коды, подключения и токены (D417, миграция `0054`) |
 | `src/db/prescriptions.py` | Предписания: черновик, отправка через Gmail сотрудника, ответ партнёра, закрытие (волна 3) |
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, отправка, закрытие (УК) и ответ партнёра (волна 3) |
@@ -477,6 +481,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0075_email_unique_live.sql` | Почта входа через Google уникальна только среди ЖИВЫХ учёток (аудит 12.10, F-031) |
 | `0076_google_sub.sql` | Номер аккаунта Google (`sub`) за учёткой (аудит 12.10, F-027) |
 | `0077_web_country_filter.sql` | «Страны» (D536): постоянный отбор стран у человека — «мне нужен только Кавказ» |
+| `0078_model_usage.sql` | Расход модели (D537): одна строка на каждый вызов провайдера — когда, какого вида, какая модель, сколько токенов на входе и выходе (или секунд звука), кто спросил, в… |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -577,6 +582,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/texts.py` | Тексты интерфейса бота: каталог по ключам, язык — параметр |
 | `src/bot/unit_pick.py` | Пиццерия проверки — из справочника, а не из написанного (D196) |
 | `src/bot/upload_sweeper.py` | Уборка брошенных кадров мини-аппа по расписанию (F-033, #531) и старых записей журналов |
+| `src/bot/usage.py` | Учёт расхода модели в боте (D537): чья проверка стоит за вызовом |
 | `src/bot/version.py` | Версия сборки: чем именно отвечает этот процесс (T246, #201) |
 | `src/bot/view.py` | Из чего складываются строки, которые аудитор читает в чате |
 | `src/bot/zones.py` | Зона из слов аудитора (задача T124, решения D047 и D048, правило 6) |
@@ -690,6 +696,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/journal.py` | Что и как попадает в журналы входов и действий (D462, `0067`) |
 | `src/domain/kinds.py` | Вид проверки: код — сущность, слово — перевод (T152, задача #123) |
 | `src/domain/log_ids.py` | Идентификаторы людей и пространств в журнале — меткой, а не как есть (F-015) |
+| `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
 | `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
@@ -730,6 +737,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/manual.py` | T034: модель недоступна — перечень пунктов для ручного выбора кнопками |
 | `src/recognize/merge.py` | Свести комментарий записи, к которой лёг ещё один кадр (#443, решение D247) |
 | `src/recognize/models.py` | Что блок отдаёт наружу: предложения, а не решения |
+| `src/recognize/pricing.py` | Оценка стоимости вызовов модели в долларах (D537) |
 | `src/recognize/process_hint.py` | Указание аудитора «<описание>, это <процесс>» (T166, D077) |
 | `src/recognize/prompt.py` | T031/T032: текст запроса к модели — правила фиксации и перечень кандидатов |
 | `src/recognize/revise.py` | Правка записи ответом словами (#454, решения D294, D295) |

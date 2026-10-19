@@ -29,6 +29,9 @@ from openai.types.responses.response_format_text_json_schema_config_param import
     ResponseFormatTextJSONSchemaConfigParam,
 )
 
+from src.db import model_usage
+from src.domain.model_usage import build_call
+
 from .config import RecognizeSettings
 from .errors import ModelKeyRejected, ModelUnavailable
 
@@ -102,8 +105,22 @@ def _content(question: str, photos: Sequence[bytes]) -> ResponseInputMessageCont
     return content
 
 
+def _note(kind: str, model: str, usage: dict[str, int], *, ok: bool) -> None:
+    """Учесть вызов (D537). Сбой учёта в журнал процесса, ответ человеку он не меняет."""
+    model_usage.record(
+        build_call(
+            kind,
+            model,
+            ok=ok,
+            input_tokens=usage.get("input"),
+            output_tokens=usage.get("output"),
+        )
+    )
+
+
 def ask_model(
     *,
+    kind: str,
     instructions: str,
     question: str,
     schema: dict[str, Any],
@@ -120,6 +137,10 @@ def ask_model(
     `model` перекрывает имя из настроек — это нужно замеру точности (T035),
     который гоняет один и тот же запрос по нескольким моделям. В работе бота
     имя берётся из конфига и никогда из кода.
+
+    `kind` — вид вызова для учёта расхода (D537, коды — `domain.model_usage`): обязателен,
+    чтобы новое место вызова не могло про учёт забыть. Каждый ушедший к провайдеру запрос
+    пишется строкой в `model_usage` — и удавшийся, и отказанный.
     """
     client = _new_client(settings)
     text_format = ResponseFormatTextJSONSchemaConfigParam(
@@ -133,9 +154,10 @@ def ask_model(
         "role": "user",
         "content": _content(question, (photo,) if photo is not None else tuple(photos)),
     }
+    used_model = model or settings.model
     try:
         response = client.responses.create(
-            model=model or settings.model,
+            model=used_model,
             instructions=instructions,
             input=[message],
             text=text_config,
@@ -146,8 +168,16 @@ def ask_model(
             max_output_tokens=MAX_OUTPUT_TOKENS,
         )
     except OpenAIError as exc:
+        _note(kind, used_model, {}, ok=False)
         raise ModelUnavailable(f"Модель не ответила: {exc}") from exc
+    raw_usage = response.usage
+    usage = (
+        {}
+        if raw_usage is None
+        else {"input": raw_usage.input_tokens, "output": raw_usage.output_tokens}
+    )
     if getattr(response, "status", None) == "incomplete":
+        _note(kind, used_model, usage, ok=False)
         raise ModelUnavailable(
             f"Ответ модели обрезан потолком в {MAX_OUTPUT_TOKENS} токенов — разбор не принят"
         )
@@ -156,16 +186,13 @@ def ask_model(
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:
+        _note(kind, used_model, usage, ok=False)
         raise ModelUnavailable(
             f"Ответ модели не разобран как JSON, хотя запрошена строгая схема: {exc}"
         ) from exc
     if not isinstance(payload, dict):
+        _note(kind, used_model, usage, ok=False)
         raise ModelUnavailable("Ответ модели — не объект, хотя запрошена строгая схема")
 
-    usage = response.usage
-    return ModelAnswer(
-        payload=payload,
-        usage=(
-            {} if usage is None else {"input": usage.input_tokens, "output": usage.output_tokens}
-        ),
-    )
+    _note(kind, used_model, usage, ok=True)
+    return ModelAnswer(payload=payload, usage=usage)

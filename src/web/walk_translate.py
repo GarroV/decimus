@@ -25,8 +25,10 @@ import threading
 
 from flask import Flask, Response, jsonify, request
 
+from src.bot.usage import chat_usage
 from src.domain import get_state
 from src.domain.log_ids import log_id
+from src.domain.model_usage import usage_scope
 from src.domain.models import TEXT_LANGS, Inspection
 from src.recognize.errors import RecognizeError
 from src.recognize.translate import translate_text
@@ -83,7 +85,8 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
         if target is None:
             return refused("walk.err.bad_request", lang, 409)
         try:
-            translated = translate_text(text, lang=target)
+            with usage_scope(telegram_id=who, tenant=inspection.tenant), chat_usage(who):
+                translated = translate_text(text, lang=target)
         except RecognizeError as exc:
             # Модель недоступна — поле остаётся как было, аудитор видит причину
             # в экране. Сырой текст исключения — в журнал, не аудитору.

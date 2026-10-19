@@ -32,6 +32,7 @@ from src.db.models import InspectionRow
 from src.db.previews import make_preview
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
+from src.domain.model_usage import KIND_SUGGEST, usage_scope
 from src.recognize.errors import RecognizeError
 
 from .review import Sheet
@@ -122,15 +123,17 @@ def suggest(
     _take(head.id)
     try:
         previews = _previews(frames)
-        offer = propose(
-            said,
-            previews,
-            zone=None,
-            chat_id=head.chat_id,
-            ui_lang=lang,
-            speech_lang=lang,
-            report_lang=head.report_lang,
-        )
+        # Расход модели (D537): подбор на экране — свой вид вызова, проверка — по номеру в базе.
+        with usage_scope(kind=KIND_SUGGEST, inspection_ref=str(head.id)):
+            offer = propose(
+                said,
+                previews,
+                zone=None,
+                chat_id=head.chat_id,
+                ui_lang=lang,
+                speech_lang=lang,
+                report_lang=head.report_lang,
+            )
         ask = Ask(
             chat_id=head.chat_id, spoken=zone_from_words(said, chat_id=head.chat_id), hint=None
         )

@@ -66,6 +66,7 @@ from ..pending import PendingStore
 from ..shown import remember as remember_shown
 from ..shown import remember_origin
 from ..texts import t
+from ..usage import chat_usage
 from ..view import zone_title
 from .edit import answer_repeat, apply_edit, set_repeat
 from .record import analyze, hear_voice
@@ -136,16 +137,17 @@ async def _revision(
     она вернёт, ляжет в отчёт, и язык у неё тот же (как у сведения, `merged`).
     """
     try:
-        return await asyncio.to_thread(
-            revise_finding,
-            item_code=finding.code,
-            item_text=refusal.item_title(finding.code, report_lang, chat_id=chat_id),
-            level=finding.level,
-            zone=f"{finding.zone} ({zone_title(finding.zone, report_lang, chat_id=chat_id)})",
-            wording=finding.text,
-            words=note,
-            lang=report_lang,
-        )
+        with chat_usage(chat_id):
+            return await asyncio.to_thread(
+                revise_finding,
+                item_code=finding.code,
+                item_text=refusal.item_title(finding.code, report_lang, chat_id=chat_id),
+                level=finding.level,
+                zone=f"{finding.zone} ({zone_title(finding.zone, report_lang, chat_id=chat_id)})",
+                wording=finding.text,
+                words=note,
+                lang=report_lang,
+            )
     except RecognizeError:
         logger.warning(
             "правка записи #%s в чате %s ответом не разобрана моделью — запись прежняя",

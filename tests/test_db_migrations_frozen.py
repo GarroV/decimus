@@ -313,6 +313,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0077_web_country_filter.sql": (
         "sql1:fde8cbaea36129227f95f3970ebd93f514c78712af89f73c1130b236c4d8d5e1"
     ),
+    "0078_model_usage.sql": (
+        "sql1:5960a11469c2b6b76ed2b809ab415578fb62957b775d23fca2e20da2cbee3fd3"
+    ),
 }
 
 

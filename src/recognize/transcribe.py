@@ -19,6 +19,9 @@ from pathlib import Path
 
 from openai import OpenAI, OpenAIError, omit
 
+from src.db import model_usage
+from src.domain.model_usage import KIND_TRANSCRIBE, build_call
+
 from .config import RecognizeSettings, load_recognize_settings
 from .errors import TranscriptionFailed
 
@@ -79,6 +82,21 @@ def _reencode(audio: bytes, ffmpeg: str) -> bytes:
         return data
 
 
+def _note(model: str, usage: object | None, *, ok: bool) -> None:
+    """Учесть расшифровку (D537): токены, если провайдер их отдал, иначе секунды звука."""
+    seconds = getattr(usage, "seconds", None)
+    model_usage.record(
+        build_call(
+            KIND_TRANSCRIBE,
+            model,
+            ok=ok,
+            input_tokens=getattr(usage, "input_tokens", None),
+            output_tokens=getattr(usage, "output_tokens", None),
+            audio_seconds=float(seconds) if isinstance(seconds, int | float) else None,
+        )
+    )
+
+
 def transcribe(
     audio: bytes, *, lang: str | None = None, settings: RecognizeSettings | None = None
 ) -> str:
@@ -109,9 +127,11 @@ def transcribe(
             language=lang or omit,
         )
     except OpenAIError as exc:
+        _note(cfg.transcribe_model, None, ok=False)
         raise TranscriptionFailed(f"Транскрипция не ответила: {exc}") from exc
 
     text = result.text.strip()
+    _note(cfg.transcribe_model, getattr(result, "usage", None), ok=bool(text))
     if not text:
         raise TranscriptionFailed(
             "Транскрипция вернула пустой текст. Голосовое, возможно, без речи — "
