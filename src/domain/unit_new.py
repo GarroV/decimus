@@ -4,7 +4,9 @@
 здесь, а не в обработчике экрана: поверхностей две, правило одно.
 
 - Имя — «Город-N» по-английски (D232, D233): написанное как угодно сводится
-  `canonical_unit`, без номера имени нет.
+  `canonical_unit`, без номера имени нет. Если справочник пиццерий страны знает
+  такую строку, пиццерия заводится под ЕГО именем и кодом Dodo, а написанное
+  остаётся синонимом (D538, `unit_resolve.with_reference`).
 - Пиццерия заводится в стране экрана. Город, который словарь знает в ДРУГОЙ
   стране, — отказ: «Yerevan-4» в Сербии — это опечатка в выборе страны, а не
   новая точка.
@@ -17,11 +19,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .errors import ValidationError
 from .geo import COUNTRIES
+from .unit_match import Ref
 from .unit_name import UNIT_NAME_BYTE_LIMIT, UNIT_NAME_LIMIT, canonical_unit
+from .unit_resolve import with_reference
 
 #: Коды отказов. Это коды, а не тексты: экран переводит их своим словарём.
 EMPTY = "empty"
@@ -51,10 +56,14 @@ class NewUnit:
     city: str | None
     #: Как написал человек — станет синонимом, если отличается от имени.
     typed: str
+    #: Код Dodo, когда имя взято из справочника пиццерий (D538).
+    code: str | None = None
+    #: Имя дал справочник пиццерий: ему верим без «Город незнаком — подтвердите».
+    from_reference: bool = False
 
     @property
     def known_city(self) -> bool:
-        return self.city is not None
+        return self.city is not None or self.from_reference
 
     @property
     def aliases(self) -> tuple[str, ...]:
@@ -69,8 +78,12 @@ def _check_length(name: str) -> None:
         raise NewUnitRefused(TOO_LONG_BYTES, limit=UNIT_NAME_BYTE_LIMIT)
 
 
-def plan_new_unit(typed: str, *, country: str) -> NewUnit:
-    """Каноническая новая пиццерия страны `country` из написанного — или `NewUnitRefused`."""
+def plan_new_unit(typed: str, *, country: str, refs: Sequence[Ref] = ()) -> NewUnit:
+    """Каноническая новая пиццерия страны `country` из написанного — или `NewUnitRefused`.
+
+    `refs` — строки справочника пиццерий (любых стран; берутся только страны `country`):
+    нашлась строка — имя и код из неё (D538).
+    """
     код_страны = (country or "").strip().upper()
     if код_страны not in COUNTRIES:
         raise NewUnitRefused(UNKNOWN_COUNTRY, country=код_страны)
@@ -87,4 +100,14 @@ def plan_new_unit(typed: str, *, country: str) -> NewUnit:
     _check_length(имя.name)
     if имя.country is not None and имя.country != код_страны:
         raise NewUnitRefused(OTHER_COUNTRY, name=имя.name, country=имя.country)
-    return NewUnit(name=имя.name, country=код_страны, city=имя.city, typed=написано)
+    по_справочнику = with_reference(имя, написано, [r for r in refs if r.country == код_страны])
+    if по_справочнику != имя:
+        _check_length(по_справочнику.name)
+    return NewUnit(
+        name=по_справочнику.name,
+        country=код_страны,
+        city=по_справочнику.city,
+        typed=написано,
+        code=по_справочнику.code,
+        from_reference=по_справочнику != имя,
+    )

@@ -273,7 +273,7 @@ def _справочник(monkeypatch: pytest.MonkeyPatch, match: object) -> lis
         заведено.append({"name": name, **kw})
         return "u-new"
 
-    monkeypatch.setattr(start_router, "match_unit", lambda _typed, **_kw: match)
+    monkeypatch.setattr(start_router, "match_unit", lambda *_a, **_kw: match)
     monkeypatch.setattr(start_router, "upsert_unit", завести)
     return заведено
 
@@ -329,6 +329,7 @@ async def test_новую_пиццерию_уk_заводит_в_справоч�
         {
             "name": "Podgorica-2",
             "aliases": ("ПОдгорица-2",),
+            "code": None,
             "country": "ME",
             "city": "podgorica",
             "tenant": "HQ",
@@ -376,3 +377,25 @@ async def test_партнёр_новую_пиццерию_не_заводит(
     assert "только управляющая компания" in session.last_text
     assert f"{UNIT_NEW_PREFIX}{UNIT_NEW_YES}" not in session.keyboard_data()
     assert заведено == [] and get_state(CHAT_ID) is None
+
+
+async def test_новая_пиццерия_заводится_под_именем_и_кодом_справочника_пиццерий(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D538: набрано кириллицей, справочник пиццерий строку знает — в базу уходит его имя и код."""
+    # Arrange
+    from src.bot import unit_pick
+    from src.domain.unit_match import Ref
+
+    заведено = _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
+    код = "ab" * 16
+    monkeypatch.setattr(unit_pick.unit_profiles, "refs", lambda: (Ref("ME", "Podgorica-2", код),))
+
+    # Act
+    bot, _session, dp = await _до_названия("ПОдгорица-2")
+    await feed(dp, bot, callback_query(f"{UNIT_NEW_PREFIX}{UNIT_NEW_YES}"))
+
+    # Assert
+    assert [(з["name"], з["code"], з["aliases"]) for з in заведено] == [
+        ("Podgorica-2", код, ("ПОдгорица-2",))
+    ]

@@ -20,6 +20,7 @@ from typing import Any
 import psycopg
 
 from .config import load_retraction_settings
+from .directory import live_unit_id
 from .errors import MoveError
 from .pool import connection
 from .queries import _require_inspection_id, _require_tenant
@@ -164,6 +165,8 @@ def _apply(
             )
         if отклонена is not None:
             raise MoveError(f"Проверка {ident} отклонена — отклонённую не исправляют")
+        # Снятая точка (D538) ведёт на ту, в которую влита: переносят в живую.
+        new_unit_id = live_unit_id(conn, new_unit_id) or new_unit_id
         cur.execute(_UNIT_OF_TENANT_SQL, {"unit": new_unit_id, "tenant": tenant})
         if cur.fetchone() is None:
             raise MoveError("Такой пиццерии в справочнике этого пространства нет")

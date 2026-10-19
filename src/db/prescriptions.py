@@ -398,6 +398,7 @@ _UNIT_CHOICES_SQL = """
 select u.id, u.name, coalesce(u.city, '')
 from units u
 where u.tenant_code = 'HQ' and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and u.merged_into is null
   and u.country = %(country)s
 order by u.name
 """

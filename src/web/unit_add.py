@@ -41,6 +41,7 @@ from src.db.reach import Reach
 from src.domain.geo import COUNTRIES
 from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, may_add_units
+from src.domain.unit_match import Ref
 from src.domain.unit_new import OTHER_COUNTRY, NewUnit, NewUnitRefused, plan_new_unit
 from src.ratings.svod import normalize as reference_key
 
@@ -113,6 +114,13 @@ def reference_rows(country: str) -> tuple[unit_profiles.Profile, ...]:
     except DbError:
         logger.warning("Справочник пиццерий страны для формы не прочитался", exc_info=True)
         return ()
+
+
+def _refs(country: str) -> tuple[Ref, ...]:
+    """Справочник страны в виде, понятном правилу имени (D538)."""
+    return tuple(
+        Ref(p.country_code, p.name, p.dodo_id, p.city, p.address) for p in reference_rows(country)
+    )
 
 
 def match_reference(
@@ -246,7 +254,7 @@ def _prefill(code: str, typed: str) -> dict[str, str]:
 def _planned_name(typed: str, code: str) -> str:
     """Каноническое имя набранного или пусто, если оно не годится."""
     try:
-        return plan_new_unit(typed, country=code).name
+        return plan_new_unit(typed, country=code, refs=_refs(code)).name
     except NewUnitRefused:
         return ""
 
@@ -299,7 +307,7 @@ def install(app: Flask, conf: Settings) -> None:
             for k in ("address", "partner", "dodo_id", "stage", "opened")
         }
         try:
-            plan = plan_new_unit(написано, country=страна)
+            plan = plan_new_unit(написано, country=страна, refs=_refs(страна))
             extras = parse_extras(request.form)
         except NewUnitRefused as exc:
             return _render(
@@ -325,6 +333,7 @@ def install(app: Flask, conf: Settings) -> None:
                 country=plan.country,
                 city=plan.city,
                 aliases=plan.aliases,
+                code=plan.code,
                 tenant=HQ_TENANT,
             )
         except UnitExistsError as exc:

@@ -28,11 +28,10 @@ from src.domain.models import Finding, Inspection, Score
 from src.domain.tenants import HQ_TENANT
 
 from .config import check_environment
-from .directory import resolve_unit_id
+from .directory import insert_typed_unit, resolve_unit_id
 from .errors import PushError, UnitRefusedError, VersionMismatchError
 from .fingerprint import compute_fingerprint, previous_fingerprints
 from .pool import connection
-from .units import normalize_unit_name
 
 #: Арендатор по умолчанию, пока в проверке своего не задано. Совпадает со
 #: значением `domain.state.DEFAULT_TENANT` буквально: второй копии константы
@@ -71,13 +70,6 @@ returning id
 """
 
 _SELECT_BY_FINGERPRINT_SQL = "select id from inspections where source_fingerprint = %s"
-
-_UPSERT_UNIT_SQL = """
-insert into units (tenant_code, name, name_normalized)
-values (%s, %s, %s)
-on conflict (tenant_code, name_normalized) do update set name = excluded.name
-returning id
-"""
 
 _INSERT_FINDING_SQL = """
 insert into findings (
@@ -336,11 +328,9 @@ def _unit_of_inspection(
         return unit_id
     unit_id = resolve_unit_id(conn, inspection.unit, tenant=tenant_code)
     if unit_id is None:
-        cur.execute(
-            _UPSERT_UNIT_SQL,
-            (tenant_code, inspection.unit, normalize_unit_name(inspection.unit)),
-        )
-        unit_id = _require_row(cur)[0]
+        # Справочник не знает названия: точка заводится под именем справочника
+        # пиццерий, если оно там есть (D538), иначе под написанным.
+        unit_id = insert_typed_unit(conn, inspection.unit, tenant=tenant_code)
     return unit_id
 
 

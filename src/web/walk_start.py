@@ -50,6 +50,7 @@ from src.bot.unit_pick import (
     UNIT_KNOWN,
     UNIT_PARTNER_REFUSED,
     match_unit,
+    new_unit_name,
     resolve_unit,
     suggest_index,
     suggest_units,
@@ -223,12 +224,13 @@ class _Wizard:
                 field="unit",
             )
         имя = проверка.name
-        сверка = match_unit(имя.name, tenant=self.space)
+        сверка = match_unit(typed, имя.name, tenant=self.space)
         решение = resolve_unit(имя, сверка, self.space)
         if решение.status == UNIT_KNOWN:
             return решение.name
         if решение.status == UNIT_PARTNER_REFUSED:
             raise Refused(t("start.unit_new_partner", self.lang, name=имя.name), field="unit")
+        имя = new_unit_name(имя, typed)  # имя новой пиццерии — по справочнику (D538)
         if body.get("add_unit") is not True:
             ask = Refused(
                 t(
@@ -253,6 +255,7 @@ class _Wizard:
             upsert_unit(
                 имя.name,
                 aliases=синонимы,
+                code=имя.code,
                 country=имя.country,
                 city=имя.city,
                 tenant=self.space,

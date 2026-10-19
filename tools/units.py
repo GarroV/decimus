@@ -10,7 +10,10 @@
     make units ARGS="list --tenant default --country GE"
 
 **Откуда берутся точки в режиме `sites`.** С сайта самой страны: страница
-контактов города перечисляет пиццерии, открытые гостю для заказа. Это НЕ
+контактов города несёт JSON-данные пиццерий, открытых гостю для заказа: код Dodo,
+имя на сайте, улица. Точка находит свою строку справочника пиццерий по коду Dodo и
+заводится под ЕЁ латинским именем (D538); имя с сайта и улица — синонимы. Страница без
+данных или недоступный город — громкий отказ (код выхода 1), а не пустой город. Это НЕ
 учётный источник — сеть числит больше точек, чем показывает витрина (сверено с
 месячным отчётом Dodo Brands: 131 против 209 у DP IMF на август 2026).
 Витрина годится, чтобы завести справочник и увидеть страны; когда появится
@@ -40,8 +43,8 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1]
 from src.db.directory import list_units, resolve_unit, upsert_unit
 from src.db.errors import PushError, RatingsError
 from src.db.reach import reach_of
-from src.db.unit_profiles import by_country
-from src.domain.unit_match import Ref, RefIndex, UnitRow, match_unit
+from src.db.unit_profiles import by_country, set_unit_codes
+from src.domain.unit_match import Ref
 
 #: Сайты сети по странам. Код страны — ISO 3166-1 alpha-2, тот же, что ляжет в
 #: `units.country`: связываем кодом, а не названием.
@@ -110,9 +113,18 @@ from src.domain.unit_match import Ref, RefIndex, UnitRow, match_unit
     "Accept-Language": "en",
 }
 
-#: Признак карточки пиццерии на странице контактов. Один на точку — проверено
-#: на городе с известным числом точек.
-ТОЧКА = re.compile(r'class="contacts-pizzerias__title title">([^<]+)<')
+#: Пиццерия в данных страницы контактов (JSON внутри страницы): код Dodo, город, имя на
+#: сайте («Bucharest-1») и улица (`alias`). Старый признак — вёрстка `contacts-pizzerias__title` —
+#: с 2026-10 страница не отдаёт: карточки рисуются скриптом. Код Dodo в объекте — тот же, что
+#: `unit_profiles.dodo_id`, поэтому имя угадывать не нужно.
+ТОЧКА = re.compile(
+    r'"id":"(?P<id>[0-9a-f]{32})","localityId":"[^"]*","name":"(?P<name>(?:[^"\\]|\\.)*)"'
+    r'(?:,"alias":"(?P<alias>(?:[^"\\]|\\.)*)")?'
+)
+#: Признак того, что страница вообще несёт данные пиццерий (даже если в городе их ноль).
+ПРИЗНАК_ДАННЫХ = '"localityId"'
+#: Длиннее — не улица, а юридический текст (на сайте Румынии в `alias` лежит номер разрешения).
+ПРЕДЕЛ_СИНОНИМА = 120
 
 ПАУЗА_СЕК = 0.2
 ПОПЫТОК = 3
@@ -122,7 +134,16 @@ from src.domain.unit_match import Ref, RefIndex, UnitRow, match_unit
 class Точка:
     country: str
     city: str
+    #: Имя с сайта — не имя точки: именем служит строка справочника пиццерий с этим кодом.
     name: str
+    #: Код Dodo с сайта — по нему точка находит свою строку справочника.
+    dodo_id: str
+    #: Улица или адрес с сайта; ляжет синонимом.
+    alias: str = ""
+
+
+class СайтОтказал(RuntimeError):
+    """Страница города не дала данных. Молчаливый ноль здесь — потерянный город (D538)."""
 
 
 def _взять(адрес: str) -> str | None:
@@ -162,75 +183,116 @@ def _города(домен: str) -> list[str]:
     return найдено
 
 
-def _точки_города(домен: str, город: str) -> list[str]:
+def разобрать_точки(страница: str, *, страна: str, город: str) -> list[Точка]:
+    """Пиццерии со страницы контактов по JSON-данным: код Dodo, имя и улица.
+
+    Ноль найденных при отсутствии самого признака данных — не «в городе нет пиццерий», а
+    «сайт изменил страницу»: отказ, а не пустой результат.
+    """
+    найдено: dict[str, Точка] = {}
+    for m in ТОЧКА.finditer(страница):
+        улица = " ".join(m["alias"].split()) if m["alias"] else ""
+        найдено.setdefault(
+            m["id"],
+            Точка(
+                страна,
+                город,
+                m["name"].strip(),
+                m["id"],
+                улица if len(улица) <= ПРЕДЕЛ_СИНОНИМА else "",
+            ),
+        )
+    if not найдено and ПРИЗНАК_ДАННЫХ not in страница:
+        raise СайтОтказал(f"{город}: в странице нет данных пиццерий (признак {ПРИЗНАК_ДАННЫХ})")
+    return list(найдено.values())
+
+
+def _точки_города(домен: str, страна: str, город: str) -> list[Точка]:
     корень, _, префикс = домен.partition("/")
     путь = f"/{префикс}" if префикс else ""
     стр = _взять(f"https://{корень}{путь}/{город}/contacts")
     if стр is None:
-        return []
-    тело = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", стр, flags=re.S | re.I)
-    return [имя.strip() for имя in ТОЧКА.findall(тело) if имя.strip()]
+        raise СайтОтказал(f"{город}: страница контактов не открылась")
+    return разобрать_точки(стр, страна=страна, город=город)
 
 
 def собрать_страну(код: str) -> tuple[str, list[Точка], str | None]:
-    """Точки одной страны с её сайта. Третье значение — причина, если не вышло."""
+    """Точки одной страны с её сайта. Третье значение — что не вышло (точки при этом отдаются)."""
     имя, домен = САЙТЫ[код]
     города = _города(домен)
     if not города:
         return имя, [], f"сайт {домен} не отдал ни одного города"
     собрано: list[Точка] = []
     видено: set[str] = set()
+    сбои: list[str] = []
     for город in города:
-        for точка in _точки_города(домен, город):
-            if точка in видено:
-                continue
-            видено.add(точка)
-            собрано.append(Точка(country=код, city=город, name=точка))
+        try:
+            страница = _точки_города(домен, код, город)
+        except СайтОтказал as сбой:
+            сбои.append(str(сбой))
+            continue
+        for точка in страница:
+            if точка.dodo_id not in видено:
+                видено.add(точка.dodo_id)
+                собрано.append(точка)
         time.sleep(ПАУЗА_СЕК)
+    if сбои:
+        return (
+            имя,
+            собрано,
+            f"{len(сбои)} из {len(города)} городов не прочитаны: " + "; ".join(сбои),
+        )
     if not собрано:
         return имя, [], f"сайт {домен} отдал города, но ни одной точки"
     return имя, собрано, None
 
 
-def _эталон(страна: str) -> RefIndex:
-    """Сведения о пиццериях страны (`unit_profiles`); пусто, если свод не загружен."""
+def _эталоны(страна: str) -> dict[str, Ref]:
+    """Справочник пиццерий страны по коду Dodo; пусто, если свод не загружен."""
     try:
         профили = by_country(страна)
     except RatingsError:
-        return RefIndex([])
-    return RefIndex([Ref(p.country_code, p.name, p.dodo_id, p.city, p.address) for p in профили])
+        return {}
+    return {
+        p.dodo_id: Ref(p.country_code, p.name, p.dodo_id, p.city, p.address)
+        for p in профили
+        if p.dodo_id
+    }
 
 
-def _залить(точки: list[Точка], *, tenant: str) -> int:
-    """Точка, которую эталон знает, ложится под его именем и кодом (#316, #909).
+def _залить(точки: list[Точка], *, tenant: str) -> tuple[int, list[str]]:
+    """Точка сайта находит строку справочника пиццерий по коду Dodo (D538).
 
-    Иначе повторная загрузка заводила бы вторую строку на каждую точку, уже
-    переименованную `make units-normalize`: имя с витрины — не то, что в базе.
-    Не знает эталон — точка ложится как есть, под именем сайта.
+    Точка заводится или находится под ЛАТИНСКИМ именем справочника и с его кодом; имя с
+    сайта и улица — синонимы. Кода нет в справочнике — точка не заводится, а попадает в
+    список «не в своде»: имя по сайту не угадывается. Возвращает (записано, не в своде).
     """
     заведено = 0
-    эталоны: dict[str, RefIndex] = {}
+    не_в_своде: list[str] = []
+    эталоны: dict[str, dict[str, Ref]] = {}
     for т in точки:
-        известная = resolve_unit(т.name, tenant=tenant)
-        if известная is not None:
-            # Имя или синоним уже называет точку: уточняем её географию под её же именем.
-            upsert_unit(
-                известная.name, code=известная.code, country=т.country, city=т.city, tenant=tenant
-            )
-            заведено += 1
+        ref = эталоны.setdefault(т.country, _эталоны(т.country)).get(т.dodo_id)
+        if ref is None:
+            не_в_своде.append(f"{т.country} {т.name} ({т.dodo_id})")
             continue
-        индекс = эталоны.setdefault(т.country, _эталон(т.country))
-        найдено = match_unit(UnitRow(id="", name=т.name, country=т.country), индекс)
-        if найдено.status == "matched":
-            ref = найдено.ref
+        синонимы = tuple(x for x in (т.name, т.alias) if x and x != ref.clean_name)
+        известная = resolve_unit(ref.clean_name, tenant=tenant)
+        if известная is not None and известная.code not in (None, т.dodo_id):
+            не_в_своде.append(f"{т.country} {ref.clean_name}: имя занято точкой с другим кодом")
+            continue
+        if известная is not None:
+            if известная.code is None:
+                set_unit_codes([(известная.id, т.dodo_id)])
             upsert_unit(
-                ref.clean_name, code=ref.dodo_id, aliases=(т.name,),
+                известная.name, aliases=синонимы, country=т.country, city=т.city, tenant=tenant
+            )
+        else:
+            upsert_unit(
+                ref.clean_name, code=т.dodo_id, aliases=синонимы,
                 country=т.country, city=т.city, tenant=tenant,
             )  # fmt: skip
-        else:
-            upsert_unit(т.name, country=т.country, city=т.city, tenant=tenant)
         заведено += 1
-    return заведено
+    return заведено, не_в_своде
 
 
 def команда_sites(args: argparse.Namespace) -> int:
@@ -244,11 +306,11 @@ def команда_sites(args: argparse.Namespace) -> int:
     отказы: list[str] = []
     with ThreadPoolExecutor(max_workers=6) as пул:
         for имя, точки, причина in пул.map(собрать_страну, коды):
+            все.extend(точки)
             if причина:
                 отказы.append(f"{имя}: {причина}")
-                print(f"{имя:15} — НЕ ВЫШЛО, {причина}")
+                print(f"{имя:15} — НЕ ВЫШЛО, {причина} (прочитано точек: {len(точки)})")
                 continue
-            все.extend(точки)
             города = len({т.city for т in точки})
             print(f"{имя:15} {len(точки):>3} точек, городов {города}")
 
@@ -256,15 +318,22 @@ def команда_sites(args: argparse.Namespace) -> int:
     if args.dry_run:
         print("Режим проверки: в базу ничего не писалось")
     else:
-        заведено = _залить(все, tenant=args.tenant)
+        заведено, не_в_своде = _залить(все, tenant=args.tenant)
         print(f"Заведено или обновлено в справочнике: {заведено}")
+        if не_в_своде:
+            print(
+                f"Не заведено — кода нет в справочнике пиццерий или имя занято ({len(не_в_своде)}):"
+            )
+            for строка in не_в_своде:
+                print(f"  — {строка}")
 
     if отказы:
         # Отказ печатается ОТДЕЛЬНО и в конце, а не тонет в общем списке:
         # страна, чей сайт не ответил, иначе выглядит страной без точек.
-        print("\nСтраны, которые собрать не удалось (их точек в базе НЕТ):")
+        print("\nСтраны и города, которые прочитать не удалось (их точек в базе может не быть):")
         for строка in отказы:
             print(f"  — {строка}")
+        return 1
     return 0
 
 

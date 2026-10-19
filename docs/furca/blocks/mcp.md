@@ -16,6 +16,8 @@
 list_inspections(unit?, date_from?, date_to?, limit?)     unit_history(unit, limit?)
 network_summary(date_from?, date_to?)                     get_inspection(id, lang?)
 findings_by_unit(unit, limit?)                            inspection_letter(id, lang?)
+# unit в этих инструментах — любое написание пиццерии («Тбилиси-1» = «Tbilisi-1»): точка
+# находится общим поиском (D538, `queries._unit_key`), в ответе — её латинское имя
 
 # снятие проверки из истории (T211, D086/D089) — ровно один инструмент, право личное токену
 retract_inspection(id, reason, confirm_unit, confirm_date)

@@ -13,6 +13,13 @@
 Ключ сопоставления один на всю карту — `normalize_unit_name` из `units.py`.
 Второе правило нормализации здесь было бы худшим из возможных дефектов:
 справочник и слив расходились бы молча и только на части написаний.
+
+D538: поиск по написанию — ОДИН для всех дверей (`domain/unit_resolve.py`): бот,
+мини-апп, MCP, админка, слив проверки и загрузки спрашивают `resolve_unit_id` /
+`resolve_unit` здесь. Справочник читается целиком (сотни строк) и сверяется в
+Python: ключ поиска (кириллица, армянский, пробелы, тире) в базе не хранится.
+Снятая точка (`units.merged_into`, миграция 0078) в списках не показывается, а её
+имя и id ведут на живую.
 """
 
 from __future__ import annotations
@@ -25,6 +32,8 @@ from uuid import UUID
 import psycopg
 
 from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.unit_match import Ref
+from src.domain.unit_resolve import DirUnit, find_reference, find_unit
 
 from .config import check_environment
 from .errors import PushError, UnitExistsError
@@ -75,30 +84,33 @@ from units u
 left join unit_aliases a on a.unit_id = u.id
 where u.tenant_code = 'HQ'
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and u.merged_into is null
   and (%(country)s::text is null or u.country = %(country)s)
 group by u.id, u.name, u.code, u.country, u.city
 order by u.country nulls last, u.city nulls last, u.name
 """
 
-# Порядок ветвей задан ЯВНО колонкой приоритета, а не тем, что каноничное
-# название написано в запросе первым: `union all` порядок строк не обещает, и
-# планировщик волен отдать сперва ветку синонимов. Проверено на себе — тест
-# «каноничное название сильнее синонима» на одном и том же коде то проходил,
-# то падал, пока приоритет не стал явным.
-_RESOLVE_SQL = """
-select id, name, code from (
-    select u.id, u.name, u.code, 0 as priority
-    from units u
-    where u.tenant_code = %(tenant)s and u.name_normalized = %(key)s
-    union all
-    select u.id, u.name, u.code, 1 as priority
-    from unit_aliases a
-    join units u on u.id = a.unit_id
-    where a.tenant_code = %(tenant)s and a.alias_normalized = %(key)s
-) candidates
-order by priority
-limit 1
+# Справочник для поиска: все точки пространства, и снятые тоже — они ведут на живые.
+_DIRECTORY_SQL = """
+select u.id::text, u.name, u.merged_into::text, u.country is not null,
+       coalesce(array_agg(a.alias order by a.alias) filter (where a.alias is not null), '{}')
+from units u
+left join unit_aliases a on a.unit_id = u.id
+where u.tenant_code = %(tenant)s
+group by u.id, u.name, u.merged_into, u.country
 """
+
+# Справочник пиццерий — эталон имени (D538).
+_REFERENCE_SQL = "select country_code, name, dodo_id, city, address from unit_profiles"
+
+# Живая точка с таким именем — быстрый ход поиска, до чтения справочника целиком.
+_LIVE_NAME_SQL = """
+select name from units
+where tenant_code = %(tenant)s and name_normalized = %(key)s and merged_into is null
+"""
+
+# Живая точка за идентификатором: сама или та, в которую влита.
+_LIVE_ID_SQL = "select coalesce(merged_into, id)::text from units where id = %s"
 
 
 # География проставляется через `coalesce(excluded…, units…)` и в обеих
@@ -129,11 +141,14 @@ returning id
 # Заведение новой точки, а не «завести или обновить»: совпадение имени — дубль,
 # и решает его человек, а не молчаливое обновление чужой строки (#437).
 _INSERT_NEW_UNIT_SQL = """
-insert into units (tenant_code, name, name_normalized, country, city)
-values (%(tenant)s, %(name)s, %(key)s, %(country)s, %(city)s)
+insert into units (tenant_code, name, name_normalized, code, country, city)
+values (%(tenant)s, %(name)s, %(key)s, %(code)s, %(country)s, %(city)s)
 on conflict (tenant_code, name_normalized) do nothing
 returning id
 """
+
+# Точка, которая уже держит код Dodo: второй такой не заводится (`units_code_idx`).
+_BY_CODE_SQL = "select id::text, name, country from units where tenant_code = %s and code = %s"
 
 _INSERT_NEW_ALIAS_SQL = """
 insert into unit_aliases (tenant_code, alias_normalized, unit_id, alias)
@@ -162,49 +177,119 @@ def _row_to_unit(row: tuple[Any, ...], aliases: tuple[str, ...] = ()) -> Unit:
     )
 
 
+def load_directory(
+    conn: psycopg.Connection[Any], *, tenant: str = DEFAULT_TENANT
+) -> tuple[DirUnit, ...]:
+    """Все точки пространства для поиска по написанию, снятые тоже. Читает на данном подключении."""
+    with conn.cursor() as cur:
+        cur.execute(_DIRECTORY_SQL, {"tenant": canonical_tenant(tenant)})
+        rows = cur.fetchall()
+    return tuple(
+        DirUnit(
+            id=str(r[0]),
+            name=str(r[1]),
+            aliases=tuple(str(a) for a in r[4]),
+            merged_into=None if r[2] is None else str(r[2]),
+            anchored=bool(r[3]),
+        )
+        for r in rows
+    )
+
+
+def reference_refs(conn: psycopg.Connection[Any]) -> tuple[Ref, ...]:
+    """Справочник пиццерий (`unit_profiles`) — эталон имени, на данном подключении (D538)."""
+    with conn.cursor() as cur:
+        cur.execute(_REFERENCE_SQL)
+        return tuple(
+            Ref(r[0], r[1], r[2] or None, r[3] or None, r[4] or None) for r in cur.fetchall()
+        )
+
+
 def resolve_unit_id(
     conn: psycopg.Connection[Any], name: str, *, tenant: str = DEFAULT_TENANT
 ) -> str | None:
-    """Идентификатор точки по любому её написанию. Не нашлось — `None`.
+    """Идентификатор ЖИВОЙ точки по любому её написанию. Не нашлось — `None`.
 
-    Сначала каноничное название, потом карта синонимов: если строка совпала с
-    названием точки, спрашивать карту незачем, а обратный порядок дал бы
-    синониму право перекрыть настоящее название чужой точки.
+    Один поиск на все двери (`domain.unit_resolve.find_unit`, D538): регистр, пробелы,
+    тире и алфавит не различаются, имя точки сильнее синонима, а имя снятой точки
+    ведёт на ту, в которую она влита. Подошло несколько разных точек — `None`: угадать
+    не значит найти.
 
     Работает на переданном подключении: вызывается изнутри транзакции слива,
     и своё подключение здесь означало бы решение о точке, принятое вне той
     транзакции, которая её же и пишет.
     """
-    tenant = canonical_tenant(tenant)
-    key = normalize_unit_name(name)
+    if not name.strip():
+        return None
+    found = find_unit(load_directory(conn, tenant=tenant), name).unit
+    return None if found is None else found.id
+
+
+def canonical_unit_name(
+    conn: psycopg.Connection[Any], typed: str, *, tenant: str = DEFAULT_TENANT
+) -> str | None:
+    """Имя живой точки по любому написанию («Тбилиси-1» → «Tbilisi-1»); не нашлась — `None`."""
+    key = normalize_unit_name(typed)
     if not key:
         return None
+    # Точное имя живой точки — самый частый случай (MCP обходит точки по их же именам):
+    # справочник целиком ради него не читается.
     with conn.cursor() as cur:
-        cur.execute(_RESOLVE_SQL, {"tenant": tenant, "key": key})
+        cur.execute(_LIVE_NAME_SQL, {"tenant": canonical_tenant(tenant), "key": key})
+        row = cur.fetchone()
+    if row is not None:
+        return str(row[0])
+    found = find_unit(load_directory(conn, tenant=tenant), typed).unit
+    return None if found is None else found.name
+
+
+def live_unit_id(conn: psycopg.Connection[Any], unit_id: str) -> str | None:
+    """Живая точка за идентификатором: он сам или точка, в которую он влит. Нет такой — `None`."""
+    try:
+        UUID(unit_id)
+    except ValueError:
+        return None
+    with conn.cursor() as cur:
+        cur.execute(_LIVE_ID_SQL, (unit_id,))
         row = cur.fetchone()
     return None if row is None else str(row[0])
 
 
-def resolve_unit(name: str, *, tenant: str = DEFAULT_TENANT) -> Unit | None:
-    """То же, но со своим подключением и полной карточкой точки."""
-    tenant = canonical_tenant(tenant)
+def redirect_target(unit_id: str) -> str | None:
+    """Точка, в которую влита снятая `unit_id`; живая или неизвестная — `None`."""
     settings = check_environment()
-    key = normalize_unit_name(name)
-    if not key:
-        return None
     try:
-        with connection(settings.dsn) as conn, conn.cursor() as cur:
-            cur.execute(_RESOLVE_SQL, {"tenant": tenant, "key": key})
-            row = cur.fetchone()
-            if row is None:
-                return None
-            cur.execute(
-                "select alias from unit_aliases where unit_id = %s order by alias", (row[0],)
-            )
-            aliases = tuple(str(a[0]) for a in cur.fetchall())
+        with connection(settings.dsn) as conn:
+            live = live_unit_id(conn, unit_id)
     except psycopg.Error as exc:
         raise PushError(f"Справочник точек недоступен ({type(exc).__name__}): {exc}") from exc
-    return _row_to_unit(row, aliases)
+    return live if live is not None and live != unit_id else None
+
+
+def resolve_unit(name: str, *, tenant: str = DEFAULT_TENANT) -> Unit | None:
+    """То же, но со своим подключением и полной карточкой живой точки."""
+    tenant = canonical_tenant(tenant)
+    settings = check_environment()
+    if not name.strip():
+        return None
+    try:
+        with connection(settings.dsn) as conn:
+            unit_id = resolve_unit_id(conn, name, tenant=tenant)
+            if unit_id is None:
+                return None
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select id, name, code, null, country, city from units where id = %s",
+                    (unit_id,),
+                )
+                row = cur.fetchone()
+                cur.execute(
+                    "select alias from unit_aliases where unit_id = %s order by alias", (unit_id,)
+                )
+                aliases = tuple(str(a[0]) for a in cur.fetchall())
+    except psycopg.Error as exc:
+        raise PushError(f"Справочник точек недоступен ({type(exc).__name__}): {exc}") from exc
+    return None if row is None else _row_to_unit(row, aliases)
 
 
 def list_units(*, reach: Reach, country: str | None = None) -> list[Unit]:
@@ -273,6 +358,13 @@ def upsert_unit(
                 # Пространство не заводится точкой справочника: незаведённое —
                 # отказ (#481).
                 require_space(cur, tenant, error=PushError)
+                if not normalized_code:
+                    # D538: набранное имя — не всегда имя точки. Она уже есть под другим
+                    # написанием — обновляется она; справочник пиццерий знает строку —
+                    # точка ложится под его именем и кодом. Набранное остаётся синонимом.
+                    name, key, normalized_code, aliases, страна = _canonical_target(
+                        conn, name, key, aliases, страна, tenant
+                    )
                 sql = _UPSERT_UNIT_BY_CODE_SQL if normalized_code else _UPSERT_UNIT_BY_NAME_SQL
                 cur.execute(
                     sql,
@@ -309,31 +401,117 @@ def upsert_unit(
     return unit_id
 
 
-def _existing(
-    cur: psycopg.Cursor[Any], tenant: str, keys: tuple[str, ...]
-) -> tuple[str, str, str | None] | None:
-    """Точка, которую любое из написаний уже называет: `(id, имя, страна)` или `None`."""
-    for key in keys:
-        cur.execute(_RESOLVE_SQL, {"tenant": tenant, "key": key})
+def _canonical_target(
+    conn: psycopg.Connection[Any],
+    name: str,
+    key: str,
+    aliases: tuple[str, ...],
+    country: str | None,
+    tenant: str,
+) -> tuple[str, str, str | None, tuple[str, ...], str | None]:
+    """Под каким именем и кодом писать точку, названную `name` без кода (D538).
+
+    Возвращает `(имя, ключ, код, синонимы, страна)`. Нашлась живая точка — пишем в неё под
+    её именем; нет, но справочник пиццерий знает строку — под его именем и кодом (если код
+    держит другая точка, это она: пишем в неё). Ничего не знаем — имя как набрано.
+    """
+    typed = name.strip()
+    found = find_unit(load_directory(conn, tenant=tenant), name).unit
+    if found is not None:
+        return found.name, normalize_unit_name(found.name), None, (*aliases, typed), country
+    ref = find_reference(name, reference_refs(conn), country=country)
+    if ref is None:
+        return name, key, None, aliases, country
+    owner = None
+    if ref.dodo_id:
+        with conn.cursor() as cur:
+            cur.execute(_BY_CODE_SQL, (tenant, ref.dodo_id))
+            owner = cur.fetchone()
+    if owner is not None:
+        return str(owner[1]), normalize_unit_name(str(owner[1])), None, (*aliases, typed), country
+    return (
+        ref.clean_name,
+        normalize_unit_name(ref.clean_name),
+        ref.dodo_id,
+        (*aliases, typed),
+        country or ref.country,
+    )
+
+
+def insert_typed_unit(
+    conn: psycopg.Connection[Any], typed: str, *, tenant: str = DEFAULT_TENANT
+) -> str:
+    """Завести точку по названию из файла проверки, которого справочник не знает (D538).
+
+    Зовётся слив проверки УК после неудачного `resolve_unit_id`. Справочник пиццерий
+    знает строку — точка ложится под его латинским именем и кодом Dodo, а написанное
+    остаётся синонимом; не знает — под написанным, как и раньше: справочник может быть
+    не заполнен, и это не повод отказать в сливе. Пишет на данном подключении, в его
+    транзакции.
+    """
+    tenant = canonical_tenant(tenant)
+    key = normalize_unit_name(typed)
+    name, key, code, aliases, country = _canonical_target(conn, typed, key, (), None, tenant)
+    sql = _UPSERT_UNIT_BY_CODE_SQL if code else _UPSERT_UNIT_BY_NAME_SQL
+    with conn.cursor() as cur:
+        cur.execute(
+            sql,
+            {
+                "tenant": tenant,
+                "name": name.strip(),
+                "key": key,
+                "code": code,
+                "country": country,
+                "city": None,
+            },
+        )
         row = cur.fetchone()
-        if row is not None:
-            cur.execute("select country from units where id = %s", (row[0],))
-            страна = cur.fetchone()
-            return str(row[0]), str(row[1]), (None if страна is None else страна[0])
-    return None
+        if row is None:
+            raise PushError(
+                "Postgres не вернул точку после записи — целостность транзакции нарушена"
+            )
+        unit_id = str(row[0])
+        for alias in aliases:
+            alias_key = normalize_unit_name(alias)
+            if alias_key and alias_key != key:
+                cur.execute(_UPSERT_ALIAS_SQL, (tenant, alias_key, UUID(unit_id), alias.strip()))
+    return unit_id
 
 
-def _insert_new(cur: psycopg.Cursor[Any], поля: dict[str, Any], alias_keys: tuple[str, ...]) -> str:
+def _existing(
+    cur: psycopg.Cursor[Any], tenant: str, spellings: tuple[str, ...]
+) -> tuple[str, str, str | None] | None:
+    """Живая точка, которую любое из написаний уже называет: `(id, имя, страна)` или `None`.
+
+    Поиск тот же, что у всех дверей (`find_unit`, D538): «Тбилиси-1» занято, если есть
+    «Tbilisi-1», а имя снятой точки называет ту, в которую она влита.
+    """
+    found = find_unit(load_directory(cur.connection, tenant=tenant), *spellings).unit
+    if found is None:
+        return None
+    cur.execute("select country from units where id = %s", (found.id,))
+    страна = cur.fetchone()
+    return found.id, found.name, (None if страна is None else страна[0])
+
+
+def _insert_new(
+    cur: psycopg.Cursor[Any], поля: dict[str, Any], alias_texts: tuple[str, ...]
+) -> str:
     """Вставить точку, если ни имя, ни синонимы ничего не называют; иначе — отказ."""
     tenant = str(поля["tenant"])
-    занята = _existing(cur, tenant, (str(поля["key"]), *alias_keys))
+    занята = _existing(cur, tenant, (str(поля["name"]), *alias_texts))
+    if занята is None and поля.get("code"):
+        cur.execute(_BY_CODE_SQL, (tenant, поля["code"]))
+        по_коду = cur.fetchone()
+        if по_коду is not None:
+            занята = (str(по_коду[0]), str(по_коду[1]), по_коду[2])
     if занята is None:
         cur.execute(_INSERT_NEW_UNIT_SQL, поля)
         row = cur.fetchone()
         if row is not None:
             return str(row[0])
         # Ключ имени занял кто-то между сверкой и вставкой: тот же дубль.
-        занята = _existing(cur, tenant, (str(поля["key"]),))
+        занята = _existing(cur, tenant, (str(поля["name"]),))
     if занята is None:
         raise PushError("Postgres не вставил точку и не нашёл занявшую её имя")
     raise UnitExistsError(
@@ -350,13 +528,15 @@ def create_unit(
     country: str,
     city: str | None = None,
     aliases: tuple[str, ...] = (),
+    code: str | None = None,
     tenant: str = DEFAULT_TENANT,
 ) -> CreatedUnit:
     """Завести НОВУЮ точку справочника; уже есть — `UnitExistsError` (#437).
 
     В отличие от `upsert_unit`, ничего существующего не трогает: имя или
     синоним, совпавшие с точкой справочника (название или синоним, тем же
-    ключом, что сверка бота), — отказ с этой точкой. Сверка и запись идут в
+    ключом, что сверка бота и любая другая дверь, `find_unit`), — отказ с этой
+    точкой. Код Dodo, уже занятый другой точкой, — тот же отказ. Сверка и запись идут в
     одной транзакции, а гонку двух одинаковых заведений закрывает уникальный
     ключ имени: вторая вставка ничего не вставляет и становится тем же отказом.
 
@@ -376,6 +556,7 @@ def create_unit(
         "tenant": tenant,
         "name": name.strip(),
         "key": key,
+        "code": (code or "").strip() or None,
         "country": (country or "").strip().upper() or None,
         "city": (city or "").strip() or None,
     }
@@ -384,7 +565,7 @@ def create_unit(
         with connection(settings.dsn) as conn:
             with conn.cursor() as cur:
                 require_space(cur, tenant, error=PushError)
-                unit_id = _insert_new(cur, поля, tuple(синонимы))
+                unit_id = _insert_new(cur, поля, tuple(синонимы.values()))
                 занятые: list[str] = []
                 for alias_key, alias in синонимы.items():
                     cur.execute(_INSERT_NEW_ALIAS_SQL, (tenant, alias_key, UUID(unit_id), alias))

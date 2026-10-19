@@ -16,6 +16,9 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
+from src.domain.unit_match import Ref
+
+from . import directory
 from .config import check_environment
 from .errors import RatingsError
 from .pool import connection
@@ -87,7 +90,7 @@ def hq_units() -> tuple[tuple[str, str | None, tuple[str, ...], str | None], ...
         select u.id::text, u.country,
                array_agg(a.alias) filter (where a.alias is not null) || u.name, u.code
         from units u left join unit_aliases a on a.unit_id = u.id
-        where u.tenant_code = 'HQ' group by u.id
+        where u.tenant_code = 'HQ' and u.merged_into is null group by u.id
     """
     try:
         with connection(check_environment().dsn) as conn:
@@ -134,6 +137,15 @@ def _read(sql: str, params: tuple[Any, ...]) -> tuple[Profile, ...]:
         )
         for r in rows
     )  # fmt: skip
+
+
+def refs() -> tuple[Ref, ...]:
+    """Строки справочника как эталоны имени (D538): по ним точка заводится под латинским именем."""
+    try:
+        with connection(check_environment().dsn) as conn:
+            return directory.reference_refs(conn)
+    except psycopg.Error as exc:
+        raise RatingsError(f"Справочник пиццерий не прочитался ({exc.__class__.__name__})") from exc
 
 
 def by_code(dodo_id: str) -> Profile | None:
