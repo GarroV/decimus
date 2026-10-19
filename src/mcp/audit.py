@@ -49,6 +49,7 @@ READ_ONLY_TOOLS = frozenset(
         "checklist_source_item",
         "ratings_summary",
         "ratings_units",
+        "ratings_unit_periods",
         "aggregators_status",
         "import_get_inspection",
         "import_list_drafts",

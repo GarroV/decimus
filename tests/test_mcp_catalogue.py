@@ -153,7 +153,12 @@ from src.mcp.catalogue import (
 ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ = {"import_ratings", "request_aggregators_update"}
 
 #: Чтение рейтингов (D420): открыто любому токену, охват ставит обработчик; записи нет.
-ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ = {"ratings_summary", "ratings_units", "aggregators_status"}
+ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ = {
+    "ratings_summary",
+    "ratings_units",
+    "ratings_unit_periods",
+    "aggregators_status",
+}
 
 ИМЕНА_ИНСТРУМЕНТОВ = (
     ИМЕНА_ИНСТРУМЕНТОВ_ПРОВЕРОК
@@ -201,17 +206,17 @@ from src.mcp.catalogue import (
 }
 
 
-def test_каталог_содержит_ровно_пятьдесят_шесть_инструментов_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_пятьдесят_семь_инструментов_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
     инструмент, к которому агент внезапно теряет доступ.
     42 + 9 загрузки (D305) + 2 управления рейтингами (D320, D420) + 3 чтения
-    рейтингов (D420)."""
+    рейтингов (D420) + 1 разбивка по периодам (#958)."""
     сверить(
         "tests/test_mcp_catalogue.py: ИМЕНА_ИНСТРУМЕНТОВ_*",
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 56
+    assert len(TOOLS) == 57
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -388,7 +393,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 56
+    assert len(перечень) == 57
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

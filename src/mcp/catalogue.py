@@ -344,6 +344,8 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="list_inspections",
         description=(
+            "These are our own on-site checklist inspections, not the Dodo ratings RS/RKO "
+            "(those live in ratings_summary, ratings_units and ratings_unit_periods). "
             "List recorded inspections for the caller's tenant, most recent "
             "first. Each entry carries the score (percentage, letter grade) "
             "and finding count exactly as they were recorded when that "
@@ -372,6 +374,8 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="unit_history",
         description=(
+            "These are our own on-site checklist inspections, not the Dodo ratings RS/RKO "
+            "(those live in ratings_summary, ratings_units and ratings_unit_periods). "
             "Read the recorded score history of one unit (pizzeria), most "
             "recent inspection first — a series of percentages and letter "
             "grades exactly as recorded at the time of each inspection. No "
@@ -463,6 +467,8 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="findings_by_unit",
         description=(
+            "These are our own on-site checklist inspections, not the Dodo ratings RS/RKO "
+            "(those live in ratings_summary, ratings_units and ratings_unit_periods). "
             "List the recorded findings of one unit (pizzeria) across all its "
             "inspections, most recent inspection first, exactly as each "
             "finding was recorded. No repeat count, grouping by code, or "
@@ -1967,6 +1973,9 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="ratings_summary",
         description=(
+            "РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, "
+            "а не наши выездные проверки по чек-листу (те — list_inspections, unit_history, "
+            "findings_by_unit). "
             "Сводка рейтингов РС (рейтинг стандартов) и РКО (рейтинг клиентского опыта) по "
             "группам стран за период: средняя оценка группы и изменение к прошлому такому же "
             "периоду — те же числа, что на экране «Рейтинги». Звать на вопросы «как дела с "
@@ -2015,6 +2024,9 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="ratings_units",
         description=(
+            "РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, "
+            "а не наши выездные проверки по чек-листу (те — list_inspections, unit_history, "
+            "findings_by_unit). "
             "Оценки отдельных пиццерий за период: РС и РКО (среднее по периодам рейтинга), "
             "оценка на картах Google (из 5, число отзывов) и оценки в агрегаторах доставки "
             "(в родной шкале: Wolt из 10, Glovo — % довольных, остальные из 5), если "
@@ -2024,7 +2036,9 @@ TOOLS: tuple[ToolSpec, ...] = (
             "пиццерию по городу), unit — часть названия или id пиццерии. Период — как в "
             "ratings_summary. Список по стране и имени, не больше limit (по умолчанию 50); "
             "'truncated' говорит, что есть ещё — сузить отбор. Партнёру показываются только "
-            "страны его пространства."
+            "страны его пространства. У оценки на карте и у каждого агрегатора есть as_of (дата "
+            "оценки) и stale — true, если оценке больше недели и новые не приходят. Почему у "
+            "пиццерии такой РС — ratings_unit_periods."
         ),
         input_schema={
             "type": "object",
@@ -2050,6 +2064,46 @@ TOOLS: tuple[ToolSpec, ...] = (
             "additionalProperties": False,
         },
         handler=ratings_read.ratings_units,
+        kind=KIND_RATINGS_READ,
+    ),
+    ToolSpec(
+        name="ratings_unit_periods",
+        description=(
+            "Разбивка одной пиццерии по периодам рейтинга РС и РКО — рейтингов Dodo из "
+            "таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наших выездных "
+            "проверок по чек-листу (те — list_inspections, unit_history, findings_by_unit). "
+            "Звать на вопросы «почему у Beograd-1 РС 24», «что просело и в каком периоде». "
+            "По каждому периоду, новые первыми: тип, границы и название, балл, флаги Д3, "
+            "критичное и обнуление с названиями, checkups_count (проверок в оценке по "
+            "данным Dodo), сколько проверок и нарушений загружено к нам и сколько проверок "
+            "принято, какой загрузкой и когда записан балл (формат, время, канал), и "
+            "period_open — период ещё не закончился. unit — часть названия или id; должна "
+            "подойти ровно одной пиццерии, иначе отказ со списком кандидатов. Период — как "
+            "в ratings_summary; не задан — последние полгода. Партнёру видны только "
+            "пиццерии стран его пространства."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "unit": {"type": "string", "description": "Часть названия или id пиццерии."},
+                "rating_type": {
+                    "type": "string",
+                    "enum": ["rs", "rko"],
+                    "description": "Только РС или только РКО; не задано — оба.",
+                },
+                "period": {
+                    "type": "string",
+                    "description": (
+                        "Период: 2026-09, 2026-Q3, rs:<номер> или 2026-09-01..2026-09-30."
+                    ),
+                },
+                "date_from": {"type": "string", "description": "Начало отрезка, ГГГГ-ММ-ДД."},
+                "date_to": {"type": "string", "description": "Конец отрезка, ГГГГ-ММ-ДД."},
+            },
+            "required": ["unit"],
+            "additionalProperties": False,
+        },
+        handler=ratings_read.ratings_unit_periods,
         kind=KIND_RATINGS_READ,
     ),
     ToolSpec(

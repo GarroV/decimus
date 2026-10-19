@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -16,7 +16,7 @@ import pytest
 from src.db import agg_store, maps_store
 from src.db import ratings_read as read
 from src.db.agg_store import LatestRating, UpdateRequest
-from src.db.ratings_read import CountryRow
+from src.db.ratings_read import CountryRow, UnitPeriodRow, UnitRef
 from src.db.reach import Reach
 from src.mcp import ratings_read as tool
 from src.mcp import ratings_tools
@@ -28,6 +28,7 @@ from src.ratings.aggregators import queue
 from src.ratings.summary import group_average
 
 ПЕРИОД = {"period": "2026-09"}
+СЕГОДНЯ = date.today()
 СТРАНЫ = (
     CountryRow("BG", "Болгария", "Bulgaria", "Dev A", True, "CEE"),
     CountryRow("NG", "Нигерия", "Nigeria", "Dev B", True, "OTHER"),
@@ -66,12 +67,16 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(read, "last_period_ids", lambda *_a, **_k: ())
     monkeypatch.setattr(
         maps_store,
-        "unit_scores",
-        lambda provider, *, until: {"a1" * 16: (4.7, 120), "b1" * 16: (4.1, 30)},
+        "unit_scores_dated",
+        lambda provider, *, until: {
+            "a1" * 16: (4.7, 120, СЕГОДНЯ - timedelta(days=2)),
+            "b1" * 16: (4.1, 30, СЕГОДНЯ - timedelta(days=30)),
+        },
     )
     монеты = (
-        LatestRating("RS", "wolt", "a1" * 16, 9.4, 10, 300, date(2026, 10, 11)),
-        LatestRating("BG", "wolt", "b1" * 16, 8.0, 10, 40, date(2026, 10, 11)),
+        LatestRating("RS", "wolt", "a1" * 16, 9.4, 10, 300, СЕГОДНЯ - timedelta(days=1)),
+        LatestRating("RS", "glovo", "a1" * 16, 90.0, 100, 50, СЕГОДНЯ - timedelta(days=9)),
+        LatestRating("BG", "wolt", "b1" * 16, 8.0, 10, 40, СЕГОДНЯ - timedelta(days=1)),
     )
     monkeypatch.setattr(
         agg_store,
@@ -140,8 +145,16 @@ def test_ук_видит_все_пиццерии_и_у_каждой_свои_к�
     assert set(по_имени) == {"Beograd-1", "Nis-1", "Sofia-1", "Lagos-1"}
     белград = по_имени["Beograd-1"]
     assert (белград["rs"], белград["rko"]) == (92.0, 80.0)
-    assert белград["maps_google"] == {"score": 4.7, "reviews": 120}
-    assert белград["aggregators"][0]["scale"] == 10
+    assert белград["maps_google"] == {
+        "score": 4.7,
+        "reviews": 120,
+        "as_of": (СЕГОДНЯ - timedelta(days=2)).isoformat(),
+        "stale": False,
+    }
+    assert {a["aggregator"]: a["scale"] for a in белград["aggregators"]} == {
+        "glovo": 100,
+        "wolt": 10,
+    }
     assert по_имени["Nis-1"]["maps_google"] is None and по_имени["Nis-1"]["aggregators"] == []
 
 
@@ -336,3 +349,185 @@ def test_заявка_с_незнакомым_агрегатором_отказ(
 def test_импорт_csv_по_прежнему_только_уК() -> None:
     with pytest.raises(ToolError):
         ratings_tools.import_ratings(tenant="GE", kind="snapshot", content="{}")
+
+
+def test_свежесть_оценок_по_порогу_охвата(база: Any) -> None:
+    """`stale` — тот же порог, что на экране охвата: старше недели, ровно неделя ещё свежая."""
+    по_имени = {u["name"]: u for u in tool.ratings_units(tenant="HQ", **ПЕРИОД)["units"]}
+
+    белград = по_имени["Beograd-1"]
+    assert {a["aggregator"]: a["stale"] for a in белград["aggregators"]} == {
+        "glovo": True,  # 9 дней
+        "wolt": False,  # вчера
+    }
+    assert белград["maps_google"]["stale"] is False
+    assert по_имени["Sofia-1"]["maps_google"]["stale"] is True  # 30 дней
+
+
+def test_ответы_рейтингов_называют_источник(база: Any) -> None:
+    for ответ in (
+        tool.ratings_summary(tenant="HQ", **ПЕРИОД),
+        tool.ratings_units(tenant="HQ", **ПЕРИОД),
+    ):
+        assert "не выездные проверки Decimus" in ответ["source"]
+
+
+# --- ratings_unit_periods -------------------------------------------------------
+
+БЕЛГРАД = "a1" * 16
+НИШ = "a2" * 16
+СОФИЯ = "b1" * 16
+ЕДИНИЦЫ = (
+    UnitRef(БЕЛГРАД, "Beograd-1", "RS"),
+    UnitRef("a3" * 16, "Beograd-10", "RS"),
+    UnitRef(НИШ, "Nis-1", "RS"),
+    UnitRef(СОФИЯ, "Sofia-1", "BG"),
+)
+
+
+def _строка_периода(end: date, **поля: Any) -> UnitPeriodRow:
+    значения: dict[str, Any] = {
+        "rating_type": "rs",
+        "period_id": 7,
+        "begin_on": end - timedelta(days=14),
+        "end_on": end,
+        "title_ru": "Период",
+        "title_en": "Period",
+        "score": 24.0,
+        "d3": True,
+        "d3_name": "Д3 пол",
+        "critical": False,
+        "critical_name": None,
+        "zeroing": False,
+        "zeroing_name": None,
+        "checkups_count": 3,
+        "loaded_checkups": 2,
+        "accepted_checkups": 1,
+        "violations": 5,
+        "import_format": "base-scores",
+        "import_at": datetime(2026, 10, 1, tzinfo=UTC),
+        "import_channel": "sync",
+    }
+    return UnitPeriodRow(**{**значения, **поля})
+
+
+@pytest.fixture
+def периоды(база: Any, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Подмена выборок базы так, как их отдал бы SQL: охват применён внутри `find_units`."""
+    журнал: dict[str, Any] = {"границы": None, "тип": "—"}
+
+    def найти(text: str, *, countries: Any, normalized: str, limit: int) -> tuple[UnitRef, ...]:
+        return tuple(
+            u
+            for u in ЕДИНИЦЫ
+            if (u.unit == normalized or normalized in u.name.casefold())
+            and (countries is None or u.country in countries)
+        )[:limit]
+
+    def строки(
+        unit: str, *, rating_type: str | None, begin: date, end: date
+    ) -> tuple[UnitPeriodRow, ...]:
+        журнал["границы"] = (begin, end)
+        журнал["тип"] = rating_type
+        return (
+            _строка_периода(СЕГОДНЯ + timedelta(days=3), period_id=9),
+            _строка_периода(СЕГОДНЯ - timedelta(days=20), period_id=8, d3=False, d3_name=None),
+        )
+
+    monkeypatch.setattr(read, "find_units", найти)
+    monkeypatch.setattr(read, "unit_periods", строки)
+    return журнал
+
+
+def test_разбивка_по_периодам_несёт_флаги_загрузку_и_открытость(база: Any, периоды: Any) -> None:
+    ответ = tool.ratings_unit_periods(tenant="HQ", unit="Beograd-1")
+
+    assert ответ["unit"] == {"unit_id": БЕЛГРАД, "name": "Beograd-1", "country": "RS"}
+    открытый, закрытый = ответ["periods"]
+    assert open_flags(открытый) == (True, "Д3 пол", 24.0)
+    assert открытый["period_open"] is True and закрытый["period_open"] is False
+    assert (открытый["checkups_count"], открытый["loaded_checkups"]) == (3, 2)
+    assert открытый["import"] == {
+        "format": "base-scores",
+        "at": "2026-10-01T00:00:00+00:00",
+        "channel": "sync",
+    }
+    assert закрытый["d3"] == {"on": False, "name": None}
+    assert "не выездные проверки Decimus" in ответ["source"]
+
+
+def open_flags(период: dict[str, Any]) -> tuple[bool, str, float]:
+    return period_flag(период), период["d3"]["name"], период["score"]
+
+
+def period_flag(период: dict[str, Any]) -> bool:
+    return bool(период["d3"]["on"])
+
+
+def test_период_открыт_в_последний_день(база: Any, периоды: Any, monkeypatch: Any) -> None:
+    monkeypatch.setattr(
+        read,
+        "unit_periods",
+        lambda *a, **k: (_строка_периода(СЕГОДНЯ), _строка_периода(СЕГОДНЯ - timedelta(days=1))),
+    )
+    открыт, закрыт = tool.ratings_unit_periods(tenant="HQ", unit="Nis")["periods"]
+    assert (открыт["period_open"], закрыт["period_open"]) == (True, False)
+
+
+def test_без_периода_берутся_последние_полгода(база: Any, периоды: Any) -> None:
+    tool.ratings_unit_periods(tenant="HQ", unit="Beograd-1")
+
+    begin, end = периоды["границы"]
+    assert end == СЕГОДНЯ and 180 <= (end - begin).days <= 186
+
+
+def test_заданный_период_и_тип_доходят_до_выборки(база: Any, периоды: Any) -> None:
+    tool.ratings_unit_periods(tenant="HQ", unit="Beograd-1", rating_type="rko", **ПЕРИОД)
+
+    assert периоды["границы"] == (date(2026, 9, 1), date(2026, 9, 30))
+    assert периоды["тип"] == "rko"
+    with pytest.raises(ToolError):
+        tool.ratings_unit_periods(tenant="HQ", unit="Beograd-1", rating_type="xx")
+
+
+def test_неоднозначное_имя_отказ_со_списком_кандидатов(база: Any, периоды: Any) -> None:
+    with pytest.raises(ToolError) as отказ:
+        tool.ratings_unit_periods(tenant="HQ", unit="Beograd")
+
+    текст = str(отказ.value)
+    assert "Beograd-1 (RS" in текст and "Beograd-10 (RS" in текст and "Nis" not in текст
+    assert периоды["границы"] is None  # до выборки периодов дело не дошло
+
+
+def test_точное_имя_выигрывает_у_подстроки(база: Any, периоды: Any) -> None:
+    ответ = tool.ratings_unit_periods(tenant="HQ", unit="beograd-1")
+
+    assert ответ["unit"]["name"] == "Beograd-1"
+
+
+def test_партнёр_не_видит_пиццерию_чужого_пространства(база: Any, периоды: Any) -> None:
+    _партнёр(база, "RS")
+
+    with pytest.raises(ToolError) as отказ:
+        tool.ratings_unit_periods(tenant="X", unit="Sofia-1")
+
+    assert "не найдена" in str(отказ.value) and "BG" not in str(отказ.value)
+    assert tool.ratings_unit_periods(tenant="X", unit="Nis-1")["status"] == "ok"
+    база["охват"] = None  # УК — все страны
+    assert tool.ratings_unit_periods(tenant="HQ", unit="Sofia-1")["status"] == "ok"
+
+
+def test_партнёр_без_стран_ничего_не_видит(база: Any, периоды: Any) -> None:
+    _партнёр(база)
+
+    ответ = tool.ratings_unit_periods(tenant="X", unit="Nis-1")
+
+    assert ответ["status"] == "no_countries" and периоды["границы"] is None
+
+
+def test_нет_оценок_в_периоде_ответ_no_data(база: Any, периоды: Any, monkeypatch: Any) -> None:
+    monkeypatch.setattr(read, "unit_periods", lambda *a, **k: ())
+
+    ответ = tool.ratings_unit_periods(tenant="HQ", unit="Nis-1")
+
+    assert ответ["status"] == "no_data" and ответ["periods"] == []
