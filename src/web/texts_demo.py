@@ -55,15 +55,13 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     },
     "landing.s2.title": {"ru": "Обход", "en": "Walk"},
     "landing.s2.body": {
-        "ru": "Зона за зоной в Telegram: фото, короткий комментарий и что было в прошлый раз.",
-        "en": "Zone by zone in Telegram: a photo, a short comment and what was found last time.",
+        "ru": "Обход ведёт человек: снимает кадр и пишет пару слов. Бегать по чек-листу и искать нужный пункт не нужно.",
+        "en": "A person walks the site: takes a photo and writes a few words. No need to dig through the checklist for the right item.",
     },
-    "landing.s3.title": {"ru": "Подтверждение", "en": "Confirm"},
+    "landing.s3.title": {"ru": "Чек-лист", "en": "Checklist"},
     "landing.s3.body": {
-        "ru": "Модель предлагает пункт и класс нарушения, аудитор фиксирует. Без него в отчёт "
-        "не попадает ничего.",
-        "en": "The model suggests the item and level, the auditor confirms. Nothing reaches "
-        "the report without them.",
+        "ru": "Работу по чек-листу ведёт машина: находит пункт и класс нарушения. Проверяющий подтверждает — без него в отчёт не попадает ничего.",
+        "en": "The machine works the checklist: it finds the item and the level. The inspector confirms — nothing reaches the report without them.",
     },
     "landing.s4.title": {"ru": "Отчёт", "en": "Report"},
     "landing.s4.body": {
@@ -72,8 +70,8 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     },
     "landing.s5.title": {"ru": "Исправление", "en": "Fix"},
     "landing.s5.body": {
-        "ru": "По серьёзным нарушениям запрашивается план действий со сроком: партнёр присылает план, УК принимает или возвращает.",
-        "en": "Serious findings trigger a request for an action plan with a deadline: the partner sends the plan, head office accepts or returns it.",
+        "ru": "План действий и общение с партнёром — всё в одном месте.",
+        "en": "The action plan and talking to the partner — all in one place.",
     },
     "landing.who.kicker": {"ru": "Кому что даёт", "en": "Who gets what"},
     "landing.who.title": {
