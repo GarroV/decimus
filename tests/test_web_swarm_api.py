@@ -342,7 +342,7 @@ def test_токен_не_открывает_остальную_админку(к
     """Токен — только эти четыре адреса: страница админки с ним уводит на вход."""
     for путь in ("/ratings", "/inspections", "/ratings/imports"):
         ответ = клиент.get(путь, headers=ВЕРНЫЙ)
-        assert ответ.status_code == 302 and "/login" in ответ.headers["Location"], путь
+        assert ответ.status_code == 302 and "/welcome?next=" in ответ.headers["Location"], путь
 
 
 def test_только_чтение(клиент: FlaskClient) -> None:

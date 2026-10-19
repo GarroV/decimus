@@ -224,7 +224,8 @@ def test_анониму_вход_а_не_экран(monkeypatch: pytest.MonkeyPa
             клиент.get(ВКЛАДКА),
             клиент.post("/users/connections/issue", data=_форма(), headers=ЗАГОЛОВКИ),
         ):
-            assert ответ.status_code == 302 and "login" in ответ.headers["Location"]
+            куда = ответ.headers["Location"]
+            assert ответ.status_code == 302 and ("login" in куда or "welcome" in куда)
     assert склад.пишущие_зовы() == []
 
 

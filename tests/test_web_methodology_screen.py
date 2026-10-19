@@ -33,7 +33,6 @@ from flask.testing import FlaskClient
 from mcp_checklist_harness import build_edition
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.web import auth
 from src.web import methodology as method
 
 ТЕНАНТ = "default"
@@ -93,7 +92,7 @@ def клиент_без_хранилища(
 def test_без_входа_методика_не_открывается(клиент: FlaskClient) -> None:
     ответ = клиент.get("/admin")
     assert ответ.status_code == 302
-    assert auth.LOGIN_PATH in (ответ.headers.get("Location") or "")
+    assert "/welcome?next=" in (ответ.headers.get("Location") or ""), "D544"
 
 
 # --- раздел показывает состав ---------------------------------------------------

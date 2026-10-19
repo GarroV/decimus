@@ -350,11 +350,22 @@ def install(app: Flask, conf: Settings) -> None:
             if request.method == "GET" and request.endpoint == "home":
                 # Корень неопознанному — посадочная страница, а не голая форма (D524).
                 return redirect(url_for(landing.ENDPOINT, lang=request.args.get("lang")))
-            if request.method == "GET":
-                # Сессия истекла на открытой странице (согласие OAuth, карточка в
-                # панели реестра): на вход и обратно сюда, а не на главную (D465).
-                # Только чтение: на POST-адрес обратно по GET не вернуться.
+            if request.method == "GET" and request.endpoint == oauth.AUTHORIZE_ENDPOINT:
+                # Согласие Claude: человек пришёл подключать, а не знакомиться с
+                # продуктом — сразу на вход и обратно сюда (D465).
                 return redirect(url_for("login", next=request.full_path.rstrip("?")))
+            if request.method == "GET":
+                # Неопознанный по умолчанию видит посадочную страницу, а не форму
+                # (D544): «Войти» на ней уносит адрес, и после входа человек
+                # возвращается туда, куда шёл (D465). Только чтение: на POST-адрес
+                # обратно по GET не вернуться.
+                return redirect(
+                    url_for(
+                        landing.ENDPOINT,
+                        lang=request.args.get("lang"),
+                        next=request.full_path.rstrip("?"),
+                    )
+                )
             return redirect(url_for("login"))
         # Админ без второго способа (D463) пользуется только подключением способа: пока
         # он не подключён, остальное закрыто — и для сессии, выданной до включения ступени.
@@ -912,7 +923,8 @@ def install(app: Flask, conf: Settings) -> None:
             # Сначала база, потом кука. Обратный порядок означал бы, что при
             # отказе базы браузер уже «вышел», а сессия осталась живой.
             close_session(token)
-        ответ = redirect(url_for("login"))
+        # После выхода — посадочная страница, как у любого неопознанного (D544).
+        ответ = redirect(url_for(landing.ENDPOINT))
         ответ.delete_cookie(COOKIE_NAME, path="/")
         return ответ
 
