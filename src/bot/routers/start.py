@@ -66,6 +66,7 @@ from ..unit_pick import (
     UNIT_PARTNER_REFUSED,
     match_unit,
     may_add_units,
+    new_unit_name,
     resolve_unit,
     where_suffix,
 )
@@ -362,7 +363,7 @@ def build_start_router(
             )
             return
         имя = проверка.name
-        сверка = await asyncio.to_thread(match_unit, имя.name, tenant=space)
+        сверка = await asyncio.to_thread(match_unit, unit, имя.name, tenant=space)
         решение = resolve_unit(имя, сверка, space)
         if решение.status == UNIT_KNOWN:
             await _unit_chosen(message, state, lang, решение.name)
@@ -372,6 +373,8 @@ def build_start_router(
                 message, lang, step="start.unit", key="start.unit_new_partner", name=имя.name
             )
             return
+        # Имя новой пиццерии — по справочнику пиццерий (D538), а не по разбору написанного.
+        имя = await asyncio.to_thread(new_unit_name, имя, unit)
         await state.update_data(unit_new=asdict(имя), unit_typed=unit)
         await message.answer(
             t("start.unit_new_ask", lang, name=имя.name, where=where_suffix(имя, lang)),
@@ -413,6 +416,7 @@ def build_start_router(
                 upsert_unit,
                 имя.name,
                 aliases=синонимы,
+                code=имя.code,
                 country=имя.country,
                 city=имя.city,
                 tenant=space,

@@ -41,7 +41,7 @@ async def test_справочник_сверяется_в_пространств
 ) -> None:
     спросили: list[str] = []
 
-    def сверка(typed: str, *, tenant: str) -> unit_pick.UnitMatch:
+    def сверка(typed: str, *_also: str, tenant: str) -> unit_pick.UnitMatch:
         спросили.append(tenant)
         return unit_pick.UnitMatch(name="Batumi-1", suggestions=(), checked=True)
 
@@ -80,7 +80,7 @@ async def test_проверка_партнёра_начинается_в_его_
     monkeypatch.setattr(
         start_router,
         "match_unit",
-        lambda _t, **_k: unit_pick.UnitMatch(name="Batumi-1", suggestions=(), checked=True),
+        lambda *_a, **_k: unit_pick.UnitMatch(name="Batumi-1", suggestions=(), checked=True),
     )
     bot, _session = make_bot()
     dp = _диспетчер()

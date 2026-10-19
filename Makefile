@@ -448,7 +448,9 @@ units:  ## справочник пиццерий: загрузка с сайто
 #   make units-normalize
 #   make units-normalize ARGS="--from-dir выгрузка/"
 #   make units-normalize ARGS="--apply --backup ~/копия-units.json"
-units-normalize:  ## справочник пиццерий по эталону unit_profiles: переименовать, слить пустые дубли
+#   make units-normalize ARGS="--retire --apply --backup ~/копия-units.json"   # снять дубли с историей (D538)
+#   make units-normalize ARGS="--map site_map.csv --apply --backup ~/копия-units.json"   # карта имён с сайтов (D538)
+units-normalize:  ## справочник пиццерий по эталону unit_profiles: переименовать, слить и снять дубли, карта имён
 	$(VENV)/python tools/units_normalize.py $(ARGS)
 
 # Учётка ДЕМО-СТЕНДА, без которой `make web-up` перестал бы быть одной

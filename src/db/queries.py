@@ -32,6 +32,7 @@ from typing import Any
 from src.domain.models import DEFAULT_CHECKLIST_CODE
 from src.domain.tenants import canonical_tenant
 
+from .directory import canonical_unit_name
 from .errors import DbError, StorageError
 from .models import (
     FindingRow,
@@ -517,7 +518,7 @@ def list_inspections(
         else:
             cur.execute(
                 _QUEUE_BY_UNIT_SQL if on_review else _LIST_BY_UNIT_SQL,
-                {**params, "unit": normalize_unit_name(unit)},
+                {**params, "unit": _unit_key(conn, unit)},
             )
         rows = _named(cur, cur.fetchall())
     return [_row_to_inspection(row) for row in rows]
@@ -608,6 +609,16 @@ def _read_detail(
     )
 
 
+def _unit_key(conn: Any, typed: str) -> str:
+    """Ключ фильтра по точке: имя ЖИВОЙ точки по любому написанию набранного (D538).
+
+    «Тбилиси-1» и «Tbilisi-1» — одна история; не нашлась точка — ключ как набрано, и
+    выборка честно пуста. Та же дверь, что у бота, админки и слива (`directory`).
+    """
+    found = canonical_unit_name(conn, typed)
+    return normalize_unit_name(found if found is not None else typed)
+
+
 def findings_by_unit(*, reach: Reach, unit: str, limit: int = DEFAULT_LIMIT) -> list[FindingRow]:
     """Находки одной точки по всем её проверкам, свежие проверки — первыми.
 
@@ -632,7 +643,7 @@ def findings_by_unit(*, reach: Reach, unit: str, limit: int = DEFAULT_LIMIT) -> 
     with _reading("находки точки") as conn, conn.cursor() as cur:
         cur.execute(
             _FINDINGS_BY_UNIT_SQL,
-            {**охват.params(), "unit": normalize_unit_name(name), "limit": rows_limit},
+            {**охват.params(), "unit": _unit_key(conn, name), "limit": rows_limit},
         )
         rows = _named(cur, cur.fetchall())
     return [_row_to_finding(row) for row in rows]
@@ -784,6 +795,7 @@ _UNITS_TOTAL_SQL = """
 select count(*) from units u
 where u.tenant_code = 'HQ'
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and u.merged_into is null
 """
 
 
@@ -909,6 +921,7 @@ _COUNTRY_SUMMARY_SQL = """
 with точки as (
     select u.id, u.country from units u
     where u.tenant_code = 'HQ' and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and u.merged_into is null
       and u.country is not null and u.country <> ''
 ),
 срез as (
@@ -1031,6 +1044,7 @@ select u.name, u.country, u.city
 from units u
 where u.tenant_code = 'HQ'
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and u.merged_into is null
 """
 
 
@@ -1039,6 +1053,7 @@ select u.name, u.id
 from units u
 where u.tenant_code = 'HQ'
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and u.merged_into is null
 """
 
 
@@ -1198,6 +1213,7 @@ from units u
            and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
            and (%(countries)s::text[] is null or u.country = any(%(countries)s))
 where u.tenant_code = 'HQ' and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and u.merged_into is null
 group by u.id, u.name, u.code
 """
 

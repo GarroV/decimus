@@ -264,6 +264,18 @@ class TestЭкран:
     def test_несуществующая_точка_отвечает_404(self, стенд: FlaskClient) -> None:
         assert стенд.get("/units/такой-нет").status_code == 404
 
+    def test_id_снятой_точки_ведёт_на_живую(
+        self, стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """D538: ссылка на кириллический дубль не умирает — она переезжает на латинскую точку."""
+        монкипатч = {"ид-снятой": "live-1"}
+        monkeypatch.setattr(app_mod.directory, "redirect_target", монкипатч.get)
+
+        ответ = стенд.get("/units/ид-снятой")
+
+        assert ответ.status_code == 301
+        assert ответ.headers["Location"].split("?")[0].endswith("/units/live-1")
+
     def test_столбик_ведёт_в_отчёт_той_же_проверки(
         self, стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:

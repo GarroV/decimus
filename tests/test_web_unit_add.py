@@ -128,6 +128,27 @@ def test_вход_на_экране_страны_только_у_уК(monkeypatc
 # --- что уходит в базу -------------------------------------------------------
 
 
+def test_имя_и_код_берутся_из_справочника_пиццерий(
+    уК: FlaskClient, заведено: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D538: набрано кириллицей, справочник знает строку — заводится его латинское имя и код."""
+    from src.db import unit_profiles
+
+    код = "ef" * 16
+    строка = unit_profiles.Profile(
+        country_code="RS", name="Belgrade-6", stage="open", status="", dodo_id=код
+    )
+    monkeypatch.setattr(unit_add, "reference_rows", lambda _страна: (строка,))
+    monkeypatch.setattr(unit_add.unit_profiles, "upsert", lambda _p: None)
+    monkeypatch.setattr(unit_add.unit_profiles, "set_unit_codes", lambda _c: 0)
+
+    ответ = отправить(уК, name="Белград 6")
+
+    assert ответ.status_code == 302
+    assert (заведено[0]["name"], заведено[0]["code"]) == ("Belgrade-6", код)
+    assert заведено[0]["aliases"] == ("Белград 6",)
+
+
 def test_заводит_каноническое_имя_со_страной_и_синонимом(
     уК: FlaskClient, заведено: list[dict[str, Any]]
 ) -> None:
@@ -142,6 +163,7 @@ def test_заводит_каноническое_имя_со_страной_и_�
             "country": "RS",
             "city": "beograd",
             "aliases": ("Белград 6",),
+            "code": None,
             "tenant": "HQ",
         }
     ]

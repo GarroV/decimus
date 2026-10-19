@@ -21,12 +21,13 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from src.db import directory
+from src.db import directory, unit_profiles
 from src.db.errors import DbError
 from src.db.reach import reach_of
 from src.domain.geo import COUNTRIES
 from src.domain.tenants import may_add_units as may_add_units
 from src.domain.unit_name import UnitName
+from src.domain.unit_resolve import DirUnit, find_unit, with_reference
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +106,12 @@ class UnitMatch:
     checked: bool
 
 
-def match_unit(typed: str, *, tenant: str) -> UnitMatch:
-    """Сверить написанное со справочником стран пространства. Отказа не бывает — см. шапку."""
+def match_unit(typed: str, *also: str, tenant: str) -> UnitMatch:
+    """Сверить написанное со справочником стран пространства. Отказа не бывает — см. шапку.
+
+    `also` — другие написания того же ввода (каноническое имя разбора): первое давшее
+    ответ решает, подсказки строятся по `typed`.
+    """
     try:
         # Справочник один (D284): у партнёра — точки его стран, у УК — все.
         # Страны читаются из базы, и её отказ — тот же `DbError`, что ниже.
@@ -114,28 +119,36 @@ def match_unit(typed: str, *, tenant: str) -> UnitMatch:
     except DbError as exc:
         logger.warning("справочник точек недоступен, название принято как написано: %s", exc)
         return UnitMatch(name=None, suggestions=(), checked=False)
-    return match_in(typed, [(u.name, u.aliases, u.country is not None) for u in units])
+    return match_in(typed, [(u.name, u.aliases, u.country is not None) for u in units], *also)
 
 
-def match_in(typed: str, units: list[tuple[str, tuple[str, ...], bool]]) -> UnitMatch:
+def match_in(typed: str, units: list[tuple[str, tuple[str, ...], bool]], *also: str) -> UnitMatch:
     """Сверка по готовому справочнику: `[(имя, синонимы, из базы)]`. Без базы — ради проверки.
 
-    «Из базы» — точка загружена справочником сети (у неё есть страна), а не
-    заведена ботом по первому написанию. При совпадении ключей побеждает точка
-    базы: иначе старый дубль, заведённый до D196, продолжал бы собирать
-    проверки мимо настоящей точки.
+    Точное совпадение решает общий поиск (`unit_resolve.find_unit`, D538) — тот же, что у
+    MCP, админки и слива. «Из базы» — точка загружена справочником сети (у неё есть
+    страна), а не заведена ботом по первому написанию: при совпадении побеждает точка
+    базы, иначе старый дубль, заведённый до D196, продолжал бы собирать проверки мимо
+    настоящей. Подсказки ближайших — ключом `_key`, он же у клиента мини-аппа.
     """
     if not units:
         # Пустой справочник — сверять не с чем, и это не повод не пускать.
         return UnitMatch(name=None, suggestions=(), checked=False)
+    found = find_unit(
+        [
+            DirUnit(id=имя, name=имя, aliases=синонимы, anchored=база)
+            for имя, синонимы, база in units
+        ],
+        typed,
+        *also,
+    ).unit
+    if found is not None:
+        return UnitMatch(name=found.name, suggestions=(), checked=True)
     по_ключу: dict[str, str] = {}
-    # Сначала точки базы, потом заведённые ботом: `setdefault` оставляет первую.
     for имя, синонимы, _ in sorted(units, key=lambda u: not u[2]):
         for написание in (имя, *синонимы):
             по_ключу.setdefault(_key(написание), имя)
     ключ = _key(typed)
-    if ключ in по_ключу:
-        return UnitMatch(name=по_ключу[ключ], suggestions=(), checked=True)
     близкие = difflib.get_close_matches(
         ключ, list(по_ключу), n=SUGGESTIONS_LIMIT * 2, cutoff=SIMILARITY_CUTOFF
     )
@@ -174,6 +187,21 @@ def resolve_unit(имя: UnitName, сверка: UnitMatch, space: str) -> UnitR
     if not may_add_units(space):
         return UnitResolution(UNIT_PARTNER_REFUSED, имя.name)
     return UnitResolution(UNIT_NEW, имя.name)
+
+
+def new_unit_name(имя: UnitName, typed: str) -> UnitName:
+    """Имя новой пиццерии по справочнику пиццерий, а не по разбору написанного (D538).
+
+    Строку справочника знают — имя и код Dodo оттуда: «Белград-1» заводится как
+    «Belgrade-1», а не как то, во что его превратил словарь городов. Справочник не
+    прочитался или строки нет — имя разбора (D233): аудитора это не держит.
+    """
+    try:
+        refs = unit_profiles.refs()
+    except DbError as exc:
+        logger.warning("справочник пиццерий недоступен, имя новой точки — по разбору: %s", exc)
+        return имя
+    return with_reference(имя, typed, refs)
 
 
 def where_suffix(имя: UnitName, lang: str) -> str:

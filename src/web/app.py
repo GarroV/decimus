@@ -557,6 +557,13 @@ def _register_units(app: Flask, conf: Settings) -> None:
             None,
         )
         if точка is None:
+            # Снятая точка (D538) ведёт на ту, в которую влита.
+            try:
+                живая = directory.redirect_target(unit_id)
+            except DbError:
+                живая = None
+            if живая is not None:
+                return redirect(_url("unit", unit_id=живая, lang=request.args.get("lang")), 301)
             return render_template("inspections/not_found.html"), 404
         # Партнёр (D508): к пиццерии один путь — экран «Пиццерии» с её списком
         # проверок; старая карточка точки остаётся УК. Старые ссылки не мертвеют.

@@ -355,3 +355,24 @@ def test_база_молчит_предвыбор_по_умолчанию_ста
     assert опции.status_code == 200 and опции.get_json()["default_lang"] == "ru"
     assert ответ.status_code == 200, "проверка началась, запись выбора — не повод её отказывать"
     assert get_state(АУДИТОР) is not None
+
+
+def test_новая_точка_мини_аппа_заводится_под_именем_и_кодом_справочника_пиццерий(
+    клиент: Клиент, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D538: мини-апп идёт той же дверью, что бот, — имя и код из справочника пиццерий."""
+    from src.bot import unit_pick
+    from src.domain.unit_match import Ref
+
+    заведено: list[tuple[str, object]] = []
+    monkeypatch.setattr(walk_start, "match_unit", lambda *_a, **_k: НЕ_ЗНАЮ)
+    monkeypatch.setattr(
+        walk_start, "upsert_unit", lambda имя, **к: заведено.append((имя, к["code"]))
+    )
+    код = "cd" * 16
+    monkeypatch.setattr(unit_pick.unit_profiles, "refs", lambda: (Ref("RS", "Belgrade-1", код),))
+
+    ответ = клиент.старт(add_unit=True)
+
+    assert ответ.status_code == 200
+    assert заведено == [("Belgrade-1", код)]

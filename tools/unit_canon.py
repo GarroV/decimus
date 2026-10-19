@@ -39,7 +39,7 @@ from src.domain.unit_name import canonical_unit
 _UNITS_SQL = """
 select u.id, u.name, u.country, u.city,
        (select count(*) from inspections i where i.unit_id = u.id)
-from units u where u.tenant_code = %s order by u.name
+from units u where u.tenant_code = %s and u.merged_into is null order by u.name
 """
 
 _RENAME_SQL = """

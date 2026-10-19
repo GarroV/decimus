@@ -81,20 +81,20 @@ _MIN_FUZZY = 6
 _FUZZY_CUTOFF = 0.86
 
 
-def _latin(text: str) -> str:
+def latin_text(text: str) -> str:
     return text.casefold().translate(_PRE)
 
 
 def _word_key(word: str) -> str:
     """Ключ слова: латиницей, без диакритики, с общими разночтениями («ch»/«c» — одно)."""
-    key = unit_name_skeleton(_latin(word))
+    key = unit_name_skeleton(latin_text(word))
     for variant, short in (("ch", "c"), ("sh", "s"), ("zh", "z"), ("dz", "z"), ("dj", "d")):
         key = key.replace(variant, short)
     return key
 
 
 def _house_key(token: str) -> str:
-    parts = (unit_name_skeleton(_latin(p)) for p in token.split("/"))
+    parts = (unit_name_skeleton(latin_text(p)) for p in token.split("/"))
     return "/".join(p for p in parts if p)
 
 
@@ -146,7 +146,7 @@ def clean_ref_name(name: str) -> str:
     return " ".join(text.split())
 
 
-def _numbered_key(name: str) -> str:
+def numbered_key(name: str) -> str:
     """Ключ имени «Город-N» для сверки между алфавитами; пусто, если номера нет."""
     text = clean_ref_name(name)
     if not re.search(r"\d\s*$", _PAREN_TEXT.sub("", text)):
@@ -236,7 +236,7 @@ class RefIndex:
         self.address: dict[str, AddressKey] = {}
         for r in refs:
             self.by_name[fold_unit_name(clean_ref_name(r.name))].append(r)
-            numbered = _numbered_key(r.name)
+            numbered = numbered_key(r.name)
             if numbered:
                 self.by_numbered[numbered].append(r)
             if r.city:
@@ -260,10 +260,10 @@ def _verdict(refs: list[Ref], rule: str, confidence: str, detail: str = "") -> M
 
 def _by_numbered(unit: UnitRow, index: RefIndex) -> Match | None:
     names = [unit.name, *unit.aliases]
-    keys = {_numbered_key(n) for n in names} - {""}
+    keys = {numbered_key(n) for n in names} - {""}
     canon = canonical_unit(re.sub(r"\s*\([^)]*\)", "", unit.name))
     if canon is not None:
-        keys.add(_numbered_key(canon.name))
+        keys.add(numbered_key(canon.name))
     country = unit.country or (canon.country if canon else None)
     found = [r for k in keys for r in _only(index.by_numbered.get(k, []), country)]
     confidence = HIGH if unit.country else MEDIUM
@@ -350,8 +350,10 @@ def _hint(unit: UnitRow, index: RefIndex) -> str:
 
 @dataclass(frozen=True)
 class Action:
-    """Одно решение по точке. `kind`: keep, fill, rename, merge, blocked, conflict,
-    ambiguous, unmatched, skipped. Для merge `target` — точка, в которую вливаем."""
+    """Одно решение по точке. `kind`: keep, fill, rename, merge, retire, blocked, conflict,
+    ambiguous, unmatched, skipped, refused. Для merge и retire `target` — точка, в которую
+    вливаем: merge удаляет пустой дубль, retire (D538) снимает дубль, на который ссылается
+    история, — строка остаётся с `merged_into`."""
 
     kind: str
     unit: UnitRow
@@ -365,7 +367,7 @@ class Action:
 
     @property
     def writes(self) -> bool:
-        return self.kind in ("fill", "rename", "merge")
+        return self.kind in ("fill", "rename", "merge", "retire")
 
 
 def _target_city(ref: Ref, unit: UnitRow) -> str | None:

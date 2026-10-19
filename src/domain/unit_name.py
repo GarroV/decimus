@@ -73,6 +73,8 @@ class UnitName:
     name: str
     city: str | None
     country: str | None
+    #: Код Dodo, когда имя взято из справочника пиццерий (D538); иначе кода нет.
+    code: str | None = None
 
 
 def _ascii(text: str) -> str:
