@@ -47,7 +47,9 @@ def test_без_переменной_демо_входа_нет(
     # Assert — неопознанного уводят на вход или отвечают 404, но сессии нет.
     assert ответ.status_code in (302, 404), ответ.status_code
     if ответ.status_code == 302:
-        assert ответ.headers["Location"].startswith("/login"), ответ.headers["Location"]
+        # GET — на посадочную (D544), POST — на форму входа.
+        ждём = "/welcome" if метод == "GET" else "/login"
+        assert ответ.headers["Location"].startswith(ждём), ответ.headers["Location"]
     assert двери["open"] == [], "без WEB_DEMO открылась сессия"
 
 

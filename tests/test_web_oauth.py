@@ -646,3 +646,11 @@ def test_несвежий_вход_разрешение_кода_не_выдаё
     assert urlsplit(ответ.headers["Location"]).path == "/settings/confirm"
     assert "decision" not in ответ.headers["Location"]
     assert not память.codes, "код выдан по несвежей сессии"
+
+
+def test_согласие_без_входа_идёт_сразу_на_форму_а_не_на_посадочную(клиент: FlaskClient) -> None:
+    """Подключение Claude — не знакомство с продуктом: сразу вход с возвратом (D465, D544)."""
+    ответ = клиент.get(f"{oauth.AUTHORIZE_PATH}?client_id=x")
+
+    assert ответ.status_code == 302
+    assert ответ.headers["Location"].startswith(f"{auth.LOGIN_PATH}?next=")

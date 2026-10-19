@@ -10,7 +10,7 @@
 {% block page_class %} page--landing{% endblock %}
 
 {% block topbar_actions %}
-  <a class="btn btn--ghost lp-top__login" href="{{ url_for('login') }}?lang={{ lang }}">{{ t('landing.login') }}</a>
+  <a class="btn btn--ghost lp-top__login" href="{{ login_href }}{{ '&' if '?' in login_href else '?' }}lang={{ lang }}">{{ t('landing.login') }}</a>
   {% if demo_href %}
     <a class="btn btn--primary lp-top__demo" href="{{ demo_href }}?lang={{ lang }}">{{ t('landing.demo') }}</a>
   {% endif %}
@@ -176,7 +176,7 @@
           {% for n in ('1', '2', '3') %}<li>{{ icon('check') }}{{ t('landing.cta.chip' ~ n) }}</li>{% endfor %}
         </ul>
       {% endif %}
-      <a class="lp-final__login" href="{{ url_for('login') }}?lang={{ lang }}">{{ t('landing.cta.login') }}</a>
+      <a class="lp-final__login" href="{{ login_href }}{{ '&' if '?' in login_href else '?' }}lang={{ lang }}">{{ t('landing.cta.login') }}</a>
     </section>
   </div>
 {% endblock %}

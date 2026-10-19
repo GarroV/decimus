@@ -9,7 +9,7 @@ from flask import Response
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, ПАРОЛЬ, СВОЙ, ТОКЕН, войти, подменить_двери, собрать
 
-from src.web import auth, landing
+from src.web import auth, landing, oauth
 from src.web import inspections as data
 
 ТЕНАНТ = "default"
@@ -61,8 +61,10 @@ def test_каждый_маршрут_админки_закрыт_без_опоз
         ответ = стенд.open(путь, method=метод, headers={"Origin": СВОЙ})
         assert ответ.status_code == 302, f"{метод} {путь} открылся без входа"
         куда = ответ.headers.get("Location") or ""
-        # Корень неопознанному — посадочная страница со входом (D524), остальное — форма.
-        ждём = landing.PATH if (метод, путь) == ("GET", "/") else auth.LOGIN_PATH
+        # Неопознанному по GET — посадочная страница (D524, D544); согласие Claude и
+        # любой POST — форма входа.
+        на_вход = метод != "GET" or путь == oauth.AUTHORIZE_PATH
+        ждём = auth.LOGIN_PATH if на_вход else landing.PATH
         assert ждём in куда, f"{метод} {путь} увёл не туда: {куда}"
 
 
@@ -119,13 +121,29 @@ def test_статика_открыта_без_опознания(стенд: Fla
 
 
 def test_истёкший_вход_на_панели_уводит_на_вход_с_возвратом_на_неё(стенд: FlaskClient) -> None:
-    """Сессия истекла на открытой панели реестра: после входа — на ту же панель."""
+    """Сессия истекла на открытой панели реестра: посадочная страница (D544), её «Войти»
+    несёт адрес на форму входа, и после входа — на ту же панель (D465)."""
     ответ = стенд.get("/inspections?inspection=abc")
 
     assert ответ.status_code == 302
     куда = urlsplit(ответ.headers["Location"])
-    assert куда.path == "/login"
+    assert куда.path == landing.PATH
     assert parse_qs(куда.query) == {"next": ["/inspections?inspection=abc"]}
+
+    посадочная = стенд.get(ответ.headers["Location"]).get_data(as_text=True)
+    assert "/login?next=/inspections?inspection%3Dabc" in посадочная.replace("&amp;", "&"), (
+        "«Войти» на посадочной потерял адрес возврата"
+    )
+
+
+def test_выход_ведёт_на_посадочную(стенд: FlaskClient) -> None:
+    """После выхода человек видит посадочную страницу, а не голую форму (D544)."""
+    войти(стенд)
+
+    ответ = стенд.post(auth.LOGOUT_PATH, headers={"Origin": СВОЙ})
+
+    assert ответ.status_code == 302
+    assert urlsplit(ответ.headers["Location"]).path == landing.PATH
 
 
 def test_адрес_без_запроса_возвращается_без_висящего_вопроса(стенд: FlaskClient) -> None:

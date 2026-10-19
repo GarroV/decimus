@@ -89,7 +89,7 @@ def test_без_входа_настройки_не_открываются(monkey
     with собрать(tenant="HQ").test_client() as client:
         ответ = client.get("/settings")
 
-    assert ответ.status_code == 302 and "/login" in ответ.headers["Location"]
+    assert ответ.status_code == 302 and "/welcome?next=" in ответ.headers["Location"]
 
 
 def test_своя_карточка_ведёт_в_настройки_и_копий_не_держит(
