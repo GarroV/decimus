@@ -55,6 +55,19 @@ _PARTNER_FILL = PatternFill("solid", fgColor="FFF8E1")
 _WRAP = Alignment(wrap_text=True, vertical="top")
 
 
+def _put(ws: Any, row: int, col: int, value: object) -> Any:
+    """Записать значение ячейки; строка — всегда текстом, никогда формулой.
+
+    openpyxl читает строку с «=» в начале как формулу, а формулировку записи,
+    название пиццерии и зоны пишут люди и модель: «=HYPERLINK(…)» в шаблоне
+    стал бы ссылкой, которую партнёр откроет одним щелчком.
+    """
+    ячейка = ws.cell(row=row, column=col, value=value)
+    if isinstance(value, str):
+        ячейка.data_type = "s"
+    return ячейка
+
+
 def plan_rows(findings: Sequence[FindingRow]) -> list[FindingRow]:
     """Нарушения, по которым ждут план, тяжёлые сверху."""
     return [f for f in by_severity(findings) if str(f.level).strip().upper() in PLAN_LEVELS]
@@ -71,12 +84,12 @@ def _head(ws: Any, req: PlanRequest, lang: str) -> int:
         (t("plans.tpl.grade", lang), итог),
         (t("plans.tpl.plan_due", lang), human_day(req.due_on, lang)),
     )
-    ws.cell(row=1, column=1, value=t("plans.tpl.title", lang)).font = _TITLE
+    _put(ws, 1, 1, t("plans.tpl.title", lang)).font = _TITLE
     for i, (label, value) in enumerate(строки, start=3):
-        ws.cell(row=i, column=1, value=label).font = _BOLD
-        ws.cell(row=i, column=3, value=value)
+        _put(ws, i, 1, label).font = _BOLD
+        _put(ws, i, 3, value)
     подсказка = 3 + len(строки) + 1
-    ws.cell(row=подсказка, column=1, value=t("plans.tpl.hint", lang))
+    _put(ws, подсказка, 1, t("plans.tpl.hint", lang))
     return подсказка + 2
 
 
@@ -89,7 +102,7 @@ def build(
     ws.title = t("plans.tpl.sheet", lang)[:31]
     начало = _head(ws, req, lang)
     for col, (key, width) in enumerate(_COLUMNS, start=1):
-        ячейка = ws.cell(row=начало, column=col, value=t(key, lang))
+        ячейка = _put(ws, начало, col, t(key, lang))
         ячейка.font = _BOLD
         ячейка.fill = _HEAD_FILL if col <= _FILLED else _PARTNER_FILL
         ячейка.alignment = _WRAP
@@ -98,7 +111,7 @@ def build(
         строка = начало + i
         значения = (i, f.level, zones.get(f.zone, f.zone), f.code, f.text or "")
         for col, value in enumerate(значения, start=1):
-            ws.cell(row=строка, column=col, value=value).alignment = _WRAP
+            _put(ws, строка, col, value).alignment = _WRAP
         for col in range(_FILLED + 1, len(_COLUMNS) + 1):
             ws.cell(row=строка, column=col).fill = _PARTNER_FILL
     ws.freeze_panes = ws.cell(row=начало + 1, column=1)
