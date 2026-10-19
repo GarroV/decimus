@@ -35,11 +35,22 @@
           <dd><a href="{{ url(registry_path ~ '/' ~ r.inspection_id) }}?lang={{ lang }}">{{ t('actions.request.inspection', date=r.inspection_date) }}</a>
             {%- if r.grade %} · {{ r.grade }}{% if r.pct is not none %} {{ '%.1f'|format(r.pct) }}%{% endif %}{% endif %}</dd></div>
         <div><dt>{{ t('actions.col.due') }}</dt>
-          <dd{% if r.overdue(today) %} class="srow__err"{% endif %}>{{ r.due_on }}</dd></div>
+          <dd{% if r.overdue(today) %} class="srow__err"{% endif %}>{{ day(r.due_on) }}</dd></div>
         <div><dt>{{ t('actions.col.state') }}</dt><dd>{{ state_tag(r, today) }}</dd></div>
         <div><dt>{{ t('actions.panel.origin') }}</dt><dd>{{ t('plans.origin.' ~ r.origin) }}</dd></div>
       </dl>
     </section>
+
+    {#- Что ждём (#976): пока план ждут (в том числе после возврата) — что прислать,
+        к какому сроку, и шаблон из записей проверки; формат загрузки — любой (D265).
+        План на приёмке или принят — секции нет: партнёру делать нечего. -#}
+    {% if r.status == 'requested' %}
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('plans.ask.title') }}</h3>
+      <p class="ssec__text">{{ t('plans.ask.text_hq' if hq else 'plans.ask.text', due=day(r.due_on)) }}</p>
+      <a class="sbtn" href="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/template.xlsx') }}?lang={{ lang }}">{{ icon('download') }}<span>{{ t('plans.tpl.download') }}</span></a>
+    </section>
+    {% endif %}
 
     {% if not hq and r.status == 'requested' %}
       <section class="ssec">

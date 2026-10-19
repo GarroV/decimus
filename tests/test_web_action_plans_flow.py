@@ -88,7 +88,7 @@ def _проверка_уК_с_d2() -> str:
 
 def _загрузить(client: FlaskClient, request_id: str, байты: bytes) -> str:
     ответ = client.post(
-        f"/plans/{request_id}/upload?lang=ru",
+        f"/actions/requests/{request_id}/upload?lang=ru",
         data={"file": (io.BytesIO(байты), "план.pdf")},
         headers=ORIGIN,
         content_type="multipart/form-data",
@@ -105,17 +105,19 @@ def test_путь_из_критерия_приёмки(как: Вход) -> None
 
     # Партнёр Грузии видит запрос у себя и загружает PDF.
     грузия = как("GE")
-    assert "Batumi-1" in грузия.get("/plans?lang=ru").get_data(as_text=True)
+    assert "Batumi-1" in грузия.get("/actions?tab=plans&lang=ru").get_data(as_text=True)
     assert "Версия 1 загружена" in _загрузить(грузия, запрос.id, b"%PDF v1")
 
-    # Партнёр Армении не видит ничего, и раздел УК ему закрыт.
+    # Партнёр Армении не видит ничего: раздел «Действия» у всех один (D526), но
+    # чужой запрос ни в списке, ни в панели, а чужой файл — 404.
     армения = как("AM")
-    assert "Batumi-1" not in армения.get("/plans?lang=ru").get_data(as_text=True)
+    assert "Batumi-1" not in армения.get("/actions?tab=plans&lang=ru").get_data(as_text=True)
     файл = plans.request_of_inspection(проверка, reach=reach_of("HQ"))
     assert файл is not None
-    assert армения.get(f"/plans/files/{файл.files[0].id}").status_code == 404
-    assert армения.get("/actions").status_code == 404
-    assert армения.get(f"/actions/requests/{запрос.id}").status_code == 404
+    assert армения.get(f"/actions/plan-files/{файл.files[0].id}").status_code == 404
+    панель = армения.get(f"/actions?tab=plans&id={запрос.id}&lang=ru").get_data(as_text=True)
+    assert "Batumi-1" not in панель
+    assert армения.get(f"/actions/requests/{запрос.id}/template.xlsx").status_code == 404
 
     # УК видит план на приёмке и возвращает с комментарием.
     уК = как("HQ")
@@ -129,7 +131,8 @@ def test_путь_из_критерия_приёмки(как: Вход) -> None
 
     # Партнёр видит комментарий и загружает вторую версию.
     грузия = как("GE")
-    assert "нет сроков" in грузия.get("/plans?lang=ru").get_data(as_text=True)
+    панель = грузия.get(f"/actions?tab=plans&id={запрос.id}&lang=ru").get_data(as_text=True)
+    assert "нет сроков" in панель
     _загрузить(грузия, запрос.id, b"%PDF v2")
 
     # УК принимает.
@@ -141,14 +144,14 @@ def test_путь_из_критерия_приёмки(как: Вход) -> None
     )
     assert "План принят." in ответ.get_data(as_text=True)
 
-    # Assert — на странице запроса обе версии, комментарий и «Принят»; файл УК
+    # Assert — в панели запроса обе версии, комментарий и «Принят»; файл УК
     # скачивает. Экран страны версий больше не показывает (D512: «Пиццерии»).
-    страница = уК.get(f"/actions/requests/{запрос.id}?lang=ru").get_data(as_text=True)
+    страница = уК.get(f"/actions?tab=plans&id={запрос.id}&lang=ru").get_data(as_text=True)
     assert "Версия 1" in страница and "Версия 2" in страница
     assert "нет сроков" in страница and "Принят" in страница
     итог = plans.request_of_inspection(проверка, reach=reach_of("HQ"))
     assert итог is not None and итог.state == plans.STATE_ACCEPTED
-    скачано = уК.get(f"/plans/files/{итог.files[-1].id}")
+    скачано = уК.get(f"/actions/plan-files/{итог.files[-1].id}")
     assert скачано.status_code == 200 and скачано.data == b"%PDF v2"
     assert [e.action for e in итог.events] == [
         "requested",
