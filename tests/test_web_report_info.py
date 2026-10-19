@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
 
@@ -147,6 +148,18 @@ def test_запись_с_кадрами_раскрывается_и_показы
     assert "find-row--photos" in html
     assert f"/inspections/{ПРОВЕРКА}/photos/{КАДР}" in html
     assert "Photos: 1" in html
+
+
+def test_кадр_записи_раскрывается_на_месте_а_не_в_новой_вкладке(
+    с_отчётом: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D534: ссылка на кадр без target=_blank, со скриптом раскрытия."""
+    находка = карточка(шапка()).findings[0].id
+    _с_кадрами(monkeypatch, с_отчётом, находка)
+    html = с_отчётом.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
+    ссылки = re.findall(r"<a [^>]*/photos/[^>]*>", html)
+    assert ссылки and all("data-zoom" in a and "_blank" not in a for a in ссылки)
+    assert "photo-zoom.js" in html
 
 
 def test_без_кадров_раскрытия_нет(с_отчётом: FlaskClient) -> None:
