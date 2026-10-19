@@ -35,7 +35,7 @@ import secrets
 import shutil
 import sys
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, time, timedelta
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -55,7 +55,8 @@ from src.db.photos import upload_photos  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.space import SYSTEM_SPACE, acting_space, apply_space  # noqa: E402
 from src.db.spaces import bind_countries  # noqa: E402
-from src.db.web_access import create_account  # noqa: E402
+from src.db.trips import Draft, StepDraft, add_step, create_trip, get_trip  # noqa: E402
+from src.db.web_access import create_account, find_by_login  # noqa: E402
 from src.domain.demo import DEMO_PARTNER_TENANT, DEMO_ROLES  # noqa: E402
 from src.domain.engine import chat_dir  # noqa: E402
 from src.domain.tenants import HQ_TENANT  # noqa: E402
@@ -67,6 +68,9 @@ FIRST_CHAT = 999_000_000_601
 #: Чат идущей проверки, которую открывает приложение аудитора в демо
 #: (`WEB_WALK_PREVIEW_CHAT`); из вымышленного диапазона просмотра.
 WALK_CHAT = 999_000_000_701
+#: Та же идущая проверка по-русски — для русского браузера (`WEB_WALK_PREVIEW_CHAT_RU`):
+#: мини-апп открывается на русском целиком, и записи в нём русские.
+WALK_CHAT_RU = 999_000_000_702
 #: Сколько самых свежих проверок оставить на приёмке — показать очередь.
 PENDING = 2
 
@@ -544,7 +548,14 @@ def _accounts() -> None:
         )
 
 
-def _build(chat_id: int, visit: Visit, unit: Unit, seen: set[str], photos_dir: Path | None) -> None:
+def _build(
+    chat_id: int,
+    visit: Visit,
+    unit: Unit,
+    seen: set[str],
+    photos_dir: Path | None,
+    lang: str = "en",
+) -> None:
     """Собрать проверку тем же кодом, что бот и мини-апп; кадры — как у мини-аппа."""
     settings = domain.check_environment()
     work_dir = chat_dir(chat_id, settings)
@@ -555,9 +566,9 @@ def _build(chat_id: int, visit: Visit, unit: Unit, seen: set[str], photos_dir: P
         chat_id,
         unit=unit.name,
         kind=visit.kind,
-        report_lang="en",
-        ui_lang="en",
-        speech_lang="en",
+        report_lang=lang,
+        ui_lang=lang,
+        speech_lang=lang,
         date=visit.date,
         city=unit.city,
         auditor=auditor,
@@ -603,11 +614,15 @@ def _storage_ready() -> bool:
 def _walk(photos_dir: Path | None) -> None:
     """Идущая проверка Northgate-1 для приложения аудитора: в базу не сливается.
 
-    У точки уже есть прошлые проверки — приложение покажет «здесь было».
+    У точки уже есть прошлые проверки — приложение покажет «здесь было». Проверка
+    заведена дважды: английская (основной чат просмотра) и русская (чат для русского
+    браузера), чтобы мини-апп в обоих языках был целиком на своём.
     """
-    visit = Visit(
+    unit = {u.name: u for u in UNITS}["Northgate-1"]
+    today = date.today().isoformat()
+    english = Visit(
         "Northgate-1",
-        date.today().isoformat(),
+        today,
         "planned",
         (
             N(
@@ -620,7 +635,112 @@ def _walk(photos_dir: Path | None) -> None:
             N("DEM13", "D1", "staff", "Debris in the corner of the courier area.", ("p26.jpg",)),
         ),
     )
-    _build(WALK_CHAT, visit, {u.name: u for u in UNITS}["Northgate-1"], {"DEM11"}, photos_dir)
+    russian = Visit(
+        "Northgate-1",
+        today,
+        "planned",
+        (
+            N("DEM11", "D1", "kitchen", "На роликах конвейера снова лёгкий нагар.", ("p09.jpg",)),
+            N("DEM13", "D1", "staff", "Мусор в углу зоны курьеров.", ("p26.jpg",)),
+        ),
+    )
+    _build(WALK_CHAT, english, unit, {"DEM11"}, photos_dir)
+    _build(WALK_CHAT_RU, russian, unit, {"DEM11"}, photos_dir, lang="ru")
+
+
+#: Прошлая проверка Northgate-1 (23.09), записи которой мини-апп показывает как
+#: «здесь было»: их формулировки по-русски — переводом записи, как у настоящих
+#: проверок, где перевод лежит рядом с оригиналом (`translations`).
+PREVIOUS_RU = {
+    "DEM11": "Лёгкий налёт на роликах конвейера.",
+    "DEM12": "Грязь вокруг винтов крепления стола для заготовок.",
+}
+PREVIOUS_RU_DATE = "2026-09-23"
+PREVIOUS_RU_UNIT = "Northgate-1"
+
+_RU_TRANSLATION_SQL = """
+insert into translations (entity_type, entity_id, field, lang, text)
+select 'finding', f.id, 'text', 'ru', %(text)s
+  from findings f
+  join inspections i on i.id = f.inspection_id
+  join units u on u.id = i.unit_id
+ where u.name = %(unit)s and i.inspection_date = %(day)s and f.code = %(code)s
+on conflict (entity_type, entity_id, field, lang) do update set text = excluded.text
+"""
+
+
+def _translate_previous(dsn: str) -> None:
+    """Русские формулировки прошлых записей точки обхода — мини-апп читает их по-русски."""
+    with psycopg.connect(dsn) as conn:
+        apply_space(conn)
+        for code, text in PREVIOUS_RU.items():
+            conn.execute(
+                _RU_TRANSLATION_SQL,
+                {"text": text, "unit": PREVIOUS_RU_UNIT, "day": PREVIOUS_RU_DATE, "code": code},
+            )
+
+
+def _trips(dsn: str, units: dict[str, Unit]) -> int:
+    """Поездки проверяющих УК к пиццериям, где прошли проверки, — «Календарь» не пуст.
+
+    Каждой проверке УК — поездка её проверяющего: день до, день проверки и день после;
+    в плане дорога и осмотр точки. Прошедшие — «done», будущие — «planned».
+    """
+    admin = find_by_login(DEMO_ROLES[0].login)
+    if admin is None:
+        raise RuntimeError("учётка админа демо не заведена — поездкам не от чьего имени")
+    with psycopg.connect(dsn) as conn:
+        apply_space(conn)
+        ids = {
+            str(name): str(uid)
+            for name, uid in conn.execute("select name, id from units").fetchall()
+        }
+    today = date.today()
+    made = 0
+    for i, visit in enumerate(sorted(VISITS, key=lambda v: v.date)):
+        if visit.by_partner:
+            continue
+        auditor = HQ_AUDITORS[(FIRST_CHAT + i) % len(HQ_AUDITORS)]
+        day = date.fromisoformat(visit.date)
+        unit = units[visit.unit]
+        trip_id = create_trip(
+            Draft(
+                executor_name=auditor,
+                executor_user_id=None,
+                country=unit.country,
+                date_from=day - timedelta(days=1),
+                date_to=day + timedelta(days=1),
+                status="done" if day < today else "planned",
+                note=f"Inspection visit to {unit.city}.",
+            ),
+            tenant=HQ_TENANT,
+            actor_id=admin.id,
+        )
+        trip = get_trip(trip_id, tenant=HQ_TENANT)
+        if trip is None:
+            raise RuntimeError("заведённая поездка не читается")
+        add_step(
+            trip,
+            StepDraft(
+                day=day - timedelta(days=1),
+                at=time(9, 0),
+                kind="road",
+                unit_id=None,
+                body=f"Travel to {unit.city}.",
+            ),
+        )
+        add_step(
+            trip,
+            StepDraft(
+                day=day,
+                at=time(10, 0),
+                kind="inspection",
+                unit_id=ids[visit.unit],
+                body="Inspection of the pizzeria.",
+            ),
+        )
+        made += 1
+    return made
 
 
 def seed() -> int:
@@ -659,9 +779,17 @@ def seed() -> int:
     for ident, owner in pushed[:-PENDING]:
         actor = PARTNER_AUDITOR if owner == DEMO_PARTNER_TENANT else "Olivia Hart"
         accept_inspection(ident, tenant=owner, actor=actor)
+    _translate_previous(admin_dsn)
+    trips = _trips(admin_dsn, units)
     _walk(photos_dir)
-    print(f"Auditor app: in-progress inspection in chat {WALK_CHAT} (WEB_WALK_PREVIEW_CHAT)")
-    print(f"Open demo seeded: {len(pushed)} inspections, {len(DEMO_ROLES)} demo accounts")
+    print(
+        f"Auditor app: in-progress inspection in chats {WALK_CHAT} (WEB_WALK_PREVIEW_CHAT) "
+        f"and {WALK_CHAT_RU} (WEB_WALK_PREVIEW_CHAT_RU)"
+    )
+    print(
+        f"Open demo seeded: {len(pushed)} inspections, {trips} trips, "
+        f"{len(DEMO_ROLES)} demo accounts"
+    )
     return 0
 
 

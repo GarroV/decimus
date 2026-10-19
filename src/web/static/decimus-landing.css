@@ -36,17 +36,20 @@ body:has(.lp) { background: var(--surface); }
   box-sizing: border-box;
   min-height: 100vh;
   min-height: 100svh;
-  padding: 104px var(--lp-side) 96px;
+  padding: 80px var(--lp-side) 96px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* Содержимое — от верха, к закладке, а не по центру: лист высотой в окно, а текста
+     на нём меньше, и по центру над заголовком висела пустота, похожая на ошибку
+     вёрстки. Свободное место внизу закрывает следующий лист, наезжая при прокрутке. */
+  justify-content: flex-start;
   border-radius: 28px 28px 0 0;
   box-shadow: 0 -14px 36px -10px rgba(27, 32, 40, .2);
 }
 .lp-sheet--white { background: var(--surface); }
 .lp-sheet--beige { background: var(--brand-beige); }
 .lp-sheet--purple { background: var(--brand-purple-deep); color: #fff; }
-.lp-hero { padding-top: 24px; border-radius: 0; box-shadow: none; justify-content: flex-start; }
+.lp-hero { padding-top: 24px; border-radius: 0; box-shadow: none; }
 .lp-hero > .lp-cols { margin-block: auto; }
 
 /* Закладка — шаг пути, как закладка в папке: того же цвета, что и лист. */

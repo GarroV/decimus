@@ -1124,27 +1124,40 @@ with прошлая as (
     limit 1
 )
 select прошлая.inspection_date, f.code, f.level, f.zone,
-    (select t.text from translations t
-      where t.entity_type = 'finding' and t.entity_id = f.id
-        and t.field = 'text' and t.lang = прошлая.speech_lang)
+    -- Сначала на языке, на котором читает человек, потом на языке проверки.
+    coalesce(
+        (select t.text from translations t
+          where t.entity_type = 'finding' and t.entity_id = f.id
+            and t.field = 'text' and t.lang = %(lang)s),
+        (select t.text from translations t
+          where t.entity_type = 'finding' and t.entity_id = f.id
+            and t.field = 'text' and t.lang = прошлая.speech_lang))
 from прошлая
 left join findings f on f.inspection_id = прошлая.id and f.level not in ('D0', 'R')
 order by f.n
 """
 
 
-def previous_findings(*, tenant: str, unit: str) -> PreviousFindings | None:
+def previous_findings(
+    *, tenant: str, unit: str, lang: str | None = None
+) -> PreviousFindings | None:
     """Прошлая проверка точки с её нарушениями — подсказка «здесь было» (#418).
 
     Отдаёт факт, как и `previous_inspection`: что записали в прошлый раз, где и
     каким классом. Исправлено ли это сегодня, решает аудитор на месте.
     Информационные записи (`D0`) и рекомендации (`R`) нарушениями не являются и не отдаются.
 
+    `lang` — язык, на котором человек читает: формулировка берётся на нём, если
+    перевод записи есть, иначе на языке проверки (`speech_lang`).
+
     `None` — прошлых проверок у точки нет (или точка чужая).
     """
     tenant_code = _require_tenant(tenant)
     with _reading("прошлые нарушения точки") as conn, conn.cursor() as cur:
-        cur.execute(_PREVIOUS_FINDINGS_SQL, {"tenant": tenant_code, "unit": _require_unit(unit)})
+        cur.execute(
+            _PREVIOUS_FINDINGS_SQL,
+            {"tenant": tenant_code, "unit": _require_unit(unit), "lang": lang},
+        )
         rows = cur.fetchall()
     if not rows:
         return None

@@ -3,6 +3,10 @@
     make landing-shots                       # открытое демо, ru и en
     LANDING_SHOTS_BASE=http://127.0.0.1:8080 make landing-shots
 
+Язык браузера (`locale`) ставится по языку снимка: мини-апп обхода выбирает по нему
+русскую или английскую идущую проверку демо (`WEB_WALK_PREVIEW_CHAT_RU`), поэтому
+русский снимок обхода получается целиком русским, а не с английскими записями.
+
 Скрипт сам входит на стенд открытого демо (`/demo` → роль без пароля), открывает
 настоящие экраны за «всё время» — иначе в демо-данных почти пусто, — прячет плашку
 «Демо: выдуманные данные…» и пишет обрезанные ретина-снимки (deviceScaleFactor 2) в
@@ -30,6 +34,12 @@ from playwright.sync_api import Page, sync_playwright
 BASE = os.environ.get("LANDING_SHOTS_BASE", "https://decimus-demo.vasiliy-garro.workers.dev")
 OUT = Path(__file__).resolve().parent.parent / "src" / "web" / "static" / "landing"
 LANGS = ("ru", "en")
+LOCALES = {"ru": "ru-RU", "en": "en-US"}
+# Куски английского интерфейса и пустого календаря: на русском снимке обхода их быть не
+# должно, а на снимке календаря не должно быть «поездок: 0». Нашлись — съёмка падает,
+# а не пишет негодный снимок: так стенд, не обновлённый после правки посева, виден сразу.
+ENGLISH_ON_RU_WALK = ("Found last time", "Recorded now", "Not looked at yet", "Checked")
+EMPTY_TRIPS = ("поездок: 0", "trips: 0")
 SCALE = 2
 WEBP_QUALITY = 86
 # Окно уже обычного: снимок показывается шириной в полстраницы, и текст на нём должен читаться.
@@ -114,6 +124,13 @@ def shot_walk(page: Page, lang: str) -> Path:
     page.goto(f"{BASE}/tg/walk?lang={lang}")
     settle(page)
     hide_chrome(page)
+    if lang == "ru":
+        text = page.inner_text("body")
+        leaked = [w for w in ENGLISH_ON_RU_WALK if w in text]
+        if leaked:
+            raise RuntimeError(
+                f"русский снимок обхода с английским текстом {leaked}: стенд без русской проверки?"
+            )
     return save(page, "walk", lang, None)
 
 
@@ -136,10 +153,13 @@ def shot_report(page: Page, lang: str) -> Path:
 
 
 def shot_plan(page: Page, lang: str) -> Path:
-    """Календарь: проверки месяца с оценками."""
+    """Календарь: проверки месяца с оценками и поездки проверяющих."""
     page.goto(f"{BASE}/calendar?from=2026-07-01&to=2026-07-31&lang={lang}")
     settle(page)
     hide_chrome(page)
+    text = page.inner_text("main")
+    if any(mark in text for mark in EMPTY_TRIPS):
+        raise RuntimeError("в календаре нет поездок: стенд без поездок в посеве?")
     return save(page, "plan", lang, main_clip(page))
 
 
@@ -195,7 +215,9 @@ def main() -> int:
         browser = pw.chromium.launch()
         for lang in LANGS:
             for role, viewport, shooter in SHOTS:
-                context = browser.new_context(viewport=viewport, device_scale_factor=SCALE)
+                context = browser.new_context(
+                    viewport=viewport, device_scale_factor=SCALE, locale=LOCALES[lang]
+                )
                 page = context.new_page()
                 try:
                     enter(page, role, lang)

@@ -102,6 +102,26 @@ def test_просмотр_не_открывается_на_настоящий_ч
     assert load_walk_settings({"WEB_WALK_PREVIEW_CHAT": "999000000501"}).preview_chat
 
 
+def test_русскому_браузеру_просмотр_отдаёт_русский_чат() -> None:
+    стенд = WalkSettings(bot_token=None, preview_chat=7, preview_chat_ru=8)
+    assert chat_of("", стенд, lang="ru") == 8
+    assert chat_of("", стенд, lang="en") == 7
+    assert chat_of("", стенд) == 7
+    без_русского = WalkSettings(bot_token=None, preview_chat=7)
+    assert chat_of("", без_русского, lang="ru") == 7, "нет второго чата — основной, как раньше"
+
+
+def test_русский_чат_просмотра_задаётся_с_тем_же_замком() -> None:
+    env = {"WEB_WALK_PREVIEW_CHAT": "999000000501", "WEB_WALK_PREVIEW_CHAT_RU": "999000000502"}
+    assert load_walk_settings(env).preview_chat_ru == 999000000502
+    with pytest.raises(ValueError, match="вымышленного диапазона"):
+        load_walk_settings({**env, "WEB_WALK_PREVIEW_CHAT_RU": str(АУДИТОР)})
+    with pytest.raises(ValueError, match="без WEB_WALK_PREVIEW_CHAT"):
+        load_walk_settings({"WEB_WALK_PREVIEW_CHAT_RU": "999000000502"})
+    with pytest.raises(ValueError, match="просмотр без подписи"):
+        load_walk_settings({**env, "TELEGRAM_BOT_TOKEN": ТОКЕН})
+
+
 def test_без_настроек_обход_выключен() -> None:
     assert not load_walk_settings({}).enabled
 
@@ -172,6 +192,7 @@ def test_ключ_пометок_свой_у_каждой_проверки(domai
 def _приложение(monkeypatch: pytest.MonkeyPatch, **env: str) -> Flask:
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("WEB_WALK_PREVIEW_CHAT", raising=False)
+    monkeypatch.delenv("WEB_WALK_PREVIEW_CHAT_RU", raising=False)
     for имя, значение in env.items():
         monkeypatch.setenv(имя, значение)
     app = create_walk_app(
@@ -208,6 +229,33 @@ def test_без_проверки_экран_говорит_что_её_нет(
     тело = client.post(walk.DATA_PATH, data="", content_type="text/plain").get_json()
 
     assert тело["state"] == "none" and "zones" not in тело
+
+
+def test_просмотр_по_языку_браузера_открывает_свою_проверку(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    start_inspection(999000000005, unit="Белград-1", kind="planned", report_lang="en", ui_lang="en")
+    start_inspection(999000000006, unit="Белград-2", kind="planned", report_lang="ru", ui_lang="ru")
+    monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
+    client = _приложение(
+        monkeypatch,
+        WEB_WALK_PREVIEW_CHAT="999000000005",
+        WEB_WALK_PREVIEW_CHAT_RU="999000000006",
+    ).test_client()
+
+    по_умолчанию = client.post(walk.DATA_PATH, data="", content_type="text/plain").get_json()
+    английский = client.post(
+        walk.DATA_PATH, data="", content_type="text/plain", headers={"Accept-Language": "en-US"}
+    ).get_json()
+    русский = client.post(
+        walk.DATA_PATH,
+        data="",
+        content_type="text/plain",
+        headers={"Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8"},
+    ).get_json()
+
+    assert по_умолчанию["unit"] == английский["unit"] == "Белград-1"
+    assert русский["unit"] == "Белград-2" and русский["lang"] == "ru"
 
 
 def test_выключенный_обход_не_отвечает(monkeypatch: pytest.MonkeyPatch) -> None:
