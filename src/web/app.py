@@ -102,6 +102,7 @@ from . import methodology as method
 from . import methodology_view as mview
 from . import unit_card as unit_data
 from .config import Settings, load_settings
+from .dates import human_day
 from .db_refusal import domain_reason, public_reason
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
@@ -267,6 +268,9 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Страна и город в справочнике — коды; на экран они идут словом.
             "city_title": lambda code: city_title(code, lang),
             "country_title": lambda code: country_title(code, lang),
+            # Дата на экран — месяцем словом: `10.12.2026` путают с октябрём (#963).
+            "day": lambda value: human_day(value, lang),
+            "by_severity": view.by_severity,
             # Письмо партнёру выводится разметкой ТОЛЬКО через белый список, и
             # чистится в момент вывода: запись в базе не принимается на слово.
             # Шаблон ставит `|safe` строго на результат этой функции.

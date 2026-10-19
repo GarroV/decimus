@@ -97,7 +97,95 @@
     </section>
   {% endif %}
 
-  <div class="hm-grid">
+  {# ── Верх (D557): фильтры слева, справа — большой блок кластеров: РС, РКО, карты, агрегаторы. #}
+  <div class="hm-top">
+    {# ── Фильтры (D557): слева вверху, действуют на весь экран, включая блоки ниже. На телефоне —
+          свёрнутым блоком «Фильтры» (флажок без JS). #}
+    <aside class="hm-filters" aria-label="{{ t('home.filters.title') }}">
+      <input class="hm-filters__flag" type="checkbox" id="hm-filters-flag">
+      <label class="hm-filters__toggle" for="hm-filters-flag">{{ t('home.filters.title') }}</label>
+      <div class="hm-filters__body">
+        <h2 class="hm-label hm-filters__title">{{ t('home.filters.title') }}</h2>
+        {% if cluster_pick %}
+          <div class="hm-field">
+            <span class="hm-field__label">{{ t('home.filters.cluster') }}</span>
+            {{ pick(cluster_pick) }}
+          </div>
+        {% endif %}
+        {% if developer_pick %}
+          <div class="hm-field">
+            <span class="hm-field__label">{{ t('home.filters.developer') }}</span>
+            {{ pick(developer_pick) }}
+          </div>
+        {% endif %}
+        {% if country_pick %}
+          <div class="hm-field">
+            <span class="hm-field__label">{{ t('home.filters.country') }}</span>
+            {{ pick(country_pick) }}
+          </div>
+        {% endif %}
+        <div class="hm-field">
+          <span class="hm-field__label">{{ t('overview.sort') }}</span>
+          {{ pick(sort_pick) }}
+        </div>
+        {# Вход на экран страны — только у УК и только при выбранной стране. #}
+        {% if only_country and country_url %}<a class="hm-more hm-filters__open" href="{{ country_url(only_country) }}">{{ t('home.countries.open', country=country_title(only_country)) }} →</a>{% endif %}
+        <p class="hm-filters__note">{{ t('home.filters.note') }}</p>
+      </div>
+    </aside>
+    {# ── 3. Рейтинги (D418): РС, РКО и карты — CEE и остальные страны. Числа берёт
+          та же функция, что у страницы «Рейтингов», ссылка ведёт туда же. Отказ — строка. #}
+    <section class="hm-card hm-ratings">
+      <header class="hm-card__head">
+        <h2 class="hm-label"><a class="hm-label__link" href="{{ ratings_block_href }}" title="{{ t('home.ratings.open') }}">{{ t('home.rb.title') }}</a></h2>
+        {% if ratings_block.maps_failed %}<span class="hm-meta">{{ t('home.rb.maps_failed') }}</span>{% endif %}
+        {% if ratings_block.aggs_failed %}<span class="hm-meta">{{ t('home.rb.aggs_failed') }}</span>{% endif %}
+        <a class="hm-more" href="{{ ratings_block_href }}">{{ t('home.rb.more') }} →</a>
+      </header>
+            {% if ratings_block.failed %}
+        {{ empty(t('home.rb.failed')) }}
+      {% elif not ratings_block.columns %}
+        {{ empty(t('home.rb.none')) }}
+      {% else %}
+        <div class="hm-rb" style="--hm-rb-cols: {{ ratings_block.columns|length }}">
+          <span class="hm-rb__corner"></span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__col">{{ t('ratings.cluster.' ~ col.key) if col.is_cluster else country_title(col.key) }}</span>
+          {% endfor %}
+          <span class="hm-rb__label">{{ t('home.rb.rs') }}</span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__cell">{{ '—' if col.rs is none else '%.1f'|format(col.rs) }} {{ delta(col.rs_delta) }}</span>
+          {% endfor %}
+          <span class="hm-rb__label">{{ t('home.rb.rko') }}</span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__cell">{{ '—' if col.rko is none else '%.1f'|format(col.rko) }} {{ delta(col.rko_delta) }}</span>
+          {% endfor %}
+          <span class="hm-rb__label">{{ t('home.rb.maps') }}</span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__cell hm-rb__cell--maps">
+              {% for m in col.maps %}
+                <span class="hm-rb__map"><small>{{ t('ratings.maps.provider.' ~ m.provider) }}</small> {{ '—' if m.avg is none else '%.2f'|format(m.avg) }} {{ delta(m.delta, '%+.2f') }}</span>
+              {% else %}—{% endfor %}
+            </span>
+          {% endfor %}
+          {#- Агрегаторы (D557): в родной шкале каждого, как на «Рейтингах». -#}
+          <span class="hm-rb__label is-last">{{ t('home.rb.aggs') }}</span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__cell hm-rb__cell--maps is-last">
+              {% for a in col.aggs %}
+                <span class="hm-rb__map"><small>{{ t('ratings.agg.name.' ~ a.code) }}</small> {{ ('%.0f%%'|format(a.avg)) if a.scale > 10 else '%.1f'|format(a.avg) }}</span>
+              {% else %}—{% endfor %}
+            </span>
+          {% endfor %}
+        </div>
+        {% if ratings_block.aggs_later %}<p class="hm-meta">{{ t('home.rb.aggs_later') }}</p>{% endif %}
+      {% endif %}
+    </section>
+
+  </div>
+
+  {# ── Второй ряд (D557): проверки за период, топ нарушений, потери по процессам. #}
+  <div class="hm-grid hm-grid--3">
     {# ── 2. Проверки за период ──────────────────────────────────────────── #}
     <section class="hm-card">
       <header class="hm-card__head">
@@ -129,44 +217,6 @@
             {% endfor %}
           </div>
         {% endif %}
-      {% endif %}
-    </section>
-
-    {# ── 3. Рейтинги (D418): РС, РКО и карты — CEE и остальные страны. Числа берёт
-          та же функция, что у страницы «Рейтингов», ссылка ведёт туда же. Отказ — строка. #}
-    <section class="hm-card hm-ratings">
-      <header class="hm-card__head">
-        <h2 class="hm-label"><a class="hm-label__link" href="{{ ratings_block_href }}" title="{{ t('home.ratings.open') }}">{{ t('home.rb.title') }}</a></h2>
-        {% if ratings_block.maps_failed %}<span class="hm-meta">{{ t('home.rb.maps_failed') }}</span>{% endif %}
-        <a class="hm-more" href="{{ ratings_block_href }}">{{ t('home.rb.more') }} →</a>
-      </header>
-            {% if ratings_block.failed %}
-        {{ empty(t('home.rb.failed')) }}
-      {% elif not ratings_block.columns %}
-        {{ empty(t('home.rb.none')) }}
-      {% else %}
-        <div class="hm-rb" style="--hm-rb-cols: {{ ratings_block.columns|length }}">
-          <span class="hm-rb__corner"></span>
-          {% for col in ratings_block.columns %}
-            <span class="hm-rb__col">{{ t('ratings.cluster.' ~ col.key) if col.is_cluster else country_title(col.key) }}</span>
-          {% endfor %}
-          <span class="hm-rb__label">{{ t('home.rb.rs') }}</span>
-          {% for col in ratings_block.columns %}
-            <span class="hm-rb__cell">{{ '—' if col.rs is none else '%.1f'|format(col.rs) }} {{ delta(col.rs_delta) }}</span>
-          {% endfor %}
-          <span class="hm-rb__label">{{ t('home.rb.rko') }}</span>
-          {% for col in ratings_block.columns %}
-            <span class="hm-rb__cell">{{ '—' if col.rko is none else '%.1f'|format(col.rko) }} {{ delta(col.rko_delta) }}</span>
-          {% endfor %}
-          <span class="hm-rb__label is-last">{{ t('home.rb.maps') }}</span>
-          {% for col in ratings_block.columns %}
-            <span class="hm-rb__cell hm-rb__cell--maps is-last">
-              {% for m in col.maps %}
-                <span class="hm-rb__map"><small>{{ t('ratings.maps.provider.' ~ m.provider) }}</small> {{ '—' if m.avg is none else '%.2f'|format(m.avg) }} {{ delta(m.delta, '%+.2f') }}</span>
-              {% else %}—{% endfor %}
-            </span>
-          {% endfor %}
-        </div>
       {% endif %}
     </section>
 
@@ -217,7 +267,6 @@
     </section>
   </div>
 
-  <div class="hm-main">
     {# ── 5. Пиццерии: проверки и последние оценки рейтинга колонками (D399) ─── #}
     <section class="hm-card hm-units">
       <header class="hm-card__head">
@@ -262,33 +311,4 @@
       {% endif %}
     </section>
 
-    {# ── Фильтры (D471): справа от списка, действуют на весь экран. На телефоне —
-          свёрнутым блоком над таблицей (флажок без JS). #}
-    <aside class="hm-filters" aria-label="{{ t('home.filters.title') }}">
-      <input class="hm-filters__flag" type="checkbox" id="hm-filters-flag">
-      <label class="hm-filters__toggle" for="hm-filters-flag">{{ t('home.filters.title') }}</label>
-      <div class="hm-filters__body">
-        <h2 class="hm-label hm-filters__title">{{ t('home.filters.title') }}</h2>
-        {% if cluster_pick %}
-          <div class="hm-field">
-            <span class="hm-field__label">{{ t('home.filters.cluster') }}</span>
-            {{ pick(cluster_pick) }}
-          </div>
-        {% endif %}
-        {% if country_pick %}
-          <div class="hm-field">
-            <span class="hm-field__label">{{ t('home.filters.country') }}</span>
-            {{ pick(country_pick) }}
-          </div>
-        {% endif %}
-        <div class="hm-field">
-          <span class="hm-field__label">{{ t('overview.sort') }}</span>
-          {{ pick(sort_pick) }}
-        </div>
-        {# Вход на экран страны — только у УК и только при выбранной стране. #}
-        {% if only_country and country_url %}<a class="hm-more hm-filters__open" href="{{ country_url(only_country) }}">{{ t('home.countries.open', country=country_title(only_country)) }} →</a>{% endif %}
-        <p class="hm-filters__note">{{ t('home.filters.note') }}</p>
-      </div>
-    </aside>
-  </div>
 {% endblock %}

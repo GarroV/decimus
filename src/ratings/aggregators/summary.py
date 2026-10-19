@@ -14,6 +14,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date
 
+from src.db import agg_store
 from src.db.agg_store import LatestRating
 
 #: Порядок колонок блока: сначала крупные, дальше по алфавиту.
@@ -67,3 +68,20 @@ def summarize(
             dates += [r.on_date for r in items]
         result.append(GroupAggs(key, scores, max(dates) if dates else None))
     return tuple(result)
+
+
+def for_groups(
+    groups: Sequence[tuple[str, Sequence[str]]], *, until: date, today: date
+) -> tuple[tuple[str, ...], tuple[GroupAggs, ...], bool]:
+    """Оценки агрегаторов по группам на конец периода: (колонки, строки, взяты ли позже).
+
+    Один путь для «Рейтингов» и «Главной» (D557). Истории у агрегаторов нет дальше
+    первого сбора (11.10.2026): на прошлый период — последние собранные, и экран
+    пишет, что они позже периода. База не ответила — `RatingsError` наверх.
+    """
+    countries = tuple(c for _, members in groups for c in members)
+    rows = agg_store.latest(countries, until=until)
+    later = not rows and until < today
+    if later:
+        rows = agg_store.latest(countries)
+    return aggregators_of(rows), summarize(rows, groups), later

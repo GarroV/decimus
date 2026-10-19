@@ -108,11 +108,12 @@ def test_без_дат_текущий_месяц(стенд: FlaskClient, спр
     assert isinstance(начало, date) and начало.day == 1
 
 
-def test_период_без_стрелок_с_месяцами_в_меню(стенд: FlaskClient) -> None:
-    """D477: стрелок ← → нет; в меню — прошлый, этот и следующий месяц, без «всё время»."""
+def test_период_со_стрелками_и_месяцами_в_меню(стенд: FlaskClient) -> None:
+    """D555: стрелки ← → листают месяц; в меню — прошлый, этот и следующий, без «всё время»."""
     страница = стенд.get("/calendar?from=2026-09-01&to=2026-09-30").get_data(as_text=True)
 
-    assert "speriod__arrow" not in страница
+    assert "speriod__arrow" in страница
+    assert "from=2026-08-01" in страница and "from=2026-10-01" in страница
     assert t("calendar.period.next_month", "ru") in страница
     assert t("registry.period.all", "ru") not in страница
 

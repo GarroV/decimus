@@ -11,10 +11,12 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.country.all": {"ru": "Все страны", "en": "All countries"},
     "home.countries.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
     "home.cluster.all": {"ru": "Все кластеры", "en": "All clusters"},
+    "home.developer.all": {"ru": "Все девелоперы", "en": "All developers"},
     # ── Панель фильтров справа от списка (D471) ─────────────────────────
     "home.filters.title": {"ru": "Фильтры", "en": "Filters"},
     "home.filters.period": {"ru": "Период", "en": "Period"},
     "home.filters.cluster": {"ru": "Кластер", "en": "Cluster"},
+    "home.filters.developer": {"ru": "Бизнес-девелопер", "en": "Business developer"},
     "home.filters.country": {"ru": "Страна", "en": "Country"},
     "home.filters.note": {
         "ru": "Фильтры действуют на весь экран, включая верхние блоки.",
@@ -100,6 +102,16 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.rb.rs": {"ru": "Стандарты · РС", "en": "Standards · RS"},
     "home.rb.rko": {"ru": "Клиентский опыт · РКО", "en": "Customer experience · CX"},
     "home.rb.maps": {"ru": "Карты", "en": "Maps"},
+    "home.rb.aggs": {"ru": "Агрегаторы", "en": "Delivery apps"},
+    "home.rb.aggs_failed": {
+        "ru": "Оценки агрегаторов не загрузились.",
+        "en": "Delivery app ratings did not load.",
+    },
+    "home.rb.aggs_later": {
+        "ru": "Агрегаторы — последние собранные оценки: за этот период их ещё не собирали.",
+        "en": "Delivery apps show the latest collected ratings: "
+        "none were collected for this period.",
+    },
     "home.rb.none": {
         "ru": "Для выбранной страны рейтингов нет.",
         "en": "No ratings for the selected country.",

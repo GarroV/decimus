@@ -438,7 +438,7 @@ web-unlock:  ## запрет на вход после перебора: посм
 #   make units ARGS="sites --country GE --country RS"
 #   make units ARGS="add 'Тбилиси-4' --country GE --city Tbilisi"
 #   make units ARGS="list --country GE"
-units:  ## справочник пиццерий: загрузка с сайтов стран и заведение руками
+units:  ## справочник пиццерий: из рейтингов РС и РКО (`ratings`, D556), с сайтов стран и руками
 	$(VENV)/python tools/units.py $(ARGS)
 
 # СВЕРКА СПРАВОЧНИКА ТОЧЕК С ЭТАЛОНОМ unit_profiles (#316, #909): имя с номером,

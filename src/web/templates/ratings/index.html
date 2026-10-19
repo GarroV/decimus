@@ -149,10 +149,11 @@
         {% if ln.dots %}<div class="rt-cl__plot"><span class="rt-cl__y" aria-hidden="true"><i>{{ sc.high|int }}</i><i>{{ sc.low|int }}</i></span>
         <div class="rt-line">
           <svg class="rt-line__svg" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img" aria-label="{{ t('ratings.line.aria', name=chart.names[i], kind=t('ratings.' ~ kind)) }}">
+            {% for b in sc.bands %}<rect class="rt-line__band is-{{ b.tone }}" x="0" y="{{ b.top }}" width="{{ chart.width }}" height="{{ b.height }}"/>{% endfor %}
             {% if sc.threshold_y is not none %}<line class="rt-line__thr" x1="0" x2="{{ chart.width }}" y1="{{ sc.threshold_y }}" y2="{{ sc.threshold_y }}" vector-effect="non-scaling-stroke"/>{% endif %}
             <polyline class="rt-line__path" points="{{ ln.path }}" vector-effect="non-scaling-stroke"/>
           </svg>
-          {% for d in ln.dots %}<span class="rt-line__dot" style="left: {{ d.left }}%; top: {{ d.top }}%" data-tip="{{ d.title }}" title="{{ d.title }}" tabindex="0"></span>{% endfor %}
+          {% for d in ln.dots %}<span class="rt-line__dot is-{{ d.tone }}" style="left: {{ d.left }}%; top: {{ d.top }}%" data-tip="{{ d.title }}" aria-label="{{ d.title }}" tabindex="0"></span>{% endfor %}
         </div>
         <span></span><div class="rt-line__axis" aria-hidden="true">{% for left, label in ln.labels %}<span style="left: {{ left }}%">{{ label }}</span>{% endfor %}</div></div>
         {% else %}<div class="rt-line__empty">{{ t('ratings.line.empty') }}</div>{% endif %}
@@ -221,6 +222,9 @@
         <td class="num is-bad">{{ v.amount }}</td>
       </tr>{% endfor %}</tbody>
     </table></div>
+    {#- Формулировки — дословно из Dodo IS, и «Дисквалифицировать пиццу» руководство
+        не поняло (#982): пояснение источника под таблицей. -#}
+    <div class="rt-note">{{ t('ratings.hard.source') }}</div>
     {% else %}<div class="rt-empty">{{ t('ratings.empty.hard') }}</div>{% endif %}
     {% for kind in no_data %}<div class="rt-note">{{ t('ratings.empty.' ~ kind) }}</div>{% endfor %}
     {% endif %}

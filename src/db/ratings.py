@@ -142,6 +142,32 @@ def record_failure(
         )
 
 
+# Живая точка — та, у которой есть оценка РС или РКО за период, кончившийся не
+# раньше `since` (D556): рейтинги считает Dodo IS, и закрытая пиццерия из них
+# выпадает сама.
+_LIVE_UNITS_SQL = """
+select u.dodo_id, u.name, u.country_code
+  from ratings.units u
+ where u.country_code is not null
+   and exists (
+       select 1
+         from ratings.scores s
+         join ratings.periods p on p.id = s.period_id
+        where s.unit_dodo_id = u.dodo_id and p.end_on >= %(since)s)
+ order by u.country_code, u.name
+"""
+
+
+def live_units(since: date) -> list[tuple[str, str, str]]:
+    """Точки рейтингов с оценкой за период, кончившийся не раньше `since`: код, имя, страна."""
+    try:
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute(_LIVE_UNITS_SQL, {"since": since}).fetchall()
+    except psycopg.Error as exc:
+        raise RatingsError(f"Точки рейтингов недоступны ({type(exc).__name__}): {exc}") from exc
+    return [(str(r[0]), str(r[1]), str(r[2])) for r in rows]
+
+
 def known_units(conn: psycopg.Connection) -> list[tuple[str, str, str | None]]:
     return [
         (r[0], r[1], r[2])

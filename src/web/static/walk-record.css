@@ -274,6 +274,14 @@
   color: var(--ink-2);
 }
 
+.walk-form__hint--warn {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+
 .walk-form__note {
   margin: 10px 0 0;
   padding: 8px 10px;

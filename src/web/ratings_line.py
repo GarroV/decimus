@@ -27,6 +27,18 @@ SCALE_TOP = 100.0
 MIN_SPAN = 4  # самая узкая шкала, баллы: меньше — шум выглядит обвалом
 SCALE_MARGIN = 1.0
 MAX_LABELS = 6  # больше подписей под графиком не помещается на телефоне
+#: Цвет по значению (D552): ниже 80 — красный, от 80 до 90 — жёлтый, от 90 — зелёный.
+TONE_BAD_BELOW = 80.0
+TONE_GOOD_FROM = 90.0
+
+
+@dataclass(frozen=True)
+class Band:
+    """Полоса фона графика в единицах viewBox: верх, высота, тон (bad / mid / good)."""
+
+    top: float
+    height: float
+    tone: str
 
 
 @dataclass(frozen=True)
@@ -34,6 +46,29 @@ class Scale:
     low: float
     high: float
     threshold_y: float | None
+    bands: tuple[Band, ...] = ()
+
+
+def tone(value: float) -> str:
+    """Тон значения по D552."""
+    if value < TONE_BAD_BELOW:
+        return "bad"
+    return "mid" if value < TONE_GOOD_FROM else "good"
+
+
+def _bands(sc: Scale) -> tuple[Band, ...]:
+    """Полосы тонов в пределах шкалы: от верха графика до низа, без пустых."""
+    edges = [(SCALE_TOP + 1, "good"), (TONE_GOOD_FROM, "mid"), (TONE_BAD_BELOW, "bad")]
+    out: list[Band] = []
+    for i, (upper, name) in enumerate(edges):
+        lower = edges[i + 1][0] if i + 1 < len(edges) else -1.0
+        hi, lo = min(upper, sc.high), max(lower, sc.low)
+        if hi <= lo:
+            continue
+        top = 0.0 if hi >= sc.high else y(sc, hi)
+        bottom = HEIGHT if lo <= sc.low else y(sc, lo)
+        out.append(Band(top, round(bottom - top, 2), name))
+    return tuple(out)
 
 
 @dataclass(frozen=True)
@@ -41,6 +76,7 @@ class Dot:
     left: float  # % ширины
     top: float  # % высоты
     title: str
+    tone: str = "mid"  # тон значения (D552)
 
 
 @dataclass(frozen=True)
@@ -54,13 +90,15 @@ def scale(values: Sequence[float], threshold: float) -> Scale:
     """Шкала строки по самим данным: от целого ниже наименьшего до целого выше
     наибольшего, не уже `MIN_SPAN` и не выше 100."""
     if not values:
-        return Scale(SCALE_TOP - MIN_SPAN, SCALE_TOP, None)
+        empty = Scale(SCALE_TOP - MIN_SPAN, SCALE_TOP, None)
+        return Scale(empty.low, empty.high, None, _bands(empty))
     high = float(min(math.ceil(max(values) + SCALE_MARGIN), SCALE_TOP))
     low = float(math.floor(min(values) - SCALE_MARGIN))
     if high - low < MIN_SPAN:
         low = high - MIN_SPAN
     base = Scale(low, high, None)
-    return Scale(low, high, y(base, threshold) if low < threshold < high else None)
+    thr = y(base, threshold) if low < threshold < high else None
+    return Scale(low, high, thr, _bands(base))
 
 
 def y(sc: Scale, value: float) -> float:
@@ -101,6 +139,7 @@ def line(points: Sequence[Point], sc: Scale, *, title: str) -> Line:
                 title.format(
                     p=f"{span_label(p.begin, p.end)}.{p.end.year}", v=f"{p.avg:.1f}", n=p.units
                 ),
+                tone(p.avg),
             )
             for x, yy, p in zip(xs, ys, points, strict=True)
         ),

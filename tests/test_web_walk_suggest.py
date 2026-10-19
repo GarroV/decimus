@@ -140,6 +140,7 @@ def test_поиск_отдаёт_карточки_и_ничего_не_запи�
         "zone": "hot_kitchen",
         "wording": "Нагар.",
         "confidence": 0,
+        "flags": [],
     }
     assert карточка["resolution"]["source"] in {"single", "words", "model", "hint", "ask"}
     assert модель.звали[0]["photos"] == (JPEG,), "кадр мини-аппа дошёл до модели"

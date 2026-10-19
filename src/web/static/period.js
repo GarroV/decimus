@@ -37,7 +37,10 @@
       if (text !== undefined) node.textContent = text;
       return node;
     }
-    function step(delta) {
+    // Стрелки перерисовывают сетку, как и щелчок по дню: без `stopPropagation`
+    // `pick.js` счёл бы щелчок внешним и закрыл список вместе с выбранным началом.
+    function step(event, delta) {
+      event.stopPropagation();
       var total = view.y * 12 + view.m + delta;
       view = { y: Math.floor(total / 12), m: total % 12 };
       draw();
@@ -54,10 +57,10 @@
       var head = el("div", "pcal__head");
       var prev = el("button", "pcal__nav", "‹");
       prev.type = "button"; prev.setAttribute("aria-label", form.dataset.labelPrev);
-      prev.addEventListener("click", function () { step(-1); });
+      prev.addEventListener("click", function (e) { step(e, -1); });
       var next = el("button", "pcal__nav", "›");
       next.type = "button"; next.setAttribute("aria-label", form.dataset.labelNext);
-      next.addEventListener("click", function () { step(1); });
+      next.addEventListener("click", function (e) { step(e, 1); });
       head.append(prev, el("b", "pcal__month", months[view.m] + " " + view.y), next);
 
       var days = el("div", "pcal__days");

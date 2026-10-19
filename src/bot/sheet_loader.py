@@ -10,8 +10,10 @@
 последнего захода по таблице прошло столько же, забирает по расписанию. Любой заход,
 удачный или нет, считается: сломанная таблица пробуется снова через интервал, а не
 каждую минуту. Итог по каждому листу — в `ratings.sheet_sync` и в журнале загрузок, его
-видно на «Загрузках». Адрес таблицы — `RATINGS_SHEET_ID`; не задан — по расписанию не
-делает ничего, а заявку закрывает отказом с причиной. Людям бот о заборе не пишет.
+видно на «Загрузках». После удачного захода живые точки рейтингов заводятся в
+справочник пиццерий (D556, `src/ratings/directory_feed.py`). Адрес таблицы —
+`RATINGS_SHEET_ID`; не задан — по расписанию не делает ничего, а заявку закрывает
+отказом с причиной. Людям бот о заборе не пишет.
 """
 
 from __future__ import annotations
@@ -21,9 +23,9 @@ import logging
 from datetime import UTC, datetime
 
 from src.db import ratings_sync as state
-from src.db.errors import RatingsError
+from src.db.errors import PushError, RatingsError
 from src.db.space import SYSTEM_SPACE, acting_space
-from src.ratings import sheet_sync
+from src.ratings import directory_feed, sheet_sync
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +62,23 @@ def _tick() -> None:
         error = _failures(results)
     if error:
         logger.warning("рейтинги: забор таблицы контроля не удался: %s", error)
+    else:
+        _feed_directory()
     if request is not None:
         state.finish_request(request.id, ok=error is None, error=error)
+
+
+def _feed_directory() -> None:
+    """Справочник пиццерий — из свежих рейтингов (D556): новая точка появляется на
+    «Странах» с первой оценкой, без ручной загрузки. Сбой справочника забор рейтингов
+    не отменяет — он уже записан; сбой виден в журнале бота."""
+    try:
+        report = directory_feed.sync()
+    except (PushError, RatingsError):
+        logger.warning("рейтинги: справочник пиццерий не обновился", exc_info=True)
+        return
+    for problem in report.skipped:
+        logger.warning("рейтинги: точка не заведена в справочник — %s", problem)
 
 
 async def load_forever() -> None:

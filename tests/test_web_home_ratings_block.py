@@ -18,7 +18,7 @@ from flask.testing import FlaskClient
 from test_web_overview import снимок
 from web_harness import войти, подменить_двери, собрать
 
-from src.db import maps_store
+from src.db import agg_store, maps_store
 from src.db import ratings_read as read
 from src.db.errors import RatingsError
 from src.db.ratings_read import CountryRow
@@ -81,6 +81,14 @@ def рейтинги(monkeypatch: pytest.MonkeyPatch) -> None:
             )
             for c in countries
             if until is None or until.month in (8, 9)
+        ),
+    )
+    monkeypatch.setattr(
+        agg_store,
+        "latest",
+        lambda countries, until=None: tuple(
+            agg_store.LatestRating(c, "wolt", c + "-1", 9.0, 10, 50, date(2026, 9, 30))
+            for c in countries
         ),
     )
 
@@ -248,3 +256,24 @@ def test_страница_передаёт_блоку_страну_и_перио
 
     assert спросили["country"] == "RS"
     assert спросили["period"] == СЕНТЯБРЬ
+
+
+def test_агрегаторы_в_колонке_кластера_в_родной_шкале(рейтинги: None) -> None:
+    """D557: в блоке кластеров — и агрегаторы, тем же подсчётом, что на «Рейтингах»."""
+    итог = block.load(scope=None, country="", period=СЕНТЯБРЬ, today=СЕГОДНЯ)
+
+    assert not итог.aggs_failed
+    assert [(a.code, a.avg, a.scale) for a in итог.columns[0].aggs] == [("wolt", 9.0, 10)]
+
+
+def test_отказ_агрегаторов_не_убирает_рейтинги(
+    рейтинги: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def отказ(*_: object, **__: object) -> tuple[Any, ...]:
+        raise RatingsError("нет связи")
+
+    monkeypatch.setattr(agg_store, "latest", отказ)
+
+    итог = block.load(scope=None, country="", period=СЕНТЯБРЬ, today=СЕГОДНЯ)
+
+    assert итог.aggs_failed and итог.columns[0].rs == 85.0 and итог.columns[0].aggs == ()

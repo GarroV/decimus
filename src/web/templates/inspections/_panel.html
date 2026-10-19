@@ -20,7 +20,7 @@
       <b class="mono spanel__pct">{{ head.pct }}</b>
       <div class="sdetail__who">
         <h2 class="sdetail__title" id="inspection-title">{{ head.unit_name }}</h2>
-        <p class="sdetail__hint">{{ head.inspection_date }} · {{ c.kind }}</p>
+        <p class="sdetail__hint"><b class="sdetail__date">{{ day(head.inspection_date) }}</b> · {{ c.kind }}</p>
         {{ grade_reason(c) }}
       </div>
       <div class="spanel__score">

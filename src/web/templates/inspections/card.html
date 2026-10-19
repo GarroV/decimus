@@ -75,7 +75,7 @@
       </div>
       <div class="head-line__grow">
         <div class="card__title">{{ head.unit_name }}</div>
-        <div class="card__meta">{{ t('card.meta', date=head.inspection_date, kind=kind, checklist=checklist_name) }}</div>
+        <div class="card__meta">{{ t('card.meta', date=day(head.inspection_date), kind=kind, checklist=checklist_name) }}</div>
         {# Сколько вычтено — одной строкой; записи по классам — метками в шапке
            списка записей (D401), не второй раз здесь. #}
         {% if not head.is_legacy %}

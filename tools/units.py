@@ -4,6 +4,8 @@
 (`db.directory.upsert_unit`) и правило повторяемости тоже одно: та же точка не
 создаёт вторую строку, а обновляет существующую.
 
+    make units ARGS="ratings"                 # основной путь (D556): точки из РС и РКО
+    make units ARGS="ratings --country TJ --dry-run"
     make units ARGS="sites --tenant default"
     make units ARGS="sites --tenant default --dry-run"
     make units ARGS="add 'Тбилиси-4' --country GE --city Tbilisi --tenant default"
@@ -16,9 +18,9 @@
 данных или недоступный город — громкий отказ (код выхода 1), а не пустой город. Это НЕ
 учётный источник — сеть числит больше точек, чем показывает витрина (сверено с
 месячным отчётом Dodo Brands: 131 против 209 у DP IMF на август 2026).
-Витрина годится, чтобы завести справочник и увидеть страны; когда появится
-ключ Partner API (#312), учётный источник заменит её, и точки сойдутся по
-`units.code`, а не по названию.
+Учётный источник — рейтинги РС и РКО (D556): режим `ratings` и бот после
+каждого забора таблицы контроля (`src/ratings/directory_feed.py`). Витрина
+осталась запасной дверью; четыре сайта (BY, HR, KG, TJ) городов не отдают (#981).
 
 Поэтому же загрузка ничего не УДАЛЯЕТ. Точка, пропавшая с витрины, не
 обязательно закрыта: её могли снять с доставки на день. Удалять справочник по
@@ -40,11 +42,13 @@ from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1]))
 
-from src.db.directory import list_units, resolve_unit, upsert_unit
+from src.db.directory import list_units, upsert_unit
 from src.db.errors import PushError, RatingsError
 from src.db.reach import reach_of
-from src.db.unit_profiles import by_country, set_unit_codes
+from src.db.unit_profiles import by_country
 from src.domain.unit_match import Ref
+from src.ratings import directory_feed
+from src.ratings.directory_feed import put_unit
 
 #: Сайты сети по странам. Код страны — ISO 3166-1 alpha-2, тот же, что ляжет в
 #: `units.country`: связываем кодом, а не названием.
@@ -276,21 +280,13 @@ def _залить(точки: list[Точка], *, tenant: str) -> tuple[int, li
             не_в_своде.append(f"{т.country} {т.name} ({т.dodo_id})")
             continue
         синонимы = tuple(x for x in (т.name, т.alias) if x and x != ref.clean_name)
-        известная = resolve_unit(ref.clean_name, tenant=tenant)
-        if известная is not None and известная.code not in (None, т.dodo_id):
-            не_в_своде.append(f"{т.country} {ref.clean_name}: имя занято точкой с другим кодом")
+        отказ = put_unit(
+            ref.clean_name, code=т.dodo_id, aliases=синонимы,
+            country=т.country, city=т.city, tenant=tenant,
+        )  # fmt: skip
+        if отказ:
+            не_в_своде.append(отказ)
             continue
-        if известная is not None:
-            if известная.code is None:
-                set_unit_codes([(известная.id, т.dodo_id)])
-            upsert_unit(
-                известная.name, aliases=синонимы, country=т.country, city=т.city, tenant=tenant
-            )
-        else:
-            upsert_unit(
-                ref.clean_name, code=т.dodo_id, aliases=синонимы,
-                country=т.country, city=т.city, tenant=tenant,
-            )  # fmt: skip
         заведено += 1
     return заведено, не_в_своде
 
@@ -337,6 +333,23 @@ def команда_sites(args: argparse.Namespace) -> int:
     return 0
 
 
+def команда_ratings(args: argparse.Namespace) -> int:
+    """Справочник из рейтингов РС и РКО — учётного источника живых пиццерий (D556)."""
+    try:
+        итог = directory_feed.sync(
+            countries=args.country or (), tenant=args.tenant, dry_run=args.dry_run
+        )
+    except (PushError, RatingsError) as exc:
+        print(f"Не вышло: {exc}", file=sys.stderr)
+        return 1
+    print(f"Живых точек в рейтингах: {итог.seen}; заведено или обновлено: {итог.put}")
+    for строка in итог.skipped:
+        print(f"  пропущено — {строка}")
+    if args.dry_run:
+        print("Режим проверки: в базу ничего не писалось")
+    return 1 if итог.skipped else 0
+
+
 def команда_add(args: argparse.Namespace) -> int:
     код = upsert_unit(
         args.name,
@@ -374,6 +387,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--tenant", default="HQ")
     s.add_argument("--dry-run", action="store_true", help="показать и не писать")
     s.set_defaults(функция=команда_sites)
+
+    r = под.add_parser("ratings", help="завести живые точки из рейтингов РС и РКО (D556)")
+    r.add_argument("--country", action="append", help="код страны; можно несколько")
+    r.add_argument("--tenant", default="HQ")
+    r.add_argument("--dry-run", action="store_true", help="показать и не писать")
+    r.set_defaults(функция=команда_ratings)
 
     a = под.add_parser("add", help="завести точку руками")
     a.add_argument("name")

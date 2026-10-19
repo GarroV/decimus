@@ -28,7 +28,7 @@
   <div class="sbox">
     <div class="sbar sbar--registry">
       {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
-                       period_hidden, arrows=False) }}
+                       period_hidden) }}
       {% if can_add_trip %}<a class="sbtn sbtn--primary sbar__add" href="{{ new_trip_href }}" data-drawer-open>{{ icon('plus') }}<span>{{ t('trip.add') }}</span></a>{% endif %}
     </div>
     {% if trips_failed %}<p class="slist__note">{{ t('trip.read_failed') }}</p>{% endif %}

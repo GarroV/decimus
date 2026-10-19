@@ -739,6 +739,10 @@
         if (isAdvice() && was !== !!f.text.trim()) redraw("footer");
       });
       box.appendChild(area);
+      // Модель вписала рассуждение вместо находки (#970): пока текст её, а не
+      // аудитора, — предупреждение под полем. Запись не меняется и не блокируется.
+      var flags = (f.textAuto && f.picked && f.picked.flags) || [];
+      if (flags.indexOf(ASIDE_FLAG) !== -1) box.appendChild(el("p", "walk-form__hint walk-form__hint--warn", tx("walk.sheet.text_aside")));
       var bar = W.translateBar(area);
       if (bar) box.appendChild(bar);
       return box;
@@ -881,6 +885,8 @@
     return box;
   }
 
+  // Имя пометки — из `src/recognize/rules_check.py` (`SERVICE_ASIDE`).
+  var ASIDE_FLAG = "служебная-оговорка";
   var ORDER = ["context", "photos", "words", "item", "reading", "level", "text", "comment", "repeat", "danger"];
 
   function redraw() {

@@ -310,6 +310,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Only {level} is possible for this item.",
     },
     "walk.sheet.text": {"ru": "Что видно", "en": "What you see"},
+    "walk.sheet.text_aside": {
+        "ru": "Похоже, это рассуждение модели, а не находка. Перепишите текст своими словами.",
+        "en": "This looks like the model's reasoning, not a finding. Rewrite it in your own words.",
+    },
     "walk.sheet.text_hint": {
         "ru": "Что, где, сколько. Пусто — формулировка пункта.",
         "en": "What, where, how many. Empty — the item wording.",

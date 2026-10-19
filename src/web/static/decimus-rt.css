@@ -116,6 +116,18 @@
 .rt-line__dot { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
   background: var(--surface); border: 2px solid var(--accent); cursor: default; outline: none; }
 .rt-line__dot:hover, .rt-line__dot:focus-visible { background: var(--accent); }
+/* Цвет по значению (D552): фон — полосами зон, точка — цветом своей зоны. */
+.rt-line__band.is-bad { fill: var(--err-line); }
+.rt-line__band.is-mid { fill: var(--warn-line); }
+.rt-line__band.is-good { fill: var(--ok-line); }
+.rt-line__band { opacity: .55; }
+.rt-line__dot.is-bad { border-color: var(--err); background: var(--err); }
+.rt-line__dot.is-mid { border-color: var(--warn); background: var(--warn); }
+.rt-line__dot.is-good { border-color: var(--ok); background: var(--ok); }
+.rt-line__dot[class*="is-"]:hover, .rt-line__dot[class*="is-"]:focus-visible { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px currentColor; }
+/* Свеча показывает свою подсказку `.rt-tip` (decimus-rt.js); общая CSS-подсказка
+   `[data-tip]::after` легла бы под неё вторым таким же текстом. */
+.rt-line__dot[data-tip]::after { display: none; }
 .rt-line__axis { position: relative; height: 16px; margin-top: 4px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
 .rt-line__axis span { position: absolute; transform: translateX(-50%); }
 .rt-line__empty { font-size: var(--fs-meta); color: var(--ink-3); padding: var(--space-4) 0; }

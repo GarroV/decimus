@@ -10,8 +10,8 @@
 
   Адреса стрелок и быстрых выборов собраны заранее в обработчике (`registry_view`).
   hidden — словарь параметров, которые форма обязана сохранить (язык, отбор).
-  arrows — рисовать ли стрелки ← → (по умолчанию да); «Календарь» (D477) зовёт с
-  `arrows=False`: у него одна кнопка-пилюля с меню, без стрелок.
+  arrows — рисовать ли стрелки ← → (по умолчанию да). «Календарь» звал с
+  `arrows=False` по D477, пока команда не попросила их обратно (D555).
 #}
 {% macro period_picker(period, title, prev, next, quick, action, hidden, arrows=True) %}
   <div class="speriod" role="group" aria-label="{{ t('registry.period.label') }}">
