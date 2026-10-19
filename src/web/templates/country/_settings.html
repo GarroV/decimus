@@ -1,45 +1,134 @@
 {#
-  Панель «Настройки страны» (D536): только администратору (`space.manage`), на этом же
-  экране справа (D527). Две формы: девелопер (справочник рейтингов) и партнёр
-  (пространство, за которым страна). Кнопки и адреса те же по правам, что у экранов
-  «Рейтинги» и «Пользователи»; обычные формы без скриптов, ответ — возврат сюда же.
+  Панель «Карточка страны» (D539; прежде «Настройки страны», D536): широкая панель
+  справа на этом же экране (D527), всё, что известно про страну. Видит каждый, кому
+  видна страна; формы правки (девелопер, пространство партнёра) — только
+  администратору (`space.manage`), остальным те же сведения текстом. Почта партнёра —
+  только УК (D375). Пиццерии — строки, которые экран уже прочитал; название — ссылка
+  на пиццерию на этом же экране. Обычные формы без скриптов, ответ — возврат сюда же.
 #}
+{% from "country/_head.html" import badge with context %}
+{% macro _date(value) %}{{ value or '—' }}{% endmacro %}
+
 {% macro settings_panel(s) %}
-  <article class="sdetail spanel">
+  <article class="sdetail spanel ccard">
     {% if s.saved == 'ok' %}
       <div class="note note--ok" role="status"><div class="note__text">{{ t('country.settings.saved') }}</div></div>
     {% elif s.saved == 'failed' %}
       <div class="note note--error" role="alert"><div class="note__text">{{ t('country.settings.failed') }}</div></div>
     {% endif %}
+
+    {% if s.stages %}
+      <p class="ccard__stages">
+        {% for stage, n in s.stages %}
+          <span class="ccard__stage ccard__stage--{{ stage }}"><b>{{ n }}</b> {{ t('unit.stage.' ~ stage) }}</span>
+        {% endfor %}
+      </p>
+    {% endif %}
+
     <section class="ssec">
-      <h3 class="ssec__title">{{ t('country.settings.developer') }}</h3>
-      <form class="sform" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/developer') }}?lang={{ lang }}">
-        <label><span class="sform__label">{{ t('country.settings.developer') }}</span>
-          <input class="sinput" type="text" name="developer" value="{{ s.developer }}" maxlength="120" autocomplete="off"></label>
-        <p class="ssec__note">{{ t('country.settings.developer_hint') }}</p>
-        <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.save') }}</button>
-      </form>
-    </section>
-    <section class="ssec">
-      <h3 class="ssec__title">{{ t('country.settings.partner') }}</h3>
-      {% if s.failed %}
-        <p class="ssec__note">{{ t('country.settings.partner_failed') }}</p>
-      {% elif s.owner %}
-        <p><b>{{ s.owner_name }}</b> <span class="is-muted">· {{ s.owner }}</span></p>
-      {% else %}
-        <p class="ssec__note">{{ t('country.settings.partner_none') }}</p>
-        {% if s.spaces %}
-          <form class="sform" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/space') }}?lang={{ lang }}">
-            <label><span class="sform__label">{{ t('country.settings.partner_pick') }}</span>
-              <select class="sinput" name="space" required>
-                {% for sp in s.spaces %}<option value="{{ sp.code }}">{{ sp.name }}</option>{% endfor %}
-              </select></label>
-            <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.partner_assign') }}</button>
-          </form>
-        {% endif %}
+      <h3 class="ssec__title">{{ t('country.card.people') }}</h3>
+      <div class="ccard__people">
+        <div class="ccard__person">
+          <span class="sform__label">{{ t('country.card.space') }}</span>
+          {% if s.failed %}
+            <p class="ssec__note">{{ t('country.settings.partner_failed') }}</p>
+          {% elif s.owner %}
+            <p><b>{{ s.owner_name }}</b> <span class="is-muted">· {{ s.owner }}</span></p>
+          {% else %}
+            <p class="is-muted">{{ t('country.settings.partner_none') }}</p>
+            {% if s.can_edit and s.spaces %}
+              <details class="ccard__edit">
+                <summary>{{ t('country.card.edit') }}</summary>
+                <form class="sform" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/space') }}?lang={{ lang }}">
+                  <label><span class="sform__label">{{ t('country.settings.partner_pick') }}</span>
+                    <select class="sinput" name="space" required>
+                      {% for sp in s.spaces %}<option value="{{ sp.code }}">{{ sp.name }}</option>{% endfor %}
+                    </select></label>
+                  <p class="ssec__note">{{ t('country.settings.partner_hint') }}</p>
+                  <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.partner_assign') }}</button>
+                </form>
+              </details>
+            {% endif %}
+          {% endif %}
+        </div>
+        <div class="ccard__person">
+          <span class="sform__label">{{ t('country.settings.developer') }}</span>
+          <p>{% if s.developer %}<b>{{ s.developer }}</b>{% else %}<span class="is-muted">{{ t('country.card.unset') }}</span>{% endif %}</p>
+          {% if s.can_edit %}
+            <details class="ccard__edit"{% if s.saved == 'failed' %} open{% endif %}>
+              <summary>{{ t('country.card.edit') }}</summary>
+              <form class="sform" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/developer') }}?lang={{ lang }}">
+                <label><span class="sform__label">{{ t('country.settings.developer') }}</span>
+                  <input class="sinput" type="text" name="developer" value="{{ s.developer }}" maxlength="120" autocomplete="off"></label>
+                <p class="ssec__note">{{ t('country.settings.developer_hint') }}</p>
+                <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.save') }}</button>
+              </form>
+            </details>
+          {% endif %}
+        </div>
+      </div>
+      {% if s.partners %}
+        <h4 class="ccard__sub">{{ t('country.card.legal') }}</h4>
+        <ul class="ccard__legal">
+          {% for p in s.partners %}
+            <li><b>{{ p.name }}</b> <span class="is-muted">· {{ t('country.card.units_n', n=p.units) }}</span>{% if p.email %} <span class="is-muted">· {{ p.email }}</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
       {% endif %}
-      <p class="ssec__note">{{ t('country.settings.partner_hint') }}</p>
+      {% if s.can_edit %}<p class="ssec__note">{{ t('country.settings.people') }}</p>{% endif %}
     </section>
-    <p class="ssec__note">{{ t('country.settings.people') }}</p>
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('country.card.units') }} <span class="is-muted">{{ s.rows|length }}</span></h3>
+      {% if s.profiles_failed %}<p class="ssec__note">{{ t('country.card.profiles_failed') }}</p>{% endif %}
+      {% if s.rows %}
+        <table class="ccard__table">
+          <thead>
+            <tr>
+              <th>{{ t('country.card.col.name') }}</th>
+              <th>{{ t('country.card.col.address') }}</th>
+              <th>{{ t('country.card.col.stage') }}</th>
+              <th>{{ t('country.card.col.dates') }}</th>
+              <th>{{ t('country.card.col.size') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in s.rows %}
+              <tr class="{{ 'is-closed' if r.is_closed }}">
+                <td data-label="{{ t('country.card.col.name') }}">
+                  <a class="ccard__name" href="{{ select_url(unit=r.key, settings='', saved='', inspection='') }}">{{ r.name }}</a>
+                  {% if r.aliases %}<span class="ccard__aliases">{{ r.aliases|join(' · ') }}</span>{% endif %}
+                  {% if r.partner and s.partners|length > 1 %}<span class="ccard__aliases">{{ r.partner }}</span>{% endif %}
+                </td>
+                <td data-label="{{ t('country.card.col.address') }}">
+                  {% if r.city %}<b class="ccard__city">{{ city_title(r.city) }}</b>{% endif %}
+                  <span>{{ r.address or '—' }}</span>
+                </td>
+                <td data-label="{{ t('country.card.col.stage') }}">
+                  {{ badge(t('unit.stage.' ~ r.stage), {'open': 'ok', 'pipeline': 'warn', 'paused': 'warn', 'closed': 'err'}.get(r.stage, '')) }}
+                  {% if r.status and r.status != t('unit.stage.' ~ r.stage) %}<span class="ccard__aliases">{{ r.status }}</span>{% endif %}
+                </td>
+                <td data-label="{{ t('country.card.col.dates') }}" class="ccard__dates">
+                  {% if r.is_closed %}
+                    <span>{{ t('country.card.closed_on') }} {{ _date(r.closed_on) }}</span>
+                  {% else %}
+                    <span>{{ t('country.card.restaurant_on') }} {{ _date(r.restaurant_on) }}</span>
+                    <span>{{ t('country.card.delivery_on') }} {{ _date(r.delivery_on) }}</span>
+                  {% endif %}
+                </td>
+                <td data-label="{{ t('country.card.col.size') }}" class="ccard__size">
+                  {% if r.area or r.seats %}
+                    {% if r.area %}<span>{{ r.area|round(0)|int }} m²</span>{% endif %}
+                    {% if r.seats %}<span>{{ t('country.card.seats', n=r.seats) }}</span>{% endif %}
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="ssec__note">{{ t('country.card.no_units') }}</p>
+      {% endif %}
+    </section>
   </article>
 {% endmacro %}

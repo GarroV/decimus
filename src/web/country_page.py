@@ -8,7 +8,7 @@
 повторным нажатием (`fold=1`). Справа: у страны — шапка (название и период в
 одной строке, сведения отдельными блоками), статистика страны и ниже список её
 проверок; у пиццерии — её сведения, цифры и ниже список её проверок. Проверка из
-списка и «Настройки страны» (только администратору) открываются панелью справа на
+списка и «Карточка страны» (D539, всем, кому видна страна) открываются панелью справа на
 этом же экране (D527), а не отдельной страницей.
 Состояние живёт в адресе: период `from` / `to`,
 `unit=<ключ>` (выбранная пиццерия), `inspection=<id>` (панель проверки),
@@ -476,7 +476,8 @@ def _one_country(
     проверки = tuple(
         sorted(data.inspections, key=lambda r: (r.inspection_date, r.pushed_at), reverse=True)
     )
-    can_settings = bool(вид.code) and guard.may("space.manage")
+    # Карточку страны видит каждый, кому видна страна (D539); правка — `space.manage`.
+    can_settings = bool(вид.code)
     settings_open = can_settings and request.args.get("settings") == "1"
     card_open = bool(card is not None and card.explicit)
     return {
@@ -494,11 +495,21 @@ def _one_country(
         "pick_open": settings_open or card_open,
         "pick_back": select(inspection="", settings="", saved=""),
         "pick_title": (
-            t("country.settings.title", lang) if settings_open else t("registry.drawer.title", lang)
+            f"{t('country.settings.title', lang)} · {country_title(вид.code, lang)}"
+            if settings_open
+            else t("registry.drawer.title", lang)
         ),
         "settings_open": settings_open,
+        "pick_wide": settings_open,
         "panel_settings": (
-            country_settings.load(вид.code, developer, request.args.get("saved", ""))
+            country_settings.load(
+                вид.code,
+                developer,
+                request.args.get("saved", ""),
+                units=units,
+                can_edit=guard.may("space.manage"),
+                show_email=auth.current_tenant() == HQ_TENANT,
+            )
             if settings_open
             else None
         ),

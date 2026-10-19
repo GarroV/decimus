@@ -75,11 +75,6 @@
         <h1 class="pk-title">{{ row.name }}</h1>
       </div>
       <div class="cn-head__period">{{ badge(t('unit.stage.' ~ row.stage), {'open': 'ok', 'pipeline': 'warn', 'paused': 'warn', 'closed': 'err'}.get(row.stage, '')) }}</div>
-      <div class="cn-head__actions">
-        {% if row.unit_id and is_hq %}
-          <a class="btn btn--sm" href="{{ url('/units/' ~ row.unit_id) }}?lang={{ lang }}">{{ t('country.unit.card') }}</a>
-        {% endif %}
-      </div>
     </div>
     <dl class="cn-facts">
       {% call fact(t('country.unit.facts.city')) %}{{ city_title(row.city) or '—' }}{% endcall %}

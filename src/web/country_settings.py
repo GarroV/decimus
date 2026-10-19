@@ -1,7 +1,12 @@
-"""«Настройки страны» на экране «Страны» (D536): девелопер и партнёр страны — только администратору.
+"""«Карточка страны» на экране «Страны» (D539, прежде «Настройки страны», D536).
 
-Панель справа на том же экране (D527). Своей логики здесь нет, только дверь веба
-в то, что уже есть:
+Широкая панель справа на том же экране (D527): всё, что известно про страну, —
+партнёр и девелопер, юридические партнёры из свода, пиццерии с адресами, датами
+открытия и другими написаниями названия (D538). Видит каждый, кому видна страна;
+почта партнёра — только УК (D375), правка — только администратору (ниже).
+
+Строки пиццерий — те же `UnitRow`, что уже прочитал экран (`country_units`): второго
+чтения базы ради панели нет. Правка — дверь веба в то, что уже есть:
 
 - девелопер — справочник рейтингов (`ratings.countries.developer`), тот же
   `ratings_read.set_developer`, что у экрана «Рейтинги → Загрузки» (`ratings.py`);
@@ -18,6 +23,8 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -30,6 +37,7 @@ from src.domain.tenants import HQ_TENANT
 
 from . import auth, guard, partner_spaces
 from . import country as country_data
+from .country_units import UnitRow, UnitsData
 from .origin import refuse_foreign_origin
 from .sections import section
 
@@ -52,6 +60,19 @@ class SpaceOption:
     name: str
 
 
+#: Порядок стадий в сводке и таблице карточки; закрытые — в конце.
+STAGES = ("open", "paused", "pipeline", "closed")
+
+
+@dataclass(frozen=True)
+class LegalPartner:
+    """Юридический партнёр из свода: имя, сколько у него пиццерий страны, почта (только УК)."""
+
+    name: str
+    units: int
+    email: str = ""
+
+
 @dataclass(frozen=True)
 class Panel:
     """Что показывает панель: девелопер, чья страна, кому её можно отдать, исход."""
@@ -67,24 +88,69 @@ class Panel:
     failed: bool = False
     #: Исход прошлого сохранения (`ok` / `failed`) или пусто.
     saved: str = ""
+    #: Формы правки — только у `space.manage`; остальным те же сведения текстом.
+    can_edit: bool = False
+    #: Пиццерии страны в порядке таблицы и сводка «стадия → сколько».
+    rows: tuple[UnitRow, ...] = ()
+    stages: tuple[tuple[str, int], ...] = ()
+    partners: tuple[LegalPartner, ...] = ()
+    #: Свод пиццерий не прочитался — адресов и дат нет, и панель об этом говорит.
+    profiles_failed: bool = False
 
 
-def load(code: str, developer: str, saved: str) -> Panel:
-    """Панель страны `code`: текущий девелопер и партнёр-пространство."""
+def _ordered(rows: Sequence[UnitRow]) -> tuple[UnitRow, ...]:
+    """Открытые сверху, закрытые в конце; внутри стадии — по названию."""
+    порядок = {stage: i for i, stage in enumerate(STAGES)}
+    return tuple(sorted(rows, key=lambda r: (порядок.get(r.stage, 0), r.name.casefold())))
+
+
+def _stages(rows: Sequence[UnitRow]) -> tuple[tuple[str, int], ...]:
+    счёт = Counter(r.stage for r in rows)
+    return tuple((stage, счёт[stage]) for stage in STAGES if счёт[stage])
+
+
+def _partners(rows: Sequence[UnitRow], *, show_email: bool) -> tuple[LegalPartner, ...]:
+    """Партнёры из свода по числу пиццерий; почта — только если её вправе видеть (D375)."""
+    счёт = Counter(r.partner for r in rows if r.partner)
+    почта = {r.partner: r.partner_email for r in rows if r.partner and r.partner_email}
+    return tuple(
+        LegalPartner(name, n, почта.get(name, "") if show_email else "")
+        for name, n in sorted(счёт.items(), key=lambda kv: (-kv[1], kv[0].casefold()))
+    )
+
+
+def load(
+    code: str,
+    developer: str,
+    saved: str,
+    *,
+    units: UnitsData,
+    can_edit: bool,
+    show_email: bool,
+) -> Panel:
+    """Карточка страны `code`: партнёр и девелопер, партнёры свода, пиццерии."""
+    сведения: dict[str, Any] = {
+        "code": code,
+        "developer": developer,
+        "saved": saved if saved in _OUTCOMES else "",
+        "can_edit": can_edit,
+        "rows": _ordered(units.rows),
+        "stages": _stages(units.rows),
+        "partners": _partners(units.rows, show_email=show_email),
+        "profiles_failed": units.profiles_failed,
+    }
     try:
         spaces = partner_spaces.overview()
     except DbError:
-        log.warning("Пространства партнёров для настроек страны не прочитались", exc_info=True)
-        return Panel(code, developer, failed=True, saved=saved if saved in _OUTCOMES else "")
+        log.warning("Пространства партнёров для карточки страны не прочитались", exc_info=True)
+        return Panel(**сведения, failed=True)
     owner = next((s for s in spaces if code in s.countries), None)
     free = tuple(SpaceOption(s.code, s.name or s.code) for s in spaces if s.code != HQ_TENANT)
     return Panel(
-        code=code,
-        developer=developer,
+        **сведения,
         owner=owner.code if owner else "",
         owner_name=(owner.name or owner.code) if owner else "",
-        spaces=() if owner else free,
-        saved=saved if saved in _OUTCOMES else "",
+        spaces=() if owner or not can_edit else free,
     )
 
 

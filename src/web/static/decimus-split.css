@@ -52,6 +52,8 @@ body:has(.sdrawer) { overflow: hidden; }
   width: 560px; max-width: 96vw; height: 100dvh; background: var(--surface); color: var(--ink);
   border-left: 1px solid var(--line); box-shadow: 0 22px 70px rgba(10, 13, 17, .3);
   animation: sdrawer-in 100ms ease-out; }
+/* Широкая панель (карточка страны, D539): таблица пиццерий не помещается в 560px. */
+@media (min-width: 720px) { .sdrawer--wide .sdrawer__panel { width: min(1040px, 96vw); } }
 .sdrawer.is-closing .sdrawer__panel { animation: sdrawer-out 100ms ease-in forwards; }
 .sdrawer.is-closing .sdrawer__scrim { animation: sdrawer-fade 100ms ease-in reverse forwards; }
 .sdrawer__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none;
