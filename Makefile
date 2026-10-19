@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest porcha porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
+.PHONY: bootstrap check test test-honest porcha porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units units-normalize demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -440,6 +440,16 @@ web-unlock:  ## запрет на вход после перебора: посм
 #   make units ARGS="list --country GE"
 units:  ## справочник пиццерий: загрузка с сайтов стран и заведение руками
 	$(VENV)/python tools/units.py $(ARGS)
+
+# СВЕРКА СПРАВОЧНИКА ТОЧЕК С ЭТАЛОНОМ unit_profiles (#316, #909): имя с номером,
+# код Dodo и город берутся из эталона, дубли на двух алфавитах сливаются. Без
+# аргументов — сухой прогон по базе, ничего не пишет; запись — `--apply --backup`.
+#
+#   make units-normalize
+#   make units-normalize ARGS="--from-dir выгрузка/"
+#   make units-normalize ARGS="--apply --backup ~/копия-units.json"
+units-normalize:  ## справочник пиццерий по эталону unit_profiles: переименовать, слить пустые дубли
+	$(VENV)/python tools/units_normalize.py $(ARGS)
 
 # Учётка ДЕМО-СТЕНДА, без которой `make web-up` перестал бы быть одной
 # командой: после T323 стенд без учётки встречает формой входа, войти в

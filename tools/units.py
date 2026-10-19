@@ -37,9 +37,11 @@ from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1]))
 
-from src.db.directory import list_units, upsert_unit
-from src.db.errors import PushError
+from src.db.directory import list_units, resolve_unit, upsert_unit
+from src.db.errors import PushError, RatingsError
 from src.db.reach import reach_of
+from src.db.unit_profiles import by_country
+from src.domain.unit_match import Ref, RefIndex, UnitRow, match_unit
 
 #: Сайты сети по странам. Код страны — ISO 3166-1 alpha-2, тот же, что ляжет в
 #: `units.country`: связываем кодом, а не названием.
@@ -190,10 +192,43 @@ def собрать_страну(код: str) -> tuple[str, list[Точка], str
     return имя, собрано, None
 
 
+def _эталон(страна: str) -> RefIndex:
+    """Сведения о пиццериях страны (`unit_profiles`); пусто, если свод не загружен."""
+    try:
+        профили = by_country(страна)
+    except RatingsError:
+        return RefIndex([])
+    return RefIndex([Ref(p.country_code, p.name, p.dodo_id, p.city, p.address) for p in профили])
+
+
 def _залить(точки: list[Точка], *, tenant: str) -> int:
+    """Точка, которую эталон знает, ложится под его именем и кодом (#316, #909).
+
+    Иначе повторная загрузка заводила бы вторую строку на каждую точку, уже
+    переименованную `make units-normalize`: имя с витрины — не то, что в базе.
+    Не знает эталон — точка ложится как есть, под именем сайта.
+    """
     заведено = 0
+    эталоны: dict[str, RefIndex] = {}
     for т in точки:
-        upsert_unit(т.name, country=т.country, city=т.city, tenant=tenant)
+        известная = resolve_unit(т.name, tenant=tenant)
+        if известная is not None:
+            # Имя или синоним уже называет точку: уточняем её географию под её же именем.
+            upsert_unit(
+                известная.name, code=известная.code, country=т.country, city=т.city, tenant=tenant
+            )
+            заведено += 1
+            continue
+        индекс = эталоны.setdefault(т.country, _эталон(т.country))
+        найдено = match_unit(UnitRow(id="", name=т.name, country=т.country), индекс)
+        if найдено.status == "matched":
+            ref = найдено.ref
+            upsert_unit(
+                ref.clean_name, code=ref.dodo_id, aliases=(т.name,),
+                country=т.country, city=т.city, tenant=tenant,
+            )  # fmt: skip
+        else:
+            upsert_unit(т.name, country=т.country, city=т.city, tenant=tenant)
         заведено += 1
     return заведено
 
