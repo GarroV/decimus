@@ -93,13 +93,14 @@ Flask-приложение управляющей компании и партн
 `app.py` собирает приложение и ещё держит часть экранов; остальные экраны
 подключаются своими `install(app, conf)`.
 
-<!-- map:begin files src/web/{__main__,app,assets,config,db_refusal,errors,icons,sections,view,webauthn_rp}.py -->
+<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,view,webauthn_rp}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/__main__.py` | Точка входа веб-админки: `python -m src.web` |
 | `src/web/app.py` | Веб-админка управляющей компании: маршруты и сборка приложения |
 | `src/web/assets.py` | Статика админки: отпечаток в адресе и долгий кеш |
 | `src/web/config.py` | Окружение веб-админки: адрес, порт, тенант, язык интерфейса, ключ подписи |
+| `src/web/dates.py` | Дата для человека: «6 сен 2026», а не `2026-09-06` и не `06.09.2026` (#963) |
 | `src/web/db_refusal.py` | Отказ базы словами для вошедшего — без устройства стенда (#515, F-012 аудита 12.10) |
 | `src/web/errors.py` | Отказы блока `web` |
 | `src/web/icons.py` | Иконки админки — набор линейки из дизайн-системы (`static/icons.json`) |
