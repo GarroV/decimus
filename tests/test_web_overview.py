@@ -218,7 +218,7 @@ def test_карточка_требует_внимания_есть_только_
 ) -> None:
     """Нет ни заданий, ни пиццерий «куда смотреть» — карточки нет; одно задание — есть."""
     # Arrange
-    monkeypatch.setattr(home_board, "SHOWN", True)  # D540: стикеры скрыты флагом
+    monkeypatch.setattr(home_board, "SHOWN", True)  # D542: стикеры скрыты флагом
     заголовок = t_ru("home.attention.title")
     monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
     monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts())
@@ -238,7 +238,7 @@ def test_отказ_доски_не_молчит(стенд: FlaskClient, monkey
     """Карточки нет из-за сбоя базы, а не из-за «нечего делать» — это надо сказать."""
 
     # Arrange
-    monkeypatch.setattr(home_board, "SHOWN", True)  # D540: стикеры скрыты флагом
+    monkeypatch.setattr(home_board, "SHOWN", True)  # D542: стикеры скрыты флагом
 
     def отказ(*_: object, **__: object) -> home_board.Counts:
         raise DbError("нет связи")
@@ -771,7 +771,7 @@ def test_главная_собирает_доску_проверки_и_стра
 ) -> None:
     """Сквозной показ «Главной» (D399) со всеми блоками: шаблон не падает ни на одном."""
     # Arrange
-    monkeypatch.setattr(home_board, "SHOWN", True)  # D540: стикеры скрыты флагом
+    monkeypatch.setattr(home_board, "SHOWN", True)  # D542: стикеры скрыты флагом
     monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
     monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=2))
 
@@ -957,7 +957,7 @@ def test_последних_проверок_на_главной_нет(
 def test_стикеры_на_главной_скрыты_флагом(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """D540: задание есть, но стикера нет — и база для доски не читается."""
+    """D542: задание есть, но стикера нет — и база для доски не читается."""
     позвали: list[object] = []
 
     def счётчики(*a: object, **_: object) -> home_board.Counts:

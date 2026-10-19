@@ -79,7 +79,7 @@
         <div class="ccard__person">
           <span class="sform__label">{{ t('country.card.auditors') }}</span>
           {% if s.auditors %}
-            <p>{% for a in s.auditors %}<b>{{ a.name }}</b> <span class="is-muted">{{ a.inspections }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+            <p>{% for a in s.auditors %}<b>{{ a.name }}</b> <span class="is-muted">· {{ t('country.card.inspections_n', n=a.inspections) }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</p>
           {% else %}<p class="is-muted">{{ t('country.card.auditors_none') }}</p>{% endif %}
         </div>
         <div class="ccard__person">

@@ -116,7 +116,7 @@ class Panel:
     partners: tuple[LegalPartner, ...] = ()
     #: Свод пиццерий не прочитался — адресов и дат нет, и панель об этом говорит.
     profiles_failed: bool = False
-    #: Площадки доставки: код Dodo → оценки (D541); не прочитались — отметка.
+    #: Площадки доставки: код Dodo → оценки (D543); не прочитались — отметка.
     aggregators: Mapping[str, tuple[AggScore, ...]] = field(default_factory=dict)
     aggregators_failed: bool = False
     #: Аудиторы страны за период экрана, по числу проверок.

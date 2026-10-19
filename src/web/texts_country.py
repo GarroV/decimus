@@ -212,6 +212,7 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     "country.card.delivery_on": {"ru": "доставка", "en": "delivery"},
     "country.card.closed_on": {"ru": "закрыта", "en": "closed"},
     "country.card.seats": {"ru": "мест: {n}", "en": "{n} seats"},
+    "country.card.inspections_n": {"ru": "проверок: {n}", "en": "inspections: {n}"},
     "country.settings.developer": {"ru": "Девелопер", "en": "Developer"},
     "country.settings.developer_hint": {
         "ru": "Имя из справочника рейтингов: по нему страны собираются в группу девелопера. "
