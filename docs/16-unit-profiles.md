@@ -60,7 +60,7 @@ docker exec <контейнер web> rm /tmp/svod.xlsx
 |---|---|
 | Таблица | `unit_profiles` (миграция `0046_unit_profiles.sql`) |
 | Разбор свода | `src/ratings/svod.py` |
-| Запись и чтение | `src/db/unit_profiles.py` |
+| Запись и чтение | `src/db/unit_profiles.py` (`save` — свод целиком; `upsert` — одна строка из формы «Добавить пиццерию», D536) |
 | Блок карточки | `src/web/templates/units/_profile.html`, `src/web/app.py: _unit_profile` |
 | Блок страны | `src/web/templates/country/index.html`, `src/web/app.py: _country_units` |
 | Тесты разбора | `tests/test_svod.py` |

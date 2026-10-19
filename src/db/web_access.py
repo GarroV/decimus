@@ -266,7 +266,8 @@ _RESOLVE_SESSION_SQL = """
            (exists (select 1 from web_passkeys p where p.user_id = u.id)
             or exists (select 1 from web_totp t
                         where t.user_id = u.id and t.confirmed_at is not null)),
-           s.second_step_at is not null
+           s.second_step_at is not null,
+           u.country_filter
       from web_sessions s
       join web_users u on u.id = s.user_id
      where s.fingerprint = %s
@@ -376,6 +377,9 @@ class Account:
     has_second_factor: bool = False
     #: Сессия выдана после второй ступени; без неё способы входа не снимаются (D463).
     passed_second_step: bool = False
+    #: Постоянный отбор стран экрана «Страны» (`web_users.country_filter`, `0077`,
+    #: D536); `None` — отбора нет. Приезжает с сессией, как язык.
+    country_filter: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -1121,6 +1125,7 @@ def resolve_session(token: str) -> Account | None:
         session_id=str(row[9]),
         has_second_factor=bool(row[10]),
         passed_second_step=bool(row[11]),
+        country_filter=tuple(row[12]) if row[12] else None,
     )
 
 

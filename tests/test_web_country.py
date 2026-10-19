@@ -159,19 +159,19 @@ def test_пиццерии_слева_закрытые_свёрнуты(
     assert "Руставели" not in страница
 
 
-def test_раскрытая_точка_открывает_панель_со_сведениями_и_историей(
+def test_выбранная_точка_показывает_справа_сведения_и_свои_проверки(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     вид = с_точкой(данные())
     вид = replace(вид, unit_id="u-1", unit_name="Батуми-1", history=вид.snapshot.inspections)
     с_таблицей(monkeypatch, строка_таблицы())
     страница = открыть(стенд, monkeypatch, вид, "/country/GE?unit=u-1")
-    assert "data-drawer" in страница and 'id="sdrawer-title"' in страница
-    assert "Руставели" in страница and "ООО Ромашка" in страница
+    # D536: сведения и цифры пиццерии — в рабочей области, а не в панели; панель — для проверки.
+    справа = страница.split("</aside>", 1)[1]
+    assert "Руставели" in справа and "ООО Ромашка" in справа and "cn-facts" in справа
     assert "/units/u-1" in страница
-    assert f"/inspections/{вид.snapshot.inspections[0].id}" in страница
-    # Без выбора панели нет.
-    assert "data-drawer>" not in открыть(стенд, monkeypatch, вид, "/country/GE")
+    assert f"inspection={вид.snapshot.inspections[0].id}" in справа
+    assert "data-drawer>" not in страница and 'id="sdrawer-title"' not in страница
 
 
 def test_точка_только_из_свода_открывается_без_карточки(
@@ -180,9 +180,8 @@ def test_точка_только_из_свода_открывается_без_�
     ключ = country_units.SVOD_KEY + "pipe-1"
     с_таблицей(monkeypatch, строка_таблицы(key=ключ, name="Pipe-1", unit_id="", stage="pipeline"))
     страница = открыть(стенд, monkeypatch, данные(), f"/country/GE?unit={ключ}")
-    assert (
-        "data-drawer" in страница and "/units/u-" not in страница and "/units/pipe" not in страница
-    )
+    assert "/units/u-" not in страница and "/units/pipe" not in страница
+    assert "Pipe-1" in страница.split("</aside>", 1)[1]
 
 
 def test_ссылки_пиццерий_сохраняют_период_и_язык(
@@ -244,8 +243,8 @@ def test_страна_выбирается_в_списке_слева_и_выб�
     assert "/country/GE" in колонка and "/country/RS" in колонка
     отмеченная = колонка.split("pk-item is-on", 1)[1].split("</a>", 1)[0]
     assert "Грузия" in отмеченная or "GE" in отмеченная
-    # Без девелопера «Все страны» не предлагается: сводки по всем нет.
-    assert "Все страны" not in страница and 'class="pick"' not in колонка
+    # Без девелопера строки «сводка по всем странам» нет; «Мои страны» — свой отбор (D536).
+    assert 'class="pick"' not in колонка and "Σ" not in колонка
 
 
 def test_без_страны_в_адресе_справа_первая_страна_а_не_пустота(
@@ -286,7 +285,7 @@ def test_шапка_страны_держит_кнопки_и_счётчики(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     страница = открыть(стенд, monkeypatch, данные(), "/country/GE")
-    шапка = страница.split('class="pk-head__actions"', 1)[1].split("</div>", 1)[0]
+    шапка = страница.split('class="cn-head__actions"', 1)[1].split("</div>", 1)[0]
     assert "cn-count" in шапка and "Экшн-планы" in шапка and "Предписания" in шапка
 
 

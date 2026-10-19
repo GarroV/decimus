@@ -113,17 +113,19 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,actions_screen,calendar_screen,calendar_view,country,country_page,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,actions_screen,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
 | `src/web/actions_screen.py` | Раздел «Действия»: экшн-планы и предписания — один экран у УК и партнёра (D526, D527) |
 | `src/web/calendar_screen.py` | Раздел «Календарь» (D497): сетка месяца с проверками и поездками (D505, D506) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
-| `src/web/country.py` | Экран «Пиццерии» (прежде «Страна»): снимок страны и история пиццерии (D260, D262, D512) |
-| `src/web/country_page.py` | Сборка экрана «Пиццерии» (D467, D474, D504, D527): колонка выбора слева, рабочая область справа |
-| `src/web/country_summary.py` | Сводка экрана «Пиццерии» (D467): цифры периода и девелоперы стран |
-| `src/web/country_units.py` | Таблица «Пиццерии» экрана «Пиццерии» (D467): одна строка на пиццерию |
+| `src/web/country.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
+| `src/web/country_filter.py` | Постоянный отбор стран экрана «Страны» (D536): «мне нужен только Кавказ» |
+| `src/web/country_page.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
+| `src/web/country_settings.py` | «Настройки страны» на экране «Страны» (D536): девелопер и партнёр страны — только администратору |
+| `src/web/country_summary.py` | Сводка экрана «Страны» (D467): цифры периода и девелоперы стран |
+| `src/web/country_units.py` | Строки пиццерий экрана «Страны» (D467): одна строка на пиццерию |
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
 | `src/web/geo_names.py` | Названия стран и городов для людей — по коду из справочника точек |
 | `src/web/google_mail.py` | Черновик письма партнёру в почте вошедшего (D174, D176, #332) |
@@ -219,7 +221,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts.py` | Тексты веб-админки: каталог по ключам, язык — параметр |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
-| `src/web/texts_country.py` | Тексты экрана «Пиццерии» (D467, D504): колонка, шапка, плитки, пиццерии, панель |
+| `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
 | `src/web/texts_demo.py` | Тексты открытого демо и лендинга (D524): выбор роли, плашка, посадочная страница |
 | `src/web/texts_grade.py` | Тексты «почему такая буква» и «расшифровка оценки» на карточке проверки (D490) |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
@@ -279,9 +281,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/` | 22 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, … (+14) |
 | `src/web/templates/actions/` | 9 | _filters.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, index.html, prescription_form.html, … (+1) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
-| `src/web/templates/country/` | 4 | _panel.html, _parts.html, _summary.html, index.html |
+| `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
-| `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
+| `src/web/templates/inspections/` | 9 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, _row.html, card.html, letter.html, list.html, … (+1) |
 | `src/web/templates/journal/` | 1 | page.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
@@ -474,6 +476,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0074_trips.sql` | Поездки на «Календаре» (D497, D505, D506): кто едет, куда, с какого по какое число и план по дням — время, что происходит, пиццерия, заметка |
 | `0075_email_unique_live.sql` | Почта входа через Google уникальна только среди ЖИВЫХ учёток (аудит 12.10, F-031) |
 | `0076_google_sub.sql` | Номер аккаунта Google (`sub`) за учёткой (аудит 12.10, F-027) |
+| `0077_web_country_filter.sql` | «Страны» (D536): постоянный отбор стран у человека — «мне нужен только Кавказ» |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

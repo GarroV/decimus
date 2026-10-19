@@ -66,7 +66,9 @@ from . import (
     assets,
     auth,
     calendar_screen,
+    country_filter,
     country_page,
+    country_settings,
     edition,
     grade_explain,
     guard,
@@ -214,6 +216,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_country(app, conf)
     _register_units(app, conf)
     unit_add.install(app, conf)
+    country_filter.install(app)
+    country_settings.install(app)
     _register_registry(app, conf)
     calendar_screen.install(app, conf)
     letter_draft.install(app, conf)
@@ -476,7 +480,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
 
 
 def _register_country(app: Flask, conf: Settings) -> None:
-    """Раздел «Пиццерии»: работа с одной страной (D260, D262, D467).
+    """Раздел «Страны» (прежде «Пиццерии»): работа с одной страной (D260, D262, D467, D536).
 
     Слева колонка стран и пиццерий, справа шапка, плитки и «Где болит» (шаблон
     «выбор слева — рабочая область справа», D474); сборка в `country_page`.
@@ -500,6 +504,8 @@ def _register_country(app: Flask, conf: Settings) -> None:
             limit=REGISTRY_LIMIT,
             item_titles=_item_titles(conf, язык),
             pick=_pick,
+            kind_title=_kind_title,
+            card=_registry_panel(request.args.get("inspection", "").strip()[:64], conf=conf),
         )
 
     @app.get(section("country").path + "/<code>", endpoint="country")
@@ -513,6 +519,8 @@ def _register_country(app: Flask, conf: Settings) -> None:
             limit=REGISTRY_LIMIT,
             item_titles=_item_titles(conf, язык),
             pick=_pick,
+            kind_title=_kind_title,
+            card=_registry_panel(request.args.get("inspection", "").strip()[:64], conf=conf),
         )
 
 
