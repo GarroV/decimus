@@ -95,15 +95,10 @@
       {{ _link(url('/actions/prescriptions/new') ~ '?inspection=' ~ head.id ~ '&lang=' ~ lang, 'flag', t('card.act.rx'), panel, short=t('card.act.rx_short')) }}
     {% endif %}
 
-    {# «Исправить» (D465). В панели — правка записей ждущей проверки: кнопка
-       раскрывает формы правки в листе вычитки (`split.js`, `data-edit-toggle`);
-       принятую не правят, и кнопки у неё нет. На странице карточки — перенос
-       по дате и пиццерии (D195). #}
-    {% if panel %}
-      {% if c.may_revise and c.sheet %}
-        <a class="hbtn hbtn--icon" href="#review" data-edit-toggle aria-label="{{ t('card.act.move') }}" title="{{ t('card.act.move') }}">{{ icon('pencil') }}</a>
-      {% endif %}
-    {% elif c.may_move %}
+    {# «Исправить» на странице карточки — перенос по дате и пиццерии (D195). В панели
+       его нет (D465), а правка записей — не кнопка в шапке, а карандаш у каждой
+       записи на вычитке (D535). #}
+    {% if c.may_move and not panel %}
       {% call _pop('move', 'pencil', t('card.act.move')) %}
         <p class="field-note">{{ t('move.hint') }}</p>
         <form method="post" action="{{ full }}/move?lang={{ lang }}" class="hact__form">

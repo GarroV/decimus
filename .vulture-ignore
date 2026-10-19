@@ -226,11 +226,6 @@ retracted_visible
 retracted_count
 # Отметка приёмки (D199): время — подсказка у метки «Принята» на карточке.
 accepted_at
-# Лист вычитки (D199, D200): число нарушений зоны, записи вне чек-листа версии
-# и каталог пунктов для формы правки читает только шаблон карточки.
-violations
-unplaced
-catalogue
 # Признак «показана самая свежая записанная версия» — по нему шаблон решает,
 # показывать формы правки или предупреждение о старой версии (T320).
 is_latest
@@ -591,6 +586,7 @@ _second_step_required
 do_add_finding
 do_add_photo
 do_delete_photo
+do_suggest
 on_fix_reading
 on_reading_other
 on_reading_value

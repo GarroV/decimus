@@ -82,9 +82,7 @@ def _лист(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         review,
         "load_sheet",
-        lambda _h, findings, **kw: review.build_sheet(
-            items=пункты, zones=зоны, findings=findings, lang=kw["lang"]
-        ),
+        lambda _h, **kw: review.build_sheet(items=пункты, zones=зоны, lang=kw["lang"]),
     )
 
 
@@ -111,7 +109,7 @@ def test_администратор_подтверждает_и_подпись_�
 
 
 @админ
-def test_ждущая_своя_показана_с_плашкой_листом_и_кнопкой_без_переноса(
+def test_ждущая_своя_показана_с_плашкой_правкой_на_месте_и_без_переноса(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Arrange
@@ -121,17 +119,19 @@ def test_ждущая_своя_показана_с_плашкой_листом_�
     # Act
     страница = стенд.get("/inspections/x").get_data(as_text=True)
 
-    # Assert — принять, исправить и отклонить можно (D465); переносить до приёмки нечего.
+    # Assert — принять, править на месте и отклонить можно (D465, D535);
+    # переносить до приёмки нечего.
     assert "Проверка на приёмке" in страница
     assert "/accept?lang=" in страница
     assert "/findings/f1/revise?lang=" in страница
-    assert "Сохранить и пересчитать" in страница
+    assert 'data-proofread-form="edit"' in страница
+    assert "Добавить нарушение" in страница
     assert "/move?lang=" not in страница
     assert "/retract?lang=" in страница
 
 
 @админ
-def test_лист_вычитки_показывает_кадры_и_называет_недоступные(
+def test_правка_записи_показывает_кадры_и_называет_недоступные(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """#422: вычитывающий видит кадр записи и то, что ещё один показать нечем."""
@@ -147,8 +147,8 @@ def test_лист_вычитки_показывает_кадры_и_называ
     # Act
     страница = стенд.get("/inspections/x").get_data(as_text=True)
 
-    # Assert — в листе миниатюра и пометка; в записях пометка в строке счётчика.
-    assert 'class="review-photo"' in страница
+    # Assert — в правке записи миниатюра и пометка; в записях пометка в строке счётчика.
+    assert 'class="pshot__img"' in страница
     assert f"/photos/{кадр}" in страница
     assert 'target="_blank"' not in re.search(r"<a [^>]*/photos/[^>]*>", страница).group(0)  # type: ignore[union-attr]
     assert страница.count("Фото недоступно: 1") == 1
@@ -159,7 +159,7 @@ def test_лист_вычитки_показывает_кадры_и_называ
 def test_ждущая_чужого_пространства_только_на_чтение(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """УК видит ждущую партнёра (D283): лист есть, кнопок приёмки и правки нет."""
+    """УК видит ждущую партнёра (D283): записи есть, кнопок приёмки и правки нет."""
     # Arrange
     вызовы = _приёмка(monkeypatch, пространство=ЧУЖОЕ)
     _лист(monkeypatch)
@@ -169,10 +169,11 @@ def test_ждущая_чужого_пространства_только_на_ч
     ответ = стенд.post("/inspections/x/accept", headers=ORIGIN)
 
     # Assert
-    assert "Весь чек-лист" in страница
+    assert "Весь чек-лист" not in страница
     assert "только для чтения" in страница
     assert "/accept?lang=" not in страница
     assert "/revise?lang=" not in страница
+    assert "data-proofread" not in страница
     assert ответ.status_code == 403
     assert вызовы == []
 
@@ -311,10 +312,10 @@ def test_отказ_правки_показан_текстом(стенд: Flask
 
 
 @админ
-def test_запись_вне_чек_листа_тоже_исправляется(
+def test_запись_в_необычной_зоне_тоже_исправляется_на_месте(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Запись, перенесённую в необычную зону, лист показывает отдельно — с формой правки."""
+    """Запись, перенесённую в необычную зону, правят так же, как любую: зона остаётся выбранной."""
     # Arrange — пункт записи в чек-листе только в зале, а запись — на кухне.
     _приёмка(monkeypatch)
     пункты = ({"id": "CLN02", "kind": "violation", "question_ru": "Пол", "zones": "HALL"},)
@@ -325,17 +326,16 @@ def test_запись_вне_чек_листа_тоже_исправляется
     monkeypatch.setattr(
         review,
         "load_sheet",
-        lambda _h, findings, **kw: review.build_sheet(
-            items=пункты, zones=зоны, findings=findings, lang=kw["lang"]
-        ),
+        lambda _h, **kw: review.build_sheet(items=пункты, zones=зоны, lang=kw["lang"]),
     )
 
     # Act
     страница = стенд.get("/inspections/x").get_data(as_text=True)
 
     # Assert
-    assert "Записи вне чек-листа версии: 1" in страница
+    assert "Записи вне чек-листа версии" not in страница
     assert "/findings/f1/revise?lang=" in страница
+    assert '<option value="KITCHEN" selected>Кухня</option>' in страница
 
 
 @админ
@@ -379,12 +379,11 @@ def test_панель_ждущей_принимает_и_правит_на_ме�
         in страница
     )
     assert "Принять проверку" in страница
-    assert (
-        "/findings/f1/revise?lang=ru" in страница
-        and '<form method="post" class="stack mt-gap" data-panel-form' in страница
-    )
-    assert "data-edit-toggle" in страница  # «Исправить» ведёт к формам правки
-    assert 'id="review"' in страница
+    assert "/findings/f1/revise?lang=ru" in страница
+    assert 'data-proofread-form="edit"' in страница and "data-panel-form" in страница
+    assert "data-proofread-add" in страница  # «+ Добавить нарушение» в шапке записей
+    assert "data-edit-toggle" not in страница  # отдельной кнопки «Исправить» нет (D535)
+    assert 'id="review"' not in страница and "Весь чек-лист" not in страница
     # Отдельной страницы карточки среди действий панели нет: «Открыть полностью» снято.
     assert 'href="/inspections/11111111-1111-1111-1111-111111111111?lang=ru"' not in страница
     assert "?lang=ru#review" not in страница
@@ -400,6 +399,7 @@ def test_панель_принятой_не_предлагает_исправи�
     страница = стенд.get(ПАНЕЛЬ).get_data(as_text=True)
 
     assert "data-edit-toggle" not in страница
+    assert "data-proofread" not in страница
     assert "/move?lang=" not in страница
     assert "/retract?lang=" in страница  # отклонить — по прежнему правилу
 

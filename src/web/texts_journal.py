@@ -34,6 +34,7 @@ _WEB: dict[str, tuple[str, str]] = {
     "do_delete_photo": ("Удалено фото", "Photo deleted"),
     "do_move": ("Проверка перенесена", "Inspection moved"),
     "do_retract": ("Проверка снята", "Inspection retracted"),
+    "do_suggest": ("Подобран пункт для нарушения", "Item matched for a violation"),
     "do_revise": ("Нарушение исправлено", "Finding revised"),
     "reset_second_factor": (
         "Сброшена вторая ступень входа у человека",

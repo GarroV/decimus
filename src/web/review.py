@@ -1,13 +1,13 @@
-"""Лист вычитки проверки на приёмке: весь чек-лист по пунктам (D199).
+"""Чек-лист той версии, по которой считали проверку, — для правки записей на вычитке (D535).
 
-Вычитывающему мало записанных нарушений — он обязан видеть и то, что аудитор
-счёл чистым. Поэтому лист собирается из ЧЕК-ЛИСТА той версии, по которой
-проверку считали, а записи раскладываются по его пунктам. «Чисто» здесь — не
-отдельная отметка аудитора (её в данных нет), а честное «по этому пункту в
-этой зоне записи нет».
+Вычитывающий правит запись на месте и добавляет нарушение: пункт он выбирает из
+пунктов нарушений ЭТОЙ версии, а класс и зону сужает по тому, что версия даёт
+пункту. Блок «Весь чек-лист» (D199) с карточки снят (D535): он повторял записи,
+а все записи — и те, что в версии без пары «пункт + зона», — показаны списком.
 
-Арифметики у листа нет: оценка, вычеты и разбивка приходят из базы такими,
-какими их посчитал движок. Лист только раскладывает.
+Арифметики здесь нет: оценка, вычеты и разбивка приходят из базы такими, какими
+их посчитал движок. Допустимость пункта, класса и зоны решает сервер при
+сохранении (`revision._checked_entry`); здесь — только то, что показать в выборе.
 """
 
 from __future__ import annotations
@@ -16,8 +16,7 @@ import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
-from src.db.models import FindingRow, InspectionRow
-from src.domain.models import NON_DEDUCTING
+from src.db.models import InspectionRow
 
 from . import methodology as method
 from .errors import MethodologyRefused
@@ -33,40 +32,31 @@ ALL_ZONES = "*"
 
 
 @dataclass(frozen=True)
-class SheetItem:
-    """Пункт чек-листа в одной зоне и записи по нему."""
-
-    code: str
-    question: str
-    findings: tuple[FindingRow, ...]
-
-    @property
-    def clean(self) -> bool:
-        # Замер и рекомендация нарушением пункт не делают (#444, D201).
-        return not any(f.level not in NON_DEDUCTING for f in self.findings)
-
-
-@dataclass(frozen=True)
 class SheetZone:
     code: str
     name: str
-    items: tuple[SheetItem, ...]
 
-    @property
-    def violations(self) -> int:
-        return sum(1 for item in self.items for f in item.findings if f.level not in NON_DEDUCTING)
+
+@dataclass(frozen=True)
+class Pick:
+    """Пункт нарушения версии для выбора в правке записи (D535).
+
+    Классы и зоны — те, что чек-лист версии даёт пункту: форма сужает по ним
+    выбор, а допустимость всё равно решает сверка на сервере (`revision`).
+    """
+
+    code: str
+    question: str
+    levels: tuple[str, ...]
+    zones: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class Sheet:
+    #: Зоны версии в её порядке — выбор зоны записи.
     zones: tuple[SheetZone, ...]
-    #: Записи, которым в чек-листе версии не нашлось пары «пункт + зона»:
-    #: пункт снят или записан в чужую для него зону. Их не прячут — вычитывающий
-    #: должен увидеть их первыми.
-    unplaced: tuple[FindingRow, ...]
-    #: Пункты нарушений версии `(код, вопрос)` — выбор пункта в форме правки
-    #: записи (D200). Тот же порядок, что в таблице чек-листа.
-    catalogue: tuple[tuple[str, str], ...] = ()
+    #: Пункты нарушений версии в порядке её таблицы — выбор пункта.
+    picks: tuple[Pick, ...]
 
 
 def _zones_of(item: Mapping[str, str], all_zones: Iterable[str]) -> tuple[str, ...]:
@@ -80,44 +70,39 @@ def build_sheet(
     *,
     items: Iterable[Mapping[str, str]],
     zones: Iterable[Mapping[str, str]],
-    findings: Iterable[FindingRow],
     lang: str,
 ) -> Sheet:
-    """Разложить записи проверки по пунктам чек-листа, зона за зоной.
+    """Пункты нарушений и зоны версии для выбора. Порядок — как в чек-листе версии.
 
-    Порядок зон — как в чек-листе версии, порядок пунктов — как в его таблице.
     Язык — интерфейса вычитывающего; формулировки записей остаются на языке
     речи проверки, как их и записали.
     """
     зоны = tuple(zones)
     коды_зон = tuple(str(z.get("code", "")) for z in зоны)
-    записи = tuple(findings)
-    размещённые: set[str] = set()
-    по_зонам: dict[str, list[SheetItem]] = {код: [] for код in коды_зон}
-    перечень: list[tuple[str, str]] = []
+    выбор: list[Pick] = []
     for item in items:
         if (item.get("kind") or VIOLATION).strip() != VIOLATION:
             continue
         код = str(item.get("id", ""))
-        вопрос = str(item.get(f"question_{lang}") or item.get("question_ru") or код)
-        перечень.append((код, вопрос))
-        for зона in _zones_of(item, коды_зон):
-            if зона not in по_зонам:
-                continue
-            свои = tuple(f for f in записи if f.code == код and f.zone == зона)
-            размещённые.update(f.id for f in свои)
-            по_зонам[зона].append(SheetItem(code=код, question=вопрос, findings=свои))
+        классы = tuple(
+            x.strip().upper()
+            for x in (item.get("levels") or "").replace(";", ",").split(",")
+            if x.strip()
+        )
+        выбор.append(
+            Pick(
+                code=код,
+                question=str(item.get(f"question_{lang}") or item.get("question_ru") or код),
+                levels=классы,
+                zones=_zones_of(item, коды_зон),
+            )
+        )
     return Sheet(
         zones=tuple(
-            SheetZone(
-                code=код,
-                name=str(z.get(f"name_{lang}") or z.get("name_ru") or код),
-                items=tuple(по_зонам[код]),
-            )
+            SheetZone(code=код, name=str(z.get(f"name_{lang}") or z.get("name_ru") or код))
             for код, z in zip(коды_зон, зоны, strict=True)
         ),
-        unplaced=tuple(f for f in записи if f.id not in размещённые),
-        catalogue=tuple(перечень),
+        picks=tuple(выбор),
     )
 
 
@@ -150,21 +135,20 @@ def checklist_of(head: InspectionRow, *, lang: str) -> method.Composition:
     return method.load_composition(store, tenant=head.tenant_code, version=head.checklist_version)
 
 
-def load_sheet(head: InspectionRow, findings: Iterable[FindingRow], *, lang: str) -> Sheet | None:
-    """Лист вычитки по чек-листу проверки. `None` — чек-лист прочитать не удалось.
+def load_sheet(head: InspectionRow, *, lang: str) -> Sheet | None:
+    """Выбор пунктов и зон по чек-листу проверки. `None` — чек-лист прочитать не удалось.
 
-    Без листа карточка остаётся карточкой: записи показаны списком, как
-    раньше, а причина уходит в лог. Выдумывать «всё чисто» при недоступном
-    чек-листе нельзя — это выглядело бы как вычитанная проверка.
+    Без него карточка остаётся карточкой: записи показаны списком, но править
+    их и добавлять нарушения не из чего — причина уходит в лог.
     """
     try:
         состав = checklist_of(head, lang=lang)
     except MethodologyRefused as exc:
         logger.warning(
-            "лист вычитки: чек-лист %s версии %s не прочитан: %s",
+            "вычитка: чек-лист %s версии %s не прочитан: %s",
             head.checklist_code,
             head.checklist_version,
             exc,
         )
         return None
-    return build_sheet(items=состав.items, zones=состав.zones, findings=findings, lang=lang)
+    return build_sheet(items=состав.items, zones=состав.zones, lang=lang)

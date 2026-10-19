@@ -9,123 +9,137 @@
 #}
 {% from "inspections/_card_parts.html" import loss_zone_list, level_chips with context %}
 
-{% macro revise_form(c, finding, panel=False) %}
+{#
+  Правка прямо в записях на вычитке (D535). Отдельного режима «Исправить» нет:
+  пока проверка ждёт приёмки и вошедший вправе её править (`c.may_revise`), у
+  каждой записи есть карандаш, а в шапке записей — «+ Добавить нарушение». Всё
+  правочное скрыто (`hidden`) и раскрывается скриптом `proofread.js` под записью
+  или над списком; формы уходят фоном в панели (`data-panel-form`, `split.js`) и
+  обычной отправкой на странице карточки.
+
+  Пункты версии для выбора лежат один раз в атрибуте секции записей
+  (`data-proofread-data`): список из полутора сотен пунктов на каждую запись
+  раздул бы страницу в разы. Классы и зоны пункта — оттуда же, форма сужает по
+  ним выбор; допустимость всё равно решает сервер (`revision._checked_entry`).
+#}
+
+{# Пункт: выбранный — строкой, сменить — поиском по коду и словам из названия. #}
+{% macro item_picker(c, code='') %}
+  <div class="ipick" data-ipick>
+    <input type="hidden" name="code" value="{{ code }}" data-orig="{{ code }}" data-ipick-value>
+    <div class="ipick__chosen">
+      <span class="ipick__text" data-ipick-chosen data-empty="{{ t('proofread.item.none') }}"></span>
+      <button class="btn btn--ghost btn--sm" type="button" data-ipick-open aria-expanded="false"
+              data-label-find="{{ t('proofread.item.find') }}" data-label-change="{{ t('proofread.item.change') }}">{{ t('proofread.item.change') }}</button>
+    </div>
+    <div class="ipick__panel" data-ipick-panel hidden>
+      <input class="input" type="search" data-ipick-search autocomplete="off"
+             placeholder="{{ t('proofread.item.search') }}" aria-label="{{ t('proofread.item') }}">
+      <ul class="ipick__list" role="listbox" data-ipick-list aria-label="{{ t('proofread.item') }}"></ul>
+    </div>
+  </div>
+{% endmacro %}
+
+{# Класс — переключателем из меток: выбирается одним нажатием, видно сразу все. #}
+{% macro level_radios(c, current='') %}
+  <div class="lvls" role="radiogroup" aria-label="{{ t('revise.level') }}" data-lvls>
+    {% for lvl in c.levels %}
+      <label class="lvls__item"><input type="radio" name="level" value="{{ lvl }}"{% if lvl == current %} checked{% endif %}>
+        <span class="tag {{ c.level_tone(lvl) }}">{{ lvl }}</span></label>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{# Кадры записи: прежние — с «✕» (снимется при «Сохранить»), новые — выбором или
+   перетаскиванием; до сохранения ничего не меняется. #}
+{% macro photo_editor(c, finding=None, drop=False) %}
+  {% set entry = c.photos.get(finding.id) if finding else None %}
+  <div class="pshots" data-pshots>
+    {% for photo_id in (entry.shown if entry else ()) %}
+      <span class="pshot">
+        {% set shot_url = url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id) %}
+        <a href="{{ shot_url }}" data-zoom><img class="pshot__img" src="{{ shot_url }}"
+             alt="{{ t('review.photo.alt', n=finding.n) }}" loading="lazy" width="72" height="72"></a>
+        <label class="pshot__x" title="{{ t('proofread.photos.remove') }}" data-remove-label="{{ t('proofread.photos.undo') }}">
+          <input class="sr-only" type="checkbox" name="remove_photo" value="{{ photo_id }}" data-pshot-remove>
+          {{ icon('x') }}<span class="sr-only">{{ t('proofread.photos.remove') }}</span></label>
+      </span>
+    {% endfor %}
+    <span class="pshots__new" data-pshots-new></span>
+    <label class="pshots__add{% if drop %} pshots__add--drop{% endif %}" data-drop>
+      {{ icon('plus') }}<span>{{ t('proofread.photos.drop') if drop else t('proofread.photos.choose') }}</span>
+      <input class="sr-only" type="file" name="photo" accept="image/*" multiple data-pshots-input>
+    </label>
+  </div>
+  {% if entry and entry.missing %}
+    <span class="find-row__meta find-row__lost">{{ t('card.findings.photos_lost', n=entry.missing) }}</span>
+  {% endif %}
+{% endmacro %}
+
+{# Правка записи на месте (D200, D495, D535): формулировка, пункт, класс, зона,
+   температура термометра (если она есть у записи), кадры. #}
+{% macro edit_form(c, finding, panel=False) %}
   {% set head = c.head %}
-  {% set sheet = c.sheet %}
-  {% set levels = c.levels %}
-  {# Форма правки записи на приёмке (D200). Одна на запись в чек-листе и на
-     запись вне его: запись, перенесённую в необычную зону, иначе нельзя было
-     бы поправить обратно. #}
-  {# Замер и рекомендация правкой класса не становятся нарушением: форма
-     предлагает только D1–D3 и молча подставила бы D1 (D201). #}
-  {% if finding.level in levels %}
-  <details class="review-revise">
-    <summary class="field-note">{{ t('revise.open', n=finding.n) }}</summary>
-    <form method="post" class="stack mt-gap"{% if panel %} data-panel-form{% endif %}
-          action="{{ url('/inspections/' ~ head.id ~ '/findings/' ~ finding.id ~ '/revise') }}?lang={{ lang }}">
-      <label><span class="field-label">{{ t('revise.item') }}</span>
-        <select class="input" name="code">
-          {% for code, question in sheet.catalogue %}
-            <option value="{{ code }}"{% if code == finding.code %} selected{% endif %}>{{ code }} — {{ question }}</option>
-          {% endfor %}
-        </select></label>
-      <label><span class="field-label">{{ t('revise.level') }}</span>
-        <select class="input" name="level">
-          {% for lvl in levels %}<option{% if lvl == finding.level %} selected{% endif %}>{{ lvl }}</option>{% endfor %}
-        </select></label>
-      <label><span class="field-label">{{ t('revise.zone') }}</span>
+  <form class="pf find-edit" method="post" enctype="multipart/form-data" hidden
+        id="edit-{{ finding.id }}" data-proofread-form="edit"{% if panel %} data-panel-form{% endif %}
+        action="{{ url('/inspections/' ~ head.id ~ '/findings/' ~ finding.id ~ '/revise') }}?lang={{ lang }}">
+    <label class="pf__row"><span class="field-label">{{ t('revise.text') }}</span>
+      <textarea class="input" name="text" required maxlength="1000" rows="3" lang="{{ finding.lang }}">{{ finding.text or '' }}</textarea></label>
+    <div class="pf__row"><span class="field-label">{{ t('proofread.item') }}</span>{{ item_picker(c, finding.code) }}</div>
+    <div class="pf__cols">
+      <div class="pf__row"><span class="field-label">{{ t('revise.level') }}</span>{{ level_radios(c, finding.level) }}</div>
+      <label class="pf__row"><span class="field-label">{{ t('revise.zone') }}</span>
         <select class="input" name="zone">
-          {% for z in sheet.zones %}<option value="{{ z.code }}"{% if z.code == finding.zone %} selected{% endif %}>{{ z.name }}</option>{% endfor %}
+          {% for z in c.sheet.zones %}<option value="{{ z.code }}"{% if z.code == finding.zone %} selected{% endif %}>{{ z.name }}</option>{% endfor %}
+          {% if finding.zone and finding.zone not in c.sheet.zones|map(attribute='code') %}<option value="{{ finding.zone }}" selected>{{ finding.zone }}</option>{% endif %}
         </select></label>
-      <label><span class="field-label">{{ t('revise.text') }}</span>
-        <textarea class="input" name="text" required maxlength="1000" rows="2" lang="{{ finding.lang }}">{{ finding.text or '' }}</textarea></label>
-      <label><span class="field-label">{{ t('revise.reading') }}</span>
-        <input class="input" name="reading_c" inputmode="decimal" maxlength="8" value="{{ '%g' % finding.reading_c if finding.reading_c is not none else '' }}"></label>
-      <p class="field-note">{{ t('revise.hint') }}</p>
-      <button class="btn" type="submit">{{ t('revise.submit') }}</button>
-    </form>
-  </details>
-  {% endif %}
-{% endmacro %}
-
-{# Кадры записи на листе вычитки (D465). Миниатюры видны всегда; в режиме правки
-   (карандаш в шапке панели, класс `is-editing` на `.spanel`) у каждой — «✕» и
-   «Заменить», у записи — «+ Фото». Формы уходят фоном (`data-panel-form`), файл
-   отправляется сразу после выбора (`data-autofile`, `split.js`). #}
-{% macro photo_forms_url(c, finding_id) -%}
-  {{ url('/inspections/' ~ c.head.id ~ '/findings/' ~ finding_id ~ '/photos') }}?lang={{ lang }}
-{%- endmacro %}
-
-{% macro finding_shots(c, finding, panel=False) %}
-  {% set review_shots = c.photos.get(finding.id) %}
-  {% for photo_id in (review_shots.shown if review_shots else ()) %}
-    <span class="shot">
-      <a href="{{ url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id) }}" data-zoom>
-        <img class="review-photo" src="{{ url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id) }}"
-             alt="{{ t('review.photo.alt', n=finding.n) }}" loading="lazy" width="160" height="120">
-      </a>
-      {% if c.may_revise %}
-        <span class="shot__tools review-edit">
-          <form method="post" data-panel-form data-confirm="{{ t('photo.confirm_delete') }}"
-                action="{{ url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id ~ '/delete') }}?lang={{ lang }}">
-            <button class="hbtn hbtn--icon" type="submit" aria-label="{{ t('photo.delete') }}" title="{{ t('photo.delete') }}">{{ icon('x') }}</button>
-          </form>
-          <form method="post" enctype="multipart/form-data" data-panel-form
-                action="{{ photo_forms_url(c, finding.id) }}">
-            <input type="hidden" name="replace" value="{{ photo_id }}">
-            <label class="hbtn hbtn--icon" title="{{ t('photo.replace') }}">{{ icon('pencil') }}
-              <span class="sr-only">{{ t('photo.replace') }}</span>
-              <input class="sr-only" type="file" name="photo" accept="image/*" data-autofile></label>
-          </form>
-        </span>
-      {% endif %}
-    </span>
-  {% endfor %}
-  {% if review_shots and review_shots.missing %}
-    <span class="find-row__meta find-row__lost">{{ t('card.findings.photos_lost', n=review_shots.missing) }}</span>
-  {% endif %}
-  {% if c.may_revise %}
-    <form method="post" enctype="multipart/form-data" class="review-edit shot__add" data-panel-form
-          action="{{ photo_forms_url(c, finding.id) }}">
-      <label class="hbtn">{{ icon('plus') }}<span>{{ t('photo.add') }}</span>
-        <input class="sr-only" type="file" name="photo" accept="image/*" data-autofile></label>
-    </form>
-  {% endif %}
-{% endmacro %}
-
-{# Добавить запись на приёмке (D465): пункт — поиском по коду и названию, класс, зона,
-   слова, кадр по желанию. Оценку пересчитывает движок, как при правке записи. #}
-{% macro add_form(c) %}
-  {% set sheet = c.sheet %}
-  {% if c.may_revise and not c.head.is_legacy and sheet.catalogue %}
-  <details class="review-edit review-add">
-  <summary class="btn btn--ghost">+ {{ t('add.open') }}</summary>
-  <form method="post" enctype="multipart/form-data" class="stack mt-gap" data-panel-form
-        action="{{ url('/inspections/' ~ c.head.id ~ '/findings') }}?lang={{ lang }}">
-    <label><span class="field-label">{{ t('revise.item') }}</span>
-      <input class="input" type="search" data-pick-filter="#add-code-{{ c.head.id }}" placeholder="{{ t('add.search') }}" autocomplete="off">
-      <select class="input" name="code" id="add-code-{{ c.head.id }}" size="6" required>
-        {% for code, question in sheet.catalogue %}
-          <option value="{{ code }}">{{ code }} — {{ question }}</option>
-        {% endfor %}
-      </select></label>
-    <label><span class="field-label">{{ t('revise.level') }}</span>
-      <select class="input" name="level">
-        {% for lvl in c.levels %}<option>{{ lvl }}</option>{% endfor %}
-      </select></label>
-    <label><span class="field-label">{{ t('revise.zone') }}</span>
-      <select class="input" name="zone">
-        {% for z in sheet.zones %}<option value="{{ z.code }}">{{ z.name }}</option>{% endfor %}
-      </select></label>
-    <label><span class="field-label">{{ t('revise.text') }}</span>
-      <textarea class="input" name="text" required maxlength="1000" rows="2"></textarea></label>
-    <label><span class="field-label">{{ t('add.photo') }}</span>
-      <input class="input" type="file" name="photo" accept="image/*"></label>
+    </div>
+    {% if finding.reading_c is not none %}
+      <label class="pf__row pf__row--narrow"><span class="field-label">{{ t('revise.reading') }}</span>
+        <input class="input" name="reading_c" inputmode="decimal" maxlength="8" value="{{ '%g' % finding.reading_c }}"></label>
+    {% endif %}
+    <div class="pf__row"><span class="field-label">{{ t('proofread.photos') }}</span>{{ photo_editor(c, finding) }}</div>
     <p class="field-note">{{ t('revise.hint') }}</p>
-    <button class="btn" type="submit">{{ t('add.submit') }}</button>
+    <div class="pf__actions">
+      <button class="btn btn--ghost" type="button" data-proofread-cancel>{{ t('proofread.cancel') }}</button>
+      <button class="btn btn--primary" type="submit" data-saving="{{ t('proofread.saving') }}">{{ t('proofread.save') }}</button>
+    </div>
   </form>
-  </details>
-  {% endif %}
+{% endmacro %}
+
+{# «+ Добавить нарушение» (D535): слова и кадры → система предлагает пункт, класс
+   и зону (тот же подбор, что у бота и мини-аппа) → человек выбирает, правит и
+   подтверждает. Запись создаёт только «Добавить»; без выбранного пункта сервер её
+   не примет. Пункт можно найти и вручную — подбор для этого не нужен. #}
+{% macro composer(c, panel=False) %}
+  {% set head = c.head %}
+  <form class="pf find-compose" method="post" enctype="multipart/form-data" hidden
+        id="compose-{{ head.id }}" data-proofread-form="add"{% if panel %} data-panel-form{% endif %}
+        data-suggest-url="{{ url('/inspections/' ~ head.id ~ '/suggest') }}?lang={{ lang }}"
+        action="{{ url('/inspections/' ~ head.id ~ '/findings') }}?lang={{ lang }}">
+    <div class="pf__title">{{ t('proofread.add.title') }}</div>
+    <label class="pf__row"><span class="field-label">{{ t('proofread.what') }}</span>
+      <textarea class="input" name="text" maxlength="1000" rows="3" placeholder="{{ t('proofread.what.hint') }}"></textarea></label>
+    <div class="pf__row"><span class="field-label">{{ t('proofread.photos') }}</span>{{ photo_editor(c, None, drop=True) }}</div>
+    <div class="pf__bar">
+      <button class="btn btn--sm" type="button" data-suggest><span>{{ t('proofread.suggest') }}</span></button>
+      <span class="field-note" data-suggest-status role="status" aria-live="polite"></span>
+    </div>
+    <div class="suggest" data-suggest-list hidden></div>
+    <div class="pf__row"><span class="field-label">{{ t('proofread.item') }}</span>{{ item_picker(c) }}</div>
+    <div class="pf__cols">
+      <div class="pf__row"><span class="field-label">{{ t('revise.level') }}</span>{{ level_radios(c) }}</div>
+      <label class="pf__row"><span class="field-label">{{ t('revise.zone') }}</span>
+        <select class="input" name="zone">
+          {% for z in c.sheet.zones %}<option value="{{ z.code }}">{{ z.name }}</option>{% endfor %}
+        </select></label>
+    </div>
+    <p class="field-note">{{ t('revise.hint') }}</p>
+    <div class="pf__actions">
+      <button class="btn btn--ghost" type="button" data-proofread-cancel>{{ t('proofread.cancel') }}</button>
+      <button class="btn btn--primary" type="submit" disabled data-need-item="{{ t('proofread.add.need_item') }}" data-saving="{{ t('proofread.saving') }}">{{ t('proofread.add.submit') }}</button>
+    </div>
+  </form>
 {% endmacro %}
 
 {% macro card_body(c, panel=False) %}
@@ -165,12 +179,39 @@
      таблицы она сжималась до ширины ячейки. Класс нарушения стоит слева
      меткой — это одно из двух мест на весь продукт, где разрешён сильный
      цвет (бриф на визуал). #}
-  <section class="ov-card ov-card--wide">
+  {# Править записи на месте — пока проверка на вычитке и вошедший вправе её править
+     (D535); без прочитанного чек-листа версии править не из чего. #}
+  {% set can_proof = may_revise and sheet and not head.is_legacy %}
+  {# Пункты и тексты для скрипта — атрибутом секции, а не встроенным `<script>`:
+     политика источников исполняет только свои файлы. `tojson` экранирует `'`,
+     поэтому кавычки атрибута — одинарные. #}
+  {% if can_proof %}
+    {% set pick_items = [] %}
+    {% for pick in sheet.picks %}{% set _ = pick_items.append({'c': pick.code, 'q': pick.question, 'l': pick.levels, 'z': pick.zones}) %}{% endfor %}
+    {% set proof_data = {
+      'items': pick_items,
+      'busy': t('proofread.suggest.busy_label'),
+      'none': t('proofread.suggest.none'),
+      'title': t('proofread.suggest.title'),
+      'net': t('proofread.suggest.net'),
+      'nothing': t('proofread.item.nothing'),
+      'question': t('proofread.suggest.question', question='{question}'),
+      'sure': t('proofread.suggest.confidence', pct='{pct}'),
+      'max_photos': 10,
+    } %}
+  {% endif %}
+  <section class="ov-card ov-card--wide"{% if can_proof %} data-proofread data-proofread-data='{{ proof_data|tojson }}'{% endif %}>
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('card.findings.title') }}</div>
       {{ level_chips(c) }}
+      {% if can_proof %}
+        <button class="hbtn hbtn--primary" type="button" data-proofread-add aria-controls="compose-{{ head.id }}" aria-expanded="false">{{ icon('plus') }}<span>{{ t('proofread.add') }}</span></button>
+      {% endif %}
       <div class="ov-card__count">{{ head.findings_count }}</div>
     </div>
+    {% if can_proof %}
+      {{ composer(c, panel) }}
+    {% endif %}
     {% if detail.findings %}
       {# Язык речи — только когда он в проверке не один: иначе это одна и та
          же пометка в каждой строке. Зона — именем, а не кодом. #}
@@ -190,6 +231,8 @@
         {% set entry = photos.get(finding.id) %}
         {% set shots = entry.shown if entry else () %}
         {% set lost = entry.missing if entry else 0 %}
+        {% set editable = can_proof and finding.level in c.levels %}
+        <div class="find-item{% if editable %} find-item--editable{% endif %}" data-finding="{{ finding.id }}">
         {% if shots %}<details class="find-row find-row--photos"><summary class="find-row__summary">{% else %}<div class="find-row">{% endif %}
           <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.advice') if finding.level == 'R' else (t('card.findings.no_class') if finding.level == 'NC' else finding.level) }}</span>
           <span class="find-row__num">{{ finding.n }}</span>
@@ -218,62 +261,17 @@
           {% if lost %}<span class="find-row__shots find-row__lost">{{ t('card.findings.photos_lost', n=lost) }}</span>{% endif %}
         </div>
         {% endif %}
+        {% if editable %}
+          <button class="hbtn hbtn--icon find-item__edit" type="button" data-proofread-edit aria-expanded="false"
+                  aria-controls="edit-{{ finding.id }}" aria-label="{{ t('proofread.edit', n=finding.n) }}" title="{{ t('proofread.edit', n=finding.n) }}">{{ icon('pencil') }}</button>
+          {{ edit_form(c, finding, panel) }}
+        {% endif %}
+        </div>
       {% endfor %}
     {% else %}
       <div class="ov-card__empty">{{ t('card.findings.empty') }}</div>
     {% endif %}
   </section>
-
-  {# Лист вычитки (D199): весь чек-лист версии по зонам, а не только записи.
-     Зона с нарушениями раскрыта, чистая свёрнута — но есть: вычитывающий
-     обязан видеть и то, что аудитор счёл чистым. #}
-  {% if sheet %}
-    <section class="ov-card ov-card--wide mt-gap" id="review">
-      <div class="ov-card__head">
-        <div class="ov-card__title">{{ t('review.sheet.title') }}</div>
-      </div>
-      <p class="field-note">{{ t('review.sheet.hint') }}</p>
-      {% if sheet.unplaced %}
-        <div class="note note--warn mt-gap"><div>
-          <div class="note__title">{{ t('review.sheet.unplaced', count=sheet.unplaced|length) }}</div>
-          {% for finding in sheet.unplaced %}
-            <div class="note__text">{{ finding.n }} · {{ finding.code }} · {{ finding.zone }} — <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span></div>
-            {% if may_revise %}{{ revise_form(c, finding, panel) }}{% endif %}
-            {{ finding_shots(c, finding, panel) }}
-          {% endfor %}
-        </div></div>
-      {% endif %}
-      {% for zone in sheet.zones %}
-        <details class="review-zone"{% if zone.violations %} open{% endif %}>
-          <summary class="find-row">
-            <span class="find-row__main">
-              <span class="find-row__text">{{ zone.name }}</span>
-              <span class="find-row__meta">{{ t('review.zone.meta', items=zone.items|length, violations=zone.violations) }}</span>
-            </span>
-          </summary>
-          {% for item in zone.items %}
-            <div class="find-row">
-              {% if item.clean %}
-                <span class="tag tag--ok find-row__level">{{ t('review.item.clean') }}</span>
-              {% else %}
-                <span class="tag {{ level_tone(item.findings[0].level) }} find-row__level">{{ item.findings[0].level }}</span>
-              {% endif %}
-              <span class="find-row__main">
-                <span class="find-row__text">{{ item.question }}</span>
-                <span class="find-row__meta">{{ item.code }}</span>
-                {% for finding in item.findings %}
-                  <span class="find-row__meta">{{ finding.n }} · <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span></span>
-                  {% if may_revise %}{{ revise_form(c, finding, panel) }}{% endif %}
-                  {{ finding_shots(c, finding, panel) }}
-                {% endfor %}
-              </span>
-            </div>
-          {% endfor %}
-        </details>
-      {% endfor %}
-      {{ add_form(c) }}
-    </section>
-  {% endif %}
 
   {# ── Информационная часть ──────────────────────────────────────────────
      Вопрос и ответ рядом: код без вопроса человеку ничего не говорит, а «Да»

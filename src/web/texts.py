@@ -494,30 +494,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Принята — в истории сети",
         "en": "Accepted — in the network history",
     },
-    "review.sheet.title": {"ru": "Весь чек-лист", "en": "Full checklist"},
-    "review.sheet.hint": {
-        "ru": (
-            "Все пункты версии, по которой считали проверку, зона за зоной. «Чисто» — по пункту "
-            "в этой зоне записи нет."
-        ),
-        "en": (
-            "Every item of the checklist version this inspection was scored against, zone by "
-            "zone. “Clean” means there is no record for the item in that zone."
-        ),
-    },
-    "review.sheet.unplaced": {
-        "ru": "Записи вне чек-листа версии: {count}",
-        "en": "Records outside the checklist version: {count}",
-    },
-    "review.zone.meta": {
-        "ru": "пунктов {items} · нарушений {violations}",
-        "en": "{items} items · {violations} violations",
-    },
-    "review.item.clean": {"ru": "Чисто", "en": "Clean"},
     "review.photo.alt": {"ru": "Кадр к записи {n}", "en": "Photo for record {n}"},
     # --- правка записи на приёмке (D200) ---------------------------------------
-    "revise.open": {"ru": "Исправить запись {n}", "en": "Correct record {n}"},
-    "revise.item": {"ru": "Пункт", "en": "Item"},
     "revise.level": {"ru": "Класс", "en": "Class"},
     "revise.zone": {"ru": "Зона", "en": "Zone"},
     "revise.text": {"ru": "Формулировка", "en": "Wording"},
@@ -526,7 +504,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "После сохранения оценка пересчитывается движком по методике этой проверки.",
         "en": "Saving recalculates the score with the engine, using this inspection's checklist.",
     },
-    "revise.submit": {"ru": "Сохранить и пересчитать", "en": "Save and recalculate"},
     "revise.done": {
         "ru": "Запись исправлена, оценка пересчитана.",
         "en": "The record is corrected and the score recalculated.",
@@ -544,15 +521,21 @@ TEXTS: dict[str, dict[str, str]] = {
             "only through MCP"
         ),
     },
+    "revise.same": {"ru": "В записи ничего не изменилось.", "en": "Nothing changed in the record."},
+    "revise.photos_done": {
+        "ru": "Кадры записи изменены.",
+        "en": "The record's photos are changed.",
+    },
+    "revise.photo_failed": {
+        "ru": "кадры записи изменены не полностью: {reason}",
+        "en": "the record's photos were not fully changed: {reason}",
+    },
     "revise.failed": {
         "ru": "Запись не исправлена: {reason}",
         "en": "The record was not corrected: {reason}",
     },
     # --- новая запись и кадры на приёмке (D465) --------------------------------
-    "add.open": {"ru": "Добавить запись", "en": "Add a record"},
-    "add.search": {"ru": "Найти пункт по коду или названию", "en": "Find an item by code or title"},
     "add.submit": {"ru": "Добавить и пересчитать", "en": "Add and recalculate"},
-    "add.photo": {"ru": "Фото (необязательно)", "en": "Photo (optional)"},
     "add.done": {
         "ru": "Запись добавлена, оценка пересчитана.",
         "en": "The record is added and the score recalculated.",
@@ -568,14 +551,14 @@ TEXTS: dict[str, dict[str, str]] = {
             "but the photo was not attached: {reason}"
         ),
     },
-    "photo.add": {"ru": "Фото", "en": "Photo"},
-    "photo.replace": {"ru": "Заменить", "en": "Replace"},
-    "photo.delete": {"ru": "Убрать кадр", "en": "Remove photo"},
-    "photo.confirm_delete": {"ru": "Убрать этот кадр?", "en": "Remove this photo?"},
     "photo.none": {"ru": "кадр не выбран", "en": "no photo chosen"},
     "photo.unreadable": {
         "ru": "кадр не читается как изображение (нужен JPEG, PNG или WebP)",
         "en": "the photo cannot be read as an image (JPEG, PNG or WebP expected)",
+    },
+    "photo.too_many": {
+        "ru": "у записи не больше {max} кадров",
+        "en": "a record takes at most {max} photos",
     },
     "photo.too_big": {"ru": "кадр больше {mb} МБ", "en": "the photo is larger than {mb} MB"},
     "photo.added": {"ru": "Кадр приложен.", "en": "The photo is attached."},
@@ -584,6 +567,83 @@ TEXTS: dict[str, dict[str, str]] = {
     "photo.failed": {
         "ru": "Кадр не изменён: {reason}",
         "en": "The photo was not changed: {reason}",
+    },
+    # --- правка прямо в записях и «Добавить нарушение» на вычитке (D535) ------
+    "proofread.edit": {"ru": "Изменить запись {n}", "en": "Edit record {n}"},
+    "proofread.save": {"ru": "Сохранить", "en": "Save"},
+    "proofread.cancel": {"ru": "Отмена", "en": "Cancel"},
+    "proofread.saving": {"ru": "Сохраняю…", "en": "Saving…"},
+    "proofread.add": {"ru": "Добавить нарушение", "en": "Add a violation"},
+    "proofread.add.title": {"ru": "Новое нарушение", "en": "New violation"},
+    "proofread.add.submit": {"ru": "Добавить", "en": "Add"},
+    "proofread.what": {"ru": "Что не так", "en": "What is wrong"},
+    "proofread.what.hint": {
+        "ru": "Своими словами, как сказал бы аудитор. Пункт, класс и зону подберёт система.",
+        "en": (
+            "In your own words, as the auditor would say it. "
+            "The system picks the item, class and zone."
+        ),
+    },
+    "proofread.photos": {"ru": "Фото", "en": "Photos"},
+    "proofread.photos.drop": {
+        "ru": "Перетащите фото сюда или выберите",
+        "en": "Drop photos here or choose them",
+    },
+    "proofread.photos.choose": {"ru": "Выбрать фото", "en": "Choose photos"},
+    "proofread.photos.remove": {"ru": "Убрать фото", "en": "Remove photo"},
+    "proofread.photos.undo": {"ru": "Вернуть фото", "en": "Keep photo"},
+    "proofread.suggest": {"ru": "Подобрать пункт", "en": "Find the item"},
+    "proofread.suggest.busy_label": {"ru": "Подбираю…", "en": "Looking…"},
+    "proofread.suggest.title": {"ru": "Подходящие пункты", "en": "Matching items"},
+    "proofread.suggest.none": {
+        "ru": "Подходящего пункта не нашлось — найдите его поиском ниже.",
+        "en": "No matching item found — look for it with the search below.",
+    },
+    "proofread.suggest.question": {
+        "ru": "Система спрашивает: {question}",
+        "en": "The system asks: {question}",
+    },
+    "proofread.suggest.confidence": {"ru": "уверенность {pct}%", "en": "{pct}% sure"},
+    "proofread.suggest.empty": {
+        "ru": "Впишите, что не так, или приложите фото.",
+        "en": "Write what is wrong, or attach a photo.",
+    },
+    "proofread.suggest.busy": {
+        "ru": "Подбор уже идёт — подождите ответа.",
+        "en": "A search is already running — wait for its answer.",
+    },
+    "proofread.suggest.failed": {
+        "ru": (
+            "Подобрать пункт не получилось. Найдите его поиском ниже — запись можно добавить и так."
+        ),
+        "en": (
+            "Could not find the item automatically. Look for it with the search below — "
+            "you can still add the record."
+        ),
+    },
+    "proofread.suggest.no_checklist": {
+        "ru": "Чек-лист этой проверки не прочитан, подобрать не с чем.",
+        "en": (
+            "This inspection's checklist could not be read, so there is nothing to match against."
+        ),
+    },
+    "proofread.suggest.net": {
+        "ru": "Не удалось связаться с сервером. Попробуйте ещё раз.",
+        "en": "Could not reach the server. Try again.",
+    },
+    "proofread.item": {"ru": "Пункт", "en": "Item"},
+    "proofread.item.none": {"ru": "Пункт не выбран", "en": "No item chosen"},
+    "proofread.item.change": {"ru": "Сменить", "en": "Change"},
+    "proofread.item.find": {"ru": "Найти пункт", "en": "Find an item"},
+    "proofread.item.search": {
+        "ru": "Код или слова из названия пункта",
+        "en": "Item code or words from its title",
+    },
+    "proofread.item.nothing": {"ru": "Ничего не найдено", "en": "Nothing found"},
+    "proofread.item.pick": {"ru": "Выбрать", "en": "Choose"},
+    "proofread.add.need_item": {
+        "ru": "Выберите пункт, чтобы добавить.",
+        "en": "Choose an item to add.",
     },
     # --- карточка проверки -------------------------------------------------
     "card.back": {"ru": "К проверкам", "en": "Back to inspections"},
