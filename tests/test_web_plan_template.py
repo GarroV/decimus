@@ -126,3 +126,11 @@ def test_план_на_приёмке_не_просит_загрузить(па�
     """Загрузки у плана на приёмке нет — и текста «загрузите ниже» тоже (norma, 19.10)."""
     html = партнёр.get(f"/actions?tab=plans&id={ЗАПРОС}&lang=ru").get_data(as_text=True)
     assert "Что ждём" not in html
+
+
+def test_строка_с_равно_в_начале_ложится_текстом_а_не_формулой() -> None:
+    """Формулировку пишут люди и модель: «=HYPERLINK(…)» не должен стать ссылкой."""
+    злая = запись(1, "D1", "X01", '=HYPERLINK("http://example.invalid","x")')
+    книга = load_workbook(io.BytesIO(plan_template.build(запрос(), (злая,), {}, "ru"))).active
+    ячейка = next(c for row in книга.iter_rows() for c in row if c.value == злая.text)
+    assert ячейка.data_type == "s"
