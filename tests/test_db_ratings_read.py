@@ -359,3 +359,111 @@ def test_правило_неверного_типа_отказ_своим_код
         with pytest.raises(RatingsError) as exc:
             ratings_read.add_hard_rule(rating_type, match, "гряз", actor="ctl")
         assert exc.value.code == ratings_read.REFUSED_RULE_KIND  # type: ignore[attr-defined]
+
+
+# --- разбивка пиццерии по периодам (#958) --------------------------------------
+
+U_RS = "e1" * 16
+U_BY = "e2" * 16
+
+
+def _вставить(dsn: str) -> None:
+    """Две пиццерии (RS, BY), у RS — РС за два периода и РКО за один, проверки и нарушения."""
+    with psycopg.connect(dsn) as conn:
+        imp = conn.execute(
+            "insert into ratings.imports (actor, channel, format, sha256, outcome, accepted) "
+            "values ('ctl', 'sync', 'base-scores', %s, 'loaded', 3) returning id",
+            ("0" * 64,),
+        ).fetchone()[0]
+        for code in ("RS", "BY"):
+            conn.execute(
+                "insert into ratings.countries (code, name_ru, name_en, is_imf) "
+                "values (%s, %s, %s, true) on conflict do nothing",
+                (code, code, code),
+            )
+        for dodo, name, country in ((U_RS, "Testville-1", "RS"), (U_BY, "Minsk-1", "BY")):
+            conn.execute(
+                "insert into ratings.units (dodo_id, name, name_normalized, country_code) "
+                "values (%s, %s, %s, %s)",
+                (dodo, name, name.casefold(), country),
+            )
+        periods = {}
+        for kind, begin, end in (
+            ("rs", "2026-08-01", "2026-08-31"),
+            ("rs", "2026-09-01", "2026-12-31"),
+            ("rko", "2026-09-01", "2026-09-30"),
+        ):
+            periods[(kind, begin)] = conn.execute(
+                "insert into ratings.periods (rating_type, begin_on, end_on, title_ru, title_en) "
+                "values (%s, %s, %s, 'П', 'P') returning id",
+                (kind, begin, end),
+            ).fetchone()[0]
+        for key, score, d3 in ((("rs", "2026-08-01"), 80, False), (("rs", "2026-09-01"), 24, True)):
+            conn.execute(
+                "insert into ratings.scores (unit_dodo_id, period_id, score, checkups_count, "
+                "source, import_id, d3, d3_name) values (%s, %s, %s, 4, 'sheet', %s, %s, %s)",
+                (U_RS, periods[key], score, imp, d3, "Д3 пол" if d3 else None),
+            )
+        conn.execute(
+            "insert into ratings.scores (unit_dodo_id, period_id, score, source, import_id) "
+            "values (%s, %s, 70, 'sheet', %s)",
+            (U_RS, periods[("rko", "2026-09-01")], imp),
+        )
+        for dodo, when, acceptance in (
+            ("f1" * 16, "2026-09-10 10:00+00", "accepted"),
+            ("f2" * 16, "2026-09-12 10:00+00", "rejected"),
+            ("f3" * 16, "2026-08-10 10:00+00", "accepted"),
+        ):
+            conn.execute(
+                "insert into ratings.checkups (rating_type, dodo_id, unit_dodo_id, occurred_at, "
+                "acceptance, import_id) values ('rs', %s, %s, %s, %s, %s)",
+                (dodo, U_RS, when, acceptance, imp),
+            )
+        conn.execute(
+            "insert into ratings.violations (row_key, rating_type, checkup_dodo_id, unit_dodo_id, "
+            "text, category, import_id) "
+            "values ('k1', 'rs', %s, %s, 'Грязный пол', 'violation', %s), "
+            "('k2', 'rs', %s, %s, 'Пыль', 'violation', %s)",
+            ("f1" * 16, U_RS, imp, "f3" * 16, U_RS, imp),
+        )
+
+
+def test_разбивка_по_периодам_считает_загруженное_по_окну_периода(db_env: str) -> None:
+    _вставить(db_env)
+
+    rows = ratings_read.unit_periods(
+        U_RS, rating_type=None, begin=date(2026, 8, 1), end=date(2026, 10, 1)
+    )
+
+    assert [(r.rating_type, r.begin_on.isoformat()) for r in rows] == [
+        ("rko", "2026-09-01"),
+        ("rs", "2026-09-01"),
+        ("rs", "2026-08-01"),
+    ]
+    сентябрь = rows[1]
+    assert (сентябрь.score, сентябрь.d3, сентябрь.d3_name, сентябрь.checkups_count) == (
+        24.0,
+        True,
+        "Д3 пол",
+        4,
+    )
+    # августовская проверка и её нарушение в сентябрьское окно не попадают
+    assert (сентябрь.loaded_checkups, сентябрь.accepted_checkups, сентябрь.violations) == (2, 1, 1)
+    assert (rows[2].loaded_checkups, rows[2].violations) == (1, 1)
+    assert (сентябрь.import_format, сентябрь.import_channel) == ("base-scores", "sync")
+    только_рко = ratings_read.unit_periods(
+        U_RS, rating_type="rko", begin=date(2026, 8, 1), end=date(2026, 10, 1)
+    )
+    assert [r.rating_type for r in только_рко] == ["rko"] and только_рко[0].loaded_checkups == 0
+
+
+def test_поиск_пиццерии_ставит_охват_в_запросе(db_env: str) -> None:
+    _вставить(db_env)
+
+    везде = ratings_read.find_units("1", countries=None, normalized="-1", limit=10)
+    только_rs = ratings_read.find_units("1", countries=["RS"], normalized="-1", limit=10)
+    по_id = ratings_read.find_units(U_BY, countries=["RS"], normalized=U_BY, limit=10)
+
+    assert {u.unit for u in везде} == {U_RS, U_BY}
+    assert {u.unit for u in только_rs} == {U_RS}
+    assert по_id == ()  # чужая страна не находится и по точному id

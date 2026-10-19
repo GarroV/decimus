@@ -3,7 +3,7 @@
 Экран «Рейтинги» показывает пиццерии кусками (Top/Bottom, зона риска, имена в
 нарушениях); инструмент MCP отдаёт их списком по отбору. Числа — те же функции,
 что у экрана: средние пиццерии по периодам рейтинга — `summary.unit_averages`,
-карта — `maps_store.unit_scores`, агрегаторы — `agg_store.latest`. Своего
+карта — `maps_store.unit_scores_dated`, агрегаторы — `agg_store.latest`. Своего
 подсчёта здесь нет: только склейка по id пиццерии.
 """
 
@@ -30,20 +30,27 @@ class AggScore:
 
 
 @dataclass(frozen=True)
+class MapsScore:
+    score: float
+    reviews: int
+    on_date: date
+
+
+@dataclass(frozen=True)
 class UnitView:
     unit: str
     name: str
     country: str
     rs: float | None
     rko: float | None
-    #: Оценка Google на карте и число отзывов; `None` — пиццерия на карте не найдена.
-    maps: tuple[float, int] | None
+    #: Оценка Google на карте, число отзывов и дата оценки; `None` — пиццерия не найдена.
+    maps: MapsScore | None
     aggregators: tuple[AggScore, ...]
 
 
 def stitch(
     facts: Iterable[Fact],
-    maps: dict[str, tuple[float, int]],
+    maps: dict[str, MapsScore],
     aggs: Iterable[agg_store.LatestRating],
 ) -> tuple[UnitView, ...]:
     """Пиццерии с оценкой РС или РКО в фактах, по стране и имени. Карта и агрегаторы
@@ -73,8 +80,12 @@ def stitch(
 
 def load(facts: Sequence[Fact], countries: Sequence[str], *, until: date) -> tuple[UnitView, ...]:
     """Склейка с картой и агрегаторами на конец периода (как у экрана: не позже `until`)."""
+    on_map = {
+        code: MapsScore(*row)
+        for code, row in maps_store.unit_scores_dated(GOOGLE, until=until).items()
+    }
     return stitch(
         facts,
-        maps_store.unit_scores(GOOGLE, until=until),
+        on_map,
         agg_store.latest(countries, until=until),
     )

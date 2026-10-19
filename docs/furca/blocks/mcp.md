@@ -74,7 +74,8 @@ request_aggregators_update(aggregators?)    # заявка на внеочере
 
 # чтение рейтингов (D420) — вид KIND_RATINGS_READ, любой токен, охват по пространству
 ratings_summary(group_by?, value?, period?, date_from?, date_to?)   # РС и РКО по группам, средние и движение к прошлому периоду
-ratings_units(country?, city?, unit?, period?, date_from?, date_to?, limit?)   # пиццерии: РС, РКО, карта Google, агрегаторы
+ratings_units(country?, city?, unit?, period?, date_from?, date_to?, limit?)   # пиццерии: РС, РКО, карта Google, агрегаторы (as_of, stale)
+ratings_unit_periods(unit, rating_type?, period?, date_from?, date_to?)   # одна пиццерия по периодам РС и РКО: балл, флаги Д3, загрузка, period_open (#958)
 aggregators_status()                       # последний сбор, исход, ошибка, заявка в очереди
 ```
 
