@@ -75,12 +75,28 @@
           {% endfor %}
         </ul>
       {% endif %}
+      <div class="ccard__people ccard__people--meta">
+        <div class="ccard__person">
+          <span class="sform__label">{{ t('country.card.auditors') }}</span>
+          {% if s.auditors %}
+            <p>{% for a in s.auditors %}<b>{{ a.name }}</b> <span class="is-muted">{{ a.inspections }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+          {% else %}<p class="is-muted">{{ t('country.card.auditors_none') }}</p>{% endif %}
+        </div>
+        <div class="ccard__person">
+          <span class="sform__label">{{ t('country.card.langs') }}</span>
+          {% if s.report_langs %}
+            <p>{% for code in s.report_langs %}<b>{{ t('nav.lang.' ~ code) }}</b>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+          {% else %}<p class="is-muted">—</p>{% endif %}
+          <p class="ssec__note">{{ t('country.card.langs_hint') }}</p>
+        </div>
+      </div>
       {% if s.can_edit %}<p class="ssec__note">{{ t('country.settings.people') }}</p>{% endif %}
     </section>
 
     <section class="ssec">
       <h3 class="ssec__title">{{ t('country.card.units') }} <span class="is-muted">{{ s.rows|length }}</span></h3>
       {% if s.profiles_failed %}<p class="ssec__note">{{ t('country.card.profiles_failed') }}</p>{% endif %}
+      {% if s.aggregators_failed %}<p class="ssec__note">{{ t('country.card.agg_failed') }}</p>{% endif %}
       {% if s.rows %}
         <table class="ccard__table">
           <thead>
@@ -89,7 +105,8 @@
               <th>{{ t('country.card.col.address') }}</th>
               <th>{{ t('country.card.col.stage') }}</th>
               <th>{{ t('country.card.col.dates') }}</th>
-              <th>{{ t('country.card.col.size') }}</th>
+              <th>{{ t('country.card.col.scores') }}</th>
+              <th>{{ t('country.card.col.last') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -115,12 +132,20 @@
                     <span>{{ t('country.card.restaurant_on') }} {{ _date(r.restaurant_on) }}</span>
                     <span>{{ t('country.card.delivery_on') }} {{ _date(r.delivery_on) }}</span>
                   {% endif %}
+                  {% if r.area %}<span class="is-muted">{{ r.area|round(0)|int }} m²{% if r.seats %} · {{ t('country.card.seats', n=r.seats) }}{% endif %}</span>
+                  {% elif r.seats %}<span class="is-muted">{{ t('country.card.seats', n=r.seats) }}</span>{% endif %}
                 </td>
-                <td data-label="{{ t('country.card.col.size') }}" class="ccard__size">
-                  {% if r.area or r.seats %}
-                    {% if r.area %}<span>{{ r.area|round(0)|int }} m²</span>{% endif %}
-                    {% if r.seats %}<span>{{ t('country.card.seats', n=r.seats) }}</span>{% endif %}
+                <td data-label="{{ t('country.card.col.scores') }}" class="ccard__scores">
+                  {% set aggs = s.aggregators.get(r.code, ()) if r.code else () %}
+                  {% if r.rs is not none or r.rko is not none or r.maps or aggs %}
+                    {% if r.rs is not none %}<span><small>{{ t('home.rs.short') }}</small> {{ '%.1f'|format(r.rs) }}</span>{% endif %}
+                    {% if r.rko is not none %}<span><small>{{ t('home.rko.short') }}</small> {{ '%.1f'|format(r.rko) }}</span>{% endif %}
+                    {% for provider, avg in r.maps.items() %}<span><small>{{ t('ratings.maps.provider.' ~ provider) }}</small> {{ '%.2f'|format(avg) }}</span>{% endfor %}
+                    {% for a in aggs %}<span><small>{{ t('ratings.agg.name.' ~ a.aggregator) }}</small> {{ '%.1f'|format(a.score) }}<small>/{{ a.scale }}</small></span>{% endfor %}
                   {% else %}—{% endif %}
+                </td>
+                <td data-label="{{ t('country.card.col.last') }}" class="ccard__dates">
+                  {% if r.last_ever %}<span>{{ r.last_ever }}</span>{% else %}<span class="is-muted">{{ t('country.card.never') }}</span>{% endif %}
                 </td>
               </tr>
             {% endfor %}

@@ -144,3 +144,9 @@
   .ccard__table td:not(:first-child)::before { content: attr(data-label); display: block; font-size: var(--fs-micro); color: var(--ink-2); }
   .ccard__dates span, .ccard__size span { white-space: normal; }
 }
+.ccard__people--meta { margin-top: var(--space-7); }
+.ccard__scores span { display: block; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ccard__scores small { color: var(--ink-2); }
+@media (max-width: 719px) {
+  .ccard__scores span { white-space: normal; }
+}

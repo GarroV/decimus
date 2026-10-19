@@ -509,6 +509,7 @@ def _one_country(
                 units=units,
                 can_edit=guard.may("space.manage"),
                 show_email=auth.current_tenant() == HQ_TENANT,
+                inspections=data.inspections,
             )
             if settings_open
             else None

@@ -24,15 +24,18 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any
 
 from flask import Flask, abort, redirect, request, url_for
 from werkzeug.wrappers import Response
 
-from src.db import ratings_read
+from src.db import agg_store, ratings_read
 from src.db.errors import DbError
+from src.db.models import InspectionRow
+from src.domain import report_langs
+from src.domain.errors import ConfigError
 from src.domain.tenants import HQ_TENANT
 
 from . import auth, guard, partner_spaces
@@ -74,6 +77,23 @@ class LegalPartner:
 
 
 @dataclass(frozen=True)
+class AggScore:
+    """Оценка пиццерии на площадке доставки: код площадки, оценка, шкала."""
+
+    aggregator: str
+    score: float
+    scale: int
+
+
+@dataclass(frozen=True)
+class Auditor:
+    """Кто проверял страну за период экрана и сколько раз."""
+
+    name: str
+    inspections: int
+
+
+@dataclass(frozen=True)
 class Panel:
     """Что показывает панель: девелопер, чья страна, кому её можно отдать, исход."""
 
@@ -96,6 +116,13 @@ class Panel:
     partners: tuple[LegalPartner, ...] = ()
     #: Свод пиццерий не прочитался — адресов и дат нет, и панель об этом говорит.
     profiles_failed: bool = False
+    #: Площадки доставки: код Dodo → оценки (D541); не прочитались — отметка.
+    aggregators: Mapping[str, tuple[AggScore, ...]] = field(default_factory=dict)
+    aggregators_failed: bool = False
+    #: Аудиторы страны за период экрана, по числу проверок.
+    auditors: tuple[Auditor, ...] = ()
+    #: Языки отчёта страны из методики (`report_langs.json`, D415) — их предлагает бот.
+    report_langs: tuple[str, ...] = ()
 
 
 def _ordered(rows: Sequence[UnitRow]) -> tuple[UnitRow, ...]:
@@ -119,6 +146,34 @@ def _partners(rows: Sequence[UnitRow], *, show_email: bool) -> tuple[LegalPartne
     )
 
 
+def _aggregators(code: str) -> tuple[dict[str, tuple[AggScore, ...]], bool]:
+    """Последние оценки площадок доставки по пиццериям страны — только когда карточка открыта."""
+    try:
+        rows = agg_store.latest((code,))
+    except DbError:  # RatingsError — тоже DbError
+        log.warning("Оценки агрегаторов для карточки страны не прочитались", exc_info=True)
+        return {}, True
+    out: dict[str, list[AggScore]] = {}
+    for r in sorted(rows, key=lambda r: r.aggregator):
+        out.setdefault(r.dodo_id, []).append(AggScore(r.aggregator, r.score, r.scale))
+    return {k: tuple(v) for k, v in out.items()}, False
+
+
+def _auditors(inspections: Sequence[InspectionRow]) -> tuple[Auditor, ...]:
+    счёт = Counter(i.auditor for i in inspections if i.auditor)
+    return tuple(
+        Auditor(name, n) for name, n in sorted(счёт.items(), key=lambda kv: (-kv[1], kv[0]))
+    )
+
+
+def _report_langs(code: str) -> tuple[str, ...]:
+    try:
+        return tuple(report_langs.report_langs_for(code))
+    except ConfigError:
+        log.warning("Языки отчёта страны не прочитались: методика не настроена", exc_info=True)
+        return ()
+
+
 def load(
     code: str,
     developer: str,
@@ -127,6 +182,7 @@ def load(
     units: UnitsData,
     can_edit: bool,
     show_email: bool,
+    inspections: Sequence[InspectionRow] = (),
 ) -> Panel:
     """Карточка страны `code`: партнёр и девелопер, партнёры свода, пиццерии."""
     сведения: dict[str, Any] = {
@@ -138,7 +194,10 @@ def load(
         "stages": _stages(units.rows),
         "partners": _partners(units.rows, show_email=show_email),
         "profiles_failed": units.profiles_failed,
+        "auditors": _auditors(inspections),
+        "report_langs": _report_langs(code),
     }
+    сведения["aggregators"], сведения["aggregators_failed"] = _aggregators(code)
     try:
         spaces = partner_spaces.overview()
     except DbError:

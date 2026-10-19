@@ -190,7 +190,24 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     "country.card.col.address": {"ru": "Город и адрес", "en": "City and address"},
     "country.card.col.stage": {"ru": "Стадия", "en": "Stage"},
     "country.card.col.dates": {"ru": "Открытие", "en": "Opening"},
-    "country.card.col.size": {"ru": "Площадь", "en": "Size"},
+    "country.card.col.scores": {"ru": "Оценки", "en": "Scores"},
+    "country.card.col.last": {"ru": "Последняя проверка", "en": "Last inspection"},
+    "country.card.never": {"ru": "не проверяли", "en": "never"},
+    "country.card.auditors": {"ru": "Аудиторы за период", "en": "Auditors in the period"},
+    "country.card.auditors_none": {
+        "ru": "за период проверок нет",
+        "en": "no inspections in the period",
+    },
+    "country.card.langs": {"ru": "Языки отчёта", "en": "Report languages"},
+    "country.card.langs_hint": {
+        "ru": "Из методики (report_langs.json): бот предлагает их при сборке отчёта.",
+        "en": "From the methodology (report_langs.json): the bot offers them "
+        "when building a report.",
+    },
+    "country.card.agg_failed": {
+        "ru": "Оценки на площадках доставки сейчас не прочитались.",
+        "en": "Delivery platform scores could not be read right now.",
+    },
     "country.card.restaurant_on": {"ru": "ресторан", "en": "restaurant"},
     "country.card.delivery_on": {"ru": "доставка", "en": "delivery"},
     "country.card.closed_on": {"ru": "закрыта", "en": "closed"},

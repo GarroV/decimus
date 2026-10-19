@@ -57,6 +57,8 @@ class UnitRow:
     opened: date | None = None
     closed_on: date | None = None
     status: str = ""
+    #: Код Dodo (справочник или свод): по нему карточка страны находит агрегаторы.
+    code: str = ""
     #: Другие написания названия (синонимы справочника, D538) — для карточки страны.
     aliases: tuple[str, ...] = ()
     restaurant_on: date | None = None
@@ -163,6 +165,7 @@ def build_rows(
                 name=unit.name,
                 unit_id=unit.id,
                 **{**сведения, "city": сведения.get("city") or unit.city or ""},
+                code=unit.code or (profile.dodo_id if profile else None) or "",
                 aliases=tuple(a for a in unit.aliases if a != unit.name),
                 last=points.get(unit.name),
                 last_ever=last_ever.get(unit.name),
@@ -179,6 +182,7 @@ def build_rows(
                 key=SVOD_KEY + (profile.name_normalized or profile.name),
                 name=profile.name,
                 unit_id="",
+                code=profile.dodo_id or "",
                 **_from_profile(profile),
             )
         )
