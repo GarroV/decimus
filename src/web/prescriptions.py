@@ -187,7 +187,7 @@ def screen_context(lang: str) -> dict[str, Any]:
     }
 
     def отбор(**изменения: str) -> str:
-        параметры = {
+        параметры: dict[str, Any] = {
             "tab": TAB_RX,
             "country": страна,
             "queue": очередь,
@@ -197,7 +197,7 @@ def screen_context(lang: str) -> dict[str, Any]:
         }
         return url_for("actions", **{к: з for к, з in параметры.items() if з})
 
-    новый_адрес = {k: v for k, v in (("country", страна), ("lang", lang)) if v}
+    новый_адрес: dict[str, Any] = {k: v for k, v in (("country", страна), ("lang", lang)) if v}
     return {
         "rows": очереди.get(очередь, в_стране),
         "countries": страны,

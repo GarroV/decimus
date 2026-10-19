@@ -158,7 +158,7 @@ def test_проверки_по_умолчанию_без_блока_и_без_ч
 def test_проверки_по_галочке_список_целиком_вместо_проверок(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """D532: `unchecked=1` — вся правая часть это точки без проверки, все строки, с отбором экрана."""
+    """D532: `unchecked=1` — вся правая часть это точки без проверки, все строки, с отбором."""
     # Arrange
     спросили: list[dict[str, object]] = []
     имена = [f"Точка-{n}" for n in range(to_inspect.TO_CHECK_TOP + 2)]
