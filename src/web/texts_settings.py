@@ -18,8 +18,8 @@ _INSTRUCTIONS_RU = "\n".join(
         "Проверки: list_inspections, get_inspection, findings_by_unit, unit_history, "
         "network_summary, inspection_letter (письмо партнёру).",
         "Оценку не считай сам: проценты, букву и разбивку по зонам бери из ответа get_inspection.",
-        "Рейтинги РС и РКО: ratings_summary, ratings_units; сбор оценок в агрегаторах: "
-        "aggregators_status.",
+        "Рейтинги РС и РКО (рейтинги Dodo, не наши проверки): ratings_summary, ratings_units, "
+        "ratings_unit_periods; сбор оценок в агрегаторах: aggregators_status.",
         "Методика: checklist_source и checklist_source_item (пункт с критериями D1/D2/D3); "
         "правка чек-листов — только если роль позволяет.",
         "Старые проверки: import_create_inspection и остальные import_* — это черновик, "
@@ -39,7 +39,8 @@ _INSTRUCTIONS_EN = "\n".join(
         "network_summary, inspection_letter (partner letter).",
         "Never compute a score yourself: take the percentage, the grade and the zone "
         "breakdown from the get_inspection response.",
-        "SS and CX ratings: ratings_summary, ratings_units; delivery-aggregator collection: "
+        "SS and CX ratings (Dodo ratings, not our inspections): ratings_summary, "
+        "ratings_units, ratings_unit_periods; delivery-aggregator collection: "
         "aggregators_status.",
         "Methodology: checklist_source and checklist_source_item (an item with its D1/D2/D3 "
         "criteria); editing checklists only if the role allows it.",

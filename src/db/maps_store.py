@@ -208,7 +208,7 @@ def save_links(links: Sequence[tuple[str, str, str, int]]) -> int:
 # При равной дате у двух филиалов одной пиццерии берётся меньший `uuid` — раньше
 # выбор был случайным.
 _UNIT_SCORES_SQL = """
-    select distinct on (c.dodo_id) c.dodo_id, last.avg_rating, last.ratings_count
+    select distinct on (c.dodo_id) c.dodo_id, last.avg_rating, last.ratings_count, last.on_date
     from maps.companies c
     cross join lateral (
         select r.avg_rating, r.ratings_count, r.on_date
@@ -223,8 +223,9 @@ _UNIT_SCORES_SQL = """
 """
 
 
-def unit_scores(provider_id: int, *, until: date) -> dict[str, tuple[float, int]]:
-    """Оценка каждой связанной пиццерии на карте на дату: код → (оценка, отзывов)."""
+def unit_scores_dated(provider_id: int, *, until: date) -> dict[str, tuple[float, int, date]]:
+    """Оценка каждой связанной пиццерии на карте на дату: код → (оценка, отзывов, на какую
+    дату снята оценка). Дата нужна, чтобы отличить свежую оценку от давно не обновлявшейся."""
     try:
         with connection(check_environment().dsn) as conn:
             rows = conn.execute(_UNIT_SCORES_SQL, (provider_id, until)).fetchall()
@@ -232,7 +233,15 @@ def unit_scores(provider_id: int, *, until: date) -> dict[str, tuple[float, int]
         raise RatingsError(
             f"Оценки пиццерий на картах не прочитались ({exc.__class__.__name__})"
         ) from exc
-    return {str(r[0]): (float(r[1]), int(r[2])) for r in rows}
+    return {str(r[0]): (float(r[1]), int(r[2]), r[3]) for r in rows}
+
+
+def unit_scores(provider_id: int, *, until: date) -> dict[str, tuple[float, int]]:
+    """Оценка каждой связанной пиццерии на карте на дату: код → (оценка, отзывов)."""
+    return {
+        code: (score, reviews)
+        for code, (score, reviews, _on) in unit_scores_dated(provider_id, until=until).items()
+    }
 
 
 def unit_latest(provider_id: int) -> dict[str, tuple[float, date]]:

@@ -31,9 +31,11 @@ from ..db import ratings_read as read
 from ..db.errors import ConfigError as DbConfigError
 from ..db.errors import RatingsError
 from ..db.reach import reach_of
+from ..db.units import normalize_unit_name
 from ..domain.tenants import HQ_TENANT, canonical_tenant
 from ..ratings import report, units_view
 from ..ratings.aggregators import queue
+from ..ratings.coverage import is_stale
 from ..ratings.periods import ReportPeriod, parse_period
 from ..ratings.summary import shown
 from .db_target import config_refusal
@@ -55,6 +57,17 @@ AGG_NOTE = (
     "Оценки агрегаторов — в родной шкале каждого: Wolt из 10, Glovo — % довольных (из 100), "
     "остальные из 5; в одну шкалу не сводятся. Карта — Google, из 5"
 )
+
+SOURCE_NOTE = (
+    "Рейтинги Dodo (таблица контроля «база рейтингов» и выгрузки Dodo IS), "
+    "не выездные проверки Decimus по чек-листу"
+)
+NO_UNIT = "Пиццерия «{text}» не найдена среди рейтингов в вашем охвате"
+MANY_UNITS = "«{text}» подходит нескольким пиццериям, уточните имя или id: {names}"
+NO_PERIODS = "У пиццерии нет оценок РС и РКО в выбранных периодах"
+RATING_TYPES = ("rs", "rko")
+DEFAULT_MONTHS = 6
+MAX_CANDIDATES = 10
 
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
@@ -195,6 +208,7 @@ def ratings_summary(
         "groups": groups,
         "loaded_at": loaded,
         "scale": SCORE_NOTE,
+        "source": SOURCE_NOTE,
         **({"message": NO_DATA} if empty else {}),
     }
 
@@ -242,6 +256,7 @@ def ratings_units(
         codes = report.group_countries(selection, found.countries)
         until = min(selection.period.end, date.today())
         views = units_view.load(report.period_scores(selection, codes), codes, until=until)
+    today = date.today()
     chosen = [v for v in views if _matches(v, city=city, name=unit)]
     page = chosen[:cap]
     return {
@@ -259,7 +274,12 @@ def ratings_units(
                 "rko": _shown(v.rko),
                 "maps_google": None
                 if v.maps is None
-                else {"score": v.maps[0], "reviews": v.maps[1]},
+                else {
+                    "score": v.maps.score,
+                    "reviews": v.maps.reviews,
+                    "as_of": v.maps.on_date.isoformat(),
+                    "stale": is_stale(v.maps.on_date, today),
+                },
                 "aggregators": [
                     {
                         "aggregator": a.aggregator,
@@ -267,6 +287,7 @@ def ratings_units(
                         "scale": a.scale,
                         "votes": a.votes,
                         "as_of": a.on_date.isoformat(),
+                        "stale": is_stale(a.on_date, today),
                     }
                     for a in v.aggregators
                 ],
@@ -274,7 +295,105 @@ def ratings_units(
             for v in page
         ],
         "scale": f"{SCORE_NOTE}. {AGG_NOTE}",
+        "source": SOURCE_NOTE,
         **({} if chosen else {"message": NO_DATA + " или под отбор никто не попал"}),
+    }
+
+
+def _months_back(day: date, months: int) -> date:
+    index = day.year * 12 + day.month - 1 - months
+    year, month = divmod(index, 12)
+    return date(year, month + 1, min(day.day, 28))
+
+
+def _range(args: dict[str, str], only: tuple[str, ...] | None, today: date) -> tuple[date, date]:
+    """Границы выборки: заданный период или последние полгода по сегодня."""
+    if not args:
+        return _months_back(today, DEFAULT_MONTHS), today
+    selection, _ = _selected(args, only, group=report.GROUP_IMF, value=None)
+    return selection.period.begin, selection.period.end
+
+
+def _resolve_unit(text: str, only: tuple[str, ...] | None) -> read.UnitRef:
+    """Ровно одна пиццерия в охвате или отказ со списком кандидатов."""
+    wanted = normalize_unit_name(text)
+    if not wanted:
+        raise ToolError("unit: нужна часть названия или id пиццерии")
+    found = read.find_units(text, countries=only, normalized=wanted, limit=MAX_CANDIDATES + 1)
+    exact = [u for u in found if u.unit == wanted or normalize_unit_name(u.name) == wanted]
+    if len(exact) == 1:
+        return exact[0]
+    if not found:
+        raise ToolError(NO_UNIT.format(text=text.strip()))
+    if len(found) > 1:
+        names = "; ".join(
+            f"{u.name} ({u.country or '—'}, {u.unit})" for u in found[:MAX_CANDIDATES]
+        )
+        more = " и другие" if len(found) > MAX_CANDIDATES else ""
+        raise ToolError(MANY_UNITS.format(text=text.strip(), names=names + more))
+    return found[0]
+
+
+def _flag(on: bool, name: str | None) -> dict[str, object]:
+    return {"on": on, "name": name}
+
+
+def _period_row(row: read.UnitPeriodRow, today: date) -> dict[str, object]:
+    return {
+        "rating_type": row.rating_type,
+        "period_id": row.period_id,
+        "begin": row.begin_on.isoformat(),
+        "end": row.end_on.isoformat(),
+        "title": row.title_ru,
+        "period_open": row.end_on >= today,
+        "score": _shown(row.score),
+        "d3": _flag(row.d3, row.d3_name),
+        "critical": _flag(row.critical, row.critical_name),
+        "zeroing": _flag(row.zeroing, row.zeroing_name),
+        "checkups_count": row.checkups_count,
+        "loaded_checkups": row.loaded_checkups,
+        "accepted_checkups": row.accepted_checkups,
+        "violations": row.violations,
+        "import": {
+            "format": row.import_format,
+            "at": row.import_at.isoformat(),
+            "channel": row.import_channel,
+        },
+    }
+
+
+def ratings_unit_periods(
+    *,
+    tenant: str,
+    unit: str,
+    rating_type: str | None = None,
+    period: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> dict[str, object]:
+    if rating_type is not None and rating_type not in RATING_TYPES:
+        raise ToolError(f"rating_type: rs или rko, получено «{rating_type}»")
+    args = _period_args(period, date_from, date_to)
+    today = date.today()
+    with _ratings():
+        only = _scope(tenant)
+        if only == ():
+            return {"status": "no_countries", "message": NO_COUNTRIES}
+        begin, end = _range(args, only, today)
+        found = _resolve_unit(unit, only)
+        rows = read.unit_periods(found.unit, rating_type=rating_type, begin=begin, end=end)
+    return {
+        "status": "ok" if rows else "no_data",
+        "unit": {"unit_id": found.unit, "name": found.name, "country": found.country},
+        "range": {"begin": begin.isoformat(), "end": end.isoformat()},
+        "periods": [_period_row(r, today) for r in rows],
+        "scale": SCORE_NOTE,
+        "note": (
+            "checkups_count — число проверок в оценке по данным Dodo; loaded_checkups и "
+            "violations — сколько из них загружено к нам, их может быть меньше"
+        ),
+        "source": SOURCE_NOTE,
+        **({} if rows else {"message": NO_PERIODS}),
     }
 
 

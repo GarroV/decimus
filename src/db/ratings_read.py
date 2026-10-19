@@ -390,3 +390,96 @@ def save_layout(blocks: Sequence[tuple[str, bool]], *, actor: str) -> None:
         raise RatingsEditError(
             f"Компоновка не легла: база отказала ({exc.__class__.__name__})", REFUSED_DB
         ) from exc
+
+
+_UNITS_BY_NAME = (
+    "select u.dodo_id, u.name, u.country_code from ratings.units u "
+    "where (u.dodo_id = %s or position(%s in u.name_normalized) > 0) "
+    "and (%s::text[] is null or u.country_code = any(%s)) "
+    "order by u.country_code, u.name, u.dodo_id limit %s"
+)
+
+
+@dataclass(frozen=True)
+class UnitRef:
+    unit: str
+    name: str
+    country: str | None
+
+
+def find_units(
+    text: str, *, countries: Sequence[str] | None, normalized: str, limit: int
+) -> tuple[UnitRef, ...]:
+    """Пиццерии, подходящие под id или часть имени, в охвате `countries` (`None` — все).
+
+    `normalized` — имя в нормализованном виде (как `name_normalized`): сравнение по нему
+    не зависит от регистра и пробелов. Охват ставится в самом запросе: чужая пиццерия
+    не попадает даже в список кандидатов.
+    """
+    scope = None if countries is None else list(countries)
+    return tuple(
+        UnitRef(r[0], r[1], r[2])
+        for r in _rows(_UNITS_BY_NAME, (text.strip().lower(), normalized, scope, scope, limit))
+    )
+
+
+@dataclass(frozen=True)
+class UnitPeriodRow:
+    rating_type: str
+    period_id: int
+    begin_on: date
+    end_on: date
+    title_ru: str
+    title_en: str
+    score: float
+    d3: bool
+    d3_name: str | None
+    critical: bool
+    critical_name: str | None
+    zeroing: bool
+    zeroing_name: str | None
+    checkups_count: int | None
+    loaded_checkups: int
+    accepted_checkups: int
+    violations: int
+    import_format: str | None
+    import_at: datetime
+    import_channel: str
+
+
+_UNIT_PERIODS = (
+    "select p.rating_type, p.id, p.begin_on, p.end_on, p.title_ru, p.title_en, s.score::float, "
+    "s.d3, s.d3_name, s.critical, s.critical_name, s.zeroing, s.zeroing_name, s.checkups_count, "
+    "(select count(*) from ratings.checkups c where c.unit_dodo_id = s.unit_dodo_id "
+    " and c.rating_type = p.rating_type "
+    " and c.occurred_at::date between p.begin_on and p.end_on), "
+    "(select count(*) from ratings.checkups c where c.unit_dodo_id = s.unit_dodo_id "
+    " and c.rating_type = p.rating_type and c.acceptance = 'accepted' "
+    " and c.occurred_at::date between p.begin_on and p.end_on), "
+    "(select count(*) from ratings.violations v where v.unit_dodo_id = s.unit_dodo_id "
+    " and v.rating_type = p.rating_type and (v.period_id = p.id or exists ("
+    "  select 1 from ratings.checkups c where c.rating_type = v.rating_type "
+    "  and c.dodo_id = v.checkup_dodo_id "
+    "  and c.occurred_at::date between p.begin_on and p.end_on))), "
+    "m.format, m.at, m.channel "
+    "from ratings.scores s join ratings.periods p on p.id = s.period_id "
+    "join ratings.imports m on m.id = s.import_id "
+    "where s.unit_dodo_id = %s and (%s::text is null or p.rating_type = %s) "
+    "and p.end_on >= %s and p.begin_on <= %s "
+    "order by p.begin_on desc, p.rating_type"
+)
+
+
+def unit_periods(
+    unit: str, *, rating_type: str | None, begin: date, end: date
+) -> tuple[UnitPeriodRow, ...]:
+    """Разбивка пиццерии по периодам рейтинга, пересекающим `begin..end`, новые первыми.
+
+    Проверки и нарушения — только загруженные у нас: `checkups_count` оценки может быть
+    больше, чем строк в `ratings.checkups`. Проверка ложится в период по дате проведения.
+    Охват здесь не проверяется: `unit` приходит из `find_units`, уже отобранный по охвату.
+    """
+    return tuple(
+        UnitPeriodRow(*r)
+        for r in _rows(_UNIT_PERIODS, (unit, rating_type, rating_type, begin, end))
+    )
