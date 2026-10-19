@@ -23,12 +23,12 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from src.db import queries, review_edit, revise
 from src.db.config import load_storage_settings
 from src.db.errors import ReviseError, StorageError
-from src.db.models import InspectionDetail
+from src.db.models import FindingRow, InspectionDetail
 from src.db.previews import make_preview
 from src.db.reach import reach_of
 from src.db.storage import PhotoStorage, S3PhotoStorage
@@ -141,6 +141,29 @@ def _editable(inspection_id: str, *, tenant: str, lang: str) -> InspectionDetail
     return detail
 
 
+def editable(inspection_id: str, *, tenant: str, lang: str) -> InspectionDetail:
+    """Та же проверка «можно ли править», для тех, кто готовит правку (D535)."""
+    return _editable(inspection_id, tenant=tenant, lang=lang)
+
+
+def is_unchanged(
+    finding: FindingRow, *, code: str, level: str, zone: str, text: str, reading: str = ""
+) -> bool:
+    """Совпадает ли форма правки с записью как есть.
+
+    Форма правки записи ещё и меняет кадры; когда исправлять в записи нечего,
+    пересчёт и строка в истории правок не нужны (D535). Показание — число или
+    пусто, как в `reading_of`; нечитаемое — отказ, а не «не изменилось».
+    """
+    return (
+        finding.code == code.strip()
+        and finding.level == level.strip().upper()
+        and (finding.zone or "") == zone.strip()
+        and (finding.text or "").strip() == text.strip()
+        and finding.reading_c == reading_of(reading)
+    )
+
+
 def reading_of(raw: str) -> float | None:
     """Показание термометра из формы вычитки (#855, D495): пусто — замера нет.
 
@@ -216,6 +239,7 @@ def add_card(
     zone: str,
     text: str,
     photo: bytes | None = None,
+    more_photos: Sequence[bytes] = (),
     storage: PhotoStorage | None = None,
 ) -> str:
     """Добавить запись в ждущую проверку и пересчитать её (D465). Отказ — `ReviseError`.
@@ -230,9 +254,10 @@ def add_card(
     код, класс, зона, слова, необычная = _checked_entry(
         detail, inspection_id, lang=lang, code=code, level=level, zone=zone, text=text
     )
-    if photo is not None:
+    кадры = [x for x in (photo, *more_photos) if x is not None]
+    for кадр in кадры:
         try:
-            make_preview(photo)
+            make_preview(кадр)
         except StorageError as exc:
             raise ReviseError(t("photo.unreadable", lang), code="photo_unreadable") from exc
     бумаги = letter_sources()
@@ -249,9 +274,9 @@ def add_card(
         raise ReviseError(
             "Пересчитать проверку не удалось, запись не добавлена", code="revise_recalc"
         ) from exc
-    if photo is not None:
+    for кадр in кадры:
         try:
-            attach_photo(inspection_id, finding_id, tenant=tenant, data=photo, storage=storage)
+            attach_photo(inspection_id, finding_id, tenant=tenant, data=кадр, storage=storage)
         except ReviseError as exc:
             raise ReviseError(
                 t("add.photo_failed", lang, reason=str(exc)),
@@ -303,3 +328,25 @@ def replace_photo(
     store = _store(storage)
     attach_photo(inspection_id, finding_id, tenant=tenant, data=data, storage=store)
     detach_photo(inspection_id, photo_id, tenant=tenant, storage=store)
+
+
+def change_photos(
+    inspection_id: str,
+    finding_id: str,
+    *,
+    tenant: str,
+    add: Sequence[bytes] = (),
+    remove: Sequence[str] = (),
+    storage: PhotoStorage | None = None,
+) -> None:
+    """Кадры записи одним заходом: сначала приложить новые, потом снять убранные (D535).
+
+    Порядок тот же, что у `replace_photo`: не вышло приложить — старые на
+    месте, доказательство важнее аккуратности. Первый отказ прекращает работу;
+    что успело лечь — осталось, и вызывающий говорит об этом словами.
+    """
+    store = _store(storage)
+    for data in add:
+        attach_photo(inspection_id, finding_id, tenant=tenant, data=data, storage=store)
+    for photo_id in remove:
+        detach_photo(inspection_id, photo_id, tenant=tenant, storage=store)

@@ -279,6 +279,8 @@ def test_новая_запись_считается_движком_вместе_
     ("поля", "причина"),
     [
         ({"code": "XXX99"}, "нет"),
+        # Пункт назван человеком (D535): подсказка системы без выбора записью не становится.
+        ({"code": ""}, "нет"),
         ({"level": "D3"}, "не предусмотрен"),
         ({"zone": "moon"}, "Зоны moon"),
         ({"text": " "}, "пуста"),
@@ -314,3 +316,51 @@ def test_у_принятой_запись_не_добавляется(добав
     with pytest.raises(ReviseError, match="уже принята"):
         _добавить()
     assert "добавлено" not in добавление
+
+
+def test_несколько_кадров_нового_нарушения_ложатся_к_нему_по_очереди(
+    добавление: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import io
+
+    from PIL import Image
+
+    буфер = io.BytesIO()
+    Image.new("RGB", (8, 8)).save(буфер, format="PNG")
+    кадр = буфер.getvalue()
+    приложены: list[str] = []
+    monkeypatch.setattr(
+        revision.review_edit, "attach_photo", lambda _i, finding, **_k: приложены.append(finding)
+    )
+
+    _добавить(photo=кадр, more_photos=[кадр, кадр])
+
+    assert приложены == ["new", "new", "new"]
+
+
+def test_правка_кадров_сначала_прикладывает_новые_потом_снимает_старые(
+    стенд: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    порядок: list[str] = []
+    monkeypatch.setattr(revision, "_store", lambda s: s or "склад")
+    monkeypatch.setattr(
+        revision.review_edit, "attach_photo", lambda *_a, **_k: порядок.append("приложен")
+    )
+    monkeypatch.setattr(
+        revision.review_edit,
+        "detach_photo",
+        lambda _i, photo, **_k: порядок.append(f"снят {photo}"),
+    )
+
+    revision.change_photos("i", ЗАПИСЬ, tenant="HQ", add=[b"x"], remove=["p1", "p2"])
+
+    assert порядок == ["приложен", "снят p1", "снят p2"]
+
+
+def test_запись_без_изменений_распознаётся_и_с_пустым_показанием(стенд: dict[str, Any]) -> None:
+    запись = стенд["проверка"].findings[0]
+    одно = {"code": "CLN05", "level": "d1", "zone": "hot_kitchen", "text": " грязный пол "}
+
+    assert revision.is_unchanged(запись, **одно)
+    assert not revision.is_unchanged(запись, **{**одно, "text": "иначе"})
+    assert not revision.is_unchanged(запись, **одно, reading="3,5")

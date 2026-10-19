@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 161 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 162 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -94,6 +94,7 @@
 | `/inspections/<inspection_id>/photos/<photo_id>/delete` | POST | `do_delete_photo` | `src/web/app.py` |
 | `/inspections/<inspection_id>/report` | GET | `report` | `src/web/app.py` |
 | `/inspections/<inspection_id>/retract` | POST | `do_retract` | `src/web/app.py` |
+| `/inspections/<inspection_id>/suggest` | POST | `do_suggest` | `src/web/app.py` |
 | `/login` | GET, POST | `login` | `src/web/auth.py` |
 | `/login/google` | GET | `google_start` | `src/web/auth.py` |
 | `/login/passkey/options` | POST | `passkey_login_options` | `src/web/passkey_login.py` |

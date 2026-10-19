@@ -172,7 +172,9 @@
     if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) return;
     var body = form.closest(".sdrawer__body");
     var top = body.scrollTop;
-    var wasEditing = !!body.querySelector(".spanel.is-editing");
+    // Правка записи на вычитке (D535): что человек вписал — запоминается, чтобы при
+    // отказе сервера форма раскрылась снова с его словами, а не пустой.
+    var kept = window.Proofread ? window.Proofread.snapshot(form) : null;
     var buttons = form.querySelectorAll("button[type=submit]");
     buttons.forEach(function (b) {
       b.disabled = true;
@@ -200,10 +202,10 @@
         if (!res.ok || !next) throw new Error("status");
         var node = document.importNode(next, true);
         body.querySelector(".spanel").replaceWith(node);
-        if (wasEditing) setEditing(node, true);
         bind(node);
         body.scrollTop = top;
         var note = node.querySelector(".note--ok, .note--error");
+        if (kept && note && note.classList.contains("note--error")) window.Proofread.restore(node, kept);
         if (note) note.scrollIntoView({ block: "nearest" });
         refreshList();
       })
@@ -213,68 +215,6 @@
         });
         panelFailed(body);
       });
-  });
-
-  // «Исправить» на проверке, ждущей приёмки: режим правки панели (D465) —
-  // показать входы в правку записей, показать «✕/Заменить/+ Фото» и «Добавить
-  // запись» (повторный щелчок — свернуть). Режим переживает ответ на действие.
-  function setEditing(panel, on) {
-    panel.classList.toggle("is-editing", on);
-    var toggle = panel.querySelector("[data-edit-toggle]");
-    if (toggle) toggle.setAttribute("aria-pressed", on ? "true" : "false");
-    var sheet = panel.querySelector("#review");
-    if (!sheet) return;
-    // Формы записей не раскрываем разом (стена полей, D465): режим правки
-    // показывает только входы «Править запись»; при выходе всё сворачивается.
-    if (!on) {
-      sheet.querySelectorAll("details.review-revise, details.review-add").forEach(function (d) {
-        d.open = false;
-      });
-    }
-    if (on) {
-      sheet.querySelectorAll("details.review-zone").forEach(function (d) {
-        d.open = true;
-      });
-    }
-  }
-
-  document.addEventListener("click", function (e) {
-    var toggle = e.target.closest("[data-edit-toggle]");
-    if (!toggle) return;
-    var panel = toggle.closest(".spanel");
-    var sheet = panel && panel.querySelector("#review");
-    if (!sheet) return;
-    e.preventDefault();
-    var on = toggle.getAttribute("aria-pressed") !== "true";
-    setEditing(panel, on);
-    if (on) sheet.scrollIntoView({ block: "start", behavior: "smooth" });
-  });
-
-  // Файл выбран — форма уходит сразу: «Заменить» и «+ Фото» без отдельной кнопки.
-  document.addEventListener("change", function (e) {
-    var input = e.target;
-    if (!input.matches || !input.matches("input[type=file][data-autofile]")) return;
-    if (!input.files || !input.files.length) return;
-    if (input.form && input.form.requestSubmit) input.form.requestSubmit();
-  });
-
-  // Поиск пункта в форме «Добавить запись»: список сужается по коду и названию.
-  document.addEventListener("input", function (e) {
-    var box = e.target;
-    if (!box.matches || !box.matches("input[data-pick-filter]")) return;
-    var select = document.querySelector(box.dataset.pickFilter);
-    if (!select) return;
-    var needle = box.value.trim().toLowerCase();
-    var firstShown = null;
-    Array.prototype.forEach.call(select.options, function (o) {
-      var hit = !needle || o.textContent.toLowerCase().indexOf(needle) !== -1;
-      o.hidden = !hit;
-      o.disabled = !hit;
-      if (hit && !firstShown) firstShown = o;
-    });
-    if (select.selectedOptions.length && select.selectedOptions[0].disabled) {
-      select.selectedIndex = firstShown ? firstShown.index : -1;
-    }
   });
 
   function bind(root) {

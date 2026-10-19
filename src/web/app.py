@@ -27,6 +27,7 @@ import psycopg
 from flask import (
     Flask,
     abort,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -46,6 +47,7 @@ from src.db.errors import (
     RetractionError,
     ReviseError,
 )
+from src.db.imports import MAX_PHOTOS_PER_FINDING
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.db.pool import shared_connections
@@ -74,6 +76,7 @@ from . import (
     letter_markup,
     oauth,
     prescriptions,
+    proofread,
     ratings,
     registry_period,
     registry_view,
@@ -941,41 +944,121 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     @guard.action("inspection.revise", object_in_route=True)
     def do_revise(inspection_id: str, finding_id: str) -> FlaskResponse | str | tuple[str, int]:
         """Исправить запись ждущей проверки с пересчётом (D200). Админ УК (D341),
-        админ партнёра — в свежей проверке своих сотрудников (D367)."""
-        отказ = _permit_inspection("inspection.revise", inspection_id)
-        if отказ is not None:
-            return отказ
-        refuse_foreign_origin()
-        notice: str | None = None
-        failure: str | None = None
-        try:
-            revision.revise_card(
-                inspection_id,
-                finding_id,
-                tenant=auth.current_tenant(),
-                lang=_lang(conf),
-                code=request.form.get("code") or "",
-                level=request.form.get("level") or "",
-                zone=request.form.get("zone") or "",
-                text=request.form.get("text") or "",
-                reading=request.form.get("reading_c") or "",
-            )
-        except ReviseError as exc:
-            failure = t("revise.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
-        else:
-            notice = t("revise.done", _lang(conf))
-        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+        админ партнёра — в свежей проверке своих сотрудников (D367).
 
-    @app.post(f"{section('registry').path}/<inspection_id>/findings")
-    @guard.action("inspection.revise", object_in_route=True)
-    def do_add_finding(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Добавить запись в ждущую проверку с пересчётом (D465); кадр — по желанию."""
+        Та же форма меняет кадры записи (D535): `photo` — новые, `remove_photo` —
+        убранные. Исправлять в записи нечего — пересчёта нет, меняются одни кадры.
+        """
         отказ = _permit_inspection("inspection.revise", inspection_id)
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
         lang = _lang(conf)
-        кадр, отказ_кадра = _uploaded_photo(lang)
+        новые, отказ_кадров = _uploaded_photos(lang)
+        if отказ_кадров is not None:
+            return _render_card(
+                inspection_id,
+                conf=conf,
+                notice=None,
+                failure=t("revise.failed", lang, reason=отказ_кадров),
+            )
+        убрать = [x.strip() for x in request.form.getlist("remove_photo") if x.strip()]
+        notice: str | None = None
+        failure: str | None = None
+        поля = dict(
+            code=request.form.get("code") or "",
+            level=request.form.get("level") or "",
+            zone=request.form.get("zone") or "",
+            text=request.form.get("text") or "",
+            reading=request.form.get("reading_c") or "",
+        )
+        try:
+            карточка = data.load_card(inspection_id, reach=auth.current_reach())
+            запись = next(
+                (f for f in (карточка.findings if карточка else ()) if f.id == finding_id), None
+            )
+            if запись is None or not revision.is_unchanged(запись, **поля):
+                revision.revise_card(
+                    inspection_id,
+                    finding_id,
+                    tenant=auth.current_tenant(),
+                    lang=lang,
+                    **поля,
+                )
+                notice = t("revise.done", lang)
+        except ReviseError as exc:
+            failure = t("revise.failed", lang, reason=domain_reason(exc, lang))
+        else:
+            try:
+                if новые or убрать:
+                    revision.change_photos(
+                        inspection_id,
+                        finding_id,
+                        tenant=auth.current_tenant(),
+                        add=новые,
+                        remove=убрать,
+                    )
+                    notice = notice or t("revise.photos_done", lang)
+            except ReviseError as exc:
+                failure = t("revise.photo_failed", lang, reason=domain_reason(exc, lang))
+                notice = None
+            notice = None if failure else (notice or t("revise.same", lang))
+        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
+    @app.post(f"{section('registry').path}/<inspection_id>/suggest")
+    @guard.action("inspection.revise", object_in_route=True)
+    def do_suggest(inspection_id: str) -> FlaskResponse | tuple[FlaskResponse, int]:
+        """Подобрать пункт для нового нарушения по словам и кадрам (D535).
+
+        Ничего не записывает: ответ — предложения, запись заводит человек
+        отдельным `POST …/findings`. Права те же, что у правки записи.
+        """
+        отказ = _permit_inspection("inspection.revise", inspection_id)
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        lang = _lang(conf)
+
+        def refused(key: str, status: int) -> tuple[FlaskResponse, int]:
+            return jsonify({"error": "refused", "message": t(key, lang)}), status
+
+        кадры, отказ_кадров = _uploaded_photos(lang)
+        if отказ_кадров is not None:
+            return jsonify({"error": "refused", "message": отказ_кадров}), 422
+        try:
+            деталь = revision.editable(inspection_id, tenant=auth.current_tenant(), lang=lang)
+        except ReviseError as exc:
+            return jsonify({"error": "refused", "message": domain_reason(exc, lang)}), 409
+        лист = review.load_sheet(деталь.inspection, lang=lang)
+        if лист is None:
+            return refused("proofread.suggest.no_checklist", 503)
+        try:
+            found = proofread.suggest(
+                деталь.inspection,
+                лист,
+                words=(request.form.get("text") or "")[: proofread.WORDS_MAX],
+                frames=кадры,
+                lang=lang,
+            )
+        except proofread.SuggestRefused as exc:
+            return refused(exc.key, exc.status)
+        return jsonify(found), 200
+
+    @app.post(f"{section('registry').path}/<inspection_id>/findings")
+    @guard.action("inspection.revise", object_in_route=True)
+    def do_add_finding(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
+        """Добавить запись в ждущую проверку с пересчётом (D465); кадры — по желанию (D535).
+
+        Пункт, класс и зону называет человек (D535): подсказка системы
+        (`/suggest`) ничего не записывает, а запись без выбранного пункта
+        `revision.add_card` не примет.
+        """
+        отказ = _permit_inspection("inspection.revise", inspection_id)
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        lang = _lang(conf)
+        кадры, отказ_кадра = _uploaded_photos(lang)
         if отказ_кадра is not None:
             return _render_card(
                 inspection_id,
@@ -994,7 +1077,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 level=request.form.get("level") or "",
                 zone=request.form.get("zone") or "",
                 text=request.form.get("text") or "",
-                photo=кадр,
+                photo=кадры[0] if кадры else None,
+                more_photos=кадры[1:],
             )
         except ReviseError as exc:
             failure = t("add.failed", lang, reason=domain_reason(exc, lang))
@@ -1092,6 +1176,35 @@ def _own(detail: Any) -> bool:
     УК по пиццериям своей страны (D289). Запись по такой проверке — отказ.
     """
     return auth.is_own(detail.inspection.tenant_code)
+
+
+def _uploaded_photos(lang: str) -> tuple[list[bytes], str | None]:
+    """Кадры из полей `photo` формы вычитки (D535): `(кадры, отказ | None)`.
+
+    Правила те же, что у одного кадра (`_uploaded_photo`): предел размера
+    каждого — как у мини-аппа, что это изображение, решает конвейер кадров.
+    Пустое поле — не отказ. Кадров не больше, чем у одной записи.
+    """
+    request.max_content_length = (
+        MAX_UPLOAD_BYTES * MAX_PHOTOS_PER_FINDING + action_plans.FORM_OVERHEAD_BYTES
+    )
+    mb = MAX_UPLOAD_BYTES // (1024 * 1024)
+    кадры: list[bytes] = []
+    try:
+        for файл in request.files.getlist("photo"):
+            if not файл.filename:
+                continue
+            data = файл.stream.read(MAX_UPLOAD_BYTES + 1)
+            if len(data) > MAX_UPLOAD_BYTES:
+                return [], t("photo.too_big", lang, mb=mb)
+            if not data:
+                return [], t("photo.unreadable", lang)
+            кадры.append(data)
+    except RequestEntityTooLarge:
+        return [], t("photo.too_big", lang, mb=mb)
+    if len(кадры) > MAX_PHOTOS_PER_FINDING:
+        return [], t("photo.too_many", lang, max=MAX_PHOTOS_PER_FINDING)
+    return кадры, None
 
 
 def _uploaded_photo(lang: str) -> tuple[bytes | None, str | None]:
@@ -1409,11 +1522,7 @@ def _card_context(
     )
     # Лист вычитки — только на приёмке (D199): у принятой проверки вычитывать
     # уже нечего, а чтение чек-листа версии на каждом открытии не бесплатно.
-    лист = (
-        review.load_sheet(detail.inspection, detail.findings, lang=lang)
-        if detail.inspection.on_review
-        else None
-    )
+    лист = review.load_sheet(detail.inspection, lang=lang) if detail.inspection.on_review else None
     # Есть ли PDF — спрашивается при каждом открытии: кнопка, ведущая в отказ,
     # хуже отсутствующей. Отказ базы здесь карточку не роняет, а честно
     # говорит, что наличие отчёта сейчас неизвестно (как у истории переносов).

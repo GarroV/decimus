@@ -48,7 +48,7 @@ def _frames(refs: list[str]) -> list[bytes]:
     return frames
 
 
-def _card(c: Candidate, offer: Offer, ask: _Ask) -> dict[str, Any]:
+def _card(c: Candidate, offer: Offer, ask: Ask) -> dict[str, Any]:
     # Зона записи — не зона экрана (D445): выводится по пункту и словам.
     # Зону кандидата как «зону модели» берём только у модели: у быстрого пути
     # и выученной фразы это эхо подсказки с экрана, а не её вывод.
@@ -77,7 +77,7 @@ def _card(c: Candidate, offer: Offer, ask: _Ask) -> dict[str, Any]:
 
 
 @dataclass(frozen=True)
-class _Ask:
+class Ask:
     """Что известно о запросе при выводе зоны: слова, подсказка, чат."""
 
     chat_id: int
@@ -85,7 +85,7 @@ class _Ask:
     hint: str | None
 
 
-def _answer(offer: Offer, ask: _Ask) -> dict[str, Any]:
+def answer(offer: Offer, ask: Ask) -> dict[str, Any]:
     # Увиденное на кадрах сверх сказанного (D208) — после найденного по
     # словам: у бота это отдельное предложение, здесь — нижние карточки.
     seen = [c for c in offer.also_seen if all(c.code != x.code for x in offer.candidates)]
@@ -180,5 +180,5 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             offer.via,
             len(offer.candidates),
         )
-        ask = _Ask(chat_id=who, spoken=zone_from_words(words, chat_id=who), hint=zone)
-        return jsonify(_answer(offer, ask)), 200
+        ask = Ask(chat_id=who, spoken=zone_from_words(words, chat_id=who), hint=zone)
+        return jsonify(answer(offer, ask)), 200
