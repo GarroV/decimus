@@ -64,10 +64,12 @@ _SCREEN: dict[str, dict[str, str]] = {
     },
     "ratings.line.hint": {
         "ru": "Точка — период рейтинга (РС — полмесяца, РКО — неделя), задевший выбранные "
-        "даты; подписи снизу — его даты. Пунктир — порог {x}. "
+        "даты; подписи снизу — его даты. Красная линия — порог {x}; фон — зоны: "
+        "ниже 80, 80–90, от 90. "
         "Подробнее по стране — фильтром «Страна».",
         "en": "Each point is a rating period (RS — half a month, RKO — a week) that touches "
-        "the selected dates; the labels below are its dates. Dashed line — threshold {x}. "
+        "the selected dates; the labels below are its dates. Red line — threshold {x}; "
+        "the background shows zones: below 80, 80–90, 90 and up. "
         "For a single country, use the Country filter.",
     },
     "ratings.line.empty": {"ru": "За период нет данных.", "en": "No data for the period."},
