@@ -307,3 +307,19 @@ def test_сбой_разборщика_оставляет_failed_и_уходит
         "failed",
         "сбой разбора: RuntimeError",
     )
+
+
+def test_живые_точки_рейтингов_заводятся_в_справочник(db_env: str) -> None:
+    """D556, #981: точка с оценкой за окно — в справочнике под своим кодом Dodo."""
+    from src.db.ratings import live_units
+    from src.ratings import directory_feed
+
+    _грузить(snapshot())
+
+    assert [u[0] for u in live_units(date(2000, 1, 1))] == [U1]
+    assert live_units(date(2100, 1, 1)) == []
+    итог = directory_feed.sync(today=date(2026, 10, 8))
+    assert (итог.seen, итог.put, итог.skipped) == (1, 1, ())
+    assert _одно(db_env, "select count(*) from units where code = %s", (U1,)) == 1
+    directory_feed.sync(today=date(2026, 10, 8))  # повтор — та же строка, не вторая
+    assert _одно(db_env, "select count(*) from units where code = %s", (U1,)) == 1

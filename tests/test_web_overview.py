@@ -254,7 +254,7 @@ def test_отказ_доски_не_молчит(стенд: FlaskClient, monkey
 
 
 def test_порядок_блоков_главной(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    """D418: внимание → итог → рейтинги → последние → топ нарушений | зоны → пиццерии."""
+    """D557: внимание → фильтры | рейтинги кластеров → итог | топ | зоны → пиццерии."""
     # Arrange
     monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
     monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=2))
@@ -272,8 +272,9 @@ def test_порядок_блоков_главной(стенд: FlaskClient, mon
     порядок: list[int] = []
     for ключ in (
         "home.attention.title",
-        "home.inspections.title",
+        "home.filters.title",
         "home.rb.rs",
+        "home.inspections.title",
         "home.top.title",
         "overview.processes.title",
         "home.units.title",
@@ -968,3 +969,29 @@ def test_стикеры_на_главной_скрыты_флагом(
     monkeypatch.setattr(home_board, "load_counts", счётчики)
     страница = показать(стенд, monkeypatch, ПУСТО)
     assert "Проверок ждут приёмки" not in страница and позвали == []
+
+
+def test_девелопер_у_ук_сужает_выборку_до_своих_стран(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D551: УК выбирает девелопера — экран сужается до его стран."""
+    # Arrange
+    from src.db import ratings_read
+
+    строки = (
+        ratings_read.CountryRow("RS", "Сербия", "Serbia", "Индира", True, "CEE"),
+        ratings_read.CountryRow("GE", "Грузия", "Georgia", "Пётр", True, "CEE"),
+        ratings_read.CountryRow("TR", "Турция", "Turkey", "Индира", True, "OTHER"),
+    )
+    monkeypatch.setattr(ratings_read, "countries", lambda: строки)
+    охваты: list[object] = []
+    monkeypatch.setattr(
+        overview_data, "load", lambda **kw: охваты.append(kw["reach"].countries) or снимок()
+    )
+
+    # Act
+    страница = стенд.get("/overview?developer=Индира").get_data(as_text=True)
+
+    # Assert
+    assert t_ru("home.filters.developer") in страница
+    assert set(охваты[0] or ()) == {"RS", "TR"}

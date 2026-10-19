@@ -227,7 +227,7 @@
       {% if not photos_known %}
         <div class="ov-card__empty">{{ t('card.findings.photos_unknown') }}</div>
       {% endif %}
-      {% for finding in detail.findings %}
+      {% for finding in by_severity(detail.findings) %}
         {% set entry = photos.get(finding.id) %}
         {% set shots = entry.shown if entry else () %}
         {% set lost = entry.missing if entry else 0 %}
@@ -293,7 +293,7 @@
             {% if row.question %}{{ row.question }}{% else %}<span class="muted">{{ row.code }}</span>{% endif %}
             <span class="info-row__code">{{ row.code }}{% if info_titles_found and not row.question %} · {{ t('card.info.no_question') }}{% endif %}</span>
           </div>
-          <div class="info-row__answer">{{ row.answer or '—' }}</div>
+          <div class="info-row__answer">{{ day(row.answer) if row.answer else '—' }}</div>
         </div>
       {% endfor %}
     </section>
@@ -321,7 +321,7 @@
     <div class="note mt-gap"><div><div class="note__text">{{ t('move.history.unknown') }}</div></div></div>
   {% endif %}
 
-  {# Сборка чек-листа — свёрнутой справкой внизу (D218), и названа она ДАТОЙ:
+  {# Версия чек-листа (до #969 «Сборка») — свёрнутой справкой внизу (D218), и названа она ДАТОЙ:
      номер сборки человеку ничего не говорит. Номер остаётся подсказкой к дате —
      он нужен только при разборе расхождений. #}
   <details class="mx-more">
@@ -331,7 +331,7 @@
       {% if head.is_legacy %}
       <div><dt class="muted">{{ t('card.legacy.method') }}</dt><dd>{{ detail.legacy_method or t('card.legacy.unlabelled') }}</dd></div>
       {% else %}
-      <div><dt class="muted">{{ t('card.build.since') }}</dt><dd title="{{ head.checklist_version }}">{{ build_since or t('card.build.since_unknown') }}</dd></div>
+      <div><dt class="muted">{{ t('card.build.since') }}</dt><dd title="{{ head.checklist_version }}">{{ day(build_since) if build_since else t('card.build.since_unknown') }}</dd></div>
       {% endif %}
     </dl>
   </details>

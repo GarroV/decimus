@@ -49,6 +49,16 @@ def level_tone(level: str) -> str:
     return _LEVEL_TONES.get(level.strip().upper(), "tag--neutral")
 
 
+# Критичное — сверху (#965): читающий карточку ищет сначала D3, а номер записи
+# говорит только о порядке обхода. Без класса и рекомендации — после нарушений.
+_SEVERITY_ORDER = {"D3": 0, "D2": 1, "D1": 2, "NC": 3, "R": 4}
+
+
+def by_severity(findings: Any) -> list[Any]:
+    """Записи в порядке D3 → D2 → D1 → без класса → рекомендации; внутри — как были."""
+    return sorted(findings, key=lambda f: _SEVERITY_ORDER.get(str(f.level).strip().upper(), 3))
+
+
 def pick(ru: object, en: object, lang: str) -> str:
     """Выбрать формулировку по языку интерфейса. Неизвестный язык — отказ.
 

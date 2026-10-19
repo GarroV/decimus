@@ -267,8 +267,8 @@ def test_карточка_называет_сборку_датой_а_не_но�
     страница = стенд.get(f"/inspections/{деталь.inspection.id}").get_data(as_text=True)
 
     # Assert
-    assert "Сборка чек-листа" in страница
-    assert ">2026-09-17</dd>" in страница
+    assert "Версия чек-листа" in страница
+    assert ">17 сен 2026</dd>" in страница
     assert f">{деталь.inspection.checklist_version}<" not in страница
 
 

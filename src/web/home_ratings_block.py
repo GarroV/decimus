@@ -1,8 +1,9 @@
-"""Блок «Рейтинги» на «Главной» (D418): РС, РКО и оценки на картах — по кластерам стран (D502).
+"""Блок «Рейтинги» на «Главной» (D418): РС, РКО, карты и агрегаторы (D557) — по кластерам (D502).
 
 Блок ничего не считает сам. Среднее группы (D353), движение к прошлому периоду
 и оценки карт берутся теми же функциями, что у страницы «Рейтинги»:
-`report.group_summary` (строки сводки `group_lines`) и `maps.compare`. Период —
+`report.group_summary` (строки сводки `group_lines`), `maps.compare` и
+`aggregators.summary.for_groups`. Период —
 тот же, что выбран на «Главной», и ссылка заголовка ведёт на «Рейтинги» с тем
 же периодом и срезом, поэтому числа на двух экранах совпадают.
 
@@ -24,6 +25,7 @@ from datetime import date
 from src.db.errors import DbError
 from src.ratings import maps as rmaps
 from src.ratings import report
+from src.ratings.aggregators import summary as ragg
 
 from .registry_period import Period
 
@@ -41,6 +43,15 @@ class MapScore:
 
 
 @dataclass(frozen=True)
+class AggCell:
+    """Оценка группы на агрегаторе — в родной шкале (Wolt из 10, Glovo %, прочие из 5)."""
+
+    code: str
+    avg: float
+    scale: int
+
+
+@dataclass(frozen=True)
 class Column:
     """Колонка блока: кластер (`key` — `CEE` / `OTHER`) или страна (`key` — её код)."""
 
@@ -51,17 +62,22 @@ class Column:
     rko: float | None
     rko_delta: float | None
     maps: tuple[MapScore, ...]
+    aggs: tuple[AggCell, ...] = ()
 
 
 @dataclass(frozen=True)
 class Block:
-    """Что показывает блок. `failed` — рейтинги не прочитались; `maps_failed` — только карты."""
+    """Что показывает блок. `failed` — рейтинги не прочитались; `maps_failed` и
+    `aggs_failed` — только карты или агрегаторы; `aggs_later` — их оценки собраны
+    позже периода (истории у агрегаторов нет)."""
 
     columns: tuple[Column, ...] = ()
     #: Параметры ссылки на «Рейтинги»: тот же срез и период.
     link: tuple[tuple[str, str], ...] = ()
     failed: bool = False
     maps_failed: bool = False
+    aggs_failed: bool = False
+    aggs_later: bool = False
 
 
 def _args(period: Period, country: str) -> dict[str, str]:
@@ -87,6 +103,21 @@ def _maps_by_key(
         )
         for row in rows
     }
+
+
+def _aggs_by_key(
+    lines: Sequence[report.GroupLine], selection: report.Selection, *, until: date, today: date
+) -> tuple[dict[str, tuple[AggCell, ...]], bool]:
+    groups = tuple((_key(line, selection), line.countries) for line in lines)
+    order, rows, later = ragg.for_groups(groups, until=until, today=today)
+    return {
+        row.group: tuple(
+            AggCell(code, row.scores[code].avg, row.scores[code].scale)
+            for code in order
+            if code in row.scores
+        )
+        for row in rows
+    }, later
 
 
 def _key(line: report.GroupLine, selection: report.Selection) -> str:
@@ -115,6 +146,12 @@ def load(*, scope: Sequence[str] | None, country: str, period: Period, today: da
     except DbError as exc:
         log.warning("главная: оценки карт не прочитались (%s)", exc.__class__.__name__)
         maps_of, maps_failed = {}, True
+    try:
+        aggs_of, aggs_later = _aggs_by_key(lines, selection, until=until, today=today)
+        aggs_failed = False
+    except DbError as exc:
+        log.warning("главная: оценки агрегаторов не прочитались (%s)", exc.__class__.__name__)
+        aggs_of, aggs_later, aggs_failed = {}, False, True
     columns = tuple(
         Column(
             key=_key(line, selection),
@@ -124,7 +161,14 @@ def load(*, scope: Sequence[str] | None, country: str, period: Period, today: da
             rko=line.rko,
             rko_delta=line.rko_delta,
             maps=maps_of.get(_key(line, selection), ()),
+            aggs=aggs_of.get(_key(line, selection), ()),
         )
         for line in lines
     )
-    return Block(columns=columns, link=link, maps_failed=maps_failed)
+    return Block(
+        columns=columns,
+        link=link,
+        maps_failed=maps_failed,
+        aggs_failed=aggs_failed,
+        aggs_later=aggs_later,
+    )

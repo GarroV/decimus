@@ -69,6 +69,9 @@ def _card(c: Candidate, offer: Offer, ask: Ask) -> dict[str, Any]:
         # Показание термометра, прочитанное моделью (#836): форма показывает его
         # числовым полем, и аудитор его правит.
         "reading_c": c.reading_c,
+        # Пометки проверки правил (`rules_check`): бот их показывал, а обход —
+        # нет, и служебная оговорка модели уехала в отчёт как текст записи (#970).
+        "flags": list(c.flags),
         "resolution": {
             "zone": found.zone,
             "source": found.source,
