@@ -350,6 +350,8 @@ def test_загрузка_рейтингов(роль: str, можно: bool) ->
     "/settings/google-link",
     "/settings/google-unlink",
     "/settings/lang",
+    # Свой постоянный отбор стран экрана «Страны» (D536) — настройка своей учётки, как язык.
+    "/country/filter",
     # Подтверждение входа перед долгоживущим доступом — своя же учётка.
     "/settings/confirm",
     "/settings/confirm/google",

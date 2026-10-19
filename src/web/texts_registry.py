@@ -64,7 +64,10 @@ _BAR: dict[str, dict[str, str]] = {
         "ru": "Период и отбор действуют на принятые проверки, новые — сверху.",
         "en": "The period and filters apply to accepted inspections, newest first.",
     },
-    "registry.unchecked.label": {"ru": "Пиццерии без проверки", "en": "Pizzerias without inspection"},
+    "registry.unchecked.label": {
+        "ru": "Пиццерии без проверки",
+        "en": "Pizzerias without inspection",
+    },
     "registry.unchecked.apply": {"ru": "Применить", "en": "Apply"},
 }
 

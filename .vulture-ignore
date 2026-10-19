@@ -621,3 +621,11 @@ demo_app
 demo_enter
 landing
 _в_демо_выключено
+# Маршруты Flask и поле панели (60% уверенности — имя не читается в коде):
+# `set_space` — POST настроек страны, регистрирует `@app.post(..., endpoint="country_set_space")`;
+# `plan_file_legacy`/`order_file_legacy` — переадресация старых адресов файлов (D526),
+# регистрирует `@app.get(...)`; `owner_name` — поле `Panel`, читает шаблон `country/_settings.html`.
+set_space
+plan_file_legacy
+order_file_legacy
+owner_name
