@@ -136,24 +136,48 @@ def test_отказ_базы_блок_называет_а_не_прячет(monk
     assert блок.failed and блок.shown
 
 
-def test_проверки_показывают_блок_с_отбором_экрана(
+def test_проверки_по_умолчанию_без_блока_и_без_чтения(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """D501: блок вернулся на «Проверки», период и отбор — те же, что у «Принятых»."""
+    """D532: без галочки «Где не проведено» не показывается и база за ним не ходит."""
+    # Arrange
+    спросили: list[dict[str, object]] = []
+    monkeypatch.setattr(to_inspect, "load", lambda **kw: спросили.append(kw) or _блок("Точка"))
+
+    # Act
+    страница = стенд.get("/inspections").get_data(as_text=True)
+
+    # Assert
+    assert t_ru("registry.tocheck.title") not in страница
+    assert "Точка" not in страница
+    assert "Белград-1" in страница
+    assert t_ru("registry.unchecked.label") in страница
+    assert not спросили
+
+
+def test_проверки_по_галочке_список_целиком_вместо_проверок(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D532: `unchecked=1` — вся правая часть это точки без проверки, все строки, с отбором экрана."""
     # Arrange
     спросили: list[dict[str, object]] = []
     имена = [f"Точка-{n}" for n in range(to_inspect.TO_CHECK_TOP + 2)]
     monkeypatch.setattr(to_inspect, "load", lambda **kw: спросили.append(kw) or _блок(*имена))
 
     # Act
-    страница = стенд.get("/inspections?from=2026-09-01&to=2026-09-30&country=RS&q=xy").get_data(
-        as_text=True
-    )
+    страница = стенд.get(
+        "/inspections?unchecked=1&from=2026-09-01&to=2026-09-30&country=RS&q=xy"
+    ).get_data(as_text=True)
 
     # Assert
     assert t_ru("registry.tocheck.title") in страница
     assert all(имя in страница for имя in имена)
-    assert "и ещё 2" in страница
+    assert "и ещё" not in страница
+    assert "Белград-1" not in страница
+    assert t_ru("registry.review.title") not in страница
+    assert t_ru("registry.accepted.title") not in страница
+    assert 'name="unchecked" value="1" checked' in страница
+    assert спросили[0]["top"] is None
     assert (спросили[0]["date_from"], спросили[0]["date_to"]) == (
         date(2026, 9, 1),
         date(2026, 9, 30),
@@ -161,12 +185,27 @@ def test_проверки_показывают_блок_с_отбором_экр
     assert (спросили[0]["country"], спросили[0]["query"]) == ("RS", "xy")
 
 
+def test_проверки_галочка_переживает_смену_периода_и_поиск(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D532: галочка в адресе — в стрелках периода и скрытых полях форм, иначе сбросится."""
+    # Arrange
+    monkeypatch.setattr(to_inspect, "load", lambda **_: _блок("Точка"))
+
+    # Act
+    страница = стенд.get("/inspections?unchecked=1&period=2026-09").get_data(as_text=True)
+
+    # Assert
+    assert страница.count('name="unchecked" value="1"') >= 2  # поиск и период несут её дальше
+    assert "unchecked=1" in страница
+
+
 def test_проверки_пустой_блок_одна_строка(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(to_inspect, "load", lambda **_: to_inspect.Block())
 
-    страница = стенд.get("/inspections").get_data(as_text=True)
+    страница = стенд.get("/inspections?unchecked=1").get_data(as_text=True)
 
     assert t_ru("registry.tocheck.empty") in страница
 
@@ -176,6 +215,6 @@ def test_проверки_отказ_блока_называется_строк�
 ) -> None:
     monkeypatch.setattr(to_inspect, "load", lambda **_: to_inspect.Block(failed=True))
 
-    страница = стенд.get("/inspections").get_data(as_text=True)
+    страница = стенд.get("/inspections?unchecked=1").get_data(as_text=True)
 
     assert t_ru("registry.tocheck.failed") in страница

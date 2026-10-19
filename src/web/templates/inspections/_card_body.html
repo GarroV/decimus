@@ -57,8 +57,9 @@
   <div class="pshots" data-pshots>
     {% for photo_id in (entry.shown if entry else ()) %}
       <span class="pshot">
-        <img class="pshot__img" src="{{ url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id) }}"
-             alt="{{ t('review.photo.alt', n=finding.n) }}" loading="lazy" width="72" height="72">
+        {% set shot_url = url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id) %}
+        <a href="{{ shot_url }}" data-zoom><img class="pshot__img" src="{{ shot_url }}"
+             alt="{{ t('review.photo.alt', n=finding.n) }}" loading="lazy" width="72" height="72"></a>
         <label class="pshot__x" title="{{ t('proofread.photos.remove') }}" data-remove-label="{{ t('proofread.photos.undo') }}">
           <input class="sr-only" type="checkbox" name="remove_photo" value="{{ photo_id }}" data-pshot-remove>
           {{ icon('x') }}<span class="sr-only">{{ t('proofread.photos.remove') }}</span></label>
@@ -252,7 +253,7 @@
           <div class="find-row__gallery">
             {% for shot in shots %}
               {% set src = url('/inspections/' ~ head.id ~ '/photos/' ~ shot) %}
-              <a href="{{ src }}" target="_blank" rel="noopener"><img src="{{ src }}" loading="lazy" alt="{{ finding.code }} · {{ loop.index }}"></a>
+              <a href="{{ src }}" data-zoom><img src="{{ src }}" loading="lazy" alt="{{ finding.code }} · {{ loop.index }}"></a>
             {% endfor %}
           </div>
         </details>

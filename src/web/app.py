@@ -627,6 +627,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             city=request.args.get("city", "").strip()[:80],
             # Поиск: часть названия пиццерии, без учёта регистра.
             q=request.args.get("q", "").strip()[:80],
+            # «Пиццерии без проверки» (D532): правая часть целиком — список точек.
+            unchecked=request.args.get("unchecked", "").strip() == "1",
         )
         гео = data.load_geography(reach=auth.current_reach())
 
@@ -651,13 +653,12 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         )
         ждёт_дней = {row.id: max((сегодня - row.inspection_date).days, 0) for row in на_приёмке}
         чипы = _registry_picks(registry_data.rows, отбор_в, место, отбор, язык)
-        return render_template(
-            "inspections/list.html",
-            registry=registry_data,
-            review_rows=на_приёмке,
-            # «Где не проведено» (D501): период и отбор страны, города и поиска —
-            # те же, что у «Принятых»; список целиком, лишнее свёрнуто в шаблоне.
-            to_check=to_inspect.load(
+        # Буква и вид — про проверки, у точек без проверки их нет: чипов нет.
+        чипы = tuple(ч for ч in чипы if not отбор_в.unchecked or ч.key in ("country", "city"))
+        # «Где не проведено» читается только по галочке (D532): без неё база не
+        # спрашивается. Список целиком, без «и ещё N».
+        без_проверки = (
+            to_inspect.load(
                 reach=auth.current_reach(),
                 date_from=период.start,
                 date_to=период.end,
@@ -665,8 +666,15 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 city=отбор_в.city,
                 query=отбор_в.q,
                 top=None,
-            ),
-            to_check_top=to_inspect.TO_CHECK_TOP,
+            )
+            if отбор_в.unchecked
+            else None
+        )
+        return render_template(
+            "inspections/list.html",
+            registry=registry_data,
+            review_rows=на_приёмке,
+            to_check=без_проверки,
             unit_href=lambda item: _unit_href(item, lang=язык),
             review_wait=ждёт_дней,
             rows=строки,
@@ -689,7 +697,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             period_hidden={"lang": язык, **{к: з for к, з in отбор_в.params().items() if з}},
             period_all=отбор(**{"from": "", "to": "", "period": registry_period.ALL}),
             select_url=отбор,
-            reset_url=отбор(grade="", kind="", country="", city="", q=""),
+            reset_url=отбор(grade="", kind="", country="", city="", q="", unchecked=""),
             picked=панель.picked,
             card=панель.context,
             card_missing=панель.missing,
@@ -1420,6 +1428,7 @@ def _registry_picks(
                 values=города,
                 href=lambda значение: select(city=значение),
                 title=lambda код: city_title(код, lang),
+                key="city",
             )
         )
     # Буквы — шкалой, а не по частоте: полоса отбора не должна менять порядок

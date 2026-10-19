@@ -61,9 +61,11 @@ _BAR: dict[str, dict[str, str]] = {
     "registry.filters.title": {"ru": "Отбор", "en": "Filters"},
     "registry.accepted.title": {"ru": "Принятые", "en": "Accepted"},
     "registry.accepted.hint": {
-        "ru": "Период и отбор действуют на «Где не проведено» и принятые проверки, новые — сверху.",
-        "en": "The period and filters apply to Not inspected yet and accepted, newest first.",
+        "ru": "Период и отбор действуют на принятые проверки, новые — сверху.",
+        "en": "The period and filters apply to accepted inspections, newest first.",
     },
+    "registry.unchecked.label": {"ru": "Пиццерии без проверки", "en": "Pizzerias without inspection"},
+    "registry.unchecked.apply": {"ru": "Применить", "en": "Apply"},
 }
 
 _PANEL: dict[str, dict[str, str]] = {
@@ -110,7 +112,6 @@ _TOCHECK: dict[str, dict[str, str]] = {
     },
     "registry.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
     "registry.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
-    "registry.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
     "registry.tocheck.empty": {
         "ru": "За этот период везде проверено.",
         "en": "Every unit has an inspection in this period.",

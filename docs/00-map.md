@@ -296,7 +296,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 55 | SOURCE.md, actions.js, apple-touch-icon.png, country.js, decimus-actions.css, decimus-country.css, decimus-domain.css, decimus-home.css, … (+47) |
+| `src/web/static/` | 56 | SOURCE.md, actions.js, apple-touch-icon.png, country.js, decimus-actions.css, decimus-country.css, decimus-domain.css, decimus-home.css, … (+48) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
@@ -699,6 +699,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/tenants.py` | Код тенанта управляющей компании и перевод старого кода (D234, #439) |
 | `src/domain/translation.py` | Поля методики, заполненные не на том языке, на котором их напечатают (T186) |
 | `src/domain/uncovered.py` | Накопитель непокрытых формулировок — случай, когда записи не появилось |
+| `src/domain/unit_match.py` | Сопоставление точек справочника `units` со сведениями о пиццериях `unit_profiles` (#316, #909) |
 | `src/domain/unit_name.py` | Имя пиццерии «Город-N» по-английски — из написанного как угодно (D233) |
 | `src/domain/unit_new.py` | Новая пиццерия справочника из веб-админки: что заводится и почему нет (#437) |
 | `src/domain/upload_sweep.py` | Уборка кадров мини-аппа, не попавших ни в одну проверку (F-033, #531) |
@@ -813,6 +814,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/storage_reconcile.py` | Сверка хранилища файлов с таблицами — экшн-планы и предписания (#496) |
 | `tools/unit_canon.py` | Справочник пиццерий к каноническим именам «Город-N» по-английски (D233, #440) |
 | `tools/units.py` | Справочник точек сети: загрузка с сайтов стран и заведение руками |
+| `tools/units_normalize.py` | Привести справочник пиццерий `units` к эталону `unit_profiles` (#316, #909) |
 | `tools/walk_healthcheck.py` | Проба здоровья сервиса мини-аппа обхода — изнутри его контейнера |
 | `tools/walk_mockup/build.py` | Кликабельный макет мини-аппа обхода (#418) — один HTML-файл для отзывов коллег |
 | `tools/web_unlock.py` | Запрет на вход: показать запертых и снять запрет |

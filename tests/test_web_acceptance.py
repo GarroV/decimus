@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from dataclasses import replace
 from typing import Any
@@ -149,6 +150,7 @@ def test_правка_записи_показывает_кадры_и_назыв
     # Assert — в правке записи миниатюра и пометка; в записях пометка в строке счётчика.
     assert 'class="pshot__img"' in страница
     assert f"/photos/{кадр}" in страница
+    assert 'target="_blank"' not in re.search(r"<a [^>]*/photos/[^>]*>", страница).group(0)  # type: ignore[union-attr]
     assert страница.count("Фото недоступно: 1") == 1
     assert "Фото: 1 · недоступно: 1" in страница
 

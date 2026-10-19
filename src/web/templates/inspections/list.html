@@ -16,8 +16,8 @@
   подтверждения (D199): мимо периода и отбора, давно ждущие первыми, у каждой
   строки — сколько она ждёт. «Принятые» — история сети за выбранный период,
   новые сверху; период и отбор (буква, вид, страна, город, пиццерия) действуют
-  только на неё, это подписано на блоке. «Где нужно проверить» живёт в
-  «Календарь» (`calendar/index.html`).
+  только на неё, это подписано на блоке. «Где не проведено» — по галочке «Пиццерии без проверки»
+  слева (D532): вместо этих двух блоков правая часть показывает только его.
 
   Период — «с — по» по дате обхода со стрелками ← →, по умолчанию всё время
   (D404; `registry_period.py`).
@@ -61,9 +61,13 @@
     <div class="shead__main">
       <h1 class="shead__title">{{ t('section.registry.title') }}</h1>
       <p class="shead__sub">
-        {{ t('registry.review.title') }}: {{ review_rows|length }}
-        · {{ t('registry.accepted.title') }} ({{ period_title }}): {{ rows|length }}
-        {%- if registry.retracted_count %} · {{ t('registry.retracted_count', count=registry.retracted_count) }}{% endif %}
+        {%- if filters.unchecked -%}
+          {{ t('registry.unchecked.label') }} ({{ period_title }}){% if to_check.shown and not to_check.failed %}: {{ to_check.total }}{% endif %}
+        {%- else -%}
+          {{ t('registry.review.title') }}: {{ review_rows|length }}
+          · {{ t('registry.accepted.title') }} ({{ period_title }}): {{ rows|length }}
+          {%- if registry.retracted_count %} · {{ t('registry.retracted_count', count=registry.retracted_count) }}{% endif %}
+        {%- endif %}
       </p>
     </div>
   </header>
@@ -91,6 +95,16 @@
                  aria-label="{{ t('registry.search') }}" autocomplete="off" spellcheck="false">
         </label>
       </form>
+      {# «Пиццерии без проверки» (D532): без скриптов — кнопка «Применить»; со скриптом — сразу при щелчке. #}
+      <form class="rg-unchecked" method="get" action="{{ url(current_path) }}" data-autosubmit>
+        {{ hidden_filters(skip=('unchecked',)) }}
+        {% for name, value in period.params().items() if value %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        <label class="spill spill--check{% if filters.unchecked %} is-on{% endif %}">
+          <input type="checkbox" name="unchecked" value="1"{% if filters.unchecked %} checked{% endif %}>
+          <span>{{ t('registry.unchecked.label') }}</span>
+        </label>
+        <button class="sbtn" type="submit" data-autosubmit-button>{{ t('registry.unchecked.apply') }}</button>
+      </form>
       {% if filters.active %}<a class="sbtn sbtn--ghost rg-reset" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
     </div>
     {% if country_pick %}
@@ -107,6 +121,7 @@
   </aside>
   <div class="mx-main">
   <div class="sbox">
+    {% if not filters.unchecked %}
     {# «На приёмке» (D466): мимо периода и отбора, давно ждущие первыми. #}
     <div class="slist slist--registry slist--review">
       <div class="slist__group">
@@ -120,9 +135,10 @@
       {% endif %}
     </div>
 
-    {# «Где не проведено» (D501): точки охвата без проверок за период, отбор
-       страны, города и поиска — тот же, что у «Принятых». Первые пять видны,
-       остальные — под «и ещё N». #}
+    {% else %}
+    {# «Пиццерии без проверки» (D532): по галочке слева вся правая часть — точки
+       охвата без проверок за период (D501), отбор страны, города и поиска — тот
+       же, что у «Принятых». Все строки, без «и ещё N»: страница прокручивается. #}
     <div class="slist slist--tocheck">
       <div class="slist__group">
         <span>{{ t('registry.tocheck.title') }}</span>{% if to_check.shown and not to_check.failed %}<span class="sbadge">{{ to_check.total }}</span>{% endif %}
@@ -138,19 +154,16 @@
             <a class="srow" href="{{ unit_href(item) }}">
               <span class="srow__dot" aria-hidden="true"></span>
               <span class="srow__main"><b>{{ item.unit }}</b><small>{{ city_title(item.city) or '' }}</small></span>
-              <span class="srow__cell mono">{% if item.last %}{{ t('registry.tocheck.last', date=item.last) }}{% else %}{{ t('registry.tocheck.never') }}{% endif %}</span>
+              <span class="srow__cell">{% if item.last %}{{ t('registry.tocheck.last', date=item.last) }}{% else %}{{ t('registry.tocheck.never') }}{% endif %}</span>
             </a>
           </li>
         {% endmacro %}
-        <ul class="slist__rows">{% for item in to_check.units[:to_check_top] %}{{ tocheck_row(item) }}{% endfor %}</ul>
-        {% if to_check.units | length > to_check_top %}
-          <details class="tocheck-more">
-            <summary class="slist__note">{{ t('registry.tocheck.more', count=to_check.units | length - to_check_top) }}</summary>
-            <ul class="slist__rows">{% for item in to_check.units[to_check_top:] %}{{ tocheck_row(item) }}{% endfor %}</ul>
-          </details>
-        {% endif %}
+        <ul class="slist__rows">{% for item in to_check.units %}{{ tocheck_row(item) }}{% endfor %}</ul>
       {% endif %}
     </div>
+    {% endif %}
+
+    {% if not filters.unchecked %}
 
     {# «Принятые» — единственный блок, на который действуют период и отбор. #}
     <div class="slist slist--registry">
@@ -191,6 +204,7 @@
         </div>
       {% endif %}
     </div>
+    {% endif %}
   </div>
   </div>
 </div>
