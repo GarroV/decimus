@@ -73,4 +73,8 @@ curl -sS -F n=<finding number> -F file=@/mnt/user-data/uploads/<file> "<url>" \
 (several -F file=@... per finding). Check the JSON answer. No network in the sandbox \
 -> give the person the url: they drop the photos on the page themselves. Do this \
 BEFORE import_accept_inspection: the PDF is built with the photos at acceptance.
+- Information part (current mode): before import_accept_inspection call \
+import_info_fields, ask the person every missing question in ONE message (or the \
+built-in question window), then record the answers with import_set_info. Without \
+them the partner's PDF has empty fields. A skipped field is simply not passed.
 """
