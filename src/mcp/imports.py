@@ -43,7 +43,7 @@ from ..domain.models import TEXT_LANGS
 from . import import_modes as modes
 from .checklist_layout import Store
 from .db_target import config_refusal
-from .errors import ToolError
+from .errors import McpError, ToolError
 from .retraction import _same_unit
 from .tools import _finding, _parse_date, _require_inspection_id
 
@@ -191,6 +191,79 @@ def _check_n(n: int) -> int:
     if isinstance(n, bool) or not isinstance(n, int) or n < 1:
         raise ToolError("Номер записи n — целое число от 1")
     return n
+
+
+# --- новая пиццерия ----------------------------------------------------------
+
+#: Отказы правила имени словами для агента: те же коды, что у веба (`unitnew.refused.*`).
+_UNIT_REFUSED = {
+    "empty": "Не названа пиццерия",
+    "too_long": "Название пиццерии слишком длинное (до {limit} знаков)",
+    "too_long_bytes": "Название пиццерии слишком длинное (до {limit} байт)",
+    "need_number": "У пиццерии нужен номер: «Город-N», например «Belgrade-3» (получено «{typed}»)",
+    "other_country": "«{name}» — город другой страны ({country}); заведите её там",
+    "unknown_country": "Страна «{country}» не из словаря сети — нужен код вроде RS, SI, ME",
+}
+
+
+def create_unit(
+    *,
+    tenant: str,
+    store: Store,
+    actor: str,
+    country: str,
+    name: str,
+    confirm_new_city: bool = False,
+) -> dict[str, object]:
+    """Завести пиццерию в справочник — по тем же правилам, что веб (`src/web/unit_add.py`).
+
+    Имя — `domain.unit_new.plan_new_unit` («Город-N» по-английски, чужая страна —
+    отказ, незнакомый город — только с `confirm_new_city`), запись —
+    `db.directory.create_unit` (дубль — отказ с существующей точкой).
+    """
+    from ..db import directory, unit_profiles
+    from ..db.errors import DbError, UnitExistsError
+    from ..domain.unit_match import Ref
+    from ..domain.unit_new import NewUnitRefused, plan_new_unit
+
+    del store, actor  # справочник общий; кто завёл — в журнале MCP
+    код_страны = _required(country, field="country", limit=8).upper()
+    написано = _required(name, field="name", limit=MAX_UNIT)
+    try:
+        строки = unit_profiles.by_country(код_страны)
+    except DbError:
+        # Подсказки справочника — необязательны, как и в вебе: без них заводим по имени.
+        logger.warning("Справочник пиццерий страны не прочитался", exc_info=True)
+        строки = ()
+    справочник = tuple(Ref(p.country_code, p.name, p.dodo_id, p.city, p.address) for p in строки)
+    try:
+        план = plan_new_unit(написано, country=код_страны, refs=справочник)
+    except NewUnitRefused as отказ:
+        raise ToolError(_UNIT_REFUSED.get(отказ.code, отказ.code).format(**отказ.params)) from отказ
+    if not план.known_city and not confirm_new_city:
+        город = план.name.rsplit("-", 1)[0]
+        raise ToolError(
+            f"Город «{город}» сети незнаком. Спросите человека, верно ли завести «{план.name}» "
+            f"({план.country}); если да — повторите create_unit с confirm_new_city=true"
+        )
+    try:
+        заведена = directory.create_unit(
+            план.name,
+            country=план.country,
+            city=план.city,
+            aliases=план.aliases,
+            code=план.code,
+            tenant=tenant,
+        )
+    except UnitExistsError as отказ:
+        raise ToolError(
+            f"Такая пиццерия уже есть: «{отказ.name}». Заводить не нужно — "
+            f"используйте это имя в unit"
+        ) from отказ
+    except DbError as отказ:
+        logger.exception("пиццерия %s не заведена в справочник", план.name)
+        raise McpError("Пиццерия не заведена: база не ответила") from отказ
+    return {"unit": план.name, "country": план.country, "id": заведена.id}
 
 
 # --- черновик -----------------------------------------------------------------
