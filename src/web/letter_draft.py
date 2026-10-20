@@ -115,7 +115,9 @@ def install(app: Flask, conf: Settings) -> None:
             # Параметр СВОЙ, а не `draft`: тем уже помечен возврат к
             # заготовке движка на этом же экране, и один параметр с двумя
             # смыслами разошёлся бы молча.
-            url_for("letter", inspection_id=inspection_id, letter_lang=lang, gmail=исход),
+            url_for(
+                "registry", inspection=inspection_id, view="letter", letter_lang=lang, gmail=исход
+            ),
             code=303,
         )
 

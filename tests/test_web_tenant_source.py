@@ -14,10 +14,6 @@ from pathlib import Path
 #: пространство человека неизвестно, а счётчик — защита от перебора, не граница.
 РАЗРЕШЕНО = {("auth.py", "рубеж = conf.tenant")}
 
-#: Маршруты без входа: вошедшего нет, пространство приходит из подписанного
-#: токена, а не со стенда. Загрузка кадров по ссылке (#1020): пара «черновик,
-#: пространство» зашита в подпись (`domain.photo_upload_link`).
-БЕЗ_ВХОДА = {"photo_upload.py"}
 КОРЕНЬ = Path(__file__).resolve().parent.parent / "src" / "web"
 
 
@@ -37,6 +33,6 @@ def test_мост_охвата_по_тенанту_снят() -> None:
     мосты = [
         путь.name
         for путь in sorted(КОРЕНЬ.rglob("*.py"))
-        if "own_reach" in путь.read_text(encoding="utf-8") and путь.name not in БЕЗ_ВХОДА
+        if "own_reach" in путь.read_text(encoding="utf-8")
     ]
     assert мосты == [], f"чтение по тенанту, а не по охвату вошедшего: {мосты}"

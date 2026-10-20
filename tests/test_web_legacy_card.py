@@ -77,7 +77,7 @@ def test_карточка_исторической_оценка_как_есть_
     assert "Critical (D3)" in страница and "Qvalon 133" in страница
     assert "без класса" in страница and "пункт не назван" in страница
     assert "зона не названа" in страница
-    assert "/letter" not in страница
+    assert "view=letter" not in страница
     assert "LEGACY" not in страница
     # Экшн-плана у загруженной нет: ни плашки «нужен», ни ручного запроса (D310).
     assert "Экшн-план" not in страница
@@ -110,7 +110,7 @@ def test_у_обхода_кнопка_письма_на_месте(
     monkeypatch.setattr(action_plans, "card_plan", lambda *_a, **_k: (None, True))
     monkeypatch.setattr(action_plans, "is_hq", lambda: True)
     страница = стенд.get(f"/inspections/{деталь.inspection.id}?lang=ru").get_data(as_text=True)
-    assert f"/inspections/{деталь.inspection.id}/letter" in страница
+    assert f"inspection={деталь.inspection.id}&amp;view=letter" in страница
     assert "Экшн-план" in страница
 
 

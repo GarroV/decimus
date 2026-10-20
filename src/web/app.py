@@ -259,6 +259,26 @@ def _lang(conf: Settings) -> str:
     return ui_lang.request_lang(conf.ui_lang)
 
 
+#: Параметры одного показа панели — на следующий адрес не переносятся.
+_PANEL_ONCE = ("saved", "gmail", "draft", "letter_lang", "view")
+
+
+def _registry_here(**changes: str) -> str:
+    """Адрес реестра с выбранной панелью: отбор и период — те, что сейчас на реестре.
+
+    С других адресов (ответ действия панели фоном, страница письма) отбора не
+    видно — тогда только `changes`. Итог прошлого действия и вид панели не
+    переносятся: «сохранено» не должно всплывать на следующем щелчке.
+    """
+    база = (
+        {к: з for к, з in request.args.items() if к not in _PANEL_ONCE}
+        if request.endpoint == "registry"
+        else {}
+    )
+    параметры: dict[str, Any] = {к: з for к, з in {**база, **changes}.items() if з}
+    return url_for("registry", **параметры)
+
+
 def _register_context(app: Flask, conf: Settings) -> None:
     """Всё, что нужно каждому шаблону: язык, тексты, реестр разделов, тенант."""
 
@@ -280,6 +300,8 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "item_label": lambda code: item_labels.current_label(code, lang),
             "item_full": lambda code: item_labels.current_full(code, lang),
             "by_severity": view.by_severity,
+            # Адрес реестра с панелью: на самом реестре — с его отбором и периодом.
+            "registry_here": _registry_here,
             # Письмо партнёру выводится разметкой ТОЛЬКО через белый список, и
             # чистится в момент вывода: запись в базе не принимается на слово.
             # Шаблон ставит `|safe` строго на результат этой функции.
@@ -673,7 +695,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             return _url("registry", **{к: з for к, з in параметры.items() if з})
 
         выбрано = request.args.get("inspection", "").strip()[:64]
-        панель = _registry_panel(выбрано, conf=conf)
+        панель = _registry_panel(выбрано, conf=conf, as_letter=request.args.get("view") == "letter")
         # «На приёмке» (D466, D548): ждущие вычитки — мимо периода, буквы, вида и
         # поиска, но в выбранной стране и городе: выбрана Турция — только Турция.
         # Самые давние сверху; сколько ждут — днями от даты обхода.
@@ -740,6 +762,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             unchecked_shown=registry_view.UNCHECKED_SHOWN,
             picked=панель.picked,
             card=панель.context,
+            letter_panel=панель.letter,
             card_missing=панель.missing,
             card_failed=панель.failed,
             split_open=панель.explicit,
@@ -834,57 +857,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # отчёта проверки; переключатель нужен там, где письмо уходит партнёру
         # другой страны. Незнакомый язык проверяет сборщик и отказывает вслух —
         # движок на такой молча собрал бы письмо по-русски.
-        письмо_на = request.args.get("letter_lang") or None
-        собранное = data.load_letter(detail, lang=письмо_на)
-        # Зафиксированное письмо СИЛЬНЕЕ заготовки: у партнёра на руках лежит
-        # один текст, и показать вместо него сегодняшнюю пересборку значит
-        # ответить на «что мы отправили» правдоподобной неправдой. Заготовка
-        # при этом собирается всё равно — по ней видно оговорки (пустая шапка,
-        # чужой язык), и они не перестают быть правдой оттого, что письмо
-        # зафиксировали.
-        # Отказ базы здесь НЕ роняет экран и не выдаётся за «письма нет»: это
-        # разные вещи, и вторая — молчаливая ложь. Без базы (законная настройка
-        # стенда) страница честно говорит, что сохранённое сейчас неизвестно, и
-        # показывает заготовку.
-        try:
-            записанное = data.saved_letter(
-                inspection_id, lang=письмо_на or detail.inspection.report_lang
-            )
-            сохранённое_известно = True
-        except DbError:
-            записанное = None
-            сохранённое_известно = False
-        # «Вернуть заготовку» — отказ от СВОИХ правок, а не от записи: письмо
-        # партнёру уже могло уйти, и вынуть его из истории нельзя ничем.
-        # Поэтому режим показывает свежесобранный движком текст в поле, но
-        # зафиксированное письмо остаётся на месте и остаётся видно, кем и
-        # когда оно записано. Новая правка ложится новой записью.
-        показать_заготовку = request.args.get("draft") == "1"
-        # Поле правит РАЗМЕТКУ письма (`letter_markup`): заготовка движка —
-        # простой текст и становится разметкой экранированием, записанное
-        # письмо уже разметка и проходит белый список заново.
-        правится = записанное is not None and not показать_заготовку
-        разметка = (
-            letter_markup.sanitize(записанное.body)
-            if правится and записанное is not None
-            else letter_markup.from_plain(собранное.text or "")
-        )
-        return render_template(
-            "inspections/letter.html",
-            letter=собранное,
-            letter_markup=разметка,
-            saved=записанное,
-            show_draft=показать_заготовку,
-            saved_known=сохранённое_известно,
-            own=guard.may("inspection.letter", detail.inspection.tenant_code),
-            save_outcome=request.args.get("saved"),
-            gmail_outcome=request.args.get("gmail"),
-            head=detail.inspection,
-            letter_langs=data.LETTER_LANGS,
-            letter_lang=письмо_на or detail.inspection.report_lang,
-            caveats=view.letter_caveats(собранное.caveats, lang),
-            source=None if собранное.source is None else view.letter_source(собранное.source, lang),
-        )
+        return render_template("inspections/letter.html", **_letter_view(detail, lang=lang))
 
     @app.post(f"{section('registry').path}/<inspection_id>/letter/save")
     @guard.action("inspection.letter", object_in_route=True)
@@ -914,9 +887,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             # Письмо фиксируется как ушедшее партнёру; по непринятой проверке
             # (D199) такой записи быть не должно. Смотреть письмо можно.
             return redirect(
-                url_for(
-                    "letter", inspection_id=inspection_id, letter_lang=письмо_на, saved="on_review"
-                ),
+                _letter_panel_url(inspection_id, letter_lang=письмо_на, saved="on_review"),
                 code=303,
             )
         вошедший = auth.current_account()
@@ -933,16 +904,14 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             # пустое письмо и потерянная база чинятся по-разному, и молчащая
             # кнопка «Сохранить» — ровно то, на что владелец и пожаловался.
             return redirect(
-                url_for(
-                    "letter", inspection_id=inspection_id, letter_lang=письмо_на, saved="failed"
-                ),
+                _letter_panel_url(inspection_id, letter_lang=письмо_на, saved="failed"),
                 code=303,
             )
         # Перенаправление, а не отрисовка на месте: иначе обновление страницы
         # повторяло бы отправку формы, и в истории появлялось бы второе письмо,
         # которого никто не фиксировал.
         return redirect(
-            url_for("letter", inspection_id=inspection_id, letter_lang=письмо_на, saved="ok"),
+            _letter_panel_url(inspection_id, letter_lang=письмо_на, saved="ok"),
             code=303,
         )
 
@@ -1411,9 +1380,74 @@ class _RegistryPanel:
     explicit: bool
     #: Карточка не прочиталась (база ответила отказом) — список при этом жив.
     failed: bool = False
+    #: Открыто письмо партнёру (`view=letter`) — его данные, как у страницы письма.
+    letter: dict[str, Any] | None = None
 
 
-def _registry_panel(chosen: str, *, conf: Settings) -> _RegistryPanel:
+def _letter_panel_url(inspection_id: str, **params: Any) -> str:
+    """Письмо в панели реестра — куда приходят сохранение и возврат от Google.
+
+    Письмо живёт в той же панели, что и карточка (владелец 20.10.2026: «просто
+    выплывала справа»), поэтому и итог действия показывается там же.
+    """
+    return url_for("registry", inspection=inspection_id, view="letter", **params)
+
+
+def _letter_view(detail: Any, *, lang: str) -> dict[str, Any]:
+    """Всё, что рисует письмо партнёру, — страницей и в панели реестра (одно тело)."""
+    письмо_на = request.args.get("letter_lang") or None
+    собранное = data.load_letter(detail, lang=письмо_на)
+    # Зафиксированное письмо СИЛЬНЕЕ заготовки: у партнёра на руках лежит
+    # один текст, и показать вместо него сегодняшнюю пересборку значит
+    # ответить на «что мы отправили» правдоподобной неправдой. Заготовка
+    # при этом собирается всё равно — по ней видно оговорки (пустая шапка,
+    # чужой язык), и они не перестают быть правдой оттого, что письмо
+    # зафиксировали.
+    # Отказ базы здесь НЕ роняет экран и не выдаётся за «письма нет»: это
+    # разные вещи, и вторая — молчаливая ложь. Без базы (законная настройка
+    # стенда) страница честно говорит, что сохранённое сейчас неизвестно, и
+    # показывает заготовку.
+    try:
+        записанное = data.saved_letter(
+            detail.inspection.id, lang=письмо_на or detail.inspection.report_lang
+        )
+        сохранённое_известно = True
+    except DbError:
+        записанное = None
+        сохранённое_известно = False
+    # «Вернуть заготовку» — отказ от СВОИХ правок, а не от записи: письмо
+    # партнёру уже могло уйти, и вынуть его из истории нельзя ничем.
+    # Поэтому режим показывает свежесобранный движком текст в поле, но
+    # зафиксированное письмо остаётся на месте и остаётся видно, кем и
+    # когда оно записано. Новая правка ложится новой записью.
+    показать_заготовку = request.args.get("draft") == "1"
+    # Поле правит РАЗМЕТКУ письма (`letter_markup`): заготовка движка —
+    # простой текст и становится разметкой экранированием, записанное
+    # письмо уже разметка и проходит белый список заново.
+    правится = записанное is not None and not показать_заготовку
+    разметка = (
+        letter_markup.sanitize(записанное.body)
+        if правится and записанное is not None
+        else letter_markup.from_plain(собранное.text or "")
+    )
+    return dict(
+        letter=собранное,
+        letter_markup=разметка,
+        saved=записанное,
+        show_draft=показать_заготовку,
+        saved_known=сохранённое_известно,
+        own=guard.may("inspection.letter", detail.inspection.tenant_code),
+        save_outcome=request.args.get("saved"),
+        gmail_outcome=request.args.get("gmail"),
+        head=detail.inspection,
+        letter_langs=data.LETTER_LANGS,
+        letter_lang=письмо_на or detail.inspection.report_lang,
+        caveats=view.letter_caveats(собранное.caveats, lang),
+        source=None if собранное.source is None else view.letter_source(собранное.source, lang),
+    )
+
+
+def _registry_panel(chosen: str, *, conf: Settings, as_letter: bool = False) -> _RegistryPanel:
     """Карточка в панели справа — только по явному выбору адресом (`?inspection=`).
 
     Права и данные — та же `_card_context`, что у отдельной карточки. Отказ
@@ -1431,7 +1465,22 @@ def _registry_panel(chosen: str, *, conf: Settings) -> _RegistryPanel:
     except DbError as exc:
         logger.warning("карточка проверки %s в реестре не прочиталась: %s", chosen, exc)
         return _RegistryPanel(chosen, None, False, True, failed=True)
+    if as_letter and контекст is not None:
+        try:
+            письмо = _panel_letter(chosen, conf)
+        except DbError as exc:
+            logger.warning("письмо по проверке %s в реестре не собралось: %s", chosen, exc)
+            return _RegistryPanel(chosen, None, False, True, failed=True)
+        return _RegistryPanel(chosen, контекст, False, True, letter=письмо)
     return _RegistryPanel(chosen, контекст, контекст is None, True)
+
+
+def _panel_letter(chosen: str, conf: Settings) -> dict[str, Any] | None:
+    """Письмо в панели; у заведённой задним числом его нет (D310) — тогда карточка."""
+    detail = data.load_card(chosen, reach=auth.current_reach())
+    if detail is None or detail.inspection.is_uploaded:
+        return None
+    return _letter_view(detail, lang=_lang(conf))
 
 
 def _registry_picks(

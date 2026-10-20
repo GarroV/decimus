@@ -207,6 +207,8 @@ def test_черновик_в_чужой_аккаунт_google_не_ложитс�
             text="Заготовка", lang="ru", source="pinned", ready=True, caveats=(), failure=None
         ),
     )
+    # Возврат — в панель письма реестра (20.10.2026): список проверок подменён.
+    monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
     экран = client.get(ответ.headers["Location"]).get_data(as_text=True)
     assert t("letter.gmail.wrong_account", "ru") in экран
 
