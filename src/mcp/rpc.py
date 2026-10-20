@@ -36,6 +36,7 @@ from .catalogue import (
     KIND_RATINGS,
     KIND_RATINGS_READ,
     KIND_RETRACTION,
+    TOOLS,
     ToolSpec,
     as_list,
     find,
@@ -45,6 +46,7 @@ from .checklist_layout import DEFAULT_SPACE, exists, space_of
 from .checklist_layout import for_code as for_checklist
 from .checklists import PROTECTED_APPLIED, protection_of
 from .errors import McpError, ToolError
+from .instructions import IMPORT_INSTRUCTIONS
 from .policy import action_of, may_edit_protected, permits_tool
 
 # Коды ошибок JSON-RPC 2.0. Свои коды не заводятся: клиент разбирает эти.
@@ -579,12 +581,19 @@ def handle(
     if method == "initialize":
         asked = params.get("protocolVersion")
         agreed = asked if asked in SUPPORTED_PROTOCOLS else LATEST_PROTOCOL
+        # Порядок загрузки отдаётся только тому, кому открыты её инструменты:
+        # текст называет их по именам и не раскрывает того, чего нет в tools/list.
+        может_грузить = imports is not None and any(
+            spec.kind == KIND_IMPORT and _tool_open(role, tenant, spec, may_retract)
+            for spec in TOOLS
+        )
         return _result(
             request_id,
             {
                 "protocolVersion": agreed,
                 "capabilities": {"tools": {"listChanged": False}},
                 "serverInfo": {"name": SERVER_NAME, "version": _version()},
+                **({"instructions": IMPORT_INSTRUCTIONS} if может_грузить else {}),
             },
         )
     if method == "ping":
