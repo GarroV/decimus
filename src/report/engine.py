@@ -30,6 +30,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -53,6 +54,14 @@ logger = logging.getLogger(__name__)
 #: Сборка PDF Белград-1 с 19 фотографиями — 1 секунда (`docs/04-engine.md`).
 #: Запас на медленный диск и большой альбом; вечно висеть бот не должен.
 TIMEOUT_SEC = 180.0
+
+#: Сколько сборок идёт в процессе одновременно (F-108). Каждая — свой
+#: интерпретатор с набором фотографий в памяти; при одновременных сдачах без
+#: предела контейнер упирался бы в память. Лишняя сборка ждёт очереди, а не падает.
+MAX_CONCURRENT_BUILDS = 3
+#: Сколько сборка ждёт своего места. Вышло — отказ словами «занято», не зависание.
+QUEUE_WAIT_SEC = 240.0
+_build_slots = threading.BoundedSemaphore(MAX_CONCURRENT_BUILDS)
 
 #: Скрипт отчёта лежит рядом с движком оценки. Путь выводится из того, что уже
 #: разобрал `domain`, чтобы обе копии кода не расходились в понимании, где
@@ -115,6 +124,11 @@ def _launch(
 ) -> subprocess.CompletedProcess[str]:
     """Один запуск `report.py`. Не уложился в срок — отказ, и повтору не подлежит."""
     command = [sys.executable, str(report_script(settings)), *args]
+    if not _build_slots.acquire(timeout=QUEUE_WAIT_SEC):
+        raise ReportError(
+            f"Сборка отчётов сейчас занята: очередь не дошла за {QUEUE_WAIT_SEC:g} с. "
+            f"Повторите через минуту"
+        )
     try:
         return subprocess.run(  # noqa: S603 — список аргументов собран здесь, оболочки нет
             command,
@@ -128,6 +142,8 @@ def _launch(
         raise ReportError(
             f"Сборка отчёта не закончилась за {TIMEOUT_SEC:g} с. Команда: {' '.join(args)}"
         ) from exc
+    finally:
+        _build_slots.release()
 
 
 def _refuse_no_verdict(args: Sequence[str], *, output: str, attempt: int, chat_id: int) -> None:
