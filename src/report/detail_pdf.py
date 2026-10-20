@@ -7,14 +7,16 @@
 печатью сверяется с записанной: отчёт с другой буквой под прежней датой хуже
 отсутствующего.
 
-Кадров в отчёте нет: у записей загрузки они лежат в хранилище за ссылками, а
-движок печатает кадр только по карте «ссылка → файл» (`--photo-map`). Это
-названная цена, а не умолчание: отчёт честно без фотографий.
+Кадры записей передаёт вызывающий (`photos`: номер записи → байты копий из
+хранилища): здесь они ложатся файлами во временный каталог, а движок печатает кадр
+только по карте «ссылка → файл» (`--photo-map`). Без `photos` отчёт честно без фото.
 """
 
 from __future__ import annotations
 
+import json
 import tempfile
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from ..db.models import InspectionDetail
@@ -33,18 +35,37 @@ from .letters import (
 REPORT_FILE = "report.pdf"
 
 
-def build_bytes(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> bytes:
+def build_bytes(
+    detail: InspectionDetail,
+    *,
+    lang: str | None,
+    papers: Papers,
+    photos: Mapping[int, Sequence[bytes]] | None = None,
+) -> bytes:
     """Собрать PDF по записанной проверке и вернуть его байты — или `LetterError`."""
     язык = _lang(detail, lang)
     каталог, _ = _methodology(detail.inspection.checklist_version, papers)
     with tempfile.TemporaryDirectory(prefix="mcp-report-") as рядом:
         состояние = Path(рядом) / "inspection.json"
-        состояние.write_text(state_json(detail, lang=язык), encoding="utf-8")
+        ссылки: dict[int, list[str]] = {}
+        карта: dict[str, str] = {}
+        for n, кадры in (photos or {}).items():
+            for i, байты in enumerate(кадры, 1):
+                файл_кадра = Path(рядом) / f"photo-{n}-{i}.jpg"
+                файл_кадра.write_bytes(байты)
+                ссылки.setdefault(n, []).append(файл_кадра.name)
+                карта[файл_кадра.name] = str(файл_кадра)
+        состояние.write_text(state_json(detail, lang=язык, photos=ссылки), encoding="utf-8")
+        аргументы = ["pdf", f"--lang={язык}", "--out", str(Path(рядом) / REPORT_FILE)]
+        if карта:
+            файл_карты = Path(рядом) / "photo-map.json"
+            файл_карты.write_text(json.dumps(карта, ensure_ascii=False), encoding="utf-8")
+            аргументы += ["--photo-map", str(файл_карты)]
         _verify(detail, каталог, состояние)
         файл = Path(рядом) / REPORT_FILE
         код, вывод, ошибки = _run(
             REPORT_SCRIPT,
-            ["pdf", f"--lang={язык}", "--out", str(файл)],
+            аргументы,
             data_dir=каталог,
             state=состояние,
         )

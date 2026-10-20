@@ -877,7 +877,7 @@ def import_accept_inspection(
                 "Its score stays exactly as in the old report — it is never recomputed, "
                 "and there is no PDF report or partner letter for a historical inspection. "
                 if история
-                else "report_url opens the PDF report (without photos), letter is the "
+                else "report_url opens the PDF report (with the findings' photos), letter is the "
                 "partner letter text — both are only returned, never sent. "
             )
             + "No action-plan request was opened and nothing was sent to anyone. "
@@ -901,6 +901,42 @@ def _report_url(ident: str) -> str | None:
     return f"{base}/inspections/{ident}/report" if base else None
 
 
+def _report_photos(detail: InspectionDetail, *, tenant: str) -> tuple[dict[int, list[bytes]], int]:
+    """Кадры записей для PDF: номер записи → байты копий; второе — сколько не скачалось.
+
+    Тем же путём, что веб отдаёт кадр (`db.previews`). Сбой кадра или хранилища —
+    не отказ отчёта: PDF собирается без него, а счёт идёт в предупреждение.
+    """
+    from ..db import previews
+    from ..db.errors import DbError
+    from ..db.reach import own_reach
+
+    reach = own_reach(tenant)
+    try:
+        по_записям = previews.finding_previews(detail.inspection.id, reach=reach)
+        хранилище: Any = _photo_storage() if по_записям else None
+    except DbError:
+        logger.warning("кадры проверки %s для отчёта не прочитаны", detail.inspection.id)
+        return {}, -1
+    номера = {f.id: f.n for f in detail.findings}
+    кадры: dict[int, list[bytes]] = {}
+    не_скачано = 0
+    for запись, показ in по_записям.items():
+        не_скачано += показ.missing
+        for фото_id in показ.shown:
+            try:
+                байты = previews.preview_bytes(
+                    detail.inspection.id, фото_id, reach=reach, storage=хранилище
+                )
+            except (DbError, OSError):
+                байты = None
+            if not байты or запись not in номера:
+                не_скачано += 1
+                continue
+            кадры.setdefault(номера[запись], []).append(байты)
+    return кадры, не_скачано
+
+
 def _finish(ident: str, *, tenant: str) -> dict[str, object]:
     """Готовые отчёт и письмо для принятой «текущей» проверки — как бот на сдаче.
 
@@ -914,11 +950,16 @@ def _finish(ident: str, *, tenant: str) -> dict[str, object]:
     from ..report.errors import ReportError
     from .letters import build, sources
 
-    итог: dict[str, object] = {"report_url": None, "pdf_error": None}
+    итог: dict[str, object] = {"report_url": None, "pdf_error": None, "pdf_warning": None}
     try:
         detail, _ = _read(ident, tenant=tenant)
         papers = sources()
-        данные = detail_pdf.build_bytes(detail, lang=None, papers=papers)
+        фото, не_скачано = _report_photos(detail, tenant=tenant)
+        if не_скачано:
+            итог["pdf_warning"] = (
+                "Some photos could not be fetched from storage — the PDF is built without them"
+            )
+        данные = detail_pdf.build_bytes(detail, lang=None, papers=papers, photos=фото)
         with _db(accept=True):
             reports.upload_report(ident, data=данные)
         итог["report_url"] = _report_url(ident)

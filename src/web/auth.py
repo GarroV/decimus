@@ -73,6 +73,7 @@ from . import (
     landing,
     oauth,
     passkey_login,
+    photo_upload,
     reauth,
     second_step,
     swarm_api,
@@ -143,6 +144,9 @@ COOKIE_SALT = "web-session"
 #: из `api.tokens` по отпечатку (`swarm_api._authorize`, D388), а не кука; без
 #: живого токена с нужным правом каждый адрес отвечает 401/403/429.
 #:
+#: `photo_upload_*` — загрузка кадров к черновику по подписанной ссылке из Claude
+#: (`photo_upload.py`): опознаёт токен в адресе, а не кука; чужой или просроченный — 403.
+#:
 #: `oauth_*` (кроме согласия) — метаданные, регистрация клиента и выдача
 #: токенов OAuth (D417, `oauth.py`): их зовёт сервер Claude, а не браузер
 #: вошедшего; сами они держатся PKCE и одноразовым кодом. Согласие
@@ -152,6 +156,7 @@ OPEN_ENDPOINTS = (
     | demo_entry.ENDPOINTS
     | walk_auth.ENDPOINTS
     | swarm_api.ENDPOINTS
+    | photo_upload.ENDPOINTS
     | oauth.ENDPOINTS
     | second_step.ENDPOINTS
     | passkey_login.ENDPOINTS
