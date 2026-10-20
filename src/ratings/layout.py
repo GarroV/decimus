@@ -12,10 +12,18 @@ from dataclasses import dataclass
 
 #: Блоки страницы в порядке по умолчанию. Код блока — ключ текста
 #: `ratings.layout.<код>` и ветка шаблона `ratings/index.html`.
-#: Агрегаторы — в блоке карт (11.10.2026): сохранённая строка `aggregators`
-#: выпадает в `arrange` как незнакомая.
+#: Агрегаторы — своя плитка выше карт (D585; с 11.10.2026 до D585 были в блоке карт).
 #: «Сравнение» (D551) видит только УК: у остальных блок пропускается шаблоном.
-BLOCKS: tuple[str, ...] = ("scores", "compare", "violations", "top", "hard", "risk", "maps")
+BLOCKS: tuple[str, ...] = (
+    "scores",
+    "compare",
+    "aggregators",
+    "violations",
+    "top",
+    "hard",
+    "risk",
+    "maps",
+)
 
 
 @dataclass(frozen=True)
