@@ -151,13 +151,13 @@ def прогон(
     токен: str | None = ТОКЕН,
     *,
     self_test: bool = True,
-    переменная: str = "DODO_MCP_URL",
+    переменная: str = "DECIMUS_MCP_URL",
 ) -> subprocess.CompletedProcess[str]:
     env = {"PATH": "/usr/bin:/bin"}
     if адрес is not None:
         env[переменная] = адрес
     if токен is not None:
-        env["DODO_MCP_TOKEN"] = токен
+        env["DECIMUS_MCP_TOKEN"] = токен
     аргументы = [sys.executable, str(СМОУК)]
     if self_test:
         аргументы.append("--self-test")
@@ -276,7 +276,7 @@ def test_без_токена_смоук_не_зеленеет(сервер: str)
     """Без токена доказать, что подключение РАБОТАЕТ, нечем."""
     r = прогон(сервер, токен=None)
     assert r.returncode == 2, r.stdout
-    assert "DODO_MCP_TOKEN" in r.stderr
+    assert "DECIMUS_MCP_TOKEN" in r.stderr
 
 
 def test_адрес_берётся_из_той_же_переменной_которую_печатает_бот(сервер: str) -> None:
