@@ -11,9 +11,16 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..db.models import ORIGIN_LEGACY
 from .checklist_layout import Store
 from .errors import McpError, ToolError
-from .imports import _only_import, _short_view, add_one
+from .imports import (
+    _only_import,
+    _short_view,
+    add_one,
+    prior_inspection,
+    repeat_warning,
+)
 from .tools import _require_inspection_id
 
 #: Предел пакета: ответ и время движка растут с числом находок.
@@ -53,13 +60,23 @@ def import_add_findings(
         raise ToolError("Список findings пуст")
     if len(findings) > MAX_BATCH:
         raise ToolError(f"В пакете не больше {MAX_BATCH} находок, передано {len(findings)}")
-    _, шапка = _only_import(ident, tenant=tenant)
+    detail, шапка = _only_import(ident, tenant=tenant)
+    # Одна прошлая проверка на весь пакет, а не запрос на каждую находку.
+    прошлая = prior_inspection(detail) if шапка.origin != ORIGIN_LEGACY else None
     added: list[dict[str, object]] = []
     refused: list[dict[str, object]] = []
     предупреждения: list[str] = []
+    кандидаты: list[dict[str, object]] = []
     for index, raw in enumerate(findings):
         try:
-            n, warn = add_one(tenant=tenant, store=store, ident=ident, шапка=шапка, **_checked(raw))
+            n, warn, был = add_one(
+                tenant=tenant,
+                store=store,
+                ident=ident,
+                шапка=шапка,
+                прошлая=прошлая,
+                **_checked(raw),
+            )
         except (ToolError, McpError) as отказ:
             refused.append({"index": index, "reason": str(отказ)})
             continue
@@ -76,10 +93,14 @@ def import_add_findings(
             break
         added.append({"index": index, "n": n})
         предупреждения.extend(f"#{n}: {w}" for w in warn)
+        if был:
+            кандидаты.append({"n": n, "date": был.isoformat()})
+            предупреждения.append(repeat_warning(n, был))
     полный = _short_view(
         ident,
         tenant=tenant,
         note=f"{len(added)} added, {len(refused)} refused of {len(findings)}",
         warnings=предупреждения,
+        repeat_candidates=кандидаты,
     )
     return {**полный, "added": added, "refused": refused}
