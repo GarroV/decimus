@@ -34,6 +34,17 @@ REENCODE_TIMEOUT = 60.0
 _SAMPLE_RATE = "16000"
 _CHANNELS = "1"
 
+#: Потолки голосового (F-123): оно идёт в ffmpeg и в платную транскрипцию.
+#: Голосовые аудитора — секунды-десятки секунд (OGG/Opus ≈ 4 КБ/с); сообщения
+#: Telegram и так не больше 20 МБ, так что размер — страховка от файла в обход бота.
+MAX_AUDIO_BYTES = 25 * 1024 * 1024
+#: Длительность: десять минут — на порядок больше обычной реплики. WAV на выходе
+#: при этом ~19 МБ, в пределе API транскрипции (25 МБ).
+MAX_AUDIO_SECONDS = 600
+#: Байт WAV в секунду: 16 кГц × 16 бит × моно.
+_WAV_BYTES_PER_SECOND = 32_000
+_WAV_HEADER_BYTES = 44
+
 
 def _reencode(audio: bytes, ffmpeg: str) -> bytes:
     """OGG/Opus (или что угодно, что понимает ffmpeg) → WAV."""
@@ -52,6 +63,10 @@ def _reencode(audio: bytes, ffmpeg: str) -> bytes:
                     _SAMPLE_RATE,
                     "-ac",
                     _CHANNELS,
+                    # Не пишем дальше потолка (+1 с, чтобы превышение было видно):
+                    # длинный файл не раздувается в гигабайты WAV.
+                    "-t",
+                    str(MAX_AUDIO_SECONDS + 1),
                     str(dst),
                 ],
                 check=True,
@@ -117,7 +132,17 @@ def transcribe(
             "Голосовое не распознано, "
             "попросите аудитора написать текстом"
         )
+    if len(audio) > MAX_AUDIO_BYTES:
+        raise TranscriptionFailed(
+            f"Голосовое слишком большое ({len(audio) / 1024 / 1024:.0f} МБ, предел "
+            f"{MAX_AUDIO_BYTES // 1024 // 1024} МБ). Не разобрано, попросите написать текстом"
+        )
     wav = _reencode(audio, cfg.ffmpeg)
+    if (len(wav) - _WAV_HEADER_BYTES) / _WAV_BYTES_PER_SECOND > MAX_AUDIO_SECONDS:
+        raise TranscriptionFailed(
+            f"Голосовое слишком длинное (предел {MAX_AUDIO_SECONDS // 60} мин). "
+            "Не разобрано, попросите написать текстом"
+        )
 
     client = OpenAI(api_key=cfg.api_key, timeout=cfg.timeout)
     try:

@@ -230,3 +230,51 @@ def test_реальный_ffmpeg_перекодирует_синтезирова
     # Assert: валидный WAV-заголовок, не пустой файл
     assert wav[:4] == b"RIFF"
     assert wav[8:12] == b"WAVE"
+
+
+# --- F-123: потолки размера и длительности ---------------------------------
+
+
+def _wav_of(seconds: int) -> bytes:
+    from src.recognize.transcribe import _WAV_BYTES_PER_SECOND, _WAV_HEADER_BYTES
+
+    return bytes(_WAV_HEADER_BYTES + seconds * _WAV_BYTES_PER_SECOND)
+
+
+def test_размер_ровно_предел_проходит_на_байт_больше_отказ_до_ffmpeg(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.recognize.transcribe import MAX_AUDIO_BYTES
+
+    seen: list[int] = []
+
+    def _reencode(audio: bytes, ffmpeg: str) -> bytes:
+        seen.append(len(audio))
+        return b"RIFF"
+
+    monkeypatch.setattr("src.recognize.transcribe._reencode", _reencode)
+    fake = _FakeTranscriptions(result=Transcription(text="ок"))
+    _patch_openai(monkeypatch, _FakeClient(audio=_FakeAudio(transcriptions=fake)))
+
+    assert transcribe(bytes(MAX_AUDIO_BYTES), settings=_settings()) == "ок"
+    with pytest.raises(TranscriptionFailed, match="слишком большое"):
+        transcribe(bytes(MAX_AUDIO_BYTES + 1), settings=_settings())
+    assert seen == [MAX_AUDIO_BYTES]  # перекодировка на лишнем файле не запускалась
+
+
+def test_длительность_ровно_предел_проходит_на_секунду_больше_отказ_до_оплаты(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.recognize.transcribe import MAX_AUDIO_SECONDS
+
+    fake = _FakeTranscriptions(result=Transcription(text="ок"))
+    _patch_openai(monkeypatch, _FakeClient(audio=_FakeAudio(transcriptions=fake)))
+
+    _patch_reencode(monkeypatch, _wav_of(MAX_AUDIO_SECONDS))
+    assert transcribe(b"ogg", settings=_settings()) == "ок"
+    assert len(fake.calls) == 1
+
+    _patch_reencode(monkeypatch, _wav_of(MAX_AUDIO_SECONDS + 1))
+    with pytest.raises(TranscriptionFailed, match="слишком длинное"):
+        transcribe(b"ogg", settings=_settings())
+    assert len(fake.calls) == 1  # платный вызов на длинном файле не ушёл
