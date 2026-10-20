@@ -37,7 +37,9 @@ from contextlib import contextmanager
 from datetime import date
 from typing import TYPE_CHECKING, Any, cast
 
+from ..db.errors import DbError
 from ..db.models import ORIGIN_IMPORT, ORIGIN_LEGACY
+from ..domain import repeat_rule
 from ..domain.kinds import INSPECTION_KINDS
 from ..domain.models import TEXT_LANGS
 from . import import_modes as modes
@@ -495,6 +497,7 @@ def _short_view(
     note: str,
     n: int | None = None,
     warnings: Sequence[str] = (),
+    repeat_candidates: Sequence[dict[str, object]] = (),
 ) -> dict[str, object]:
     """Короткий ответ записи: затронутая находка и оценка, без списка и разбивок (#1016).
 
@@ -507,6 +510,8 @@ def _short_view(
         **{k: полный[k] for k in _SHORT_KEYS},
         "finding": next((f for f in находки if f.get("n") == n), None),
         "warnings": list(warnings),
+        # Только если есть: без кандидатов ответ не растёт (#1016).
+        **({"repeat_candidates": list(repeat_candidates)} if repeat_candidates else {}),
         "findings_total": len(находки),
     }
 
@@ -596,6 +601,32 @@ def _wording(text: str | None, comment: str | None) -> Any:
     )
 
 
+def prior_inspection(detail: InspectionDetail) -> Any:
+    """Прошлая проверка этой точки строго до даты черновика (#1019); `None` — нет или недоступна.
+
+    Сбой базы подсказку снимает, а не роняет запись: находка важнее вопроса о
+    повторе, как и в боте (`src/bot/repeats.py`).
+    """
+    from ..db import queries
+
+    строка = detail.inspection
+    try:
+        return queries.previous_inspection_before(
+            tenant=строка.tenant_code, unit=строка.unit_name, before=строка.inspection_date
+        )
+    except DbError as exc:
+        logger.warning("прошлая проверка не пришла (%s): %s", type(exc).__name__, exc)
+        return None
+
+
+def repeat_warning(n: int, day: date) -> str:
+    """Слова предупреждения: пункт был нарушением в прошлой проверке, повтор ставит человек."""
+    return (
+        f"#{n}: this item was a violation in the inspection of {day.isoformat()} "
+        "- ask whether it is a repeat"
+    )
+
+
 def add_one(
     *,
     tenant: str,
@@ -608,8 +639,13 @@ def add_one(
     zone: str | None = None,
     comment: str | None = None,
     repeat: bool = False,
-) -> tuple[int, list[str]]:
-    """Записать одну находку: номер и предупреждения. Общий путь `import_add_finding(s)`.
+    прошлая: Any = None,
+) -> tuple[int, list[str], date | None]:
+    """Записать одну находку: номер, предупреждения и дата прошлой проверки с этим пунктом.
+
+    Общий путь `import_add_finding(s)`. Дата — только если пункт был нарушением в
+    `прошлая` (до даты черновика) и `repeat` не передан: повтор сам не ставится,
+    его подтверждает человек (D191, D255).
 
     Проверку делает ровно этот код — поштучный и пакетный инструменты не
     расходятся в том, что пускают в черновик.
@@ -629,7 +665,7 @@ def add_one(
         )
         with _db():
             n = legacy.add_legacy_finding(ident, tenant=tenant, finding=запись, wording=слова)
-        return n, modes.soft_warnings(store, code=запись.code, zone=запись.zone)
+        return n, modes.soft_warnings(store, code=запись.code, zone=запись.zone), None
     code, level, zone = _engine_triple(code, level, zone)
     args = [
         "add",
@@ -645,7 +681,12 @@ def add_one(
     ]
     with _db():
         n, _ = db.add_finding(ident, tenant=tenant, wording=слова, apply=_engine(args))
-    return n, []
+    был = (
+        прошлая is not None
+        and not repeat
+        and repeat_rule.was_violation(прошлая.codes, code=code.strip(), level=level.strip())
+    )
+    return n, [], (прошлая.date if был else None)
 
 
 def import_add_finding(
@@ -664,12 +705,13 @@ def import_add_finding(
     """Добавить запись в черновик: текущая — через движок, историческая — как в отчёте."""
     del actor
     ident = _require_inspection_id(inspection_id)
-    _, шапка = _only_import(ident, tenant=tenant)
-    n, предупреждения = add_one(
+    detail, шапка = _only_import(ident, tenant=tenant)
+    n, предупреждения, был = add_one(
         tenant=tenant,
         store=store,
         ident=ident,
         шапка=шапка,
+        прошлая=prior_inspection(detail) if шапка.origin != ORIGIN_LEGACY else None,
         text=text,
         code=code,
         level=level,
@@ -677,8 +719,14 @@ def import_add_finding(
         comment=comment,
         repeat=repeat,
     )
+    кандидаты: list[dict[str, object]] = [{"n": n, "date": был.isoformat()}] if был else []
     return _short_view(
-        ident, tenant=tenant, note=f"finding #{n} added", n=n, warnings=предупреждения
+        ident,
+        tenant=tenant,
+        note=f"finding #{n} added",
+        n=n,
+        warnings=[*предупреждения, *([repeat_warning(n, был)] if был else [])],
+        repeat_candidates=кандидаты,
     )
 
 

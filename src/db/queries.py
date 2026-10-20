@@ -1105,6 +1105,50 @@ def previous_inspection(*, tenant: str, unit: str) -> PreviousInspection | None:
     )
 
 
+# Прошлая проверка ДО даты черновика загрузки (#1019): та же выборка, что у
+# `_PREVIOUS_INSPECTION_SQL`, но строго раньше `before` и только принятая
+# (`finalized`) — черновик и более поздние проверки «прошлой» не бывают.
+_PREVIOUS_BEFORE_SQL = """
+with прошлая as (
+    select i.id, i.inspection_date
+    from inspections i
+    join units u on u.id = i.unit_id
+    where i.tenant_code = %(tenant)s
+      and u.name = %(unit)s
+      and i.retracted_at is null
+      and i.status = 'finalized'
+      and i.origin <> 'legacy'
+      and i.inspection_date < %(before)s
+    order by i.inspection_date desc, i.pushed_at desc
+    limit 1
+)
+select прошлая.inspection_date, f.code
+from прошлая
+left join findings f on f.inspection_id = прошлая.id and f.level not in ('D0', 'R')
+"""
+
+
+def previous_inspection_before(
+    *, tenant: str, unit: str, before: date
+) -> PreviousInspection | None:
+    """Последняя принятая неснятая проверка точки строго до даты `before`.
+
+    Для загрузки задним числом: `previous_inspection` берёт последнюю вообще, а
+    у черновика с прошлой датой «прошлая» — та, что была до неё. Остальное как у
+    `previous_inspection`: факт, а не вывод о повторе (D191, D255).
+    """
+    tenant_code = _require_tenant(tenant)
+    params = {"tenant": tenant_code, "unit": _require_unit(unit), "before": before}
+    with _reading("прошлая проверка точки до даты") as conn, conn.cursor() as cur:
+        cur.execute(_PREVIOUS_BEFORE_SQL, params)
+        rows = cur.fetchall()
+    if not rows:
+        return None
+    return PreviousInspection(
+        date=rows[0][0], codes=frozenset(str(код) for _, код in rows if код is not None)
+    )
+
+
 # Прошлая проверка с формулировками (#418) — тот же выбор «прошлой», что у
 # `_PREVIOUS_INSPECTION_SQL`: одна последняя неснятая проверка точки. Выбор
 # повторён намеренно, а не склеен из общего куска строки: каждый запрос

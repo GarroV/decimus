@@ -58,6 +58,11 @@ totals. Item = its wording from checklist_items, zone = its name, class = \
 deviation / significant / critical. Codes go only into tool calls.
 
 Rules
+- Repeats: if an import_add_finding(s) answer has repeat_candidates, the item was a \
+violation in the previous inspection of that unit (repeats cost double). Never set \
+repeat yourself. After the batch ask the person ONE question about all of them at \
+once, in plain words (what was found, date of the previous inspection), no codes. \
+For each "yes": import_edit_finding repeat=true.
 - Never compute or adjust the score: the engine does it.
 - Class (D1/D2/D3) = the item's criteria applied to the facts given (words, numbers on \
 photos). Facts meet a class -> that class, no milder or harsher one "just in case". \
