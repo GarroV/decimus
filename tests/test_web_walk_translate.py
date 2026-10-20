@@ -19,6 +19,7 @@ from bot_harness import bound_only
 from test_web_walk import АУДИТОР, ТОКЕН, _приложение
 from test_web_walk_write import Клиент
 
+from src.db.busy_lock import Hold
 from src.domain import get_state, start_inspection
 from src.recognize import translate
 from src.recognize.client import ModelAnswer
@@ -208,3 +209,43 @@ def test_данные_экрана_несут_язык_кнопки_перево
     данные = ответ.get_json()
     assert данные["translate_lang"] == "en", "кнопка называет язык по этому полю"
     assert данные["report_lang"] == "ru", "до конца обхода язык отчёта равен языку чек-листа"
+
+
+def test_перевод_пока_идёт_в_другом_процессе_отказ_без_вызова_модели(
+    завести: Callable[..., Клиент], модель: Модель, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F-110: набор в памяти про другой процесс не знает — занятость держит замок базы."""
+    клиент = завести(ui_lang="ru", speech_lang="ru")
+    monkeypatch.setattr(walk_translate, "try_hold", lambda *_a: Hold(acquired=False))
+
+    ответ = _перевести(клиент, text="Нагар на поду печи.")
+
+    assert ответ.status_code == 429 and модель.звали == []
+
+
+def test_перевод_отпускает_чат_после_себя_и_после_отказа_модели(
+    завести: Callable[..., Клиент], модель: Модель, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    клиент = завести(ui_lang="ru", speech_lang="ru")
+    monkeypatch.setattr(walk_translate, "try_hold", lambda *_a: Hold(acquired=True))
+    модель.падает = True
+    упавший = _перевести(клиент, text="Нагар на поду печи.")
+    модель.падает = False
+
+    следующий = _перевести(клиент, text="Нагар на поду печи.")
+
+    assert (упавший.status_code, следующий.status_code) == (503, 200), "чат остался занятым"
+
+
+def test_отказ_нет_другого_языка_не_запирает_чат(
+    завести: Callable[..., Клиент], модель: Модель, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Раньше 409 возвращался уже после занятия чата и запирал его до перезапуска."""
+    клиент = завести(ui_lang="ru", speech_lang="ru")
+    with monkeypatch.context() as m:
+        m.setattr(walk_translate, "TEXT_LANGS", ("ru",))
+        отказ = _перевести(клиент, text="Нагар на поду печи.")
+
+    после = _перевести(клиент, text="Нагар на поду печи.")
+
+    assert (отказ.status_code, после.status_code) == (409, 200), "чат остался занятым"

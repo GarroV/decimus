@@ -31,7 +31,6 @@ from .texts_journal import JOURNAL_TEXTS
 from .texts_master import MASTER_TEXTS
 from .texts_model_key import MODEL_KEY_TEXTS
 from .texts_oauth import OAUTH_TEXTS
-from .texts_photo_upload import PHOTO_UPLOAD_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
 from .texts_ratings import RATINGS_TEXTS
@@ -111,7 +110,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.points.grade": {"ru": "Оценка", "en": "Grade"},
     "overview.points.score": {"ru": "Итог, %", "en": "Score, %"},
     "overview.points.delta": {"ru": "Δ", "en": "Δ"},
-    "overview.points.process": {"ru": "Слабое направление", "en": "Weakest direction"},
+    "overview.points.process": {"ru": "Больше всего потерь", "en": "Most points lost"},
     "overview.points.date": {"ru": "Проверена", "en": "Inspected"},
     "overview.points.empty": {
         "ru": "В этой выборке нет ни одной проверенной точки. Снимите часть отбора.",
@@ -368,8 +367,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "This unit has not been audited yet",
     },
     "unit.weak": {
-        "ru": "Слабые направления последней проверки",
-        "en": "Weak directions of the last audit",
+        "ru": "Где потеряны проценты в последней проверке",
+        "en": "Where the last audit lost points",
     },
     "unit.weak.empty": {
         "ru": "В последней проверке потерь по направлениям не записано",
@@ -1729,7 +1728,6 @@ _ЧАСТИ = (
     TEXTS,
     DEMO_TEXTS,
     OAUTH_TEXTS,
-    PHOTO_UPLOAD_TEXTS,
     CONNECTIONS_TEXTS,
     COUNTRY_TEXTS,
     GRADE_TEXTS,
@@ -1768,7 +1766,6 @@ TEXTS = {
     **MASTER_TEXTS,
     **MODEL_KEY_TEXTS,
     **OAUTH_TEXTS,
-    **PHOTO_UPLOAD_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,
     **TRIP_TEXTS,

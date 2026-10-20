@@ -188,7 +188,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
 | `src/web/passkey_login.py` | Вход ключом доступа без логина (D485): ключ открывает сессию сам, без второй ступени |
 | `src/web/people.py` | Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399) |
-| `src/web/photo_upload.py` | Загрузка кадров к черновику загрузки проверки по подписанной ссылке (мимо Claude) |
+| `src/web/photo_upload.py` | Загрузка кадров к черновику загрузки проверки по подписанному адресу (мимо Claude) |
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
 | `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами — и кому из соседей верить |
 | `src/web/reauth.py` | Свежий вход для действий, создающих долгоживущий доступ (аудит безопасности 12.10) |
@@ -236,7 +236,6 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
 | `src/web/texts_model_key.py` | Тексты блока «Ключ модели» на вкладке «Подключения» (D491) |
 | `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках» |
-| `src/web/texts_photo_upload.py` | Тексты страницы загрузки кадров к черновику по ссылке из Claude (`photo_upload.py`) |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2) и раздела «Действия» (D526): вкладка, панель, блоки, карточки |
 | `src/web/texts_prescriptions.py` | Тексты предписаний (волна 3): раздел УК, раздел партнёра, блок экрана страны |
 | `src/web/texts_ratings.py` | Тексты раздела «Рейтинги» и подраздела «Загрузки» (спека 2026-10-08) |
@@ -286,7 +285,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 23 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, … (+15) |
+| `src/web/templates/` | 22 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, … (+14) |
 | `src/web/templates/actions/` | 9 | _filters.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, index.html, prescription_form.html, … (+1) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
@@ -381,12 +380,14 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,journals,maps_store,model_key,model_usage,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
 | `src/db/agg_store.py` | Оценки в агрегаторах доставки в базе (схема `agg`, миграция 0050) |
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
+| `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
+| `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
 | `src/db/maps_store.py` | Оценки на картах в базе (схема `maps`, миграция 0044): запись снимка и чтение |
 | `src/db/model_key.py` | Ключ модели из базы (D491): запись, чтение, кэш на минуту |
@@ -394,6 +395,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/oauth_store.py` | Хранилище OAuth: клиенты, коды, подключения и токены (D417, миграция `0054`) |
 | `src/db/prescriptions.py` | Предписания: черновик, отправка через Gmail сотрудника, ответ партнёра, закрытие (волна 3) |
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, отправка, закрытие (УК) и ответ партнёра (волна 3) |
+| `src/db/rate_window.py` | Общее скользящее окно частоты запросов (F-110, миграция `0082`) |
 | `src/db/ratings.py` | Запись рейтингов РС/РКО: журнал загрузок и строки схемы `ratings` (0039) |
 | `src/db/ratings_read.py` | Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039) |
 | `src/db/ratings_sync.py` | Забор общей таблицы контроля: состояние по листам и заявки «Забрать сейчас» (D464) |
@@ -495,6 +497,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0079_units_merged_into.sql` | D538: название пиццерии — латиницей по справочнику (`unit_profiles`); другие написания («Тбилиси-1») — только синонимы |
 | `0080_ratings_layout_compare.sql` | D551 (#972): блок «Сравнение девелоперов и стран» на «Рейтингах» — только УК |
 | `0081_inspection_edits.sql` | Журнал правок записей проверки на приёмке (аудит F-134, #1006) |
+| `0082_rate_windows.sql` | Общее скользящее окно частоты запросов (аудит F-110, #1006) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -517,6 +520,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/mcp/checklists_tools.py` | Инструменты MCP уровня чек-листа: перечень, заведение, состояние, применение к проду |
 | `src/mcp/cli.py` | Точка запуска сервера, отделённая от `__main__` ради проверяемости |
 | `src/mcp/config.py` | Окружение MCP-сервера: чей токен, чьи проверки, на каком адресе слушать |
+| `src/mcp/confirm.py` | Двухшаговое подтверждение опасных инструментов MCP (F-130, #1006) |
 | `src/mcp/db_target.py` | Непригодное окружение базы — «не задано» или «ведёт не туда» (#521) |
 | `src/mcp/errors.py` | Отказы блока `mcp` |
 | `src/mcp/import_batch.py` | `import_add_findings`: пакетная запись подтверждённых находок (#1017) |
@@ -525,7 +529,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/mcp/import_info.py` | Информационная часть загруженной проверки: `import_info_fields`, `import_set_info` |
 | `src/mcp/import_match.py` | `import_match_findings`: пункт, класс и зона по замечаниям конвейером бота (#1033) |
 | `src/mcp/import_modes.py` | Два режима загрузки проверок задним числом (D332, D334): что каждый принимает |
-| `src/mcp/import_photo_link.py` | `import_photo_upload_link`: ссылка, по которой кадры к черновику идут мимо модели |
+| `src/mcp/import_photo_link.py` | `import_upload_photos`: команда для песочницы, по которой кадры к черновику идут мимо модели |
 | `src/mcp/import_suggest.py` | `import_suggest_items`: подбор пункта по словам ОДНОЙ находки (#1015, #1033) |
 | `src/mcp/imports.py` | Инструменты загрузки проверок задним числом поштучно (D305–D310, D332–D335) |
 | `src/mcp/info_part.py` | Информационная часть записанной проверки в карточке чтения (T207) |
@@ -727,7 +731,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
 | `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |
-| `src/domain/photo_upload_link.py` | Ссылка загрузки кадров к черновику загрузки проверки: подписанный токен без срока |
+| `src/domain/photo_upload_link.py` | Адрес загрузки кадров к черновику загрузки проверки: подписанный токен без срока |
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
 | `src/domain/repeat_rule.py` | Правило «пункт уже был нарушением в прошлой проверке» (D191, D255) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |

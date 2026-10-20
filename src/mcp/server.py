@@ -90,7 +90,7 @@ class _Server(ThreadingHTTPServer):
         # Ограниченный семафор — страховка: лишний release (счётчик выше предела)
         # падает громко, а не разъедает предел молча (F-118).
         self._slots = threading.BoundedSemaphore(MAX_CONNECTIONS)
-        self.rate = McpRate()
+        self.rate = McpRate(shared=True)
         super().__init__(address, _Handler)
 
     def process_request(self, request: Any, client_address: Any) -> None:

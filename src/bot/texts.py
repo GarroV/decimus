@@ -1654,14 +1654,14 @@ TEXTS: dict[str, dict[str, str]] = {
             "Скрипт сам находит, что стоит на машине: Claude Code он настраивает "
             "сразу, Claude Desktop — через мост, и тогда приложение надо полностью "
             "перезапустить (Cmd+Q и открыть заново).\n\n"
-            "Проверить в терминале: claude mcp list — в списке должен стоять dodo-audit "
+            "Проверить в терминале: claude mcp list — в списке должен стоять decimus "
             "с отметкой Connected. Если его нет, напишите сюда."
         ),
         "en": (
             "The script finds what is installed on the machine: Claude Code is set up "
             "right away, Claude Desktop through a bridge — and then the app has to be "
             "fully restarted (Cmd+Q and open again).\n\n"
-            "To check in a terminal: claude mcp list — dodo-audit should be there, marked "
+            "To check in a terminal: claude mcp list — decimus should be there, marked "
             "Connected. If it is missing, tell us here."
         ),
     },
@@ -1681,8 +1681,8 @@ TEXTS: dict[str, dict[str, str]] = {
     # Отдельным ключом — потому что оно на языке человека, как и остальной
     # разговор, а не на языке того, кто писал скрипт.
     "mcp.desktop_done": {
-        "ru": "dodo-audit подключён, перезапустите Claude Desktop",
-        "en": "dodo-audit connected, restart Claude Desktop",
+        "ru": "decimus подключён, перезапустите Claude Desktop",
+        "en": "decimus connected, restart Claude Desktop",
     },
     # Сказано ДО команды, а не после: обе вещи здесь человек должен знать
     # прежде, чем нажмёт ввод. Про macOS — потому что на Windows и Linux файл

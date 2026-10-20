@@ -155,7 +155,7 @@ from src.mcp.catalogue import (
     "import_get_inspection",
     "import_list_drafts",
     "import_add_photo",
-    "import_photo_upload_link",
+    "import_upload_photos",
     "import_info_fields",
     "import_set_info",
     "import_accept_inspection",
@@ -280,7 +280,9 @@ def test_свойства_схемы_совпадают_с_сигнатурой_
         # `checklist` называет собеседник, а снимает точка входа (T344):
         # обработчику приходит хранилище, уже наведённое на нужный чек-лист,
         # поэтому в сигнатуре его нет и быть не должно.
-        параметры_схемы = set(spec.input_schema["properties"]) - {"checklist"}
+        # `confirmation_token` — то же самое: токен подтверждения снимает
+        # диспетчер (F-130), до обработчика он не доходит.
+        параметры_схемы = set(spec.input_schema["properties"]) - {"checklist", "confirmation_token"}
         assert параметры_схемы == параметры_обработчика, spec.name
 
 
@@ -295,7 +297,8 @@ def test_required_согласован_со_схемой_и_с_сигнатур�
         assert обязательные <= свойства, spec.name
         # `checklist` снимает точка входа (T344), обработчику он не приходит:
         # сверять его с сигнатурой не с чем.
-        for имя_параметра in свойства - {"checklist"}:
+        # `confirmation_token` снимает диспетчер (F-130), как и `checklist`.
+        for имя_параметра in свойства - {"checklist", "confirmation_token"}:
             без_умолчания = параметры_обработчика[имя_параметра].default is inspect.Parameter.empty
             assert без_умолчания == (имя_параметра in обязательные), (spec.name, имя_параметра)
 

@@ -128,7 +128,12 @@ a.hm-row:hover { background: var(--surface-2); text-decoration: none; }
 .hm-table small { color: var(--ink-3); }
 .hm-cell__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--w-medium); }
 .hm-cell__muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
-.hm-table--units .hm-table__head, .hm-table--units .hm-table__row { grid-template-columns: minmax(8rem, 1.4fr) minmax(5rem, 1fr) 3rem 4rem 4rem minmax(6rem, 1fr) 6rem 3.5rem 3.5rem; min-width: 51rem; }
+/* Шапка — одной строкой и одним шрифтом: моноширинный и размер чисел — только у
+   значений, иначе заголовки числовых колонок крупнее соседних и переносятся. */
+.hm-table__head > * { white-space: nowrap; }
+.hm-table__head .is-num { font-family: inherit; font-size: inherit; }
+.hm-table .is-center { text-align: center; }
+.hm-table--units .hm-table__head, .hm-table--units .hm-table__row { grid-template-columns: minmax(8rem, 1.4fr) minmax(5rem, 1fr) 4rem 4.5rem 3.5rem minmax(9rem, 1fr) 6.5rem 3.5rem 3.5rem; gap: 16px; min-width: 56rem; }
 
 /* ── доска стикеров ─────────────────────────────────────────────────── */
 .hm-board { background-color: var(--surface);

@@ -29,6 +29,7 @@ from typing import Any
 
 import pytest
 from mcp_checklist_harness import build_methodology
+from mcp_checklist_harness import handle_confirmed as handle
 from mcp_places import сверить
 from ratings_samples import rko_violations
 
@@ -36,7 +37,6 @@ from src.mcp.catalogue import TOOLS
 from src.mcp.checklist import Store, current_version
 from src.mcp.checklist_tools import MAX_NOTE
 from src.mcp.errors import McpError
-from src.mcp.rpc import handle
 
 # "HQ", а не прежняя "укашка" (волна 1, #340): вызовы идут через `handle` →
 # `rpc._aimed`, а та наводит правящий инструмент в `space_of(tenant)`, который
@@ -106,7 +106,7 @@ from src.mcp.rpc import handle
         "image_base64": "aGVsbG8=",
         "mime": "image/jpeg",
     },
-    "import_photo_upload_link": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
+    "import_upload_photos": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
     "import_info_fields": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
     "import_set_info": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
@@ -281,7 +281,7 @@ from src.mcp.rpc import handle
         "image_base64": "@@@",
         "mime": "image/gif",
     },
-    "import_photo_upload_link": {"inspection_id": "не-uuid"},
+    "import_upload_photos": {"inspection_id": "не-uuid"},
     "import_info_fields": {"inspection_id": "не-uuid"},
     "import_set_info": {"inspection_id": "не-uuid", "values": {"INF03": "yes"}},
     "import_accept_inspection": {
