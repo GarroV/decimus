@@ -48,6 +48,7 @@ from src.db.errors import (
     ReviseError,
 )
 from src.db.imports import MAX_PHOTOS_PER_FINDING
+from src.db.inspection_edits import Editor
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.db.pool import shared_connections
@@ -1017,6 +1018,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                     finding_id,
                     tenant=auth.current_tenant(),
                     lang=lang,
+                    editor=_editor(),
                     **поля,
                 )
                 notice = t("revise.done", lang)
@@ -1107,6 +1109,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 inspection_id,
                 tenant=auth.current_tenant(),
                 lang=lang,
+                editor=_editor(),
                 code=request.form.get("code") or "",
                 level=request.form.get("level") or "",
                 zone=request.form.get("zone") or "",
@@ -1210,6 +1213,14 @@ def _own(detail: Any) -> bool:
     УК по пиццериям своей страны (D289). Запись по такой проверке — отказ.
     """
     return auth.is_own(detail.inspection.tenant_code)
+
+
+def _editor() -> Editor:
+    """Кто правит запись на приёмке — для журнала правок (F-134). Без учётки правки нет."""
+    вошедший = auth.current_account()
+    if вошедший is None:
+        abort(403)
+    return Editor(user_id=вошедший.id, login=вошедший.login, role=вошедший.role)
 
 
 def _uploaded_photos(lang: str) -> tuple[list[bytes], str | None]:

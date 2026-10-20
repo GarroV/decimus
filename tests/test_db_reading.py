@@ -15,6 +15,7 @@ from db_harness import accept_pushed, привязать_страну, точк�
 
 psycopg = pytest.importorskip("psycopg")
 
+from src.db.inspection_edits import Editor  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import get_inspection  # noqa: E402
 from src.db.reach import own_reach  # noqa: E402
@@ -86,6 +87,9 @@ def test_правка_на_вычитке_пишет_показание(сеть
         ident,
         запись.id,
         tenant="HQ",
+        editor=Editor(
+            user_id="00000000-0000-0000-0000-0000000000a1", login="kontroling", role="admin"
+        ),
         revision=Revision(
             code=запись.code,
             level=запись.level,

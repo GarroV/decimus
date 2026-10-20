@@ -19,6 +19,7 @@ from test_web_letter import собранное
 from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
 from src.db.errors import AcceptError, ReviseError
+from src.db.inspection_edits import Editor
 from src.db.previews import FindingShots
 from src.domain.tenants import canonical_tenant
 from src.report.letters import Papers
@@ -263,6 +264,10 @@ def test_администратор_исправляет_запись_своег
             "finding": "f1",
             "tenant": canonical_tenant(ТЕНАНТ),
             "lang": "ru",
+            # Кто правит — из сессии, а не из формы: след в журнале правок (F-134).
+            "editor": Editor(
+                user_id="22222222-2222-2222-2222-222222222222", login=ЛОГИН, role="admin"
+            ),
             **ИСПРАВЛЕНИЕ,
             "reading": "",
         }
