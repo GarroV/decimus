@@ -165,3 +165,84 @@ def test_письмо_загруженной_current_собирается_а_и�
 
     with pytest.raises(letters.LetterError, match="историческая"):
         letters.build(_детали(ORIGIN_LEGACY), lang=None, papers=papers)
+
+
+def test_pdf_при_приёмке_собирается_с_кадрами_записей(
+    мир: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    получено: dict[str, Any] = {}
+
+    def собрать(*_: object, **kw: Any) -> bytes:
+        получено.update(kw)
+        return b"%PDF-1.7 test"
+
+    monkeypatch.setattr(imports, "_report_photos", lambda *_, **__: ({1: [b"jpeg"]}, 0))
+    monkeypatch.setattr(detail_pdf, "build_bytes", собрать)
+
+    ответ = _принять()
+
+    assert получено["photos"] == {1: [b"jpeg"]}
+    assert ответ["pdf_warning"] is None
+
+
+def test_не_скачавшийся_кадр_не_отказ_а_предупреждение(
+    мир: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(imports, "_report_photos", lambda *_, **__: ({}, 2))
+
+    ответ = _принять()
+
+    assert ответ["pdf_error"] is None
+    assert "without them" in str(ответ["pdf_warning"])
+    assert мир.загружено  # PDF собран и выгружен
+
+
+def test_state_json_несёт_ссылки_кадров_только_когда_переданы() -> None:
+    import json
+
+    без = json.loads(letters.state_json(_детали(ORIGIN_IMPORT), lang="ru"))
+    с = json.loads(letters.state_json(_детали(ORIGIN_IMPORT), lang="ru", photos={1: ["p.jpg"]}))
+
+    assert без["findings"][0]["photos"] == []
+    assert с["findings"][0]["photos"] == ["p.jpg"]
+
+
+def _ссылка(monkeypatch: pytest.MonkeyPatch) -> Any:
+    from src.mcp import import_photo_link
+
+    monkeypatch.setattr(
+        import_photo_link, "_only_import", lambda *a, **k: (_детали(ORIGIN_IMPORT), None)
+    )
+    return import_photo_link.import_photo_upload_link(
+        tenant="укашка",
+        store=None,  # type: ignore[arg-type]
+        actor="mcp:HQ",
+        inspection_id=ID,
+    )
+
+
+def test_ссылка_загрузки_подписана_и_привязана_к_черновику(
+    мир: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.domain import photo_upload_link
+
+    monkeypatch.setenv("WEB_SECRET_KEY", "s" * 40)
+
+    ответ = _ссылка(monkeypatch)
+
+    токен = str(ответ["url"]).rsplit("/", 1)[1]
+    право = photo_upload_link.verify("s" * 40, токен)
+    assert право == photo_upload_link.UploadGrant(inspection_id=ID, tenant="укашка")
+    assert str(ответ["url"]).startswith("https://audit.example.org/photo-upload/")
+    assert "-F file=@/mnt/user-data/uploads/" in str(ответ["command"])
+
+
+def test_ссылка_загрузки_без_ключа_подписи_отказ(
+    мир: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.mcp.errors import ToolError
+
+    monkeypatch.delenv("WEB_SECRET_KEY", raising=False)
+
+    with pytest.raises(ToolError):
+        _ссылка(monkeypatch)

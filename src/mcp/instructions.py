@@ -52,5 +52,11 @@ photos). Facts meet a class -> that class, no milder or harsher one "just in cas
 Read checklist_item criteria only for an item with several classes.
 - Wording: the fact in the person's words; no guesses about scale or damage, no \
 assessments, no remarks to people.
-- Do not invent codes or zones. Photos are optional (import_add_photo).
+- Do not invent codes or zones. Photos are optional.
+- Photos attached to the chat: after the findings are written, call \
+import_photo_upload_link, then in the sandbox send each photo to its finding: \
+curl -sS -F n=<finding number> -F file=@/mnt/user-data/uploads/<file> "<url>" \
+(several -F file=@... per finding). Check the JSON answer. No network in the sandbox \
+-> give the person the url: they drop the photos on the page themselves. Do this \
+BEFORE import_accept_inspection: the PDF is built with the photos at acceptance.
 """

@@ -43,7 +43,7 @@ import sys
 import tempfile
 import threading
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -364,12 +364,15 @@ def _blank_wordings(detail: InspectionDetail) -> list[int]:
     return sorted(находка.n for находка in detail.findings if not (находка.text or "").strip())
 
 
-def state_json(detail: InspectionDetail, *, lang: str) -> str:
+def state_json(
+    detail: InspectionDetail, *, lang: str, photos: Mapping[int, Sequence[str]] | None = None
+) -> str:
     """Записанная проверка в форме файла состояния, который читает движок.
 
-    Кадров здесь нет: они лежат в хранилище за ссылками, а письму они не
-    нужны вовсе — их печатает отчёт. Пустой список честнее подставленного
-    пути: движок ничего не ищет на диске сам.
+    Кадров здесь нет, если не переданы: они лежат в хранилище за ссылками, а письму
+    они не нужны вовсе — их печатает отчёт. Пустой список честнее подставленного
+    пути: движок ничего не ищет на диске сам. Отчёт передаёт `photos` — номер
+    записи → ссылки; файлы по ссылкам он кладёт рядом и отдаёт движку картой.
 
     Формулировка находки уезжает как записана, на языке речи аудитора.
     Переводить её нельзя: это чужие слова в отчёте партнёру.
@@ -406,7 +409,7 @@ def state_json(detail: InspectionDetail, *, lang: str) -> str:
                     "qid": находка.code,
                     "level": находка.level,
                     "zone": находка.zone,
-                    "photos": [],
+                    "photos": list((photos or {}).get(находка.n, ())),
                     "comment": находка.comment or "",
                     "evidence": находка.text or "",
                     # Повтор удваивает вычет (D191). Без него сверка оценки

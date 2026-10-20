@@ -18,6 +18,7 @@ import io
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+import pillow_heif
 import psycopg
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -26,6 +27,9 @@ from .errors import DbError, StorageError
 from .pool import connection
 from .reach import Reach, require_reach
 from .storage import S3PhotoStorage, key_of_uri
+
+# HEIC/HEIF (iPhone) читается как обычный кадр: копия всё равно JPEG.
+pillow_heif.register_heif_opener()
 
 #: Длинная сторона копии в пикселях. Меньше — надпись на ценнике и дата на
 #: маркировке перестают читаться; больше — копия приближается к оригиналу.

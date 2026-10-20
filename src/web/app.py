@@ -78,6 +78,7 @@ from . import (
     letter_draft,
     letter_markup,
     oauth,
+    photo_upload,
     prescriptions,
     proofread,
     ratings,
@@ -234,6 +235,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     swarm_api.install(app, conf)
     # Подключение Claude входом через сайт (D417): только при публичных адресах.
     oauth.install(app, conf)
+    # Кадры к черновику загрузки по подписанной ссылке из Claude: токен в адресе, не кука.
+    photo_upload.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
@@ -1315,9 +1318,11 @@ def _install_origin_gate(app: Flask) -> None:
     доезжают), API для сервисов (ключ в заголовке, только чтение) и машинные
     адреса OAuth — регистрация клиента и обмен кода (D417): их зовёт сервер
     Claude без `Origin`, куки входа там не участвуют. Согласие (`/oauth/authorize`)
-    — форма человека и идёт под заслоном.
+    — форма человека и идёт под заслоном. И загрузка кадров по ссылке из Claude
+    (`photo_upload`): её шлёт `curl` без `Origin`, а доступ даёт токен в адресе,
+    сессии у такого запроса нет вовсе.
     """
-    мимо = walk_auth.ENDPOINTS | swarm_api.ENDPOINTS | oauth.ENDPOINTS
+    мимо = walk_auth.ENDPOINTS | swarm_api.ENDPOINTS | oauth.ENDPOINTS | photo_upload.ENDPOINTS
 
     @app.before_request
     def _запись_только_со_своей_страницы() -> None:

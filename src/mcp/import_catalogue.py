@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import import_batch, import_suggest, imports
+from . import import_batch, import_photo_link, import_suggest, imports
 
 _ID: dict[str, object] = {
     "type": "string",
@@ -437,6 +437,22 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             ["inspection_id", "n", "image_base64", "mime"],
         ),
         handler=imports.import_add_photo,
+    ),
+    ImportTool(
+        name="import_photo_upload_link",
+        description=(
+            "Get an upload link for the photos attached to the chat, for ONE imported "
+            "draft. Photos cannot be passed through tool arguments, so they go around "
+            "the model: the answer has a ready `command` for the sandbox "
+            "(curl -F n=<finding number> -F file=@<path of the attached photo> <url>, "
+            "several -F file=@... for one finding; JPEG, PNG, WebP or HEIC, up to 25 MB "
+            "per request) and the url itself. If the command cannot connect, give the "
+            "person the url: it opens a page where they drop the photos on the right "
+            "finding. The link lives 2 hours, belongs to this draft only and stops "
+            "working once the draft is accepted. Findings must be recorded first."
+        ),
+        input_schema=_schema({"inspection_id": _ID}, ["inspection_id"]),
+        handler=import_photo_link.import_photo_upload_link,
     ),
     ImportTool(
         name="import_accept_inspection",

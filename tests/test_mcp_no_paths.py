@@ -91,6 +91,7 @@ from src.mcp.rpc import handle
         "image_base64": "aGVsbG8=",
         "mime": "image/jpeg",
     },
+    "import_photo_upload_link": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
     "import_accept_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "confirm_unit": "Белград-1",
@@ -256,6 +257,7 @@ from src.mcp.rpc import handle
         "image_base64": "@@@",
         "mime": "image/gif",
     },
+    "import_photo_upload_link": {"inspection_id": "не-uuid"},
     "import_accept_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "confirm_unit": "Белград-1",
