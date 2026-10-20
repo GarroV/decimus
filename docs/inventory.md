@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 166 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 168 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -112,6 +112,8 @@
 | `/oauth/register` | POST | `oauth_register` | `src/web/oauth.py` |
 | `/oauth/token` | POST | `oauth_token` | `src/web/oauth.py` |
 | `/overview` | GET | `overview` | `src/web/app.py` |
+| `/photo-upload/<token>` | GET | `photo_upload_page` | `src/web/photo_upload.py` |
+| `/photo-upload/<token>` | POST | `photo_upload_post` | `src/web/photo_upload.py` |
 | `/plans` | GET | `plans` | `src/web/action_plans.py` |
 | `/plans/files/<file_id>` | GET | `plan_file_legacy` | `src/web/action_plans.py` |
 | `/prescriptions` | GET | `orders` | `src/web/prescriptions.py` |
@@ -208,7 +210,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **59** инструментов (checklist — 33, checklist_source — 2, import — 11, inspections — 6, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **62** инструментов (checklist — 33, checklist_source — 2, import — 13, inspections — 6, move — 1, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
@@ -254,8 +256,10 @@
 | `import_create_inspection` | import | Start entering ONE inspection after the fact: creates a DRAFT with no findings | `src/mcp/imports.py` |
 | `import_discard_draft` | import | Delete an imported DRAFT entirely, with its findings and photos — e.g | `src/mcp/imports.py` |
 | `import_edit_finding` | import | Correct one finding of an imported draft by its number n | `src/mcp/imports.py` |
+| `import_edit_inspection` | import | Correct the HEADER of an imported DRAFT before it is accepted: the inspection date, the unit (pizzeria), the auditor… | `src/mcp/imports.py` |
 | `import_get_inspection` | import | Read an imported inspection (draft or accepted): its mode, header and findings with their numbers | `src/mcp/imports.py` |
 | `import_list_drafts` | import | List this space's imported drafts that are not accepted yet: mode (history/current), unit, date, checklist version… | `src/mcp/imports.py` |
+| `import_photo_upload_link` | import | Get an upload link for the photos attached to the chat, for ONE imported draft | `src/mcp/import_photo_link.py` |
 | `import_remove_finding` | import | Remove one finding (with its photos) from an imported draft by its number n | `src/mcp/imports.py` |
 | `import_suggest_items` | import | Read-only: suggest up to 5 checklist items for ONE finding, by the word map of the draft's checklist edition | `src/mcp/import_suggest.py` |
 | `findings_by_unit` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
@@ -264,6 +268,7 @@
 | `list_inspections` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `network_summary` | inspections | Summarize the caller's tenant network over a date range: how many inspections and units, total findings, the… | `src/mcp/tools.py` |
 | `unit_history` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
+| `move_inspection` | move | Correct the date and/or the unit (pizzeria) of an inspection that is already accepted (or waiting for acceptance) — the… | `src/mcp/move.py` |
 | `import_ratings` | ratings | Upload a ratings file into Decimus (standards and customer-experience ratings, IMF only) | `src/mcp/ratings_tools.py` |
 | `request_aggregators_update` | ratings | Запросить внеочередное обновление оценок пиццерий в агрегаторах доставки (Wolt, Glovo, Bolt Food, Yemeksepeti, Trendyol… | `src/mcp/ratings_tools.py` |
 | `aggregators_status` | ratings_read | Состояние сбора оценок в агрегаторах доставки: по каждому — когда был последний сбор, чем кончился (ok, failed или… | `src/mcp/ratings_read.py` |
@@ -370,7 +375,7 @@
 | `WEB_HSTS` | `src/web/config.py` | да |
 | `WEB_LISTEN_NETWORK` | `src/web/config.py` | да |
 | `WEB_PORT` | `src/web/config.py`, `tools/walk_healthcheck.py` | да |
-| `WEB_SECRET_KEY` | `src/web/config.py` | да |
+| `WEB_SECRET_KEY` | `src/mcp/import_photo_link.py`, `src/web/config.py` | да |
 | `WEB_TENANT` | `src/web/config.py` | да |
 | `WEB_TRUSTED_PROXIES` | `src/web/config.py` | да |
 | `WEB_TRUSTED_PROXY_ADDR` | `src/web/config.py` | да |

@@ -639,6 +639,94 @@ def discard_draft(inspection_id: str, *, tenant: str) -> tuple[str, ...]:
         ) from exc
 
 
+_SAME_VISIT_OTHER_SQL = """
+select id::text, origin from inspections
+where unit_id = %(unit)s and inspection_date = %(day)s and retracted_at is null
+  and id <> %(id)s
+order by pushed_at
+limit 1
+"""
+
+_SELECT_DRAFT_HEAD_SQL = "select unit_id, inspection_date from inspections where id = %(id)s"
+
+_UPDATE_HEAD_SQL = """
+update inspections
+set unit_id = %(unit)s, inspection_date = %(day)s, kind = %(kind)s, auditor = %(auditor)s
+where id = %(id)s and tenant_code = %(tenant)s and status = 'draft'
+"""
+
+
+def edit_head(
+    inspection_id: str,
+    *,
+    tenant: str,
+    day: date | None = None,
+    unit: str | None = None,
+    auditor: str | None = None,
+    kind: str | None = None,
+    second_visit: bool = False,
+) -> None:
+    """Исправить шапку загруженного черновика: дата, точка, аудитор, вид (до принятия).
+
+    Оценка не меняется: от даты и точки она не зависит. Точка — по справочнику, как
+    при создании; «одна проверка на точку и день» (#782) держится и здесь.
+    """
+    ident = _require_inspection_id(inspection_id)
+    tenant_code = _require_tenant(tenant)
+    try:
+        with _connect() as conn, conn.cursor() as cur:
+            _locked_detail(cur, ident, tenant_code)
+            cur.execute(_SELECT_DRAFT_HEAD_SQL, {"id": ident})
+            прежняя = cur.fetchone()
+            if прежняя is None:
+                raise HistoryImportError(f"Проверки {ident} у этого доступа нет")
+            unit_id = str(прежняя[0])
+            if unit is not None:
+                found = resolve_unit_id(conn, unit, tenant=HQ_TENANT)
+                if found is None:
+                    raise _unit_refused(unit, tenant_code)
+                unit_id = found
+            new_day = прежняя[1] if day is None else day
+            if not second_visit:
+                cur.execute(_SAME_VISIT_OTHER_SQL, {"unit": unit_id, "day": new_day, "id": ident})
+                чужая = cur.fetchone()
+                if чужая is not None:
+                    raise HistoryImportError(
+                        f"У этой точки на {new_day.isoformat()} уже есть проверка (id "
+                        f"{чужая[0]}, происхождение {чужая[1]}). Если это правда второй визит "
+                        f"в тот же день — повторите с second_visit=true"
+                    )
+            cur.execute("select kind, auditor from inspections where id = %s", (ident,))
+            строка = cur.fetchone()
+            if строка is None:
+                raise HistoryImportError(f"Проверки {ident} у этого доступа нет")
+            try:
+                cur.execute(
+                    _UPDATE_HEAD_SQL,
+                    {
+                        "id": ident,
+                        "tenant": tenant_code,
+                        "unit": unit_id,
+                        "day": new_day,
+                        "kind": строка[0] if kind is None else kind,
+                        "auditor": строка[1] if auditor is None else auditor,
+                    },
+                )
+            except psycopg.errors.RaiseException as exc:
+                # Сторож точки (0030): точка не из стран пространства.
+                raise _unit_refused(unit or unit_id, tenant_code) from exc
+            if cur.rowcount != 1:
+                raise HistoryImportError(
+                    f"Шапка {ident} не исправлена: изменено строк — {cur.rowcount}, "
+                    f"ожидалась одна. Ничего не записано"
+                )
+            conn.commit()
+    except HistoryImportError:
+        raise
+    except psycopg.Error as exc:
+        raise _refused(exc, "Исправить шапку черновика") from exc
+
+
 # --- записи -------------------------------------------------------------------
 
 

@@ -106,12 +106,16 @@ def move_inspection(
     inspection_id: str,
     *,
     tenant: str,
-    new_date: date,
-    new_unit_id: str,
+    new_date: date | None,
+    new_unit_id: str | None,
     reason: str,
     actor: str,
 ) -> bool:
-    """Перенести сданную проверку. `False` — переносить нечего, всё уже так.
+    """Перенести проверку: сданную или ждущую приёмки. `False` — переносить нечего.
+
+    `None` у даты или точки — оставить как есть (MCP правит одно из двух). У ждущей
+    приёмки триггер истории не срабатывает (она ещё не документ): след правки
+    остаётся в журнале действий (`inspection.move`).
 
     Отказ — `MoveError` с объяснением: нет проверки, она не сдана или
     отклонена, пиццерия чужая, не названа причина.
@@ -120,12 +124,13 @@ def move_inspection(
     tenant_code = _require_tenant(tenant)
     причина = _require_text(reason, what="повод")
     автор = _require_text(actor, what="автор")
-    try:
-        new_unit_id = str(uuid.UUID(new_unit_id))
-    except (ValueError, TypeError, AttributeError):
-        raise MoveError(
-            "Пиццерия не выбрана или указана неверно", code="move_unit_invalid"
-        ) from None
+    if new_unit_id is not None:
+        try:
+            new_unit_id = str(uuid.UUID(new_unit_id))
+        except (ValueError, TypeError, AttributeError):
+            raise MoveError(
+                "Пиццерия не выбрана или указана неверно", code="move_unit_invalid"
+            ) from None
     settings = load_retraction_settings()
     try:
         with connection(settings.dsn) as conn:
@@ -147,8 +152,8 @@ def _apply(
     conn: psycopg.Connection[Any],
     ident: str,
     tenant: str,
-    new_date: date,
-    new_unit_id: str,
+    new_date: date | None,
+    new_unit_id: str | None,
     причина: str,
     автор: str,
 ) -> bool:
@@ -158,15 +163,15 @@ def _apply(
         if шапка is None:
             raise MoveError(f"Проверки {ident} у арендатора {tenant} нет — исправлять нечего")
         статус, отклонена, дата, точка = шапка
-        if статус != "finalized":
-            raise MoveError(
-                f"Проверка {ident} ещё не сдана (статус «{статус}») — исправляется только "
-                f"сданная; черновик правит аудитор в боте"
-            )
+        if статус not in ("finalized", "draft"):
+            raise MoveError(f"Проверка {ident} в статусе «{статус}» — исправлять её нельзя")
         if отклонена is not None:
             raise MoveError(f"Проверка {ident} отклонена — отклонённую не исправляют")
+        new_date = дата if new_date is None else new_date
         # Снятая точка (D538) ведёт на ту, в которую влита: переносят в живую.
-        new_unit_id = live_unit_id(conn, new_unit_id) or new_unit_id
+        new_unit_id = (
+            str(точка) if new_unit_id is None else live_unit_id(conn, new_unit_id) or new_unit_id
+        )
         cur.execute(_UNIT_OF_TENANT_SQL, {"unit": new_unit_id, "tenant": tenant})
         if cur.fetchone() is None:
             raise MoveError("Такой пиццерии в справочнике этого пространства нет")

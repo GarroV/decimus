@@ -49,6 +49,8 @@ The person answers "yes" or corrects by number. Then ONE import_add_findings cal
 import_accept_inspection (no separate review: the person already checked it). Give \
 the person the partner letter and the PDF link from its answer \
 (inspection_letter rebuilds the letter any time).
+6. Wrong date or unit: a draft -> import_edit_inspection (before accept); an \
+accepted one -> move_inspection with a reason.
 
 Rules
 - Never compute or adjust the score: the engine does it.

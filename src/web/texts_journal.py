@@ -194,6 +194,8 @@ _MCP: dict[str, tuple[str, str]] = {
         "Findings added to a draft in a batch",
     ),
     "import_edit_finding": ("Изменено нарушение в черновике", "Finding edited in a draft"),
+    "import_edit_inspection": ("Исправлена шапка черновика", "Draft header edited"),
+    "move_inspection": ("Перенесена проверка (дата/пиццерия)", "Inspection moved (date/unit)"),
     "import_remove_finding": ("Удалено нарушение из черновика", "Finding removed from a draft"),
     "import_add_photo": ("Добавлено фото в черновик", "Photo added to a draft"),
     "import_photo_upload_link": (
