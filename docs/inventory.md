@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 168 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 167 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -112,7 +112,6 @@
 | `/oauth/register` | POST | `oauth_register` | `src/web/oauth.py` |
 | `/oauth/token` | POST | `oauth_token` | `src/web/oauth.py` |
 | `/overview` | GET | `overview` | `src/web/app.py` |
-| `/photo-upload/<token>` | GET | `photo_upload_page` | `src/web/photo_upload.py` |
 | `/photo-upload/<token>` | POST | `photo_upload_post` | `src/web/photo_upload.py` |
 | `/plans` | GET | `plans` | `src/web/action_plans.py` |
 | `/plans/files/<file_id>` | GET | `plan_file_legacy` | `src/web/action_plans.py` |
@@ -261,10 +260,10 @@
 | `import_get_inspection` | import | Read an imported inspection (draft or accepted): its mode, header and findings with their numbers | `src/mcp/imports.py` |
 | `import_info_fields` | import | Read the INFORMATION part of a current-mode imported DRAFT: the fields the bot asks at the end of an inspection and the… | `src/mcp/import_info.py` |
 | `import_list_drafts` | import | List this space's imported drafts that are not accepted yet: mode (history/current), unit, date, checklist version… | `src/mcp/imports.py` |
-| `import_photo_upload_link` | import | Get an upload link for the photos attached to the chat, for ONE imported draft | `src/mcp/import_photo_link.py` |
 | `import_remove_finding` | import | Remove one finding (with its photos) from an imported draft by its number n | `src/mcp/imports.py` |
 | `import_set_info` | import | Record answers to information fields of a current-mode imported DRAFT (values = {code: answer}) | `src/mcp/import_info.py` |
 | `import_suggest_items` | import | Read-only: suggest up to 5 checklist items for ONE finding, by the word map of the draft's checklist edition | `src/mcp/import_suggest.py` |
+| `import_upload_photos` | import | Upload the photos attached to the chat to ONE imported draft | `src/mcp/import_photo_link.py` |
 | `findings_by_unit` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `get_inspection` | inspections | Read one recorded inspection of the caller's tenant in full: its header, the score breakdown (percentage, letter grade… | `src/mcp/tools.py` |
 | `inspection_letter` | inspections | Rebuild the partner letter for one recorded inspection of the caller's tenant and return its text, ready for a human to… | `src/mcp/tools.py` |
@@ -315,6 +314,8 @@
 | `DB_POOL_MAX` | `src/db/pool.py` | да |
 | `DB_POOL_TIMEOUT_S` | `src/db/pool.py` | да |
 | `DB_STATEMENT_TIMEOUT_S` | `src/db/timeouts.py` | да |
+| `DECIMUS_MCP_TOKEN` | `tools/mcp_outside.py` | да |
+| `DECIMUS_MCP_URL` | `tools/mcp_outside.py` | да |
 | `DEMO_PHOTOS_DIR` | `tools/seed_open_demo.py` | да |
 | `DEMO_STATE_DIR` | `tools/seed_demo.py` | да |
 | `DODO_MCP_TOKEN` | `tools/mcp_outside.py` | да |
