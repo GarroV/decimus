@@ -85,19 +85,44 @@
 .hm-grades { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); }
 .hm-grades__item { display: inline-flex; align-items: center; gap: 6px; }
 
-/* ── блок «Рейтинги» (D418): строки РС / РКО / карты × колонки CEE / остальные ── */
+/* ── блок «Рейтинги» (D418): строки РС / РКО / карты / агрегаторы × колонки по срезу ── */
 .hm-label__link { color: inherit; text-decoration: none; }
 .hm-label__link:hover { color: var(--accent); text-decoration: underline; }
-.hm-rb { display: grid; grid-template-columns: minmax(6.5rem, 1.1fr) repeat(var(--hm-rb-cols, 2), minmax(0, 1fr));
-  align-items: baseline; gap: 0 10px; font-size: 13px; }
-.hm-rb > * { padding: 7px 0; border-bottom: 1px solid var(--line); min-width: 0; }
-.hm-rb .is-last { border-bottom: 0; }
-.hm-rb__col { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); text-align: right; }
-.hm-rb__label { color: var(--ink-2); font-size: 12.5px; }
-.hm-rb__cell { display: flex; align-items: baseline; justify-content: flex-end; flex-wrap: wrap; gap: 2px 6px; text-align: right;
+/* Слайдер колонок (D583, D584): подписи строк стоят на месте, колонки прокручиваются вбок.
+   Страница вбок не едет: прокручивается только .hm-rbs__view. */
+.hm-rbs { position: relative; min-width: 0; }
+.hm-rbs__view { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin; outline-offset: 2px; }
+.hm-rb { --hm-rb-label: 5.25rem; --hm-rb-w: 7.25rem;
+  display: grid; grid-template-columns: var(--hm-rb-label) repeat(var(--hm-rb-cols, 2), minmax(var(--hm-rb-w), 1fr));
+  width: max-content; min-width: 100%; align-items: baseline; gap: 0; font-size: 13px; }
+.hm-rb > * { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.hm-rb__corner, .hm-rb__label { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+.hm-rb__label { color: var(--ink-2); font-size: 12.5px; line-height: 1.25; overflow-wrap: anywhere; align-self: center; }
+.hm-rb .is-first { border-top: 1px solid var(--line-strong); }
+.hm-rb__col { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3);
+  text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-rb__col a { color: inherit; text-decoration: none; }
+.hm-rb__col a:hover { color: var(--accent); text-decoration: underline; }
+.hm-rb__col.is-total { color: var(--ink-2); }
+.hm-rb__cell { display: flex; align-self: center; align-items: baseline; justify-content: flex-end; flex-wrap: wrap; gap: 2px 6px; text-align: right;
   font-family: var(--font-mono); font-weight: var(--w-semibold); color: var(--ink); }
-.hm-rb__cell--maps { flex-direction: column; align-items: flex-end; gap: 2px; font-weight: var(--w-regular, 400); }
-.hm-rb__map small { font-family: inherit; font-size: 11px; color: var(--ink-3); }
+.hm-rb__cell.is-total { background: var(--surface-2); padding-left: 8px; }
+/* Подсказка прокрутки: кромка-затухание с той стороны, где колонки ещё есть, и стрелки на десктопе. */
+.hm-rbs::before, .hm-rbs::after { content: ""; position: absolute; top: 0; bottom: 0; width: 28px; z-index: 2;
+  pointer-events: none; opacity: 0; transition: opacity .15s; }
+.hm-rbs::before { left: var(--hm-rb-label, 5.25rem); background: linear-gradient(90deg, var(--surface), transparent); }
+.hm-rbs::after { right: 0; background: linear-gradient(270deg, var(--surface), transparent); }
+.hm-rbs.can-prev::before, .hm-rbs.can-next::after { opacity: 1; }
+.hm-rbs__arrow { display: none; position: absolute; top: 0; z-index: 3; width: 26px; height: 26px; padding: 0; border: 1px solid var(--line-strong);
+  border-radius: 50%; background: var(--surface); color: var(--ink-2); font-size: 16px; line-height: 1; cursor: pointer;
+  box-shadow: var(--sh-card); }
+.hm-rbs__arrow:hover { color: var(--accent); border-color: var(--accent); }
+.hm-rbs__arrow--prev { left: calc(5.25rem + 4px); }
+.hm-rbs__arrow--next { right: 2px; }
+.hm-rbs.can-prev .hm-rbs__arrow--prev, .hm-rbs.can-next .hm-rbs__arrow--next { display: block; }
+@media (hover: none) { .hm-rbs__arrow { display: none !important; } }
+@media (max-width: 640px) { .hm-rb { --hm-rb-w: 6.5rem; } }
 
 /* ── строки и таблицы ───────────────────────────────────────────────── */
 .hm-rows { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
