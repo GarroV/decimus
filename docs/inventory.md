@@ -209,7 +209,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **65** инструментов (checklist — 33, checklist_source — 2, import — 16, inspections — 6, move — 1, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **66** инструментов (checklist — 33, checklist_source — 2, import — 17, inspections — 6, move — 1, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
@@ -260,9 +260,10 @@
 | `import_get_inspection` | import | Read an imported inspection (draft or accepted): its mode, header and findings with their numbers | `src/mcp/imports.py` |
 | `import_info_fields` | import | Read the INFORMATION part of a current-mode imported DRAFT: the fields the bot asks at the end of an inspection and the… | `src/mcp/import_info.py` |
 | `import_list_drafts` | import | List this space's imported drafts that are not accepted yet: mode (history/current), unit, date, checklist version… | `src/mcp/imports.py` |
+| `import_match_findings` | import | Read-only: for ALL dictated findings at once (up to 50), pick the checklist item, class and zone with the SAME pipeline… | `src/mcp/import_match.py` |
 | `import_remove_finding` | import | Remove one finding (with its photos) from an imported draft by its number n | `src/mcp/imports.py` |
 | `import_set_info` | import | Record answers to information fields of a current-mode imported DRAFT (values = {code: answer}) | `src/mcp/import_info.py` |
-| `import_suggest_items` | import | Read-only: suggest up to 5 checklist items for ONE finding, by the word map of the draft's checklist edition | `src/mcp/import_suggest.py` |
+| `import_suggest_items` | import | Read-only: pick the checklist item, class and zone for ONE finding — the same pipeline as import_match_findings and the… | `src/mcp/import_suggest.py` |
 | `import_upload_photos` | import | Upload the photos attached to the chat to ONE imported draft | `src/mcp/import_photo_link.py` |
 | `findings_by_unit` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `get_inspection` | inspections | Read one recorded inspection of the caller's tenant in full: its header, the score breakdown (percentage, letter grade… | `src/mcp/tools.py` |
@@ -294,7 +295,7 @@
 | `API_TOKEN_BY` | `tools/api_token.py` | да |
 | `ATTACHMENT_MAX_MB` | `src/db/config.py` | да |
 | `AUDITOR_NAMES` | `src/bot/config.py` | да |
-| `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 6 | да |
+| `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 7 | да |
 | `BACKUP_DIR` | `tools/state_backup.py` | да |
 | `BACKUP_KEEP_DAYS` | `tools/state_backup.py` | да |
 | `BOT_MCP_URL` | `src/bot/mcp_setup.py`, `tools/mcp_outside.py` | да |
@@ -333,7 +334,7 @@
 | `INSPECTION_FILE` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
 | `LANDING_SHOTS_BASE` | `tools/landing_shots.py` | да |
 | `LOG_ID_SALT` | `src/domain/log_ids.py` | да |
-| `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 1 | да |
+| `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 2 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_CONFIRM_SECRET` | `src/mcp/confirm.py` | да |
 | `MCP_HOST` | `src/mcp/config.py` | да |

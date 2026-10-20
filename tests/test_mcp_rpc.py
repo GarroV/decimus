@@ -410,7 +410,7 @@ def test_instructions_про_загрузку_отдаются_доступу_с
 
     текст = результат["instructions"]
     assert len(текст) <= 6000
-    assert "import_suggest_items" in текст
+    assert "import_match_findings" in текст
     assert "import_add_findings" in текст
 
 
