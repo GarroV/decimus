@@ -215,7 +215,7 @@ def test_каждый_код_отказа_есть_на_обоих_языках(
         }
         | {f"ratings.format.{v}" for v in model.FORMATS}
     )
-    assert len(коды) == 10 + 5 + 7 + 9
+    assert len(коды) == 11 + 5 + 7 + 9
     for ключ in коды:
         assert set(TEXTS.get(ключ, {})) >= {"ru", "en"}, ключ
 

@@ -318,7 +318,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space,space_guard,storage,storage_reconcile,target_refusal}.py -->
+<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space,space_guard,storage,storage_reconcile,target_refusal,timeouts}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
@@ -339,6 +339,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/storage.py` | Хранилище кадров за S3-совместимым интерфейсом (D004, D054) |
 | `src/db/storage_reconcile.py` | Сверка хранилища файлов с таблицами: экшн-планы и ответы на предписания (#496) |
 | `src/db/target_refusal.py` | Расхождение баз в цепочке отказа — узнать и записать в журнал (#515, #521) |
+| `src/db/timeouts.py` | Пределы ожидания базы по умолчанию для обычных соединений (F-119) |
 <!-- map:end -->
 
 ### Проверки, справочники, чтение
