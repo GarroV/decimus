@@ -162,7 +162,13 @@ def test_установщик_реально_отрабатывает_на_по�
     дом = tmp_path / "home"
     (дом / "Library" / "Application Support" / "Claude").mkdir(parents=True)
     чужой = дом / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
-    чужой.write_text('{"mcpServers":{"сосед":{"command":"/bin/echo","args":["привет"]}}}')
+    # У человека уже стоит прежняя установка (`dodo-audit`, мост в `~/.dodo-audit`).
+    (дом / ".dodo-audit" / "bin").mkdir(parents=True)
+    (дом / ".dodo-audit" / "bin" / "mcp_bridge.sh").write_text("старый мост")
+    чужой.write_text(
+        '{"mcpServers":{"сосед":{"command":"/bin/echo","args":["привет"]},'
+        '"dodo-audit":{"command":"/bin/bash","args":["старый"]}}}'
+    )
 
     прогон = subprocess.run(
         ["/bin/bash", "-s"],
@@ -173,18 +179,21 @@ def test_установщик_реально_отрабатывает_на_по�
         env={
             "HOME": str(дом),
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
-            "DODO_MCP_URL": "http://127.0.0.1:8265/",
-            "DODO_MCP_TOKEN": "t" * 40,
+            "DECIMUS_MCP_URL": "http://127.0.0.1:8265/",
+            "DECIMUS_MCP_TOKEN": "t" * 40,
         },
     )
 
     assert прогон.returncode == 0, f"установщик упал: {прогон.stderr}"
-    мост = дом / ".dodo-audit" / "bin" / "mcp_bridge.sh"
+    мост = дом / ".decimus" / "bin" / "mcp_bridge.sh"
     assert мост.exists(), "мост на машину не лёг"
     assert "curl" in мост.read_text(), "мост лёг пустым"
     настройки = json.loads(чужой.read_text())
     assert "сосед" in настройки["mcpServers"], "чужой сервер в настройках затёрт"
-    наш = настройки["mcpServers"]["dodo-audit"]
+    assert "dodo-audit" not in настройки["mcpServers"], "прежний ключ сервера остался"
+    assert not (дом / ".dodo-audit").exists(), "прежний каталог моста остался"
+    наш = настройки["mcpServers"]["decimus"]
+    assert наш["env"]["DECIMUS_MCP_URL"] == "http://127.0.0.1:8265/"
     assert наш["command"] == "/bin/bash", "запись сделана не в форме command+args"
     assert "url" not in наш and "type" not in наш, (
         "в настройки Desktop попала форма http — приложение молча сотрёт весь блок"

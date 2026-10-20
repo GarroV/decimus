@@ -114,7 +114,7 @@ def _учётки(request: pytest.FixtureRequest) -> None:
 #: Токен стоит ровно там, где его подхватит установщик, — в окружении перед
 #: `bash` (#244, D112). В аргументы он не попадает намеренно: `argv` виден
 #: через `ps`, окружение чужого процесса на маке — нет.
-_TOKEN_IN_COMMAND = re.compile(r"DODO_MCP_TOKEN='?([A-Za-z0-9_-]+)")
+_TOKEN_IN_COMMAND = re.compile(r"DECIMUS_MCP_TOKEN='?([A-Za-z0-9_-]+)")
 
 
 def выданный_токен(текст: str) -> str:

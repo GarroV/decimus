@@ -512,7 +512,7 @@ DEPLOY_HOST=<HOST> scripts/smoke.sh
 машины, не с площадки и не с ноутбука, с которого шла раскатка:
 
 ```bash
-DODO_MCP_URL=https://<имя из шага 2>/ DODO_MCP_TOKEN=<личный токен из бота> \
+DECIMUS_MCP_URL=https://<имя из шага 2>/ DECIMUS_MCP_TOKEN=<личный токен из бота> \
   python3 tools/mcp_outside.py
 ```
 

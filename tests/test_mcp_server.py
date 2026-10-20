@@ -410,6 +410,7 @@ def test_содержимое_проверки_остаётся_нетронут
     assert {spec.handler.__module__ for spec in загружающие} <= {
         "src.mcp.imports",
         "src.mcp.import_suggest",
+        "src.mcp.import_match",
         "src.mcp.import_batch",
         "src.mcp.import_photo_link",
         "src.mcp.import_info",

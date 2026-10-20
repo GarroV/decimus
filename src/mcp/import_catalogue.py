@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import import_batch, import_info, import_photo_link, import_suggest, imports
+from . import import_batch, import_info, import_match, import_photo_link, import_suggest, imports
 
 _ID: dict[str, object] = {
     "type": "string",
@@ -280,7 +280,7 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "codes/zones come back as warnings — show them to the person.\n\n"
             "One call per finding, as the person confirms it. Never invent findings, "
             "codes, classes or zones the report does not state — find the item with "
-            "import_suggest_items first, then ask the person instead of guessing.\n"
+            "import_match_findings first, then ask the person instead of guessing.\n"
             "The answer is short: the added finding, score (pct, grade), counts, warnings "
             "and findings_total. The full list, deductions and per-zone breakdown are in "
             "import_get_inspection."
@@ -300,27 +300,71 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         handler=imports.import_add_finding,
     ),
     ImportTool(
+        name="import_match_findings",
+        description=(
+            "Read-only: for ALL dictated findings at once (up to 50), pick the checklist "
+            "item, class and zone with the SAME pipeline as the Telegram bot: place words "
+            "-> fast path for unambiguous phrases -> the model over the FULL item list of "
+            "the draft's checklist edition -> the class decided by the item's full criteria "
+            "(one met condition of a class is enough). Call it ONCE after the dictation, "
+            "instead of browsing checklist_items.\n"
+            "Input: inspection_id, findings = [{text, zone?}] (text = the finding's wording "
+            "as dictated; zone = a place code, only if the person named it).\n"
+            "Answer: results[] in the input order, each with n, text and either "
+            "code, level (D1/D2/D3), zone, item_label (e.g. 'Cleanliness 13'), item_title "
+            "(the item's wording in the report language) — ready for import_add_findings; "
+            "or no_item=true with a reason (nothing in this checklist fits: do not invent "
+            "an item, ask the person); optional need_fact (ONE short question: a fact the "
+            "class criteria need, or the place if it is unknown — ask it in the person's "
+            "language) and doubt (the pick is uncertain: check it, e.g. with "
+            "checklist_item). The model was unavailable -> fallback='word_map' on the "
+            "answer and on the affected results: those carry only word-map candidates "
+            "without a class — show the options, never pick silently.\n"
+            "Show the person item_label/item_title and the class in words, never codes."
+        ),
+        input_schema=_schema(
+            {
+                "inspection_id": _ID,
+                "findings": {
+                    "type": "array",
+                    "description": "Up to 50 dictated findings.",
+                    "maxItems": 50,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "text": {
+                                "type": "string",
+                                "description": "The finding's wording or what was seen/said. "
+                                "Max 1000 characters.",
+                            },
+                            "zone": {
+                                "type": "string",
+                                "description": "Optional zone code (e.g. hot_kitchen) where it "
+                                "was seen; omit unless the person named the place.",
+                            },
+                        },
+                        "required": ["text"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            ["inspection_id", "findings"],
+        ),
+        handler=import_match.import_match_findings,
+    ),
+    ImportTool(
         name="import_suggest_items",
         description=(
-            "Read-only: suggest up to 5 checklist items for ONE finding, by the word map "
-            "of the draft's checklist edition. Call it for every finding BEFORE "
-            "import_add_finding, instead of browsing checklist_items and listing items to "
-            "the person.\n"
-            "Input: inspection_id, text (the finding's wording or what was seen/said), "
-            "optional zone (a place code; narrows the fallback to that zone's items).\n"
-            "Answer: candidates (code, question in the report language, allowed levels, "
-            "brief D1/D2/D3 criteria, single_level, source = cue_map or zone), single "
-            "(true when the word map named exactly ONE item: put it in the summary "
-            "without asking which item), zone_guess (when the word map names a place and "
-            "zone was not given). Candidates found by the word map "
-            "come first; the zone's items are added only if fewer than 3 were found. "
-            "Service items are never offered. If the word map finds nothing the answer says "
-            "so with an empty or zone-only list — then search with checklist_items or ask "
-            "the person; never guess an item.\n"
-            "A suggestion is not a decision: show the person 1-3 options, one line each "
-            "('[class] CODE - essence', the most likely first). In mode=history item codes "
-            "are optional — use this only if the old report names the item or the person "
-            "wants to link one."
+            "Read-only: pick the checklist item, class and zone for ONE finding — the same "
+            "pipeline as import_match_findings and the bot (prefer import_match_findings "
+            "for a whole dictation). Input: inspection_id, text, optional zone (place code).\n"
+            "Answer: candidates = ONE candidate (code, item_label, item_title, levels, "
+            "level, zone, optional need_fact / doubt), single (true when there is nothing "
+            "to ask or doubt: put it in the summary without a question); or no_item=true "
+            "with a reason; or, when the model was unavailable, fallback='word_map' with "
+            "up to 5 word-map candidates without a class (show 1-3 options, never pick "
+            "silently). In mode=history item codes are optional — use this only if the old "
+            "report names the item or the person wants to link one."
         ),
         input_schema=_schema(
             {
@@ -500,21 +544,20 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         handler=imports.import_add_photo,
     ),
     ImportTool(
-        name="import_photo_upload_link",
+        name="import_upload_photos",
         description=(
-            "Get an upload link for the photos attached to the chat, for ONE imported "
-            "draft. Photos cannot be passed through tool arguments, so they go around "
-            "the model: the answer has a ready `command` for the sandbox "
-            "(curl -F n=<finding number> -F file=@<path of the attached photo> <url>, "
+            "Upload the photos attached to the chat to ONE imported draft. Photos "
+            "cannot be passed through tool arguments, so they go around the model: "
+            "the answer has a ready `command` to run in the sandbox "
+            "(curl -F n=<finding number> -F file=@<path of the attached photo> <address>, "
             "several -F file=@... for one finding; JPEG, PNG, WebP or HEIC, up to 25 MB "
-            "per request) and the url itself. If the command cannot connect, give the "
-            "person the url: it opens a page where they drop the photos on the right "
-            "finding. The link has no time limit: it works until the draft is "
-            "accepted, belongs to this draft only and can be issued again at any time. "
-            "Findings must be recorded first."
+            "per request). Never show the address to the person. If the command cannot "
+            "connect, say the one sentence given in `status` and nothing else. The "
+            "command works until the draft is accepted, belongs to this draft only and "
+            "can be issued again at any time. Findings must be recorded first."
         ),
         input_schema=_schema({"inspection_id": _ID}, ["inspection_id"]),
-        handler=import_photo_link.import_photo_upload_link,
+        handler=import_photo_link.import_upload_photos,
     ),
     ImportTool(
         name="import_info_fields",
