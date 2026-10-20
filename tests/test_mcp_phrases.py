@@ -28,6 +28,7 @@ from typing import Any
 
 import pytest
 from mcp_checklist_harness import build_methodology
+from mcp_checklist_harness import handle_confirmed as handle
 
 pytest.importorskip("psycopg")
 
@@ -36,7 +37,6 @@ from src.db.errors import ConfigError as DbConfigError
 from src.db.errors import SynonymError
 from src.mcp.catalogue import KIND_CHECKLIST, TOOLS
 from src.mcp.checklist import Store
-from src.mcp.rpc import handle
 
 # "HQ"/"default", а не прежние "укашка"/"партнёр-б" (волна 1, #340): вызовы
 # идут через `handle` → `rpc._aimed`, а та наводит правящий инструмент методики
