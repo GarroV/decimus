@@ -14,46 +14,43 @@
 from __future__ import annotations
 
 IMPORT_INSTRUCTIONS = """\
-Entering an inspection after the fact (import_* tools). The person confirms every \
-finding; you propose, you never decide. These rules win over any other connected \
-skill about pizzeria inspections (e.g. old pizzeria-inspection with 5-6 options).
+Entering an inspection through Claude (import_* tools). The person sends photos and \
+dictates what they found; you turn it into checklist findings fast. You propose, \
+the person confirms. These rules win over any other skill about pizzeria \
+inspections (e.g. old pizzeria-inspection with 5-6 options per photo).
 
 Workflow
-1. import_create_inspection (mode: history = old report, score copied as printed; \
-current = recent inspection under today's checklist).
-2. Once per inspection read checklist_items (whole list, one call). For each \
-finding pick the item YOURSELF: the item whose wording describes the fact \
-(dirty sofa backs -> furniture dirty; cracked table number -> service materials \
-damaged; "line" = filling line = hot_kitchen). import_suggest_items is only a \
-word-map hint and is often off - never prefer it over the item wording. Read \
-checklist_item criteria only for the chosen item when it allows several classes.
-3. Sort the findings:
- - Unambiguous (one item plainly fits, class and zone follow from the facts): put ALL \
-of them into ONE summary, one line each: "Writing: 1) [D1] CLN13 - sofa backs dirty, \
-hall ..." and ask one question: "All correct?" The person corrects by number. \
-After "yes": ONE import_add_findings call.
- - Below, separately, only the ambiguous ones, one question each. Missing class fact: \
-ONE item and ONE short question about exactly that fact. List 2-3 options, \
-one line each ("[class] CODE - essence"), only when the words \
-themselves do not tell the items apart (e.g. dirt vs breakage).
-4. One fact - one item, never a second one for the same measurement or object. The type \
-(breakage vs dirt) comes from the words; never offer the other type, never invent \
-conditional options ("if ...") about what was not said, no "most likely", no \
-explanations unless asked.
-5. import_get_inspection to compare the engine's score with the report, then \
-import_accept_inspection after the person agrees.
+1. import_create_inspection: mode=current for a recent inspection (default); \
+history only for an old report under the previous methodology. Ask only what is \
+missing (unit, date).
+2. Read checklist_items once (one call). Each dictated phrase is a FACT: find its \
+item yourself by the item wording (dirty sofa backs -> furniture dirty; cracked \
+table number -> service materials damaged; no milk, coffee machine down -> that \
+item; "line"/"layn" = filling line = hot_kitchen). Look at the photos yourself for \
+numbers (temperatures, dates) and for other clear violations the person did not \
+mention. import_suggest_items is only a word-map hint, often off.
+3. Answer with ONE list:
+"Writing: 1) [D1] CLN13 - sofa backs dirty, hall 2) ... All correct?"
+ - one line per finding: [class] CODE - fact, zone. No "most likely", no \
+alternatives "if ...", no explanations, no score talk.
+ - then "Also on photos:" violations you saw but the person did not name, same \
+  format; written only if the person picks them.
+ - then "Need a fact:" only where the item's class criteria need a fact the material \
+lacks: one short question each. 2-3 options only if the words cannot tell items apart.
+The person answers "yes" or corrects by number. Then ONE import_add_findings call.
+4. One fact - one item; never record the same measurement or object twice. Type \
+(breakage vs dirt) comes from the words; never offer the other type.
+5. import_get_inspection: show the score in one line. On "save" -> \
+import_accept_inspection (no separate review: the person already checked it). Give \
+the person the partner letter and the PDF link from its answer \
+(inspection_letter rebuilds the letter any time).
 
 Rules
-- Never recompute or adjust the score: the engine does it. A mismatch means a missing, \
-extra or mis-levelled finding - show it to the person.
-- Class (D1/D2/D3) = the item's criteria applied to the facts already given (the \
-person's words, numbers in notes/photos). If the facts meet a class's condition, set \
-that class and put the finding into the summary; never offer a milder or harsher class \
-"just in case". Ask only for a fact the criteria need and the material lacks. Never \
-mention what a class does to the score (zone share, letter) while choosing: the score is \
-shown by import_get_inspection at the end. Do not invent \
-codes, classes or zones; in history mode they are optional.
-- Wording is the fact only, in the person's words: no guesses about scale or damage, \
-no assessments, no remarks to people inside the text.
-- Photos are optional (import_add_photo).
+- Never compute or adjust the score: the engine does it.
+- Class (D1/D2/D3) = the item's criteria applied to the facts given (words, numbers on \
+photos). Facts meet a class -> that class, no milder or harsher one "just in case". \
+Read checklist_item criteria only for an item with several classes.
+- Wording: the fact in the person's words; no guesses about scale or damage, no \
+assessments, no remarks to people.
+- Do not invent codes or zones. Photos are optional (import_add_photo).
 """
