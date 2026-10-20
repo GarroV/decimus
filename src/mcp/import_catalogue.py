@@ -122,6 +122,38 @@ def _schema(properties: dict[str, object], required: list[str]) -> dict[str, obj
 
 IMPORT_TOOLS: tuple[ImportTool, ...] = (
     ImportTool(
+        name="create_unit",
+        description=(
+            "Add a NEW unit (pizzeria) to the unit directory — for when "
+            "import_create_inspection says the unit does not exist. Ask the person to "
+            "confirm before calling. The name follows the network rule: 'City-N' in "
+            "English (e.g. 'Belgrade-3'); a city of another country is refused. An "
+            "unfamiliar city is refused until the person confirms it — then repeat the "
+            "call with confirm_new_city=true. A unit that already exists is refused and "
+            "named. Returns the canonical unit name and country: use exactly that name "
+            "as unit afterwards."
+        ),
+        input_schema=_schema(
+            {
+                "country": {
+                    "type": "string",
+                    "description": "Country code of the network, e.g. RS, SI, ME.",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Unit name as the person wrote it, e.g. 'Belgrade 3'.",
+                },
+                "confirm_new_city": {
+                    "type": "boolean",
+                    "description": "true only after the person confirmed that the city is "
+                    "new to the network. Default false.",
+                },
+            },
+            ["country", "name"],
+        ),
+        handler=imports.create_unit,
+    ),
+    ImportTool(
         name="import_create_inspection",
         description=(
             "Start entering ONE inspection after the fact: creates a DRAFT with no "
@@ -138,9 +170,11 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "current version of the reference checklist automatically; naming another "
             "checklist or an older version is refused. reported_pct/reported_grade are "
             "optional and used only to compare with the engine's score.\n\n"
-            "The unit must already exist in the unit directory: imports never create "
-            "units. Next: add each finding with import_add_finding, review with "
-            "import_get_inspection, then import_accept_inspection."
+            "The unit must already exist in the unit directory. If it does not, tell the "
+            "person and offer to create it with create_unit (only with their "
+            "confirmation), then continue here. Next: add each finding with "
+            "import_add_finding, review with import_get_inspection, then "
+            "import_accept_inspection."
         ),
         input_schema=_schema(
             {

@@ -184,6 +184,7 @@ _MCP: dict[str, tuple[str, str]] = {
     "apply_checklist": ("Чек-лист применён к проду", "Checklist applied to production"),
     "import_ratings": ("Загружены рейтинги", "Ratings uploaded"),
     "request_aggregators_update": ("Обновление оценок агрегаторов", "Aggregator ratings update"),
+    "create_unit": ("Заведена пиццерия через Claude", "Unit created via Claude"),
     "import_create_inspection": (
         "Создан черновик старой проверки",
         "Legacy inspection draft created",

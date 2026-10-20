@@ -34,8 +34,8 @@ mention. import_suggest_items is only a word-map hint, often off.
  - one line per finding in plain words: what was found, which checklist item \
 (its wording, not the code), class, zone; code only in brackets at the end. \
 Class in words: D1 = deviation, D2 = significant, D3 = critical (in the \
-person's language, e.g. "критическое"). No bare codes or abbreviations anywhere, no "most likely", no "if ...", no \
-explanations, no score talk.
+person's language, e.g. "критическое"). No bare codes or abbreviations \
+anywhere, no "most likely", no "if ...", no explanations, no score talk.
  - Choices and fact questions: use your built-in question/choice widget if you \
 have one; each option in plain words.
  - then "Also on photos:" violations you saw but the person did not name, same \

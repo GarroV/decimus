@@ -164,7 +164,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,model_key_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,photo_upload,account_menu,accounts,auth,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,model_key_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -187,6 +187,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
 | `src/web/passkey_login.py` | Вход ключом доступа без логина (D485): ключ открывает сессию сам, без второй ступени |
 | `src/web/people.py` | Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399) |
+| `src/web/photo_upload.py` | Загрузка кадров к черновику загрузки проверки по подписанной ссылке (мимо Claude) |
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
 | `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами — и кому из соседей верить |
 | `src/web/reauth.py` | Свежий вход для действий, создающих долгоживущий доступ (аудит безопасности 12.10) |
@@ -345,7 +346,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -361,6 +362,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/letters.py` | T333 (#310): письмо партнёру, зафиксированное человеком |
 | `src/db/mcp_access.py` | Личный доступ к MCP: токены учёток сайта (T253, D098; аудит 12.10, D448) |
 | `src/db/move.py` | Перенос проверки по дате и пиццерии — с историей каждой правки (D195) |
+| `src/db/photo_intake.py` | Приём кадра по ссылке загрузки: тип — по сигнатуре байт, а не по имени и заголовку клиента |
 | `src/db/push.py` | T093: слив завершённой проверки в базу |
 | `src/db/queries.py` | Чтение уже слитых проверок |
 | `src/db/reach.py` | Охват чтения: что видит пространство (волна 1, #340; D283, D284, D289) |

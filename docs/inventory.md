@@ -210,7 +210,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **62** инструментов (checklist — 33, checklist_source — 2, import — 13, inspections — 6, move — 1, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **63** инструментов (checklist — 33, checklist_source — 2, import — 14, inspections — 6, move — 1, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
@@ -249,6 +249,7 @@
 | `uncovered_phrases` | checklist | List the words auditors say on site that still produce no record, most frequent first, with the zone each was said in… | `src/mcp/checklist_tools.py` |
 | `checklist_source` | checklist_source | Read the checklist the caller is audited against: its items (what is checked), the violation classes each item can… | `src/mcp/checklist_source.py` |
 | `checklist_source_item` | checklist_source | Read one item of the checklist the caller is audited against, together with the D1/D2/D3 criteria that decide which… | `src/mcp/checklist_source.py` |
+| `create_unit` | import | Add a NEW unit (pizzeria) to the unit directory — for when import_create_inspection says the unit does not exist | `src/mcp/imports.py` |
 | `import_accept_inspection` | import | Accept an imported draft after the person has checked it (the person who imported it accepts it) | `src/mcp/imports.py` |
 | `import_add_finding` | import | Add one finding from the report to an imported draft | `src/mcp/imports.py` |
 | `import_add_findings` | import | Add SEVERAL findings to an imported draft in one call (up to 50) | `src/mcp/import_batch.py` |

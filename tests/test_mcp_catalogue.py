@@ -143,6 +143,7 @@ from src.mcp.catalogue import (
 #: лишь загруженные черновики своего пространства — это держит замок строки
 #: (`src/db/imports.py`) и `tests/test_db_imports.py`.
 ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ = {
+    "create_unit",
     "import_create_inspection",
     "import_add_finding",
     "import_add_findings",
@@ -230,7 +231,7 @@ def test_каталог_содержит_ровно_шестьдесят_два_
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 62
+    assert len(TOOLS) == 63
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -416,7 +417,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 62
+    assert len(перечень) == 63
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

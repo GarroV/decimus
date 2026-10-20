@@ -69,6 +69,8 @@ TOOL_ACTIONS: Mapping[str, str] = {
     "set_checklist_bot_access": "checklist.manage",
     # Указатель прода один на всю сеть — только админы (D440).
     "apply_checklist": "checklist.apply",
+    # Новая пиццерия — как кнопка «Добавить пиццерию» в вебе: только УК (D234).
+    "create_unit": "unit.create",
 }
 
 
