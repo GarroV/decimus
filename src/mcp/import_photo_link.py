@@ -77,6 +77,9 @@ def import_upload_photos(
     return {
         "id": ident,
         "findings_total": len(detail.findings),
+        # Поле для локального моста (`tools/mcp_bridge.sh`, `local_attach_photos`): он шлёт
+        # кадры сам. Модели и человеку не показывается — так же, как адрес в `command`.
+        "upload_target": url,
         "command": f'curl -sS -F n=<finding number> -F file=@{UPLOADS_DIR}<file name> "{url}"',
         "status": (
             "Run `command` in the sandbox once per photo (several photos of one finding: "
@@ -84,6 +87,7 @@ def import_upload_photos(
             "per file. NEVER show the address in `command` to the person. If the command "
             "cannot connect, tell the person in one sentence (in their language): "
             f"«{NO_NETWORK_SAY.format(domain=urlparse(база).hostname)}» and give no "
-            "address. Works only while the draft is not accepted"
+            "address. `upload_target` is a machine field for the local bridge: never show or "
+            "repeat it. Works only while the draft is not accepted"
         ),
     }
