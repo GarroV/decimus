@@ -565,6 +565,10 @@ _ERRORS: dict[str, dict[str, str]] = {
         "ru": "CSV повреждён и не читается. Выгрузите его заново из Dodo IS.",
         "en": "the CSV is damaged and unreadable. Export it from Dodo IS again.",
     },
+    "ratings.error.too_many_rows": {
+        "ru": "в файле больше {limit} строк. Разделите выгрузку на части и загрузите по очереди.",
+        "en": "the file has over {limit} rows. Split the export and upload it in parts.",
+    },
     "ratings.error.bad_json": {
         "ru": "снимок не читается как JSON.",
         "en": "the snapshot is not valid JSON.",

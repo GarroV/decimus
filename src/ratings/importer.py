@@ -23,6 +23,7 @@ from src.db import ratings as store
 from src.db.config import check_environment
 from src.db.errors import RatingsError
 from src.db.space import apply_space
+from src.db.timeouts import timed_dsn
 from src.db.units import normalize_unit_name
 from src.domain.unit_name import fold_unit_name
 
@@ -477,7 +478,7 @@ def _write(
     source: str | None,
     directory: Mapping[str, str] | None = None,
 ) -> ImportReport:
-    with psycopg.connect(check_environment().dsn) as conn:
+    with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
         apply_space(conn)
         with conn.transaction():
             store.lock_imports(conn)

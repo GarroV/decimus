@@ -26,6 +26,14 @@ TIMEOUT_SEC = 40
 RETRIES = 3
 BACKOFF_SEC = 15
 RETRY_CODES = frozenset({429, 500, 502, 503, 504})
+#: Потолок тела ответа (F-126). Ответы агрегаторов — JSON со списком точек, самые
+#: большие — единицы мегабайт; 20 МБ с большим запасом, а чужой сервер или
+#: перехваченный канал не заставит читать гигабайты в память.
+BODY_MAX_BYTES = 20_000_000
+#: Общий срок на запрос со всеми повторами и паузами. Без повторов укладывается
+#: (40 с), с тремя попытками и паузами 15 + 30 с — тоже (≈ 165 с); срок не даёт
+#: суммарно зависнуть дольше, если сервер отвечает медленно на каждой попытке.
+DEADLINE_SEC = 200.0
 
 
 class AggregatorError(Exception):
@@ -132,11 +140,23 @@ class Http:
 
     def _call(self, request: urllib.request.Request) -> object:
         last = ""
+        deadline = time.monotonic() + DEADLINE_SEC
         for attempt in range(RETRIES):
-            time.sleep(self.gap_sec if attempt == 0 else BACKOFF_SEC * attempt)
+            pause = self.gap_sec if attempt == 0 else BACKOFF_SEC * attempt
+            if attempt and time.monotonic() + pause >= deadline:
+                last = f"{last}, общий срок {DEADLINE_SEC:g} с"
+                break
+            time.sleep(pause)
+            timeout = min(TIMEOUT_SEC, max(1.0, deadline - time.monotonic()))
             try:
-                with urllib.request.urlopen(request, timeout=TIMEOUT_SEC) as response:  # noqa: S310
-                    return json.load(response)
+                with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+                    body = response.read(BODY_MAX_BYTES + 1)
+                if len(body) > BODY_MAX_BYTES:
+                    # Повтор тот же ответ не уменьшит.
+                    raise AggregatorError(
+                        f"Ответ больше {BODY_MAX_BYTES} байт — {request.full_url.split('?')[0]}"
+                    )
+                return json.loads(body)
             except urllib.error.HTTPError as exc:
                 last = f"HTTP {exc.code}"
                 if exc.code not in RETRY_CODES:

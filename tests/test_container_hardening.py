@@ -63,3 +63,17 @@ def test_service_drops_capabilities_and_new_privileges(
         f"{name}: нет security_opt no-new-privileges"
     )
     assert "user" not in svc or str(svc["user"]) not in {"0", "root"}, f"{name}: user — root"
+
+
+#: Все сервисы с потолком памяти и числа процессов (F-128): страховка от убегающего процесса.
+LIMITED_SERVICES = (*OWN_IMAGE_SERVICES, "db", "storage", "link", "web-link", "tunnel")
+
+
+@pytest.mark.parametrize("name", LIMITED_SERVICES)
+def test_service_has_memory_and_pids_ceiling_but_no_cpu_throttle(
+    services: dict[str, dict], name: str
+) -> None:
+    svc = services[name]
+    assert svc.get("mem_limit"), f"{name}: нет mem_limit — убегающий процесс заберёт хост"
+    assert svc.get("pids_limit"), f"{name}: нет pids_limit"
+    assert "cpus" not in svc and "cpu_quota" not in svc, f"{name}: лимит по ЦП душит задержку"

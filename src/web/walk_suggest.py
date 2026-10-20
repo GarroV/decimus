@@ -36,6 +36,11 @@ from .walk_zone import resolve_item_zone
 
 logger = logging.getLogger(__name__)
 
+#: Сколько кадров уходит в один поиск (F-120). Каждый читается в память и
+#: отправляется в платный вызов модели; настоящий запрос несёт два-три кадра,
+#: двадцать — с большим запасом. Остальные не отправляются, ответ говорит об этом.
+MAX_SUGGEST_PHOTOS = 20
+
 
 def _frames(refs: list[str]) -> list[bytes]:
     """Байты кадров мини-аппа — той же дверью, что у бота (`bot.photos`)."""
@@ -89,6 +94,13 @@ class Ask:
     hint: str | None
 
 
+def cap_photos(value: Any) -> tuple[Any, int]:
+    """Первые `MAX_SUGGEST_PHOTOS` ссылок и сколько отброшено; не список — как есть."""
+    if isinstance(value, list) and len(value) > MAX_SUGGEST_PHOTOS:
+        return value[:MAX_SUGGEST_PHOTOS], len(value) - MAX_SUGGEST_PHOTOS
+    return value, 0
+
+
 def answer(offer: Offer, ask: Ask) -> dict[str, Any]:
     # Увиденное на кадрах сверх сказанного (D208) — после найденного по
     # словам: у бота это отдельное предложение, здесь — нижние карточки.
@@ -138,7 +150,8 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             # полем `zone`.
             hint_key = "zone_hint" if body.get("zone_hint") else "zone"
             zone = _code(body, hint_key) if body.get(hint_key) else None
-            frames = _frames(_refs(body.get("photos"), who, inspection))
+            photos, omitted = cap_photos(body.get("photos"))
+            frames = _frames(_refs(photos, who, inspection))
             # Расход модели (D537): подбор на экране — свой вид вызова.
             with usage_scope(kind=KIND_SUGGEST, telegram_id=who, tenant=inspection.tenant):
                 offer = propose(
@@ -175,6 +188,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             words=words,
             zone=zone,
             frames=len(frames),
+            frames_omitted=omitted,
             candidates=journal.candidates(offer.candidates),
             also_seen=journal.candidates(offer.also_seen),
             question=offer.question,
@@ -187,4 +201,8 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             len(offer.candidates),
         )
         ask = Ask(chat_id=who, spoken=zone_from_words(words, chat_id=who), hint=zone)
-        return jsonify(answer(offer, ask)), 200
+        reply = answer(offer, ask)
+        if omitted:
+            # Не ошибка: поиск идёт по первым кадрам, клиент видит, что часть не учтена.
+            reply["photos_omitted"] = omitted
+        return jsonify(reply), 200
