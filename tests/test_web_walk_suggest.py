@@ -242,3 +242,16 @@ def test_в_модель_идёт_не_больше_десяти_кадров(м
     _найти("нагар", [bytes([i]) for i in range(25)])
 
     assert len(модель.звали[0]["photos"]) == ядро.MODEL_FRAMES_MAX, "каждый кадр — платный"
+
+
+def test_photo_cap_boundary_keeps_first_and_reports_omitted() -> None:
+    """F-120: ровно предел — всё уходит; на один больше — первые кадры и счёт отброшенных."""
+    from src.web.walk_suggest import MAX_SUGGEST_PHOTOS, cap_photos
+
+    ровно = [f"ref{i}" for i in range(MAX_SUGGEST_PHOTOS)]
+    assert cap_photos(ровно) == (ровно, 0)
+    больше = [*ровно, "лишний"]
+    kept, omitted = cap_photos(больше)
+    assert kept == ровно
+    assert omitted == 1
+    assert cap_photos(None) == (None, 0)
