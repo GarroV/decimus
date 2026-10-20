@@ -31,6 +31,7 @@ from .texts_journal import JOURNAL_TEXTS
 from .texts_master import MASTER_TEXTS
 from .texts_model_key import MODEL_KEY_TEXTS
 from .texts_oauth import OAUTH_TEXTS
+from .texts_photo_upload import PHOTO_UPLOAD_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
 from .texts_ratings import RATINGS_TEXTS
@@ -497,6 +498,20 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Принята — в истории сети",
         "en": "Accepted — in the network history",
     },
+    # Откуда проверка и как принята — словами в шапке карточки, а не только меткой.
+    "card.origin.field": {"ru": "Через бота", "en": "Via the bot"},
+    "card.origin.import": {"ru": "Через Claude", "en": "Via Claude"},
+    "card.origin.legacy": {
+        "ru": "Историческая из старого отчёта",
+        "en": "Historical, from an old report",
+    },
+    "card.accepted.by": {"ru": "Принята: {by} · {at}", "en": "Accepted: {by} · {at}"},
+    "card.accepted.at": {"ru": "Принята · {at}", "en": "Accepted · {at}"},
+    "card.accepted.old": {
+        "ru": "Принята до появления приёмки",
+        "en": "Accepted before the review step existed",
+    },
+    "card.accepted.waiting": {"ru": "Ждёт приёмки", "en": "Awaiting acceptance"},
     "review.photo.alt": {"ru": "Кадр к записи {n}", "en": "Photo for record {n}"},
     # --- правка записи на приёмке (D200) ---------------------------------------
     "revise.level": {"ru": "Класс", "en": "Class"},
@@ -772,6 +787,20 @@ TEXTS: dict[str, dict[str, str]] = {
             "This inspection's PDF is not stored: the inspection predates server-side "
             "report storage, or the report did not reach the storage."
         ),
+    },
+    "card.report.none.import": {
+        "ru": (
+            "PDF собирается при приёмке через Claude. Если его нет — попросите Claude "
+            "собрать отчёт заново (inspection_letter / приёмка)."
+        ),
+        "en": (
+            "The PDF is built when the inspection is accepted via Claude. If it is "
+            "missing, ask Claude to build the report again (inspection_letter / acceptance)."
+        ),
+    },
+    "card.report.none.legacy": {
+        "ru": "Для исторической проверки PDF нет.",
+        "en": "A historical inspection has no PDF.",
     },
     "card.report.unknown": {
         "ru": "Есть ли PDF этой проверки, сейчас неизвестно: база не ответила.",
@@ -1700,6 +1729,7 @@ _ЧАСТИ = (
     TEXTS,
     DEMO_TEXTS,
     OAUTH_TEXTS,
+    PHOTO_UPLOAD_TEXTS,
     CONNECTIONS_TEXTS,
     COUNTRY_TEXTS,
     GRADE_TEXTS,
@@ -1738,6 +1768,7 @@ TEXTS = {
     **MASTER_TEXTS,
     **MODEL_KEY_TEXTS,
     **OAUTH_TEXTS,
+    **PHOTO_UPLOAD_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,
     **TRIP_TEXTS,

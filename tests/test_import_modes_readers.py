@@ -70,10 +70,10 @@ def test_пересчёт_исторической_отказ_до_движка(
         rescore.apply_command(_проверка("legacy"), papers=бумаги_повсюду, args=["drop", "1"])
 
 
-@pytest.mark.parametrize("origin", ["legacy", "import"])
-def test_письма_по_загруженной_нет(origin: str, бумаги_повсюду: Papers) -> None:
+def test_письма_по_исторической_нет(бумаги_повсюду: Papers) -> None:
+    # Текущая загруженная письмо получает (D569); историческая — нет (D310, D332).
     with pytest.raises(LetterError, match="письма партнёру"):
-        letters.build(_проверка(origin), lang=None, papers=бумаги_повсюду)
+        letters.build(_проверка("legacy"), lang=None, papers=бумаги_повсюду)
 
 
 def test_каждая_прежняя_методика_своя_группа_в_справке() -> None:

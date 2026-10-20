@@ -38,6 +38,7 @@ from src.db import imports as db  # noqa: E402
 from src.db import imports_legacy as legacy  # noqa: E402
 from src.db import revise  # noqa: E402
 from src.db.errors import ActionPlanError, HistoryImportError, ReviseError  # noqa: E402
+from src.db.inspection_edits import Editor  # noqa: E402
 from src.db.queries import (  # noqa: E402
     item_usage,
     list_inspections,
@@ -280,6 +281,9 @@ def test_правка_на_приёмке_исторической_отказ_д
             ident,
             запись.id,
             tenant="HQ",
+            editor=Editor(
+                user_id="00000000-0000-0000-0000-0000000000a1", login="kontroling", role="admin"
+            ),
             revision=revise.Revision(
                 code="CLN03", level="D2", zone="hot_kitchen", zone_unusual=False, text="x"
             ),

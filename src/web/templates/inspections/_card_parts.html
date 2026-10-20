@@ -38,6 +38,21 @@
   <span class="{{ cls }} tip tip--end" tabindex="0" data-tip="{{ hint }}">{{ t('state.sealed') }}</span>
 {% endmacro %}
 
+{# Происхождение и приёмка одной строкой словами: откуда проверка, кем и когда
+   принята. Ждущая приёмки — «Ждёт приёмки» (кнопка «Принять» — в действиях шапки,
+   если у роли есть право). #}
+{% macro provenance(head, cls='meta') %}
+  {% set at = head.accepted_at[:16].replace('T', ' ') if head.accepted_at else '' %}
+  <p class="{{ cls }} provenance">
+    <span>{{ t('card.origin.' ~ head.origin) }}</span>
+    {% if head.retracted %}
+    {% elif head.on_review %} · <span>{{ t('card.accepted.waiting') }}</span>
+    {% elif at and head.accepted_by %} · <span>{{ t('card.accepted.by', by=head.accepted_by.replace('web:', ''), at=at) }}</span>
+    {% elif at %} · <span>{{ t('card.accepted.at', at=at) }}</span>
+    {% else %} · <span>{{ t('card.accepted.old') }}</span>{% endif %}
+  </p>
+{% endmacro %}
+
 {% macro card_actions(c, panel=False) %}
   {% set head = c.head %}
   {% set full = url('/inspections/' ~ head.id) %}

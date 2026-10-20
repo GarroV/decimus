@@ -31,6 +31,7 @@ from src.mcp.catalogue import (
     KIND_CHECKLIST,
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
+    KIND_MOVE,
     KIND_RATINGS,
     KIND_RATINGS_READ,
     KIND_RETRACTION,
@@ -406,10 +407,15 @@ def test_содержимое_проверки_остаётся_нетронут
     )
 
     загружающие = [spec for spec in TOOLS if spec.kind == KIND_IMPORT]
-    assert {spec.handler.__module__ for spec in загружающие} == {"src.mcp.imports"}, (
+    assert {spec.handler.__module__ for spec in загружающие} <= {
+        "src.mcp.imports",
+        "src.mcp.import_suggest",
+        "src.mcp.import_batch",
+        "src.mcp.import_photo_link",
+    }, (
         "загрузка исторических проверок (D305) — второе названное исключение: её "
-        "обработчики живут только в своём модуле, где заслон «только загруженный "
-        "черновик своего пространства» стоит у каждого пишущего"
+        "обработчики живут только в своих модулях загрузки, где заслон «только загруженный "
+        "черновик своего пространства» (`imports._only_import`) стоит у каждого"
     )
 
     for spec in TOOLS:
@@ -417,6 +423,9 @@ def test_содержимое_проверки_остаётся_нетронут
             continue
         if spec.kind == KIND_CHECKLIST_SOURCE:
             assert spec.handler.__module__ == "src.mcp.checklist_source", spec.name
+            continue
+        if spec.kind == KIND_MOVE:
+            assert spec.handler.__module__ == "src.mcp.move", spec.name
             continue
         if spec.kind == KIND_RATINGS:
             assert spec.handler.__module__ == "src.mcp.ratings_tools", spec.name

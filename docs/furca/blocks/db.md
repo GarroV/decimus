@@ -218,6 +218,15 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 - **Права.** Роль приложения: `select, insert, delete` и обновление только нужных колонок; администратор истории — `select, delete` (сброс чужой ступени, `reset_all`, `reset_by_login`). Матрицы — `tests/test_db_migrate_roles.py`.
 - Двери: `src/db/second_factor.py`; сессия знает `has_second_factor` и `passed_second_step` (`resolve_session`). Проверено `tests/test_db_second_factor.py`.
 
+### Журнал правок записей на приёмке (миграция `0081`, F-134, #1006)
+
+Вычитка на приёмке — базовая механика, и правит её и УК, и партнёр (решение владельца): правка не ограничивается, но каждая оставляет след.
+
+- `0081_inspection_edits.sql` — таблица `inspection_edits`: время, проверка, запись, пространство, учётка правившего (`user_id`, `login`, `role` на момент правки), вид (`revise` — исправление записи, `add` — добавление) и `changes` (jsonb) вида `{поле: {"old": ..., "new": ...}}` — только изменившиеся поля записи (`code`, `level`, `zone`, `zone_unusual`, `text`, `reading_c`) и оценка до и после (`score_pct`, `score_grade`, `score_deductions`). У добавленной записи `old` пуст. Отдельная таблица, а не `action_journal`: там действие обрезается до 120 знаков и «было → стало» не помещается.
+- **Одна транзакция.** Строку пишет `src/db/inspection_edits.py: record_edit` на курсоре самой правки (`revise.revise_finding`, `review_edit.add_finding`): откатилась правка — откатилась строка; правки без следа нет. Правящий (`Editor`) обязателен в обеих; веб берёт его из сессии (`app._editor`), а не из формы.
+- **Права.** Роли приложения выдан только `insert` (и `usage` на последовательность): ни `select`, ни `update`, ни `delete`. Читать журнал сейчас можно только под владельцем схемы; экрана и функции чтения нет.
+- Фото-правки (приложить, снять, заменить кадр) в этот журнал не пишутся: ни запись, ни оценка от них не меняются.
+
 ### Журналы входов и действий (миграция `0067`, D462)
 
 - `0067_journals.sql` — `web_sessions.ip`, `web_sessions.user_agent` (откуда открыта сессия); таблицы `login_journal` (каждая попытка входа: учётка или пусто, время, адрес, браузер до 200 знаков, способ `password | google | oauth-claude | personal-mcp-token | bot-link`, результат `ok | bad-password | frozen | unknown | rate-limited | refused`, номер сессии) и `action_journal` (изменяющее действие админа: учётка, роль и пространство на момент действия, дверь `web | mcp | bot`, чем вошёл, адрес, код действия, сводка цели, исход).

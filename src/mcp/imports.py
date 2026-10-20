@@ -35,7 +35,7 @@ import re
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import date
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ..db.models import ORIGIN_IMPORT, ORIGIN_LEGACY
 from ..domain.kinds import INSPECTION_KINDS
@@ -43,7 +43,7 @@ from ..domain.models import TEXT_LANGS
 from . import import_modes as modes
 from .checklist_layout import Store
 from .db_target import config_refusal
-from .errors import ToolError
+from .errors import McpError, ToolError
 from .retraction import _same_unit
 from .tools import _finding, _parse_date, _require_inspection_id
 
@@ -191,6 +191,79 @@ def _check_n(n: int) -> int:
     if isinstance(n, bool) or not isinstance(n, int) or n < 1:
         raise ToolError("Номер записи n — целое число от 1")
     return n
+
+
+# --- новая пиццерия ----------------------------------------------------------
+
+#: Отказы правила имени словами для агента: те же коды, что у веба (`unitnew.refused.*`).
+_UNIT_REFUSED = {
+    "empty": "Не названа пиццерия",
+    "too_long": "Название пиццерии слишком длинное (до {limit} знаков)",
+    "too_long_bytes": "Название пиццерии слишком длинное (до {limit} байт)",
+    "need_number": "У пиццерии нужен номер: «Город-N», например «Belgrade-3» (получено «{typed}»)",
+    "other_country": "«{name}» — город другой страны ({country}); заведите её там",
+    "unknown_country": "Страна «{country}» не из словаря сети — нужен код вроде RS, SI, ME",
+}
+
+
+def create_unit(
+    *,
+    tenant: str,
+    store: Store,
+    actor: str,
+    country: str,
+    name: str,
+    confirm_new_city: bool = False,
+) -> dict[str, object]:
+    """Завести пиццерию в справочник — по тем же правилам, что веб (`src/web/unit_add.py`).
+
+    Имя — `domain.unit_new.plan_new_unit` («Город-N» по-английски, чужая страна —
+    отказ, незнакомый город — только с `confirm_new_city`), запись —
+    `db.directory.create_unit` (дубль — отказ с существующей точкой).
+    """
+    from ..db import directory, unit_profiles
+    from ..db.errors import DbError, UnitExistsError
+    from ..domain.unit_match import Ref
+    from ..domain.unit_new import NewUnitRefused, plan_new_unit
+
+    del store, actor  # справочник общий; кто завёл — в журнале MCP
+    код_страны = _required(country, field="country", limit=8).upper()
+    написано = _required(name, field="name", limit=MAX_UNIT)
+    try:
+        строки = unit_profiles.by_country(код_страны)
+    except DbError:
+        # Подсказки справочника — необязательны, как и в вебе: без них заводим по имени.
+        logger.warning("Справочник пиццерий страны не прочитался", exc_info=True)
+        строки = ()
+    справочник = tuple(Ref(p.country_code, p.name, p.dodo_id, p.city, p.address) for p in строки)
+    try:
+        план = plan_new_unit(написано, country=код_страны, refs=справочник)
+    except NewUnitRefused as отказ:
+        raise ToolError(_UNIT_REFUSED.get(отказ.code, отказ.code).format(**отказ.params)) from отказ
+    if not план.known_city and not confirm_new_city:
+        город = план.name.rsplit("-", 1)[0]
+        raise ToolError(
+            f"Город «{город}» сети незнаком. Спросите человека, верно ли завести «{план.name}» "
+            f"({план.country}); если да — повторите create_unit с confirm_new_city=true"
+        )
+    try:
+        заведена = directory.create_unit(
+            план.name,
+            country=план.country,
+            city=план.city,
+            aliases=план.aliases,
+            code=план.code,
+            tenant=tenant,
+        )
+    except UnitExistsError as отказ:
+        raise ToolError(
+            f"Такая пиццерия уже есть: «{отказ.name}». Заводить не нужно — "
+            f"используйте это имя в unit"
+        ) from отказ
+    except DbError as отказ:
+        logger.exception("пиццерия %s не заведена в справочник", план.name)
+        raise McpError("Пиццерия не заведена: база не ответила") from отказ
+    return {"unit": план.name, "country": план.country, "id": заведена.id}
 
 
 # --- черновик -----------------------------------------------------------------
@@ -411,6 +484,33 @@ def _view(ident: str, *, tenant: str, note: str, warnings: Sequence[str] = ()) -
     }
 
 
+#: Поля короткого ответа записи (#1016). Полный вид — `import_get_inspection`.
+_SHORT_KEYS = ("id", "mode", "status", "note", "pct", "grade", "counts")
+
+
+def _short_view(
+    ident: str,
+    *,
+    tenant: str,
+    note: str,
+    n: int | None = None,
+    warnings: Sequence[str] = (),
+) -> dict[str, object]:
+    """Короткий ответ записи: затронутая находка и оценка, без списка и разбивок (#1016).
+
+    Весь список находок, вычеты и разбивка по зонам каждый раз раздували ответ и
+    контекст агента; они остаются в `import_get_inspection`.
+    """
+    полный = _view(ident, tenant=tenant, note=note)
+    находки = cast("list[dict[str, object]]", полный["findings"])
+    return {
+        **{k: полный[k] for k in _SHORT_KEYS},
+        "finding": next((f for f in находки if f.get("n") == n), None),
+        "warnings": list(warnings),
+        "findings_total": len(находки),
+    }
+
+
 def _legacy_view(
     detail: InspectionDetail, шапка: Any, *, note: str, warnings: Sequence[str]
 ) -> dict[str, object]:
@@ -496,26 +596,27 @@ def _wording(text: str | None, comment: str | None) -> Any:
     )
 
 
-def import_add_finding(
+def add_one(
     *,
     tenant: str,
     store: Store,
-    actor: str,
-    inspection_id: str,
+    ident: str,
+    шапка: Any,
     text: str,
     code: str | None = None,
     level: str | None = None,
     zone: str | None = None,
     comment: str | None = None,
     repeat: bool = False,
-) -> dict[str, object]:
-    """Добавить запись в черновик: текущая — через движок, историческая — как в отчёте."""
+) -> tuple[int, list[str]]:
+    """Записать одну находку: номер и предупреждения. Общий путь `import_add_finding(s)`.
+
+    Проверку делает ровно этот код — поштучный и пакетный инструменты не
+    расходятся в том, что пускают в черновик.
+    """
     from ..db import imports as db
     from ..db import imports_legacy as legacy
 
-    del actor
-    ident = _require_inspection_id(inspection_id)
-    _, шапка = _only_import(ident, tenant=tenant)
     слова = _wording(text, comment)
     if not (слова.text or ""):
         raise ToolError("Формулировка записи text пуста — запись без слов в отчёт не идёт")
@@ -528,12 +629,7 @@ def import_add_finding(
         )
         with _db():
             n = legacy.add_legacy_finding(ident, tenant=tenant, finding=запись, wording=слова)
-        return _view(
-            ident,
-            tenant=tenant,
-            note=f"finding #{n} added",
-            warnings=modes.soft_warnings(store, code=запись.code, zone=запись.zone),
-        )
+        return n, modes.soft_warnings(store, code=запись.code, zone=запись.zone)
     code, level, zone = _engine_triple(code, level, zone)
     args = [
         "add",
@@ -549,7 +645,41 @@ def import_add_finding(
     ]
     with _db():
         n, _ = db.add_finding(ident, tenant=tenant, wording=слова, apply=_engine(args))
-    return _view(ident, tenant=tenant, note=f"finding #{n} added")
+    return n, []
+
+
+def import_add_finding(
+    *,
+    tenant: str,
+    store: Store,
+    actor: str,
+    inspection_id: str,
+    text: str,
+    code: str | None = None,
+    level: str | None = None,
+    zone: str | None = None,
+    comment: str | None = None,
+    repeat: bool = False,
+) -> dict[str, object]:
+    """Добавить запись в черновик: текущая — через движок, историческая — как в отчёте."""
+    del actor
+    ident = _require_inspection_id(inspection_id)
+    _, шапка = _only_import(ident, tenant=tenant)
+    n, предупреждения = add_one(
+        tenant=tenant,
+        store=store,
+        ident=ident,
+        шапка=шапка,
+        text=text,
+        code=code,
+        level=level,
+        zone=zone,
+        comment=comment,
+        repeat=repeat,
+    )
+    return _short_view(
+        ident, tenant=tenant, note=f"finding #{n} added", n=n, warnings=предупреждения
+    )
 
 
 def _engine_triple(code: str | None, level: str | None, zone: str | None) -> tuple[str, str, str]:
@@ -612,7 +742,50 @@ def import_edit_finding(
         )
     with _db():
         db.edit_finding(ident, номер, tenant=tenant, wording=слова, apply=_engine(args))
-    return _view(ident, tenant=tenant, note=f"finding #{номер} edited")
+    return _short_view(ident, tenant=tenant, note=f"finding #{номер} edited", n=номер)
+
+
+def import_edit_inspection(
+    *,
+    tenant: str,
+    store: Store,
+    actor: str,
+    inspection_id: str,
+    date: str | None = None,
+    unit: str | None = None,
+    auditor: str | None = None,
+    kind: str | None = None,
+    second_visit: bool = False,
+) -> dict[str, object]:
+    """Исправить шапку черновика до принятия: дата, пиццерия, аудитор, вид. Оценка та же."""
+    from ..db import imports as db
+
+    del store, actor
+    ident = _require_inspection_id(inspection_id)
+    _only_import(ident, tenant=tenant)
+    день = _parse_date(date, field="date") if date is not None else None
+    if день is not None and день > _today():
+        raise ToolError(
+            f"Дата {день.isoformat()} в будущем. Загружаются прошедшие проверки — дата обхода "
+            f"из старого отчёта"
+        )
+    точка = None if unit is None else _required(unit, field="unit", limit=MAX_UNIT)
+    аудитор = None if auditor is None else _required(auditor, field="auditor", limit=MAX_AUDITOR)
+    if kind is not None and kind not in INSPECTION_KINDS:
+        raise ToolError(f"Вид проверки kind — один из: {', '.join(INSPECTION_KINDS)}")
+    if день is None and точка is None and аудитор is None and kind is None:
+        raise ToolError("Нечего менять: назовите хотя бы одно из date, unit, auditor, kind")
+    with _db():
+        db.edit_head(
+            ident,
+            tenant=tenant,
+            day=день,
+            unit=точка,
+            auditor=аудитор,
+            kind=kind,
+            second_visit=bool(second_visit),
+        )
+    return _short_view(ident, tenant=tenant, note="draft header edited")
 
 
 def _edit_legacy(
@@ -643,10 +816,11 @@ def _edit_legacy(
             finding=legacy.LegacyFinding(**итог),
             wording=wording,
         )
-    return _view(
+    return _short_view(
         detail.inspection.id,
         tenant=tenant,
         note=f"finding #{n} edited",
+        n=n,
         warnings=modes.soft_warnings(store, code=итог["code"], zone=итог["zone"]),
     )
 
@@ -670,7 +844,7 @@ def import_remove_finding(
                 ident, номер, tenant=tenant, apply=_engine(["drop", str(номер)])
             )
     _forget(кадры)
-    return _view(ident, tenant=tenant, note=f"finding #{номер} removed")
+    return _short_view(ident, tenant=tenant, note=f"finding #{номер} removed")
 
 
 # --- кадры (D309) -------------------------------------------------------------
@@ -801,6 +975,7 @@ def import_accept_inspection(
     with _db(accept=True):
         accept_inspection(ident, tenant=tenant, actor=actor)
     история = шапка.origin == ORIGIN_LEGACY
+    итог = {} if история else _finish(ident, tenant=tenant)
     return {
         "id": ident,
         "mode": _mode_of(шапка.origin),
@@ -810,18 +985,116 @@ def import_accept_inspection(
         "grade": detail.inspection.grade or None,
         "accepted_by": actor,
         **({} if история else _comparison(detail, шапка)),
+        **итог,
         "status": (
             "accepted: the inspection is now in the unit's history next to the others "
             "(get_inspection, unit_history, network_summary). "
             + (
-                "Its score stays exactly as in the old report — it is never recomputed. "
+                "Its score stays exactly as in the old report — it is never recomputed, "
+                "and there is no PDF report or partner letter for a historical inspection. "
                 if история
-                else ""
+                else "report_url opens the PDF report (with the findings' photos), letter is the "
+                "partner letter text — both are only returned, never sent. "
             )
-            + "No action-plan request was opened, there is no partner letter for it, and "
-            "nothing was sent to anyone. It can no longer be edited or discarded"
+            + "No action-plan request was opened and nothing was sent to anyone. "
+            "It can no longer be edited or discarded"
         ),
     }
+
+
+def _report_url(ident: str) -> str | None:
+    """Абсолютный адрес отчёта в вебе — из `ADMIN_PUBLIC_URL`; не задан или кривой — `None`."""
+    import os
+
+    from ..domain.public_urls import ADMIN_PUBLIC_URL_VAR, parse_public_url
+
+    try:
+        base = parse_public_url(
+            os.environ.get(ADMIN_PUBLIC_URL_VAR) or "", var=ADMIN_PUBLIC_URL_VAR
+        )
+    except ValueError:
+        return None
+    return f"{base}/inspections/{ident}/report" if base else None
+
+
+def _report_photos(detail: InspectionDetail, *, tenant: str) -> tuple[dict[int, list[bytes]], int]:
+    """Кадры записей для PDF: номер записи → байты копий; второе — сколько не скачалось.
+
+    Тем же путём, что веб отдаёт кадр (`db.previews`). Сбой кадра или хранилища —
+    не отказ отчёта: PDF собирается без него, а счёт идёт в предупреждение.
+    """
+    from ..db import previews
+    from ..db.errors import DbError
+    from ..db.reach import own_reach
+
+    reach = own_reach(tenant)
+    try:
+        по_записям = previews.finding_previews(detail.inspection.id, reach=reach)
+        хранилище: Any = _photo_storage() if по_записям else None
+    except DbError:
+        logger.warning("кадры проверки %s для отчёта не прочитаны", detail.inspection.id)
+        return {}, -1
+    номера = {f.id: f.n for f in detail.findings}
+    кадры: dict[int, list[bytes]] = {}
+    не_скачано = 0
+    for запись, показ in по_записям.items():
+        не_скачано += показ.missing
+        for фото_id in показ.shown:
+            try:
+                байты = previews.preview_bytes(
+                    detail.inspection.id, фото_id, reach=reach, storage=хранилище
+                )
+            except (DbError, OSError):
+                байты = None
+            if not байты or запись not in номера:
+                не_скачано += 1
+                continue
+            кадры.setdefault(номера[запись], []).append(байты)
+    return кадры, не_скачано
+
+
+def _finish(ident: str, *, tenant: str) -> dict[str, object]:
+    """Готовые отчёт и письмо для принятой «текущей» проверки — как бот на сдаче.
+
+    Приёмка к этому моменту уже состоялась и не откатывается: сбой сборки или
+    выгрузки PDF называется в `pdf_error`, сбой письма — в `letter_error`.
+    Ничего никуда не отправляется — всё возвращается в ответе.
+    """
+    from ..db import reports
+    from ..db.errors import DbError
+    from ..report import detail_pdf
+    from ..report.errors import ReportError
+    from .letters import build, sources
+
+    итог: dict[str, object] = {"report_url": None, "pdf_error": None, "pdf_warning": None}
+    try:
+        detail, _ = _read(ident, tenant=tenant)
+        papers = sources()
+        фото, не_скачано = _report_photos(detail, tenant=tenant)
+        if не_скачано:
+            итог["pdf_warning"] = (
+                "Some photos could not be fetched from storage — the PDF is built without them"
+            )
+        данные = detail_pdf.build_bytes(detail, lang=None, papers=papers, photos=фото)
+        with _db(accept=True):
+            reports.upload_report(ident, data=данные)
+        итог["report_url"] = _report_url(ident)
+        if итог["report_url"] is None:
+            итог["pdf_error"] = "PDF saved, but ADMIN_PUBLIC_URL is not set — no absolute link"
+    except (ReportError, ToolError, DbError, OSError) as exc:
+        logger.warning("отчёт принятой проверки %s не собран: %s", ident, exc)
+        итог["pdf_error"] = str(exc)
+    try:
+        detail, _ = _read(ident, tenant=tenant)
+        письмо = build(detail, lang=None, papers=sources())
+        итог["letter"] = письмо["letter"]
+        итог["letter_ready_to_send"] = письмо["ready_to_send"]
+        итог["letter_not_restored"] = письмо["not_restored"]
+    except (ReportError, ToolError) as exc:
+        logger.warning("письмо принятой проверки %s не собрано: %s", ident, exc)
+        итог["letter"] = None
+        итог["letter_error"] = str(exc)
+    return итог
 
 
 def import_discard_draft(

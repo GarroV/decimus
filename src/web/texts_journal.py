@@ -14,6 +14,10 @@ _WEB: dict[str, tuple[str, str]] = {
     "actions_due": ("Срок по запросу экшн-плана", "Action plan request due date"),
     "actions_new": ("Запрос экшн-плана", "Action plan requested"),
     "actions_review": ("Вердикт по экшн-плану", "Action plan verdict"),
+    "photo_upload_post": (
+        "Загружены фото к черновику по ссылке",
+        "Photos uploaded to a draft by link",
+    ),
     "add_space": ("Заведено пространство партнёра", "Partner space added"),
     "add_user": ("Заведена учётка", "Account created"),
     "bot_unlink": ("Отвязан бот у человека", "Bot unlinked for a person"),
@@ -180,14 +184,25 @@ _MCP: dict[str, tuple[str, str]] = {
     "apply_checklist": ("Чек-лист применён к проду", "Checklist applied to production"),
     "import_ratings": ("Загружены рейтинги", "Ratings uploaded"),
     "request_aggregators_update": ("Обновление оценок агрегаторов", "Aggregator ratings update"),
+    "create_unit": ("Заведена пиццерия через Claude", "Unit created via Claude"),
     "import_create_inspection": (
         "Создан черновик старой проверки",
         "Legacy inspection draft created",
     ),
     "import_add_finding": ("Добавлено нарушение в черновик", "Finding added to a draft"),
+    "import_add_findings": (
+        "Добавлены нарушения в черновик пакетом",
+        "Findings added to a draft in a batch",
+    ),
     "import_edit_finding": ("Изменено нарушение в черновике", "Finding edited in a draft"),
+    "import_edit_inspection": ("Исправлена шапка черновика", "Draft header edited"),
+    "move_inspection": ("Перенесена проверка (дата/пиццерия)", "Inspection moved (date/unit)"),
     "import_remove_finding": ("Удалено нарушение из черновика", "Finding removed from a draft"),
     "import_add_photo": ("Добавлено фото в черновик", "Photo added to a draft"),
+    "import_photo_upload_link": (
+        "Выдана ссылка загрузки фото к черновику",
+        "Photo upload link issued for a draft",
+    ),
     "import_accept_inspection": ("Принята загруженная проверка", "Imported inspection accepted"),
     "import_discard_draft": ("Отброшен черновик проверки", "Inspection draft discarded"),
 }

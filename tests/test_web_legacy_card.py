@@ -112,3 +112,34 @@ def test_у_обхода_кнопка_письма_на_месте(
     страница = стенд.get(f"/inspections/{деталь.inspection.id}?lang=ru").get_data(as_text=True)
     assert f"/inspections/{деталь.inspection.id}/letter" in страница
     assert "Экшн-план" in страница
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+@pytest.mark.parametrize(
+    ("поля", "ждём", "не_ждём"),
+    [
+        (
+            {"origin": "import", "accepted_at": "2026-10-19T09:30:00+00:00", "accepted_by": "anna"},
+            ("Через Claude", "Принята: anna · 2026-10-19 09:30"),
+            ("Через бота",),
+        ),
+        ({"origin": "field"}, ("Через бота",), ("Через Claude",)),
+        ({"origin": "import", "on_review": True}, ("Через Claude", "Ждёт приёмки"), ()),
+    ],
+)
+def test_шапка_карточки_говорит_откуда_проверка_и_кем_принята(
+    стенд: FlaskClient,
+    monkeypatch: pytest.MonkeyPatch,
+    поля: dict[str, object],
+    ждём: tuple[str, ...],
+    не_ждём: tuple[str, ...],
+) -> None:
+    деталь = карточка(шапка(**поля))
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)
+
+    страница = стенд.get(f"/inspections/{деталь.inspection.id}?lang=ru").get_data(as_text=True)
+
+    for строка in ждём:
+        assert строка in страница
+    for строка in не_ждём:
+        assert строка not in страница

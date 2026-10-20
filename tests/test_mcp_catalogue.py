@@ -24,7 +24,13 @@ import inspect
 from mcp_places import сверить
 
 from src.mcp import checklist_source as checklist_source_module
-from src.mcp import checklist_tools, checklists_tools
+from src.mcp import (
+    checklist_tools,
+    checklists_tools,
+    import_batch,
+    import_photo_link,
+    import_suggest,
+)
 from src.mcp import imports as imports_module
 from src.mcp import phrases as phrases_module
 from src.mcp import retraction as retraction_module
@@ -34,6 +40,7 @@ from src.mcp.catalogue import (
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
     KIND_INSPECTIONS,
+    KIND_MOVE,
     KIND_RATINGS,
     KIND_RATINGS_READ,
     KIND_RETRACTION,
@@ -136,13 +143,18 @@ from src.mcp.catalogue import (
 #: лишь загруженные черновики своего пространства — это держит замок строки
 #: (`src/db/imports.py`) и `tests/test_db_imports.py`.
 ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ = {
+    "create_unit",
     "import_create_inspection",
     "import_add_finding",
+    "import_add_findings",
+    "import_suggest_items",
     "import_edit_finding",
+    "import_edit_inspection",
     "import_remove_finding",
     "import_get_inspection",
     "import_list_drafts",
     "import_add_photo",
+    "import_photo_upload_link",
     "import_accept_inspection",
     "import_discard_draft",
 }
@@ -150,6 +162,8 @@ from src.mcp.catalogue import (
 #: Загрузка рейтингов (D320) и заявка на обновление агрегаторов (D420). Своим
 #: модулем и своим видом: пишет в схему `ratings` и `agg`, а не в проверки и не в
 #: методику; открыта только токену УК.
+ИМЕНА_ИНСТРУМЕНТОВ_ИСПРАВЛЕНИЯ = {"move_inspection"}
+
 ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ = {"import_ratings", "request_aggregators_update"}
 
 #: Чтение рейтингов (D420): открыто любому токену, охват ставит обработчик; записи нет.
@@ -169,6 +183,7 @@ from src.mcp.catalogue import (
     | ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ
     | ИМЕНА_ИНСТРУМЕНТОВ_ЧЕКЛИСТОВ
     | ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ
+    | ИМЕНА_ИНСТРУМЕНТОВ_ИСПРАВЛЕНИЯ
     | ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ
 )
 
@@ -206,7 +221,7 @@ from src.mcp.catalogue import (
 }
 
 
-def test_каталог_содержит_ровно_пятьдесят_семь_инструментов_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_шестьдесят_два_инструмента_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
     инструмент, к которому агент внезапно теряет доступ.
     42 + 9 загрузки (D305) + 2 управления рейтингами (D320, D420) + 3 чтения
@@ -216,7 +231,7 @@ def test_каталог_содержит_ровно_пятьдесят_семь_
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 57
+    assert len(TOOLS) == 63
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -300,6 +315,8 @@ def test_вид_инструмента_соответствует_его_гру�
             assert spec.kind == KIND_RETRACTION, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ:
             assert spec.kind == KIND_IMPORT, spec.name
+        elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ИСПРАВЛЕНИЯ:
+            assert spec.kind == KIND_MOVE, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ:
             assert spec.kind == KIND_RATINGS, spec.name
         elif spec.name in ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ:
@@ -367,7 +384,14 @@ def test_обработчик_взят_из_правильного_модуля(
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ:
             assert spec.handler.__module__ == retraction_module.__name__, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ:
-            assert spec.handler.__module__ == imports_module.__name__, spec.name
+            assert spec.handler.__module__ in {
+                imports_module.__name__,
+                import_photo_link.__name__,
+                import_suggest.__name__,
+                import_batch.__name__,
+            }, spec.name
+        elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ИСПРАВЛЕНИЯ:
+            assert spec.handler.__module__ == "src.mcp.move", spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ:
             assert spec.handler.__module__ == "src.mcp.ratings_tools", spec.name
         elif spec.name in ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ:
@@ -393,7 +417,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 57
+    assert len(перечень) == 63
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

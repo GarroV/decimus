@@ -56,6 +56,8 @@ from src.mcp.rpc import handle
 #: Годные аргументы каждого инструмента: доводят до успеха там, где стенд
 #: собран, и до отказа окружения там, где он сломан.
 ГОДНЫЕ: dict[str, dict[str, Any]] = {
+    # Страна не из словаря: отказ правила имени до записи — стенд не пополняется.
+    "create_unit": {"country": "XX", "name": "Белград-1"},
     "import_create_inspection": {
         "unit": "Белград-1",
         "date": "2024-03-15",
@@ -68,6 +70,23 @@ from src.mcp.rpc import handle
         "level": "D1",
         "zone": "fridge",
         "text": "пол в пятнах",
+    },
+    "import_add_findings": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "findings": [{"text": "пол в пятнах", "code": "CLN01", "level": "D1", "zone": "fridge"}],
+    },
+    "import_suggest_items": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "text": "пол в пятнах",
+    },
+    "import_edit_inspection": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "date": "2020-01-01",
+    },
+    "move_inspection": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "date": "2020-01-01",
+        "reason": "опечатка",
     },
     "import_edit_finding": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
@@ -83,6 +102,7 @@ from src.mcp.rpc import handle
         "image_base64": "aGVsbG8=",
         "mime": "image/jpeg",
     },
+    "import_photo_upload_link": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
     "import_accept_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "confirm_unit": "Белград-1",
@@ -222,6 +242,7 @@ from src.mcp.rpc import handle
 #: Инструменты методики здесь отказывают ДО движка намеренно: отказ движка
 #: стоит трёх подпроцессов, а годные аргументы через него и так проходят.
 НЕГОДНЫЕ: dict[str, dict[str, Any]] = {
+    "create_unit": {"country": "XX", "name": "Белград-1"},
     "import_create_inspection": {
         "unit": "Белград-1",
         "date": "2024-03-15",
@@ -236,7 +257,11 @@ from src.mcp.rpc import handle
         "zone": "fridge",
         "text": "x",
     },
+    "import_add_findings": {"inspection_id": "не-uuid", "findings": [{"text": "x"}]},
+    "import_suggest_items": {"inspection_id": "не-uuid", "text": "x"},
     "import_edit_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": 0},
+    "import_edit_inspection": {"inspection_id": "не-uuid"},
+    "move_inspection": {"inspection_id": "не-uuid", "reason": "x"},
     "import_remove_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": -1},
     "import_get_inspection": {"inspection_id": "не-uuid"},
     "import_list_drafts": {},
@@ -246,6 +271,7 @@ from src.mcp.rpc import handle
         "image_base64": "@@@",
         "mime": "image/gif",
     },
+    "import_photo_upload_link": {"inspection_id": "не-uuid"},
     "import_accept_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "confirm_unit": "Белград-1",

@@ -43,7 +43,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Повтор | Нарушение, которое было в прошлой проверке точки и не устранено; вычитает вдвое. Действует в момент расчёта и задним числом ничего не меняет | `docs/02-domain.md`, `src/bot/repeats.py` |
 | Кадр | Фотография к записи; хранится в S3-совместимом хранилище, в вебе показывается сжатой копией | `src/db/photos.py`, `src/db/previews.py`, `src/db/storage.py` |
 | Словарь синонимов (`photo-cues`; в коде и старых записях — «карта кадров», «карта слов») | Данные методики: какими словами аудитор называет нарушение или объект → какой пункт и какая зона за ними стоят. Нужна быстрому пути разбора, без неё каждый комментарий уходит в модель | `src/recognize/cues.py`, `src/recognize/fastpath.py`, `docs/furca/blocks/recognize.md` |
-| Сдача, приёмка | Аудитор сдаёт проверку (`handover`); она лежит в базе `draft` на приёмке — её вычитывают, правят с пересчётом оценки и подтверждают, после чего она `finalized` и заморожена политиками базы | `src/domain/handover.py`, `src/db/accept.py`, `src/db/revise.py`, `src/web/review.py` |
+| Сдача, приёмка | Аудитор сдаёт проверку (`handover`); она лежит в базе `draft` на приёмке — её вычитывают, правят с пересчётом оценки (правит и УК, и партнёр; каждая правка пишется в журнал правок `inspection_edits` в той же транзакции: кто, когда, было → стало) и подтверждают, после чего она `finalized` и заморожена политиками базы | `src/domain/handover.py`, `src/db/accept.py`, `src/db/revise.py`, `src/db/inspection_edits.py`, `src/web/review.py` |
 | Снятие | Отзыв сданной проверки из истории: помечается, не удаляется, причина обязательна. Делает только роль «администратор истории» | `src/db/retract.py`, `src/mcp/retraction.py`, `docs/furca/blocks/db.md` |
 | Перенос | Смена даты и пиццерии у проверки; история каждой правки пишется самой базой | `src/db/move.py` |
 | Legacy-проверка | Историческая проверка, загруженная из старого отчёта (`origin = 'legacy'`): оценка переносится как есть и нигде не пересчитывается | `src/db/imports_legacy.py`, `src/mcp/imports.py`, `docs/14-history-import.md` |
@@ -164,7 +164,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,model_key_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,photo_upload,account_menu,accounts,auth,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,model_key_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -187,6 +187,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
 | `src/web/passkey_login.py` | Вход ключом доступа без логина (D485): ключ открывает сессию сам, без второй ступени |
 | `src/web/people.py` | Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399) |
+| `src/web/photo_upload.py` | Загрузка кадров к черновику загрузки проверки по подписанной ссылке (мимо Claude) |
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
 | `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами — и кому из соседей верить |
 | `src/web/reauth.py` | Свежий вход для действий, создающих долгоживущий доступ (аудит безопасности 12.10) |
@@ -234,6 +235,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
 | `src/web/texts_model_key.py` | Тексты блока «Ключ модели» на вкладке «Подключения» (D491) |
 | `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках» |
+| `src/web/texts_photo_upload.py` | Тексты страницы загрузки кадров к черновику по ссылке из Claude (`photo_upload.py`) |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2) и раздела «Действия» (D526): вкладка, панель, блоки, карточки |
 | `src/web/texts_prescriptions.py` | Тексты предписаний (волна 3): раздел УК, раздел партнёра, блок экрана страны |
 | `src/web/texts_ratings.py` | Тексты раздела «Рейтинги» и подраздела «Загрузки» (спека 2026-10-08) |
@@ -283,7 +285,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 22 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, … (+14) |
+| `src/web/templates/` | 23 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, … (+15) |
 | `src/web/templates/actions/` | 9 | _filters.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, index.html, prescription_form.html, … (+1) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
@@ -344,7 +346,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -356,9 +358,11 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/finish_modes.py` | Режим «Завершить» в мини-аппе, выбранный аудитором (D449): чтение и запись |
 | `src/db/imports.py` | Загрузка проверки задним числом поштучно: черновик, записи, кадры (D305–D310, D334) |
 | `src/db/imports_legacy.py` | Записи исторической проверки (`origin = 'legacy'`, D332): без движка |
+| `src/db/inspection_edits.py` | Журнал правок записей проверки на приёмке (F-134, `0081`) |
 | `src/db/letters.py` | T333 (#310): письмо партнёру, зафиксированное человеком |
 | `src/db/mcp_access.py` | Личный доступ к MCP: токены учёток сайта (T253, D098; аудит 12.10, D448) |
 | `src/db/move.py` | Перенос проверки по дате и пиццерии — с историей каждой правки (D195) |
+| `src/db/photo_intake.py` | Приём кадра по ссылке загрузки: тип — по сигнатуре байт, а не по имени и заголовку клиента |
 | `src/db/push.py` | T093: слив завершённой проверки в базу |
 | `src/db/queries.py` | Чтение уже слитых проверок |
 | `src/db/reach.py` | Охват чтения: что видит пространство (волна 1, #340; D283, D284, D289) |
@@ -489,6 +493,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0078_model_usage.sql` | Расход модели (D537): одна строка на каждый вызов провайдера — когда, какого вида, какая модель, сколько токенов на входе и выходе (или секунд звука), кто спросил, в… |
 | `0079_units_merged_into.sql` | D538: название пиццерии — латиницей по справочнику (`unit_profiles`); другие написания («Тбилиси-1») — только синонимы |
 | `0080_ratings_layout_compare.sql` | D551 (#972): блок «Сравнение девелоперов и стран» на «Рейтингах» — только УК |
+| `0081_inspection_edits.sql` | Журнал правок записей проверки на приёмке (аудит F-134, #1006) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -513,13 +518,18 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/mcp/config.py` | Окружение MCP-сервера: чей токен, чьи проверки, на каком адресе слушать |
 | `src/mcp/db_target.py` | Непригодное окружение базы — «не задано» или «ведёт не туда» (#521) |
 | `src/mcp/errors.py` | Отказы блока `mcp` |
+| `src/mcp/import_batch.py` | `import_add_findings`: пакетная запись подтверждённых находок (#1017) |
 | `src/mcp/import_catalogue.py` | Каталог инструментов загрузки проверок задним числом (D305–D310, D332–D335): описания для агента |
 | `src/mcp/import_modes.py` | Два режима загрузки проверок задним числом (D332, D334): что каждый принимает |
+| `src/mcp/import_photo_link.py` | `import_photo_upload_link`: ссылка, по которой кадры к черновику идут мимо модели |
+| `src/mcp/import_suggest.py` | `import_suggest_items`: подбор пунктов чек-листа по словам находки (#1015) |
 | `src/mcp/imports.py` | Инструменты загрузки проверок задним числом поштучно (D305–D310, D332–D335) |
 | `src/mcp/info_part.py` | Информационная часть записанной проверки в карточке чтения (T207) |
 | `src/mcp/install.py` | Скрипт установки, который сервер отдаёт по публичному GET (#244, D112) |
+| `src/mcp/instructions.py` | Текст `instructions` рукопожатия MCP: как вести загрузку проверки (#1018) |
 | `src/mcp/letters.py` | Письмо партнёру по записанной проверке — для протокола MCP |
 | `src/mcp/methodologies.py` | Какими методиками оценены проверки ряда — справка, а не запрет (D365) |
+| `src/mcp/move.py` | Инструмент «исправить дату или пиццерию проверки» (D195) — та же функция, что у веба |
 | `src/mcp/photo_cues.py` | Карта слов: правка через агента, версиями (T144, issue #115) |
 | `src/mcp/phrases.py` | Карта синонимов формулировок глазами управляющей компании (T294) |
 | `src/mcp/policy.py` | Права MCP по роли учётки сайта — по той же матрице, что веб и бот (D408, D417) |
@@ -710,6 +720,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
 | `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |
+| `src/domain/photo_upload_link.py` | Ссылка загрузки кадров к черновику загрузки проверки: подписанный токен с жизнью в 2 часа |
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
 | `src/domain/route.py` | Маршрут обхода: в каком порядке аудитор идёт по зонам и по пунктам внутри них |
@@ -759,6 +770,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/shortlist.py` | T030: перечень кандидатов, который уходит в запрос к модели |
 | `src/recognize/transcribe.py` | T033: голосовое сообщение аудитора → текст |
 | `src/recognize/translate.py` | Перевод свободного текста аудитора на язык отчёта (D394, #542) |
+| `src/recognize/zone_words.py` | Зона из слов аудитора: обиходные названия мест и разбор текста (T124, D047, D048) |
 <!-- map:end -->
 
 ## src/report — отчёт и письмо
@@ -770,6 +782,7 @@ Telegram, ни HTTP, ни SQL.
 | Файл | Что делает |
 |---|---|
 | `src/report/build.py` | Сборка отчёта и письма партнёру |
+| `src/report/detail_pdf.py` | PDF-отчёт по записанной в базе проверке — для загруженной «текущей» (D334) |
 | `src/report/engine.py` | Вызов `engine/report.py` подпроцессом — единственный способ собрать отчёт |
 | `src/report/engine_call.py` | Общее для тех, кто зовёт движок подпроцессом: где он лежит, сколько ждать, что печатать |
 | `src/report/errors.py` | Отказы блока `report` |

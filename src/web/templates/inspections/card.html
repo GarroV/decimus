@@ -9,7 +9,7 @@
   записаны, а подписи вокруг — на языке интерфейса. Это разные языки, и
   смешивать их нельзя (`CLAUDE.md`).
 #}{% extends "base.html" %}
-{% from "inspections/_card_parts.html" import card_actions, accept_badge, grade_reason, explain_block with context %}
+{% from "inspections/_card_parts.html" import card_actions, accept_badge, provenance, grade_reason, explain_block with context %}
 {% from "inspections/_card_body.html" import card_body with context %}
 {% block title %}{{ head.unit_name }}{% endblock %}
 {% block head %}{% if may_revise %}<script src="{{ url_for('static', filename='proofread.js') }}" defer></script>{% endif %}{% endblock %}
@@ -20,7 +20,7 @@
     <a class="back" href="{{ url('/inspections') }}?lang={{ lang }}">‹ {{ t('card.back') }}</a>
   </div>
   {% if not report and not failure %}
-    <div class="note mt-gap"><div><div class="note__text">{{ t('card.report.none') if report_known else t('card.report.unknown') }}</div></div></div>
+    <div class="note mt-gap"><div><div class="note__text">{{ t('card.report.none.' ~ head.origin if head.origin != 'field' else 'card.report.none') if report_known else t('card.report.unknown') }}</div></div></div>
   {% endif %}
 
   {% if notice %}
@@ -76,6 +76,7 @@
       <div class="head-line__grow">
         <div class="card__title">{{ head.unit_name }}</div>
         <div class="card__meta">{{ t('card.meta', date=day(head.inspection_date), kind=kind, checklist=checklist_name) }}</div>
+        {{ provenance(head) }}
         {# Сколько вычтено — одной строкой; записи по классам — метками в шапке
            списка записей (D401), не второй раз здесь. #}
         {% if not head.is_legacy %}

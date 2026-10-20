@@ -53,6 +53,7 @@ READ_ONLY_TOOLS = frozenset(
         "aggregators_status",
         "import_get_inspection",
         "import_list_drafts",
+        "import_suggest_items",
     }
 )
 

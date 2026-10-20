@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import imports
+from . import import_batch, import_photo_link, import_suggest, imports
 
 _ID: dict[str, object] = {
     "type": "string",
@@ -122,6 +122,38 @@ def _schema(properties: dict[str, object], required: list[str]) -> dict[str, obj
 
 IMPORT_TOOLS: tuple[ImportTool, ...] = (
     ImportTool(
+        name="create_unit",
+        description=(
+            "Add a NEW unit (pizzeria) to the unit directory — for when "
+            "import_create_inspection says the unit does not exist. Ask the person to "
+            "confirm before calling. The name follows the network rule: 'City-N' in "
+            "English (e.g. 'Belgrade-3'); a city of another country is refused. An "
+            "unfamiliar city is refused until the person confirms it — then repeat the "
+            "call with confirm_new_city=true. A unit that already exists is refused and "
+            "named. Returns the canonical unit name and country: use exactly that name "
+            "as unit afterwards."
+        ),
+        input_schema=_schema(
+            {
+                "country": {
+                    "type": "string",
+                    "description": "Country code of the network, e.g. RS, SI, ME.",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Unit name as the person wrote it, e.g. 'Belgrade 3'.",
+                },
+                "confirm_new_city": {
+                    "type": "boolean",
+                    "description": "true only after the person confirmed that the city is "
+                    "new to the network. Default false.",
+                },
+            },
+            ["country", "name"],
+        ),
+        handler=imports.create_unit,
+    ),
+    ImportTool(
         name="import_create_inspection",
         description=(
             "Start entering ONE inspection after the fact: creates a DRAFT with no "
@@ -138,9 +170,11 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "current version of the reference checklist automatically; naming another "
             "checklist or an older version is refused. reported_pct/reported_grade are "
             "optional and used only to compare with the engine's score.\n\n"
-            "The unit must already exist in the unit directory: imports never create "
-            "units. Next: add each finding with import_add_finding, review with "
-            "import_get_inspection, then import_accept_inspection."
+            "The unit must already exist in the unit directory. If it does not, tell the "
+            "person and offer to create it with create_unit (only with their "
+            "confirmation), then continue here. Next: add each finding with "
+            "import_add_finding, review with import_get_inspection, then "
+            "import_accept_inspection."
         ),
         input_schema=_schema(
             {
@@ -245,7 +279,11 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "level). The score does NOT change: it stays as in the old report. Unknown "
             "codes/zones come back as warnings — show them to the person.\n\n"
             "One call per finding, as the person confirms it. Never invent findings, "
-            "codes, classes or zones the report does not state — ask the person instead."
+            "codes, classes or zones the report does not state — find the item with "
+            "import_suggest_items first, then ask the person instead of guessing.\n"
+            "The answer is short: the added finding, score (pct, grade), counts, warnings "
+            "and findings_total. The full list, deductions and per-zone breakdown are in "
+            "import_get_inspection."
         ),
         input_schema=_schema(
             {
@@ -262,6 +300,87 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         handler=imports.import_add_finding,
     ),
     ImportTool(
+        name="import_suggest_items",
+        description=(
+            "Read-only: suggest up to 5 checklist items for ONE finding, by the word map "
+            "of the draft's checklist edition. Call it for every finding BEFORE "
+            "import_add_finding, instead of browsing checklist_items and listing items to "
+            "the person.\n"
+            "Input: inspection_id, text (the finding's wording or what was seen/said), "
+            "optional zone (a place code; narrows the fallback to that zone's items).\n"
+            "Answer: candidates (code, question in the report language, allowed levels, "
+            "brief D1/D2/D3 criteria, single_level, source = cue_map or zone), single "
+            "(true when the word map named exactly ONE item: put it in the summary "
+            "without asking which item), zone_guess (when the word map names a place and "
+            "zone was not given). Candidates found by the word map "
+            "come first; the zone's items are added only if fewer than 3 were found. "
+            "Service items are never offered. If the word map finds nothing the answer says "
+            "so with an empty or zone-only list — then search with checklist_items or ask "
+            "the person; never guess an item.\n"
+            "A suggestion is not a decision: show the person 1-3 options, one line each "
+            "('[class] CODE - essence', the most likely first). In mode=history item codes "
+            "are optional — use this only if the old report names the item or the person "
+            "wants to link one."
+        ),
+        input_schema=_schema(
+            {
+                "inspection_id": _ID,
+                "text": {
+                    "type": "string",
+                    "description": "The finding's wording or what was seen/said. Max 1000 "
+                    "characters.",
+                },
+                "zone": {
+                    "type": "string",
+                    "description": "Optional zone code (e.g. hot_kitchen) where it was seen.",
+                },
+            },
+            ["inspection_id", "text"],
+        ),
+        handler=import_suggest.import_suggest_items,
+    ),
+    ImportTool(
+        name="import_add_findings",
+        description=(
+            "Add SEVERAL findings to an imported draft in one call (up to 50). Use it only "
+            "for findings the person has ALREADY confirmed; each one goes through exactly "
+            "the same check as import_add_finding (current: the engine checks code, class, "
+            "zone and recomputes the score; history: as in the old report).\n"
+            "NOT atomic: the findings that passed are written and stay; each refused one "
+            "comes back in refused with its index in your list and the reason — fix those "
+            "and send them again, do not resend the written ones. The answer is short: "
+            "added (index, n), refused, score (pct, grade), counts, warnings, "
+            "findings_total; the full view is import_get_inspection."
+        ),
+        input_schema=_schema(
+            {
+                "inspection_id": _ID,
+                "findings": {
+                    "type": "array",
+                    "maxItems": import_batch.MAX_BATCH,
+                    "description": "Confirmed findings, in order. Each is an object with "
+                    "the same fields as import_add_finding: text (required), code, level, "
+                    "zone, comment, repeat.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "text": {"type": "string", "description": _TEXT},
+                            "code": {"type": "string", "description": _CODE},
+                            "level": {"type": "string", "description": _LEVEL},
+                            "zone": {"type": "string", "description": _ZONE},
+                            "comment": {"type": "string", "description": _COMMENT},
+                            "repeat": {"type": "boolean", "description": _REPEAT},
+                        },
+                        "required": ["text"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            ["inspection_id", "findings"],
+        ),
+        handler=import_batch.import_add_findings,
+    ),
+    ImportTool(
         name="import_edit_finding",
         description=(
             "Correct one finding of an imported draft by its number n. Only the given "
@@ -269,7 +388,9 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "current checklist version and recomputes the score; a recommendation (R) and "
             "a violation cannot be turned into each other by editing — remove and add "
             "again. history: nothing is recomputed; pass an empty string for code, level "
-            "or zone to mark it 'not given'. Pass comment as an empty string to clear it."
+            "or zone to mark it 'not given'. Pass comment as an empty string to clear it. "
+            "The answer is short (the edited finding, score, counts, warnings); the full "
+            "view is import_get_inspection."
         ),
         input_schema=_schema(
             {
@@ -287,11 +408,39 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         handler=imports.import_edit_finding,
     ),
     ImportTool(
+        name="import_edit_inspection",
+        description=(
+            "Correct the HEADER of an imported DRAFT before it is accepted: the "
+            "inspection date, the unit (pizzeria), the auditor, the kind. Only the given "
+            "fields change; the score and the findings stay as they are (date and unit "
+            "do not affect them). The date must not be in the future; the unit is "
+            "resolved by the directory, as at creation; one inspection per unit and day "
+            "unless second_visit=true. An ACCEPTED inspection is not edited here — use "
+            "move_inspection (date/unit with a recorded reason). The answer is short."
+        ),
+        input_schema=_schema(
+            {
+                "inspection_id": _ID,
+                "date": {"type": "string", "description": "New inspection date, YYYY-MM-DD."},
+                "unit": {"type": "string", "description": "New unit (pizzeria) name."},
+                "auditor": {"type": "string", "description": "New auditor name."},
+                "kind": {"type": "string", "description": "New inspection kind."},
+                "second_visit": {
+                    "type": "boolean",
+                    "description": "True only if the person confirmed a second visit that day.",
+                },
+            },
+            ["inspection_id"],
+        ),
+        handler=imports.import_edit_inspection,
+    ),
+    ImportTool(
         name="import_remove_finding",
         description=(
             "Remove one finding (with its photos) from an imported draft by its number "
             "n. current: the score is recomputed by the engine. history: the score stays "
-            "as in the old report."
+            "as in the old report. The answer is short (score, counts, findings_total); "
+            "the full view is import_get_inspection."
         ),
         input_schema=_schema({"inspection_id": _ID, "n": _N}, ["inspection_id", "n"]),
         handler=imports.import_remove_finding,
@@ -351,14 +500,37 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         handler=imports.import_add_photo,
     ),
     ImportTool(
+        name="import_photo_upload_link",
+        description=(
+            "Get an upload link for the photos attached to the chat, for ONE imported "
+            "draft. Photos cannot be passed through tool arguments, so they go around "
+            "the model: the answer has a ready `command` for the sandbox "
+            "(curl -F n=<finding number> -F file=@<path of the attached photo> <url>, "
+            "several -F file=@... for one finding; JPEG, PNG, WebP or HEIC, up to 25 MB "
+            "per request) and the url itself. If the command cannot connect, give the "
+            "person the url: it opens a page where they drop the photos on the right "
+            "finding. The link lives 2 hours, belongs to this draft only and stops "
+            "working once the draft is accepted. Findings must be recorded first."
+        ),
+        input_schema=_schema({"inspection_id": _ID}, ["inspection_id"]),
+        handler=import_photo_link.import_photo_upload_link,
+    ),
+    ImportTool(
         name="import_accept_inspection",
         description=(
             "Accept an imported draft after the person has checked it (the person who "
             "imported it accepts it). It enters the unit's history and analytics next to "
             "live audits and can no longer be edited or discarded. Accepting opens NO "
-            "action-plan request, there is no partner letter for imported inspections, "
-            "and nothing is sent to anyone.\n\n"
-            "Confirm with the person first: history — the score, letter and status exactly "
+            "action-plan request and nothing is sent to anyone.\n\n"
+            "For a current inspection the reply is the finished result, like the bot "
+            "at hand-in: the PDF report is built (without photos) and stored — "
+            "'report_url' is its absolute web link, 'pdf_error' names why it could not "
+            "be built or stored (acceptance stands either way) — and 'letter' is the "
+            "partner letter text for a human to paste into mail ('letter_ready_to_send', "
+            "'letter_not_restored' say what is missing; 'letter_error' if it could not "
+            "be built). Nothing is sent. A historical inspection gets neither a PDF nor "
+            "a letter.\n\n"
+            "Confirm with the person first: history — the score and status exactly "
             "as in the old report; current — the engine's score vs the reported one. The "
             "call must name the unit and the date as recorded; on mismatch nothing is "
             "accepted."

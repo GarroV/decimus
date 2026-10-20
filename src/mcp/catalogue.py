@@ -35,6 +35,7 @@ from . import (
     checklist_source,
     checklist_tools,
     checklists_tools,
+    move,
     phrases,
     ratings_read,
     ratings_tools,
@@ -93,6 +94,11 @@ KIND_RATINGS = "ratings"
 #: (`src.mcp.ratings_read`), а не вход: заслон входа отличает токены, а охват
 #: решает, какие строки отдать. Записи в этом виде нет вовсе.
 KIND_RATINGS_READ = "ratings_read"
+
+#: Исправление даты и пиццерии проверки (D195). Восьмой вид: правит шапку, а не
+#: документ, через ту же db-функцию, что веб. Право — действие матрицы
+#: `inspection.move` (`policy.KIND_ACTIONS`); обработчик — `src.mcp.move`.
+KIND_MOVE = "move"
 
 
 @dataclass(frozen=True)
@@ -507,7 +513,9 @@ TOOLS: tuple[ToolSpec, ...] = (
             "engine fills with a blank line, and findings recorded in another "
             "language are listed there too, with both languages named in "
             "'status'. Returns found: false, with no error, when the id does "
-            "not match any inspection of this tenant."
+            "not match any inspection of this tenant. A current inspection "
+            "uploaded through import_* gets a letter like any other; a "
+            "historical one is refused (its score is from the old report)."
         ),
         input_schema={
             "type": "object",
@@ -2139,6 +2147,38 @@ TOOLS = TOOLS + tuple(
         kind=KIND_IMPORT,
     )
     for t in IMPORT_TOOLS
+)
+
+TOOLS = (
+    *TOOLS,
+    ToolSpec(
+        name="move_inspection",
+        description=(
+            "Correct the date and/or the unit (pizzeria) of an inspection that is already "
+            "accepted (or waiting for acceptance) — the same 'Fix' action as in the web. "
+            "Records, score and grade stay as they are. A reason is mandatory and is kept "
+            "in the history of fixes. For an imported DRAFT before acceptance prefer "
+            "import_edit_inspection. The date must not be in the future; the unit is "
+            "resolved by the directory. Cannot move to a unit of another country when an "
+            "action plan exists."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "inspection_id": _INSPECTION_ID_PROPERTY,
+                "date": {"type": "string", "description": "New inspection date, YYYY-MM-DD."},
+                "unit": {"type": "string", "description": "New unit (pizzeria) name."},
+                "reason": {
+                    "type": "string",
+                    "description": "Why it is fixed, in the words of the person. Required.",
+                },
+            },
+            "required": ["inspection_id", "reason"],
+            "additionalProperties": False,
+        },
+        handler=move.move_inspection,
+        kind=KIND_MOVE,
+    ),
 )
 
 #: Каждому инструменту методики дописывается свойство «какой чек-лист» — одним

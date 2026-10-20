@@ -15,7 +15,7 @@ dependencies = [
     # сжатие фотографий в отчёте и импорт чек-листа из xlsx в manage.py.
     "weasyprint==70.0",
     "pillow==12.3.0",
-    # HEIC/HEIF от iPhone, присланный файлом: на входе бота становится JPEG (#1023).
+    # HEIC/HEIF с iPhone: бот (кадр файлом, #1023) и кадры из чата Claude (src/db/photo_intake.py).
     "pillow-heif==1.8.0",
     "openpyxl==3.1.5",
     # recognize: единственный провайдер LLM — OpenAI (решение D010). Один

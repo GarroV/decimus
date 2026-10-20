@@ -48,6 +48,7 @@ from src.db.errors import (
     ReviseError,
 )
 from src.db.imports import MAX_PHOTOS_PER_FINDING
+from src.db.inspection_edits import Editor
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.db.pool import shared_connections
@@ -77,6 +78,7 @@ from . import (
     letter_draft,
     letter_markup,
     oauth,
+    photo_upload,
     prescriptions,
     proofread,
     ratings,
@@ -233,6 +235,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     swarm_api.install(app, conf)
     # Подключение Claude входом через сайт (D417): только при публичных адресах.
     oauth.install(app, conf)
+    # Кадры к черновику загрузки по подписанной ссылке из Claude: токен в адресе, не кука.
+    photo_upload.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
@@ -1017,6 +1021,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                     finding_id,
                     tenant=auth.current_tenant(),
                     lang=lang,
+                    editor=_editor(),
                     **поля,
                 )
                 notice = t("revise.done", lang)
@@ -1107,6 +1112,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 inspection_id,
                 tenant=auth.current_tenant(),
                 lang=lang,
+                editor=_editor(),
                 code=request.form.get("code") or "",
                 level=request.form.get("level") or "",
                 zone=request.form.get("zone") or "",
@@ -1212,6 +1218,14 @@ def _own(detail: Any) -> bool:
     return auth.is_own(detail.inspection.tenant_code)
 
 
+def _editor() -> Editor:
+    """Кто правит запись на приёмке — для журнала правок (F-134). Без учётки правки нет."""
+    вошедший = auth.current_account()
+    if вошедший is None:
+        abort(403)
+    return Editor(user_id=вошедший.id, login=вошедший.login, role=вошедший.role)
+
+
 def _uploaded_photos(lang: str) -> tuple[list[bytes], str | None]:
     """Кадры из полей `photo` формы вычитки (D535): `(кадры, отказ | None)`.
 
@@ -1304,9 +1318,11 @@ def _install_origin_gate(app: Flask) -> None:
     доезжают), API для сервисов (ключ в заголовке, только чтение) и машинные
     адреса OAuth — регистрация клиента и обмен кода (D417): их зовёт сервер
     Claude без `Origin`, куки входа там не участвуют. Согласие (`/oauth/authorize`)
-    — форма человека и идёт под заслоном.
+    — форма человека и идёт под заслоном. И загрузка кадров по ссылке из Claude
+    (`photo_upload`): её шлёт `curl` без `Origin`, а доступ даёт токен в адресе,
+    сессии у такого запроса нет вовсе.
     """
-    мимо = walk_auth.ENDPOINTS | swarm_api.ENDPOINTS | oauth.ENDPOINTS
+    мимо = walk_auth.ENDPOINTS | swarm_api.ENDPOINTS | oauth.ENDPOINTS | photo_upload.ENDPOINTS
 
     @app.before_request
     def _запись_только_со_своей_страницы() -> None:
@@ -1543,7 +1559,6 @@ def _card_context(
         and история_известна
         and data.retraction_available()
         and not detail.inspection.retracted
-        and not detail.inspection.on_review
     )
     # Подтверждать и править записи — по матрице (`inspection.accept`): УК по своей
     # проверке (D283, D341), админ партнёра — свежую своих сотрудников (D367), и

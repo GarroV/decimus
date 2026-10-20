@@ -1,0 +1,41 @@
+{#
+  Загрузка кадров к черновику проверки по ссылке из Claude (запасной путь, если у
+  песочницы Claude закрыта сеть). Без входа: доступ держится на токене в адресе
+  (`photo_upload.py`). Форма на находку: выбор или перетаскивание файлов в поле,
+  отправка на тот же POST, что и `curl`; скриптов нет.
+#}{% extends "base.html" %}
+{% block topbar %}{% endblock %}
+{% block title %}{{ t('photo_upload.title') }}{% endblock %}
+
+{% block body %}
+  <div class="section">
+    <div class="section__head">
+      <h1 class="section__title">{{ t('photo_upload.title') }}</h1>
+    </div>
+  </div>
+
+  <p class="empty__text">{{ t('photo_upload.lead', mb=max_mb) }}</p>
+
+  {% if outcome %}
+    {% for item in outcome.attached %}
+      <div class="note"><div class="note__text">{{ t('photo_upload.attached', n=item.n, name=item.file) }}</div></div>
+    {% endfor %}
+    {% for item in outcome.refused %}
+      <div class="note note--warn"><div class="note__text">{{ t('photo_upload.refused', name=item.file or '—', reason=item.reason) }}</div></div>
+    {% endfor %}
+  {% endif %}
+
+  {% if not findings %}
+    <p class="empty__text">{{ t('photo_upload.no_findings') }}</p>
+  {% endif %}
+  {% for f in findings %}
+    <form method="post" action="{{ action }}" enctype="multipart/form-data" class="section">
+      <input type="hidden" name="n" value="{{ f.n }}">
+      <input type="hidden" name="html" value="1">
+      <p><strong>#{{ f.n }} {{ f.code }}</strong> — {{ f.text }}</p>
+      <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple required
+             aria-label="{{ t('photo_upload.pick', n=f.n) }}">
+      <button type="submit" class="btn">{{ t('photo_upload.send') }}</button>
+    </form>
+  {% endfor %}
+{% endblock %}
