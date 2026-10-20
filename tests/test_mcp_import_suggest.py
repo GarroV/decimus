@@ -61,7 +61,10 @@ from src.mcp.errors import ToolError
         "zones": "hot_kitchen",
     },
 ]
-ЗОНЫ = [{"code": "hot_kitchen"}, {"code": "hall"}]
+ЗОНЫ = [
+    {"code": "hot_kitchen", "name_ru": "Цех А", "name_en": "Area A"},
+    {"code": "hall", "name_ru": "Место Б", "name_en": "Place B"},
+]
 
 
 @pytest.fixture
@@ -103,7 +106,8 @@ def test_карта_слов_называет_пункт_и_зону(подме�
     assert коды == ["CLN05"]
     assert ответ["candidates"][0]["criteria"] == "D1: CLN05"
     assert ответ["candidates"][0]["question"] == "Вытяжка чистая"
-    assert ответ["zone_guess"] == ["hot_kitchen"]
+    assert ответ["zone_guess"] == "hot_kitchen"
+    assert ответ["zone_source"] == "cue_map"
     assert ответ["single"] is True
     assert ответ["candidates"][0]["single_level"] is False
     assert "note" not in ответ
@@ -135,3 +139,15 @@ def test_карта_молчит_зона_даёт_только_свои_пун�
 def test_неизвестная_зона_отказ(подмена: None) -> None:
     with pytest.raises(ToolError, match="Нет зоны"):
         _спросить("жир на вытяжке", zone="moon")
+
+
+def test_лайн_это_горячий_цех_по_словам_места(подмена: None) -> None:
+    """Слова места сильнее карты: «на лайне» — горячий цех (D207)."""
+    ответ = _спросить("температура на лайне 12 градусов")
+
+    assert ответ["zone_guess"] == "hot_kitchen"
+    assert ответ["zone_source"] == "words"
+
+
+def test_без_слов_места_и_без_карты_зона_не_угадывается(подмена: None) -> None:
+    assert "zone_guess" not in _спросить("что-то непонятное")
