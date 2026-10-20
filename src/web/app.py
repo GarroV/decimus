@@ -92,6 +92,7 @@ from . import (
     settings_screen,
     swarm_api,
     to_inspect,
+    training_page,
     ui_lang,
     unit_add,
     users_screen,
@@ -149,6 +150,7 @@ SCREENS = (
     "registry",
     "country",
     "ratings",
+    "training",
     "admin",
     "users",
     "settings",
@@ -232,6 +234,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     security_screen.install(app, conf)
     prescriptions.install(app, conf)
     ratings.install(app, conf)
+    training_page.install(app, conf)
     # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.
     swarm_api.install(app, conf)
     # Подключение Claude входом через сайт (D417): только при публичных адресах.

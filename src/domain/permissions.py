@@ -58,6 +58,8 @@ _VIEWS: tuple[Action, ...] = (
     # и видит только свои страны (охват, а не флаг) — поэтому не `hq_only`.
     Action("view.country", "view", writes=False),
     Action("view.ratings", "view", writes=False),
+    # «Обучение» (D578, #906): те же роли, что у рейтингов; партнёр — свои страны (охват).
+    Action("view.training", "view", writes=False),
     Action("view.calendar", "view", writes=False),
     Action("view.admin", "view", writes=False),
     # «Действия» (D526): экшн-планы и предписания — раздел УК и партнёра; кнопки
@@ -221,7 +223,12 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     (SIDE_HQ, "developer"): _HQ_WORK | _CHECKLISTS | _ALL_VIEWS_HQ | _codes("inspection.import"),
     # Контроль (D420): только рейтинги и свои люди (D360) — без смены ролей.
     (SIDE_HQ, "control"): _codes(
-        "ratings.read", "ratings.manage", "people.manage", "view.ratings", "view.users"
+        "ratings.read",
+        "ratings.manage",
+        "people.manage",
+        "view.ratings",
+        "view.training",
+        "view.users",
     ),
     # Гость (D429, D440): вся сеть на чтение, ничего не меняет и не отправляет.
     (SIDE_HQ, "guest"): _codes(
@@ -232,6 +239,7 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
         "view.calendar",
         "view.country",
         "view.ratings",
+        "view.training",
         "view.users",
     ),
     (SIDE_PARTNER, "admin"): _PARTNER_AUDITOR

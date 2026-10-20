@@ -26,7 +26,7 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
-from src.db import bot_links, journals, second_factor, web_throttle
+from src.db import bot_links, journals, second_factor, training_read, web_throttle
 from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.web import auth, home_board, home_ratings, home_ratings_block, to_inspect
@@ -263,6 +263,9 @@ def подменить_двери(
     monkeypatch.setattr(home_ratings, "load_latest", lambda *_, **__: {})
     monkeypatch.setattr(home_ratings_block, "load", lambda **_: home_ratings_block.Block())
     monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts())
+    # «Обучение» (#906) читает снимок iSpring из базы: по умолчанию загрузки ещё не было —
+    # экран в пустом состоянии. Наборы про экран подменяют чтение сами.
+    monkeypatch.setattr(training_read, "snapshot_date", lambda: None)
     # Ограничитель перебора (T325) стоит на том же пути, что и вход, и без
     # хранилища пошёл бы в настоящую базу на КАЖДОЙ отправке формы — то есть
     # уронил бы все экранные наборы разом.

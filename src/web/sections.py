@@ -97,6 +97,9 @@ SECTIONS: tuple[Section, ...] = (
     # (D327, «рейтинги видят все»). Загрузки и справочники — заслон на маршрутах
     # (`src/web/ratings.py`), не флаг раздела.
     Section(key="ratings", path="/ratings", built=True, icon="graph", group="stats"),
+    # «Обучение» (D578, #906): обученность пиццерий по данным iSpring, рядом с рейтингами.
+    # Видят те же роли, что рейтинги; партнёр — только свои страны (`auth.current_reach`).
+    Section(key="training", path="/training", built=True, icon="board", group="stats"),
     # ── Администрирование (D499) ──
     Section(key="admin", path="/admin", built=True, icon="book", group="admin"),
     # Люди проекта (T338, #322). В прототипе раздела нет: заведение учёток

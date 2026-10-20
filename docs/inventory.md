@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 167 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 169 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -169,6 +169,8 @@
 | `/tg/walk/start` | POST | `walk_start` | `src/web/walk_proxy.py` |
 | `/tg/walk/suggest` | POST | `walk_suggest` | `src/web/walk_proxy.py` |
 | `/tg/walk/translate` | POST | `walk_translate` | `src/web/walk_proxy.py` |
+| `/training` | GET | `training_index` | `src/web/training_page.py` |
+| `/training/<code>` | GET | `training` | `src/web/training_page.py` |
 | `/units/<unit_id>` | GET | `unit` | `src/web/app.py` |
 | `/users` | GET | `users` | `src/web/users_screen.py` |
 | `/users/add` | POST | `add_user` | `src/web/users_screen.py` |
@@ -492,6 +494,7 @@
 | `0082_rate_windows.sql` | `rate_windows` |
 | `0083_ratings_layout_aggregators.sql` | — |
 | `0084_service_keys.sql` | — |
+| `0085_learning.sql` | `learning.departments`, `learning.courses`, `learning.unit_totals`, `learning.unit_courses`, `learning.loads` |
 <!-- map:end -->
 
 ## Makefile

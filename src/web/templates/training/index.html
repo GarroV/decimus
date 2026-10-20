@@ -1,0 +1,136 @@
+{#
+  Экран «Обучение» (D578, #906): обученность пиццерий по данным iSpring. Каркас — общий
+  шаблон «выбор слева — рабочая область справа» (`_pick_page.html`, D474), как у «Стран»:
+  слева «Все страны» и страны с обученностью (выбранная раскрывается своими пиццериями),
+  справа плитки, список худших сверху и курсы выбранного. Один вопрос: насколько обучены
+  люди и где хуже всего.
+
+  Состояние в адресе (`/training/<страна>?unit=<подразделение>`), без скриптов всё —
+  ссылки; `country.js` лишь подменяет колонку и область без перескока страницы.
+  Ни одного вычисления: всё приходит из `src/web/training_page.py`. Данных о сотрудниках
+  на экране нет — только счётчики (D575).
+#}{% extends "_pick_page.html" %}
+{% from "_pick_ui.html" import pick_item, pick_head, pick_sub, pick_block, pick_empty, pick_tile, pick_tiles with context %}
+{% block title %}{{ t('section.training.title') }}{% endblock %}
+{% block pick_assets %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-training.css') }}">
+  <script src="{{ url_for('static', filename='country.js') }}" defer></script>
+{% endblock %}
+
+{% block pick_label %}{{ t('training.filter.title') }}{% endblock %}
+
+{% block pick_list %}
+  {% if view %}
+    {{ pick_item(network_href, t('training.network'), '', network_pct, network_on, code='Σ') }}
+    {% for row in rail %}
+      {{ pick_item(row.href, row.title, row.meta, row.pct, row.on, code=row.code, expanded=(row.on if row.units else none)) }}
+      {% if row.on and row.units %}
+        {% call pick_sub() %}
+          {% for u in row.units %}{{ pick_item(u.href, u.title, '', u.pct, u.on, sub=true) }}{% endfor %}
+        {% endcall %}
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <p class="pk-empty pk-empty--rail">{{ t('training.empty.title') }}</p>
+  {% endif %}
+{% endblock %}
+
+{% macro bar(pct) %}
+  <span class="tr-bar" role="img" aria-label="{{ '—' if pct is none else '%.1f'|format(pct) ~ '%' }}"><span class="tr-bar__fill" style="width: {{ 0 if pct is none else [pct, 100]|min|round(1) }}%"></span></span>
+{% endmacro %}
+
+{% block pick_work %}
+{% if not view %}
+  <section class="pk-block tr-empty">
+    <header class="pk-block__head"><h1 class="pk-block__title">{{ t('training.empty.title') }}</h1></header>
+    <div class="tr-empty__body">
+      {% if failed %}
+        <p class="note note--warn" role="status">{{ t('training.failed') }}</p>
+      {% else %}
+        <p>{{ t('training.empty.text') }}</p>
+        {% if keys_path %}
+          <p>{{ t('training.empty.keys') }}.</p>
+          <p><a class="btn btn--sm btn--primary" href="{{ url(keys_path) }}">{{ t('training.empty.keys_open') }}</a></p>
+        {% else %}
+          <p>{{ t('training.empty.ask') }}</p>
+        {% endif %}
+      {% endif %}
+    </div>
+  </section>
+{% else %}
+  {% call pick_head(kicker, title) %}
+    <div class="pk-head__facts"><span title="{{ t('training.asof.hint') }}">{{ t('training.asof', date=on_date.strftime('%d.%m.%Y')) }}</span></div>
+  {% endcall %}
+
+  {% call pick_tiles(5) %}
+    {% for tile in tiles %}
+      {{ pick_tile(tile.label, tile.value, tile.sub, tile.hint) }}
+    {% endfor %}
+  {% endcall %}
+
+  {% if empty_counters %}
+    {% call pick_empty() %}{{ t('training.nothing') }}{% endcall %}
+  {% endif %}
+
+  {% if rows %}
+    {% call pick_block(rows_title, '', rows|length) %}
+      <div class="tr-table">
+        <div class="tr-table__head">
+          <span>{{ t('training.col.name') }}</span>
+          <span>{{ t('training.col.trained') }}</span>
+          <span class="tr-num">{{ t('training.col.assigned') }}</span>
+          <span class="tr-num">{{ t('training.col.overdue') }}</span>
+        </div>
+        {% for r in rows %}
+          <a class="tr-table__row" href="{{ r.href }}">
+            <span class="tr-name"><b>{{ r.title }}</b>{% if r.note %}<small>{{ r.note }}</small>{% endif %}</span>
+            <span class="tr-trained">{{ bar(r.pct) }}<span class="tr-pct">{{ '—' if r.pct is none else '%.1f'|format(r.pct) ~ '%' }}</span></span>
+            <span class="tr-num">{{ r.assigned }}</span>
+            <span class="tr-num{% if r.overdue %} tr-num--warn{% endif %}">{{ r.overdue }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endcall %}
+  {% endif %}
+
+  {% if courses %}
+    {% call pick_block(t('training.block.courses'), t('training.block.courses_hint'), course_total) %}
+      <div class="tr-table tr-table--courses">
+        <div class="tr-table__head">
+          <span>{{ t('training.block.courses') }}</span>
+          <span class="tr-num">{{ t('training.col.assigned') }}</span>
+          <span>{{ t('training.col.completed') }}</span>
+          <span class="tr-num">{{ t('training.col.overdue') }}</span>
+          <span class="tr-num">{{ t('training.col.time') }}</span>
+        </div>
+        {% for c in courses %}
+          <div class="tr-table__row">
+            <span class="tr-name"><b>{{ c.title }}</b></span>
+            <span class="tr-num">{{ c.assigned }}</span>
+            <span class="tr-trained">{{ bar(c.pct) }}<span class="tr-pct">{{ c.pct_text }}</span></span>
+            <span class="tr-num{% if c.overdue %} tr-num--warn{% endif %}">{{ c.overdue }}</span>
+            <span class="tr-num">{{ c.time_text }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      {% if course_total > courses|length %}
+        <p class="pk-note tr-cut">{{ t('training.block.courses_cut', shown=courses|length, total=course_total) }}</p>
+      {% endif %}
+    {% endcall %}
+  {% endif %}
+
+  {% if lost %}
+    {% call pick_block(t('training.lost.title'), t('training.lost.hint'), lost|length) %}
+      <div class="tr-table tr-table--lost">
+        {% for u in lost %}
+          <a class="tr-table__row" href="{{ u.href }}">
+            <span class="tr-name"><b>{{ u.title }}</b><small>{{ u.country }}</small></span>
+            <span class="tr-num">{{ u.pct }}</span>
+            <span class="tr-num">{{ u.assigned }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endcall %}
+  {% endif %}
+{% endif %}
+{% endblock %}

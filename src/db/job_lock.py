@@ -30,6 +30,8 @@ from .timeouts import timed_dsn
 #: Новые номера берутся от номера аудита (F-125), чтобы владельца замка было видно в `pg_locks`.
 MAPS_LOADER_LOCK_KEY = 125_0001
 SHEET_LOADER_LOCK_KEY = 125_0002
+#: Загрузчик обучения из iSpring (#906).
+LEARNING_LOADER_LOCK_KEY = 906_0001
 
 
 @contextmanager

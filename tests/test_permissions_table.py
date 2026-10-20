@@ -82,6 +82,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "ratings.manage",
         "people.manage",
         "view.ratings",
+        "view.training",
         "view.users",
     },
     # Гость: вся сеть на чтение (D429, D440).
@@ -93,6 +94,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "view.calendar",
         "view.country",
         "view.ratings",
+        "view.training",
         "view.users",
     },
     # Админ партнёра: сотрудник + люди, свои чек-листы, вычитка свежих (D346, D367).

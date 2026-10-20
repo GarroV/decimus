@@ -51,6 +51,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Предписание | Письмо УК партнёру с требованием: черновик, отправка через почту сотрудника, ответ партнёра, закрытие | `src/db/prescriptions.py`, `src/web/prescriptions.py` |
 | РС, РКО | Рейтинг стандартов и рейтинг клиентского опыта: средние оценки по пиццериям из выгрузок Dodo IS; раздел «Рейтинги» | `docs/15-ratings.md`, `src/ratings/` |
 | Агрегатор | Площадка доставки с оценками пиццерий (Wolt, Glovo, Bolt Food, Yemeksepeti и др.); оценки собираются раз в сутки | `docs/17-aggregators.md`, `src/ratings/aggregators/` |
+| Обучение | Раздел «Обучение»: обученность пиццерий по данным iSpring LMS (завершено / назначено), снимок раз в сутки; только счётчики, данных о сотрудниках нет (D575) | `docs/20-training.md`, `src/learning/`, `src/domain/training_metrics.py` |
 | Pointer | Внешний API оценок и отзывов с карт | `docs/09-pointer-api.md`, `src/ratings/pointer.py` |
 | Свод пиццерий | Таблица сведений о пиццериях, из которой наполняется справочник профилей | `docs/16-unit-profiles.md`, `src/ratings/svod.py` |
 | Swarm | Внутренняя платформа команды, главная которой показывает наши данные. Читает их по API чтения, своих копий не держит | `src/web/swarm_api.py`, `docs/12-web-admin.md` (раздел «API чтения для Swarm») |
@@ -245,6 +246,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_second_factor.py` | Тексты второй ступени входа (D463): «Подтвердите вход» и «Вход и защита» |
 | `src/web/texts_service_keys.py` | Тексты блока «Ключи сервисов» на вкладке «Подключения» (D491, D576) |
 | `src/web/texts_settings.py` | Тексты экрана «Настройки» (D447): подключения, Google, язык, пароль |
+| `src/web/texts_training.py` | Тексты экрана «Обучение» (D578, #906): колонка, плитки, списки, пустое состояние |
 | `src/web/texts_trips.py` | Тексты поездок «Календаря» (D505, D506): сетка, карточка, план, отказы |
 | `src/web/texts_units.py` | Тексты заведения пиццерии из веб-админки (#437, D233, D240) |
 | `src/web/texts_usage.py` | Тексты экрана «Расход модели» (D537): вкладка «Администрирования», расход токенов |
@@ -503,6 +505,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0082_rate_windows.sql` | Общее скользящее окно частоты запросов (аудит F-110, #1006) |
 | `0083_ratings_layout_aggregators.sql` | D585: агрегаторы на «Рейтингах» — своя плитка выше, а не часть блока карт |
 | `0084_service_keys.sql` | Таблица `vault.secrets` (0070) с первого дня хранила один секрет — `model_key` — и стерегла это `check`-ом по имени |
+| `0085_learning.sql` | Обучение пиццерий из iSpring (D574, D575, D578, #906) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -589,6 +592,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/keyboards.py` | Инлайн-клавиатуры мастера начала проверки (T050, T051, T052) |
 | `src/bot/lang.py` | Языки этого чата — так, чтобы на них нельзя было упасть (T126) |
 | `src/bot/lang_choice.py` | Кто говорит с ботом прямо сейчас и какой язык он выбрал (D303, #411) |
+| `src/bot/learning_loader.py` | Раз в сутки — обучение пиццерий из iSpring в нашу базу (D574, D575, #906; docs/20-training.md) |
 | `src/bot/maps_loader.py` | Раз в сутки — оценки пиццерий на картах из Pointer (docs/09-pointer-api.md) |
 | `src/bot/material.py` | Связывание фото нарушения с комментарием аудитора |
 | `src/bot/mcp_setup.py` | Строка настройки Claude Desktop: свой мост, штатный `plutil`, никакого Node (#222, D103) |
@@ -747,6 +751,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/shape.py` | Оценочная форма издания: чем считали, а не что написано (T349, #337) |
 | `src/domain/state.py` | Состояние проверки: чтение, старт и собственные поля блока |
 | `src/domain/tenants.py` | Код тенанта управляющей компании и перевод старого кода (D234, #439) |
+| `src/domain/training_metrics.py` | Метрики экрана «Обучение» — определения в одном месте (D574, D575, #906; docs/20-training.md) |
 | `src/domain/translation.py` | Поля методики, заполненные не на том языке, на котором их напечатают (T186) |
 | `src/domain/uncovered.py` | Накопитель непокрытых формулировок — случай, когда записи не появилось |
 | `src/domain/unit_match.py` | Сопоставление точек справочника `units` со сведениями о пиццериях `unit_profiles` (#316, #909) |
@@ -929,6 +934,7 @@ Telegram, ни HTTP, ни SQL.
 | Изменить разбор комментария моделью | Запрос — `src/recognize/prompt.py`, схема ответа — `schema.py`, быстрый путь без модели — `fastpath.py`, карта слов — `cues.py`; замеры — `make fastpath`, `make zonecov` |
 | Рейтинги: новый блок страницы | Состав и порядок блоков — `BLOCKS` в `src/ratings/layout.py`; расчёты — `src/ratings/summary.py`, `report.py`; экран — `src/web/ratings.py`; тексты — `src/web/texts_ratings.py`; контракт — `docs/15-ratings.md` |
 | Рейтинги: новый формат выгрузки | Узнавание по заголовку — `src/ratings/formats.py`, разбор — `csvio.py`, загрузка в транзакции — `importer.py` |
+| Обучение (iSpring): новый показатель или страница | Определение — только в `src/domain/training_metrics.py` (и таблица в `docs/20-training.md`); загрузка — `src/learning/` (клиент `ispring.py`, дерево `departments.py`, заход `sync.py`), расписание — `src/bot/learning_loader.py`; база — `src/db/learning_store.py` (запись), `training_read.py` (чтение), миграция `0085`; экран — `src/web/training_page.py`, `templates/training/index.html`. Данных о сотрудниках в базе и логе нет (D575): новый столбец с текстом краснит `tests/test_db_learning_schema.py` |
 | Подключить агрегатор доставки | Модуль в `src/ratings/aggregators/` по образцу `wolt.py` (поиск у координат) или `glovo.py` (известная точка), затем строка в `SEARCHERS` или `KNOWN` в `collect.py`; описание — `docs/17-aggregators.md` |
 | Метод API чтения для Swarm | Адрес и право — `src/web/swarm_api.py`, сборка ответа — `src/web/api_feed.py`, чтение — `src/db/swarm_read.py`, `src/ratings/feed.py`; права ключей — `src/db/api_access.py`; контракт — `docs/12-web-admin.md`, «API чтения для Swarm» |
 | Новая переменная окружения | Читается в `config.py` своего блока (`src/<блок>/config.py`) с понятным отказом на мусор; впишите в `.env.example` с комментарием — тест `tests/test_docs_map.py` требует; `make map` обновит `docs/inventory.md` |
