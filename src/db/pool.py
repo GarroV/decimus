@@ -278,8 +278,12 @@ def _shared(held: dict[str, _Held], dsn: str, h: _Held) -> Iterator[psycopg.Conn
 
 
 @contextmanager
-def connection(dsn: str) -> Iterator[psycopg.Connection[Any]]:
-    """Соединение на время блока: из пула, а при `DB_POOL_MAX=0` — своё."""
+def connection(dsn: str, *, timeout: float | None = None) -> Iterator[psycopg.Connection[Any]]:
+    """Соединение на время блока: из пула, а при `DB_POOL_MAX=0` — своё.
+
+    `timeout` — сколько ждать свободное соединение вместо общего срока: для горячих
+    путей, которым нельзя занимать поток на `DB_POOL_TIMEOUT_S` (общее окно частоты).
+    """
     cfg = _settings()
     max_size = cfg.max_size
     if max_size == 0:
@@ -287,7 +291,7 @@ def connection(dsn: str) -> Iterator[psycopg.Connection[Any]]:
             apply_space(conn)
             yield conn
         return
-    timeout = cfg.timeout_s
+    timeout = cfg.timeout_s if timeout is None else timeout
     held = _SHARED.get()
     if held is not None:
         h = held.get(dsn)

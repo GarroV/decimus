@@ -15,8 +15,8 @@ _WEB: dict[str, tuple[str, str]] = {
     "actions_new": ("Запрос экшн-плана", "Action plan requested"),
     "actions_review": ("Вердикт по экшн-плану", "Action plan verdict"),
     "photo_upload_post": (
-        "Загружены фото к черновику по ссылке",
-        "Photos uploaded to a draft by link",
+        "Загружены фото к черновику из песочницы Claude",
+        "Photos uploaded to a draft from the Claude sandbox",
     ),
     "add_space": ("Заведено пространство партнёра", "Partner space added"),
     "add_user": ("Заведена учётка", "Account created"),
@@ -199,9 +199,9 @@ _MCP: dict[str, tuple[str, str]] = {
     "move_inspection": ("Перенесена проверка (дата/пиццерия)", "Inspection moved (date/unit)"),
     "import_remove_finding": ("Удалено нарушение из черновика", "Finding removed from a draft"),
     "import_add_photo": ("Добавлено фото в черновик", "Photo added to a draft"),
-    "import_photo_upload_link": (
-        "Выдана ссылка загрузки фото к черновику",
-        "Photo upload link issued for a draft",
+    "import_upload_photos": (
+        "Выдана команда загрузки фото к черновику",
+        "Photo upload command issued for a draft",
     ),
     "import_info_fields": (
         "Прочитана информационная часть черновика",

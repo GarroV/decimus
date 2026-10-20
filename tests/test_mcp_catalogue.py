@@ -148,13 +148,14 @@ from src.mcp.catalogue import (
     "import_add_finding",
     "import_add_findings",
     "import_suggest_items",
+    "import_match_findings",
     "import_edit_finding",
     "import_edit_inspection",
     "import_remove_finding",
     "import_get_inspection",
     "import_list_drafts",
     "import_add_photo",
-    "import_photo_upload_link",
+    "import_upload_photos",
     "import_info_fields",
     "import_set_info",
     "import_accept_inspection",
@@ -233,7 +234,7 @@ def test_каталог_содержит_ровно_шестьдесят_два_
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 65
+    assert len(TOOLS) == 66
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -279,7 +280,9 @@ def test_свойства_схемы_совпадают_с_сигнатурой_
         # `checklist` называет собеседник, а снимает точка входа (T344):
         # обработчику приходит хранилище, уже наведённое на нужный чек-лист,
         # поэтому в сигнатуре его нет и быть не должно.
-        параметры_схемы = set(spec.input_schema["properties"]) - {"checklist"}
+        # `confirmation_token` — то же самое: токен подтверждения снимает
+        # диспетчер (F-130), до обработчика он не доходит.
+        параметры_схемы = set(spec.input_schema["properties"]) - {"checklist", "confirmation_token"}
         assert параметры_схемы == параметры_обработчика, spec.name
 
 
@@ -294,7 +297,8 @@ def test_required_согласован_со_схемой_и_с_сигнатур�
         assert обязательные <= свойства, spec.name
         # `checklist` снимает точка входа (T344), обработчику он не приходит:
         # сверять его с сигнатурой не с чем.
-        for имя_параметра in свойства - {"checklist"}:
+        # `confirmation_token` снимает диспетчер (F-130), как и `checklist`.
+        for имя_параметра in свойства - {"checklist", "confirmation_token"}:
             без_умолчания = параметры_обработчика[имя_параметра].default is inspect.Parameter.empty
             assert без_умолчания == (имя_параметра in обязательные), (spec.name, имя_параметра)
 
@@ -391,6 +395,7 @@ def test_обработчик_взят_из_правильного_модуля(
                 import_photo_link.__name__,
                 "src.mcp.import_info",
                 import_suggest.__name__,
+                "src.mcp.import_match",
                 import_batch.__name__,
             }, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ИСПРАВЛЕНИЯ:
@@ -420,7 +425,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 65
+    assert len(перечень) == 66
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

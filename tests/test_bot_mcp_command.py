@@ -133,7 +133,7 @@ def test_запись_поднимает_наш_мост_а_токен_лежи�
     наш = json.loads(_настройки(tmp_path).read_text(encoding="utf-8"))["mcpServers"][SERVER_NAME]
     assert наш["command"] == "/bin/bash"
     assert наш["args"] == [str(tmp_path / BRIDGE_PATH)]
-    assert наш["env"] == {"DODO_MCP_URL": АДРЕС, "DODO_MCP_TOKEN": ТОКЕН}
+    assert наш["env"] == {"DECIMUS_MCP_URL": АДРЕС, "DECIMUS_MCP_TOKEN": ТОКЕН}
     assert ТОКЕН not in json.dumps(наш["args"]), "токен уехал в argv, где его видно через ps"
 
 
@@ -186,7 +186,7 @@ def test_повторная_настройка_не_плодит_записей(
     assert исход.returncode == 0, f"команда не выполнилась: {исход.stderr}"
     стало = json.loads(_настройки(tmp_path).read_text(encoding="utf-8"))
     assert list(стало["mcpServers"]) == [SERVER_NAME], "вторая настройка добавила ещё одну запись"
-    assert стало["mcpServers"][SERVER_NAME]["env"]["DODO_MCP_TOKEN"] == "tok_" + "y" * 28
+    assert стало["mcpServers"][SERVER_NAME]["env"]["DECIMUS_MCP_TOKEN"] == "tok_" + "y" * 28
 
 
 @ЕСТЬ_PLUTIL
@@ -244,7 +244,7 @@ def test_установленный_мост_доносит_запрос_и_пр
             capture_output=True,
             text=True,
             timeout=30,
-            env={**os.environ, "DODO_MCP_URL": адрес, "DODO_MCP_TOKEN": ТОКЕН},
+            env={**os.environ, "DECIMUS_MCP_URL": адрес, "DECIMUS_MCP_TOKEN": ТОКЕН},
         )
     finally:
         сервер.shutdown()

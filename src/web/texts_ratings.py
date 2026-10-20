@@ -109,25 +109,35 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.col.scores": {"ru": "Оценки по периодам", "en": "Scores by period"},
     "ratings.filter.country": {"ru": "Страна", "en": "Country"},
     "ratings.filter.all": {"ru": "Все", "en": "All"},
-    "ratings.block.maps": {
-        "ru": "Оценки на картах и в агрегаторах",
-        "en": "Ratings on maps and in delivery apps",
+    "ratings.layout.maps": {"ru": "Оценки на картах", "en": "Map ratings"},
+    "ratings.layout.aggregators": {"ru": "Оценки в агрегаторах", "en": "Delivery app ratings"},
+    "ratings.tile.open": {"ru": "Развернуть", "en": "Expand"},
+    "ratings.tile.close": {"ru": "Свернуть", "en": "Collapse"},
+    "ratings.more": {"ru": "Показать ещё ({n})", "en": "Show more ({n})"},
+    "ratings.tile.none": {"ru": "Данных за период нет", "en": "No data for the period"},
+    "ratings.tile.scores": {"ru": "Групп в сводке: {n}", "en": "Groups in the summary: {n}"},
+    "ratings.tile.developers": {"ru": "Девелоперов", "en": "Developers"},
+    "ratings.tile.countries": {"ru": "Стран", "en": "Countries"},
+    "ratings.tile.compare": {"ru": "Лучший РС: {name}, {x}", "en": "Best RS: {name}, {x}"},
+    "ratings.tile.violations": {
+        "ru": "Нарушений на проверку: РКО {rko}, РС {rs}",
+        "en": "Violations per checkup: RKO {rko}, RS {rs}",
     },
-    "ratings.layout.maps": {
-        "ru": "Оценки на картах и в агрегаторах",
-        "en": "Map and delivery app ratings",
+    "ratings.tile.best": {"ru": "{kind}, лучшая", "en": "{kind}, best"},
+    "ratings.tile.worst": {"ru": "{kind}, худшая", "en": "{kind}, worst"},
+    "ratings.tile.top": {"ru": "Лучшая по РС: {name}", "en": "Best by RS: {name}"},
+    "ratings.tile.hard": {
+        "ru": "Пиццерий с нарушениями: {n}",
+        "en": "Pizzerias with violations: {n}",
     },
+    "ratings.tile.maps": {"ru": "Средняя по отзывам на картах", "en": "Average of map reviews"},
+    "ratings.tile.aggregators": {"ru": "Площадок доставки: {n}", "en": "Delivery apps: {n}"},
     "ratings.maps.hint": {
         "ru": "Средняя по всем отзывам и оценкам пиццерий группы",
         "en": "Average over all reviews and ratings of the group's pizzerias",
     },
     "ratings.maps.reviews": {"ru": "{n} отз.", "en": "{n} reviews"},
     "ratings.agg.points": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
-    "ratings.maps.title": {"ru": "Карты, Pointer", "en": "Maps, Pointer"},
-    "ratings.agg.title": {
-        "ru": "Агрегаторы доставки, шкала агрегатора",
-        "en": "Delivery apps, app's own scale",
-    },
     "ratings.maps.branches_n": {"ru": "филиалов: {n}", "en": "branches: {n}"},
     "ratings.agg.later": {
         "ru": (

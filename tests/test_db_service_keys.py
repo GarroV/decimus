@@ -63,7 +63,7 @@ def test_пара_ispring_пишется_и_убирается_вместе(хр
 
 def test_чужое_имя_отклоняется_кодом_и_базой(хранилище: str) -> None:
     # Сломанная копия: убрать `_known` — код пропускает имя, и тест падает на второй проверке
-    # только если снять и `check` в 0082; обе стены проверяются по отдельности.
+    # только если снять и `check` в 0084; обе стены проверяются по отдельности.
     with pytest.raises(AccessError):
         service_keys.save_many({"evil.name": ЗНАЧЕНИЕ}, provider="x", by="director")
     with pytest.raises(AccessError):

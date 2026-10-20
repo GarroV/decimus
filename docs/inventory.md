@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 168 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 167 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -112,7 +112,6 @@
 | `/oauth/register` | POST | `oauth_register` | `src/web/oauth.py` |
 | `/oauth/token` | POST | `oauth_token` | `src/web/oauth.py` |
 | `/overview` | GET | `overview` | `src/web/app.py` |
-| `/photo-upload/<token>` | GET | `photo_upload_page` | `src/web/photo_upload.py` |
 | `/photo-upload/<token>` | POST | `photo_upload_post` | `src/web/photo_upload.py` |
 | `/plans` | GET | `plans` | `src/web/action_plans.py` |
 | `/plans/files/<file_id>` | GET | `plan_file_legacy` | `src/web/action_plans.py` |
@@ -210,7 +209,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **65** инструментов (checklist — 33, checklist_source — 2, import — 16, inspections — 6, move — 1, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **66** инструментов (checklist — 33, checklist_source — 2, import — 17, inspections — 6, move — 1, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
@@ -261,10 +260,11 @@
 | `import_get_inspection` | import | Read an imported inspection (draft or accepted): its mode, header and findings with their numbers | `src/mcp/imports.py` |
 | `import_info_fields` | import | Read the INFORMATION part of a current-mode imported DRAFT: the fields the bot asks at the end of an inspection and the… | `src/mcp/import_info.py` |
 | `import_list_drafts` | import | List this space's imported drafts that are not accepted yet: mode (history/current), unit, date, checklist version… | `src/mcp/imports.py` |
-| `import_photo_upload_link` | import | Get an upload link for the photos attached to the chat, for ONE imported draft | `src/mcp/import_photo_link.py` |
+| `import_match_findings` | import | Read-only: for ALL dictated findings at once (up to 50), pick the checklist item, class and zone with the SAME pipeline… | `src/mcp/import_match.py` |
 | `import_remove_finding` | import | Remove one finding (with its photos) from an imported draft by its number n | `src/mcp/imports.py` |
 | `import_set_info` | import | Record answers to information fields of a current-mode imported DRAFT (values = {code: answer}) | `src/mcp/import_info.py` |
-| `import_suggest_items` | import | Read-only: suggest up to 5 checklist items for ONE finding, by the word map of the draft's checklist edition | `src/mcp/import_suggest.py` |
+| `import_suggest_items` | import | Read-only: pick the checklist item, class and zone for ONE finding — the same pipeline as import_match_findings and the… | `src/mcp/import_suggest.py` |
+| `import_upload_photos` | import | Upload the photos attached to the chat to ONE imported draft | `src/mcp/import_photo_link.py` |
 | `findings_by_unit` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `get_inspection` | inspections | Read one recorded inspection of the caller's tenant in full: its header, the score breakdown (percentage, letter grade… | `src/mcp/tools.py` |
 | `inspection_letter` | inspections | Rebuild the partner letter for one recorded inspection of the caller's tenant and return its text, ready for a human to… | `src/mcp/tools.py` |
@@ -281,6 +281,15 @@
 | `retract_inspection` | retraction | Retract a finalized inspection from the history | `src/mcp/retraction.py` |
 <!-- map:end -->
 
+### Локальные инструменты моста (вручную, не из каталога)
+
+Выполняются **мостом на машине пользователя** (`tools/mcp_bridge.sh`, D583), на сервер не уходят и в таблицу выше не попадают: мост дописывает их к ответу сервера на `tools/list`. Нужны `jq`, `sips`, `base64`, `curl` (штатные в macOS); без `jq` не объявляются. Подключение Claude Code по прямому HTTP (без моста) их не имеет — фото тогда через `import_upload_photos` из песочницы.
+
+| Инструмент | Что делает | Где |
+|---|---|---|
+| `local_photo_folder` | Папка с фото на машине человека (только внутри `$HOME`, без подпапок и ссылок): имена файлов и уменьшенные копии JPEG ~768 px как ImageContent, порциями (`offset`/`limit`, до 60). HEIC конвертируется через `sips` | `tools/mcp_bridge.sh` |
+| `local_attach_photos` | Оригиналы из той же папки к находкам черновика: мост сам берёт у сервера адрес (`import_upload_photos` → поле `upload_target`, не показывается человеку) и шлёт multipart | `tools/mcp_bridge.sh` |
+
 ## Переменные окружения
 
 Читаются кодом в `src/`, `tools/`, `scripts/`, `engine/`. «Нет» в последней колонке
@@ -295,7 +304,7 @@
 | `API_TOKEN_BY` | `tools/api_token.py` | да |
 | `ATTACHMENT_MAX_MB` | `src/db/config.py` | да |
 | `AUDITOR_NAMES` | `src/bot/config.py` | да |
-| `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 6 | да |
+| `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 7 | да |
 | `BACKUP_DIR` | `tools/state_backup.py` | да |
 | `BACKUP_KEEP_DAYS` | `tools/state_backup.py` | да |
 | `BOT_MCP_URL` | `src/bot/mcp_setup.py`, `tools/mcp_outside.py` | да |
@@ -315,6 +324,8 @@
 | `DB_POOL_MAX` | `src/db/pool.py` | да |
 | `DB_POOL_TIMEOUT_S` | `src/db/pool.py` | да |
 | `DB_STATEMENT_TIMEOUT_S` | `src/db/timeouts.py` | да |
+| `DECIMUS_MCP_TOKEN` | `tools/mcp_outside.py` | да |
+| `DECIMUS_MCP_URL` | `tools/mcp_outside.py` | да |
 | `DEMO_PHOTOS_DIR` | `tools/seed_open_demo.py` | да |
 | `DEMO_STATE_DIR` | `tools/seed_demo.py` | да |
 | `DODO_MCP_TOKEN` | `tools/mcp_outside.py` | да |
@@ -332,8 +343,9 @@
 | `INSPECTION_FILE` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
 | `LANDING_SHOTS_BASE` | `tools/landing_shots.py` | да |
 | `LOG_ID_SALT` | `src/domain/log_ids.py` | да |
-| `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 1 | да |
+| `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 2 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
+| `MCP_CONFIRM_SECRET` | `src/mcp/confirm.py` | да |
 | `MCP_HOST` | `src/mcp/config.py` | да |
 | `MCP_IMPORT_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_LINK_PORT` | `tools/mcp_healthcheck.py` | да |
@@ -350,6 +362,7 @@
 | `OPENAI_API_KEY` | `src/recognize/config.py` | да |
 | `POINTER_API_KEY` | `src/ratings/maps.py` | да |
 | `PRESCRIPTION_MAX_REPLIES` | `src/db/config.py` | да |
+| `RATE_WINDOW_SHARED` | `src/db/rate_window.py` | да |
 | `RATINGS_SHEET_ID` | `src/ratings/sheet_sync.py` | да |
 | `RECOGNIZE_MAX_CANDIDATES` | `src/recognize/config.py` | да |
 | `RECOGNIZE_MERGE_MODEL` | `src/recognize/config.py` | да |
@@ -476,7 +489,9 @@
 | `0079_units_merged_into.sql` | — |
 | `0080_ratings_layout_compare.sql` | — |
 | `0081_inspection_edits.sql` | `inspection_edits` |
-| `0082_service_keys.sql` | — |
+| `0082_rate_windows.sql` | `rate_windows` |
+| `0083_ratings_layout_aggregators.sql` | — |
+| `0084_service_keys.sql` | — |
 <!-- map:end -->
 
 ## Makefile

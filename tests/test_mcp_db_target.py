@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 from mcp_checklist_harness import build_methodology
+from mcp_checklist_harness import handle_confirmed as handle
 
 pytest.importorskip("psycopg")
 
@@ -27,7 +28,6 @@ from src.mcp import imports, phrases, retraction, tools
 from src.mcp.checklist import Store
 from src.mcp.db_target import DB_TARGET_MISMATCH
 from src.mcp.errors import ToolError
-from src.mcp.rpc import handle
 
 АРЕНДАТОР = "HQ"
 ПАРОЛЬ = "s3cret-не-печатать"

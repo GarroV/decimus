@@ -328,8 +328,16 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0081_inspection_edits.sql": (
         "sql1:2e0815cb0cb23039e3cd740716238831bd50f0b8303fcc404e25775604480a86"
     ),
+    # Общее скользящее окно частоты запросов (аудит F-110, #1006).
+    "0082_rate_windows.sql": (
+        "sql1:818dd3c0d9cad281b5a7fc2f51ee3c2d400eb7fb4afddc0ce919042e2612437c"
+    ),
+    # Агрегаторы на «Рейтингах» — своя плитка (D585).
+    "0083_ratings_layout_aggregators.sql": (
+        "sql1:e2d0b77a7e573dab4eddd5e93b79d4ebd6228000453bf15efb5f0ee49014cef5"
+    ),
     # Ключи сервисов на экране «Подключения» (D576, #906).
-    "0082_service_keys.sql": (
+    "0084_service_keys.sql": (
         "sql1:df6cded467f4d94f01692e50159ea892a7372443ba773990d77e9c9c9e79e023"
     ),
 }

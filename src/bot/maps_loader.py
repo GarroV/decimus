@@ -14,6 +14,12 @@
 ничего не теряет, первый же час после старта продолжает с места. Закрытая история
 больше часа не тратит; новый день и новая суточная загрузка (новые филиалы) открывают
 проверку заново.
+
+**Один процесс на заход (F-125).** «Пора» решается по отметке в базе, и два процесса
+(перекрывшийся контейнер при выкатке, второй экземпляр) видят одну и ту же отметку и
+оба тянут из Pointer и пишут: двойная квота и задвоенные строки. Загрузка и шаг истории
+идут под замком базы (`src/db/job_lock.py`, как у сборщика агрегаторов); замок занят —
+этот процесс заход молча пропускает, работу уже делает другой.
 """
 
 from __future__ import annotations
@@ -26,6 +32,7 @@ from datetime import UTC, date, datetime
 
 from src.db import maps_store
 from src.db.errors import RatingsError
+from src.db.job_lock import MAPS_LOADER_LOCK_KEY, job_lock
 from src.db.space import SYSTEM_SPACE, acting_space
 from src.ratings import maps, pointer
 from src.ratings.pointer import PointerError
@@ -87,6 +94,26 @@ def history_cycle(state: HistoryState, fetch: pointer.Fetch | None = None) -> bo
     return step.done
 
 
+def _load_if_due(history: HistoryState) -> None:
+    """Суточная загрузка, когда пора; под замком — «пора» и загрузка не разрываются."""
+    with job_lock(MAPS_LOADER_LOCK_KEY, what="оценки карт") as got:
+        if not got:
+            logger.info("Оценки карт: загрузку ведёт другой процесс — заход пропущен")
+            return
+        if _due():
+            maps.load_once()
+            history.done = False  # в загрузке могли прийти новые филиалы
+
+
+def _history_step(history: HistoryState) -> None:
+    """Шаг дозагрузки истории под тем же замком, что и суточная загрузка."""
+    with job_lock(MAPS_LOADER_LOCK_KEY, what="оценки карт") as got:
+        if not got:
+            logger.info("История карт: загрузку ведёт другой процесс — заход пропущен")
+            return
+        history_cycle(history)
+
+
 async def load_forever() -> None:
     """Задача бота: держит снимок оценок карт не старше суток.
 
@@ -105,16 +132,14 @@ async def _load_forever() -> None:
     history = HistoryState()
     while True:
         try:
-            if await asyncio.to_thread(_due):
-                await asyncio.to_thread(maps.load_once)
-                history.done = False  # в загрузке могли прийти новые филиалы
+            await asyncio.to_thread(_load_if_due, history)
         except (PointerError, RatingsError) as exc:
             logger.warning("Оценки карт не загрузились: %s", exc)
         except Exception:
             # Упавшая задача asyncio молчит — поэтому ловим всё и живём дальше.
             logger.exception("Оценки карт: непредвиденный сбой загрузки")
         try:
-            await asyncio.to_thread(history_cycle, history)
+            await asyncio.to_thread(_history_step, history)
         except (PointerError, RatingsError) as exc:
             logger.warning("История карт не догрузилась, продолжим в следующий круг: %s", exc)
         except Exception:

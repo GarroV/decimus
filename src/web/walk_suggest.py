@@ -22,6 +22,7 @@ from flask import Flask, Response, jsonify, request
 from src.bot import journal
 from src.bot.propose import Offer, propose
 from src.bot.zones import allowed_zones, zone_from_words
+from src.db.busy_lock import WALK_SUGGEST, try_hold
 from src.domain import check_environment, get_state, handed_over, upload_file
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
@@ -117,7 +118,8 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
 
     Один поиск на чат за раз: каждый — оплачиваемый вызов модели, и второй,
     пока идёт первый, — это двойное нажатие или зацикленный клиент, а не
-    работа аудитора.
+    работа аудитора. «За раз» — на все процессы: внутри процесса держит набор,
+    между процессами — замок в базе (`src/db/busy_lock.py`, F-110).
     """
     busy: set[int] = set()
     guard = threading.Lock()
@@ -144,6 +146,11 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             if who in busy:
                 return refused("walk.err.suggest_busy", lang, 429)
             busy.add(who)
+        hold = try_hold(WALK_SUGGEST, str(who))
+        if not hold.acquired:
+            with guard:
+                busy.discard(who)
+            return refused("walk.err.suggest_busy", lang, 429)
         try:
             words = _text(body, "words")
             # Зона на экране — только подсказка (D445). Старый клиент слал её
@@ -177,6 +184,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             logger.warning("Обход: поиск пункта для чата %s не удался: %s", log_id(who), exc)
             return refused("walk.err.recognize", lang, 503)
         finally:
+            hold.release()
             with guard:
                 busy.discard(who)
         # Что ушло в поиск и что вернулось (#367) — тем же журналом, что у

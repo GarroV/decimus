@@ -42,6 +42,7 @@ from . import (
     retraction,
     tools,
 )
+from .confirm import TOKEN_ARGUMENT
 from .import_catalogue import IMPORT_TOOLS
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
@@ -153,6 +154,23 @@ class ToolSpec:
     #: именно этот список и держит `tests/test_mcp_catalogue.py` в
     #: `ИМЕНА_ЧИТАЮЩИХ_МЕТОДИКУ`, а не угадывает его отсюда.
     writes: bool = True
+    #: Опасный инструмент: с первого вызова не выполняется, а отвечает этим
+    #: описанием эффекта и токеном подтверждения (`confirm.py`, F-130, #1006).
+    #: Пустая строка — подтверждение не нужно. Аргумент-токен дописывается в
+    #: схему ниже, одним местом, как «какой чек-лист».
+    confirm_effect: str = ""
+
+
+_CONFIRMATION_PROPERTY: dict[str, object] = {
+    "type": "string",
+    "description": (
+        "Confirmation token. Omit it on the first call: the server will not "
+        "perform the action, it answers with what would change and a token. "
+        "Show that to the person; only if they agree, repeat the SAME call "
+        "with this token. A token fits exactly one tool with exactly those "
+        "arguments and expires in minutes."
+    ),
+}
 
 
 def _date_property(*, meaning: str) -> dict[str, object]:
@@ -857,6 +875,10 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.remove_checklist_item,
         kind=KIND_CHECKLIST,
+        confirm_effect=(
+            "Отключит пункт чек-листа (с hard — удалит строку целиком): сохранится как новая "
+            "версия."
+        ),
     ),
     ToolSpec(
         name="restore_checklist_item",
@@ -990,6 +1012,10 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.remove_zone,
         kind=KIND_CHECKLIST,
+        confirm_effect=(
+            "Уберёт зону и вычеркнет её из списка зон всех пунктов; доля зоны "
+            "перераспределится: сохранится как новая версия."
+        ),
     ),
     ToolSpec(
         name="set_zone_shares",
@@ -1031,6 +1057,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.set_zone_shares,
         kind=KIND_CHECKLIST,
+        confirm_effect="Изменит доли зон в итоговой оценке: сохранится как новая версия чек-листа.",
     ),
     ToolSpec(
         name="scoring",
@@ -1103,6 +1130,10 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.set_scoring,
         kind=KIND_CHECKLIST,
+        confirm_effect=(
+            "Изменит ставки вычетов в чек-листе (стартовый процент, цена нарушений D1/D2, "
+            "повтор): сохранится как новая версия."
+        ),
     ),
     ToolSpec(
         name="rename_zone",
@@ -1213,6 +1244,10 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.set_route,
         kind=KIND_CHECKLIST,
+        confirm_effect=(
+            "Изменит маршрут обхода пиццерии (порядок зон и/или пунктов): сохранится как "
+            "новая версия."
+        ),
     ),
     # --- методика: публикация ------------------------------------------------
     # --- карта слов: чтение и правка (T144) --------------------------------
@@ -1362,6 +1397,10 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.remove_photo_cue,
         kind=KIND_CHECKLIST,
+        confirm_effect=(
+            "Уберёт строку фото-подсказки из словаря синонимов: сохранится как новая версия "
+            "методики."
+        ),
     ),
     ToolSpec(
         name="photo_cue_suggestions",
@@ -1601,6 +1640,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=phrases.retract_learned_phrase,
         kind=KIND_CHECKLIST,
+        confirm_effect="Снимет выученную фразу: она перестанет срабатывать и предлагать запись.",
     ),
     ToolSpec(
         name="repoint_learned_phrase",
@@ -1651,6 +1691,10 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=phrases.repoint_learned_phrase,
         kind=KIND_CHECKLIST,
+        confirm_effect=(
+            "Перенацелит выученную фразу на другой пункт (или вернёт снятую в работу): "
+            "изменит, к какому пункту она ведёт."
+        ),
     ),
     ToolSpec(
         name="publish_checklist_version",
@@ -1678,6 +1722,10 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.publish_checklist_version,
         kind=KIND_CHECKLIST,
+        confirm_effect=(
+            "Сделает выбранную версию чек-листа действующей: по ней будут оцениваться "
+            "следующие проверки."
+        ),
     ),
     ToolSpec(
         name="retract_inspection",
@@ -1864,6 +1912,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklists_tools.set_checklist_state,
         kind=KIND_CHECKLIST,
+        confirm_effect="Изменит состояние чек-листа (черновик, действует, снят с использования).",
     ),
     ToolSpec(
         name="set_checklist_bot_access",
@@ -1909,6 +1958,10 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklists_tools.apply_checklist,
         kind=KIND_CHECKLIST,
+        confirm_effect=(
+            "Применит чек-лист к проду: новые проверки будут оцениваться по нему (откат — "
+            "применить прежний)."
+        ),
     ),
     ToolSpec(
         name="import_ratings",
@@ -2191,6 +2244,12 @@ for _спец in TOOLS:
         _свойства = _спец.input_schema.setdefault("properties", {})
         if isinstance(_свойства, dict):
             _свойства.setdefault("checklist", _CHECKLIST_CODE_PROPERTY)
+
+for _спец in TOOLS:
+    if _спец.confirm_effect:
+        _свойства = _спец.input_schema.setdefault("properties", {})
+        if isinstance(_свойства, dict):
+            _свойства.setdefault(TOKEN_ARGUMENT, _CONFIRMATION_PROPERTY)
 
 #: Индекс по имени — `find()` вызывается на каждый запрос `tools/call`,
 #: а линейный проход по всем записям каталога пересчитывать незачем.

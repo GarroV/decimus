@@ -8,7 +8,7 @@ from pathlib import Path
 from src.domain import service_keys as registry
 
 МИГРАЦИЯ = (
-    Path(__file__).resolve().parents[1] / "src" / "db" / "migrations" / "0082_service_keys.sql"
+    Path(__file__).resolve().parents[1] / "src" / "db" / "migrations" / "0084_service_keys.sql"
 )
 
 

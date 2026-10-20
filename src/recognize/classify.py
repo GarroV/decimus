@@ -9,14 +9,14 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any
 
 from src.domain import list_zones
 from src.domain.model_usage import KIND_RECOGNIZE
 from src.domain.models import READING_MAX_C, READING_MIN_C
 
-from .client import ask_model
+from .client import ModelAnswer, ask_model
 from .config import DEFAULT_LANG, RecognizeSettings, load_recognize_settings
 from .cues import class_thresholds
 from .guard import MAX_QUESTION_CHARS, MAX_REASON_CHARS, MAX_WORDING_CHARS, clean_text
@@ -167,6 +167,136 @@ def _suggestion(
     )
 
 
+@dataclass(frozen=True)
+class AskArgs:
+    """Аргументы `ask_model` одним куском: собрали сейчас, спросят потом."""
+
+    kind: str
+    instructions: str
+    question: str
+    schema: dict[str, Any]
+    photo: bytes | None
+    photos: Sequence[bytes]
+    settings: RecognizeSettings
+    model: str | None
+
+    def call(self) -> ModelAnswer:
+        return ask_model(
+            kind=self.kind,
+            instructions=self.instructions,
+            question=self.question,
+            schema=self.schema,
+            photo=self.photo,
+            photos=self.photos,
+            settings=self.settings,
+            model=self.model,
+        )
+
+
+@dataclass(frozen=True)
+class PreparedRequest:
+    """Собранный запрос к модели и то, что нужно знать при разборе ответа."""
+
+    ask: AskArgs
+    settings: RecognizeSettings
+    shortlist: tuple[str, ...]
+    used_photo: bool
+    album: bool
+    reading_c: float | None
+
+
+def prepare_request(
+    note: str,
+    photo: bytes | None = None,
+    zone_hint: str | None = None,
+    *,
+    lang: str = DEFAULT_LANG,
+    settings: RecognizeSettings | None = None,
+    model: str | None = None,
+    chat_id: int | None,
+    photos: Sequence[bytes] = (),
+    sent_at: str = "",
+    reading_c: float | None = None,
+) -> PreparedRequest:
+    """Собрать запрос к модели по комментарию аудитора — сам вызов не делается.
+
+    Выделено из `classify`, чтобы MCP собирал запросы под издание черновика по
+    очереди (каталог методики назначается на время сборки, `pinned_data_dir`), а
+    сами вызовы к модели слал пакетом параллельно. Бот зовёт `classify` — тот же
+    путь целиком.
+
+
+    `reading_c` — температура, которую аудитор ИСПРАВИЛ после того, как модель
+    неверно прочла термометр (#836). Тот же запрос, того же семейства промптов,
+    с одним добавленным утверждением; в каждом ответе показание — это число
+    аудитора, а не повторное чтение кадра.
+
+    `lang` — язык формулировок и текста пунктов (язык отчёта проверки).
+    `settings` и `model` нужны замеру точности (T035), который гоняет один и тот
+    же вход по нескольким моделям; бот их не передаёт.
+
+    `chat_id` обязателен и умолчания не имеет (T226): весь запрос — перечень
+    кандидатов, перечисление классов, названия зон, пороги из карты слов —
+    собирается по изданию ТОЙ проверки (T169), а не по каталогу, который лежит
+    в `AUDIT_DATA_DIR` сейчас. Пустой чат (`config.NO_CHAT`) — законное
+    «проверки нет»: так зовут замеры по выгрузкам `examples/`.
+    """
+    album = framed(note, len(photos))
+    cfg = settings or load_recognize_settings()
+    picked = shortlist(note, zone_hint, chat_id=chat_id)
+    picks = picks_for(picked.codes, chat_id=chat_id)
+    zones = list_zones(chat_id=chat_id)
+    use_photo = album or (photo is not None and needs_photo(note))
+    ask = AskArgs(
+        kind=KIND_RECOGNIZE,
+        instructions=instructions(class_thresholds(chat_id=chat_id)),
+        question=question_text(
+            note if reading_c is None else f"{note.strip()}\n{correction_line(reading_c)}".strip(),
+            picks,
+            zones,
+            zone_hint,
+            lang,
+            with_photo=use_photo,
+            chat_id=chat_id,
+            album_frames=len(photos) if album else 0,
+            sent_at=sent_at,
+        ),
+        schema=response_schema(picks, [z.code for z in zones], album=album),
+        photo=photo if use_photo and not album else None,
+        photos=photos if album else (),
+        settings=cfg,
+        model=model,
+    )
+    return PreparedRequest(
+        ask=ask,
+        settings=cfg,
+        shortlist=picked.codes,
+        used_photo=use_photo,
+        album=album,
+        reading_c=reading_c,
+    )
+
+
+def finish(request: PreparedRequest, answer: ModelAnswer) -> Suggestion:
+    """Разобрать ответ модели на собранный запрос в предложение."""
+    found = replace(
+        _suggestion(answer.payload, answer.usage, request.settings, used_photo=request.used_photo),
+        shortlist=request.shortlist,
+        also_seen=(
+            _candidates(answer.payload.get("also_seen"), request.settings) if request.album else ()
+        ),
+    )
+    reading_c = request.reading_c
+    if reading_c is None:
+        return found
+    # Показание — слово аудитора: что бы модель ни вернула в поле, остаётся оно.
+    return replace(
+        found,
+        candidates=tuple(replace(c, reading_c=reading_c) for c in found.candidates),
+        also_seen=tuple(replace(c, reading_c=reading_c) for c in found.also_seen),
+    )
+
+
 def classify(
     note: str,
     photo: bytes | None = None,
@@ -197,42 +327,16 @@ def classify(
     в `AUDIT_DATA_DIR` сейчас. Пустой чат (`config.NO_CHAT`) — законное
     «проверки нет»: так зовут замеры по выгрузкам `examples/`.
     """
-    album = framed(note, len(photos))
-    cfg = settings or load_recognize_settings()
-    picked = shortlist(note, zone_hint, chat_id=chat_id)
-    picks = picks_for(picked.codes, chat_id=chat_id)
-    zones = list_zones(chat_id=chat_id)
-    use_photo = album or (photo is not None and needs_photo(note))
-    answer = ask_model(
-        kind=KIND_RECOGNIZE,
-        instructions=instructions(class_thresholds(chat_id=chat_id)),
-        question=question_text(
-            note if reading_c is None else f"{note.strip()}\n{correction_line(reading_c)}".strip(),
-            picks,
-            zones,
-            zone_hint,
-            lang,
-            with_photo=use_photo,
-            chat_id=chat_id,
-            album_frames=len(photos) if album else 0,
-            sent_at=sent_at,
-        ),
-        schema=response_schema(picks, [z.code for z in zones], album=album),
-        photo=photo if use_photo and not album else None,
-        photos=photos if album else (),
-        settings=cfg,
+    request = prepare_request(
+        note,
+        photo,
+        zone_hint,
+        lang=lang,
+        settings=settings,
         model=model,
+        chat_id=chat_id,
+        photos=photos,
+        sent_at=sent_at,
+        reading_c=reading_c,
     )
-    found = replace(
-        _suggestion(answer.payload, answer.usage, cfg, used_photo=use_photo),
-        shortlist=picked.codes,
-        also_seen=_candidates(answer.payload.get("also_seen"), cfg) if album else (),
-    )
-    if reading_c is None:
-        return found
-    # Показание — слово аудитора: что бы модель ни вернула в поле, остаётся оно.
-    return replace(
-        found,
-        candidates=tuple(replace(c, reading_c=reading_c) for c in found.candidates),
-        also_seen=tuple(replace(c, reading_c=reading_c) for c in found.also_seen),
-    )
+    return finish(request, request.ask.call())

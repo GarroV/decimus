@@ -10,10 +10,10 @@
 **Запускать с ДРУГОЙ машины, не с площадки.** С самой площадки прогон проверит
 туннель, но не путь снаружи, и об этом сказано в выводе прямо.
 
-    DODO_MCP_URL=<адрес туннеля> DODO_MCP_TOKEN=<токен> python3 tools/mcp_outside.py
+    DECIMUS_MCP_URL=<адрес туннеля> DECIMUS_MCP_TOKEN=<токен> python3 tools/mcp_outside.py
 
-Адрес берётся из `DODO_MCP_URL`, а не задан — из `BOT_MCP_URL`: по умолчанию
-проверяется ровно та строка, которую бот раздаёт людям, а не отдельно
+Адрес берётся из `DECIMUS_MCP_URL` (запасное имя — прежнее `DODO_MCP_URL`), а не задан — из
+`BOT_MCP_URL`: по умолчанию проверяется ровно та строка, которую бот раздаёт людям, а не отдельно
 придуманный адрес. Имена переменных те же, что у моста `tools/mcp_bridge.sh`.
 
 Что проверяется и почему именно это:
@@ -54,13 +54,15 @@ import urllib.request
 #: `_Handler.server_version`) и которым он подписывается в `initialize`
 #: (`src/mcp/rpc.py`, `SERVER_NAME`). Копия строки — тест сверяет её с живым
 #: ответом, чтобы расхождение поймал прогон, а не площадка.
-SERVER_NAME = "dodo-audit-mcp"
+SERVER_NAME = "decimus"
 
 #: Адрес: своя переменная, а не задана — та, которую печатает бот.
-URL_VARS = ("DODO_MCP_URL", "BOT_MCP_URL")
+URL_VARS = ("DECIMUS_MCP_URL", "DODO_MCP_URL", "BOT_MCP_URL")
 
 #: Токен. Тот же, что у моста: человек уже держит его в окружении.
-TOKEN_VAR = "DODO_MCP_TOKEN"  # noqa: S105 — имя переменной, не значение
+TOKEN_VAR = "DECIMUS_MCP_TOKEN"  # noqa: S105 — имя переменной, не значение
+#: Прежнее имя токена — запасное: у людей оно уже стоит в окружении.
+OLD_TOKEN_VAR = "DODO_MCP_TOKEN"  # noqa: S105 — имя переменной, не значение
 
 #: Туннель через полмира — не локальная петля, и десяти секунд ему мало не
 #: бывает только при настоящей поломке.
@@ -287,12 +289,12 @@ def main(argv: list[str] | None = None) -> int:
     url, откуда = resolve_url()
     if not url:
         print(
-            f"смоук: не назван адрес — задай {URL_VARS[0]} (или {URL_VARS[1]}, тот же адрес, "
+            f"смоук: не назван адрес — задай {URL_VARS[0]} (или {URL_VARS[2]}, тот же адрес, "
             f"что бот печатает людям)",
             file=sys.stderr,
         )
         return 2
-    token = (os.environ.get(TOKEN_VAR) or "").strip()
+    token = (os.environ.get(TOKEN_VAR) or os.environ.get(OLD_TOKEN_VAR) or "").strip()
     if not token:
         print(
             f"смоук: не назван {TOKEN_VAR}. Без токена доказать, что подключение работает, "

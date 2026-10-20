@@ -8,7 +8,9 @@
 
 - **Загрузка** — задача бота `src/bot/maps_loader.py`: раз в час смотрит журнал
   `maps.loads`; если удачной загрузки не было 20 часов, зовёт `src/ratings/maps.py:
-  load_once`. Руками: `docker exec decimus-bot-1 python -m src.ratings.maps`.
+  load_once`. Загрузка и шаг истории идут под замком базы (`src/db/job_lock.py`, F-125): второй
+  процесс (перекрытие при выкатке, второй экземпляр) при занятом замке заход молча пропускает.
+  Руками: `docker exec decimus-bot-1 python -m src.ratings.maps`.
 - **Запросы** (`src/ratings/pointer.py`): `/networks`, затем `/companies?network_uuid=…
   &with_ratings=1` по каждой сети — около 25 запросов с паузой 1,1 с. Суточные экспорты
   не используются: оценки филиала приходят в обычном списке.
