@@ -208,7 +208,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **57** инструментов (checklist — 33, checklist_source — 2, import — 9, inspections — 6, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **59** инструментов (checklist — 33, checklist_source — 2, import — 11, inspections — 6, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
@@ -249,6 +249,7 @@
 | `checklist_source_item` | checklist_source | Read one item of the checklist the caller is audited against, together with the D1/D2/D3 criteria that decide which… | `src/mcp/checklist_source.py` |
 | `import_accept_inspection` | import | Accept an imported draft after the person has checked it (the person who imported it accepts it) | `src/mcp/imports.py` |
 | `import_add_finding` | import | Add one finding from the report to an imported draft | `src/mcp/imports.py` |
+| `import_add_findings` | import | Add SEVERAL findings to an imported draft in one call (up to 50) | `src/mcp/import_batch.py` |
 | `import_add_photo` | import | Attach a photo from the old report to one finding of an imported draft | `src/mcp/imports.py` |
 | `import_create_inspection` | import | Start entering ONE inspection after the fact: creates a DRAFT with no findings | `src/mcp/imports.py` |
 | `import_discard_draft` | import | Delete an imported DRAFT entirely, with its findings and photos — e.g | `src/mcp/imports.py` |
@@ -256,6 +257,7 @@
 | `import_get_inspection` | import | Read an imported inspection (draft or accepted): its mode, header and findings with their numbers | `src/mcp/imports.py` |
 | `import_list_drafts` | import | List this space's imported drafts that are not accepted yet: mode (history/current), unit, date, checklist version… | `src/mcp/imports.py` |
 | `import_remove_finding` | import | Remove one finding (with its photos) from an imported draft by its number n | `src/mcp/imports.py` |
+| `import_suggest_items` | import | Read-only: suggest up to 5 checklist items for ONE finding, by the word map of the draft's checklist edition | `src/mcp/import_suggest.py` |
 | `findings_by_unit` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `get_inspection` | inspections | Read one recorded inspection of the caller's tenant in full: its header, the score breakdown (percentage, letter grade… | `src/mcp/tools.py` |
 | `inspection_letter` | inspections | Rebuild the partner letter for one recorded inspection of the caller's tenant and return its text, ready for a human to… | `src/mcp/tools.py` |
