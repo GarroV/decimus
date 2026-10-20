@@ -43,7 +43,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Повтор | Нарушение, которое было в прошлой проверке точки и не устранено; вычитает вдвое. Действует в момент расчёта и задним числом ничего не меняет | `docs/02-domain.md`, `src/bot/repeats.py` |
 | Кадр | Фотография к записи; хранится в S3-совместимом хранилище, в вебе показывается сжатой копией | `src/db/photos.py`, `src/db/previews.py`, `src/db/storage.py` |
 | Словарь синонимов (`photo-cues`; в коде и старых записях — «карта кадров», «карта слов») | Данные методики: какими словами аудитор называет нарушение или объект → какой пункт и какая зона за ними стоят. Нужна быстрому пути разбора, без неё каждый комментарий уходит в модель | `src/recognize/cues.py`, `src/recognize/fastpath.py`, `docs/furca/blocks/recognize.md` |
-| Сдача, приёмка | Аудитор сдаёт проверку (`handover`); она лежит в базе `draft` на приёмке — её вычитывают, правят с пересчётом оценки и подтверждают, после чего она `finalized` и заморожена политиками базы | `src/domain/handover.py`, `src/db/accept.py`, `src/db/revise.py`, `src/web/review.py` |
+| Сдача, приёмка | Аудитор сдаёт проверку (`handover`); она лежит в базе `draft` на приёмке — её вычитывают, правят с пересчётом оценки (правит и УК, и партнёр; каждая правка пишется в журнал правок `inspection_edits` в той же транзакции: кто, когда, было → стало) и подтверждают, после чего она `finalized` и заморожена политиками базы | `src/domain/handover.py`, `src/db/accept.py`, `src/db/revise.py`, `src/db/inspection_edits.py`, `src/web/review.py` |
 | Снятие | Отзыв сданной проверки из истории: помечается, не удаляется, причина обязательна. Делает только роль «администратор истории» | `src/db/retract.py`, `src/mcp/retraction.py`, `docs/furca/blocks/db.md` |
 | Перенос | Смена даты и пиццерии у проверки; история каждой правки пишется самой базой | `src/db/move.py` |
 | Legacy-проверка | Историческая проверка, загруженная из старого отчёта (`origin = 'legacy'`): оценка переносится как есть и нигде не пересчитывается | `src/db/imports_legacy.py`, `src/mcp/imports.py`, `docs/14-history-import.md` |
@@ -344,7 +344,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -356,6 +356,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/finish_modes.py` | Режим «Завершить» в мини-аппе, выбранный аудитором (D449): чтение и запись |
 | `src/db/imports.py` | Загрузка проверки задним числом поштучно: черновик, записи, кадры (D305–D310, D334) |
 | `src/db/imports_legacy.py` | Записи исторической проверки (`origin = 'legacy'`, D332): без движка |
+| `src/db/inspection_edits.py` | Журнал правок записей проверки на приёмке (F-134, `0081`) |
 | `src/db/letters.py` | T333 (#310): письмо партнёру, зафиксированное человеком |
 | `src/db/mcp_access.py` | Личный доступ к MCP: токены учёток сайта (T253, D098; аудит 12.10, D448) |
 | `src/db/move.py` | Перенос проверки по дате и пиццерии — с историей каждой правки (D195) |
@@ -489,6 +490,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0078_model_usage.sql` | Расход модели (D537): одна строка на каждый вызов провайдера — когда, какого вида, какая модель, сколько токенов на входе и выходе (или секунд звука), кто спросил, в… |
 | `0079_units_merged_into.sql` | D538: название пиццерии — латиницей по справочнику (`unit_profiles`); другие написания («Тбилиси-1») — только синонимы |
 | `0080_ratings_layout_compare.sql` | D551 (#972): блок «Сравнение девелоперов и стран» на «Рейтингах» — только УК |
+| `0081_inspection_edits.sql` | Журнал правок записей проверки на приёмке (аудит F-134, #1006) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
