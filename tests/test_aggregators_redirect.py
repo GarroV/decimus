@@ -48,9 +48,9 @@ def _redirecting(target: str) -> Generator[str]:
         ("https://10.0.0.5/admin", "закрытый адрес"),
         ("https://192.168.1.1/", "закрытый адрес"),
         ("https://127.0.0.1/", "закрытый адрес"),
-        ("https://100.64.0.1/", "закрытый адрес"),
+        ("https://100.64.1.2/", "закрытый адрес"),
         ("http://127.0.0.1/", "не-https адрес"),
-        ("http://100.64.0.1/", "не-https адрес"),
+        ("http://100.64.1.2/", "не-https адрес"),
         ("http://example.com/", "не-https адрес"),
         ("file:///etc/passwd", "HTTP 302"),  # схему режет сам urllib,
     ],
@@ -66,9 +66,7 @@ def test_redirect_to_forbidden_target_is_rejected(target: str, reason: str) -> N
 
 
 def test_public_https_hop_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        base.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 0))]
-    )
+    monkeypatch.setattr(base.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("8.8.8.8", 0))])
     assert base._check_hop("https://example.com/next") == "https://example.com/next"
 
 
