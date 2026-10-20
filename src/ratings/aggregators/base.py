@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import socket
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Any
 from urllib.parse import urlsplit
 
 USER_AGENT = (
@@ -116,6 +119,59 @@ def _https(url: str) -> str:
     raise AggregatorError(f"Не https-адрес: {url[:60]}")
 
 
+def _is_public(address: str) -> bool:
+    """Адрес публичный. Link-local и облачные метаданные (169.254.0.0/16, в том числе
+    169.254.169.254), частные сети RFC 1918, петля, Tailscale CGNAT, зарезервированные и
+    многоадресные — нет."""
+    try:
+        ip = ipaddress.ip_address(address.split("%")[0])
+    except ValueError:
+        return False
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return ip.is_global
+
+
+def _check_hop(url: str) -> str:
+    """Политика для хода редиректа — СТРОЖЕ, чем для начального адреса: только https
+    и только публичные адреса. Исключение «http на Tailscale/петлю» (`_https`) действует
+    для начального url, а редирект им воспользоваться не может — иначе он уводит запрос
+    во внутреннюю сеть. Недопустимый ход — `AggregatorError`.
+
+    Известный остаток: имя резолвится здесь, а соединение резолвит его заново, так что
+    DNS-rebinding между проверкой и соединением остаётся возможным. Пиновать проверенный
+    IP значит подменять `HTTPSConnection` (SNI, Host, проверка сертификата) — цена выше
+    риска: цели агрегаторов — константы кода, а редирект на публичный адрес не даёт
+    дотянуться до внутренней сети напрямую."""
+    if not url.startswith("https://"):
+        raise AggregatorError(f"Редирект на не-https адрес: {url[:60]}")
+    host = urlsplit(url).hostname or ""
+    try:
+        resolved = {str(info[4][0]) for info in socket.getaddrinfo(host, None)}
+    except OSError as exc:
+        raise AggregatorError(f"Редирект на {host[:60]}: имя не резолвится ({exc})") from exc
+    closed = sorted(addr for addr in resolved if not _is_public(addr))
+    if closed or not resolved:
+        raise AggregatorError(
+            f"Редирект на закрытый адрес {host[:60]} → {', '.join(closed) or 'нет адресов'}"
+        )
+    return url
+
+
+class _CheckedRedirects(urllib.request.HTTPRedirectHandler):
+    """3xx следуем, но каждый `Location` проходит `_check_hop`: без этого редирект
+    уводил запрос на http, во внутреннюю сеть и на 169.254.169.254 (F-136)."""
+
+    def redirect_request(
+        self, req: urllib.request.Request, fp: Any, code: int, msg: str, headers: Any, newurl: str
+    ) -> urllib.request.Request | None:
+        _check_hop(urllib.parse.urljoin(req.full_url, newurl))
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_CheckedRedirects)
+
+
 class Http:
     """Запросы одного агрегатора: пауза перед каждым, повтор на 429/5xx."""
 
@@ -149,7 +205,7 @@ class Http:
             time.sleep(pause)
             timeout = min(TIMEOUT_SEC, max(1.0, deadline - time.monotonic()))
             try:
-                with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+                with _OPENER.open(request, timeout=timeout) as response:
                     body = response.read(BODY_MAX_BYTES + 1)
                 if len(body) > BODY_MAX_BYTES:
                     # Повтор тот же ответ не уменьшит.
