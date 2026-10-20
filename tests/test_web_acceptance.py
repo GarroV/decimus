@@ -110,7 +110,7 @@ def test_администратор_подтверждает_и_подпись_�
 
 
 @админ
-def test_ждущая_своя_показана_с_плашкой_правкой_на_месте_и_без_переноса(
+def test_ждущая_своя_показана_с_плашкой_правкой_на_месте_и_переносом(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Arrange
@@ -120,14 +120,14 @@ def test_ждущая_своя_показана_с_плашкой_правкой
     # Act
     страница = стенд.get("/inspections/x").get_data(as_text=True)
 
-    # Assert — принять, править на месте и отклонить можно (D465, D535);
-    # переносить до приёмки нечего.
+    # Assert — принять, править на месте и отклонить можно (D465, D535); дату и
+    # пиццерию ждущей тоже правят — «Исправить» шапки (#1045).
     assert "Проверка на приёмке" in страница
     assert "/accept?lang=" in страница
     assert "/findings/f1/revise?lang=" in страница
     assert 'data-proofread-form="edit"' in страница
     assert "Добавить нарушение" in страница
-    assert "/move?lang=" not in страница
+    assert "/move?lang=" in страница
     assert "/retract?lang=" in страница
 
 

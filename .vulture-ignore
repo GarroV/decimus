@@ -587,6 +587,7 @@ do_add_finding
 do_add_photo
 do_delete_photo
 do_suggest
+on_document
 on_fix_reading
 on_reading_other
 on_reading_value

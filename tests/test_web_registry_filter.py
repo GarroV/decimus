@@ -166,3 +166,25 @@ def test_города_показаны_словом_а_не_кодом(
     # Assert — «tbilisi» 24.09.2026 стояло на экране кодом источника.
     assert "Тбилиси" in страница
     assert ">tbilisi<" not in страница
+
+
+def test_страна_где_всё_на_приёмке_есть_в_списке_стран(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1047: у Беларуси обе проверки ждали приёмки — страны в рейле не было вовсе."""
+    # Arrange — принятые есть только в Грузии и Турции, белорусская ждёт приёмки.
+    ждёт = шапка(unit_name="Polotsk-1", pct=87.5, grade="C")
+    monkeypatch.setattr(
+        data, "load_registry", lambda **_: data.Registry(РЯД_МЕСТ, True, review=(ждёт,))
+    )
+    monkeypatch.setattr(data, "load_geography", lambda **_: {**ГЕО, "Polotsk-1": ("BY", "")})
+
+    # Act
+    страница = стенд.get("/inspections?period=all&lang=ru").get_data(as_text=True)
+    рейл = страница.split('class="rg-countries"', 1)[1].split("</aside>", 1)[0]
+
+    # Assert — страна в рейле и счёт равен тому, что покажет щелчок.
+    assert "Беларусь" in рейл
+    беларусь = рейл.split(">Беларусь</span>", 1)[1]
+    assert беларусь.split("</a>", 1)[0].count('<span class="mx-rail__count">1</span>') == 1
+    assert "Грузия" in рейл

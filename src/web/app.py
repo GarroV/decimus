@@ -681,7 +681,12 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             )
         )
         ждёт_дней = {row.id: max((сегодня - row.inspection_date).days, 0) for row in на_приёмке}
-        чипы = _registry_picks(registry_data.rows, отбор_в, место, отбор, язык)
+        # Страны и города считаются и по ждущим приёмки: блок «На приёмке» режется
+        # по стране (D548), и страна, где всё ещё на приёмке, иначе пропадала из
+        # рейла — выбрать её было нельзя (#1047). Буква и вид — только по принятым.
+        чипы = _registry_picks(
+            registry_data.rows, отбор_в, место, отбор, язык, review=registry_data.review
+        )
         # Буква и вид — про проверки, у точек без проверки их нет: чипов нет.
         чипы = tuple(ч for ч in чипы if not отбор_в.unchecked or ч.key in ("country", "city"))
         # «Где не проведено» читается только по галочке (D532): без неё база не
@@ -1430,20 +1435,26 @@ def _registry_picks(
     place: Callable[[InspectionRow], tuple[str, str]],
     select: Callable[..., str],
     lang: str,
+    review: tuple[InspectionRow, ...] = (),
 ) -> tuple[Pick, ...]:
-    """Чипы отбора реестра — страна, город, буква, вид — со счётом по периоду."""
+    """Чипы отбора реестра — страна, город, буква, вид — со счётом по периоду.
+
+    Страна и город считают и `review` — ждущие приёмки: счёт равен тому, что
+    покажет щелчок (принятые за период плюс блок «На приёмке»).
+    """
     чипы = []
+    места = rows + review
     страны = tuple(
-        (код, sum(1 for row in rows if place(row)[0] == код))
-        for код in sorted({place(row)[0] for row in rows} - {""})
+        (код, sum(1 for row in места if place(row)[0] == код))
+        for код in sorted({place(row)[0] for row in места} - {""})
     )
     # Города — только выбранной страны, как и на «Обзоре».
     города = tuple(
-        (код, sum(1 for row in rows if place(row)[1] == код))
+        (код, sum(1 for row in места if place(row)[1] == код))
         for код in sorted(
             {
                 place(row)[1]
-                for row in rows
+                for row in места
                 if not current.country or place(row)[0] == current.country
             }
             - {""}
