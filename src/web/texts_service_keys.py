@@ -12,21 +12,17 @@ SERVICE_KEYS_TEXTS: dict[str, dict[str, str]] = {
     "keys.title": {"ru": "Ключи сервисов", "en": "Service keys"},
     "keys.sub": {
         "ru": (
-            "Ключи внешних сервисов, которыми пользуется продукт. Хранятся зашифрованными и "
-            "после сохранения нигде не показываются. Замена и удаление требуют второго шага "
-            "входа не старше 10 минут; новый ключ сначала проверяется у провайдера. "
-            "Новое значение начинает работать в течение минуты."
+            "Хранятся зашифрованными и после сохранения не показываются. "
+            "Замена и удаление — со вторым шагом входа."
         ),
         "en": (
-            "Keys of the external services the product uses. They are stored encrypted and "
-            "are never shown again after saving. Replacing or removing needs a second sign-in "
-            "step no older than 10 minutes; a new key is checked with the provider first. "
-            "A new value takes effect within a minute."
+            "Stored encrypted and never shown again. "
+            "Replacing or removing needs the second sign-in step."
         ),
     },
     "keys.service.openai": {"ru": "Нейросеть (OpenAI)", "en": "AI model (OpenAI)"},
-    "keys.service.pointer": {"ru": "Pointer (оценки на картах)", "en": "Pointer (map ratings)"},
-    "keys.service.ispring": {"ru": "iSpring (обучение)", "en": "iSpring (training)"},
+    "keys.service.pointer": {"ru": "Pointer", "en": "Pointer"},
+    "keys.service.ispring": {"ru": "iSpring", "en": "iSpring"},
     "keys.purpose.openai": {
         "ru": "Ключом бот и веб разбирают комментарии и голосовые.",
         "en": "The bot and the web use it to read comments and voice notes.",
@@ -50,14 +46,18 @@ SERVICE_KEYS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Partly set: some fields come from the server environment",
     },
     "keys.set_by": {"ru": "Поставлен", "en": "Set"},
+    "keys.tile.db": {"ru": "Задан", "en": "Set"},
+    "keys.tile.env": {"ru": "Из окружения", "en": "From environment"},
+    "keys.tile.unset": {"ru": "Не задан", "en": "Not set"},
+    "keys.tile.partial": {"ru": "Частично", "en": "Partly"},
     "keys.unknown": {
         "ru": "Не удалось прочитать, что задано. Повторите чуть позже.",
         "en": "Could not read what is set. Try again shortly.",
     },
     "keys.replace_title": {"ru": "Заменить", "en": "Replace"},
     "keys.new_hint": {
-        "ru": "Вставьте значение целиком. Оно не показывается ни до, ни после сохранения.",
-        "en": "Paste the whole value. It is not shown before or after saving.",
+        "ru": "Вставьте значение целиком: оно проверится у провайдера и нигде не показывается.",
+        "en": "Paste the whole value: it is checked with the provider and never shown.",
     },
     "keys.save": {"ru": "Заменить", "en": "Replace"},
     "keys.check": {"ru": "Проверить", "en": "Check"},
