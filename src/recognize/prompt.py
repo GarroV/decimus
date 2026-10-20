@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Sequence
 
 from src.domain import Zone, get_item
@@ -148,14 +149,39 @@ DATA_BLOCKS_LINE = (
 )
 
 
+#: Невидимки и управляющие, кроме нужных в тексте (перенос, табуляция). В
+#: отличие от guard.clean_text ZWJ тут НЕ щадим: между `<` и `/` он разрывает
+#: тег мимо _TAG_LIKE — ровно канал обхода, который закрываем.
+_BLOCK_KEEP = frozenset({"\n", "\t"})
+_BLOCK_STRIP_CATEGORIES = frozenset({"Cc", "Cf", "Cs"})
+
+
+def _defuse(text: str) -> str:
+    """Свести вход к форме, на которой _TAG_LIKE нельзя обойти.
+
+    Сначала NFKC: иначе аналог тега из других кодпоинтов (`＜/тег＞`
+    полноширинными) после подстановки модели читается как закрывающий, а
+    регекс его не видит. Затем срезаем невидимки/управляющие, которыми можно
+    вставить разрыв внутрь тега (`<​/тег>` с нулевой шириной). Это parser
+    differential санитайзера (security-ревью): нормализуем ДО матчинга.
+    """
+    normalized = unicodedata.normalize("NFKC", text)
+    return "".join(
+        ch
+        for ch in normalized
+        if ch in _BLOCK_KEEP or unicodedata.category(ch) not in _BLOCK_STRIP_CATEGORIES
+    )
+
+
 def data_block(tag: str, text: str) -> str:
     """Непроверенный фрагмент в тег: закрыть блок изнутри нельзя.
 
-    Тег-подобные последовательности во входе (`</untrusted_auditor_note>` и
-    его вариации с пробелами и регистром) обезвреживаются заменой `<` на `‹`:
-    остальной текст — как был, слова аудитора не искажаются.
+    Вход сводится к нормальной форме (`_defuse`), затем тег-подобные
+    последовательности (`</untrusted_auditor_note>` и вариации с пробелами,
+    регистром, полноширинными или нулевой ширины символами) обезвреживаются
+    заменой `<` на `‹`: остальной текст — как был, слова аудитора не искажаются.
     """
-    return f"<{tag}>{_TAG_LIKE.sub(r'‹\1', text)}</{tag}>"
+    return f"<{tag}>{_TAG_LIKE.sub(r'‹\1', _defuse(text))}</{tag}>"
 
 
 def instructions(thresholds: str) -> str:
