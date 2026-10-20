@@ -15,11 +15,15 @@
     {% endif %}
     {% if countries|length > 1 %}
       <span class="sbar__gap" aria-hidden="true"></span>
-      <span class="sbar__label">{{ t('actions.country') }}</span>
-      <a class="spill spill--check{% if not country %} is-on{% endif %}" href="{{ select_url(country='') }}">{{ t('actions.all_countries') }}</a>
-      {% for code in countries %}
-        <a class="spill spill--check{% if code == country %} is-on{% endif %}" href="{{ select_url(country=code) }}">{{ country_title(code) or code }}</a>
-      {% endfor %}
+      {#- Страны — одной группой: не влезла — переносится целиком, с подписью,
+          а не одной последней страной (#1086). -#}
+      <span class="sbar__set" role="group" aria-label="{{ t('actions.country') }}">
+        <span class="sbar__label">{{ t('actions.country') }}</span>
+        <a class="spill spill--check{% if not country %} is-on{% endif %}" href="{{ select_url(country='') }}">{{ t('actions.all_countries') }}</a>
+        {% for code in countries %}
+          <a class="spill spill--check{% if code == country %} is-on{% endif %}" href="{{ select_url(country=code) }}">{{ country_title(code) or code }}</a>
+        {% endfor %}
+      </span>
     {% endif %}
     <span class="sbar__count">{{ rows|length }}</span>
   </div>

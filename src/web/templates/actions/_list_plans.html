@@ -19,8 +19,8 @@
               <span class="grade tag {{ grade_tone(r.grade or '') }} srow__grade">{{ r.grade or '—' }}</span>
               <span class="srow__main"><b>{{ r.unit_name }}</b></span>
               <span class="srow__cell srow__country">{{ (country_title(r.country) or r.country) if r.country else '—' }}</span>
-              <span class="srow__cell mono is-num srow__date" data-label="{{ t('actions.col.inspection') }}">{{ r.inspection_date }}</span>
-              <span class="srow__cell mono is-num srow__due{% if r.overdue(today) %} srow__err{% endif %}" data-label="{{ t('actions.col.due') }}">{{ r.due_on }}</span>
+              <span class="srow__cell mono is-num srow__date" data-label="{{ t('actions.col.inspection') }}">{{ day(r.inspection_date) }}</span>
+              <span class="srow__cell mono is-num srow__due{% if r.overdue(today) %} srow__err{% endif %}" data-label="{{ t('actions.col.due') }}">{{ day(r.due_on) }}</span>
               <span class="srow__cell srow__state">{{ state_tag(r, today) }}</span>
             </a>
           </li>

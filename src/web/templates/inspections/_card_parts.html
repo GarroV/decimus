@@ -34,7 +34,7 @@
 {# Метка «Принята» объясняет себя при наведении и фокусе. Проверки, принятые до
    появления приёмки, `accepted_at` не имеют — они сразу легли в историю сети. #}
 {% macro accept_badge(head, cls='tag tag--neutral tag--micro') %}
-  {% set hint = t('accept.meta', at=head.accepted_at[:16].replace('T', ' '), by=head.accepted_by or '—') if head.accepted_at else t('accept.legacy_hint') %}
+  {% set hint = t('accept.meta', at=day(head.accepted_at[:16].replace('T', ' ')), by=head.accepted_by or '—') if head.accepted_at else t('accept.legacy_hint') %}
   <span class="{{ cls }} tip tip--end" tabindex="0" data-tip="{{ hint }}">{{ t('state.sealed') }}</span>
 {% endmacro %}
 
@@ -42,7 +42,7 @@
    принята. Ждущая приёмки — «Ждёт приёмки» (кнопка «Принять» — в действиях шапки,
    если у роли есть право). #}
 {% macro provenance(head, cls='meta') %}
-  {% set at = head.accepted_at[:16].replace('T', ' ') if head.accepted_at else '' %}
+  {% set at = day(head.accepted_at[:16].replace('T', ' ')) if head.accepted_at else '' %}
   <p class="{{ cls }} provenance">
     <span>{{ t('card.origin.' ~ head.origin) }}</span>
     {% if head.retracted %}

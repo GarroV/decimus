@@ -112,7 +112,7 @@
       {% endif %}
       <div class="card__fact">
         <div class="card__fact-label">{{ t('card.fact.report_lang') }}</div>
-        <div>{{ head.report_lang }}</div>
+        <div>{{ t('lang.name.' ~ head.report_lang) if head.report_lang in ('ru', 'en') else head.report_lang }}</div>
       </div>
     </div>
 

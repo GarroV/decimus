@@ -106,4 +106,12 @@ def test_принята_с_датой_называет_кто_принял(
     )
 
     # Assert
-    assert 'data-tip="Принята 2026-09-19 08:30 · Demo Lead"' in страница
+    assert 'data-tip="Принята 19 сен 2026, 08:30 · Demo Lead"' in страница
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+def test_язык_отчёта_словом_а_не_кодом(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """#1086: «Язык отчёта: английский», а не «en»."""
+    страница = _открыть(стенд, monkeypatch, уК=True, report_lang="en")
+    факт = страница.split("Язык отчёта", 1)[1].split("</div>", 2)[1]
+    assert "английский" in факт and ">en<" not in факт
