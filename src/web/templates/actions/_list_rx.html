@@ -18,7 +18,7 @@
               <span class="srow__main"><b>{{ p.subject }}</b></span>
               <span class="srow__cell srow__country">{{ country_title(p.country) or p.country }}</span>
               <span class="srow__cell srow__units">{{ rx_units(p) }}</span>
-              <span class="srow__cell mono is-num srow__due{% if p.overdue(today) %} srow__err{% endif %}" data-label="{{ t('rx.col.due') }}">{{ p.due_on }}</span>
+              <span class="srow__cell mono is-num srow__due{% if p.overdue(today) %} srow__err{% endif %}" data-label="{{ t('rx.col.due') }}">{{ day(p.due_on) }}</span>
               <span class="srow__cell srow__state">{{ rx_tag(p, today) }}{{ rx_replied(p) }}</span>
             </a>
           </li>

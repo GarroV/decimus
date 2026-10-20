@@ -29,7 +29,7 @@
       <h3 class="ssec__title">{{ t('actions.panel.facts') }}</h3>
       <dl class="sprops">
         <div><dt>{{ t('rx.col.due') }}</dt>
-          <dd{% if p.overdue(today) %} class="srow__err"{% endif %}>{{ p.due_on }}</dd></div>
+          <dd{% if p.overdue(today) %} class="srow__err"{% endif %}>{{ day(p.due_on) }}</dd></div>
         <div><dt>{{ t('rx.col.state') }}</dt><dd>{{ rx_tag(p, today) }}{{ rx_replied(p) }}</dd></div>
         {% if p.issued_at %}<div><dt>{{ t('actions.panel.sent') }}</dt><dd>{{ meta(p) }}</dd></div>{% endif %}
       </dl>

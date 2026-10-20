@@ -64,6 +64,9 @@ TEXTS: dict[str, dict[str, str]] = {
     # Название языка — на нём самом: ищущий свой язык читает его, а не перевод.
     "nav.lang.ru": {"ru": "Русский", "en": "Русский"},
     "nav.lang.en": {"ru": "English", "en": "English"},
+    # Язык — словом на языке экрана (#1086): «Язык отчёта: английский», а не «en».
+    "lang.name.ru": {"ru": "русский", "en": "Russian"},
+    "lang.name.en": {"ru": "английский", "en": "English"},
     "nav.sections": {"ru": "Разделы", "en": "Sections"},
     "nav.more": {"ru": "Ещё", "en": "More"},
     "split.back": {"ru": "Назад", "en": "Back"},
