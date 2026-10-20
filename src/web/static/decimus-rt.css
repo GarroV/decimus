@@ -384,3 +384,85 @@
   .rt-tbl--stack .rt-stack__wide { flex-direction: column; align-items: flex-start; gap: 0; text-align: left; }
   .rt-tbl--stack .rt-stack__empty { display: none; }
 }
+
+/* ── Плитки (D585): лицо — заголовок, цифры, строка; раскрытая — на всю ширину.
+   Вид плитки — по Tile хаба imf-vc (скруглённая карточка, цветное пятно в углу,
+   «Подробнее ›»), раскрытие — на месте, а не окном. ───────────────────── */
+.rt-tiles {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  grid-auto-flow: dense;  /* плитка после раскрытой занимает пустое место в ряду выше */
+  gap: var(--rt-gap); align-items: stretch;
+}
+.rt-tile {
+  position: relative; min-width: 0; overflow: hidden; isolation: isolate;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.rt-tile::after {  /* цветное пятно в углу, как у плитки хаба */
+  content: ""; position: absolute; z-index: -1; right: -18%; bottom: -38%;
+  width: 46%; aspect-ratio: 1; border-radius: 50%; background: var(--accent-soft); opacity: .6;
+}
+.rt-tile:hover { border-color: var(--accent-line); }
+.rt-tile__h { margin: 0; font: inherit; }
+.rt-tile__face {
+  all: unset; box-sizing: border-box; width: 100%; min-height: 9.5rem; cursor: pointer;
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  display: flex; flex-direction: column; gap: var(--space-3); text-align: left;
+}
+.rt-tile__face:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 12px; }
+.rt-tile__title { font-size: var(--fs-body); line-height: var(--lh-body); font-weight: var(--w-bold); color: var(--ink); }
+.rt-tile__figs { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); }
+.rt-tile__fig { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.rt-tile__fig b { font-family: var(--font-sans, inherit); font-variant-numeric: tabular-nums; font-size: 26px; line-height: 30px; font-weight: var(--w-semibold); color: var(--ink); }
+.rt-tile__fig small { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); }
+.rt-tile__note { font-size: var(--fs-dense); line-height: var(--lh-dense); color: var(--ink-2); max-width: 30ch; text-wrap: pretty; }
+.rt-tile__more {
+  margin-top: auto; display: inline-flex; align-items: center; gap: var(--space-2);
+  font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--accent);
+}
+.rt-tile__chev {
+  width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translate(-1px, -1px); transition: transform .2s ease;
+}
+.rt-tile.is-open { grid-column: 1 / -1; border-color: var(--accent-line); }
+.rt-tile.is-open::after { display: none; }
+.rt-tile.is-open .rt-tile__face {
+  min-height: 0; flex-direction: row; flex-wrap: wrap; align-items: baseline;
+  gap: var(--space-2) var(--space-7); background: var(--accent-soft);
+}
+.rt-tile.is-open .rt-tile__title { font-size: 17px; line-height: 22px; }
+.rt-tile.is-open .rt-tile__fig { flex-direction: row; align-items: baseline; gap: var(--space-2); }
+.rt-tile.is-open .rt-tile__fig b { font-size: var(--fs-body); line-height: var(--lh-body); }
+.rt-tile.is-open .rt-tile__more { margin: 0 0 0 auto; }
+.rt-tile.is-open .rt-tile__chev { transform: rotate(-135deg) translate(-1px, -1px); }
+.rt-tile__body { padding: var(--space-6); border-top: 1px solid var(--line); min-width: 0; }
+.rt-tile__body[hidden] { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .rt-tile.is-open .rt-tile__body { animation: rt-tile-in .24s ease both; }
+  @keyframes rt-tile-in { from { opacity: 0; transform: translateY(-6px); } }
+}
+@media (max-width: 719px) {
+  .rt-tile__face { min-height: 0; padding: var(--space-5); }
+  .rt-tile.is-open .rt-tile__more { margin-left: 0; }
+  .rt-tile__body { padding: var(--space-5) var(--space-4); }
+}
+
+/* Хард-нарушения (D585): столбцы по десять строк, на широком экране по два. */
+.rt-hard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-7); align-items: start; margin-bottom: var(--space-4); }
+.rt-hard__col { list-style: none; margin: 0; padding: 0; min-width: 0; border-top: 1px solid var(--line); }
+.rt-hard__col[hidden] { display: none; }
+.rt-hard__row {
+  counter-increment: list-item;
+  display: grid; grid-template-columns: 2em minmax(0, 1fr) auto; column-gap: var(--space-3); row-gap: 2px; align-items: baseline;
+  padding: var(--space-3) 0; border-bottom: 1px solid var(--line);
+}
+.rt-hard__row::before { content: counter(list-item); grid-row: 1; font-family: var(--font-mono); font-size: var(--fs-meta); color: var(--ink-3); text-align: right; }
+.rt-hard__who { grid-column: 2; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-3); font-size: var(--fs-dense); line-height: var(--lh-dense); }
+.rt-hard__who a { font-weight: var(--w-semibold); }
+.rt-hard__who small { color: var(--ink-3); font-size: var(--fs-meta); }
+.rt-hard__who .rt-kind { margin-left: var(--space-1); }
+.rt-hard__n { grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-weight: var(--w-semibold); color: var(--err); }
+.rt-hard__text { grid-column: 2 / -1; font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-2); overflow-wrap: anywhere; }
+.rt-hard__more { margin-top: var(--space-2); }
+.rt-hard__more[hidden] { display: none; }
+@media (max-width: 719px) { .rt-hard { grid-template-columns: minmax(0, 1fr); } }

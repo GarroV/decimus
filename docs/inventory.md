@@ -490,6 +490,7 @@
 | `0080_ratings_layout_compare.sql` | — |
 | `0081_inspection_edits.sql` | `inspection_edits` |
 | `0082_rate_windows.sql` | `rate_windows` |
+| `0083_ratings_layout_aggregators.sql` | — |
 <!-- map:end -->
 
 ## Makefile
