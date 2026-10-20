@@ -56,7 +56,7 @@ async def test_показывает_записанное_не_завершая_�
     await feed(dp, bot, text_message(COMMAND))
 
     показано = "\n".join(session.texts)
-    assert "#1" in показано and "PRD01" in показано, "записанное не показано"
+    assert "#1" in показано and "Заготовки 1" in показано, "записанное не показано"
     assert FINISH_BUILD_CALLBACK not in session.keyboard_data(), (
         "показ записанного не должен предлагать собрать отчёт — он ничего не завершает"
     )

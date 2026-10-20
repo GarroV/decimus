@@ -118,7 +118,7 @@ async def test_поправленная_запись_показывается_в
     await feed(dp, bot, text_message(SINK_REPLY, reply_to=bot_message(said)))
 
     shown = session.last_text
-    assert "CLN02" in shown
+    assert "Порядок 2" in shown and "CLN02" not in shown
     assert "Раковина и смеситель без налёта" in shown, "вопрос пункта аудитору не показан"
     assert "Посудный участок" in shown, "новая зона в показе не названа"
 

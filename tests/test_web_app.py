@@ -35,8 +35,9 @@ from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.move import MoveRecord
 from src.db.reach import own_reach
 from src.db.retract import Retraction
+from src.domain.item_label import ItemTexts
 from src.domain.tenants import canonical_tenant
-from src.web import action_plans
+from src.web import action_plans, item_labels
 from src.web import country as country_data
 from src.web import inspections as data
 from src.web import overview as overview_data
@@ -250,6 +251,25 @@ def test_карточка_печатает_разбивку_записанной
     # стилей и однажды уже содержал «92», из-за чего проверка упала не по делу.
     видимое = re.sub(r"\?v=[0-9a-f]+", "", страница)
     assert "92" not in видимое
+
+
+@pytest.mark.parametrize(("lang", "ожидается"), [("ru", "Порядок 2 · "), ("en", "Tidiness 2 · ")])
+def test_карточка_называет_пункт_меткой_на_языке_экрана_а_не_кодом(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, lang: str, ожидается: str
+) -> None:
+    # Arrange — тексты пунктов берутся из методики версии проверки; здесь подменена
+    # граница чтения методики, всё остальное — настоящая карточка.
+    тексты = {"CLN02": ItemTexts("Порядок", "Tidiness", "Раковина", "Sink")}
+    monkeypatch.setattr(item_labels.info_titles, "item_texts", lambda *_a, **_k: (тексты, "found"))
+    деталь = карточка(шапка())
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)
+
+    # Act
+    страница = стенд.get(f"/inspections/{деталь.inspection.id}?lang={lang}").get_data(as_text=True)
+
+    # Assert — код записи (CLN02) на экране не стоит, метка — на языке экрана
+    assert ожидается in страница
+    assert "CLN02" not in страница
 
 
 def test_карточка_называет_сборку_датой_а_не_номером(

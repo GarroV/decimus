@@ -94,9 +94,17 @@ def _head(ws: Any, req: PlanRequest, lang: str) -> int:
 
 
 def build(
-    req: PlanRequest, findings: Sequence[FindingRow], zones: Mapping[str, str], lang: str
+    req: PlanRequest,
+    findings: Sequence[FindingRow],
+    zones: Mapping[str, str],
+    lang: str,
+    labels: Mapping[str, str] | None = None,
 ) -> bytes:
-    """Книга `.xlsx`: шапка запроса и строка на каждое нарушение проверки."""
+    """Книга `.xlsx`: шапка запроса и строка на каждое нарушение проверки.
+
+    `labels` — метки пунктов («Порядок 13») по кодам; в колонке «Пункт» партнёр
+    видит их, а не код (20.10.2026). Пункта нет в словаре — остаётся код.
+    """
     wb = Workbook()
     ws = wb.active
     ws.title = t("plans.tpl.sheet", lang)[:31]
@@ -109,7 +117,13 @@ def build(
         ws.column_dimensions[get_column_letter(col)].width = width
     for i, f in enumerate(plan_rows(findings), start=1):
         строка = начало + i
-        значения = (i, f.level, zones.get(f.zone, f.zone), f.code, f.text or "")
+        значения = (
+            i,
+            f.level,
+            zones.get(f.zone, f.zone),
+            (labels or {}).get(f.code, f.code),
+            f.text or "",
+        )
         for col, value in enumerate(значения, start=1):
             _put(ws, строка, col, value).alignment = _WRAP
         for col in range(_FILLED + 1, len(_COLUMNS) + 1):

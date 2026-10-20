@@ -25,6 +25,7 @@ from bot_harness import (
 from src import domain
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
+from src.bot.item_labels import shown as метка_пункта
 from src.bot.texts import t
 from src.bot.view import zone_title
 from src.domain.errors import EngineError
@@ -219,7 +220,7 @@ async def test_wording_edit_is_taken_from_the_next_plain_message(domain_env: obj
         "edit.changed",
         "ru",
         n=1,
-        code=finding.code,
+        code=метка_пункта(finding.code, "ru", chat_id=CHAT_ID),
         level=finding.level,
         zone=FRIDGE_TITLE_RU,
     )

@@ -47,7 +47,7 @@ from .checklist_layout import Store
 from .db_target import config_refusal
 from .errors import McpError, ToolError
 from .retraction import _same_unit
-from .tools import _finding, _parse_date, _require_inspection_id
+from .tools import _finding, _item_texts_of, _parse_date, _require_inspection_id
 
 if TYPE_CHECKING:
     from ..db.models import InspectionDetail
@@ -461,6 +461,8 @@ def _view(ident: str, *, tenant: str, note: str, warnings: Sequence[str] = ()) -
     if шапка.origin == ORIGIN_LEGACY:
         return _legacy_view(detail, шапка, note=note, warnings=warnings)
     строка = detail.inspection
+    # Пункт человеку — меткой и формулировкой (`item_label`, `item_title`), не кодом.
+    тексты = _item_texts_of(строка.checklist_version)
     return {
         "id": строка.id,
         "mode": modes.MODE_CURRENT,
@@ -481,7 +483,8 @@ def _view(ident: str, *, tenant: str, note: str, warnings: Sequence[str] = ()) -
         "by_zone": detail.by_zone,
         **_comparison(detail, шапка),
         "findings": [
-            {**_finding(f), "repeat": f.repeat} for f in sorted(detail.findings, key=lambda f: f.n)
+            {**_finding(f, тексты, строка.report_lang), "repeat": f.repeat}
+            for f in sorted(detail.findings, key=lambda f: f.n)
         ],
     }
 

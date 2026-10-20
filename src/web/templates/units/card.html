@@ -117,9 +117,9 @@
         <div class="find-row">
           <span class="tag {{ level_tone(f.level) }} find-row__level">{{ f.level }}</span>
           <span class="find-row__main">
-            <span class="find-row__text">{{ item_titles.get(f.code, f.text or f.code) }}</span>
+            <span class="find-row__text">{{ item_titles.get(f.code, f.text or item_label(f.code)) }}</span>
             <span class="find-row__meta">
-              {{ f.code }} · {{ data.zone_names.get(f.zone, f.zone) }}
+              {{ item_label(f.code) }} · {{ data.zone_names.get(f.zone, f.zone) }}
               {% if f.repeat %} · <span class="pt-doubled">{{ t('unit.finding.doubled') }}</span>{% endif %}
             </span>
           </span>
@@ -139,8 +139,8 @@
       {% if data.repeats %}
         {% for r in data.repeats %}
           <div class="ov-row">
-            <span class="ov-row__name">{{ item_titles.get(r.code, r.text or r.code) }}</span>
-            <span class="ov-row__meta">{{ r.code }} · {{ data.zone_names.get(r.zone, r.zone) }}</span>
+            <span class="ov-row__name">{{ item_titles.get(r.code, r.text or item_label(r.code)) }}</span>
+            <span class="ov-row__meta">{{ item_label(r.code) }} · {{ data.zone_names.get(r.zone, r.zone) }}</span>
             {# Три состояния клетки, а не два: пусто — нарушения в той проверке
                не записано; обводка — записано (наблюдение); заливка — аудитор
                отметил повтор и вычет удвоен (факт расчёта). #}

@@ -34,6 +34,7 @@ from bot_harness import (
 
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
+from src.bot.item_labels import shown as метка_пункта
 from src.bot.keyboards import MODEL_CALLBACK, ZONE_FOR_ITEM_PREFIX
 from src.bot.phrases import synonyms
 from src.bot.texts import t
@@ -235,7 +236,9 @@ async def test_многозонный_синоним_спрашивает_зон
 
     await feed(dp, bot, photo_message("frame-1", caption=НЕПРЯМЫЕ_СЛОВА, message_id=601))
 
-    assert session.last_text == t("record.ask_zone_for_item", "ru", code=МНОГОЗОННЫЙ)
+    assert session.last_text == t(
+        "record.ask_zone_for_item", "ru", code=метка_пункта(МНОГОЗОННЫЙ, "ru", chat_id=CHAT_ID)
+    )
     своих = [
         f"{ZONE_FOR_ITEM_PREFIX}{zone}" for zone in allowed_zones(МНОГОЗОННЫЙ, chat_id=CHAT_ID)
     ]

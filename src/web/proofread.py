@@ -97,6 +97,7 @@ def _card(card: dict[str, Any], sheet: Sheet, zone_names: dict[str, str]) -> dic
     zone = card["resolution"]["zone"] or ""
     return {
         "code": pick.code,
+        "label": pick.label,
         "title": pick.question,
         "level": level,
         "levels": list(pick.levels),

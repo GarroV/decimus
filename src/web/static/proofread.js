@@ -105,7 +105,8 @@
 
   // ── Выбор пункта ───────────────────────────────────────────────────────────
   function itemTitle(item) {
-    return item.c + " — " + item.q;
+    // Поиск идёт и по коду (его знают привыкшие), но на экране код не показывается.
+    return item.c + " " + item.n + " — " + item.q;
   }
 
   function showChosen(picker, item) {
@@ -121,7 +122,7 @@
     out.classList.remove("is-empty");
     var code = document.createElement("span");
     code.className = "ipick__code";
-    code.textContent = item.c;
+    code.textContent = item.n;
     var title = document.createElement("span");
     title.textContent = item.q;
     out.appendChild(code);
@@ -157,7 +158,7 @@
       btn.dataset.code = item.c;
       var c = document.createElement("span");
       c.className = "ipick__code";
-      c.textContent = item.c;
+      c.textContent = item.n;
       var q = document.createElement("span");
       q.textContent = item.q;
       btn.appendChild(c);
@@ -472,7 +473,7 @@
       main.className = "suggest__main";
       var code = document.createElement("span");
       code.className = "ipick__code";
-      code.textContent = card.code;
+      code.textContent = card.label;
       var title = document.createElement("span");
       title.textContent = card.title;
       main.appendChild(code);

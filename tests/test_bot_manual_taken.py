@@ -47,6 +47,7 @@ from bot_harness import callback_query as callback
 
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
+from src.bot.item_labels import shown as метка_пункта
 from src.bot.keyboards import MANUAL_PAGE_SIZE
 from src.bot.texts import t
 from src.domain import add_finding, start_inspection
@@ -95,7 +96,8 @@ async def test_занятый_пункт_назван_в_тексте_стран
 
     await открыть_перечень(dp, bot)
 
-    assert "CLN06" in session.last_text, f"занятый пункт не назван: {session.last_text!r}"
+    assert "Порядок 6" in session.last_text, f"занятый пункт не назван: {session.last_text!r}"
+    assert "CLN06" not in session.last_text, "код пункта уехал аудитору"
     assert "#1" in session.last_text, "номер занявшей записи не назван — править пойдут вслепую"
 
 
@@ -109,12 +111,14 @@ async def test_формулировка_на_кнопке_не_пострада�
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    ожидается = [f"{item.code} · {item.title}" for item in ПЕРЕЧЕНЬ]
+    ожидается = [
+        f"{метка_пункта(item.code, 'ru', chat_id=CHAT_ID)} · {item.title}" for item in ПЕРЕЧЕНЬ
+    ]
 
     await открыть_перечень(dp, bot)
 
     assert session.keyboard_texts()[: len(ожидается)] == ожидается, (
-        f"надпись кнопки не равна «код · формулировка»: {session.keyboard_texts()}"
+        f"надпись кнопки не равна «метка · формулировка»: {session.keyboard_texts()}"
     )
     без_пометки = session.keyboard_texts()
 
@@ -192,7 +196,7 @@ async def test_пометка_только_про_пункты_этой_стра
     session.clear()
     await feed(dp, bot, callback("rec:mp:1"))
 
-    assert занятый in session.last_text, (
+    assert метка_пункта(занятый, "ru", chat_id=CHAT_ID) in session.last_text, (
         f"вторая страница о своём занятом пункте промолчала: {session.last_text!r}"
     )
 

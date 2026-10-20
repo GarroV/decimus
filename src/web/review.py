@@ -17,6 +17,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from src.db.models import InspectionRow
+from src.domain import item_label
 
 from . import methodology as method
 from .errors import MethodologyRefused
@@ -46,6 +47,8 @@ class Pick:
     """
 
     code: str
+    #: Метка для человека («Порядок 13»): в списке и в выбранном пункте — вместо кода.
+    label: str
     question: str
     levels: tuple[str, ...]
     zones: tuple[str, ...]
@@ -78,6 +81,8 @@ def build_sheet(
     речи проверки, как их и записали.
     """
     зоны = tuple(zones)
+    items = tuple(items)
+    тексты = item_label.from_csv(items)
     коды_зон = tuple(str(z.get("code", "")) for z in зоны)
     выбор: list[Pick] = []
     for item in items:
@@ -89,10 +94,12 @@ def build_sheet(
             for x in (item.get("levels") or "").replace(";", ",").split(",")
             if x.strip()
         )
+        метка = item_label.label(код, тексты, lang)
         выбор.append(
             Pick(
                 code=код,
-                question=str(item.get(f"question_{lang}") or item.get("question_ru") or код),
+                label=метка,
+                question=str(item.get(f"question_{lang}") or item.get("question_ru") or метка),
                 levels=классы,
                 zones=_zones_of(item, коды_зон),
             )

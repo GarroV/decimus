@@ -17,6 +17,7 @@ from collections.abc import Mapping, Sequence
 from src import domain
 from src.recognize.models import UNKNOWN_ZONE, Candidate
 
+from . import item_labels
 from .texts import t
 
 #: Информационный уровень записи: замеры и фото продукта (`INF09`–`INF11`,
@@ -137,6 +138,7 @@ def candidate_lines(
     пометить её значило бы отговаривать аудитора от верного действия.
     """
     titles = zone_titles(lang, chat_id=chat_id)
+    labels = item_labels.chat_texts(chat_id)
     occupied = taken or {}
     lines = []
     for index, candidate in enumerate(candidates, start=1):
@@ -145,7 +147,7 @@ def candidate_lines(
             key,
             lang,
             index=index,
-            code=candidate.code,
+            code=item_labels.shown(candidate.code, lang, chat_id=chat_id, texts=labels),
             level=candidate.level,
             zone=zone_title(candidate.zone, lang, titles, chat_id=chat_id),
             wording=candidate.wording,
@@ -158,7 +160,12 @@ def candidate_lines(
 
 
 def manual_taken_line(
-    codes: Sequence[str], zone: str, lang: str, taken: Mapping[tuple[str, str], int]
+    codes: Sequence[str],
+    zone: str,
+    lang: str,
+    taken: Mapping[tuple[str, str], int],
+    *,
+    chat_id: int,
 ) -> str:
     """Пометка занятых пар для страницы ручного перечня — или пусто (T173).
 
@@ -175,8 +182,14 @@ def manual_taken_line(
     Номер занявшей записи назван по той же причине, что и в перечне модели: с
     ним аудитор идёт править запись, а без него — искать её.
     """
+    labels = item_labels.chat_texts(chat_id)
     hits = [
-        t("record.manual_taken_item", lang, code=code, n=taken[(code, zone)])
+        t(
+            "record.manual_taken_item",
+            lang,
+            code=item_labels.shown(code, lang, chat_id=chat_id, texts=labels),
+            n=taken[(code, zone)],
+        )
         for code in codes
         if (code, zone) in taken
     ]
@@ -219,7 +232,7 @@ def confirm_line(finding: domain.Finding, lang: str, *, chat_id: int) -> str:
         key,
         lang,
         n=finding.n,
-        code=finding.code,
+        code=item_labels.shown(finding.code, lang, chat_id=chat_id),
         level=finding.level,
         zone=zone_title(finding.zone, lang, chat_id=chat_id),
     )
@@ -447,7 +460,7 @@ def changed_line(finding: domain.Finding, lang: str, *, chat_id: int) -> str:
         "edit.changed_info" if finding.level == INFO_LEVEL else "edit.changed",
         lang,
         n=finding.n,
-        code=finding.code,
+        code=item_labels.shown(finding.code, lang, chat_id=chat_id),
         level=finding.level,
         zone=zone_title(finding.zone, lang, chat_id=chat_id),
     )
@@ -479,6 +492,7 @@ def record_lines(findings: Sequence[domain.Finding], lang: str, *, chat_id: int)
     партнёру, а в нём пометки нет.
     """
     titles = zone_titles(lang, chat_id=chat_id)
+    labels = item_labels.chat_texts(chat_id)
     lines = []
     for finding in findings:
         mark = t("finish.source_photo", lang) if finding.source == domain.SOURCE_PHOTO else ""
@@ -487,7 +501,7 @@ def record_lines(findings: Sequence[domain.Finding], lang: str, *, chat_id: int)
                 "finish.record_line",
                 lang,
                 n=finding.n,
-                code=finding.code,
+                code=item_labels.shown(finding.code, lang, chat_id=chat_id, texts=labels),
                 level=finding.level,
                 zone=zone_title(finding.zone, lang, titles, chat_id=chat_id),
                 source=mark,

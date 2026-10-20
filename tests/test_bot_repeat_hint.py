@@ -225,7 +225,7 @@ async def test_вопрос_идёт_после_записи_и_сам_ниче�
 
     await зафиксировать(dp, bot, monkeypatch)
 
-    блок = next(текст for текст in session.texts if "CLN05" in текст)  # type: ignore[attr-defined]
+    блок = next(текст for текст in session.texts if "Порядок 5" in текст)  # type: ignore[attr-defined]
     assert session.texts.index(блок) < session.texts.index(текст_вопроса())  # type: ignore[attr-defined]
     assert запись().repeat is False
 

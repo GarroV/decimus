@@ -32,7 +32,7 @@
     <form method="post" action="{{ action }}" enctype="multipart/form-data" class="section">
       <input type="hidden" name="n" value="{{ f.n }}">
       <input type="hidden" name="html" value="1">
-      <p><strong>#{{ f.n }} {{ f.code }}</strong> — {{ f.text }}</p>
+      <p><strong>#{{ f.n }} {{ f.label }}</strong> — {{ f.text }}</p>
       <input type="file" name="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple required
              aria-label="{{ t('photo_upload.pick', n=f.n) }}">
       <button type="submit" class="btn">{{ t('photo_upload.send') }}</button>

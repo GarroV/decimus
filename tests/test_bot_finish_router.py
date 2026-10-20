@@ -77,7 +77,8 @@ async def test_summary_shows_score_and_the_recorded_list(domain_env: object) -> 
     итог = session.texts[0]
     assert f"{score(CHAT_ID).pct:.1f}%" in итог
     assert score(CHAT_ID).grade in итог
-    assert "CLN05" in session.texts[1]
+    assert "Порядок 5" in session.texts[1]
+    assert "CLN05" not in session.texts[1], "код пункта уехал аудитору"
     assert "Нагар на подине печи" in session.texts[1]
     assert session.last_text == t("finish.ask", "ru")
 
@@ -222,7 +223,8 @@ async def test_edit_from_the_summary_opens_the_record(domain_env: object) -> Non
     assert session.keyboard_data() == ["fin:pick:1"]
 
     await feed(dp, bot, callback("fin:pick:1"))
-    assert "CLN05" in session.last_text
+    assert "Порядок 5" in session.last_text
+    assert "CLN05" not in session.last_text
     assert "edit:1:zone" in session.keyboard_data()
     assert "edit:1:drop" in session.keyboard_data()
 

@@ -236,8 +236,8 @@
             <li class="hm-row">
               <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
               <span class="hm-row__main">
-                {% if item_titles.get(item.code) %}{{ item_titles.get(item.code) }}{% elif item.text %}<span lang="{{ item.lang }}">{{ item.text }}</span>{% else %}{{ item.code }}{% endif %}
-                <span class="hm-row__meta">{% if item_titles.get(item.code) or item.text %}{{ item.code }} · {% endif %}{{ t('overview.systemic.spread', units=item.units, records=item.records) }}</span>
+                {% if item_titles.get(item.code) %}{{ item_titles.get(item.code) }}{% elif item.text %}<span lang="{{ item.lang }}">{{ item.text }}</span>{% else %}{{ item_label(item.code) }}{% endif %}
+                <span class="hm-row__meta">{% if item_titles.get(item.code) or item.text %}{{ item_label(item.code) }} · {% endif %}{{ t('overview.systemic.spread', units=item.units, records=item.records) }}</span>
               </span>
             </li>
           {% endfor %}

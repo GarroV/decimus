@@ -353,7 +353,7 @@
                href="{{ href(item=code, new='') }}" data-mx-item="{{ code }}" data-mx-open
                {% if code == selected %}aria-current="true"{% endif %}>
               <span class="mx-row__code mono">{{ code }}</span>
-              <span class="mx-row__text">{{ plain(it.get('question_ru') or it.get('question_en') or '—') }}</span>
+              <span class="mx-row__text"><span class="mx-muted">{{ item_label(code) }} ·</span> {{ plain(it.get('question_ru') or it.get('question_en') or '—') }}</span>
               <span class="mx-row__levels">{{ level_slots(it) }}</span>
               <span class="mx-row__days">{{ t('methodology.days.short', days=it.get('days')) if it.get('days') else '—' }}</span>
             </a>
@@ -386,6 +386,8 @@
         <header class="mx-drawer__head">
           <div class="grow mx-drawer__id">
             <span class="mx-drawer__code mono" id="mx-drawer-title">{{ code }}</span>
+            {# Код — рабочий идентификатор редактора; метка рядом показывает, как пункт видят люди (20.10.2026). #}
+            <span class="mx-muted">{{ item_label(code) }}</span>
             {% if is_off(card) %}<span class="tag tag--err tag--micro">{{ t('methodology.off.badge') }}</span>
             {% else %}<span class="tag tag--neutral tag--micro">{{ kind_title(card.get('kind')) }}</span>{% endif %}
             <span class="mx-drawer__dirty" data-mx-dirty hidden>{{ t('methodology.drawer.dirty') }}</span>

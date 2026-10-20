@@ -416,8 +416,9 @@ def _install_template(app: Flask, conf: Settings) -> None:
             return "", 404
         лист = review.load_sheet(деталь.inspection, lang=lang)
         зоны = {z.code: z.name for z in лист.zones} if лист else {}
+        метки = {p.code: p.label for p in лист.picks} if лист else {}
         ответ = send_file(
-            io.BytesIO(plan_template.build(запрос, деталь.findings, зоны, lang)),
+            io.BytesIO(plan_template.build(запрос, деталь.findings, зоны, lang, метки)),
             mimetype=XLSX_MIME,
             as_attachment=True,
             download_name=plan_template.file_name(запрос),

@@ -73,7 +73,7 @@ async def test_подтверждение_записи_по_кадру_без_п
     await feed(dp, bot, callback("rec:pick:0"))
 
     line = session.texts[0]
-    assert "#1" in line and "CLN05" in line, "запись перестала показываться вовсе"
+    assert "#1" in line and "Порядок 5" in line, "запись перестала показываться вовсе"
     assert "%" not in line, "процент во время обхода показывать нельзя (D072)"
 
 

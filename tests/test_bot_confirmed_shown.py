@@ -43,6 +43,7 @@ from bot_harness import callback_query as callback
 
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
+from src.bot.item_labels import shown as метка_пункта
 from src.bot.texts import t
 from src.bot.view import zone_title
 from src.domain import get_item, get_state, start_inspection
@@ -170,7 +171,7 @@ async def test_показ_подтверждённой_и_автоматичес
         "record.saved",
         "ru",
         n=1,
-        code="CLN05",
+        code=метка_пункта("CLN05", "ru", chat_id=CHAT_ID),
         level="D1",
         zone=zone_title("hot_kitchen", "ru", chat_id=CHAT_ID),
     )
