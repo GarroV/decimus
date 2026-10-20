@@ -111,7 +111,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.points.grade": {"ru": "Оценка", "en": "Grade"},
     "overview.points.score": {"ru": "Итог, %", "en": "Score, %"},
     "overview.points.delta": {"ru": "Δ", "en": "Δ"},
-    "overview.points.process": {"ru": "Слабое направление", "en": "Weakest direction"},
+    "overview.points.process": {"ru": "Больше всего потерь", "en": "Most points lost"},
     "overview.points.date": {"ru": "Проверена", "en": "Inspected"},
     "overview.points.empty": {
         "ru": "В этой выборке нет ни одной проверенной точки. Снимите часть отбора.",
@@ -368,8 +368,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "This unit has not been audited yet",
     },
     "unit.weak": {
-        "ru": "Слабые направления последней проверки",
-        "en": "Weak directions of the last audit",
+        "ru": "Где потеряны проценты в последней проверке",
+        "en": "Where the last audit lost points",
     },
     "unit.weak.empty": {
         "ru": "В последней проверке потерь по направлениям не записано",
