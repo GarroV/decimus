@@ -51,6 +51,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Предписание | Письмо УК партнёру с требованием: черновик, отправка через почту сотрудника, ответ партнёра, закрытие | `src/db/prescriptions.py`, `src/web/prescriptions.py` |
 | РС, РКО | Рейтинг стандартов и рейтинг клиентского опыта: средние оценки по пиццериям из выгрузок Dodo IS; раздел «Рейтинги» | `docs/15-ratings.md`, `src/ratings/` |
 | Агрегатор | Площадка доставки с оценками пиццерий (Wolt, Glovo, Bolt Food, Yemeksepeti и др.); оценки собираются раз в сутки | `docs/17-aggregators.md`, `src/ratings/aggregators/` |
+| Обучение | Раздел «Обучение»: обученность пиццерий по данным iSpring LMS (завершено / назначено), снимок раз в сутки; только счётчики, данных о сотрудниках нет (D575) | `docs/20-training.md`, `src/learning/`, `src/domain/training_metrics.py` |
 | Pointer | Внешний API оценок и отзывов с карт | `docs/09-pointer-api.md`, `src/ratings/pointer.py` |
 | Свод пиццерий | Таблица сведений о пиццериях, из которой наполняется справочник профилей | `docs/16-unit-profiles.md`, `src/ratings/svod.py` |
 | Swarm | Внутренняя платформа команды, главная которой показывает наши данные. Читает их по API чтения, своих копий не держит | `src/web/swarm_api.py`, `docs/12-web-admin.md` (раздел «API чтения для Swarm») |
@@ -114,7 +115,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,actions_screen,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,actions_screen,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -156,6 +157,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/review.py` | Чек-лист той версии, по которой считали проверку, — для правки записей на вычитке (D535) |
 | `src/web/revision.py` | Правка записи на приёмке с пересчётом отчёта (D200) |
 | `src/web/to_inspect.py` | «Где не проведено» на «Проверках» (D399; D418, D466, D497 — переезды; D501 — вернулся сюда) |
+| `src/web/training_page.py` | Экран «Обучение»: обученность пиццерий по данным iSpring (D574, D575, D578, #906) |
 | `src/web/unit_add.py` | Новая пиццерия из веб-админки: экран страны → «Добавить пиццерию» (#437, D240) |
 | `src/web/unit_card.py` | Карточка точки: где пиццерия сейчас, куда движется и что у неё не чинится |
 <!-- map:end -->
@@ -245,6 +247,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_second_factor.py` | Тексты второй ступени входа (D463): «Подтвердите вход» и «Вход и защита» |
 | `src/web/texts_service_keys.py` | Тексты блока «Ключи сервисов» на вкладке «Подключения» (D491, D576) |
 | `src/web/texts_settings.py` | Тексты экрана «Настройки» (D447): подключения, Google, язык, пароль |
+| `src/web/texts_training.py` | Тексты экрана «Обучение» (D578, #906): колонка, плитки, списки, пустое состояние |
 | `src/web/texts_trips.py` | Тексты поездок «Календаря» (D505, D506): сетка, карточка, план, отказы |
 | `src/web/texts_units.py` | Тексты заведения пиццерии из веб-админки (#437, D233, D240) |
 | `src/web/texts_usage.py` | Тексты экрана «Расход модели» (D537): вкладка «Администрирования», расход токенов |
@@ -300,6 +303,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/prescriptions/` | 1 | not_found.html |
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
 | `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
+| `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/usage/` | 1 | page.html |
 | `src/web/templates/users/` | 8 | _card.html, _connections.html, _service_keys.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
@@ -308,7 +312,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 60 | SOURCE.md, actions.js, apple-touch-icon.png, country.js, decimus-actions.css, decimus-country.css, decimus-domain.css, decimus-home.css, … (+52) |
+| `src/web/static/` | 61 | SOURCE.md, actions.js, apple-touch-icon.png, country.js, decimus-actions.css, decimus-country.css, decimus-domain.css, decimus-home.css, … (+53) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -382,7 +386,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
@@ -391,6 +395,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
+| `src/db/learning_store.py` | Обучение в базе (схема `learning`, миграция 0085): запись снимка дня и журнал загрузок |
 | `src/db/maps_store.py` | Оценки на картах в базе (схема `maps`, миграция 0044): запись снимка и чтение |
 | `src/db/model_key.py` | Ключ модели из базы (D491): тонкая обёртка над общим хранилищем `service_keys` (D576) |
 | `src/db/model_usage.py` | Расход модели (D537, `0078`): запись вызова и чтение сводки для экрана |
@@ -404,6 +409,8 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/second_factor.py` | Вторая ступень входа (D463, `0068`): хранение и одноразовые переходы |
 | `src/db/secret_crypto.py` | Шифрование секретов, которые лежат в базе (D491): AES-256-GCM, ключ — вне базы |
 | `src/db/service_keys.py` | Ключи внешних сервисов из базы (D576, обобщение ключа модели D491) |
+| `src/db/training_names.py` | Столбцы счётчиков обучения (миграция 0085) — общие для записи и чтения |
+| `src/db/training_read.py` | Чтение обучения для экрана «Обучение» (схема `learning`, миграция 0085; D574, D578) |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
 | `src/db/web_own_profile.py` | Свой профиль с экрана «Настройки» (D447): почта Google и язык сайта — уровень базы |
 | `src/db/web_throttle.py` | Ограничитель перебора пароля на форме входа (T325, решения D154 и D155) |
@@ -503,6 +510,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0082_rate_windows.sql` | Общее скользящее окно частоты запросов (аудит F-110, #1006) |
 | `0083_ratings_layout_aggregators.sql` | D585: агрегаторы на «Рейтингах» — своя плитка выше, а не часть блока карт |
 | `0084_service_keys.sql` | Таблица `vault.secrets` (0070) с первого дня хранила один секрет — `model_key` — и стерегла это `check`-ом по имени |
+| `0085_learning.sql` | Обучение пиццерий из iSpring (D574, D575, D578, #906) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -589,6 +597,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/keyboards.py` | Инлайн-клавиатуры мастера начала проверки (T050, T051, T052) |
 | `src/bot/lang.py` | Языки этого чата — так, чтобы на них нельзя было упасть (T126) |
 | `src/bot/lang_choice.py` | Кто говорит с ботом прямо сейчас и какой язык он выбрал (D303, #411) |
+| `src/bot/learning_loader.py` | Раз в сутки — обучение пиццерий из iSpring в нашу базу (D574, D575, #906; docs/20-training.md) |
 | `src/bot/maps_loader.py` | Раз в сутки — оценки пиццерий на картах из Pointer (docs/09-pointer-api.md) |
 | `src/bot/material.py` | Связывание фото нарушения с комментарием аудитора |
 | `src/bot/mcp_setup.py` | Строка настройки Claude Desktop: свой мост, штатный `plutil`, никакого Node (#222, D103) |
@@ -641,6 +650,23 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/routers/start.py` | Начало проверки и продолжение незавершённой (T050, T051, T052, T063) |
 | `src/bot/routers/stops.py` | `/stops` — счётчик отказов мастера за период, только админам (#436) |
 | `src/bot/routers/version.py` | Команда «какая это сборка» (T246, #201) |
+<!-- map:end -->
+
+## src/learning — обучение из iSpring
+
+Загрузка раздела «Обучение» (`docs/20-training.md`, D574, D575): клиент iSpring Learn,
+дерево подразделений, один заход «подразделения → результаты → счётчики → база».
+Расписание — `src/bot/learning_loader.py`, запись и чтение — `src/db/learning_store.py`,
+`training_read.py`, определения показателей — `src/domain/training_metrics.py`.
+
+<!-- map:begin files src/learning/*.py -->
+| Файл | Что делает |
+|---|---|
+| `src/learning/__main__.py` | Ручная загрузка обучения из iSpring: `python -m src.learning` |
+| `src/learning/departments.py` | Дерево подразделений iSpring → страны, пиццерии, офисы; сопоставление с рейтингами |
+| `src/learning/ispring.py` | Клиент iSpring Learn API: подразделения и результаты прохождения курсов |
+| `src/learning/keys.py` | Ключи iSpring для загрузчика: база, затем окружение (`resolve` из `src.db.service_keys`) |
+| `src/learning/sync.py` | Один заход загрузки: подразделения → результаты по пиццериям → агрегаты → база |
 <!-- map:end -->
 
 ## src/ratings — рейтинги и оценки площадок
@@ -747,6 +773,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/shape.py` | Оценочная форма издания: чем считали, а не что написано (T349, #337) |
 | `src/domain/state.py` | Состояние проверки: чтение, старт и собственные поля блока |
 | `src/domain/tenants.py` | Код тенанта управляющей компании и перевод старого кода (D234, #439) |
+| `src/domain/training_metrics.py` | Метрики экрана «Обучение» — определения в одном месте (D574, D575, #906; docs/20-training.md) |
 | `src/domain/translation.py` | Поля методики, заполненные не на том языке, на котором их напечатают (T186) |
 | `src/domain/uncovered.py` | Накопитель непокрытых формулировок — случай, когда записи не появилось |
 | `src/domain/unit_match.py` | Сопоставление точек справочника `units` со сведениями о пиццериях `unit_profiles` (#316, #909) |
@@ -929,6 +956,7 @@ Telegram, ни HTTP, ни SQL.
 | Изменить разбор комментария моделью | Запрос — `src/recognize/prompt.py`, схема ответа — `schema.py`, быстрый путь без модели — `fastpath.py`, карта слов — `cues.py`; замеры — `make fastpath`, `make zonecov` |
 | Рейтинги: новый блок страницы | Состав и порядок блоков — `BLOCKS` в `src/ratings/layout.py`; расчёты — `src/ratings/summary.py`, `report.py`; экран — `src/web/ratings.py`; тексты — `src/web/texts_ratings.py`; контракт — `docs/15-ratings.md` |
 | Рейтинги: новый формат выгрузки | Узнавание по заголовку — `src/ratings/formats.py`, разбор — `csvio.py`, загрузка в транзакции — `importer.py` |
+| Обучение (iSpring): новый показатель или страница | Определение — только в `src/domain/training_metrics.py` (и таблица в `docs/20-training.md`); загрузка — `src/learning/` (клиент `ispring.py`, дерево `departments.py`, заход `sync.py`), расписание — `src/bot/learning_loader.py`; база — `src/db/learning_store.py` (запись), `training_read.py` (чтение), миграция `0085`; экран — `src/web/training_page.py`, `templates/training/index.html`. Данных о сотрудниках в базе и логе нет (D575): новый столбец с текстом краснит `tests/test_db_learning_schema.py` |
 | Подключить агрегатор доставки | Модуль в `src/ratings/aggregators/` по образцу `wolt.py` (поиск у координат) или `glovo.py` (известная точка), затем строка в `SEARCHERS` или `KNOWN` в `collect.py`; описание — `docs/17-aggregators.md` |
 | Метод API чтения для Swarm | Адрес и право — `src/web/swarm_api.py`, сборка ответа — `src/web/api_feed.py`, чтение — `src/db/swarm_read.py`, `src/ratings/feed.py`; права ключей — `src/db/api_access.py`; контракт — `docs/12-web-admin.md`, «API чтения для Swarm» |
 | Новая переменная окружения | Читается в `config.py` своего блока (`src/<блок>/config.py`) с понятным отказом на мусор; впишите в `.env.example` с комментарием — тест `tests/test_docs_map.py` требует; `make map` обновит `docs/inventory.md` |

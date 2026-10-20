@@ -58,6 +58,9 @@ _VIEWS: tuple[Action, ...] = (
     # и видит только свои страны (охват, а не флаг) — поэтому не `hq_only`.
     Action("view.country", "view", writes=False),
     Action("view.ratings", "view", writes=False),
+    # «Обучение» (D578, #906): все, кроме контроля (D420: контроль ведёт только «Рейтинги»);
+    # партнёр — свои страны (охват).
+    Action("view.training", "view", writes=False),
     Action("view.calendar", "view", writes=False),
     Action("view.admin", "view", writes=False),
     # «Действия» (D526): экшн-планы и предписания — раздел УК и партнёра; кнопки
@@ -232,6 +235,7 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
         "view.calendar",
         "view.country",
         "view.ratings",
+        "view.training",
         "view.users",
     ),
     (SIDE_PARTNER, "admin"): _PARTNER_AUDITOR

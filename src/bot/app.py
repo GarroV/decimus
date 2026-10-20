@@ -39,6 +39,7 @@ from src.domain.log_ids import log_id
 from . import (
     agg_loader,
     frame_copies,
+    learning_loader,
     maps_loader,
     photo_backfill,
     sheet_loader,
@@ -398,6 +399,8 @@ async def start_polling() -> None:
     agg_ratings = asyncio.create_task(agg_loader.load_forever())
     # Общая таблица контроля «база рейтингов» — раз в несколько часов и по заявке (D464).
     sheet_ratings = asyncio.create_task(sheet_loader.load_forever())
+    # Обучение пиццерий из iSpring — раз в сутки, только агрегаты (D574, D575, #906).
+    training = asyncio.create_task(learning_loader.load_forever())
     try:
         await dispatcher.start_polling(bot, handle_as_tasks=False)
     finally:
@@ -407,6 +410,7 @@ async def start_polling() -> None:
         map_ratings.cancel()
         agg_ratings.cancel()
         sheet_ratings.cancel()
+        training.cancel()
         await bot.session.close()
 
 

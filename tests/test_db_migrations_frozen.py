@@ -340,6 +340,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0084_service_keys.sql": (
         "sql1:df6cded467f4d94f01692e50159ea892a7372443ba773990d77e9c9c9e79e023"
     ),
+    "0085_learning.sql": ("sql1:6c146c641b714be48e4b9add20e02a91c9a16d80bfdb2b612e928df714fdd513"),
 }
 
 

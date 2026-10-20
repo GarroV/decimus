@@ -287,6 +287,7 @@ bound_at
 #
 # Маршруты Flask (`@app.get`/`@app.post`) — зовёт фреймворк по адресу запроса.
 country_index
+training_index
 users
 add_user
 freeze_user

@@ -93,6 +93,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "view.calendar",
         "view.country",
         "view.ratings",
+        "view.training",
         "view.users",
     },
     # Админ партнёра: сотрудник + люди, свои чек-листы, вычитка свежих (D346, D367).

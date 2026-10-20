@@ -38,6 +38,7 @@ from .texts_registry import REGISTRY_TEXTS
 from .texts_second_factor import SECOND_FACTOR_TEXTS
 from .texts_service_keys import SERVICE_KEYS_TEXTS
 from .texts_settings import SETTINGS_TEXTS
+from .texts_training import TRAINING_TEXTS
 from .texts_trips import TRIP_TEXTS
 from .texts_units import UNIT_TEXTS
 from .texts_usage import USAGE_TEXTS
@@ -1745,6 +1746,7 @@ _ЧАСТИ = (
     REGISTRY_TEXTS,
     SECOND_FACTOR_TEXTS,
     SETTINGS_TEXTS,
+    TRAINING_TEXTS,
     UNIT_TEXTS,
     USAGE_TEXTS,
     USERS_TEXTS,
@@ -1777,6 +1779,7 @@ TEXTS = {
     **REGISTRY_TEXTS,
     **SECOND_FACTOR_TEXTS,
     **SETTINGS_TEXTS,
+    **TRAINING_TEXTS,
     **UNIT_TEXTS,
     **USAGE_TEXTS,
     **USERS_TEXTS,
