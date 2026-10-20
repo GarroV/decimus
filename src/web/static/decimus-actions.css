@@ -7,6 +7,7 @@
 .sbar--actions .spill { text-decoration: none; }
 .sbar__gap { flex: 0 0 var(--space-4); }
 .sbar__label { font-size: 12.5px; color: var(--ink-3); }
+.sbar__set { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .sbar--actions .sbar__count { margin-left: auto; }
 
 /* ── список: пиццерия | страна | проверка | срок | состояние ──────────── */
