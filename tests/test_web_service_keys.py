@@ -26,7 +26,7 @@ from src.web.service_probes import KeyRejected, KeyUnverified
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 ВКЛАДКА = "/users?tab=connections"
-ЗНАЧЕНИЕ = "sk-proj-Zq9Xw8Vv7Uu6Tt5Ss4Rr3Qq2Pp1-никому-не-показывать"
+ЗНАЧЕНИЕ = "sk-proj-Zq9Xw8Vv7Uu6Tt5Ss4Rr3Qq2Pp1-never-show-this"
 ID_ISPRING = "ispring-client-id-AAAA1111BBBB2222"
 SECRET_ISPRING = "ispring-client-secret-CCCC3333DDDD4444"
 ДЕЙСТВИЯ = ("check", "save", "delete")
