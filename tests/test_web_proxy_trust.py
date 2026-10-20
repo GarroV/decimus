@@ -137,3 +137,64 @@ def test_прод_требует_адрес_звена_без_допускающ
     assert len(строки) == 1, строки
     assert f"${{{WEB_TRUSTED_PROXY_ADDR_VAR}:?" in строки[0]
     assert ":-" not in строки[0] and "*" not in строки[0].split(":?")[0]
+
+
+# --- F-107: ключ фронта проверяется и на origin ---------------------------------
+
+FRONT = "front-key-for-tests-0123456789abcdef"
+FRONT_HEADER = "X-Decimus-Front-Key"
+
+
+def _адрес_клиента(front_key: str, headers: dict[str, str], peer: str = "172.19.0.2") -> str:
+    settings = replace(
+        _settings(trusted=1, host="0.0.0.0", addrs=(PROXY_NET,)),  # noqa: S104
+        front_key=front_key,
+    )
+    app = Flask(__name__)
+    seen: list[str] = []
+
+    @app.get("/")
+    def index() -> str:
+        seen.append(client_address(trusted_proxies=settings.trusted_proxies))
+        return ""
+
+    app.wsgi_app = guard_forwarded(app.wsgi_app, settings)  # type: ignore[method-assign, assignment]
+    app.test_client().get(
+        "/",
+        headers={"X-Forwarded-For": "198.51.100.9", **headers},
+        environ_base={"REMOTE_ADDR": peer},
+    )
+    return seen[0]
+
+
+def test_ключ_совпал_заголовкам_звена_верим() -> None:
+    assert _адрес_клиента(FRONT, {FRONT_HEADER: FRONT}) == "198.51.100.9"
+
+
+@pytest.mark.parametrize("headers", [{}, {FRONT_HEADER: "wrong"}, {FRONT_HEADER: ""}])
+def test_ключ_задан_но_не_совпал_сосед_по_подсети_чужой(headers: dict[str, str]) -> None:
+    assert _адрес_клиента(FRONT, headers) == "172.19.0.2"
+
+
+def test_ключ_не_задан_доверие_по_подсети_и_одно_предупреждение(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("WARNING", logger="src.web.proxy"):
+        assert _адрес_клиента("", {}) == "198.51.100.9"
+    assert sum("WEB_FRONT_KEY" in r.getMessage() for r in caplog.records) == 1
+
+
+def test_отказ_пишется_в_журнал_без_значения_ключа(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level("WARNING", logger="src.web.proxy"):
+        _адрес_клиента(FRONT, {FRONT_HEADER: "wrong-value"})
+    text = " ".join(r.getMessage() for r in caplog.records)
+    assert "ключа фронта" in text
+    assert FRONT not in text
+    assert "wrong-value" not in text
+
+
+def test_ключ_читается_из_окружения_и_не_светится_в_repr() -> None:
+    settings = load_settings(_env(WEB_FRONT_KEY=f" {FRONT} "))
+    assert settings.front_key == FRONT
+    assert FRONT not in repr(settings)
+    assert load_settings(_env()).front_key == ""

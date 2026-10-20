@@ -34,9 +34,7 @@ def _json_of_size(n: int) -> bytes:
 
 def test_body_exactly_at_cap_is_parsed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(base, "BODY_MAX_BYTES", 1000)
-    monkeypatch.setattr(
-        base.urllib.request, "urlopen", lambda *_a, **_k: _Resp(_json_of_size(1000))
-    )
+    monkeypatch.setattr(base._OPENER, "open", lambda *_a, **_k: _Resp(_json_of_size(1000)))
     assert Http(0).get(URL) == {"a": "x" * (1000 - 8)}
 
 
@@ -49,7 +47,7 @@ def test_body_over_cap_is_refused_without_retry(monkeypatch: pytest.MonkeyPatch)
         calls += 1
         return _Resp(_json_of_size(1001))
 
-    monkeypatch.setattr(base.urllib.request, "urlopen", opener)
+    monkeypatch.setattr(base._OPENER, "open", opener)
     with pytest.raises(AggregatorError, match="больше 1000 байт"):
         Http(0).get(URL)
     assert calls == 1
@@ -67,7 +65,7 @@ def test_deadline_stops_retries(monkeypatch: pytest.MonkeyPatch) -> None:
         clock[0] += 60  # каждая попытка висит минуту
         raise urllib.error.HTTPError(URL, 503, "busy", {}, None)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(base.urllib.request, "urlopen", failing)
+    monkeypatch.setattr(base._OPENER, "open", failing)
     monkeypatch.setattr(base, "DEADLINE_SEC", 100.0)
     with pytest.raises(AggregatorError, match="общий срок"):
         Http(0).get(URL)

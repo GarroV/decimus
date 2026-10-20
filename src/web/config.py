@@ -22,7 +22,7 @@ import os
 import re
 import secrets
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
 from src.domain.demo import DEMO_URL_VAR, DEMO_VAR
@@ -40,6 +40,10 @@ WEB_TRUSTED_PROXIES_VAR = "WEB_TRUSTED_PROXIES"
 #: Адреса своих звеньев (адрес или подсеть, через запятую; `*` — любой сосед):
 #: только от них верим `X-Forwarded-*` (F-038 аудита 12.10, `src/web/proxy.py`).
 WEB_TRUSTED_PROXY_ADDR_VAR = "WEB_TRUSTED_PROXY_ADDR"
+#: Ключ фронта Cloudflare (тот же, что секрет `FRONT_KEY` у Worker'ов): если задан,
+#: `X-Forwarded-*` верим только запросу с верным `X-Decimus-Front-Key`
+#: (F-107 аудита, `src/web/proxy.py`). Не задан — доверие по подсети, как раньше.
+WEB_FRONT_KEY_VAR = "WEB_FRONT_KEY"
 WEB_URL_PREFIX_VAR = "WEB_URL_PREFIX"
 WEB_LISTEN_NETWORK_VAR = "WEB_LISTEN_NETWORK"
 #: Имя бота в Telegram без «@» — для ссылки привязки `t.me/<бот>?start=...`
@@ -114,6 +118,9 @@ class Settings:
     #: Адреса и подсети своих звеньев (`WEB_TRUSTED_PROXY_ADDR`): заголовкам
     #: `X-Forwarded-*` верим только от них. Пусто — звено не названо.
     trusted_proxy_addrs: tuple[str, ...] = ()
+    #: Ключ фронта (`WEB_FRONT_KEY`): пусто — origin ключ не проверяет. Значение
+    #: секретное: в журнал и в `repr` не попадает.
+    front_key: str = field(default="", repr=False)
     #: Путь, на котором админка живёт снаружи, когда общий вход площадки отдан
     #: не ей. Пусто — своё имя целиком, и это умолчание. Непустой префикс
     #: уходит в `SCRIPT_NAME`, поэтому ссылки страницы собираются вместе с ним:
@@ -501,6 +508,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         secret_key_is_ephemeral=ephemeral,
         trusted_proxies=_parse_trusted_proxies(src.get(WEB_TRUSTED_PROXIES_VAR) or ""),
         trusted_proxy_addrs=_parse_trusted_proxy_addrs(src.get(WEB_TRUSTED_PROXY_ADDR_VAR) or ""),
+        front_key=(src.get(WEB_FRONT_KEY_VAR) or "").strip(),
         url_prefix=_parse_url_prefix(src.get(WEB_URL_PREFIX_VAR) or ""),
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
         hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),
