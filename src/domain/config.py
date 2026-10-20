@@ -9,8 +9,10 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .errors import ConfigError
@@ -117,6 +119,27 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     )
 
 
+#: Каталог методики, назначенный на время блока `pinned_data_dir` (MCP: у черновика
+#: загрузки нет чата, а его издание лежит в хранилище версий). Пусто — как было:
+#: `AUDIT_DATA_DIR`. Действует только в своём потоке/контексте.
+_PINNED_DATA_DIR: ContextVar[Path | None] = ContextVar("pinned_data_dir", default=None)
+
+
+@contextmanager
+def pinned_data_dir(path: Path) -> Iterator[None]:
+    """На время блока вся предметная область (`list_items`, карта слов) читает ЭТОТ каталог.
+
+    Так конвейер разбора, написанный под издание чата, гоняется по версии
+    методики из хранилища без копии своей логики. Только явный `env=None`:
+    подставленное окружение (тесты, замеры) блок не трогает.
+    """
+    mark = _PINNED_DATA_DIR.set(Path(os.path.abspath(path)))
+    try:
+        yield
+    finally:
+        _PINNED_DATA_DIR.reset(mark)
+
+
 def check_environment(env: Mapping[str, str] | None = None) -> Settings:
     """Проверить окружение целиком и вернуть его. Отказ — `ConfigError`.
 
@@ -125,6 +148,9 @@ def check_environment(env: Mapping[str, str] | None = None) -> Settings:
     по чужой или пустой методике.
     """
     settings = load_settings(env)
+    pinned = _PINNED_DATA_DIR.get() if env is None else None
+    if pinned is not None:
+        settings = replace(settings, data_dir=pinned)
     if not settings.data_dir.is_dir():
         raise ConfigError(
             f"Каталог методики не найден: {settings.data_dir} "
