@@ -467,6 +467,7 @@
 | `0078_model_usage.sql` | `model_usage` |
 | `0079_units_merged_into.sql` | — |
 | `0080_ratings_layout_compare.sql` | — |
+| `0081_inspection_edits.sql` | `inspection_edits` |
 <!-- map:end -->
 
 ## Makefile
