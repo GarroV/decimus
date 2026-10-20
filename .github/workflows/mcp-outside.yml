@@ -25,10 +25,11 @@ on:
         type: boolean
         default: false
 
-# Нужно, чтобы сторож мог открыть и закрыть свою задачу.
+# Наименьшие права по умолчанию (F-102): прогон читает репозиторий и больше
+# ничего. Право писать задачи выдано только джобе `notify`, где нет ни
+# checkout, ни секрета адреса.
 permissions:
   contents: read
-  issues: write
 
 env:
   # Заголовок — он же ключ поиска: задача у сторожа одна, вторую он не плодит.
@@ -38,8 +39,12 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Проверить дверь и установщик
         id: probe
@@ -51,10 +56,24 @@ jobs:
           MCP_PUBLIC_URL: ${{ inputs.porcha && 'https://127.0.0.1:9' || secrets.MCP_PUBLIC_URL }}
         run: python3 tools/mcp_watch.py
 
+  # Задачи пишет отдельная джоба: у `check` есть секрет адреса и чужой код из
+  # checkout, но нет `issues: write`; у этой есть `issues: write`, но ни секрета,
+  # ни checkout. Результат пробы приходит через `needs`.
+  notify:
+    needs: check
+    if: always() && (needs.check.result == 'success' || needs.check.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: write
+    steps:
       - name: Открыть задачу, если путь оборван
-        if: failure()
+        if: needs.check.result == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
+          # Без checkout нет git-каталога, по которому gh узнал бы репозиторий.
+          GH_REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           issue_no=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number -q '.[0].number')
@@ -76,9 +95,11 @@ jobs:
           gh issue create --title "$ISSUE_TITLE" --body-file /tmp/body.md
 
       - name: Закрыть задачу, когда путь вернулся
-        if: success()
+        if: needs.check.result == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
+          # Без checkout нет git-каталога, по которому gh узнал бы репозиторий.
+          GH_REPO: ${{ github.repository }}
         run: |
           issue_no=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number -q '.[0].number')
           if [ -n "$issue_no" ]; then

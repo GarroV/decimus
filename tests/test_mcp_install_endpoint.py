@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -188,3 +189,17 @@ def test_установщик_реально_отрабатывает_на_по�
     assert "url" not in наш and "type" not in наш, (
         "в настройки Desktop попала форма http — приложение молча сотрёт весь блок"
     )
+
+
+def test_отпечаток_в_строке_запуска_совпадает_с_тем_что_отдаёт_сервер(сервер: str) -> None:
+    """Бот сверяет скачанное с отпечатком; расхождение — установка не идёт (F-103)."""
+    from src.bot.mcp_setup import installer_sha256, setup_command
+
+    _, тело, _ = _get(сервер + INSTALL_PATH)
+    отдано = hashlib.sha256(тело.encode("utf-8")).hexdigest()
+
+    команда = setup_command(url=сервер, token=ТОКЕН)
+
+    assert installer_sha256() == отдано, "отпечаток считается не от того, что отдаёт сервер"
+    assert f'echo "{отдано}  $f" | shasum -a 256 -c -' in команда
+    assert "| bash" not in команда, "вернулся слепой `curl | bash`"

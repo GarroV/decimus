@@ -74,3 +74,6 @@ front/wrangler.admin.jsonc
 front/wrangler.mcp.jsonc
 front/wrangler.stand.jsonc
 front/wrangler.demo.jsonc
+
+# Логи dev-сервера (serve.log был закоммичен, F-115)
+*.log

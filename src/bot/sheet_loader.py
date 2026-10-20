@@ -58,6 +58,9 @@ def _tick() -> None:
         results = sheet_sync.run()
     except sheet_sync.SyncError as exc:
         error: str | None = f"{exc.code}: {exc}"
+    except Exception as exc:  # заявка не должна висеть из-за непредвиденного сбоя (F-124)
+        logger.exception("рейтинги: забор таблицы контроля упал")
+        error = type(exc).__name__
     else:
         error = _failures(results)
     if error:

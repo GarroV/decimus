@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+import socket
 import sys
 import threading
 import traceback
@@ -86,7 +87,9 @@ class _Server(ThreadingHTTPServer):
 
     def __init__(self, address: tuple[str, int], settings: Settings) -> None:
         self.settings = settings
-        self._slots = threading.Semaphore(MAX_CONNECTIONS)
+        # Ограниченный семафор — страховка: лишний release (счётчик выше предела)
+        # падает громко, а не разъедает предел молча (F-118).
+        self._slots = threading.BoundedSemaphore(MAX_CONNECTIONS)
         self.rate = McpRate()
         super().__init__(address, _Handler)
 
@@ -98,7 +101,14 @@ class _Server(ThreadingHTTPServer):
         отказ соединения, а не молчание.
         """
         if not self._slots.acquire(blocking=False):
-            self.shutdown_request(request)
+            # Слот не брали — и отпускать нечего: `shutdown_request` пришёл бы
+            # в `close_request` и вернул бы чужой слот (F-118), поэтому
+            # закрываем сокет напрямую.
+            try:
+                request.shutdown(socket.SHUT_WR)
+            except OSError:
+                pass
+            request.close()
             return
         super().process_request(request, client_address)
 

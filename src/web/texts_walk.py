@@ -464,6 +464,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Не получилось записать. Повторите через минуту.",
         "en": "Could not save. Try again in a minute.",
     },
+    "walk.err.rejected": {
+        "ru": "Запись не принята. Проверьте выбранный пункт и уровень и повторите.",
+        "en": "The entry was not accepted. Check the chosen item and level and try again.",
+    },
     "walk.err.bad_date": {"ru": "Дата не разобрана.", "en": "The date was not understood."},
     "walk.offline.parked": {
         "ru": "Нет связи. Кадр сохранён на телефоне и уйдёт сам, когда сеть вернётся.",

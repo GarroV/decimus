@@ -22,6 +22,7 @@ from test_web_walk import АУДИТОР, ТОКЕН, _приложение, п�
 
 from src.db.bot_links import Binding, Standing
 from src.domain import get_state, start_inspection
+from src.domain.errors import EngineError
 from src.domain.handover import HANDED_OVER_KEY, NOTES_FILE_NAME
 from src.web import walk, walk_access, walk_write
 
@@ -138,12 +139,29 @@ def test_запись_без_настоящего_кадра_не_заводит
     assert get_state(АУДИТОР).findings == [], "D078: записи без фотофиксации быть не может"  # type: ignore[union-attr]
 
 
-def test_отказ_движка_приходит_его_словами(клиент: Клиент) -> None:
+def test_отказ_движка_приходит_общим_текстом(клиент: Клиент) -> None:
     ответ = клиент.запись(**_нарушение(клиент.ссылка(), level="D3"))
 
     assert ответ.status_code == 422
-    assert ответ.get_json()["message"], "аудитор должен увидеть, что не так"
+    assert ответ.get_json()["message"], "аудитор должен увидеть, что запись не принята"
     assert get_state(АУДИТОР).findings == []  # type: ignore[union-attr]
+
+
+def test_текст_исключения_аудитору_не_уходит(
+    клиент: Клиент, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F-114: путь и подробности движка остаются в журнале, не в ответе."""
+    секрет = "/srv/internal/engine.py: boom"
+
+    def _падает(*_: Any, **__: Any) -> None:
+        raise EngineError(секрет, code=2, command="x")
+
+    monkeypatch.setattr(walk_write, "add_finding", _падает)
+
+    ответ = клиент.запись(**_нарушение(клиент.ссылка()))
+
+    assert ответ.status_code == 422
+    assert секрет not in ответ.get_data(as_text=True)
 
 
 def test_повтор_только_по_нажатию_и_не_у_замера(клиент: Клиент) -> None:

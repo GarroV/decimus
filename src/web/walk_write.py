@@ -401,10 +401,16 @@ def install(
         except WalkRefused as exc:
             return refused(said(str(exc), lang))
         except (ValidationError, EngineError) as exc:
-            # Отказ движка или домена — его словами, как в чате: аудитор видит,
-            # что именно не так (пара занята, класс не разрешён для пункта).
-            logger.info("Обход: запись чата %s отклонена — %s", log_id(who), type(exc).__name__)
-            return refused(str(exc))
+            # Текст отказа движка или домена аудитору не уходит (F-114): он
+            # пишется оператору и может нести пути и подробности. Аудитор
+            # получает общий текст, подробности — в журнал сервера.
+            logger.warning(
+                "Обход: запись чата %s отклонена — %s: %s",
+                log_id(who),
+                type(exc).__name__,
+                exc,
+            )
+            return refused(said("walk.err.rejected", lang))
         except DomainError:
             # Прочее (битые заметки, занятый замок) — внутренности сервера:
             # пути и подробности в журнал, аудитору — общее «не вышло».
