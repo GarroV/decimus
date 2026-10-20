@@ -32,6 +32,7 @@ import base64
 import binascii
 import logging
 import re
+from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import date
@@ -463,6 +464,7 @@ def _view(ident: str, *, tenant: str, note: str, warnings: Sequence[str] = ()) -
     строка = detail.inspection
     # Пункт человеку — меткой и формулировкой (`item_label`, `item_title`), не кодом.
     тексты = _item_texts_of(строка.checklist_version)
+    кадры = _photo_counts(строка.id, tenant=tenant)
     return {
         "id": строка.id,
         "mode": modes.MODE_CURRENT,
@@ -483,10 +485,32 @@ def _view(ident: str, *, tenant: str, note: str, warnings: Sequence[str] = ()) -
         "by_zone": detail.by_zone,
         **_comparison(detail, шапка),
         "findings": [
-            {**_finding(f, тексты, строка.report_lang), "repeat": f.repeat}
+            {
+                **_finding(f, тексты, строка.report_lang),
+                "repeat": f.repeat,
+                **({"photos": кадры[f.id]} if кадры is not None else {}),
+            }
             for f in sorted(detail.findings, key=lambda f: f.n)
         ],
     }
+
+
+def _photo_counts(inspection_id: str, *, tenant: str) -> dict[str, int] | None:
+    """Сколько кадров у каждой записи — чтобы агент видел, что фото дошли.
+
+    `None` — база кадры не отдала: поле `photos` тогда не показывается вовсе, а не
+    врёт нулём.
+    """
+    from ..db import previews
+    from ..db.errors import DbError
+    from ..db.reach import own_reach
+
+    try:
+        по_записям = previews.finding_previews(inspection_id, reach=own_reach(tenant))
+    except DbError:
+        logger.warning("кадры черновика %s не прочитаны", inspection_id)
+        return None
+    return defaultdict(int, {k: len(v.shown) + v.missing for k, v in по_записям.items()})
 
 
 #: Поля короткого ответа записи (#1016). Полный вид — `import_get_inspection`.
