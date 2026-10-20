@@ -480,7 +480,7 @@ def test_у_гостя_доски_нет_а_девелопер_вычитыва�
 МАТРИЦА_MCP: dict[tuple[str, str], frozenset[str]] = {
     ("HQ", "superadmin"): frozenset(ВСЕ_ВИДЫ) - {KIND_RETRACTION},
     ("HQ", "admin"): frozenset(ВСЕ_ВИДЫ) - {KIND_RETRACTION},
-    ("HQ", "developer"): ЧТЕНИЕ_УК | {KIND_CHECKLIST},
+    ("HQ", "developer"): ЧТЕНИЕ_УК | {KIND_CHECKLIST, KIND_IMPORT},  # загрузка — D567
     ("HQ", "control"): frozenset({KIND_RATINGS_READ, KIND_RATINGS}),
     # Гость: только чтение проверок и рейтингов; методики и загрузок нет.
     ("HQ", "guest"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
