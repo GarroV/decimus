@@ -13,11 +13,17 @@
 (function () {
   "use strict";
 
-  var editor = document.querySelector("[data-letter-editor]");
-  var tools = document.querySelector("[data-letter-tools]");
+  // Письмо живёт и страницей, и в панели реестра (`split.js` подменяет панель
+  // и зовёт `LetterEditor.init` на новом узле): всё ищется внутри `root`, и
+  // один редактор включается один раз.
+  function init(root) {
+  var editor = root.querySelector("[data-letter-editor]");
+  var tools = root.querySelector("[data-letter-tools]");
   if (!editor || !tools || typeof document.execCommand !== "function") return;
-  var field = document.getElementById(editor.getAttribute("data-field"));
-  var plain = document.querySelector("[data-letter-plain]");
+  if (editor.dataset.ready) return;
+  editor.dataset.ready = "1";
+  var field = root.querySelector("#" + editor.getAttribute("data-field"));
+  var plain = root.querySelector("[data-letter-plain]");
   var form = editor.closest("form");
   if (!field || !plain || !form) return;
 
@@ -174,4 +180,8 @@
   document.addEventListener("selectionchange", refresh);
   form.addEventListener("submit", sync);
   sync();
+  }
+
+  window.LetterEditor = { init: init };
+  init(document);
 })();

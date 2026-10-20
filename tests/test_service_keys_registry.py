@@ -38,7 +38,8 @@ def test_неизвестное_не_находится() -> None:
 
 def test_форма_значения() -> None:
     assert registry.is_acceptable("abc-123")
-    for плохое in ("", "a b", "a\nb", "x" * (registry.MAX_LENGTH + 1)):
+    # не-ASCII роняет заголовок запроса в http.client (500 вместо отказа)
+    for плохое in ("", "a b", "a\nb", "x" * (registry.MAX_LENGTH + 1), "ключ", "sk-é"):
         assert not registry.is_acceptable(плохое)
 
 

@@ -117,7 +117,7 @@ def test_у_админа_свои_действия_кнопками_в_шапк�
     страница = _открыть(стенд, monkeypatch, адрес)
 
     шапка_действий = страница.index('class="hact"')
-    for действие in ("/retract", "/letter"):
+    for действие in ("/retract", "view=letter"):
         assert страница.count(действие) == 1, действие
         assert страница.index(действие) > шапка_действий, действие
 
@@ -129,7 +129,7 @@ def test_у_админа_чужой_проверки_кнопок_действи
 ) -> None:
     страница = _открыть(стенд, monkeypatch, адрес, row=шапка(tenant_code="GE"))
 
-    assert "/retract" not in страница and "/letter" not in страница
+    assert "/retract" not in страница and "view=letter" not in страница
     assert t("card.act.move", "ru") not in страница
 
 
