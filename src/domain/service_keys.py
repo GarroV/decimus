@@ -85,9 +85,10 @@ def form_name(field_code: str) -> str:
 
 
 def is_acceptable(value: str) -> bool:
-    """Форма значения: непустое, без пробелов и непечатаемых, не длиннее предела."""
+    """Форма значения: непустое, ASCII, без пробелов и непечатаемых, не длиннее предела."""
     return (
         bool(value)
         and len(value) <= MAX_LENGTH
+        and value.isascii()
         and all(c.isprintable() and not c.isspace() for c in value)
     )
