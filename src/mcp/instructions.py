@@ -49,6 +49,8 @@ Rules
 - Never compute or adjust the score: the engine does it.
 - Class (D1/D2/D3) = the item's criteria applied to the facts given (words, numbers on \
 photos). Facts meet a class -> that class, no milder or harsher one "just in case". \
+Criteria often list alternatives ("or"): ONE met condition is enough - never ask \
+about another condition of the same class. \
 Read checklist_item criteria only for an item with several classes.
 - Wording: the fact in the person's words; no guesses about scale or damage, no \
 assessments, no remarks to people.
