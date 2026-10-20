@@ -37,6 +37,7 @@ COUNTRIES: dict[str, dict[str, str]] = {
     "SI": {"ru": "Словения", "en": "Slovenia"},
     "TJ": {"ru": "Таджикистан", "en": "Tajikistan"},
     "TR": {"ru": "Турция", "en": "Türkiye"},
+    "UZ": {"ru": "Узбекистан", "en": "Uzbekistan"},
 }
 
 CITIES: dict[str, dict[str, str]] = {
