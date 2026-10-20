@@ -34,3 +34,20 @@
 .sconn-days__bar .is-num { min-width: 2.5ch; }
 .sconn-days__err { color: var(--err); font-weight: var(--w-medium); }
 .sconn-log__path { word-break: break-all; }
+
+/* ── «Ключи сервисов»: плитки и панель выбранного (приём «Настроек», `.sconn`), без растяжки на экран ── */
+.skeys .sconn { grid-template-columns: minmax(240px, 300px) minmax(0, 600px); margin-top: var(--space-6); }
+.skeys .stiles { grid-template-columns: minmax(0, 1fr); }
+.skeys .stile { min-height: 56px; }
+.skeys__facts { margin-top: var(--space-6); }
+.skeys__actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-4); margin-top: var(--space-6); }
+.skeys__actions .sfold { flex: 1 1 100%; }
+.skeys__actions .sfold[open] ~ .skeys__delete { margin-top: var(--space-3); }
+.skeys__actions .sfold:not([open]) { flex: 0 0 auto; }
+.skeys__delete { margin: 0; }
+.skeys__form { max-width: 420px; margin-top: var(--space-5); }
+.skeys__form .sinput { width: 100%; }
+@media (max-width: 899px) {
+  .skeys .sconn { grid-template-columns: minmax(0, 1fr); }
+  .skeys .sbtn { min-height: 44px; }
+}

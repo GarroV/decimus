@@ -10,7 +10,8 @@
 {% from "users/_tabs.html" import users_tabs with context %}
 {% from "users/_connections.html" import service_card, add_card, key_card with context %}
 {% block title %}{{ t('section.users.title') }}{% endblock %}
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">{% endblock %}
 
 {% block split_top %}
   <header class="shead">
