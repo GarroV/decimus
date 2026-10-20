@@ -47,7 +47,7 @@
     <span>{{ t('card.origin.' ~ head.origin) }}</span>
     {% if head.retracted %}
     {% elif head.on_review %} · <span>{{ t('card.accepted.waiting') }}</span>
-    {% elif at and head.accepted_by %} · <span>{{ t('card.accepted.by', by=head.accepted_by, at=at) }}</span>
+    {% elif at and head.accepted_by %} · <span>{{ t('card.accepted.by', by=head.accepted_by.replace('web:', ''), at=at) }}</span>
     {% elif at %} · <span>{{ t('card.accepted.at', at=at) }}</span>
     {% else %} · <span>{{ t('card.accepted.old') }}</span>{% endif %}
   </p>
