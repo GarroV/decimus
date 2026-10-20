@@ -136,6 +136,57 @@ def test_недостающий_факт_доходит_одной_фразой(
     assert строка["need_fact"] == "Сколько тар?"
 
 
+def test_у_одноклассового_пункта_нет_need_fact_и_зона_берётся_из_пункта(
+    черновик: dr.Draft, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # PRD15: класс только D1, зоны «hot_kitchen,cold_kitchen,...»; модель зону не назвала
+    # и задала вопрос — он не доходит до человека.
+    модель = _Модель(_stage1("PRD15:D1", zone="UNKNOWN", question="Где это было?"))
+    _подменить(monkeypatch, модель)
+
+    [строка] = im.match_texts(черновик, [("заготовки без ярлыка", None)])
+
+    assert строка["code"] == "PRD15"
+    assert "need_fact" not in строка
+    assert строка["zone"] == "hot_kitchen"
+    assert строка["zone_assumed"] is True
+    assert len(модель.questions) == 1  # второго вопроса про класс нет
+
+
+def test_единственная_зона_пункта_не_считается_допущением(
+    черновик: dr.Draft, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _подменить(monkeypatch, _Модель(_stage1("CLN12:D1", zone="UNKNOWN")))
+
+    [строка] = im.match_texts(черновик, [("на полу мусор", None)])
+
+    assert строка["zone"] == "dining"
+    assert "zone_assumed" not in строка and "need_fact" not in строка
+
+
+def test_зона_из_слов_замечания_без_допущения(
+    черновик: dr.Draft, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _подменить(monkeypatch, _Модель(_stage1("PRD15:D1", zone="UNKNOWN")))
+
+    [строка] = im.match_texts(черновик, [("повар без перчаток режет пиццу", None)])
+
+    assert строка["zone"] == "hot_kitchen"
+    assert "zone_assumed" not in строка and "need_fact" not in строка
+
+
+def test_вопрос_про_класс_у_многоклассового_идёт_на_языке_замечания(
+    черновик: dr.Draft, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    модель = _Модель(_stage1("PRD01:D1"), {"level": "D1", "need_fact": "Сколько?", "reason": "r"})
+    _подменить(monkeypatch, модель)
+
+    [строка] = im.match_texts(черновик, [("заготовки без ярлыка", None)])
+
+    assert строка["need_fact"] == "Сколько?"
+    assert any("ЯЗЫК ВОПРОСА need_fact: ru" in q for q in модель.questions)
+
+
 def test_пункта_нет_отдаётся_как_no_item(
     черновик: dr.Draft, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -144,7 +195,7 @@ def test_пункта_нет_отдаётся_как_no_item(
     [строка] = im.match_texts(черновик, [("нет номера столика", None)])
 
     assert строка["no_item"] is True
-    assert строка["reason"]
+    assert строка["reason"].startswith("В этом издании")  # язык замечания, не английский
     assert "code" not in строка
 
 
