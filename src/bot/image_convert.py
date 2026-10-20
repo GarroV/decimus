@@ -48,7 +48,9 @@ def _has_rotation(raw: bytes) -> bool:
     try:
         with Image.open(BytesIO(raw)) as img:
             return int(img.getexif().get(0x0112, 1)) != 1
-    except (OSError, UnidentifiedImageError):
+    except (OSError, UnidentifiedImageError, Image.DecompressionBombError, ValueError):
+        # Бомба распаковки или битый EXIF — не повод уронить скачивание: решит
+        # `normalize_image`, который ловит то же и отвечает «не картинка».
         return False
 
 
