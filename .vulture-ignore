@@ -646,3 +646,7 @@ plan_template_file
 # Автоиспользуемые фикстуры `tests/test_aggregator_http_caps.py` и `tests/test_report_engine_concurrency.py` (#1006): pytest вызывает их сам.
 _без_пауз
 _свежие_места
+# `photo_upload_page` / `photo_upload_post` — страница загрузки фото по ссылке
+# (#1020), регистрирует `@app.get/post(PATH, endpoint=...)`.
+photo_upload_page
+photo_upload_post
