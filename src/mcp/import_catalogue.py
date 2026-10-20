@@ -245,7 +245,10 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "level). The score does NOT change: it stays as in the old report. Unknown "
             "codes/zones come back as warnings — show them to the person.\n\n"
             "One call per finding, as the person confirms it. Never invent findings, "
-            "codes, classes or zones the report does not state — ask the person instead."
+            "codes, classes or zones the report does not state — ask the person instead.\n"
+            "The answer is short: the added finding, score (pct, grade), counts, warnings "
+            "and findings_total. The full list, deductions and per-zone breakdown are in "
+            "import_get_inspection."
         ),
         input_schema=_schema(
             {
@@ -269,7 +272,9 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "current checklist version and recomputes the score; a recommendation (R) and "
             "a violation cannot be turned into each other by editing — remove and add "
             "again. history: nothing is recomputed; pass an empty string for code, level "
-            "or zone to mark it 'not given'. Pass comment as an empty string to clear it."
+            "or zone to mark it 'not given'. Pass comment as an empty string to clear it. "
+            "The answer is short (the edited finding, score, counts, warnings); the full "
+            "view is import_get_inspection."
         ),
         input_schema=_schema(
             {
@@ -291,7 +296,8 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         description=(
             "Remove one finding (with its photos) from an imported draft by its number "
             "n. current: the score is recomputed by the engine. history: the score stays "
-            "as in the old report."
+            "as in the old report. The answer is short (score, counts, findings_total); "
+            "the full view is import_get_inspection."
         ),
         input_schema=_schema({"inspection_id": _ID, "n": _N}, ["inspection_id", "n"]),
         handler=imports.import_remove_finding,

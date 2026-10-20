@@ -35,7 +35,7 @@ import re
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import date
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ..db.models import ORIGIN_IMPORT, ORIGIN_LEGACY
 from ..domain.kinds import INSPECTION_KINDS
@@ -411,6 +411,33 @@ def _view(ident: str, *, tenant: str, note: str, warnings: Sequence[str] = ()) -
     }
 
 
+#: Поля короткого ответа записи (#1016). Полный вид — `import_get_inspection`.
+_SHORT_KEYS = ("id", "mode", "status", "note", "pct", "grade", "counts")
+
+
+def _short_view(
+    ident: str,
+    *,
+    tenant: str,
+    note: str,
+    n: int | None = None,
+    warnings: Sequence[str] = (),
+) -> dict[str, object]:
+    """Короткий ответ записи: затронутая находка и оценка, без списка и разбивок (#1016).
+
+    Весь список находок, вычеты и разбивка по зонам каждый раз раздували ответ и
+    контекст агента; они остаются в `import_get_inspection`.
+    """
+    полный = _view(ident, tenant=tenant, note=note)
+    находки = cast("list[dict[str, object]]", полный["findings"])
+    return {
+        **{k: полный[k] for k in _SHORT_KEYS},
+        "finding": next((f for f in находки if f.get("n") == n), None),
+        "warnings": list(warnings),
+        "findings_total": len(находки),
+    }
+
+
 def _legacy_view(
     detail: InspectionDetail, шапка: Any, *, note: str, warnings: Sequence[str]
 ) -> dict[str, object]:
@@ -528,10 +555,11 @@ def import_add_finding(
         )
         with _db():
             n = legacy.add_legacy_finding(ident, tenant=tenant, finding=запись, wording=слова)
-        return _view(
+        return _short_view(
             ident,
             tenant=tenant,
             note=f"finding #{n} added",
+            n=n,
             warnings=modes.soft_warnings(store, code=запись.code, zone=запись.zone),
         )
     code, level, zone = _engine_triple(code, level, zone)
@@ -549,7 +577,7 @@ def import_add_finding(
     ]
     with _db():
         n, _ = db.add_finding(ident, tenant=tenant, wording=слова, apply=_engine(args))
-    return _view(ident, tenant=tenant, note=f"finding #{n} added")
+    return _short_view(ident, tenant=tenant, note=f"finding #{n} added", n=n)
 
 
 def _engine_triple(code: str | None, level: str | None, zone: str | None) -> tuple[str, str, str]:
@@ -612,7 +640,7 @@ def import_edit_finding(
         )
     with _db():
         db.edit_finding(ident, номер, tenant=tenant, wording=слова, apply=_engine(args))
-    return _view(ident, tenant=tenant, note=f"finding #{номер} edited")
+    return _short_view(ident, tenant=tenant, note=f"finding #{номер} edited", n=номер)
 
 
 def _edit_legacy(
@@ -643,10 +671,11 @@ def _edit_legacy(
             finding=legacy.LegacyFinding(**итог),
             wording=wording,
         )
-    return _view(
+    return _short_view(
         detail.inspection.id,
         tenant=tenant,
         note=f"finding #{n} edited",
+        n=n,
         warnings=modes.soft_warnings(store, code=итог["code"], zone=итог["zone"]),
     )
 
@@ -670,7 +699,7 @@ def import_remove_finding(
                 ident, номер, tenant=tenant, apply=_engine(["drop", str(номер)])
             )
     _forget(кадры)
-    return _view(ident, tenant=tenant, note=f"finding #{номер} removed")
+    return _short_view(ident, tenant=tenant, note=f"finding #{номер} removed")
 
 
 # --- кадры (D309) -------------------------------------------------------------
