@@ -32,7 +32,7 @@
       <h3 class="ssec__title">{{ t('actions.panel.facts') }}</h3>
       <dl class="sprops">
         <div><dt>{{ t('actions.col.inspection') }}</dt>
-          <dd><a href="{{ url(registry_path ~ '/' ~ r.inspection_id) }}?lang={{ lang }}">{{ t('actions.request.inspection', date=r.inspection_date) }}</a>
+          <dd><a href="{{ url(registry_path ~ '/' ~ r.inspection_id) }}?lang={{ lang }}">{{ t('actions.request.inspection', date=day(r.inspection_date)) }}</a>
             {%- if r.grade %} · {{ r.grade }}{% if r.pct is not none %} {{ '%.1f'|format(r.pct) }}%{% endif %}{% endif %}</dd></div>
         <div><dt>{{ t('actions.col.due') }}</dt>
           <dd{% if r.overdue(today) %} class="srow__err"{% endif %}>{{ day(r.due_on) }}</dd></div>

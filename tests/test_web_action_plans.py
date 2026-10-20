@@ -176,6 +176,9 @@ def test_уК_видит_очередь_и_запрос(уК: FlaskClient) -> No
     страница = уК.get("/actions?lang=ru").get_data(as_text=True)
     assert "Batumi-1" in страница
     assert "Ждут приёмки · 1" in страница
+    # Даты — словами, как везде (#1086), а не ISO.
+    assert "3 окт 2026" in страница and "11 окт 2026" in страница
+    assert "2026-10-03" not in страница.split("slist", 1)[1]
 
 
 def test_уК_переключается_на_принятые_и_очереди_там_нет(
