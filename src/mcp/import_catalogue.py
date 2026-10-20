@@ -408,6 +408,33 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         handler=imports.import_edit_finding,
     ),
     ImportTool(
+        name="import_edit_inspection",
+        description=(
+            "Correct the HEADER of an imported DRAFT before it is accepted: the "
+            "inspection date, the unit (pizzeria), the auditor, the kind. Only the given "
+            "fields change; the score and the findings stay as they are (date and unit "
+            "do not affect them). The date must not be in the future; the unit is "
+            "resolved by the directory, as at creation; one inspection per unit and day "
+            "unless second_visit=true. An ACCEPTED inspection is not edited here — use "
+            "move_inspection (date/unit with a recorded reason). The answer is short."
+        ),
+        input_schema=_schema(
+            {
+                "inspection_id": _ID,
+                "date": {"type": "string", "description": "New inspection date, YYYY-MM-DD."},
+                "unit": {"type": "string", "description": "New unit (pizzeria) name."},
+                "auditor": {"type": "string", "description": "New auditor name."},
+                "kind": {"type": "string", "description": "New inspection kind."},
+                "second_visit": {
+                    "type": "boolean",
+                    "description": "True only if the person confirmed a second visit that day.",
+                },
+            },
+            ["inspection_id"],
+        ),
+        handler=imports.import_edit_inspection,
+    ),
+    ImportTool(
         name="import_remove_finding",
         description=(
             "Remove one finding (with its photos) from an imported draft by its number "

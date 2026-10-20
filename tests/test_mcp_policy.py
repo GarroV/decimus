@@ -22,6 +22,7 @@ from src.mcp.catalogue import (
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
     KIND_INSPECTIONS,
+    KIND_MOVE,
     KIND_RATINGS,
     KIND_RATINGS_READ,
     KIND_RETRACTION,
@@ -38,6 +39,7 @@ from src.mcp.rpc import handle
     KIND_RATINGS_READ,
     KIND_RATINGS,
     KIND_RETRACTION,
+    KIND_MOVE,
 )
 
 #: Матрица из спеки `docs/superpowers/specs/2026-10-12-claude-connect-design.md`,
@@ -52,6 +54,7 @@ _ВСЁ_УК = frozenset(
         KIND_IMPORT,
         KIND_RATINGS_READ,
         KIND_RATINGS,
+        KIND_MOVE,
     }
 )
 МАТРИЦА: dict[tuple[str, str], frozenset[str]] = {
@@ -59,7 +62,14 @@ _ВСЁ_УК = frozenset(
     ("HQ", "admin"): _ВСЁ_УК,
     # Девелопер заносит проверки через Claude (D567).
     ("HQ", "developer"): frozenset(
-        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ, KIND_IMPORT}
+        {
+            KIND_INSPECTIONS,
+            KIND_CHECKLIST_SOURCE,
+            KIND_CHECKLIST,
+            KIND_RATINGS_READ,
+            KIND_IMPORT,
+            KIND_MOVE,
+        }
     ),
     # Гость (D440): только чтение проверок и рейтингов. Аудитора в УК больше нет.
     ("HQ", "guest"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),

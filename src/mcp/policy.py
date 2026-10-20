@@ -36,6 +36,7 @@ from .catalogue import (
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
     KIND_INSPECTIONS,
+    KIND_MOVE,
     KIND_RATINGS,
     KIND_RATINGS_READ,
     KIND_RETRACTION,
@@ -50,6 +51,7 @@ KIND_ACTIONS: Mapping[str, str] = {
     KIND_CHECKLIST: "checklist.read",
     KIND_RETRACTION: "inspection.retract",
     KIND_IMPORT: "inspection.import",
+    KIND_MOVE: "inspection.move",
     KIND_RATINGS: "ratings.manage",
     KIND_RATINGS_READ: "ratings.read",
 }

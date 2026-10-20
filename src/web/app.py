@@ -1559,7 +1559,6 @@ def _card_context(
         and история_известна
         and data.retraction_available()
         and not detail.inspection.retracted
-        and not detail.inspection.on_review
     )
     # Подтверждать и править записи — по матрице (`inspection.accept`): УК по своей
     # проверке (D283, D341), админ партнёра — свежую своих сотрудников (D367), и

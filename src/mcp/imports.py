@@ -745,6 +745,49 @@ def import_edit_finding(
     return _short_view(ident, tenant=tenant, note=f"finding #{номер} edited", n=номер)
 
 
+def import_edit_inspection(
+    *,
+    tenant: str,
+    store: Store,
+    actor: str,
+    inspection_id: str,
+    date: str | None = None,
+    unit: str | None = None,
+    auditor: str | None = None,
+    kind: str | None = None,
+    second_visit: bool = False,
+) -> dict[str, object]:
+    """Исправить шапку черновика до принятия: дата, пиццерия, аудитор, вид. Оценка та же."""
+    from ..db import imports as db
+
+    del store, actor
+    ident = _require_inspection_id(inspection_id)
+    _only_import(ident, tenant=tenant)
+    день = _parse_date(date, field="date") if date is not None else None
+    if день is not None and день > _today():
+        raise ToolError(
+            f"Дата {день.isoformat()} в будущем. Загружаются прошедшие проверки — дата обхода "
+            f"из старого отчёта"
+        )
+    точка = None if unit is None else _required(unit, field="unit", limit=MAX_UNIT)
+    аудитор = None if auditor is None else _required(auditor, field="auditor", limit=MAX_AUDITOR)
+    if kind is not None and kind not in INSPECTION_KINDS:
+        raise ToolError(f"Вид проверки kind — один из: {', '.join(INSPECTION_KINDS)}")
+    if день is None and точка is None and аудитор is None and kind is None:
+        raise ToolError("Нечего менять: назовите хотя бы одно из date, unit, auditor, kind")
+    with _db():
+        db.edit_head(
+            ident,
+            tenant=tenant,
+            day=день,
+            unit=точка,
+            auditor=аудитор,
+            kind=kind,
+            second_visit=bool(second_visit),
+        )
+    return _short_view(ident, tenant=tenant, note="draft header edited")
+
+
 def _edit_legacy(
     store: Store,
     detail: InspectionDetail,

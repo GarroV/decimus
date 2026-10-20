@@ -79,6 +79,15 @@ from src.mcp.rpc import handle
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "text": "пол в пятнах",
     },
+    "import_edit_inspection": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "date": "2020-01-01",
+    },
+    "move_inspection": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "date": "2020-01-01",
+        "reason": "опечатка",
+    },
     "import_edit_finding": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "n": 1,
@@ -251,6 +260,8 @@ from src.mcp.rpc import handle
     "import_add_findings": {"inspection_id": "не-uuid", "findings": [{"text": "x"}]},
     "import_suggest_items": {"inspection_id": "не-uuid", "text": "x"},
     "import_edit_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": 0},
+    "import_edit_inspection": {"inspection_id": "не-uuid"},
+    "move_inspection": {"inspection_id": "не-uuid", "reason": "x"},
     "import_remove_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": -1},
     "import_get_inspection": {"inspection_id": "не-uuid"},
     "import_list_drafts": {},
