@@ -26,6 +26,7 @@ import threading
 from flask import Flask, Response, jsonify, request
 
 from src.bot.usage import chat_usage
+from src.db.busy_lock import WALK_TRANSLATE, try_hold
 from src.domain import get_state
 from src.domain.log_ids import log_id
 from src.domain.model_usage import usage_scope
@@ -51,7 +52,11 @@ def translate_target(inspection: Inspection) -> str | None:
 
 
 def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify) -> None:
-    """Повесить перевод. Опознание — то же, что у записи."""
+    """Повесить перевод. Опознание — то же, что у записи.
+
+    Один перевод на чат за раз — на все процессы: внутри процесса держит набор,
+    между процессами — замок в базе (`src/db/busy_lock.py`, F-110).
+    """
     busy: set[int] = set()
     guard = threading.Lock()
 
@@ -77,13 +82,20 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             text = _text(body, "text", required=True)
         except WalkRefused as exc:
             return refused(str(exc), lang)
+        # Язык перевода — до занятия чата: отказ ниже раньше возвращался при уже занятом
+        # чате и запирал его до перезапуска процесса.
+        target = translate_target(inspection)
+        if target is None:
+            return refused("walk.err.bad_request", lang, 409)
         with guard:
             if who in busy:
                 return refused("walk.err.translate_busy", lang, 429)
             busy.add(who)
-        target = translate_target(inspection)
-        if target is None:
-            return refused("walk.err.bad_request", lang, 409)
+        hold = try_hold(WALK_TRANSLATE, str(who))
+        if not hold.acquired:
+            with guard:
+                busy.discard(who)
+            return refused("walk.err.translate_busy", lang, 429)
         try:
             with usage_scope(telegram_id=who, tenant=inspection.tenant), chat_usage(who):
                 translated = translate_text(text, lang=target)
@@ -93,6 +105,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             logger.warning("Обход: перевод для чата %s не удался: %s", log_id(who), exc)
             return refused("walk.err.translate", lang, 503)
         finally:
+            hold.release()
             with guard:
                 busy.discard(who)
         if len(translated) > MAX_TEXT:

@@ -476,6 +476,7 @@
 | `0079_units_merged_into.sql` | — |
 | `0080_ratings_layout_compare.sql` | — |
 | `0081_inspection_edits.sql` | `inspection_edits` |
+| `0082_rate_windows.sql` | `rate_windows` |
 <!-- map:end -->
 
 ## Makefile

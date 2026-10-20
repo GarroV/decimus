@@ -18,6 +18,7 @@ from test_web_walk_write import JPEG, Клиент, клиент  # noqa: F401 -
 
 from src.bot import propose as ядро
 from src.bot.phrases import Learned
+from src.db.busy_lock import Hold
 from src.domain import get_state
 from src.recognize.errors import ModelUnavailable
 from src.recognize.fastpath import FastItem, FastPath
@@ -255,3 +256,36 @@ def test_photo_cap_boundary_keeps_first_and_reports_omitted() -> None:
     assert kept == ровно
     assert omitted == 1
     assert cap_photos(None) == (None, 0)
+
+
+def test_поиск_пока_идёт_в_другом_процессе_отказ_без_вызова_модели(
+    клиент: Клиент,  # noqa: F811
+    модель: Модель,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-110: набор в памяти про другой процесс не знает — занятость держит замок базы."""
+    monkeypatch.setattr(walk_suggest, "try_hold", lambda *_a: Hold(acquired=False))
+
+    ответ = _поиск(клиент, zone="hot_kitchen", words="нагар", photos=[клиент.ссылка()])
+
+    assert ответ.status_code == 429 and модель.звали == []
+
+
+def test_поиск_отпускает_замок_и_чат_после_себя(
+    клиент: Клиент,  # noqa: F811
+    модель: Модель,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    взятые: list[Hold] = []
+
+    def взять(*_a: Any) -> Hold:
+        взятые.append(Hold(acquired=True))
+        return взятые[-1]
+
+    monkeypatch.setattr(walk_suggest, "try_hold", взять)
+
+    первый = _поиск(клиент, zone="hot_kitchen", words="нагар", photos=[клиент.ссылка()])
+    второй = _поиск(клиент, zone="hot_kitchen", words="нагар", photos=[клиент.ссылка()])
+
+    assert (первый.status_code, второй.status_code) == (200, 200), "чат остался занятым"
+    assert len(взятые) == 2

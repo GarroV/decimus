@@ -19,6 +19,7 @@ from test_web_acceptance import ORIGIN, _лист, _приёмка, админ, 
 from test_web_app import карточка, шапка
 
 from src.bot.propose import Offer
+from src.db.busy_lock import Hold
 from src.db.errors import ReviseError
 from src.recognize.errors import ModelUnavailable
 from src.recognize.models import Candidate
@@ -500,3 +501,17 @@ def test_отказ_пересчёта_не_трогает_кадры(
 
     assert "Запись не исправлена" in страница
     assert "change_photos" not in зовы
+
+
+def test_подбор_пока_идёт_в_другом_процессе_отказ_и_чат_не_заперт(
+    подбор: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F-110: занятость между процессами держит замок базы, а не набор в памяти."""
+    monkeypatch.setattr(proofread, "try_hold", lambda *_a: Hold(acquired=False))
+
+    with pytest.raises(proofread.SuggestRefused) as отказ:
+        _подобрать()
+
+    assert (отказ.value.key, отказ.value.status) == ("proofread.suggest.busy", 429)
+    assert proofread._busy.held == set(), "отказ запер проверку в этом процессе навсегда"
+    assert подбор["зовы"] == 0, "модель вызвана, хотя подбор идёт в другом процессе"
