@@ -58,6 +58,7 @@ from psycopg_pool import ConnectionPool, PoolTimeout
 
 from .errors import DbError
 from .space import apply_space, current_space
+from .timeouts import timed_dsn
 
 log = logging.getLogger(__name__)
 
@@ -156,7 +157,7 @@ _lock = threading.Lock()
 
 def _make_pool(dsn: str, max_size: int) -> ConnectionPool[Any]:
     pool: ConnectionPool[Any] = ConnectionPool(
-        dsn,
+        timed_dsn(dsn),
         min_size=min(POOL_MIN_SIZE, max_size),
         max_size=max_size,
         kwargs={"connect_timeout": CONNECT_TIMEOUT_S},
@@ -183,7 +184,7 @@ def _pool_for(dsn: str, max_size: int) -> ConnectionPool[Any]:
             # или адрес отказывают сразу и настоящей причиной, как до пула. Пул же
             # про неудачу подключения молчит и пересоединяется в фоне, а ждущий
             # увидел бы через `DB_POOL_TIMEOUT_S` лишь «нет соединения».
-            psycopg.connect(dsn, connect_timeout=CONNECT_TIMEOUT_S).close()
+            psycopg.connect(timed_dsn(dsn), connect_timeout=CONNECT_TIMEOUT_S).close()
             pool = _make_pool(dsn, max_size)
             _pools[key] = pool
     return pool
@@ -282,7 +283,7 @@ def connection(dsn: str) -> Iterator[psycopg.Connection[Any]]:
     cfg = _settings()
     max_size = cfg.max_size
     if max_size == 0:
-        with psycopg.connect(dsn) as conn:
+        with psycopg.connect(timed_dsn(dsn)) as conn:
             apply_space(conn)
             yield conn
         return

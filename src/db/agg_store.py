@@ -24,6 +24,7 @@ from .config import check_environment
 from .errors import RatingsError
 from .pool import connection
 from .space import apply_space
+from .timeouts import timed_dsn
 
 
 class UnitIn(Protocol):
@@ -331,7 +332,7 @@ def collector_lock() -> Iterator[bool]:
     и отпускается базой сам, если процесс умер посреди сбора.
     """
     try:
-        conn = psycopg.connect(check_environment().dsn, autocommit=True)
+        conn = psycopg.connect(timed_dsn(check_environment().dsn), autocommit=True)
     except psycopg.Error as exc:
         raise _fail("Замок сборщика агрегаторов не взят", exc) from exc
     with conn:
@@ -351,7 +352,7 @@ def open_request() -> UpdateRequest | None:
         "from agg.requests where done_at is null"
     )
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
             apply_space(conn)
             row = conn.execute(sql).fetchone()
     except psycopg.Error as exc:
@@ -369,7 +370,7 @@ def request_update(aggregators: Sequence[str], *, by: str) -> tuple[UpdateReques
         "returning id, requested_at, requested_by, aggregators, done_at, outcome, error"
     )
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
             apply_space(conn)
             row = conn.execute(sql, (by, list(aggregators) or None)).fetchone()
     except psycopg.Error as exc:
@@ -387,7 +388,7 @@ def request_update(aggregators: Sequence[str], *, by: str) -> tuple[UpdateReques
 def finish_request(request_id: int, *, ok: bool, error: str | None = None) -> None:
     """Закрыть заявку исходом сбора; текст ошибки обрезается, как у журнала."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
             apply_space(conn)
             conn.execute(
                 "update agg.requests set done_at = now(), outcome = %s, error = %s "
