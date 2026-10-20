@@ -336,6 +336,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0083_ratings_layout_aggregators.sql": (
         "sql1:e2d0b77a7e573dab4eddd5e93b79d4ebd6228000453bf15efb5f0ee49014cef5"
     ),
+    # Ключи сервисов на экране «Подключения» (D576, #906).
+    "0084_service_keys.sql": (
+        "sql1:df6cded467f4d94f01692e50159ea892a7372443ba773990d77e9c9c9e79e023"
+    ),
 }
 
 

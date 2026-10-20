@@ -295,9 +295,9 @@ connections_issue
 connections_update
 connections_reissue
 connections_revoke
-model_key_check
-model_key_save
-model_key_delete
+service_key_check
+service_key_save
+service_key_delete
 do_move
 methodology_zone_add
 methodology_zone_shares

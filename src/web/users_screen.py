@@ -132,7 +132,7 @@ def install(app: Flask, conf: Settings) -> None:
     _install_add_freeze(app, users_path)
     _install_spaces(app, users_path)
     connections_screen.install(app)
-    connections_screen.install_model_key(app)
+    connections_screen.install_service_keys(app)
     journal_screen.install(app, conf)
 
 

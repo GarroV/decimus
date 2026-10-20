@@ -10,13 +10,12 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from src.db import maps_store
+from src.db import maps_store, service_keys
 from src.db.maps_store import LatestRating
 from src.db.space import SYSTEM_SPACE, acting_space
 
@@ -111,7 +110,7 @@ def compare(
 
 
 def _key_fetch() -> pointer.Fetch:
-    key = os.environ.get(KEY_ENV, "").strip()
+    key = service_keys.resolve("pointer", "api_key")
     if not key:
         raise pointer.PointerError(f"{KEY_ENV} не задан — загрузка оценок карт выключена")
     return pointer.http_fetch(key)
