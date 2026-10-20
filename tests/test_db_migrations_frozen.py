@@ -328,6 +328,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0081_inspection_edits.sql": (
         "sql1:2e0815cb0cb23039e3cd740716238831bd50f0b8303fcc404e25775604480a86"
     ),
+    # Общее скользящее окно частоты запросов (аудит F-110, #1006).
+    "0082_rate_windows.sql": (
+        "sql1:818dd3c0d9cad281b5a7fc2f51ee3c2d400eb7fb4afddc0ce919042e2612437c"
+    ),
 }
 
 

@@ -351,6 +351,7 @@
 | `OPENAI_API_KEY` | `src/recognize/config.py` | да |
 | `POINTER_API_KEY` | `src/ratings/maps.py` | да |
 | `PRESCRIPTION_MAX_REPLIES` | `src/db/config.py` | да |
+| `RATE_WINDOW_SHARED` | `src/db/rate_window.py` | да |
 | `RATINGS_SHEET_ID` | `src/ratings/sheet_sync.py` | да |
 | `RECOGNIZE_MAX_CANDIDATES` | `src/recognize/config.py` | да |
 | `RECOGNIZE_MERGE_MODEL` | `src/recognize/config.py` | да |
@@ -477,6 +478,7 @@
 | `0079_units_merged_into.sql` | — |
 | `0080_ratings_layout_compare.sql` | — |
 | `0081_inspection_edits.sql` | `inspection_edits` |
+| `0082_rate_windows.sql` | `rate_windows` |
 <!-- map:end -->
 
 ## Makefile

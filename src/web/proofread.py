@@ -27,6 +27,7 @@ from typing import Any
 
 from src.bot.propose import propose
 from src.bot.zones import zone_from_words
+from src.db.busy_lock import PROOFREAD_SUGGEST, Hold, try_hold
 from src.db.errors import StorageError
 from src.db.models import InspectionRow
 from src.db.previews import make_preview
@@ -59,7 +60,11 @@ class SuggestRefused(Exception):
 
 @dataclass
 class _Busy:
-    """Один подбор на проверку за раз: каждый — оплачиваемый вызов модели."""
+    """Один подбор на проверку за раз: каждый — оплачиваемый вызов модели.
+
+    Внутри процесса держит набор, между процессами — замок в базе
+    (`src/db/busy_lock.py`, F-110): второй процесс про набор не знает.
+    """
 
     held: set[str]
     lock: threading.Lock
@@ -68,14 +73,20 @@ class _Busy:
 _busy = _Busy(held=set(), lock=threading.Lock())
 
 
-def _take(inspection_id: str) -> None:
+def _take(inspection_id: str) -> Hold:
     with _busy.lock:
         if inspection_id in _busy.held:
             raise SuggestRefused("proofread.suggest.busy", 429)
         _busy.held.add(inspection_id)
+    hold = try_hold(PROOFREAD_SUGGEST, inspection_id)
+    if not hold.acquired:
+        _release(inspection_id, hold)
+        raise SuggestRefused("proofread.suggest.busy", 429)
+    return hold
 
 
-def _release(inspection_id: str) -> None:
+def _release(inspection_id: str, hold: Hold) -> None:
+    hold.release()
     with _busy.lock:
         _busy.held.discard(inspection_id)
 
@@ -121,7 +132,7 @@ def suggest(
     said = words.strip()
     if not said and not frames:
         raise SuggestRefused("proofread.suggest.empty")
-    _take(head.id)
+    hold = _take(head.id)
     try:
         previews = _previews(frames)
         # Расход модели (D537): подбор на экране — свой вид вызова, проверка — по номеру в базе.
@@ -149,7 +160,7 @@ def suggest(
         )
         raise SuggestRefused("proofread.suggest.failed", 503) from exc
     finally:
-        _release(head.id)
+        _release(head.id, hold)
     zone_names = {z.code: z.name for z in sheet.zones}
     cards = [c for c in (_card(x, sheet, zone_names) for x in found["candidates"]) if c is not None]
     logger.info(

@@ -51,8 +51,10 @@ def отчёты(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, int]]:
         walk_finish, "_run_report", lambda token, chat: запущено.append((token, chat))
     )
     walk_finish._building.clear()
+    walk_finish._holds.clear()
     yield запущено
     walk_finish._building.clear()
+    walk_finish._holds.clear()
 
 
 def _начать() -> None:
@@ -392,3 +394,44 @@ def test_отчёт_собирает_функция_чата_для_чата_ч�
 
     assert вызовы == [(АУДИТОР, АУДИТОР, False)]
     assert АУДИТОР not in walk_finish._building, "после сборки чат освобождается"
+
+
+def test_отчёт_уже_собирается_в_другом_процессе_второй_не_запускается(
+    база: База,  # noqa: F811
+    отчёты: list[tuple[str, int]],
+    domain_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-110: набор в памяти про другой процесс не знает — занятость держит замок базы."""
+    from src.db.busy_lock import Hold
+
+    _начать()
+    _заполнить_сведения()
+    monkeypatch.setattr(walk_finish, "try_hold", lambda *_a: Hold(acquired=False))
+
+    итог = walk_finish.start_report(ТОКЕН, АУДИТОР, "en", "ru")
+
+    assert итог.status == walk_finish.BUSY and отчёты == []
+    assert walk_finish._building == set(), "отказ запер чат в этом процессе навсегда"
+
+
+def test_сборка_отпускает_замок_базы_вместе_с_чатом(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Замок берётся в запросе, а отпускается в фоновом потоке сборки."""
+    from src.db.busy_lock import Hold
+
+    async def собрать(token: str, chat_id: int) -> None:
+        return None
+
+    отпущено: list[int] = []
+    замок = Hold(acquired=True)
+    monkeypatch.setattr(замок, "release", lambda: отпущено.append(1))
+    monkeypatch.setattr(walk_finish, "_deliver_report", собрать)
+    walk_finish._building.add(АУДИТОР)
+    walk_finish._holds[АУДИТОР] = замок
+
+    walk_finish._run_report(ТОКЕН, АУДИТОР)
+
+    assert отпущено == [1] and АУДИТОР not in walk_finish._building
+    assert АУДИТОР not in walk_finish._holds
