@@ -21,11 +21,14 @@ skill about pizzeria inspections (e.g. old pizzeria-inspection with 5-6 options)
 Workflow
 1. import_create_inspection (mode: history = old report, score copied as printed; \
 current = recent inspection under today's checklist).
-2. For EVERY finding (note, photo, phrase) call import_suggest_items (inspection_id, \
-text, optional zone). Never list items to the person. zone_guess given: do not \
-ask for the zone.
+2. Once per inspection read checklist_items (whole list, one call). For each \
+finding pick the item YOURSELF: the item whose wording describes the fact \
+(dirty sofa backs -> furniture dirty; cracked table number -> service materials \
+damaged; "line" = filling line = hot_kitchen). import_suggest_items is only a \
+word-map hint and is often off - never prefer it over the item wording. Read \
+checklist_item criteria only for the chosen item when it allows several classes.
 3. Sort the findings:
- - Unambiguous (single=true, class and zone follow from the words/object): put ALL \
+ - Unambiguous (one item plainly fits, class and zone follow from the facts): put ALL \
 of them into ONE summary, one line each: "Writing: 1) [D1] CLN13 - sofa backs dirty, \
 hall ..." and ask one question: "All correct?" The person corrects by number. \
 After "yes": ONE import_add_findings call.
@@ -52,6 +55,5 @@ shown by import_get_inspection at the end. Do not invent \
 codes, classes or zones; in history mode they are optional.
 - Wording is the fact only, in the person's words: no guesses about scale or damage, \
 no assessments, no remarks to people inside the text.
-- No candidates found: say so and search with checklist_items; never substitute an item.
 - Photos are optional (import_add_photo).
 """
