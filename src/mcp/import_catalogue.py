@@ -509,8 +509,9 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "several -F file=@... for one finding; JPEG, PNG, WebP or HEIC, up to 25 MB "
             "per request) and the url itself. If the command cannot connect, give the "
             "person the url: it opens a page where they drop the photos on the right "
-            "finding. The link lives 2 hours, belongs to this draft only and stops "
-            "working once the draft is accepted. Findings must be recorded first."
+            "finding. The link has no time limit: it works until the draft is "
+            "accepted, belongs to this draft only and can be issued again at any time. "
+            "Findings must be recorded first."
         ),
         input_schema=_schema({"inspection_id": _ID}, ["inspection_id"]),
         handler=import_photo_link.import_photo_upload_link,

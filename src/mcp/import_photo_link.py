@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime, timedelta
 
 from ..domain import photo_upload_link
 from ..domain.public_urls import ADMIN_PUBLIC_URL_VAR, parse_public_url
@@ -67,12 +66,10 @@ def import_photo_upload_link(
     база = _base()
     token = photo_upload_link.issue(секрет, inspection_id=ident, tenant=tenant)
     url = f"{база}{PATH}{token}"
-    до = datetime.now(UTC) + timedelta(seconds=photo_upload_link.TTL_SEC)
     return {
         "id": ident,
         "url": url,
-        "expires_at": до.isoformat(timespec="seconds"),
-        "expires_in_minutes": photo_upload_link.TTL_SEC // 60,
+        "valid_until": "the draft is accepted (no time limit)",
         "findings_total": len(detail.findings),
         "command": f'curl -sS -F n=<finding number> -F file=@{UPLOADS_DIR}<file name> "{url}"',
         "status": (
