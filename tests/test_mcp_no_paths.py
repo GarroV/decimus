@@ -69,6 +69,14 @@ from src.mcp.rpc import handle
         "zone": "fridge",
         "text": "пол в пятнах",
     },
+    "import_add_findings": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "findings": [{"text": "пол в пятнах", "code": "CLN01", "level": "D1", "zone": "fridge"}],
+    },
+    "import_suggest_items": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "text": "пол в пятнах",
+    },
     "import_edit_finding": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "n": 1,
@@ -236,6 +244,8 @@ from src.mcp.rpc import handle
         "zone": "fridge",
         "text": "x",
     },
+    "import_add_findings": {"inspection_id": "не-uuid", "findings": [{"text": "x"}]},
+    "import_suggest_items": {"inspection_id": "не-uuid", "text": "x"},
     "import_edit_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": 0},
     "import_remove_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": -1},
     "import_get_inspection": {"inspection_id": "не-uuid"},

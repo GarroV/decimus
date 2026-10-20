@@ -392,3 +392,28 @@ def test_сбой_инструмента_пишется_в_журнал_без_�
     assert "list_inspections" in записи[0].getMessage()
     assert записи[0].exc_info is not None
     assert "секретная-точка" not in caplog.text
+
+
+# --- instructions в рукопожатии (#1018) ---------------------------------------
+
+
+def _initialize(**доступ: Any) -> Any:
+    return handle(
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+        tenant=АРЕНДАТОР,
+        **доступ,
+    )["result"]
+
+
+def test_instructions_про_загрузку_отдаются_доступу_с_инструментами_загрузки() -> None:
+    результат = _initialize(role="admin", imports=object(), actor="a@b.c")  # type: ignore[arg-type]
+
+    текст = результат["instructions"]
+    assert len(текст) <= 2600
+    assert "import_suggest_items" in текст
+    assert "import_add_findings" in текст
+
+
+def test_instructions_нет_без_хранилища_загрузки_и_без_роли() -> None:
+    assert "instructions" not in _initialize(role="admin")
+    assert "instructions" not in _initialize(role=None, imports=object())  # type: ignore[arg-type]

@@ -709,6 +709,15 @@ def read_items(
     return _rows(каталог / _FILES[what])
 
 
+def cues_file(store: Store, *, version: str | None = None) -> Path:
+    """Файл карты слов этой версии методики — для подбора пункта по словам (#1015).
+
+    Файла может не быть: карта необязательна, читатель (`recognize.cues`) на
+    отсутствующий файл отвечает пустой картой.
+    """
+    return _version_dir(store, _ensure(store) if version is None else version) / CUES_FILE
+
+
 def read_item(store: Store, *, code: str, version: str | None = None) -> dict[str, str]:
     """Один пункт вместе с его критериями D1/D2/D3.
 

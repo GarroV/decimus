@@ -24,7 +24,7 @@ import inspect
 from mcp_places import сверить
 
 from src.mcp import checklist_source as checklist_source_module
-from src.mcp import checklist_tools, checklists_tools
+from src.mcp import checklist_tools, checklists_tools, import_batch, import_suggest
 from src.mcp import imports as imports_module
 from src.mcp import phrases as phrases_module
 from src.mcp import retraction as retraction_module
@@ -138,6 +138,8 @@ from src.mcp.catalogue import (
 ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ = {
     "import_create_inspection",
     "import_add_finding",
+    "import_add_findings",
+    "import_suggest_items",
     "import_edit_finding",
     "import_remove_finding",
     "import_get_inspection",
@@ -206,7 +208,7 @@ from src.mcp.catalogue import (
 }
 
 
-def test_каталог_содержит_ровно_пятьдесят_семь_инструментов_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_пятьдесят_девять_инструментов_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
     инструмент, к которому агент внезапно теряет доступ.
     42 + 9 загрузки (D305) + 2 управления рейтингами (D320, D420) + 3 чтения
@@ -216,7 +218,7 @@ def test_каталог_содержит_ровно_пятьдесят_семь_
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 57
+    assert len(TOOLS) == 59
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -367,7 +369,11 @@ def test_обработчик_взят_из_правильного_модуля(
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ:
             assert spec.handler.__module__ == retraction_module.__name__, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ:
-            assert spec.handler.__module__ == imports_module.__name__, spec.name
+            assert spec.handler.__module__ in {
+                imports_module.__name__,
+                import_suggest.__name__,
+                import_batch.__name__,
+            }, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ:
             assert spec.handler.__module__ == "src.mcp.ratings_tools", spec.name
         elif spec.name in ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ:
@@ -393,7 +399,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 57
+    assert len(перечень) == 59
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

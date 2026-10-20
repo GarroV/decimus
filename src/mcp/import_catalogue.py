@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import imports
+from . import import_batch, import_suggest, imports
 
 _ID: dict[str, object] = {
     "type": "string",
@@ -245,7 +245,11 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "level). The score does NOT change: it stays as in the old report. Unknown "
             "codes/zones come back as warnings — show them to the person.\n\n"
             "One call per finding, as the person confirms it. Never invent findings, "
-            "codes, classes or zones the report does not state — ask the person instead."
+            "codes, classes or zones the report does not state — find the item with "
+            "import_suggest_items first, then ask the person instead of guessing.\n"
+            "The answer is short: the added finding, score (pct, grade), counts, warnings "
+            "and findings_total. The full list, deductions and per-zone breakdown are in "
+            "import_get_inspection."
         ),
         input_schema=_schema(
             {
@@ -262,6 +266,87 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         handler=imports.import_add_finding,
     ),
     ImportTool(
+        name="import_suggest_items",
+        description=(
+            "Read-only: suggest up to 5 checklist items for ONE finding, by the word map "
+            "of the draft's checklist edition. Call it for every finding BEFORE "
+            "import_add_finding, instead of browsing checklist_items and listing items to "
+            "the person.\n"
+            "Input: inspection_id, text (the finding's wording or what was seen/said), "
+            "optional zone (a place code; narrows the fallback to that zone's items).\n"
+            "Answer: candidates (code, question in the report language, allowed levels, "
+            "brief D1/D2/D3 criteria, single_level, source = cue_map or zone), single "
+            "(true when the word map named exactly ONE item: put it in the summary "
+            "without asking which item), zone_guess (when the word map names a place and "
+            "zone was not given). Candidates found by the word map "
+            "come first; the zone's items are added only if fewer than 3 were found. "
+            "Service items are never offered. If the word map finds nothing the answer says "
+            "so with an empty or zone-only list — then search with checklist_items or ask "
+            "the person; never guess an item.\n"
+            "A suggestion is not a decision: show the person 1-3 options, one line each "
+            "('[class] CODE - essence', the most likely first). In mode=history item codes "
+            "are optional — use this only if the old report names the item or the person "
+            "wants to link one."
+        ),
+        input_schema=_schema(
+            {
+                "inspection_id": _ID,
+                "text": {
+                    "type": "string",
+                    "description": "The finding's wording or what was seen/said. Max 1000 "
+                    "characters.",
+                },
+                "zone": {
+                    "type": "string",
+                    "description": "Optional zone code (e.g. hot_kitchen) where it was seen.",
+                },
+            },
+            ["inspection_id", "text"],
+        ),
+        handler=import_suggest.import_suggest_items,
+    ),
+    ImportTool(
+        name="import_add_findings",
+        description=(
+            "Add SEVERAL findings to an imported draft in one call (up to 50). Use it only "
+            "for findings the person has ALREADY confirmed; each one goes through exactly "
+            "the same check as import_add_finding (current: the engine checks code, class, "
+            "zone and recomputes the score; history: as in the old report).\n"
+            "NOT atomic: the findings that passed are written and stay; each refused one "
+            "comes back in refused with its index in your list and the reason — fix those "
+            "and send them again, do not resend the written ones. The answer is short: "
+            "added (index, n), refused, score (pct, grade), counts, warnings, "
+            "findings_total; the full view is import_get_inspection."
+        ),
+        input_schema=_schema(
+            {
+                "inspection_id": _ID,
+                "findings": {
+                    "type": "array",
+                    "maxItems": import_batch.MAX_BATCH,
+                    "description": "Confirmed findings, in order. Each is an object with "
+                    "the same fields as import_add_finding: text (required), code, level, "
+                    "zone, comment, repeat.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "text": {"type": "string", "description": _TEXT},
+                            "code": {"type": "string", "description": _CODE},
+                            "level": {"type": "string", "description": _LEVEL},
+                            "zone": {"type": "string", "description": _ZONE},
+                            "comment": {"type": "string", "description": _COMMENT},
+                            "repeat": {"type": "boolean", "description": _REPEAT},
+                        },
+                        "required": ["text"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            ["inspection_id", "findings"],
+        ),
+        handler=import_batch.import_add_findings,
+    ),
+    ImportTool(
         name="import_edit_finding",
         description=(
             "Correct one finding of an imported draft by its number n. Only the given "
@@ -269,7 +354,9 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "current checklist version and recomputes the score; a recommendation (R) and "
             "a violation cannot be turned into each other by editing — remove and add "
             "again. history: nothing is recomputed; pass an empty string for code, level "
-            "or zone to mark it 'not given'. Pass comment as an empty string to clear it."
+            "or zone to mark it 'not given'. Pass comment as an empty string to clear it. "
+            "The answer is short (the edited finding, score, counts, warnings); the full "
+            "view is import_get_inspection."
         ),
         input_schema=_schema(
             {
@@ -291,7 +378,8 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         description=(
             "Remove one finding (with its photos) from an imported draft by its number "
             "n. current: the score is recomputed by the engine. history: the score stays "
-            "as in the old report."
+            "as in the old report. The answer is short (score, counts, findings_total); "
+            "the full view is import_get_inspection."
         ),
         input_schema=_schema({"inspection_id": _ID, "n": _N}, ["inspection_id", "n"]),
         handler=imports.import_remove_finding,
