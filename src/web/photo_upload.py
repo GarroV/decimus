@@ -1,9 +1,9 @@
-"""Загрузка кадров к черновику загрузки проверки по подписанной ссылке (мимо Claude).
+"""Загрузка кадров к черновику загрузки проверки по подписанному адресу (мимо Claude).
 
 Модель не передаёт байты картинки аргументом инструмента, поэтому MCP
-(`import_photo_upload_link`) выдаёт ссылку, а кадры идут сюда: из песочницы Claude
-командой `curl -F n=… -F file=@…` (POST) или руками человека — страницей по той же
-ссылке (GET), если у песочницы закрыта сеть.
+(`import_upload_photos`) выдаёт песочнице команду, а кадры идут сюда: из песочницы
+Claude командой `curl -F n=… -F file=@…` (POST). Человеку адрес не показывается и
+страницы ручной загрузки нет: действия с отчётом идут только через MCP.
 
 **Доступ — только токен** (`domain.photo_upload_link`: подпись, пара «черновик,
 пространство», без срока — до приёмки, D573). Куки админки здесь не читаются и
@@ -29,7 +29,7 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from flask import Flask, Response, jsonify, make_response, render_template, request
+from flask import Flask, Response, jsonify, make_response, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from src.db import imports as db_imports
@@ -38,21 +38,17 @@ from src.db.errors import ConfigError as DbConfigError
 from src.db.errors import DbError, HistoryImportError
 from src.db.models import UPLOADED_ORIGINS
 from src.db.photo_intake import sniff_image
-from src.db.queries import get_inspection
-from src.db.reach import own_reach
 from src.db.space import acting_space
 from src.db.storage import PhotoStorage, S3PhotoStorage
 from src.domain import photo_upload_link
 
-from . import item_labels, ui_lang
 from .config import Settings
 
 logger = logging.getLogger(__name__)
 
 PATH = "/photo-upload/<token>"
-PAGE_ENDPOINT = "photo_upload_page"
 POST_ENDPOINT = "photo_upload_post"
-ENDPOINTS = frozenset({PAGE_ENDPOINT, POST_ENDPOINT})
+ENDPOINTS = frozenset({POST_ENDPOINT})
 
 #: Предел тела запроса: несколько кадров с телефона за раз.
 MAX_REQUEST_BYTES = 25 * 1024 * 1024
@@ -62,11 +58,10 @@ MAX_FILE_BYTES = 12 * 1024 * 1024
 FORM_OVERHEAD_BYTES = 64 * 1024
 #: Номер находки в черновике: те же пределы, что у инструментов MCP.
 MAX_N = 999
-#: Запросов в минуту с одного токена: ссылку открывают, шлют пачку, перезагружают.
+#: Запросов в минуту с одного токена: песочница шлёт пачку кадров.
 PER_MINUTE = 30
 WINDOW_SEC = 60.0
 SWEEP_AFTER = 256
-HTML_FIELD = "html"
 
 
 class _TokenRate:
@@ -119,7 +114,7 @@ def _plain(status: int) -> Response:
 
 
 def _guarded(response: Response) -> Response:
-    """Ссылка со значением токена не должна утекать ни в кэш, ни в Referer."""
+    """Ответ с адресом токена не должен утекать ни в кэш, ни в Referer."""
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     return response
@@ -134,20 +129,6 @@ def _is_open_draft(grant: photo_upload_link.UploadGrant) -> bool:
         and head.status == "draft"
         and not head.retracted
     )
-
-
-def _findings(grant: photo_upload_link.UploadGrant, lang: str) -> list[dict[str, object]]:
-    detail = get_inspection(
-        grant.inspection_id, reach=own_reach(grant.tenant), include_on_review=True
-    )
-    if detail is None:
-        return []
-    # Пункт человеку — меткой «Порядок 13», не кодом (20.10.2026): по методике версии проверки.
-    label = item_labels.for_detail(detail, lang)
-    return [
-        {"n": f.n, "code": f.code, "label": label(f.code), "text": f.text}
-        for f in sorted(detail.findings, key=lambda f: f.n)
-    ]
 
 
 def _attach(grant: photo_upload_link.UploadGrant, n: int) -> _Outcome:
@@ -203,36 +184,6 @@ def install(app: Flask, conf: Settings) -> None:
             return None
         return photo_upload_link.verify(conf.secret_key, token)
 
-    def _page(
-        grant: photo_upload_link.UploadGrant, token: str, *, outcome: _Outcome | None, status: int
-    ) -> Response:
-        ответ = make_response(
-            render_template(
-                "photo_upload.html",
-                findings=_findings(grant, ui_lang.request_lang(conf.ui_lang)),
-                outcome=outcome,
-                action=request.path,
-                max_mb=MAX_FILE_BYTES // (1024 * 1024),
-                token=token,
-            ),
-            status,
-        )
-        return _guarded(ответ)
-
-    @app.get(PATH, endpoint=PAGE_ENDPOINT)
-    def photo_upload_page(token: str) -> Response:
-        grant = _grant(token)
-        if grant is None or not RATE.allow(token):
-            return _plain(403 if grant is None else 429)
-        try:
-            with acting_space(grant.tenant):
-                if not _is_open_draft(grant):
-                    return _plain(410)
-                return _page(grant, token, outcome=None, status=200)
-        except DbError:
-            logger.warning("страница загрузки кадров: база недоступна")
-            return _plain(503)
-
     @app.post(PATH, endpoint=POST_ENDPOINT)
     def photo_upload_post(token: str) -> Response:
         grant = _grant(token)
@@ -243,7 +194,6 @@ def install(app: Flask, conf: Settings) -> None:
         request.max_content_length = MAX_REQUEST_BYTES + FORM_OVERHEAD_BYTES
         try:
             n_raw = request.form.get("n", "")
-            пришли_со_страницы = request.form.get(HTML_FIELD) == "1"
             if not (n_raw.isascii() and n_raw.isdigit() and 1 <= int(n_raw) <= MAX_N):
                 return _json({"error": "n must be the finding number (1..999)"}, 400)
             n = int(n_raw)
@@ -251,8 +201,6 @@ def install(app: Flask, conf: Settings) -> None:
                 if not _is_open_draft(grant):
                     return _plain(410)
                 итог = _attach(grant, n)
-                if пришли_со_страницы:
-                    return _page(grant, token, outcome=итог, status=200 if итог.attached else 422)
         except RequestEntityTooLarge:
             return _json({"error": "request is larger than the limit"}, 413)
         except DbError:

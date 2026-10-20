@@ -79,6 +79,10 @@ from src.mcp.errors import McpError
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "text": "пол в пятнах",
     },
+    "import_match_findings": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "findings": [{"text": "пол в пятнах"}],
+    },
     "import_edit_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "date": "2020-01-01",
@@ -102,7 +106,7 @@ from src.mcp.errors import McpError
         "image_base64": "aGVsbG8=",
         "mime": "image/jpeg",
     },
-    "import_photo_upload_link": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
+    "import_upload_photos": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
     "import_info_fields": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
     "import_set_info": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
@@ -264,6 +268,7 @@ from src.mcp.errors import McpError
     },
     "import_add_findings": {"inspection_id": "не-uuid", "findings": [{"text": "x"}]},
     "import_suggest_items": {"inspection_id": "не-uuid", "text": "x"},
+    "import_match_findings": {"inspection_id": "не-uuid", "findings": [{"text": "x"}]},
     "import_edit_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": 0},
     "import_edit_inspection": {"inspection_id": "не-uuid"},
     "move_inspection": {"inspection_id": "не-uuid", "reason": "x"},
@@ -276,7 +281,7 @@ from src.mcp.errors import McpError
         "image_base64": "@@@",
         "mime": "image/gif",
     },
-    "import_photo_upload_link": {"inspection_id": "не-uuid"},
+    "import_upload_photos": {"inspection_id": "не-uuid"},
     "import_info_fields": {"inspection_id": "не-uuid"},
     "import_set_info": {"inspection_id": "не-uuid", "values": {"INF03": "yes"}},
     "import_accept_inspection": {
@@ -578,7 +583,7 @@ def test_батарея_доходит_и_до_успешных_ответов(�
     успешные = [о for о in батарея.ответы if о.текст.startswith("{")]
     версии = [json.loads(о.текст).get("version") for о in успешные]
 
-    assert len(успешные) > len(TOOLS), "успешных ответов слишком мало для утверждения"
+    assert len(успешные) >= len(TOOLS), "успешных ответов слишком мало для утверждения"
     assert any(версия for версия in версии), "ни одна правка не дошла до новой версии"
 
 

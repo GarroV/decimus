@@ -54,6 +54,7 @@ READ_ONLY_TOOLS = frozenset(
         "import_get_inspection",
         "import_list_drafts",
         "import_suggest_items",
+        "import_match_findings",
     }
 )
 
