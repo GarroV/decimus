@@ -103,6 +103,11 @@ from src.mcp.rpc import handle
         "mime": "image/jpeg",
     },
     "import_photo_upload_link": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
+    "import_info_fields": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
+    "import_set_info": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "values": {"INF03": "yes"},
+    },
     "import_accept_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "confirm_unit": "Белград-1",
@@ -272,6 +277,8 @@ from src.mcp.rpc import handle
         "mime": "image/gif",
     },
     "import_photo_upload_link": {"inspection_id": "не-uuid"},
+    "import_info_fields": {"inspection_id": "не-uuid"},
+    "import_set_info": {"inspection_id": "не-uuid", "values": {"INF03": "yes"}},
     "import_accept_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "confirm_unit": "Белград-1",

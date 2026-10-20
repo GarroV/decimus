@@ -31,14 +31,12 @@ from datetime import date
 
 from src.db import queries
 from src.db.errors import DbError
+from src.domain import repeat_rule
 from src.domain.models import Inspection
 
 logger = logging.getLogger(__name__)
 
-#: Классы, у которых нет ставки за запись, — удваивать нечего (D191): `D3`
-#: сжигает долю зоны целиком, `D0` — информационная запись без вычета, `R` —
-#: рекомендация (D201).
-NOTHING_TO_DOUBLE = frozenset({"D0", "D3", "R"})
+NOTHING_TO_DOUBLE = repeat_rule.NOTHING_TO_DOUBLE
 
 
 def seen_before(inspection: Inspection | None, *, code: str, level: str) -> date | None:
@@ -65,6 +63,6 @@ def seen_before(inspection: Inspection | None, *, code: str, level: str) -> date
         # «почему бот молчал про повтор» должен найти причину в журнале.
         logger.warning("предыдущая проверка не пришла (%s): %s", type(exc).__name__, exc)
         return None
-    if прошлая is None or code not in прошлая.codes:
+    if прошлая is None or not repeat_rule.was_violation(прошлая.codes, code=code, level=level):
         return None
     return прошлая.date

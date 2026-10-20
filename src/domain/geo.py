@@ -18,6 +18,7 @@ COUNTRIES: dict[str, dict[str, str]] = {
     "AM": {"ru": "Армения", "en": "Armenia"},
     "AZ": {"ru": "Азербайджан", "en": "Azerbaijan"},
     "BG": {"ru": "Болгария", "en": "Bulgaria"},
+    "BY": {"ru": "Беларусь", "en": "Belarus"},
     "CY": {"ru": "Кипр", "en": "Cyprus"},
     "EE": {"ru": "Эстония", "en": "Estonia"},
     "ES": {"ru": "Испания", "en": "Spain"},
