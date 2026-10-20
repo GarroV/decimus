@@ -3,7 +3,7 @@
 #
 # Запускается человеком одной строкой, которую присылает бот:
 #   скачать `https://<адрес>/setup`, сверить SHA-256 с отпечатком из строки бота
-#   (`shasum -a 256 -c`) и только потом запустить с DODO_MCP_TOKEN='...' в окружении
+#   (`shasum -a 256 -c`) и только потом запустить с DECIMUS_MCP_TOKEN='...' в окружении
 #
 # Форма повторяет соседний продукт (swarm-brain, `functions/v1/swarm-setup`):
 # публичный GET отдаёт этот скрипт, токен приезжает ОКРУЖЕНИЕМ, а не в
@@ -28,10 +28,15 @@
 # `tools/mcp_bridge.sh`. Адрес и токен приезжают окружением из строки бота.
 set -eu
 
-TOKEN="${DODO_MCP_TOKEN:?не задан DODO_MCP_TOKEN — возьмите команду в боте, пункт «Установка MCP»}"
-URL="${DODO_MCP_URL:?не задан DODO_MCP_URL — возьмите команду в боте целиком}"
-NAME="dodo-audit"
-BRIDGE="$HOME/.dodo-audit/bin/mcp_bridge.sh"
+# Прежние имена DODO_MCP_* — запасные: так называлась строка бота до переименования.
+TOKEN="${DECIMUS_MCP_TOKEN:-${DODO_MCP_TOKEN:-}}"
+URL="${DECIMUS_MCP_URL:-${DODO_MCP_URL:-}}"
+: "${TOKEN:?не задан DECIMUS_MCP_TOKEN — возьмите команду в боте, пункт «Установка MCP»}"
+: "${URL:?не задан DECIMUS_MCP_URL — возьмите команду в боте целиком}"
+NAME="decimus"
+OLD_NAME="dodo-audit"
+BRIDGE="$HOME/.decimus/bin/mcp_bridge.sh"
+OLD_DIR="$HOME/.dodo-audit"
 CFG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
 
 mkdir -p "$(dirname "$BRIDGE")"
@@ -49,6 +54,7 @@ installed=0
 # на уже существующем имени, и повторный запуск установщика (а он задуман
 # повторяемым, как у соседей) не обновлял бы токен.
 if command -v claude >/dev/null 2>&1; then
+  claude mcp remove "$OLD_NAME" --scope user >/dev/null 2>&1 || true
   claude mcp remove "$NAME" --scope user >/dev/null 2>&1 || true
   if claude mcp add --transport http "$NAME" "$URL" \
       --header "Authorization: Bearer $TOKEN" --scope user >/dev/null 2>&1; then
@@ -77,7 +83,10 @@ if [ -d "$HOME/Library/Application Support/Claude" ]; then
   if [ -f "$CFG" ]; then cp "$CFG" "$TMP"; else printf '{"mcpServers":{}}' > "$TMP"; fi
   plutil -extract mcpServers json -o /dev/null "$TMP" 2>/dev/null \
     || plutil -insert mcpServers -json '{}' "$TMP"
-  ENTRY="{\"command\":\"/bin/bash\",\"args\":[\"$BRIDGE\"],\"env\":{\"DODO_MCP_URL\":\"$URL\",\"DODO_MCP_TOKEN\":\"$TOKEN\"}}"
+  ENTRY="{\"command\":\"/bin/bash\",\"args\":[\"$BRIDGE\"],\"env\":{\"DECIMUS_MCP_URL\":\"$URL\",\"DECIMUS_MCP_TOKEN\":\"$TOKEN\"}}"
+  # Прежний ключ сервера снимается (переименование 20.10.2026): иначе в списке
+  # приложения стояли бы два сервера на один адрес. Чужие ключи не трогаются.
+  plutil -remove "mcpServers.$OLD_NAME" "$TMP" 2>/dev/null || true
   if plutil -replace "mcpServers.$NAME" -json "$ENTRY" "$TMP" \
      && plutil -convert json -r -o "$TMP" "$TMP"; then
     mv "$TMP" "$CFG"
@@ -86,6 +95,12 @@ if [ -d "$HOME/Library/Application Support/Claude" ]; then
   else
     echo "Claude Desktop: файл настроек не разобран, он оставлен как был" >&2
   fi
+fi
+
+# Прежний каталог моста больше никому не нужен: ключ с ним в конфиге снят выше.
+if [ "$installed" = "1" ] && [ -d "$OLD_DIR" ]; then
+  rm -rf "$OLD_DIR"
+  echo "Прежний каталог $OLD_DIR удалён"
 fi
 
 if [ "$installed" = "0" ]; then

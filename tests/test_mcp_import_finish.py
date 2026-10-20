@@ -213,7 +213,7 @@ def _ссылка(monkeypatch: pytest.MonkeyPatch) -> Any:
     monkeypatch.setattr(
         import_photo_link, "_only_import", lambda *a, **k: (_детали(ORIGIN_IMPORT), None)
     )
-    return import_photo_link.import_photo_upload_link(
+    return import_photo_link.import_upload_photos(
         tenant="укашка",
         store=None,  # type: ignore[arg-type]
         actor="mcp:HQ",
@@ -221,7 +221,7 @@ def _ссылка(monkeypatch: pytest.MonkeyPatch) -> Any:
     )
 
 
-def test_ссылка_загрузки_подписана_и_привязана_к_черновику(
+def test_команда_загрузки_подписана_и_привязана_к_черновику(
     мир: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.domain import photo_upload_link
@@ -230,14 +230,22 @@ def test_ссылка_загрузки_подписана_и_привязана_
 
     ответ = _ссылка(monkeypatch)
 
-    токен = str(ответ["url"]).rsplit("/", 1)[1]
-    право = photo_upload_link.verify("s" * 40, токен)
+    assert "url" not in ответ
+    команда = str(ответ["command"])
+    адрес = команда.rsplit('"', 2)[1]
+    assert адрес.startswith("https://audit.example.org/photo-upload/")
+    право = photo_upload_link.verify("s" * 40, адрес.rsplit("/", 1)[1])
     assert право == photo_upload_link.UploadGrant(inspection_id=ID, tenant="укашка")
-    assert str(ответ["url"]).startswith("https://audit.example.org/photo-upload/")
-    assert "-F file=@/mnt/user-data/uploads/" in str(ответ["command"])
+    assert "-F file=@/mnt/user-data/uploads/" in команда
+    # Человеку адрес не отдаётся: в status его нет, а фраза про настройку — есть.
+    статус = str(ответ["status"])
+    assert адрес not in статус
+    assert "link" not in статус.lower()
+    assert "ссылк" not in статус.lower()
+    assert "audit.example.org" in статус and "Code execution" in статус
 
 
-def test_ссылка_загрузки_без_ключа_подписи_отказ(
+def test_команда_загрузки_без_ключа_подписи_отказ(
     мир: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.mcp.errors import ToolError

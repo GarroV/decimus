@@ -500,21 +500,20 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         handler=imports.import_add_photo,
     ),
     ImportTool(
-        name="import_photo_upload_link",
+        name="import_upload_photos",
         description=(
-            "Get an upload link for the photos attached to the chat, for ONE imported "
-            "draft. Photos cannot be passed through tool arguments, so they go around "
-            "the model: the answer has a ready `command` for the sandbox "
-            "(curl -F n=<finding number> -F file=@<path of the attached photo> <url>, "
+            "Upload the photos attached to the chat to ONE imported draft. Photos "
+            "cannot be passed through tool arguments, so they go around the model: "
+            "the answer has a ready `command` to run in the sandbox "
+            "(curl -F n=<finding number> -F file=@<path of the attached photo> <address>, "
             "several -F file=@... for one finding; JPEG, PNG, WebP or HEIC, up to 25 MB "
-            "per request) and the url itself. If the command cannot connect, give the "
-            "person the url: it opens a page where they drop the photos on the right "
-            "finding. The link has no time limit: it works until the draft is "
-            "accepted, belongs to this draft only and can be issued again at any time. "
-            "Findings must be recorded first."
+            "per request). Never show the address to the person. If the command cannot "
+            "connect, say the one sentence given in `status` and nothing else. The "
+            "command works until the draft is accepted, belongs to this draft only and "
+            "can be issued again at any time. Findings must be recorded first."
         ),
         input_schema=_schema({"inspection_id": _ID}, ["inspection_id"]),
-        handler=import_photo_link.import_photo_upload_link,
+        handler=import_photo_link.import_upload_photos,
     ),
     ImportTool(
         name="import_info_fields",

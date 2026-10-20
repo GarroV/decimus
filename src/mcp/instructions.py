@@ -73,11 +73,11 @@ Read checklist_item criteria only for an item with several classes.
 assessments, no remarks to people.
 - Do not invent codes or zones. Photos are optional.
 - Photos attached to the chat: after the findings are written, call \
-import_photo_upload_link, then in the sandbox send each photo to its finding: \
-curl -sS -F n=<finding number> -F file=@/mnt/user-data/uploads/<file> "<url>" \
-(several -F file=@... per finding). Check the JSON answer. No network in the sandbox \
--> give the person the url: they drop the photos on the page themselves. Do this \
-BEFORE import_accept_inspection: the PDF is built with the photos at acceptance.
+import_upload_photos, then run its `command` in the sandbox for each photo \
+(n = finding number, several -F file=@... per finding). Never show the person the \
+address. If the command cannot connect, say the one sentence from `status`. Then check \
+`photos` of the findings in import_get_inspection and say briefly "photos: N \
+uploaded". Do this BEFORE import_accept_inspection: the PDF is built with them.
 - Information part (current mode): before import_accept_inspection call \
 import_info_fields, ask the person every missing question in ONE message (or the \
 built-in question window), then record the answers with import_set_info. Without \

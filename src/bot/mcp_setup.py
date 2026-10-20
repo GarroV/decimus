@@ -41,12 +41,16 @@ MCP_URL_VAR = "BOT_MCP_URL"
 #: Имя нашего сервера в файле настроек приложения. Оно же — ключ, который
 #: команда заменяет при повторной настройке, поэтому вторая настройка не
 #: плодит записей, а обновляет одну.
-SERVER_NAME = "dodo-audit"
+SERVER_NAME = "decimus"
+
+#: Прежнее имя сервера и каталога моста (до 20.10.2026): команда снимает их у человека.
+OLD_SERVER_NAME = "dodo-audit"
+OLD_BRIDGE_DIR = ".dodo-audit"
 
 #: Куда кладётся мост на машине человека — путь ОТНОСИТЕЛЬНО его дома. Свой
 #: каталог, а не общий `~/bin`: приём соседнего продукта (`~/.swarm-brain/bin`),
 #: и по нему сразу видно, чьё это и что сносить, если продукт больше не нужен.
-BRIDGE_PATH = ".dodo-audit/bin/mcp_bridge.sh"
+BRIDGE_PATH = ".decimus/bin/mcp_bridge.sh"
 
 #: Файл настроек Claude Desktop — тоже относительно дома. Путь macOS-only, и
 #: человеку это сказано ДО команды (`mcp.desktop_note`).
@@ -131,7 +135,7 @@ def setup_command(*, url: str, token: str) -> str:
     return (
         f'f=$(mktemp) && curl -fsSL {shlex.quote(установщик)} -o "$f" && '
         f'echo "{отпечаток}  $f" | shasum -a 256 -c - && '
-        f'DODO_MCP_URL={shlex.quote(адрес)} DODO_MCP_TOKEN={shlex.quote(секрет)} bash "$f"; '
+        f'DECIMUS_MCP_URL={shlex.quote(адрес)} DECIMUS_MCP_TOKEN={shlex.quote(секрет)} bash "$f"; '
         'rm -f "$f"'
     )
 
@@ -162,7 +166,7 @@ def desktop_command(*, url: str, token: str, done: str) -> str:
     сообщение = shlex.quote(done)
     запись = (
         '{\\"command\\":\\"/bin/bash\\",\\"args\\":[\\"$BIN\\"],\\"env\\":'
-        f'{{\\"DODO_MCP_URL\\":\\"{адрес}\\",\\"DODO_MCP_TOKEN\\":\\"{секрет}\\"}}}}'
+        f'{{\\"DECIMUS_MCP_URL\\":\\"{адрес}\\",\\"DECIMUS_MCP_TOKEN\\":\\"{секрет}\\"}}}}'
     )
     шаги = [
         "bash <<'DODO_SETUP'",
@@ -179,9 +183,11 @@ def desktop_command(*, url: str, token: str, done: str) -> str:
         'if [ -f "$CFG" ]; then cp "$CFG" "$TMP"; else printf \'{"mcpServers":{}}\' > "$TMP"; fi',
         'plutil -extract mcpServers json -o /dev/null "$TMP" 2>/dev/null \\',
         "  || plutil -insert mcpServers -json '{}' \"$TMP\"",
+        f'plutil -remove mcpServers.{OLD_SERVER_NAME} "$TMP" 2>/dev/null || true',
         f'plutil -replace mcpServers.{SERVER_NAME} -json "{запись}" "$TMP"',
         'plutil -convert json -r -o "$TMP" "$TMP"',
         'mv "$TMP" "$CFG"',
+        f'rm -rf "$HOME/{OLD_BRIDGE_DIR}"',
         f"printf '%s\\n' {сообщение}",
         "DODO_SETUP",
     ]

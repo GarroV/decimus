@@ -31,7 +31,6 @@ from .texts_journal import JOURNAL_TEXTS
 from .texts_master import MASTER_TEXTS
 from .texts_model_key import MODEL_KEY_TEXTS
 from .texts_oauth import OAUTH_TEXTS
-from .texts_photo_upload import PHOTO_UPLOAD_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
 from .texts_ratings import RATINGS_TEXTS
@@ -1729,7 +1728,6 @@ _ЧАСТИ = (
     TEXTS,
     DEMO_TEXTS,
     OAUTH_TEXTS,
-    PHOTO_UPLOAD_TEXTS,
     CONNECTIONS_TEXTS,
     COUNTRY_TEXTS,
     GRADE_TEXTS,
@@ -1768,7 +1766,6 @@ TEXTS = {
     **MASTER_TEXTS,
     **MODEL_KEY_TEXTS,
     **OAUTH_TEXTS,
-    **PHOTO_UPLOAD_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,
     **TRIP_TEXTS,

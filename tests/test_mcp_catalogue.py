@@ -154,7 +154,7 @@ from src.mcp.catalogue import (
     "import_get_inspection",
     "import_list_drafts",
     "import_add_photo",
-    "import_photo_upload_link",
+    "import_upload_photos",
     "import_info_fields",
     "import_set_info",
     "import_accept_inspection",
