@@ -111,6 +111,9 @@ ACTIONS: tuple[Action, ...] = (
     Action("space.manage", "people", hq_only=True),
     Action("unit.create", "unit", hq_only=True),
     Action("api.manage", "api", hq_only=True),
+    # Ключи внешних сервисов на экране «Подключения» (D576): отдельный код, чтобы доступ к
+    # секретам не вытекал из доступа к ключам API.
+    Action("keys.manage", "api", hq_only=True),
     # Бот: счётчик отказов мастера (`/stops`). Журнал отказов один на весь бот,
     # разделения по пространствам в нём нет, поэтому партнёру не выдаётся (F-104).
     Action("refusals.read", "bot", hq_only=True, writes=False),
@@ -209,7 +212,7 @@ _PARTNER_AUDITOR = _ALL_VIEWS_PARTNER | _codes(
 #: Матрица: (сторона, роль учётки) → действия. Нет клетки — нет права.
 MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     # Главный админ — всё, что админ, и ключи API (D440).
-    (SIDE_HQ, "superadmin"): _HQ_ADMIN | _codes("api.manage"),
+    (SIDE_HQ, "superadmin"): _HQ_ADMIN | _codes("api.manage", "keys.manage"),
     (SIDE_HQ, "admin"): _HQ_ADMIN,
     # Бизнес-девелопер (D440): сервис в полном объёме, кроме главного чек-листа,
     # указателя прода, стран, людей, ключей и загрузок рейтингов.

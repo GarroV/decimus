@@ -1,0 +1,51 @@
+{#
+  Блок «Ключи сервисов» на «Подключениях» (D491, D576). Значение ТОЛЬКО НА ЗАПИСЬ: здесь
+  нет ни одного места, куда подставилось бы введённое, — поля пустые и после отказа, и
+  после сохранения. Показываются состояние, «••••» и последние четыре знака, кто и когда
+  поставил. Список сервисов и полей — реестр `src/domain/service_keys.py`.
+#}
+{% set ks = keys %}
+<section class="ssec" id="service-keys" aria-labelledby="service-keys-title">
+  <h2 class="ssec__title" id="service-keys-title">{{ t('keys.title') }}</h2>
+  <p class="ssec__note">{{ t('keys.sub') }}</p>
+  {% if ks.flash and not ks.flash.service %}
+    <div class="note note--warn" role="alert"><div class="note__text">{{ t(ks.flash.key, **(ks.flash.params or {})) }}</div></div>
+  {% endif %}
+  {% if not ks.known %}
+    <p class="ssec__note">{{ t('keys.unknown') }}</p>
+  {% endif %}
+  {% for svc in ks.services %}
+    <section class="ssec" id="service-key-{{ svc.code }}" aria-labelledby="service-key-{{ svc.code }}-title">
+      <h3 class="ssec__title" id="service-key-{{ svc.code }}-title">{{ t('keys.service.' ~ svc.code) }}</h3>
+      <p class="ssec__note">{{ t('keys.purpose.' ~ svc.code) }}</p>
+      {% if ks.flash and ks.flash.service == svc.code %}
+        <div class="note {{ 'note--ok' if ks.flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ t(ks.flash.key, **(ks.flash.params or {})) }}</div></div>
+      {% endif %}
+      <p class="ssec__note"><span class="sdot {{ 'sdot--ok' if svc.state in ('db', 'env') else '' }}"></span>{{ t('keys.status.' ~ svc.state) }}</p>
+      <dl class="sprops">
+        {% for f in svc.fields %}
+          <div><dt>{{ t('keys.field.' ~ f.code) }}</dt>
+            <dd class="mono">{% if f.status %}{{ f.status.masked }} · {{ t('connections.card.issued_by', by=f.status.set_by, date=day(f.status.set_at)) }}{% elif f.in_env %}{{ t('keys.status.env') }}{% else %}—{% endif %}</dd></div>
+        {% endfor %}
+      </dl>
+      <form method="post" action="{{ users_url }}/connections/keys/{{ svc.code }}/save?lang={{ lang }}" class="sform" autocomplete="off">
+        {% for f in svc.fields %}
+          <label><span class="sform__label">{{ t('keys.field.' ~ f.code) }}</span>
+            <input class="sinput mono" type="password" name="{{ f.form_name }}" maxlength="{{ keys_max }}" autocomplete="new-password" spellcheck="false" required>
+          </label>
+        {% endfor %}
+        <small class="sform__hint">{{ t('keys.new_hint') }}</small>
+        <div class="sactions">
+          <button class="sbtn sbtn--primary" type="submit">{{ t('keys.save') }}</button>
+          <button class="sbtn sbtn--ghost" type="submit" formaction="{{ users_url }}/connections/keys/{{ svc.code }}/check?lang={{ lang }}">{{ t('keys.check') }}</button>
+        </div>
+      </form>
+      {% if svc.fields | selectattr('status') | list %}
+        <form method="post" action="{{ users_url }}/connections/keys/{{ svc.code }}/delete?lang={{ lang }}" class="sform">
+          <div class="sactions"><button class="sbtn sbtn--ghost" type="submit">{{ t('keys.delete') }}</button></div>
+          <small class="sform__hint">{{ t('keys.delete_hint') }}</small>
+        </form>
+      {% endif %}
+    </section>
+  {% endfor %}
+</section>

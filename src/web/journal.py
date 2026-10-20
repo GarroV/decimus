@@ -26,13 +26,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Flask, Response, request
+from flask import Flask, Response, g, request
 from werkzeug.exceptions import HTTPException
 
 from src.db import journals
 from src.domain.journal import (
     DOOR_WEB,
     JOURNALED_ROLES,
+    MAX_TARGET,
     summarize_target,
     truncate_user_agent,
 )
@@ -80,8 +81,17 @@ def _body_fields() -> dict[str, Any]:
         return {}
 
 
+#: Ключ в `flask.g`: маршрут сам называет цель записи. Тогда сводка из формы не строится вовсе —
+#: так делают маршруты с секретами (ключи сервисов, D576): в журнал идёт только то, что
+#: маршрут положил сам, а не то, что правило по именам решило пропустить.
+TARGET_OVERRIDE = "journal_target"
+
+
 def action_target() -> str:
     """Сводка цели запроса: части пути, строка запроса и поля тела — правилом по именам."""
+    явная = g.get(TARGET_OVERRIDE)
+    if isinstance(явная, str):
+        return явная[:MAX_TARGET]
     return summarize_target(
         {ключ: значение for ключ, значение in request.args.items()},
         _body_fields(),

@@ -177,9 +177,9 @@
 | `/users/connections/<int:token_id>/revoke` | POST | `connections_revoke` | `src/web/connections_screen.py` |
 | `/users/connections/<int:token_id>/update` | POST | `connections_update` | `src/web/connections_screen.py` |
 | `/users/connections/issue` | POST | `connections_issue` | `src/web/connections_screen.py` |
-| `/users/connections/model-key/check` | POST | `model_key_check` | `src/web/connections_screen.py` |
-| `/users/connections/model-key/delete` | POST | `model_key_delete` | `src/web/connections_screen.py` |
-| `/users/connections/model-key/save` | POST | `model_key_save` | `src/web/connections_screen.py` |
+| `/users/connections/keys/<service_code>/check` | POST | `service_key_check` | `src/web/connections_screen.py` |
+| `/users/connections/keys/<service_code>/delete` | POST | `service_key_delete` | `src/web/connections_screen.py` |
+| `/users/connections/keys/<service_code>/save` | POST | `service_key_save` | `src/web/connections_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
 | `/users/freeze` | POST | `freeze_user` | `src/web/users_screen.py` |
 | `/users/reset-second-factor` | POST | `reset_second_factor` | `src/web/users_screen.py` |
@@ -491,6 +491,7 @@
 | `0081_inspection_edits.sql` | `inspection_edits` |
 | `0082_rate_windows.sql` | `rate_windows` |
 | `0083_ratings_layout_aggregators.sql` | — |
+| `0084_service_keys.sql` | — |
 <!-- map:end -->
 
 ## Makefile

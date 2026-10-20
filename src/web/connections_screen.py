@@ -24,17 +24,19 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from flask import Flask, abort, make_response, render_template, request
+from flask import Flask, abort, g, make_response, render_template, request
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import api_access
+from src.db import api_access, web_throttle
 from src.db import ratings_read as ratings
 from src.db.errors import DbError
+from src.domain import service_keys as registry
 
-from . import access_policy, auth, connections_form, guard, model_key_screen, reauth
+from . import access_policy, auth, connections_form, guard, reauth, service_keys_screen
 from .connections_form import Draft, Refusal
 from .db_refusal import note_target_mismatch
+from .journal import TARGET_OVERRIDE
 from .origin import refuse_foreign_origin
 from .sections import section
 from .users_view import TAB_CONNECTIONS, Filters, screen_url
@@ -154,7 +156,7 @@ def _page(
     reissued: bool = False,
     picked_id: int | None = None,
     add: bool = False,
-    key_flash: model_key_screen.KeyFlash | None = None,
+    key_flash: service_keys_screen.KeyFlash | None = None,
     code: int = 200,
 ) -> FlaskResponse:
     """Страница вкладки целиком — для GET и для ответа на любое действие."""
@@ -198,12 +200,12 @@ def _page(
         max_contact=connections_form.MAX_CONTACT,
         split_open=issued is not None or add or picked is not None,
         split_back=_link(tab=TAB_CONNECTIONS),
-        **model_key_screen.context(key_flash),
+        **service_keys_screen.context(key_flash),
     )
     response = make_response(html, code)
-    if issued is not None:
-        # Ключ в теле ответа: ни браузер, ни прокси не оставляют его копии.
-        response.headers["Cache-Control"] = "private, no-store"
+    # Ключ API в теле ответа выдачи и записи о ключах сервисов: ни браузер, ни прокси не
+    # оставляют копии вкладки (D576 — для всех ответов вкладки, не только для выдачи).
+    response.headers["Cache-Control"] = "private, no-store"
     return response
 
 
@@ -362,37 +364,88 @@ def install(app: Flask) -> None:
         )
 
 
-def _key_action(do: Callable[[str], tuple[model_key_screen.KeyFlash, int]]) -> Response:
-    """Общий порядок для действий над ключом модели (D491).
+def _key_gate(login: str, back: str) -> Response | tuple[service_keys_screen.KeyFlash, int] | None:
+    """Заслоны действий над ключами сервисов после роли и происхождения (D576).
 
-    Роль → происхождение → свежий вход (иначе увод на «Подтвердите вход») → действие.
-    Ответ — вкладка целиком, а не перенаправление: исход виден сразу, ключа в ответе нет.
+    Порядок: второй шаг входа включён → он пройден в ЭТОЙ сессии → вход не старше
+    `STEP_UP_MINUTES` (иначе «Подтвердите вход») → предел попыток. `None` — можно действовать.
+    Возвращает исход-отказ (его рисует страница) либо готовый ответ-увод.
+    """
+    вошедший = auth.current_account()
+    if not bool(getattr(вошедший, "has_second_factor", False)):
+        return service_keys_screen.KeyFlash("", "keys.err.no_factor", False), 403
+    if not bool(getattr(вошедший, "passed_second_step", False)):
+        return service_keys_screen.KeyFlash("", "keys.err.prove_step", False), 403
+    переспрос = reauth.require_fresh(back, max_age=timedelta(minutes=registry.STEP_UP_MINUTES))
+    if переспрос is not None:
+        return переспрос
+    попытка = web_throttle.admit_service_key_action(tenant=_stand(), login=login)
+    if not попытка.admitted:
+        minutes = попытка.verdict.retry_after_minutes
+        return service_keys_screen.KeyFlash("", "keys.err.rate", False, {"minutes": minutes}), 429
+    return None
+
+
+def _stand() -> str:
+    from flask import current_app
+
+    return str(current_app.extensions["decimus_conf"].tenant)
+
+
+def _key_action(
+    service_code: str,
+    do: Callable[[registry.Service, str], tuple[service_keys_screen.KeyFlash, int]],
+) -> Response:
+    """Общий порядок действий над ключами сервисов (D576).
+
+    Роль (404) → сервис из реестра (404) → происхождение (403) → заслоны `_key_gate` →
+    действие. Ответ — вкладка целиком, а не перенаправление: исход виден сразу, значения в
+    ответе нет. Цель записи журнала названа здесь заранее и без формы.
     """
     автор = _boss()
+    service = registry.service(service_code)
+    if service is None:
+        abort(404)
+    setattr(g, TARGET_OVERRIDE, f"service={service.code}")
     refuse_foreign_origin()
-    if (
-        переспрос := reauth.require_fresh(f"{section('users').path}?tab={TAB_CONNECTIONS}")
-    ) is not None:
-        return переспрос
-    flash, code = do(автор)
+    back = f"{section('users').path}?tab={TAB_CONNECTIONS}"
+    refused = _key_gate(автор, back)
+    if isinstance(refused, tuple):
+        flash, code = refused
+        return _page(key_flash=_with_service(flash, service.code), code=code)
+    if refused is not None:
+        return refused
+    flash, code = do(service, автор)
+    if flash.ok:
+        web_throttle.note_service_key_ok(tenant=_stand(), login=автор)
     return _page(key_flash=flash, code=code)
 
 
-def install_model_key(app: Flask) -> None:
-    """Действия блока «Ключ модели»: проверить, сохранить, убрать."""
-    base = f"{section('users').path}/connections/model-key"
+def _with_service(flash: service_keys_screen.KeyFlash, code: str) -> service_keys_screen.KeyFlash:
+    return service_keys_screen.KeyFlash(code, flash.key, flash.ok, flash.params)
+
+
+def install_service_keys(app: Flask) -> None:
+    """Действия блока «Ключи сервисов»: проверить, заменить, удалить."""
+    base = f"{section('users').path}/connections/keys/<service_code>"
 
     @app.post(f"{base}/check")
-    @guard.action("api.manage", hidden=True)
-    def model_key_check() -> Response:
-        return _key_action(lambda _by: model_key_screen.check())
+    @guard.action("keys.manage", hidden=True)
+    def service_key_check(service_code: str) -> Response:
+        return _key_action(service_code, lambda svc, _by: service_keys_screen.check(svc))
 
     @app.post(f"{base}/save")
-    @guard.action("api.manage", hidden=True)
-    def model_key_save() -> Response:
-        return _key_action(model_key_screen.save)
+    @guard.action("keys.manage", hidden=True)
+    def service_key_save(service_code: str) -> Response:
+        def do(svc: registry.Service, by: str) -> tuple[service_keys_screen.KeyFlash, int]:
+            flash, code, summary = service_keys_screen.save(svc, by)
+            if summary:
+                setattr(g, TARGET_OVERRIDE, f"service={svc.code}; {summary}")
+            return flash, code
+
+        return _key_action(service_code, do)
 
     @app.post(f"{base}/delete")
-    @guard.action("api.manage", hidden=True)
-    def model_key_delete() -> Response:
-        return _key_action(lambda _by: model_key_screen.remove())
+    @guard.action("keys.manage", hidden=True)
+    def service_key_delete(service_code: str) -> Response:
+        return _key_action(service_code, lambda svc, _by: service_keys_screen.remove(svc))

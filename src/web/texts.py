@@ -29,7 +29,6 @@ from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_journal import JOURNAL_TEXTS
 from .texts_master import MASTER_TEXTS
-from .texts_model_key import MODEL_KEY_TEXTS
 from .texts_oauth import OAUTH_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
@@ -37,6 +36,7 @@ from .texts_ratings import RATINGS_TEXTS
 from .texts_refusals import REFUSAL_TEXTS
 from .texts_registry import REGISTRY_TEXTS
 from .texts_second_factor import SECOND_FACTOR_TEXTS
+from .texts_service_keys import SERVICE_KEYS_TEXTS
 from .texts_settings import SETTINGS_TEXTS
 from .texts_trips import TRIP_TEXTS
 from .texts_units import UNIT_TEXTS
@@ -1733,7 +1733,7 @@ _ЧАСТИ = (
     GRADE_TEXTS,
     JOURNAL_TEXTS,
     MASTER_TEXTS,
-    MODEL_KEY_TEXTS,
+    SERVICE_KEYS_TEXTS,
     PLAN_TEXTS,
     PRESCRIPTION_TEXTS,
     TRIP_TEXTS,
@@ -1764,7 +1764,7 @@ TEXTS = {
     **HOME_TEXTS,
     **JOURNAL_TEXTS,
     **MASTER_TEXTS,
-    **MODEL_KEY_TEXTS,
+    **SERVICE_KEYS_TEXTS,
     **OAUTH_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,

@@ -70,7 +70,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
 
 ОЖИДАНИЕ: dict[tuple[str, str], set[str]] = {
     # Главный админ = админ + ключи API (D440).
-    (SIDE_HQ, "superadmin"): АДМИН_УК | {"api.manage"},
+    (SIDE_HQ, "superadmin"): АДМИН_УК | {"api.manage", "keys.manage"},
     (SIDE_HQ, "admin"): АДМИН_УК,
     # Бизнес-девелопер: всё в работе, без главного чек-листа, прода, стран, людей,
     # ключей и загрузок рейтингов (D440); загрузка проверок через Claude — открыта
@@ -170,7 +170,7 @@ def test_граница_держит_даже_сломанную_матрицу(
     сломанная = {**MATRIX, (SIDE_PARTNER, "admin"): frozenset(ACTION_CODES)}
     monkeypatch.setattr(perm, "MATRIX", сломанная)
     админ_партнёра = perm.Actor(tenant="RS", role="admin")
-    for код in ("unit.create", "space.manage", "inspection.retract", "api.manage"):
+    for код in ("unit.create", "space.manage", "inspection.retract", "api.manage", "keys.manage"):
         решение = perm.can(админ_партнёра, код)
         assert (решение.allowed, решение.rule) == (False, perm.RULE_HQ_ONLY), код
     решение = perm.can(админ_партнёра, "checklist.edit", "HQ")
