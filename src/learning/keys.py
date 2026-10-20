@@ -1,4 +1,4 @@
-"""Ключи iSpring для загрузчика: база, затем окружение (`src/db/service_keys.resolve`)."""
+"""Ключи iSpring для загрузчика: база, затем окружение (`resolve` из `src.db.service_keys`)."""
 
 from __future__ import annotations
 

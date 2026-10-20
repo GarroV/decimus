@@ -36,6 +36,7 @@ def test_у_админа_ук_четыре_пункта_и_ещё_с_остал�
     assert re.findall(r'class="tabbar__row[^"]*"\s+href="/(\w+)', ещё) == [
         "country",
         "ratings",
+        "training",
         "admin",
         "users",
     ]

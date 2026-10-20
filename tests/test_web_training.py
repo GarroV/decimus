@@ -162,10 +162,8 @@ def test_сбой_чтения_говорит_словами_а_не_500(monkeyp
         assert "не прочитались" in response.get_data(as_text=True)
 
 
-@pytest.mark.parametrize("role", ["guest", "control"])
-def test_гость_и_контроль_видят_экран(
-    monkeypatch: pytest.MonkeyPatch, чтения: dict, role: str
-) -> None:
+@pytest.mark.parametrize("role", ["guest"])
+def test_гость_видит_экран(monkeypatch: pytest.MonkeyPatch, чтения: dict, role: str) -> None:
     for client in _войти(monkeypatch, role=role):
         assert client.get("/training").status_code == 200
 
@@ -193,3 +191,10 @@ def test_без_входа_экран_закрыт(monkeypatch: pytest.MonkeyPat
         response = client.get("/training")
         assert response.status_code in (302, 401)
         assert "Brasov-1" not in response.get_data(as_text=True)
+
+
+def test_контролю_экран_закрыт_он_ведёт_только_рейтинги(
+    monkeypatch: pytest.MonkeyPatch, чтения: dict
+) -> None:
+    for client in _войти(monkeypatch, role="control"):
+        assert client.get("/training").status_code == 404

@@ -82,7 +82,6 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "ratings.manage",
         "people.manage",
         "view.ratings",
-        "view.training",
         "view.users",
     },
     # Гость: вся сеть на чтение (D429, D440).
