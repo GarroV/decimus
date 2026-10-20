@@ -20,7 +20,6 @@ from collections.abc import Callable
 
 from flask import g
 
-from src.db.models import InspectionDetail
 from src.domain import item_label
 from src.report import info_titles
 from src.report.letters import sources as letter_sources
@@ -68,9 +67,3 @@ def pinned(version: str, lang: str) -> tuple[Callable[[str], str], Callable[[str
         lambda code: item_label.label(code, texts, lang),
         lambda code: item_label.full(code, texts, lang),
     )
-
-
-def for_detail(detail: InspectionDetail, lang: str) -> Callable[[str], str]:
-    """Метка пункта для карточки проверки — по версии этой проверки."""
-    label, _ = pinned(detail.inspection.checklist_version, lang)
-    return label
