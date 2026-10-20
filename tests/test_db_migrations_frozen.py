@@ -324,6 +324,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0080_ratings_layout_compare.sql": (
         "sql1:951eff64e908b971fe164528a9211c467b320c26fdd0f7cec179fb7320de29f6"
     ),
+    # Журнал правок записей проверки на приёмке (аудит F-134, #1006).
+    "0081_inspection_edits.sql": (
+        "sql1:2e0815cb0cb23039e3cd740716238831bd50f0b8303fcc404e25775604480a86"
+    ),
 }
 
 

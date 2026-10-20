@@ -34,6 +34,7 @@ from ..domain.models import Score
 from .config import check_environment
 from .errors import ReviseError, StorageError
 from .imports import MAX_FINDINGS, MAX_PHOTOS_PER_FINDING, MAX_PHOTOS_PER_INSPECTION, forget_objects
+from .inspection_edits import Editor, finding_changes, record_edit, score_changes
 from .models import ORIGIN_LEGACY, FindingRow, InspectionDetail
 from .pool import connection
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
@@ -102,9 +103,13 @@ def add_finding(
     *,
     tenant: str,
     addition: Addition,
+    editor: Editor,
     score_of: Callable[[InspectionDetail], Score],
 ) -> str:
     """Добавить запись в ждущую проверку и положить оценку, посчитанную после замка.
+
+    `editor` — кто добавляет: в той же транзакции правка ложится в журнал правок
+    (`inspection_edits`, `0081`) — значения новой записи и оценка до и после.
 
     Возвращает идентификатор новой записи. Отказ — `ReviseError`: проверки нет,
     она принята, отклонена или историческая (D332), пара «пункт + зона» уже
@@ -192,6 +197,27 @@ def add_finding(
             finding_id = str(inserted[0])
             cur.execute(_INSERT_TRANSLATION_SQL, ("finding", finding_id, "text", язык_речи, слова))
             _write_score(cur, ident, tenant_code, score)
+            record_edit(
+                cur,
+                inspection_id=ident,
+                finding_id=finding_id,
+                tenant=tenant_code,
+                editor=editor,
+                kind="add",
+                changes={
+                    **finding_changes(
+                        None,
+                        {
+                            "code": addition.code,
+                            "level": addition.level,
+                            "zone": addition.zone,
+                            "zone_unusual": addition.zone_unusual,
+                            "text": слова,
+                        },
+                    ),
+                    **score_changes(detail, score),
+                },
+            )
             conn.commit()
             return finding_id
     except ReviseError:

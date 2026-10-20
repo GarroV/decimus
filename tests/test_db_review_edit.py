@@ -19,6 +19,7 @@ psycopg = pytest.importorskip("psycopg")
 Image = pytest.importorskip("PIL.Image")
 
 from src.db.errors import ReviseError, StorageError  # noqa: E402
+from src.db.inspection_edits import Editor  # noqa: E402
 from src.db.models import InspectionDetail  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import get_inspection  # noqa: E402
@@ -42,6 +43,8 @@ pytestmark = requires_db
     deductions=23.0,
     by_zone={},
 )
+
+ПРАВИТ = Editor(user_id="00000000-0000-0000-0000-0000000000a1", login="kontroling", role="admin")
 
 НОВАЯ = Addition(code="CLN06", level="D2", zone="dining", zone_unusual=False, text="стены в зале")
 
@@ -101,7 +104,7 @@ def test_запись_добавляется_с_оценкой_движка_од
         return ОЦЕНКА
 
     # Act
-    новая = add_finding(ident, tenant="HQ", addition=НОВАЯ, score_of=движок)
+    новая = add_finding(ident, tenant="HQ", addition=НОВАЯ, editor=ПРАВИТ, score_of=движок)
 
     # Assert — движок видел обе записи, в базе обе и оценка движка
     assert увиденное == [2]
@@ -124,7 +127,7 @@ def test_упавший_движок_ничего_не_оставляет(сет
         raise RuntimeError("движок упал")
 
     with pytest.raises(RuntimeError):
-        add_finding(ident, tenant="HQ", addition=НОВАЯ, score_of=сломан)
+        add_finding(ident, tenant="HQ", addition=НОВАЯ, editor=ПРАВИТ, score_of=сломан)
     после = get_inspection(ident, reach=УК, include_on_review=True)
     assert after_count(после) == 1
 
@@ -140,7 +143,7 @@ def test_занятая_пара_пункт_зона_отклоняется(се
         code="CLN05", level="D1", zone="hot_kitchen", zone_unusual=False, text="ещё раз"
     )
     with pytest.raises(ReviseError, match="уже записан"):
-        add_finding(ident, tenant="HQ", addition=в_занятую, score_of=_по(ОЦЕНКА))
+        add_finding(ident, tenant="HQ", addition=в_занятую, editor=ПРАВИТ, score_of=_по(ОЦЕНКА))
     assert after_count(get_inspection(ident, reach=УК, include_on_review=True)) == 1
 
 
@@ -148,7 +151,7 @@ def test_у_принятой_запись_не_добавляется(сеть: 
     ident, _ = _ждущая(704)
     accept_pushed(ident, dsn=db_env)
     with pytest.raises(ReviseError, match="уже принята"):
-        add_finding(ident, tenant="HQ", addition=НОВАЯ, score_of=_по(ОЦЕНКА))
+        add_finding(ident, tenant="HQ", addition=НОВАЯ, editor=ПРАВИТ, score_of=_по(ОЦЕНКА))
     assert after_count(get_inspection(ident, reach=УК)) == 1
 
 
@@ -156,7 +159,7 @@ def test_у_принятой_запись_не_добавляется(сеть: 
 def test_в_чужую_проверку_запись_не_добавляется(сеть: None, владелец: str, правит: str) -> None:
     ident, _ = _ждущая(705, tenant=владелец)
     with pytest.raises(ReviseError, match="нет"):
-        add_finding(ident, tenant=правит, addition=НОВАЯ, score_of=_по(ОЦЕНКА))
+        add_finding(ident, tenant=правит, addition=НОВАЯ, editor=ПРАВИТ, score_of=_по(ОЦЕНКА))
     assert (
         after_count(get_inspection(ident, reach=own_reach(владелец), include_on_review=True)) == 1
     )
@@ -166,7 +169,7 @@ def test_пустая_формулировка_отклоняется(сеть: 
     ident, _ = _ждущая(706)
     пустая = Addition(code="CLN06", level="D2", zone="dining", zone_unusual=False, text="  ")
     with pytest.raises(ReviseError, match="пуста"):
-        add_finding(ident, tenant="HQ", addition=пустая, score_of=_по(ОЦЕНКА))
+        add_finding(ident, tenant="HQ", addition=пустая, editor=ПРАВИТ, score_of=_по(ОЦЕНКА))
 
 
 # --- кадры ---------------------------------------------------------------------

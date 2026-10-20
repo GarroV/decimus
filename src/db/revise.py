@@ -41,6 +41,7 @@ from psycopg.types.json import Json
 from ..domain.models import Score
 from .config import check_environment
 from .errors import ReviseError
+from .inspection_edits import Editor, finding_changes, record_edit, score_changes
 from .models import ORIGIN_LEGACY, InspectionDetail
 from .pool import connection
 from .push import _INSERT_TRANSLATION_SQL, _by_process_payload, _by_zone_payload
@@ -109,9 +110,14 @@ def revise_finding(
     *,
     tenant: str,
     revision: Revision,
+    editor: Editor,
     score_of: Callable[[InspectionDetail], Score],
 ) -> None:
     """Исправить запись ждущей проверки и положить оценку, посчитанную после замка.
+
+    `editor` — кто правит (УК или партнёр, правка одинакова): в той же транзакции в
+    журнал правок (`inspection_edits`, `0081`) ложится, что изменилось — старое и новое
+    значение каждого поля и оценки. Правка от этого не ограничивается и не меняется.
 
     `score_of` получает проверку, прочитанную ПОСЛЕ замка и с уже применённой
     правкой, и возвращает оценку движка. Его исключение откатывает всё.
@@ -128,7 +134,7 @@ def revise_finding(
         )
     try:
         with connection(check_environment().dsn) as conn:
-            _apply(conn, ident, запись, tenant_code, revision, score_of)
+            _apply(conn, ident, запись, tenant_code, revision, editor, score_of)
             conn.commit()
     except ReviseError:
         raise
@@ -181,6 +187,7 @@ def _apply(
     запись: str,
     tenant: str,
     revision: Revision,
+    editor: Editor,
     score_of: Callable[[InspectionDetail], Score],
 ) -> None:
     with conn.cursor() as cur:
@@ -242,6 +249,29 @@ def _apply(
             ("finding", запись, "text", язык_речи, revision.text.strip()),
         )
         _write_score(cur, ident, tenant, score)
+        прежняя = next((f for f in detail.findings if f.id == запись), None)
+        record_edit(
+            cur,
+            inspection_id=ident,
+            finding_id=запись,
+            tenant=tenant,
+            editor=editor,
+            kind="revise",
+            changes={
+                **finding_changes(
+                    прежняя,
+                    {
+                        "code": revision.code,
+                        "level": revision.level,
+                        "zone": revision.zone,
+                        "zone_unusual": revision.zone_unusual,
+                        "text": revision.text.strip(),
+                        "reading_c": revision.reading_c,
+                    },
+                ),
+                **score_changes(detail, score),
+            },
+        )
 
 
 def _write_score(cur: Any, ident: str, tenant: str, score: Score) -> None:

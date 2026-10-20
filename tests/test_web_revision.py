@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from src.db.errors import ReviseError
+from src.db.inspection_edits import Editor
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.reach import reach_of
 from src.domain.models import Score
@@ -98,11 +99,19 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     return журнал
 
 
+ПРАВИТ = Editor(user_id="00000000-0000-0000-0000-0000000000a1", login="kontroling", role="admin")
+
+
 def _исправить(**поля: str) -> None:
     основа = {"code": "CLN05", "level": "D2", "zone": "hot_kitchen", "text": "грязный пол"}
     основа.update(поля)
     revision.revise_card(
-        "11111111-1111-1111-1111-111111111111", ЗАПИСЬ, tenant="HQ", lang="ru", **основа
+        "11111111-1111-1111-1111-111111111111",
+        ЗАПИСЬ,
+        tenant="HQ",
+        lang="ru",
+        editor=ПРАВИТ,
+        **основа,
     )
 
 
@@ -165,6 +174,7 @@ def test_историческая_отказывает_честно_до_чте�
             ЗАПИСЬ,
             tenant="HQ",
             lang=lang,
+            editor=ПРАВИТ,
             code="CLN05",
             level="D2",
             zone="hot_kitchen",
@@ -256,7 +266,7 @@ def _добавить(**поля: Any) -> str:
     основа = {"code": "CLN05", "level": "D2", "zone": "dining", "text": "  пол в зале  "}
     основа.update(поля)
     return revision.add_card(
-        "11111111-1111-1111-1111-111111111111", tenant="HQ", lang="ru", **основа
+        "11111111-1111-1111-1111-111111111111", tenant="HQ", lang="ru", editor=ПРАВИТ, **основа
     )
 
 
