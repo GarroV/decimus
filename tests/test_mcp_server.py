@@ -406,10 +406,14 @@ def test_содержимое_проверки_остаётся_нетронут
     )
 
     загружающие = [spec for spec in TOOLS if spec.kind == KIND_IMPORT]
-    assert {spec.handler.__module__ for spec in загружающие} == {"src.mcp.imports"}, (
+    assert {spec.handler.__module__ for spec in загружающие} <= {
+        "src.mcp.imports",
+        "src.mcp.import_suggest",
+        "src.mcp.import_batch",
+    }, (
         "загрузка исторических проверок (D305) — второе названное исключение: её "
-        "обработчики живут только в своём модуле, где заслон «только загруженный "
-        "черновик своего пространства» стоит у каждого пишущего"
+        "обработчики живут только в своих модулях загрузки, где заслон «только загруженный "
+        "черновик своего пространства» (`imports._only_import`) стоит у каждого"
     )
 
     for spec in TOOLS:

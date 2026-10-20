@@ -523,26 +523,27 @@ def _wording(text: str | None, comment: str | None) -> Any:
     )
 
 
-def import_add_finding(
+def add_one(
     *,
     tenant: str,
     store: Store,
-    actor: str,
-    inspection_id: str,
+    ident: str,
+    шапка: Any,
     text: str,
     code: str | None = None,
     level: str | None = None,
     zone: str | None = None,
     comment: str | None = None,
     repeat: bool = False,
-) -> dict[str, object]:
-    """Добавить запись в черновик: текущая — через движок, историческая — как в отчёте."""
+) -> tuple[int, list[str]]:
+    """Записать одну находку: номер и предупреждения. Общий путь `import_add_finding(s)`.
+
+    Проверку делает ровно этот код — поштучный и пакетный инструменты не
+    расходятся в том, что пускают в черновик.
+    """
     from ..db import imports as db
     from ..db import imports_legacy as legacy
 
-    del actor
-    ident = _require_inspection_id(inspection_id)
-    _, шапка = _only_import(ident, tenant=tenant)
     слова = _wording(text, comment)
     if not (слова.text or ""):
         raise ToolError("Формулировка записи text пуста — запись без слов в отчёт не идёт")
@@ -555,13 +556,7 @@ def import_add_finding(
         )
         with _db():
             n = legacy.add_legacy_finding(ident, tenant=tenant, finding=запись, wording=слова)
-        return _short_view(
-            ident,
-            tenant=tenant,
-            note=f"finding #{n} added",
-            n=n,
-            warnings=modes.soft_warnings(store, code=запись.code, zone=запись.zone),
-        )
+        return n, modes.soft_warnings(store, code=запись.code, zone=запись.zone)
     code, level, zone = _engine_triple(code, level, zone)
     args = [
         "add",
@@ -577,7 +572,41 @@ def import_add_finding(
     ]
     with _db():
         n, _ = db.add_finding(ident, tenant=tenant, wording=слова, apply=_engine(args))
-    return _short_view(ident, tenant=tenant, note=f"finding #{n} added", n=n)
+    return n, []
+
+
+def import_add_finding(
+    *,
+    tenant: str,
+    store: Store,
+    actor: str,
+    inspection_id: str,
+    text: str,
+    code: str | None = None,
+    level: str | None = None,
+    zone: str | None = None,
+    comment: str | None = None,
+    repeat: bool = False,
+) -> dict[str, object]:
+    """Добавить запись в черновик: текущая — через движок, историческая — как в отчёте."""
+    del actor
+    ident = _require_inspection_id(inspection_id)
+    _, шапка = _only_import(ident, tenant=tenant)
+    n, предупреждения = add_one(
+        tenant=tenant,
+        store=store,
+        ident=ident,
+        шапка=шапка,
+        text=text,
+        code=code,
+        level=level,
+        zone=zone,
+        comment=comment,
+        repeat=repeat,
+    )
+    return _short_view(
+        ident, tenant=tenant, note=f"finding #{n} added", n=n, warnings=предупреждения
+    )
 
 
 def _engine_triple(code: str | None, level: str | None, zone: str | None) -> tuple[str, str, str]:
