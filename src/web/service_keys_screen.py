@@ -183,6 +183,21 @@ def remove(service: registry.Service) -> tuple[KeyFlash, int]:
     return KeyFlash(service.code, "keys.err.none", False), 409
 
 
+def selected(rows: tuple[ServiceRow, ...], flash: KeyFlash | None) -> str:
+    """Сервис в панели: тот, у кого исход действия, иначе `?key=`, иначе первый не заданный."""
+    codes = [r.code for r in rows]
+    for wanted in (flash.service if flash else "", request.args.get("key") or ""):
+        if wanted in codes:
+            return wanted
+    unset = [r.code for r in rows if r.state == "unset"]
+    return (unset or codes or [""])[0]
+
+
 def context(flash: KeyFlash | None = None) -> dict[str, Any]:
     """Переменные шаблона блока."""
-    return {"keys": view(flash), "keys_max": registry.MAX_LENGTH}
+    shown = view(flash)
+    return {
+        "keys": shown,
+        "keys_max": registry.MAX_LENGTH,
+        "keys_selected": selected(shown.services, flash),
+    }

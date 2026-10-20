@@ -140,9 +140,12 @@ def _отправить(клиент: FlaskClient, сервис: str, дейст
 def test_главный_админ_видит_все_сервисы_и_поля_без_значений(главный: FlaskClient) -> None:
     html = главный.get(ВКЛАДКА).get_data(as_text=True)
     assert "Ключи сервисов" in html
-    for название in ("OpenAI", "Pointer", "iSpring", "Client ID", "Client secret"):
+    for название in ("OpenAI", "Pointer", "iSpring"):  # плитка у каждого сервиса
         assert название in html
-    assert html.count('type="password"') == 4
+    assert html.count('type="password"') == 1  # поля — только у открытого в панели
+    ispring = главный.get(f"{ВКЛАДКА}&key=ispring").get_data(as_text=True)
+    assert ispring.count('type="password"') == 2
+    assert "Client ID" in ispring and "Client secret" in ispring
     assert 'autocomplete="new-password"' in html and 'autocomplete="off"' in html
     assert "Не задан" in html
 
@@ -161,7 +164,7 @@ def test_запись_видна_как_последние_четыре_и_кт�
     склад.записи["pointer.api_key"] = service_keys.KeyStatus(
         "pointer", "wxyz", "director", datetime.now(UTC)
     )
-    html = главный.get(ВКЛАДКА).get_data(as_text=True)
+    html = главный.get(f"{ВКЛАДКА}&key=pointer").get_data(as_text=True)
     assert "••••wxyz" in html and "director" in html and "Задан в админке" in html
 
 
@@ -169,7 +172,7 @@ def test_окружение_называется_окружением(
     главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("POINTER_API_KEY", "из-окружения-1234567")
-    html = главный.get(ВКЛАДКА).get_data(as_text=True)
+    html = главный.get(f"{ВКЛАДКА}&key=pointer").get_data(as_text=True)
     assert "Из окружения сервера" in html and "из-окружения-1234567" not in html
 
 
