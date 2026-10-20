@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import import_batch, import_photo_link, import_suggest, imports
+from . import import_batch, import_info, import_photo_link, import_suggest, imports
 
 _ID: dict[str, object] = {
     "type": "string",
@@ -514,6 +514,44 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         ),
         input_schema=_schema({"inspection_id": _ID}, ["inspection_id"]),
         handler=import_photo_link.import_photo_upload_link,
+    ),
+    ImportTool(
+        name="import_info_fields",
+        description=(
+            "Read the INFORMATION part of a current-mode imported DRAFT: the fields the "
+            "bot asks at the end of an inspection and the partner reads in the PDF "
+            "(strengths, yes/no answers, dates). For each field of this checklist: code, "
+            "kind (text / yes_no / date), the question in the report language and the "
+            "value recorded so far; 'missing' lists unanswered codes. Call it BEFORE "
+            "import_accept_inspection, ask the person the missing questions in ONE "
+            "message, then record the answers with import_set_info."
+        ),
+        input_schema=_schema({"inspection_id": _ID}, ["inspection_id"]),
+        handler=import_info.import_info_fields,
+    ),
+    ImportTool(
+        name="import_set_info",
+        description=(
+            "Record answers to information fields of a current-mode imported DRAFT "
+            "(values = {code: answer}). Checked by field kind as in the bot: yes_no — "
+            "'yes' or 'no'; date — a date like 15.09.2026 or '15 September' (INF05 may "
+            "carry a time), anything else is refused; text — as the person said it. All "
+            "or nothing; a repeated code replaces its answer; a skipped field is simply "
+            "not passed. The score is not affected. The answer is short."
+        ),
+        input_schema=_schema(
+            {
+                "inspection_id": _ID,
+                "values": {
+                    "type": "object",
+                    "description": 'Answers by field code, e.g. {"INF03": "yes", '
+                    '"INF05": "15.09.2026 14:00"}. Codes come from import_info_fields.',
+                    "additionalProperties": {"type": "string"},
+                },
+            },
+            ["inspection_id", "values"],
+        ),
+        handler=import_info.import_set_info,
     ),
     ImportTool(
         name="import_accept_inspection",

@@ -37,3 +37,29 @@ FIELDS: tuple[InfoField, ...] = (
     InfoField("INF07", KIND_DATE),
     InfoField("INF08", KIND_TEXT),
 )
+
+
+#: Значения «да/нет» на языке ОТЧЁТА (их читает партнёр): те же слова, что бот
+#: кладёт кнопками (`info.value_yes/no` в `src/bot/texts.py`).
+_YES_NO_WORDS = {"ru": ("Да", "Нет"), "en": ("Yes", "No")}
+_YES = frozenset({"да", "yes", "y", "true", "1", "д"})
+_NO = frozenset({"нет", "no", "n", "false", "0", "н"})
+
+
+def yes_no_value(answer: object, lang: str) -> str | None:
+    """«Да»/«Нет» на языке отчёта — или `None`, если это не да/нет.
+
+    Язык, которого нет в таблице, получает английские слова.
+    """
+    if isinstance(answer, bool):
+        word = "yes" if answer else "no"
+    elif isinstance(answer, str):
+        word = answer.strip().lower()
+    else:
+        return None
+    yes, no = _YES_NO_WORDS.get(lang, _YES_NO_WORDS["en"])
+    if word in _YES:
+        return yes
+    if word in _NO:
+        return no
+    return None

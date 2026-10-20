@@ -155,6 +155,8 @@ from src.mcp.catalogue import (
     "import_list_drafts",
     "import_add_photo",
     "import_photo_upload_link",
+    "import_info_fields",
+    "import_set_info",
     "import_accept_inspection",
     "import_discard_draft",
 }
@@ -231,7 +233,7 @@ def test_каталог_содержит_ровно_шестьдесят_два_
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 63
+    assert len(TOOLS) == 65
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -387,6 +389,7 @@ def test_обработчик_взят_из_правильного_модуля(
             assert spec.handler.__module__ in {
                 imports_module.__name__,
                 import_photo_link.__name__,
+                "src.mcp.import_info",
                 import_suggest.__name__,
                 import_batch.__name__,
             }, spec.name
@@ -417,7 +420,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 63
+    assert len(перечень) == 65
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

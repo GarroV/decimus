@@ -832,6 +832,45 @@ def remove_finding(
         raise _refused(exc, "Снять запись") from exc
 
 
+#: Поле информационной части черновика (T158): повторная запись того же кода
+#: заменяет текст и оставляет прежнее место, новое ложится в конец — как у бота
+#: (`push._write_info`: порядок записи и есть порядок разделов отчёта).
+_UPSERT_INFO_SQL = """
+insert into inspection_info (inspection_id, position, code, text)
+values (
+    %(id)s,
+    (select coalesce(max(position) + 1, 0) from inspection_info where inspection_id = %(id)s),
+    %(code)s, %(text)s
+)
+on conflict (inspection_id, code) do update set text = excluded.text
+"""
+
+
+def set_info(inspection_id: str, values: Sequence[tuple[str, str]], *, tenant: str) -> None:
+    """Записать информационные поля текущего черновика загрузки; оценку не трогает.
+
+    Движок поля только хранит (`audit.py info`), на процент они не влияют, поэтому
+    команда движка не нужна: пишется та же таблица, что у бота. Пустой текст не
+    пишется (D070) — проверку делает и база (`inspection_info_answer_is_not_empty`).
+    """
+    ident = _require_inspection_id(inspection_id)
+    tenant_code = _require_tenant(tenant)
+    try:
+        with _connect() as conn, conn.cursor() as cur:
+            _locked_detail(cur, ident, tenant_code, mode=ORIGIN_IMPORT)
+            for code, text in values:
+                if not text.strip():
+                    raise HistoryImportError(
+                        f"Ответ поля {code} пуст — пропущенное поле не пишется"
+                    )
+                cur.execute(_UPSERT_INFO_SQL, {"id": ident, "code": code, "text": text})
+            conn.commit()
+    except HistoryImportError:
+        raise
+    except psycopg.Error as exc:
+        raise _refused(exc, "Записать информационные поля") from exc
+
+
 def _delete_finding(cur: Any, ident: str, запись: str, n: int) -> tuple[str, ...]:
     """Строка записи, её формулировки; вернуть ссылки её кадров (строки уходят каскадом)."""
     cur.execute(_PHOTOS_OF_FINDING_SQL, (запись,))
