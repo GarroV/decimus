@@ -43,6 +43,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from src.db.busy_lock import WALK_REPORT, Hold, try_hold
 from src.domain import get_state, handed_over, set_report_lang
 from src.domain.errors import DomainError
 from src.domain.handover import HandedOverError
@@ -66,9 +67,21 @@ LANG_GONE = "lang_gone"
 INFO_MISSING = "info_missing"
 BUSY = "busy"
 
-#: Чаты, у которых сейчас собирается отчёт. Один процесс веба — один набор.
+#: Чаты, у которых сейчас собирается отчёт, в этом процессе. Между процессами то же
+#: держит замок в базе (`src/db/busy_lock.py`, F-110): он берётся в запросе и
+#: отпускается в фоновом потоке сборки, поэтому лежит здесь, рядом с набором.
 _building: set[int] = set()
+_holds: dict[int, Hold] = {}
 _building_lock = threading.Lock()
+
+
+def _free(chat_id: int) -> None:
+    """Освободить чат: убрать из набора и отпустить замок в базе, если он был взят."""
+    with _building_lock:
+        _building.discard(chat_id)
+        hold = _holds.pop(chat_id, None)
+    if hold is not None:
+        hold.release()
 
 
 @dataclass(frozen=True)
@@ -162,8 +175,7 @@ def _run_report(token: str, chat_id: int) -> None:
             "Завершение из приложения: отчёт чата %s — сбой без ответа в чат", log_id(chat_id)
         )
     finally:
-        with _building_lock:
-            _building.discard(chat_id)
+        _free(chat_id)
 
 
 def _offered(chat_id: int) -> list[str] | None:
@@ -216,6 +228,12 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
             if chat_id in _building:
                 return ReportStart(BUSY)
             _building.add(chat_id)
+        hold = try_hold(WALK_REPORT, str(chat_id))
+        if not hold.acquired:
+            _free(chat_id)
+            return ReportStart(BUSY)
+        with _building_lock:
+            _holds[chat_id] = hold
     except DomainError:
         logger.exception(
             "Завершение из приложения: чат %s — состояние не читается", log_id(chat_id)
@@ -226,8 +244,7 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
             set_report_lang(chat_id, chosen)
         except HandedOverError:
             # Сдали между проверкой выше и записью: сборку не начинаем.
-            with _building_lock:
-                _building.discard(chat_id)
+            _free(chat_id)
             return ReportStart(SEALED)
         # Поток не наследует контекст сам: без копии сборка ушла бы в базу без
         # пространства человека и получила бы отказ (F-037, `src/db/space.py`).
@@ -239,8 +256,7 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
         ).start()
     except Exception:  # — до запуска потока: освободить чат, иначе он заперт навсегда
         logger.exception("Завершение из приложения: отчёт чата %s не запущен", log_id(chat_id))
-        with _building_lock:
-            _building.discard(chat_id)
+        _free(chat_id)
         return ReportStart(FAILED)
     logger.info("Завершение из приложения: сборка отчёта чата %s запущена", log_id(chat_id))
     return ReportStart(STARTED)

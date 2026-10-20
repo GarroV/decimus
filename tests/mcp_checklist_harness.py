@@ -16,6 +16,7 @@ import functools
 import json
 import tempfile
 from pathlib import Path
+from typing import Any
 
 SCORING = {
     "start_pct": 100.0,
@@ -127,3 +128,27 @@ def harness_edition(*, name: str = "harness", day: str = "2026-09-04") -> str:
     """
     with tempfile.TemporaryDirectory() as tmp:
         return build_edition(Path(tmp), name=name, day=day)
+
+
+def handle_confirmed(message: Any, **kwargs: Any) -> Any:
+    """`rpc.handle`, который сам проходит второй шаг подтверждения (F-130, #1006).
+
+    Тесты, проверяющие, ЧТО делает опасный инструмент, не должны каждый
+    повторять двухшаговый обмен; сам обмен проверяет `tests/test_mcp_confirm.py`.
+    """
+    from src.mcp.confirm import TOKEN_ARGUMENT
+    from src.mcp.rpc import handle
+
+    ответ = handle(message, **kwargs)
+    данные = ((ответ or {}).get("result") or {}).get("structuredContent")
+    if not isinstance(данные, dict) or данные.get("status") != "confirmation_required":
+        return ответ
+    params = message["params"]
+    повтор = {
+        **message,
+        "params": {
+            **params,
+            "arguments": {**params["arguments"], TOKEN_ARGUMENT: данные["confirmation_token"]},
+        },
+    }
+    return handle(повтор, **kwargs)

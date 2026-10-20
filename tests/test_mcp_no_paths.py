@@ -29,6 +29,7 @@ from typing import Any
 
 import pytest
 from mcp_checklist_harness import build_methodology
+from mcp_checklist_harness import handle_confirmed as handle
 from mcp_places import сверить
 from ratings_samples import rko_violations
 
@@ -36,7 +37,6 @@ from src.mcp.catalogue import TOOLS
 from src.mcp.checklist import Store, current_version
 from src.mcp.checklist_tools import MAX_NOTE
 from src.mcp.errors import McpError
-from src.mcp.rpc import handle
 
 # "HQ", а не прежняя "укашка" (волна 1, #340): вызовы идут через `handle` →
 # `rpc._aimed`, а та наводит правящий инструмент в `space_of(tenant)`, который

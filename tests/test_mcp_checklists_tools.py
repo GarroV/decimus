@@ -16,11 +16,11 @@ from typing import Any
 
 import pytest
 from mcp_checklist_harness import build_methodology
+from mcp_checklist_harness import handle_confirmed as handle
 
 from src.mcp.checklist import Store, current_version
 from src.mcp.checklist_layout import DRAFT, applied
 from src.mcp.checklists import apply_to_production, create
-from src.mcp.rpc import handle
 
 # "HQ", а не прежняя "укашка" (волна 1, #340): вызовы идут через `handle` →
 # `rpc._aimed`, а та наводит правящий инструмент в `space_of(tenant)`, который

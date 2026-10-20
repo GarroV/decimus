@@ -14,6 +14,12 @@
 справочник пиццерий (D556, `src/ratings/directory_feed.py`). Адрес таблицы —
 `RATINGS_SHEET_ID`; не задан — по расписанию не делает ничего, а заявку закрывает
 отказом с причиной. Людям бот о заборе не пишет.
+
+**Один процесс на заход (F-125).** Заявка и «пора» решаются по строкам в базе, и два
+процесса (перекрывшийся контейнер при выкатке, второй экземпляр) видят одно и то же и оба
+забирают таблицу: двойная нагрузка на Google и задвоенные строки. Заход идёт под замком базы
+(`src/db/job_lock.py`, как у сборщика агрегаторов); замок занят — этот процесс заход молча
+пропускает, заявку выполнит тот, кто держит замок, или следующий заход.
 """
 
 from __future__ import annotations
@@ -24,6 +30,7 @@ from datetime import UTC, datetime
 
 from src.db import ratings_sync as state
 from src.db.errors import PushError, RatingsError
+from src.db.job_lock import SHEET_LOADER_LOCK_KEY, job_lock
 from src.db.space import SYSTEM_SPACE, acting_space
 from src.ratings import directory_feed, sheet_sync
 
@@ -50,7 +57,15 @@ def _failures(results: tuple[sheet_sync.TabResult, ...]) -> str | None:
 
 
 def _tick() -> None:
-    """Один заход: заявка — всегда; расписание — когда пора."""
+    """Один заход под замком: заявка — всегда; расписание — когда пора."""
+    with job_lock(SHEET_LOADER_LOCK_KEY, what="таблица контроля") as got:
+        if not got:
+            logger.info("рейтинги: таблицу контроля забирает другой процесс — заход пропущен")
+            return
+        _tick_locked()
+
+
+def _tick_locked() -> None:
     request = state.open_request()
     if request is None and not _due():
         return

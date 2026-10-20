@@ -46,6 +46,7 @@ from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, exists, space_of
 from .checklist_layout import for_code as for_checklist
 from .checklists import PROTECTED_APPLIED, protection_of
+from .confirm import TOKEN_ARGUMENT, challenge, verify
 from .errors import McpError, ToolError
 from .instructions import IMPORT_INSTRUCTIONS
 from .policy import action_of, may_edit_protected, permits_tool
@@ -152,6 +153,14 @@ def _check_arguments(spec: ToolSpec, arguments: dict[str, Any]) -> str | None:
                 return f"Аргумент {name} инструмента {spec.name} ожидается типа {expected}"
     return None
 
+
+#: Отказ второго шага подтверждения: токен чужой, просроченный или от других
+#: аргументов. Причины не различаются — подбирающему они не нужны.
+CONFIRMATION_REFUSED = (
+    "Подтверждение не принято: токен не подходит к этому вызову {инструмент} (другие "
+    "аргументы, другой инструмент, другой арендатор или истёк срок). Действие НЕ выполнено. "
+    "Вызовите инструмент без токена — сервер вернёт описание эффекта и новый токен"
+)
 
 #: Отказ на инструмент методики без открытого доступа. Один текст на оба
 #: случая — «не настроено» и «этому арендатору не открыто» — намеренно: разница
@@ -432,9 +441,14 @@ def _call_tool(
     refusal = _check_arguments(spec, arguments)
     if refusal is not None:
         return refusal
+    # Токен подтверждения — не аргумент обработчика: снимается здесь, а подпись
+    # считается по остальным аргументам, как их и назвали (F-130).
+    token = arguments.get(TOKEN_ARGUMENT)
+    arguments = {имя: значение for имя, значение in arguments.items() if имя != TOKEN_ARGUMENT}
     # Хранилище подставляется ПО ВИДУ, каждому своё: правящему инструменту —
     # только то, что пришло с правом на правку. Общая переменная «какое-нибудь
     # хранилище» открыла бы правку читательским правом одной опечаткой.
+    подпись = dict(arguments)
     методика = spec.kind in (KIND_CHECKLIST, KIND_CHECKLIST_SOURCE)
     # Хранилища здесь уже не может не быть: заслоны выше отказали бы. Но `None`
     # сюда всё равно не пропускается — заслон и подстановка стоят порознь, и
@@ -469,6 +483,17 @@ def _call_tool(
             # Проверка по ПОДСТАВЛЕННОМУ хранилищу, а не по названному коду: код
             # может быть не назван вовсе, и правка ушла бы в применённый к проду.
             raise ToolError(APPLIED_READONLY if причина == PROTECTED_APPLIED else MASTER_READONLY)
+        if spec.confirm_effect:
+            # Двухшаговое подтверждение (F-130, #1006) — В ДОПОЛНЕНИЕ к роли и
+            # заслонам выше: отказанный ими вызов токена не получает. Стоит
+            # последним перед обработчиком, а проверяется по аргументам ДО
+            # снятия `checklist`: код чек-листа входит в подпись.
+            if not isinstance(token, str):
+                return challenge(
+                    spec.name, spec.confirm_effect, tenant=tenant, actor=actor, arguments=подпись
+                )
+            if not verify(token, spec.name, tenant=tenant, actor=actor, arguments=подпись):
+                return _tool_text(CONFIRMATION_REFUSED.format(инструмент=spec.name), failed=True)
         if spec.kind == KIND_IMPORT:
             # Хранилище версий — для поиска версии методики черновика (D307),
             # подпись — для подтверждения (D308). Обе приходят от транспорта,
