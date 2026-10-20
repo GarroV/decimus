@@ -562,7 +562,7 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "live audits and can no longer be edited or discarded. Accepting opens NO "
             "action-plan request and nothing is sent to anyone.\n\n"
             "For a current inspection the reply is the finished result, like the bot "
-            "at hand-in: the PDF report is built (without photos) and stored — "
+            "at hand-in: the PDF report is built (with the findings photos) and stored — "
             "'report_url' is its absolute web link, 'pdf_error' names why it could not "
             "be built or stored (acceptance stands either way) — and 'letter' is the "
             "partner letter text for a human to paste into mail ('letter_ready_to_send', "
