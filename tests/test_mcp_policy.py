@@ -57,8 +57,9 @@ _ВСЁ_УК = frozenset(
 МАТРИЦА: dict[tuple[str, str], frozenset[str]] = {
     ("HQ", "superadmin"): _ВСЁ_УК,
     ("HQ", "admin"): _ВСЁ_УК,
+    # Девелопер заносит проверки через Claude (D567).
     ("HQ", "developer"): frozenset(
-        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
+        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ, KIND_IMPORT}
     ),
     # Гость (D440): только чтение проверок и рейтингов. Аудитора в УК больше нет.
     ("HQ", "guest"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),

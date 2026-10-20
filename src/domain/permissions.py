@@ -213,7 +213,9 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     (SIDE_HQ, "admin"): _HQ_ADMIN,
     # Бизнес-девелопер (D440): сервис в полном объёме, кроме главного чек-листа,
     # указателя прода, стран, людей, ключей и загрузок рейтингов.
-    (SIDE_HQ, "developer"): _HQ_WORK | _CHECKLISTS | _ALL_VIEWS_HQ,
+    # Загрузка проверки через Claude — и у девелопера (владелец 20.10.2026: «дай
+    # нормально обкатать основной функционал»; партнёрам по-прежнему никогда, D335).
+    (SIDE_HQ, "developer"): _HQ_WORK | _CHECKLISTS | _ALL_VIEWS_HQ | _codes("inspection.import"),
     # Контроль (D420): только рейтинги и свои люди (D360) — без смены ролей.
     (SIDE_HQ, "control"): _codes(
         "ratings.read", "ratings.manage", "people.manage", "view.ratings", "view.users"
