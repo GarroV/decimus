@@ -158,7 +158,8 @@
     var old = body.querySelector(".note[data-net-note]");
     if (old) old.remove();
     note.setAttribute("data-net-note", "");
-    if (panel) panel.querySelector(".sdetail__head").after(note);
+    var head = panel && (panel.querySelector(".sdetail__head") || panel.querySelector(".lt__head"));
+    if (head) head.after(note);
   }
 
   // Действие в панели — фоном: форму принимает сервер, обратно приходит та же
@@ -168,6 +169,10 @@
     var form = e.target;
     if (!form.matches || !form.matches("[data-drawer] form[data-panel-form]")) return;
     if (!window.fetch || !window.FormData) return;
+    // Кнопка, которая уводит со страницы (черновик в почте — через окно согласия
+    // Google), уходит обычной отправкой: фоном за чужим сайтом не сходить.
+    var submitter = e.submitter || null;
+    if (submitter && submitter.hasAttribute("data-full-submit")) return;
     e.preventDefault();
     if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) return;
     var body = form.closest(".sdrawer__body");
@@ -179,9 +184,14 @@
     buttons.forEach(function (b) {
       b.disabled = true;
     });
-    fetch(form.action, {
+    // У формы может быть несколько кнопок со своим адресом (`formaction`):
+    // уходит туда, куда вела нажатая, и с её именем и значением.
+    var action = (submitter && submitter.getAttribute("formaction")) || form.action;
+    var payload = new FormData(form);
+    if (submitter && submitter.name) payload.append(submitter.name, submitter.value);
+    fetch(action, {
       method: "POST",
-      body: new FormData(form),
+      body: payload,
       credentials: "same-origin",
       headers: { "X-Panel": "1" },
     })
@@ -218,6 +228,7 @@
   });
 
   function bind(root) {
+    if (window.LetterEditor) window.LetterEditor.init(root);
     root.querySelectorAll("form[data-autosubmit]").forEach(function (form) {
       var button = form.querySelector("[data-autosubmit-button]");
       if (button) button.hidden = true;

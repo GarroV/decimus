@@ -238,7 +238,7 @@ def test_действия_справа_те_же_что_у_карточки(
 
     страница = стенд.get(f"/inspections?inspection={строка.id}").get_data(as_text=True)
 
-    for действие in ("/retract", "/letter"):
+    for действие in ("/retract", "view=letter"):
         assert (действие in страница) is свои_действия, действие
     # Принятую проверку не правят (D465): «Исправить» в панели у неё нет ни у кого.
     assert t("card.act.move", "ru") not in страница

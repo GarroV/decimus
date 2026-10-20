@@ -27,7 +27,7 @@
 {% from "inspections/_panel.html" import inspection_panel with context %}
 {% from "inspections/_row.html" import inspection_row with context %}
 {% block title %}{{ t('section.registry.title') }}{% endblock %}
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}"><script src="{{ url_for('static', filename='proofread.js') }}" defer></script>{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}"><script src="{{ url_for('static', filename='proofread.js') }}" defer></script><script src="{{ url_for('static', filename='letter.js') }}" defer></script>{% endblock %}
 
 {% macro row_link(row, review=false) %}
   {% set текущая = split_open and picked == row.id %}
@@ -206,7 +206,22 @@
 {% block split_title %}{{ t('registry.drawer.title') }}{% endblock %}
 
 {% block split_detail %}
-  {% if card %}
+  {% if letter_panel %}
+    {#- Письмо партнёру в той же панели, что и карточка: «‹ К карточке» возвращает
+        карточку сюда же, а не на отдельную страницу (владелец 20.10.2026). -#}
+    <article class="sdetail spanel spanel--letter" aria-label="{{ t('letter.title') }}" data-net-error="{{ t('registry.panel.net_error') }}">
+      <a class="back" href="{{ registry_here(inspection=picked, lang=lang) }}" data-drawer-open>‹ {{ t('letter.back') }}</a>
+      {% with in_panel=true, letter=letter_panel.letter, letter_markup=letter_panel.letter_markup,
+              saved=letter_panel.saved, show_draft=letter_panel.show_draft,
+              saved_known=letter_panel.saved_known, own=letter_panel.own,
+              save_outcome=letter_panel.save_outcome, gmail_outcome=letter_panel.gmail_outcome,
+              head=letter_panel.head, letter_langs=letter_panel.letter_langs,
+              letter_lang=letter_panel.letter_lang, caveats=letter_panel.caveats,
+              source=letter_panel.source %}
+        {% include "inspections/_letter_form.html" %}
+      {% endwith %}
+    </article>
+  {% elif card %}
     {{ inspection_panel(card) }}
   {% elif card_failed %}
     <div class="sdetail sdetail--hint">

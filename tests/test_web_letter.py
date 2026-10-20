@@ -176,7 +176,7 @@ def test_карточка_ведёт_к_письму(стенд: FlaskClient) ->
     страница = стенд.get(f"/inspections/{ПРОВЕРКА}").get_data(as_text=True)
 
     # Assert
-    assert f"/inspections/{ПРОВЕРКА}/letter" in страница
+    assert f"inspection={ПРОВЕРКА}&amp;view=letter" in страница
 
 
 def test_выбранный_язык_доезжает_до_сборщика(
@@ -268,3 +268,64 @@ def test_возврат_к_заготовке_показывает_её_не_т�
     # уйти, и вынуть его из истории нельзя ничем. На экране по-прежнему видно,
     # что зафиксированное существует.
     assert "director" in заготовка
+
+
+# --- письмо в панели реестра (владелец 20.10.2026: «просто выплывала справа») -----
+
+
+def test_письмо_открывается_в_панели_реестра(стенд: FlaskClient) -> None:
+    # Act
+    страница = стенд.get(f"/inspections?inspection={ПРОВЕРКА}&view=letter&lang=ru").get_data(
+        as_text=True
+    )
+
+    # Assert — письмо в панели, переходы остаются в ней, сохранение — фоном.
+    панель = страница.split("spanel--letter", 1)[1]
+    assert "Your inspection scored 92%." in панель
+    assert "lt--panel" in панель and "data-panel-form" in панель
+    назад = панель.split('class="back"', 1)[1].split(">", 1)[0]
+    assert f"inspection={ПРОВЕРКА}" in назад and "view=letter" not in назад
+    assert "data-drawer-open" in назад
+    языки = панель.split('class="seg"', 1)[1].split("</span>", 1)[0]
+    assert "view=letter" in языки and "data-drawer-open" in языки
+    # Черновик в почте уходит обычной отправкой: окно согласия Google фоном не открыть.
+    assert "data-full-submit" in панель
+
+
+def test_без_вида_письма_в_панели_карточка(стенд: FlaskClient) -> None:
+    страница = стенд.get(f"/inspections?inspection={ПРОВЕРКА}&lang=ru").get_data(as_text=True)
+    assert "spanel--letter" not in страница
+    кнопка = страница.split('data-tip="Письмо партнёру"', 1)[0].rsplit("<a ", 1)[1]
+    assert "view=letter" in кнопка and "data-drawer-open" in кнопка
+
+
+def test_у_загруженной_задним_числом_вместо_письма_карточка(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D310: письма у заведённой задним числом нет — и в панели тоже."""
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка(origin="import")))
+    страница = стенд.get(f"/inspections?inspection={ПРОВЕРКА}&view=letter&lang=ru").get_data(
+        as_text=True
+    )
+    assert "spanel--letter" not in страница
+    assert "Demo Pizzeria #1" in страница
+
+
+def test_сохранение_возвращает_в_панель_письма(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(data, "remember_letter", lambda *_a, **_k: None)
+    ответ = стенд.post(
+        f"/inspections/{ПРОВЕРКА}/letter/save",
+        data={"text": "Текст", "letter_lang": "en"},
+        headers=СВОЙ,
+    )
+    куда = ответ.headers["Location"]
+    assert ответ.status_code == 303
+    assert куда.startswith("/inspections?") and "view=letter" in куда and "saved=ok" in куда
+
+
+def test_со_страницы_письма_назад_в_реестр_а_не_на_карточку(стенд: FlaskClient) -> None:
+    страница = стенд.get(f"/inspections/{ПРОВЕРКА}/letter?lang=ru").get_data(as_text=True)
+    назад = страница.split('class="back"', 1)[1].split(">", 1)[0]
+    assert f"/inspections?inspection={ПРОВЕРКА}" in назад
