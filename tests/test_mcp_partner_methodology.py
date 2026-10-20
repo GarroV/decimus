@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 from mcp_checklist_harness import build_methodology
+from mcp_checklist_harness import handle_confirmed as handle
 
 from src.mcp.catalogue import KIND_CHECKLIST, KIND_CHECKLIST_SOURCE, TOOLS
 from src.mcp.checklist import Store, current_version, read_journal
@@ -25,7 +26,7 @@ from src.mcp.checklist_tools import uncovered_phrases
 from src.mcp.checklists import create
 from src.mcp.config import MIN_TOKEN_LENGTH, Settings
 from src.mcp.errors import ToolError
-from src.mcp.rpc import ETALON_READONLY_FOR_PARTNER, ROLE_CLOSED, handle
+from src.mcp.rpc import ETALON_READONLY_FOR_PARTNER, ROLE_CLOSED
 from src.mcp.server import _checklist_for, _checklist_source_for
 
 ПАРТНЁР = "GE"
