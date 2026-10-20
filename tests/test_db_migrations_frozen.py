@@ -332,6 +332,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0082_rate_windows.sql": (
         "sql1:818dd3c0d9cad281b5a7fc2f51ee3c2d400eb7fb4afddc0ce919042e2612437c"
     ),
+    # Агрегаторы на «Рейтингах» — своя плитка (D585).
+    "0083_ratings_layout_aggregators.sql": (
+        "sql1:e2d0b77a7e573dab4eddd5e93b79d4ebd6228000453bf15efb5f0ee49014cef5"
+    ),
 }
 
 
