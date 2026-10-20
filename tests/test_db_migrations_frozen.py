@@ -328,6 +328,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0081_inspection_edits.sql": (
         "sql1:2e0815cb0cb23039e3cd740716238831bd50f0b8303fcc404e25775604480a86"
     ),
+    # Ключи сервисов на экране «Подключения» (D576, #906).
+    "0082_service_keys.sql": (
+        "sql1:df6cded467f4d94f01692e50159ea892a7372443ba773990d77e9c9c9e79e023"
+    ),
 }
 
 

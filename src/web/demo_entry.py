@@ -54,9 +54,9 @@ LOCKED_ENDPOINTS = frozenset(
         "settings_claude_token",
         "settings_claude_token_revoke",
         "settings_sign_out_everywhere",
-        "model_key_save",
-        "model_key_check",
-        "model_key_delete",
+        "service_key_save",
+        "service_key_check",
+        "service_key_delete",
     }
 )
 

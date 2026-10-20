@@ -474,3 +474,32 @@ def note_address_failure(*, tenant: str, address: str) -> Verdict:
     with attempt_transaction(tenant=tenant, keys=(ключ,)) as строки:
         счётчик = строки.bump(scope=ключ[0], fingerprint=ключ[1])
     return verdict_of(счётчик, scope=ключ[0])
+
+
+def _action_keys(login: str) -> _Keys:
+    return ((SCOPE_LOGIN, key_fingerprint(f"service-keys\x1f{login}")),)
+
+
+def admit_service_key_action(*, tenant: str, login: str) -> Attempt:
+    """Пустить проверку или запись ключа сервиса (D576) — и записать её тем же движением.
+
+    Тот же счётчик, пороги и сроки запрета, что у пароля (`FAILURES_BEFORE_LOCK`,
+    `LOCK_STEPS`), но на своём ключе: у проверок ключей нет общего счёта со входом, и
+    запертый вход не запирает экран ключей. Считается ПОПЫТКА; успешное действие счёт
+    обнуляет (`note_service_key_ok`), поэтому запирают подряд идущие неудачи — подбор
+    значения через «Проверить» упирается в потолок из нескольких попыток в час.
+    """
+    ключи = _action_keys(login)
+    with attempt_transaction(tenant=tenant, keys=ключи) as строки:
+        scope, отпечаток = ключи[0]
+        запрет = verdict_of(строки.load(scope=scope, fingerprint=отпечаток), scope=scope)
+        if запрет.locked:
+            return Attempt(admitted=False, verdict=запрет)
+        стало = строки.bump(scope=scope, fingerprint=отпечаток)
+    return Attempt(admitted=True, verdict=verdict_of(стало, scope=scope))
+
+
+def note_service_key_ok(*, tenant: str, login: str) -> None:
+    """Действие над ключом удалось: неудачи по этому ключу забыты."""
+    scope, отпечаток = _action_keys(login)[0]
+    forget_counter(tenant=tenant, scope=scope, fingerprint=отпечаток)

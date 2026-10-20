@@ -75,13 +75,13 @@ REAUTH_KIND = "reauth"
 _BACK_PREFIXES = ("/settings#", "/settings?", "/oauth/authorize?", "/users?tab=connections")
 
 
-def is_fresh(account: object, *, now: datetime | None = None) -> bool:
-    """Сессия открыта не раньше `MAX_AGE` назад. Неизвестно когда — не свежая."""
+def is_fresh(account: object, *, now: datetime | None = None, max_age: timedelta = MAX_AGE) -> bool:
+    """Сессия открыта не раньше `max_age` назад (по умолчанию `MAX_AGE`). Неизвестно когда — нет."""
     когда = getattr(account, "signed_in_at", None)
     if not isinstance(когда, datetime):
         return False
     сейчас = now or datetime.now(UTC)
-    return сейчас - когда <= MAX_AGE
+    return сейчас - когда <= max_age
 
 
 def safe_back(raw: str | None) -> str:
@@ -100,8 +100,12 @@ def safe_back(raw: str | None) -> str:
     return "/settings"
 
 
-def require_fresh(back: str, action: str | None = None) -> Response | None:
+def require_fresh(
+    back: str, action: str | None = None, *, max_age: timedelta = MAX_AGE
+) -> Response | None:
     """`None` — вход свежий, действие можно делать; иначе — увод на подтверждение.
+
+    `max_age` — строже общего окна для действий с секретами (ключи сервисов, D576: 10 минут).
 
     `action` — название действия из `INTENT_ACTIONS`: после подтверждения оно
     выполнится само (D457); без него человек нажмёт кнопку ещё раз.
@@ -109,7 +113,7 @@ def require_fresh(back: str, action: str | None = None) -> Response | None:
     from . import auth
 
     account = auth.current_account()
-    if is_fresh(account):
+    if is_fresh(account, max_age=max_age):
         return None
     ответ = ask_confirm(back)
     if action is not None and account is not None:
