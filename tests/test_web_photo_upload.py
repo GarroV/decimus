@@ -113,13 +113,16 @@ def test_токен_чужого_ключа_403(мир: SimpleNamespace) -> None
     assert _post(мир, чужой, [("a.jpg", _image("JPEG"))]).status_code == 403
 
 
-def test_просроченный_токен_403(мир: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_месячный_токен_работает_до_приёмки(
+    мир: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Срока у ссылки нет (D573): держит только приёмка черновика."""
     токен = _token()
     сейчас = time.time()
-    monkeypatch.setattr(time, "time", lambda: сейчас + photo_upload_link.TTL_SEC + 5)
+    monkeypatch.setattr(time, "time", lambda: сейчас + 30 * 24 * 3600)
 
-    assert _post(мир, токен, [("a.jpg", _image("JPEG"))]).status_code == 403
-    assert мир.added == []
+    assert _post(мир, токен, [("a.jpg", _image("JPEG"))]).status_code != 403
+    assert мир.added
 
 
 def test_принятый_черновик_410(мир: SimpleNamespace) -> None:

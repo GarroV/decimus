@@ -9,9 +9,11 @@ PHOTO_UPLOAD_TEXTS: dict[str, dict[str, str]] = {
     "photo_upload.title": {"ru": "Фото к находкам", "en": "Photos for the findings"},
     "photo_upload.lead": {
         "ru": "Выберите или перетащите фото в поле нужной находки и нажмите «Загрузить». "
-        "JPEG, PNG, WebP или HEIC, до {mb} МБ каждое. Ссылка действует недолго.",
+        "JPEG, PNG, WebP или HEIC, до {mb} МБ каждое. "
+        "Ссылка работает, пока проверка не принята.",
         "en": "Choose or drop photos into the field of the right finding and press "
-        "“Upload”. JPEG, PNG, WebP or HEIC, up to {mb} MB each. The link expires soon.",
+        "“Upload”. JPEG, PNG, WebP or HEIC, up to {mb} MB each. "
+        "The link works until the inspection is accepted.",
     },
     "photo_upload.no_findings": {
         "ru": "В черновике пока нет находок — фото прикладывать не к чему.",

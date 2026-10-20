@@ -114,7 +114,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,actions_screen,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,actions_screen,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -137,6 +137,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/home_ratings_block.py` | Блок «Рейтинги» на «Главной» (D418): РС, РКО, карты и агрегаторы (D557) — по кластерам (D502) |
 | `src/web/inspection_titles.py` | Формулировки пунктов методики по коду — для деталей проверки в API Swarm (D391) |
 | `src/web/inspections.py` | Раздел «Проверки»: что показать и чем это взято |
+| `src/web/item_labels.py` | Пункт чек-листа для человека на экранах веба: «Порядок 13», а не `CLN13` (20.10.2026) |
 | `src/web/letter_draft.py` | Письмо уходит в черновики почты вошедшего (T352, D174, D176, D185, #332) |
 | `src/web/letter_markup.py` | Разметка письма партнёру: белый список из четырёх элементов (T353, D169, #332) |
 | `src/web/methodology.py` | Раздел «Методика»: правка состава чек-листа той же дверью, что MCP и CLI |
@@ -724,7 +725,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
 | `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |
-| `src/domain/photo_upload_link.py` | Ссылка загрузки кадров к черновику загрузки проверки: подписанный токен с жизнью в 2 часа |
+| `src/domain/photo_upload_link.py` | Ссылка загрузки кадров к черновику загрузки проверки: подписанный токен без срока |
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
 | `src/domain/repeat_rule.py` | Правило «пункт уже был нарушением в прошлой проверке» (D191, D255) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
