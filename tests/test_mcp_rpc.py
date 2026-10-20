@@ -409,7 +409,7 @@ def test_instructions_про_загрузку_отдаются_доступу_с
     результат = _initialize(role="admin", imports=object(), actor="a@b.c")  # type: ignore[arg-type]
 
     текст = результат["instructions"]
-    assert len(текст) <= 4000
+    assert len(текст) <= 6000
     assert "import_suggest_items" in текст
     assert "import_add_findings" in текст
 

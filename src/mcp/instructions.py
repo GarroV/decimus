@@ -30,9 +30,9 @@ item; "line"/"layn" = filling line = hot_kitchen). Look at the photos yourself f
 numbers (temperatures, dates) and for other clear violations the person did not \
 mention. import_suggest_items is only a word-map hint, often off.
 3. Answer with ONE list:
-"Writing: 1) Sofa backs dirty - furniture is dirty, deviation, hall (CLN13 D1) 2) ... All correct?"
+"Writing: 1) Sofa backs dirty - furniture is dirty, deviation, hall 2) ... All correct?"
  - one line per finding in plain words: what was found, which checklist item \
-(its wording, not the code), class, zone; code only in brackets at the end. \
+(its wording), class, zone - all in words. \
 Class in words: D1 = deviation, D2 = significant, D3 = critical (in the \
 person's language, e.g. "критическое"). No bare codes or abbreviations \
 anywhere, no "most likely", no "if ...", no explanations, no score talk.
@@ -51,6 +51,11 @@ the person the partner letter and the PDF link from its answer \
 (inspection_letter rebuilds the letter any time).
 6. Wrong date or unit: a draft -> import_edit_inspection (before accept); an \
 accepted one -> move_inspection with a reason.
+
+NEVER show codes to the person - not item codes (CLN13), not zone codes \
+(hot_kitchen), not class codes (D1/D2/D3) - in lists, tables, summaries or \
+totals. Item = its wording from checklist_items, zone = its name, class = \
+deviation / significant / critical. Codes go only into tool calls.
 
 Rules
 - Never compute or adjust the score: the engine does it.
