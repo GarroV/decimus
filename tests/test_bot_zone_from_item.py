@@ -41,6 +41,7 @@ from bot_harness import (
 
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
+from src.bot.item_labels import shown as метка_пункта
 from src.bot.texts import t
 from src.domain import get_state, only_zone, start_inspection
 
@@ -115,7 +116,9 @@ async def test_печь_в_чужой_зоне_от_модели_спрашив�
     assert до_ответа is not None and not до_ответа.findings, (
         "невозможная пара «пункт + зона» записана молча"
     )
-    assert session.last_text == t("record.ask_zone_for_item", "ru", code="CLN05")
+    assert session.last_text == t(
+        "record.ask_zone_for_item", "ru", code=метка_пункта("CLN05", "ru", chat_id=CHAT_ID)
+    )
     # Все зоны, зона пункта — первой (D206): место находки выбирает человек.
     assert session.keyboard_data()[0] == "rec:zp:hot_kitchen", "зона пункта не стоит первой"
 
@@ -201,7 +204,10 @@ async def test_пункт_в_одной_зоне_при_неизвестной_�
         "зона пункта очевидна, а бот снова спросил её кнопками"
     )
     assert состояние.findings[-1].zone == "hot_kitchen"
-    assert t("record.ask_zone_for_item", "ru", code="CLN05") not in session.last_text
+    assert (
+        t("record.ask_zone_for_item", "ru", code=метка_пункта("CLN05", "ru", chat_id=CHAT_ID))
+        not in session.last_text
+    )
 
 
 @pytest.mark.asyncio
@@ -217,4 +223,6 @@ async def test_пункт_многих_зон_при_неизвестной_зо
 
     состояние = get_state(CHAT_ID)
     assert состояние is not None and not состояние.findings, "зона выдумана там, где её нет"
-    assert session.last_text == t("record.ask_zone_for_item", "ru", code="CLN03")
+    assert session.last_text == t(
+        "record.ask_zone_for_item", "ru", code=метка_пункта("CLN03", "ru", chat_id=CHAT_ID)
+    )

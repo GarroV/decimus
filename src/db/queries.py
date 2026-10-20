@@ -215,7 +215,7 @@ select
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
         and t.field = 'comment' and t.lang = i.speech_lang) as comment,
-    f.repeat, f.reading_c
+    f.repeat, f.reading_c, i.checklist_version
 from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.id = i.unit_id
@@ -373,6 +373,8 @@ def _row_to_finding(row: Mapping[str, Any]) -> FindingRow:
         repeat=bool(row["repeat"]),
         # Показание термометра (#855): `numeric` приходит `Decimal`-ом.
         reading_c=None if row["reading_c"] is None else float(row["reading_c"]),
+        # Не каждая выборка несёт издание; без него метка пункта останется кодом.
+        checklist_version=str(row.get("checklist_version") or ""),
     )
 
 

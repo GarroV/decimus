@@ -440,7 +440,7 @@
       lead: lead,
       list: function (q) {
         return choices(q).map(function (i) {
-          return { code: i.code, label: i.q, value: i.code, on: i.code === f.code, badge: previousHere(i.code) ? tx("walk.sheet.was_here") : null };
+          return { code: i.label, label: i.q, value: i.code, on: i.code === f.code, badge: previousHere(i.code) ? tx("walk.sheet.was_here") : null };
         });
       },
       onPick: function (code) { pick(code, null); },

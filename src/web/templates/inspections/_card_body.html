@@ -154,6 +154,8 @@
   {% set may_revise = c.may_revise %}
   {% set info = c.info %}
   {% set info_titles_found = c.info_titles_found %}
+  {# Пункт — меткой («Порядок 13»), не кодом: решение владельца 20.10.2026. Код остаётся в формах. #}
+  {% set item_label = c.item_label %}
   {% set moves = c.moves %}
   {% set moves_known = c.moves_known %}
   {% set may_retract = c.may_retract %}
@@ -187,7 +189,7 @@
      поэтому кавычки атрибута — одинарные. #}
   {% if can_proof %}
     {% set pick_items = [] %}
-    {% for pick in sheet.picks %}{% set _ = pick_items.append({'c': pick.code, 'q': pick.question, 'l': pick.levels, 'z': pick.zones}) %}{% endfor %}
+    {% for pick in sheet.picks %}{% set _ = pick_items.append({'c': pick.code, 'n': pick.label, 'q': pick.question, 'l': pick.levels, 'z': pick.zones}) %}{% endfor %}
     {% set proof_data = {
       'items': pick_items,
       'busy': t('proofread.suggest.busy_label'),
@@ -240,7 +242,7 @@
             <span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>
             <span class="find-row__meta">
               {#- Маркеры исторической записи (D332): LEGACY — пункт не назван, пустая зона — не названа. #}
-              {{ t('card.findings.note') if finding.code == 'NOTE' else (t('card.findings.no_item') if finding.code == 'LEGACY' else finding.code) }} · {{ zone_names.get(finding.zone, finding.zone) if finding.zone else t('card.findings.no_zone') }}
+              {{ t('card.findings.note') if finding.code == 'NOTE' else (t('card.findings.no_item') if finding.code == 'LEGACY' else item_label(finding.code)) }} · {{ zone_names.get(finding.zone, finding.zone) if finding.zone else t('card.findings.no_zone') }}
               {%- if finding.zone_unusual %} · {{ t('card.findings.zone_unusual') }}{% endif %}
               {%- if mixed_speech %} · {{ t('card.findings.speech_lang', lang=finding.lang) }}{% endif %}
               {%- if finding.reading_c is not none %} · {{ t('card.findings.reading', value='%g' % finding.reading_c) }}{% endif %}
@@ -253,7 +255,7 @@
           <div class="find-row__gallery">
             {% for shot in shots %}
               {% set src = url('/inspections/' ~ head.id ~ '/photos/' ~ shot) %}
-              <a href="{{ src }}" data-zoom><img src="{{ src }}" loading="lazy" alt="{{ finding.code }} · {{ loop.index }}"></a>
+              <a href="{{ src }}" data-zoom><img src="{{ src }}" loading="lazy" alt="{{ item_label(finding.code) }} · {{ loop.index }}"></a>
             {% endfor %}
           </div>
         </details>
@@ -290,8 +292,8 @@
       {% for row in info %}
         <div class="info-row">
           <div class="info-row__question">
-            {% if row.question %}{{ row.question }}{% else %}<span class="muted">{{ row.code }}</span>{% endif %}
-            <span class="info-row__code">{{ row.code }}{% if info_titles_found and not row.question %} · {{ t('card.info.no_question') }}{% endif %}</span>
+            {% if row.question %}{{ row.question }}{% else %}<span class="muted">{{ item_label(row.code) }}</span>{% endif %}
+            <span class="info-row__code">{{ item_label(row.code) }}{% if info_titles_found and not row.question %} · {{ t('card.info.no_question') }}{% endif %}</span>
           </div>
           <div class="info-row__answer">{{ day(row.answer) if row.answer else '—' }}</div>
         </div>

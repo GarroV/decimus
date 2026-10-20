@@ -179,8 +179,9 @@ async def test_аудитор_предупреждён_и_отчёт_всё_ра
     head = t("finish.untranslated", "ru", lang="?", codes="?").split("(")[0]
     warned = [text for text in session.texts if text.startswith(head)]
     assert warned, f"аудитор не предупреждён, что отчёт напечатает чужой язык: {session.texts[-3:]}"
-    assert BROKEN_CODE in warned[0], (
-        f"предупреждение не называет код, с которым идти в управляющую компанию: {warned[0]}"
+    # Пункт назван меткой («Заготовки 2»), а не кодом (20.10.2026).
+    assert "Заготовки 2" in warned[0] and BROKEN_CODE not in warned[0], (
+        f"предупреждение не называет пункт, с которым идти в управляющую компанию: {warned[0]}"
     )
 
 

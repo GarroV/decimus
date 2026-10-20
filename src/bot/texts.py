@@ -1263,12 +1263,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": (
             "⚠ В методике не переведено то, что печатается в отчёте ({lang}): {codes}. "
             "Партнёр увидит эти строки на чужом языке. Отчёт менять не нужно — "
-            "передайте коды управляющей компании."
+            "передайте эти пункты управляющей компании."
         ),
         "en": (
             "⚠ The methodology is untranslated where the report ({lang}) prints it: {codes}. "
             "The partner will see those lines in another language. The report needs no change "
-            "— pass the codes on to the management company."
+            "— pass these items on to the management company."
         ),
     },
     # Причина не называется — тот же принцип, что у отказа движка (T127) и у

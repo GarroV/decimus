@@ -407,4 +407,4 @@ async def test_config_error_building_the_manual_list_is_reported_and_bot_survive
     # Бот жив: следующее событие обрабатывается штатно, а не повторяет отказ.
     stub_classify(monkeypatch, suggestion(candidate("PRD06", "D1", "hot_kitchen", "Формулировка")))
     await feed(dp, bot, photo_message("frame-2", caption="ещё одна проблема"))
-    assert "PRD06" in session.last_text
+    assert "Заготовки 6" in session.last_text

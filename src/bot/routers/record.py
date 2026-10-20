@@ -78,7 +78,7 @@ from src.recognize.manual import ManualCandidate, manual_candidates, search_item
 from src.recognize.models import UNKNOWN_ZONE, Candidate
 from src.recognize.transcribe import transcribe
 
-from .. import frame_copies, journal, merged, refusal, repeats, sealed, sidecar, view
+from .. import frame_copies, item_labels, journal, merged, refusal, repeats, sealed, sidecar, view
 from ..dates import DATE_FORMAT
 from ..inspection import read_inspection
 from ..keyboards import (
@@ -318,8 +318,15 @@ async def _show_manual_page(
     shown = proposal.manual[start : start + MANUAL_PAGE_SIZE]
     # Служебный префикс класса с кнопки снимается (T217): те же классы продукт
     # читает колонкой методики и предлагает кнопками следующим шагом.
+    # На кнопке — метка пункта («Порядок 13»), не код (20.10.2026); код уходит в
+    # callback по месту в перечне и сюда не попадает.
+    texts = item_labels.chat_texts(chat_id)
     titles = [
-        (start + shift, item.code, view.without_level_prefix(item.title, item.levels))
+        (
+            start + shift,
+            item_labels.shown(item.code, lang, chat_id=chat_id, texts=texts),
+            view.without_level_prefix(item.title, item.levels),
+        )
         for shift, item in enumerate(shown)
     ]
     # Зона перечня — та, по которой он собран: пара, а не код. Тот же пункт в
@@ -329,6 +336,7 @@ async def _show_manual_page(
         proposal.zone_hint,
         lang,
         refusal.occupied_pairs(message.chat.id),
+        chat_id=chat_id,
     )
     header = (
         t(
@@ -375,7 +383,11 @@ async def _ask_zone(
     текст = (
         t("record.ask_zone", lang)
         if item_code is None
-        else t("record.ask_zone_for_item", lang, code=item_code)
+        else t(
+            "record.ask_zone_for_item",
+            lang,
+            code=item_labels.shown(item_code, lang, chat_id=chat_id),
+        )
     )
     await _hand(message, chat_id, pending, proposal, текст, zones_keyboard(prefix, zones))
 
@@ -2165,7 +2177,7 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             chat_id,
             pending,
             proposal,
-            t("record.ask_level", lang, code=item.code),
+            t("record.ask_level", lang, code=item_labels.shown(item.code, lang, chat_id=chat_id)),
             levels_keyboard(f"{MANUAL_LEVEL_PREFIX}{raw}:", item.levels),
         )
 

@@ -33,6 +33,7 @@ from src.db.models import FindingRow, InspectionDetail
 from src.db.previews import make_preview
 from src.db.reach import reach_of
 from src.db.storage import PhotoStorage, S3PhotoStorage
+from src.domain import item_label
 from src.domain.models import READING_MAX_C, READING_MIN_C
 from src.domain.tenants import canonical_tenant
 from src.report.letters import LetterError
@@ -93,18 +94,20 @@ def _checked_entry(
             "Чек-лист этой проверки не прочитан, сверять не с чем", code="revise_checklist"
         ) from exc
     пункт = next((i for i in состав.items if str(i.get("id", "")) == код), None)
+    # Человеку пункт называется меткой («Порядок 13»), не кодом (20.10.2026).
+    метка = item_label.label(код, item_label.from_csv(состав.items), lang)
     if пункт is None or (пункт.get("kind") or VIOLATION).strip() != VIOLATION:
         raise ReviseError(
             f"Пункта нарушения {код} в чек-листе версии этой проверки нет",
             code="revise_no_item",
-            params={"item": код},
+            params={"item": метка},
         )
     if класс not in _levels(пункт):
         raise ReviseError(
             f"Класс {класс} для пункта {код} не предусмотрен — допустимы: "
             f"{', '.join(_levels(пункт)) or 'никакие'}",
             code="revise_bad_level",
-            params={"level": класс, "item": код, "allowed": ", ".join(_levels(пункт)) or "—"},
+            params={"level": класс, "item": метка, "allowed": ", ".join(_levels(пункт)) or "—"},
         )
     зоны_версии = {str(z.get("code", "")) for z in состав.zones}
     if зона not in зоны_версии:
@@ -116,6 +119,26 @@ def _checked_entry(
     свои = _zones(пункт)
     необычная = bool(свои) and свои != ("*",) and зона not in свои
     return код, класс, зона, слова, необычная
+
+
+def _pair_taken_labelled(exc: ReviseError, detail: InspectionDetail, lang: str) -> ReviseError:
+    """Отказ «пара пункт + зона занята» из базы несёт код пункта; человеку — его метка.
+
+    База метками не владеет (методика — не её данные), поэтому подмена на границе веба.
+    Остальные отказы проходят как есть.
+    """
+    if exc.code != "revise_pair_taken":
+        return exc
+    try:
+        тексты = item_label.from_csv(checklist_of(detail.inspection, lang=lang).items)
+    except MethodologyRefused:
+        return exc
+    код = str(exc.params.get("code", ""))
+    return ReviseError(
+        str(exc),
+        code=exc.code,
+        params={**exc.params, "code": item_label.label(код, тексты, lang)},
+    )
 
 
 def _editable(inspection_id: str, *, tenant: str, lang: str) -> InspectionDetail:
@@ -232,6 +255,8 @@ def revise_card(
         raise ReviseError(
             "Пересчитать проверку не удалось, запись не тронута", code="revise_recalc"
         ) from exc
+    except ReviseError as exc:
+        raise _pair_taken_labelled(exc, detail, lang) from exc
 
 
 def add_card(
@@ -281,6 +306,8 @@ def add_card(
         raise ReviseError(
             "Пересчитать проверку не удалось, запись не добавлена", code="revise_recalc"
         ) from exc
+    except ReviseError as exc:
+        raise _pair_taken_labelled(exc, detail, lang) from exc
     for кадр in кадры:
         try:
             attach_photo(inspection_id, finding_id, tenant=tenant, data=кадр, storage=storage)

@@ -33,6 +33,7 @@ from bot_harness import callback_query as callback
 from src.bot import view
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
+from src.bot.item_labels import shown as метка_пункта
 from src.bot.texts import t
 from src.domain import Finding, add_finding, get_state, start_inspection
 
@@ -110,7 +111,11 @@ async def test_старая_пометка_видна_в_списке_перед
     bot, session = make_bot()
     await feed(build_dispatcher(SETTINGS), bot, text_message("/finish"))
 
-    список = [текст for текст in session.texts if f"#1 {ПУНКТ}" in текст]
+    список = [
+        текст
+        for текст in session.texts
+        if f"#1 {метка_пункта(ПУНКТ, 'ru', chat_id=CHAT_ID)}" in текст
+    ]
     assert список, "в итоге завершения нет строки записи"
     assert ПОМЕТКА in список[0], "список перед сборкой отчёта о нетипичной зоне молчит"
 

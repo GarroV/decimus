@@ -18,6 +18,9 @@ network_summary(date_from?, date_to?)                     get_inspection(id, lan
 findings_by_unit(unit, limit?)                            inspection_letter(id, lang?)
 # unit в этих инструментах — любое написание пиццерии («Тбилиси-1» = «Tbilisi-1»): точка
 # находится общим поиском (D538, `queries._unit_key`), в ответе — её латинское имя
+# Находка в ответе (`get_inspection`, `findings_by_unit`, `import_*`) несёт `code` — связь — и
+# для людей `item_label` («Порядок 13») и `item_title` (формулировка) из методики издания
+# проверки; агент называет пункт ими, а не кодом (20.10.2026, `domain.item_label`)
 
 # снятие проверки из истории (T211, D086/D089) — ровно один инструмент, право личное токену
 retract_inspection(id, reason, confirm_unit, confirm_date)

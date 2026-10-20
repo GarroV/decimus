@@ -74,6 +74,7 @@ from . import (
     grade_explain,
     guard,
     home_page,
+    item_labels,
     journal,
     letter_draft,
     letter_markup,
@@ -274,6 +275,10 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "country_title": lambda code: country_title(code, lang),
             # Дата на экран — месяцем словом: `10.12.2026` путают с октябрём (#963).
             "day": lambda value: human_day(value, lang),
+            # Пункт чек-листа на экран — меткой «Порядок 13», не кодом (20.10.2026);
+            # по действующей методике. Карточка проверки подставляет свои — по версии проверки.
+            "item_label": lambda code: item_labels.current_label(code, lang),
+            "item_full": lambda code: item_labels.current_full(code, lang),
             "by_severity": view.by_severity,
             # Письмо партнёру выводится разметкой ТОЛЬКО через белый список, и
             # чистится в момент вывода: запись в базе не принимается на слово.
@@ -1583,6 +1588,9 @@ def _card_context(
         отчёт = None
         отчёт_известен = False
     поля, методика_полей = data.load_info(detail, lang=lang)
+    # Пункт на экран идёт меткой «Порядок 13», а не кодом (20.10.2026); тексты —
+    # методики версии этой проверки.
+    метка_пункта, метка_с_текстом = item_labels.pinned(detail.inspection.checklist_version, lang)
     # Кадры — украшение к записи, а не её часть: отказ базы здесь карточку не
     # роняет, записи показываются без кадров, и это сказано словами.
     кадры: dict[str, Any] = {}
@@ -1646,6 +1654,8 @@ def _card_context(
         photos=кадры,
         photos_known=кадры_известны,
         info=поля,
+        item_label=метка_пункта,
+        item_full=метка_с_текстом,
         info_titles_found=методика_полей == FOUND,
         moves=переносы,
         moves_known=история_известна,

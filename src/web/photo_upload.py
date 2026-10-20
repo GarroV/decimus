@@ -43,6 +43,7 @@ from src.db.space import acting_space
 from src.db.storage import PhotoStorage, S3PhotoStorage
 from src.domain import photo_upload_link
 
+from . import item_labels, ui_lang
 from .config import Settings
 
 logger = logging.getLogger(__name__)
@@ -134,14 +135,16 @@ def _is_open_draft(grant: photo_upload_link.UploadGrant) -> bool:
     )
 
 
-def _findings(grant: photo_upload_link.UploadGrant) -> list[dict[str, object]]:
+def _findings(grant: photo_upload_link.UploadGrant, lang: str) -> list[dict[str, object]]:
     detail = get_inspection(
         grant.inspection_id, reach=own_reach(grant.tenant), include_on_review=True
     )
     if detail is None:
         return []
+    # Пункт человеку — меткой «Порядок 13», не кодом (20.10.2026): по методике версии проверки.
+    label = item_labels.for_detail(detail, lang)
     return [
-        {"n": f.n, "code": f.code, "text": f.text}
+        {"n": f.n, "code": f.code, "label": label(f.code), "text": f.text}
         for f in sorted(detail.findings, key=lambda f: f.n)
     ]
 
@@ -205,7 +208,7 @@ def install(app: Flask, conf: Settings) -> None:
         ответ = make_response(
             render_template(
                 "photo_upload.html",
-                findings=_findings(grant),
+                findings=_findings(grant, ui_lang.request_lang(conf.ui_lang)),
                 outcome=outcome,
                 action=request.path,
                 max_mb=MAX_FILE_BYTES // (1024 * 1024),

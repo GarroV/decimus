@@ -41,6 +41,7 @@ from bot_harness import callback_query as callback
 from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
+from src.bot.item_labels import shown as метка_пункта
 from src.bot.pending import Offer
 from src.bot.routers.record import _drop_question
 from src.bot.texts import t
@@ -169,7 +170,8 @@ async def test_candidates_are_shown_but_nothing_is_recorded_yet(
 
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
 
-    assert "CLN05" in session.last_text and "PRD01" in session.last_text
+    assert "Порядок 5" in session.last_text and "Заготовки 1" in session.last_text
+    assert "CLN05" not in session.last_text, "код пункта уехал аудитору"
     assert session.keyboard_data()[:2] == ["rec:pick:0", "rec:pick:1"]
     assert findings() == []
 
@@ -206,7 +208,7 @@ async def test_confirmation_records_and_answers_compactly(
     saved = findings()
     assert len(saved) == 1
     block = session.texts[0]
-    for part in ("#1", "CLN05", "D1", "Тепловой участок"):
+    for part in ("#1", "Порядок 5", "D1", "Тепловой участок"):
         assert part in block
     assert "%" not in block, "процент во время обхода не показывается (T162, D072)"
     assert block.count("\n") <= 4, "подтверждение разрослось — это уже таблица"
@@ -361,7 +363,9 @@ async def test_candidate_without_a_zone_asks_for_it_by_button(
     await feed(dp, bot, photo_message("frame-1", caption="вот продукт"))
     await feed(dp, bot, callback("rec:pick:0"))
 
-    assert session.last_text == t("record.ask_zone_for_item", "ru", code="INF11")
+    assert session.last_text == t(
+        "record.ask_zone_for_item", "ru", code=метка_пункта("INF11", "ru", chat_id=CHAT_ID)
+    )
     предложены = {d.removeprefix("rec:zp:") for d in session.keyboard_data()}
     assert предложены == set(allowed_zones("INF11", chat_id=CHAT_ID)), (
         "кнопками предложено не то, что методика даёт этому пункту"
@@ -699,7 +703,7 @@ async def test_question_from_the_model_is_shown_above_the_candidates(
 
     показано = session.last_text
     assert "Это подина печи или под конвейером?" in показано
-    assert показано.index("подина") < показано.index("CLN05"), "вопрос спрятан под кандидатами"
+    assert показано.index("подина") < показано.index("Порядок 5"), "вопрос спрятан под кандидатами"
 
 
 async def test_frame_that_did_not_attach_is_not_lost_silently(
@@ -765,7 +769,7 @@ async def test_telegram_refusing_to_remove_the_button_does_not_stop_the_analysis
         await feed(dp, bot, text_message("нагар на печи"))
 
     assert any("снять кнопку" in r.message for r in caplog.records)
-    assert "CLN05" in session.last_text, "разбор не дошёл до аудитора"
+    assert "Порядок 5" in session.last_text, "разбор не дошёл до аудитора"
 
 
 async def test_question_is_not_removed_when_there_is_nothing_to_remove() -> None:

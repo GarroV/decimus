@@ -39,7 +39,15 @@ from src.db import finish_modes, queries
 from src.db.errors import DbError
 from src.db.models import PreviousFindings
 from src.db.space import enter_space, leave_space
-from src.domain import get_item, get_state, handed_over, is_upload_ref, list_items, list_zones
+from src.domain import (
+    get_item,
+    get_state,
+    handed_over,
+    is_upload_ref,
+    item_label,
+    list_items,
+    list_zones,
+)
 from src.domain.errors import DomainError
 from src.domain.info_fields import FIELDS
 from src.domain.log_ids import log_id
@@ -125,9 +133,13 @@ def _catalogue(items: Iterable[ChecklistItem], lang: str) -> list[dict[str, Any]
 
     Служебные (`aggregate`, `info`) не предлагаются — правило фиксации 8.
     """
+    items = tuple(items)
+    texts = item_label.from_items(items)
     return [
         {
             "code": item.code,
+            # Метка для человека («Порядок 13»): в меню пунктов вместо кода (20.10.2026).
+            "label": item_label.label(item.code, texts, lang),
             "q": _question_text(item.question(lang)),
             "process": item.process(lang),
             "levels": list(item.levels),

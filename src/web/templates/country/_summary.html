@@ -64,9 +64,9 @@
             <span class="ov-row__name">
               {% if item_titles.get(item.code) %}{{ item_titles.get(item.code) }}
               {% elif item.text %}<span lang="{{ item.lang }}">{{ item.text }}</span>
-              {% else %}{{ item.code }}{% endif %}
+              {% else %}{{ item_label(item.code) }}{% endif %}
               <span class="ov-row__meta">
-                {% if item_titles.get(item.code) or item.text %}{{ item.code }} · {% endif %}
+                {% if item_titles.get(item.code) or item.text %}{{ item_label(item.code) }} · {% endif %}
                 {{ t('overview.systemic.spread', units=item.units, records=item.records) }}
               </span>
             </span>

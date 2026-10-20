@@ -33,6 +33,7 @@ from datetime import date
 
 from ..db.errors import ConfigError as DbConfigError
 from ..db.models import FindingRow, InspectionDetail, InspectionRow
+from ..domain import item_label
 from . import methodologies
 from .db_target import config_refusal
 from .errors import ToolError
@@ -313,8 +314,32 @@ def _history_entry(row: InspectionRow) -> dict[str, object]:
     }
 
 
-def _finding(row: FindingRow) -> dict[str, object]:
+#: Язык меток пунктов, когда инструмент языка не принимает: читает ответ агент,
+#: которому английские названия процессов нужны не меньше русских, а при
+#: отсутствии английского текста метка сама откатится на русский.
+LABEL_LANG = "en"
+
+
+def _item_texts_of(version: str) -> dict[str, item_label.ItemTexts]:
+    """Тексты пунктов методики этой версии — для меток; нет методики — пусто (метка = код)."""
+    from ..report.info_titles import item_texts
+    from .letters import sources
+
+    texts, _ = item_texts(version, papers=sources())
+    return texts
+
+
+def _finding(
+    row: FindingRow,
+    texts: dict[str, item_label.ItemTexts] | None = None,
+    lang: str = LABEL_LANG,
+) -> dict[str, object]:
     """Одна записанная находка — как лежит, без выведенных чисел.
+
+    `item_label` («Порядок 13») и `item_title` (формулировка пункта) — для людей:
+    пересказывая находку, агент называет пункт ими, а не кодом (20.10.2026).
+    `code` остаётся связью и ничем не заменяется. Тексты — из методики издания
+    проверки (`texts`); их нет — метка совпадает с кодом, а `item_title` пуст.
 
     `text`/`comment` могут быть `None` — так и отдаётся наружу, `None` пустой
     строкой не подменяется: «перевода нет вовсе» и «аудитор ничего не
@@ -327,6 +352,8 @@ def _finding(row: FindingRow) -> dict[str, object]:
         "inspection_date": row.inspection_date.isoformat(),
         "n": row.n,
         "code": row.code,
+        "item_label": item_label.label(row.code, texts, lang),
+        "item_title": item_label.wording(row.code, texts, lang) or None,
         "level": row.level,
         "zone": row.zone,
         "zone_unusual": row.zone_unusual,
@@ -566,6 +593,7 @@ def get_inspection(*, tenant: str, id: str, lang: str | None = None) -> dict[str
     from .letters import sources
 
     section = read(detail, lang=asked_lang, papers=sources())
+    texts = _item_texts_of(detail.inspection.checklist_version)
     return {
         "tenant": tenant,
         "id": ident,
@@ -575,7 +603,7 @@ def get_inspection(*, tenant: str, id: str, lang: str | None = None) -> dict[str
         "deductions": detail.deductions,
         "counts": detail.counts,
         "by_zone": detail.by_zone,
-        "findings": [_finding(row) for row in detail.findings],
+        "findings": [_finding(row, texts, section.lang) for row in detail.findings],
         "info": section.fields,
         "info_lang": section.lang,
     }
@@ -637,6 +665,7 @@ def findings_by_unit(*, tenant: str, unit: str, limit: int | None = None) -> dic
     with _history():
         rows = db_findings_by_unit(reach=reach_of(tenant), unit=name, limit=applied_limit)
     truncated = len(rows) >= applied_limit
+    by_version = {v: _item_texts_of(v) for v in {row.checklist_version for row in rows}}
     return {
         "tenant": tenant,
         "unit": name,
@@ -645,5 +674,6 @@ def findings_by_unit(*, tenant: str, unit: str, limit: int | None = None) -> dic
         "truncated": truncated,
         "status": _found(len(rows), subject="findings")
         + _limit_note(limit=applied_limit, truncated=truncated, subject="findings"),
-        "findings": [_finding(row) for row in rows],
+        # Издание у находок разное (проверки разных лет): тексты — по каждому.
+        "findings": [_finding(row, by_version[row.checklist_version]) for row in rows],
     }

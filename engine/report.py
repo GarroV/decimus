@@ -199,6 +199,22 @@ def advice_html(f, t, qk, src):
     return out
 
 
+def item_label(code, row, lang):
+    """Метка пункта для человека — «Порядок 13», а не `CLN13` (решение владельца 20.10.2026).
+
+    Единственная копия правила `src/domain/item_label.py` в движке: движок — отдельный
+    подпроцесс и `src` не импортирует. Расхождение двух копий стережёт
+    `tests/test_item_label_parity.py`. Нет названия процесса или номера — сам код:
+    пункт, которого нет в методике, честно остаётся кодом.
+    """
+    found = re.search(r"(\d+)$", code.strip())
+    if found is None or not row:
+        return code
+    own, other = ("process_en", "process_ru") if lang == "en" else ("process_ru", "process_en")
+    process = (row.get(own) or row.get(other) or "").strip()
+    return f"{process} {int(found.group(1))}" if process else code
+
+
 def item_title(f, qk):
     """Название пункта стандарта на языке ПЕЧАТИ, без служебной пометки класса.
 
@@ -469,7 +485,8 @@ def build_html(res, lang, photos, src=None):
         if info:
             h.append('<div class="info">')
             for k, v in info.items():
-                q = cl.get(k, {}).get(qk) or cl.get(k, {}).get("question_ru") or k
+                q = (cl.get(k, {}).get(qk) or cl.get(k, {}).get("question_ru")
+                     or item_label(k, cl.get(k), lang))
                 # Маркер класса срезаем так же, как у формулировки нарушения
                 # ниже: партнёру он не адресован, а до T159 поля не печатались
                 # вовсе, и увидеть это было негде.

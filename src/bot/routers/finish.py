@@ -46,7 +46,7 @@ from src.domain.log_ids import log_id
 from src.domain.translation import untranslated
 from src.report import PhotoMissing, ReportError, build_letter, build_pdf
 
-from .. import sealed, sidecar, stops, view
+from .. import item_labels, sealed, sidecar, stops, view
 from ..errors import BotNotesError
 from ..finish_translate import translate_comments
 from ..inspection import read_inspection
@@ -334,6 +334,7 @@ async def warn_untranslated(message: Message, inspection: domain.Inspection, lan
         return
     if not found:
         return
+    labels = await asyncio.to_thread(item_labels.chat_texts, message.chat.id)
     logger.warning(
         "методика не переведена на язык отчёта %s (чат %s): %s",
         inspection.report_lang,
@@ -345,7 +346,12 @@ async def warn_untranslated(message: Message, inspection: domain.Inspection, lan
             "finish.untranslated",
             lang,
             lang=inspection.report_lang,
-            codes=", ".join(dict.fromkeys(one.code for one in found)),
+            codes=", ".join(
+                dict.fromkeys(
+                    item_labels.shown(one.code, lang, chat_id=message.chat.id, texts=labels)
+                    for one in found
+                )
+            ),
         )
     )
 

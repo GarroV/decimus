@@ -49,6 +49,7 @@ from bot_harness import callback_query as callback
 
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
+from src.bot.item_labels import shown as метка_пункта
 from src.bot.keyboards import EDIT_PREFIX, MODEL_CALLBACK, PICK_PREFIX
 from src.bot.texts import t
 from src.bot.view import stored_headline, zone_title
@@ -174,7 +175,7 @@ async def test_показ_записи_называет_пункт_словам�
             "record.saved",
             "ru",
             n=1,
-            code="CLN05",
+            code=метка_пункта("CLN05", "ru", chat_id=CHAT_ID),
             level="D1",
             zone=zone_title("hot_kitchen", "ru", chat_id=CHAT_ID),
         ),
@@ -277,7 +278,7 @@ async def test_кнопка_разобрать_моделью_отдаёт_мо�
     assert note == TWO_VIOLATIONS
     assert photo is None, "кадр с комментарием снова уехал в модель"
     assert zone == "hot_kitchen"
-    assert "CLN12" in session.last_text
+    assert "Порядок 12" in session.last_text
     assert len(findings()) == 1, "разбор моделью сам ничего не фиксирует"
 
 

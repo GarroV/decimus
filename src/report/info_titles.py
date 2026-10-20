@@ -19,6 +19,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from ..domain import item_label
 from ..domain.models import TEXT_LANGS, pick_text
 from .engine_call import to_log
 from .errors import ReportError
@@ -88,3 +89,25 @@ def titles(version: str, *, lang: str, papers: Papers) -> tuple[dict[str, str], 
         if код and not код.startswith("#") and подпись:
             подписи.setdefault(код, подпись)
     return подписи, FOUND
+
+
+def item_texts(version: str, *, papers: Papers) -> tuple[dict[str, item_label.ItemTexts], str]:
+    """Тексты пунктов (процесс и формулировка, оба языка) методики ТОЙ версии — для меток.
+
+    Метка пункта «Порядок 13» (`domain.item_label`) строится из них. Исход и
+    правило отказа те же, что у `titles`: нет методики этой версии — пустой
+    словарь и причина, а не ошибка; метка тогда честно остаётся кодом.
+    """
+    try:
+        найдено = pinned(version, papers)
+    except ReportError:
+        return {}, NOT_A_NAME
+    if найдено is None:
+        return {}, NOT_AT_HAND
+    каталог, _ = найдено
+    try:
+        строки = _rows(каталог / ITEMS_FILE)
+    except OSError:
+        to_log("методику версии проверки не прочитать", метка="info", методика=каталог)
+        return {}, NOT_AT_HAND
+    return item_label.from_csv(строки), FOUND
