@@ -153,6 +153,9 @@ a.hm-row:hover { background: var(--surface-2); text-decoration: none; }
 .hm-table small { color: var(--ink-3); }
 .hm-cell__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--w-medium); }
 .hm-cell__muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+/* Название процесса — переносом, а не многоточием: обрезанное «Персонал и гиг…»
+   не читается, а строка таблицы выдерживает вторую строку. */
+.hm-cell__wrap { color: var(--ink-2); overflow-wrap: anywhere; line-height: 1.3; padding: 4px 0; }
 /* Шапка — одной строкой и одним шрифтом: моноширинный и размер чисел — только у
    значений, иначе заголовки числовых колонок крупнее соседних и переносятся. */
 .hm-table__head > * { white-space: nowrap; }

@@ -315,7 +315,7 @@
               <span class="is-num is-strong">{{ '%.1f'|format(point.pct) }}</span>
               <span class="is-num is-center{% if point.delta is not none and point.delta < 0 %} is-err{% endif %}"
                     {% if point.delta is none %}title="{{ t('overview.points.nodelta') }}"{% endif %}>{{ '—' if point.delta is none else ('%+.1f'|format(point.delta)) }}</span>
-              <span class="hm-cell__muted">{{ (point.worst_process_ru if lang == 'ru' else point.worst_process_en) or '—' }}</span>
+              <span class="hm-cell__wrap">{{ (point.worst_process_ru if lang == 'ru' else point.worst_process_en) or '—' }}</span>
               <span class="is-num hm-cell__muted">{{ day(point.when) }}</span>
               <span class="is-num">{{ '—' if score[0] is none else '%.1f'|format(score[0]) }}</span>
               <span class="is-num">{{ '—' if score[1] is none else '%.1f'|format(score[1]) }}</span>
