@@ -210,7 +210,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **63** инструментов (checklist — 33, checklist_source — 2, import — 14, inspections — 6, move — 1, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **65** инструментов (checklist — 33, checklist_source — 2, import — 16, inspections — 6, move — 1, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
@@ -259,9 +259,11 @@
 | `import_edit_finding` | import | Correct one finding of an imported draft by its number n | `src/mcp/imports.py` |
 | `import_edit_inspection` | import | Correct the HEADER of an imported DRAFT before it is accepted: the inspection date, the unit (pizzeria), the auditor… | `src/mcp/imports.py` |
 | `import_get_inspection` | import | Read an imported inspection (draft or accepted): its mode, header and findings with their numbers | `src/mcp/imports.py` |
+| `import_info_fields` | import | Read the INFORMATION part of a current-mode imported DRAFT: the fields the bot asks at the end of an inspection and the… | `src/mcp/import_info.py` |
 | `import_list_drafts` | import | List this space's imported drafts that are not accepted yet: mode (history/current), unit, date, checklist version… | `src/mcp/imports.py` |
 | `import_photo_upload_link` | import | Get an upload link for the photos attached to the chat, for ONE imported draft | `src/mcp/import_photo_link.py` |
 | `import_remove_finding` | import | Remove one finding (with its photos) from an imported draft by its number n | `src/mcp/imports.py` |
+| `import_set_info` | import | Record answers to information fields of a current-mode imported DRAFT (values = {code: answer}) | `src/mcp/import_info.py` |
 | `import_suggest_items` | import | Read-only: suggest up to 5 checklist items for ONE finding, by the word map of the draft's checklist edition | `src/mcp/import_suggest.py` |
 | `findings_by_unit` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `get_inspection` | inspections | Read one recorded inspection of the caller's tenant in full: its header, the score breakdown (percentage, letter grade… | `src/mcp/tools.py` |

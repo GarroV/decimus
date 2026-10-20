@@ -203,6 +203,14 @@ _MCP: dict[str, tuple[str, str]] = {
         "Выдана ссылка загрузки фото к черновику",
         "Photo upload link issued for a draft",
     ),
+    "import_info_fields": (
+        "Прочитана информационная часть черновика",
+        "Draft information part read",
+    ),
+    "import_set_info": (
+        "Записана информационная часть черновика",
+        "Draft information part recorded",
+    ),
     "import_accept_inspection": ("Принята загруженная проверка", "Imported inspection accepted"),
     "import_discard_draft": ("Отброшен черновик проверки", "Inspection draft discarded"),
 }
