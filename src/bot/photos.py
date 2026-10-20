@@ -25,6 +25,8 @@ from aiogram import Bot
 from src.domain import check_environment, is_upload_ref, upload_file
 from src.domain.errors import DomainError
 
+from .image_convert import jpeg_if_image
+
 logger = logging.getLogger(__name__)
 
 #: Сколько ждать файл. Кадр с телефона на плохой связи доезжает не мгновенно, а
@@ -66,7 +68,10 @@ async def fetch_bytes(bot: Bot, file_id: str) -> bytes | None:
         return None
     if buffer is None:
         return None
-    return buffer.read()
+    raw = buffer.read()
+    # Кадр, присланный файлом (HEIC, PNG, JPEG с поворотом), здесь становится
+    # JPEG: нижние слои ждут именно его (#1023). Фото телеграма проходит как есть.
+    return await asyncio.to_thread(jpeg_if_image, raw)
 
 
 #: Сколько кадров качаем одновременно. Не «побольше»: телеграм отвечает лимитом

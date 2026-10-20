@@ -352,6 +352,32 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Проверка не начата. Нажмите «Новая проверка».",
         "en": "No inspection started. Tap “New inspection”.",
     },
+    # --- кадр, присланный файлом (#1023) ---
+    "image.not_image": {
+        "ru": "Это не картинка. Пришлите фото или файл JPEG, PNG, HEIC.",
+        "en": "That is not an image. Send a photo or a JPEG, PNG or HEIC file.",
+    },
+    "image.too_big": {
+        "ru": "Файл больше 20 МБ — Telegram не отдаёт такие боту. Пришлите как обычное фото.",
+        "en": (
+            "The file is over 20 MB — Telegram does not hand those to bots. "
+            "Send it as a regular photo."
+        ),
+    },
+    "image.broken": {
+        "ru": (
+            "Не получилось открыть картинку: файл повреждён или формат не поддерживается. "
+            "Пришлите как обычное фото."
+        ),
+        "en": (
+            "Could not open the image: the file is damaged or the format is not supported. "
+            "Send it as a regular photo."
+        ),
+    },
+    "image.not_downloaded": {
+        "ru": "Не получилось скачать файл. Пришлите ещё раз.",
+        "en": "Could not download the file. Please send it again.",
+    },
     "material.photo_taken": {
         "ru": "Кадр принят. Разобрать? Или пришлите комментарий — по словам точнее.",
         "en": "Photo received. Analyze it? Or send a comment — your words are more precise.",

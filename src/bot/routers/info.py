@@ -53,6 +53,7 @@ from src.recognize.errors import RecognizeError
 from src.recognize.transcribe import transcribe
 
 from .. import frame_copies, sealed, sidecar, stops, view
+from ..image_input import document_frame_id
 from ..info import KIND_DATE, KIND_TEXT, KIND_YES_NO, fields_to_ask, parse_date
 from ..inspection import read_inspection
 from ..keyboards import (
@@ -365,9 +366,20 @@ def build_info_router() -> Router:
         Без подписи кадр ждёт слов на тот же вопрос: движок печатает его ПОД
         ТЕКСТОМ поля, и кадра без ответа в отчёте не существует.
         """
+        file_id = message.photo[-1].file_id if message.photo else None
+        await _take_photo(message, state, file_id)
+
+    @router.message(InfoFlow.waiting, F.document)
+    async def on_document(message: Message, state: FSMContext) -> None:
+        """Кадр, присланный файлом (HEIC с iPhone), — тем же путём, что фото (#1023)."""
+        lang, _ = chat_langs(message.chat.id)
+        file_id = await document_frame_id(message, lang)
+        if file_id is not None:
+            await _take_photo(message, state, file_id)
+
+    async def _take_photo(message: Message, state: FSMContext, file_id: str | None) -> None:
         chat_id = message.chat.id
         lang, _ = chat_langs(chat_id)
-        file_id = message.photo[-1].file_id if message.photo else None
         if file_id is not None:
             sidecar.remember_frames(
                 chat_id, [sidecar.SeenFrame(message_id=message.message_id, file_id=file_id)]
