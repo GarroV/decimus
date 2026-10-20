@@ -507,7 +507,9 @@ TOOLS: tuple[ToolSpec, ...] = (
             "engine fills with a blank line, and findings recorded in another "
             "language are listed there too, with both languages named in "
             "'status'. Returns found: false, with no error, when the id does "
-            "not match any inspection of this tenant."
+            "not match any inspection of this tenant. A current inspection "
+            "uploaded through import_* gets a letter like any other; a "
+            "historical one is refused (its score is from the old report)."
         ),
         input_schema={
             "type": "object",
