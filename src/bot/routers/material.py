@@ -40,6 +40,7 @@ from src.domain.log_ids import log_id
 
 from .. import frame_copies, sealed, sidecar
 from ..albums import ALBUM_WINDOW_SECONDS, AlbumBuffer, Frame
+from ..image_input import document_frame_id
 from ..inspection import read_inspection
 from ..lang import chat_ui_lang
 from ..material import Comment, Material, MaterialStore, PhotoGroup
@@ -188,10 +189,20 @@ def build_material_router(
 
     @router.message(F.photo)
     async def on_photo(message: Message) -> None:
-        chat_id = message.chat.id
         file_id = largest_photo_id(message)
         if file_id is None:
             return
+        await take_frame(message, file_id)
+
+    @router.message(F.document)
+    async def on_document(message: Message) -> None:
+        """Кадр, присланный файлом (HEIC с iPhone, «без сжатия»), — тот же путь (#1023)."""
+        file_id = await document_frame_id(message, chat_ui_lang(message.chat.id))
+        if file_id is not None:
+            await take_frame(message, file_id)
+
+    async def take_frame(message: Message, file_id: str) -> None:
+        chat_id = message.chat.id
         if await claimed_by_reply(message, chat_id, file_id):
             return
         group_key = message.media_group_id or f"single-{message.message_id}"
