@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import hmac
 import ipaddress
 import logging
 from collections.abc import Callable, Iterable
@@ -25,7 +26,7 @@ from typing import Any
 
 from waitress.proxy_headers import proxy_headers_middleware
 
-from .config import ANY_PEER, Settings
+from .config import ANY_PEER, WEB_FRONT_KEY_VAR, Settings
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,10 @@ logger = logging.getLogger(__name__)
 #: вырезается — именно этого мы и хотим от постороннего, который решит
 #: представиться сам.
 TRUSTED_HEADERS = frozenset({"x-forwarded-for", "x-forwarded-proto", "x-forwarded-host"})
+
+#: Заголовок, в котором Worker фронта шлёт ключ (`front/src/proxy.js`); Caddy
+#: проверяет его и пропускает дальше, origin сверяет ещё раз (F-107).
+FRONT_KEY_ENVIRON = "HTTP_X_DECIMUS_FRONT_KEY"
 
 WsgiApp = Callable[[dict[str, Any], Callable[..., Any]], Iterable[bytes]]
 
@@ -116,6 +121,11 @@ def peer_trusted(peer: str, addrs: tuple[str, ...]) -> bool:
     return any(адрес in ipaddress.ip_network(сеть, strict=False) for сеть in addrs)
 
 
+def front_key_matches(expected: str, given: str) -> bool:
+    """Ключ фронта совпал: сравнение за постоянное время, пустой присланный — нет."""
+    return bool(given) and hmac.compare_digest(expected.encode(), given.encode())
+
+
 def guard_forwarded(app: WsgiApp, settings: Settings) -> WsgiApp:
     """Обернуть приложение: заголовки звена — только от своего звена по адресу.
 
@@ -126,6 +136,14 @@ def guard_forwarded(app: WsgiApp, settings: Settings) -> WsgiApp:
     if settings.trusted_proxies <= 0 or not settings.trusted_proxy_addrs:
         return app
     addrs = settings.trusted_proxy_addrs
+    front_key = settings.front_key
+    if not front_key:
+        logger.warning(
+            "%s не задан: origin не проверяет ключ фронта, заголовкам X-Forwarded-* верим "
+            "любому соседу по подсети звена (docs/08-deploy.md, §8.9)",
+            WEB_FRONT_KEY_VAR,
+        )
+    refused_logged = False
     доверяя = proxy_headers_middleware(
         app,
         trusted_proxy=ANY_PEER,
@@ -136,7 +154,19 @@ def guard_forwarded(app: WsgiApp, settings: Settings) -> WsgiApp:
     не_доверяя = proxy_headers_middleware(app, trusted_proxy=None, clear_untrusted=True)
 
     def пропустить(запрос: dict[str, Any], start_response: Callable[..., Any]) -> Iterable[bytes]:
-        if peer_trusted(str(запрос.get("REMOTE_ADDR") or ""), addrs):
+        nonlocal refused_logged
+        given = str(запрос.pop(FRONT_KEY_ENVIRON, "") or "")  # приложению ключ ни к чему
+        свой = peer_trusted(str(запрос.get("REMOTE_ADDR") or ""), addrs)
+        if свой and front_key and not front_key_matches(front_key, given):
+            if not refused_logged:  # один раз: иначе подделка заливает журнал
+                refused_logged = True
+                logger.warning(
+                    "Сосед %s из подсети звена пришёл без верного ключа фронта: "
+                    "X-Forwarded-* отброшены (дальше такие запросы не пишутся)",
+                    запрос.get("REMOTE_ADDR"),
+                )
+            свой = False
+        if свой:
             return доверяя(запрос, start_response)
         return не_доверяя(запрос, start_response)
 
