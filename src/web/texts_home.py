@@ -99,10 +99,12 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     # ── Блок «Рейтинги» (D418) ──────────────────────────────────────────
     "home.rb.title": {"ru": "Рейтинги", "en": "Ratings"},
     "home.rb.more": {"ru": "Все рейтинги", "en": "All ratings"},
-    "home.rb.rs": {"ru": "Стандарты · РС", "en": "Standards · RS"},
-    "home.rb.rko": {"ru": "Клиентский опыт · РКО", "en": "Customer experience · CX"},
+    "home.rb.rs": {"ru": "РС", "en": "RS"},
+    "home.rb.rko": {"ru": "РКО", "en": "CX"},
     "home.rb.maps": {"ru": "Карты", "en": "Maps"},
-    "home.rb.aggs": {"ru": "Агрегаторы", "en": "Delivery apps"},
+    "home.rb.total": {"ru": "Итого", "en": "Total"},
+    "home.rb.prev": {"ru": "Прокрутить влево", "en": "Scroll left"},
+    "home.rb.next": {"ru": "Прокрутить вправо", "en": "Scroll right"},
     "home.rb.aggs_failed": {
         "ru": "Оценки агрегаторов не загрузились.",
         "en": "Delivery app ratings did not load.",
