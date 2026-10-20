@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import contextvars
 import logging
+import re
 import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -117,17 +118,49 @@ def _prepare(draft: Draft, job: _Job, settings: RecognizeSettings) -> None:
         job.failure = f"the request to the model could not be built ({type(exc).__name__})"
 
 
-def _zone_of(draft: Draft, job: _Job, code: str, model_zone: str | None) -> str | None:
-    """Зона: названная вызывающим > ответ модели > слова места > единственная зона пункта."""
+_CYRILLIC = re.compile("[а-яё]", re.IGNORECASE)
+
+
+def _remark_lang(text: str) -> str:
+    """Язык замечания: кириллица — русский, иначе английский. Вопросы и отказы — на нём."""
+    return "ru" if _CYRILLIC.search(text) else "en"
+
+
+def _say(text: str, ru: str, en: str) -> str:
+    return ru if _remark_lang(text) == "ru" else en
+
+
+def _zone_of(draft: Draft, job: _Job, code: str, model_zone: str | None) -> tuple[str | None, bool]:
+    """Зона и признак «взята по умолчанию». Зону не спрашивают — выводят.
+
+    Порядок: названная вызывающим > слова места > ответ модели > единственная зона
+    пункта > первая из зон пункта (порядок в столбце `zones` осмысленный) с пометкой
+    `zone_assumed`. Не вывелась (у пункта `*` или зон нет) — `None` без вопроса.
+    """
     codes = draft.zone_codes
     if job.zone:
-        return job.zone
-    if model_zone and model_zone != UNKNOWN_ZONE and model_zone in codes:
-        return model_zone
+        return job.zone, False
     if job.hint:
-        return job.hint
+        return job.hint, False
+    if model_zone and model_zone != UNKNOWN_ZONE and model_zone in codes:
+        return model_zone, False
     own = [z.strip() for z in (draft.offered[code].get("zones") or "").split(",") if z.strip()]
-    return own[0] if len(own) == 1 and own[0] != "*" and own[0] in codes else None
+    own = [z for z in own if z in codes]
+    if not own or "*" in own:
+        return None, False
+    return own[0], len(own) > 1
+
+
+def _no_item_reason(text: str, suggestion: Suggestion | None) -> str:
+    """Причина отказа на языке замечания: вопрос модели берём, только если он на нём же."""
+    asked = suggestion.question if suggestion is not None else ""
+    if asked and bool(_CYRILLIC.search(asked)) == (_remark_lang(text) == "ru"):
+        return asked
+    return _say(
+        text,
+        "В этом издании нет пункта под такую формулировку",
+        "no checklist item of this edition matches this wording",
+    )
 
 
 def _described(
@@ -190,10 +223,9 @@ def _result(
             "text": job.text,
             "via": "model",
             "no_item": True,
-            "reason": (suggestion.question if suggestion is not None else "")
-            or "no checklist item of this edition matches this wording",
+            "reason": _no_item_reason(job.text, suggestion),
         }
-    zone = _zone_of(draft, job, top.code, top.zone)
+    zone, assumed = _zone_of(draft, job, top.code, top.zone)
     answer: dict[str, object] = {
         "n": job.n,
         "text": job.text,
@@ -202,13 +234,12 @@ def _result(
         "level": level.level if level is not None else top.level,
         "zone": zone,
     }
-    need = (level.need_fact if level is not None else "") or (
-        suggestion.question if suggestion is not None else ""
-    )
-    if zone is None and not need:
-        need = "In which area (place) was this seen?"
-    if need:
-        answer["need_fact"] = need
+    if assumed:
+        answer["zone_assumed"] = True
+    # Вопрос — только про класс и только там, где у пункта есть выбор класса (`level`
+    # приходит лишь у пунктов с двумя и больше классами). Про зону не спрашиваем.
+    if level is not None and level.need_fact:
+        answer["need_fact"] = level.need_fact
     if top.confidence < settings.min_confidence:
         answer["doubt"] = f"the model is not sure (confidence {top.confidence:.2f}): check the item"
     return answer
@@ -256,7 +287,7 @@ def match_texts(
             code=top.code,
             levels=levels,
             criteria=criteria["criteria"],
-            lang=draft.lang,
+            lang=_remark_lang(job.text),
             settings=cfg,
         )
         refining.append((job, levels))
