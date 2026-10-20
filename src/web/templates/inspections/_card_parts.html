@@ -24,8 +24,8 @@
 
 {# Ссылка-действие: в панели пиктограмма с подсказкой, на странице — с подписью. #}
 {# `short` — короткая надпись на странице (полное имя — в подсказке и aria-label). #}
-{% macro _link(href, ico, label, panel, tone='', hint='', short='') %}
-  <a class="hbtn {{ 'hbtn--icon ' if panel }}{{ tone }}" href="{{ href }}"
+{% macro _link(href, ico, label, panel, tone='', hint='', short='', drawer=False) %}
+  <a class="hbtn {{ 'hbtn--icon ' if panel }}{{ tone }}" href="{{ href }}"{% if drawer %} data-drawer-open{% endif %}
      {%- if panel %} aria-label="{{ label }}" data-tip="{{ hint or label }}"
      {%- elif short %} aria-label="{{ label }}" data-tip="{{ hint or label }}"
      {%- elif hint %} data-tip="{{ hint }}"{% endif %}>{{ icon(ico) }}{% if not panel %}<span>{{ short or label }}</span>{% endif %}</a>
@@ -84,7 +84,9 @@
        вошедший только читает (УК у партнёра, D283), кнопки нет. У заведённой
        задним числом письма нет вовсе (D310). #}
     {% if c.own and not head.is_uploaded %}
-      {{ _link(full ~ '/letter?lang=' ~ lang, 'mail', t('letter.open'), panel, short=t('card.act.letter')) }}
+      {#- В панели реестра письмо открывается в ней же (20.10.2026), со страницы
+          карточки — в реестре с открытым письмом: отдельной страницы письма нет. -#}
+      {{ _link(registry_here(inspection=head.id, view='letter', lang=lang), 'mail', t('letter.open'), panel, short=t('card.act.letter'), drawer=panel) }}
     {% endif %}
 
     {# Экшн-план: запрос открыт — ссылка на него; нет — УК запрашивает (D272).
