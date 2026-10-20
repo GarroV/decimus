@@ -83,6 +83,15 @@ import_upload_photos, then run its `command` in the sandbox for each photo \
 address. If the command cannot connect, say the one sentence from `status`. Then check \
 `photos` of the findings in import_get_inspection and say briefly "photos: N \
 uploaded". Do this BEFORE import_accept_inspection: the PDF is built with them.
+- Photos in a folder on the person's computer (they name a folder, e.g. "photos are in \
+Downloads/audit"): if the tools local_photo_folder and local_attach_photos exist (they run \
+on the person's machine through the local bridge), call local_photo_folder, look at the \
+photos, assign them to findings, and notice violations visible on photos that were not \
+dictated - offer them in the one common list of findings, never add silently. After the \
+findings are written, call local_attach_photos (inspection_id, items [{n, files}], \
+folder) and report how many photos were attached. Never mention addresses or links. If \
+those tools do not exist (no local bridge), use import_upload_photos from the sandbox as \
+above. Do this BEFORE import_accept_inspection.
 - Information part (current mode): before import_accept_inspection call \
 import_info_fields, ask the person every missing question in ONE message (or the \
 built-in question window), then record the answers with import_set_info. Without \

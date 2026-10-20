@@ -281,6 +281,15 @@
 | `retract_inspection` | retraction | Retract a finalized inspection from the history | `src/mcp/retraction.py` |
 <!-- map:end -->
 
+### Локальные инструменты моста (вручную, не из каталога)
+
+Выполняются **мостом на машине пользователя** (`tools/mcp_bridge.sh`, D583), на сервер не уходят и в таблицу выше не попадают: мост дописывает их к ответу сервера на `tools/list`. Нужны `jq`, `sips`, `base64`, `curl` (штатные в macOS); без `jq` не объявляются. Подключение Claude Code по прямому HTTP (без моста) их не имеет — фото тогда через `import_upload_photos` из песочницы.
+
+| Инструмент | Что делает | Где |
+|---|---|---|
+| `local_photo_folder` | Папка с фото на машине человека (только внутри `$HOME`, без подпапок и ссылок): имена файлов и уменьшенные копии JPEG ~768 px как ImageContent, порциями (`offset`/`limit`, до 60). HEIC конвертируется через `sips` | `tools/mcp_bridge.sh` |
+| `local_attach_photos` | Оригиналы из той же папки к находкам черновика: мост сам берёт у сервера адрес (`import_upload_photos` → поле `upload_target`, не показывается человеку) и шлёт multipart | `tools/mcp_bridge.sh` |
+
 ## Переменные окружения
 
 Читаются кодом в `src/`, `tools/`, `scripts/`, `engine/`. «Нет» в последней колонке
@@ -481,6 +490,7 @@
 | `0080_ratings_layout_compare.sql` | — |
 | `0081_inspection_edits.sql` | `inspection_edits` |
 | `0082_rate_windows.sql` | `rate_windows` |
+| `0083_ratings_layout_aggregators.sql` | — |
 <!-- map:end -->
 
 ## Makefile

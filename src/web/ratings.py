@@ -41,7 +41,7 @@ from src.ratings.model import RatingsFormatError
 from src.ratings.periods import KIND_RANGE, KIND_RATING, ReportPeriod
 from src.ratings.pointer import GOOGLE
 
-from . import auth, guard, ratings_calendar, ratings_sheet, ui_lang
+from . import auth, guard, ratings_calendar, ratings_sheet, ratings_tiles, ui_lang
 from . import ratings_line as rl_chart
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
@@ -248,19 +248,31 @@ def render_summary(conf: Settings) -> str:
 
     names_of_groups = [_group_name(g, selection, lang, country_name) for g in summary.groups]
     agg_failures, agg_names = _agg_failures(), _agg_names(lang)
+    # «Сравнение» есть только у УК; плитки — по тем же блокам компоновки (D585).
+    blocks = tuple(
+        b.key for b in _layout() if b.visible and (b.key != "compare" or comparison is not None)
+    )
+    groups = tuple(zip(names_of_groups, (g.countries for g in summary.groups), strict=True))
+    until = min(selection.period.end, date.today())
+    maps = _maps(groups, until, summary.previous.end if summary.previous else None)
+    aggs = _aggs(groups, until)
+    faces = ratings_tiles.faces(
+        summary,
+        comparison,
+        maps=maps,
+        map_providers=rmaps.SHOWN_PROVIDERS,
+        aggs=aggs,
+        agg_names=agg_names,
+        lang=lang,
+    )
     return render_template(
         "ratings/index.html",
-        blocks=tuple(b.key for b in _layout() if b.visible),
-        maps=_maps(
-            tuple(zip(names_of_groups, (g.countries for g in summary.groups), strict=True)),
-            min(selection.period.end, date.today()),
-            summary.previous.end if summary.previous else None,
-        ),
+        blocks=blocks,
+        faces=faces,
+        open_tile=ratings_tiles.open_key(request.args.get("open"), blocks),
+        maps=maps,
         map_providers=rmaps.SHOWN_PROVIDERS,
-        aggs=_aggs(
-            tuple(zip(names_of_groups, (g.countries for g in summary.groups), strict=True)),
-            min(selection.period.end, date.today()),
-        ),
+        aggs=aggs,
         agg_failures=agg_failures,
         agg_failed_names=", ".join(agg_names.get(f.aggregator, f.aggregator) for f in agg_failures),
         agg_names=agg_names,
@@ -568,7 +580,8 @@ def install(app: Flask, conf: Settings) -> None:
         except RatingsError:
             logger.warning("рейтинги: заявка на обновление агрегаторов не легла", exc_info=True)
             outcome = "db_down"
-        args = {**request.args.to_dict(), "agg": outcome}
+        # Исход виден в плитке агрегаторов: возвращаем человека к раскрытой.
+        args = {**request.args.to_dict(), "agg": outcome, "open": "aggregators"}
         return redirect(f"{request.script_root}{путь}?{urlencode(args)}", code=303)
 
     @app.post(f"{путь}/sheet-sync")
