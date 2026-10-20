@@ -37,3 +37,16 @@ def test_bad_env_value_falls_back_to_default(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("DB_STATEMENT_TIMEOUT_S", "abc")
     monkeypatch.delenv("DB_LOCK_TIMEOUT_S", raising=False)
     assert "statement_timeout=30000" in conninfo_to_dict(timed_dsn(URL))["options"]
+
+
+def test_batch_uses_own_longer_statement_timeout_and_same_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for var in ("DB_STATEMENT_TIMEOUT_S", "DB_LOCK_TIMEOUT_S", "DB_BATCH_STATEMENT_TIMEOUT_S"):
+        monkeypatch.delenv(var, raising=False)
+    parts = conninfo_to_dict(timed_dsn(URL, batch=True))
+    assert parts["options"] == "-c statement_timeout=300000 -c lock_timeout=10000"
+    assert parts["connect_timeout"] == "10"
+    monkeypatch.setenv("DB_BATCH_STATEMENT_TIMEOUT_S", "600")
+    assert "statement_timeout=600000" in conninfo_to_dict(timed_dsn(URL, batch=True))["options"]
+    assert "statement_timeout=30000" in conninfo_to_dict(timed_dsn(URL))["options"]

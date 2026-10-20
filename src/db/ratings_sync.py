@@ -54,7 +54,7 @@ class SyncRequest:
 def states() -> tuple[SyncState, ...]:
     """Состояние по листам с итогами их загрузок, старые первыми."""
     try:
-        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
             apply_space(conn)
             rows = conn.execute(
                 "select s.tab, s.checked_at, s.outcome, s.sha256, s.import_id, s.note, "
@@ -75,7 +75,7 @@ def states() -> tuple[SyncState, ...]:
 def last_state(tab: str) -> tuple[str | None, str] | None:
     """`(sha256, исход)` последнего захода по листу; `None` — листа ещё не брали."""
     try:
-        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
             apply_space(conn)
             row = conn.execute(
                 "select sha256, outcome from ratings.sheet_sync where tab = %s", (tab,)
@@ -88,7 +88,7 @@ def last_state(tab: str) -> tuple[str | None, str] | None:
 def was_loaded(sha: str) -> bool:
     """Файл с таким sha256 уже лежал в журнале загрузок исходом `loaded`."""
     try:
-        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
             apply_space(conn)
             row = conn.execute(
                 "select 1 from ratings.imports where sha256 = %s and outcome = 'loaded'", (sha,)
@@ -104,7 +104,7 @@ def record(
     """Итог по листу. `sha256=None` — лист не скачался: следующий заход применит его заново,
     даже если он тот же, что лёг до сбоя."""
     try:
-        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
             apply_space(conn)
             conn.execute(
                 "insert into ratings.sheet_sync "
@@ -126,7 +126,7 @@ def touch(tab: str) -> str:
     """Лист не менялся: отметить заход. Прежний сбой остаётся сбоем (его причина уже
     в журнале), всё прочее становится `unchanged`. Возвращает исход листа."""
     try:
-        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
             apply_space(conn)
             row = conn.execute(
                 "update ratings.sheet_sync set checked_at = now(), "
@@ -143,7 +143,7 @@ def touch(tab: str) -> str:
 def open_request() -> SyncRequest | None:
     """Заявка, которую бот ещё не выполнил (`None` — очередь пуста)."""
     try:
-        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
             apply_space(conn)
             row = conn.execute(
                 "select id, requested_at, requested_by from ratings.sheet_sync_requests "
@@ -158,7 +158,7 @@ def request_sync(*, by: str) -> tuple[SyncRequest, bool]:
     """Поставить заявку. Пока предыдущая не выполнена, второй не заводится: вернётся
     она сама и `False`; принята сейчас — `True`."""
     try:
-        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
             apply_space(conn)
             row = conn.execute(
                 "insert into ratings.sheet_sync_requests (requested_by) values (%s) "
@@ -177,7 +177,7 @@ def request_sync(*, by: str) -> tuple[SyncRequest, bool]:
 
 def finish_request(request_id: int, *, ok: bool, error: str | None = None) -> None:
     try:
-        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
             apply_space(conn)
             conn.execute(
                 "update ratings.sheet_sync_requests set done_at = now(), outcome = %s, error = %s "
@@ -191,7 +191,7 @@ def finish_request(request_id: int, *, ok: bool, error: str | None = None) -> No
 def recent_requests(limit: int = 1) -> Sequence[tuple[datetime, str, str | None]]:
     """Последние закрытые заявки: `(когда, исход, текст ошибки)`."""
     try:
-        with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+        with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
             apply_space(conn)
             rows = conn.execute(
                 "select done_at, outcome, error from ratings.sheet_sync_requests "

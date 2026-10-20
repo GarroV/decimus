@@ -59,11 +59,11 @@ x-stand: &stand
   logging: *logging
   # Страховочный потолок ресурсов (F-128): не рабочий лимит, а предел, на
   # котором взбесившийся процесс (утечка, зациклившаяся сборка отчёта) убивается
-  # самим docker, а не уносит с собой площадку. Нормальная работа — сотни МБ;
+  # самим docker, а не уносит с собой площадку. Нормальная работа — сотни МБ (прод 12.10: web 221, walk 210, bot 187, mcp 35, db 46 МиБ); площадка общая, потолок — 3–5 пиков, а не «сколько не жалко»;
   # сборка PDF с фото — до десятков МБ на кадр, а одновременных сборок не
   # больше трёх (`src/report/engine.py`). Лимит по ЦП намеренно не ставится:
   # он молча душит задержку. `pids_limit` считает и потоки — запас большой.
-  mem_limit: 3g
+  mem_limit: 768m
   pids_limit: 512
   # Базовая защита процесса (F-003, аудит 12.10): образ идёт не от root
   # (Dockerfile), а здесь у него отбирается всё, что ему не нужно. Бот, MCP,
@@ -145,6 +145,7 @@ x-demo-volumes: &demo-volumes
 services:
   bot:
     <<: *stand
+    mem_limit: 1g
 
     # AUDIT_DATA_DIR и STATE_DIR приходят из .env для хоста (см. volumes
     # ниже), но внутри контейнера намеренно переопределены на точки
@@ -194,6 +195,7 @@ services:
   # Наружу ведёт туннель — сервис `tunnel` ниже.
   mcp:
     <<: *stand
+    mem_limit: 512m
     # Тот же образ, что у бота, другая точка входа. Второй Dockerfile
     # разошёлся бы с первым ровно так же, как разъезжалось демо (D059).
     command: ["python", "-m", "src.mcp"]
@@ -552,7 +554,7 @@ services:
     image: cloudflare/cloudflared:2026.8.3@sha256:51c9cefcb4569df44e1ad403ab1d3d8065aa8e84339bcfc6aee75502e1140339
     logging: *logging
     restart: unless-stopped
-    mem_limit: 512m
+    mem_limit: 256m
     pids_limit: 256
     network_mode: "service:mcp"
     # `--no-autoupdate` уже стоит в entrypoint образа: обновляться сам он не
@@ -580,6 +582,7 @@ services:
   # сам по себе — обновление демо это пересев, а не перезапуск продукта.
   demo-seed:
     <<: *stand
+    mem_limit: 512m
     profiles: ["demo"]
     restart: "no"
     command: ["python", "tools/seed_demo.py"]
@@ -625,7 +628,7 @@ services:
     restart: unless-stopped
     # Потолок базы выше остальных: убитая docker база — худшая из потерь, поэтому
     # он с запасом над shared_buffers и рабочей памятью запросов (F-128).
-    mem_limit: 4g
+    mem_limit: 1g
     pids_limit: 1024
 
     environment:
@@ -701,7 +704,7 @@ services:
     image: adobe/s3mock:4.9.0@sha256:c1beb36492706566afdea274fa19a15fe6ca519aa4d82889b13a127237b6d301
     logging: *logging
     restart: unless-stopped
-    mem_limit: 1g
+    mem_limit: 512m
     pids_limit: 512
 
     environment:
@@ -739,6 +742,7 @@ services:
   # `DATABASE_URL` с предупреждением, то есть выглядел бы работающим.
   migrate:
     <<: *stand
+    mem_limit: 512m
     profiles: ["migrate"]
     restart: "no"
     command: ["python", "-m", "src.db.migrate"]
@@ -765,6 +769,7 @@ services:
   # Профиль `backup` — чтобы обычный `up -d` его не трогал вовсе.
   state-backup:
     <<: *stand
+    mem_limit: 512m
     profiles: ["backup"]
     restart: "no"
     command: ["python", "tools/state_backup.py"]

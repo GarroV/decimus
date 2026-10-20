@@ -478,7 +478,7 @@ def _write(
     source: str | None,
     directory: Mapping[str, str] | None = None,
 ) -> ImportReport:
-    with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+    with psycopg.connect(timed_dsn(check_environment().dsn, batch=True)) as conn:
         apply_space(conn)
         with conn.transaction():
             store.lock_imports(conn)

@@ -1158,14 +1158,16 @@ docker run --rm \
 
 | Сервис | `mem_limit` | `pids_limit` |
 |---|---|---|
-| `bot`, `mcp`, `web`, `walk`, `demo`, `demo-seed`, `migrate`, `state-backup` (якорь `x-stand`) | 3g | 512 |
-| `db` | 4g | 1024 |
-| `storage` (мок для смоука) | 1g | 512 |
-| `tunnel` | 512m | 256 |
-| `link`, `web-link` | 256m | 256 |
+| `web`, `walk`, `demo` (якорь `x-stand`) | 768m | 512 |
+| `bot` (ffmpeg, PDF, расшифровка) | 1g | 512 |
+| `mcp`, `migrate`, `demo-seed`, `state-backup` | 512m | 512 |
+| `db` | 1g | 1024 |
+| `storage` (мок для смоука) | 512m | 512 |
+| `tunnel`, `link`, `web-link` | 256m | 256 |
 
-Значения подобраны без замера на живой площадке — сверить с `docker stats` и
-поднять, если рабочий пик подходит к половине. Тест: `tests/test_container_hardening.py`.
+Площадка общая (11 ГиБ на несколько проектов), поэтому потолок — 3–5 рабочих
+пиков (прод 12.10: web 221, walk 210, bot 187, mcp 35, db 46 МиБ), а не «сколько
+не жалко». Сверять с `docker stats`; пик подошёл к половине — поднять. Тест: `tests/test_container_hardening.py`.
 Одновременных сборок PDF в процессе не больше трёх (`MAX_CONCURRENT_BUILDS`,
 `src/report/engine.py`); лишняя ждёт очереди до `QUEUE_WAIT_SEC`, потом отказ
 «сборка занята».
@@ -1173,9 +1175,11 @@ docker run --rm \
 **Сроки базы.** Соединения роли приложения (пул `src/db/pool.py` и прямые
 подключения слива, рейтингов, агрегаторов, OAuth) получают при старте
 `statement_timeout` 30 с, `lock_timeout` 10 с и `connect_timeout` 10 с
-(`src/db/timeouts.py`). Не затронуты: накат миграций, подключения владельца
+(`src/db/timeouts.py`); пакетные загрузки рейтингов (`ratings_sync`,
+`agg_store`, `ratings/importer`) — `statement_timeout` 300 с
+(`DB_BATCH_STATEMENT_TIMEOUT_S`), остальные сроки те же. Не затронуты: накат миграций, подключения владельца
 схемы и администратора истории вне пула, `tools/`; предписания УК держат свои
-5 с / 15 с. Настройка: `DB_STATEMENT_TIMEOUT_S`, `DB_LOCK_TIMEOUT_S` (секунды;
+5 с / 15 с. Настройка: `DB_STATEMENT_TIMEOUT_S`, `DB_LOCK_TIMEOUT_S`, `DB_BATCH_STATEMENT_TIMEOUT_S` (секунды;
 `0` — не ставить). Если `DATABASE_URL` поведёт через пулер, не принимающий
 стартовый параметр `options` (Supabase), — обе переменные в `0`.
 
