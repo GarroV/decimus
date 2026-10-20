@@ -651,3 +651,5 @@ _свежие_места
 # (#1020), регистрирует `@app.get/post(PATH, endpoint=...)`.
 photo_upload_page
 photo_upload_post
+# Фикстура `tests/test_db_rate_window.py` (F-110): подключается через `usefixtures`.
+общее_окно

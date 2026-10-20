@@ -3,9 +3,10 @@
 Адреса обхода открыты без учётки: подпись Telegram проверяется дёшево, но
 каждый подписанный запрос дальше ходит в Postgres, а кадр ещё и пишется на
 диск до 10 МБ. Предел считается по номеру чата сразу после подписи — до тяжёлых
-обращений. Окно ОБЩЕЕ между процессами (F-110, `src/db/rate_window.py`): иначе второй
-экземпляр сервиса или перекрытие при выкатке удваивали бы предел. База не отвечает —
-окно процесса, как было до F-110: предел слабеет до одного процесса, запрос не падает.
+обращений. Окно в памяти процесса; при `RATE_WINDOW_SHARED=1` — ОБЩЕЕ между процессами
+(F-110, `src/db/rate_window.py`), когда экземпляров больше одного. База молчит или замок
+ключа занят — окно процесса, запрос не ждёт и не падает. Флаг не задан — база на горячем
+пути не трогается вовсе.
 
 Пределы с запасом на живой обход: аудитор снимает кадры подряд, а приложение
 после связи досылает накопленное пачкой. Отказ — 429 с текстом «слишком
@@ -38,8 +39,9 @@ _LIMITS = {PHOTO: PHOTO_PER_MINUTE, OTHER: OTHER_PER_MINUTE}
 class ChatRate:
     """Скользящее окно по (чат, вид запроса). Потокобезопасно.
 
-    `shared` — окно общее между процессами (таблица `rate_windows`), окно процесса
-    остаётся запасным на случай, когда база не отвечает.
+    `shared` и включённый `RATE_WINDOW_SHARED` — окно общее между процессами (таблица
+    `rate_windows`); окно процесса остаётся пред-чеком и запасным на случай, когда
+    база не отвечает или замок занят. Флаг не задан — только окно процесса.
     """
 
     def __init__(
@@ -52,16 +54,40 @@ class ChatRate:
 
     def allow(self, chat_id: int, kind: str = OTHER) -> bool:
         """Учесть запрос; `False` — предел за минуту уже выбран, запрос не учтён."""
-        if self._shared:
-            shared = rate_window.try_allow(
-                scope=f"walk.{kind}",
-                key=str(chat_id),
-                limit=_LIMITS[kind],
-                window_sec=WINDOW_SEC,
-            )
-            if shared is not None:
-                return shared
+        if self._shared and rate_window.enabled():
+            return self._allow_shared(chat_id, kind)
         return self._allow_local(chat_id, kind)
+
+    def _allow_shared(self, chat_id: int, kind: str) -> bool:
+        # Пред-чек в памяти: локальных отметок не больше общих, поэтому предел,
+        # выбранный здесь, выбран и там — база не нужна.
+        if self._is_full(chat_id, kind):
+            return False
+        shared = rate_window.try_allow(
+            scope=f"walk.{kind}", key=str(chat_id), limit=_LIMITS[kind], window_sec=WINDOW_SEC
+        )
+        if shared is None:
+            return self._allow_local(chat_id, kind)
+        if shared:
+            self._record(chat_id, kind)
+        return shared
+
+    def _is_full(self, chat_id: int, kind: str) -> bool:
+        now = self._clock()
+        with self._lock:
+            stamps = self._seen.get((chat_id, kind))
+            if stamps is None:
+                return False
+            while stamps and now - stamps[0] >= WINDOW_SEC:
+                stamps.popleft()
+            return len(stamps) >= _LIMITS[kind]
+
+    def _record(self, chat_id: int, kind: str) -> None:
+        now = self._clock()
+        with self._lock:
+            self._seen.setdefault((chat_id, kind), deque()).append(now)
+            if len(self._seen) > SWEEP_AFTER:
+                self._forget_idle(now)
 
     def _allow_local(self, chat_id: int, kind: str) -> bool:
         now = self._clock()

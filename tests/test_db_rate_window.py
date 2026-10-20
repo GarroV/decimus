@@ -20,6 +20,13 @@ from src.db import rate_window
 from src.mcp.ratelimit import WindowLimiter
 from src.web.walk_rate import ChatRate
 
+
+@pytest.fixture
+def общее_окно(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Включает общее окно (`RATE_WINDOW_SHARED`): по умолчанию оно выключено."""
+    monkeypatch.setenv(rate_window.SHARED_VAR, "1")
+
+
 WINDOW = timedelta(seconds=60)
 T0 = datetime(2026, 10, 20, 12, 0, tzinfo=UTC)
 
@@ -67,6 +74,7 @@ def test_без_базы_чат_обхода_считает_в_памяти_пр
 
 
 @requires_db
+@pytest.mark.usefixtures("общее_окно")
 def test_предел_общий_у_двух_процессов(db_env: str) -> None:
     первый = WindowLimiter(3, scope="test.shared")
     второй = WindowLimiter(3, scope="test.shared")  # другой процесс: память пуста
@@ -85,6 +93,7 @@ def test_предел_общий_у_двух_процессов(db_env: str) -> 
 
 
 @requires_db
+@pytest.mark.usefixtures("общее_окно")
 def test_разные_ключи_и_разные_пределы_не_делят_счёт(db_env: str) -> None:
     окно = WindowLimiter(1, scope="test.keys")
     другой = WindowLimiter(1, scope="test.other")
@@ -94,24 +103,30 @@ def test_разные_ключи_и_разные_пределы_не_делят_
 
 
 @requires_db
-def test_параллельные_запросы_не_проходят_заслон_все_разом(db_env: str) -> None:
-    """Без замка на ключ параллельные процессы читают одно число и пропускают все."""
+def test_параллельные_запросы_общее_окно_не_пропускает_сверх_предела(db_env: str) -> None:
+    """Без замка на ключ параллельные процессы читают одно число и пропускают все.
+
+    Замок неблокирующий: проигравший гонку получает `None` (его решит окно процесса), —
+    поэтому проверяется то, что решила именно база: «да» не больше предела.
+    """
     limit, workers = 5, 24
-    окна = [WindowLimiter(limit, scope="test.race") for _ in range(workers)]
-    итог: list[bool] = []
+    итог: list[bool | None] = []
     старт = threading.Barrier(workers)
 
-    def запрос(окно: WindowLimiter) -> None:
+    def запрос() -> None:
         старт.wait()
-        итог.append(окно.allow("k"))
+        итог.append(rate_window.allow(scope="test.race", key="k", limit=limit, window_sec=60))
 
-    потоки = [threading.Thread(target=запрос, args=(о,)) for о in окна]
+    потоки = [threading.Thread(target=запрос) for _ in range(workers)]
     for п in потоки:
         п.start()
     for п in потоки:
         п.join()
 
-    assert sum(итог) == limit, f"пропущено {sum(итог)} из {workers} при пределе {limit}"
+    assert sum(1 for x in итог if x is True) <= limit, (
+        f"база пропустила {итог.count(True)} при пределе {limit}"
+    )
+    assert any(x is True for x in итог), "никто не получил решения базы — тест ничего не проверяет"
 
 
 @requires_db
@@ -155,6 +170,7 @@ def test_в_базе_лежит_отпечаток_а_не_ключ(db_env: str)
 
 
 @requires_db
+@pytest.mark.usefixtures("общее_окно")
 def test_ограничители_сервера_mcp_делят_окно_между_процессами(db_env: str) -> None:
     from src.mcp.ratelimit import TOKEN_PER_MINUTE, McpRate
 
@@ -168,6 +184,7 @@ def test_ограничители_сервера_mcp_делят_окно_меж�
 
 
 @requires_db
+@pytest.mark.usefixtures("общее_окно")
 def test_предел_чата_обхода_общий_у_двух_процессов(
     db_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -180,3 +197,104 @@ def test_предел_чата_обхода_общий_у_двух_процес�
     итог = [счёт.allow(чат, walk_rate.PHOTO) for счёт, чат in решения]
 
     assert итог == [True, True, True, False, True], "предел чата считался в памяти процесса"
+
+
+def _база_не_должна_трогаться(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    звали: list[str] = []
+
+    def запрет(*_a: object, **_k: object) -> None:
+        звали.append("база")
+        raise AssertionError("горячий путь полез в базу")
+
+    from types import SimpleNamespace
+
+    # Строка подключения нужна, чтобы дойти до соединения: без неё обращение к базе
+    # оборвалось бы раньше, на настройках, и проверка не поймала бы лишнего хода.
+    monkeypatch.setattr(rate_window, "check_environment", lambda: SimpleNamespace(dsn="x"))
+    monkeypatch.setattr(rate_window, "connection", запрет)
+    return звали
+
+
+def test_флаг_выключен_база_на_горячем_пути_не_трогается(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.mcp.ratelimit import McpRate
+
+    monkeypatch.delenv(rate_window.SHARED_VAR, raising=False)
+    звали = _база_не_должна_трогаться(monkeypatch)
+    mcp, обход = McpRate(shared=True), ChatRate(shared=True)
+
+    решения = [mcp.by_token.allow("t"), mcp.by_address.allow("a"), обход.allow(1, "photo")]
+
+    assert решения == [True, True, True] and звали == []
+
+
+def test_флаг_включён_и_локальное_окно_уже_полно_база_не_трогается(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(rate_window.SHARED_VAR, "1")
+    окно = WindowLimiter(2, scope="test.precheck")
+    # Локальные отметки есть: общее окно уже сказало «да» дважды.
+    окно._record("k")
+    окно._record("k")
+    звали = _база_не_должна_трогаться(monkeypatch)
+
+    assert окно.allow("k") is False and звали == [], "предел выбран в памяти — база не нужна"
+
+
+def test_флаг_включён_база_молчит_считаем_в_памяти(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(rate_window.SHARED_VAR, "1")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    окно = WindowLimiter(2, scope="test.down")
+
+    assert [окно.allow("k") for _ in range(3)] == [True, True, False]
+
+
+@requires_db
+@pytest.mark.usefixtures("общее_окно")
+def test_замок_ключа_занят_не_ждём_а_считаем_в_памяти(db_env: str) -> None:
+    """Чужой процесс держит замок ключа: запрос не блокируется и не получает отказ."""
+    import time
+
+    import psycopg
+
+    scope, key = "test.busy", "k"
+    fp = rate_window.key_fingerprint(key)
+    окно = WindowLimiter(3, scope=scope)
+    with psycopg.connect(db_env, autocommit=False) as чужой:
+        чужой.execute(
+            "select pg_advisory_xact_lock(%s, hashtext(%s))",
+            (rate_window.ADVISORY_NAMESPACE, f"{scope}\x1f{fp}"),
+        )
+        rate_window.allow(scope=scope, key="прогрев", limit=1, window_sec=60)  # пул и соединение
+        начало = time.monotonic()
+        решения = [окно.allow(key) for _ in range(4)]
+        ушло = time.monotonic() - начало
+
+    assert решения == [True, True, True, False], "при занятом замке окно процесса обязано решать"
+    assert ушло < 0.1, f"запрос ждал замок {ушло:.1f} с"
+
+
+@requires_db
+def test_запросы_окна_идут_под_короткими_сроками(
+    db_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    видно: dict[str, str] = {}
+    оригинал = rate_window._DROP_STALE_SQL
+
+    class Курсор:
+        pass
+
+    import psycopg
+
+    исходный = psycopg.Cursor.execute
+
+    def execute(self: psycopg.Cursor, query: object, params: object = None, **kw: object):  # type: ignore[no-untyped-def]
+        if query == оригинал:
+            for имя in ("lock_timeout", "statement_timeout"):
+                видно[имя] = self.connection.execute(f"show {имя}").fetchone()[0]  # type: ignore[index]
+        return исходный(self, query, params, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(psycopg.Cursor, "execute", execute)
+
+    rate_window.allow(scope="test.timeouts", key="k", limit=5, window_sec=60)
+
+    assert видно == {"lock_timeout": "200ms", "statement_timeout": "500ms"}
