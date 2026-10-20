@@ -28,6 +28,7 @@ from collections.abc import Mapping, Sequence
 from src.db import queries, review_edit, revise
 from src.db.config import load_storage_settings
 from src.db.errors import ReviseError, StorageError
+from src.db.inspection_edits import Editor
 from src.db.models import FindingRow, InspectionDetail
 from src.db.previews import make_preview
 from src.db.reach import reach_of
@@ -189,13 +190,16 @@ def revise_card(
     *,
     tenant: str,
     lang: str,
+    editor: Editor,
     code: str,
     level: str,
     zone: str,
     text: str,
     reading: str = "",
 ) -> None:
-    """Исправить запись ждущей проверки и пересчитать её. Отказ — `ReviseError`."""
+    """Исправить запись ждущей проверки и пересчитать её. Отказ — `ReviseError`.
+
+    `editor` — кто правит: правка пишется в журнал правок (F-134), УК и партнёр одинаково."""
     показание = reading_of(reading)
     detail = _editable(inspection_id, tenant=tenant, lang=lang)
     прежняя = next((f for f in detail.findings if f.id == finding_id), None)
@@ -211,6 +215,7 @@ def revise_card(
             inspection_id,
             finding_id,
             tenant=tenant,
+            editor=editor,
             revision=revise.Revision(
                 code=код,
                 level=класс,
@@ -234,6 +239,7 @@ def add_card(
     *,
     tenant: str,
     lang: str,
+    editor: Editor,
     code: str,
     level: str,
     zone: str,
@@ -265,6 +271,7 @@ def add_card(
         finding_id = review_edit.add_finding(
             inspection_id,
             tenant=tenant,
+            editor=editor,
             addition=review_edit.Addition(
                 code=код, level=класс, zone=зона, zone_unusual=необычная, text=слова
             ),

@@ -9,6 +9,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from conftest import requires_db
@@ -17,10 +18,13 @@ from db_harness import accept_pushed, привязать_страну, точк�
 psycopg = pytest.importorskip("psycopg")
 
 from src.db.errors import ReviseError  # noqa: E402
+from src.db.inspection_edits import Editor  # noqa: E402
 from src.db.models import InspectionDetail  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import get_inspection  # noqa: E402
 from src.db.reach import own_reach  # noqa: E402
+from src.db.review_edit import Addition  # noqa: E402
+from src.db.review_edit import add_finding as add_review_finding  # noqa: E402
 from src.db.revise import Revision, revise_finding  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
 from src.domain.models import Score  # noqa: E402
@@ -41,6 +45,8 @@ pytestmark = requires_db
     deductions=11.5,
     by_zone={},
 )
+
+ПРАВИТ = Editor(user_id="00000000-0000-0000-0000-0000000000a1", login="kontroling", role="admin")
 
 ИСПРАВЛЕНИЕ = Revision(
     code="CLN05", level="D2", zone="dining", zone_unusual=False, text="грязный пол в зале"
@@ -87,7 +93,9 @@ def test_правка_меняет_запись_и_оценку_вместе(с�
     ident, запись = _ждущая(601)
 
     # Act
-    revise_finding(ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, score_of=_по(ПЕРЕСЧЁТ))
+    revise_finding(
+        ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, editor=ПРАВИТ, score_of=_по(ПЕРЕСЧЁТ)
+    )
 
     # Assert
     после = get_inspection(ident, reach=УК, include_on_review=True)
@@ -105,7 +113,9 @@ def test_у_принятой_правка_закрыта(сеть: None, db_env:
 
     # Act / Assert
     with pytest.raises(ReviseError, match="уже принята"):
-        revise_finding(ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, score_of=_по(ПЕРЕСЧЁТ))
+        revise_finding(
+            ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, editor=ПРАВИТ, score_of=_по(ПЕРЕСЧЁТ)
+        )
     после = get_inspection(ident, reach=УК)
     assert после is not None and после.findings[0].zone == "hot_kitchen"
 
@@ -125,7 +135,9 @@ def test_занятая_пара_пункт_зона_отклоняется(се
 
     # Act / Assert — CLN05 в цехе уже записан первой записью.
     with pytest.raises(ReviseError, match="уже записан"):
-        revise_finding(ident, стены.id, tenant="HQ", revision=в_занятую, score_of=_по(ПЕРЕСЧЁТ))
+        revise_finding(
+            ident, стены.id, tenant="HQ", revision=в_занятую, editor=ПРАВИТ, score_of=_по(ПЕРЕСЧЁТ)
+        )
 
 
 @pytest.mark.parametrize(("владелец", "правит"), [("GE", "HQ"), ("HQ", "GE")])
@@ -136,7 +148,14 @@ def test_чужое_пространство_не_правит(сеть: None, �
 
     # Act / Assert
     with pytest.raises(ReviseError, match="нет"):
-        revise_finding(ident, запись, tenant=правит, revision=ИСПРАВЛЕНИЕ, score_of=_по(ПЕРЕСЧЁТ))
+        revise_finding(
+            ident,
+            запись,
+            tenant=правит,
+            revision=ИСПРАВЛЕНИЕ,
+            editor=ПРАВИТ,
+            score_of=_по(ПЕРЕСЧЁТ),
+        )
     после = get_inspection(ident, reach=own_reach(владелец), include_on_review=True)
     assert после is not None and после.findings[0].zone == "hot_kitchen"
     assert после.inspection.pct != ПЕРЕСЧЁТ.pct
@@ -182,6 +201,7 @@ def test_две_правки_одной_проверки_не_теряют_др�
                 revision=Revision(
                     code=код, level="D2", zone="hot_kitchen", zone_unusual=False, text="d2"
                 ),
+                editor=ПРАВИТ,
                 score_of=движок,
             )
         except BaseException as exc:  # поток отдаёт ошибку тесту
@@ -223,6 +243,199 @@ def test_правка_без_задетой_записи_не_пишет_оце�
 
     # Act / Assert
     with pytest.raises(ReviseError, match="Запись не исправлена"):
-        revise_finding(ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, score_of=_по(ПЕРЕСЧЁТ))
+        revise_finding(
+            ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, editor=ПРАВИТ, score_of=_по(ПЕРЕСЧЁТ)
+        )
     после = get_inspection(ident, reach=УК, include_on_review=True)
     assert после is not None and после.inspection.pct == до.inspection.pct
+
+
+# --- журнал правок (F-134, #1006) ---------------------------------------------
+
+
+def _журнал(pg_dsn: str, ident: str) -> list[dict[str, Any]]:
+    """Строки журнала правок проверки — под владельцем: роль приложения их не читает."""
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "select finding_id::text, tenant_code, user_id::text, login, role, kind, changes, "
+            "occurred_at is not null from inspection_edits where inspection_id = %s order by id",
+            (ident,),
+        )
+        return [
+            {
+                "finding": r[0],
+                "tenant": r[1],
+                "user": r[2],
+                "login": r[3],
+                "role": r[4],
+                "kind": r[5],
+                "changes": r[6],
+                "timed": r[7],
+            }
+            for r in cur.fetchall()
+        ]
+
+
+def _одна_строка(pg_dsn: str, ident: str) -> dict[str, Any]:
+    журнал = _журнал(pg_dsn, ident)
+    assert len(журнал) == 1, f"правка не оставила следа в журнале: строк {len(журнал)}, ждали 1"
+    return журнал[0]
+
+
+def test_правка_пишет_в_журнал_кто_что_и_было_стало(сеть: None, pg_dsn: str) -> None:
+    # Arrange
+    ident, запись = _ждущая(610)
+    до = get_inspection(ident, reach=УК, include_on_review=True)
+    assert до is not None
+
+    # Act
+    revise_finding(
+        ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, editor=ПРАВИТ, score_of=_по(ПЕРЕСЧЁТ)
+    )
+
+    # Assert
+    строка = _одна_строка(pg_dsn, ident)
+    assert (строка["finding"], строка["tenant"], строка["kind"]) == (запись, "HQ", "revise")
+    assert (строка["user"], строка["login"], строка["role"]) == (
+        ПРАВИТ.user_id,
+        "kontroling",
+        "admin",
+    )
+    assert строка["timed"] is True
+    изменения = строка["changes"]
+    assert изменения["level"] == {"old": "D1", "new": "D2"}
+    assert изменения["zone"] == {"old": "hot_kitchen", "new": "dining"}
+    assert изменения["text"] == {"old": "грязный пол в цехе", "new": "грязный пол в зале"}
+    assert "code" not in изменения, "код не менялся — в журнал не идёт"
+    assert изменения["score_pct"] == {"old": до.inspection.pct, "new": 88.5}
+    assert изменения["score_grade"] == {"old": до.inspection.grade, "new": "B"}
+    assert изменения["score_deductions"] == {"old": до.deductions, "new": 11.5}
+
+
+def test_правка_партнёра_тоже_в_журнале(сеть: None, pg_dsn: str) -> None:
+    """Вычитка одинакова для УК и партнёра (решение владельца): след — у обоих."""
+    # Arrange
+    ident, запись = _ждущая(611, tenant="GE")
+    партнёр = Editor(
+        user_id="00000000-0000-0000-0000-0000000000b2", login="geo-admin", role="admin"
+    )
+
+    # Act
+    revise_finding(
+        ident, запись, tenant="GE", revision=ИСПРАВЛЕНИЕ, editor=партнёр, score_of=_по(ПЕРЕСЧЁТ)
+    )
+
+    # Assert
+    строка = _одна_строка(pg_dsn, ident)
+    assert (строка["tenant"], строка["login"], строка["kind"]) == ("GE", "geo-admin", "revise")
+    assert строка["changes"]["level"] == {"old": "D1", "new": "D2"}
+
+
+def test_несколько_правок_дают_несколько_строк_по_порядку(сеть: None, pg_dsn: str) -> None:
+    # Arrange
+    ident, запись = _ждущая(612)
+    вторая = Revision(
+        code="CLN05", level="D3", zone="dining", zone_unusual=False, text="грязный пол в зале"
+    )
+
+    # Act
+    revise_finding(
+        ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, editor=ПРАВИТ, score_of=_по(ПЕРЕСЧЁТ)
+    )
+    revise_finding(
+        ident, запись, tenant="HQ", revision=вторая, editor=ПРАВИТ, score_of=_по(ПЕРЕСЧЁТ)
+    )
+
+    # Assert — вторая правка помнит результат первой как «было».
+    журнал = _журнал(pg_dsn, ident)
+    assert len(журнал) == 2, f"две правки — две строки в журнале, а их {len(журнал)}"
+    первая_строка, вторая_строка = журнал
+    assert первая_строка["changes"]["level"] == {"old": "D1", "new": "D2"}
+    assert вторая_строка["changes"]["level"] == {"old": "D2", "new": "D3"}
+    assert "zone" not in вторая_строка["changes"]
+
+
+def test_правка_принятой_закрыта_и_следа_не_оставляет(сеть: None, db_env: str, pg_dsn: str) -> None:
+    # Arrange
+    ident, запись = _ждущая(613)
+    accept_pushed(ident, dsn=db_env)
+
+    # Act / Assert — гейт приёмки на месте, журнал пуст.
+    with pytest.raises(ReviseError, match="уже принята"):
+        revise_finding(
+            ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, editor=ПРАВИТ, score_of=_по(ПЕРЕСЧЁТ)
+        )
+    assert _журнал(pg_dsn, ident) == []
+
+
+def test_отказ_правки_не_оставляет_строки_в_журнале(сеть: None, pg_dsn: str) -> None:
+    """Движок упал — ни правки, ни следа: они в одной транзакции."""
+    # Arrange
+    ident, запись = _ждущая(614)
+
+    def упавший(_detail: InspectionDetail) -> Score:
+        raise RuntimeError("движок упал")
+
+    # Act / Assert
+    with pytest.raises(RuntimeError):
+        revise_finding(
+            ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, editor=ПРАВИТ, score_of=упавший
+        )
+    assert _журнал(pg_dsn, ident) == []
+
+
+def test_без_названной_учётки_правка_не_проходит_и_запись_не_меняется(
+    сеть: None, pg_dsn: str
+) -> None:
+    """След без автора не пишется, а правка без следа не бывает: отказ целиком."""
+    # Arrange
+    ident, запись = _ждущая(615)
+    безымянный = Editor(user_id=ПРАВИТ.user_id, login="  ", role="admin")
+
+    # Act / Assert
+    with pytest.raises(ReviseError):
+        revise_finding(
+            ident,
+            запись,
+            tenant="HQ",
+            revision=ИСПРАВЛЕНИЕ,
+            editor=безымянный,
+            score_of=_по(ПЕРЕСЧЁТ),
+        )
+    после = get_inspection(ident, reach=УК, include_on_review=True)
+    assert после is not None and после.findings[0].level == "D1"
+    assert _журнал(pg_dsn, ident) == []
+
+
+def test_добавление_записи_пишется_в_журнал(сеть: None, pg_dsn: str) -> None:
+    # Arrange
+    ident = _ждущая(616)[0]
+
+    # Act
+    новая = add_review_finding(
+        ident,
+        tenant="HQ",
+        addition=Addition(
+            code="CLN06", level="D2", zone="dining", zone_unusual=False, text="  стены  "
+        ),
+        editor=ПРАВИТ,
+        score_of=_по(ПЕРЕСЧЁТ),
+    )
+
+    # Assert
+    строка = _одна_строка(pg_dsn, ident)
+    assert (строка["finding"], строка["kind"], строка["login"]) == (новая, "add", "kontroling")
+    assert строка["changes"]["level"] == {"old": None, "new": "D2"}
+    assert строка["changes"]["text"] == {"old": None, "new": "стены"}
+    assert строка["changes"]["score_pct"]["new"] == 88.5
+
+
+def test_роль_приложения_журнал_правок_только_дописывает(сеть: None, pg_dsn: str) -> None:
+    """Правку следа задним числом база не даёт: у роли приложения нет update/delete/select."""
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "select privilege_type from information_schema.role_table_grants "
+            "where table_name = 'inspection_edits' and grantee = 'dodo_audit_app'"
+        )
+        права = {r[0] for r in cur.fetchall()}
+    assert права == {"INSERT"}
