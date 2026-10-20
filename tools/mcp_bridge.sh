@@ -63,6 +63,12 @@ elif command -v jq >/dev/null 2>&1; then JQ="$(command -v jq)"; fi
 [ -n "$JQ" ] || printf 'mcp_bridge: нет jq — локальные инструменты для фото отключены\n' >&2
 
 HOME_REAL="$(cd "$HOME" 2>/dev/null && pwd -P)"
+# Без настоящей домашней папки граница чтения теряет смысл (HOME пуст или «/»):
+# тогда локальные инструменты выключаются, а не читают весь диск.
+if [ -z "$HOME_REAL" ] || [ "$HOME_REAL" = "/" ]; then
+  JQ=""
+  printf 'mcp_bridge: нет домашней папки — локальные инструменты для фото отключены\n' >&2
+fi
 MAX_LIST=60              # снимков за один вызов local_photo_folder
 DEFAULT_LIST=20
 THUMB_MAX=768            # длинная сторона уменьшенной копии, px
