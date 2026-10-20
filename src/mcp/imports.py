@@ -859,6 +859,7 @@ def import_accept_inspection(
     with _db(accept=True):
         accept_inspection(ident, tenant=tenant, actor=actor)
     история = шапка.origin == ORIGIN_LEGACY
+    итог = {} if история else _finish(ident, tenant=tenant)
     return {
         "id": ident,
         "mode": _mode_of(шапка.origin),
@@ -868,18 +869,75 @@ def import_accept_inspection(
         "grade": detail.inspection.grade or None,
         "accepted_by": actor,
         **({} if история else _comparison(detail, шапка)),
+        **итог,
         "status": (
             "accepted: the inspection is now in the unit's history next to the others "
             "(get_inspection, unit_history, network_summary). "
             + (
-                "Its score stays exactly as in the old report — it is never recomputed. "
+                "Its score stays exactly as in the old report — it is never recomputed, "
+                "and there is no PDF report or partner letter for a historical inspection. "
                 if история
-                else ""
+                else "report_url opens the PDF report (without photos), letter is the "
+                "partner letter text — both are only returned, never sent. "
             )
-            + "No action-plan request was opened, there is no partner letter for it, and "
-            "nothing was sent to anyone. It can no longer be edited or discarded"
+            + "No action-plan request was opened and nothing was sent to anyone. "
+            "It can no longer be edited or discarded"
         ),
     }
+
+
+def _report_url(ident: str) -> str | None:
+    """Абсолютный адрес отчёта в вебе — из `ADMIN_PUBLIC_URL`; не задан или кривой — `None`."""
+    import os
+
+    from ..domain.public_urls import ADMIN_PUBLIC_URL_VAR, parse_public_url
+
+    try:
+        base = parse_public_url(
+            os.environ.get(ADMIN_PUBLIC_URL_VAR) or "", var=ADMIN_PUBLIC_URL_VAR
+        )
+    except ValueError:
+        return None
+    return f"{base}/inspections/{ident}/report" if base else None
+
+
+def _finish(ident: str, *, tenant: str) -> dict[str, object]:
+    """Готовые отчёт и письмо для принятой «текущей» проверки — как бот на сдаче.
+
+    Приёмка к этому моменту уже состоялась и не откатывается: сбой сборки или
+    выгрузки PDF называется в `pdf_error`, сбой письма — в `letter_error`.
+    Ничего никуда не отправляется — всё возвращается в ответе.
+    """
+    from ..db import reports
+    from ..db.errors import DbError
+    from ..report import detail_pdf
+    from ..report.errors import ReportError
+    from .letters import build, sources
+
+    итог: dict[str, object] = {"report_url": None, "pdf_error": None}
+    try:
+        detail, _ = _read(ident, tenant=tenant)
+        papers = sources()
+        данные = detail_pdf.build_bytes(detail, lang=None, papers=papers)
+        with _db(accept=True):
+            reports.upload_report(ident, data=данные)
+        итог["report_url"] = _report_url(ident)
+        if итог["report_url"] is None:
+            итог["pdf_error"] = "PDF saved, but ADMIN_PUBLIC_URL is not set — no absolute link"
+    except (ReportError, ToolError, DbError, OSError) as exc:
+        logger.warning("отчёт принятой проверки %s не собран: %s", ident, exc)
+        итог["pdf_error"] = str(exc)
+    try:
+        detail, _ = _read(ident, tenant=tenant)
+        письмо = build(detail, lang=None, papers=sources())
+        итог["letter"] = письмо["letter"]
+        итог["letter_ready_to_send"] = письмо["ready_to_send"]
+        итог["letter_not_restored"] = письмо["not_restored"]
+    except (ReportError, ToolError) as exc:
+        logger.warning("письмо принятой проверки %s не собрано: %s", ident, exc)
+        итог["letter"] = None
+        итог["letter_error"] = str(exc)
+    return итог
 
 
 def import_discard_draft(
