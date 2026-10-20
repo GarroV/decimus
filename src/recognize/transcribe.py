@@ -145,6 +145,10 @@ def transcribe(
         )
 
     client = OpenAI(api_key=cfg.api_key, timeout=cfg.timeout)
+    # Хранение голоса у OpenAI кодом не отключить (F-112): у `audio.transcriptions`
+    # в SDK 2.9.0 нет параметра `store`, как у Responses (`client.py`), и
+    # выдуманный параметр вернёт 400. Срок хранения задают настройки организации
+    # OpenAI — Zero Data Retention (`docs/08-deploy.md` §8.20).
     try:
         result = client.audio.transcriptions.create(
             model=cfg.transcribe_model,

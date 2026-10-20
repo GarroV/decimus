@@ -19,6 +19,7 @@ from src.domain.models import READING_MAX_C, READING_MIN_C
 from .client import ask_model
 from .config import DEFAULT_LANG, RecognizeSettings, load_recognize_settings
 from .cues import class_thresholds
+from .guard import MAX_QUESTION_CHARS, MAX_REASON_CHARS, MAX_WORDING_CHARS, clean_text
 from .models import NONE_CODE, UNKNOWN_ZONE, Candidate, Suggestion
 from .prompt import correction_line, instructions, question_text
 from .rules_check import check_wording
@@ -99,8 +100,8 @@ def _candidate(record: dict[str, Any]) -> Candidate | None:
     if code == NONE_CODE or not level:
         return None
     zone = str(record.get("zone", UNKNOWN_ZONE))
-    wording = str(record.get("wording", "")).strip()
-    reason = str(record.get("reason", "")).strip()
+    wording = clean_text(str(record.get("wording", "")), MAX_WORDING_CHARS)
+    reason = clean_text(str(record.get("reason", "")), MAX_REASON_CHARS)
     return Candidate(
         code=code,
         level=level,
@@ -149,7 +150,7 @@ def _suggestion(
     used_photo: bool,
 ) -> Suggestion:
     candidates = _candidates(payload.get("records"), settings)
-    question = str(payload.get("question", "")).strip()
+    question = clean_text(str(payload.get("question", "")), MAX_QUESTION_CHARS)
     top = candidates[0] if candidates else None
     needs_human = (
         top is None
