@@ -125,14 +125,14 @@ def test_в_демо_общие_учётки_не_портятся(monkeypatch: 
     подменить_двери(monkeypatch, tenant="HQ", role="admin")
     app = _app(demo=True)
     адреса = {
-        r.endpoint: r.rule
+        r.endpoint: (r.rule, "POST" if "POST" in (r.methods or set()) else "GET")
         for r in app.url_map.iter_rules()
         if r.endpoint in demo_entry.LOCKED_ENDPOINTS and "<" not in r.rule
     }
     assert адреса, "выключенных действий не нашлось на карте маршрутов"
     клиент = app.test_client()
-    for конец, путь in адреса.items():
-        ответ = клиент.post(путь, headers={"Origin": СВОЙ})
+    for конец, (путь, метод) in адреса.items():
+        ответ = клиент.open(путь, method=метод, headers={"Origin": СВОЙ})
         assert ответ.status_code == 403, f"{конец} {путь} в демо не выключен"
 
 
@@ -140,3 +140,26 @@ def test_выключенные_в_демо_действия_есть_в_про�
     """Опечатка в списке молча оставила бы действие открытым."""
     конечные = {r.endpoint for r in _app(demo=True).url_map.iter_rules()}
     assert demo_entry.LOCKED_ENDPOINTS <= конечные, demo_entry.LOCKED_ENDPOINTS - конечные
+
+
+def test_каждое_действие_продукта_разобрано_для_демо() -> None:
+    """Новое действие не проскочит в демо молча: оно выключено или названо открытым."""
+    # Arrange
+    действия = {
+        r.endpoint
+        for r in _app(demo=True).url_map.iter_rules()
+        if (r.methods or set()) - {"GET", "HEAD", "OPTIONS"}
+    }
+    разобрано = demo_entry.LOCKED_ENDPOINTS | demo_entry.OPEN_ENDPOINTS
+
+    # Assert
+    assert not действия - разобрано, f"не решено, работает ли в демо: {действия - разобрано}"
+    assert not demo_entry.LOCKED_ENDPOINTS & demo_entry.OPEN_ENDPOINTS
+    assert demo_entry.OPEN_ENDPOINTS <= действия, demo_entry.OPEN_ENDPOINTS - действия
+
+
+@pytest.mark.parametrize("путь", ["/login/google", "/auth/google/callback", "/auth/google/mail"])
+def test_в_демо_google_выключен_и_для_get(monkeypatch: pytest.MonkeyPatch, путь: str) -> None:
+    подменить_двери(monkeypatch, tenant="HQ", role="admin")
+    ответ = _app(demo=True).test_client().get(путь)
+    assert ответ.status_code == 403, f"{путь} в демо открыт: {ответ.status_code}"

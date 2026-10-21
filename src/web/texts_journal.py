@@ -302,7 +302,7 @@ _SCREEN: dict[str, dict[str, str]] = {
         "ru": "Действия хранятся 365 дней. Пароли, токены и свободный текст в журнал не пишутся.",
         "en": "Actions are kept for 365 days. Passwords, tokens and free text are not recorded.",
     },
-    "journal.own.title": {"ru": "Мои входы", "en": "My sign-ins"},
+    "journal.own.title": {"ru": "Журнал входов", "en": "Sign-in log"},
     "journal.own.sub": {
         "ru": (
             "Куда и как входили в вашу учётку. Увидели чужой вход — нажмите «Выйти везде» "
@@ -317,7 +317,7 @@ _SCREEN: dict[str, dict[str, str]] = {
         "ru": "Время, адрес, браузер и способ каждого входа в вашу учётку.",
         "en": "Time, address, browser and method of every sign-in to your account.",
     },
-    "journal.own.link": {"ru": "Мои входы", "en": "My sign-ins"},
+    "journal.own.link": {"ru": "Журнал входов", "en": "Sign-in log"},
     "journal.own.back": {"ru": "К настройкам", "en": "Back to settings"},
 }
 

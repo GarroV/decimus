@@ -306,7 +306,10 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     "menu.all_settings": {"ru": "Все настройки", "en": "All settings"},
     "settings.tile.password_set": {"ru": "Пароль задан", "en": "Password set"},
     "settings.tile.password_google": {"ru": "Вход через Google", "en": "Signing in with Google"},
-    "settings.tile.signins": {"ru": "Журнал входов", "en": "Sign-in history"},
+    "settings.tile.signins": {"ru": "Когда и откуда входили", "en": "When and from where"},
+    "settings.group.connect": {"ru": "Подключения", "en": "Connections"},
+    "settings.group.profile": {"ru": "Профиль", "en": "Profile"},
+    "settings.group.access": {"ru": "Вход и безопасность", "en": "Sign-in and security"},
     "settings.tile.signout": {"ru": "Сессии и выход", "en": "Sessions and sign-out"},
     "settings.signout.title": {"ru": "Выйти везде", "en": "Sign out everywhere"},
     "settings.signout.note": {
