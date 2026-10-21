@@ -29,7 +29,8 @@ from .walk_auth import PAGE_PATH as WALK_PAGE_PATH
 #: пароля упрётся во вторую ступень), заморозить или понизить учётку, сменить ей
 #: пароль, привязать Google или выйти «везде». Ключ модели посетитель не сохраняет:
 #: чужие ключи демо не собирает. Сброс раз в час починил бы и это, но час без демо —
-#: тоже поломка.
+#: тоже поломка. И ничего из демо не выходит наружу: ни Google, ни Telegram, ни
+#: Claude, ни ключи API — демо показывает продукт, а не выдаёт к нему доступ.
 LOCKED_ENDPOINTS = frozenset(
     {
         "freeze_user",
@@ -57,6 +58,99 @@ LOCKED_ENDPOINTS = frozenset(
         "service_key_save",
         "service_key_check",
         "service_key_delete",
+        # Подтверждение входа и «продолжить» выполняют то же намерение, что кнопки
+        # выше (`reauth.INTENT_ACTIONS`): закрыта кнопка — закрыт и обход через них.
+        "settings_continue",
+        "reauth_confirm",
+        "reauth_confirm_password",
+        "reauth_confirm_google",
+        # Круг людей и пространств: новая учётка с паролем пережила бы час до сброса,
+        # а перепривязка стран сломала бы роль партнёра всем посетителям.
+        "add_user",
+        "add_space",
+        "space_countries",
+        "bot_unlink",
+        # Выход наружу — настоящие сервисы под настоящими ключами: ключи API на
+        # данные, Google (вход, почта, таблица), сайты агрегаторов.
+        "connections_issue",
+        "connections_reissue",
+        "connections_revoke",
+        "connections_update",
+        "google_start",
+        "google_callback",
+        "google_mail_callback",
+        "letter_draft",
+        "rx_send",
+        "ratings_agg_update",
+        "ratings_sheet_sync",
+    }
+)
+
+#: Действия, которые в демо работают: вход и смена роли, язык, фильтры и вся
+#: работа с данными демо-сети — проверки, методика, поездки, планы, рейтинги.
+#: Сброс раз в час возвращает их к исходному. Каждое действие (не GET) продукта
+#: стоит в одном из двух списков — новое не проскочит в демо незамеченным (тест).
+OPEN_ENDPOINTS = frozenset(
+    {
+        "demo_enter",
+        "login",
+        "logout",
+        "passkey_login_options",
+        "passkey_login_verify",
+        "second_step_code",
+        "second_step_passkey_options",
+        "second_step_passkey_verify",
+        "settings_lang",
+        "country_filter",
+        "photo_upload_post",
+        "rx_create",
+        "rx_close",
+        "rx_update",
+        "order_reply",
+        "actions_new",
+        "actions_due",
+        "actions_review",
+        "plans_upload",
+        "methodology_bot",
+        "checklists_create",
+        "checklists_apply",
+        "checklists_master",
+        "checklists_state",
+        "methodology_add",
+        "methodology_edit",
+        "methodology_disable",
+        "methodology_restore",
+        "methodology_publish",
+        "methodology_route",
+        "methodology_scoring",
+        "methodology_zone_add",
+        "methodology_zone_remove",
+        "methodology_zone_rename",
+        "methodology_zone_shares",
+        "trip_create",
+        "trip_update",
+        "trip_delete",
+        "trip_step_add",
+        "trip_step_delete",
+        "country_set_developer",
+        "country_set_space",
+        "unit_create",
+        "do_accept",
+        "do_add_finding",
+        "do_add_photo",
+        "do_revise",
+        "save_letter",
+        "do_move",
+        "do_delete_photo",
+        "do_retract",
+        "do_suggest",
+        "ratings_developer",
+        "ratings_coverage_link",
+        "ratings_rule_add",
+        "ratings_rule_remove",
+        "ratings_upload",
+        "ratings_layout",
+        "ratings_settings",
     }
 )
 
@@ -81,7 +175,8 @@ def install(
 
     @app.before_request
     def _в_демо_выключено() -> tuple[str, int] | None:
-        if request.method == "POST" and request.endpoint in LOCKED_ENDPOINTS:
+        # Любым методом: вход через Google и возвраты из него — GET.
+        if request.endpoint in LOCKED_ENDPOINTS:
             return render_template("demo/locked.html"), 403
         return None
 

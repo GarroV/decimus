@@ -1823,6 +1823,7 @@ D391) — так же: миграций нет, право — уже выдан
 | Сборка | `docker-compose.yml` + `docker-compose.prod.yml` + `deploy/demo/compose.demo.yaml` |
 | Настройки | `/srv/decimus-demo/.env` (вне git): свои пароли ролей базы, `WEB_SECRET_KEY`, `AUDIT_DATA_DIR=./demo/data`, `S3_*` на `http://storage:9090`, `WEB_TRUSTED_PROXY_ADDR` — подсеть `edge-decimus` |
 | Кадры для посева | `/srv/decimus-demo-photos` — снимки Белграда-1 и -2 без метаданных (вне git: репозиторий публичный) |
+| Посев | `tools/seed_open_demo.py`: восемь точек в RS, GE, AM; проверки за полгода, календарь сдвигается к дню посева (текущий месяц всегда наполнен); поездки; рейтинги РС и РКО (`tools/open_demo_ratings.py`, импортёр продукта) и обучение из выдуманного iSpring (`tools/open_demo_training.py`, загрузчик продукта) — D590 |
 | Сброс | `deploy/demo/reset.sh`: тома `pgdata`, `state`, `methodology` заново → миграции → `tools/seed_open_demo.py` → подъём, около минуты. Cron пользователя `garva`: `17 * * * *`, лог `~/decimus-demo-reset.log` |
 | Обновление кода | `deploy/demo/update.sh`: `git pull`, сборка, сброс |
 | Caddy | `vps-infra` `edge/sites/decimus-demo.caddy` (`<DEMO_ORIGIN_HOST>` → `decimus-demo-web:8267`): сайт без ключа фронта, заголовки фронта срезаются (как у стенда §8.11) |

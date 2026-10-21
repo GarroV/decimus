@@ -4,8 +4,9 @@
   пароль. Открыта каждому вошедшему, любой роли; людей здесь нет, только
   учётка самого человека, и чья она — решает сессия, а не форма.
 
-  Страница целиком плитками, как «Настройки» в Swarm Brain (D470): профиль, язык, пароль,
-  вход и защита, мои входы, выход, Claude, бот и Google — одинаковые плитки и панель
+  Страница целиком плитками, как «Настройки» в Swarm Brain (D470), тремя секциями по
+  значимости (D589): подключения (Claude, бот, Google), профиль (профиль, язык), вход и
+  безопасность (пароль, вход и защита, журнал входов, выход) — одинаковые плитки и панель
   выбранной справа (на телефоне под плитками). Выбранная плитка — в адресе
   (`?tile=profile|language|password|security|signins|signout|claude|bot|google`), плитки —
   обычные ссылки, скрипт не нужен. Все формы, маршруты и подтверждение входа (D457) прежние.
@@ -41,18 +42,25 @@
     {# ── Плитки настроек и панель выбранной ──────────────────────────── #}
     <section class="scard scard--wide" id="connections">
       <div class="sconn">
-        <nav class="stiles" aria-label="{{ t('section.settings.title') }}">
-          {% for key in tiles %}
-            {% set state = tile_states[key] %}
-            <a class="stile{% if key == tile %} is-current{% endif %}" href="{{ base }}?lang={{ lang }}&tile={{ key }}#connections"
-               {% if key == tile %}aria-current="true"{% endif %}>
-              <span class="stile__icon">{{ icon(tile_icon[key]) }}</span>
-              <span class="stile__main">
-                <b>{{ t(tile_name[key]) }}</b>
-                <small>{{ tile_hint[key] if tile_hint[key] is defined else t('menu.' ~ state) }}</small>
-              </span>
-              <span class="sdot{% if state == 'on' %} sdot--ok{% endif %}" aria-hidden="true"></span>
-            </a>
+        <nav class="sgroups" aria-label="{{ t('section.settings.title') }}">
+          {% for group, keys in tile_groups %}
+          <div class="sgroup">
+            <h2 class="sgroup__title">{{ t('settings.group.' ~ group) }}</h2>
+            <div class="stiles">
+              {% for key in keys %}
+                {% set state = tile_states[key] %}
+                <a class="stile{% if key == tile %} is-current{% endif %}" href="{{ base }}?lang={{ lang }}&tile={{ key }}#connections"
+                   {% if key == tile %}aria-current="true"{% endif %}>
+                  <span class="stile__icon">{{ icon(tile_icon[key]) }}</span>
+                  <span class="stile__main">
+                    <b>{{ t(tile_name[key]) }}</b>
+                    <small>{{ tile_hint[key] if tile_hint[key] is defined else t('menu.' ~ state) }}</small>
+                  </span>
+                  <span class="sdot{% if state == 'on' %} sdot--ok{% endif %}" aria-hidden="true"></span>
+                </a>
+              {% endfor %}
+            </div>
+          </div>
           {% endfor %}
         </nav>
 

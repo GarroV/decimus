@@ -295,10 +295,11 @@ def test_выбранная_плитка_берётся_из_адреса_а_б�
         бот = client.get("/settings?tile=bot").get_data(as_text=True)
         чужое = client.get("/settings?tile=../x").get_data(as_text=True)
 
-        assert 'id="profile"' in по_умолчанию and 'id="bot"' not in по_умолчанию
-        assert 'id="bot"' in бот and 'id="profile"' not in бот
+        # Первая — Claude: секция «Подключения» идёт первой (D589).
+        assert 'id="claude"' in по_умолчанию and 'id="bot"' not in по_умолчанию
+        assert 'id="bot"' in бот and 'id="claude"' not in бот
         assert бот.count('aria-current="true"') == 1, "выбрана должна быть ровно одна плитка"
-        assert 'id="profile"' in чужое, "неизвестная плитка не должна ломать страницу"
+        assert 'id="claude"' in чужое, "неизвестная плитка не должна ломать страницу"
 
 
 def test_плитки_показывают_статус_и_счётчик(monkeypatch: pytest.MonkeyPatch) -> None:

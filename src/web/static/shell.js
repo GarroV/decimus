@@ -82,10 +82,18 @@
     connectionsLoaded = true;
     fetch(box.dataset.src, { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
       .then(function (r) {
+        // Сессия кончилась (в демо — сброс базы раз в час): заслон уводит на вход
+        // или лендинг, fetch проходит редирект молча и отдал бы ЦЕЛУЮ страницу —
+        // она встала бы внутрь меню. Уходим туда же всей вкладкой.
+        if (r.redirected) {
+          window.location.assign(r.url);
+          return null;
+        }
         if (!r.ok) throw new Error("status " + r.status);
         return r.text();
       })
       .then(function (html) {
+        if (html === null) return;
         // Подмена строк уносит фокус, если он стоял на одной из них: вернуть
         // его на то же по счёту место, иначе Tab начнёт с начала страницы.
         var rows = Array.prototype.slice.call(box.querySelectorAll("a"));

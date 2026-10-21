@@ -259,10 +259,10 @@ DEMO_TEXTS: dict[str, dict[str, str]] = {
     },
     "demo.app.back": {"ru": "← К выбору роли", "en": "← Back to roles"},
     "demo.locked": {
-        "ru": "В демо это выключено: учётки здесь общие на всех посетителей. "
-        "В настоящем продукте действие работает.",
-        "en": "This is switched off in the demo: the accounts here are shared by every visitor. "
-        "In the real product it works.",
+        "ru": "В демо это выключено: учётки здесь общие на всех посетителей, а Google, "
+        "Telegram и Claude к демо не подключены. В настоящем продукте действие работает.",
+        "en": "This is switched off in the demo: the accounts here are shared by every visitor, "
+        "and Google, Telegram and Claude are not connected to it. In the real product it works.",
     },
     "demo.not_ready": {
         "ru": "Демо как раз обновляется. Попробуйте через минуту.",

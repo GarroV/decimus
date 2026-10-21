@@ -41,6 +41,9 @@
 
 /* ── подключения: плитки слева, панель выбранной справа ──────────────── */
 .sconn { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-7); align-items: start; }
+.sgroups { display: flex; flex-direction: column; gap: var(--space-7); min-width: 0; }
+.sgroup { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.sgroup__title { margin: 0; font-size: 11px; line-height: 16px; font-weight: var(--w-semibold); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
 .stiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
 .stile { display: flex; align-items: center; gap: var(--space-5); min-width: 0; padding: var(--space-6); border: 1px solid var(--line-strong); border-radius: var(--r-block, 12px);
   background: var(--surface); color: var(--ink); text-decoration: none; transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease); }

@@ -76,6 +76,27 @@ def test_посев_открытого_демо(
             "select count(*), count(distinct date_trunc('month', date_from)) from trips"
         ).fetchone()
         шагов = conn.execute("select count(*) from trip_steps where kind = 'inspection'").fetchone()
+        рейтинги = conn.execute(
+            "select count(distinct u.name), count(*) from ratings.scores s "
+            "join ratings.units u on u.dodo_id = s.unit_dodo_id"
+        ).fetchone()
+        девелоперы = conn.execute(
+            "select count(*) from ratings.countries where developer is not null"
+        ).fetchone()
+        обучение = conn.execute(
+            "select count(*) from learning.departments where kind = 'pizzeria' "
+            "and unit_dodo_id is not null"
+        ).fetchone()
+        загрузок = conn.execute(
+            "select count(*) from learning.loads where outcome = 'ok'"
+        ).fetchone()
+        за_месяц = conn.execute(
+            "select count(*) from inspections where status = 'finalized' "
+            "and date_trunc('month', inspection_date) = date_trunc('month', current_date)"
+        ).fetchone()
+        партнёрских = conn.execute(
+            "select count(*) from inspections where tenant_code = 'demo'"
+        ).fetchone()
         русских = conn.execute(
             "select count(*) from translations where entity_type = 'finding' and lang = 'ru'"
         ).fetchone()
@@ -88,6 +109,12 @@ def test_посев_открытого_демо(
         "в календаре демо должны быть поездки по нескольким месяцам"
     )
     assert шагов is not None and шагов[0] == поездок[0], "у каждой поездки — осмотр точки"
+    assert рейтинги is not None and рейтинги[0] == 8 and рейтинги[1] > 0, рейтинги
+    assert девелоперы is not None and девелоперы[0] == 3, "странам демо не раздали девелоперов"
+    assert обучение is not None and обучение[0] == 8, "обучение не сопоставилось с точками"
+    assert загрузок is not None and загрузок[0] == 1
+    assert за_месяц is not None and за_месяц[0] >= 1, "«Главная» за текущий месяц пуста"
+    assert партнёрских is not None and партнёрских[0] >= 1, "нет проверки аудитора партнёра"
     assert русских is not None and русских[0] == 2, "прошлые записи точки обхода — по-русски"
     assert "chats 999000000701 (WEB_WALK_PREVIEW_CHAT) and 999000000702" in посев.stdout, (
         "русская идущая проверка не заведена"

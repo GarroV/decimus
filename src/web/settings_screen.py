@@ -118,18 +118,17 @@ def _google_result() -> Flash | None:
     return None if ключ is None else Flash(ключ[0], ключ[1])
 
 
-#: Плитки подключений, они же значения `?tile=`: порядок — порядок на экране.
-TILES = (
-    "profile",
-    "language",
-    "password",
-    "security",
-    "signins",
-    "signout",
-    "claude",
-    "bot",
-    "google",
+#: Плитки по секциям, по значимости сверху вниз: сначала то, ради чего сюда приходят
+#: (подключить Claude, бота, Google), потом сам человек, потом вход и безопасность.
+#: Ключ секции — ключ её заголовка в текстах (`settings.group.<ключ>`).
+TILE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("connect", ("claude", "bot", "google")),
+    ("profile", ("profile", "language")),
+    ("access", ("password", "security", "signins", "signout")),
 )
+
+#: Плитки, они же значения `?tile=`: порядок — порядок на экране.
+TILES = tuple(плитка for _, плитки in TILE_GROUPS for плитка in плитки)
 
 #: Плитка, к которой относится исход действия: по началу ключа текста.
 _FLASH_TILE_PREFIXES = (
@@ -248,7 +247,7 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             tile=selected_tile(show, request.args.get("tile")),
             tile_states={**состояния, **_own_tile_states(вошедший, has_google_login)},
             tile_hint=_tile_hints(вошедший, lang, has_google_login),
-            tiles=TILES,
+            tile_groups=TILE_GROUPS,
             me=вошедший,
             base=f"{request.script_root}{section('settings').path}",
             own_binding=привязка,

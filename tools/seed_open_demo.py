@@ -9,19 +9,24 @@
 Что получается:
 
 * восемь пиццерий в трёх странах, все — точки партнёра `demo`;
-* проверки с мая по октябрь 2026, по две-три на точку: плановые, внеплановые
-  и повторные, с повторами замечаний между визитами;
+* проверки за полгода до сегодняшнего дня, по две-четыре на точку: плановые,
+  внеплановые и повторные, с повторами замечаний между визитами; календарь
+  `VISITS` написан от `ANCHOR` и сдвигается к дню посева, поэтому текущий месяц
+  всегда наполнен; одну проверку провёл аудитор партнёра;
 * к замечаниям — кадры из `DEMO_PHOTOS_DIR` (снимки Белграда-1 и -2 без
   метаданных; в репозиторий не кладутся — он публичный). Кадры проходят той же
   дорогой, что кадры мини-аппа: `save_upload` → слив → `upload_photos`;
-* все проверки, кроме двух самых свежих, приняты дверью продукта
+* все проверки, кроме двух помеченных `pending`, приняты дверью продукта
   (`accept_inspection`), и D2 порождают планы действий сами (D272);
+* рейтинги РС и РКО (`tools/open_demo_ratings.py`) и обучение из выдуманного
+  iSpring (`tools/open_demo_training.py`) — теми же импортёром и загрузчиком, что у
+  продукта;
 * по учётке на роль из `src.domain.demo.DEMO_ROLES`, пароль случайный и нигде
   не печатается — входят через `/demo`.
 
 Методика — синтетический демо-чек-лист `demo/data` (боевая методика вне git и
-наружу не выходит). Даты фиксированные: демо, меняющееся от дня запуска, нечем
-сверять.
+наружу не выходит). Даты — сдвиг календаря `VISITS` к дню посева: расстояния между
+проверками постоянны, и сверять есть с чем, а «Главная» за текущий месяц не пустеет.
 
 Запуск (окружение стенда, из корня репозитория):
 
@@ -42,6 +47,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
+import open_demo_ratings  # noqa: E402 -- путь к tools выставляется выше
+import open_demo_training  # noqa: E402
 import psycopg  # noqa: E402
 import seed_demo  # noqa: E402 -- путь к репозиторию выставляется выше
 from seed_web_demo import ADMIN_URL_VAR, _require_local_dsn  # noqa: E402
@@ -71,8 +78,10 @@ WALK_CHAT = 999_000_000_701
 #: Та же идущая проверка по-русски — для русского браузера (`WEB_WALK_PREVIEW_CHAT_RU`):
 #: мини-апп открывается на русском целиком, и записи в нём русские.
 WALK_CHAT_RU = 999_000_000_702
-#: Сколько самых свежих проверок оставить на приёмке — показать очередь.
-PENDING = 2
+#: День, от которого написан календарь `VISITS`. Посев сдвигает все даты на
+#: расстояние от него до сегодня: свежие проверки всегда в последних неделях, и
+#: «Главная» за текущий месяц не пустеет через месяц после того, как демо написано.
+ANCHOR = date(2026, 10, 21)
 
 HQ_AUDITORS = ("Marco Bianchi", "Olivia Hart")
 PARTNER_AUDITOR = "Lena Novak"
@@ -116,6 +125,13 @@ class Visit:
     notes: tuple[Note, ...]
     by_partner: bool = False
     auditor: str = field(default="")
+    #: Оставить на приёмке — показать очередь «ждут приёмки».
+    pending: bool = False
+
+
+def shifted(day: str, today: date | None = None) -> date:
+    """Дата календаря демо, перенесённая к сегодняшнему дню (см. `ANCHOR`)."""
+    return date.fromisoformat(day) + ((today or date.today()) - ANCHOR)
 
 
 N = Note
@@ -492,7 +508,8 @@ VISITS: tuple[Visit, ...] = (
         "Old Town-1",
         "2026-10-12",
         "planned",
-        (
+        pending=True,
+        notes=(
             N("DEM13", "D1", "dining", "Floor streaks along the aisle at opening.", ("q52.jpg",)),
             N(
                 "DEM05",
@@ -506,7 +523,8 @@ VISITS: tuple[Visit, ...] = (
         "Lakeside-1",
         "2026-10-14",
         "planned",
-        (
+        pending=True,
+        notes=(
             N(
                 "DEM11",
                 "D1",
@@ -516,6 +534,111 @@ VISITS: tuple[Visit, ...] = (
             ),
             N("DEM02", "D1", "facade", "Fingerprints on the entrance door handle."),
             N("DEM18", "D0", "kitchen", "Pizza from the line: no remarks.", ("q32.jpg",)),
+        ),
+    ),
+    # Октябрь: почти каждая точка проверена в последние три недели — «Главная» за
+    # текущий месяц полна, а нагар печи (DEM11) и полы (DEM13) на нескольких точках
+    # дают «Топ нарушений» (`SYSTEMIC_MIN_UNITS`).
+    Visit(
+        "Northgate-2",
+        "2026-10-01",
+        "planned",
+        (
+            N(
+                "DEM11",
+                "D1",
+                "kitchen",
+                "Carbon build-up on the oven conveyor rollers.",
+                ("p10.jpg",),
+            ),
+            N("DEM13", "D1", "dining", "Sticky patch on the floor by the drinks fridge."),
+            N("DEM17", "D0", "storage", "All refrigeration within range.", ("p19.jpg",)),
+        ),
+    ),
+    Visit(
+        "Riverside-1",
+        "2026-10-05",
+        "unscheduled",
+        (
+            N(
+                "DEM06",
+                "D2",
+                "kitchen",
+                "Same knife used for raw chicken and vegetables without washing.",
+            ),
+            N("DEM11", "D1", "kitchen", "Grease on the oven hood filters.", ("q30.jpg",)),
+            N("DEM10", "D1", "staff", "Paper towels ran out at the hand-wash sink."),
+        ),
+    ),
+    Visit(
+        "Harbor Bay-1",
+        "2026-10-09",
+        "planned",
+        (
+            N("DEM13", "D1", "dining", "Floor streaks along the aisle at opening.", ("q52.jpg",)),
+            N(
+                "DEM08",
+                "D1",
+                "storage",
+                "Opened tomato sauce without an opening date.",
+                ("p18.jpg",),
+            ),
+            N("DEM18", "D0", "dining", "Test order: no remarks.", ("q16.jpg",)),
+        ),
+    ),
+    # Проверка аудитора партнёра: партнёр проверяет свои точки сам, и его админ
+    # видит свою работу рядом с проверками УК.
+    Visit(
+        "Westfield-1",
+        "2026-10-10",
+        "planned",
+        by_partner=True,
+        notes=(
+            N("DEM15", "D1", "dining", "Crumbs on the sofa in the family corner.", ("q51.jpg",)),
+            N("DEM13", "D1", "dining", "Wet floor without a warning sign at the counter."),
+            N("DEM18", "D0", "kitchen", "Pizza from the line: no remarks.", ("q32.jpg",)),
+        ),
+    ),
+    Visit(
+        "Riverside-1",
+        "2026-10-17",
+        "repeat",
+        (
+            N(
+                "DEM06",
+                "D1",
+                "kitchen",
+                "Colour-coded boards now used; one knife left on the raw side.",
+            ),
+            N("DEM16", "D0", "kitchen", "Oven display: 275 °C, 00:41.", ("q35.jpg",)),
+        ),
+    ),
+    Visit(
+        "Northgate-2",
+        "2026-10-19",
+        "unscheduled",
+        (
+            N("DEM11", "D1", "kitchen", "Conveyor rollers cleaned; residue left at the exit side."),
+            N("DEM12", "D1", "kitchen", "Dough mixer guard with flour build-up.", ("p17.jpg",)),
+        ),
+    ),
+    # Вчера и сегодня: в первые дни месяца «Главная» за текущий месяц тоже не пуста.
+    Visit(
+        "Westfield-1",
+        "2026-10-20",
+        "repeat",
+        (
+            N("DEM15", "D1", "dining", "Sofa cushions wiped, crumbs left under the seat."),
+            N("DEM17", "D0", "storage", "All refrigeration within range.", ("p20.jpg",)),
+        ),
+    ),
+    Visit(
+        "Hillcrest-1",
+        "2026-10-21",
+        "unscheduled",
+        (
+            N("DEM13", "D1", "dining", "Footprints by the entrance after the rain.", ("q52.jpg",)),
+            N("DEM18", "D0", "dining", "Test order: no remarks.", ("q17.jpg",)),
         ),
     ),
 )
@@ -569,7 +692,7 @@ def _build(
         report_lang=lang,
         ui_lang=lang,
         speech_lang=lang,
-        date=visit.date,
+        date=shifted(visit.date).isoformat(),
         city=unit.city,
         auditor=auditor,
         tenant=DEMO_PARTNER_TENANT if visit.by_partner else HQ_TENANT,
@@ -676,7 +799,12 @@ def _translate_previous(dsn: str) -> None:
         for code, text in PREVIOUS_RU.items():
             conn.execute(
                 _RU_TRANSLATION_SQL,
-                {"text": text, "unit": PREVIOUS_RU_UNIT, "day": PREVIOUS_RU_DATE, "code": code},
+                {
+                    "text": text,
+                    "unit": PREVIOUS_RU_UNIT,
+                    "day": shifted(PREVIOUS_RU_DATE),
+                    "code": code,
+                },
             )
 
 
@@ -701,7 +829,7 @@ def _trips(dsn: str, units: dict[str, Unit]) -> int:
         if visit.by_partner:
             continue
         auditor = HQ_AUDITORS[(FIRST_CHAT + i) % len(HQ_AUDITORS)]
-        day = date.fromisoformat(visit.date)
+        day = shifted(visit.date)
         unit = units[visit.unit]
         trip_id = create_trip(
             Draft(
@@ -762,7 +890,7 @@ def seed() -> int:
 
     units = {u.name: u for u in UNITS}
     seen: dict[str, set[str]] = {}
-    pushed: list[tuple[str, str]] = []
+    pushed: list[tuple[str, str, bool]] = []
     for i, visit in enumerate(sorted(VISITS, key=lambda v: v.date)):
         chat_id = FIRST_CHAT + i
         prior = seen.setdefault(visit.unit, set())
@@ -773,14 +901,22 @@ def seed() -> int:
         score = domain.score(chat_id)
         prior.clear()
         prior.update(n.code for n in visit.notes if n.level != "D0")
-        pushed.append((ident, DEMO_PARTNER_TENANT if visit.by_partner else HQ_TENANT))
-        print(f"{visit.unit} {visit.date}: {score.pct:g}% {score.grade}")
+        pushed.append(
+            (ident, DEMO_PARTNER_TENANT if visit.by_partner else HQ_TENANT, visit.pending)
+        )
+        print(f"{visit.unit} {shifted(visit.date)}: {score.pct:g}% {score.grade}")
     # Принимает пространство, которое проверку провело: партнёрскую — его админ.
-    for ident, owner in pushed[:-PENDING]:
+    for ident, owner, pending in pushed:
+        if pending:
+            continue
         actor = PARTNER_AUDITOR if owner == DEMO_PARTNER_TENANT else "Olivia Hart"
         accept_inspection(ident, tenant=owner, actor=actor)
     _translate_previous(admin_dsn)
     trips = _trips(admin_dsn, units)
+    network = [(u.name, u.country) for u in UNITS]
+    for line in open_demo_ratings.seed(network, date.today()):
+        print(line)
+    print(open_demo_training.seed(network, date.today()))
     _walk(photos_dir)
     print(
         f"Auditor app: in-progress inspection in chats {WALK_CHAT} (WEB_WALK_PREVIEW_CHAT) "
