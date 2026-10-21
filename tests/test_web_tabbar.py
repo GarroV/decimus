@@ -34,6 +34,7 @@ def test_у_админа_ук_четыре_пункта_и_ещё_с_остал�
     ]
     assert len(re.findall(r'class="tabbar__item', панель)) == TABBAR_MAX  # 4 + «Ещё»
     assert re.findall(r'class="tabbar__row[^"]*"\s+href="/(\w+)', ещё) == [
+        "osb",
         "country",
         "ratings",
         "training",

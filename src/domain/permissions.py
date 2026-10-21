@@ -67,6 +67,9 @@ _VIEWS: tuple[Action, ...] = (
     # УК и партнёра различают действия `plan.*` и `prescription.*`.
     Action("view.actions", "view", writes=False),
     Action("view.users", "view", writes=False),
+    # «ОСБ» (D599): очередь предписаний сети. Только УК; видят ОСБ, админ (без
+    # действий) и главный админ — девелопер и гость страницы не видят.
+    Action("view.osb", "view", hq_only=True, writes=False),
 )
 
 ACTIONS: tuple[Action, ...] = (
@@ -82,7 +85,10 @@ ACTIONS: tuple[Action, ...] = (
     Action("inspection.move", "inspection", hq_only=True, own_space=True),
     Action("inspection.letter", "inspection", own_space=True),
     Action("inspection.import", "inspection", hq_only=True),
-    # Предписания и экшн-планы
+    # Предписания и экшн-планы. Запросить предписание из проверки — девелопер, админ,
+    # ОСБ (D600); вести его (завести без проверки, править чужое, согласовать,
+    # вернуть, черновик в почту, закрыть) — только ОСБ и главный админ (D599).
+    Action("prescription.request", "prescription", hq_only=True),
     Action("prescription.manage", "prescription", hq_only=True),
     Action("prescription.reply", "prescription", partner_only=True),
     Action("plan.manage", "plan", hq_only=True),
@@ -156,7 +162,8 @@ def _codes(*codes: str) -> frozenset[str]:
     return frozenset(require_action(c).code for c in codes)
 
 
-_ALL_VIEWS_HQ = frozenset(a.code for a in _VIEWS)
+#: Разделы, которые видят все роли УК с «полным» доступом; «ОСБ» им выдаётся поимённо.
+_ALL_VIEWS_HQ = frozenset(a.code for a in _VIEWS if a.code != "view.osb")
 _ALL_VIEWS_PARTNER = frozenset(a.code for a in _VIEWS if not a.hq_only)
 
 #: Работа с проверками в УК: проводить, вычитывать, принимать, править, снимать,
@@ -169,7 +176,7 @@ _HQ_WORK = _codes(
     "inspection.retract",
     "inspection.move",
     "inspection.letter",
-    "prescription.manage",
+    "prescription.request",
     "plan.manage",
     "ratings.read",
     "unit.create",
@@ -196,6 +203,7 @@ _HQ_ADMIN = (
         "people.role",
         "space.manage",
         "refusals.read",
+        "view.osb",  # D599: админ видит страницу «ОСБ» без действий
     )
 )
 
@@ -212,10 +220,23 @@ _PARTNER_AUDITOR = _ALL_VIEWS_PARTNER | _codes(
     "trip.own",
 )
 
+#: Чтение всей сети (D429, D440): гость и основа ОСБ.
+_GUEST = _codes(
+    "inspection.read",
+    "ratings.read",
+    "view.overview",
+    "view.registry",
+    "view.calendar",
+    "view.country",
+    "view.ratings",
+    "view.training",
+    "view.users",
+)
+
 #: Матрица: (сторона, роль учётки) → действия. Нет клетки — нет права.
 MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     # Главный админ — всё, что админ, и ключи API (D440).
-    (SIDE_HQ, "superadmin"): _HQ_ADMIN | _codes("api.manage", "keys.manage"),
+    (SIDE_HQ, "superadmin"): _HQ_ADMIN | _codes("api.manage", "keys.manage", "prescription.manage"),
     (SIDE_HQ, "admin"): _HQ_ADMIN,
     # Бизнес-девелопер (D440): сервис в полном объёме, кроме главного чек-листа,
     # указателя прода, стран, людей, ключей и загрузок рейтингов.
@@ -227,17 +248,10 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
         "ratings.read", "ratings.manage", "people.manage", "view.ratings", "view.users"
     ),
     # Гость (D429, D440): вся сеть на чтение, ничего не меняет и не отправляет.
-    (SIDE_HQ, "guest"): _codes(
-        "inspection.read",
-        "ratings.read",
-        "view.overview",
-        "view.registry",
-        "view.calendar",
-        "view.country",
-        "view.ratings",
-        "view.training",
-        "view.users",
-    ),
+    (SIDE_HQ, "guest"): _GUEST,
+    # ОСБ (D599): права гостя на чтение, а пишет только предписания — на своей
+    # странице. Записи в проверки у неё нет ни одной.
+    (SIDE_HQ, "osb"): _GUEST | _codes("prescription.request", "prescription.manage", "view.osb"),
     (SIDE_PARTNER, "admin"): _PARTNER_AUDITOR
     | _CHECKLISTS
     | _codes("checklist.master")

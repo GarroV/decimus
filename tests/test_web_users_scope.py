@@ -183,7 +183,12 @@ def test_главный_админ_назначает_другого_главн�
 
     assert ответ.status_code == 200
     assert база["role"] == [
-        ("kostya", "HQ", "superadmin", ("guest", "developer", "control", "admin", "superadmin"))
+        (
+            "kostya",
+            "HQ",
+            "superadmin",
+            ("guest", "osb", "developer", "control", "admin", "superadmin"),
+        )
     ]
 
 

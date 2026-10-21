@@ -33,10 +33,30 @@ cases = [
     # Слой 2: лишняя клетка у гостя.
     (
         "src/domain/permissions.py",
-        '        "inspection.read",\n        "ratings.read",\n        "view.overview",\n',
-        '        "inspection.read",\n        "ratings.read",\n        "people.manage",\n'
-        '        "view.overview",\n',
+        '    "inspection.read",\n    "ratings.read",\n    "view.overview",\n',
+        '    "inspection.read",\n    "ratings.read",\n    "people.manage",\n    "view.overview",\n',
         T + "test_permissions_table.py::test_каждая_клетка_матрицы",
+    ),
+    # D599: ОСБ — не больше, чем предписания; админ ведёт ничего; девелопер без страницы ОСБ.
+    (
+        "src/domain/permissions.py",
+        '_GUEST | _codes("prescription.request", "prescription.manage", "view.osb")',
+        '_GUEST | _codes("prescription.request", "prescription.manage", "view.osb", '
+        '"people.manage")',
+        T
+        + "test_permissions_osb.py::test_осб_не_пишет_в_проверки_и_вообще_ничего_кроме_предписаний",
+    ),
+    (
+        "src/domain/permissions.py",
+        '    (SIDE_HQ, "admin"): _HQ_ADMIN,\n',
+        '    (SIDE_HQ, "admin"): _HQ_ADMIN | _codes("prescription.manage"),\n',
+        T + "test_permissions_osb.py::test_вести_предписание_могут_только_осб_и_главный_админ",
+    ),
+    (
+        "src/domain/permissions.py",
+        '_ALL_VIEWS_HQ = frozenset(a.code for a in _VIEWS if a.code != "view.osb")',
+        "_ALL_VIEWS_HQ = frozenset(a.code for a in _VIEWS)",
+        T + "test_permissions_osb.py::test_страницу_осб_видят_осб_админ_и_главный_админ",
     ),
     # Закрытое в Claude.
     (

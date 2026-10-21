@@ -341,6 +341,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
         "sql1:df6cded467f4d94f01692e50159ea892a7372443ba773990d77e9c9c9e79e023"
     ),
     "0085_learning.sql": ("sql1:6c146c641b714be48e4b9add20e02a91c9a16d80bfdb2b612e928df714fdd513"),
+    "0086_osb_role.sql": ("sql1:6159c0ec1b79de8ae59658595c9b603bafed8d64356d15e895afaaad089daa20"),
+    "0087_prescription_review.sql": (
+        "sql1:f59b34956664e455d45ef7bd272a2b174d14937b3272f67019b63122bb750818"
+    ),
 }
 
 

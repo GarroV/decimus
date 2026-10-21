@@ -397,6 +397,11 @@ rx_edit
 rx_update
 rx_send
 rx_close
+rx_request
+rx_approve
+rx_return
+# Страница «ОСБ» (`src/web/osb.py`): маршрут Flask, регистрирует декоратор.
+osb_page
 orders
 order_reply
 order_file

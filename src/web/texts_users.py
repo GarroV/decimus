@@ -19,6 +19,7 @@ _ROLES: dict[str, dict[str, str]] = {
     "users.role.control": {"ru": "Контролинг", "en": "Controller"},
     "users.role.developer": {"ru": "Бизнес-девелопер", "en": "Business developer"},
     "users.role.guest": {"ru": "Гость", "en": "Guest"},
+    "users.role.osb": {"ru": "ОСБ", "en": "OSB"},
     "users.role.auditor": {"ru": "Аудитор", "en": "Auditor"},
     "users.role.partner.admin": {"ru": "Админ", "en": "Admin"},
     "users.role.partner.auditor": {"ru": "Сотрудник", "en": "Staff"},
@@ -55,6 +56,18 @@ _ROLES: dict[str, dict[str, str]] = {
         "en": (
             "Sees the whole network read-only: overview, inspections and reports, "
             "countries, ratings. Changes nothing."
+        ),
+    },
+    "users.hint.osb": {
+        "ru": (
+            "Отдел сопровождения бизнеса. Видит всю сеть на чтение, как гость; на странице "
+            "«ОСБ» ведёт предписания: согласует, возвращает, кладёт письмо в почту, закрывает. "
+            "Проверки не меняет."
+        ),
+        "en": (
+            "Business support department. Sees the whole network read-only, like a guest; "
+            "on the OSB page it runs compliance notices: approves, returns, puts the letter "
+            "into the mailbox, closes. Does not change inspections."
         ),
     },
     "users.hint.control": {
@@ -220,11 +233,11 @@ _ADD: dict[str, dict[str, str]] = {
     },
     "users.add.role_space": {
         "ru": (
-            "Главный админ, бизнес-девелопер, контролинг и гость бывают только в "
+            "Главный админ, бизнес-девелопер, ОСБ, контролинг и гость бывают только в "
             "пространстве УК (HQ). Не добавлено."
         ),
         "en": (
-            "Super admin, business developer, controller and guest exist only in the "
+            "Super admin, business developer, OSB, controller and guest exist only in the "
             "HQ space. Nothing was added."
         ),
     },

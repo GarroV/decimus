@@ -286,8 +286,10 @@ def _предписание(status: str) -> rx.Prescription:
         status=status,
         created_by="hq-lead",
         created_at=datetime(2026, 10, 5, tzinfo=UTC),
-        issued_by=None if status == "draft" else "hq-lead",
-        issued_at=None if status == "draft" else datetime(2026, 10, 5, tzinfo=UTC),
+        issued_by="hq-lead" if status in ("issued", "closed") else None,
+        issued_at=datetime(2026, 10, 5, tzinfo=UTC) if status in ("issued", "closed") else None,
+        approved_by="osb-vera" if status == "approved" else None,
+        approved_at=datetime(2026, 10, 5, tzinfo=UTC) if status == "approved" else None,
         closed_by=None,
         closed_at=None,
         close_comment=None,
@@ -297,9 +299,11 @@ def _предписание(status: str) -> rx.Prescription:
 @pytest.mark.parametrize(
     ("tenant", "статус", "адрес"),
     [
-        ("HQ", "issued", "/actions?tab=prescriptions"),
+        ("HQ", "issued", "/osb"),
         ("HQ", "issued", "/actions/prescriptions/new?country=GE"),
-        ("HQ", "issued", f"/actions?tab=prescriptions&id={РАСПОРЯЖЕНИЕ}"),
+        ("HQ", "issued", f"/osb?id={РАСПОРЯЖЕНИЕ}"),
+        ("HQ", "review", f"/osb?id={РАСПОРЯЖЕНИЕ}"),
+        ("HQ", "approved", f"/osb?id={РАСПОРЯЖЕНИЕ}"),
         ("HQ", "draft", f"/actions/prescriptions/{РАСПОРЯЖЕНИЕ}/edit"),
         ("GE", "issued", "/actions?tab=prescriptions"),
         ("GE", "issued", f"/actions?tab=prescriptions&id={РАСПОРЯЖЕНИЕ}"),
@@ -316,10 +320,12 @@ def test_предписания_несут_набор_и_без_встроенн
         rx, "list_prescriptions", lambda *_a, **_k: rx.PrescriptionList((предписание,), False)
     )
     monkeypatch.setattr(rx, "get_prescription", lambda *_a, **_k: предписание)
+    monkeypatch.setattr(rx, "status_counts", lambda **_k: dict.fromkeys(rx.STATUSES, 0))
     monkeypatch.setattr(rx, "choices", lambda *_a, **_k: ((), ()))
     monkeypatch.setattr(rx, "remembered_recipients", lambda _c: "ops@ge.example.com")
     monkeypatch.setattr(country_data, "countries", lambda **_: (("GE", 2),))
-    подменить_двери(monkeypatch, tenant=tenant, role="admin")
+    # ОСБ видит страницу «ОСБ» с кнопками и правит черновик; партнёр — админ своего пространства.
+    подменить_двери(monkeypatch, tenant=tenant, role="osb" if tenant == "HQ" else "admin")
 
     with собрать(tenant=tenant).test_client() as client:
         assert войти(client).status_code == 302

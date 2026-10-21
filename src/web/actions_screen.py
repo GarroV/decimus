@@ -25,7 +25,7 @@ from flask import Flask, current_app, render_template, request, url_for
 from flask import redirect as flask_redirect
 from werkzeug.wrappers import Response
 
-from . import ui_lang
+from . import guard, ui_lang
 from .config import Settings
 from .sections import section
 from .texts import t
@@ -37,6 +37,12 @@ PANEL_HEADER = "X-Panel"
 TAB_PLANS = "plans"
 TAB_RX = "prescriptions"
 TABS = (TAB_PLANS, TAB_RX)
+#: Страница «ОСБ» (D599) — тот же экран с очередями предписаний вместо вкладок; в
+#: `TABS` её нет: вкладкой «Действий» она не бывает, у неё свой адрес.
+TAB_OSB = "osb"
+
+#: Что пришло в адрес панели после сохранения формы предписания (`?saved=`) → ключ текста.
+SAVED_NOTICES = {"1": "rx.saved", "requested": "rx.requested", "approved": "rx.approved"}
 
 #: Длина кода строки из адреса — с запасом на uuid; длиннее — не код.
 ID_MAX = 64
@@ -85,6 +91,8 @@ def tab_of(raw: str | None) -> str:
 def panel_link(tab: str, item_id: str, *, lang: str, **extra: str) -> str:
     """Адрес экрана с открытой панелью строки — куда возвращаются после действия."""
     kept: dict[str, Any] = {k: v for k, v in extra.items() if v}
+    if tab == TAB_OSB:
+        return url_for("osb", id=item_id, lang=lang, **kept)
     return url_for("actions", tab=tab, id=item_id, lang=lang, **kept)
 
 
@@ -119,6 +127,20 @@ def _page(conf: Settings, tab: str, picked: str, panel: dict[str, Any]) -> dict[
     }
 
 
+def view(conf: Settings, tab: str) -> str:
+    """Страница экрана: список слева и панель выбранной строки справа (`?id=`)."""
+    picked = (request.args.get("id") or "").strip()[:ID_MAX]
+    gmail = request.args.get("gmail") or ""
+    notice_key = SAVED_NOTICES.get(request.args.get("saved") or "")
+    notice = t(notice_key, _lang(conf)) if notice_key and tab in (TAB_RX, TAB_OSB) else None
+    panel = (
+        _tab(tab).panel(picked, notice=notice, failure=None, gmail=gmail)
+        if picked
+        else _empty_panel()
+    )
+    return render_template("actions/index.html", **_page(conf, tab, picked, panel))
+
+
 def respond(
     conf: Settings,
     tab: str,
@@ -151,20 +173,17 @@ def install(app: Flask, conf: Settings) -> None:
     """Повесить экран раздела. Вкладки регистрируют себя сами (`register`)."""
 
     @app.get(section("actions").path, endpoint="actions")
-    def actions() -> str:
+    def actions() -> str | Response:
         tab = tab_of(request.args.get("tab"))
-        picked = (request.args.get("id") or "").strip()[:ID_MAX]
-        gmail = request.args.get("gmail") or ""
-        saved = request.args.get("saved") == "1"
-        notice = None
-        if saved and tab == TAB_RX:
-            notice = t("rx.saved", _lang(conf))
-        panel = (
-            _tab(tab).panel(picked, notice=notice, failure=None, gmail=gmail)
-            if picked
-            else _empty_panel()
-        )
-        return render_template("actions/index.html", **_page(conf, tab, picked, panel))
+        if tab == TAB_RX and guard.may("view.osb"):
+            # Предписаниями УК ведёт страница «ОСБ» (D599): вкладка «Предписания» ведёт туда.
+            kept: dict[str, Any] = {
+                k: request.args[k]
+                for k in ("lang", "country", "id", "saved", "gmail")
+                if request.args.get(k)
+            }
+            return flask_redirect(url_for("osb", **kept), code=303)
+        return view(conf, tab)
 
 
 def _empty_panel() -> dict[str, Any]:

@@ -79,6 +79,7 @@ from . import (
     letter_draft,
     letter_markup,
     oauth,
+    osb,
     photo_upload,
     prescriptions,
     proofread,
@@ -155,6 +156,7 @@ SCREENS = (
     "users",
     "settings",
     "actions",
+    "osb",
     "calendar",
 )
 
@@ -233,6 +235,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     settings_screen.install(app, conf)
     security_screen.install(app, conf)
     prescriptions.install(app, conf)
+    osb.install(app, conf)
     ratings.install(app, conf)
     training_page.install(app, conf)
     # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.
@@ -1703,7 +1706,7 @@ def _card_context(
         # Предписание с карточки (решение владельца 11.10.2026): раздел УК, принятая
         # проверка УК. Какие проверки годятся основанием, решает база (`inspection_basis`).
         may_prescribe=(
-            guard.may("prescription.manage", тенант)
+            guard.may("prescription.request", тенант)
             and своя
             and not detail.inspection.on_review
             and not detail.inspection.retracted

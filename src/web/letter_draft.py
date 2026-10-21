@@ -245,7 +245,7 @@ def install(app: Flask, conf: Settings) -> None:
         return возврат.finish(ident, lang, lambda: _токен_вошедшего(реквизиты, код))
 
     @app.get(MAIL_CALLBACK_PATH, endpoint="google_mail_callback")
-    @guard.action("inspection.letter")
+    @guard.action("inspection.letter", "prescription.manage", object_in_route=True)
     def google_mail_callback() -> Response | tuple[str, int]:
         """Возврат от Google: сверить метку, обменять код, положить черновик.
 
@@ -254,9 +254,16 @@ def install(app: Flask, conf: Settings) -> None:
         снимается здесь, в одном месте, а не на каждом выходе. До 12.10 письмо по
         проверке снимало её только на успехе, и после отказа та же метка
         принимала второй возврат следующие десять минут (F-019).
+
+        Возврат один на два вида письма: по проверке его ждёт тот, кто пишет
+        письма, по предписанию — тот, кто ведёт предписания (ОСБ). Какая из
+        клеток есть у вошедшего, та и спрашивается; чужой вид закроет проверка
+        внутри самого вида (`guard.may` ниже и в `_finish_gmail`).
         """
+        код = "inspection.letter" if guard.may("inspection.letter") else "prescription.manage"
         try:
-            ответ = _возврат_похода()
+            отказ = guard.permit(код)
+            ответ = отказ if отказ is not None else _возврат_похода()
         except HTTPException as exc:
             ответ = exc.get_response()
         if isinstance(ответ, tuple):

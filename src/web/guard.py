@@ -94,6 +94,14 @@ NAVIGATION_ENDPOINTS: Mapping[str, str] = {
 #: проверок, то же, что «Проверки».
 ENDPOINT_VIEWS: Mapping[str, str] = {"unit": "view.registry"}
 
+#: Страницы, чьё чтение решает действие, а не `view.<раздел>`: форма предписания лежит
+#: под `/actions`, а запросить предписание может и ОСБ, у которой раздела «Действия»
+#: нет (D599, D600). Форма видна тому, у кого есть код; остальным — 404 как раньше.
+READ_BY_ACTION: Mapping[str, str] = {
+    "rx_new": "prescription.request",
+    "rx_edit": "prescription.request",
+}
+
 #: Маршруты, которых чтение их раздела НЕ открывает: объявлены только своим
 #: действием. Форма «Добавить пиццерию» лежит под `/country`, а раздел открыт и
 #: партнёру (D508), но форма — только УК (`unit.create`).
@@ -106,8 +114,13 @@ WITHOUT_SECTION_VIEW = frozenset(
         "actions_review",
         "actions_due",
         "actions_new",
+        "rx_new",
+        "rx_edit",
         "rx_create",
         "rx_update",
+        "rx_request",
+        "rx_approve",
+        "rx_return",
         "rx_send",
         "rx_close",
     }
@@ -183,6 +196,8 @@ def _writes(endpoint: str | None, methods: set[str] | frozenset[str]) -> bool:
 
 
 def _read_code(endpoint: str | None, path: str) -> str | None:
+    if endpoint in READ_BY_ACTION:
+        return READ_BY_ACTION[endpoint or ""]
     ключ = current_section(path)
     if ключ is not None:
         return section_view(ключ)
@@ -273,6 +288,8 @@ def _declared_codes(app: Flask, endpoint: str | None, path: str) -> frozenset[st
     ):
         коды.add(код)
     if (код := ENDPOINT_VIEWS.get(endpoint or "")) is not None:
+        коды.add(код)
+    if (код := READ_BY_ACTION.get(endpoint or "")) is not None:
         коды.add(код)
     return frozenset(коды)
 

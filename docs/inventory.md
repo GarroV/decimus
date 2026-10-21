@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 169 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 173 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -29,10 +29,13 @@
 | `/actions/prescriptions` | GET | `rx_list` | `src/web/prescriptions.py` |
 | `/actions/prescriptions` | POST | `rx_create` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>` | GET | `rx_view` | `src/web/prescriptions.py` |
+| `/actions/prescriptions/<prescription_id>/approve` | POST | `rx_approve` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/close` | POST | `rx_close` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/edit` | GET | `rx_edit` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/edit` | POST | `rx_update` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/reply` | POST | `order_reply` | `src/web/prescriptions.py` |
+| `/actions/prescriptions/<prescription_id>/request` | POST | `rx_request` | `src/web/prescriptions.py` |
+| `/actions/prescriptions/<prescription_id>/return` | POST | `rx_return` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/send` | POST | `rx_send` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/new` | GET | `rx_new` | `src/web/prescriptions.py` |
 | `/actions/request` | POST | `actions_new` | `src/web/action_plans.py` |
@@ -111,6 +114,7 @@
 | `/oauth/authorize` | GET, POST | `oauth_authorize` | `src/web/oauth.py` |
 | `/oauth/register` | POST | `oauth_register` | `src/web/oauth.py` |
 | `/oauth/token` | POST | `oauth_token` | `src/web/oauth.py` |
+| `/osb` | GET | `osb` | `src/web/osb.py` |
 | `/overview` | GET | `overview` | `src/web/app.py` |
 | `/photo-upload/<token>` | POST | `photo_upload_post` | `src/web/photo_upload.py` |
 | `/plans` | GET | `plans` | `src/web/action_plans.py` |
@@ -495,6 +499,8 @@
 | `0083_ratings_layout_aggregators.sql` | — |
 | `0084_service_keys.sql` | — |
 | `0085_learning.sql` | `learning.departments`, `learning.courses`, `learning.unit_totals`, `learning.unit_courses`, `learning.loads` |
+| `0086_osb_role.sql` | — |
+| `0087_prescription_review.sql` | — |
 <!-- map:end -->
 
 ## Makefile

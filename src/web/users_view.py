@@ -139,7 +139,15 @@ def role_options(rows: Iterable[_Row]) -> tuple[RoleOption, ...]:
 
 
 #: Порядок ролей в фильтре: сверху самые широкие.
-_ROLE_ORDER = {"superadmin": 0, "admin": 1, "developer": 2, "control": 3, "auditor": 4, "guest": 5}
+_ROLE_ORDER = {
+    "superadmin": 0,
+    "admin": 1,
+    "developer": 2,
+    "osb": 3,
+    "control": 4,
+    "auditor": 5,
+    "guest": 6,
+}
 
 
 def selected[R: _Row](rows: Iterable[R], person_id: str) -> R | None:

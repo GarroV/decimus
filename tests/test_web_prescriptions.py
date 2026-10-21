@@ -32,7 +32,7 @@ ORIGIN = {"Origin": "http://localhost"}
 
 
 def предписание(*, status: str = "issued") -> rx.Prescription:
-    отправлено = status != "draft"
+    отправлено = status in ("issued", "closed")
     return rx.Prescription(
         id=ИД,
         country="GE",
@@ -48,6 +48,8 @@ def предписание(*, status: str = "issued") -> rx.Prescription:
         closed_by="hq-lead" if status == "closed" else None,
         closed_at=datetime(2026, 10, 6, tzinfo=UTC) if status == "closed" else None,
         close_comment="выполнено" if status == "closed" else None,
+        approved_by="osb-vera" if status == "approved" else None,
+        approved_at=datetime(2026, 10, 5, tzinfo=UTC) if status == "approved" else None,
     )
 
 
@@ -55,7 +57,20 @@ def предписание(*, status: str = "issued") -> rx.Prescription:
 def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]:
     """Двери блока `db` предписаний, подменённые и пишущие, кого звали."""
     журнал: dict[str, list[dict[str, Any]]] = {
-        имя: [] for имя in ("list", "get", "create", "update", "close", "reply", "file", "issue")
+        имя: []
+        for имя in (
+            "list",
+            "get",
+            "create",
+            "update",
+            "close",
+            "reply",
+            "file",
+            "issue",
+            "request",
+            "approve",
+            "return",
+        )
     }
 
     def записать(имя: str, результат: Any = None) -> Any:
@@ -71,6 +86,7 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]
         записать("list", rx.PrescriptionList(rows=(предписание(),), truncated=False)),
     )
     monkeypatch.setattr(rx, "get_prescription", записать("get", предписание()))
+    monkeypatch.setattr(rx, "status_counts", lambda **_k: dict.fromkeys(rx.STATUSES, 0))
     monkeypatch.setattr(rx, "file_for_download", записать("file", None))
     monkeypatch.setattr(rx, "choices", lambda *_a, **_k: ((), ()))
     monkeypatch.setattr(rx, "remembered_recipients", lambda _c: "ops@ge.example.com")
@@ -79,12 +95,17 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]
     monkeypatch.setattr(rxw, "close", записать("close"))
     monkeypatch.setattr(rxw, "reply", записать("reply", ОТВЕТ))
     monkeypatch.setattr(rxw, "issue", записать("issue"))
+    monkeypatch.setattr(rxw, "request_review", записать("request"))
+    monkeypatch.setattr(rxw, "approve", записать("approve"))
+    monkeypatch.setattr(rxw, "return_to_author", записать("return"))
     monkeypatch.setattr("src.web.country.countries", lambda **_: (("GE", 2), ("AM", 1)))
     return журнал
 
 
-def _стенд(monkeypatch: pytest.MonkeyPatch, tenant: str) -> Iterator[FlaskClient]:
-    подменить_двери(monkeypatch, tenant=tenant, role="admin", email=ПОЧТА)
+def _стенд(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str = "admin"
+) -> Iterator[FlaskClient]:
+    подменить_двери(monkeypatch, tenant=tenant, role=role, email=ПОЧТА)
     with собрать(tenant=tenant).test_client() as client:
         assert войти(client).status_code == 302
         yield client
@@ -92,7 +113,13 @@ def _стенд(monkeypatch: pytest.MonkeyPatch, tenant: str) -> Iterator[FlaskC
 
 @pytest.fixture
 def уК(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[FlaskClient]:
-    yield from _стенд(monkeypatch, "HQ")
+    """Сотрудник УК, который ведёт предписания, — ОСБ (D599)."""
+    yield from _стенд(monkeypatch, "HQ", "osb")
+
+
+@pytest.fixture
+def девелопер(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[FlaskClient]:
+    yield from _стенд(monkeypatch, "HQ", "developer")
 
 
 @pytest.fixture
@@ -114,6 +141,9 @@ def партнёр(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[F
     ("post", "/actions/prescriptions"),
     ("get", f"/actions/prescriptions/{ИД}/edit"),
     ("post", f"/actions/prescriptions/{ИД}/edit"),
+    ("post", f"/actions/prescriptions/{ИД}/request"),
+    ("post", f"/actions/prescriptions/{ИД}/approve"),
+    ("post", f"/actions/prescriptions/{ИД}/return"),
     ("post", f"/actions/prescriptions/{ИД}/send"),
     ("post", f"/actions/prescriptions/{ИД}/close"),
 ]
@@ -126,6 +156,7 @@ def test_запись_уК_отказывает_партнёру_на_каждо
     ответ = getattr(партнёр, метод)(адрес, data=ФОРМА, headers=ORIGIN)
     assert ответ.status_code == 404
     assert зовы["create"] == зовы["update"] == зовы["close"] == зовы["issue"] == []
+    assert зовы["request"] == зовы["approve"] == зовы["return"] == []
 
 
 @pytest.mark.parametrize(("метод", "адрес"), МАРШРУТЫ_УК)
@@ -146,6 +177,7 @@ def test_второй_заслон_держит_и_без_границы_про�
     # форма УК отвечает партнёру 404 сама — раздел открыт, форма нет.
     assert ответ.status_code == (403 if метод == "post" else 404)
     assert зовы["create"] == зовы["update"] == зовы["close"] == зовы["issue"] == []
+    assert зовы["request"] == зовы["approve"] == зовы["return"] == []
 
 
 def test_уК_ответ_за_партнёра_не_кладёт(уК: FlaskClient, зовы: dict[str, list[Any]]) -> None:
@@ -160,7 +192,7 @@ def _куда(ответ: Any) -> tuple[str, dict[str, str]]:
     return разбор.path, dict(parse_qsl(разбор.query))
 
 
-@pytest.mark.parametrize("клиент", ["уК", "партнёр"])
+@pytest.mark.parametrize("клиент", ["девелопер", "партнёр"])
 def test_старые_адреса_предписаний_переадресуют_в_действия(
     клиент: str, request: pytest.FixtureRequest
 ) -> None:
@@ -210,7 +242,7 @@ def test_чужой_файл_это_404(партнёр: FlaskClient, зовы: d
     assert зовы["file"][-1]["reach"].tenant == "GE"
 
 
-@pytest.mark.parametrize("клиент", ["уК", "партнёр"])
+@pytest.mark.parametrize("клиент", ["девелопер", "партнёр"])
 def test_меню_обеих_сторон_зовёт_в_одни_действия(
     клиент: str, request: pytest.FixtureRequest
 ) -> None:
@@ -250,12 +282,13 @@ def test_ответ_на_закрытое_формы_не_показывает(
 # --- раздел УК -------------------------------------------------------------
 
 
-def test_уК_видит_очередь_и_вкладки(уК: FlaskClient) -> None:
-    страница = уК.get("/actions?tab=prescriptions&lang=ru").get_data(as_text=True)
+def test_девелопер_видит_очередь_и_вкладки_но_не_новое_предписание(девелопер: FlaskClient) -> None:
+    страница = девелопер.get("/actions?tab=prescriptions&lang=ru").get_data(as_text=True)
     assert "Предписание · Грузия" in страница
     assert "Черновики · 0" in страница and "Просрочены · 0" in страница
     assert "tab=plans" in страница, "вкладки «Экшн-планы» нет"
-    assert "Новое предписание" in страница
+    # Без проверки предписание заводит ОСБ (D599): девелоперу кнопки нет.
+    assert "Новое предписание" not in страница
 
 
 def test_партнёр_видит_те_же_вкладки_но_без_очереди_черновиков_и_кнопки_составления(
@@ -267,8 +300,8 @@ def test_партнёр_видит_те_же_вкладки_но_без_очер
     assert "Черновики" not in страница and "Новое предписание" not in страница
 
 
-def test_панель_уК_даёт_закрытие_а_ответа_нет(уК: FlaskClient) -> None:
-    страница = уК.get(f"/actions?tab=prescriptions&id={ИД}&lang=ru").get_data(as_text=True)
+def test_панель_осб_даёт_закрытие_а_ответа_нет(уК: FlaskClient) -> None:
+    страница = уК.get(f"/osb?queue=active&id={ИД}&lang=ru").get_data(as_text=True)
     assert f"/actions/prescriptions/{ИД}/close" in страница
     assert "/reply" not in страница
 
@@ -331,7 +364,7 @@ def test_сохранить_черновик_ведёт_на_карточку(у
         "/actions/prescriptions?lang=ru", data={**ФОРМА, "then": "save"}, headers=ORIGIN
     )
     assert ответ.status_code == 303
-    assert ответ.headers["Location"].startswith(f"/actions?tab=prescriptions&id={ИД}")
+    assert ответ.headers["Location"].startswith(f"/osb?id={ИД}")
     черновик = зовы["create"][-1]["args"][0]
     assert (черновик.country, черновик.subject, черновик.unit_ids) == ("GE", "Тема", ())
 
@@ -339,6 +372,7 @@ def test_сохранить_черновик_ведёт_на_карточку(у
 def test_без_реквизитов_google_экран_говорит_словами(
     уК: FlaskClient, monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
 ) -> None:
+    monkeypatch.setattr(rx, "get_prescription", lambda *_a, **_k: предписание(status="approved"))
     for имя in ("GOOGLE_CLIENT_ID", "GOOGLE_MAIL_REDIRECT_URI"):
         monkeypatch.delenv(имя, raising=False)
     ответ = уК.post(f"/actions/prescriptions/{ИД}/send?lang=ru", headers=ORIGIN)
@@ -349,11 +383,11 @@ def test_без_реквизитов_google_экран_говорит_слова
 def test_отправленное_нельзя_открыть_на_правку(уК: FlaskClient, зовы: dict[str, list[Any]]) -> None:
     ответ = уК.get(f"/actions/prescriptions/{ИД}/edit?lang=ru")
     assert ответ.status_code == 303
-    assert _куда(ответ) == ("/actions", {"tab": "prescriptions", "id": ИД, "lang": "ru"})
+    assert _куда(ответ) == ("/osb", {"id": ИД, "lang": "ru"})
 
 
 def test_у_отправленного_нет_кнопки_в_gmail_а_есть_закрыть(уК: FlaskClient) -> None:
-    страница = уК.get(f"/actions?tab=prescriptions&id={ИД}&lang=ru").get_data(as_text=True)
+    страница = уК.get(f"/osb?queue=active&id={ИД}&lang=ru").get_data(as_text=True)
     assert "Положить в Gmail" not in страница and "Изменить черновик" not in страница
     assert "Закрыть предписание" in страница
 
@@ -459,3 +493,52 @@ def test_форма_говорит_сколько_проверок_показа�
     monkeypatch.setattr(rx, "choices", lambda *_a, **_k: ((), (основание,)))
     страница = уК.get("/actions/prescriptions/new?country=GE&lang=ru").get_data(as_text=True)
     assert f"Последние {rx.BASES_LIMIT} принятых проверок" in страница
+
+
+@pytest.mark.parametrize(
+    "адрес",
+    ["/actions/prescriptions?lang=ru", f"/actions/prescriptions/{ИД}/edit?lang=ru"],
+    ids=["завести", "править"],
+)
+def test_девелопер_без_основания_предписание_не_сохраняет(
+    девелопер: FlaskClient, зовы: dict[str, list[Any]], адрес: str
+) -> None:
+    """Предписание без проверки-основания — только ОСБ (D599), и при правке тоже."""
+    ответ = девелопер.post(адрес, data={**ФОРМА, "then": "save"}, headers=ORIGIN)
+
+    assert ответ.status_code == 400
+    assert зовы["create"] == [] and зовы["update"] == []
+
+
+def test_форма_девелопера_просит_основание_а_не_всю_страну(
+    девелопер: FlaskClient, зовы: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        rx, "choices", lambda *_a, **_k: ((), (rx.Choice(id=ИД, title="Пиццерия · 2026-10-01"),))
+    )
+    страница = девелопер.get("/actions/prescriptions/new?country=GE").get_data(as_text=True)
+    assert "Предписание по проверке" in страница
+    assert "Отметьте проверку-основание" in страница
+    assert "всю страну" not in страница and "Можно не отмечать" not in страница
+
+
+def test_форма_осб_держит_подсказки_про_всю_страну(
+    уК: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    страница = уК.get("/actions/prescriptions/new?country=GE").get_data(as_text=True)
+    assert "Новое предписание" in страница
+    assert "всю страну" in страница
+
+
+def test_панель_согласованного_говорит_про_почту_а_на_согласовании_нет(
+    уК: FlaskClient, зовы: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(rx, "get_prescription", lambda *_a, **_k: предписание(status="approved"))
+    одобрено = уК.get(f"/osb?id={ИД}").get_data(as_text=True)
+    assert "Черновик в почту" in одобрено and "Изменить (снимет согласование)" in одобрено
+    assert "Положить в Gmail" not in одобрено
+    assert "Согласованное предписание можно положить в почту" in одобрено
+    monkeypatch.setattr(rx, "get_prescription", lambda *_a, **_k: предписание(status="review"))
+    на_согласовании = уК.get(f"/osb?id={ИД}").get_data(as_text=True)
+    assert "Согласованное предписание можно положить в почту" not in на_согласовании
+    assert "С этого момента" not in на_согласовании

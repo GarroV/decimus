@@ -41,6 +41,7 @@ from src.domain.tenants import (
     DEVELOPER_ROLE,
     GUEST_ROLE,
     HQ_TENANT,
+    OSB_ROLE,
     SUPERADMIN_ROLE,
     canonical_tenant,
 )
@@ -55,7 +56,9 @@ PARTNER_ADMIN = "partner_admin"
 
 #: Роли людей УК, которых ведёт админ УК: всё, кроме главного админа (D364);
 #: другие админы — тоже его люди (D440, «Admin too»).
-_HQ_ADMIN_TOUCHES_IN_HQ = frozenset({ROLE_ADMIN, DEVELOPER_ROLE, CONTROL_ROLE, GUEST_ROLE})
+_HQ_ADMIN_TOUCHES_IN_HQ = frozenset(
+    {ROLE_ADMIN, DEVELOPER_ROLE, CONTROL_ROLE, GUEST_ROLE, OSB_ROLE}
+)
 #: Роли людей партнёра (D346): админ пространства и сотрудник.
 _PARTNER_ROLES = frozenset({ROLE_ADMIN, ROLE_AUDITOR})
 

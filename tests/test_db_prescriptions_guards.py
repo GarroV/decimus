@@ -24,6 +24,7 @@ from test_db_prescriptions import (
     _sql,
     _ответить,
     _отправленное,
+    _согласованное,
     _черновик,
 )
 
@@ -166,7 +167,7 @@ def test_сегодня_для_срока_у_базы_по_utc(сеть: dict[st
     # отверг бы отправку. Утром у пояса −12 ещё вчера: вчерашний срок
     # по current_date прошёл бы.
     пояс, срок = ("Etc/GMT-14", сегодня) if вечер else ("Etc/GMT+12", сегодня - timedelta(days=1))
-    ident = _черновик()
+    ident = _согласованное()
     with psycopg.connect(pg_dsn) as conn:
         conn.execute("alter table prescriptions disable trigger user")
         conn.execute("update prescriptions set due_on = %s where id = %s", (срок, ident))

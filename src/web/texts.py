@@ -702,7 +702,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.zones.none": {"ru": "Потерь по зонам нет", "en": "No loss in any zone"},
     "card.actions.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
     "card.act.move": {"ru": "Исправить", "en": "Correct"},
-    "card.act.rx": {"ru": "Предписание", "en": "Compliance notice"},
+    "card.act.rx": {"ru": "Сформировать предписание", "en": "Create compliance notice"},
     "card.act.rx_short": {"ru": "Предписание", "en": "Notice"},
     "card.act.letter": {"ru": "Письмо", "en": "Letter"},
     "card.act.plan": {"ru": "План", "en": "Plan"},

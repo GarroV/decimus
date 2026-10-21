@@ -3,14 +3,14 @@
   выбирается первой: от неё зависят пиццерии, проверки-основания и
   подставленные адресаты. Текст письма сотрудник вставляет сам.
 #}{% extends "base.html" %}
-{% block title %}{{ t('section.actions.title') }} · {{ t('rx.form.title_edit') if current else t('rx.form.title_new') }}{% endblock %}
+{% block title %}{{ t('section.actions.title') }} · {{ t('rx.form.title_edit') if current else (t('rx.form.title_new') if is_manager else t('rx.form.title_by_inspection')) }}{% endblock %}
 
 {% block body %}
-  <a class="cn-back" href="{{ url(actions_path) }}?tab=prescriptions{% if current %}&amp;id={{ current.id }}{% endif %}&amp;lang={{ lang }}">‹ {{ t('actions.tab.prescriptions') }}</a>
+  <a class="cn-back" href="{{ back_url }}">‹ {{ t('actions.tab.prescriptions') }}</a>
   <div class="ov-head">
     <div class="ov-head__main">
       <div class="ov-head__kicker">{{ (country_title(country) or country) if country else t('rx.form.kicker') }}</div>
-      <h1 class="ov-head__title">{{ t('rx.form.title_edit') if current else t('rx.form.title_new') }}</h1>
+      <h1 class="ov-head__title">{{ t('rx.form.title_edit') if current else (t('rx.form.title_new') if is_manager else t('rx.form.title_by_inspection')) }}</h1>
     </div>
   </div>
 
@@ -40,7 +40,7 @@
                 <span>{{ c.title }}</span>{% if c.detail %}<span class="ov-cell__muted">{{ city_title(c.detail) or c.detail }}</span>{% endif %}</label>
             {% endfor %}
           </div>
-          <div class="field-note">{{ t('rx.form.units_hint') }}</div>
+          {% if is_manager %}<div class="field-note">{{ t('rx.form.units_hint') }}</div>{% endif %}
         </fieldset>
 
         <fieldset class="field field--wide rx-pick">
@@ -52,7 +52,7 @@
                   <span>{{ c.title }}</span>{% if c.detail %}<span class="ov-cell__muted">{{ c.detail }}</span>{% endif %}</label>
               {% endfor %}
             </div>
-            <div class="field-note">{{ t('rx.form.bases_hint', n=bases_limit) }}</div>
+            <div class="field-note">{{ t('rx.form.bases_hint', n=bases_limit) if is_manager else t('rx.form.pick_base') }}</div>
           {% else %}
             <div class="field-note">{{ t('rx.form.no_bases') }}</div>
           {% endif %}
@@ -70,7 +70,10 @@
           <span class="field-note">{{ t('rx.form.body_hint') }}</span></label>
         <div class="row rx-form__actions">
           <button class="btn" type="submit" name="then" value="save">{{ t('rx.form.save') }}</button>
-          <button class="btn btn--primary" type="submit" name="then" value="send">{{ t('rx.form.save_send') }}</button>
+          {#- Девелопер и админ отправляют на согласование, ОСБ и главный админ согласуют сами (D600);
+              письмо в почту уходит только с панели согласованного предписания. -#}
+          {% if can_request %}<button class="btn btn--primary" type="submit" name="then" value="request">{{ t('rx.form.save_request') }}</button>{% endif %}
+          {% if can_approve %}<button class="btn btn--primary" type="submit" name="then" value="approve">{{ t('rx.form.save_approve') }}</button>{% endif %}
         </div>
       </div>
     </form>

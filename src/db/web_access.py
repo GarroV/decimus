@@ -298,17 +298,20 @@ ROLE_SUPERADMIN = "superadmin"
 ROLE_DEVELOPER = "developer"
 #: Гость (D440): вся сеть только на чтение. Только в HQ (`0060`).
 ROLE_GUEST = "guest"
+#: ОСБ (D599): гость плюс ведение предписаний. Только в HQ.
+ROLE_OSB = "osb"
 #: От самой узкой к самой широкой: в таком порядке роли идут в форме.
 ROLES = (
     ROLE_AUDITOR,
     ROLE_GUEST,
+    ROLE_OSB,
     ROLE_DEVELOPER,
     ROLE_CONTROL,
     ROLE_ADMIN,
     ROLE_SUPERADMIN,
 )
 #: Роли, которые бывают только в пространстве УК (`0040`, `0041`, `0060`).
-HQ_ONLY_ROLES = (ROLE_CONTROL, ROLE_SUPERADMIN, ROLE_DEVELOPER, ROLE_GUEST)
+HQ_ONLY_ROLES = (ROLE_CONTROL, ROLE_SUPERADMIN, ROLE_DEVELOPER, ROLE_GUEST, ROLE_OSB)
 #: Роль, которой в УК больше нет (D440, `0060`): аудиторы УК стали девелоперами.
 PARTNER_ONLY_ROLES = (ROLE_AUDITOR,)
 

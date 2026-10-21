@@ -19,7 +19,8 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
 ВИДЫ_ВСЕ = {f"view.{s.key}" for s in SECTIONS if s.key not in OWN_SECTIONS}
 # «Страна» открыта и партнёру (D508): экран пиццерии, в пределах его стран.
 # «Действия» — один раздел у УК и партнёра (D526): разделов «только УК» среди видов нет.
-ВИДЫ_ПАРТНЁРА = ВИДЫ_ВСЕ
+# «ОСБ» (D599) — страница только УК: партнёру её нет.
+ВИДЫ_ПАРТНЁРА = ВИДЫ_ВСЕ - {"view.osb"}
 
 РАБОТА_УК = {
     "inspection.read",
@@ -29,7 +30,9 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
     "inspection.retract",
     "inspection.move",
     "inspection.letter",
-    "prescription.manage",
+    # Запросить предписание из проверки может и девелопер, и админ (D600);
+    # вести его — только ОСБ и главный админ (`prescription.manage`).
+    "prescription.request",
     "plan.manage",
     "ratings.read",
     "unit.create",
@@ -68,14 +71,26 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
     "trip.own",
 }
 
+ГОСТЬ_УК = {
+    "inspection.read",
+    "ratings.read",
+    "view.overview",
+    "view.registry",
+    "view.calendar",
+    "view.country",
+    "view.ratings",
+    "view.training",
+    "view.users",
+}
+
 ОЖИДАНИЕ: dict[tuple[str, str], set[str]] = {
     # Главный админ = админ + ключи API (D440).
-    (SIDE_HQ, "superadmin"): АДМИН_УК | {"api.manage", "keys.manage"},
+    (SIDE_HQ, "superadmin"): АДМИН_УК | {"api.manage", "keys.manage", "prescription.manage"},
     (SIDE_HQ, "admin"): АДМИН_УК,
     # Бизнес-девелопер: всё в работе, без главного чек-листа, прода, стран, людей,
     # ключей и загрузок рейтингов (D440); загрузка проверок через Claude — открыта
     # (владелец 20.10.2026), партнёрам закрыта (D335).
-    (SIDE_HQ, "developer"): РАБОТА_УК | ВИДЫ_ВСЕ | {"inspection.import"},
+    (SIDE_HQ, "developer"): РАБОТА_УК | (ВИДЫ_ВСЕ - {"view.osb"}) | {"inspection.import"},
     # Контроль: рейтинги и свои люди, роли не меняет (D420, D360).
     (SIDE_HQ, "control"): {
         "ratings.read",
@@ -85,17 +100,9 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "view.users",
     },
     # Гость: вся сеть на чтение (D429, D440).
-    (SIDE_HQ, "guest"): {
-        "inspection.read",
-        "ratings.read",
-        "view.overview",
-        "view.registry",
-        "view.calendar",
-        "view.country",
-        "view.ratings",
-        "view.training",
-        "view.users",
-    },
+    (SIDE_HQ, "guest"): ГОСТЬ_УК,
+    # ОСБ (D599): права гостя на чтение + вести предписания; проверки не пишет.
+    (SIDE_HQ, "osb"): ГОСТЬ_УК | {"prescription.request", "prescription.manage", "view.osb"},
     # Админ партнёра: сотрудник + люди, свои чек-листы, вычитка свежих (D346, D367).
     (SIDE_PARTNER, "admin"): СОТРУДНИК_ПАРТНЁРА
     | {
