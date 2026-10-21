@@ -27,11 +27,13 @@ from src.recognize.classify import (
     MAX_CUE_EXTRAS,
     classify,
     needs_photo,
+    prepare_request,
     with_cue_extras,
 )
 from src.recognize.client import ModelAnswer
 from src.recognize.config import NO_CHAT
 from src.recognize.models import NONE_CODE, UNKNOWN_ZONE, Candidate, Suggestion
+from src.recognize.prompt import readings_line
 from src.recognize.shortlist import shortlist
 
 
@@ -553,3 +555,20 @@ def test_пустой_ответ_с_вопросом_берёт_по_пункт�
     вышло = with_cue_extras(found, rows)
 
     assert [c.code for c in вышло.cue_extras] == ["CLN15", "MGM01", "SFT01"][:MAX_CUE_EXTRAS]
+
+
+def test_разные_прочтения_названы_модели_только_при_двух_строках_словаря() -> None:
+    assert readings_line(["CLN15"]) == "", "одна строка — один объект, читать нечего"
+    line = readings_line(["CLN15", "MGM01"])
+    assert "CLN15, MGM01" in line and "спроси" in line
+
+
+def test_запрос_несёт_прочтения_когда_словарь_поднял_несколько_строк(domain_env: Path) -> None:
+    picked = shortlist("термометр на стене в зале", "dining", chat_id=NO_CHAT)
+    assert len(picked.cue_rows) >= 2, "предпосылка: слова поднимают несколько строк карты"
+
+    запрос = prepare_request("термометр на стене в зале", None, "dining", chat_id=NO_CHAT)
+
+    assert "разные прочтения" in запрос.ask.question
+    first = dict.fromkeys(row[0] for row in picked.cue_rows)
+    assert ", ".join(first) in запрос.ask.question

@@ -21,7 +21,7 @@ from .config import DEFAULT_LANG, RecognizeSettings, load_recognize_settings
 from .cues import class_thresholds
 from .guard import MAX_QUESTION_CHARS, MAX_REASON_CHARS, MAX_WORDING_CHARS, clean_text
 from .models import ANSWER_LEVELS, NONE_CODE, UNKNOWN_ZONE, Answer, Candidate, Suggestion
-from .prompt import correction_line, instructions, question_text
+from .prompt import correction_line, instructions, question_text, readings_line
 from .rules_check import check_wording
 from .schema import picks_for, response_schema, split_pick
 from .shortlist import shortlist
@@ -280,6 +280,7 @@ def prepare_request(
     picks = picks_for(picked.codes, chat_id=chat_id)
     zones = list_zones(chat_id=chat_id)
     use_photo = album or (photo is not None and needs_photo(note))
+    readings = readings_line(tuple(dict.fromkeys(row[0] for row in picked.cue_rows)))
     ask = AskArgs(
         kind=KIND_RECOGNIZE,
         instructions=instructions(class_thresholds(chat_id=chat_id)),
@@ -293,7 +294,8 @@ def prepare_request(
             chat_id=chat_id,
             album_frames=len(photos) if album else 0,
             sent_at=sent_at,
-        ),
+        )
+        + (f"\n\n{readings}" if readings else ""),
         schema=response_schema(picks, [z.code for z in zones], album=album),
         photo=photo if use_photo and not album else None,
         photos=photos if album else (),
