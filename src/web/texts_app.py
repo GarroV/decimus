@@ -47,6 +47,20 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.start.replace_yes": {"ru": "Да, начать новую", "en": "Yes, start a new one"},
     "walk.start.keep": {"ru": "Оставить текущую", "en": "Keep the current one"},
+    "walk.start.drop": {"ru": "Завершить без сдачи", "en": "End without handing over"},
+    "walk.start.drop_title": {
+        "ru": "Завершить текущую проверку без сдачи?",
+        "en": "End the current inspection without handing it over?",
+    },
+    "walk.start.drop_note": {
+        "ru": "Записи и кадры несданной проверки пропадут. Сданные отчёты останутся.",
+        "en": "Findings and photos of the unsent inspection are lost. Handed-over reports stay.",
+    },
+    "walk.start.drop_yes": {"ru": "Да, завершить", "en": "Yes, end it"},
+    "walk.start.dropped": {
+        "ru": "Проверка завершена без сдачи. Можно начинать новую.",
+        "en": "Inspection ended without handing over. You can start a new one.",
+    },
     "walk.start.cancel": {"ru": "Отмена", "en": "Cancel"},
     "walk.start.new_yes": {"ru": "Да, добавить", "en": "Yes, add it"},
     "walk.start.new_no": {"ru": "Нет, изменить название", "en": "No, edit the name"},

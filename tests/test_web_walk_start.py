@@ -254,6 +254,38 @@ def test_сданная_заменяется_без_вопроса_и_призн
     assert not handed_over(АУДИТОР), "новая проверка не наследует «сдана» прежней"
 
 
+def test_завершить_без_сдачи_снимает_идущую_и_новая_начинается_без_вопроса(
+    клиент: Клиент,
+) -> None:
+    """Зависшая проверка (тестовая, начатая не там) снимается кнопкой, и новая стартует."""
+    # Arrange
+    start_inspection(АУДИТОР, unit="Podgorica-2", kind="planned", report_lang="en")
+
+    # Act
+    снята = клиент.пост(op="drop")
+    состояние = клиент.пост(op="options").get_json()["state"]
+    новая = клиент.старт()
+
+    # Assert
+    assert снята.status_code == 200 and снята.get_json() == {"state": "none"}
+    assert состояние == "none", "после «Завершить без сдачи» проверка ещё идёт"
+    assert новая.status_code == 200, новая.get_json()
+    assert get_state(АУДИТОР).unit == "Belgrade-1"  # type: ignore[union-attr]
+
+
+def test_завершить_без_проверки_не_ошибка(клиент: Клиент) -> None:
+    """Второе нажатие (проверки уже нет) — не поломка."""
+    assert клиент.пост(op="drop").status_code == 200
+    assert get_state(АУДИТОР) is None
+
+
+def test_завершить_без_подписи_не_пускают(клиент: Клиент) -> None:
+    start_inspection(АУДИТОР, unit="Podgorica-2", kind="planned", report_lang="en")
+    ответ = клиент.c.post(ПУТЬ, data=json.dumps({"op": "drop"}), content_type="application/json")
+    assert ответ.status_code == 401
+    assert get_state(АУДИТОР) is not None, "без подписи проверка снята"
+
+
 def test_опции_называют_состояние_проверки(клиент: Клиент) -> None:
     нет = клиент.пост(op="options").get_json()["state"]
     start_inspection(АУДИТОР, unit="Podgorica-2", kind="planned", report_lang="en")
