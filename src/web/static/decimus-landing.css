@@ -23,6 +23,10 @@ body:has(.lp) { background: var(--surface); }
   --lp-wrap: 1240px;
   --lp-gutter: 24px;
   --lp-bar-h: 72px;
+  /* Закладки: высота полосы над прилипшими листами, ширина и зазор места в ряду. */
+  --lp-tab-h: 36px;
+  --lp-tab-w: 168px;
+  --lp-tab-gap: 6px;
   --lp-side: max(var(--lp-gutter), calc((100% - var(--lp-wrap)) / 2));
   /* Снимок выходит за правое поле листа, но не за край окна. */
   --lp-bleed: clamp(0px, calc((100vw - 1288px) / 2), 56px);
@@ -33,7 +37,7 @@ body:has(.lp) { background: var(--surface); }
 /* ── Лист ───────────────────────────────────────────────────────────────── */
 .lp-sheet {
   position: sticky;
-  top: var(--lp-bar-h); /* листу выше окна `landing.js` ставит меньший top */
+  top: var(--lp-bar-h); /* `landing.js` ставит свой: под полосой закладок, а листу выше окна — меньший */
   box-sizing: border-box;
   min-height: calc(100vh - var(--lp-bar-h));
   min-height: calc(100svh - var(--lp-bar-h));
@@ -50,23 +54,38 @@ body:has(.lp) { background: var(--surface); }
 .lp-sheet--white { background: var(--surface); }
 .lp-sheet--beige { background: var(--brand-beige); }
 .lp-sheet--purple { background: var(--brand-purple-deep); color: #fff; }
-.lp-hero { padding-top: 40px; border-radius: 0; box-shadow: none; }
+.lp-hero { top: var(--lp-bar-h); padding-top: 40px; border-radius: 0; box-shadow: none; }
 .lp-hero > .lp-cols { margin-block: auto; }
 
-/* Закладка — шаг пути, как закладка в папке: того же цвета, что и лист. */
+/* Закладка — шаг пути, как закладка в папке: того же цвета, что и лист. У каждой своё
+   место в ряду (`--lp-tab-i`): дошедший до верха лист оставляет закладку в полосе под
+   шапкой (`.lp-tabs`), и они складываются слева направо, как папки в стопке; прокрутка
+   вверх разбирает стопку обратно. Полосу ведёт `landing.js` — без него закладки просто
+   едут со своими листами. */
 .lp-tab {
   position: absolute;
-  top: -36px;
-  left: var(--lp-side);
+  top: calc(-1 * var(--lp-tab-h));
+  left: calc(var(--lp-side) + var(--lp-tab-i, 0) * (var(--lp-tab-w) + var(--lp-tab-gap)));
+  box-sizing: border-box;
+  width: var(--lp-tab-w);
   margin: 0;
   padding: 0 20px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   border-radius: 14px 14px 0 0;
   background: inherit;
   box-shadow: 0 -10px 18px -10px rgba(27, 32, 40, .22);
   font-size: 15px;
   font-weight: var(--w-semibold);
-  line-height: 36px;
+  line-height: var(--lp-tab-h);
 }
+.lp-tab.is-docked { visibility: hidden; }
+/* Полоса прилипших закладок. Копии закладок стоят там же по горизонтали, что и оригиналы,
+   поэтому лист передаёт закладку полосе без скачка. Над листами, под шапкой. */
+.lp-tabs { position: fixed; top: var(--lp-bar-h); left: 0; right: 0; height: var(--lp-tab-h); z-index: 15; pointer-events: none; }
+.lp-tabs .lp-tab { top: 0; display: none; }
+.lp-tabs .lp-tab.is-on { display: block; }
 .lp-tab__n { margin-right: 10px; color: var(--ink-2); font-weight: var(--w-bold); }
 
 /* ── Шапка: над листами, а не на первом: ярлык листа не наезжает на логотип ──────────────────────────────────────────────── */
@@ -143,7 +162,14 @@ body:has(.lp) { background: var(--surface); }
 
 /* ── Узкое окно: одна колонка, снимок под текстом ───────────────────────── */
 @media (max-width: 860px) {
-  .lp { --lp-gutter: 16px; --lp-bleed: 0px; --lp-bar-h: 60px; }
+  .lp {
+    --lp-gutter: 16px; --lp-bleed: 0px; --lp-bar-h: 60px;
+    /* Пять закладок в ширину телефона: место делится поровну. */
+    --lp-tab-h: 32px; --lp-tab-gap: 4px;
+    --lp-tab-w: calc((100vw - 2 * var(--lp-gutter) - 4 * var(--lp-tab-gap)) / 5);
+  }
+  .lp-tab { padding: 0 8px; font-size: 12px; border-radius: 10px 10px 0 0; }
+  .lp-tab__n { margin-right: 4px; }
   .lp-sheet { padding-top: 72px; padding-bottom: 56px; border-radius: 22px 22px 0 0; }
   .lp-hero { padding-top: 24px; }
   .lp-bar__demo { display: none; }
