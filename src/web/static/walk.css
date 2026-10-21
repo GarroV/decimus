@@ -190,6 +190,10 @@
   cursor: pointer;
 }
 
+.walk-progress-row { display: flex; align-items: center; gap: 8px; }
+.walk-progress-row .walk-progress { flex: 1; min-width: 0; }
+.walk-switch__arrow--top { height: 32px; width: 40px; font-size: 20px; line-height: 1; }
+
 .walk-switch__main {
   flex: 1;
   display: flex;
