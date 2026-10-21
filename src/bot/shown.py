@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 
@@ -55,7 +56,7 @@ def _quietly(запомнить: Callable[[], None], chat_id: int, n: int, по�
         )
 
 
-def remember(chat_id: int, sent: Message | None, n: int) -> None:
+async def remember(chat_id: int, sent: Message | None, n: int) -> None:
     """Запомнить сообщение, которым показана запись #`n`.
 
     Отказ заметок наружу не пускается: запись уже сделана и показана, а потеря
@@ -68,7 +69,7 @@ def remember(chat_id: int, sent: Message | None, n: int) -> None:
     """
     if sent is None:
         return
-    _quietly(
+    await _quietly_in_thread(
         lambda: sidecar.remember_record(chat_id, sent.message_id, n),
         chat_id,
         n,
@@ -76,7 +77,7 @@ def remember(chat_id: int, sent: Message | None, n: int) -> None:
     )
 
 
-def remember_repeat_ask(chat_id: int, sent: Message | None, n: int, code: str) -> None:
+async def remember_repeat_ask(chat_id: int, sent: Message | None, n: int, code: str) -> None:
     """Запомнить сообщение с вопросом о повторе записи #`n` (D255).
 
     Отказ заметок гасится по тому же правилу: вопрос уже задан, и кнопки
@@ -84,7 +85,7 @@ def remember_repeat_ask(chat_id: int, sent: Message | None, n: int, code: str) -
     """
     if sent is None:
         return
-    _quietly(
+    await _quietly_in_thread(
         lambda: sidecar.remember_repeat_ask(chat_id, sent.message_id, n, code),
         chat_id,
         n,
@@ -92,7 +93,7 @@ def remember_repeat_ask(chat_id: int, sent: Message | None, n: int, code: str) -
     )
 
 
-def remember_origin(chat_id: int, message_id: int | None, n: int) -> None:
+async def remember_origin(chat_id: int, message_id: int | None, n: int) -> None:
     """Запомнить сообщение аудитора, из которого выросла запись #`n` (T205).
 
     Отказ заметок гасится по тому же правилу и по той же причине, что и у
@@ -105,12 +106,23 @@ def remember_origin(chat_id: int, message_id: int | None, n: int) -> None:
     """
     if message_id is None:
         return
-    _quietly(
+    await _quietly_in_thread(
         lambda: sidecar.remember_origin(chat_id, message_id, n),
         chat_id,
         n,
         "кадр ответом на свои слова в неё не попадёт",
     )
+
+
+async def _quietly_in_thread(
+    запомнить: Callable[[], None], chat_id: int, n: int, потеря: str
+) -> None:
+    """То же `_quietly`, но запись заметок — в потоке, не в цикле событий.
+
+    Заметки пишутся под `flock` (до 30 с ожидания), и на цикле это стоп для всех
+    чатов разом (F-122).
+    """
+    await asyncio.to_thread(_quietly, запомнить, chat_id, n, потеря)
 
 
 async def tell_refusal(message: Message, chat_id: int, told: Refusal, lang: str) -> Message:
@@ -132,5 +144,5 @@ async def tell_refusal(message: Message, chat_id: int, told: Refusal, lang: str)
         reply_markup=edit_keyboard(told.clash.n, lang) if told.clash is not None else None,
     )
     if told.clash is not None:
-        remember(chat_id, sent, told.clash.n)
+        await remember(chat_id, sent, told.clash.n)
     return sent

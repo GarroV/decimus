@@ -1605,11 +1605,11 @@ async def _save(
     # ведётся здесь, а не в роутере правки: показ записи собирается в этом
     # месте, и любой другой был бы вторым списком мест, который однажды отстал
     # бы от первого на один показ.
-    remember_shown(chat_id, sent, finding.n)
+    await remember_shown(chat_id, sent, finding.n)
     # А ответом на СВОЁ сообщение аудитор досылает в эту запись кадр (T205). Обе
     # карты ведутся рядом по той же причине: запись показана здесь, и разнеси их
     # по разным местам — одна отстала бы от другой на один путь фиксации.
-    remember_origin(chat_id, origin, finding.n)
+    await remember_origin(chat_id, origin, finding.n)
     if correcting is None and auto is None and not learned:
         # Совпадение было НЕПРЯМЫМ: сверка со списком нарушений пункт не нашла,
         # а человек его назвал — кнопкой кандидата или в ручном перечне. С D119
@@ -1676,7 +1676,7 @@ async def _ask_repeat(
         ),
         reply_markup=repeat_keyboard(shown.n, shown.code, lang),
     )
-    remember_repeat_ask(chat_id, asked, shown.n, shown.code)
+    await remember_repeat_ask(chat_id, asked, shown.n, shown.code)
 
 
 def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Router:
@@ -2266,8 +2266,10 @@ def make_frame_handler() -> FrameHandler:
         # Кадр запоминается ДО прикрепления и независимо от его исхода: список
         # присланного нужен целиком (T068), и не прикрепившийся кадр обязан
         # найтись при завершении, а не исчезнуть.
-        sidecar.remember_frames(
-            chat_id, [sidecar.SeenFrame(message_id=message.message_id, file_id=file_id)]
+        await asyncio.to_thread(
+            sidecar.remember_frames,
+            chat_id,
+            [sidecar.SeenFrame(message_id=message.message_id, file_id=file_id)],
         )
         frame_copies.received(message.bot, chat_id, [(message.message_id, file_id)])
         try:

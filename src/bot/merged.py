@@ -136,8 +136,8 @@ async def into_taken(
     )
     # Это показ записи: ответ словами на него правит её (T204), а кадр ответом
     # на своё сообщение ложится в неё же (T205).
-    remember_shown(chat_id, sent, taken.n)
-    remember_origin(chat_id, origin, taken.n)
+    await remember_shown(chat_id, sent, taken.n)
+    await remember_origin(chat_id, origin, taken.n)
     journal.note(
         chat_id,
         "merged",

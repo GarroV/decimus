@@ -83,7 +83,7 @@ async def show_changed(message: Message, chat_id: int, n: int, lang: str) -> Non
     # Правка кнопкой — тоже показ записи, и отвечать аудитор будет на последнее
     # сообщение о ней, а не искать первое (T204). Не запомнить его значило бы
     # сделать правку ответом доступной ровно до первого нажатия кнопки.
-    remember_shown(chat_id, sent, n)
+    await remember_shown(chat_id, sent, n)
 
 
 def _finding(chat_id: int, n: int) -> domain.Finding | None:

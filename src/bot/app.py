@@ -4,15 +4,15 @@
 `BOT_MODE`): постоянного публичного адреса нет ни на ноутбуке, ни на домашнем
 сервере, а вебхук без него не поднять.
 
-**Обновления обрабатываются последовательно** (`handle_as_tasks=False`). Это не
-экономия и не осторожность, а требование задачи T059: по умолчанию aiogram
-заводит задачу на каждое обновление, и пачка сообщений, пришедшая разом после
-потери связи, разбирается вперемешку — комментарии привязываются не к тем
-кадрам. Последовательная обработка даёт порядок по построению: Telegram
-сохраняет порядок доставки внутри чата, и бот его больше не перемешивает.
-Цена — пока идёт разбор одного сообщения, следующее ждёт; для проверки, где
-работает один аудитор и шаги идут строго друг за другом, это и есть желаемое
-поведение.
+**Обновления разных чатов обрабатываются параллельно, одного чата — строго по
+очереди** (F-122, #1006). Раньше опрос шёл с `handle_as_tasks=False`: так
+обеспечивался порядок задачи T059 (пачка кадров и комментариев после потери
+связи не должна разбираться вперемешку), но ценой было то, что одна медленная
+голосовая или тормозящий провайдер задерживали ответы ВСЕМ чатам. Теперь
+aiogram заводит задачу на обновление, а порядок внутри чата держит замок чата
+(`src/bot/chat_lock.py`): Telegram сохраняет порядок доставки внутри чата, замок
+не даёт его перемешать. Число одновременных обновлений ограничено
+(`UPDATE_TASKS_LIMIT`).
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import replace
+from typing import Any
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -47,6 +48,7 @@ from . import (
 )
 from .access import AccessMiddleware, BindingCache, ChatSpaceMiddleware
 from .albums import ALBUM_WINDOW_SECONDS, AlbumBuffer
+from .chat_lock import ChatLockMiddleware
 from .config import BotSettings, load_bot_settings
 from .lang import chat_ui_lang
 from .lang_choice import PersonMiddleware
@@ -82,6 +84,19 @@ from .texts import DEFAULT_UI_LANG, default_ui_lang, t
 from .version import build_version
 
 logger = logging.getLogger(__name__)
+
+#: Сколько обновлений aiogram разбирает одновременно. Предел нужен, чтобы пачка
+#: после потери связи или залипший провайдер не наплодили задач без счёта; с
+#: запасом над числом аудиторов, которые работают одновременно.
+UPDATE_TASKS_LIMIT = 128
+
+#: Как опрашивать Telegram: обновления — задачами (разные чаты не ждут друг
+#: друга), порядок внутри чата — замок `ChatLockMiddleware`. Вынесено в
+#: константу, чтобы тест гонял ту же настройку, что и бот (F-122).
+POLLING_OPTIONS: dict[str, Any] = {
+    "handle_as_tasks": True,
+    "tasks_concurrency_limit": UPDATE_TASKS_LIMIT,
+}
 
 
 def _asked_here(event: ErrorEvent) -> Message | None:
@@ -179,6 +194,11 @@ def build_dispatcher(
     # Раньше роутеров: сбой в любом из них обязан дойти до аудитора, а не
     # раствориться в aiogram (T126).
     dispatcher.errors.register(on_unexpected_error)
+
+    # Самой первой из внешних, на уровне апдейта: порядок внутри чата (T059) при
+    # параллельной обработке держит замок чата, и всё, что делают остальные
+    # мидлвари и хендлер, обязано пройти под ним (F-122).
+    dispatcher.update.outer_middleware(ChatLockMiddleware())
 
     # Имя из связок, собранных по приглашениям до D286, нужно шапке отчёта; ручная
     # запись `AUDITOR_NAMES` сильнее — иначе исправить имя можно было бы только
@@ -402,7 +422,7 @@ async def start_polling() -> None:
     # Обучение пиццерий из iSpring — раз в сутки, только агрегаты (D574, D575, #906).
     training = asyncio.create_task(learning_loader.load_forever())
     try:
-        await dispatcher.start_polling(bot, handle_as_tasks=False)
+        await dispatcher.start_polling(bot, **POLLING_OPTIONS)
     finally:
         sweeper.cancel()
         backfill.cancel()
