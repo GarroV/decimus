@@ -26,9 +26,10 @@
        alt="{{ t('landing.alt.' ~ name) }}" decoding="async"{% if not eager %} loading="lazy"{% endif %}>
 {% endmacro %}
 
-{# Закладка листа — шаг пути. Номер только у шагов проверки: это настоящая последовательность. #}
-{% macro tab(num, key) %}
-  <p class="lp-tab">{% if num %}<span class="lp-tab__n">{{ num }}</span>{% endif %}{{ t(key) }}</p>
+{# Закладка листа — шаг пути. Номер только у шагов проверки: это настоящая последовательность.
+   `place` — место закладки в ряду: прилипшие листы складывают закладки слева направо, как папки. #}
+{% macro tab(num, key, place) %}
+  <p class="lp-tab" style="--lp-tab-i: {{ place }}">{% if num %}<span class="lp-tab__n">{{ num }}</span>{% endif %}{{ t(key) }}</p>
 {% endmacro %}
 
 {% block body %}
@@ -66,7 +67,7 @@
     </section>
 
     <section class="lp-sheet lp-sheet--beige" aria-labelledby="lp-plan">
-      {{ tab(1, 'landing.plan.tab') }}
+      {{ tab(1, 'landing.plan.tab', 0) }}
       <div class="lp-cols">
         <div class="lp-copy">
           <h2 class="lp-h2" id="lp-plan">{{ t('landing.plan.title') }}</h2>
@@ -77,7 +78,7 @@
     </section>
 
     <section class="lp-sheet lp-sheet--white" aria-labelledby="lp-walk">
-      {{ tab(2, 'landing.walk.tab') }}
+      {{ tab(2, 'landing.walk.tab', 1) }}
       <div class="lp-cols lp-cols--hero lp-cols--top">
         <div class="lp-copy">
           <h2 class="lp-h2" id="lp-walk">{{ t('landing.walk.title') }}</h2>
@@ -98,7 +99,7 @@
     </section>
 
     <section class="lp-sheet lp-sheet--beige" aria-labelledby="lp-report">
-      {{ tab(3, 'landing.report.tab') }}
+      {{ tab(3, 'landing.report.tab', 2) }}
       <div class="lp-cols">
         <div class="lp-copy">
           <h2 class="lp-h2" id="lp-report">{{ t('landing.report.title') }}</h2>
@@ -109,7 +110,7 @@
     </section>
 
     <section class="lp-sheet lp-sheet--white" aria-labelledby="lp-actions">
-      {{ tab(4, 'landing.actions.tab') }}
+      {{ tab(4, 'landing.actions.tab', 3) }}
       <div class="lp-cols">
         <div class="lp-copy">
           <h2 class="lp-h2" id="lp-actions">{{ t('landing.actions.title') }}</h2>
@@ -120,7 +121,7 @@
     </section>
 
     <section class="lp-sheet lp-sheet--beige lp-net" aria-labelledby="lp-net">
-      {{ tab(None, 'landing.net.tab') }}
+      {{ tab(None, 'landing.net.tab', 4) }}
       <div class="lp-copy lp-copy--wide">
         <h2 class="lp-h2" id="lp-net">{{ t('landing.net.title') }}</h2>
         <p class="lp-body">{{ t('landing.net.body') }}</p>
