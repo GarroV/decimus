@@ -234,6 +234,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.finding": {"ru": "Система ищет пункт…", "en": "Looking for the item…"},
     "walk.sheet.finding_short": {"ru": "Ищу…", "en": "Searching…"},
     "walk.sheet.found": {"ru": "Система предлагает", "en": "Suggested"},
+    # Второе нарушение по тем же кадрам (D593).
+    "walk.sheet.also": {"ru": "+ Тоже записать", "en": "+ Record this too"},
+    "walk.sheet.also_on": {"ru": "✓ Запишется тоже", "en": "✓ Will be recorded too"},
+    "walk.sheet.save_n": {"ru": "Сохранить ({n})", "en": "Save ({n})"},
     # Показание термометра (#836).
     "walk.sheet.reading": {"ru": "Температура, °C", "en": "Temperature, °C"},
     "walk.sheet.reading_hint": {
