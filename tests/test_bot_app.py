@@ -3,9 +3,9 @@
 Проверяется не «функция вызывается», а два решения, которые иначе живут только
 в комментарии и молча исчезают при первой же правке:
 
-* обновления обрабатываются **последовательно** (`handle_as_tasks=False`) — это
-  и есть механизм задачи T059: пачка, пришедшая разом после потери связи,
-  разбирается в порядке доставки, а не вперемешку по задачам;
+* обновления обрабатываются задачами (`handle_as_tasks=True`, F-122), а порядок
+  внутри чата — механизм задачи T059: пачка, пришедшая разом после потери
+  связи, разбирается в порядке доставки — держит замок чата;
 * методика проверяется **до** первого сообщения, а не при первой записи: пустой
   или неполный каталог методики дал бы честный на вид ответ «нарушений нет»,
   и узнал бы об этом аудитор уже на точке.
@@ -87,13 +87,14 @@ def polling(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> PollingSpy:
 
 
 @pytest.mark.asyncio
-async def test_updates_are_processed_one_by_one_so_a_burst_keeps_its_order(
+async def test_updates_are_processed_as_tasks_with_a_bounded_number(
     polling: PollingSpy,
 ) -> None:
-    """T059: опрос поднимается без задачи на обновление — иначе пачка разберётся вперемешку."""
+    """F-122: чаты не ждут друг друга; порядок внутри чата — замок (`test_bot_chat_lock.py`)."""
     await app.start_polling()
 
-    assert polling.kwargs["handle_as_tasks"] is False
+    assert polling.kwargs["handle_as_tasks"] is True
+    assert polling.kwargs["tasks_concurrency_limit"] == app.UPDATE_TASKS_LIMIT
 
 
 @pytest.mark.asyncio

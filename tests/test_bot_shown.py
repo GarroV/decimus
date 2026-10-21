@@ -22,6 +22,8 @@ from src.bot.shown import remember
 
 CHAT = 4242
 
+pytestmark = pytest.mark.asyncio
+
 
 def сообщение(message_id: int) -> Message:
     return Message(
@@ -31,24 +33,24 @@ def сообщение(message_id: int) -> Message:
     )
 
 
-def test_сообщение_запоминается(domain_env: Path) -> None:
-    remember(CHAT, сообщение(9001), 1)
+async def test_сообщение_запоминается(domain_env: Path) -> None:
+    await remember(CHAT, сообщение(9001), 1)
 
     assert sidecar.record_of(CHAT, 9001) == 1
 
 
-def test_отправки_не_было_запоминать_нечего(domain_env: Path) -> None:
+async def test_отправки_не_было_запоминать_нечего(domain_env: Path) -> None:
     """Телеграм не сказал, каким сообщением показана запись, — заметок не заводим.
 
     Файла заметок в этом случае не появляется вовсе: пустая карта в файле
     выглядела бы как «сообщений о записях не было», хотя их просто не помнят.
     """
-    remember(CHAT, None, 1)
+    await remember(CHAT, None, 1)
 
     assert not sidecar.notes_path(CHAT).is_file()
 
 
-def test_испорченные_заметки_показ_записи_не_роняют(
+async def test_испорченные_заметки_показ_записи_не_роняют(
     domain_env: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Заметки не читаются — запись всё равно сделана и показана.
@@ -62,6 +64,6 @@ def test_испорченные_заметки_показ_записи_не_ро
     путь.write_text(json.dumps({"schema": 3, "records": [{"нет": "номера"}]}), encoding="utf-8")
 
     with caplog.at_level(logging.WARNING):
-        remember(CHAT, сообщение(9001), 1)
+        await remember(CHAT, сообщение(9001), 1)
 
     assert "правка ответом" in caplog.text, "потеря карты не названа в журнале"

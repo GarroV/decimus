@@ -141,11 +141,11 @@ async def _ask_checklist(message: Message, state: FSMContext, lang: str, space: 
     )
 
 
-def _forget_chat_notes(
+async def _forget_chat_notes(
     chat_id: int, pending: PendingStore | None, store: MaterialStore | None
 ) -> None:
     """Заметки уходят вместе с проверкой: кадры, зона и карта сообщений — её, а не чата."""
-    sidecar.reset(chat_id)
+    await asyncio.to_thread(sidecar.reset, chat_id)
     if pending is not None:
         pending.forget(chat_id)
     if store is not None:
@@ -175,7 +175,7 @@ async def _drop_sealed_copy(
             "сданная проверка чата %s не убралась: drop_inspection вернул ложь", log_id(chat_id)
         )
         return False
-    _forget_chat_notes(chat_id, pending, store)
+    await _forget_chat_notes(chat_id, pending, store)
     return True
 
 
@@ -343,7 +343,7 @@ def build_start_router(
         if not убрана:
             await stops.refuse(message, lang, step="start.drop", key="sealed.drop_gone")
             return
-        _forget_chat_notes(chat_id, pending, store)
+        await _forget_chat_notes(chat_id, pending, store)
         await message.answer(t("sealed.dropped", lang), reply_markup=new_inspection_keyboard(lang))
 
     @router.message(StateFilter(StartFlow.waiting_unit), F.text, ~F.text.startswith("/"))
@@ -592,7 +592,7 @@ def build_start_router(
 
         # Заметки бота — того же возраста, что и проверка: источники записей,
         # список кадров и последняя зона от прошлой к новой не относятся.
-        sidecar.reset(message.chat.id)
+        await asyncio.to_thread(sidecar.reset, message.chat.id)
         if pending is not None:
             pending.forget(message.chat.id)
         if store is not None:

@@ -189,8 +189,8 @@ async def _revise(
     sent = await message.answer(t("correct.revised", lang, n=n, text=revision.text))
     # Ответом на подтверждение правят ту же запись (T204), а кадр ответом на
     # свои слова ложится в неё же (T205) — как у правки через разбор.
-    remember_shown(chat_id, sent, n)
-    remember_origin(chat_id, message.message_id, n)
+    await remember_shown(chat_id, sent, n)
+    await remember_origin(chat_id, message.message_id, n)
     return True
 
 

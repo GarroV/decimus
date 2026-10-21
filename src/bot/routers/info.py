@@ -381,8 +381,10 @@ def build_info_router() -> Router:
         chat_id = message.chat.id
         lang, _ = chat_langs(chat_id)
         if file_id is not None:
-            sidecar.remember_frames(
-                chat_id, [sidecar.SeenFrame(message_id=message.message_id, file_id=file_id)]
+            await asyncio.to_thread(
+                sidecar.remember_frames,
+                chat_id,
+                [sidecar.SeenFrame(message_id=message.message_id, file_id=file_id)],
             )
             frame_copies.received(message.bot, chat_id, [(message.message_id, file_id)])
             shots = await _photos(state)
