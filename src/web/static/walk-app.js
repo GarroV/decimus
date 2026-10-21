@@ -515,6 +515,40 @@
     root.appendChild(box);
   }
 
+  /** «Завершить без сдачи»: снять идущую проверку, чтобы начать новую с чистого листа. */
+  function dropConfirm(root, wz) {
+    var box = el("section", "walk-app__card");
+    box.appendChild(el("h2", "walk-app__card-unit", tx("walk.start.drop_title")));
+    box.appendChild(el("p", "walk-form__note", tx("walk.start.drop_note")));
+    box.appendChild(W.button("walk-btn walk-btn--danger", tx("walk.start.drop_yes"), function () { dropCurrent(wz); }));
+    box.appendChild(W.button("walk-link", tx("walk.start.keep"), function () { wz.dropAsk = false; W.render(); }));
+    root.appendChild(box);
+  }
+
+  function dropCurrent(wz) {
+    if (wz.busy) return;
+    wz.busy = true;
+    W.render();
+    W.post(W.urls.start, { op: "drop" }).then(function (res) {
+      if (A.wiz !== wz) return;
+      wz.busy = false;
+      wz.dropAsk = false;
+      if (res.ok) {
+        W.haptic("success");
+        wz.opts.state = "none";
+        wz.replaceOk = false;
+        wz.confirm = false;
+        wz.dropped = true;
+      } else {
+        W.haptic("error");
+        wz.error = (res.body && res.body.message) || tx("walk.error");
+      }
+      W.render();
+    }).catch(function () {
+      if (A.wiz === wz) wizardFail(wz, tx("walk.err.network"));
+    });
+  }
+
   function startScreen(root) {
     var wz = A.wiz || (A.wiz = wizardFresh());
     root.appendChild(head(tx("walk.start.title")));
@@ -532,6 +566,15 @@
     // «Идёт проверка…» — один раз: над формой и над подтверждением замены.
     if (o.state === "running") {
       root.appendChild(el("p", "walk-banner", tx("walk.start.running", { unit: data().unit || "—" })));
+      if (wz.dropAsk) return dropConfirm(root, wz);
+      if (!wz.confirm) {
+        root.appendChild(W.button("walk-link walk-app__drop", tx("walk.start.drop"), function () {
+          wz.dropAsk = true;
+          W.render();
+        }));
+      }
+    } else if (wz.dropped) {
+      root.appendChild(el("p", "walk-banner", tx("walk.start.dropped")));
     }
     if (wz.confirm) return replaceConfirm(root, wz);
     var form = el("form", "walk-app__form");

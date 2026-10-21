@@ -6,7 +6,10 @@
   виды проверки, языки (предвыбран прошлый выбор человека, D451) и состояние
   текущей проверки (нет / идёт / сдана);
 - `suggest` — подсказки к полю названия по мере набора;
-- `start` — начать проверку.
+- `start` — начать проверку;
+- `drop` — завершить текущую проверку без сдачи: снять её из чата, чтобы начать
+  новую (зависшая тестовая, начатая не там). Несданное пропадает — экран
+  спрашивает об этом до запроса.
 
 Правила не переписаны, а взяты у бота: пределы и каноничность названия
 (`domain.unit_name.check_unit_name`), сверка со справочником и «Новая пиццерия?»
@@ -276,6 +279,23 @@ class _Wizard:
             raise Refused(self.say("walk.start.err.checklist_gone"), field="checklist")
         return code
 
+    def drop(self) -> None:
+        """Завершить проверку чата без сдачи — под тем же замком, что старт.
+
+        Снимается только копия в чате (`drop_inspection`): сданный отчёт и история
+        точки остаются. Нечитаемое состояние тоже снимается — иначе человек застрял
+        бы с проверкой, которую ни продолжить, ни заменить.
+        """
+        try:
+            with holding_notes(self.who):
+                drop_inspection(self.who)
+                reset_notes(self.who)
+        except DomainError as exc:
+            logger.exception("Мини-апп: проверку чата %s не удалось завершить", log_id(self.who))
+            raise Refused(self.say("walk.start.err.failed"), 500) from exc
+        journal.close(self.who)
+        logger.info("Мини-апп: чат %s завершил проверку без сдачи", log_id(self.who))
+
     def start(self, body: dict[str, Any], full_name: str) -> None:
         kind = _choice(body, "kind", KIND_TITLES)
         speech_lang = _choice(body, "speech_lang", LANG_LABELS)
@@ -354,6 +374,9 @@ def install(
                 return jsonify(wizard.options()), 200
             if op == "suggest":
                 return jsonify(wizard.suggest(body)), 200
+            if op == "drop":
+                wizard.drop()
+                return jsonify({"state": STATE_NONE}), 200
             if op == "start":
                 name = full_name_of(request.headers.get(INIT_DATA_HEADER, ""), conf)
                 wizard.start(body, name)
