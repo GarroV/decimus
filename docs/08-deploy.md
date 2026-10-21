@@ -1848,7 +1848,7 @@ D391) — так же: миграций нет, право — уже выдан
 | Надстройка | `deploy/preview/compose.preview.yaml` над dev-compose: бот и MCP выключены, `WEB_DEMO`, чаты мини-аппа демо, свой порт `127.0.0.1:8296`, сервис посева `seed` |
 | Настройки | файл настроек стенда — копия настроек `decimus-walk` плюс ключ модели и `RECOGNIZE_*` с прода, перенесённые владельцем без показа значений |
 | Кадры посева | `C:\data\decimus-preview-photos` (копия `/srv/decimus-demo-photos` с VPS), путь — `PREVIEW_PHOTOS_DIR` |
-| Адрес | `https://muspelheim.tail48dfee.ts.net:9443` — `tailscale serve --https=9443`, только внутри tailnet |
+| Адрес | `https://<TAILNET_HOST>:9443` — `tailscale serve --https=9443`, только внутри tailnet |
 
 Обновить на другую ветку или свежий код (в `cmd` на площадке):
 
