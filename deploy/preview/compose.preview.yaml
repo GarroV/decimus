@@ -21,6 +21,9 @@ services:
   web:
     environment:
       WEB_DEMO: "1"
+      # Стенд открывается с корня своего порта: префикс пути из настроек
+      # соседнего стенда (тот жил под /decimus-walk) не наследуется.
+      WEB_URL_PREFIX: ""
     ports: !override
       - "127.0.0.1:${PREVIEW_WEB_PORT:-8296}:8268"
   walk:
@@ -30,6 +33,7 @@ services:
       WEB_WALK_PREVIEW_CHAT: "999000000701"
       WEB_WALK_PREVIEW_CHAT_RU: "999000000702"
       WEB_DEMO: "1"
+      WEB_URL_PREFIX: ""
   db:
     ports: !override []
   storage:
