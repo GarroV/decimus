@@ -145,10 +145,13 @@ FRONT = "front-key-for-tests-0123456789abcdef"
 FRONT_HEADER = "X-Decimus-Front-Key"
 
 
-def _адрес_клиента(front_key: str, headers: dict[str, str], peer: str = "172.19.0.2") -> str:
+def _адрес_клиента(
+    front_key: str, headers: dict[str, str], mode: str = "enforce", peer: str = "172.19.0.2"
+) -> str:
     settings = replace(
         _settings(trusted=1, host="0.0.0.0", addrs=(PROXY_NET,)),  # noqa: S104
         front_key=front_key,
+        front_key_mode=mode,
     )
     app = Flask(__name__)
     seen: list[str] = []
@@ -167,34 +170,108 @@ def _адрес_клиента(front_key: str, headers: dict[str, str], peer: st
     return seen[0]
 
 
-def test_ключ_совпал_заголовкам_звена_верим() -> None:
-    assert _адрес_клиента(FRONT, {FRONT_HEADER: FRONT}) == "198.51.100.9"
+FORGED = "198.51.100.9"  # адрес, который подставляет сосед или называет Worker
+NEIGHBOUR = "172.19.0.2"  # адрес соединения (сосед по подсети звена)
+GOOD = {FRONT_HEADER: FRONT}
+BAD_KEYS = [{}, {FRONT_HEADER: "wrong"}, {FRONT_HEADER: ""}]
 
 
-@pytest.mark.parametrize("headers", [{}, {FRONT_HEADER: "wrong"}, {FRONT_HEADER: ""}])
-def test_ключ_задан_но_не_совпал_сосед_по_подсети_чужой(headers: dict[str, str]) -> None:
-    assert _адрес_клиента(FRONT, headers) == "172.19.0.2"
+@pytest.mark.parametrize("mode", ["off", "log", "enforce"])
+def test_верный_ключ_заголовкам_звена_верим_в_любом_режиме(mode: str) -> None:
+    assert _адрес_клиента(FRONT, GOOD, mode) == FORGED
 
 
-def test_ключ_не_задан_доверие_по_подсети_и_одно_предупреждение(
+@pytest.mark.parametrize("headers", BAD_KEYS)
+def test_enforce_без_верного_ключа_сосед_по_подсети_чужой(headers: dict[str, str]) -> None:
+    assert _адрес_клиента(FRONT, headers, "enforce") == NEIGHBOUR
+
+
+@pytest.mark.parametrize("mode", ["off", "log"])
+@pytest.mark.parametrize("headers", BAD_KEYS)
+def test_off_и_log_без_ключа_верят_по_подсети_как_раньше(
+    mode: str, headers: dict[str, str]
+) -> None:
+    assert _адрес_клиента(FRONT, headers, mode) == FORGED
+
+
+def test_off_ключ_не_нужен_даже_не_заданный_и_одно_предупреждение(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     with caplog.at_level("WARNING", logger="src.web.proxy"):
-        assert _адрес_клиента("", {}) == "198.51.100.9"
-    assert sum("WEB_FRONT_KEY" in r.getMessage() for r in caplog.records) == 1
+        assert _адрес_клиента("", {}, "off") == FORGED
+    assert sum("WEB_FRONT_KEY_MODE" in r.getMessage() for r in caplog.records) == 1
+
+
+def test_off_ключ_не_сверяется_и_в_журнал_о_нём_ничего(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level("INFO", logger="src.web.proxy"):
+        _адрес_клиента(FRONT, {FRONT_HEADER: "wrong-value"}, "off")
+    assert not any("без верного" in r.getMessage() for r in caplog.records)
+    assert not any("совпал" in r.getMessage() for r in caplog.records)
+
+
+def test_enforce_чужой_адрес_ключом_не_становится_своим() -> None:
+    # Вне подсети звена верный ключ ничего не меняет: ключ добавляется к подсети.
+    assert _адрес_клиента(FRONT, GOOD, "enforce", peer="172.18.0.5") == "172.18.0.5"
+
+
+def test_log_несовпадение_пишется_и_верим_а_совпадение_отмечается(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("INFO", logger="src.web.proxy"):
+        _адрес_клиента(FRONT, {FRONT_HEADER: "wrong-value"}, "log")
+        _адрес_клиента(FRONT, GOOD, "log")
+    text = " ".join(r.getMessage() for r in caplog.records)
+    assert "без верного ключа фронта (режим log, верим)" in text
+    assert "совпал" in text
 
 
 def test_отказ_пишется_в_журнал_без_значения_ключа(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level("WARNING", logger="src.web.proxy"):
-        _адрес_клиента(FRONT, {FRONT_HEADER: "wrong-value"})
+        _адрес_клиента(FRONT, {FRONT_HEADER: "wrong-value"}, "enforce")
     text = " ".join(r.getMessage() for r in caplog.records)
     assert "ключа фронта" in text
+    assert "отброшены" in text
     assert FRONT not in text
     assert "wrong-value" not in text
 
 
-def test_ключ_читается_из_окружения_и_не_светится_в_repr() -> None:
-    settings = load_settings(_env(WEB_FRONT_KEY=f" {FRONT} "))
+def test_несовпадения_в_журнале_не_чаще_раза_в_интервал(caplog: pytest.LogCaptureFixture) -> None:
+    settings = replace(
+        _settings(trusted=1, host="0.0.0.0", addrs=(PROXY_NET,)),  # noqa: S104
+        front_key=FRONT,
+        front_key_mode="enforce",
+    )
+    app = Flask(__name__)
+    app.add_url_rule("/", "i", lambda: "")
+    app.wsgi_app = guard_forwarded(app.wsgi_app, settings)  # type: ignore[method-assign, assignment]
+    with caplog.at_level("WARNING", logger="src.web.proxy"):
+        for _ in range(5):
+            app.test_client().get("/", environ_base={"REMOTE_ADDR": NEIGHBOUR})
+    assert sum("без верного ключа" in r.getMessage() for r in caplog.records) == 1
+
+
+def test_ключ_и_режим_читаются_из_окружения_и_ключ_не_светится_в_repr() -> None:
+    settings = load_settings(_env(WEB_FRONT_KEY=f" {FRONT} ", WEB_FRONT_KEY_MODE=" Enforce "))
     assert settings.front_key == FRONT
+    assert settings.front_key_mode == "enforce"
     assert FRONT not in repr(settings)
-    assert load_settings(_env()).front_key == ""
+    default = load_settings(_env())
+    assert (default.front_key, default.front_key_mode) == ("", "off")
+
+
+def test_режим_off_с_ключом_допустим_катить_первым() -> None:
+    assert load_settings(_env(WEB_FRONT_KEY=FRONT)).front_key_mode == "off"
+
+
+@pytest.mark.parametrize(
+    ("env", "match"),
+    [
+        ({"WEB_FRONT_KEY_MODE": "enforse", "WEB_FRONT_KEY": FRONT}, "WEB_FRONT_KEY_MODE"),
+        ({"WEB_FRONT_KEY_MODE": "enforce"}, "требует заданный WEB_FRONT_KEY"),
+        ({"WEB_FRONT_KEY_MODE": "log"}, "требует заданный WEB_FRONT_KEY"),
+        ({"WEB_FRONT_KEY": "short"}, "короче"),
+    ],
+)
+def test_несовместимое_окружение_отказ_запуска(env: dict[str, str], match: str) -> None:
+    with pytest.raises(WebConfigError, match=match):
+        load_settings(_env(**env))

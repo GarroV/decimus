@@ -40,10 +40,18 @@ WEB_TRUSTED_PROXIES_VAR = "WEB_TRUSTED_PROXIES"
 #: Адреса своих звеньев (адрес или подсеть, через запятую; `*` — любой сосед):
 #: только от них верим `X-Forwarded-*` (F-038 аудита 12.10, `src/web/proxy.py`).
 WEB_TRUSTED_PROXY_ADDR_VAR = "WEB_TRUSTED_PROXY_ADDR"
-#: Ключ фронта Cloudflare (тот же, что секрет `FRONT_KEY` у Worker'ов): если задан,
-#: `X-Forwarded-*` верим только запросу с верным `X-Decimus-Front-Key`
-#: (F-107 аудита, `src/web/proxy.py`). Не задан — доверие по подсети, как раньше.
+#: Ключ фронта Cloudflare (тот же, что секрет `FRONT_KEY` у Worker'ов): им origin
+#: сверяет `X-Decimus-Front-Key` (F-107 аудита, `src/web/proxy.py`).
 WEB_FRONT_KEY_VAR = "WEB_FRONT_KEY"
+#: Что origin делает с ключом: `off` — не сверяет (умолчание), `log` — сверяет и
+#: пишет несовпадение, но верит по подсети, `enforce` — без верного ключа не верит.
+#: Три состояния нужны порядку выката: ключ не должен требоваться раньше, чем
+#: Caddy его пропускает (docs/08-deploy.md, §8.9).
+WEB_FRONT_KEY_MODE_VAR = "WEB_FRONT_KEY_MODE"
+FRONT_KEY_OFF = "off"
+FRONT_KEY_LOG = "log"
+FRONT_KEY_ENFORCE = "enforce"
+FRONT_KEY_MODES = (FRONT_KEY_OFF, FRONT_KEY_LOG, FRONT_KEY_ENFORCE)
 WEB_URL_PREFIX_VAR = "WEB_URL_PREFIX"
 WEB_LISTEN_NETWORK_VAR = "WEB_LISTEN_NETWORK"
 #: Имя бота в Telegram без «@» — для ссылки привязки `t.me/<бот>?start=...`
@@ -118,9 +126,11 @@ class Settings:
     #: Адреса и подсети своих звеньев (`WEB_TRUSTED_PROXY_ADDR`): заголовкам
     #: `X-Forwarded-*` верим только от них. Пусто — звено не названо.
     trusted_proxy_addrs: tuple[str, ...] = ()
-    #: Ключ фронта (`WEB_FRONT_KEY`): пусто — origin ключ не проверяет. Значение
-    #: секретное: в журнал и в `repr` не попадает.
+    #: Ключ фронта (`WEB_FRONT_KEY`). Значение секретное: в журнал и в `repr`
+    #: не попадает. Сверяется, только когда `front_key_mode` не `off`.
     front_key: str = field(default="", repr=False)
+    #: Режим сверки ключа (`WEB_FRONT_KEY_MODE`): `off` | `log` | `enforce`.
+    front_key_mode: str = FRONT_KEY_OFF
     #: Путь, на котором админка живёт снаружи, когда общий вход площадки отдан
     #: не ей. Пусто — своё имя целиком, и это умолчание. Непустой префикс
     #: уходит в `SCRIPT_NAME`, поэтому ссылки страницы собираются вместе с ним:
@@ -338,6 +348,33 @@ def _parse_demo_url(raw: str) -> str | None:
     return value.rstrip("/")
 
 
+def _parse_front_key(key_raw: str, mode_raw: str) -> tuple[str, str]:
+    """Ключ фронта и режим его сверки; несовместимое — отказ запуска.
+
+    Опечатка в режиме не должна тихо значить «не проверяем» (защита, которую
+    считают включённой, не работает), а `log`/`enforce` без ключа — «верим всем»
+    или «не верим никому» вместо названного. Короткий ключ подбирается, как и
+    ключ подписи, поэтому ниже `MIN_SECRET_KEY_LENGTH` — отказ.
+    """
+    key = key_raw.strip()
+    mode = mode_raw.strip().lower() or FRONT_KEY_OFF
+    if mode not in FRONT_KEY_MODES:
+        raise WebConfigError(
+            f"Значение {WEB_FRONT_KEY_MODE_VAR}={mode_raw.strip()} не понято: ожидается "
+            f"{' | '.join(FRONT_KEY_MODES)} (пусто — {FRONT_KEY_OFF})"
+        )
+    if key and len(key) < MIN_SECRET_KEY_LENGTH:
+        raise WebConfigError(
+            f"Ключ {WEB_FRONT_KEY_VAR} короче {MIN_SECRET_KEY_LENGTH} знаков: это тот же ключ, "
+            f"что секрет FRONT_KEY у Worker'ов"
+        )
+    if mode != FRONT_KEY_OFF and not key:
+        raise WebConfigError(
+            f"{WEB_FRONT_KEY_MODE_VAR}={mode} требует заданный {WEB_FRONT_KEY_VAR}"
+        )
+    return key, mode
+
+
 def _parse_hsts(raw: str) -> bool:
     """Включён ли HSTS. Пусто и `0` — нет, `1` — да, остальное — отказ запуска.
 
@@ -498,6 +535,9 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     admin_public_url = _parse_public(src, ADMIN_PUBLIC_URL_VAR)
     rp_id, origin = _parse_webauthn(src, admin_public_url)
     secret_key, ephemeral = _parse_secret_key(src.get(WEB_SECRET_KEY_VAR) or "")
+    front_key, front_key_mode = _parse_front_key(
+        src.get(WEB_FRONT_KEY_VAR) or "", src.get(WEB_FRONT_KEY_MODE_VAR) or ""
+    )
     listen_network = _parse_listen_network(src.get(WEB_LISTEN_NETWORK_VAR) or "")
     return Settings(
         host=_parse_host(src.get(WEB_HOST_VAR) or "", listen_network=listen_network),
@@ -508,7 +548,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         secret_key_is_ephemeral=ephemeral,
         trusted_proxies=_parse_trusted_proxies(src.get(WEB_TRUSTED_PROXIES_VAR) or ""),
         trusted_proxy_addrs=_parse_trusted_proxy_addrs(src.get(WEB_TRUSTED_PROXY_ADDR_VAR) or ""),
-        front_key=(src.get(WEB_FRONT_KEY_VAR) or "").strip(),
+        front_key=front_key,
+        front_key_mode=front_key_mode,
         url_prefix=_parse_url_prefix(src.get(WEB_URL_PREFIX_VAR) or ""),
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
         hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),
