@@ -256,7 +256,9 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         suggested=suggested,
         reading_c=reading_of(body),
     )
-    if words and learns:
+    # «Тоже»-запись по тем же кадрам (D593): слова сказаны про основной пункт,
+    # синонимом второго они не становятся.
+    if words and learns and body.get("also") is not True:
         # Запомнить сказанное синонимом выбранного пункта (D119) — как бот после
         # записи по предложению: в следующий раз эти слова найдут его без модели.
         learn(words, item_code=code, lang=inspection.speech_lang, chat_id=chat_id)

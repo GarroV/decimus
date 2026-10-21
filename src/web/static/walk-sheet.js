@@ -11,6 +11,10 @@
  * выводит сервер (`resolution` у карточки) по пункту, словам и подсказке с
  * экрана; не вывелась — форма спрашивает пилюлями «Где?» и не даёт сохранить.
  * Результат — одна строка «пункт · зона», зона в ней — пилюля с меню.
+ * Одним кадром бывает видно два нарушения (сломанный дозатор и в нём нет мыла):
+ * у невыбранной карточки есть «Тоже записать» (D593) — отмеченные пункты
+ * сохраняются отдельными записями с теми же кадрами и словами, следом за
+ * основной; зона — своя у пункта, а не вывелась — та же, что у основной.
  * Рекомендация (D201, класс R) и общая заметка (D314, код NOTE) — без вычета,
  * текст обязателен. Замер (D0) — со стоянки «Печь и холодильники» (D315).
  *
@@ -361,6 +365,7 @@
     }
     f.repeat = false;
     f.picked = null;
+    f.also = [];
     // Рекомендации и замеру зону показывает пилюля над формой — подсказка с
     // экрана ложится в неё видимо, а не молча.
     if (mode !== "violation" && !f.zone && f.hint) f.zone = f.hint;
@@ -473,6 +478,8 @@
     if (!i) return;
     f.code = code;
     f.picked = cand ? cand : null;
+    // Ставший основным пункт из «тоже» уходит: одна запись на пункт.
+    f.also = f.also.filter(function (c) { return c.code !== code; });
     if (recognizing()) applyResolution(i, cand);
     if (i.measure) f.level = "D0";
     else if (isAdvice() || i.note) f.level = ADVICE_LEVEL;
@@ -508,6 +515,7 @@
       if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
       f.finding = false;
       f.found = (res.body && res.body.candidates) || [];
+      f.also = [];
       f.question = (res.body && res.body.question) || "";
       f.via = (res.body && res.body.via) || "model";
       f.asked = JSON.stringify(asked);
@@ -569,7 +577,45 @@
     b.setAttribute("aria-pressed", "false");
     b.appendChild(top);
     b.appendChild(el("span", "walk-found__q", i.q));
-    return b;
+    if (!recognizing() || !f.code || !item(cand.code)) return b;
+    // «Тоже записать» (D593) — рядом с карточкой, а не в ней: кнопка в кнопке недопустима.
+    var row = el("div", "walk-found__row");
+    var also = isAlso(cand);
+    var t = W.button("walk-found__also" + (also ? " is-on" : ""), tx(also ? "walk.sheet.also_on" : "walk.sheet.also"), function () { toggleAlso(cand); });
+    t.setAttribute("aria-pressed", String(also));
+    row.appendChild(b);
+    row.appendChild(t);
+    return row;
+  }
+
+  function isAlso(cand) { return f.also.some(function (c) { return c.code === cand.code; }); }
+
+  function toggleAlso(cand) {
+    f.also = isAlso(cand) ? f.also.filter(function (c) { return c.code !== cand.code; }) : f.also.concat([cand]);
+    W.haptic();
+    redraw("item", "footer");
+  }
+
+  /** Отмеченные «тоже» — только у свежего поиска нового нарушения. */
+  function extras() {
+    if (!recognizing() || !f.found || stale()) return [];
+    return f.also.filter(function (c) { return item(c.code) && c.code !== f.code; });
+  }
+
+  /** Зона «тоже»-записи: своя у пункта, иначе — та же, что у основной (D593). */
+  function extraZone(cand) {
+    var r = cand.resolution;
+    var own = itemZones(cand.code);
+    var z = r && r.zone && zoneOf(r.zone) && !zoneOf(r.zone).equipment ? r.zone
+      : own.length === 1 ? own[0].code : null;
+    return z || f.zone;
+  }
+
+  function extraLevel(cand) {
+    var i = item(cand.code);
+    if (i.note) return ADVICE_LEVEL;
+    if (i.levels.indexOf(cand.level) !== -1) return cand.level;
+    return i.levels.length === 1 ? i.levels[0] : cand.level;
   }
 
   /** «Где?»: зоны пункта пилюлями, пока зона не названа (D445). */
@@ -847,6 +893,7 @@
       var label = f.saving ? tx("walk.sheet.saving")
         : f.finding ? tx("walk.sheet.rechecking")
         : recheck ? tx("walk.sheet.recheck")
+        : extras().length ? tx("walk.sheet.save_n", { n: extras().length + 1 })
         : taken() ? tx("walk.sheet.add_photos") : tx("walk.sheet.save");
       var save = W.hinted(W.button("walk-mark", label, save_), "save");
       save.disabled = !!why || f.saving || !!f.finding;
@@ -919,17 +966,30 @@
     return parseReading(f.reading);
   }
 
+  /** «Тоже»-записи (D593): те же кадры и слова, синоним по ним не учится — слова про основной пункт. */
+  function extraOps() {
+    var photos = readyPhotos().map(function (p) { return p.ref; });
+    return extras().map(function (c) {
+      return {
+        op: "add", zone: extraZone(c), code: c.code, level: extraLevel(c), text: (c.wording || "").trim(),
+        comment: "", repeat: false, photos: photos, words: f.words.trim(), also: true,
+        suggested: { code: c.code, level: c.level, zone: c.zone, confidence: c.confidence, via: f.via },
+        reading_c: c.reading_c === undefined ? null : c.reading_c,
+      };
+    });
+  }
+
   function ops() {
     var refs = readyPhotos().filter(function (p) { return p.fresh; }).map(function (p) { return p.ref; });
     var t = taken();
-    if (t) return refs.map(function (ref) { return { op: "attach", n: t.n, ref: ref }; });
+    if (t) return refs.map(function (ref) { return { op: "attach", n: t.n, ref: ref }; }).concat(extraOps());
     if (!f.n) {
       return [{
         op: "add", zone: f.zone, code: f.code, level: isAdvice() ? ADVICE_LEVEL : f.level, text: f.text.trim(),
         comment: f.comment.trim(), repeat: !!f.repeat && repeatOffered(),
         photos: readyPhotos().map(function (p) { return p.ref; }),
         words: f.words.trim(), suggested: suggested(), reading_c: readingValue(),
-      }];
+      }].concat(extraOps());
     }
     var o = f.original;
     var edit = { op: "edit", n: f.n };
@@ -1052,6 +1112,7 @@
       gone: [],
       words: "",
       found: null,
+      also: [],
       preset: opts.code || null,
       reading: null,
       readingBase: null,

@@ -289,3 +289,39 @@ def test_поиск_отпускает_замок_и_чат_после_себя(
 
     assert (первый.status_code, второй.status_code) == (200, 200), "чат остался занятым"
     assert len(взятые) == 2
+
+
+def test_второе_нарушение_по_тем_же_кадрам_пишется_и_не_учит_слова(
+    клиент: Клиент,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D593: «Тоже записать» — вторая запись с теми же кадрами; слова учат только основной пункт."""
+    выучено: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        walk_write, "learn", lambda w, *, item_code, **k: выучено.append((w, item_code)) or ""
+    )
+    кадр = клиент.ссылка()
+    общее = {"zone": "hot_kitchen", "words": "дозатор", "photos": [кадр]}
+
+    def предложено(code: str, level: str) -> dict[str, Any]:
+        return {"code": code, "level": level, "zone": "hot_kitchen", "via": "model"}
+
+    первая = клиент.запись(
+        op="add", code="CLN05", level="D1", suggested=предложено("CLN05", "D1"), **общее
+    )
+    вторая = клиент.запись(
+        op="add",
+        code="PRD06",
+        level="D1",
+        also=True,
+        suggested=предложено("PRD06", "D1"),
+        **общее,
+    )
+
+    assert первая.status_code == 200, первая.get_json()
+    assert вторая.status_code == 200, вторая.get_json()
+    записи = {f.code: f for f in get_state(АУДИТОР).findings}  # type: ignore[union-attr]
+    assert set(записи) == {"CLN05", "PRD06"}
+    assert записи["PRD06"].photos == записи["CLN05"].photos == [кадр], "кадр общий у обеих"
+    assert записи["PRD06"].suggested_code == "PRD06", "предложение второй — её карточка"
+    assert выучено == [("дозатор", "CLN05")], "синонимом второго пункта слова не становятся"
