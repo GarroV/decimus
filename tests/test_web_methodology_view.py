@@ -119,3 +119,22 @@ def test_порядок_обхода_по_номерам_а_без_номера_
 
 def test_равные_номера_сохраняют_прежний_порядок() -> None:
     assert mv.route_order({"a": "1", "b": "1"}, ["b", "a"]) == ["b", "a"]
+
+
+def test_группы_и_формулировки_на_языке_экрана() -> None:
+    """При английском экране пункт и процесс — английские; нет перевода — русские."""
+    # Arrange
+    пункты = (
+        {"id": "A1", "question_ru": "Пол чистый", "question_en": "Floor is clean",
+         "process_ru": "Зал", "process_en": "Dining"},
+        {"id": "A2", "question_ru": "Только по-русски", "process_ru": "Зал"},
+    )  # fmt: skip
+
+    # Act
+    en = mv.group(пункты, "process", "en")
+
+    # Assert
+    assert [g.key for g in en] == ["Dining", "Зал"]
+    assert mv.localized(пункты[0], "question", "en") == "Floor is clean"
+    assert mv.localized(пункты[1], "question", "en") == "Только по-русски"
+    assert [g.key for g in mv.group(пункты, "process", "ru")] == ["Зал"]

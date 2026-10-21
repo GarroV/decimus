@@ -119,15 +119,21 @@ def select(items: Sequence[Item], f: ItemFilter) -> tuple[Item, ...]:
     )
 
 
-def _keys(item: Item, by: str) -> tuple[str, ...]:
+def localized(item: Item, field: str, lang: str) -> str:
+    """Поле пункта на языке экрана (`question`, `process`); нет перевода — другой язык."""
+    other = "en" if lang == "ru" else "ru"
+    return item.get(f"{field}_{lang}") or item.get(f"{field}_{other}") or ""
+
+
+def _keys(item: Item, by: str, lang: str) -> tuple[str, ...]:
     if by == "zone":
         return zones_of(item)
     if by == "level":
         return levels_of(item) or ("",)
-    return (item.get("process_ru") or item.get("process_en") or "",)
+    return (localized(item, "process", lang),)
 
 
-def group(items: Sequence[Item], by: str) -> tuple[Group, ...]:
+def group(items: Sequence[Item], by: str, lang: str = "ru") -> tuple[Group, ...]:
     """Сложить пункты в группы в порядке первого появления.
 
     Пункт нескольких зон (или классов) стоит в каждой своей группе: вопрос
@@ -137,7 +143,7 @@ def group(items: Sequence[Item], by: str) -> tuple[Group, ...]:
     порядок: list[str] = []
     по_ключу: dict[str, list[Item]] = {}
     for item in items:
-        for key in _keys(item, by):
+        for key in _keys(item, by, lang):
             if key not in по_ключу:
                 порядок.append(key)
                 по_ключу[key] = []
