@@ -22,7 +22,7 @@ from dataclasses import dataclass
 
 from src.domain import list_items
 
-from .cues import load_cues, match_cues
+from .cues import load_cues, matched_cues
 
 #: Пункты, которые ставит только человек: «другое критическое нарушение» и
 #: «массовость нарушений D1». Модель их не предлагает — так велит последний
@@ -37,6 +37,10 @@ class Shortlist:
     codes: tuple[str, ...]
     cue_hits: tuple[str, ...]
     zone: str | None
+    #: Те же подсказки по строкам карты, в порядке показа (D597): строка — это
+    #: один объект («Туалет: интерьер» — грязь и поломка), и запас к вопросу
+    #: модели берётся по одному пункту из строки, а не подряд по кодам.
+    cue_rows: tuple[tuple[str, ...], ...] = ()
 
     def __len__(self) -> int:
         return len(self.codes)
@@ -66,7 +70,8 @@ def shortlist(
     исчезает, и модель уверенно предлагает соседний. Пустой чат
     (`config.NO_CHAT`) — законное «проверки нет», а не забытый параметр.
     """
-    hits = match_cues(note, load_cues(chat_id=chat_id))
+    rows = matched_cues(note, load_cues(chat_id=chat_id))
+    hits = tuple(dict.fromkeys(code for cue in rows for code in cue.codes))
     everything = list_items(chat_id=chat_id)
     offered = {i.code for i in everything if _offered(i.kind, i.code, with_manual=with_manual)}
     # Зона проверяется, даже когда перечень ею не режется: неизвестный код зоны
@@ -84,4 +89,7 @@ def shortlist(
     base.sort(key=lambda code: code not in in_zone)
     front = tuple(code for code in hits if code in offered)
     codes = list(front) + [code for code in base if code not in front]
-    return Shortlist(codes=tuple(codes), cue_hits=front, zone=zone_hint)
+    cue_rows = tuple(
+        row for row in (tuple(c for c in cue.codes if c in offered) for cue in rows) if row
+    )
+    return Shortlist(codes=tuple(codes), cue_hits=front, zone=zone_hint, cue_rows=cue_rows)

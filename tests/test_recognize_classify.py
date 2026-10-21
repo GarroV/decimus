@@ -22,10 +22,16 @@ from typing import Any
 
 import pytest
 
-from src.recognize.classify import classify, needs_photo
+from src.recognize.classify import (
+    CUE_REASON,
+    MAX_CUE_EXTRAS,
+    classify,
+    needs_photo,
+    with_cue_extras,
+)
 from src.recognize.client import ModelAnswer
 from src.recognize.config import NO_CHAT
-from src.recognize.models import UNKNOWN_ZONE
+from src.recognize.models import NONE_CODE, UNKNOWN_ZONE, Candidate, Suggestion
 from src.recognize.shortlist import shortlist
 
 
@@ -505,3 +511,45 @@ def test_негодные_варианты_ответа_отбрасываютс
 
     assert s.answers == (), почему
     assert s.question, "вопрос остаётся текстом, пропадают только кнопки"
+
+
+# ── D597: пункты словаря рядом с вопросом ──────────────────────────────
+
+
+def _уверенный(code: str) -> Candidate:
+    return Candidate(code=code, level="D1", zone="dining", wording="Факт.", confidence=0.8)
+
+
+def test_вопрос_дописывает_пункт_словаря_которого_модель_не_назвала() -> None:
+    found = Suggestion(candidates=(_уверенный("CLN15"),), question="Грязь или отметка?")
+    rows = [[("CLN15", "D1"), ("TEH12", "D1")], [("MGM01", "D1")]]
+
+    вышло = with_cue_extras(found, rows)
+
+    assert [c.code for c in вышло.cue_extras] == ["MGM01"], (
+        "строка, из которой модель уже назвала пункт, пропускается целиком"
+    )
+    extra = вышло.cue_extras[0]
+    assert (extra.wording, extra.confidence, extra.zone) == ("", 0.0, UNKNOWN_ZONE)
+    assert extra.reason == CUE_REASON
+    assert вышло.candidates == found.candidates, "кандидаты модели не тронуты"
+
+
+def test_без_вопроса_словарь_ничего_не_дописывает() -> None:
+    found = Suggestion(candidates=(_уверенный("CLN15"),), needs_human=False)
+
+    assert with_cue_extras(found, [[("MGM01", "D1")]]).cue_extras == ()
+
+
+def test_пустой_ответ_с_вопросом_берёт_по_пункту_из_строки_не_больше_предела() -> None:
+    found = Suggestion(question="Что нарушено?")
+    rows = [
+        [("CLN15", "D1"), ("TEH12", "D1")],
+        [(NONE_CODE, "D1"), ("MGM01", "D1")],
+        [("CLN15", "D1")],
+        [("SFT01", "D1")],
+    ]
+
+    вышло = with_cue_extras(found, rows)
+
+    assert [c.code for c in вышло.cue_extras] == ["CLN15", "MGM01", "SFT01"][:MAX_CUE_EXTRAS]

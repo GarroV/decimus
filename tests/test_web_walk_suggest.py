@@ -325,3 +325,24 @@ def test_второе_нарушение_по_тем_же_кадрам_пише�
     assert записи["PRD06"].photos == записи["CLN05"].photos == [кадр], "кадр общий у обеих"
     assert записи["PRD06"].suggested_code == "PRD06", "предложение второй — её карточка"
     assert выучено == [("дозатор", "CLN05")], "синонимом второго пункта слова не становятся"
+
+
+def test_пункт_словаря_нижней_карточкой_без_формулировки(
+    клиент: Клиент,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D597: модель спросила и не назвала пункт словаря — он в самом низу, текст пишет аудитор."""
+    запас = Candidate(code="CLN06", level="D1", zone="unknown", wording="", confidence=0.0)
+
+    def модель(note: str, photo: bytes | None, zone: str | None, **kw: Any) -> Suggestion:
+        return Suggestion(candidates=(МОДЕЛЬ,), question="Нагар или жир?", cue_extras=(запас,))
+
+    monkeypatch.setattr(ядро, "classify", модель)
+    monkeypatch.setattr(ядро, "fast_path", lambda *a, **k: FastPath(item=None, reason="no_cue"))
+    monkeypatch.setattr(ядро, "recall", lambda *a, **k: None)
+
+    тело = _поиск(клиент, zone="hot_kitchen", words="нагар", photos=[клиент.ссылка()]).get_json()
+
+    assert [c["code"] for c in тело["candidates"]] == ["CLN05", "CLN06"]
+    assert тело["candidates"][-1]["wording"] == ""
+    assert get_state(АУДИТОР).findings == [], "запас ничего не записывает"  # type: ignore[union-attr]
