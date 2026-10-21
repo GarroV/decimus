@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
-from src.domain import list_zones
+from src.domain import get_item, list_zones
 from src.domain.model_usage import KIND_RECOGNIZE
 from src.domain.models import READING_MAX_C, READING_MIN_C
 
@@ -20,7 +20,7 @@ from .client import ModelAnswer, ask_model
 from .config import DEFAULT_LANG, RecognizeSettings, load_recognize_settings
 from .cues import class_thresholds
 from .guard import MAX_QUESTION_CHARS, MAX_REASON_CHARS, MAX_WORDING_CHARS, clean_text
-from .models import NONE_CODE, UNKNOWN_ZONE, Candidate, Suggestion
+from .models import ANSWER_LEVELS, NONE_CODE, UNKNOWN_ZONE, Answer, Candidate, Suggestion
 from .prompt import correction_line, instructions, question_text
 from .rules_check import check_wording
 from .schema import picks_for, response_schema, split_pick
@@ -142,6 +142,34 @@ def _candidates(raw: Any, settings: RecognizeSettings) -> tuple[Candidate, ...]:
     )[: settings.max_candidates]
 
 
+#: Длина кнопки ответа: длиннее — это уже не ответ, а пересказ.
+MAX_ANSWER_CHARS = 80
+
+
+def _answers(raw: Any) -> tuple[Answer, ...]:
+    """Варианты ответа на вопрос о классе (#1107) — все годные или ни одного.
+
+    Кнопки обещают «нажми — будет такой класс», поэтому негодный набор не
+    чинится по частям: один вариант — не выбор, одинаковый класс у всех — ответ
+    класс не меняет, пустой текст или класс вне методики — мусор. Тогда вопрос
+    остаётся текстом, как было до вариантов.
+    """
+    if not isinstance(raw, list):
+        return ()
+    out: list[Answer] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            return ()
+        text = clean_text(str(entry.get("text", "")), MAX_ANSWER_CHARS)
+        level = str(entry.get("level", ""))
+        if not text or level not in ANSWER_LEVELS:
+            return ()
+        out.append(Answer(text=text, level=level))
+    if len(out) < 2 or len({a.level for a in out}) < 2:
+        return ()
+    return tuple(out)
+
+
 def _suggestion(
     payload: dict[str, Any],
     usage: dict[str, int],
@@ -162,6 +190,8 @@ def _suggestion(
         candidates=candidates,
         needs_human=needs_human,
         question=question,
+        # Варианты без вопроса не показать: нечему отвечать.
+        answers=_answers(payload.get("answers")) if question else (),
         used_photo=used_photo,
         usage=usage,
     )
@@ -203,6 +233,9 @@ class PreparedRequest:
     used_photo: bool
     album: bool
     reading_c: float | None
+    #: Строки словаря подсказок, поднятые словами аудитора, — пункты с первым
+    #: допустимым классом; запас на случай, когда модель спрашивает (D597).
+    cue_rows: tuple[tuple[tuple[str, str], ...], ...] = ()
 
 
 def prepare_request(
@@ -274,7 +307,62 @@ def prepare_request(
         used_photo=use_photo,
         album=album,
         reading_c=reading_c,
+        cue_rows=tuple(
+            tuple((code, get_item(code, chat_id=chat_id).levels[0]) for code in row)
+            for row in picked.cue_rows
+        ),
     )
+
+
+#: Сколько пунктов словаря дописывается к ответу с вопросом — не больше двух:
+#: это подсказка «может быть и это», а не второй перечень.
+MAX_CUE_EXTRAS = 2
+
+#: Пометка дописанного кандидата: его нашёл словарь, а не модель.
+CUE_REASON = "по словарю подсказок"
+
+
+def with_cue_extras(found: Suggestion, cue_rows: Sequence[Sequence[tuple[str, str]]]) -> Suggestion:
+    """Модель спрашивает — дописать пункты словаря, которых она не назвала (D597).
+
+    Правило 7 велит модели при двусмысленных словах дать оба пункта, но по
+    пробам на боевой методике она делает это не всегда: «не была произведена
+    уборка в туалете» у снимка графика давала только чистоту туалета. Словарь
+    подсказок — документ управляющей компании, и пункт, который он связывает
+    со словами аудитора, показывается рядом, ниже предложенных моделью, без
+    формулировки — её пишет аудитор. Отдельным полем, а не хвостом
+    `candidates`: бот строит по кандидатам строки с формулировкой и зоной, а у
+    этого пункта нет ни того, ни другого. Без вопроса модель уверена, и запас
+    не нужен.
+
+    По одному пункту из строки, и строка, из которой модель уже назвала пункт,
+    пропускается: строка — один объект, и её второй код (поломка того же
+    туалета) — не другое прочтение слов, а шум, который вытеснил бы нужное.
+    """
+    if not found.question:
+        return found
+    named = {c.code for c in found.candidates}
+    picked: dict[str, str] = {}
+    for row in cue_rows:
+        if any(code in named for code, _ in row):
+            continue
+        fresh = [(code, level) for code, level in row if code != NONE_CODE and code not in picked]
+        if fresh:
+            picked.setdefault(*fresh[0])
+    extras = tuple(
+        Candidate(
+            code=code,
+            level=level,
+            zone=UNKNOWN_ZONE,
+            wording="",
+            confidence=0.0,
+            reason=CUE_REASON,
+        )
+        for code, level in list(picked.items())[:MAX_CUE_EXTRAS]
+    )
+    if not extras:
+        return found
+    return replace(found, cue_extras=extras)
 
 
 def finish(request: PreparedRequest, answer: ModelAnswer) -> Suggestion:
@@ -286,6 +374,7 @@ def finish(request: PreparedRequest, answer: ModelAnswer) -> Suggestion:
             _candidates(answer.payload.get("also_seen"), request.settings) if request.album else ()
         ),
     )
+    found = with_cue_extras(found, request.cue_rows)
     reading_c = request.reading_c
     if reading_c is None:
         return found

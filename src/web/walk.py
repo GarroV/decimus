@@ -249,7 +249,12 @@ def _previous(inspection: Inspection, lang: str) -> PreviousOutcome:
     """Прошлая проверка точки. База молчит — обход работает без подсказки."""
     try:
         return PreviousOutcome(
-            queries.previous_findings(tenant=inspection.tenant, unit=inspection.unit, lang=lang)
+            queries.previous_findings(
+                tenant=inspection.tenant,
+                unit=inspection.unit,
+                lang=lang,
+                before=inspection.visit_date(),
+            )
         )
     except DbError:
         logger.warning("Обход: история точки «%s» недоступна", inspection.unit, exc_info=True)

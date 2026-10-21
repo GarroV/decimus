@@ -22,7 +22,7 @@ from typing import Any
 from src.domain import allowed_levels
 
 from .errors import RecognizeConfigError
-from .models import NONE_CODE, UNKNOWN_ZONE
+from .models import ANSWER_LEVELS, NONE_CODE, UNKNOWN_ZONE
 
 #: Разделитель кода и класса внутри значения перечисления.
 PICK_SEP = ":"
@@ -144,6 +144,23 @@ def response_schema(
             "description": (
                 "Что спросить у аудитора, если непонятно. Пустая строка — вопросов нет."
             ),
+        },
+        "answers": {
+            "type": "array",
+            "description": (
+                "Если вопрос о пороге класса первой записи — 2–3 варианта ответа словами "
+                "аудитора, у каждого класс, который он даёт. Вопрос не о классе или "
+                "вопроса нет — пустой список."
+            ),
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["text", "level"],
+                "properties": {
+                    "text": {"type": "string", "description": "Короткий ответ, как кнопка."},
+                    "level": {"type": "string", "enum": list(ANSWER_LEVELS)},
+                },
+            },
         },
     }
     if album:

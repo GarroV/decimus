@@ -75,7 +75,7 @@ def подменить(monkeypatch: pytest.MonkeyPatch, ответ: object) -> l
     """Подменить поход в базу за прошлой проверкой. `ответ` — коды, None или отказ."""
     звали: list[dict[str, str]] = []
 
-    def вместо(*, tenant: str, unit: str) -> PreviousInspection | None:
+    def вместо(*, tenant: str, unit: str, before: object = None) -> PreviousInspection | None:
         звали.append({"tenant": tenant, "unit": unit})
         if isinstance(ответ, Exception):
             raise ответ

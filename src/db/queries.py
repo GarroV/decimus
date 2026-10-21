@@ -1070,6 +1070,9 @@ with прошлая as (
       -- Историческая (0042, D332) — проверка по прежней методике: её пункты не
       -- пункты нынешнего чек-листа, и повтор по ней не спрашивается.
       and i.origin <> 'legacy'
+      -- Прошлая — с более ранней датой (#1108): сданная сегодня же — тест или
+      -- переделка, а не показание о точке на момент этого обхода.
+      and (%(before)s::date is null or i.inspection_date < %(before)s::date)
     order by i.inspection_date desc, i.pushed_at desc
     limit 1
 )
@@ -1079,7 +1082,9 @@ left join findings f on f.inspection_id = прошлая.id and f.level not in (
 """
 
 
-def previous_inspection(*, tenant: str, unit: str) -> PreviousInspection | None:
+def previous_inspection(
+    *, tenant: str, unit: str, before: date | None = None
+) -> PreviousInspection | None:
     """Предыдущая проверка точки и её нарушения — основа вопроса о повторе.
 
     Отдаётся ровно факт: когда был прошлый обход и какие пункты тогда были
@@ -1093,12 +1098,15 @@ def previous_inspection(*, tenant: str, unit: str) -> PreviousInspection | None:
     идут: снятая проверка не является показанием о точке. Информационные
     записи (`D0`) и рекомендации (`R`) нарушениями не считаются и в коды не попадают.
 
+    `before` — дата идущей проверки: прошлая строго раньше неё (#1108).
+
     `None` — прошлых проверок нет либо точка чужая. Для вопроса это одно и то
     же: спрашивать не о чем.
     """
     tenant_code = _require_tenant(tenant)
+    params = {"tenant": tenant_code, "unit": _require_unit(unit), "before": before}
     with _reading("предыдущая проверка точки") as conn, conn.cursor() as cur:
-        cur.execute(_PREVIOUS_INSPECTION_SQL, {"tenant": tenant_code, "unit": _require_unit(unit)})
+        cur.execute(_PREVIOUS_INSPECTION_SQL, params)
         rows = cur.fetchall()
     if not rows:
         return None
@@ -1166,6 +1174,9 @@ with прошлая as (
       -- Историческая (0042, D332) — проверка по прежней методике: её пункты не
       -- пункты нынешнего чек-листа, и повтор по ней не спрашивается.
       and i.origin <> 'legacy'
+      -- Прошлая — с более ранней датой (#1108): сданная сегодня же — тест или
+      -- переделка, а не показание о точке на момент этого обхода.
+      and (%(before)s::date is null or i.inspection_date < %(before)s::date)
     order by i.inspection_date desc, i.pushed_at desc
     limit 1
 )
@@ -1185,7 +1196,7 @@ order by f.n
 
 
 def previous_findings(
-    *, tenant: str, unit: str, lang: str | None = None
+    *, tenant: str, unit: str, lang: str | None = None, before: date | None = None
 ) -> PreviousFindings | None:
     """Прошлая проверка точки с её нарушениями — подсказка «здесь было» (#418).
 
@@ -1196,13 +1207,15 @@ def previous_findings(
     `lang` — язык, на котором человек читает: формулировка берётся на нём, если
     перевод записи есть, иначе на языке проверки (`speech_lang`).
 
+    `before` — дата идущей проверки: прошлая строго раньше неё (#1108).
+
     `None` — прошлых проверок у точки нет (или точка чужая).
     """
     tenant_code = _require_tenant(tenant)
     with _reading("прошлые нарушения точки") as conn, conn.cursor() as cur:
         cur.execute(
             _PREVIOUS_FINDINGS_SQL,
-            {"tenant": tenant_code, "unit": _require_unit(unit), "lang": lang},
+            {"tenant": tenant_code, "unit": _require_unit(unit), "lang": lang, "before": before},
         )
         rows = cur.fetchall()
     if not rows:

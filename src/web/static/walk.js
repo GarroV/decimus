@@ -211,7 +211,10 @@
     top.appendChild(row);
 
     var done = zones.filter(zoneDone).length;
-    var progress = el("div", "walk-progress");
+    // Полоса — те же зоны, что в списке: нажатие открывает список (#1106). Её
+    // нажимают первой, приняв за переключатель зон, — и не должна молчать.
+    var progress = W.button("walk-progress", null, function () { setPanel(true); });
+    progress.setAttribute("aria-label", tx("walk.switch.all") + ". " + tx("walk.progress", { done: done, total: zones.length }));
     var bar = el("div", "walk-progress__bar");
     bar.setAttribute("aria-hidden", "true");
     zones.forEach(function (z) {
@@ -221,7 +224,19 @@
     var count = el("span", "walk-progress__count", done + "/" + zones.length);
     count.setAttribute("aria-label", tx("walk.progress", { done: done, total: zones.length }));
     progress.appendChild(count);
-    top.appendChild(progress);
+    // Стрелки соседних зон — по бокам полосы (владелец, 21.10.2026): туда
+    // смотрят первым делом, а у названия зоны их не замечали.
+    var at = zoneIndex(S.open);
+    var n = zones.length;
+    var nav = el("div", "walk-progress-row");
+    var back = W.button("walk-switch__arrow walk-switch__arrow--top", "‹", function () { go(zones[(at - 1 + n) % n].code, -1); });
+    back.setAttribute("aria-label", tx("walk.switch.prev"));
+    var fwd = W.button("walk-switch__arrow walk-switch__arrow--top", "›", function () { go(zones[(at + 1) % n].code, 1); });
+    fwd.setAttribute("aria-label", tx("walk.switch.next"));
+    if (n > 1) nav.appendChild(back);
+    nav.appendChild(progress);
+    if (n > 1) nav.appendChild(fwd);
+    top.appendChild(nav);
 
     top.appendChild(renderPrevLine(zones));
     if (S.data.sealed) top.appendChild(el("p", "walk-banner", tx("walk.sealed")));
@@ -302,10 +317,6 @@
   function renderSwitch(zones, zone) {
     var box = W.hinted(el("section", "walk-switch"), "zones");
     var bar = el("div", "walk-switch__bar");
-    var at = zoneIndex(zone.code);
-    var n = zones.length;
-    var back = W.button("walk-switch__arrow", "‹", function () { go(zones[(at - 1 + n) % n].code, -1); });
-    back.setAttribute("aria-label", tx("walk.switch.prev"));
     var main = W.button("walk-switch__main", null, function () { setPanel(!S.panel); });
     main.setAttribute("aria-expanded", S.panel ? "true" : "false");
     main.setAttribute("aria-label", zone.title + ". " + tx("walk.switch.all"));
@@ -316,12 +327,9 @@
       zoneDone(zone) ? tx("walk.tile.done") : zoneStarted(zone) ? tx("walk.tile.started") : tx("walk.tile.todo")));
     main.appendChild(label);
     // Без стрелки «▾»: список зон выезжает снизу, а стрелка вниз обещает
-    // список, раскрывающийся под кнопкой (владелец, 08.10.2026).
-    var fwd = W.button("walk-switch__arrow", "›", function () { go(zones[(at + 1) % n].code, 1); });
-    fwd.setAttribute("aria-label", tx("walk.switch.next"));
-    bar.appendChild(back);
+    // список, раскрывающийся под кнопкой (владелец, 08.10.2026). Стрелки
+    // соседних зон — наверху, у полосы прогресса (21.10.2026).
     bar.appendChild(main);
-    bar.appendChild(fwd);
     box.appendChild(bar);
 
     var left = zones.filter(function (z) { return !zoneDone(z) && z.code !== zone.code; });
@@ -340,7 +348,14 @@
     } else if (zoneDone(zone)) {
       hints.appendChild(el("span", "walk-hints__label is-ok", "✓ " + tx("walk.all_done")));
     }
-    if (hints.childNodes.length) box.appendChild(hints);
+    if (hints.childNodes.length) {
+      box.appendChild(hints);
+      // Лента листается вбок, а по виду этого не скажешь (#1106): пока справа
+      // есть ещё, край затухает.
+      var edge = function () { hints.classList.toggle("has-more", hints.scrollLeft + hints.clientWidth < hints.scrollWidth - 2); };
+      hints.addEventListener("scroll", edge, { passive: true });
+      window.requestAnimationFrame(edge);
+    }
     return box;
   }
 

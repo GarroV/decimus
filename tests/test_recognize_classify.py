@@ -22,10 +22,16 @@ from typing import Any
 
 import pytest
 
-from src.recognize.classify import classify, needs_photo
+from src.recognize.classify import (
+    CUE_REASON,
+    MAX_CUE_EXTRAS,
+    classify,
+    needs_photo,
+    with_cue_extras,
+)
 from src.recognize.client import ModelAnswer
 from src.recognize.config import NO_CHAT
-from src.recognize.models import UNKNOWN_ZONE
+from src.recognize.models import NONE_CODE, UNKNOWN_ZONE, Candidate, Suggestion
 from src.recognize.shortlist import shortlist
 
 
@@ -445,3 +451,105 @@ def test_неоднозначный_комментарий_с_кадром_то�
     # Assert
     assert s.used_photo is False
     assert recorder.last["photo"] is None
+
+
+def _с_вопросом(answers: Any) -> dict[str, Any]:
+    return {
+        "records": [
+            {
+                "item": "PRD09:D2",
+                "zone": "dough",
+                "wording": "x",
+                "reason": "",
+                "confidence": 0.9,
+            }
+        ],
+        "question": "Тесто продолжают использовать?",
+        "answers": answers,
+    }
+
+
+def test_варианты_ответа_на_вопрос_приходят_с_классом(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange: #1107 — вопрос о пороге вместе с тем, какой класс даёт каждый ответ
+    ответы = [
+        {"text": "Да, продолжают", "level": "D3"},
+        {"text": "Нет, списали", "level": "D2"},
+    ]
+    _patch(monkeypatch, _Recorder(_с_вопросом(ответы)))
+
+    # Act
+    s = classify("тесто плывёт", zone_hint="dough", chat_id=NO_CHAT)
+
+    # Assert
+    assert [(a.text, a.level) for a in s.answers] == [
+        ("Да, продолжают", "D3"),
+        ("Нет, списали", "D2"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("answers", "почему"),
+    [
+        ([{"text": "Да", "level": "D3"}], "один вариант — это не выбор"),
+        (
+            [{"text": "Да", "level": "D2"}, {"text": "Нет", "level": "D2"}],
+            "ответ не меняет класс — кнопки обманут",
+        ),
+        ([{"text": "", "level": "D3"}, {"text": "Нет", "level": "D2"}], "пустая кнопка"),
+        ([{"text": "Да", "level": "D9"}, {"text": "Нет", "level": "D2"}], "класса нет в методике"),
+        ("мусор", "не список"),
+    ],
+)
+def test_негодные_варианты_ответа_отбрасываются_целиком(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch, answers: Any, почему: str
+) -> None:
+    _patch(monkeypatch, _Recorder(_с_вопросом(answers)))
+
+    s = classify("тесто плывёт", zone_hint="dough", chat_id=NO_CHAT)
+
+    assert s.answers == (), почему
+    assert s.question, "вопрос остаётся текстом, пропадают только кнопки"
+
+
+# ── D597: пункты словаря рядом с вопросом ──────────────────────────────
+
+
+def _уверенный(code: str) -> Candidate:
+    return Candidate(code=code, level="D1", zone="dining", wording="Факт.", confidence=0.8)
+
+
+def test_вопрос_дописывает_пункт_словаря_которого_модель_не_назвала() -> None:
+    found = Suggestion(candidates=(_уверенный("CLN15"),), question="Грязь или отметка?")
+    rows = [[("CLN15", "D1"), ("TEH12", "D1")], [("MGM01", "D1")]]
+
+    вышло = with_cue_extras(found, rows)
+
+    assert [c.code for c in вышло.cue_extras] == ["MGM01"], (
+        "строка, из которой модель уже назвала пункт, пропускается целиком"
+    )
+    extra = вышло.cue_extras[0]
+    assert (extra.wording, extra.confidence, extra.zone) == ("", 0.0, UNKNOWN_ZONE)
+    assert extra.reason == CUE_REASON
+    assert вышло.candidates == found.candidates, "кандидаты модели не тронуты"
+
+
+def test_без_вопроса_словарь_ничего_не_дописывает() -> None:
+    found = Suggestion(candidates=(_уверенный("CLN15"),), needs_human=False)
+
+    assert with_cue_extras(found, [[("MGM01", "D1")]]).cue_extras == ()
+
+
+def test_пустой_ответ_с_вопросом_берёт_по_пункту_из_строки_не_больше_предела() -> None:
+    found = Suggestion(question="Что нарушено?")
+    rows = [
+        [("CLN15", "D1"), ("TEH12", "D1")],
+        [(NONE_CODE, "D1"), ("MGM01", "D1")],
+        [("CLN15", "D1")],
+        [("SFT01", "D1")],
+    ]
+
+    вышло = with_cue_extras(found, rows)
+
+    assert [c.code for c in вышло.cue_extras] == ["CLN15", "MGM01", "SFT01"][:MAX_CUE_EXTRAS]

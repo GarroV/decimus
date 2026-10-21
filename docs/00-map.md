@@ -938,7 +938,7 @@ Telegram, ни HTTP, ни SQL.
 
 ## По задаче → куда идти
 
-Каждая строка сверена с кодом на 12.10.2026; поменялось устройство — поправьте
+Каждая строка сверена с кодом на 12.10.2026 (строки о демо, стендах, раскатке, мини-аппе и посадочной — на 21.10.2026); поменялось устройство — поправьте
 строку тем же изменением.
 
 | Задача | Куда идти |
@@ -967,6 +967,11 @@ Telegram, ни HTTP, ни SQL.
 | Загрузить историческую проверку | `src/mcp/imports.py`, `import_modes.py`, запись — `src/db/imports.py`, `imports_legacy.py`; процедура — `docs/14-history-import.md` |
 | Пространство и страны | Завести и привязать — `tools/space.py` (`make space`), логика — `src/db/spaces.py`, `src/db/reach.py` |
 | Завести учётку веб-админки или ключ API | `tools/web_user.py` (`make web-user`), `tools/web_unlock.py` (`make web-unlock`), `tools/api_token.py` |
-| Демо и тестовый стенд | `make demo` (бот), `make web-demo` и `make web-up` (админка), сиды — `tools/seed_*.py` |
-| Раскатка и откат | `docs/08-deploy.md`; `scripts/deploy.sh`, `scripts/prod-update.sh`, смоук — `scripts/smoke.sh` |
+| Открытое демо (публичное, для коллег) | VPS, `/srv/decimus-demo`: `deploy/demo/` (надстройка, `reset.sh` раз в час, `update.sh` после выкладки прода — иначе демо отстаёт), посев `tools/seed_open_demo.py` (+ `open_demo_ratings.py`, `open_demo_training.py`), запреты демо — `src/web/demo_entry.py`; `docs/08-deploy.md` §8.21 |
+| Показать доработку владельцу до прода | Превью-стенд на MUSPELHEIM: `deploy/preview/compose.preview.yaml`, `C:\projects\decimus-preview`, `https://<TAILNET_HOST>:9443` (только tailnet); собирать **`web` и `walk`** — мини-апп в своём образе; `docs/08-deploy.md` §8.22 |
+| Стенд Виктории (рейтинги) | MUSPELHEIM `decimus-viktoria`, ветка `stand/viktoria`, сам обновляется раз в 2 минуты; адрес `https://decimus-stand.vasiliy-garro.workers.dev`; `docs/08-deploy.md` §8.11 |
+| Демо и стенд разработчика | `make demo` (бот), `make web-demo` и `make web-up` (админка), сиды — `tools/seed_*.py`; стенды — только на MUSPELHEIM, на Маке их нет |
+| Раскатка и откат | `docs/08-deploy.md`; на VPS — `cd /srv/decimus && git pull --ff-only && scripts/prod-update.sh` (надстройку площадки `compose.edge.yaml` скрипт подключает сам; без неё `web` теряет сеть прокси — 502), затем `deploy/demo/update.sh` в `/srv/decimus-demo`; смоук — `scripts/smoke.sh` |
+| Мини-апп обхода: экран, форма записи | Отдельный сервис `walk` (`src/web/walk_main.py`, свой образ — пересобирать вместе с `web`); экран — `src/web/static/walk.js`, форма — `walk-sheet.js`, «Ещё не смотрели» — `walk-unseen.js`, старт — `walk-app.js` + `src/web/walk_start.py`; запись — `walk_write.py`, поиск пункта — `walk_suggest.py`; тексты — `texts_walk.py`, `texts_app.py`; описание — `docs/13-walk-mini-app.md` |
+| Посадочная страница | `src/web/landing.py`, `templates/landing.html`, `static/decimus-landing.css`, `static/landing.js`; снимки — `make landing-shots`; `docs/12-web-admin.md`, раздел о посадочной |
 | Написать тест | Блоки без базы — `tests/test_<блок>_*.py` с общей оснасткой `tests/*_harness.py`; с базой — `tests/test_db_*.py` (`tests/db_harness.py`), на CI пропускаются; методика тестов — `tests/methodology/` |

@@ -1102,6 +1102,10 @@ cd /srv/decimus
 DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 ```
 
+Без `DECIMUS_OVERLAYS` скрипт сам подключает `compose.edge.yaml` из каталога репозитория
+и пишет об этом: забытая надстройка роняла прод в 502 (`web` выпадал из сети прокси,
+21.10.2026). Пустое значение (`DECIMUS_OVERLAYS=`) — осознанный подъём без неё.
+
 Выкатка идёт одна за раз (#729): скрипт берёт замок `.git/prod-update.lock`
 (`flock`), вторая ждёт первую до `DEPLOY_LOCK_WAIT_S` секунд (по умолчанию 900)
 и иначе отказывает. Накат миграций вдобавок держит `pg_advisory_lock` — два
@@ -1831,6 +1835,39 @@ D391) — так же: миграций нет, право — уже выдан
 
 На проде `WEB_DEMO_URL` — адрес Worker'а демо: по нему кнопка «Открыть демо» на
 посадочной странице.
+
+### 8.22. Превью-стенд ветки (MUSPELHEIM)
+
+Чтобы владелец пощупал доработку до прода: ветка с данными открытого демо и мини-аппом
+в браузере. Модель настоящая — «Найти пункт» работает как на проде (в открытом демо
+модели нет, только быстрый путь по словам).
+
+| Что | Где |
+|---|---|
+| Папка | `C:\projects\decimus-preview` — клон репозитория на ветке доработки |
+| Надстройка | `deploy/preview/compose.preview.yaml` над dev-compose: бот и MCP выключены, `WEB_DEMO`, чаты мини-аппа демо, свой порт `127.0.0.1:8296`, сервис посева `seed` |
+| Настройки | файл настроек стенда — копия настроек `decimus-walk` плюс ключ модели и `RECOGNIZE_*` с прода, перенесённые владельцем без показа значений |
+| Кадры посева | `C:\data\decimus-preview-photos` (копия `/srv/decimus-demo-photos` с VPS), путь — `PREVIEW_PHOTOS_DIR` |
+| Адрес | `https://<TAILNET_HOST>:9443` — `tailscale serve --https=9443`, только внутри tailnet |
+
+Обновить на другую ветку или свежий код (в `cmd` на площадке):
+
+```
+cd /d C:\projects\decimus-preview && git fetch -q && git checkout <ветка> && git pull -q
+set PREVIEW_PHOTOS_DIR=C:/data/decimus-preview-photos
+set P=docker compose -p decimus-preview -f docker-compose.yml -f deploy/preview/compose.preview.yaml --profile web --profile db --profile storage
+%P% build -q web walk && %P% --profile migrate run --rm --no-deps migrate
+%P% --profile seed run --rm --no-deps seed      &rem только если нужны свежие демо-данные
+%P% up -d --wait web walk web-link
+```
+
+**Собирать `web` И `walk`.** Мини-апп (`/tg/walk`) отдаёт свой контейнер `walk` со своим
+образом и своей копией статики: собран только `web` — админка новая, а мини-апп старый,
+и снаружи этого не видно (21.10.2026 так владельцу показали старые стрелки зон). Сверка
+после подъёма — отпечаток `walk.js?v=…` на странице `/tg/walk` должен совпасть с
+отпечатком файла в ветке.
+
+Погасить: `docker compose -p decimus-preview down` и `tailscale serve --https=9443 off`.
 
 ### 8.20. Хранение голоса у OpenAI (F-112)
 

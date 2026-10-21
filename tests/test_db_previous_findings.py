@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -91,3 +92,22 @@ def test_формулировка_на_языке_читающего_если_п
         "нет перевода — язык проверки"
     )
     assert без_языка.findings[0].text == "контейнеры без даты"
+
+
+def test_сданная_в_тот_же_день_не_прошлая(domain_env: Path, db_env: str) -> None:
+    """#1108: проверка, сданная сегодня же, — тест или переделка, а не «прошлый раз»."""
+    start_inspection(1, unit="Белград-1", kind="planned", report_lang="ru", date="2026-09-01")
+    add_finding(1, code="CLN05", level="D1", zone="hot_kitchen", text="две недели назад")
+    push_inspection(1)
+    start_inspection(2, unit="Белград-1", kind="planned", report_lang="ru", date="2026-09-15")
+    add_finding(2, code="PRD09", level="D2", zone="fridge", text="утром")
+    push_inspection(2)
+    сегодня = date(2026, 9, 15)
+
+    прошлая = previous_findings(tenant=ТЕНАНТ, unit="Белград-1", before=сегодня)
+    повтор = previous_inspection(tenant=ТЕНАНТ, unit="Белград-1", before=сегодня)
+
+    assert прошлая is not None and прошлая.date == date(2026, 9, 1), "утренняя — не прошлая"
+    assert [f.code for f in прошлая.findings] == ["CLN05"]
+    assert повтор is not None and повтор.date == прошлая.date, "подсказки смотрят в разные обходы"
+    assert previous_findings(tenant=ТЕНАНТ, unit="Белград-1", before=date(2026, 9, 1)) is None

@@ -106,10 +106,18 @@ def answer(offer: Offer, ask: Ask) -> dict[str, Any]:
     # Увиденное на кадрах сверх сказанного (D208) — после найденного по
     # словам: у бота это отдельное предложение, здесь — нижние карточки.
     seen = [c for c in offer.also_seen if all(c.code != x.code for x in offer.candidates)]
+    # Пункты словаря, которых модель не назвала, задав вопрос (D597), — в самом низу.
+    cue = offer.suggestion.cue_extras if offer.suggestion else ()
+    extras = [c for c in cue if all(c.code != x.code for x in (*offer.candidates, *seen))]
     return {
         "via": offer.via,
-        "candidates": [_card(c, offer, ask) for c in (*offer.candidates, *seen)],
+        "candidates": [_card(c, offer, ask) for c in (*offer.candidates, *seen, *extras)],
         "question": offer.question,
+        # Ответы на вопрос о классе первой карточки — кнопками (#1107).
+        "answers": [
+            {"text": a.text, "level": a.level}
+            for a in (offer.suggestion.answers if offer.suggestion else ())
+        ],
     }
 
 

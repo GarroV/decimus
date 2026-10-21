@@ -19,6 +19,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 compose=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
+# Забытая надстройка площадки роняет прод молча: `web` теряет сеть общего прокси,
+# снаружи 502 (21.10.2026, около 18 минут). Поэтому без DECIMUS_OVERLAYS надстройка,
+# лежащая рядом, подключается сама; пустая строка (`DECIMUS_OVERLAYS=`) — осознанный
+# отказ от неё.
+if [ -z "${DECIMUS_OVERLAYS+set}" ] && [ -f compose.edge.yaml ]; then
+    DECIMUS_OVERLAYS="$PWD/compose.edge.yaml"
+    echo "надстройка площадки: $DECIMUS_OVERLAYS (DECIMUS_OVERLAYS не задан)" >&2
+fi
 IFS=: read -r -a overlays <<<"${DECIMUS_OVERLAYS:-}"
 for overlay in "${overlays[@]}"; do
     [ -n "$overlay" ] && compose+=(-f "$overlay")
