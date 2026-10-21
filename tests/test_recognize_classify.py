@@ -564,10 +564,10 @@ def test_разные_прочтения_названы_модели_тольк�
 
 
 def test_запрос_несёт_прочтения_когда_словарь_поднял_несколько_строк(domain_env: Path) -> None:
-    picked = shortlist("термометр на стене в зале", "dining", chat_id=NO_CHAT)
+    picked = shortlist("короб и урна без ярлыка", "hot_kitchen", chat_id=NO_CHAT)
     assert len(picked.cue_rows) >= 2, "предпосылка: слова поднимают несколько строк карты"
 
-    запрос = prepare_request("термометр на стене в зале", None, "dining", chat_id=NO_CHAT)
+    запрос = prepare_request("короб и урна без ярлыка", None, "hot_kitchen", chat_id=NO_CHAT)
 
     assert "разные прочтения" in запрос.ask.question
     first = dict.fromkeys(row[0] for row in picked.cue_rows)
