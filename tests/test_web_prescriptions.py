@@ -493,3 +493,18 @@ def test_форма_говорит_сколько_проверок_показа�
     monkeypatch.setattr(rx, "choices", lambda *_a, **_k: ((), (основание,)))
     страница = уК.get("/actions/prescriptions/new?country=GE&lang=ru").get_data(as_text=True)
     assert f"Последние {rx.BASES_LIMIT} принятых проверок" in страница
+
+
+@pytest.mark.parametrize(
+    "адрес",
+    ["/actions/prescriptions?lang=ru", f"/actions/prescriptions/{ИД}/edit?lang=ru"],
+    ids=["завести", "править"],
+)
+def test_девелопер_без_основания_предписание_не_сохраняет(
+    девелопер: FlaskClient, зовы: dict[str, list[Any]], адрес: str
+) -> None:
+    """Предписание без проверки-основания — только ОСБ (D599), и при правке тоже."""
+    ответ = девелопер.post(адрес, data={**ФОРМА, "then": "save"}, headers=ORIGIN)
+
+    assert ответ.status_code == 400
+    assert зовы["create"] == [] and зовы["update"] == []

@@ -431,9 +431,14 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         if then == THEN_APPROVE and not ведущий:
             return guard.forbidden()
         try:
+            черновик = _draft_from_form(текущее.country)
+            if not ведущий and not черновик.inspection_ids:
+                # Как в rx_create: снять все основания и оставить предписание без
+                # проверки может только ОСБ (D599).
+                raise PrescriptionError(t("rx.need_base", lang))
             rxw.update_draft(
                 текущее.id,
-                _draft_from_form(текущее.country),
+                черновик,
                 actor=_actor(),
                 manager=ведущий,
                 submit=then == THEN_REQUEST,
