@@ -353,7 +353,7 @@
                href="{{ href(item=code, new='') }}" data-mx-item="{{ code }}" data-mx-open
                {% if code == selected %}aria-current="true"{% endif %}>
               <span class="mx-row__code mono">{{ code }}</span>
-              <span class="mx-row__text"><span class="mx-muted">{{ item_label(code) }} ·</span> {{ plain(it.get('question_ru') or it.get('question_en') or '—') }}</span>
+              <span class="mx-row__text"><span class="mx-muted">{{ item_label(code) }} ·</span> {{ plain(item_text(it) or '—') }}</span>
               <span class="mx-row__levels">{{ level_slots(it) }}</span>
               <span class="mx-row__days">{{ t('methodology.days.short', days=it.get('days')) if it.get('days') else '—' }}</span>
             </a>
