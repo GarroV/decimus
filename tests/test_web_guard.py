@@ -49,6 +49,7 @@ def test_исключения_существуют_в_приложении(app: 
     есть = {п.endpoint for п in app.url_map.iter_rules()}
     assert set(guard.EXEMPT_ENDPOINTS) <= есть
     assert set(guard.ENDPOINT_VIEWS) <= есть
+    assert set(guard.READ_BY_ACTION) <= есть
 
 
 def test_полнота_ловит_маршрут_без_кода() -> None:

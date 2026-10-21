@@ -21,6 +21,9 @@
     {% endif %}
     {% if notice %}<div class="note note--ok" role="status"><div class="note__text">{{ notice }}</div></div>{% endif %}
     {% if failure %}<div class="note note--error" role="alert"><div class="note__text">{{ failure }}</div></div>{% endif %}
+    {% if returned_note %}
+      <div class="note note--warn" role="status"><div class="note__text">{{ t('rx.card.returned_note', comment=returned_note) }}</div></div>
+    {% endif %}
     {% if p.status == 'closed' %}
       <div class="note note--ok"><div class="note__text">{{ t('rx.card.closed_note', comment=p.close_comment) }}</div></div>
     {% endif %}
@@ -31,11 +34,58 @@
         <div><dt>{{ t('rx.col.due') }}</dt>
           <dd{% if p.overdue(today) %} class="srow__err"{% endif %}>{{ day(p.due_on) }}</dd></div>
         <div><dt>{{ t('rx.col.state') }}</dt><dd>{{ rx_tag(p, today) }}{{ rx_replied(p) }}</dd></div>
+        {% if p.approved_at %}<div><dt>{{ t('rx.card.approved') }}</dt><dd>{{ t('rx.approved_meta', at=p.approved_at.strftime('%Y-%m-%d'), by=p.approved_by) }}</dd></div>{% endif %}
         {% if p.issued_at %}<div><dt>{{ t('actions.panel.sent') }}</dt><dd>{{ meta(p) }}</dd></div>{% endif %}
       </dl>
     </section>
 
-    {% if hq and p.status == 'draft' %}
+    {#- Согласование и отправка (D599, D600): кнопки по статусу и праву — `acts` из `panel_context`.
+        Админ без `prescription.manage` и девелопер чужого предписания их не видят, а прямой POST им отказан. -#}
+    {% if hq and p.status == 'review' and not acts.approve %}
+      <div class="note"><div class="note__text">{{ t('rx.card.in_review') }}</div></div>
+    {% endif %}
+
+    {% if acts.request %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('rx.card.request_title') }}</h3>
+        <p class="ssec__text">{{ t('rx.card.request_hint') }}</p>
+        <div class="sactions">
+          <form method="post" data-panel-form action="{{ url(rx_base ~ '/' ~ p.id ~ '/request') }}?lang={{ lang }}">
+            <button class="sbtn sbtn--primary" type="submit">{{ t('rx.card.request') }}</button>
+          </form>
+          {% if acts.edit %}<a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit') }}</a>{% endif %}
+        </div>
+      </section>
+    {% endif %}
+
+    {% if acts.approve %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('rx.card.approve_title') }}</h3>
+        <p class="ssec__text">{{ t('rx.card.approve_hint') }}</p>
+        <div class="sactions">
+          <form method="post" data-panel-form action="{{ url(rx_base ~ '/' ~ p.id ~ '/approve') }}?lang={{ lang }}">
+            <button class="sbtn sbtn--primary" type="submit">{{ t('rx.card.approve') }}</button>
+          </form>
+          {% if acts.edit %}<a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit') }}</a>{% endif %}
+        </div>
+        {% if acts['return'] %}
+          <form class="sform sform--gap" method="post" data-panel-form action="{{ url(rx_base ~ '/' ~ p.id ~ '/return') }}?lang={{ lang }}">
+            <label><span class="sform__label">{{ t('rx.card.return_comment') }}</span>
+              <textarea class="sinput sinput--area" name="comment" required maxlength="2000" rows="3"></textarea></label>
+            <button class="sbtn" type="submit">{{ t('rx.card.return') }}</button>
+          </form>
+        {% endif %}
+      </section>
+    {% elif acts.edit and not acts.request %}
+      <section class="ssec">
+        <div class="sactions">
+          <a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit') }}</a>
+        </div>
+        {% if p.status == 'approved' %}<p class="ssec__note">{{ t('rx.card.edit_drops_approval') }}</p>{% endif %}
+      </section>
+    {% endif %}
+
+    {% if acts.send %}
       <section class="ssec">
         <h3 class="ssec__title">{{ t('rx.card.send_title') }}</h3>
         <p class="ssec__text">{{ t('rx.card.send_hint') }}</p>
@@ -43,7 +93,6 @@
           <form method="post" action="{{ url(rx_base ~ '/' ~ p.id ~ '/send') }}?lang={{ lang }}">
             <button class="sbtn sbtn--primary" type="submit">{{ t('rx.card.send') }}</button>
           </form>
-          <a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit') }}</a>
         </div>
       </section>
     {% endif %}
@@ -58,7 +107,7 @@
       {{ bases(p, registry_path) }}
     </section>
 
-    {% if p.status != 'draft' %}
+    {% if p.status in ('issued', 'closed') %}
       <section class="ssec">
         <h3 class="ssec__title">{{ t('rx.card.replies') }}</h3>
         {{ replies(p, rx_files_path) }}
@@ -84,7 +133,7 @@
       </section>
     {% endif %}
 
-    {% if hq and p.status == 'issued' %}
+    {% if acts.close %}
       <section class="ssec">
         <h3 class="ssec__title">{{ t('rx.card.close_title') }}</h3>
         <p class="ssec__text">{{ t('rx.card.close_hint') }}</p>

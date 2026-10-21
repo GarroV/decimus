@@ -245,8 +245,16 @@ def install(app: Flask, conf: Settings) -> None:
         return возврат.finish(ident, lang, lambda: _токен_вошедшего(реквизиты, код))
 
     @app.get(MAIL_CALLBACK_PATH, endpoint="google_mail_callback")
-    @guard.action("inspection.letter")
+    @guard.action("inspection.letter", "prescription.manage", object_in_route=True)
     def google_mail_callback() -> Response | tuple[str, int]:
+        # Возврат один на два вида письма: по проверке его ждёт тот, кто пишет
+        # письма, по предписанию — тот, кто ведёт предписания (ОСБ). Какая из
+        # клеток есть у вошедшего, та и спрашивается; чужой вид закроет проверка
+        # внутри самого вида (`guard.may` ниже и в `_finish_gmail`).
+        код = "inspection.letter" if guard.may("inspection.letter") else "prescription.manage"
+        отказ = guard.permit(код)
+        if отказ is not None:
+            return отказ
         """Возврат от Google: сверить метку, обменять код, положить черновик.
 
         **Метка одноразовая на ЛЮБОМ исходе** — успех, отказ в окне согласия,

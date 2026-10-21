@@ -474,6 +474,8 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
             "issued_by",
             "closed_by",
             "close_comment",
+            # Кто согласовал (`0087`): колонку ставит ОСБ через дверь, время — триггер.
+            "approved_by",
         }
     },
     # Правка карты синонимов (`0013`, T292) — тот же заслон, что у снятия

@@ -128,7 +128,7 @@ def test_главный_замораживает_админа_и_подписы�
 
     assert ответ.status_code == 200
     assert зовы["freeze"] == [
-        ("kostya", "HQ", ("guest", "developer", "control", "admin", "superadmin"), АКТОР)
+        ("kostya", "HQ", ("guest", "osb", "developer", "control", "admin", "superadmin"), АКТОР)
     ], "заморозка ушла без подписи «кем» или без охвата цели"
 
 
@@ -177,7 +177,7 @@ def test_главный_размораживает(главный: FlaskClient, 
 
     assert ответ.status_code == 200
     assert зовы["unfreeze"] == [
-        ("ghost", "HQ", ("guest", "developer", "control", "admin", "superadmin"))
+        ("ghost", "HQ", ("guest", "osb", "developer", "control", "admin", "superadmin"))
     ]
 
 

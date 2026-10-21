@@ -127,11 +127,11 @@ def test_кого_можно_трогать(кто: tuple[str, str], цель: t
 #: Какие роли вошедший может ВЫДАТЬ в пространстве (заведение и смена роли).
 ВЫДАЁТ: dict[tuple[str, str], dict[str, tuple[str, ...]]] = {
     ("superadmin", "HQ"): {
-        "HQ": ("guest", "developer", "control", "admin", "superadmin"),
+        "HQ": ("guest", "osb", "developer", "control", "admin", "superadmin"),
         "GE": ("auditor", "admin"),
     },
     ("admin", "HQ"): {
-        "HQ": ("guest", "developer", "control", "admin"),
+        "HQ": ("guest", "osb", "developer", "control", "admin"),
         "GE": ("auditor", "admin"),
     },
     ("control", "HQ"): {"HQ": ("control",), "GE": ()},

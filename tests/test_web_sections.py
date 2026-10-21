@@ -32,6 +32,7 @@ def test_sections_go_in_menu_groups_in_order() -> None:
         ("work", "registry"),
         ("work", "calendar"),
         ("work", "actions"),
+        ("work", "osb"),
         ("stats", "country"),
         ("stats", "ratings"),
         ("stats", "training"),
@@ -54,6 +55,7 @@ def test_built_keys_are_the_built_screens() -> None:
             "users",
             "settings",
             "actions",
+            "osb",
         }
     )
 
@@ -95,6 +97,7 @@ def test_check_registry_accepts_exactly_the_built_sections() -> None:
             "users",
             "settings",
             "actions",
+            "osb",
         )
     )
 
@@ -112,6 +115,7 @@ def test_check_registry_refuses_a_built_calendar_left_without_a_screen() -> None
                 "overview",
                 "registry",
                 "actions",
+                "osb",
                 "country",
                 "ratings",
                 "training",

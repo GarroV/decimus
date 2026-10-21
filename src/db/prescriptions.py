@@ -1,18 +1,20 @@
-"""Предписания: черновик, отправка через Gmail сотрудника, ответ партнёра, закрытие (волна 3).
+"""Предписания: черновик, согласование ОСБ, отправка через Gmail, ответ партнёра, закрытие.
 
 Предписание — официальное письмо УК партнёру страны (D266). Сотрудник УК
-вставляет текст сам (D270), письмо ложится черновиком в его почту, и с этого
-момента предписание «действует». Партнёр отвечает комментарием и файлом, УК
-закрывает с комментарием. Отправленное не правится: исправление — закрытие и
-новое предписание.
+вставляет текст сам (D270) и запрашивает согласование; ОСБ возвращает с
+комментарием или согласует (D599, D600); согласованное ложится черновиком в
+почту того, кто нажал кнопку, и с этого момента предписание «действует».
+Партнёр отвечает комментарием и файлом, УК закрывает с комментарием.
+Отправленное не правится: исправление — закрытие и новое предписание.
 
 **Кто что пишет — держит база (`0037`), а не этот модуль.** Черновик, его
 связи, отправка и закрытие — ролью администратора истории; роль приложения
 может только ответить на действующее предписание своей страны. Здесь —
 понятные человеку отказы до похода в базу и охват.
 
-**Охват.** УК читает всё, партнёр — предписания своих стран (D284) и никогда не
-черновики. Чужое по угаданному id отвечает тем же `None`, что несуществующее.
+**Охват.** УК читает всё, партнёр — предписания своих стран (D284), но только
+отправленные и закрытые: черновик, запрос на согласование и согласованное он не
+видит. Чужое по угаданному id отвечает тем же `None`, что несуществующее.
 
 **«Просрочено» не хранится**, а считается на чтении (`is_overdue`).
 
@@ -46,12 +48,18 @@ from .storage import S3PhotoStorage, key_of_uri
 logger = logging.getLogger(__name__)
 
 STATUS_DRAFT = "draft"
+STATUS_REVIEW = "review"
+STATUS_APPROVED = "approved"
 STATUS_ISSUED = "issued"
 STATUS_CLOSED = "closed"
-STATUSES = (STATUS_DRAFT, STATUS_ISSUED, STATUS_CLOSED)
+STATUSES = (STATUS_DRAFT, STATUS_REVIEW, STATUS_APPROVED, STATUS_ISSUED, STATUS_CLOSED)
+#: Ещё не у партнёра: правятся (автором или ОСБ) и согласуются.
+UNSENT = (STATUS_DRAFT, STATUS_REVIEW, STATUS_APPROVED)
 
 #: Состояние для экрана: статус базы плюс посчитанная просрочка.
 STATE_DRAFT = "draft"
+STATE_REVIEW = "review"
+STATE_APPROVED = "approved"
 STATE_ACTIVE = "active"
 STATE_OVERDUE = "overdue"
 STATE_CLOSED = "closed"
@@ -87,9 +95,14 @@ def is_overdue(status: str, due_on: date, *, today: date) -> bool:
 
 
 def state_of(status: str, due_on: date, *, today: date) -> str:
-    """Состояние для экрана: черновик / действует / просрочено / закрыто."""
+    """Состояние для экрана: черновик / на согласовании / согласовано / действует /
+    просрочено / закрыто."""
     if _require_status(status) == STATUS_DRAFT:
         return STATE_DRAFT
+    if status == STATUS_REVIEW:
+        return STATE_REVIEW
+    if status == STATUS_APPROVED:
+        return STATE_APPROVED
     if status == STATUS_CLOSED:
         return STATE_CLOSED
     return STATE_OVERDUE if is_overdue(status, due_on, today=today) else STATE_ACTIVE
@@ -252,6 +265,9 @@ class Prescription:
     closed_by: str | None
     closed_at: datetime | None
     close_comment: str | None
+    #: Кто и когда согласовал (ОСБ). Пусто у неразрешённого и у выданных до 0087.
+    approved_by: str | None = None
+    approved_at: datetime | None = None
     units: tuple[UnitRef, ...] = ()
     bases: tuple[BaseRef, ...] = ()
     replies: tuple[Reply, ...] = ()
@@ -298,22 +314,25 @@ class Choice:
 # ── Запросы ─────────────────────────────────────────────────────────────────
 
 # Охват предписаний — литералом `PRESCRIPTION_REACH_SQL` в каждом чтении
-# (сверка `tests/test_db_reach_static.py`). Партнёр не видит черновиков: условие
+# (сверка `tests/test_db_reach_static.py`). Партнёр видит только отправленное и
+# закрытое, а черновик, запрос на согласование и согласованное — нет: условие
 # стоит в той же скобке, что и его страны, и снаружи его не обойти.
 PRESCRIPTION_REACH_SQL = (
-    "(%(countries)s::text[] is null or (p.country = any(%(countries)s) and p.status <> 'draft'))"
+    "(%(countries)s::text[] is null or "
+    "(p.country = any(%(countries)s) and p.status in ('issued', 'closed')))"
 )
 
 _COLUMNS = """p.id, p.country, p.due_on, p.recipients, p.subject, p.body, p.status,
        p.created_by, p.created_at, p.issued_by, p.issued_at, p.closed_by, p.closed_at,
-       p.close_comment"""
+       p.close_comment, p.approved_by, p.approved_at"""
 
 # Очередь — только открытые; условие статуса литералом, чтобы его узнал
 # частичный индекс `prescriptions_open_idx`.
 _OPEN_SQL = f"""
 select {_COLUMNS}
 from prescriptions p
-where (%(countries)s::text[] is null or (p.country = any(%(countries)s) and p.status <> 'draft'))
+where (%(countries)s::text[] is null
+       or (p.country = any(%(countries)s) and p.status in ('issued', 'closed')))
   and p.status <> 'closed'
   and (%(country)s::text is null or p.country = %(country)s)
 order by p.due_on, p.created_at
@@ -323,28 +342,41 @@ limit %(limit)s
 _CLOSED_SQL = f"""
 select {_COLUMNS}
 from prescriptions p
-where (%(countries)s::text[] is null or (p.country = any(%(countries)s) and p.status <> 'draft'))
+where (%(countries)s::text[] is null
+       or (p.country = any(%(countries)s) and p.status in ('issued', 'closed')))
   and p.status = 'closed'
   and (%(country)s::text is null or p.country = %(country)s)
 order by p.closed_at desc
 limit %(limit)s
 """  # noqa: S608
 
-# Экран страны: отправленные и закрытые, свежие сверху; черновиков нет никому.
+# Экран страны: отправленные и закрытые, свежие сверху; неотправленных нет никому.
 _COUNTRY_SQL = f"""
 select {_COLUMNS}
 from prescriptions p
-where (%(countries)s::text[] is null or (p.country = any(%(countries)s) and p.status <> 'draft'))
-  and p.status <> 'draft'
+where (%(countries)s::text[] is null
+       or (p.country = any(%(countries)s) and p.status in ('issued', 'closed')))
+  and p.status in ('issued', 'closed')
   and p.country = %(country)s
 order by (p.status = 'closed'), p.due_on, p.issued_at desc
 limit %(limit)s
 """  # noqa: S608
 
+# Сколько предписаний в каждом статусе — счётчики очередей страницы «ОСБ».
+_COUNTS_SQL = """
+select p.status, count(*)
+from prescriptions p
+where (%(countries)s::text[] is null
+       or (p.country = any(%(countries)s) and p.status in ('issued', 'closed')))
+  and (%(country)s::text is null or p.country = %(country)s)
+group by p.status
+"""
+
 ONE_SQL = f"""
 select {_COLUMNS}
 from prescriptions p
-where (%(countries)s::text[] is null or (p.country = any(%(countries)s) and p.status <> 'draft'))
+where (%(countries)s::text[] is null
+       or (p.country = any(%(countries)s) and p.status in ('issued', 'closed')))
   and p.id = %(id)s
 """  # noqa: S608
 
@@ -386,7 +418,8 @@ _FILE_SQL = """
 select r.storage_path, r.file_name, r.content_type, r.size_bytes
 from prescription_replies r
 join prescriptions p on p.id = r.prescription_id
-where (%(countries)s::text[] is null or (p.country = any(%(countries)s) and p.status <> 'draft'))
+where (%(countries)s::text[] is null
+       or (p.country = any(%(countries)s) and p.status in ('issued', 'closed')))
   and r.id = %(id)s
   and r.storage_path is not null
 """
@@ -504,6 +537,8 @@ def _assemble(
         closed_by=head[11],
         closed_at=head[12],
         close_comment=head[13],
+        approved_by=head[14],
+        approved_at=head[15],
         units=tuple(
             UnitRef(id=str(r[1]), name=str(r[2]), country=r[3]) for r in _mine(units, ident)
         ),
@@ -551,6 +586,18 @@ def list_prescriptions(
     params = {**reach_params(reach), "country": country or None, "limit": LIST_LIMIT + 1}
     rows = _read_conn(_CLOSED_SQL if closed else _OPEN_SQL, params)
     return PrescriptionList(rows=rows[:LIST_LIMIT], truncated=len(rows) > LIST_LIMIT)
+
+
+def status_counts(*, reach: Reach, country: str | None = None) -> dict[str, int]:
+    """Сколько предписаний в каждом статусе в охвате (и стране) — счётчики очередей «ОСБ»."""
+    params = {**reach_params(reach), "country": country or None}
+    try:
+        with connect_read() as conn, conn.cursor() as cur:
+            cur.execute(_COUNTS_SQL, params)
+            rows = cur.fetchall()
+    except psycopg.Error as exc:
+        raise PrescriptionError(f"Не удалось посчитать предписания ({type(exc).__name__})") from exc
+    return {status: 0 for status in STATUSES} | {str(r[0]): int(r[1]) for r in rows}
 
 
 def country_prescriptions(country: str, *, reach: Reach) -> PrescriptionList:

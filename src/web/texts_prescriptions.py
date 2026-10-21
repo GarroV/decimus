@@ -12,6 +12,8 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     "actions.tab.prescriptions": {"ru": "Предписания", "en": "Compliance notices"},
     # --- состояние --------------------------------------------------------
     "rx.state.draft": {"ru": "Черновик", "en": "Draft"},
+    "rx.state.review": {"ru": "На согласовании", "en": "In review"},
+    "rx.state.approved": {"ru": "Согласовано", "en": "Approved"},
     "rx.state.active": {"ru": "Действует", "en": "In force"},
     "rx.state.overdue": {"ru": "Просрочено", "en": "Overdue"},
     "rx.state.closed": {"ru": "Закрыто", "en": "Closed"},
@@ -80,11 +82,17 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     },
     "rx.form.body": {"ru": "Текст письма", "en": "Email text"},
     "rx.form.body_hint": {
-        "ru": "Вставьте текст целиком. После отправки он не правится.",
-        "en": "Paste the full text. It cannot be edited after sending.",
+        "ru": "Вставьте текст целиком. После отправки партнёру он не правится; "
+        "правка согласованного снимает согласование.",
+        "en": "Paste the full text. It cannot be edited once sent to the partner; "
+        "editing an approved notice withdraws the approval.",
     },
     "rx.form.save": {"ru": "Сохранить черновик", "en": "Save draft"},
-    "rx.form.save_send": {"ru": "Сохранить и положить в Gmail", "en": "Save and put in Gmail"},
+    "rx.form.save_request": {
+        "ru": "Отправить на согласование",
+        "en": "Send for approval",
+    },
+    "rx.form.save_approve": {"ru": "Сохранить и согласовать", "en": "Save and approve"},
     "rx.form.cancel": {"ru": "Отмена", "en": "Cancel"},
     # --- карточка УК ------------------------------------------------------
     "rx.card.kicker": {"ru": "Предписание", "en": "Compliance notice"},
@@ -97,6 +105,41 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     "rx.card.replies": {"ru": "Ответы партнёра", "en": "Partner replies"},
     "rx.card.no_replies": {"ru": "Ответов пока нет.", "en": "No replies yet."},
     "rx.card.history": {"ru": "История", "en": "History"},
+    "rx.card.in_review": {
+        "ru": "Предписание на согласовании у ОСБ. Пока оно не согласовано, партнёр его не видит.",
+        "en": "The notice is waiting for OSB approval. The partner cannot see it until then.",
+    },
+    "rx.card.request_title": {"ru": "Согласование", "en": "Approval"},
+    "rx.card.request_hint": {
+        "ru": "Отправьте черновик ОСБ: она согласует его или вернёт с комментарием. "
+        "Партнёру он не уйдёт, пока ОСБ не согласует.",
+        "en": "Send the draft to OSB: it will approve it or return it with a comment. "
+        "Nothing reaches the partner before OSB approves.",
+    },
+    "rx.card.request": {"ru": "Отправить на согласование", "en": "Send for approval"},
+    "rx.card.approve_title": {"ru": "Согласование", "en": "Approval"},
+    "rx.card.approve_hint": {
+        "ru": "Согласованное предписание можно положить в почту. Текст, нарушения и адресаты "
+        "после согласования заморожены: правка снимет согласование.",
+        "en": "An approved notice can be put into the mailbox. Text, violations and recipients "
+        "are frozen after approval: editing withdraws the approval.",
+    },
+    "rx.card.approve": {"ru": "Согласовать", "en": "Approve"},
+    "rx.card.return": {"ru": "Вернуть автору", "en": "Return to the author"},
+    "rx.card.return_comment": {
+        "ru": "Комментарий автору (обязательно)",
+        "en": "Comment for the author (required)",
+    },
+    "rx.card.returned_note": {
+        "ru": "Вернули с комментарием: «{comment}»",
+        "en": "Returned with a comment: “{comment}”",
+    },
+    "rx.card.approved": {"ru": "Согласовано", "en": "Approved"},
+    "rx.approved_meta": {"ru": "{at}, {by}", "en": "{at}, {by}"},
+    "rx.card.edit_drops_approval": {
+        "ru": "Правка снимет согласование: после неё предписание снова на согласовании.",
+        "en": "Editing withdraws the approval: the notice goes back to review afterwards.",
+    },
     "rx.card.send_title": {"ru": "Отправка", "en": "Sending"},
     "rx.card.send_hint": {
         "ru": "Письмо ляжет черновиком в вашу почту Gmail — отправите его вы сами. С этого "
@@ -119,6 +162,23 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     # --- исходы ------------------------------------------------------------
     "rx.failed": {"ru": "Не получилось: {reason}", "en": "Not done: {reason}"},
     "rx.saved": {"ru": "Черновик сохранён.", "en": "Draft saved."},
+    "rx.requested": {
+        "ru": "Отправлено на согласование ОСБ.",
+        "en": "Sent to OSB for approval.",
+    },
+    "rx.approved": {"ru": "Предписание согласовано.", "en": "The notice is approved."},
+    "rx.returned": {
+        "ru": "Предписание возвращено автору.",
+        "en": "The notice is returned to its author.",
+    },
+    "rx.need_base": {
+        "ru": "Предписание без проверки заводит ОСБ: отметьте проверку-основание.",
+        "en": "A notice without an inspection is created by OSB: tick an inspection to base it on.",
+    },
+    "rx.not_approved": {
+        "ru": "в почту кладут только согласованное ОСБ предписание",
+        "en": "only a notice approved by OSB can be put into the mailbox",
+    },
     "rx.closed": {"ru": "Предписание закрыто.", "en": "The notice is closed."},
     "rx.bad_date": {"ru": "Срок не разобран.", "en": "The deadline could not be read."},
     "rx.gmail.ok": {
@@ -127,12 +187,14 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
         "en": "The letter is in your Gmail drafts: check and send it. The notice is now in force.",
     },
     "rx.gmail.failed": {
-        "ru": "Черновик в почту не лёг — предписание осталось черновиком. Попробуйте ещё раз.",
-        "en": "The draft did not reach your mailbox, so the notice is still a draft. Try again.",
+        "ru": "Черновик в почту не лёг — предписание осталось согласованным, но не отправленным. "
+        "Попробуйте ещё раз.",
+        "en": "The draft did not reach your mailbox, so the notice is still approved but unsent. "
+        "Try again.",
     },
     "rx.gmail.denied": {
-        "ru": "Доступ к почте не выдан — предписание осталось черновиком.",
-        "en": "Mail access was not granted, so the notice is still a draft.",
+        "ru": "Доступ к почте не выдан — предписание осталось согласованным, но не отправленным.",
+        "en": "Mail access was not granted, so the notice is still approved but unsent.",
     },
     "rx.gmail.unavailable": {
         "ru": "На этом стенде почта Google не настроена — положить письмо в черновики нельзя.",
@@ -186,10 +248,39 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     "rx.reply.meta": {"ru": "{by}, {at}", "en": "{by}, {at}"},
     # --- история ----------------------------------------------------------
     "rx.event.created": {"ru": "Составлен черновик", "en": "Draft created"},
-    "rx.event.edited": {"ru": "Черновик изменён", "en": "Draft edited"},
+    "rx.event.edited": {"ru": "Предписание изменено", "en": "Notice edited"},
+    "rx.event.edited_approval_dropped": {
+        "ru": "Изменено, согласование снято",
+        "en": "Edited, approval withdrawn",
+    },
+    "rx.event.requested": {"ru": "Отправлено на согласование", "en": "Sent for approval"},
+    "rx.event.returned": {"ru": "Возвращено автору", "en": "Returned to the author"},
+    "rx.event.approved": {"ru": "Согласовано ОСБ", "en": "Approved by OSB"},
     "rx.event.issued": {"ru": "Положено в Gmail, действует", "en": "Put in Gmail, in force"},
     "rx.event.replied": {"ru": "Ответ партнёра", "en": "Partner reply"},
     "rx.event.closed": {"ru": "Закрыто", "en": "Closed"},
+    # --- страница «ОСБ» (D599) ---------------------------------------------
+    "section.osb.title": {"ru": "ОСБ", "en": "OSB"},
+    "osb.queues": {"ru": "Очереди предписаний", "en": "Notice queues"},
+    "osb.queue.review": {"ru": "На согласовании · {n}", "en": "In review · {n}"},
+    "osb.queue.approved": {
+        "ru": "Согласовано, не отправлено · {n}",
+        "en": "Approved, not sent · {n}",
+    },
+    "osb.queue.active": {"ru": "Действуют · {n}", "en": "In force · {n}"},
+    "osb.queue.drafts": {"ru": "Черновики · {n}", "en": "Drafts · {n}"},
+    "osb.queue.closed": {"ru": "Закрытые · {n}", "en": "Closed · {n}"},
+    "osb.empty.review": {
+        "ru": "Ничего не ждёт согласования.",
+        "en": "Nothing is waiting for approval.",
+    },
+    "osb.empty.approved": {
+        "ru": "Согласованных, но не отправленных предписаний нет.",
+        "en": "No approved notices are waiting to be sent.",
+    },
+    "osb.empty.active": {"ru": "Действующих предписаний нет.", "en": "No notices are in force."},
+    "osb.empty.drafts": {"ru": "Черновиков нет.", "en": "There are no drafts."},
+    "osb.empty.closed": {"ru": "Закрытых предписаний нет.", "en": "No closed notices."},
     # --- экран страны -----------------------------------------------------
     "country.rx.title": {"ru": "Предписания", "en": "Compliance notices"},
     "country.rx.hint": {

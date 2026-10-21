@@ -28,3 +28,22 @@
     <span class="sbar__count">{{ rows|length }}</span>
   </div>
 {% endmacro %}
+
+{#
+  Полоса отбора «ОСБ»: очередь выбирают вкладки над списком, здесь — только страна.
+  Те же ссылки и те же классы, что у `filter_bar`.
+#}
+{% macro osb_bar() %}
+  <div class="sbar sbar--actions">
+    {% if countries|length > 1 or country %}
+      <span class="sbar__set" role="group" aria-label="{{ t('actions.country') }}">
+        <span class="sbar__label">{{ t('actions.country') }}</span>
+        <a class="spill spill--check{% if not country %} is-on{% endif %}" href="{{ select_url(country='') }}">{{ t('actions.all_countries') }}</a>
+        {% for code in countries %}
+          <a class="spill spill--check{% if code == country %} is-on{% endif %}" href="{{ select_url(country=code) }}">{{ country_title(code) or code }}</a>
+        {% endfor %}
+      </span>
+    {% endif %}
+    <span class="sbar__count">{{ rows|length }}</span>
+  </div>
+{% endmacro %}

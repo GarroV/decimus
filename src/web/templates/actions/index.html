@@ -8,33 +8,42 @@
   Выбор живёт в адресе: без скриптов строка — обычная ссылка, перезагрузка
   держит панель открытой, ссылкой можно поделиться.
 #}{% extends "_split_page.html" %}
-{% from "actions/_filters.html" import filter_bar with context %}
+{% from "actions/_filters.html" import filter_bar, osb_bar with context %}
 {% from "actions/_list_plans.html" import plans_list with context %}
 {% from "actions/_list_rx.html" import rx_list with context %}
 {% from "actions/_panel_plan.html" import plan_panel with context %}
 {% from "actions/_panel_rx.html" import rx_panel with context %}
-{% block title %}{{ t('section.actions.title') }}{% endblock %}
+{% block title %}{{ t(title_key|default('section.actions.title')) }}{% endblock %}
 {% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-actions.css') }}"><script src="{{ url_for('static', filename='actions.js') }}" defer></script>{% endblock %}
 
 {% block split_top %}
   <header class="shead">
     <div class="shead__main">
-      <h1 class="shead__title">{{ t('section.actions.title') }}</h1>
+      <h1 class="shead__title">{{ t(title_key|default('section.actions.title')) }}</h1>
       <p class="shead__sub">{{ country_title(country) if country else t('actions.all_countries') }} · {{ t('actions.count', n=total) }}</p>
     </div>
-    {% if tab == 'prescriptions' and hq and may('prescription.manage') %}
+    {#- «Новое предписание» без проверки — только у ОСБ и главного админа; админ смотрит без кнопок. -#}
+    {% if tab == 'osb' and may('prescription.manage') %}
       <a class="sbtn sbtn--primary" href="{{ new_url }}">{{ t('rx.new') }}</a>
     {% endif %}
   </header>
-  <nav class="stabs" aria-label="{{ t('section.actions.title') }}">
-    <a class="stabs__item{% if tab == 'plans' %} is-current{% endif %}" href="{{ tab_links['plans'] }}"{% if tab == 'plans' %} aria-current="page"{% endif %}>{{ t('actions.tab.plans') }}</a>
-    <a class="stabs__item{% if tab == 'prescriptions' %} is-current{% endif %}" href="{{ tab_links['prescriptions'] }}"{% if tab == 'prescriptions' %} aria-current="page"{% endif %}>{{ t('actions.tab.prescriptions') }}</a>
-  </nav>
+  {% if tab == 'osb' %}
+    <nav class="stabs" aria-label="{{ t('osb.queues') }}">
+      {% for key, text, n in queues %}
+        <a class="stabs__item{% if queue == key %} is-current{% endif %}" href="{{ select_url(queue=key, id='') }}"{% if queue == key %} aria-current="page"{% endif %}>{{ t(text, n=n) }}</a>
+      {% endfor %}
+    </nav>
+  {% else %}
+    <nav class="stabs" aria-label="{{ t('section.actions.title') }}">
+      <a class="stabs__item{% if tab == 'plans' %} is-current{% endif %}" href="{{ tab_links['plans'] }}"{% if tab == 'plans' %} aria-current="page"{% endif %}>{{ t('actions.tab.plans') }}</a>
+      <a class="stabs__item{% if tab == 'prescriptions' %} is-current{% endif %}" href="{{ tab_links['prescriptions'] }}"{% if tab == 'prescriptions' %} aria-current="page"{% endif %}>{{ t('actions.tab.prescriptions') }}</a>
+    </nav>
+  {% endif %}
 {% endblock %}
 
 {% block split_list %}
   <div class="sbox">
-    {{ filter_bar() }}
+    {% if tab == 'osb' %}{{ osb_bar() }}{% else %}{{ filter_bar() }}{% endif %}
     {% if truncated %}<p class="slist__note">{{ t(truncated_key, n=limit) }}</p>{% endif %}
     {% if tab == 'plans' %}{{ plans_list() }}{% else %}{{ rx_list() }}{% endif %}
   </div>

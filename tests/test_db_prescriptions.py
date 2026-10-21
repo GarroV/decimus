@@ -111,8 +111,15 @@ def _положено(журнал: list[str]) -> rx.PutDraft:
     return положить
 
 
-def _отправленное(**поля: Any) -> str:
+def _согласованное(**поля: Any) -> str:
+    """Предписание, согласованное ОСБ, но ещё не отправленное (0087)."""
     ident = _черновик(**поля)
+    rxw.approve(ident, actor="hq-lead")
+    return ident
+
+
+def _отправленное(**поля: Any) -> str:
+    ident = _согласованное(**поля)
     rxw.issue(ident, actor="hq-lead", put_draft=_положено([]))
     return ident
 
@@ -152,6 +159,7 @@ def test_путь_предписания_и_его_история(сеть: dict
     ident = _черновик(unit_ids=(сеть["Batumi-1"],), inspection_ids=(основание,))
 
     # Act
+    rxw.approve(ident, actor="hq-lead")
     rxw.issue(ident, actor="hq-lead", put_draft=_положено(журнал))
     _ответить(
         ident,
@@ -170,6 +178,7 @@ def test_путь_предписания_и_его_история(сеть: dict
     assert итог.replies[0].comment == "план приложен"
     assert [(e.action, e.actor) for e in итог.events] == [
         ("created", "hq-lead"),
+        ("approved", "hq-lead"),
         ("issued", "hq-lead"),
         ("replied", "partner-ge"),
         ("closed", "hq-lead"),
@@ -182,15 +191,15 @@ def test_отправка_запоминает_адресатов_страны(�
     assert rx.remembered_recipients("GE") == "a@ge.example.com, b@ge.example.com"
 
 
-def test_не_легло_в_почту_остаётся_черновиком(сеть: dict[str, str]) -> None:
-    ident = _черновик()
+def test_не_легло_в_почту_остаётся_согласованным(сеть: dict[str, str]) -> None:
+    ident = _согласованное()
 
     def отказ(_: rx.Prescription) -> None:
         raise RuntimeError("Gmail недоступен")
 
     with pytest.raises(RuntimeError):
         rxw.issue(ident, actor="hq-lead", put_draft=отказ)
-    assert _hq(ident).status == "draft"
+    assert _hq(ident).status == "approved"
     assert rx.remembered_recipients("GE") == ""
 
 
@@ -207,6 +216,7 @@ def test_правка_черновика_в_истории_с_подписью(�
             unit_ids=(сеть["Tbilisi-1"],),
         ),
         actor="hq-two",
+        manager=True,
     )
     итог = _hq(ident)
     assert (итог.country, итог.subject, итог.recipients) == (
@@ -256,9 +266,9 @@ def test_отправленное_не_правит_и_уК_мимо_двери(
 
 def test_пиццерии_отправленного_не_меняются(сеть: dict[str, str], admin_env: str) -> None:
     ident = _отправленное(unit_ids=(сеть["Batumi-1"],))
-    with pytest.raises(psycopg.errors.CheckViolation, match="только у черновика"):
+    with pytest.raises(psycopg.errors.CheckViolation, match="только у неотправленного"):
         _sql(admin_env, "delete from prescription_units where prescription_id = %s", (ident,))
-    with pytest.raises(psycopg.errors.CheckViolation, match="только у черновика"):
+    with pytest.raises(psycopg.errors.CheckViolation, match="только у неотправленного"):
         _sql(
             admin_env,
             "insert into prescription_units (prescription_id, unit_id) values (%s, %s)",
@@ -364,7 +374,7 @@ def test_отклонённое_основание_не_даёт_отправи�
 ) -> None:
     # Arrange — черновик на проверке, которую потом отклонили.
     основание = _принятая()
-    ident = _черновик(inspection_ids=(основание,))
+    ident = _согласованное(inspection_ids=(основание,))
     retract_inspection(основание, tenant="HQ", reason="ошибка точки", storage=Хранилище())
 
     # Act / Assert
@@ -380,7 +390,7 @@ def test_перенос_основания_в_другую_страну_не_д�
     # D1: принятая с D2/D3 сама заводит экшн-план (D272), а проверку с планом
     # в другую страну не переносят вовсе — до предписания дело бы не дошло.
     основание = _принятая(finding=("CLN05", "D1", "hot_kitchen"))
-    ident = _черновик(inspection_ids=(основание,))
+    ident = _согласованное(inspection_ids=(основание,))
     move_inspection(
         основание,
         tenant="HQ",
@@ -394,7 +404,7 @@ def test_перенос_основания_в_другую_страну_не_д�
 
 
 def test_без_адресатов_не_отправляют(сеть: dict[str, str]) -> None:
-    ident = _черновик(recipients="")
+    ident = _согласованное(recipients="")
     журнал: list[str] = []
     with pytest.raises(PrescriptionError, match="Нет адресатов"):
         rxw.issue(ident, actor="hq-lead", put_draft=_положено(журнал))
@@ -405,7 +415,7 @@ def test_отказ_базы_на_отправке_в_почту_не_кладё
     сеть: dict[str, str], admin_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Arrange — перевод в «действует» база отвергает (подменённый переход).
-    ident = _черновик()
+    ident = _согласованное()
     monkeypatch.setattr(
         rxw,
         "_ISSUE_SQL",
@@ -420,13 +430,13 @@ def test_отказ_базы_на_отправке_в_почту_не_кладё
     # Assert — база проверяет ДО почты: в Gmail ничего, предписание — черновик.
     assert not isinstance(отказ.value, IssuedDraftLostError)
     assert положено == [], "письмо легло в почту раньше, чем база приняла отправку"
-    assert _hq(ident).status == "draft"
+    assert _hq(ident).status == "approved"
 
 
 def test_коммит_не_прошёл_после_почты_говорит_удалить_черновик(
     сеть: dict[str, str], pg_dsn: str
 ) -> None:
-    ident = _черновик()
+    ident = _согласованное()
 
     def оборвать(_п: rx.Prescription) -> None:
         # Письмо «легло», а соединение отправки обрывается до коммита.
@@ -439,7 +449,7 @@ def test_коммит_не_прошёл_после_почты_говорит_у�
 
     with pytest.raises(IssuedDraftLostError, match="Удалите этот черновик"):
         rxw.issue(ident, actor="hq-lead", put_draft=оборвать)
-    assert _hq(ident).status == "draft"
+    assert _hq(ident).status == "approved"
 
 
 # --- охват: партнёр, чужая страна, IDOR -------------------------------------

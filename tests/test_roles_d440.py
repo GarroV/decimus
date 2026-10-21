@@ -273,11 +273,11 @@ def test_админ_уК_назначает_админов_но_не_главн�
 
     разрешено = {
         r
-        for r in ("superadmin", "admin", "developer", "control", "guest")
+        for r in ("superadmin", "admin", "developer", "control", "guest", "osb")
         if may_grant(охват, tenant="HQ", role=r)
     }
 
-    assert разрешено == {"admin", "developer", "control", "guest"}
+    assert разрешено == {"admin", "developer", "control", "guest", "osb"}
 
 
 def test_главный_админ_назначает_любые_роли_уК() -> None:
@@ -290,6 +290,7 @@ def test_главный_админ_назначает_любые_роли_уК()
         "developer",
         "control",
         "guest",
+        "osb",
     }
 
 

@@ -1,9 +1,11 @@
-"""Предписания: запись — черновик, отправка, закрытие (УК) и ответ партнёра (волна 3).
+"""Предписания: запись — черновик, согласование, отправка, закрытие (УК), ответ партнёра.
 
 Чтение, модель и правила — `src/db/prescriptions.py`; здесь двери записи.
-Черновик, связи, отправка и закрытие идут ролью администратора истории, ответ —
-ролью приложения. Что кому можно, держит база (`0037`); здесь — понятные
-человеку отказы до похода в базу.
+Черновик, связи, переходы согласования (D599, D600), отправка и закрытие идут
+ролью администратора истории, ответ — ролью приложения. Порядок переходов и
+подпись держит база (`0037`, `0087`); здесь — понятные человеку отказы до
+похода в базу и различие «автор или ведущий»: база знает лишь подпись, а кто
+такой ОСБ, решает веб (`prescription.manage`) и передаёт сюда флагом `manager`.
 """
 
 from __future__ import annotations
@@ -27,8 +29,11 @@ from .config import (
 from .errors import IssuedDraftLostError, PrescriptionError, StorageError
 from .prescriptions import (
     ONE_SQL,
+    STATUS_APPROVED,
     STATUS_DRAFT,
     STATUS_ISSUED,
+    STATUS_REVIEW,
+    UNSENT,
     Draft,
     Prescription,
     check_draft,
@@ -67,18 +72,25 @@ _DELETE_BASES_SQL = "delete from prescription_inspections where prescription_id 
 #: Берётся ПЕРВЫМ, до замка строки, во всех дверях — иначе ответ (замок → ключ
 #: строки) и закрытие (строка → замок) взаимно ждали бы друг друга.
 _ADVISORY_SQL = "select lock_prescription(%s::uuid)"
-_LOCK_SQL = "select status, country from prescriptions where id = %s for no key update"
+_LOCK_SQL = "select status, country, created_by from prescriptions where id = %s for no key update"
 #: Пределы ожидания на соединениях УК: занятая база — внятный отказ, а не
 #: зависший экран. Пока письмо кладётся в Gmail, транзакция стоит открытой —
 #: её держит свой предел (у Gmail свой сетевой таймаут, `google_auth`).
 _TIMEOUTS_SQL = "set lock_timeout = '5s'; set statement_timeout = '15s'"
 _IDLE_SQL = "set local idle_in_transaction_session_timeout = '30s'"
 _SIGN_SQL = "select set_config('decimus.prescription_actor', %s, true)"
+#: Комментарий возврата: триггер 0087 не пускает `review → draft` без него.
+_COMMENT_SQL = "select set_config('decimus.prescription_comment', %s, true)"
 _UPDATE_SQL = """
 update prescriptions
 set due_on = %(due_on)s, recipients = %(recipients)s, subject = %(subject)s, body = %(body)s
 where id = %(id)s
 """
+_REQUEST_SQL = "update prescriptions set status = 'review' where id = %s"
+_APPROVE_SQL = """
+update prescriptions set status = 'approved', approved_by = %(actor)s where id = %(id)s
+"""
+_RETURN_SQL = "update prescriptions set status = 'draft' where id = %s"
 _ISSUE_SQL = "update prescriptions set status = 'issued', issued_by = %(actor)s where id = %(id)s"
 _CLOSE_SQL = """
 update prescriptions
@@ -93,7 +105,8 @@ where id = %(id)s
 _HEAD_FOR_REPLY_SQL = """
 select p.status
 from prescriptions p
-where (%(countries)s::text[] is null or (p.country = any(%(countries)s) and p.status <> 'draft'))
+where (%(countries)s::text[] is null
+       or (p.country = any(%(countries)s) and p.status in ('issued', 'closed')))
   and p.id = %(id)s
 """
 
@@ -147,8 +160,12 @@ def _links(cur: psycopg.Cursor[Any], ident: str, draft: Draft) -> None:
         cur.execute(_INSERT_BASE_SQL, (ident, inspection_id))
 
 
-def create_draft(draft: Draft, *, actor: str) -> str:
-    """Завести черновик предписания. Возвращает его id."""
+def create_draft(draft: Draft, *, actor: str, submit: bool = False) -> str:
+    """Завести черновик предписания. Возвращает его id.
+
+    `submit` — форма девелопера или админа кончается «Отправить на согласование»
+    (D600): черновик и запрос ложатся одной транзакцией.
+    """
     who = _actor(actor)
     чистый = check_draft(draft, on=today())
     try:
@@ -170,35 +187,66 @@ def create_draft(draft: Draft, *, actor: str) -> str:
             ident = str(row[0])
             cur.execute(_SIGN_SQL, (who,))
             _links(cur, ident, чистый)
+            if submit:
+                cur.execute(_REQUEST_SQL, (ident,))
             conn.commit()
             return ident
     except psycopg.Error as exc:
         raise _translate("Сохранить предписание", exc) from exc
 
 
-def _locked(cur: psycopg.Cursor[Any], ident: str) -> tuple[str, str]:
+def _locked(cur: psycopg.Cursor[Any], ident: str) -> tuple[str, str, str]:
+    """Статус, страна и автор под замком предписания."""
     cur.execute(_ADVISORY_SQL, (ident,))
     cur.execute(_LOCK_SQL, (ident,))
     row = cur.fetchone()
     if row is None:
         raise PrescriptionError("Предписания нет")
-    return str(row[0]), str(row[1])
+    return str(row[0]), str(row[1]), str(row[2])
 
 
-def update_draft(prescription_id: str, draft: Draft, *, actor: str) -> None:
-    """Поправить черновик. Отправленное не правится — его закрывают и составляют новое."""
+def _check_may_edit(статус: str, автор: str, *, who: str, manager: bool) -> None:
+    """Кто что правит (D599): автор — свой черновик, ОСБ — любое неотправленное."""
+    if статус not in UNSENT:
+        raise PrescriptionError(
+            "Предписание уже отправлено — оно не правится. Закройте его с "
+            "комментарием и составьте новое"
+        )
+    if manager:
+        return
+    if статус != STATUS_DRAFT:
+        raise PrescriptionError(
+            "Предписание у ОСБ: на согласовании и после него его правит только ОСБ"
+        )
+    if автор != who:
+        raise PrescriptionError("Черновик правит его автор или ОСБ")
+
+
+def update_draft(
+    prescription_id: str,
+    draft: Draft,
+    *,
+    actor: str,
+    manager: bool = False,
+    submit: bool = False,
+) -> None:
+    """Поправить неотправленное предписание.
+
+    Автор правит свой черновик; на согласовании и после него — только ведущий
+    (`manager`, ОСБ). Правка согласованного снимает согласование (триггер 0087).
+    `submit` — правка и запрос на согласование одним шагом (форма девелопера).
+    Отправленное не правится — его закрывают и составляют новое.
+    """
     who = _actor(actor)
     ident = uuid_or_none(prescription_id)
     if ident is None:
         raise PrescriptionError("Предписания нет")
     try:
         with _admin("Сохранить предписание") as conn, conn.cursor() as cur:
-            статус, страна = _locked(cur, ident)
-            if статус != STATUS_DRAFT:
-                raise PrescriptionError(
-                    "Предписание уже отправлено — оно не правится. Закройте его с "
-                    "комментарием и составьте новое"
-                )
+            статус, страна, автор = _locked(cur, ident)
+            _check_may_edit(статус, автор, who=who, manager=manager)
+            if submit and статус != STATUS_DRAFT:
+                raise PrescriptionError("На согласование отправляют черновик")
             чистый = check_draft(replace(draft, country=страна), on=today())
             cur.execute(_SIGN_SQL, (who,))
             cur.execute(
@@ -214,9 +262,88 @@ def update_draft(prescription_id: str, draft: Draft, *, actor: str) -> None:
             cur.execute(_DELETE_UNITS_SQL, (ident,))
             cur.execute(_DELETE_BASES_SQL, (ident,))
             _links(cur, ident, чистый)
+            if submit:
+                cur.execute(_REQUEST_SQL, (ident,))
             conn.commit()
     except psycopg.Error as exc:
         raise _translate("Сохранить предписание", exc) from exc
+
+
+def _transition(
+    prescription_id: str, what: str, step: Callable[[psycopg.Cursor[Any], str, str, str], None]
+) -> None:
+    """Общий каркас перехода: под замком читается статус, `step` проверяет и пишет."""
+    ident = uuid_or_none(prescription_id)
+    if ident is None:
+        raise PrescriptionError("Предписания нет")
+    try:
+        with _admin(what) as conn, conn.cursor() as cur:
+            статус, _, автор = _locked(cur, ident)
+            step(cur, ident, статус, автор)
+            conn.commit()
+    except psycopg.Error as exc:
+        raise _translate(what, exc) from exc
+
+
+def request_review(prescription_id: str, *, actor: str, manager: bool = False) -> None:
+    """Отправить черновик на согласование ОСБ (D600): `draft → review`.
+
+    Запрашивает автор черновика; ведущий (`manager`) — любой.
+    """
+    who = _actor(actor)
+
+    def шаг(cur: psycopg.Cursor[Any], ident: str, статус: str, автор: str) -> None:
+        if статус != STATUS_DRAFT:
+            raise PrescriptionError("На согласование отправляют черновик")
+        if not manager and автор != who:
+            raise PrescriptionError("Запрос на согласование отправляет автор черновика или ОСБ")
+        cur.execute(_SIGN_SQL, (who,))
+        cur.execute(_REQUEST_SQL, (ident,))
+
+    _transition(prescription_id, "Отправить на согласование", шаг)
+
+
+def approve(prescription_id: str, *, actor: str) -> None:
+    """Согласовать: `review → approved`; свой черновик ОСБ согласует и без запроса.
+
+    Чужой черновик, не отправленный на согласование, не согласуется: автор ещё
+    не просил. Согласуется тем, что лежит, — правка и согласование разными шагами.
+    """
+    who = _actor(actor)
+
+    def шаг(cur: psycopg.Cursor[Any], ident: str, статус: str, автор: str) -> None:
+        if статус == STATUS_DRAFT and автор != who:
+            raise PrescriptionError(
+                "Чужой черновик ещё не отправлен на согласование: его согласует "
+                "сам автор, когда запросит"
+            )
+        if статус not in (STATUS_DRAFT, STATUS_REVIEW):
+            raise PrescriptionError(
+                "Согласовать можно предписание на согласовании или свой черновик"
+            )
+        cur.execute(_SIGN_SQL, (who,))
+        cur.execute(_APPROVE_SQL, {"id": ident, "actor": who})
+
+    _transition(prescription_id, "Согласовать предписание", шаг)
+
+
+def return_to_author(prescription_id: str, *, actor: str, comment: str) -> None:
+    """Вернуть автору: `review → draft`, комментарий обязателен (D599)."""
+    who = _actor(actor)
+    текст = (comment or "").strip()
+    if not текст:
+        raise PrescriptionError("Возвращают с комментарием: что поправить")
+    if len(текст) > MAX_COMMENT:
+        raise PrescriptionError(f"Комментарий длиннее {MAX_COMMENT} знаков")
+
+    def шаг(cur: psycopg.Cursor[Any], ident: str, статус: str, _автор: str) -> None:
+        if статус != STATUS_REVIEW:
+            raise PrescriptionError("Вернуть можно только предписание на согласовании")
+        cur.execute(_SIGN_SQL, (who,))
+        cur.execute(_COMMENT_SQL, (текст,))
+        cur.execute(_RETURN_SQL, (ident,))
+
+    _transition(prescription_id, "Вернуть предписание", шаг)
 
 
 #: Кладёт письмо черновиком в почту сотрудника. Даёт веб; база о Gmail не знает.
@@ -224,7 +351,9 @@ PutDraft = Callable[[Prescription], None]
 
 
 def issue(prescription_id: str, *, actor: str, put_draft: PutDraft) -> Prescription:
-    """Отметить предписание «действует» и положить письмо черновиком в почту сотрудника.
+    """Отметить согласованное предписание «действует» и положить письмо черновиком в почту.
+
+    Только из `approved`: без согласования ОСБ предписание не уходит (D600).
 
     Порядок — база, потом почта, потом коммит. Под замком строка переводится в
     «действует», и триггер сверяет всё, что держит база (страна пиццерий,
@@ -242,14 +371,18 @@ def issue(prescription_id: str, *, actor: str, put_draft: PutDraft) -> Prescript
             cur = conn.cursor()
             cur.execute(_IDLE_SQL)
             статус = _locked(cur, ident)[0]
-            if статус != STATUS_DRAFT:
-                raise PrescriptionError("Предписание уже отправлено")
+            if статус != STATUS_APPROVED:
+                raise PrescriptionError(
+                    "Предписание уже отправлено"
+                    if статус not in UNSENT
+                    else "Отправить можно только согласованное ОСБ предписание"
+                )
             found = read_with(cur, ONE_SQL, {"countries": None, "tenants": None, "id": ident})
             предписание = found[0]
             if not предписание.recipients.strip():
                 raise PrescriptionError("Нет адресатов — впишите хотя бы один адрес")
             if предписание.due_on < today():
-                raise PrescriptionError("Срок уже прошёл — поправьте его в черновике")
+                raise PrescriptionError("Срок уже прошёл — поправьте его и согласуйте снова")
             cur.execute(_ISSUE_SQL, {"id": ident, "actor": who})
         except psycopg.Error as exc:
             raise _translate("Отправить предписание", exc) from exc
@@ -283,7 +416,7 @@ def close(prescription_id: str, *, actor: str, comment: str) -> None:
             if статус != STATUS_ISSUED:
                 raise PrescriptionError(
                     "Закрыть можно только действующее предписание"
-                    if статус == STATUS_DRAFT
+                    if статус in UNSENT
                     else "Предписание уже закрыто"
                 )
             cur.execute(_CLOSE_SQL, {"id": ident, "actor": who, "comment": текст})
