@@ -1,0 +1,60 @@
+# Превью-стенд: ветка с данными открытого демо и мини-аппом в браузере — чтобы
+# владелец пощупал доработку ДО прода (docs/08-deploy.md, §8.22).
+#
+# Надстройка над dev-compose (docker-compose.yml), как у стендов на MUSPELHEIM,
+# а не над прод-сборкой открытого демо (deploy/demo): тут нет сети фронта
+# `edge-decimus` и MinIO, стенд виден только внутри tailnet.
+#
+#   docker compose -p decimus-preview -f docker-compose.yml \
+#     -f deploy/preview/compose.preview.yaml --profile web --profile db --profile storage up -d
+#   ... run --rm --no-deps migrate && ... --profile seed run --rm --no-deps seed
+#
+# Порты — свои, чтобы не спорить с соседними стендами; `.env` стенда задаёт
+# остальное (ключ модели — чтобы «Найти пункт» звал модель, как на проде).
+
+services:
+  # Бот и MCP превью не нужны: в Telegram стенд не смотрит, Claude — тоже.
+  bot:
+    profiles: !override ["off"]
+  mcp:
+    profiles: !override ["off"]
+  web:
+    environment:
+      WEB_DEMO: "1"
+    ports: !override
+      - "127.0.0.1:${PREVIEW_WEB_PORT:-8296}:8268"
+  walk:
+    environment:
+      # Чаты мини-аппа в браузере — те же, что у открытого демо: сид кладёт
+      # идущие проверки именно им (tools/seed_open_demo.py).
+      WEB_WALK_PREVIEW_CHAT: "999000000701"
+      WEB_WALK_PREVIEW_CHAT_RU: "999000000702"
+      WEB_DEMO: "1"
+  db:
+    ports: !override []
+  storage:
+    ports: !override []
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["seed"]
+    restart: "no"
+    env_file:
+      - .env
+    command: ["python", "tools/seed_open_demo.py"]
+    environment:
+      SEED_WEB_DEMO_FORCE: "1"
+      DEMO_STATE_DIR: /app/state
+      STATE_DIR: /app/state
+      DEMO_PHOTOS_DIR: /photos
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./demo/data:/app/demo/data:ro
+      - state:/app/state
+      - ${PREVIEW_PHOTOS_DIR:?папка кадров демо, см. docs/08-deploy.md §8.22}:/photos:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
