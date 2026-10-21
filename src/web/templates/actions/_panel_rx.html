@@ -53,7 +53,7 @@
           <form method="post" data-panel-form action="{{ url(rx_base ~ '/' ~ p.id ~ '/request') }}?lang={{ lang }}">
             <button class="sbtn sbtn--primary" type="submit">{{ t('rx.card.request') }}</button>
           </form>
-          {% if acts.edit %}<a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit') }}</a>{% endif %}
+          {% if acts.edit %}<a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit_approved' if p.status == 'approved' else 'rx.card.edit') }}</a>{% endif %}
         </div>
       </section>
     {% endif %}
@@ -66,7 +66,7 @@
           <form method="post" data-panel-form action="{{ url(rx_base ~ '/' ~ p.id ~ '/approve') }}?lang={{ lang }}">
             <button class="sbtn sbtn--primary" type="submit">{{ t('rx.card.approve') }}</button>
           </form>
-          {% if acts.edit %}<a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit') }}</a>{% endif %}
+          {% if acts.edit %}<a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit_approved' if p.status == 'approved' else 'rx.card.edit') }}</a>{% endif %}
         </div>
         {% if acts['return'] %}
           <form class="sform sform--gap" method="post" data-panel-form action="{{ url(rx_base ~ '/' ~ p.id ~ '/return') }}?lang={{ lang }}">
@@ -79,7 +79,7 @@
     {% elif acts.edit and not acts.request %}
       <section class="ssec">
         <div class="sactions">
-          <a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit') }}</a>
+          <a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit_approved' if p.status == 'approved' else 'rx.card.edit') }}</a>
         </div>
         {% if p.status == 'approved' %}<p class="ssec__note">{{ t('rx.card.edit_drops_approval') }}</p>{% endif %}
       </section>
@@ -88,6 +88,7 @@
     {% if acts.send %}
       <section class="ssec">
         <h3 class="ssec__title">{{ t('rx.card.send_title') }}</h3>
+        <p class="ssec__text">{{ t('rx.card.approved_hint') }}</p>
         <p class="ssec__text">{{ t('rx.card.send_hint') }}</p>
         <div class="sactions">
           <form method="post" action="{{ url(rx_base ~ '/' ~ p.id ~ '/send') }}?lang={{ lang }}">

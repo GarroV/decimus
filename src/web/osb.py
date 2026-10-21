@@ -60,16 +60,21 @@ def queue_rows(
     return tuple(sorted(rows, key=lambda p: (not p.overdue(today), p.due_on, p.created_at)))
 
 
+def _first_busy(counts: dict[str, int]) -> str:
+    return next((q for q in QUEUES if q != QUEUE_CLOSED and counts.get(q)), DEFAULT_QUEUE)
+
+
 def screen_context(lang: str) -> dict[str, Any]:
     """Список очереди и полоса отбора: очередь и страна живут в адресе."""
     страна = country_data.normalize_code(request.args.get("country") or "")
-    очередь = (request.args.get("queue") or "").strip()
-    очередь = очередь if очередь in QUEUES else DEFAULT_QUEUE
+    заказанная = (request.args.get("queue") or "").strip()
     reach = auth.current_reach()
     сегодня = rx.today()
 
     открытые = rx.list_prescriptions(reach=reach)
-    закрытые = rx.list_prescriptions(reach=reach, closed=True) if очередь == QUEUE_CLOSED else None
+    закрытые = (
+        rx.list_prescriptions(reach=reach, closed=True) if заказанная == QUEUE_CLOSED else None
+    )
     страны = tuple(sorted({p.country for p in (закрытые or открытые).rows} | {страна} - {""}))
 
     def в_стране(rows: tuple[rx.Prescription, ...]) -> tuple[rx.Prescription, ...]:
@@ -80,6 +85,9 @@ def screen_context(lang: str) -> dict[str, Any]:
         queue: sum(1 for p in открытые_в_стране if p.status == status)
         for queue, status in _STATUS_OF.items()
     }
+    # Очередь без выбора — первая непустая: пустое «На согласовании» при живом
+    # «Согласовано · 1» выглядело бы как «ничего нет».
+    очередь = заказанная if заказанная in QUEUES else _first_busy(счётчики)
     счётчики[QUEUE_CLOSED] = rx.status_counts(reach=reach, country=страна or None)[rx.STATUS_CLOSED]
     if закрытые is not None:
         строки = в_стране(закрытые.rows)
@@ -95,7 +103,7 @@ def screen_context(lang: str) -> dict[str, Any]:
     def отбор(**изменения: str) -> str:
         параметры: dict[str, Any] = {
             "country": страна,
-            "queue": очередь if очередь != DEFAULT_QUEUE else "",
+            "queue": заказанная if заказанная in QUEUES else "",
             "lang": lang,
             **изменения,
         }

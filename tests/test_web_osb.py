@@ -82,3 +82,38 @@ def test_девелопер_запрашивает_но_без_основани�
     )
     assert ответ.status_code in (200, 400, 422)
     assert зовы["create"] == []
+
+
+def test_очередь_согласовано_показывает_ровно_столько_сколько_в_счётчике(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from test_web_prescriptions import предписание
+
+    from src.db import prescriptions as rx
+
+    monkeypatch.setattr(
+        rx,
+        "list_prescriptions",
+        lambda **_k: rx.PrescriptionList(rows=(предписание(status="approved"),), truncated=False),
+    )
+    страница = уК.get("/osb?queue=approved").get_data(as_text=True)
+    assert "не отправлено · 1" in страница
+    assert "в списке: 1" in страница
+    assert "Ничего не" not in страница
+
+
+def test_без_выбора_открывается_первая_непустая_очередь(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from test_web_prescriptions import предписание
+
+    from src.db import prescriptions as rx
+
+    monkeypatch.setattr(
+        rx,
+        "list_prescriptions",
+        lambda **_k: rx.PrescriptionList(rows=(предписание(status="approved"),), truncated=False),
+    )
+    страница = уК.get("/osb").get_data(as_text=True)
+    assert "в списке: 1" in страница
+    assert "Ничего не" not in страница

@@ -508,3 +508,37 @@ def test_девелопер_без_основания_предписание_н�
 
     assert ответ.status_code == 400
     assert зовы["create"] == [] and зовы["update"] == []
+
+
+def test_форма_девелопера_просит_основание_а_не_всю_страну(
+    девелопер: FlaskClient, зовы: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        rx, "choices", lambda *_a, **_k: ((), (rx.Choice(id=ИД, title="Пиццерия · 2026-10-01"),))
+    )
+    страница = девелопер.get("/actions/prescriptions/new?country=GE").get_data(as_text=True)
+    assert "Предписание по проверке" in страница
+    assert "Отметьте проверку-основание" in страница
+    assert "всю страну" not in страница and "Можно не отмечать" not in страница
+
+
+def test_форма_осб_держит_подсказки_про_всю_страну(
+    уК: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    страница = уК.get("/actions/prescriptions/new?country=GE").get_data(as_text=True)
+    assert "Новое предписание" in страница
+    assert "всю страну" in страница
+
+
+def test_панель_согласованного_говорит_про_почту_а_на_согласовании_нет(
+    уК: FlaskClient, зовы: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(rx, "get_prescription", lambda *_a, **_k: предписание(status="approved"))
+    одобрено = уК.get(f"/osb?id={ИД}").get_data(as_text=True)
+    assert "Черновик в почту" in одобрено and "Изменить (снимет согласование)" in одобрено
+    assert "Положить в Gmail" not in одобрено
+    assert "Согласованное предписание можно положить в почту" in одобрено
+    monkeypatch.setattr(rx, "get_prescription", lambda *_a, **_k: предписание(status="review"))
+    на_согласовании = уК.get(f"/osb?id={ИД}").get_data(as_text=True)
+    assert "Согласованное предписание можно положить в почту" not in на_согласовании
+    assert "С этого момента" not in на_согласовании

@@ -674,6 +674,7 @@ def _render_form(
         values=values,
         unit_choices=точки,
         base_choices=основания,
+        is_manager=ведущий,
         can_request=not ведущий and (current is None or current.status == rx.STATUS_DRAFT),
         can_approve=ведущий and (current is None or acts_for(current)["approve"]),
         back_url=(

@@ -47,6 +47,14 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     # --- форма ------------------------------------------------------------
     "rx.form.kicker": {"ru": "Предписание партнёру", "en": "Compliance notice to the partner"},
     "rx.form.title_new": {"ru": "Новое предписание", "en": "New compliance notice"},
+    "rx.form.title_by_inspection": {
+        "ru": "Предписание по проверке",
+        "en": "Notice based on an inspection",
+    },
+    "rx.form.pick_base": {
+        "ru": "Отметьте проверку-основание.",
+        "en": "Tick the inspection it is based on.",
+    },
     "rx.form.title_edit": {"ru": "Черновик предписания", "en": "Notice draft"},
     "rx.form.pick_country": {
         "ru": "Выберите страну — предписание адресовано её партнёру.",
@@ -119,6 +127,12 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     "rx.card.request": {"ru": "Отправить на согласование", "en": "Send for approval"},
     "rx.card.approve_title": {"ru": "Согласование", "en": "Approval"},
     "rx.card.approve_hint": {
+        "ru": "Согласуйте предписание или верните автору с комментарием. Партнёру оно уйдёт "
+        "отдельным шагом — после согласования.",
+        "en": "Approve the notice or return it to the author with a comment. It reaches the "
+        "partner as a separate step, after approval.",
+    },
+    "rx.card.approved_hint": {
         "ru": "Согласованное предписание можно положить в почту. Текст, нарушения и адресаты "
         "после согласования заморожены: правка снимет согласование.",
         "en": "An approved notice can be put into the mailbox. Text, violations and recipients "
@@ -142,13 +156,17 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     },
     "rx.card.send_title": {"ru": "Отправка", "en": "Sending"},
     "rx.card.send_hint": {
-        "ru": "Письмо ляжет черновиком в вашу почту Gmail — отправите его вы сами. С этого "
-        "момента предписание действует, партнёр видит его у себя, текст больше не правится.",
-        "en": "The letter goes to your Gmail drafts and you send it yourself. From then on the "
+        "ru": "Письмо ляжет черновиком в вашу почту — отправите его вы сами. С этого момента "
+        "предписание действует, партнёр видит его, текст больше не правится.",
+        "en": "The letter goes to your mailbox drafts and you send it yourself. From then on the "
         "notice is in force, the partner sees it, and the text can no longer be edited.",
     },
-    "rx.card.send": {"ru": "Положить в Gmail", "en": "Put in Gmail"},
+    "rx.card.send": {"ru": "Черновик в почту", "en": "Draft to mailbox"},
     "rx.card.edit": {"ru": "Изменить черновик", "en": "Edit draft"},
+    "rx.card.edit_approved": {
+        "ru": "Изменить (снимет согласование)",
+        "en": "Edit (withdraws approval)",
+    },
     "rx.card.close_title": {"ru": "Закрыть предписание", "en": "Close the notice"},
     "rx.card.close_hint": {
         "ru": "Требование выполнено или снято. Исправить отправленное нельзя — закройте его "
@@ -184,7 +202,8 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     "rx.gmail.ok": {
         "ru": "Письмо лежит в черновиках вашей почты — проверьте и отправьте. "
         "Предписание действует.",
-        "en": "The letter is in your Gmail drafts: check and send it. The notice is now in force.",
+        "en": "The letter is in your mailbox drafts: check and send it. "
+        "The notice is now in force.",
     },
     "rx.gmail.failed": {
         "ru": "Черновик в почту не лёг — предписание осталось согласованным, но не отправленным. "
@@ -256,7 +275,7 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     "rx.event.requested": {"ru": "Отправлено на согласование", "en": "Sent for approval"},
     "rx.event.returned": {"ru": "Возвращено автору", "en": "Returned to the author"},
     "rx.event.approved": {"ru": "Согласовано ОСБ", "en": "Approved by OSB"},
-    "rx.event.issued": {"ru": "Положено в Gmail, действует", "en": "Put in Gmail, in force"},
+    "rx.event.issued": {"ru": "Черновик в почте, действует", "en": "Draft in mailbox, in force"},
     "rx.event.replied": {"ru": "Ответ партнёра", "en": "Partner reply"},
     "rx.event.closed": {"ru": "Закрыто", "en": "Closed"},
     # --- страница «ОСБ» (D599) ---------------------------------------------

@@ -24,11 +24,11 @@
 
 {# Ссылка-действие: в панели пиктограмма с подсказкой, на странице — с подписью. #}
 {# `short` — короткая надпись на странице (полное имя — в подсказке и aria-label). #}
-{% macro _link(href, ico, label, panel, tone='', hint='', short='', drawer=False) %}
-  <a class="hbtn {{ 'hbtn--icon ' if panel }}{{ tone }}" href="{{ href }}"{% if drawer %} data-drawer-open{% endif %}
+{% macro _link(href, ico, label, panel, tone='', hint='', short='', drawer=False, text=False) %}
+  <a class="hbtn {{ 'hbtn--icon ' if panel and not text }}{{ tone }}" href="{{ href }}"{% if drawer %} data-drawer-open{% endif %}
      {%- if panel %} aria-label="{{ label }}" data-tip="{{ hint or label }}"
      {%- elif short %} aria-label="{{ label }}" data-tip="{{ hint or label }}"
-     {%- elif hint %} data-tip="{{ hint }}"{% endif %}>{{ icon(ico) }}{% if not panel %}<span>{{ short or label }}</span>{% endif %}</a>
+     {%- elif hint %} data-tip="{{ hint }}"{% endif %}>{{ icon(ico) }}{% if not panel or text %}<span>{{ short or label }}</span>{% endif %}</a>
 {% endmacro %}
 
 {# Метка «Принята» объясняет себя при наведении и фокусе. Проверки, принятые до
@@ -109,7 +109,7 @@
     {# Предписание по этой проверке (D403): форма раздела УК, где проверка уже
        выбрана основанием. Право — `may_prescribe` из `_card_context`. #}
     {% if c.may_prescribe %}
-      {{ _link(url('/actions/prescriptions/new') ~ '?inspection=' ~ head.id ~ '&lang=' ~ lang, 'flag', t('card.act.rx'), panel, short=t('card.act.rx_short')) }}
+      {{ _link(url('/actions/prescriptions/new') ~ '?inspection=' ~ head.id ~ '&lang=' ~ lang, 'flag', t('card.act.rx'), panel, text=True) }}
     {% endif %}
 
     {# «Исправить» на странице карточки — перенос по дате и пиццерии (D195). В панели
