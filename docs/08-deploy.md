@@ -1102,6 +1102,10 @@ cd /srv/decimus
 DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 ```
 
+Без `DECIMUS_OVERLAYS` скрипт сам подключает `compose.edge.yaml` из каталога репозитория
+и пишет об этом: забытая надстройка роняла прод в 502 (`web` выпадал из сети прокси,
+21.10.2026). Пустое значение (`DECIMUS_OVERLAYS=`) — осознанный подъём без неё.
+
 Выкатка идёт одна за раз (#729): скрипт берёт замок `.git/prod-update.lock`
 (`flock`), вторая ждёт первую до `DEPLOY_LOCK_WAIT_S` секунд (по умолчанию 900)
 и иначе отказывает. Накат миграций вдобавок держит `pg_advisory_lock` — два
@@ -1852,10 +1856,16 @@ D391) — так же: миграций нет, право — уже выдан
 cd /d C:\projects\decimus-preview && git fetch -q && git checkout <ветка> && git pull -q
 set PREVIEW_PHOTOS_DIR=C:/data/decimus-preview-photos
 set P=docker compose -p decimus-preview -f docker-compose.yml -f deploy/preview/compose.preview.yaml --profile web --profile db --profile storage
-%P% build -q web && %P% --profile migrate run --rm --no-deps migrate
+%P% build -q web walk && %P% --profile migrate run --rm --no-deps migrate
 %P% --profile seed run --rm --no-deps seed      &rem только если нужны свежие демо-данные
 %P% up -d --wait web walk web-link
 ```
+
+**Собирать `web` И `walk`.** Мини-апп (`/tg/walk`) отдаёт свой контейнер `walk` со своим
+образом и своей копией статики: собран только `web` — админка новая, а мини-апп старый,
+и снаружи этого не видно (21.10.2026 так владельцу показали старые стрелки зон). Сверка
+после подъёма — отпечаток `walk.js?v=…` на странице `/tg/walk` должен совпасть с
+отпечатком файла в ветке.
 
 Погасить: `docker compose -p decimus-preview down` и `tailscale serve --https=9443 off`.
 
