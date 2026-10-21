@@ -110,6 +110,11 @@ def answer(offer: Offer, ask: Ask) -> dict[str, Any]:
         "via": offer.via,
         "candidates": [_card(c, offer, ask) for c in (*offer.candidates, *seen)],
         "question": offer.question,
+        # Ответы на вопрос о классе первой карточки — кнопками (#1107).
+        "answers": [
+            {"text": a.text, "level": a.level}
+            for a in (offer.suggestion.answers if offer.suggestion else ())
+        ],
     }
 
 

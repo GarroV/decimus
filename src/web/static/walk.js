@@ -211,7 +211,10 @@
     top.appendChild(row);
 
     var done = zones.filter(zoneDone).length;
-    var progress = el("div", "walk-progress");
+    // Полоса — те же зоны, что в списке: нажатие открывает список (#1106). Её
+    // нажимают первой, приняв за переключатель зон, — и не должна молчать.
+    var progress = W.button("walk-progress", null, function () { setPanel(true); });
+    progress.setAttribute("aria-label", tx("walk.switch.all") + ". " + tx("walk.progress", { done: done, total: zones.length }));
     var bar = el("div", "walk-progress__bar");
     bar.setAttribute("aria-hidden", "true");
     zones.forEach(function (z) {
@@ -340,7 +343,14 @@
     } else if (zoneDone(zone)) {
       hints.appendChild(el("span", "walk-hints__label is-ok", "✓ " + tx("walk.all_done")));
     }
-    if (hints.childNodes.length) box.appendChild(hints);
+    if (hints.childNodes.length) {
+      box.appendChild(hints);
+      // Лента листается вбок, а по виду этого не скажешь (#1106): пока справа
+      // есть ещё, край затухает.
+      var edge = function () { hints.classList.toggle("has-more", hints.scrollLeft + hints.clientWidth < hints.scrollWidth - 2); };
+      hints.addEventListener("scroll", edge, { passive: true });
+      window.requestAnimationFrame(edge);
+    }
     return box;
   }
 

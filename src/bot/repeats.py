@@ -57,7 +57,9 @@ def seen_before(inspection: Inspection | None, *, code: str, level: str) -> date
         # Поход в базу за пустым названием точки всё равно кончился бы отказом.
         return None
     try:
-        прошлая = queries.previous_inspection(tenant=tenant, unit=unit)
+        прошлая = queries.previous_inspection(
+            tenant=tenant, unit=unit, before=inspection.visit_date()
+        )
     except DbError as exc:
         # Предупреждением, а не молчанием: вопрос пропал, и разбирающий
         # «почему бот молчал про повтор» должен найти причину в журнале.

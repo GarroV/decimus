@@ -445,3 +445,63 @@ def test_неоднозначный_комментарий_с_кадром_то�
     # Assert
     assert s.used_photo is False
     assert recorder.last["photo"] is None
+
+
+def _с_вопросом(answers: Any) -> dict[str, Any]:
+    return {
+        "records": [
+            {
+                "item": "PRD09:D2",
+                "zone": "dough",
+                "wording": "x",
+                "reason": "",
+                "confidence": 0.9,
+            }
+        ],
+        "question": "Тесто продолжают использовать?",
+        "answers": answers,
+    }
+
+
+def test_варианты_ответа_на_вопрос_приходят_с_классом(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange: #1107 — вопрос о пороге вместе с тем, какой класс даёт каждый ответ
+    ответы = [
+        {"text": "Да, продолжают", "level": "D3"},
+        {"text": "Нет, списали", "level": "D2"},
+    ]
+    _patch(monkeypatch, _Recorder(_с_вопросом(ответы)))
+
+    # Act
+    s = classify("тесто плывёт", zone_hint="dough", chat_id=NO_CHAT)
+
+    # Assert
+    assert [(a.text, a.level) for a in s.answers] == [
+        ("Да, продолжают", "D3"),
+        ("Нет, списали", "D2"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("answers", "почему"),
+    [
+        ([{"text": "Да", "level": "D3"}], "один вариант — это не выбор"),
+        (
+            [{"text": "Да", "level": "D2"}, {"text": "Нет", "level": "D2"}],
+            "ответ не меняет класс — кнопки обманут",
+        ),
+        ([{"text": "", "level": "D3"}, {"text": "Нет", "level": "D2"}], "пустая кнопка"),
+        ([{"text": "Да", "level": "D9"}, {"text": "Нет", "level": "D2"}], "класса нет в методике"),
+        ("мусор", "не список"),
+    ],
+)
+def test_негодные_варианты_ответа_отбрасываются_целиком(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch, answers: Any, почему: str
+) -> None:
+    _patch(monkeypatch, _Recorder(_с_вопросом(answers)))
+
+    s = classify("тесто плывёт", zone_hint="dough", chat_id=NO_CHAT)
+
+    assert s.answers == (), почему
+    assert s.question, "вопрос остаётся текстом, пропадают только кнопки"

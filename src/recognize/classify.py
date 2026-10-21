@@ -20,7 +20,7 @@ from .client import ModelAnswer, ask_model
 from .config import DEFAULT_LANG, RecognizeSettings, load_recognize_settings
 from .cues import class_thresholds
 from .guard import MAX_QUESTION_CHARS, MAX_REASON_CHARS, MAX_WORDING_CHARS, clean_text
-from .models import NONE_CODE, UNKNOWN_ZONE, Candidate, Suggestion
+from .models import ANSWER_LEVELS, NONE_CODE, UNKNOWN_ZONE, Answer, Candidate, Suggestion
 from .prompt import correction_line, instructions, question_text
 from .rules_check import check_wording
 from .schema import picks_for, response_schema, split_pick
@@ -142,6 +142,34 @@ def _candidates(raw: Any, settings: RecognizeSettings) -> tuple[Candidate, ...]:
     )[: settings.max_candidates]
 
 
+#: Длина кнопки ответа: длиннее — это уже не ответ, а пересказ.
+MAX_ANSWER_CHARS = 80
+
+
+def _answers(raw: Any) -> tuple[Answer, ...]:
+    """Варианты ответа на вопрос о классе (#1107) — все годные или ни одного.
+
+    Кнопки обещают «нажми — будет такой класс», поэтому негодный набор не
+    чинится по частям: один вариант — не выбор, одинаковый класс у всех — ответ
+    класс не меняет, пустой текст или класс вне методики — мусор. Тогда вопрос
+    остаётся текстом, как было до вариантов.
+    """
+    if not isinstance(raw, list):
+        return ()
+    out: list[Answer] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            return ()
+        text = clean_text(str(entry.get("text", "")), MAX_ANSWER_CHARS)
+        level = str(entry.get("level", ""))
+        if not text or level not in ANSWER_LEVELS:
+            return ()
+        out.append(Answer(text=text, level=level))
+    if len(out) < 2 or len({a.level for a in out}) < 2:
+        return ()
+    return tuple(out)
+
+
 def _suggestion(
     payload: dict[str, Any],
     usage: dict[str, int],
@@ -162,6 +190,8 @@ def _suggestion(
         candidates=candidates,
         needs_human=needs_human,
         question=question,
+        # Варианты без вопроса не показать: нечему отвечать.
+        answers=_answers(payload.get("answers")) if question else (),
         used_photo=used_photo,
         usage=usage,
     )

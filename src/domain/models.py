@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass, field
 
 from .errors import ValidationError
@@ -224,6 +225,13 @@ class Inspection:
     #: другой процесс, до памяти бота ему не дотянуться. Пусто — проверка
     #: начата до D392.
     run_id: str = ""
+
+    def visit_date(self) -> datetime.date | None:
+        """Дата обхода датой; нечитаемая строка — `None` (сравнивать не с чем)."""
+        try:
+            return datetime.date.fromisoformat(self.date)
+        except ValueError:
+            return None
 
     def finding(self, n: int) -> Finding | None:
         return next((f for f in self.findings if f.n == n), None)

@@ -517,6 +517,8 @@
       f.found = (res.body && res.body.candidates) || [];
       f.also = [];
       f.question = (res.body && res.body.question) || "";
+      f.answers = (res.body && res.body.answers) || [];
+      f.answered = null;
       f.via = (res.body && res.body.via) || "model";
       f.asked = JSON.stringify(asked);
       if (f.found.length) {
@@ -616,6 +618,37 @@
     if (i.note) return ADVICE_LEVEL;
     if (i.levels.indexOf(cand.level) !== -1) return cand.level;
     return i.levels.length === 1 ? i.levels[0] : cand.level;
+  }
+
+  /**
+   * Уточняющий вопрос системы (#1107). Если он о классе первой карточки и
+   * варианты годятся для её пункта — кнопки «ответ → класс»: нажатие ставит
+   * класс. Иначе — текстом, как раньше. Класс по-прежнему можно поправить ниже.
+   */
+  function questionBox() {
+    var box = el("div", "walk-form__note walk-form__note--info walk-ask");
+    box.appendChild(el("p", "walk-ask__q", f.question));
+    var top = f.found && f.found[0];
+    var it = top && f.code === top.code ? item(top.code) : null;
+    var answers = it ? (f.answers || []).filter(function (a) { return it.levels.indexOf(a.level) !== -1; }) : [];
+    if (answers.length < 2) return box;
+    var row = el("div", "walk-ask__answers");
+    answers.forEach(function (a) {
+      var on = f.answered === a.text;
+      var b = W.button("walk-ask__answer" + (on ? " is-on" : ""), null, function () {
+        f.answered = a.text;
+        f.level = a.level;
+        W.haptic();
+        changed();
+        redraw.apply(null, ORDER.concat(["footer"]));
+      });
+      b.setAttribute("aria-pressed", String(on));
+      b.appendChild(el("span", "walk-ask__text", a.text));
+      b.appendChild(W.level(a.level));
+      row.appendChild(b);
+    });
+    box.appendChild(row);
+    return box;
   }
 
   /** «Где?»: зоны пункта пилюлями, пока зона не названа (D445). */
@@ -919,7 +952,7 @@
     if (list.childNodes.length) box.appendChild(list);
     if (f.code && !f.zone && item(f.code) && !isAdvice() && !isMeasure()) box.appendChild(whereRow());
     if (f.found && !f.found.length && !hasNoViolation()) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.found_none")));
-    if (f.question) box.appendChild(el("p", "walk-form__note walk-form__note--info", f.question));
+    if (f.question) box.appendChild(questionBox());
     if (stale()) {
       var again = el("p", "walk-form__note walk-form__note--info");
       again.appendChild(document.createTextNode(tx("walk.sheet.found_stale") + " "));
