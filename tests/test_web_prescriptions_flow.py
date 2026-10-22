@@ -1,10 +1,13 @@
 """Сквозной путь предписания — через настоящую базу, двери и экраны (волна 3).
 
-УК составляет предписание Грузии → письмо ложится черновиком в Gmail
-сотрудника (Gmail подменён) → предписание действует, адресаты запомнены →
+ОСБ составляет и согласует предписание Грузии, отправляет → письмо ложится
+черновиком в Gmail сотрудника (Gmail подменён) → предписание действует,
+адресаты запомнены →
 партнёр Грузии видит его у себя и отвечает комментарием с файлом → УК
 закрывает с комментарием → на экране страны видно предписание и «Закрыто».
 Партнёр Армении ничего из этого не видит, раздел УК отвечает ему 404.
+Девелопер и админ УК формируют предписание только из проверки и запрашивают
+согласование; согласовать, вернуть, отправить и закрыть им нельзя (D599, D600).
 
 Подменены только опознание, хранилище файлов и разговор с Google — база с
 ролями и триггерами `0037`, маршруты и шаблоны настоящие.
@@ -57,7 +60,10 @@ class Хранилище:
         self.объекты.pop(key, None)
 
 
-Вход = Callable[[str], FlaskClient]
+Вход = Callable[..., FlaskClient]
+#: Роль сотрудника УК по умолчанию — ОСБ: ведёт предписание целиком (D599, D600).
+#: У партнёра пространства роль админа — как было.
+РОЛЬ_УК = "osb"
 
 
 @pytest.fixture
@@ -86,7 +92,10 @@ def почта(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
 
 @pytest.fixture
 def как(pg_dsn: str, db_env: str, domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> Вход:
-    """`как("GE")` — клиент, вошедший человеком этого пространства."""
+    """`как("GE")` — клиент, вошедший человеком этого пространства.
+
+    В HQ без роли входит ОСБ; `как("HQ", role="developer")` — девелопер или админ УК.
+    """
     set_retraction_env(db_env, monkeypatch)
     точка_справочника("Batumi-1", country="GE", city="Batumi")
     точка_справочника("Yerevan-1", country="AM", city="Yerevan")
@@ -98,14 +107,15 @@ def как(pg_dsn: str, db_env: str, domain_env: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(rx, "S3PhotoStorage", lambda _settings: склад)
     monkeypatch.setattr(rx, "load_storage_settings", lambda: None)
 
-    def войти_как(tenant: str) -> FlaskClient:
+    def войти_как(tenant: str, role: str | None = None) -> FlaskClient:
+        роль = role or (РОЛЬ_УК if tenant == "HQ" else "admin")
         # Входит оснастка паролем, а учётке с почтой Google пароль закрыт:
         # почта появляется у сессии после входа — как у вошедшего через Google.
-        подменить_двери(monkeypatch, tenant=tenant, role="admin")
+        подменить_двери(monkeypatch, tenant=tenant, role=роль)
         monkeypatch.setattr("src.web.auth.reach_of", reach_of)
         client = собрать(tenant=tenant).test_client()
         assert войти(client).status_code == 302
-        подменить_двери(monkeypatch, tenant=tenant, role="admin", email=ПОЧТА)
+        подменить_двери(monkeypatch, tenant=tenant, role=роль, email=ПОЧТА)
         monkeypatch.setattr("src.web.auth.reach_of", reach_of)
         return client
 
@@ -130,8 +140,8 @@ def test_путь_предписания(как: Вход, почта: list[dict
     форма = уК.get("/actions/prescriptions/new?country=GE&lang=ru").get_data(as_text=True)
     assert "Batumi-1" in форма and основание in форма, "в форме нет пиццерии или проверки"
 
-    # Act — составить и сразу положить в Gmail.
-    уход = уК.post(
+    # Act — составить и согласовать, затем отправить: ответ ведёт в Google.
+    составлено = уК.post(
         "/actions/prescriptions?lang=ru",
         data={
             "country": "GE",
@@ -141,10 +151,14 @@ def test_путь_предписания(как: Вход, почта: list[dict
             "recipients": "ops@ge.example.com",
             "subject": "Предписание · Грузия",
             "body": "Устраните нарушения хранения.\nСрок — десять дней.",
-            "then": "send",
+            "then": "approve",
         },
         headers=ORIGIN,
     )
+    assert составлено.status_code == 303, составлено.get_data(as_text=True)[:400]
+    (согласовано,) = rx.list_prescriptions(reach=reach_of("HQ")).rows
+    assert согласовано.status == "approved"
+    уход = уК.post(f"/actions/prescriptions/{согласовано.id}/send?lang=ru", headers=ORIGIN)
     assert уход.status_code == 302, уход.get_data(as_text=True)[:400]
     метка = parse_qs(urlsplit(уход.headers["Location"]).query)["state"][0]
     возврат = уК.get(f"/auth/google/mail?state={метка}&code=код")
@@ -163,9 +177,11 @@ def test_путь_предписания(как: Вход, почта: list[dict
 
     # Партнёр Грузии видит предписание и отвечает файлом с комментарием.
     грузия = как("GE")
-    assert "Предписание · Грузия" in грузия.get("/prescriptions?lang=ru").get_data(as_text=True)
+    assert "Предписание · Грузия" in грузия.get(
+        "/prescriptions?lang=ru", follow_redirects=True
+    ).get_data(as_text=True)
     ответ = грузия.post(
-        f"/prescriptions/{п.id}/reply?lang=ru",
+        f"/actions/prescriptions/{п.id}/reply?lang=ru",
         data={"comment": "Разделили партии", "file": (io.BytesIO(b"%PDF fix"), "акт.pdf")},
         headers=ORIGIN,
         content_type="multipart/form-data",
@@ -177,40 +193,52 @@ def test_путь_предписания(как: Вход, почта: list[dict
     армения = как("AM")
     файл = rx.get_prescription(п.id, reach=reach_of("HQ"))
     assert файл is not None and файл.replies[0].file_name == "акт.pdf"
-    assert "Предписание · Грузия" not in армения.get("/prescriptions?lang=ru").get_data(
-        as_text=True
+    assert "Предписание · Грузия" not in армения.get(
+        "/prescriptions?lang=ru", follow_redirects=True
+    ).get_data(as_text=True)
+    assert "Предписание · Грузия" not in армения.get(
+        f"/prescriptions/{п.id}", follow_redirects=True
+    ).get_data(as_text=True)
+    assert (
+        армения.get(f"/prescriptions/files/{файл.replies[0].id}", follow_redirects=True).status_code
+        == 404
     )
-    assert армения.get(f"/prescriptions/{п.id}").status_code == 404
-    assert армения.get(f"/prescriptions/files/{файл.replies[0].id}").status_code == 404
-    assert армения.get("/actions/prescriptions").status_code == 404
-    assert армения.get(f"/actions/prescriptions/{п.id}").status_code == 404
+    # Составление и правка — раздел УК: партнёру 404 (старый адрес списка лишь переадресует).
+    assert армения.get("/actions/prescriptions/new?country=AM").status_code == 404
+    assert армения.get(f"/actions/prescriptions/{п.id}/edit").status_code == 404
+    assert армения.get(f"/actions/prescriptions/{п.id}").status_code in (303, 404)
+    assert "Предписание · Грузия" not in армения.get(
+        f"/actions/prescriptions/{п.id}", follow_redirects=True
+    ).get_data(as_text=True)
     # «Пиццерии» партнёр видит в пределах своих стран (D512): своя — да, чужая — 404.
     assert армения.get("/country/AM?lang=ru").status_code == 200
     assert армения.get("/country/GE?lang=ru").status_code == 404
 
     # УК видит ответ, скачивает файл и закрывает с комментарием.
     уК = как("HQ")
-    карточка = уК.get(f"/actions/prescriptions/{п.id}?lang=ru").get_data(as_text=True)
+    карточка = уК.get(f"/osb?id={п.id}&lang=ru").get_data(as_text=True)
     assert "Разделили партии" in карточка
-    скачано = уК.get(f"/prescriptions/files/{файл.replies[0].id}")
-    assert скачано.status_code == 200 and скачано.data == b"%PDF fix"
     закрыто = уК.post(
         f"/actions/prescriptions/{п.id}/close?lang=ru",
         data={"comment": "Выполнено, проверили на месте"},
         headers=ORIGIN,
     )
     assert "Предписание закрыто." in закрыто.get_data(as_text=True)
+    скачано = уК.get(f"/actions/prescription-files/{файл.replies[0].id}")
+    assert скачано.status_code == 200 and скачано.data == b"%PDF fix"
 
     # На карточке УК в «Действиях» — предписание и «Закрыто» («Пиццерии» его
     # не показывают, D512). Партнёр видит «Закрыто» на карточке в своём разделе.
-    список = уК.get(f"/actions/prescriptions/{п.id}?lang=ru").get_data(as_text=True)
+    список = уК.get(f"/osb?id={п.id}&lang=ru").get_data(as_text=True)
     assert "Предписание · Грузия" in список and "Закрыто" in список
     грузия = как("GE")
-    своё = грузия.get(f"/prescriptions/{п.id}?lang=ru").get_data(as_text=True)
+    своё = грузия.get(f"/prescriptions/{п.id}?lang=ru", follow_redirects=True).get_data(
+        as_text=True
+    )
     assert "Закрыто" in своё
     итог = rx.get_prescription(п.id, reach=reach_of("HQ"))
     assert итог is not None
-    assert [e.action for e in итог.events] == ["created", "issued", "replied", "closed"]
+    assert [e.action for e in итог.events] == ["created", "approved", "issued", "replied", "closed"]
 
 
 def test_черновик_партнёр_не_видит_нигде(как: Вход) -> None:
@@ -223,12 +251,130 @@ def test_черновик_партнёр_не_видит_нигде(как: Вх
             "recipients": "ops@ge.example.com",
             "subject": "Черновая тема",
             "body": "текст",
+            "inspection": [_проверка_уК()],
             "then": "save",
         },
         headers=ORIGIN,
     )
     assert ответ.status_code == 303
-    ident = ответ.headers["Location"].split("/actions/prescriptions/")[1].split("?")[0]
+    ident = _ident(ответ)
     грузия = как("GE")
-    assert "Черновая тема" not in грузия.get("/prescriptions?lang=ru").get_data(as_text=True)
-    assert грузия.get(f"/prescriptions/{ident}").status_code == 404
+    assert "Черновая тема" not in грузия.get(
+        "/prescriptions?lang=ru", follow_redirects=True
+    ).get_data(as_text=True)
+    assert "Черновая тема" not in грузия.get(
+        f"/prescriptions/{ident}", follow_redirects=True
+    ).get_data(as_text=True)
+
+
+def _составить(клиент: FlaskClient, основание: str, *, then: str) -> Any:
+    return клиент.post(
+        "/actions/prescriptions?lang=ru",
+        data={
+            "country": "GE",
+            "inspection": [основание],
+            "due": СРОК,
+            "recipients": "ops@ge.example.com",
+            "subject": "Предписание от девелопера",
+            "body": "Устраните нарушения.",
+            "then": then,
+        },
+        headers=ORIGIN,
+    )
+
+
+def _ident(ответ: Any) -> str:
+    return parse_qs(urlsplit(ответ.headers["Location"]).query)["id"][0]
+
+
+def test_путь_девелопера_запрос_согласование_отправка(
+    как: Вход, почта: list[dict[str, Any]]
+) -> None:
+    # Arrange
+    основание = _проверка_уК()
+    девелопер = как("HQ", role="developer")
+
+    # Act — девелопер формирует с основанием и запрашивает согласование.
+    составлено = _составить(девелопер, основание, then="request")
+    assert составлено.status_code == 303, составлено.get_data(as_text=True)[:400]
+    ident = _ident(составлено)
+    (запрошено,) = rx.list_prescriptions(reach=reach_of("HQ")).rows
+    assert запрошено.status == "review"
+
+    # Партнёр на согласовании ничего не видит.
+    assert "Предписание от девелопера" not in как("GE").get(
+        f"/prescriptions/{ident}", follow_redirects=True
+    ).get_data(as_text=True)
+
+    # ОСБ согласует и отправляет: письмо ложится в Gmail того, кто нажал.
+    осб = как("HQ")
+    assert (
+        осб.post(f"/actions/prescriptions/{ident}/approve?lang=ru", headers=ORIGIN).status_code
+        == 200
+    )
+    (согласовано,) = rx.list_prescriptions(reach=reach_of("HQ")).rows
+    assert согласовано.status == "approved"
+    уход = осб.post(f"/actions/prescriptions/{ident}/send?lang=ru", headers=ORIGIN)
+    assert уход.status_code == 302, уход.get_data(as_text=True)[:400]
+    метка = parse_qs(urlsplit(уход.headers["Location"]).query)["state"][0]
+    возврат = осб.get(f"/auth/google/mail?state={метка}&code=код")
+
+    # Assert
+    assert возврат.status_code == 303 and "gmail=ok" in возврат.headers["Location"]
+    assert [ч["to"] for ч in почта] == ["ops@ge.example.com"]
+    (итог,) = rx.list_prescriptions(reach=reach_of("HQ")).rows
+    assert итог.status == "issued"
+    assert "Предписание от девелопера" in как("GE").get(
+        "/prescriptions?lang=ru", follow_redirects=True
+    ).get_data(as_text=True)
+
+
+@pytest.mark.parametrize("роль", ["developer", "admin"])
+def test_девелопер_и_админ_не_согласуют_и_не_отправляют(
+    как: Вход, почта: list[dict[str, Any]], роль: str
+) -> None:
+    # Arrange — запрос на согласование уже лежит у ОСБ.
+    основание = _проверка_уК()
+    клиент = как("HQ", role=роль)
+    ident = _ident(_составить(клиент, основание, then="request"))
+
+    def статус() -> str:
+        (п,) = rx.list_prescriptions(reach=reach_of("HQ")).rows
+        return п.status
+
+    # Act / Assert — каждое действие ведущего отвечает отказом, статус не сдвигается.
+    for действие, данные in (
+        ("approve", {}),
+        ("return", {"comment": "верните"}),
+        ("send", {}),
+        ("close", {"comment": "закрыто"}),
+    ):
+        ответ = клиент.post(
+            f"/actions/prescriptions/{ident}/{действие}?lang=ru", data=данные, headers=ORIGIN
+        )
+        assert ответ.status_code == 403, (действие, ответ.status_code)
+        assert статус() == "review", действие
+    assert почта == []
+
+    # «Составить и согласовать» одним шагом тоже закрыто — после отказа нового нет.
+    сразу = _составить(клиент, основание, then="approve")
+    assert сразу.status_code == 403
+    assert len(rx.list_prescriptions(reach=reach_of("HQ")).rows) == 1
+
+
+@pytest.mark.parametrize("роль", ["developer", "admin"])
+def test_без_проверки_основания_девелопер_и_админ_получают_отказ(как: Вход, роль: str) -> None:
+    ответ = как("HQ", role=роль).post(
+        "/actions/prescriptions?lang=ru",
+        data={
+            "country": "GE",
+            "due": СРОК,
+            "recipients": "ops@ge.example.com",
+            "subject": "Без основания",
+            "body": "текст",
+            "then": "request",
+        },
+        headers=ORIGIN,
+    )
+    assert ответ.status_code == 400
+    assert rx.list_prescriptions(reach=reach_of("HQ")).rows == ()
