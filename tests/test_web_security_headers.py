@@ -20,6 +20,7 @@ from flask import Flask
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, СЕКРЕТ, войти, подменить_двери, собрать
 
+from src.db import country_contracts as contracts_db
 from src.db import prescriptions as rx
 from src.web import action_plans
 from src.web import country as country_data
@@ -323,6 +324,7 @@ def test_предписания_несут_набор_и_без_встроенн
     monkeypatch.setattr(rx, "status_counts", lambda **_k: dict.fromkeys(rx.STATUSES, 0))
     monkeypatch.setattr(rx, "choices", lambda *_a, **_k: ((), ()))
     monkeypatch.setattr(rx, "remembered_recipients", lambda _c: "ops@ge.example.com")
+    monkeypatch.setattr(contracts_db, "dkk_recipients", lambda _c: "")
     monkeypatch.setattr(country_data, "countries", lambda **_: (("GE", 2),))
     # ОСБ видит страницу «ОСБ» с кнопками и правит черновик; партнёр — админ своего пространства.
     подменить_двери(monkeypatch, tenant=tenant, role="osb" if tenant == "HQ" else "admin")

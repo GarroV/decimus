@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 173 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 175 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -82,6 +82,8 @@
 | `/calendar/trips/<trip_id>/steps/<step_id>/delete` | POST | `trip_step_delete` | `src/web/calendar_screen.py` |
 | `/country` | GET | `country_index` | `src/web/app.py` |
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
+| `/country/<code>/settings/contract` | POST | `country_save_contract` | `src/web/country_settings.py` |
+| `/country/<code>/settings/contract/<contract_id>/delete` | POST | `country_delete_contract` | `src/web/country_settings.py` |
 | `/country/<code>/settings/developer` | POST | `country_set_developer` | `src/web/country_settings.py` |
 | `/country/<code>/settings/space` | POST | `country_set_space` | `src/web/country_settings.py` |
 | `/country/<code>/units/new` | GET | `unit_new` | `src/web/unit_add.py` |
@@ -501,6 +503,7 @@
 | `0085_learning.sql` | `learning.departments`, `learning.courses`, `learning.unit_totals`, `learning.unit_courses`, `learning.loads` |
 | `0086_osb_role.sql` | — |
 | `0087_prescription_review.sql` | — |
+| `0088_country_contracts.sql` | `country_contracts` |
 <!-- map:end -->
 
 ## Makefile

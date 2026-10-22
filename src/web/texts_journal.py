@@ -104,6 +104,8 @@ _WEB: dict[str, tuple[str, str]] = {
     "country_filter": ("Изменён отбор стран", "Country filter changed"),
     "country_set_developer": ("Изменён девелопер страны", "Country developer changed"),
     "country_set_space": ("Страна закреплена за партнёром", "Country assigned to a partner"),
+    "country_save_contract": ("Сохранён договор страны", "Country agreement saved"),
+    "country_delete_contract": ("Снята строка договора страны", "Country agreement row removed"),
     "ratings_layout": ("Изменён состав блока рейтингов", "Ratings layout changed"),
     "ratings_rule_add": ("Добавлено жёсткое правило", "Hard rule added"),
     "ratings_rule_remove": ("Удалено жёсткое правило", "Hard rule removed"),

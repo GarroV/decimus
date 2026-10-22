@@ -57,6 +57,8 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "people.role",
         "space.manage",
         "refusals.read",
+        # Договор страны (D603): правят админ УК, главный админ и ОСБ.
+        "contract.manage",
     }
 )
 СОТРУДНИК_ПАРТНЁРА = ВИДЫ_ПАРТНЁРА | {
@@ -102,7 +104,8 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
     # Гость: вся сеть на чтение (D429, D440).
     (SIDE_HQ, "guest"): ГОСТЬ_УК,
     # ОСБ (D599): права гостя на чтение + вести предписания; проверки не пишет.
-    (SIDE_HQ, "osb"): ГОСТЬ_УК | {"prescription.request", "prescription.manage", "view.osb"},
+    (SIDE_HQ, "osb"): ГОСТЬ_УК
+    | {"prescription.request", "prescription.manage", "view.osb", "contract.manage"},
     # Админ партнёра: сотрудник + люди, свои чек-листы, вычитка свежих (D346, D367).
     (SIDE_PARTNER, "admin"): СОТРУДНИК_ПАРТНЁРА
     | {
