@@ -320,6 +320,36 @@ def add_card(
     return finding_id
 
 
+def delete_card(
+    inspection_id: str,
+    finding_id: str,
+    *,
+    tenant: str,
+    lang: str,
+    editor: Editor,
+    storage: PhotoStorage | None = None,
+) -> None:
+    """Снять ошибочно занесённую запись ждущей проверки и пересчитать её (#1164).
+
+    Права и пересчёт те же, что у правки: `_editable` и `rescore` — второй арифметики
+    нет. Номера остальных записей не сдвигаются. Отказ — `ReviseError`."""
+    _editable(inspection_id, tenant=tenant, lang=lang)
+    бумаги = letter_sources()
+    try:
+        review_edit.delete_finding(
+            inspection_id,
+            finding_id,
+            tenant=tenant,
+            editor=editor,
+            score_of=lambda current: rescore(current, papers=бумаги),
+            storage=_store(storage),
+        )
+    except LetterError as exc:
+        raise ReviseError(
+            "Пересчитать проверку не удалось, запись не снята", code="revise_recalc"
+        ) from exc
+
+
 def _store(storage: PhotoStorage | None) -> PhotoStorage:
     return storage if storage is not None else S3PhotoStorage(load_storage_settings())
 

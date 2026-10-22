@@ -5,11 +5,16 @@
 здесь три недостающих действия: добавить запись, приложить кадр к записи, снять
 кадр с записи.
 
+Снять запись (#1164) — четвёртое: ошибочно занесённое на вычитке убирается, а не
+правится. Номера остальных записей не сдвигаются (как у черновика загрузки,
+`imports.remove_finding`); оценку пересчитывает тот же движок вызывающего по
+проверке без этой записи, всё — одной транзакцией со строкой журнала правок.
+
 Всё идёт тем же замком, что правка и подтверждение (`revise._LOCK_SQL`):
 проверка СВОЕГО пространства, `status = 'draft'`, не отклонена. Принятая
 отвечает отказом из базы, а не из этого модуля — политиками `0004`.
 
-Запись добавляется вместе с пересчётом: оценку считает движок вызывающего
+Запись добавляется (и снимается) вместе с пересчётом: оценку считает движок вызывающего
 (`score_of`, обычно `src/report/rescore.py`) по проверке, уже содержащей новую
 запись, и обе вещи ложатся одной транзакцией — как у правки. Кадры оценку не
 трогают и пересчёта не вызывают.
@@ -34,7 +39,13 @@ from ..domain.models import Score
 from .config import check_environment
 from .errors import ReviseError, StorageError
 from .imports import MAX_FINDINGS, MAX_PHOTOS_PER_FINDING, MAX_PHOTOS_PER_INSPECTION, forget_objects
-from .inspection_edits import Editor, finding_changes, record_edit, score_changes
+from .inspection_edits import (
+    Editor,
+    finding_changes,
+    finding_removal,
+    record_edit,
+    score_changes,
+)
 from .models import ORIGIN_LEGACY, FindingRow, InspectionDetail
 from .pool import connection
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
@@ -78,6 +89,16 @@ where id = %s and inspection_id = %s and finding_id is not null
 """
 
 _DELETE_PHOTO_SQL = "delete from photos where id = %s and inspection_id = %s"
+
+_PHOTOS_OF_FINDING_SQL = """
+select storage_path, preview_path from photos where finding_id = %s and inspection_id = %s
+"""
+
+_DELETE_TRANSLATIONS_SQL = """
+delete from translations where entity_type = 'finding' and entity_id = %s
+"""
+
+_DELETE_FINDING_SQL = "delete from findings where id = %(finding)s and inspection_id = %(id)s"
 
 
 @dataclass(frozen=True)
@@ -224,6 +245,83 @@ def add_finding(
         raise
     except psycopg.Error as exc:
         raise _fail(exc, "Добавить запись") from exc
+
+
+def delete_finding(
+    inspection_id: str,
+    finding_id: str,
+    *,
+    tenant: str,
+    editor: Editor,
+    score_of: Callable[[InspectionDetail], Score],
+    storage: PhotoStorage,
+) -> None:
+    """Снять запись ждущей проверки и положить оценку, посчитанную после замка (#1164).
+
+    Уходят строка записи, её формулировки и кадры (строки кадров — каскадом); номера
+    других записей не меняются. `score_of` получает проверку БЕЗ этой записи. В той же
+    транзакции в журнал правок (`inspection_edits`, `0089`) ложится вид `delete`:
+    прежние значения полей записи и оценка до и после. Объекты кадров убираются из
+    хранилища после коммита; отказ уборки — в журнал, а не откат (`forget_objects`).
+
+    Отказ — `ReviseError`: проверки нет, она принята, отклонена или историческая
+    (D332), такой записи в ней нет.
+    """
+    ident = _require_inspection_id(inspection_id)
+    запись = _require_inspection_id(finding_id)
+    tenant_code = _require_tenant(tenant)
+    try:
+        with connection(check_environment().dsn) as conn, conn.cursor() as cur:
+            cur.execute(_LOCK_SQL, {"id": ident, "tenant": tenant_code})
+            замок = cur.fetchone()
+            if замок is None:
+                raise _refuse_lock(cur, ident, tenant_code)
+            if замок[1] == ORIGIN_LEGACY:
+                raise ReviseError(
+                    "Проверка историческая: оценка перенесена из старого отчёта как есть и "
+                    "движком не пересчитывается (D332) — записи из неё снимают инструментами "
+                    "загрузки",
+                    code="revise_legacy",
+                )
+            detail = _read_detail(
+                cur, reach=own_reach(tenant_code), ident=ident, include_on_review=True
+            )
+            if detail is None:
+                raise ReviseError(
+                    f"Проверки {ident} у арендатора {tenant_code} нет", code="inspection_not_found"
+                )
+            прежняя = next((f for f in detail.findings if f.id == запись), None)
+            if прежняя is None:
+                raise ReviseError("Такой записи в этой проверке нет", code="revise_no_finding")
+            score = score_of(
+                replace(detail, findings=tuple(f for f in detail.findings if f.id != запись))
+            )
+            cur.execute(_PHOTOS_OF_FINDING_SQL, (запись, ident))
+            объекты = sorted({str(p) for r in cur.fetchall() for p in r if p})
+            cur.execute(_DELETE_TRANSLATIONS_SQL, (запись,))
+            cur.execute(_DELETE_FINDING_SQL, {"id": ident, "finding": запись})
+            if cur.rowcount != 1:
+                raise ReviseError(
+                    "Запись не снята: проверка уже подтверждена или записи больше нет. "
+                    "Ни запись, ни оценка не изменились",
+                    code="revise_stale",
+                )
+            _write_score(cur, ident, tenant_code, score)
+            record_edit(
+                cur,
+                inspection_id=ident,
+                finding_id=запись,
+                tenant=tenant_code,
+                editor=editor,
+                kind="delete",
+                changes={**finding_removal(прежняя), **score_changes(detail, score)},
+            )
+            conn.commit()
+    except ReviseError:
+        raise
+    except psycopg.Error as exc:
+        raise _fail(exc, "Снять запись") from exc
+    forget_objects(storage, объекты)
 
 
 def attach_photo(

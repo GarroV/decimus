@@ -985,6 +985,13 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .pf__bar { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
 .pf__actions { display: flex; justify-content: flex-end; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-2); }
 .find-compose { margin-top: var(--space-6); }
+/* Удаление записи (#1164): подтверждение раскрывается под кнопкой, окна браузера нет. */
+.pf__delete > summary { list-style: none; width: fit-content; cursor: pointer; }
+.pf__delete > summary::-webkit-details-marker { display: none; }
+.pf__delete[open] > summary { display: none; }
+.pf__delete-body { display: grid; gap: var(--space-5); padding: var(--space-6); border: 1px solid var(--err-line, var(--line));
+  border-radius: var(--r-block); background: var(--surface); }
+.pf__delete-text { margin: 0; font-size: 13px; line-height: 1.5; }
 @media (max-width: 719px) {
   .pf { margin-inline: var(--space-4); padding: var(--space-6); }
   .pf__cols { grid-template-columns: minmax(0, 1fr); }

@@ -35,6 +35,7 @@ _WEB: dict[str, tuple[str, str]] = {
     "do_accept": ("Принята проверка", "Inspection accepted"),
     "do_add_finding": ("Добавлено нарушение", "Finding added"),
     "do_add_photo": ("Добавлено фото", "Photo added"),
+    "do_delete_finding": ("Удалено нарушение", "Finding deleted"),
     "do_delete_photo": ("Удалено фото", "Photo deleted"),
     "do_move": ("Проверка перенесена", "Inspection moved"),
     "do_retract": ("Проверка снята", "Inspection retracted"),

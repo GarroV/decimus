@@ -147,6 +147,7 @@ OPEN_ENDPOINTS = frozenset(
         "save_letter",
         "do_move",
         "do_delete_photo",
+        "do_delete_finding",
         "do_retract",
         "do_suggest",
         "ratings_developer",

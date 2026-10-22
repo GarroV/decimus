@@ -348,6 +348,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0088_country_contracts.sql": (
         "sql1:c59b9f1d4557fe6f1371c45b8cce9fd4297ec144a366aaaa1036287d75f942ad"
     ),
+    "0089_inspection_edits_delete.sql": (
+        "sql1:7c2ae6265e83c8199a184fa57f6a24117fdf890e5fe72136726e63a6fc600832"
+    ),
 }
 
 

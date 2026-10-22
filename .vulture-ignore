@@ -591,6 +591,7 @@ _снять_пространство
 _second_step_required
 do_add_finding
 do_add_photo
+do_delete_finding
 do_delete_photo
 do_suggest
 on_document

@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 175 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 176 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -93,6 +93,7 @@
 | `/inspections/<inspection_id>` | GET | `card` | `src/web/app.py` |
 | `/inspections/<inspection_id>/accept` | POST | `do_accept` | `src/web/app.py` |
 | `/inspections/<inspection_id>/findings` | POST | `do_add_finding` | `src/web/app.py` |
+| `/inspections/<inspection_id>/findings/<finding_id>/delete` | POST | `do_delete_finding` | `src/web/app.py` |
 | `/inspections/<inspection_id>/findings/<finding_id>/photos` | POST | `do_add_photo` | `src/web/app.py` |
 | `/inspections/<inspection_id>/findings/<finding_id>/revise` | POST | `do_revise` | `src/web/app.py` |
 | `/inspections/<inspection_id>/letter` | GET | `letter` | `src/web/app.py` |
@@ -503,6 +504,7 @@
 | `0086_osb_role.sql` | — |
 | `0087_prescription_review.sql` | — |
 | `0088_country_contracts.sql` | `country_contracts` |
+| `0089_inspection_edits_delete.sql` | — |
 <!-- map:end -->
 
 ## Makefile
