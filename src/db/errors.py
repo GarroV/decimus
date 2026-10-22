@@ -304,3 +304,11 @@ class TripError(DbError):
         super().__init__(code)
         self.code = code
         self.params = params
+
+
+class CountryContractError(DbError):
+    """Договор страны не прочитан или не записан (D603): неверная почта, длинное поле, база.
+
+    Текст безопасен для показа на экране: ни строки подключения, ни текста
+    драйвера в нём нет.
+    """

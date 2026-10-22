@@ -118,6 +118,9 @@ ACTIONS: tuple[Action, ...] = (
     Action("people.manage", "people"),
     Action("people.role", "people"),
     Action("space.manage", "people", hq_only=True),
+    # Блок «Договор» карточки страны (D603): юрлицо, договор, контакты по ДКК. Отдельный
+    # код, чтобы ОСБ правила ровно его, а не девелопера и партнёра страны (`space.manage`).
+    Action("contract.manage", "people", hq_only=True),
     Action("unit.create", "unit", hq_only=True),
     Action("api.manage", "api", hq_only=True),
     # Ключи внешних сервисов на экране «Подключения» (D576): отдельный код, чтобы доступ к
@@ -202,6 +205,7 @@ _HQ_ADMIN = (
         "people.manage",
         "people.role",
         "space.manage",
+        "contract.manage",
         "refusals.read",
         "view.osb",  # D599: админ видит страницу «ОСБ» без действий
     )
@@ -250,8 +254,9 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     # Гость (D429, D440): вся сеть на чтение, ничего не меняет и не отправляет.
     (SIDE_HQ, "guest"): _GUEST,
     # ОСБ (D599): права гостя на чтение, а пишет только предписания — на своей
-    # странице. Записи в проверки у неё нет ни одной.
-    (SIDE_HQ, "osb"): _GUEST | _codes("prescription.request", "prescription.manage", "view.osb"),
+    # странице — и договор страны (D603). Записи в проверки у неё нет ни одной.
+    (SIDE_HQ, "osb"): _GUEST
+    | _codes("prescription.request", "prescription.manage", "view.osb", "contract.manage"),
     (SIDE_PARTNER, "admin"): _PARTNER_AUDITOR
     | _CHECKLISTS
     | _codes("checklist.master")

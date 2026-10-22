@@ -3,11 +3,82 @@
   справа на этом же экране (D527), всё, что известно про страну. Видит каждый, кому
   видна страна; формы правки (девелопер, пространство партнёра) — только
   администратору (`space.manage`), остальным те же сведения текстом. Почта партнёра —
-  только УК (D375). Пиццерии — строки, которые экран уже прочитал; название — ссылка
+  только УК (D375). Блок «Договор» (D603, D609) — только тем, кто его ведёт (почты контактов по ДКК —
+  персональные данные): видят и правят ОСБ, админ, главный админ (`contract.manage`), форма — по
+  кнопке «Изменить», блоком ограниченной ширины. Пиццерии — строки, которые экран уже прочитал; название — ссылка
   на пиццерию на этом же экране. Обычные формы без скриптов, ответ — возврат сюда же.
 #}
 {% from "country/_head.html" import badge with context %}
 {% macro _date(value) %}{{ value or '—' }}{% endmacro %}
+
+{% macro _contract_fields(c) %}
+  <label><span class="sform__label">{{ t('country.contract.legal_name') }}</span>
+    <input class="sinput" type="text" name="legal_name" value="{{ c.legal_name if c else '' }}" maxlength="200" autocomplete="off"></label>
+  <label><span class="sform__label">{{ t('country.contract.registration_country') }}</span>
+    <input class="sinput" type="text" name="registration_country" value="{{ c.registration_country if c else '' }}" maxlength="100" autocomplete="off"></label>
+  <label><span class="sform__label">{{ t('country.contract.company_number') }}</span>
+    <input class="sinput" type="text" name="company_number" value="{{ c.company_number if c else '' }}" maxlength="60" autocomplete="off"></label>
+  <label><span class="sform__label">{{ t('country.contract.address') }}</span>
+    <input class="sinput" type="text" name="address" value="{{ c.address if c else '' }}" maxlength="300" autocomplete="off"></label>
+  <label><span class="sform__label">{{ t('country.contract.agreement') }}</span>
+    <input class="sinput" type="text" name="agreement" value="{{ c.agreement if c else '' }}" maxlength="300" autocomplete="off"></label>
+  <label><span class="sform__label">{{ t('country.contract.dkk_emails') }}</span>
+    <textarea class="sinput" name="dkk_emails" rows="2" maxlength="2000" autocomplete="off">{{ c.dkk_emails if c else '' }}</textarea></label>
+  <p class="ssec__note">{{ t('country.contract.dkk_hint') }}</p>
+{% endmacro %}
+
+{% macro _contract_block(s) %}
+  <section class="ssec ccard__contract">
+    <h3 class="ssec__title">{{ t('country.contract.title') }}</h3>
+    {% if s.saved == 'invalid' %}
+      <div class="note note--error" role="alert"><div class="note__text">{{ t('country.contract.invalid') }}</div></div>
+    {% endif %}
+    {% if s.contracts_failed %}
+      <p class="ssec__note">{{ t('country.contract.read_failed') }}</p>
+    {% elif not s.contracts %}
+      <p class="is-muted">{{ t('country.contract.none') }}</p>
+    {% endif %}
+    {% for c in s.contracts %}
+      <div class="ccard__contract-item">
+        <dl class="ccard__facts">
+          {% for label, value in [
+            ('country.contract.legal_name', c.legal_name),
+            ('country.contract.registration_country', c.registration_country),
+            ('country.contract.company_number', c.company_number),
+            ('country.contract.address', c.address),
+            ('country.contract.agreement', c.agreement),
+            ('country.contract.dkk_emails', c.dkk_emails)] %}
+            <dt>{{ t(label) }}</dt>
+            <dd>{% if value %}{{ value }}{% else %}<span class="is-muted">—</span>{% endif %}</dd>
+          {% endfor %}
+        </dl>
+        <p class="ssec__note">{{ t('country.contract.updated', who=c.updated_by, when=c.updated_at.strftime('%Y-%m-%d') if c.updated_at else '—') }}</p>
+        {% if s.can_contract %}
+          <details class="ccard__edit">
+            <summary>{{ t('country.card.edit') }}</summary>
+            <form class="sform ccard__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contract') }}?lang={{ lang }}">
+              <input type="hidden" name="contract_id" value="{{ c.id }}">
+              {{ _contract_fields(c) }}
+              <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.save') }}</button>
+            </form>
+            <form class="sform ccard__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contract/' ~ c.id ~ '/delete') }}?lang={{ lang }}">
+              <button class="sbtn" type="submit">{{ t('country.contract.delete') }}</button>
+            </form>
+          </details>
+        {% endif %}
+      </div>
+    {% endfor %}
+    {% if s.can_contract and not s.contracts_failed %}
+      <details class="ccard__edit"{% if s.saved == 'invalid' %} open{% endif %}>
+        <summary>{{ t('country.contract.add') if s.contracts else t('country.contract.add_first') }}</summary>
+        <form class="sform ccard__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contract') }}?lang={{ lang }}">
+          {{ _contract_fields(none) }}
+          <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.save') }}</button>
+        </form>
+      </details>
+    {% endif %}
+  </section>
+{% endmacro %}
 
 {% macro settings_panel(s) %}
   <article class="sdetail spanel ccard">
@@ -92,6 +163,8 @@
       </div>
       {% if s.can_edit %}<p class="ssec__note">{{ t('country.settings.people') }}</p>{% endif %}
     </section>
+
+    {% if s.show_contract %}{{ _contract_block(s) }}{% endif %}
 
     <section class="ssec">
       <h3 class="ssec__title">{{ t('country.card.units') }} <span class="is-muted">{{ s.rows|length }}</span></h3>

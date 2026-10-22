@@ -18,6 +18,12 @@
 Кто вправе — по матрице: оба маршрута объявлены действием `space.manage` (главный
 админ и админ УК, D364). Кнопка на экране показывается по тому же коду, остальным
 адреса отвечают отказом заслона.
+
+Блок «Договор» (D603) — юрлицо партнёра, договор одной строкой, контакты по ДКК: список
+строк на страну (`db/country_contracts.py`). Видит только УК (почты — персональные
+данные, как `partner_email`, D375), правят ОСБ, админ и главный админ — отдельное
+действие `contract.manage`, чтобы ОСБ не получила девелопера и партнёра страны
+(`space.manage`). Два маршрута: сохранить строку (новую или правку) и снять её.
 """
 
 from __future__ import annotations
@@ -32,7 +38,8 @@ from flask import Flask, abort, redirect, request, url_for
 from werkzeug.wrappers import Response
 
 from src.db import agg_store, ratings_read
-from src.db.errors import DbError
+from src.db import country_contracts as contracts_db
+from src.db.errors import CountryContractError, DbError
 from src.db.models import InspectionRow
 from src.domain import report_langs
 from src.domain.errors import ConfigError
@@ -49,7 +56,9 @@ log = logging.getLogger(__name__)
 #: Исходы сохранения — коды в адресе возврата (`?saved=`); текст подбирает экран.
 SAVED = "ok"
 FAILED = "failed"
-_OUTCOMES = frozenset({SAVED, FAILED})
+#: Договор: ввод не прошёл проверку (почта, пустая строка) — не база, а поля.
+INVALID = "invalid"
+_OUTCOMES = frozenset({SAVED, FAILED, INVALID})
 
 #: Длина имени девелопера — как у поля справочника (`country_page.DEVELOPER_MAX`).
 DEVELOPER_MAX = 120
@@ -123,6 +132,12 @@ class Panel:
     auditors: tuple[Auditor, ...] = ()
     #: Языки отчёта страны из методики (`report_langs.json`, D415) — их предлагает бот.
     report_langs: tuple[str, ...] = ()
+    #: Блок «Договор» (D603, D609): виден и правится только у `contract.manage`.
+    show_contract: bool = False
+    can_contract: bool = False
+    contracts: tuple[contracts_db.Contract, ...] = ()
+    #: Договор не прочитался — блок об этом говорит, а не рисует «договора нет».
+    contracts_failed: bool = False
 
 
 def _ordered(rows: Sequence[UnitRow]) -> tuple[UnitRow, ...]:
@@ -174,6 +189,15 @@ def _report_langs(code: str) -> tuple[str, ...]:
         return ()
 
 
+def _contracts(code: str) -> tuple[tuple[contracts_db.Contract, ...], bool]:
+    """Строки договора страны; не прочиталось — пусто и отметка, а не «договора нет»."""
+    try:
+        return contracts_db.read(code), False
+    except (DbError, ConfigError):
+        log.warning("Договор страны %s не прочитался", code, exc_info=True)
+        return (), True
+
+
 def load(
     code: str,
     developer: str,
@@ -182,9 +206,13 @@ def load(
     units: UnitsData,
     can_edit: bool,
     show_email: bool,
+    can_contract: bool = False,
     inspections: Sequence[InspectionRow] = (),
 ) -> Panel:
-    """Карточка страны `code`: партнёр и девелопер, партнёры свода, пиццерии."""
+    """Карточка страны `code`: партнёр и девелопер, партнёры свода, пиццерии, договор.
+
+    Договор читается и показывается только там, где видны почты (`show_email`, УК, D375).
+    """
     сведения: dict[str, Any] = {
         "code": code,
         "developer": developer,
@@ -198,6 +226,12 @@ def load(
         "report_langs": _report_langs(code),
     }
     сведения["aggregators"], сведения["aggregators_failed"] = _aggregators(code)
+    # Договор и контакты по ДКК видят только те, кто их ведёт: ОСБ, админ, главный
+    # админ (D609). Девелопер и гость УК блока не видят вовсе.
+    if show_email and can_contract:
+        сведения["show_contract"] = True
+        сведения["can_contract"] = can_contract
+        сведения["contracts"], сведения["contracts_failed"] = _contracts(code)
     try:
         spaces = partner_spaces.overview()
     except DbError:
@@ -261,3 +295,49 @@ def install(app: Flask) -> None:
             log.warning("Страна %s не закреплена за %s", страна, пространство, exc_info=True)
             outcome = FAILED
         return _back(страна, outcome, request.args.get("lang", ""))
+
+    contract_base = base + "/contract"
+
+    def _contract_back(code: str, outcome: str) -> Response:
+        return _back(code, outcome, request.args.get("lang", ""))
+
+    @app.post(contract_base, endpoint="country_save_contract")
+    @guard.action("contract.manage")
+    def save_contract(code: str) -> Response:
+        """Новая строка договора страны или правка существующей (`contract_id`)."""
+        страна = _checked(code)
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        поля = contracts_db.ContractFields(
+            **{
+                name: request.form.get(name) or ""
+                for name in (*contracts_db.TEXT_FIELDS, "dkk_emails")
+            }
+        )
+        try:
+            contracts_db.clean(поля)
+        except CountryContractError:
+            return _contract_back(страна, INVALID)
+        try:
+            contracts_db.save(
+                страна,
+                поля,
+                actor=вошедший.login if вошедший else "",
+                contract_id=(request.form.get("contract_id") or "").strip() or None,
+            )
+        except (DbError, ConfigError):
+            log.warning("Договор страны %s не сохранён", страна, exc_info=True)
+            return _contract_back(страна, FAILED)
+        return _contract_back(страна, SAVED)
+
+    @app.post(contract_base + "/<contract_id>/delete", endpoint="country_delete_contract")
+    @guard.action("contract.manage")
+    def delete_contract(code: str, contract_id: str) -> Response:
+        страна = _checked(code)
+        refuse_foreign_origin()
+        try:
+            contracts_db.remove(страна, contract_id)
+        except (DbError, ConfigError):
+            log.warning("Строка договора страны %s не снята", страна, exc_info=True)
+            return _contract_back(страна, FAILED)
+        return _contract_back(страна, SAVED)
