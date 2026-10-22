@@ -64,9 +64,11 @@
 {#- Фильтр по странам блока (п. 7 interface-logic: действует только на свой блок,
     стоит в нём). Без скрипта спрятан — видны все строки. -#}
 {% macro cfilter(codes) %}{% set uniq = codes|unique|sort|list %}{% if uniq|length > 1 %}
-  <div class="rt-filter" role="group" aria-label="{{ t('ratings.filter.country') }}" hidden>
-    <button type="button" aria-pressed="true" data-country="">{{ t('ratings.filter.all') }} <small>{{ codes|length }}</small></button>
-    {% for c in uniq %}<button type="button" aria-pressed="false" data-country="{{ c }}">{{ country_name(c) }} <small>{{ codes|select('equalto', c)|list|length }}</small></button>{% endfor %}
+  <div class="rt-filter" hidden>
+    <select class="pickselect" aria-label="{{ t('ratings.filter.country') }}">
+      <option value="" selected>{{ t('ratings.filter.all') }} · {{ codes|length }}</option>
+      {% for c in uniq %}<option value="{{ c }}">{{ country_name(c) }} · {{ codes|select('equalto', c)|list|length }}</option>{% endfor %}
+    </select>
   </div>{% endif %}
 {% endmacro %}
 
@@ -88,11 +90,12 @@
     <input type="hidden" name="lang" value="{{ lang }}">
     <div class="rt-field">
       <span class="rt-field__label">{{ t('ratings.group') }}</span>
-      <nav class="rt-seg" aria-label="{{ t('ratings.group') }}">
+      {# Срез — выпадающий список, а не ряд кнопок (D611): значение пункта — адрес среза. #}
+      <select class="pickselect" data-pick-nav aria-label="{{ t('ratings.group') }}">
         {% for g in ('imf', 'cluster', 'developer', 'country') %}
-        <a href="{{ href(g) }}"{% if selection.group == g %} aria-current="page"{% endif %}>{{ t('ratings.group.' ~ g) }}</a>
+        <option value="{{ href(g) }}"{% if selection.group == g %} selected{% endif %}>{{ t('ratings.group.' ~ g) }}</option>
         {% endfor %}
-      </nav>
+      </select>
     </div>
     {% if selection.group == 'cluster' %}
     <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.group.cluster') }}</span>

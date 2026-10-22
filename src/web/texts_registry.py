@@ -42,6 +42,7 @@ _PERIOD: dict[str, dict[str, str]] = {
     "registry.period.from": {"ru": "С", "en": "From"},
     "registry.period.to": {"ru": "По", "en": "To"},
     "registry.period.apply": {"ru": "Применить", "en": "Apply"},
+    "registry.period.quick": {"ru": "Быстрый выбор", "en": "Quick pick"},
     "registry.period.prev": {"ru": "Предыдущий период", "en": "Previous period"},
     "registry.period.next": {"ru": "Следующий период", "en": "Next period"},
     "registry.period.empty.title": {

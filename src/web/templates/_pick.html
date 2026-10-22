@@ -1,35 +1,30 @@
 {#
-  Выпадающий чип отбора — общий для всех экранов, где сужают выборку.
+  Отбор — выпадающий список (`<select>`), общий для всех экранов, где сужают
+  выборку (D611: никаких рядов чипов и тегов, только списки, столбцы и меню).
 
-  ОСНОВА БЕЗ JS: `<details>` открывается и закрывается сам, работает с
-  клавиатуры и в браузере с отключённым скриптом. Общее `name` делает чипы
-  взаимоисключающими — открыл один, соседний закрылся (Chrome 120+, Safari
-  17.2+). Закрытие кликом мимо и по Esc добавляет `static/pick.js`: владелец
-  24.09.2026 — «списки не закрываются сами». Не загрузился скрипт — чип всё
-  равно открывается и закрывается собственным кликом.
+  Варианты — готовые адреса, собранные в обработчике: шаблон не считает и не
+  склеивает ссылки. Значение пункта — адрес перехода; `static/pick.js`
+  переходит по нему сразу при выборе. БЕЗ СКРИПТА выбор сам ничего не делает,
+  поэтому под `<noscript>` те же варианты лежат обычными ссылками.
 
-  Подпись чипа показывает ТЕКУЩИЙ выбор, а не название размерности: панель
-  обязана отвечать «что сейчас выбрано» одним взглядом, иначе человек открывает
-  каждый чип по очереди, чтобы вспомнить, что он сузил.
-
-  Адреса опций собраны ЗАРАНЕЕ, в обработчике: шаблон не считает и не
-  склеивает ссылки — это решение приложения, а не оформление.
+  Подпись — название размерности над списком; в самом списке всегда виден
+  ТЕКУЩИЙ выбор, так что панель отвечает «что сужено» одним взглядом.
+  Несколько отборов на экране идут одной строкой списков над тем, что они
+  сужают (interface-logic п. 7).
 #}
 {% macro pick(chip) %}
-  <details class="pick" name="pick">
-    <summary class="ov-chip{% if chip.current %} is-on{% endif %}">
-      <span>{% if chip.label %}{{ chip.label }}: {% endif %}{{ chip.current_title }}</span>
-      <span class="pick__caret" aria-hidden="true">▾</span>
-    </summary>
-    <div class="pick__menu" role="menu">
+  <label class="pickbox">
+    {% if chip.label %}<span class="pickbox__label">{{ chip.label }}</span>{% endif %}
+    <select class="pickselect pickbox__select{% if chip.current %} is-on{% endif %}" data-pick-nav
+            aria-label="{{ chip.label or chip.current_title }}">
       {% for option in chip.options %}
-        <a class="pick__item{% if option.selected %} is-on{% endif %}"
-           href="{{ option.href }}" role="menuitem">
-          <span class="pick__label">{{ option.title }}</span>
-          {% if option.count is not none %}<span class="pick__count">{{ option.count }}</span>{% endif %}
-          {% if option.selected %}<span class="pick__mark" aria-hidden="true">✓</span>{% endif %}
-        </a>
+        <option value="{{ option.href }}"{% if option.selected %} selected{% endif %}>{{ option.title }}{% if option.count is not none %} · {{ option.count }}{% endif %}</option>
       {% endfor %}
-    </div>
-  </details>
+    </select>
+  </label>
+  <noscript>
+    <span class="pickbox__nojs">
+      {% for option in chip.options %}<a href="{{ option.href }}"{% if option.selected %} aria-current="true"{% endif %}>{{ option.title }}</a>{% endfor %}
+    </span>
+  </noscript>
 {% endmacro %}

@@ -869,7 +869,10 @@ def test_выбранная_страна_стоит_в_списке_и_ведё�
 
     # Assert
     assert "hm-only" not in страница
-    assert "<span>Сербия</span>" in страница
+    # Список «Страна»: выбранная — пункт со `selected`, а не плашка над списком.
+    assert re.search(
+        r'<option value="[^"]*country=RS[^"]*" selected>Сербия · 12</option>', страница
+    )
     assert 'href="/overview"' in страница or 'href="/overview?lang=' in страница
 
 

@@ -80,12 +80,13 @@
 .pk-block .slist { border: 0; border-radius: 0 0 10px 10px; box-shadow: none; }
 .pk-block .slist__rows .srow { padding-left: var(--space-5); padding-right: var(--space-5); }
 
-/* «Мои страны»: раскрывается в колонке, флажки по алфавиту, кластеры кнопками */
+/* «Мои страны»: раскрывается в колонке, флажки по алфавиту, кластер — списком (D611) */
+.cn-mine { display: block; }
+.cn-mine__summary { display: flex; width: 100%; justify-content: space-between; }
+.cn-mine__summary.is-on { border-color: var(--accent); }
 .cn-mine__body { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-2);
   padding: var(--space-3); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
 .cn-mine__hint { margin: 0; font-size: var(--fs-meta); line-height: 16px; color: var(--ink-3); }
-.cn-mine__clusters { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.cn-mine__clusters .speriod__chip { border: 0; cursor: pointer; font: inherit; }
 .cn-mine__list { list-style: none; margin: 0; padding: 0; max-height: 14rem; overflow-y: auto;
   display: flex; flex-direction: column; gap: 1px; }
 .cn-mine__row { display: flex; align-items: center; gap: var(--space-3); padding: 4px 6px; border-radius: 6px;

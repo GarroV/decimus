@@ -2,8 +2,9 @@
   Период экрана — один на экран, общий для «Проверок» и «Главной»:
   `‹ Октябрь 2026 ›`, по заголовку открывается маленький календарь.
 
-  ОСНОВА БЕЗ JS: `<details>` раскрывается сам; внутри быстрые выборы ссылками
-  («Всё время», «Этот месяц», «Прошлый») и обычная GET-форма с двумя полями
+  ОСНОВА БЕЗ JS: `<details>` раскрывается сам; внутри выпадающий список быстрых выборов
+  («Всё время», «Этот месяц», «Прошлый»; D611 — не ряд кнопок; переходит по выбору через
+  `pick.js`, без скрипта работает форма) и обычная GET-форма с двумя полями
   даты и кнопкой «Применить». С `static/period.js` поля и кнопка прячутся, а
   вместо них рисуется месяц с выбором отрезка двумя щелчками (начало → конец,
   порядок не важен), как у Swarm (`RangePicker.tsx`); второй щелчок применяет.
@@ -20,9 +21,15 @@
     <details class="pick speriod__pick" name="pick">
       <summary class="spill speriod__title">{{ icon('cal') }}<span>{{ title }}</span></summary>
       <div class="pick__menu speriod__menu">
-        <div class="speriod__quick">
-          {% for q in quick %}<a class="speriod__chip{% if q.on %} is-on{% endif %}" href="{{ q.href }}">{{ q.title }}</a>{% endfor %}
-        </div>
+        {% if quick %}
+          <label class="pickbox speriod__quick">
+            <span class="pickbox__label">{{ t('registry.period.quick') }}</span>
+            <select class="pickselect pickbox__select" data-pick-nav aria-label="{{ t('registry.period.quick') }}">
+              {% if not quick|selectattr('on')|list %}<option value="" selected disabled>{{ title }}</option>{% endif %}
+              {% for q in quick %}<option value="{{ q.href }}"{% if q.on %} selected{% endif %}>{{ q.title }}</option>{% endfor %}
+            </select>
+          </label>
+        {% endif %}
         <form method="get" action="{{ action }}" class="pcal"
               data-pcal data-from="{{ period.start or '' }}" data-to="{{ period.end or '' }}"
               data-weekdays="{{ t('registry.weekdays') }}"

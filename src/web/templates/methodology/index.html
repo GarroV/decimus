@@ -322,8 +322,6 @@
                aria-label="{{ t('methodology.search.placeholder') }}" data-mx-search>
       </form>
       {% for chip in picks %}{{ pick(chip) }}{% endfor %}
-      <a class="ov-chip{% if item_filter.off %} is-on{% endif %}"
-         href="{{ href(off='' if item_filter.off else '1', item='') }}">{{ t('methodology.off.toggle') }}</a>
       <span class="mx-count">{{ t('methodology.shown', shown=shown, total=total) }}</span>
     </div>
 
