@@ -32,7 +32,7 @@ import base64
 import json
 import urllib.parse
 import urllib.request
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from email.message import EmailMessage
 from typing import Any
@@ -78,6 +78,20 @@ class MailAccountMismatchError(GoogleMailError):
     Своим классом, а не общим «не вышло»: экран говорит человеку, что выбрать
     в окне Google, а предписание остаётся черновиком.
     """
+
+
+@dataclass(frozen=True)
+class MailAttachment:
+    """Вложение письма: имя файла, тип и байты (предписание кладёт PDF документа)."""
+
+    filename: str
+    content_type: str
+    data: bytes
+
+
+#: Потолок вложений черновика: Gmail принимает письмо целиком до 25 МБ, а base64
+#: раздувает его на треть — упереться молча в чужой отказ хуже своего с причиной.
+MAX_ATTACHMENTS_BYTES = 15 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -216,8 +230,12 @@ def draft_subject(*, city: str, date: str, lang: str) -> str:
     return " · ".join(часть for часть in части if часть)
 
 
-def letter_message(*, to: str, subject: str, body: str) -> EmailMessage:
+def letter_message(
+    *, to: str, subject: str, body: str, attachments: Sequence[MailAttachment] = ()
+) -> EmailMessage:
     """Письмо партнёру как MIME: текстовая часть и HTML-часть одного содержания.
+
+    `attachments` — файлы во вложении (PDF предписания); письмо тогда `multipart/mixed`.
 
     `body` — разметка письма (`src/web/letter_markup.py`), и чистится она
     ЗДЕСЬ, а не только при сохранении: запись могла лечь в базу в обход
@@ -249,12 +267,26 @@ def letter_message(*, to: str, subject: str, body: str) -> EmailMessage:
     # к богатой, и клиент показывает последнюю, которую умеет.
     письмо.set_content(текст)
     письмо.add_alternative(to_email_html(body), subtype="html")
+    if sum(len(a.data) for a in attachments) > MAX_ATTACHMENTS_BYTES:
+        raise GoogleMailError(
+            f"вложения больше {MAX_ATTACHMENTS_BYTES // (1024 * 1024)} МБ — "
+            "Gmail такое письмо не примет"
+        )
+    for вложение in attachments:
+        if not вложение.data:
+            raise GoogleMailError(f"вложение «{вложение.filename}» пустое — черновик не заводится")
+        тип, _, подтип = вложение.content_type.partition("/")
+        письмо.add_attachment(
+            вложение.data, maintype=тип, subtype=подтип, filename=вложение.filename
+        )
     return письмо
 
 
-def mime_message(*, to: str, subject: str, body: str) -> str:
+def mime_message(
+    *, to: str, subject: str, body: str, attachments: Sequence[MailAttachment] = ()
+) -> str:
     """Письмо как `raw` для Gmail: MIME в base64url без выравнивания."""
-    письмо = letter_message(to=to, subject=subject, body=body)
+    письмо = letter_message(to=to, subject=subject, body=body, attachments=attachments)
     return base64.urlsafe_b64encode(письмо.as_bytes()).decode().rstrip("=")
 
 
@@ -264,6 +296,7 @@ def create_draft(
     to: str,
     subject: str,
     body: str,
+    attachments: Sequence[MailAttachment] = (),
     opener: Callable[..., Any] = urllib.request.urlopen,
 ) -> str:
     """Положить письмо в черновики вошедшего. Возвращает номер черновика.
@@ -271,7 +304,7 @@ def create_draft(
     `opener` — точка подмены для проверки: сам разговор с Gmail тривиален, а
     вот разбор его ответов решает, увидит ли человек внятную причину отказа.
     """
-    сырое = mime_message(to=to, subject=subject, body=body)
+    сырое = mime_message(to=to, subject=subject, body=body, attachments=attachments)
     запрос = urllib.request.Request(
         DRAFTS_ENDPOINT,
         data=json.dumps({"message": {"raw": сырое}}).encode(),

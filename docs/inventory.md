@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 175 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 176 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -31,6 +31,7 @@
 | `/actions/prescriptions/<prescription_id>` | GET | `rx_view` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/approve` | POST | `rx_approve` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/close` | POST | `rx_close` | `src/web/prescriptions.py` |
+| `/actions/prescriptions/<prescription_id>/document.pdf` | GET | `rx_document` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/edit` | GET | `rx_edit` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/edit` | POST | `rx_update` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/reply` | POST | `order_reply` | `src/web/prescriptions.py` |
@@ -504,6 +505,7 @@
 | `0086_osb_role.sql` | — |
 | `0087_prescription_review.sql` | — |
 | `0088_country_contracts.sql` | `country_contracts` |
+| `0089_prescription_notice.sql` | `mail_templates`, `prescription_findings` |
 <!-- map:end -->
 
 ## Makefile

@@ -19,8 +19,10 @@ import pytest
 from src.web.google_auth import GoogleSettings
 from src.web.google_mail import (
     DRAFT_SCOPE,
+    MAX_ATTACHMENTS_BYTES,
     GoogleMailError,
     MailAccountMismatchError,
+    MailAttachment,
     MailGrant,
     consent_url,
     create_draft,
@@ -331,3 +333,36 @@ def test_свой_аккаунт_отдаёт_токен() -> None:
     assert (
         verified_token(MailGrant("т", "lead@example.com"), expected_email="Lead@example.com") == "т"
     )
+
+
+def test_pdf_доезжает_вложением_с_именем_и_содержимым() -> None:
+    # Arrange
+    pdf = b"%PDF-1.7 \x00\x01 body"
+    вложение = MailAttachment(filename="Notice GE.pdf", content_type="application/pdf", data=pdf)
+
+    # Act
+    сырое = mime_message(to="a@b.c", subject="Notice", body="Cover text", attachments=(вложение,))
+
+    # Assert
+    письмо = email.message_from_bytes(
+        base64.urlsafe_b64decode(сырое + "=" * (-len(сырое) % 4)), policy=email.policy.default
+    )
+    assert письмо.get_content_type() == "multipart/mixed"
+    (часть,) = list(письмо.iter_attachments())
+    assert часть.get_filename() == "Notice GE.pdf"
+    assert часть.get_content_type() == "application/pdf"
+    assert часть.get_content() == pdf
+
+
+def test_пустое_вложение_отказ_словами() -> None:
+    вложение = MailAttachment(filename="x.pdf", content_type="application/pdf", data=b"")
+    with pytest.raises(GoogleMailError, match="пустое"):
+        mime_message(to="a@b.c", subject="s", body="text", attachments=(вложение,))
+
+
+def test_вложения_сверх_предела_отказ_словами() -> None:
+    большое = MailAttachment(
+        filename="x.pdf", content_type="application/pdf", data=b"0" * (MAX_ATTACHMENTS_BYTES + 1)
+    )
+    with pytest.raises(GoogleMailError, match="больше"):
+        mime_message(to="a@b.c", subject="s", body="text", attachments=(большое,))

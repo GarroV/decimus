@@ -24,6 +24,7 @@ from __future__ import annotations
 import io
 import logging
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -38,15 +39,23 @@ from src.db import prescriptions_write as rxw
 from src.db.config import load_action_plan_settings
 from src.db.errors import DbError, IssuedDraftLostError, PrescriptionError, StorageError
 from src.domain.errors import ConfigError
+from src.report import notice_pdf, notice_template
+from src.report.errors import ReportError
 
 from . import actions_columns as columns
 from . import actions_screen, auth, guard, ui_lang
 from . import country as country_data
+from . import prescription_notice as notice
 from .action_plans import FORM_OVERHEAD_BYTES, is_hq
 from .actions_screen import TAB_RX
 from .config import Settings
 from .geo_names import country_title
-from .google_mail import GoogleMailError, MailAccountMismatchError, create_draft
+from .google_mail import (
+    GoogleMailError,
+    MailAccountMismatchError,
+    MailAttachment,
+    create_draft,
+)
 from .letter_draft import MAIL_CONSENT_KEY, MAIL_RETURNS_KEY, OUTCOME_WRONG_ACCOUNT, MailReturn
 from .letter_markup import from_plain
 from .origin import refuse_foreign_origin
@@ -307,6 +316,33 @@ def _draft_from_form(country: str) -> rx.Draft:
     )
 
 
+def _with_findings(draft: rx.Draft) -> rx.Draft:
+    """Черновик с нарушениями из проверок-оснований: таблица документа по шаблону (шаг 3)."""
+    if not draft.inspection_ids:
+        return draft
+    picks = notice.assemble(
+        draft.inspection_ids,
+        reach=auth.current_reach(),
+        due=draft.due_on,
+        state=notice.state_of(request),
+    )
+    return replace(draft, findings=picks)
+
+
+def _notice_rows_from_form(country_due: str, inspection_ids: tuple[str, ...]) -> tuple[Any, ...]:
+    """Строки таблицы нарушений для формы после отказа: по состоянию формы, без новых отказов."""
+    срок = _parse_date(country_due) or notice.default_due(rx.today())
+    try:
+        return notice.as_rows(
+            notice.assemble(
+                inspection_ids, reach=auth.current_reach(), due=срок, state=notice.state_of(request)
+            )
+        )
+    except PrescriptionError as exc:
+        logger.warning("нарушения для формы не собраны: %s", exc)
+        return ()
+
+
 def _install_hq(app: Flask, conf: Settings) -> None:
     путь = _base()
 
@@ -320,16 +356,33 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         # не принятая — форма открывается пустой, без молчаливого чужого основания.
         основание = _basis_from_card()
         значения = _defaults(страна, lang)
+        строки: tuple[Any, ...] = ()
+        сбой: str | None = None
         if основание is not None:
             страна = основание[0]
-            значения = {**_defaults(страна, lang), "inspections": (основание[1].id,)}
+            значения = {
+                **_defaults(страна, lang),
+                "inspections": (основание[1].id,),
+                "body": notice_template.DEFAULT_COVER,
+            }
+            try:
+                строки = notice.as_rows(
+                    notice.assemble(
+                        (основание[1].id,),
+                        reach=auth.current_reach(),
+                        due=notice.default_due(rx.today()),
+                    )
+                )
+            except PrescriptionError as exc:
+                сбой = t("rx.failed", lang, reason=exc)
         return _render_form(
             lang=lang,
             country=страна,
             current=None,
             values=значения,
-            failure=None,
+            failure=сбой,
             extra_bases=(основание[1],) if основание is not None else (),
+            notice_rows=строки,
         )
 
     @app.post(путь, endpoint="rx_create")
@@ -348,7 +401,9 @@ def _install_hq(app: Flask, conf: Settings) -> None:
             if not ведущий and not черновик.inspection_ids:
                 # Предписание без проверки-основания заводит только ОСБ (D599).
                 raise PrescriptionError(t("rx.need_base", lang))
-            ident = rxw.create_draft(черновик, actor=_actor(), submit=then == THEN_REQUEST)
+            ident = rxw.create_draft(
+                _with_findings(черновик), actor=_actor(), submit=then == THEN_REQUEST
+            )
         except PrescriptionError as exc:
             return _render_form(
                 lang=lang,
@@ -356,6 +411,9 @@ def _install_hq(app: Flask, conf: Settings) -> None:
                 current=None,
                 values=_form_values(),
                 failure=t("rx.failed", lang, reason=exc),
+                notice_rows=_notice_rows_from_form(
+                    request.form.get("due") or "", tuple(request.form.getlist("inspection"))
+                ),
             ), 400
         return _after_save(conf, ident, lang, then=then)
 
@@ -374,6 +432,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
             current=текущее,
             values=_values_of(текущее),
             failure=None,
+            notice_rows=текущее.findings if текущее.has_document else (),
         )
 
     @app.post(f"{путь}/<prescription_id>/edit", endpoint="rx_update")
@@ -395,6 +454,8 @@ def _install_hq(app: Flask, conf: Settings) -> None:
                 # Как в rx_create: снять все основания и оставить предписание без
                 # проверки может только ОСБ (D599).
                 raise PrescriptionError(t("rx.need_base", lang))
+            if текущее.has_document:
+                черновик = _with_findings(черновик)
             rxw.update_draft(
                 текущее.id,
                 черновик,
@@ -409,6 +470,13 @@ def _install_hq(app: Flask, conf: Settings) -> None:
                 current=текущее,
                 values=_form_values(),
                 failure=t("rx.failed", lang, reason=exc),
+                notice_rows=(
+                    _notice_rows_from_form(
+                        request.form.get("due") or "", tuple(request.form.getlist("inspection"))
+                    )
+                    if текущее.has_document
+                    else ()
+                ),
             ), 400
         return _after_save(conf, текущее.id, lang, then=then)
 
@@ -466,6 +534,28 @@ def _install_hq(app: Flask, conf: Settings) -> None:
             причина = t("rx.not_approved", lang)
             return _respond(conf, текущее.id, failure=t("rx.failed", lang, reason=причина))
         return _go_to_gmail(текущее.id, lang)
+
+    @app.get(f"{путь}/<prescription_id>/document.pdf", endpoint="rx_document")
+    def rx_document(prescription_id: str) -> FlaskResponse | tuple[str, int]:
+        """Документ предписания — тот же PDF, что ляжет в письмо. Только УК, только по шаблону."""
+        _require_hq()
+        текущее = rx.get_prescription(prescription_id, reach=auth.current_reach())
+        if текущее is None or not текущее.has_document:
+            return not_found()
+        try:
+            данные = notice_pdf.build_for(
+                текущее, reach=auth.current_reach(), on=_document_date(текущее)
+            )
+        except (ReportError, DbError) as exc:
+            logger.warning("документ предписания %s не собран: %s", текущее.id, exc)
+            return "", 503
+        ответ = send_file(
+            io.BytesIO(данные),
+            mimetype="application/pdf",
+            download_name=_document_name(текущее),
+        )
+        ответ.headers["Cache-Control"] = "private, no-store"
+        return ответ
 
     @app.post(f"{путь}/<prescription_id>/close", endpoint="rx_close")
     @guard.action("prescription.manage")
@@ -531,6 +621,7 @@ def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
             to=предписание.recipients,
             subject=предписание.subject,
             body=from_plain(предписание.body),
+            attachments=_attachments(предписание),
         )
 
     try:
@@ -541,6 +632,28 @@ def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
         logger.warning("предписание %s не отправлено: %s", ident, exc)
         return _back_from_gmail(ident, lang, "failed")
     return _back_from_gmail(ident, lang, "ok")
+
+
+def _document_date(p: rx.Prescription) -> date:
+    """Дата документа: день согласования; до согласования — сегодня."""
+    return p.approved_at.date() if p.approved_at is not None else rx.today()
+
+
+def _document_name(p: rx.Prescription) -> str:
+    return f"Notice {p.country} {_document_date(p).isoformat()}.pdf"
+
+
+def _attachments(p: rx.Prescription) -> tuple[MailAttachment, ...]:
+    """PDF документа во вложение — у предписания по шаблону; у вписанного руками вложения нет."""
+    if not p.has_document:
+        return ()
+    try:
+        data = notice_pdf.build_for(p, reach=auth.current_reach(), on=_document_date(p))
+    except (ReportError, DbError) as exc:
+        # Текст рендерера и базы в черновик и на экран не идёт: он в журнале.
+        logger.warning("документ предписания %s не собран: %s", p.id, exc)
+        raise GoogleMailError("документ предписания не собран — черновик не заводится") from exc
+    return (MailAttachment(filename=_document_name(p), content_type="application/pdf", data=data),)
 
 
 def _default_recipients(country: str) -> str:
@@ -570,7 +683,7 @@ def _defaults(country: str, lang: str) -> dict[str, Any]:
         if country
         else "",
         "body": "",
-        "due": "",
+        "due": notice.default_due(rx.today()).isoformat(),
         "units": (),
         "inspections": (),
     }
@@ -617,6 +730,7 @@ def _render_form(
     values: Mapping[str, Any],
     failure: str | None,
     extra_bases: tuple[rx.Choice, ...] = (),
+    notice_rows: tuple[Any, ...] = (),
 ) -> str:
     ведущий = guard.may("prescription.manage")
     точки: tuple[rx.Choice, ...] = ()
@@ -658,6 +772,8 @@ def _render_form(
         ),
         bases_limit=rx.BASES_LIMIT,
         failure=failure,
+        notice_rows=notice_rows,
+        notice_term_days=notice.DEFAULT_TERM_DAYS,
         **common(),
     )
 

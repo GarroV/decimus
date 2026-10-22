@@ -103,6 +103,32 @@
       {{ letter(p) }}
     </section>
 
+    {% if hq and p.has_document %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('rx.card.document') }}</h3>
+        <div class="sactions">
+          <a class="sbtn" href="{{ url(rx_base ~ '/' ~ p.id ~ '/document.pdf') }}" target="_blank" rel="noopener">{{ t('rx.card.open_document') }}</a>
+        </div>
+        <ul class="rx-finds">
+          {% for f in p.findings %}
+            <li class="rx-find{% if not f.included %} rx-find--off{% endif %}">
+              <span class="rx-find__body">
+                <span class="rx-find__head">
+                  <span class="tag tag--micro {{ 'tag--err' if f.level == 'D3' else 'tag--neutral' }}">{{ f.level }}</span>
+                  <strong>{{ f.object_name }}</strong>
+                  {% if not f.included %}<span class="tag tag--micro tag--neutral">{{ t('rx.find.excluded') }}</span>{% endif %}
+                  {% if not f.description_translated %}<span class="tag tag--micro tag--warn">{{ t('rx.find.no_translation') }}</span>{% endif %}
+                </span>
+                <span class="rx-find__clause">{{ f.clause }}</span>
+                <span class="rx-find__desc">{{ f.description or '—' }}</span>
+                <span class="ov-cell__muted">{{ t('rx.find.due') }}: {{ day(f.due_on) }}</span>
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
     <section class="ssec">
       <h3 class="ssec__title">{{ t('rx.card.bases') }}</h3>
       {{ bases(p, registry_path) }}

@@ -91,6 +91,24 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
         "en": "Paste the full text. It cannot be edited once sent to the partner; "
         "editing an approved notice withdraws the approval.",
     },
+    "rx.form.findings": {"ru": "Нарушения в документе", "en": "Violations in the document"},
+    "rx.form.findings_hint": {
+        "ru": "Отмечены D3 и нарушения зон, обнулённых целиком; любую запись проверки можно "
+        "снять или добавить. Срок устранения по умолчанию — {days} дней от даты документа, "
+        "его можно поправить у каждой записи. Документ английский: формулировка пункта "
+        "берётся из чек-листа на английском.",
+        "en": "D3 records and records of fully zeroed zones are ticked; any record of the "
+        "inspection can be unticked or added. The default remedy term is {days} days from "
+        "the document date and can be changed per record. The document is in English: "
+        "the clause wording is taken from the English checklist.",
+    },
+    "rx.find.suggested": {"ru": "по правилу", "en": "by the rule"},
+    "rx.find.no_translation": {"ru": "нет перевода", "en": "no translation"},
+    "rx.find.due": {"ru": "Срок устранения", "en": "Remedy term"},
+    "rx.find.engine_due": {"ru": "по методике: {due}", "en": "per methodology: {due}"},
+    "rx.find.excluded": {"ru": "не включено", "en": "not included"},
+    "rx.card.document": {"ru": "Документ предписания", "en": "Notice document"},
+    "rx.card.open_document": {"ru": "Открыть документ", "en": "Open document"},
     "rx.form.save": {"ru": "Сохранить черновик", "en": "Save draft"},
     "rx.form.save_request": {
         "ru": "Отправить на согласование",

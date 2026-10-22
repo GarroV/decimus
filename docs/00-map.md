@@ -49,6 +49,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Legacy-проверка | Историческая проверка, загруженная из старого отчёта (`origin = 'legacy'`): оценка переносится как есть и нигде не пересчитывается | `src/db/imports_legacy.py`, `src/mcp/imports.py`, `docs/14-history-import.md` |
 | План действий (экшн-план) | Ответ партнёра на запрос УК по проверке с D2/D3: файл с версиями, приём и возврат | `src/db/action_plans.py`, `src/web/action_plans.py`, `docs/12-web-admin.md` |
 | Предписание | Письмо УК партнёру с требованием: черновик, отправка через почту сотрудника, ответ партнёра, закрытие | `src/db/prescriptions.py`, `src/web/prescriptions.py` |
+| Документ предписания (шаблон) | Предписание по проверке собирается по шаблону: отбор нарушений (все D3 и зоны, обнулённые целиком, D606), таблицы визитов и нарушений, приложение с фото, PDF (WeasyPrint); язык документа — английский (D601); версии шаблона в `mail_templates`, реальный текст грузится `tools/prescription_template.py` | `src/report/notice.py`, `src/report/notice_template.py`, `src/report/notice_pdf.py`, `src/db/mail_templates.py`, `src/db/prescription_notice.py`, `src/web/prescription_notice.py` |
 | Договор страны, контакты по ДКК | Блок «Договор» в карточке страны: юрлицо партнёра, договор одной строкой (ДКК не моделируется, D603), почты, которые форма предписания подставляет в «Кому»; видит только УК, правят ОСБ, админ, главный админ (`contract.manage`) | `src/db/country_contracts.py`, `src/web/country_settings.py` |
 | РС, РКО | Рейтинг стандартов и рейтинг клиентского опыта: средние оценки по пиццериям из выгрузок Dodo IS; раздел «Рейтинги» | `docs/15-ratings.md`, `src/ratings/` |
 | Агрегатор | Площадка доставки с оценками пиццерий (Wolt, Glovo, Bolt Food, Yemeksepeti и др.); оценки собираются раз в сутки | `docs/17-aggregators.md`, `src/ratings/aggregators/` |
@@ -116,7 +117,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
+<!-- map:begin files src/web/{action_plans,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescription_notice,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -148,6 +149,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/osb.py` | Страница «ОСБ»: очереди предписаний сети (D599, D606; шаг 1 спеки 2026-10-21-osb-prescriptions) |
 | `src/web/overview.py` | Экран «Обзор сети»: что показать и чем это взято |
 | `src/web/plan_template.py` | Шаблон экшн-плана — `.xlsx` из записей проверки (#976, ступень 1) |
+| `src/web/prescription_notice.py` | Сборка предписания из проверки в вебе: отбор нарушений, форма, документ PDF (шаг 3, D602, D606) |
 | `src/web/prescriptions.py` | Предписания в вебе: вкладка «Предписания» «Действий» и записи (D266, D270, D275, D526, D599) |
 | `src/web/proofread.py` | «Добавить нарушение» на вычитке: подбор пункта по словам и кадрам (D535) |
 | `src/web/ratings.py` | Раздел «Рейтинги» (спека 2026-10-08) и подраздел «Загрузки» |
@@ -389,7 +391,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,country_contracts,api_access,busy_lock,job_lock,journals,mail_templates,maps_store,model_key,prescription_notice,model_usage,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
@@ -400,10 +402,12 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
 | `src/db/learning_store.py` | Обучение в базе (схема `learning`, миграция 0085): запись снимка дня и журнал загрузок |
+| `src/db/mail_templates.py` | Версии шаблонов писем и документов (0089, D601, D608) |
 | `src/db/maps_store.py` | Оценки на картах в базе (схема `maps`, миграция 0044): запись снимка и чтение |
 | `src/db/model_key.py` | Ключ модели из базы (D491): тонкая обёртка над общим хранилищем `service_keys` (D576) |
 | `src/db/model_usage.py` | Расход модели (D537, `0078`): запись вызова и чтение сводки для экрана |
 | `src/db/oauth_store.py` | Хранилище OAuth: клиенты, коды, подключения и токены (D417, миграция `0054`) |
+| `src/db/prescription_notice.py` | Чтение для документа предписания: визиты проверок и английские формулировки записей (шаг 3) |
 | `src/db/prescriptions.py` | Предписания: черновик, согласование ОСБ, отправка через Gmail, ответ партнёра, закрытие |
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, согласование, отправка, закрытие (УК), ответ партнёра |
 | `src/db/rate_window.py` | Общее скользящее окно частоты запросов (F-110, миграция `0082`) |
@@ -518,6 +522,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0086_osb_role.sql` | Роль ОСБ (отдел сопровождения бизнеса) — D599, спека 2026-10-21-osb-prescriptions-design |
 | `0087_prescription_review.sql` | Согласование предписания ОСБ (D599, D600, шаг 1 спеки 2026-10-21-osb-prescriptions-design) |
 | `0088_country_contracts.sql` | Блок «Договор» в карточке страны (шаг 2 спеки 2026-10-21-osb-prescriptions-design, D603, D606): юрлицо партнёра, договор одной строкой и КОНТАКТЫ ПО ДКК — почты, которые… |
+| `0089_prescription_notice.sql` | Сборка предписания из проверки (шаг 3 спеки 2026-10-21-osb-prescriptions-design, D601, D602, D606, D607): вид предписания, нарушения из проверки-основания, версии… |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -842,6 +847,9 @@ Telegram, ни HTTP, ни SQL.
 | `src/report/explain.py` | Почему оценка такая — ответ движка по записанной проверке (D490) |
 | `src/report/info_titles.py` | Подписи полей информационной части — формулировки вопросов по кодам |
 | `src/report/letters.py` | Письмо партнёру по уже записанной проверке — пересборка, а не пересчёт |
+| `src/report/notice.py` | Отбор нарушений для предписания по проверке (D602, D606, шаг 3 спеки 2026-10-21) |
+| `src/report/notice_pdf.py` | PDF предписания по проверке: таблица визитов, таблица нарушений, приложение с фото (шаг 3) |
+| `src/report/notice_template.py` | Шаблон предписания: текст с подстановками и его разметка в HTML (D601, шаг 3 спеки 2026-10-21) |
 | `src/report/photos.py` | Где взять кадр, приложенный к записи или к информационному полю, и что считать его пропажей |
 | `src/report/rescore.py` | Пересчёт записанной проверки движком — для правки на приёмке (D200) |
 <!-- map:end -->
@@ -895,6 +903,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/porcha_second_factor.py` | Порча второй ступени входа (D463): каждая сломанная защита обязана уронить свой тест |
 | `tools/porcha_walk.py` | Порча защит мини-аппа обхода (D312): каждая сломанная защита обязана уронить свой тест |
 | `tools/pre-push-guard.sh` | Сторож пуша: не пускает наружу значения из приватного списка |
+| `tools/prescription_template.py` | Шаблон предписания: загрузить новую версию из файла или показать действующую |
 | `tools/process_hint_measure.py` | T166 (D077): сколько раз признак «<описание>, это <процесс>» срабатывает зря |
 | `tools/regress_check.py` | Регрессионный якорь: цифры на боевых данных не должны меняться |
 | `tools/seed_demo.py` | Идемпотентный сид демо-набора (задачи T074, T100; блок infra) |

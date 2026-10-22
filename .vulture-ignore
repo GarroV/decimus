@@ -400,6 +400,8 @@ rx_close
 rx_request
 rx_approve
 rx_return
+# Документ предписания по шаблону (шаг 3, #1128): маршрут PDF, регистрирует декоратор.
+rx_document
 # Страница «ОСБ» (`src/web/osb.py`): маршрут Flask, регистрирует декоратор.
 osb_page
 orders
