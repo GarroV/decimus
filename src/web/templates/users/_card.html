@@ -29,7 +29,7 @@
       <span class="avatar avatar--lg" aria-hidden="true">{{ логин[:2]|upper }}</span>
       <div class="sdetail__who">
         <h2 class="sdetail__title" id="card-title">{{ логин }}{% if свой %} <em class="sbadge">{{ t('users.me') }}</em>{% endif %}</h2>
-        <p class="sdetail__hint">{{ t(role_key(роль, пространство)) }} · <span class="mono">{{ пространство }}</span></p>
+        <p class="sdetail__hint">{{ t(role_key(роль, пространство)) }} · {% if is_partner_space(пространство) %}{{ t('users.partner_space', code=пространство) }}{% else %}<span class="mono">{{ пространство }}</span>{% endif %}</p>
       </div>
     </header>
     {{ flash() }}
