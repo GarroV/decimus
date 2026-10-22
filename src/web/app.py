@@ -1113,6 +1113,36 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             notice = t("add.done", lang)
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
+    @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/delete")
+    @guard.action("inspection.revise", object_in_route=True)
+    def do_delete_finding(
+        inspection_id: str, finding_id: str
+    ) -> FlaskResponse | str | tuple[str, int]:
+        """Снять ошибочно занесённую запись ждущей проверки с пересчётом (#1164).
+
+        Права те же, что у правки записи; подтверждение — раскрывающийся блок в форме
+        записи, до этой двери доходит только его кнопка."""
+        отказ = _permit_inspection("inspection.revise", inspection_id)
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        lang = _lang(conf)
+        notice: str | None = None
+        failure: str | None = None
+        try:
+            revision.delete_card(
+                inspection_id,
+                finding_id,
+                tenant=auth.current_tenant(),
+                lang=lang,
+                editor=_editor(),
+            )
+        except ReviseError as exc:
+            failure = t("delete.failed", lang, reason=domain_reason(exc, lang))
+        else:
+            notice = t("delete.done", lang)
+        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
     @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/photos")
     @guard.action("inspection.revise", object_in_route=True)
     def do_add_photo(inspection_id: str, finding_id: str) -> FlaskResponse | str | tuple[str, int]:

@@ -63,6 +63,9 @@
 
   function resetForm(form) {
     form.reset();
+    form.querySelectorAll("[data-del]").forEach(function (d) {
+      d.open = false;
+    });
     // Скрытое поле `form.reset()` не возвращает: у него значение и есть атрибут.
     var code = form.querySelector("[data-ipick-value]");
     if (code) code.value = code.dataset.orig || "";
@@ -93,6 +96,11 @@
     if (add) {
       var composer = document.getElementById(add.getAttribute("aria-controls"));
       if (composer) toggleForm(composer, add, composer.hidden);
+      return;
+    }
+    var keep = e.target.closest("[data-del-cancel]");
+    if (keep) {
+      keep.closest("[data-del]").open = false;
       return;
     }
     var cancel = e.target.closest("[data-proofread-cancel]");

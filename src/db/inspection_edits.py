@@ -20,7 +20,7 @@ from psycopg.types.json import Json
 from ..domain.models import Score
 from .models import FindingRow, InspectionDetail
 
-EditKind = Literal["revise", "add"]
+EditKind = Literal["revise", "add", "delete"]
 
 _INSERT_SQL = """
 insert into inspection_edits
@@ -64,6 +64,18 @@ def finding_changes(old: FindingRow | None, new: Mapping[str, object]) -> dict[s
         поле: _pair(прежние.get(поле), значение)
         for поле, значение in new.items()
         if old is None or прежние.get(поле) != значение
+    }
+
+
+def finding_removal(old: FindingRow) -> dict[str, Any]:
+    """Запись снята: у каждого поля прежнее значение и пустое новое (`new: None`)."""
+    return {
+        "code": _pair(old.code, None),
+        "level": _pair(old.level, None),
+        "zone": _pair(old.zone, None),
+        "zone_unusual": _pair(old.zone_unusual, None),
+        "text": _pair((old.text or "").strip(), None),
+        "reading_c": _pair(old.reading_c, None),
     }
 
 
