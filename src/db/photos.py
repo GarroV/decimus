@@ -99,8 +99,9 @@ where i.id = %s
 """
 
 #: Кадры этого происхождения штампа не получают: сегодняшняя дата на кадре
-#: старого отчёта была бы ложью (D332).
-_UNSTAMPED_ORIGIN = "legacy"
+#: старого отчёта (D332) или проверки, загруженной задним числом через MCP,
+#: была бы ложью — снимали их не сегодня.
+_UNSTAMPED_ORIGINS = frozenset({"legacy", "import"})
 
 
 @dataclass(frozen=True)
@@ -151,14 +152,15 @@ def stamp_context(cur: psycopg.Cursor[Any], inspection_id: str) -> StampContext 
 
     Единая точка для всех путей, что кладут кадр в хранилище: выгрузка живых
     кадров (бот, мини-апп, веб), приложенный на вычитке и загруженный через MCP.
-    Штамп нужен всем, кроме исторической загрузки (`origin = 'legacy'`).
+    Штамп нужен живым кадрам; загрузке задним числом (`origin` `legacy` и
+    `import`) — нет.
     """
     cur.execute(_STAMP_CONTEXT_SQL, (inspection_id,))
     row = cur.fetchone()
     if row is None:
         raise PushError(f"В базе нет проверки {inspection_id} — штамп кадра брать не откуда")
     name, auditor, country, origin = row
-    if origin == _UNSTAMPED_ORIGIN:
+    if origin in _UNSTAMPED_ORIGINS:
         return None
     return StampContext(str(name), str(auditor or ""), country)
 

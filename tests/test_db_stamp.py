@@ -119,11 +119,13 @@ def test_историческая_загрузка_штампа_не_получ�
 
     legacy = _Курсор(("Тбилиси-1", "И. Иванов", "GE", "legacy"))
     assert stamp_for(legacy, "i-1", _МОМЕНТ) is None  # type: ignore[arg-type]
+    загрузка = _Курсор(("Тбилиси-1", "И. Иванов", "GE", "import"))
+    assert stamp_for(загрузка, "i-1", _МОМЕНТ) is None  # type: ignore[arg-type]
 
 
-def test_живая_и_текущая_загрузка_штамп_получают() -> None:
+def test_живая_проверка_штамп_получает() -> None:
     from src.db.photos import stamp_for
 
-    for происхождение in ("field", "import"):
+    for происхождение in ("field",):
         курсор = _Курсор(("Тбилиси-1", "И. Иванов", "GE", происхождение))
         assert stamp_for(курсор, "i-1", _МОМЕНТ) == "23.10.2026 01:30 · Тбилиси-1 · И. Иванов"  # type: ignore[arg-type]
