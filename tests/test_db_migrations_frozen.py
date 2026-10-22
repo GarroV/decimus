@@ -351,6 +351,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0089_inspection_edits_delete.sql": (
         "sql1:7c2ae6265e83c8199a184fa57f6a24117fdf890e5fe72136726e63a6fc600832"
     ),
+    "0090_notifications.sql": (
+        "sql1:4a59135cbf1acf71840a769c3c43317b7d729685597c19a41ecd00d7d79ea2fc"
+    ),
 }
 
 
