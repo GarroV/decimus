@@ -2583,7 +2583,7 @@ def _methodology_picks(
     зоны: dict[str, str],
     lang: str,
 ) -> tuple[Pick, ...]:
-    """Чипы над списком пунктов: класс, зона, группировка."""
+    """Списки отбора над перечнем пунктов: класс, зона, выключенные, группировка."""
     return (
         _pick(
             label=t("methodology.pick.level", lang),
@@ -2599,6 +2599,19 @@ def _methodology_picks(
             values=mview.zone_options(состав.items, состав.zones),
             href=lambda значение: адрес(zone=значение, item=""),
             title=lambda код: зоны.get(код, код),
+        ),
+        Pick(
+            label=t("methodology.off.toggle", lang),
+            current="1" if отбор.off else "",
+            current_title=t("methodology.off.show" if отбор.off else "methodology.off.hide", lang),
+            options=tuple(
+                PickOption(
+                    title=t("methodology.off.show" if показаны else "methodology.off.hide", lang),
+                    href=адрес(off="1" if показаны else "", item=""),
+                    selected=показаны == bool(отбор.off),
+                )
+                for показаны in (False, True)
+            ),
         ),
         Pick(
             label=t("methodology.pick.group", lang),

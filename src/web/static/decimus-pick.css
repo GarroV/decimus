@@ -58,10 +58,7 @@
 .pk-closed .pk-item { color: var(--ink-3); }
 .pk-note { margin: 0; padding: 4px 8px; font-size: var(--fs-meta); color: var(--ink-3); }
 
-/* отбор «Девелопер» раскрывается внутри колонки */
-.pk-rail .pick { display: block; }
-.pk-rail .ov-chip { display: flex; width: 100%; justify-content: space-between; height: 30px; }
-.pk-rail .pick__menu { position: static; width: 100%; min-width: 0; margin-top: var(--space-2); box-shadow: none; }
+/* отбор «Девелопер» — выпадающий список на ширину колонки (`.pickbox`, D611) */
 
 /* ── рабочая область ────────────────────────────────────────────────── */
 .pk-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main actions" "facts facts" "period period";

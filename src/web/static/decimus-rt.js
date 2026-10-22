@@ -5,7 +5,7 @@
   "use strict";
   document.addEventListener("change", function (event) {
     var form = event.target.closest && event.target.closest("form[data-rt-auto]");
-    if (form && event.target.tagName === "SELECT") form.submit();
+    if (form && event.target.tagName === "SELECT" && !event.target.hasAttribute("data-pick-nav")) form.submit();
   });
 
   // Подсказка свечи — сразу при наведении или фокусе (D385): системная по
@@ -40,16 +40,13 @@
   // Фильтр по странам в блоке (зона риска, хард-нарушения): прячет строки чужих
   // стран только в своём блоке. Без скрипта фильтр скрыт — видны все строки.
   document.querySelectorAll(".rt-filter").forEach(function (bar) { bar.hidden = false; });
-  document.addEventListener("click", function (event) {
-    var button = event.target.closest && event.target.closest(".rt-filter button");
-    if (!button) return;
-    var code = button.getAttribute("data-country");
-    button.parentNode.querySelectorAll("button").forEach(function (b) {
-      b.setAttribute("aria-pressed", b === button ? "true" : "false");
-    });
-    var hardBox = button.closest("[data-rt-hard]");
+  document.addEventListener("change", function (event) {
+    var select = event.target.closest && event.target.closest(".rt-filter select");
+    if (!select) return;
+    var code = select.value;
+    var hardBox = select.closest("[data-rt-hard]");
     if (hardBox) { hardBox.rtHard.filter(code); return; }
-    var block = button.closest("[data-rt-filtered]");
+    var block = select.closest("[data-rt-filtered]");
     block.querySelectorAll("tr[data-country]").forEach(function (row) {
       row.hidden = code !== "" && row.getAttribute("data-country") !== code;
     });
