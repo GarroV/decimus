@@ -97,9 +97,13 @@ ENDPOINT_VIEWS: Mapping[str, str] = {"unit": "view.registry"}
 #: Страницы, чьё чтение решает действие, а не `view.<раздел>`: форма предписания лежит
 #: под `/actions`, а запросить предписание может и ОСБ, у которой раздела «Действия»
 #: нет (D599, D600). Форма видна тому, у кого есть код; остальным — 404 как раньше.
-READ_BY_ACTION: Mapping[str, str] = {
-    "rx_new": "prescription.request",
-    "rx_edit": "prescription.request",
+READ_BY_ACTION: Mapping[str, tuple[str, ...]] = {
+    "rx_new": ("prescription.request",),
+    "rx_edit": ("prescription.request",),
+    # Файл ответа партнёра лежит под `/actions`, а читают его и ОСБ со своей
+    # страницы «ОСБ», где раздела «Действия» нет (#1151): хватает любого из кодов.
+    # Охват и принадлежность файла проверяет сам маршрут.
+    "order_file": ("view.actions", "view.osb"),
 }
 
 #: Маршруты, которых чтение их раздела НЕ открывает: объявлены только своим
@@ -195,13 +199,16 @@ def _writes(endpoint: str | None, methods: set[str] | frozenset[str]) -> bool:
     return bool(set(methods) & WRITING_METHODS) or endpoint in WRITING_GETS
 
 
-def _read_code(endpoint: str | None, path: str) -> str | None:
+def _read_codes(endpoint: str | None, path: str) -> tuple[str, ...]:
+    """Коды, любой из которых открывает чтение маршрута; пусто — чтение не ограничено."""
     if endpoint in READ_BY_ACTION:
         return READ_BY_ACTION[endpoint or ""]
     ключ = current_section(path)
     if ключ is not None:
-        return section_view(ключ)
-    return ENDPOINT_VIEWS.get(endpoint or "")
+        код = section_view(ключ)
+        return (код,) if код is not None else ()
+    код = ENDPOINT_VIEWS.get(endpoint or "")
+    return (код,) if код is not None else ()
 
 
 def install(app: Flask) -> None:
@@ -216,8 +223,8 @@ def install(app: Flask) -> None:
             return None
         setattr(g, _REACHED, True)
         if not _writes(request.endpoint, {request.method}):
-            код = _read_code(request.endpoint, request.path)
-            if код is not None and not can(current_actor(), код).allowed:
+            коды = _read_codes(request.endpoint, request.path)
+            if коды and not any(can(current_actor(), код).allowed for код in коды):
                 abort(404)
             return None
         if request.endpoint in EXEMPT_ENDPOINTS:
@@ -289,8 +296,7 @@ def _declared_codes(app: Flask, endpoint: str | None, path: str) -> frozenset[st
         коды.add(код)
     if (код := ENDPOINT_VIEWS.get(endpoint or "")) is not None:
         коды.add(код)
-    if (код := READ_BY_ACTION.get(endpoint or "")) is not None:
-        коды.add(код)
+    коды.update(READ_BY_ACTION.get(endpoint or "", ()))
     return frozenset(коды)
 
 
