@@ -1930,6 +1930,19 @@ a[data-zoom] { cursor: zoom-in; }
 .rx-pick__item input { accent-color: var(--accent); flex: 0 0 auto; }
 .rx-pick__item span { overflow-wrap: anywhere; }
 .rx-form__body { min-height: 14rem; font: inherit; }
+/* Нарушения предписания по проверке (шаг 3): строка — запись, галочка и срок справа. */
+.rx-finds { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.rx-find {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) 0; border-top: 1px solid var(--line);
+}
+.rx-find--off { opacity: .6; }
+.rx-find__main { display: flex; align-items: flex-start; gap: var(--space-2); flex: 1 1 22rem; min-width: 0; cursor: pointer; }
+.rx-find__main input { accent-color: var(--accent); flex: 0 0 auto; margin-top: .25rem; }
+.rx-find__body { display: grid; gap: var(--space-1); min-width: 0; overflow-wrap: anywhere; }
+.rx-find__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.rx-find__clause { font-weight: 600; }
+.rx-find__due { display: grid; gap: var(--space-1); flex: 0 0 11rem; }
 .rx-form__actions { grid-column: 1 / -1; gap: var(--space-3); flex-wrap: wrap; }
 .rx-form__actions .btn { margin-top: 0; }
 

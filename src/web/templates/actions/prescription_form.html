@@ -58,6 +58,36 @@
           {% endif %}
         </fieldset>
 
+        {% if notice_rows %}
+          <fieldset class="field field--wide rx-pick">
+            <legend class="field-label">{{ t('rx.form.findings') }}</legend>
+            <ul class="rx-finds">
+              {% for r in notice_rows %}
+                <li class="rx-find">
+                  <input type="hidden" name="finding_shown" value="{{ r.finding_id }}">
+                  <label class="rx-find__main">
+                    <input type="checkbox" name="finding" value="{{ r.finding_id }}"{% if r.included %} checked{% endif %}>
+                    <span class="rx-find__body">
+                      <span class="rx-find__head">
+                        <span class="tag tag--micro {{ 'tag--err' if r.level == 'D3' else 'tag--neutral' }}">{{ r.level }}</span>
+                        <strong>{{ r.object_name }}</strong>
+                        {% if r.suggested %}<span class="tag tag--micro tag--accent">{{ t('rx.find.suggested') }}</span>{% endif %}
+                        {% if not r.description_translated %}<span class="tag tag--micro tag--warn">{{ t('rx.find.no_translation') }}</span>{% endif %}
+                      </span>
+                      <span class="rx-find__clause">{{ r.clause }}</span>
+                      <span class="rx-find__desc">{{ r.description or '—' }}</span>
+                    </span>
+                  </label>
+                  <label class="rx-find__due"><span class="field-label">{{ t('rx.find.due') }}</span>
+                    <input class="input" type="date" name="fdue_{{ r.finding_id }}" value="{{ r.due_on }}">
+                    {% if r.engine_due_on %}<span class="field-note">{{ t('rx.find.engine_due', due=r.engine_due_on) }}</span>{% endif %}</label>
+                </li>
+              {% endfor %}
+            </ul>
+            <div class="field-note">{{ t('rx.form.findings_hint', days=notice_term_days) }}</div>
+          </fieldset>
+        {% endif %}
+
         <label class="field field--narrow"><span class="field-label">{{ t('rx.form.due') }}</span>
           <input class="input" type="date" name="due" value="{{ values.due }}" min="{{ today }}" required></label>
         <label class="field"><span class="field-label">{{ t('rx.form.recipients') }}</span>

@@ -131,8 +131,36 @@ def parse_recipients(raw: str) -> str:
 
 
 @dataclass(frozen=True)
+class FindingPick:
+    """Строка таблицы нарушений, как она ложится в предписание (0089, D602, D606).
+
+    Формулировки — снимок на момент сборки: документ, который согласовали, не
+    меняется от правки справочника.
+    """
+
+    inspection_id: str
+    finding_id: str
+    position: int
+    object_name: str
+    level: str
+    clause: str
+    description: str
+    description_translated: bool
+    due_on: date
+    engine_due_on: date | None
+    suggested: bool
+    included: bool
+    object_kind: str = "pizzeria"
+
+
+@dataclass(frozen=True)
 class Draft:
-    """Содержимое черновика, как его вписал сотрудник УК."""
+    """Содержимое черновика, как его вписал сотрудник УК.
+
+    `findings` — нарушения из проверок-оснований; непусто — предписание собирается по
+    шаблону (`kind = inspection`, версия шаблона запоминается), пусто — текст вписан
+    руками, как до шага 3.
+    """
 
     country: str
     due_on: date
@@ -141,6 +169,7 @@ class Draft:
     body: str
     unit_ids: tuple[str, ...] = ()
     inspection_ids: tuple[str, ...] = ()
+    findings: tuple[FindingPick, ...] = ()
 
 
 def check_draft(draft: Draft, *, on: date) -> Draft:
@@ -176,7 +205,31 @@ def check_draft(draft: Draft, *, on: date) -> Draft:
         body=текст,
         unit_ids=точки,
         inspection_ids=основания,
+        findings=_check_findings(draft.findings, основания),
     )
+
+
+def _check_findings(
+    picks: Iterable[FindingPick], bases: tuple[str, ...]
+) -> tuple[FindingPick, ...]:
+    """Нарушения: только из выбранных оснований, без повторов, и хоть одно включено."""
+    строки = tuple(picks)
+    if not строки:
+        return ()
+    seen: set[str] = set()
+    for pick in строки:
+        if pick.inspection_id not in bases:
+            raise PrescriptionError("Нарушение не из выбранных проверок-оснований")
+        if pick.finding_id in seen:
+            raise PrescriptionError("Одна запись проверки названа в предписании дважды")
+        seen.add(pick.finding_id)
+        if not pick.clause.strip():
+            raise PrescriptionError("У нарушения нет формулировки пункта")
+    if not any(p.included for p in строки):
+        raise PrescriptionError(
+            "Отметьте хотя бы одно нарушение — в предписании должно быть что исправлять"
+        )
+    return строки
 
 
 def _ids(values: Iterable[str], what: str) -> tuple[str, ...]:
@@ -225,6 +278,26 @@ class BaseRef:
 
 
 @dataclass(frozen=True)
+class NoticeFinding:
+    """Строка таблицы нарушений предписания, как она записана."""
+
+    id: str
+    inspection_id: str
+    finding_id: str
+    position: int
+    object_kind: str
+    object_name: str
+    level: str
+    clause: str
+    description: str
+    description_translated: bool
+    due_on: date
+    engine_due_on: date | None
+    suggested: bool
+    included: bool
+
+
+@dataclass(frozen=True)
 class Reply:
     """Ответ партнёра: комментарий и, если приложен, файл."""
 
@@ -268,10 +341,19 @@ class Prescription:
     #: Кто и когда согласовал (ОСБ). Пусто у неразрешённого и у выданных до 0087.
     approved_by: str | None = None
     approved_at: datetime | None = None
+    #: Вид (inspection / ratings / other) и версия шаблона документа (0089).
+    kind: str = "other"
+    template_version_id: str | None = None
     units: tuple[UnitRef, ...] = ()
     bases: tuple[BaseRef, ...] = ()
     replies: tuple[Reply, ...] = ()
     events: tuple[Event, ...] = ()
+    findings: tuple[NoticeFinding, ...] = ()
+
+    @property
+    def has_document(self) -> bool:
+        """Собрано по шаблону: у предписания есть версия шаблона и нарушения."""
+        return self.template_version_id is not None and bool(self.findings)
 
     def overdue(self, on: date) -> bool:
         return is_overdue(self.status, self.due_on, today=on)
@@ -324,7 +406,7 @@ PRESCRIPTION_REACH_SQL = (
 
 _COLUMNS = """p.id, p.country, p.due_on, p.recipients, p.subject, p.body, p.status,
        p.created_by, p.created_at, p.issued_by, p.issued_at, p.closed_by, p.closed_at,
-       p.close_comment, p.approved_by, p.approved_at"""
+       p.close_comment, p.approved_by, p.approved_at, p.kind, p.template_version_id"""
 
 # Очередь — только открытые; условие статуса литералом, чтобы его узнал
 # частичный индекс `prescriptions_open_idx`.
@@ -414,6 +496,15 @@ where e.prescription_id = any(%(ids)s::uuid[])
 order by e.prescription_id, e.at, e.id
 """
 
+_FINDINGS_SQL = """
+select pf.prescription_id, pf.id, pf.inspection_id, pf.finding_id, pf.position, pf.object_kind,
+       pf.object_name, pf.level, pf.clause, pf.description, pf.description_translated,
+       pf.due_on, pf.engine_due_on, pf.suggested, pf.included
+from prescription_findings pf
+where pf.prescription_id = any(%(ids)s::uuid[])
+order by pf.prescription_id, pf.position, pf.id
+"""
+
 _FILE_SQL = """
 select r.storage_path, r.file_name, r.content_type, r.size_bytes
 from prescription_replies r
@@ -499,7 +590,9 @@ def read_with(
     replies = cur.fetchall()
     cur.execute(_EVENTS_SQL, side)
     events = cur.fetchall()
-    return tuple(_assemble(row, units, bases, replies, events) for row in heads)
+    cur.execute(_FINDINGS_SQL, side)
+    findings = cur.fetchall()
+    return tuple(_assemble(row, units, bases, replies, events, findings) for row in heads)
 
 
 def _read_conn(sql: str, params: dict[str, Any]) -> tuple[Prescription, ...]:
@@ -520,6 +613,7 @@ def _assemble(
     bases: list[tuple[Any, ...]],
     replies: list[tuple[Any, ...]],
     events: list[tuple[Any, ...]],
+    findings: list[tuple[Any, ...]],
 ) -> Prescription:
     ident = str(head[0])
     return Prescription(
@@ -539,6 +633,9 @@ def _assemble(
         close_comment=head[13],
         approved_by=head[14],
         approved_at=head[15],
+        kind=str(head[16]),
+        template_version_id=None if head[17] is None else str(head[17]),
+        findings=tuple(_finding(r) for r in _mine(findings, ident)),
         units=tuple(
             UnitRef(id=str(r[1]), name=str(r[2]), country=r[3]) for r in _mine(units, ident)
         ),
@@ -559,6 +656,25 @@ def _assemble(
             Event(action=str(r[1]), actor=str(r[2]), detail=r[3], at=r[4])
             for r in _mine(events, ident)
         ),
+    )
+
+
+def _finding(row: tuple[Any, ...]) -> NoticeFinding:
+    return NoticeFinding(
+        id=str(row[1]),
+        inspection_id=str(row[2]),
+        finding_id=str(row[3]),
+        position=int(row[4]),
+        object_kind=str(row[5]),
+        object_name=str(row[6]),
+        level=str(row[7]),
+        clause=str(row[8]),
+        description=str(row[9]),
+        description_translated=bool(row[10]),
+        due_on=row[11],
+        engine_due_on=row[12],
+        suggested=bool(row[13]),
+        included=bool(row[14]),
     )
 
 
