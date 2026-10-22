@@ -19,6 +19,7 @@ from src.db import prescriptions as rx
 
 from . import auth
 from . import country as country_data
+from .geo_names import country_title
 
 #: Ключ параметра «показать закрытые» в адресе.
 PARAM_CLOSED = "closed"
@@ -47,6 +48,12 @@ class Block:
 def sorted_rows(rows: Iterable[Any], *, today: date, overdue_first: bool) -> tuple[Any, ...]:
     """Строки по сроку (при равном — как пришли); просроченные сверху, если блок просит."""
     return tuple(sorted(rows, key=lambda p: (not (overdue_first and p.overdue(today)), p.due_on)))
+
+
+def rail_codes(reach: Any, with_rows: Iterable[str], selected: str, lang: str) -> tuple[str, ...]:
+    """Все страны охвата (а не только те, где есть строки), по названию на языке экрана (D611)."""
+    codes = {c for c, _n in country_data.countries(reach=reach)} | set(with_rows) | {selected}
+    return tuple(sorted(codes - {""}, key=lambda c: (country_title(c, lang).casefold(), c)))
 
 
 # ── предписания ────────────────────────────────────────────────────────────
@@ -113,12 +120,11 @@ def rx_screen(
 
     открытые = rx.list_prescriptions(reach=reach)
     закрытые = rx.list_prescriptions(reach=reach, closed=True) if закрытые_нужны else None
-    страны = tuple(
-        sorted(
-            {p.country for p in открытые.rows}
-            | {p.country for p in (закрытые.rows if закрытые else ())}
-            | {страна} - {""}
-        )
+    страны = rail_codes(
+        reach,
+        [p.country for p in (*открытые.rows, *(закрытые.rows if закрытые else ()))],
+        страна,
+        lang,
     )
 
     def в_стране(rows: tuple[rx.Prescription, ...]) -> tuple[rx.Prescription, ...]:

@@ -108,6 +108,7 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]
 
 def _стенд(monkeypatch: pytest.MonkeyPatch, tenant: str) -> Iterator[FlaskClient]:
     подменить_двери(monkeypatch, tenant=tenant, role="admin")
+    monkeypatch.setattr("src.web.country.countries", lambda **_: (("GE", 2), ("AM", 1)))
     with собрать(tenant=tenant).test_client() as client:
         assert войти(client).status_code == 302
         yield client

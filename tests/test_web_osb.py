@@ -119,6 +119,33 @@ def test_осб_слева_столбец_стран_со_счётчиками(
     assert "на согласовании 1" in столбец
 
 
+def test_осб_в_столбце_все_страны_охвата_а_не_только_с_предписаниями(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _строки(monkeypatch)
+    # Армения есть в охвате, предписаний у неё нет: строка есть, счётчиков нет.
+    monkeypatch.setattr("src.web.country.countries", lambda **_: (("GE", 2), ("AM", 1), ("PL", 1)))
+    страница = уК.get("/osb?lang=ru").get_data(as_text=True)
+    столбец = страница.split('class="pk-rail__list"', 1)[1].split("</aside>", 1)[0]
+    assert "Армения" in столбец
+    армения = столбец.split("Армения", 1)[1].split("</a>", 1)[0]
+    assert "pk-item__meta" not in армения and "pk-item__alert" not in армения
+    порядок = [столбец.index(x) for x in ("Армения", "Грузия", "Польша")]
+    assert порядок == sorted(порядок), "порядок — по названию"
+
+
+def test_осб_пустой_список_без_строки_в_списке_ноль(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.db import prescriptions as rx
+
+    monkeypatch.setattr(
+        rx, "list_prescriptions", lambda **_k: rx.PrescriptionList(rows=(), truncated=False)
+    )
+    страница = уК.get("/osb?lang=ru").get_data(as_text=True)
+    assert "Предписаний нет" in страница and "в списке" not in страница
+
+
 def test_осб_справа_блоки_по_состоянию_и_закрытые_свёрнуты(
     уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

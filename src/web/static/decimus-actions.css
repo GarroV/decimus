@@ -12,6 +12,7 @@
 .pk-block .slist { border: 0; }
 .pk-note a { color: var(--ink-3); }
 .pk-rail-select { display: none; }
+.pk-rail-select [hidden] { display: none; }
 .rx-country { display: flex; align-items: flex-end; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5); }
 .rx-country .input { min-width: 14rem; }
 

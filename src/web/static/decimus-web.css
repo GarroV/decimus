@@ -1929,6 +1929,8 @@ a[data-zoom] { cursor: zoom-in; }
 .rx-pick__item { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; cursor: pointer; }
 .rx-pick__item input { accent-color: var(--accent); flex: 0 0 auto; }
 .rx-pick__item span { overflow-wrap: anywhere; }
+/* форма и подсказка не растягиваются на весь экран */
+.rx-form { max-width: 60rem; }
 .rx-form__body { min-height: 14rem; font: inherit; }
 .rx-form__actions { grid-column: 1 / -1; gap: var(--space-3); flex-wrap: wrap; }
 .rx-form__actions .btn { margin-top: 0; }

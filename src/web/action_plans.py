@@ -33,7 +33,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import actions_screen, auth, guard, plan_template, review, ui_lang, view
 from . import inspections as data
-from .actions_columns import Block, RailItem, rail_form, sorted_rows
+from .actions_columns import Block, RailItem, rail_codes, rail_form, sorted_rows
 from .actions_screen import TAB_PLANS
 from .config import Settings
 from .origin import refuse_foreign_origin
@@ -206,11 +206,11 @@ def screen_context(lang: str) -> dict[str, Any]:
     архив = plans.list_requests(reach=reach, accepted=True) if принятые else None
     сегодня = plans.today()
     все = открытые.rows
-    страны = tuple(
-        sorted(
-            {r.country for r in (*все, *(архив.rows if архив else ())) if r.country}
-            | {страна} - {""}
-        )
+    страны = rail_codes(
+        reach,
+        [r.country for r in (*все, *(архив.rows if архив else ())) if r.country],
+        страна,
+        lang,
     )
 
     def в_стране(rows: tuple[plans.PlanRequest, ...]) -> tuple[plans.PlanRequest, ...]:

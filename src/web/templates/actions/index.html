@@ -42,7 +42,7 @@
     {% if tab == 'osb' and may('prescription.manage') %}
       <div class="pk-head__actions"><a class="sbtn sbtn--primary" href="{{ new_url }}">{{ t('rx.new') }}</a></div>
     {% endif %}
-    <div class="pk-head__facts"><span>{{ t('actions.count', n=total) }}</span></div>
+    {% if total %}<div class="pk-head__facts"><span>{{ t('actions.count', n=total) }}</span></div>{% endif %}
   </header>
   {% if truncated %}<p class="slist__note">{{ t(truncated_key, n=limit) }}</p>{% endif %}
   {{ state_blocks(plans_list if tab == 'plans' else rx_list) }}

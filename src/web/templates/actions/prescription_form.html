@@ -32,7 +32,7 @@
   {% endif %}
 
   {% if not country %}
-    <section class="ov-card ov-card--wide"><div class="ov-card__empty">{{ t('rx.form.pick_country') }}</div></section>
+    <section class="ov-card ov-card--wide rx-form"><div class="ov-card__empty">{{ t('rx.form.pick_country') }}</div></section>
   {% else %}
     <form method="post" class="ov-card ov-card--wide rx-form"
           action="{{ url(rx_base ~ ('/' ~ current.id ~ '/edit' if current else '')) }}?lang={{ lang }}">
