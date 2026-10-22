@@ -22,6 +22,8 @@ _ROLES: dict[str, dict[str, str]] = {
     "users.role.osb": {"ru": "ОСБ", "en": "OSB"},
     "users.role.auditor": {"ru": "Аудитор", "en": "Auditor"},
     "users.role.partner.admin": {"ru": "Админ", "en": "Admin"},
+    # Чьё это пространство — словами (#1122): «Админ · TEST» читали как админа УК.
+    "users.partner_space": {"ru": "пространство партнёра {code}", "en": "partner space {code}"},
     "users.role.partner.auditor": {"ru": "Сотрудник", "en": "Staff"},
     # Что роль может — по D344, D346, D360, D364, D367.
     "users.hint.superadmin": {

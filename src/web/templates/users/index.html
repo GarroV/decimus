@@ -111,7 +111,7 @@
                 <a class="srow{% if текущий %} is-current{% endif %}{% if р.disabled_at %} is-off{% endif %}"
                    href="{{ link(person=р.id) }}"{% if текущий %} aria-current="true"{% endif %}>
                   <span class="srow__main">
-                    <b>{{ р.login }}{% if me and р.id == me.id %} <em class="sbadge">{{ t('users.me') }}</em>{% endif %}</b>
+                    <b>{{ р.login }}{% if me and р.id == me.id %} <em class="sbadge">{{ t('users.me') }}</em>{% endif %}{% if is_partner_space(р.tenant) %} <em class="sbadge" title="{{ t('users.partner_space', code=р.tenant) }}">{{ р.tenant }}</em>{% endif %}</b>
                     <small>{{ р.email or t('users.no_email') }}</small>
                   </span>
                   <span class="srow__cell mono" data-label="{{ t('users.col.space') }}">{{ р.tenant }}</span>
