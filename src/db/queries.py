@@ -1230,6 +1230,53 @@ def previous_findings(
     )
 
 
+#: Привычная зона пункта (#1109): сколько записей нужно и какая их доля в одной
+#: зоне, чтобы зона считалась очевидной. Ниже — спросить человека.
+USUAL_ZONE_MIN_RECORDS = 3
+USUAL_ZONE_MIN_SHARE = 0.7
+#: Насколько далеко в прошлое смотреть: методика и привычки меняются.
+USUAL_ZONE_DAYS = 365
+
+_USUAL_ZONE_SQL = """
+select f.zone, count(*)
+from findings f
+join inspections i on i.id = f.inspection_id
+where i.tenant_code = %(tenant)s
+  and f.code = %(code)s
+  and i.retracted_at is null
+  and i.origin <> 'legacy'
+  -- Зона, которую человек назвал вопреки методике (D206), привычкой не считается.
+  and not f.zone_unusual
+  and i.inspection_date >= current_date - %(days)s::int
+group by f.zone
+"""
+
+
+def usual_zone(*, tenant: str, code: str) -> str | None:
+    """Зона, в которую этот пункт почти всегда записывают в своём пространстве (#1109).
+
+    Мини-апп спрашивал «Где?» с выбором из двух цехов там, где ответ очевиден
+    по опыту сети. Если за год по пункту набралось не меньше
+    `USUAL_ZONE_MIN_RECORDS` записей и не меньше `USUAL_ZONE_MIN_SHARE` из них в
+    одной зоне — она и есть ответ; аудитор её видит и может сменить. Иначе —
+    `None`, и зону спрашивают, как раньше.
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("привычная зона пункта") as conn, conn.cursor() as cur:
+        cur.execute(_USUAL_ZONE_SQL, {"tenant": tenant_code, "code": code, "days": USUAL_ZONE_DAYS})
+        rows = [(str(зона), int(сколько)) for зона, сколько in cur.fetchall()]
+    return pick_usual_zone(rows)
+
+
+def pick_usual_zone(rows: list[tuple[str, int]]) -> str | None:
+    """Зона-привычка по счёту записей `(зона, сколько)`, или `None`, если очевидной нет."""
+    всего = sum(сколько for _, сколько in rows)
+    if всего < USUAL_ZONE_MIN_RECORDS:
+        return None
+    зона, сколько = max(rows, key=lambda r: r[1])
+    return зона if сколько / всего >= USUAL_ZONE_MIN_SHARE else None
+
+
 def unit_ids(*, reach: Reach) -> dict[str, str]:
     """Идентификаторы точек справочника: `{название: id}`.
 

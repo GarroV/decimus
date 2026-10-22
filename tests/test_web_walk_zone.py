@@ -15,6 +15,7 @@ from test_web_walk_suggest import Модель, _поиск, модель  # noq
 from test_web_walk_write import Клиент, клиент  # noqa: F401 -- фикстура
 
 from src.bot import propose as ядро
+from src.db.queries import pick_usual_zone
 from src.recognize.fastpath import FastItem, FastPath
 from src.web import walk_suggest, walk_zone
 from src.web.walk_zone import resolve_item_zone
@@ -71,6 +72,48 @@ def test_ничего_не_сказано_и_экрана_нет_спрашив�
     итог = resolve_item_zone(НЕСКОЛЬКО, spoken=None, model=None, hint=None)
 
     assert итог.zone is None and итог.source == "ask"
+
+
+# ── привычная зона пункта (#1109) ─────────────────────────────────────
+
+
+def test_молчат_все_источники_берётся_привычная_зона_пункта() -> None:
+    итог = resolve_item_zone(
+        НЕСКОЛЬКО, spoken=None, model=None, hint=None, usual=lambda: "cold_kitchen"
+    )
+
+    assert (итог.zone, итог.source) == ("cold_kitchen", "usual")
+
+
+def test_зона_с_экрана_сильнее_привычки_и_база_не_спрашивается() -> None:
+    def привычка() -> str:
+        raise AssertionError("привычку не спрашивают, когда зона уже выведена")
+
+    итог = resolve_item_zone(НЕСКОЛЬКО, spoken=None, model=None, hint="hall", usual=привычка)
+
+    assert (итог.zone, итог.source) == ("hall", "hint")
+
+
+def test_привычная_зона_вне_списка_пункта_не_берётся() -> None:
+    итог = resolve_item_zone(НЕСКОЛЬКО, spoken=None, model=None, hint=None, usual=lambda: "storage")
+
+    assert итог.zone is None and итог.source == "ask"
+
+
+@pytest.mark.parametrize(
+    ("счёт", "ждём"),
+    [
+        ([("hot_kitchen", 3)], "hot_kitchen"),
+        ([("hot_kitchen", 7), ("cold_kitchen", 3)], "hot_kitchen"),
+        ([("hot_kitchen", 2)], None),
+        ([("hot_kitchen", 6), ("cold_kitchen", 4)], None),
+        ([], None),
+    ],
+)
+def test_привычка_это_не_меньше_трёх_записей_и_семидесяти_процентов(
+    счёт: list[tuple[str, int]], ждём: str | None
+) -> None:
+    assert pick_usual_zone(счёт) == ждём
 
 
 # ── в ответе поиска ─────────────────────────────────────────────────────
@@ -143,8 +186,31 @@ def test_старый_клиент_с_полем_zone_читается_как_п
     assert (итог["zone"], итог["source"]) == ("cold_kitchen", "hint")
 
 
+def test_ответ_поиска_без_экрана_берёт_привычную_зону_пространства(
+    клиент: Клиент,  # noqa: F811
+    модель: Модель,  # noqa: F811
+    зоны: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    спросили: list[tuple[str, str]] = []
+
+    def привычка(*, tenant: str, code: str) -> str:
+        спросили.append((tenant, code))
+        return "cold_kitchen"
+
+    # Модель называет горячий цех, а у пункта его нет — её зона не годится.
+    monkeypatch.setattr(
+        walk_suggest, "allowed_zones", lambda code, chat_id: ("cold_kitchen", "hall")
+    )
+    monkeypatch.setattr(walk_suggest.queries, "usual_zone", привычка)
+    итог = _разбор(клиент, words="нагар")
+
+    assert (итог["zone"], итог["source"]) == ("cold_kitchen", "usual")
+    assert спросили and спросили[0][1] == "CLN05"
+
+
 def test_модуль_зоны_экспортирует_источники() -> None:
-    assert set(walk_zone.SOURCES) == {"single", "words", "model", "hint", "ask"}
+    assert set(walk_zone.SOURCES) == {"single", "words", "model", "hint", "usual", "ask"}
 
 
 def test_быстрый_путь_повторяет_подсказку_экрана_и_это_не_зона_модели(
