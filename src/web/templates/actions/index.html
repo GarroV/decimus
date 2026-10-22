@@ -1,57 +1,54 @@
 {#
-  «Действия» (D526, D527): экшн-планы и предписания — один экран у УК и
-  партнёра. Слева список с отбором, справа панель выбранной строки (`?tab=…&id=…`);
-  каркас тот же, что у «Проверок» и «Пиццерий» (`_split_page.html`, `split.js`).
-  Сторона меняет объём сведений и кнопки внутри панели, а не раскладку.
+  «Действия» (D526, D527) и «ОСБ» (D599): экшн-планы и предписания — один экран у
+  УК и партнёра. Раскладка по D611: слева столбец стран (у партнёра с одной
+  страной столбца нет, на телефоне — выпадающий список), справа блоки по
+  состоянию, выбранная строка открывается панелью справа (`?tab=…&id=…`). Каркас —
+  `_pick_page.html`, части — `_columns.html`. Сторона меняет объём сведений и
+  кнопки внутри панели, а не раскладку.
 
   Строка списка — пиццерия, страна, буква, дата проверки, срок, состояние.
   Выбор живёт в адресе: без скриптов строка — обычная ссылка, перезагрузка
   держит панель открытой, ссылкой можно поделиться.
-#}{% extends "_split_page.html" %}
-{% from "actions/_filters.html" import filter_bar, osb_bar with context %}
+#}{% extends "_pick_page.html" %}
+{% from "actions/_columns.html" import country_rail, country_select, state_blocks with context %}
 {% from "actions/_list_plans.html" import plans_list with context %}
 {% from "actions/_list_rx.html" import rx_list with context %}
 {% from "actions/_panel_plan.html" import plan_panel with context %}
 {% from "actions/_panel_rx.html" import rx_panel with context %}
+{% set pick_open = split_open %}
+{% set pick_back = split_back %}
+{% set pick_norail = not rail %}
+{% set pick_title = t('actions.drawer.plan' if tab == 'plans' else 'actions.drawer.rx') %}
 {% block title %}{{ t(title_key|default('section.actions.title')) }}{% endblock %}
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-actions.css') }}"><script src="{{ url_for('static', filename='actions.js') }}" defer></script>{% endblock %}
+{% block pick_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-actions.css') }}"><script src="{{ url_for('static', filename='actions.js') }}" defer></script>{% endblock %}
+{% block pick_label %}{{ t('actions.country') }}{% endblock %}
+{% block pick_rail_mod %} pk-rail--select{% endblock %}
+{% block pick_tools %}{{ country_select() }}{% endblock %}
+{% block pick_list %}{{ country_rail() }}{% endblock %}
 
-{% block split_top %}
-  <header class="shead">
-    <div class="shead__main">
-      <h1 class="shead__title">{{ t(title_key|default('section.actions.title')) }}</h1>
-      <p class="shead__sub">{{ country_title(country) if country else t('actions.all_countries') }} · {{ t('actions.count', n=total) }}</p>
-    </div>
-    {#- «Новое предписание» без проверки — только у ОСБ и главного админа; админ смотрит без кнопок. -#}
-    {% if tab == 'osb' and may('prescription.manage') %}
-      <a class="sbtn sbtn--primary" href="{{ new_url }}">{{ t('rx.new') }}</a>
-    {% endif %}
-  </header>
-  {% if tab == 'osb' %}
-    <nav class="stabs" aria-label="{{ t('osb.queues') }}">
-      {% for key, text, n in queues %}
-        <a class="stabs__item{% if queue == key %} is-current{% endif %}" href="{{ select_url(queue=key, id='') }}"{% if queue == key %} aria-current="page"{% endif %}>{{ t(text, n=n) }}</a>
-      {% endfor %}
-    </nav>
-  {% else %}
+{% block pick_work %}
+  {% if tab != 'osb' %}
     <nav class="stabs" aria-label="{{ t('section.actions.title') }}">
       <a class="stabs__item{% if tab == 'plans' %} is-current{% endif %}" href="{{ tab_links['plans'] }}"{% if tab == 'plans' %} aria-current="page"{% endif %}>{{ t('actions.tab.plans') }}</a>
       <a class="stabs__item{% if tab == 'prescriptions' %} is-current{% endif %}" href="{{ tab_links['prescriptions'] }}"{% if tab == 'prescriptions' %} aria-current="page"{% endif %}>{{ t('actions.tab.prescriptions') }}</a>
     </nav>
   {% endif %}
+  <header class="pk-head">
+    <div class="pk-head__main">
+      <div class="pk-kicker">{{ country_title(country) or country if country else t('actions.all_countries') }}</div>
+      <h1 class="pk-title">{{ t(title_key|default('section.actions.title')) }}</h1>
+    </div>
+    {#- «Новое предписание» без проверки — только у ОСБ и главного админа; админ смотрит без кнопок. -#}
+    {% if tab == 'osb' and may('prescription.manage') %}
+      <div class="pk-head__actions"><a class="sbtn sbtn--primary" href="{{ new_url }}">{{ t('rx.new') }}</a></div>
+    {% endif %}
+    <div class="pk-head__facts"><span>{{ t('actions.count', n=total) }}</span></div>
+  </header>
+  {% if truncated %}<p class="slist__note">{{ t(truncated_key, n=limit) }}</p>{% endif %}
+  {{ state_blocks(plans_list if tab == 'plans' else rx_list) }}
 {% endblock %}
 
-{% block split_list %}
-  <div class="sbox">
-    {% if tab == 'osb' %}{{ osb_bar() }}{% else %}{{ filter_bar() }}{% endif %}
-    {% if truncated %}<p class="slist__note">{{ t(truncated_key, n=limit) }}</p>{% endif %}
-    {% if tab == 'plans' %}{{ plans_list() }}{% else %}{{ rx_list() }}{% endif %}
-  </div>
-{% endblock %}
-
-{% block split_title %}{{ t('actions.drawer.plan' if tab == 'plans' else 'actions.drawer.rx') }}{% endblock %}
-
-{% block split_detail %}
+{% block pick_panel %}
   {% if item %}
     {% if tab == 'plans' %}{{ plan_panel(item) }}{% else %}{{ rx_panel(item) }}{% endif %}
   {% elif failed %}

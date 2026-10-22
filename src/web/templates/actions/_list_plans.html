@@ -1,8 +1,8 @@
-{# Список экшн-планов: пиццерия, страна, буква, проверка, срок, состояние (D526). #}
+{# Строки экшн-планов одного блока: пиццерия, страна, буква, проверка, срок, состояние (D526, D611). #}
 {% from "_plan.html" import state_tag with context %}
-{% macro plans_list() %}
+{% macro plans_list(items) %}
   <div class="slist slist--actions slist--plans">
-    {% if rows %}
+    {% if items %}
       <div class="slist__head" aria-hidden="true">
         <span></span>
         <span>{{ t('actions.col.unit') }}</span>
@@ -12,7 +12,7 @@
         <span>{{ t('actions.col.state') }}</span>
       </div>
       <ul class="slist__rows">
-        {% for r in rows %}
+        {% for r in items %}
           {% set current = split_open and picked == r.id %}
           <li>
             <a class="srow{% if current %} is-current{% endif %}" href="{{ select_url(id=r.id) }}"{% if current %} aria-current="true"{% endif %}>
@@ -26,8 +26,6 @@
           </li>
         {% endfor %}
       </ul>
-    {% else %}
-      <div class="sempty"><p class="sempty__title">{{ t(empty_key) }}</p></div>
     {% endif %}
   </div>
 {% endmacro %}

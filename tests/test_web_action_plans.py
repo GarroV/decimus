@@ -175,18 +175,18 @@ def test_меню_обеих_сторон_зовёт_в_одни_действи�
 def test_уК_видит_очередь_и_запрос(уК: FlaskClient) -> None:
     страница = уК.get("/actions?lang=ru").get_data(as_text=True)
     assert "Batumi-1" in страница
-    assert "Ждут приёмки · 1" in страница
+    assert "Ждут приёмки" in страница
     # Даты — словами, как везде (#1086), а не ISO.
     assert "3 окт 2026" in страница and "11 окт 2026" in страница
     assert "2026-10-03" not in страница.split("slist", 1)[1]
 
 
-def test_уК_переключается_на_принятые_и_очереди_там_нет(
+def test_уК_переключается_на_принятые_и_блок_принятых_открыт(
     уК: FlaskClient, зовы: dict[str, list[Any]]
 ) -> None:
     страница = уК.get("/actions?accepted=1&lang=ru").get_data(as_text=True)
     assert зовы["list"][-1]["accepted"] is True
-    assert "Ждут приёмки" not in страница
+    assert "Принятые" in страница and 'class="pk-archive"' not in страница
 
 
 def test_очередь_по_умолчанию_только_открытые(уК: FlaskClient, зовы: dict[str, list[Any]]) -> None:

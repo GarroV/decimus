@@ -17,12 +17,18 @@
   {% if failure %}<div class="note note--error mt-gap"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
 
   {% if not current %}
-    <div class="ov-filters">
-      <span class="ov-filters__label">{{ t('rx.form.country') }}</span>
-      {% for code, _n in countries %}
-        <a class="ov-chip{% if code == country %} is-on{% endif %}" href="{{ url(rx_base ~ '/new') }}?country={{ code }}&amp;lang={{ lang }}">{{ country_title(code) or code }}</a>
-      {% endfor %}
-    </div>
+    {#- Страна — выпадающий список, а не ряд кнопок (D611): выбор и кнопка работают без скрипта. -#}
+    <form class="rx-country" method="get" action="{{ url(rx_base ~ '/new') }}" data-autosubmit>
+      <input type="hidden" name="lang" value="{{ lang }}">
+      <label class="field field--narrow"><span class="field-label">{{ t('rx.form.country') }}</span>
+        <select class="input" name="country">
+          {% if not country %}<option value="" selected>—</option>{% endif %}
+          {% for code, _n in countries %}
+            <option value="{{ code }}"{% if code == country %} selected{% endif %}>{{ country_title(code) or code }}</option>
+          {% endfor %}
+        </select></label>
+      <button class="btn" type="submit" data-autosubmit-button>{{ t('rx.form.country_apply') }}</button>
+    </form>
   {% endif %}
 
   {% if not country %}

@@ -293,7 +293,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | Каталог | Файлов | Какие |
 |---|---|---|
 | `src/web/templates/` | 22 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, … (+14) |
-| `src/web/templates/actions/` | 9 | _filters.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, index.html, prescription_form.html, … (+1) |
+| `src/web/templates/actions/` | 8 | _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, index.html, prescription_form.html, refused.html |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
