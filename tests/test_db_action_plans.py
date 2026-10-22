@@ -123,14 +123,16 @@ def _sql(dsn: str, текст: str, параметры: tuple[Any, ...] = ()) ->
 # --- автозапрос при подтверждении (D272, D274) -------------------------------
 
 
-def test_подтверждение_с_d2_само_заводит_запрос_на_семь_дней(сеть: None) -> None:
+def test_подтверждение_с_d2_само_заводит_запрос_на_срок_методики(сеть: None) -> None:
     # Act
     ident = _принятая("D1", "D2")
 
     # Assert
     запрос = _запрос(ident)
     assert (запрос.country, запрос.status, запрос.origin) == ("GE", "requested", "auto")
-    assert запрос.due_on == СЕГОДНЯ + timedelta(days=7)
+    assert запрос.due_on == СЕГОДНЯ + timedelta(
+        days=10
+    )  # plan_due_days синтетической методики, D617
     assert запрос.requested_by == "garva"
     assert [(e.action, e.actor) for e in запрос.events] == [("requested", "garva")]
 
