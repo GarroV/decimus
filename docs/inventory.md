@@ -307,7 +307,6 @@
 <!-- map:begin env -->
 | Переменная | Где читается | В `.env.example` |
 |---|---|---|
-| `ACTION_PLAN_DUE_DAYS` | `src/db/config.py` | да |
 | `ADMIN_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/oauth_smoke.py` | да |
 | `API_TOKEN_BY` | `tools/api_token.py` | да |
 | `ATTACHMENT_MAX_MB` | `src/db/config.py` | да |

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -35,6 +36,18 @@ EXAMPLES = ROOT / "examples"
 #: Формулировки, названия зон, критерии и подсказки выдуманы —
 #: см. `tests/methodology/README.md`.
 TEST_DATA = ROOT / "tests" / "methodology"
+
+
+def методика_со_сроком(tmp: Path, days: object) -> Path:
+    """Копия синтетической методики с другим `plan_due_days` (D617): проверить источник срока."""
+    куда = tmp / "methodology-plan-due"
+    shutil.copytree(TEST_DATA, куда)
+    файл = куда / "scoring.json"
+    ставки = json.loads(файл.read_text(encoding="utf-8"))
+    ставки["plan_due_days"] = days
+    файл.write_text(json.dumps(ставки, ensure_ascii=False), encoding="utf-8")
+    return куда
+
 
 # Причина пропуска одна на все тесты: методика и боевые проверки лежат вне git
 # (решение D002), поэтому на чужой машине их может не быть.
@@ -504,6 +517,10 @@ def db_env(pg_dsn: str, monkeypatch: pytest.MonkeyPatch) -> str:
     # на строке без этой настройки.
     dsn = app_role_dsn(pg_dsn, space="*")
     monkeypatch.setenv(DATABASE_URL_VAR, dsn)
+    # Подтверждение проверки с D2/D3 читает срок плана из методики (D617). Тест,
+    # который методику не выбирал, получает синтетическую, а не ту, что в оболочке.
+    if not os.environ.get("AUDIT_DATA_DIR"):
+        monkeypatch.setenv("AUDIT_DATA_DIR", str(TEST_DATA))
     return dsn
 
 
