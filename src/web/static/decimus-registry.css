@@ -16,7 +16,6 @@
 /* «На приёмке» стоит над полосой периода и отбора: полоса — середина карточки. */
 .slist--review + .sbar--registry { border-radius: 0; border-top: 1px solid var(--line); }
 .sbar--registry .sbar__search { display: contents; }
-.sbar--registry .ov-chip { height: 30px; padding: 0 var(--space-6); border-radius: var(--r-pill); font-size: 12.5px; }
 
 
 /* ── список: буква | пиццерия + мета | итог | дата ──────────────────── */

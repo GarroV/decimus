@@ -558,24 +558,6 @@ a.ov-row:hover { background: var(--surface-2); }
   margin-right: var(--space-1);
 }
 .ov-filters__gap { flex: 1; min-width: var(--space-3); }
-.ov-chips { display: inline-flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
-.ov-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  font-size: var(--fs-micro);
-  font-weight: var(--w-semibold);
-  color: var(--ink-2);
-  text-decoration: none;
-  white-space: nowrap;
-}
-.ov-chip:hover { border-color: var(--accent-line); }
-.ov-chip.is-on { background: var(--accent); border-color: var(--accent); color: var(--ink-inverse); }
-.ov-chip__num { font-family: var(--font-num); font-variant-numeric: tabular-nums; opacity: .7; }
-.ov-chip--reset { background: var(--surface-3); border-color: transparent; }
 
 .ov-card--wide { margin-top: var(--space-5); }
 .ov-card__count {
@@ -678,12 +660,11 @@ a.ov-table__row:hover { background: var(--surface-2); }
    как ссылка в тексте (владелец 30.09.2026: «когда наводишь на город он
    отображается как гиперссылка»). Как в Swarm: строка светлеет, текст стоит. */
 a.ov-table__row:hover, a.ov-row:hover, a.ins-row:hover, a.ov-tile:hover,
-a.pick__item:hover, a.ov-chip:hover, a.mx-row:hover, a.mx-rail__row:hover,
+a.pick__item:hover, a.mx-row:hover, a.mx-rail__row:hover,
 a.tabbar__item:hover, a.pt-bars__col:hover {
   color: inherit; text-decoration: none;
 }
 a.pick__item.is-on:hover { color: var(--accent); }
-a.ov-chip.is-on:hover { color: var(--ink-inverse); }
 a.ov-table__row:focus-visible, a.ov-row:focus-visible, a.ins-row:focus-visible, a.ov-tile:focus-visible {
   outline: none; box-shadow: inset 0 0 0 2px var(--accent);
 }
@@ -1234,10 +1215,6 @@ a[data-zoom] { cursor: zoom-in; }
 .pick__item.is-on { background: var(--accent-soft); color: var(--accent); }
 .pick__label { flex: 1; }
 .pick__count { font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--ink-3); }
-/* Сбросить нечего — кнопка на месте, но не зовёт нажать: исчезающая кнопка
-   сдвигает панель ровно под рукой. */
-.ov-chip--reset.is-idle { opacity: .45; }
-
 /* ── Карточка точки (экран «point» прототипа, T355) ───────────────────────
    Столбики движения оценки, отметки повторов и шапка с действиями. Высоту
    столбика считает `src/web/unit_card.py` и отдаёт готовым процентом: CSS
