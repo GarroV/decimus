@@ -343,6 +343,8 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Роль словами — как должность; у партнёра свои названия (D346).
             "role_key": users_view.role_key,
             "hint_key": users_view.hint_key,
+            # Чужое пространство в списке людей и карточке — словами, а не одним кодом (#1122).
+            "is_partner_space": users_view.is_partner,
             # Меню учётки ведёт в «Настройки»: подключения, вход, язык (D447).
             "settings_url": f"{request.script_root}{section('settings').path}?lang={lang}",
             # Touch ID на этом устройстве (D485): после входа паролем или Google браузер без
