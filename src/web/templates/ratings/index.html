@@ -65,7 +65,7 @@
     стоит в нём). Без скрипта спрятан — видны все строки. -#}
 {% macro cfilter(codes) %}{% set uniq = codes|unique|sort|list %}{% if uniq|length > 1 %}
   <div class="rt-filter" hidden>
-    <select class="spill" aria-label="{{ t('ratings.filter.country') }}">
+    <select class="pickselect" aria-label="{{ t('ratings.filter.country') }}">
       <option value="" selected>{{ t('ratings.filter.all') }} · {{ codes|length }}</option>
       {% for c in uniq %}<option value="{{ c }}">{{ country_name(c) }} · {{ codes|select('equalto', c)|list|length }}</option>{% endfor %}
     </select>
@@ -91,7 +91,7 @@
     <div class="rt-field">
       <span class="rt-field__label">{{ t('ratings.group') }}</span>
       {# Срез — выпадающий список, а не ряд кнопок (D611): значение пункта — адрес среза. #}
-      <select class="spill" data-pick-nav aria-label="{{ t('ratings.group') }}">
+      <select class="pickselect" data-pick-nav aria-label="{{ t('ratings.group') }}">
         {% for g in ('imf', 'cluster', 'developer', 'country') %}
         <option value="{{ href(g) }}"{% if selection.group == g %} selected{% endif %}>{{ t('ratings.group.' ~ g) }}</option>
         {% endfor %}

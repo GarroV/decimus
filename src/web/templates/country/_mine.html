@@ -18,7 +18,7 @@
            (кнопка «Показывать выбранные»); пусто — берутся флажки ниже. #}
         <label class="pickbox">
           <span class="pickbox__label">{{ t('country.mine.clusters') }}</span>
-          <select class="spill pickbox__select" name="cluster">
+          <select class="pickselect pickbox__select" name="cluster">
             <option value="" selected>—</option>
             {% for c in m.clusters %}
               <option value="{{ c.key }}">{{ t('ratings.cluster.' ~ c.key) }} · {{ c.codes|length }}{% if c.on %} ✓{% endif %}</option>

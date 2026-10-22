@@ -55,7 +55,7 @@
         <div class="lt__lang" title="{{ t('letter.lang.note') }}">
           <span class="lt__lang-label">{{ t('letter.meta.lang') }}</span>
           {# Выпадающий список, а не ряд кнопок (D611); значение пункта — адрес пересборки. #}
-          <select class="spill" data-pick-nav aria-label="{{ t('letter.lang.pick') }}"{{ drawer_attr }}>
+          <select class="pickselect" data-pick-nav aria-label="{{ t('letter.lang.pick') }}"{{ drawer_attr }}>
             {% for код in letter_langs %}
               <option value="{{ letter_base }}&amp;letter_lang={{ код }}"{% if код == letter_lang %} selected{% endif %}>{{ код|upper }}</option>
             {% endfor %}

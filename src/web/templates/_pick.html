@@ -15,7 +15,7 @@
 {% macro pick(chip) %}
   <label class="pickbox">
     {% if chip.label %}<span class="pickbox__label">{{ chip.label }}</span>{% endif %}
-    <select class="spill pickbox__select{% if chip.current %} is-on{% endif %}" data-pick-nav
+    <select class="pickselect pickbox__select{% if chip.current %} is-on{% endif %}" data-pick-nav
             aria-label="{{ chip.label or chip.current_title }}">
       {% for option in chip.options %}
         <option value="{{ option.href }}"{% if option.selected %} selected{% endif %}>{{ option.title }}{% if option.count is not none %} · {{ option.count }}{% endif %}</option>
