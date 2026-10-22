@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env, привязать_страну
+from db_harness import set_retraction_env, привязать_страну, точка_справочника
 
 from src.db import notifications as store
 from src.db import prescriptions as rx
@@ -143,6 +143,7 @@ def люди(pg_dsn: str, db_env: str, domain_env: Path, admin_env: str) -> dict
     """Учётки УК: автор-девелопер, две ОСБ и гость; ключи — как их знает база."""
     from src.db.web_access import password_hash
 
+    точка_справочника("Batumi-1", country="GE", city="Batumi")
     привязать_страну(pg_dsn, tenant="GE", country="GE")
     хеш = password_hash("пароль-учётки-теста")
     ключи: dict[str, str] = {}

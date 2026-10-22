@@ -423,8 +423,10 @@ def issue(prescription_id: str, *, actor: str, put_draft: PutDraft) -> Prescript
                 raise PrescriptionError("Нет адресатов — впишите хотя бы один адрес")
             if предписание.due_on < today():
                 raise PrescriptionError("Срок уже прошёл — поправьте его и согласуйте снова")
-            cur.execute(_ISSUE_SQL, {"id": ident, "actor": who})
+            # Уведомление — до перехода, той же транзакцией: последним в ней
+            # остаётся сам переход, и обрыв перед коммитом виден по нему.
             _notify_event(cur, NOTE_ISSUED, ident, actor=who)
+            cur.execute(_ISSUE_SQL, {"id": ident, "actor": who})
         except psycopg.Error as exc:
             raise _translate("Отправить предписание", exc) from exc
         put_draft(предписание)

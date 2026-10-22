@@ -26,7 +26,10 @@ create table notifications (
     user_id uuid not null references web_users (id),
     kind text not null check (kind ~ '^[a-z][a-z0-9_.]{0,63}$'),
     -- Относительный путь внутри приложения, без адреса сайта и без префикса площадки.
-    link text not null check (link ~ '^/[^[:space:]]{0,500}$' and link !~ '^//'),
+    -- Длина — отдельным условием: регулярки Postgres не принимают повтор больше 255.
+    link text not null check (
+        link ~ '^/[^[:space:]]*$' and link !~ '^//' and length(link) <= 500
+    ),
     params jsonb not null default '{}'::jsonb check (jsonb_typeof(params) = 'object'),
     created_at timestamptz not null default now(),
     read_at timestamptz
