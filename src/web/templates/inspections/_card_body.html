@@ -100,6 +100,19 @@
     {% endif %}
     <div class="pf__row"><span class="field-label">{{ t('proofread.photos') }}</span>{{ photo_editor(c, finding) }}</div>
     <p class="field-note">{{ t('revise.hint') }}</p>
+    {#- Удаление (#1164): подтверждение — раскрывающийся блок, без окна браузера. Кнопка
+        «Да» уходит на свой адрес (`formaction`), поля формы при этом не проверяются. #}
+    <details class="pf__delete" data-del>
+      <summary class="btn btn--sm btn--danger">{{ t('proofread.delete') }}</summary>
+      <div class="pf__delete-body" role="group" aria-labelledby="del-{{ finding.id }}">
+        <p class="pf__delete-text" id="del-{{ finding.id }}">{{ t('proofread.delete.text') }}</p>
+        <div class="pf__actions">
+          <button class="btn btn--ghost" type="button" data-del-cancel>{{ t('proofread.delete.no') }}</button>
+          <button class="btn btn--danger" type="submit" formnovalidate
+                  formaction="{{ url('/inspections/' ~ head.id ~ '/findings/' ~ finding.id ~ '/delete') }}?lang={{ lang }}">{{ t('proofread.delete.yes') }}</button>
+        </div>
+      </div>
+    </details>
     <div class="pf__actions">
       <button class="btn btn--ghost" type="button" data-proofread-cancel>{{ t('proofread.cancel') }}</button>
       <button class="btn btn--primary" type="submit" data-saving="{{ t('proofread.saving') }}">{{ t('proofread.save') }}</button>

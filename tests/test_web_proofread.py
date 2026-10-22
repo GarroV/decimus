@@ -72,6 +72,9 @@ def test_в_панели_на_вычитке_нет_режима_исправи�
     assert "data-edit-toggle" not in страница and "is-editing" not in страница
     # Правка — у самой записи: карандаш и скрытая форма под ней.
     assert "data-proofread-edit" in страница and 'data-proofread-form="edit"' in страница
+    # Удаление ошибочной записи (#1164): подтверждение раскрывающимся блоком, без alert/confirm.
+    assert "/findings/" in страница and "/delete" in страница and "data-del" in страница
+    assert "window.confirm" not in страница and "data-confirm" not in страница
 
 
 # --- «+ Добавить нарушение»: кому и когда --------------------------------------

@@ -49,7 +49,7 @@ def _двери_кадров(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str,
 
         return дверь
 
-    for имя in ("add_card", "attach_photo", "replace_photo", "detach_photo"):
+    for имя in ("add_card", "attach_photo", "replace_photo", "detach_photo", "delete_card"):
         monkeypatch.setattr(revision, имя, запись(имя))
     return зовы
 
@@ -88,6 +88,38 @@ def test_из_панели_возвращается_карточка_а_не_с�
     ответ = стенд.post("/inspections/x/findings", data=ФОРМА, headers={**ORIGIN, PANEL_HEADER: "1"})
     тело = ответ.get_data(as_text=True)
     assert 'class="sdetail spanel' in тело and "<html" not in тело
+
+
+@админ
+def test_снятие_записи_доходит_до_двери_и_показывает_итог(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _приёмка(monkeypatch)
+    зовы = _двери_кадров(monkeypatch)
+
+    # Act
+    ответ = стенд.post("/inspections/x/findings/f1/delete", headers=ORIGIN)
+
+    # Assert
+    [(имя, поля)] = зовы
+    assert имя == "delete_card" and поля["args"] == ("x", "f1")
+    assert поля["tenant"] == canonical_tenant("HQ")
+    assert "Запись снята, оценка пересчитана." in ответ.get_data(as_text=True)
+
+
+@админ
+def test_отказ_снятия_записи_показан_текстом(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _приёмка(monkeypatch)
+
+    def отказать(*_a: Any, **_k: Any) -> None:
+        raise ReviseError("Проверка уже принята", code="revise_accepted")
+
+    monkeypatch.setattr(revision, "delete_card", отказать)
+    ответ = стенд.post("/inspections/x/findings/f1/delete", headers=ORIGIN)
+    assert "Запись не снята: Проверка уже принята" in ответ.get_data(as_text=True)
 
 
 @админ
@@ -187,7 +219,7 @@ def test_гость_не_добавляет_и_не_снимает(
 def _партнёр(monkeypatch: pytest.MonkeyPatch, **случай: Any) -> list[str]:
     параметры: dict[str, Any] = {"tenant": ПАРТНЁР, "role": "admin", "ждёт": True, **случай}
     зовы = _двери(monkeypatch, **параметры)
-    for имя in ("add_card", "detach_photo"):
+    for имя in ("add_card", "detach_photo", "delete_card"):
         monkeypatch.setattr(revision, имя, lambda *_a, _и=имя, **_k: зовы.append(_и))
     return зовы
 
@@ -203,6 +235,7 @@ def _пост(адрес: str) -> Any:
     [
         (f"/inspections/{ID}/findings", "add_card"),
         (f"/inspections/{ID}/photos/{КАДР}/delete", "detach_photo"),
+        (f"/inspections/{ID}/findings/{ЗАПИСЬ}/delete", "delete_card"),
     ],
 )
 def test_админ_партнёра_правит_свежую_проверку_своих(
@@ -214,7 +247,12 @@ def test_админ_партнёра_правит_свежую_проверку_
 
 
 @pytest.mark.parametrize(
-    "адрес", [f"/inspections/{ID}/findings", f"/inspections/{ID}/photos/{КАДР}/delete"]
+    "адрес",
+    [
+        f"/inspections/{ID}/findings",
+        f"/inspections/{ID}/photos/{КАДР}/delete",
+        f"/inspections/{ID}/findings/{ЗАПИСЬ}/delete",
+    ],
 )
 @pytest.mark.parametrize(
     "случай",

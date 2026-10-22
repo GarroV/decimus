@@ -24,7 +24,13 @@ from src.db.models import InspectionDetail  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import get_inspection  # noqa: E402
 from src.db.reach import own_reach  # noqa: E402
-from src.db.review_edit import Addition, add_finding, attach_photo, detach_photo  # noqa: E402
+from src.db.review_edit import (  # noqa: E402
+    Addition,
+    add_finding,
+    attach_photo,
+    delete_finding,
+    detach_photo,
+)
 from src.domain import add_finding as walk_add_finding  # noqa: E402
 from src.domain import start_inspection  # noqa: E402
 from src.domain.models import Score  # noqa: E402
@@ -251,3 +257,95 @@ def test_кадр_чужой_записи_другой_проверки_не_с�
     with pytest.raises(ReviseError, match="нет"):
         detach_photo(вторая, кадр, tenant="HQ", storage=склад)
     assert len(склад.объекты) == 1
+
+
+# --- снять запись (#1164) ------------------------------------------------------
+
+
+def _журнал_правок(pg_dsn: str, ident: str) -> list[tuple[str, str, dict[str, object]]]:
+    """Вид, запись и изменения из журнала правок — под владельцем: роль приложения не читает."""
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "select kind, finding_id::text, changes from inspection_edits "
+            "where inspection_id = %s order by id",
+            (ident,),
+        )
+        return [(r[0], r[1], r[2]) for r in cur.fetchall()]
+
+
+def test_запись_снимается_номера_не_сдвигаются_оценка_от_движка_след_в_журнале(
+    сеть: None, pg_dsn: str
+) -> None:
+    # Arrange — две записи, у первой кадр
+    ident, первая = _ждущая(721)
+    вторая = add_finding(ident, tenant="HQ", addition=НОВАЯ, editor=ПРАВИТ, score_of=_по(ОЦЕНКА))
+    склад = Склад()
+    attach_photo(ident, первая, tenant="HQ", data=_кадр(), storage=склад)
+    увиденное: list[list[str]] = []
+
+    def движок(current: InspectionDetail) -> Score:
+        увиденное.append([f.id for f in current.findings])
+        return ОЦЕНКА
+
+    # Act
+    delete_finding(ident, первая, tenant="HQ", editor=ПРАВИТ, score_of=движок, storage=склад)
+
+    # Assert — движок видел проверку без снятой записи, у оставшейся прежний номер
+    assert увиденное == [[вторая]]
+    после = get_inspection(ident, reach=УК, include_on_review=True)
+    assert после is not None
+    assert [(f.id, f.n) for f in после.findings] == [(вторая, 2)]
+    assert (после.inspection.pct, после.inspection.grade) == (77.0, "C")
+    assert склад.объекты == {}
+    # след в журнале: вид, запись, прежние значения полей и оценка до и после
+    *_, (вид, запись, изменения) = _журнал_правок(pg_dsn, ident)
+    assert (вид, запись) == ("delete", первая)
+    assert изменения["code"] == {"old": "CLN05", "new": None}
+    assert изменения["text"] == {"old": "пол в цехе", "new": None}
+    assert "score_pct" in изменения
+
+
+def test_несуществующая_запись_не_снимается(сеть: None) -> None:
+    ident, _ = _ждущая(722)
+    with pytest.raises(ReviseError, match="записи в этой проверке нет"):
+        delete_finding(
+            ident,
+            "99999999-9999-9999-9999-999999999999",
+            tenant="HQ",
+            editor=ПРАВИТ,
+            score_of=_по(ОЦЕНКА),
+            storage=Склад(),
+        )
+
+
+def test_у_принятой_запись_не_снимается(сеть: None, db_env: str) -> None:
+    ident, запись = _ждущая(723)
+    accept_pushed(ident, dsn=db_env)
+    with pytest.raises(ReviseError, match="уже принята"):
+        delete_finding(
+            ident, запись, tenant="HQ", editor=ПРАВИТ, score_of=_по(ОЦЕНКА), storage=Склад()
+        )
+    assert after_count(get_inspection(ident, reach=УК)) == 1
+
+
+@pytest.mark.parametrize(("владелец", "правит"), [("GE", "HQ"), ("HQ", "GE")])
+def test_чужая_запись_не_снимается(сеть: None, владелец: str, правит: str) -> None:
+    ident, запись = _ждущая(724, tenant=владелец)
+    with pytest.raises(ReviseError, match="нет"):
+        delete_finding(
+            ident, запись, tenant=правит, editor=ПРАВИТ, score_of=_по(ОЦЕНКА), storage=Склад()
+        )
+    assert (
+        after_count(get_inspection(ident, reach=own_reach(владелец), include_on_review=True)) == 1
+    )
+
+
+def test_упавший_движок_запись_не_снимает(сеть: None) -> None:
+    ident, запись = _ждущая(725)
+
+    def сломан(_detail: InspectionDetail) -> Score:
+        raise RuntimeError("движок упал")
+
+    with pytest.raises(RuntimeError):
+        delete_finding(ident, запись, tenant="HQ", editor=ПРАВИТ, score_of=сломан, storage=Склад())
+    assert after_count(get_inspection(ident, reach=УК, include_on_review=True)) == 1

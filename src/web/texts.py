@@ -565,6 +565,14 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Запись не добавлена: {reason}",
         "en": "The record was not added: {reason}",
     },
+    "delete.done": {
+        "ru": "Запись снята, оценка пересчитана.",
+        "en": "The record is removed and the score recalculated.",
+    },
+    "delete.failed": {
+        "ru": "Запись не снята: {reason}",
+        "en": "The record was not removed: {reason}",
+    },
     "add.photo_failed": {
         "ru": "запись добавлена и оценка пересчитана, но кадр не приложен: {reason}",
         "en": (
@@ -593,6 +601,15 @@ TEXTS: dict[str, dict[str, str]] = {
     "proofread.edit": {"ru": "Изменить запись {n}", "en": "Edit record {n}"},
     "proofread.save": {"ru": "Сохранить", "en": "Save"},
     "proofread.cancel": {"ru": "Отмена", "en": "Cancel"},
+    "proofread.delete": {"ru": "Удалить запись", "en": "Delete this record"},
+    "proofread.delete.text": {
+        "ru": "Запись уйдёт из проверки вместе с кадрами, оценка пересчитается. Номера "
+        "остальных записей не изменятся. Действие остаётся в журнале правок.",
+        "en": "The record leaves the inspection together with its photos and the score is "
+        "recalculated. Other records keep their numbers. The deletion stays in the edit log.",
+    },
+    "proofread.delete.yes": {"ru": "Да, удалить запись", "en": "Yes, delete the record"},
+    "proofread.delete.no": {"ru": "Не удалять", "en": "Keep it"},
     "proofread.saving": {"ru": "Сохраняю…", "en": "Saving…"},
     "proofread.add": {"ru": "Добавить нарушение", "en": "Add a violation"},
     "proofread.add.title": {"ru": "Новое нарушение", "en": "New violation"},
