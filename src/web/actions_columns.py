@@ -101,6 +101,7 @@ def rx_screen(
     endpoint: str,
     fixed: Mapping[str, str],
     count_closed: bool,
+    always_rail: bool = False,
     empty_key: str,
     title_key: str,
 ) -> dict[str, Any]:
@@ -155,7 +156,7 @@ def rx_screen(
                 for c in страны
             ),
         )
-        if len(страны) > 1 or страна
+        if len(страны) > 1 or страна or always_rail
         else ()
     )
     return {

@@ -145,6 +145,22 @@ def test_осб_страна_из_столбца_оставляет_только
     assert "/actions/prescriptions/new?country=PL" in справа
 
 
+def test_осб_столбец_стран_есть_и_при_одной_стране(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from test_web_prescriptions import предписание
+
+    from src.db import prescriptions as rx
+
+    monkeypatch.setattr(
+        rx,
+        "list_prescriptions",
+        lambda **_k: rx.PrescriptionList(rows=(предписание(status="approved"),), truncated=False),
+    )
+    страница = уК.get("/osb?lang=ru").get_data(as_text=True)
+    assert 'class="pk-rail' in страница and "Все страны" in страница
+
+
 def test_осб_без_ряда_чипов_и_вкладок_очередей(
     уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

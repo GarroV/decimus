@@ -41,6 +41,7 @@ def screen_context(lang: str) -> dict[str, Any]:
             endpoint="osb",
             fixed={},
             count_closed=True,
+            always_rail=True,
             empty_key="osb.empty",
             title_key="section.osb.title",
         ),
