@@ -40,9 +40,9 @@ cases = [
     # D599: ОСБ — не больше, чем предписания; админ ведёт ничего; девелопер без страницы ОСБ.
     (
         "src/domain/permissions.py",
-        '_GUEST | _codes("prescription.request", "prescription.manage", "view.osb")',
-        '_GUEST | _codes("prescription.request", "prescription.manage", "view.osb", '
-        '"people.manage")',
+        '| _codes("prescription.request", "prescription.manage", "view.osb", "contract.manage"),',
+        '| _codes("prescription.request", "prescription.manage", "view.osb", "contract.manage", '
+        '"people.manage"),',
         T
         + "test_permissions_osb.py::test_осб_не_пишет_в_проверки_и_вообще_ничего_кроме_предписаний",
     ),
@@ -190,6 +190,55 @@ cases = [
         'FIELD_ACTION = "inspection.conduct"\n',
         'FIELD_ACTION = "inspection.read"\n',
         T + "test_bot_command_actions.py::test_вход_в_бота_по_матрице",
+    ),
+    # D603: договор страны — ОСБ получила бы девелопера и партнёра страны; блок и
+    # правка у лишней роли; почты партнёру.
+    (
+        "src/domain/permissions.py",
+        '"prescription.request", "prescription.manage", "view.osb", "contract.manage"),',
+        '"prescription.request", "prescription.manage", "view.osb", "contract.manage", '
+        '"space.manage"),',
+        T + "test_permissions_osb.py::test_осб_правит_договор_но_не_остальную_карточку_страны",
+    ),
+    (
+        "src/domain/permissions.py",
+        '    (SIDE_HQ, "developer"): _HQ_WORK | _CHECKLISTS | _ALL_VIEWS_HQ | _codes("inspection.import"),\n',  # noqa: E501
+        '    (SIDE_HQ, "developer"): _HQ_WORK | _CHECKLISTS | _ALL_VIEWS_HQ'
+        ' | _codes("inspection.import", "contract.manage"),\n',
+        T + "test_permissions_osb.py::test_договор_страны_правят_осб_админ_и_главный_админ",
+    ),
+    (
+        "src/domain/permissions.py",
+        '    Action("contract.manage", "people", hq_only=True),\n',
+        '    Action("contract.manage", "people"),\n',
+        T + "test_permissions_osb.py::test_договор_страны_только_для_ук_и_пишущее",
+    ),
+    (
+        "src/web/country_settings.py",
+        '    if show_email:\n        сведения["show_contract"] = True\n',
+        '    if True:\n        сведения["show_contract"] = True\n',
+        T
+        + "test_web_country_contract.py::test_партнёр_договор_и_почты_не_видит_и_база_не_читается",
+    ),
+    (
+        "src/web/country_settings.py",
+        '    @guard.action("contract.manage")\n    def save_contract',
+        '    @guard.action("view.country")\n    def save_contract',
+        T
+        + "test_web_country_contract.py::test_правка_договора_остальным_ролям_закрыта_и_ничего_не_пишет",  # noqa: E501
+    ),
+    (
+        "src/web/templates/country/_settings.html",
+        "{% if s.can_contract and not s.contracts_failed %}",
+        "{% if not s.contracts_failed %}",
+        T + "test_web_country_contract.py::test_остальные_роли_ук_видят_договор_но_без_форм_правки",
+    ),
+    (
+        "src/db/country_contracts.py",
+        '    значения["dkk_emails"] = normalize_emails(fields.dkk_emails)\n',
+        '    значения["dkk_emails"] = fields.dkk_emails\n',
+        T
+        + "test_web_country_contract.py::test_подмена_заголовка_через_перевод_строки_не_доходит_до_базы",  # noqa: E501
     ),
 ]
 

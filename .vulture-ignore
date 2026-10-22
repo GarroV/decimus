@@ -641,6 +641,19 @@ stages
 # Поля `Panel` карточки страны (D543): площадки не прочитались и аудиторы — читает шаблон.
 aggregators_failed
 auditors
+# Блок «Договор» карточки страны (D603): `save_contract`/`delete_contract` — POST, регистрируют
+# `@app.post(..., endpoint=...)`; поля `Panel` и `Contract` читает шаблон `country/_settings.html`
+# (Jinja обращается по имени, в коде имя не читается); `гость` — фикстура, берётся по имени
+# через `request.getfixturevalue` (`tests/test_web_country_contract.py`).
+save_contract
+delete_contract
+show_contract
+contracts
+contracts_failed
+registration_country
+company_number
+agreement
+гость
 # Свойства ячеек и листа openpyxl (`src/web/plan_template.py`, #976): присваивание
 # — это и есть запись в книгу, читает их `Workbook.save`, а не наш код.
 font

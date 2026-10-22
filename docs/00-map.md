@@ -49,6 +49,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Legacy-проверка | Историческая проверка, загруженная из старого отчёта (`origin = 'legacy'`): оценка переносится как есть и нигде не пересчитывается | `src/db/imports_legacy.py`, `src/mcp/imports.py`, `docs/14-history-import.md` |
 | План действий (экшн-план) | Ответ партнёра на запрос УК по проверке с D2/D3: файл с версиями, приём и возврат | `src/db/action_plans.py`, `src/web/action_plans.py`, `docs/12-web-admin.md` |
 | Предписание | Письмо УК партнёру с требованием: черновик, отправка через почту сотрудника, ответ партнёра, закрытие | `src/db/prescriptions.py`, `src/web/prescriptions.py` |
+| Договор страны, контакты по ДКК | Блок «Договор» в карточке страны: юрлицо партнёра, договор одной строкой (ДКК не моделируется, D603), почты, которые форма предписания подставляет в «Кому»; видит только УК, правят ОСБ, админ, главный админ (`contract.manage`) | `src/db/country_contracts.py`, `src/web/country_settings.py` |
 | РС, РКО | Рейтинг стандартов и рейтинг клиентского опыта: средние оценки по пиццериям из выгрузок Dodo IS; раздел «Рейтинги» | `docs/15-ratings.md`, `src/ratings/` |
 | Агрегатор | Площадка доставки с оценками пиццерий (Wolt, Glovo, Bolt Food, Yemeksepeti и др.); оценки собираются раз в сутки | `docs/17-aggregators.md`, `src/ratings/aggregators/` |
 | Обучение | Раздел «Обучение»: обученность пиццерий по данным iSpring LMS (завершено / назначено), снимок раз в сутки; только счётчики, данных о сотрудниках нет (D575) | `docs/20-training.md`, `src/learning/`, `src/domain/training_metrics.py` |
@@ -387,13 +388,14 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
 | `src/db/agg_store.py` | Оценки в агрегаторах доставки в базе (схема `agg`, миграция 0050) |
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
+| `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
 | `src/db/learning_store.py` | Обучение в базе (схема `learning`, миграция 0085): запись снимка дня и журнал загрузок |
@@ -514,6 +516,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0085_learning.sql` | Обучение пиццерий из iSpring (D574, D575, D578, #906) |
 | `0086_osb_role.sql` | Роль ОСБ (отдел сопровождения бизнеса) — D599, спека 2026-10-21-osb-prescriptions-design |
 | `0087_prescription_review.sql` | Согласование предписания ОСБ (D599, D600, шаг 1 спеки 2026-10-21-osb-prescriptions-design) |
+| `0088_country_contracts.sql` | Блок «Договор» в карточке страны (шаг 2 спеки 2026-10-21-osb-prescriptions-design, D603, D606): юрлицо партнёра, договор одной строкой и КОНТАКТЫ ПО ДКК — почты, которые… |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

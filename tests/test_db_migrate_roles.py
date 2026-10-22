@@ -268,6 +268,9 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "prescription_replies": {"SELECT", "INSERT"},
     "prescription_events": {"SELECT"},
     "country_recipients": {"SELECT"},
+    # Договор страны (`0088`, D603): приложение читает, и то лишь из пространства УК
+    # (политика) — почты контактов партнёру не видны. Пишет только администратор.
+    "country_contracts": {"SELECT"},
     # Сведения о пиццерии из свода (`0046`): загрузка перезаписывает строку
     # целиком и убирает пропавшие из свода, поэтому полный набор прав.
     "unit_profiles": {"SELECT", "INSERT", "UPDATE", "DELETE"},
@@ -397,12 +400,28 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "prescription_replies": {"SELECT"},
     "prescription_events": {"SELECT"},
     "country_recipients": {"SELECT"},
+    # Договор страны (`0088`, D603): строки заводит и снимает УК, правка — по колонкам.
+    "country_contracts": {"SELECT", "INSERT", "DELETE"},
 }
 
 #: А пишет администратор ровно три колонки, и это главный заслон снятия
 #: (`0010`): политика «менять разрешено только пометку» не выражается вовсе,
 #: потому что `with check` не видит старой строки.
 ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
+    # Договор страны (`0088`, D603): всё содержимое, кроме страны и id — строка
+    # не переезжает в другую страну.
+    "country_contracts": {
+        "UPDATE": {
+            "legal_name",
+            "registration_country",
+            "company_number",
+            "address",
+            "agreement",
+            "dkk_emails",
+            "updated_by",
+            "updated_at",
+        }
+    },
     # Плюс перенос (`0025`, D195): дата и пиццерия, и только они. Содержимое —
     # оценка, буква, разбивка — по-прежнему не правится никем.
     # Плюс подтверждение на приёмке (`0034`, D199): статус и отметка «кто и

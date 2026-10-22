@@ -32,10 +32,12 @@ from flask import Response as FlaskResponse
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.wrappers import Response
 
+from src.db import country_contracts as contracts_db
 from src.db import prescriptions as rx
 from src.db import prescriptions_write as rxw
 from src.db.config import load_action_plan_settings
 from src.db.errors import DbError, IssuedDraftLostError, PrescriptionError, StorageError
+from src.domain.errors import ConfigError
 
 from . import actions_screen, auth, guard, ui_lang
 from . import country as country_data
@@ -584,14 +586,25 @@ def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
     return _back_from_gmail(ident, lang, "ok")
 
 
+def _default_recipients(country: str) -> str:
+    """«Кому» пустой формы: контакты по ДКК страны (D603); нет их — запомненные (D275)."""
+    try:
+        контакты = contracts_db.dkk_recipients(country)
+    except (DbError, ConfigError) as exc:
+        logger.warning("контакты по ДКК страны %s не прочитаны: %s", country, exc)
+        контакты = ""
+    if контакты:
+        return контакты
+    try:
+        return rx.remembered_recipients(country)
+    except PrescriptionError as exc:
+        logger.warning("адреса страны %s не прочитаны: %s", country, exc)
+        return ""
+
+
 def _defaults(country: str, lang: str) -> dict[str, Any]:
-    """Пустая форма: адресаты страны из памяти (D275), тема по стране."""
-    адресаты = ""
-    if country:
-        try:
-            адресаты = rx.remembered_recipients(country)
-        except PrescriptionError as exc:
-            logger.warning("адресаты страны %s не прочитаны: %s", country, exc)
+    """Пустая форма: адресаты страны (ДКК, иначе запомненные), тема по стране."""
+    адресаты = _default_recipients(country) if country else ""
     return {
         "recipients": адресаты,
         "subject": t(
