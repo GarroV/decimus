@@ -15,6 +15,7 @@ import re
 from collections.abc import Mapping, Sequence
 
 from src import domain
+from src.recognize.classify import CUE_REASON
 from src.recognize.models import UNKNOWN_ZONE, Candidate
 
 from . import item_labels
@@ -152,6 +153,8 @@ def candidate_lines(
             zone=zone_title(candidate.zone, lang, titles, chat_id=chat_id),
             wording=candidate.wording,
         )
+        if candidate.reason == CUE_REASON:
+            line += t("record.candidate_cue", lang)
         n = occupied.get((candidate.code, candidate.zone))
         if n is not None:
             line += t("record.candidate_taken", lang, n=n)

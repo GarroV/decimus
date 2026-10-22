@@ -75,7 +75,7 @@ from src.recognize.classify import album_mode, classify
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.fastpath import NO_CUE, FastItem, fast_path
 from src.recognize.manual import ManualCandidate, manual_candidates, search_items
-from src.recognize.models import UNKNOWN_ZONE, Candidate
+from src.recognize.models import UNKNOWN_ZONE, Candidate, Suggestion
 from src.recognize.transcribe import transcribe
 
 from .. import frame_copies, item_labels, journal, merged, refusal, repeats, sealed, sidecar, view
@@ -1065,12 +1065,14 @@ async def _analyze_resolved(
         album_frames=len(photos),
         candidates=journal.candidates(suggestion.candidates),
         also_seen=journal.candidates(suggestion.also_seen),
+        cue_extras=journal.candidates(suggestion.cue_extras),
         question=suggestion.question,
         needs_human=suggestion.needs_human,
         degraded=suggestion.degraded,
         usage=suggestion.usage,
     )
-    if not suggestion.candidates:
+    offered = (*suggestion.candidates, *_cue_candidates(suggestion, base.note))
+    if not offered:
         if suggestion.question:
             await message.answer(t("record.question", lang, question=suggestion.question))
         await message.answer(t("record.nothing_found", lang))
@@ -1086,7 +1088,7 @@ async def _analyze_resolved(
         await _offer_also_seen(message, chat_id, base, suggestion.also_seen, pending, lang)
         return
 
-    proposal = replace(base, candidates=suggestion.candidates, question=suggestion.question)
+    proposal = replace(base, candidates=offered, question=suggestion.question)
     await _show_candidates(message, chat_id, proposal, pending, lang)
     await _offer_also_seen(message, chat_id, base, suggestion.also_seen, pending, lang)
 
@@ -1159,6 +1161,19 @@ async def _reevaluate_reading(
         slot=pending.next_slot(),
     )
     await _show_candidates(message, chat_id, fresh, pending, lang)
+
+
+def _cue_candidates(suggestion: Suggestion, note: str) -> tuple[Candidate, ...]:
+    """Пункты словаря подсказок, которых модель не назвала, задав вопрос (D597, #1112).
+
+    Ниже предложенных моделью и с пометкой «по словарю» (`view.candidate_lines`):
+    модель сомневается, а словарь управляющей компании связывает слова аудитора
+    ещё и с этим пунктом. Формулировки у такого пункта нет — ставятся слова
+    аудитора, как при ручном выборе (`_save_manual`); зоны нет — её выводят или
+    спрашивают при нажатии (`on_pick`), как у любого кандидата без зоны.
+    """
+    named = {c.code for c in suggestion.candidates}
+    return tuple(replace(c, wording=note) for c in suggestion.cue_extras if c.code not in named)
 
 
 async def _offer_also_seen(
