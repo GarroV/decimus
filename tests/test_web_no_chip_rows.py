@@ -18,9 +18,6 @@ TEMPLATES = Path(__file__).resolve().parents[1] / "src" / "web" / "templates"
 ЧИП = re.compile(
     r"""class\s*=\s*["'][^"']*\b(?:ov-chip|speriod__chip|rt-seg|seg|seg__item|seg__current)\b"""
 )
-# Форма «Новое предписание» переделывается отдельной задачей (ветка osb-columns, D611):
-# строка уходит отсюда, когда та ветка в main.
-ПОКА_НЕ_ПЕРЕДЕЛАНО = frozenset({"actions/prescription_form.html"})
 
 
 def найти_ряды_чипов(root: Path) -> list[str]:
@@ -28,8 +25,6 @@ def найти_ряды_чипов(root: Path) -> list[str]:
     найдено = []
     for path in sorted(root.rglob("*.html")):
         имя = path.relative_to(root).as_posix()
-        if имя in ПОКА_НЕ_ПЕРЕДЕЛАНО:
-            continue
         for номер, строка in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if ЧИП.search(строка):
                 найдено.append(f"{имя}:{номер}")

@@ -85,7 +85,95 @@ def test_девелопер_запрашивает_но_без_основани�
     assert зовы["create"] == []
 
 
-def test_очередь_согласовано_показывает_ровно_столько_сколько_в_счётчике(
+def _строки(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Три открытых: в Грузии согласовано и действует, в Польше — на согласовании."""
+    from dataclasses import replace
+
+    from test_web_prescriptions import предписание
+
+    from src.db import prescriptions as rx
+
+    строки = (
+        replace(предписание(status="approved"), id="a" * 32, subject="Согласованное ГЕ"),
+        replace(предписание(status="issued"), id="b" * 32, subject="Действующее ГЕ"),
+        replace(
+            предписание(status="review"), id="c" * 32, country="PL", subject="На согласовании ПЛ"
+        ),
+    )
+    monkeypatch.setattr(
+        rx,
+        "list_prescriptions",
+        lambda **_k: rx.PrescriptionList(rows=строки, truncated=False),
+    )
+
+
+def test_осб_слева_столбец_стран_со_счётчиками(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _строки(monkeypatch)
+    страница = уК.get("/osb?lang=ru").get_data(as_text=True)
+    столбец = страница.split('class="pk-rail', 1)[1].split("</aside>", 1)[0]
+    assert "Все страны" in столбец
+    assert "Грузия" in столбец and "Польша" in столбец
+    assert "согласовано 1" in столбец and "действуют 1" in столбец
+    assert "на согласовании 1" in столбец
+
+
+def test_осб_в_столбце_все_страны_охвата_а_не_только_с_предписаниями(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _строки(monkeypatch)
+    # Армения есть в охвате, предписаний у неё нет: строка есть, счётчиков нет.
+    monkeypatch.setattr("src.web.country.countries", lambda **_: (("GE", 2), ("AM", 1), ("PL", 1)))
+    страница = уК.get("/osb?lang=ru").get_data(as_text=True)
+    столбец = страница.split('class="pk-rail__list"', 1)[1].split("</aside>", 1)[0]
+    assert "Армения" in столбец
+    армения = столбец.split("Армения", 1)[1].split("</a>", 1)[0]
+    assert "pk-item__meta" not in армения and "pk-item__alert" not in армения
+    порядок = [столбец.index(x) for x in ("Армения", "Грузия", "Польша")]
+    assert порядок == sorted(порядок), "порядок — по названию"
+
+
+def test_осб_пустой_список_без_строки_в_списке_ноль(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.db import prescriptions as rx
+
+    monkeypatch.setattr(
+        rx, "list_prescriptions", lambda **_k: rx.PrescriptionList(rows=(), truncated=False)
+    )
+    страница = уК.get("/osb?lang=ru").get_data(as_text=True)
+    assert "Предписаний нет" in страница and "в списке" not in страница
+
+
+def test_осб_справа_блоки_по_состоянию_и_закрытые_свёрнуты(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _строки(monkeypatch)
+    страница = уК.get("/osb?lang=ru").get_data(as_text=True)
+    справа = страница.split('class="pk-work"', 1)[1]
+    порядок = [
+        справа.index(x) for x in ("На согласовании", "Согласовано, не отправлено", "Действуют")
+    ]
+    assert порядок == sorted(порядок)
+    assert "Согласованное ГЕ" in справа and "Действующее ГЕ" in справа
+    assert "Черновики" not in справа, "пустой блок не рисуется"
+    assert 'class="pk-archive"' in справа and "closed=1" in справа
+
+
+def test_осб_страна_из_столбца_оставляет_только_свои_строки(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _строки(monkeypatch)
+    страница = уК.get("/osb?country=PL&lang=ru").get_data(as_text=True)
+    справа = страница.split('class="pk-work"', 1)[1]
+    assert "На согласовании ПЛ" in справа
+    assert "Действующее ГЕ" not in справа and "Согласованное ГЕ" not in справа
+    # Кнопка «Новое предписание» несёт выбранную страну.
+    assert "/actions/prescriptions/new?country=PL" in справа
+
+
+def test_осб_столбец_стран_есть_и_при_одной_стране(
     уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from test_web_prescriptions import предписание
@@ -97,27 +185,34 @@ def test_очередь_согласовано_показывает_ровно_�
         "list_prescriptions",
         lambda **_k: rx.PrescriptionList(rows=(предписание(status="approved"),), truncated=False),
     )
-    страница = уК.get("/osb?queue=approved").get_data(as_text=True)
-    assert "не отправлено · 1" in страница
-    assert "в списке: 1" in страница
-    assert "Ничего не" not in страница
+    страница = уК.get("/osb?lang=ru").get_data(as_text=True)
+    assert 'class="pk-rail' in страница and "Все страны" in страница
 
 
-def test_без_выбора_открывается_первая_непустая_очередь(
+def test_осб_без_ряда_чипов_и_вкладок_очередей(
     уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from test_web_prescriptions import предписание
+    _строки(monkeypatch)
+    страница = уК.get("/osb?lang=ru").get_data(as_text=True)
+    assert "spill" not in страница and "ov-chip" not in страница
+    assert "sbar" not in страница and "stabs" not in страница
 
-    from src.db import prescriptions as rx
 
-    monkeypatch.setattr(
-        rx,
-        "list_prescriptions",
-        lambda **_k: rx.PrescriptionList(rows=(предписание(status="approved"),), truncated=False),
-    )
-    страница = уК.get("/osb").get_data(as_text=True)
-    assert "в списке: 1" in страница
-    assert "Ничего не" not in страница
+def test_осб_на_телефоне_страны_выпадающим_списком(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _строки(monkeypatch)
+    страница = уК.get("/osb?country=GE&lang=ru").get_data(as_text=True)
+    форма = страница.split('class="pk-rail-select"', 1)[1].split("</form>", 1)[0]
+    assert "<select" in форма and 'name="country"' in форма
+    assert 'value="GE" selected' in форма
+    assert "data-autosubmit-button" in форма, "без скрипта выбор уходит кнопкой"
+
+
+def test_форма_предписания_страна_выпадающим_списком(уК: FlaskClient) -> None:
+    страница = уК.get("/actions/prescriptions/new?lang=ru").get_data(as_text=True)
+    assert 'class="rx-country"' in страница and 'name="country"' in страница
+    assert "ov-chip" not in страница
 
 
 def _файл_ответа(monkeypatch: pytest.MonkeyPatch) -> None:

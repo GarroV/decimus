@@ -82,6 +82,7 @@ def test_имя_файла_латиницей() -> None:
 def партнёр(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[FlaskClient]:  # noqa: F811
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка(), findings=ЗАПИСИ))
     подменить_двери(monkeypatch, tenant="GE", role="admin")
+    monkeypatch.setattr("src.web.country.countries", lambda **_: (("GE", 2),))
     with собрать(tenant="GE").test_client() as client:
         assert войти(client).status_code == 302
         yield client

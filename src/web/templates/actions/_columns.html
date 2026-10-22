@@ -1,0 +1,48 @@
+{#
+  Столбец стран слева и блоки по состоянию справа (D611) — одни на «ОСБ» и
+  «Действия». Данные собирает `actions_columns.py`: `rail` (строки столбца),
+  `rail_form` (выпадающий список для телефона), `blocks` (блоки справа).
+  Шапок из рядов чипов нет: страна — строка столбца, очередь — блок.
+#}
+{% from "_pick_ui.html" import pick_item, pick_block, pick_empty with context %}
+
+{# Столбец: «Все страны» и страна за страной, у каждой — что ждёт; просрочка выделена. #}
+{% macro country_rail() %}
+  {% for item in rail %}
+    {% set bits = [] %}
+    {% for text, n in item.parts %}{% set _ = bits.append(t(text, n=n)) %}{% endfor %}
+    {% call pick_item(select_url(country=item.code, id=''), (country_title(item.code) or item.code) if item.code else t('actions.all_countries'), meta=bits|join(' · '), on=item.code == country) %}
+      {% if item.alert %}<span class="pk-item__alert">{{ t('actions.rail.overdue', n=item.alert) }}</span>{% endif %}
+    {% endcall %}
+  {% endfor %}
+{% endmacro %}
+
+{# На телефоне столбец прячется, вместо него — выпадающий список; без скрипта — кнопка «Показать». #}
+{% macro country_select() %}
+  {% set action, keep = rail_form %}
+  <form class="pk-rail-select" method="get" action="{{ action }}" data-autosubmit>
+    {% for name, value in keep.items() %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+    <select class="sinput" name="country" aria-label="{{ t('actions.country') }}">
+      {% for item in rail %}
+        <option value="{{ item.code }}"{% if item.code == country %} selected{% endif %}>{{ (country_title(item.code) or item.code) if item.code else t('actions.all_countries') }}</option>
+      {% endfor %}
+    </select>
+    <button class="sbtn" type="submit" data-autosubmit-button>{{ t('actions.country.apply') }}</button>
+  </form>
+{% endmacro %}
+
+{# Блоки справа: каждый — свой заголовок и счётчик; закрытые свёрнуты ссылкой до запроса. `list_rows(items)` рисует строки. #}
+{% macro state_blocks(list_rows) %}
+  {% set filled = blocks|selectattr('rows')|list %}
+  {% if not filled %}<p class="pk-empty">{{ t(empty_key) }}</p>{% endif %}
+  {% for b in blocks %}
+    {% if b.load_url %}
+      <a class="pk-archive" href="{{ b.load_url }}">{{ t(b.title_key) }}{% if b.count is not none %} · {{ b.count }}{% endif %}</a>
+    {% elif b.rows or b.key in ('closed', 'accepted') %}
+      {% call pick_block(t(b.title_key), count=b.rows|length) %}
+        {% if b.rows %}{{ list_rows(b.rows) }}{% else %}{% call pick_empty() %}{{ t('actions.block.empty') }}{% endcall %}{% endif %}
+        {% if b.key in ('closed', 'accepted') %}<p class="pk-note"><a href="{{ select_url(**{archive_param: ''}) }}">{{ t('actions.block.collapse') }}</a></p>{% endif %}
+      {% endcall %}
+    {% endif %}
+  {% endfor %}
+{% endmacro %}
