@@ -197,6 +197,8 @@ def test_форма_отмечает_по_правилу_документ_бер
     assert вложение.content_type == "application/pdf" and вложение.data.startswith(b"%PDF-")
     assert вложение.filename.startswith("Notice GE ") and вложение.filename.endswith(".pdf")
 
+    чужой = клиент.get("/actions/prescriptions/00000000-0000-4000-8000-000000000000/document.pdf")
+    assert чужой.status_code == 404, "несуществующий — тот же 404"
     # Assert — партнёру документ не открывается.
     партнёр = осб_партнёром()
     assert партнёр.get(f"/actions/prescriptions/{п.id}/document.pdf").status_code == 404

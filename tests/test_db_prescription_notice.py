@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -250,3 +251,61 @@ def test_правка_пересобирает_нарушения_а_рукам�
     assert _hq(руками).kind == "other" and not _hq(руками).has_document
     with pytest.raises(PrescriptionError, match="руками"):
         rxw.update_draft(руками, _драфт(проверка, _строка(проверка, запись)), actor=АВТОР)
+
+
+def _tool() -> Any:
+    import importlib.util
+
+    путь = Path(__file__).resolve().parents[1] / "tools" / "prescription_template.py"
+    spec = importlib.util.spec_from_file_location("prescription_template_tool", путь)
+    assert spec and spec.loader
+    модуль = importlib.util.module_from_spec(spec)
+    # Инструмент при импорте читает `.env` репозитория; в тесте окружение — тестовой базы.
+    окружение = dict(os.environ)
+    try:
+        spec.loader.exec_module(модуль)
+    finally:
+        os.environ.clear()
+        os.environ.update(окружение)
+    return модуль
+
+
+def test_инструмент_шаблона_set_заводит_новую_версию_а_show_её_печатает(
+    сеть: dict[str, str], admin_env: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Arrange
+    инструмент = _tool()
+    файл = tmp_path / "t.txt"
+    файл.write_text("# Notice of {{date}}\n\n{{findings_table}}\n", encoding="utf-8")
+    было = len(mail_templates.versions(notice_template.TEMPLATE_KIND, "zz"))
+
+    # Act
+    код = инструмент.main(
+        ["set", "--file", str(файл), "--kind", notice_template.TEMPLATE_KIND, "--lang", "zz"]
+    )
+    вывод_set = capsys.readouterr()
+    код_show = инструмент.main(["show", "--kind", notice_template.TEMPLATE_KIND, "--lang", "zz"])
+    вывод_show = capsys.readouterr().out
+
+    # Assert
+    assert код == 0, вывод_set.err
+    assert код_show == 0
+    assert f"версия {было + 1}" in вывод_set.out
+    assert f"версия {было + 1}" in вывод_show and "# Notice of {{date}}" in вывод_show
+    assert len(mail_templates.versions(notice_template.TEMPLATE_KIND, "zz")) == было + 1
+
+
+def test_инструмент_шаблона_неизвестная_подстановка_не_пишет_версию(
+    сеть: dict[str, str], admin_env: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    инструмент = _tool()
+    файл = tmp_path / "bad.txt"
+    файл.write_text("# T\n\n{{no_such_token}}\n", encoding="utf-8")
+    было = len(mail_templates.versions(notice_template.TEMPLATE_KIND, "zz"))
+
+    код = инструмент.main(
+        ["set", "--file", str(файл), "--kind", notice_template.TEMPLATE_KIND, "--lang", "zz"]
+    )
+
+    assert код == 1 and "неизвестные подстановки" in capsys.readouterr().err
+    assert len(mail_templates.versions(notice_template.TEMPLATE_KIND, "zz")) == было
