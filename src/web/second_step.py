@@ -109,6 +109,7 @@ ENROLL_ENDPOINTS = frozenset(
         "logout",
         "static",
         "settings_menu",
+        "notifications_menu",
         "settings_avatar",
         "settings_lang",
     }

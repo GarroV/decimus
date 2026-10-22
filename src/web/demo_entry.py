@@ -101,6 +101,8 @@ OPEN_ENDPOINTS = frozenset(
         "second_step_passkey_options",
         "second_step_passkey_verify",
         "settings_lang",
+        "notifications_read",
+        "notifications_read_all",
         "country_filter",
         "photo_upload_post",
         "rx_create",

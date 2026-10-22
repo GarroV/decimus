@@ -24,6 +24,20 @@
     {% endfor %}
   </div>
 {% endmacro %}{#
+  Колокольчик уведомлений (#1129, D604, D614): кнопка, которая открывает окно `#notif-menu`
+  (`bell.js`); красная точка — когда есть непрочитанное. Состояние пересчитывается на каждой
+  странице (`notif_state`), а при переходе без перезагрузки (`nav.js`) кнопка подменяется целиком.
+#}{% macro bell_btn(place, cls) %}
+  {% set unread = notif_state().unread %}
+  <button type="button" class="{{ cls }} bell" data-bell data-place="{{ place }}"
+          aria-haspopup="menu" aria-expanded="false" aria-controls="notif-menu"
+          title="{{ t('notif.title') }}"
+          aria-label="{{ t('notif.bell_unread') if unread else t('notif.bell') }}">
+    {{ icon('bell') }}<span class="bell__label">{{ t('notif.title') }}</span><span class="bell__dot" aria-hidden="true"{% if not unread %} hidden{% endif %}></span>
+  </button>
+{% endmacro %}{#
+  Красная точка на пункте меню раздела, где есть непрочитанное уведомление.
+#}{% macro section_dot(key) %}{% if key in notif_state().sections %}<span class="notif-dot" role="img" aria-label="{{ t('notif.new') }}"></span>{% endif %}{% endmacro %}{#
   Имя и аватар вошедшего (D468): имя и фото из Google, если они есть; иначе
   логин и инициалы. Фото — со своего адреса (`/settings/avatar`), версия в
   адресе: смена фото — новый адрес, а старый браузер держит без вопросов.
@@ -68,6 +82,7 @@
   <script data-shell src="{{ url_for('static', filename='pick.js') }}" defer></script>
   <script data-shell src="{{ url_for('static', filename='period.js') }}" defer></script>
   <script data-shell src="{{ url_for('static', filename='shell.js') }}" defer></script>
+  <script data-shell src="{{ url_for('static', filename='bell.js') }}" defer></script>
   <script data-shell src="{{ url_for('static', filename='nav.js') }}" defer></script>
   <script data-shell src="{{ url_for('static', filename='photo-zoom.js') }}" defer></script>
 </head>
@@ -109,6 +124,7 @@
         <span class="topbar__name">{{ t('app.name') }}</span>
       </a>
       <span class="topbar__spacer"></span>
+      {{ bell_btn('down', 'mbar__bell') }}
       {# На телефоне левой панели нет: аватар открывает то же меню учётки (D468),
          а тема и язык лежат в нём. Без скрипта — ссылка в «Настройки». #}
       <a class="mbar__me" href="{{ settings_url }}" data-acct-menu data-place="down" title="{{ t('menu.title') }}" aria-label="{{ t('menu.title') }}">
@@ -149,14 +165,14 @@
             {# Граница групп меню (D499): проверки · статистика · администрирование. #}
             {% if not loop.first and item.group != loop.previtem.group %}<span class="sidenav__sep" aria-hidden="true"></span>{% endif %}
             {% if item.path == current_path %}
-              <span class="sidenav__current" aria-current="page" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span></span>
+              <span class="sidenav__current" aria-current="page" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</span>
             {% elif item.key == current_key %}
               {# Вложенная страница раздела: пункт подсвечен и ведёт на раздел. #}
-              <a class="sidenav__current" aria-current="location" href="{{ url(item.path) }}?lang={{ lang }}" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span></a>
+              <a class="sidenav__current" aria-current="location" href="{{ url(item.path) }}?lang={{ lang }}" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</a>
             {% else %}
               <a class="sidenav__item{% if not item.built %} is-wip{% endif %}"
                  href="{{ url(item.path) }}?lang={{ lang }}"
-                 title="{{ title }}{% if not item.built %} · {{ t('nav.wip') }}{% endif %}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span></a>
+                 title="{{ title }}{% if not item.built %} · {{ t('nav.wip') }}{% endif %}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</a>
             {% endif %}
           {% endfor %}
         </div>
@@ -164,6 +180,7 @@
         {# Низ панели, как в Swarm (D470): тема, язык и явная кнопка настроек одной
            строкой. Блок учётки ниже — отдельно (D468). #}
         <div class="sidenav__foot">
+          {{ bell_btn('up', 'sidenav__item') }}
           <div class="sidenav__prefs">
             {{ theme_pick() }}
             {% include "_langpick.html" %}
@@ -214,6 +231,11 @@
   #}
   {% if account %}
     {% include "_account_menu.html" %}
+    {#- Окно колокольчика (#1129): пустое, список приходит фрагментом при каждом открытии. -#}
+    <div class="popover acct-menu notif-menu" id="notif-menu" role="menu" aria-label="{{ t('notif.title') }}" tabindex="-1" hidden>
+      <div class="popover__group" role="presentation">{{ t('notif.title') }}</div>
+      <div class="notif-menu__list" role="none" data-src="{{ url('/settings/notifications') }}" data-failed="{{ t('notif.failed') }}"></div>
+    </div>
     {#- Не больше пяти пунктов (D518, #686): девять разделов на 390px обрезали
         подписи. Сверх пяти — первые четыре и «Ещё» со списком остальных. -#}
     {%- set tabs = sections|selectattr('built')|list -%}
@@ -223,13 +245,13 @@
       <a class="{{ cls }}{% if item.key == current_key %} is-current{% endif %}"
          href="{{ url(item.path) }}?lang={{ lang }}"
          {% if item.key == current_key %}aria-current="page"{% endif %}
-         title="{{ t('section.' ~ item.key ~ '.title') }}">{{ icon(item.icon) }}<span>{{ t('section.' ~ item.key ~ '.title') }}</span></a>
+         title="{{ t('section.' ~ item.key ~ '.title') }}">{{ icon(item.icon) }}<span>{{ t('section.' ~ item.key ~ '.title') }}</span>{{ section_dot(item.key) }}</a>
     {%- endmacro %}
     <nav class="tabbar" aria-label="{{ t('nav.sections') }}">
       {% for item in main_tabs %}{{ tab(item, 'tabbar__item') }}{% endfor %}
       {% if more_tabs %}
       <details class="tabbar__more">
-        <summary class="tabbar__item{% if current_key in more_tabs|map(attribute='key') %} is-current{% endif %}">{{ icon('dots') }}<span>{{ t('nav.more') }}</span></summary>
+        <summary class="tabbar__item{% if current_key in more_tabs|map(attribute='key') %} is-current{% endif %}">{{ icon('dots') }}<span>{{ t('nav.more') }}</span>{% if more_tabs|map(attribute='key')|select('in', notif_state().sections)|list %}<span class="notif-dot" role="img" aria-label="{{ t('notif.new') }}"></span>{% endif %}</summary>
         <div class="tabbar__sheet">
           {% for item in more_tabs %}{{ tab(item, 'tabbar__row') }}{% endfor %}
         </div>
