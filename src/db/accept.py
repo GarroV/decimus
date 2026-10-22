@@ -31,6 +31,8 @@ from typing import Any
 
 import psycopg
 
+from src.domain.errors import ConfigError as DomainConfigError
+
 from .action_plans import open_auto_request, today
 from .config import load_retraction_settings
 from .errors import AcceptError, ActionPlanError, ConfigError
@@ -130,15 +132,15 @@ def _open_plan_request(conn: psycopg.Connection[Any], ident: str, автор: st
     """Запрос экшн-плана при D2/D3 (D272) — в ТОЙ ЖЕ транзакции, что подтверждение.
 
     Проверка не может оказаться принятой без запроса, которого ждёт партнёр,
-    поэтому сбой запроса — отказ подтверждения. Настройку срока читает сама
-    `open_auto_request` и только когда запрос нужен: кривая
-    `ACTION_PLAN_DUE_DAYS` не мешает принять проверку без D2/D3. Подробности
+    поэтому сбой запроса — отказ подтверждения. Срок читает сама
+    `open_auto_request` из методики (`plan_due_days`, D617) и только когда запрос
+    нужен: кривая методика не мешает принять проверку без D2/D3. Подробности
     сбоя — в журнал, на карточку — понятный отказ без текста драйвера.
     """
     try:
         with conn.cursor() as cur:
             open_auto_request(cur, ident, actor=автор, on=today())
-    except (ActionPlanError, ConfigError, psycopg.Error) as exc:
+    except (ActionPlanError, ConfigError, DomainConfigError, psycopg.Error) as exc:
         logger.error("запрос экшн-плана по проверке %s не завёлся: %r", ident, exc)
         raise AcceptError(
             f"Проверка {ident} не подтверждена: в ней есть D2 или D3, и вместе с ней "

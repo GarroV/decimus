@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from conftest import requires_db
+from conftest import requires_db, методика_со_сроком
 from db_harness import admin_role_dsn, set_retraction_env, привязать_страну, точка_справочника
 
 psycopg = pytest.importorskip("psycopg")
@@ -123,14 +123,16 @@ def _sql(dsn: str, текст: str, параметры: tuple[Any, ...] = ()) ->
 # --- автозапрос при подтверждении (D272, D274) -------------------------------
 
 
-def test_подтверждение_с_d2_само_заводит_запрос_на_семь_дней(сеть: None) -> None:
+def test_подтверждение_с_d2_само_заводит_запрос_на_срок_методики(сеть: None) -> None:
     # Act
     ident = _принятая("D1", "D2")
 
     # Assert
     запрос = _запрос(ident)
     assert (запрос.country, запрос.status, запрос.origin) == ("GE", "requested", "auto")
-    assert запрос.due_on == СЕГОДНЯ + timedelta(days=7)
+    assert запрос.due_on == СЕГОДНЯ + timedelta(
+        days=10
+    )  # plan_due_days синтетической методики, D617
     assert запрос.requested_by == "garva"
     assert [(e.action, e.actor) for e in запрос.events] == [("requested", "garva")]
 
@@ -139,11 +141,11 @@ def test_подтверждение_с_d3_заводит_запрос(сеть: 
     assert _запрос(_принятая("D3")).status == "requested"
 
 
-def test_срок_по_умолчанию_берётся_из_настройки(
-    сеть: None, monkeypatch: pytest.MonkeyPatch
+def test_срок_по_умолчанию_берётся_из_методики(
+    сеть: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("ACTION_PLAN_DUE_DAYS", "10")
-    assert _запрос(_принятая("D2")).due_on == СЕГОДНЯ + timedelta(days=10)
+    monkeypatch.setenv("AUDIT_DATA_DIR", str(методика_со_сроком(tmp_path, 12)))
+    assert _запрос(_принятая("D2")).due_on == СЕГОДНЯ + timedelta(days=12)
 
 
 def test_подтверждение_без_d2_d3_запроса_не_заводит(сеть: None) -> None:
@@ -633,17 +635,17 @@ def test_подпись_срока_берётся_из_транзакции(се
 
 
 def test_кривая_настройка_срока_не_мешает_принять_проверку_без_d2(
-    сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str
+    сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("ACTION_PLAN_DUE_DAYS", "семь")
+    monkeypatch.setenv("AUDIT_DATA_DIR", str(методика_со_сроком(tmp_path, "семь")))
     ident = _принятая("D1")
     assert _статус(admin_env, ident) == "finalized"
 
 
 def test_кривая_настройка_при_d2_это_понятный_отказ_и_проверка_ждёт(
-    сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str
+    сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("ACTION_PLAN_DUE_DAYS", "семь")
+    monkeypatch.setenv("AUDIT_DATA_DIR", str(методика_со_сроком(tmp_path, "семь")))
     ident = _проверка("D2")
 
     with pytest.raises(AcceptError, match="запрос экшн-плана, а он не завёлся") as отказ:

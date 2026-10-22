@@ -100,7 +100,7 @@
         <form method="post" action="{{ url('/actions/request') }}?lang={{ lang }}" class="hact__form">
           <input type="hidden" name="inspection_id" value="{{ head.id }}">
           <label><span class="field-label">{{ t('card.plan.due') }}</span>
-            <input class="input" type="date" name="due" value="{{ c.plan_due_default }}" min="{{ c.plan_today }}" required></label>
+            <input class="input" type="date" name="due" value="{{ c.plan_due_default or '' }}" min="{{ c.plan_today }}" required></label>
           <button class="btn btn--primary btn--sm" type="submit">{{ t('card.plan.request_submit') }}</button>
         </form>
       {% endcall %}

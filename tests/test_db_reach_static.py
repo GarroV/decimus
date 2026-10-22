@@ -30,6 +30,7 @@ from src.db import (
     push,
     queries,
     reports,
+    review_edit,
     revise,
     swarm_read,
 )
@@ -220,6 +221,7 @@ _ЧИТАЮТ_ПРОВЕРКУ_ЦЕЛИКОМ = {
     ("db/revise.py", "_apply"),
     ("db/imports.py", "_locked_detail"),
     ("db/review_edit.py", "add_finding"),
+    ("db/review_edit.py", "delete_finding"),
 }
 
 
@@ -272,6 +274,17 @@ def test_проверку_целиком_читают_только_после_о
     чтение = вызовы[("db/revise.py", "_apply")]
     assert замок and min(замок) < чтение, "правка читает проверку до замка своего пространства"
     assert отказ and min(отказ) < чтение, "нет выхода без замка до чтения проверки"
+
+    # Добавление и снятие записи на приёмке (#1164): тот же замок правки до чтения.
+    for имя in ("add_finding", "delete_finding"):
+        функция = next(
+            у
+            for у in ast.walk(ast.parse(inspect.getsource(review_edit)))
+            if isinstance(у, ast.FunctionDef) and у.name == имя
+        )
+        замок = [строка for строка, запрос in _вызовы_execute(функция) if запрос == "_LOCK_SQL"]
+        чтение = вызовы[("db/review_edit.py", имя)]
+        assert замок and min(замок) < чтение, f"{имя} читает проверку до замка своего пространства"
 
     # Загрузка: тот же порядок, и замок берёт только загруженный черновик своего.
     assert "tenant_code = %(tenant)s" in imports._LOCK_SQL

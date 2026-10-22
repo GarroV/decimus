@@ -29,6 +29,8 @@ from werkzeug.wrappers import Response
 from src.db import action_plans as plans
 from src.db.config import load_action_plan_settings
 from src.db.errors import ActionPlanError, DbError, StorageError
+from src.domain.errors import ConfigError as DomainConfigError
+from src.domain.plan_due import plan_due_days
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import actions_screen, auth, guard, plan_template, review, ui_lang, view
@@ -112,9 +114,18 @@ def country_plans(code: str) -> tuple[plans.PlanList, plans.PlanList, bool]:
     return открытые, принятые, True
 
 
-def default_due() -> date:
-    """Срок по умолчанию для ручного запроса — та же настройка, что у автозапроса (D274)."""
-    return plans.due_date(plans.today(), load_action_plan_settings().due_days)
+def default_due() -> date | None:
+    """Срок по умолчанию для ручного запроса — тот же, что у автозапроса и в письме (D617).
+
+    Методика не читается — `None`: поле срока остаётся пустым и обязательным, а
+    карточка проверки открывается. Ронять всю карточку из-за подсказки в одном
+    поле нельзя; причина — в журнал.
+    """
+    try:
+        return plans.due_date(plans.today(), plan_due_days())
+    except DomainConfigError as exc:
+        logger.error("срок плана по умолчанию не прочитан из методики: %s", exc)
+        return None
 
 
 def _parse_date(raw: str) -> date | None:

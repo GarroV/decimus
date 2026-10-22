@@ -93,21 +93,17 @@ def test_срок_меньше_дня_это_отказ() -> None:
         due_date(date(2026, 10, 4), 0)
 
 
-def test_настройки_по_умолчанию_семь_дней_и_25_мб() -> None:
-    настройки = load_action_plan_settings({})
-    assert (настройки.due_days, настройки.max_bytes) == (7, 25 * 1024 * 1024)
+def test_предел_файла_по_умолчанию_25_мб() -> None:
+    assert load_action_plan_settings({}).max_bytes == 25 * 1024 * 1024
 
 
-def test_настройки_правятся_окружением() -> None:
-    настройки = load_action_plan_settings({"ACTION_PLAN_DUE_DAYS": "10", "ATTACHMENT_MAX_MB": "40"})
-    assert (настройки.due_days, настройки.max_bytes) == (10, 40 * 1024 * 1024)
+def test_предел_файла_правится_окружением() -> None:
+    assert load_action_plan_settings({"ATTACHMENT_MAX_MB": "40"}).max_bytes == 40 * 1024 * 1024
 
 
 @pytest.mark.parametrize(
     "env",
     [
-        {"ACTION_PLAN_DUE_DAYS": "неделя"},
-        {"ACTION_PLAN_DUE_DAYS": "0"},
         {"ATTACHMENT_MAX_MB": "-1"},
         {"ATTACHMENT_MAX_MB": "100000"},
     ],

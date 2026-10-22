@@ -141,15 +141,11 @@ def load_storage_settings(env: Mapping[str, str] | None = None) -> StorageSettin
     )
 
 
-#: Срок ответа на запрос экшн-плана по умолчанию, дней от подтверждения (D274).
-ACTION_PLAN_DUE_DAYS_VAR = "ACTION_PLAN_DUE_DAYS"
-DEFAULT_ACTION_PLAN_DUE_DAYS = 7
 #: Предел файла экшн-плана, МБ (D269): настройкой, чтобы увеличить без правки кода.
 ATTACHMENT_MAX_MB_VAR = "ATTACHMENT_MAX_MB"
 DEFAULT_ATTACHMENT_MAX_MB = 25
-#: Ловушки на опечатку, а не пределы устройства: срок больше года и файл больше
-#: гигабайта — это лишний ноль, а не решение.
-MAX_ACTION_PLAN_DUE_DAYS = 365
+#: Ловушка на опечатку, а не предел устройства: файл больше гигабайта — это
+#: лишний ноль, а не решение. Срок ответа планом — не здесь, а в методике (D617).
 MAX_ATTACHMENT_MB = 1024
 #: Предел ответов партнёра на одно предписание: ловушка на зацикленную форму и
 #: замусоривание, а не норма переписки.
@@ -161,9 +157,8 @@ _MB = 1024 * 1024
 
 @dataclass(frozen=True)
 class ActionPlanSettings:
-    """Настройки экшн-планов: срок по умолчанию и предел файла в байтах."""
+    """Настройки экшн-планов: предел файла в байтах."""
 
-    due_days: int
     max_bytes: int
 
 
@@ -184,12 +179,13 @@ def _bounded_int(src: Mapping[str, str], name: str, default: int, upper: int) ->
 
 
 def load_action_plan_settings(env: Mapping[str, str] | None = None) -> ActionPlanSettings:
-    """Срок ответа (D274) и предел файла (D269) из окружения. Мусор — `ConfigError`."""
+    """Предел файла (D269) из окружения. Мусор — `ConfigError`.
+
+    Срок ответа планом здесь больше не живёт: он в методике (`plan_due_days`,
+    D617) и читается `src.domain.plan_due`.
+    """
     src = os.environ if env is None else env
     return ActionPlanSettings(
-        due_days=_bounded_int(
-            src, ACTION_PLAN_DUE_DAYS_VAR, DEFAULT_ACTION_PLAN_DUE_DAYS, MAX_ACTION_PLAN_DUE_DAYS
-        ),
         max_bytes=_bounded_int(
             src, ATTACHMENT_MAX_MB_VAR, DEFAULT_ATTACHMENT_MAX_MB, MAX_ATTACHMENT_MB
         )

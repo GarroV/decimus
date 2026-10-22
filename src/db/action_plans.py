@@ -29,11 +29,11 @@ from typing import Any, Protocol
 
 import psycopg
 
+from src.domain.plan_due import plan_due_days
 from src.domain.tenants import HQ_TENANT
 
 from .config import (
     check_environment,
-    load_action_plan_settings,
     load_retraction_settings,
     load_storage_settings,
 )
@@ -550,9 +550,9 @@ def open_auto_request(
     запроса невозможно, оба ложатся вместе или не ложатся вовсе. Возвращает id
     запроса или `None`, если он не нужен (нет D2/D3, проверка не УК) или уже был.
 
-    Срок (`ACTION_PLAN_DUE_DAYS`) читается здесь и только когда запрос нужен:
-    кривая настройка роняет подтверждение проверки с D2/D3 (`ConfigError`), а не
-    любой проверки.
+    Срок (`plan_due_days` методики, D617) читается здесь и только когда запрос
+    нужен: кривая методика роняет подтверждение проверки с D2/D3 (`ConfigError`
+    блока `domain`), а не любой проверки.
     """
     cur.execute(_INSPECTION_FOR_REQUEST_SQL, (inspection_id,))
     row = cur.fetchone()
@@ -575,7 +575,7 @@ def open_auto_request(
         _INSERT_REQUEST_SQL,
         {
             "inspection_id": inspection_id,
-            "due_on": due_date(on, load_action_plan_settings().due_days),
+            "due_on": due_date(on, plan_due_days()),
             "origin": ORIGIN_AUTO,
             "actor": actor,
         },
