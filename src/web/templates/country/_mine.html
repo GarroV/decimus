@@ -1,12 +1,12 @@
 {#
   «Мои страны» (D536): постоянный отбор над колонкой стран. Раскрывается на месте
-  (`<details>`, без скриптов): кластеры одной кнопкой, страны флажками по алфавиту,
+  (`<details>`, без скриптов): кластер выпадающим списком, страны флажками по алфавиту,
   «Все страны» снимает отбор. Форма уходит на `POST /country/filter` и возвращает
   на этот же экран; сохранённое живёт в профиле человека. Ни одного вычисления.
 #}
 {% macro mine_filter(m) %}
   <details class="pick cn-mine" name="pick">
-    <summary class="ov-chip{% if m.active %} is-on{% endif %}">
+    <summary class="spill cn-mine__summary{% if m.active %} is-on{% endif %}">
       <span>{{ t('country.mine.title') }}: {{ t('country.mine.some', n=m.count, total=m.total) if m.active else t('country.mine.all') }}</span>
       <span class="pick__caret" aria-hidden="true">▾</span>
     </summary>
@@ -14,11 +14,17 @@
       <input type="hidden" name="next" value="{{ m.next }}">
       <p class="cn-mine__hint">{{ t('country.mine.hint') }}</p>
       {% if m.clusters %}
-        <div class="cn-mine__clusters" role="group" aria-label="{{ t('country.mine.clusters') }}">
-          {% for c in m.clusters %}
-            <button class="speriod__chip{% if c.on %} is-on{% endif %}" type="submit" name="cluster" value="{{ c.key }}">{{ t('ratings.cluster.' ~ c.key) }} · {{ c.codes|length }}</button>
-          {% endfor %}
-        </div>
+        {# Кластер — выпадающий список, а не ряд кнопок (D611). Выбран — отбор станет его странами
+           (кнопка «Показывать выбранные»); пусто — берутся флажки ниже. #}
+        <label class="pickbox">
+          <span class="pickbox__label">{{ t('country.mine.clusters') }}</span>
+          <select class="spill pickbox__select" name="cluster">
+            <option value="" selected>—</option>
+            {% for c in m.clusters %}
+              <option value="{{ c.key }}">{{ t('ratings.cluster.' ~ c.key) }} · {{ c.codes|length }}{% if c.on %} ✓{% endif %}</option>
+            {% endfor %}
+          </select>
+        </label>
       {% endif %}
       <ul class="cn-mine__list">
         {% for r in m.rows %}

@@ -49,20 +49,17 @@
         {#
           Язык ПИСЬМА, а не интерфейса: партнёру пишут на его языке. Перечень
           приезжает из методики — свой список предложил бы язык, которого в
-          ней нет. Выбор пересобирает письмо, поэтому это переход (ссылка), а
-          не поле формы.
+          ней нет. Выбор пересобирает письмо, поэтому это переход (адрес в
+          значении пункта), а не поле формы.
         #}
         <div class="lt__lang" title="{{ t('letter.lang.note') }}">
           <span class="lt__lang-label">{{ t('letter.meta.lang') }}</span>
-          <span class="seg" role="group" aria-label="{{ t('letter.lang.pick') }}">
-            {# Текущий — тоже ссылка: она пересобирает письмо заново на том же
-               языке, и перечень языков методики остаётся полным. #}
+          {# Выпадающий список, а не ряд кнопок (D611); значение пункта — адрес пересборки. #}
+          <select class="spill" data-pick-nav aria-label="{{ t('letter.lang.pick') }}"{{ drawer_attr }}>
             {% for код in letter_langs %}
-              <a class="{{ 'seg__current' if код == letter_lang else 'seg__item' }}"
-                 {% if код == letter_lang %}aria-current="true"{% endif %}
-                 href="{{ letter_base }}&amp;letter_lang={{ код }}"{{ drawer_attr }}>{{ код }}</a>
+              <option value="{{ letter_base }}&amp;letter_lang={{ код }}"{% if код == letter_lang %} selected{% endif %}>{{ код|upper }}</option>
             {% endfor %}
-          </span>
+          </select>
         </div>
         <div class="lt__actions">
           {#

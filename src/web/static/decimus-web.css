@@ -287,9 +287,7 @@
 .lt__score { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: var(--w-semibold); color: var(--ink-2); }
 .lt__lang { display: inline-flex; align-items: center; gap: var(--space-4); }
 .lt__lang-label { font-size: var(--fs-meta); color: var(--ink-3); white-space: nowrap; }
-.lt__lang .seg__item, .lt__lang .seg__current { text-transform: uppercase; font-family: var(--font-mono); letter-spacing: .06em; }
-.lt__lang a:hover { text-decoration: none; }
-.lt__lang a.seg__current:hover { color: var(--ink); }
+.lt__lang select { font-family: var(--font-mono); letter-spacing: .06em; }
 .lt__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .lt__notes { display: grid; gap: var(--space-3); padding: var(--space-5) var(--space-7) 0; }
 .lt__notes .note { margin: 0; }
@@ -1180,10 +1178,23 @@ a[data-zoom] { cursor: zoom-in; }
 .att-row__when--err { color: var(--err); }
 .att-row__when--warn { color: var(--warn-ink); }
 
-/* ── Выпадающий чип отбора ──────────────────────────────────────────────
-   Построен на `<details>`, без единой строки JS: панель обязана открываться
-   и там, где скрипт не загрузился. Стрелка поворачивается через `[open]` —
-   состояние держит сам браузер, а не класс, который кто-то забудет снять. */
+/* ── Отбор — выпадающий список (`_pick.html`, D611) ──────────────────────
+   Подпись над списком, сам список — `select.spill`. В колонках отбора
+   (реестр, «Главная», «Страны») список растягивается на всю ширину колонки. */
+.pickbox { display: inline-flex; flex-direction: column; gap: var(--space-1); min-width: 0; max-width: 100%; }
+.pickbox__label { font-size: 11.5px; color: var(--ink-3); }
+.pickbox__select { max-width: 100%; text-overflow: ellipsis; }
+.pickbox__select.is-on { border-color: var(--accent); color: var(--accent); font-weight: var(--w-semibold); }
+.pickbox__nojs { display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: var(--fs-meta); }
+.pickbox__nojs a[aria-current] { font-weight: var(--w-semibold); }
+.rg-filters .pickbox, .hm-field .pickbox, .pk-rail .pickbox, .cn-mine__body .pickbox { display: flex; width: 100%; }
+.rg-filters .pickbox__select, .hm-field .pickbox__select, .pk-rail .pickbox__select, .cn-mine__body .pickbox__select { width: 100%; }
+.hm-field .pickbox__label { display: none; }
+
+/* ── Выпадающая панель на `<details>` (период, переключатель чек-листов) ──
+   Без единой строки JS: панель обязана открываться и там, где скрипт не
+   загрузился. Стрелка поворачивается через `[open]` — состояние держит сам
+   браузер, а не класс, который кто-то забудет снять. */
 .pick { position: relative; display: inline-block; }
 .pick > summary { list-style: none; cursor: pointer; user-select: none; }
 .pick > summary::-webkit-details-marker { display: none; }
