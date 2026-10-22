@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 176 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 179 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -152,6 +152,9 @@
 | `/settings/google-unlink` | POST | `settings_google_unlink` | `src/web/settings_screen.py` |
 | `/settings/lang` | POST | `settings_lang` | `src/web/ui_lang.py` |
 | `/settings/menu` | GET | `settings_menu` | `src/web/settings_screen.py` |
+| `/settings/notifications` | GET | `notifications_menu` | `src/web/notifications.py` |
+| `/settings/notifications/<int:notification_id>/read` | POST | `notifications_read` | `src/web/notifications.py` |
+| `/settings/notifications/read-all` | POST | `notifications_read_all` | `src/web/notifications.py` |
 | `/settings/password` | POST | `settings_own_password` | `src/web/settings_screen.py` |
 | `/settings/security` | GET | `security_page` | `src/web/security_screen.py` |
 | `/settings/security/backup/generate` | POST | `security_backup_generate` | `src/web/security_screen.py` |
@@ -505,6 +508,7 @@
 | `0087_prescription_review.sql` | — |
 | `0088_country_contracts.sql` | `country_contracts` |
 | `0089_inspection_edits_delete.sql` | — |
+| `0090_notifications.sql` | `notifications` |
 <!-- map:end -->
 
 ## Makefile
