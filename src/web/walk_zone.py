@@ -14,7 +14,9 @@
 2. пункт бывает в одной зоне — она;
 3. зона, которую вернула модель, если она есть в списке пункта;
 4. зона с экрана, если она есть в списке пункта;
-5. иначе — спросить пилюлями из зон пункта (`ask`).
+5. привычная зона пункта в своём пространстве — куда его почти всегда
+   записывают (#1109, `db.queries.usual_zone`), если она есть в списке пункта;
+6. иначе — спросить пилюлями из зон пункта (`ask`).
 
 Зону вне списка пункта даёт только человек — словами или пилюлей в форме;
 машинные источники (модель, экран) ограничены списком пункта.
@@ -22,11 +24,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
-ZoneSource = Literal["single", "words", "model", "hint", "ask"]
-SOURCES: tuple[ZoneSource, ...] = ("single", "words", "model", "hint", "ask")
+ZoneSource = Literal["single", "words", "model", "hint", "usual", "ask"]
+SOURCES: tuple[ZoneSource, ...] = ("single", "words", "model", "hint", "usual", "ask")
 
 
 @dataclass(frozen=True)
@@ -46,8 +49,13 @@ def resolve_item_zone(
     spoken: str | None,
     model: str | None,
     hint: str | None,
+    usual: Callable[[], str | None] = lambda: None,
 ) -> ItemZone:
-    """Зона записи по порядку источников (см. модуль)."""
+    """Зона записи по порядку источников (см. модуль).
+
+    `usual` — привычная зона пункта; зовётся, только когда остальные источники
+    промолчали, потому что это поход в базу.
+    """
     if spoken:
         return ItemZone(spoken, "words", options)
     if len(options) == 1:
@@ -55,4 +63,7 @@ def resolve_item_zone(
     for zone, source in ((model, "model"), (hint, "hint")):
         if zone and zone in options:
             return ItemZone(zone, source, options)  # type: ignore[arg-type]
+    привычная = usual()
+    if привычная and привычная in options:
+        return ItemZone(привычная, "usual", options)
     return ItemZone(None, "ask", options)

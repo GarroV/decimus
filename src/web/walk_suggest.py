@@ -22,7 +22,9 @@ from flask import Flask, Response, jsonify, request
 from src.bot import journal
 from src.bot.propose import Offer, propose
 from src.bot.zones import allowed_zones, zone_from_words
+from src.db import queries
 from src.db.busy_lock import WALK_SUGGEST, try_hold
+from src.db.errors import DbError
 from src.domain import check_environment, get_state, handed_over, upload_file
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
@@ -65,6 +67,7 @@ def _card(c: Candidate, offer: Offer, ask: Ask) -> dict[str, Any]:
         spoken=ask.spoken,
         model=c.zone if offer.via == "model" else None,
         hint=ask.hint,
+        usual=lambda: _usual_zone(ask.tenant, c.code),
     )
     return {
         "code": c.code,
@@ -86,6 +89,17 @@ def _card(c: Candidate, offer: Offer, ask: Ask) -> dict[str, Any]:
     }
 
 
+def _usual_zone(tenant: str | None, code: str) -> str | None:
+    """Привычная зона пункта (#1109). База молчит — спросим человека, как раньше."""
+    if not tenant:
+        return None
+    try:
+        return queries.usual_zone(tenant=tenant, code=code)
+    except DbError:
+        logger.warning("Обход: привычная зона пункта %s недоступна", code, exc_info=True)
+        return None
+
+
 @dataclass(frozen=True)
 class Ask:
     """Что известно о запросе при выводе зоны: слова, подсказка, чат."""
@@ -93,6 +107,8 @@ class Ask:
     chat_id: int
     spoken: str | None
     hint: str | None
+    #: Пространство проверки — для привычной зоны пункта (#1109). Пусто — не спрашивать.
+    tenant: str | None = None
 
 
 def cap_photos(value: Any) -> tuple[Any, int]:
@@ -216,7 +232,12 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             offer.via,
             len(offer.candidates),
         )
-        ask = Ask(chat_id=who, spoken=zone_from_words(words, chat_id=who), hint=zone)
+        ask = Ask(
+            chat_id=who,
+            spoken=zone_from_words(words, chat_id=who),
+            hint=zone,
+            tenant=inspection.tenant,
+        )
         reply = answer(offer, ask)
         if omitted:
             # Не ошибка: поиск идёт по первым кадрам, клиент видит, что часть не учтена.
