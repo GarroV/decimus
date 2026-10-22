@@ -17,6 +17,7 @@ from flask.testing import FlaskClient
 from test_web_prescriptions import (  # noqa: F401
     ORIGIN,
     ИД,
+    ОТВЕТ,
     ФОРМА,
     _куда,
     _стенд,
@@ -185,3 +186,34 @@ def test_форма_предписания_страна_выпадающим_с�
     страница = уК.get("/actions/prescriptions/new?lang=ru").get_data(as_text=True)
     assert 'class="rx-country"' in страница and 'name="country"' in страница
     assert "ov-chip" not in страница
+
+
+def _файл_ответа(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Файл ответа виден только охвату УК: чужому пространству база отдаёт `None`.
+
+    Вызывать ПОСЛЕ фикстур стенда: `зовы` подменяет ту же дверь своей.
+    """
+    from src.db import prescriptions as rx
+
+    ссылка = rx.FileRef("s3://b/prescriptions/x/y", "акт.pdf", "application/pdf", 8)
+    monkeypatch.setattr(
+        rx, "file_for_download", lambda _id, *, reach: ссылка if reach.tenant == "HQ" else None
+    )
+    monkeypatch.setattr(rx, "fetch_file", lambda _ref, **_k: b"%PDF fix")
+
+
+@pytest.mark.parametrize("клиент", ["уК", "админ", "девелопер"])
+def test_файл_ответа_скачивают_осб_админ_и_девелопер(
+    клиент: str, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> None:
+    стенд = request.getfixturevalue(клиент)
+    _файл_ответа(monkeypatch)
+    ответ = стенд.get(f"/actions/prescription-files/{ОТВЕТ}")
+    assert ответ.status_code == 200 and ответ.data == b"%PDF fix"
+
+
+def test_файл_ответа_партнёру_чужой_страны_404(
+    партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _файл_ответа(monkeypatch)
+    assert партнёр.get(f"/actions/prescription-files/{ОТВЕТ}").status_code == 404
