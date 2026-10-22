@@ -48,14 +48,6 @@
 .rt-field__label { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink-2); white-space: nowrap; }
 .rt-field--grow { flex: 0 1 auto; }
 .rt-field .input { width: auto; min-width: 9rem; max-width: 13rem; }
-.rt-seg { display: inline-flex; flex-wrap: wrap; gap: var(--space-3); }
-.rt-seg a {
-  display: inline-flex; align-items: center; height: 26px; padding: 0 var(--space-5);
-  border: 1px solid var(--line-control); border-radius: var(--r-pill);
-  font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink-2); white-space: nowrap;
-}
-.rt-seg a:hover { color: var(--accent); border-color: var(--accent-line); text-decoration: none; }
-.rt-seg a[aria-current="page"] { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); }
 .rt-bar > .btn { margin-left: auto; }
 
 /* ── Блок: заголовок предложением ~18px, подпись справа ──────── */
@@ -262,8 +254,7 @@
   .rt-bar .rt-field { flex: 1 1 100%; }
   .rt-bar .rt-field__label { min-width: 4.5rem; }
   .rt-bar .rt-field .input { flex: 1 1 auto; min-width: 0; max-width: none; }
-  /* Подпись среза на телефоне не нужна: у чипов есть aria-label, а строка чипов так помещается целиком. */
-  .rt-bar .rt-field:has(> .rt-seg) > .rt-field__label { display: none; }
+  .rt-bar .rt-field select.spill { flex: 1 1 auto; min-width: 0; }
   .rt-bar > .btn { flex: 1 1 100%; justify-content: center; margin-left: 0; }
   .rt-two { grid-template-columns: 1fr; }
   .rt-tbl th:first-child, .rt-tbl td:first-child { padding-left: var(--space-5); }
@@ -330,12 +321,8 @@
 .rt-cmp__v.is-good { color: var(--ok); }
 
 /* Фильтр по странам — внутри своего блока (interface-logic п. 7). */
-.rt-filter { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+.rt-filter { margin-bottom: var(--space-3); }
 .rt-filter[hidden] { display: none; }
-.rt-filter button { font: inherit; font-size: var(--fs-meta); min-height: 32px; padding: 0 var(--space-4); border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--ink-2); cursor: pointer; }
-.rt-filter button small { color: var(--ink-3); margin-left: 2px; }
-.rt-filter button:hover { color: var(--accent); border-color: var(--accent-line); }
-.rt-filter button[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); }
 
 /* Top-10 и Bottom-10: изменение пиццерии к прошлому периоду. */
 .rt-rank__d { font-size: var(--fs-meta); white-space: nowrap; text-align: right; min-width: 4.5em; }

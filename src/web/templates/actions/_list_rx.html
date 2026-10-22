@@ -1,8 +1,8 @@
-{# Список предписаний: тема, страна, пиццерии, срок, состояние (D526). #}
+{# Строки предписаний одного блока: тема, страна, пиццерии, срок, состояние (D526, D611). #}
 {% from "_prescription.html" import rx_tag, rx_replied, rx_units with context %}
-{% macro rx_list() %}
+{% macro rx_list(items) %}
   <div class="slist slist--actions slist--rx">
-    {% if rows %}
+    {% if items %}
       <div class="slist__head" aria-hidden="true">
         <span>{{ t('rx.col.subject') }}</span>
         <span>{{ t('rx.col.country') }}</span>
@@ -11,7 +11,7 @@
         <span>{{ t('rx.col.state') }}</span>
       </div>
       <ul class="slist__rows">
-        {% for p in rows %}
+        {% for p in items %}
           {% set current = split_open and picked == p.id %}
           <li>
             <a class="srow{% if current %} is-current{% endif %}" href="{{ select_url(id=p.id) }}"{% if current %} aria-current="true"{% endif %}>
@@ -24,8 +24,6 @@
           </li>
         {% endfor %}
       </ul>
-    {% else %}
-      <div class="sempty"><p class="sempty__title">{{ t(empty_key) }}</p></div>
     {% endif %}
   </div>
 {% endmacro %}

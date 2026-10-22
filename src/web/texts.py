@@ -1377,6 +1377,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.group.zone": {"ru": "по зоне", "en": "by zone"},
     "methodology.group.level": {"ru": "по классу", "en": "by level"},
     "methodology.off.toggle": {"ru": "Выключенные", "en": "Disabled"},
+    "methodology.off.hide": {"ru": "скрыты", "en": "hidden"},
+    "methodology.off.show": {"ru": "показаны", "en": "shown"},
     "methodology.off.badge": {"ru": "выключен", "en": "disabled"},
     "methodology.shown": {"ru": "Показано {shown} из {total}", "en": "{shown} of {total}"},
     "methodology.add.open": {"ru": "+ Пункт", "en": "+ Item"},

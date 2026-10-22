@@ -286,8 +286,8 @@ def test_письмо_открывается_в_панели_реестра(ст
     назад = панель.split('class="back"', 1)[1].split(">", 1)[0]
     assert f"inspection={ПРОВЕРКА}" in назад and "view=letter" not in назад
     assert "data-drawer-open" in назад
-    языки = панель.split('class="seg"', 1)[1].split("</span>", 1)[0]
-    assert "view=letter" in языки and "data-drawer-open" in языки
+    языки = панель.split("data-pick-nav", 1)[1].split("</select>", 1)[0]
+    assert "view=letter" in языки and "data-drawer-open" in языки.split(">", 1)[0]
     # Черновик в почте уходит обычной отправкой: окно согласия Google фоном не открыть.
     assert "data-full-submit" in панель
 

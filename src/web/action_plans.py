@@ -33,6 +33,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import actions_screen, auth, guard, plan_template, review, ui_lang, view
 from . import inspections as data
+from .actions_columns import Block, RailItem, rail_codes, rail_form, sorted_rows
 from .actions_screen import TAB_PLANS
 from .config import Settings
 from .origin import refuse_foreign_origin
@@ -45,11 +46,6 @@ logger = logging.getLogger(__name__)
 FORM_OVERHEAD_BYTES = 64 * 1024
 #: Тип ответа шаблона плана (`plan_template`): книга Excel — открывается и в Google Таблицах.
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-#: Очереди раздела УК: что ждёт приёмки и что просрочено (спека).
-QUEUE_REVIEW = "review"
-QUEUE_OVERDUE = "overdue"
-QUEUES = (QUEUE_REVIEW, QUEUE_OVERDUE)
 
 #: Тон метки состояния — классы `tag` из `forma`.
 STATE_TONES = {
@@ -181,52 +177,95 @@ def _respond(
 # ── Данные вкладки ──────────────────────────────────────────────────────────
 
 
+#: Блоки списка запросов в порядке показа: состояние, ключ заголовка.
+_PLAN_BLOCKS = (
+    (plans.STATE_ON_REVIEW, "plans.block.on_review"),
+    (plans.STATE_RETURNED, "plans.block.returned"),
+    (plans.STATE_REQUESTED, "plans.block.requested"),
+)
+#: Что показывает столбец у страны: ждут приёмки, ждут партнёра (запрошены и возвращены).
+_PLAN_RAIL = (
+    ((plans.STATE_ON_REVIEW,), "plans.rail.on_review"),
+    ((plans.STATE_REQUESTED, plans.STATE_RETURNED), "plans.rail.waiting"),
+)
+
+
+def _rail_item(code: str, rows: tuple[plans.PlanRequest, ...], today: date) -> RailItem:
+    parts = tuple(
+        (text, n) for states, text in _PLAN_RAIL if (n := sum(1 for r in rows if r.state in states))
+    )
+    return RailItem(code, parts, sum(1 for r in rows if r.overdue(today)))
+
+
 def screen_context(lang: str) -> dict[str, Any]:
-    """Список запросов и полоса отбора — одни у УК и партнёра, охват решает объём (D526)."""
+    """Список запросов — столбец стран и блоки по состоянию, одни у УК и партнёра (D526, D611)."""
     страна = (request.args.get("country") or "").strip().upper()[:2]
-    очередь = (request.args.get("queue") or "").strip()
-    очередь = очередь if очередь in QUEUES else ""
     принятые = request.args.get("accepted") == "1"
-    список = plans.list_requests(reach=auth.current_reach(), accepted=принятые)
+    reach = auth.current_reach()
+    открытые = plans.list_requests(reach=reach, accepted=False)
+    архив = plans.list_requests(reach=reach, accepted=True) if принятые else None
     сегодня = plans.today()
-    все = список.rows
-    страны = tuple(sorted({r.country for r in все if r.country}))
-    в_стране = tuple(r for r in все if not страна or r.country == страна)
-    на_приёмке = tuple(r for r in в_стране if r.status == plans.STATUS_ON_REVIEW)
-    просрочены = tuple(r for r in в_стране if r.overdue(сегодня))
-    строки = {QUEUE_REVIEW: на_приёмке, QUEUE_OVERDUE: просрочены}.get(очередь, в_стране)
+    все = открытые.rows
+    страны = rail_codes(
+        reach,
+        [r.country for r in (*все, *(архив.rows if архив else ())) if r.country],
+        страна,
+        lang,
+    )
+
+    def в_стране(rows: tuple[plans.PlanRequest, ...]) -> tuple[plans.PlanRequest, ...]:
+        return tuple(r for r in rows if not страна or r.country == страна)
 
     def отбор(**изменения: str) -> str:
         параметры: dict[str, Any] = {
             "tab": TAB_PLANS,
             "country": страна,
-            "queue": очередь,
             "accepted": "1" if принятые else "",
             "lang": lang,
             **изменения,
         }
         return url_for("actions", **{к: з for к, з in параметры.items() if з})
 
+    видимые = в_стране(все)
+    принятые_в_стране = в_стране(архив.rows) if архив else ()
+    блоки = tuple(
+        Block(state, title, chosen_rows)
+        for state, title in _PLAN_BLOCKS
+        if (
+            chosen_rows := sorted_rows(
+                (r for r in видимые if r.state == state), today=сегодня, overdue_first=True
+            )
+        )
+    )
+    блоки += (
+        Block("accepted", "plans.block.accepted", принятые_в_стране, len(принятые_в_стране))
+        if архив
+        else Block("accepted", "plans.block.accepted", (), None, отбор(accepted="1")),
+    )
+    столбец = (
+        (
+            _rail_item("", все, сегодня),
+            *(_rail_item(c, tuple(r for r in все if r.country == c), сегодня) for c in страны),
+        )
+        if len(страны) > 1 or страна
+        else ()
+    )
     return {
-        "rows": строки,
+        "rows": видимые,
+        "rail": столбец,
+        "rail_form": rail_form(
+            "actions", {"tab": TAB_PLANS}, lang, {"accepted": "1" if принятые else ""}
+        ),
+        "blocks": блоки,
         "countries": страны,
         "country": страна,
-        "queue": очередь,
-        "queues": (
-            (QUEUE_REVIEW, "actions.queue.review", len(на_приёмке)),
-            (QUEUE_OVERDUE, "actions.queue.overdue", len(просрочены)),
-        ),
-        "archive": принятые,
-        "archive_param": "accepted",
-        "open_key": "plans.show_open",
-        "archive_key": "plans.show_accepted",
-        "list_title_key": "actions.list.title",
-        "empty_key": "plans.accepted_empty" if принятые else "actions.list.empty",
-        "truncated": список.truncated,
+        "empty_key": "actions.list.empty",
+        "truncated": открытые.truncated,
         "truncated_key": "plans.truncated",
         "limit": plans.LIST_LIMIT,
-        "total": len(в_стране),
+        "total": len(видимые) + len(принятые_в_стране),
         "select_url": отбор,
+        "archive_param": "accepted",
         "today": сегодня,
         "state_tones": STATE_TONES,
         "grade_tone": view.grade_tone,

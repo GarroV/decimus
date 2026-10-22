@@ -15,10 +15,12 @@
     pick_list   — элементы списка (`pick_item` из `_pick_ui.html`);
     pick_work   — рабочая область: шапка, плитки, блоки;
     pick_panel  — содержимое панели выбранной строки справа;
-    pick_assets — дополнительные стили и скрипты экрана.
+    pick_assets — дополнительные стили и скрипты экрана;
+    pick_rail_mod — добавка к классу колонки (`pk-rail--select`: на телефоне список стран — выпадающий).
   Что передаёт экран: `pick_open` — строка выбрана (панель открыта), `pick_back` —
   адрес закрытия (тот же экран без выбора), `pick_title` — заголовок панели,
-  `pick_wide` — широкая панель (по умолчанию обычная).
+  `pick_wide` — широкая панель (по умолчанию обычная), `pick_norail` — колонки нет, рабочая область
+  на всю ширину.
 
   Панель — тот же механизм, что у «Проверок» и «Пользователей»: `decimus-split.css`,
   `split.js` и макрос `drawer` из `_split_ui.html`; своей второй панели у каркаса
@@ -34,11 +36,14 @@
 {% endblock %}
 {% block page_class %} page--pick{% endblock %}
 {% block body %}
-  <div class="pk-shell">
-    <aside class="pk-rail" aria-label="{% block pick_label %}{% endblock %}">
+  <div class="pk-shell{% if pick_norail %} pk-shell--solo{% endif %}">
+    {#- Столбца нет, когда выбирать не из чего (партнёр с одной страной). -#}
+    {% if not pick_norail %}
+    <aside class="pk-rail{% block pick_rail_mod %}{% endblock %}" aria-label="{% block pick_label %}{% endblock %}">
       {% block pick_tools %}{% endblock %}
       <div class="pk-rail__list">{% block pick_list %}{% endblock %}</div>
     </aside>
+    {% endif %}
     <section class="pk-work">{% block pick_work %}{% endblock %}</section>
   </div>
   {% if pick_open %}

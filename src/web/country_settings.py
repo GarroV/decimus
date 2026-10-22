@@ -132,7 +132,7 @@ class Panel:
     auditors: tuple[Auditor, ...] = ()
     #: Языки отчёта страны из методики (`report_langs.json`, D415) — их предлагает бот.
     report_langs: tuple[str, ...] = ()
-    #: Блок «Договор» (D603): виден только УК; формы правки — у `contract.manage`.
+    #: Блок «Договор» (D603, D609): виден и правится только у `contract.manage`.
     show_contract: bool = False
     can_contract: bool = False
     contracts: tuple[contracts_db.Contract, ...] = ()
@@ -226,7 +226,9 @@ def load(
         "report_langs": _report_langs(code),
     }
     сведения["aggregators"], сведения["aggregators_failed"] = _aggregators(code)
-    if show_email:
+    # Договор и контакты по ДКК видят только те, кто их ведёт: ОСБ, админ, главный
+    # админ (D609). Девелопер и гость УК блока не видят вовсе.
+    if show_email and can_contract:
         сведения["show_contract"] = True
         сведения["can_contract"] = can_contract
         сведения["contracts"], сведения["contracts_failed"] = _contracts(code)

@@ -287,9 +287,7 @@
 .lt__score { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: var(--w-semibold); color: var(--ink-2); }
 .lt__lang { display: inline-flex; align-items: center; gap: var(--space-4); }
 .lt__lang-label { font-size: var(--fs-meta); color: var(--ink-3); white-space: nowrap; }
-.lt__lang .seg__item, .lt__lang .seg__current { text-transform: uppercase; font-family: var(--font-mono); letter-spacing: .06em; }
-.lt__lang a:hover { text-decoration: none; }
-.lt__lang a.seg__current:hover { color: var(--ink); }
+.lt__lang select { font-family: var(--font-mono); letter-spacing: .06em; }
 .lt__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .lt__notes { display: grid; gap: var(--space-3); padding: var(--space-5) var(--space-7) 0; }
 .lt__notes .note { margin: 0; }
@@ -560,24 +558,6 @@ a.ov-row:hover { background: var(--surface-2); }
   margin-right: var(--space-1);
 }
 .ov-filters__gap { flex: 1; min-width: var(--space-3); }
-.ov-chips { display: inline-flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
-.ov-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  font-size: var(--fs-micro);
-  font-weight: var(--w-semibold);
-  color: var(--ink-2);
-  text-decoration: none;
-  white-space: nowrap;
-}
-.ov-chip:hover { border-color: var(--accent-line); }
-.ov-chip.is-on { background: var(--accent); border-color: var(--accent); color: var(--ink-inverse); }
-.ov-chip__num { font-family: var(--font-num); font-variant-numeric: tabular-nums; opacity: .7; }
-.ov-chip--reset { background: var(--surface-3); border-color: transparent; }
 
 .ov-card--wide { margin-top: var(--space-5); }
 .ov-card__count {
@@ -680,12 +660,11 @@ a.ov-table__row:hover { background: var(--surface-2); }
    как ссылка в тексте (владелец 30.09.2026: «когда наводишь на город он
    отображается как гиперссылка»). Как в Swarm: строка светлеет, текст стоит. */
 a.ov-table__row:hover, a.ov-row:hover, a.ins-row:hover, a.ov-tile:hover,
-a.pick__item:hover, a.ov-chip:hover, a.mx-row:hover, a.mx-rail__row:hover,
+a.pick__item:hover, a.mx-row:hover, a.mx-rail__row:hover,
 a.tabbar__item:hover, a.pt-bars__col:hover {
   color: inherit; text-decoration: none;
 }
 a.pick__item.is-on:hover { color: var(--accent); }
-a.ov-chip.is-on:hover { color: var(--ink-inverse); }
 a.ov-table__row:focus-visible, a.ov-row:focus-visible, a.ins-row:focus-visible, a.ov-tile:focus-visible {
   outline: none; box-shadow: inset 0 0 0 2px var(--accent);
 }
@@ -1180,10 +1159,27 @@ a[data-zoom] { cursor: zoom-in; }
 .att-row__when--err { color: var(--err); }
 .att-row__when--warn { color: var(--warn-ink); }
 
-/* ── Выпадающий чип отбора ──────────────────────────────────────────────
-   Построен на `<details>`, без единой строки JS: панель обязана открываться
-   и там, где скрипт не загрузился. Стрелка поворачивается через `[open]` —
-   состояние держит сам браузер, а не класс, который кто-то забудет снять. */
+/* ── Отбор — выпадающий список (`_pick.html`, D611) ──────────────────────
+   Подпись над списком, сам список — `select.spill`. В колонках отбора
+   (реестр, «Главная», «Страны») список растягивается на всю ширину колонки. */
+.pickbox { display: inline-flex; flex-direction: column; gap: var(--space-1); min-width: 0; max-width: 100%; }
+.pickbox__label { font-size: 11.5px; color: var(--ink-3); }
+.pickselect { height: 30px; padding: 0 var(--space-5) 0 var(--space-6); border: 1px solid var(--line-control); border-radius: var(--r-pill);
+  background: var(--surface); font: inherit; font-size: 12.5px; font-weight: var(--w-medium); color: var(--ink-2); cursor: pointer; }
+.pickselect:hover { color: var(--ink); background: var(--surface-2); }
+.pickselect:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-soft); }
+.pickbox__select { max-width: 100%; text-overflow: ellipsis; }
+.pickbox__select.is-on { border-color: var(--accent); color: var(--accent); font-weight: var(--w-semibold); }
+.pickbox__nojs { display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: var(--fs-meta); }
+.pickbox__nojs a[aria-current] { font-weight: var(--w-semibold); }
+.rg-filters .pickbox, .hm-field .pickbox, .pk-rail .pickbox, .cn-mine__body .pickbox { display: flex; width: 100%; }
+.rg-filters .pickbox__select, .hm-field .pickbox__select, .pk-rail .pickbox__select, .cn-mine__body .pickbox__select { width: 100%; }
+.hm-field .pickbox__label { display: none; }
+
+/* ── Выпадающая панель на `<details>` (период, переключатель чек-листов) ──
+   Без единой строки JS: панель обязана открываться и там, где скрипт не
+   загрузился. Стрелка поворачивается через `[open]` — состояние держит сам
+   браузер, а не класс, который кто-то забудет снять. */
 .pick { position: relative; display: inline-block; }
 .pick > summary { list-style: none; cursor: pointer; user-select: none; }
 .pick > summary::-webkit-details-marker { display: none; }
@@ -1219,10 +1215,6 @@ a[data-zoom] { cursor: zoom-in; }
 .pick__item.is-on { background: var(--accent-soft); color: var(--accent); }
 .pick__label { flex: 1; }
 .pick__count { font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--ink-3); }
-/* Сбросить нечего — кнопка на месте, но не зовёт нажать: исчезающая кнопка
-   сдвигает панель ровно под рукой. */
-.ov-chip--reset.is-idle { opacity: .45; }
-
 /* ── Карточка точки (экран «point» прототипа, T355) ───────────────────────
    Столбики движения оценки, отметки повторов и шапка с действиями. Высоту
    столбика считает `src/web/unit_card.py` и отдаёт готовым процентом: CSS
@@ -1929,6 +1921,8 @@ a[data-zoom] { cursor: zoom-in; }
 .rx-pick__item { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; cursor: pointer; }
 .rx-pick__item input { accent-color: var(--accent); flex: 0 0 auto; }
 .rx-pick__item span { overflow-wrap: anywhere; }
+/* форма и подсказка не растягиваются на весь экран */
+.rx-form { max-width: 60rem; }
 .rx-form__body { min-height: 14rem; font: inherit; }
 /* Нарушения предписания по проверке (шаг 3): строка — запись, галочка и срок справа. */
 .rx-finds { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }

@@ -42,6 +42,7 @@ from src.domain.errors import ConfigError
 from src.report import notice_pdf, notice_template
 from src.report.errors import ReportError
 
+from . import actions_columns as columns
 from . import actions_screen, auth, guard, ui_lang
 from . import country as country_data
 from . import prescription_notice as notice
@@ -65,12 +66,6 @@ logger = logging.getLogger(__name__)
 
 #: Вид похода за почтовым согласием (кука `letter_draft`).
 MAIL_KIND = "prescription"
-
-#: Очереди раздела УК над списком.
-QUEUE_OVERDUE = "overdue"
-QUEUE_REPLIED = "replied"
-QUEUE_DRAFTS = "drafts"
-QUEUES = (QUEUE_OVERDUE, QUEUE_REPLIED, QUEUE_DRAFTS)
 
 #: Чем кончается форма (поле `then`): сохранить черновик; сохранить и отправить на
 #: согласование (девелопер, админ); сохранить и согласовать (ОСБ, главный админ).
@@ -242,57 +237,19 @@ def install(app: Flask, conf: Settings) -> None:
 
 
 def screen_context(lang: str) -> dict[str, Any]:
-    """Список предписаний и полоса отбора — одни у УК и партнёра, охват решает объём (D526)."""
-    уК = is_hq()
+    """Список предписаний — столбец стран и блоки, как у «ОСБ»; охват решает объём (D526, D611)."""
     страна = country_data.normalize_code(request.args.get("country") or "")
-    # Черновики и «ответил партнёр» — разговор УК; партнёру в очереди только срок.
-    доступные = QUEUES if уК else (QUEUE_OVERDUE,)
-    очередь = (request.args.get("queue") or "").strip()
-    очередь = очередь if очередь in доступные else ""
-    закрытые = request.args.get("closed") == "1"
-    список = rx.list_prescriptions(reach=auth.current_reach(), closed=закрытые)
-    сегодня = rx.today()
-    все = список.rows
-    страны = tuple(sorted({p.country for p in все}))
-    в_стране = tuple(p for p in все if not страна or p.country == страна)
-    очереди = {
-        QUEUE_OVERDUE: tuple(p for p in в_стране if p.overdue(сегодня)),
-        QUEUE_REPLIED: tuple(p for p in в_стране if p.status == rx.STATUS_ISSUED and p.replies),
-        QUEUE_DRAFTS: tuple(p for p in в_стране if p.status == rx.STATUS_DRAFT),
-    }
-
-    def отбор(**изменения: str) -> str:
-        параметры: dict[str, Any] = {
-            "tab": TAB_RX,
-            "country": страна,
-            "queue": очередь,
-            "closed": "1" if закрытые else "",
-            "lang": lang,
-            **изменения,
-        }
-        return url_for("actions", **{к: з for к, з in параметры.items() if з})
-
     новый_адрес: dict[str, Any] = {k: v for k, v in (("country", страна), ("lang", lang)) if v}
     return {
-        "rows": очереди.get(очередь, в_стране),
-        "countries": страны,
-        "country": страна,
-        "queue": очередь,
-        "queues": tuple((q, f"rx.queue.{q}", len(очереди[q])) for q in доступные),
-        "archive": закрытые,
-        "archive_param": "closed",
-        "open_key": "rx.show_open",
-        "archive_key": "rx.show_closed",
-        "list_title_key": "rx.list.title",
-        "empty_key": ("rx.closed_empty" if закрытые else "rx.list.empty")
-        if уК
-        else ("rx.closed_empty" if закрытые else "rx.partner.empty"),
-        "truncated": список.truncated,
-        "truncated_key": "rx.truncated",
-        "limit": rx.LIST_LIMIT,
-        "total": len(в_стране),
-        "select_url": отбор,
-        "hq": уК,
+        **columns.rx_screen(
+            lang,
+            endpoint="actions",
+            fixed={"tab": TAB_RX},
+            count_closed=False,
+            empty_key="rx.list.empty" if is_hq() else "rx.partner.empty",
+            title_key="section.actions.title",
+        ),
+        "hq": is_hq(),
         "new_url": url_for("rx_new", **новый_адрес),
         **common(),
     }

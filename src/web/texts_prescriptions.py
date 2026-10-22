@@ -26,14 +26,7 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
         "en": "inspection retracted or unavailable",
     },
     # --- список УК --------------------------------------------------------
-    "rx.list.title": {"ru": "Предписания", "en": "Compliance notices"},
     "rx.list.empty": {"ru": "Предписаний нет.", "en": "No compliance notices."},
-    "rx.closed_empty": {"ru": "Закрытых предписаний нет.", "en": "No closed notices."},
-    "rx.show_open": {"ru": "Открытые", "en": "Open"},
-    "rx.show_closed": {"ru": "Закрытые", "en": "Closed"},
-    "rx.queue.overdue": {"ru": "Просрочены · {n}", "en": "Overdue · {n}"},
-    "rx.queue.replied": {"ru": "Ответил партнёр · {n}", "en": "Partner replied · {n}"},
-    "rx.queue.drafts": {"ru": "Черновики · {n}", "en": "Drafts · {n}"},
     "rx.new": {"ru": "Новое предписание", "en": "New notice"},
     "rx.col.subject": {"ru": "Тема", "en": "Subject"},
     "rx.col.country": {"ru": "Страна", "en": "Country"},
@@ -301,26 +294,17 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     "rx.event.closed": {"ru": "Закрыто", "en": "Closed"},
     # --- страница «ОСБ» (D599) ---------------------------------------------
     "section.osb.title": {"ru": "ОСБ", "en": "OSB"},
-    "osb.queues": {"ru": "Очереди предписаний", "en": "Notice queues"},
-    "osb.queue.review": {"ru": "На согласовании · {n}", "en": "In review · {n}"},
-    "osb.queue.approved": {
-        "ru": "Согласовано, не отправлено · {n}",
-        "en": "Approved, not sent · {n}",
-    },
-    "osb.queue.active": {"ru": "Действуют · {n}", "en": "In force · {n}"},
-    "osb.queue.drafts": {"ru": "Черновики · {n}", "en": "Drafts · {n}"},
-    "osb.queue.closed": {"ru": "Закрытые · {n}", "en": "Closed · {n}"},
-    "osb.empty.review": {
-        "ru": "Ничего не ждёт согласования.",
-        "en": "Nothing is waiting for approval.",
-    },
-    "osb.empty.approved": {
-        "ru": "Согласованных, но не отправленных предписаний нет.",
-        "en": "No approved notices are waiting to be sent.",
-    },
-    "osb.empty.active": {"ru": "Действующих предписаний нет.", "en": "No notices are in force."},
-    "osb.empty.drafts": {"ru": "Черновиков нет.", "en": "There are no drafts."},
-    "osb.empty.closed": {"ru": "Закрытых предписаний нет.", "en": "No closed notices."},
+    "osb.empty": {"ru": "Предписаний нет.", "en": "No compliance notices."},
+    # --- столбец стран и блоки по состоянию (D611) ---------------------------
+    "rx.block.review": {"ru": "На согласовании", "en": "In review"},
+    "rx.block.approved": {"ru": "Согласовано, не отправлено", "en": "Approved, not sent"},
+    "rx.block.active": {"ru": "Действуют", "en": "In force"},
+    "rx.block.drafts": {"ru": "Черновики", "en": "Drafts"},
+    "rx.block.closed": {"ru": "Закрытые", "en": "Closed"},
+    "rx.rail.review": {"ru": "на согласовании {n}", "en": "in review {n}"},
+    "rx.rail.approved": {"ru": "согласовано {n}", "en": "approved {n}"},
+    "rx.rail.active": {"ru": "действуют {n}", "en": "in force {n}"},
+    "rx.form.country_apply": {"ru": "Выбрать", "en": "Choose"},
     # --- экран страны -----------------------------------------------------
     "country.rx.title": {"ru": "Предписания", "en": "Compliance notices"},
     "country.rx.hint": {

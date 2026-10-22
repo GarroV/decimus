@@ -121,12 +121,13 @@ def test_осб_админ_и_главный_админ_видят_догово�
 
 
 @pytest.mark.parametrize("кто", ["девелопер", "гость"])
-def test_остальные_роли_ук_видят_договор_но_без_форм_правки(
+def test_остальные_роли_ук_договор_не_видят(
     кто: str, request: pytest.FixtureRequest, монкей: pytest.MonkeyPatch
 ) -> None:
+    """Договор — только тем, кто его ведёт: ОСБ, админ, главный админ (D609)."""
     клиент: FlaskClient = request.getfixturevalue(кто)
     страница = _страница(клиент, монкей)
-    assert ПОЧТА in страница
+    assert ПОЧТА not in страница and "Lotos LLC" not in страница
     assert ФОРМА not in страница
 
 
