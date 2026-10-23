@@ -38,7 +38,7 @@ from src.ratings.aggregators import summary as ragg
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
 from src.ratings.model import RatingsFormatError
-from src.ratings.periods import KIND_RANGE, KIND_RATING, ReportPeriod
+from src.ratings.periods import KIND_RANGE, KIND_RATING, RatingPeriod, ReportPeriod
 from src.ratings.pointer import GOOGLE
 
 from . import auth, guard, ratings_calendar, ratings_sheet, ratings_tiles, ui_lang
@@ -287,7 +287,11 @@ def render_summary(conf: Settings) -> str:
         choices=found,
         selection=selection,
         calendar=ratings_calendar.build(
-            selection.period, read.period_months(), found.rs_periods, lang
+            selection.period,
+            read.period_months(),
+            found.rs_periods,
+            lang,
+            tuple(RatingPeriod(*p) for p in read.rko_periods()),
         ),
         previous_title=_period_title(summary.previous, found, lang),
         risk_short_names=", ".join(t(f"ratings.{kind}", lang) for kind in summary.risk_short),

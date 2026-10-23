@@ -104,6 +104,26 @@ def _read_rs_periods() -> tuple[tuple[int, date, date, str, str], ...]:
     )
 
 
+def rko_periods() -> tuple[tuple[int, date, date, str, str], ...]:
+    """Недели РКО с оценками, новые первыми: `(id, begin_on, end_on, title_ru, title_en)`.
+
+    Пустую неделю (период заведён, оценок нет) выбирать незачем — список строится по оценкам.
+    """
+    return memoized(("ratings.rko_periods",), _read_rko_periods)
+
+
+def _read_rko_periods() -> tuple[tuple[int, date, date, str, str], ...]:
+    return tuple(
+        (int(r[0]), r[1], r[2], r[3], r[4])
+        for r in _rows(
+            "select p.id, p.begin_on, p.end_on, p.title_ru, p.title_en from ratings.periods p "
+            "where p.rating_type = 'rko' "
+            "and exists (select 1 from ratings.scores s where s.period_id = p.id) "
+            "order by p.begin_on desc"
+        )
+    )
+
+
 def period_months() -> tuple[date, ...]:
     """Месяцы, в которых начался хоть один период рейтинга (любого типа), новые первыми.
 

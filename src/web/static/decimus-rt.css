@@ -35,6 +35,25 @@
   text-transform: uppercase; font-weight: var(--w-bold); color: var(--accent);
 }
 .rt-head__title { margin: 0; font-size: 19px; line-height: 24px; font-weight: var(--w-bold); color: var(--ink); }
+.rt-head__row { position: relative; display: flex; align-items: center; gap: var(--space-3); }
+/* Свежесть загрузок под «?» (D630): блок раскрывается наведением и фокусом, без скрипта;
+   на телефоне нажатие фокусирует элемент с tabindex. Блок цепляется к строке заголовка,
+   а не к значку: слева он начинается от поля страницы и на 390 px не уходит за экран. */
+.rt-info { align-self: stretch; display: inline-flex; align-items: center; }
+.rt-info__mark {
+  display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; cursor: help;
+  border: 1px solid var(--line-control); border-radius: var(--r-pill);
+  font-size: var(--fs-meta); font-weight: var(--w-semibold); line-height: 1; color: var(--ink-3);
+}
+.rt-info__mark:hover, .rt-info:focus-within .rt-info__mark { color: var(--accent); border-color: var(--accent-line); }
+.rt-info__pop {
+  display: none; position: absolute; z-index: 30; top: 100%; left: 0;
+  width: min(20rem, calc(100vw - 2rem)); padding-bottom: var(--space-3);
+}
+.rt-info:hover .rt-info__pop, .rt-info:focus-within .rt-info__pop { display: block; }
+.rt-info__list { margin: 0; padding: 0 var(--space-5); list-style: none; font-size: var(--fs-dense); color: var(--ink-2); }
+.rt-info__list li { padding: var(--space-1) 0; }
+.rt-info__none { margin: 0; padding: 0 var(--space-5); font-size: var(--fs-dense); color: var(--ink-3); }
 .rt-head__meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); }
 .rt-head__meta b { font-weight: var(--w-semibold); color: var(--ink-2); }
 
@@ -285,6 +304,9 @@
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
   box-shadow: 0 12px 32px rgb(0 0 0 / .25);
 }
+.rt-cal__list { display: flex; flex-direction: column; gap: var(--space-1); }
+.rt-cal__list .pickselect { width: 100%; }
+.rt-cal__nojs a { margin-right: var(--space-3); }
 .rt-cal__dates { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 .rt-cal__dates label { display: flex; flex-direction: column; gap: var(--space-1); }
 .rt-cal__pop .btn { align-self: flex-end; }

@@ -74,6 +74,7 @@ def страница(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(screen.rcompare, "build", lambda *_a: rcompare.Comparison((), ()))
     monkeypatch.setattr(screen.read, "layout_rows", lambda: (("aggregators", 0, True),))
     monkeypatch.setattr(screen.read, "period_months", lambda: ())
+    monkeypatch.setattr(screen.read, "rko_periods", lambda: ())
     monkeypatch.setattr(screen, "_maps", lambda *_a: None)
     monkeypatch.setattr(screen, "_aggs", lambda *_a: None)
     monkeypatch.setattr(screen, "_unit_maps", lambda _u: {})

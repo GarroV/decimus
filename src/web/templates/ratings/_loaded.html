@@ -1,0 +1,24 @@
+{#
+  Свежесть загрузок под значком «?» рядом с заголовком (D630): одна строка — один
+  источник, «источник — дата время». Перечень через точку в шапке снят — владелец:
+  «целая куча текста, которую невозможно читать».
+
+  БЕЗ СКРИПТА: блок раскрывается по наведению и по фокусу (`:hover`, `:focus-within`);
+  на телефоне нажатие даёт фокус элементу с `tabindex`. Положение блока считает
+  CSS (`decimus-rt.css`, `.rt-info`).
+#}
+{% macro loaded_hint(last_loaded, at_format) %}
+  <div class="rt-info">
+    <span class="rt-info__mark" tabindex="0" role="button" aria-label="{{ t('ratings.loaded.hint') }}" aria-describedby="rt-loaded">?</span>
+    <div class="rt-info__pop popover" id="rt-loaded" role="tooltip">
+      <div class="popover__group">{{ t('ratings.loaded.title') }}</div>
+      {% if last_loaded %}
+        <ul class="rt-info__list">
+          {% for fmt, at in last_loaded|dictsort %}<li>{{ t('ratings.loaded', fmt=t('ratings.format.' ~ fmt), at=at.strftime(at_format)) }}</li>{% endfor %}
+        </ul>
+      {% else %}
+        <p class="rt-info__none">{{ t('ratings.loaded.none') }}</p>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}

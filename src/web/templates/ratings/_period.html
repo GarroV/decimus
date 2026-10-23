@@ -1,0 +1,24 @@
+{#
+  Списки периода «Рейтингов» (D629): «Период РС» и «Неделя РКО» — над календарём «с — по»
+  в одном окне. Выпадающие списки, не ряды кнопок (D611): значение пункта — готовый
+  адрес, переход делает `pick.js`; БЕЗ СКРИПТА под `<noscript>` те же пункты лежат
+  ссылками. Выбран пункт, совпавший с текущим отрезком; не совпал ни один — в списке
+  заглушка. Ключи и «выбран» считает `ratings_calendar`, шаблон не считает.
+  `href(group, value, key)` — макрос адреса из `index.html`, передаётся аргументом:
+  свой копии адреса здесь нет.
+#}
+{% macro period_lists(calendar, href, group, value) %}
+  {% for kind, options in (('rs', calendar.rs_options), ('rko', calendar.rko_options)) if options %}
+    {% set label = t('ratings.period.' ~ kind) %}
+    <label class="rt-cal__list">
+      <span class="rt-field__label">{{ label }}</span>
+      <select class="pickselect" data-pick-nav data-period-list="{{ kind }}" aria-label="{{ label }}">
+        {% if not options|selectattr('on')|list %}<option value="" selected disabled>{{ t('ratings.period.none') }}</option>{% endif %}
+        {% for o in options %}<option value="{{ href(group, value, o.key) }}"{% if o.on %} selected{% endif %}>{{ o.title }}</option>{% endfor %}
+      </select>
+    </label>
+    <noscript>
+      <span class="rt-cal__nojs">{% for o in options %}<a href="{{ href(group, value, o.key) }}"{% if o.on %} aria-current="true"{% endif %}>{{ o.title }}</a> {% endfor %}</span>
+    </noscript>
+  {% endfor %}
+{% endmacro %}
