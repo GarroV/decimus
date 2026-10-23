@@ -518,6 +518,7 @@
 | `0088_country_contracts.sql` | `country_contracts` |
 | `0089_inspection_edits_delete.sql` | — |
 | `0090_notifications.sql` | `notifications` |
+| `0091_units_merge_guard_search_path.sql` | — |
 | `0092_action_plan_rows.sql` | `action_plan_rows` |
 <!-- map:end -->
 

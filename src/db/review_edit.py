@@ -32,6 +32,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 
 import psycopg
 
@@ -47,6 +48,7 @@ from .inspection_edits import (
     score_changes,
 )
 from .models import ORIGIN_LEGACY, FindingRow, InspectionDetail
+from .photos import stamp_for
 from .pool import connection
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
 from .push import _INSERT_TRANSLATION_SQL
@@ -336,17 +338,11 @@ def attach_photo(
 
     Байты, которые не читаются как изображение, — отказ: оригинал не хранится,
     и «положить как есть» значило бы хранить то, что никто не покажет.
+    Кадр получает видимый штамп (D619, D621) на момент приложения.
     """
     ident = _require_inspection_id(inspection_id)
     запись = _require_inspection_id(finding_id)
     tenant_code = _require_tenant(tenant)
-    try:
-        копия = make_preview(data)
-    except StorageError as exc:
-        raise ReviseError(
-            "Кадр не читается как изображение (ожидается JPEG, PNG или WebP) — не приложен",
-            code="photo_unreadable",
-        ) from exc
     try:
         with connection(check_environment().dsn) as conn, conn.cursor() as cur:
             cur.execute(_LOCK_SQL, {"id": ident, "tenant": tenant_code})
@@ -370,6 +366,13 @@ def attach_photo(
                     code="photo_limit_inspection",
                     params={"max": MAX_PHOTOS_PER_INSPECTION},
                 )
+            try:
+                копия = make_preview(data, stamp=stamp_for(cur, ident, datetime.now(UTC)))
+            except StorageError as exc:
+                raise ReviseError(
+                    "Кадр не читается как изображение (ожидается JPEG, PNG или WebP) — не приложен",
+                    code="photo_unreadable",
+                ) from exc
             кадр = str(uuid.uuid4())
             try:
                 uri = storage.put(object_key(ident, кадр), копия, content_type=PREVIEW_CONTENT_TYPE)

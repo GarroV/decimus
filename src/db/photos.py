@@ -41,6 +41,7 @@ from .errors import PhotosDeferredError, PushError, StorageError
 from .pool import connection
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
 from .space import SYSTEM_SPACE, acting_space
+from .stamp import StampContext, stamp_text
 from .storage import PHOTO_CONTENT_TYPE, PhotoStorage, S3PhotoStorage, object_key
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,7 @@ logger = logging.getLogger(__name__)
 FetchPhoto = Callable[[str], bytes | None]
 
 _SELECT_PENDING_SQL = """
-select id, telegram_file_id
+select id, telegram_file_id, created_at
 from photos
 where inspection_id = %s and storage_path is null
 order by created_at, id
@@ -85,6 +86,22 @@ limit %(limit)s
 """
 
 _INSPECTION_EXISTS_SQL = "select 1 from inspections where id = %s"
+
+#: Что идёт на штамп кадра, кроме времени (D621): название пиццерии из
+#: справочника, проверяющий так, как он записан в шапке проверки и попадает в
+#: отчёт, страна — для местного времени. Происхождение нужно, чтобы историческая
+#: загрузка штампа не получила (D332).
+_STAMP_CONTEXT_SQL = """
+select u.name, i.auditor, u.country, i.origin
+from inspections i
+join units u on u.id = i.unit_id
+where i.id = %s
+"""
+
+#: Кадры этого происхождения штампа не получают: сегодняшняя дата на кадре
+#: старого отчёта (D332) или проверки, загруженной задним числом через MCP,
+#: была бы ложью — снимали их не сегодня.
+_UNSTAMPED_ORIGINS = frozenset({"legacy", "import"})
 
 
 @dataclass(frozen=True)
@@ -130,6 +147,30 @@ def pending_photo_uploads(
     return [PendingUpload(key, tuple(ids), since[key]) for key, ids in by_inspection.items()]
 
 
+def stamp_context(cur: psycopg.Cursor[Any], inspection_id: str) -> StampContext | None:
+    """Что идёт на штамп кадров проверки; `None` — штампа нет.
+
+    Единая точка для всех путей, что кладут кадр в хранилище: выгрузка живых
+    кадров (бот, мини-апп, веб), приложенный на вычитке и загруженный через MCP.
+    Штамп нужен живым кадрам; загрузке задним числом (`origin` `legacy` и
+    `import`) — нет.
+    """
+    cur.execute(_STAMP_CONTEXT_SQL, (inspection_id,))
+    row = cur.fetchone()
+    if row is None:
+        raise PushError(f"В базе нет проверки {inspection_id} — штамп кадра брать не откуда")
+    name, auditor, country, origin = row
+    if origin in _UNSTAMPED_ORIGINS:
+        return None
+    return StampContext(str(name), str(auditor or ""), country)
+
+
+def stamp_for(cur: psycopg.Cursor[Any], inspection_id: str, moment: datetime) -> str | None:
+    """Текст штампа кадра проверки на момент `moment`; `None` — штампа нет."""
+    context = stamp_context(cur, inspection_id)
+    return None if context is None else stamp_text(moment, context)
+
+
 def _require_inspection(conn: psycopg.Connection[Any], inspection_id: str) -> None:
     """Проверки нет — это отказ, а не «выгружено ноль кадров».
 
@@ -145,7 +186,7 @@ def _require_inspection(conn: psycopg.Connection[Any], inspection_id: str) -> No
 
 
 def _put_photo(
-    store: PhotoStorage, inspection_id: str, photo_id: str, data: bytes
+    store: PhotoStorage, inspection_id: str, photo_id: str, data: bytes, *, stamp: str | None
 ) -> tuple[str, str | None]:
     """Положить кадр в хранилище одним объектом и вернуть `(storage_path, preview_path)`.
 
@@ -160,12 +201,16 @@ def _put_photo(
     нечего, как и раньше), и это сказано в лог, а не проглочено молча.
     Отказ самого хранилища — отказ выгрузки.
 
+    `stamp` — текст видимого штампа, вшиваемого в копию (D619, D621); `None` —
+    кадр без штампа (историческая загрузка). Нечитаемый кадр штампа не получает:
+    ставить его не на что.
+
     Кладётся ДО записи строки: после неё строка заморожена
     (`photos_uploaded_only_once`), и дописать ссылку было бы уже нельзя.
     """
     key = object_key(inspection_id, photo_id)
     try:
-        копия = make_preview(data)
+        копия = make_preview(data, stamp=stamp)
     except StorageError as exc:
         logger.warning(
             "кадр %s проверки %s не читается как изображение, лёг как есть: %s",
@@ -217,13 +262,22 @@ def upload_photos(
             with conn.cursor() as cur:
                 cur.execute(_SELECT_PENDING_SQL, (inspection_id,))
                 pending = cur.fetchall()
+                # Время штампа — когда кадр лёг в проверку (`created_at`), а не
+                # когда его догрузили: дозагрузка идёт позже съёмки.
+                context = stamp_context(cur, inspection_id)
+                stamps = {
+                    photo_id: None if context is None else stamp_text(created_at, context)
+                    for photo_id, _file_id, created_at in pending
+                }
 
-        for photo_id, file_id in pending:
+        for photo_id, file_id, _created_at in pending:
             data = fetch(file_id)
             if data is None:
                 missing.append(str(file_id))
                 continue
-            uri, preview_uri = _put_photo(store, inspection_id, str(photo_id), data)
+            uri, preview_uri = _put_photo(
+                store, inspection_id, str(photo_id), data, stamp=stamps[photo_id]
+            )
             with connection(settings.dsn) as conn:
                 with conn.cursor() as cur:
                     cur.execute(_MARK_UPLOADED_SQL, (uri, preview_uri, photo_id))

@@ -77,7 +77,10 @@ def test_синоним_новой_точки_называющий_сущест�
         create_unit("Tbilisi-1", country="GE", aliases=("Тбилиси-1",), tenant=УК)
 
     assert отказ.value.unit_id == прежняя
-    assert resolve_unit("Tbilisi-1", tenant=УК) is None
+    # D538: латиница находит точку под кириллицей, а не заводит вторую.
+    найдена = resolve_unit("Tbilisi-1", tenant=УК)
+    assert найдена is not None
+    assert найдена.id == прежняя
 
 
 def test_незаведённое_пространство_отказ(db_env: str) -> None:

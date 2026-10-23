@@ -26,6 +26,7 @@ from .config import check_environment, load_storage_settings
 from .errors import DbError, StorageError
 from .pool import connection
 from .reach import Reach, require_reach
+from .stamp import stamp_image
 from .storage import S3PhotoStorage, key_of_uri
 
 # HEIC/HEIF (iPhone) читается как обычный кадр: копия всё равно JPEG.
@@ -42,8 +43,13 @@ PREVIEW_QUALITY = 75
 PREVIEW_CONTENT_TYPE = "image/jpeg"
 
 
-def make_preview(data: bytes) -> bytes:
+def make_preview(data: bytes, *, stamp: str | None = None) -> bytes:
     """Сжать кадр до копии для показа. Не картинка — `StorageError`, а не пустые байты.
+
+    `stamp` — текст видимого штампа (D619, D621): вшивается в правый нижний
+    угол ПОСЛЕ сжатия, чтобы размер шрифта шёл от ширины готового кадра.
+    Без него кадр сжимается как есть — так читаются кадры для модели и проверка
+    «это изображение», и так кладутся кадры исторической загрузки.
 
     Поворот по EXIF применяется ДО сжатия: телефон пишет кадр боком и
     помечает, как его повернуть, а сохранённая без метки копия легла бы боком.
@@ -54,6 +60,8 @@ def make_preview(data: bytes) -> bytes:
     except (UnidentifiedImageError, OSError) as exc:
         raise StorageError(f"Кадр не читается как изображение ({type(exc).__name__})") from exc
     кадр.thumbnail((PREVIEW_MAX_SIDE, PREVIEW_MAX_SIDE), Image.Resampling.LANCZOS)
+    if stamp:
+        кадр = stamp_image(кадр, stamp)
     выход = io.BytesIO()
     кадр.save(выход, format="JPEG", quality=PREVIEW_QUALITY, optimize=True, progressive=True)
     return выход.getvalue()

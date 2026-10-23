@@ -44,7 +44,7 @@ import uuid
 from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any, Protocol
 
 import psycopg
@@ -61,6 +61,7 @@ from .models import (
     UPLOADED_ORIGINS,
     InspectionDetail,
 )
+from .photos import stamp_for
 from .pool import connection
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
 from .push import _INSERT_TRANSLATION_SQL
@@ -956,15 +957,13 @@ def add_photo(
     В хранилище ложится сжатая копия (D250, D253), как у кадров обхода. Байты,
     которые не читаются как изображение, — отказ: оригинал не хранится, и
     «положить как есть» значило бы хранить то, что никто не покажет.
+
+    Кадр текущей загрузки получает видимый штамп (D619, D621) на момент
+    загрузки; кадр исторической — нет (D332): штамп снимается до сжатия, но
+    после замка, потому что режим черновика известен только из базы.
     """
     ident = _require_inspection_id(inspection_id)
     tenant_code = _require_tenant(tenant)
-    try:
-        копия = make_preview(data)
-    except StorageError as exc:
-        raise HistoryImportError(
-            "Кадр не читается как изображение (ожидается JPEG, PNG или WebP) — не приложен"
-        ) from exc
     ссылка = photo_ref(data)
     try:
         with _connect() as conn, conn.cursor() as cur:
@@ -974,6 +973,12 @@ def add_photo(
             cur.execute(_PHOTO_TAKEN_SQL, (запись, ссылка))
             if cur.fetchone() is not None:
                 raise HistoryImportError(f"Этот кадр уже приложен к записи #{n}")
+            try:
+                копия = make_preview(data, stamp=stamp_for(cur, ident, datetime.now(UTC)))
+            except StorageError as exc:
+                raise HistoryImportError(
+                    "Кадр не читается как изображение (ожидается JPEG, PNG или WebP) — не приложен"
+                ) from exc
             кадр = str(uuid.uuid4())
             try:
                 uri = storage.put(object_key(ident, кадр), копия, content_type=PREVIEW_CONTENT_TYPE)

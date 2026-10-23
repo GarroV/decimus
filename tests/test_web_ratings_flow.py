@@ -94,7 +94,7 @@ def test_контроль_грузит_партнёр_видит(
         замечания_рс = две.get_data(as_text=True).split("rt-viol__cluster")[1]
         assert "За период нет данных РС." in замечания_рс
         # Сравнение девелоперов и стран (D551) — у УК: Dev One со своими странами.
-        сравнение = две.get_data(as_text=True).split('id="rt-compare"')[1].split("</section>")[0]
+        сравнение = две.get_data(as_text=True).split('id="rt-tp-compare"')[1].split("</article>")[0]
         assert "Dev One" in сравнение and "rt-cmp__v is-" in сравнение
 
     подменить_двери(monkeypatch, tenant="GE", role="admin")
@@ -106,7 +106,7 @@ def test_контроль_грузит_партнёр_видит(
         текст = страница.get_data(as_text=True)
         assert "97.5" in текст
         assert "/ratings/imports" not in текст
-        assert 'id="rt-compare"' not in текст  # D551: сравнение — только УК
+        assert 'id="rt-tp-compare"' not in текст  # D551: сравнение — только УК
         assert (
             client.post(
                 "/ratings/import", data={"file": (io.BytesIO(b"x"), "x.csv")}, headers=ORIGIN

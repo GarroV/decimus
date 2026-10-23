@@ -333,7 +333,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space,space_guard,storage,storage_reconcile,target_refusal,timeouts}.py -->
+<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
@@ -351,6 +351,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/request_memo.py` | Память одного HTTP-запроса для чтений, которые страница просит из разных блоков |
 | `src/db/space.py` | Пространство, от имени которого идёт обращение к базе (аудит 12.10, F-037, F-005) |
 | `src/db/space_guard.py` | Пространство записи обязано быть заведено — опечатка в коде это отказ (#481) |
+| `src/db/stamp.py` | Видимый штамп на кадре проверки: когда, где, кто снял (D619, D621) |
 | `src/db/storage.py` | Хранилище кадров за S3-совместимым интерфейсом (D004, D054) |
 | `src/db/storage_reconcile.py` | Сверка хранилища файлов с таблицами: экшн-планы и ответы на предписания (#496) |
 | `src/db/target_refusal.py` | Расхождение баз в цепочке отказа — узнать и записать в журнал (#515, #521) |
@@ -529,6 +530,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0088_country_contracts.sql` | Блок «Договор» в карточке страны (шаг 2 спеки 2026-10-21-osb-prescriptions-design, D603, D606): юрлицо партнёра, договор одной строкой и КОНТАКТЫ ПО ДКК — почты, которые… |
 | `0089_inspection_edits_delete.sql` | Журнал правок на приёмке (0081) принимает и снятие записи (#1164): владелец 21.10.2026 — «добавь в проверки, которые на вычитке, возможность удаления каких-то пунктов… |
 | `0090_notifications.sql` | Уведомления в приложении (#1129, D604, D614): колокольчик в левой панели и красная точка на пункте меню, где есть новое |
+| `0091_units_merge_guard_search_path.sql` | Сторож слияния точек (`units_merge_guard`, 0079) — функция владельца (`security definer`) — был заведён с путём поиска `pg_catalog, public` без `pg_temp` |
 | `0092_action_plan_rows.sql` | Электронный план исправлений, шаг 2 эпика #1168 (спека 2026-10-22-electronic-action-plan-design; D612, D613, D617, D618, D621) |
 <!-- map:end -->
 
