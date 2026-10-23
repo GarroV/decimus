@@ -62,7 +62,6 @@ from .routers import (
     build_info_router,
     build_lang_router,
     build_material_router,
-    build_mcp_router,
     build_record_router,
     build_records_router,
     build_resend_router,
@@ -74,7 +73,6 @@ from .routers import (
 from .routers.help import HELP_COMMAND
 from .routers.lang import LANG_COMMAND
 from .routers.material import MaterialHandler
-from .routers.mcp import MCP_COMMAND
 from .routers.record import make_frame_handler, make_material_handler, make_waiting_handler
 from .routers.records import RECORDS_COMMAND
 from .routers.resend import RESEND_COMMAND
@@ -221,10 +219,6 @@ def build_dispatcher(
     # собираются записи (T241): при завершении называются не только кадры без
     # записи, но и слова, кадра не дождавшиеся.
     dispatcher.include_router(build_records_router(store))
-    # Установка MCP (T209, T253, D448) и версия сборки (T246) —
-    # рядом с остальными командами: своих состояний диалога у них нет, обычного
-    # текста они не ждут, и на порядок разбора материала не влияют.
-    dispatcher.include_router(build_mcp_router())
     dispatcher.include_router(build_stops_router())
     dispatcher.include_router(build_help_router())
     dispatcher.include_router(build_lang_router())
@@ -288,9 +282,6 @@ MENU_COMMANDS = (
     # Язык бота (D303) — рядом со справкой: тоже не шаг обхода, а настройка,
     # и подписан на обоих языках, чтобы его нашёл и тот, кто язык стенда не читает.
     (LANG_COMMAND, "cmd.lang"),
-    # Подключение Claude (D448): токен себе выпускает каждый, кого бот пускает,
-    # — круга, который видел пункт отдельно, больше нет.
-    (MCP_COMMAND, "cmd.mcp"),
     (RESEND_COMMAND, "cmd.resend"),
     (VERSION_COMMAND, "cmd.version"),
 )
