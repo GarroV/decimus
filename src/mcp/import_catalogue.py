@@ -521,10 +521,13 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         name="import_add_photo",
         description=(
             "Attach a photo from the old report to one finding of an imported draft. "
-            "Optional: a finding without a photo is fine for imports. The image is "
-            "passed as base64 (JPEG, PNG or WebP, at most 700 KB after decoding — the "
-            "request body is capped at 1 MB; downscale larger images first). The same "
-            "image is not attached twice to one finding."
+            "Optional: a finding without a photo is fine for imports. Last resort only: "
+            "for photos the person sent or keeps in a folder use local_attach_photos or "
+            "import_upload_photos — they carry the original, while base64 typed into "
+            "this argument ends up as a thumbnail whose labels and dates are unreadable "
+            "in the PDF (the answer warns with low_resolution). The image is passed as "
+            "base64 (JPEG, PNG or WebP, at most 700 KB after decoding — the request "
+            "body is capped at 1 MB). The same image is not attached twice to one finding."
         ),
         input_schema=_schema(
             {

@@ -47,6 +47,7 @@ from . import import_modes as modes
 from .checklist_layout import Store
 from .db_target import config_refusal
 from .errors import McpError, ToolError
+from .photo_quality import low_resolution_warning
 from .retraction import _same_unit
 from .tools import _finding, _item_texts_of, _parse_date, _require_inspection_id
 
@@ -996,7 +997,13 @@ def import_add_photo(
         ) from None
     with _db():
         db.add_photo(ident, номер, tenant=tenant, data=байты, storage=хранилище)
-    return _view(ident, tenant=tenant, note=f"photo attached to finding #{номер}")
+    мелкий = low_resolution_warning(байты)
+    return _view(
+        ident,
+        tenant=tenant,
+        note=f"photo attached to finding #{номер}",
+        warnings=[мелкий] if мелкий else (),
+    )
 
 
 def _too_big() -> str:
