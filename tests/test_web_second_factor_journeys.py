@@ -33,7 +33,7 @@ from src.domain.second_factor import (  # noqa: E402
     new_totp_secret,
     totp_step_now,
 )
-from src.web import auth, second_step  # noqa: E402
+from src.web import auth, landing, oauth, second_step  # noqa: E402
 
 pytestmark = requires_db
 
@@ -156,7 +156,11 @@ def test_полувход_не_открывает_ни_одного_маршру
                 continue
             ответ = стенд.client.open(путь, method=метод, headers=HDR)
             assert ответ.status_code == 302, f"полувход открыл {метод} {путь}"
-            assert auth.LOGIN_PATH in (ответ.headers.get("Location") or "")
+            # Неопознанного на чтении встречает посадочная (D544), на записи и на согласии
+            # Claude (D465) — форма входа.
+            на_вход = метод != "GET" or rule.endpoint == oauth.AUTHORIZE_ENDPOINT
+            ожидали = auth.LOGIN_PATH if на_вход else landing.PATH
+            assert ожидали in (ответ.headers.get("Location") or "")
             проверено += 1
     assert проверено > 20, "перебор маршрутов ничего не проверил"
     assert не_вошёл(стенд.client)
