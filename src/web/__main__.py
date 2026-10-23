@@ -41,6 +41,7 @@ from .config import (  # noqa: E402
 )
 from .errors import WebError  # noqa: E402
 from .proxy import guard_forwarded, serve_options, untrusted_network  # noqa: E402
+from .server_limits import server_options  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ def main() -> int:
     try:
         settings = load_settings()
         require_signing_key(settings)
+        limits = server_options()
         app = create_app(settings)
     except WebError as exc:
         print(f"Веб-админка не поднялась: {exc}", file=sys.stderr)
@@ -100,6 +102,7 @@ def main() -> int:
         host=settings.host,
         port=settings.port,
         ident="decimus",
+        **limits,
         **serve_options(settings),
     )
     return 0

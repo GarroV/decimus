@@ -18,13 +18,14 @@
 
 from __future__ import annotations
 
-import hmac
 import ipaddress
 import logging
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from waitress.proxy_headers import proxy_headers_middleware
+
+from src.domain.client_ip import front_key_matches
 
 from .config import ANY_PEER, WEB_FRONT_KEY_VAR, Settings
 
@@ -119,11 +120,6 @@ def peer_trusted(peer: str, addrs: tuple[str, ...]) -> bool:
     except ValueError:
         return False
     return any(адрес in ipaddress.ip_network(сеть, strict=False) for сеть in addrs)
-
-
-def front_key_matches(expected: str, given: str) -> bool:
-    """Ключ фронта совпал: сравнение за постоянное время, пустой присланный — нет."""
-    return bool(given) and hmac.compare_digest(expected.encode(), given.encode())
 
 
 def guard_forwarded(app: WsgiApp, settings: Settings) -> WsgiApp:

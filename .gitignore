@@ -77,3 +77,7 @@ front/wrangler.demo.jsonc
 
 # Логи dev-сервера (serve.log был закоммичен, F-115)
 *.log
+
+# SBOM меняется на каждой сборке: make sbom, в репозитории не хранится.
+sbom.cdx.json
+.venv-audit/

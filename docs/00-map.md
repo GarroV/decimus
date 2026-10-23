@@ -95,7 +95,7 @@ Flask-приложение управляющей компании и партн
 `app.py` собирает приложение и ещё держит часть экранов; остальные экраны
 подключаются своими `install(app, conf)`.
 
-<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,view,webauthn_rp}.py -->
+<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,server_limits,view,webauthn_rp}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/__main__.py` | Точка входа веб-админки: `python -m src.web` |
@@ -107,6 +107,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/errors.py` | Отказы блока `web` |
 | `src/web/icons.py` | Иконки админки — набор линейки из дизайн-системы (`static/icons.json`) |
 | `src/web/sections.py` | Разделы веб-админки и признак «построен / не построен» (D138) |
+| `src/web/server_limits.py` | Явные пределы сервера `waitress` и предел одновременных медленных запросов |
 | `src/web/view.py` | Подготовка того, что уже посчитано, к показу |
 | `src/web/webauthn_rp.py` | Ключи доступа (WebAuthn): тонкая обёртка над `webauthn` (duo-labs/py_webauthn, D463) |
 <!-- map:end -->
@@ -645,6 +646,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/roster.py` | Связки «юзернейм → Telegram ID», собранные по приглашениям до D286 (#230) |
 | `src/bot/run_guard.py` | Память бота о проверке и чужой старт: сверка личности проверки (D392) |
 | `src/bot/sealed.py` | Сданная проверка не правится (задача T201, решение владельца D080) |
+| `src/bot/serial.py` | Обновления разных чатов идут параллельно, одного чата — строго по очереди (GHSA-7gm6-hc9m-w3vc) |
 | `src/bot/sheet_loader.py` | Раз в несколько часов и по заявке — забор общей таблицы контроля «база рейтингов» (D464, docs/15-ratings.md) |
 | `src/bot/shown.py` | Карты «сообщение → запись»: чем бот показал запись и из чего она выросла |
 | `src/bot/sidecar.py` | Заметки бота рядом с проверкой: то, чего нет ни у движка, ни в отчёте |
@@ -910,7 +912,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/mcp_healthcheck.py` | Проба здоровья MCP-сервера — изнутри его контейнера (задача T255, #210) |
 | `tools/mcp_install.sh` | Установщик подключения к MCP-серверу проверок (#244, решение D112) |
 | `tools/mcp_outside.py` | Смоук доступа к MCP-серверу С ЧУЖОЙ МАШИНЫ (задача T256, #211) |
-| `tools/mcp_watch.py` | Сторож доступности MCP снаружи (#243) |
+| `tools/mcp_watch.py` | Сторож доступности продукта снаружи: MCP (#243) и вход в админку (F-111) |
 | `tools/methodology_leak.py` | Проверка: методика управляющей компании не цитируется в репозитории (#138, #854) |
 | `tools/oauth_smoke.py` | Сквозной прогон подключения Claude входом через сайт (D417) против живого стенда |
 | `tools/open_demo_ratings.py` | Рейтинги открытого демо (D524): РС и РКО пиццерий демо-сети — тем же импортёром, что у продукта |
@@ -955,6 +957,7 @@ Telegram, ни HTTP, ни SQL.
 | `scripts/deploy.sh` | Раскатка на площадку одной командой (T246, #201) |
 | `scripts/prod-update.sh` | Обновление прода на Linux (VPS) — запускается НА САМОМ СЕРВЕРЕ из каталога репозитория |
 | `scripts/smoke.sh` | Смоук раскатанного бота на целевой площадке |
+| `scripts/verify-source.sh` | Сверка источника перед сборкой образа (см |
 <!-- map:end -->
 
 ## front/ — Cloudflare Worker'ы

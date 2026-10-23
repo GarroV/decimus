@@ -34,6 +34,7 @@ from src.domain.models import TEXT_LANGS, Inspection
 from src.recognize.errors import RecognizeError
 from src.recognize.translate import translate_text
 
+from .server_limits import walk_model_gate
 from .texts_walk import WALK_TEXTS
 from .walk_auth import TRANSLATE_ENDPOINT, TRANSLATE_PATH, WalkSettings
 from .walk_write import MAX_TEXT, Identify, WalkRefused, _text
@@ -59,6 +60,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
     """
     busy: set[int] = set()
     guard = threading.Lock()
+    gate = walk_model_gate()
 
     def refused(key: str, lang: str, status: int = 422) -> tuple[Response, int]:
         entry = WALK_TEXTS[key]
@@ -96,6 +98,11 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             with guard:
                 busy.discard(who)
             return refused("walk.err.translate_busy", lang, 429)
+        if not gate.try_enter():
+            hold.release()
+            with guard:
+                busy.discard(who)
+            return refused("walk.err.overloaded", lang, 503)
         try:
             with usage_scope(telegram_id=who, tenant=inspection.tenant), chat_usage(who):
                 translated = translate_text(text, lang=target)
@@ -105,6 +112,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             logger.warning("Обход: перевод для чата %s не удался: %s", log_id(who), exc)
             return refused("walk.err.translate", lang, 503)
         finally:
+            gate.leave()
             hold.release()
             with guard:
                 busy.discard(who)

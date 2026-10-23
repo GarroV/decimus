@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest porcha porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units units-normalize demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map landing-shots
+.PHONY: bootstrap check test test-honest porcha porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units units-normalize demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map landing-shots lock audit sbom
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -13,8 +13,39 @@ PYTHON ?= python3.12
 bootstrap:  ## окружение прогона с нуля: `.venv` и зависимости (нужен Python 3.12)
 	$(PYTHON) -m venv .venv
 	$(VENV)/pip install -q --upgrade pip
-	$(VENV)/pip install -q -e '.[dev]'
+	$(VENV)/pip install -q --require-hashes -r requirements-dev.txt -r requirements-build.txt
+	$(VENV)/pip install -q --no-deps --no-build-isolation -e .
 	$(VENV)/pytest --version
+
+# Цепочка поставки (см. GHSA-7gm6-hc9m-w3vc). Зависимости ставятся ТОЛЬКО из
+# lockfile с хэшами (`pip --require-hashes`): прямые версии в pyproject.toml
+# закреплены через ==, а транзитивные без lockfile плавали. `requirements.txt` —
+# всё дерево продукта (его ставит Dockerfile), `requirements-dev.txt` — то же
+# плюс экстра dev (его ставят `make bootstrap` и CI), `requirements-audit.txt` —
+# сканер и генератор SBOM (свой venv `.venv-audit`: они тянут lxml, а с lxml в
+# среде тестов падает тест плана, см. комментарий к экстре audit в
+# pyproject.toml). Обновление — осознанное: правка pyproject.toml, `make lock`,
+# коммит pyproject.toml и всех четырёх файлов. Нужен `uv` (он только собирает
+# lockfile; ставит обычный pip).
+AUDIT_VENV := ./.venv-audit/bin
+
+lock:  ## пересобрать lockfile с хэшами (requirements*.txt, включая зависимости сборки) из pyproject.toml; нужен uv
+	uv pip compile pyproject.toml --universal --python-version 3.12 --generate-hashes -q -o requirements.txt
+	uv pip compile pyproject.toml --extra dev -c requirements.txt --universal --python-version 3.12 --generate-hashes -q -o requirements-dev.txt
+	uv pip compile pyproject.toml --extra audit -c requirements.txt --universal --python-version 3.12 --generate-hashes -q -o requirements-audit.txt
+	$(PYTHON) -c "import tomllib; print(chr(10).join(tomllib.load(open('pyproject.toml', 'rb'))['build-system']['requires']))" | uv pip compile - --universal --python-version 3.12 --generate-hashes -q -o requirements-build.txt
+
+# Окружение сканера: ставится из своего lockfile, как и всё остальное.
+$(AUDIT_VENV)/pip-audit: requirements-audit.txt
+	$(PYTHON) -m venv .venv-audit
+	$(AUDIT_VENV)/pip install -q --upgrade pip
+	$(AUDIT_VENV)/pip install -q --require-hashes -r requirements-audit.txt
+
+audit: $(AUDIT_VENV)/pip-audit  ## сверка lockfile с базами advisory (`pip-audit`); находка роняет цель
+	$(AUDIT_VENV)/pip-audit -r requirements-dev.txt -r requirements-audit.txt -r requirements-build.txt --require-hashes --disable-pip --progress-spinner off
+
+sbom: $(AUDIT_VENV)/pip-audit  ## SBOM продукта в формате CycloneDX (sbom.cdx.json, в репозитории не лежит) из requirements.txt
+	$(AUDIT_VENV)/cyclonedx-py requirements requirements.txt --of JSON -o sbom.cdx.json
 
 # Полный набор проверок. Прогоняется перед сдачей блока.
 #
@@ -183,7 +214,7 @@ demo:  ## наполнить синтетический англоязычный
 # цель доставит её сама; браузер берётся из кеша Playwright. Правили экран, который виден на лендинге, —
 # запусти и закоммить снимки.
 landing-shots:  ## пересъёмка настоящих снимков для лендинга (открытое демо, ru и en)
-	@$(VENV)/python -c "import playwright" 2>/dev/null || $(VENV)/pip install -q -e '.[dev]'
+	@$(VENV)/python -c "import playwright" 2>/dev/null || $(VENV)/pip install -q --require-hashes -r requirements-dev.txt
 	$(VENV)/python tools/landing_shots.py
 
 # Замер потолка нагрузки (T101, D058). Владелец назвал нагрузку главным риском,

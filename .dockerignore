@@ -31,3 +31,4 @@ demo/state/
 docs/furca/
 tasks.md
 progress.md
+.venv-audit/

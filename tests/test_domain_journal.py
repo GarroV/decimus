@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.client_ip import forwarded_client, peer_trusted
+from src.domain.client_ip import forwarded_client, front_key_matches, peer_trusted
 from src.domain.journal import HIDDEN, MAX_TARGET, is_hidden_field, summarize_target
 
 СЕКРЕТНЫЕ_ПОЛЯ = [
@@ -143,3 +143,39 @@ def test_звено_узнаётся_по_адресу_и_по_подсети() 
     assert peer_trusted("10.0.0.1", ("10.0.0.1",))
     assert not peer_trusted("172.20.0.4", ("172.19.0.0/16",))
     assert not peer_trusted("не-адрес", ("172.19.0.0/16",))
+
+
+# --- ключ фронта: звену из подсети верим только с верным ключом (F-107) -------
+
+КЛЮЧ = "k" * 32
+
+
+def _адрес_с_ключом(присланный: str | None, ключ: str = КЛЮЧ) -> str:
+    return forwarded_client(
+        "172.19.0.4",
+        "10.6.6.6, 198.51.100.7",
+        trusted_proxies=1,
+        trusted_addrs=("172.19.0.0/16",),
+        front_key=ключ,
+        given_key=присланный,
+    )
+
+
+def test_звену_с_верным_ключом_фронта_верим() -> None:
+    assert _адрес_с_ключом(КЛЮЧ) == "198.51.100.7"
+
+
+@pytest.mark.parametrize("присланный", [None, "", "x" * 32, КЛЮЧ + "x"])
+def test_звену_без_верного_ключа_фронта_не_верим(присланный: str | None) -> None:
+    assert _адрес_с_ключом(присланный) == "172.19.0.4", "сосед по подсети выбрал адрес сам"
+
+
+def test_ключ_не_задан_доверие_по_подсети_как_раньше() -> None:
+    assert _адрес_с_ключом(None, ключ="") == "198.51.100.7"
+
+
+def test_ключ_фронта_сверяется_целиком_и_пустой_присланный_не_совпадает() -> None:
+    assert front_key_matches(КЛЮЧ, КЛЮЧ)
+    assert not front_key_matches(КЛЮЧ, "")
+    assert not front_key_matches(КЛЮЧ, None)
+    assert not front_key_matches(КЛЮЧ, КЛЮЧ[:-1])
