@@ -32,6 +32,9 @@ services:
       # идущие проверки именно им (tools/seed_open_demo.py).
       WEB_WALK_PREVIEW_CHAT: "999000000701"
       WEB_WALK_PREVIEW_CHAT_RU: "999000000702"
+      # Просмотр без подписи несовместим с токеном бота (guard в walk_auth):
+      # поднятый из каталога с боевым `.env` стенд иначе не стартует (#1222).
+      TELEGRAM_BOT_TOKEN: ""
       WEB_DEMO: "1"
       WEB_URL_PREFIX: ""
   db:
