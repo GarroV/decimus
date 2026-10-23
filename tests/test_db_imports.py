@@ -171,7 +171,9 @@ def test_добавление_правка_снятие_пересчитываю
         tenant="HQ", store=хранилище, actor=КТО, inspection_id=ident, n=2
     )
     assert _движок_согласен(ident) == (99.0, "A")
-    assert [f["n"] for f in ответ["findings"]] == [1]
+    # Короткий ответ (#1016): списка нет — только число оставшихся; какая именно осталась,
+    # видно по записанной проверке ниже.
+    assert ответ["findings_total"] == 1
     запись = _записано(ident).findings[0]
     assert (запись.code, запись.level, запись.repeat) == ("CLN03", "D1", True)
 
