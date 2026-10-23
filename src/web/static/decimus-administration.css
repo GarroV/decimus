@@ -1,6 +1,6 @@
 /* Раздел «Администрирование» (D639): столбец вкладок слева, содержимое справа, и блок
    «Состояние подключений» (D638). Только токены линейки (`dodo-ds.css`); своих цветов
-   и размеров нет. Блоки ограниченной ширины, не на весь экран. */
+   и размеров нет. Блок состояния — по ширине соседних блоков вкладки. */
 
 .sadmin { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: var(--space-7); align-items: start; }
 .sadmin__nav { position: sticky; top: var(--space-6); }
@@ -12,7 +12,7 @@
 .sadmin__tab:focus-visible { outline: var(--focus-outline); }
 .sadmin__main { min-width: 0; }
 
-.shealth { max-width: 880px; margin: var(--space-6) 0; }
+.shealth { margin: var(--space-6) 0; }
 .shealth__head { display: flex; align-items: center; gap: var(--space-3); }
 .shealth__title { margin: 0; font-size: var(--fs-title); font-weight: var(--w-semibold); }
 .shealth__summary { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-4) 0; font-weight: var(--w-semibold); color: var(--ink); }
@@ -33,6 +33,7 @@
 }
 
 @media (max-width: 719px) {
-  .shealth__row { flex-wrap: wrap; }
-  .shealth__act { width: 100%; padding-left: calc(10px + var(--space-4)); }
+  .shealth__row { align-items: flex-start; gap: var(--space-3); }
+  .shealth__dot { margin-top: 6px; }
+  .shealth__act .sbtn { padding-inline: var(--space-3); font-size: var(--fs-meta); }
 }
