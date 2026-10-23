@@ -301,7 +301,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | Каталог | Файлов | Какие |
 |---|---|---|
 | `src/web/templates/` | 23 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, _pick_page.html, … (+15) |
-| `src/web/templates/actions/` | 10 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_rows.html, index.html, … (+2) |
+| `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
@@ -536,7 +536,8 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0090_notifications.sql` | Уведомления в приложении (#1129, D604, D614): колокольчик в левой панели и красная точка на пункте меню, где есть новое |
 | `0091_units_merge_guard_search_path.sql` | Сторож слияния точек (`units_merge_guard`, 0079) — функция владельца (`security definer`) — был заведён с путём поиска `pg_catalog, public` без `pg_temp` |
 | `0092_action_plan_rows.sql` | Электронный план исправлений, шаг 2 эпика #1168 (спека 2026-10-22-electronic-action-plan-design; D612, D613, D617, D618, D621) |
-| `0093_action_plan_file_parsed.sql` | Файл «туда и обратно» электронного плана, шаг 3 эпика #1168 (спека 2026-10-22-electronic-action-plan-design, «Файл туда и обратно») |
+| `0093_ratings_rko_service_marks.sql` | «Дисквалифицировать пиццу» в фото-проверке РКО — не нарушение, а служебная пометка контроля: отчёт ресторана не идёт в пул баллов по продукту |
+| `0094_action_plan_file_parsed.sql` | Файл «туда и обратно» электронного плана, шаг 3 эпика #1168 (спека 2026-10-22-electronic-action-plan-design, «Файл туда и обратно») |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
