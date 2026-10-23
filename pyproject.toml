@@ -18,6 +18,9 @@ dependencies = [
     # HEIC/HEIF с iPhone: бот (кадр файлом, #1023) и кадры из чата Claude (src/db/photo_intake.py).
     "pillow-heif==1.8.0",
     "openpyxl==3.1.5",
+    # openpyxl сам подхватывает defusedxml и разбирает XML книги без раскрытия
+    # сущностей: файл плана от партнёра — недоверенный (#1168, XML-бомба).
+    "defusedxml==0.7.1",
     # recognize: единственный провайдер LLM — OpenAI (решение D010). Один
     # клиент закрывает и разбор комментариев, и транскрипцию голоса.
     "openai==2.9.0",
@@ -237,6 +240,8 @@ extend_exclude = ["^\\.venv/", "^tests/"]
 # Инструменты проверок не импортируются кодом — они запускаются командами.
 [tool.deptry.per_rule_ignores]
 DEP002 = [
+    # openpyxl подхватывает его сам при разборе книги; в нашем коде импорта нет.
+    "defusedxml",
     "ruff",
     "mypy",
     "pytest",

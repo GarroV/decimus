@@ -488,3 +488,10 @@ def test_мусор_в_колонке_id_доходит_до_сверки_и_т�
         строки, [строка(СТРОКА_1, 1), строка(СТРОКА_2, 2)], count_from=НАЧАЛО, today=СЕГОДНЯ
     )
     assert [s.code for s in итог.skipped] == [SKIP_UNKNOWN]
+
+
+def test_книгу_партнёра_openpyxl_разбирает_через_defusedxml() -> None:
+    """Файл плана — недоверенный: без defusedxml openpyxl раскрыл бы XML-сущности (бомба)."""
+    from openpyxl import xml as openpyxl_xml  # type: ignore[import-untyped]
+
+    assert openpyxl_xml.DEFUSEDXML, "defusedxml не установлен — разбор книги беззащитен"
