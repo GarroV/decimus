@@ -45,7 +45,7 @@ from .config import (
 from .errors import ActionPlanError, DbError, StorageError
 from .models import UPLOADED_ORIGINS
 from .plan_notify import KIND_REQUESTED, notify_event
-from .plan_rows import PlanRow, insert_rows, prepare_rows, read_rows
+from .plan_rows import PlanRow, TermsProvider, insert_rows, prepare_rows, read_rows
 from .pool import connection
 from .reach import Reach, require_reach
 from .storage import PhotoStorage, S3PhotoStorage, key_of_uri
@@ -610,7 +610,12 @@ def fetch_file(ref: PlanFileRef, *, storage: FileReader | None = None) -> bytes:
 
 
 def open_auto_request(
-    cur: psycopg.Cursor[Any], inspection_id: str, *, actor: str, on: date
+    cur: psycopg.Cursor[Any],
+    inspection_id: str,
+    *,
+    actor: str,
+    on: date,
+    terms: TermsProvider | None = None,
 ) -> str | None:
     """Завести запрос сам — тем же курсором, что подтверждает проверку (D272).
 
@@ -649,6 +654,7 @@ def open_auto_request(
         actor=actor,
         count_from=on,
         due_on=plan_due_on(on),
+        terms=terms,
     )
 
 
@@ -660,13 +666,14 @@ def _create_request(
     actor: str,
     count_from: date,
     due_on: date,
+    terms: TermsProvider | None,
 ) -> str | None:
     """Запрос, его строки и уведомление партнёру — одним курсором. Уже был — `None`.
 
     Строки — по нарушениям проверки: есть хоть одна — план электронный. Нарушений
     нет (ручной запрос по проверке без D1–D3) — файловый, как раньше.
     """
-    rows = prepare_rows(cur, inspection_id)
+    rows = prepare_rows(cur, inspection_id, terms=terms)
     cur.execute(
         _INSERT_REQUEST_SQL,
         {
@@ -715,12 +722,14 @@ def request_plan(
     actor: str,
     due_on: date | None = None,
     count_from: date | None = None,
+    terms: TermsProvider | None = None,
 ) -> str:
     """Запросить план кнопкой УК по принятой проверке УК. Возвращает id запроса.
 
     `count_from` — от какой даты считать срок (D613), по умолчанию сегодня. Срок
     ответа — от неё плюс дни методики; `due_on` перекрывает его, когда УК назвала
-    дату сама (и тогда она обязана быть не в прошлом).
+    дату сама (и тогда она обязана быть не в прошлом). `terms` — дни и формулировки записей
+    от движка (`plan_rows.TermsProvider`): без них строк нет, и план файловый.
     """
     who = _actor(actor)
     ident = _uuid_or_none(inspection_id)
@@ -745,6 +754,7 @@ def request_plan(
                 actor=who,
                 count_from=начало,
                 due_on=срок,
+                terms=terms,
             )
             if created is None:
                 raise ActionPlanError("По этой проверке экшн-план уже запрошен")
@@ -875,7 +885,10 @@ def upload_version(
     max_bytes: int,
     storage: PhotoStorage | None = None,
 ) -> int:
-    """Положить новую версию плана и отправить запрос на приёмку. Возвращает номер версии.
+    """Положить новую версию плана; файловый запрос уходит на приёмку. Возвращает номер версии.
+
+    К электронному плану файл ложится вложением и ничего не двигает: строки он не
+    заполняет, их заполняют на экране (разбор файла в строки — следующий шаг).
 
     Запрос вне охвата отвечает «нет», как несуществующий. Что кладёт только
     партнёр этой страны и только в запрошенный запрос — держит ещё и триггер.
@@ -930,11 +943,6 @@ def _record_version(ident: str, *, reach: Reach, row: dict[str, Any]) -> int:
         head = cur.fetchone()
         if head is None:
             raise ActionPlanError("Запроса нет")
-        if head[1]:
-            raise ActionPlanError(
-                "План электронный: строки заполняют на экране. Файл туда и обратно "
-                "появится следующим шагом"
-            )
         if head[0] != STATUS_REQUESTED:
             raise ActionPlanError(
                 "План уже на приёмке или принят — новую версию кладут после возврата"
@@ -943,7 +951,11 @@ def _record_version(ident: str, *, reach: Reach, row: dict[str, Any]) -> int:
         version_row = cur.fetchone()
         version = int(version_row[0]) if version_row else 1
         cur.execute(_INSERT_FILE_SQL, {**row, "version": version})
-        cur.execute(_SET_STATUS_SQL, {"id": ident, "status": STATUS_ON_REVIEW})
+        if not head[1]:
+            # Файловый план уходит на приёмку с файлом. Электронный — нет: файл у него
+            # вложение («не разобран», строки заполняют на экране), согласование идёт
+            # по строкам (`plan_flow.submit_plan`).
+            cur.execute(_SET_STATUS_SQL, {"id": ident, "status": STATUS_ON_REVIEW})
         conn.commit()
         return version
 

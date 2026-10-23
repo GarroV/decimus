@@ -18,12 +18,10 @@ from dataclasses import dataclass
 
 import psycopg
 
-from src.domain.errors import ConfigError as DomainConfigError
-
 from .action_plans import _admin_write
 from .errors import ActionPlanError
 from .plan_flow import _SIGN_SQL
-from .plan_rows import insert_rows, prepare_rows
+from .plan_rows import TermsProvider, insert_rows, prepare_rows
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +52,13 @@ class BackfillReport:
     applied: bool
 
 
-def backfill_rows(*, apply: bool = False) -> BackfillReport:
+def backfill_rows(*, terms: TermsProvider, apply: bool = False) -> BackfillReport:
     """Завести строки открытым запросам без файла. `apply=False` — ничего не пишет.
 
-    Запрос, по которому строк не вышло (в проверке нет D1–D3) или методика её издания
-    не читается, остаётся файловым и попадает в `skipped` с причиной: молча пропущенный
-    запрос — тот, о котором никто не узнает.
+    `terms` — сроки записей от движка (`report.plan_terms.provider`): блок `db` движок
+    не зовёт, поставщика даёт инструмент. Запрос, по которому строк не вышло (в проверке
+    нет D1–D3) или движок сроков не дал, остаётся файловым и попадает в `skipped` с
+    причиной: молча пропущенный запрос — тот, о котором никто не узнает.
     """
     skipped: list[str] = []
     converted = 0
@@ -70,11 +69,11 @@ def backfill_rows(*, apply: bool = False) -> BackfillReport:
             candidates = [(str(r[0]), str(r[1])) for r in cur.fetchall()]
             for request_id, inspection_id in candidates:
                 try:
-                    rows = prepare_rows(cur, inspection_id)
-                except DomainConfigError as exc:
-                    # Методика издания проверки не читается — срок строки не выдумываем.
+                    rows = prepare_rows(cur, inspection_id, terms=terms)
+                except ActionPlanError as exc:
+                    # Движок сроков не дал (методика издания не читается) — свои не выдумываем.
                     logger.warning("строки запроса %s не собраны: %s", request_id, exc)
-                    skipped.append(f"{request_id}: методика не читается")
+                    skipped.append(f"{request_id}: {exc}")
                     continue
                 if not rows:
                     skipped.append(f"{request_id}: в проверке нет D1–D3")

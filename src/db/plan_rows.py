@@ -6,10 +6,12 @@
 тяжёлые сверху. Снимок класса, зоны и формулировки лежит в строке: связь с записью
 проверки — кодом, формулировка нужна лишь для показа.
 
-**Срок строки — не здесь.** Дни считает домен (`plan_due.Deadlines`: дни пункта
-методики, не больше потолка класса, D3 — немедленно) и кладёт в строку числом
-`days`; действующий срок `due_on` считает база по одной формуле (`plan_row_due`,
-`0092`) и держит зеркало в `plan_due.effective_row_due`. «Просрочено» не хранится:
+**Дни строки — не отсюда.** Их считает движок (`audit.py score`, поле `days` у записи:
+дни пункта, не больше потолка класса) — «сроки только через движок» (CLAUDE.md). Блок
+`db` движок не зовёт: вызывающий (веб, инструмент) передаёт готовое — `TermsProvider`,
+его делает `src/report/plan_terms.py`. Здесь `days` кладётся в строку числом;
+действующий срок `due_on` считает база по одной формуле (`plan_row_due`, `0092`) и
+держит зеркало в `plan_due.effective_row_due`. «Просрочено» не хранится:
 `PlanRow.overdue` считает на чтении.
 
 **Кто что пишет — держит база (`0092`)**, а не этот модуль: партнёр пишет текст
@@ -18,14 +20,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import logging
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
 import psycopg
 
-from src.domain.plan_due import Deadlines, load_deadlines, row_due_on
+from src.domain.plan_due import row_due_on
+
+from .errors import ActionPlanError
+
+logger = logging.getLogger(__name__)
 
 ROW_FILLING = "filling"
 ROW_IN_WORK = "in_work"
@@ -113,13 +120,10 @@ where w.request_id = any(%(ids)s::uuid[])
 order by w.request_id, w.position
 """
 
-# Методика проверки: издание и чек-лист, по которым считаются дни строк.
-_EDITION_SQL = "select checklist_version, checklist_code from inspections where id = %s"
-
 # Записи проверки, из которых растут строки: нарушения D1–D3, тяжёлые сверху.
 # Рекомендации и информационные записи в план не входят.
 _FINDINGS_SQL = """
-select f.id, f.code, f.level, f.zone
+select f.id, f.n, f.code, f.level, f.zone
 from findings f
 where f.inspection_id = %s and f.level in ('D1', 'D2', 'D3')
 order by f.level desc, f.n
@@ -167,36 +171,55 @@ def read_rows(cur: psycopg.Cursor[Any], ids: Iterable[str]) -> dict[str, tuple[P
     return {k: tuple(v) for k, v in found.items()}
 
 
-def prepare_rows(
-    cur: psycopg.Cursor[Any], inspection_id: str, *, book: Deadlines | None = None
-) -> tuple[NewRow, ...]:
-    """Строки для проверки: по записи D1–D3, дни и формулировки — из методики её издания.
+@dataclass(frozen=True)
+class FindingTerms:
+    """Что движок сказал о записи проверки: дни на устранение и формулировка пункта."""
 
-    Методика не читается — `ConfigError` домена: срок строки, которого нет в
-    методике, не выдумываем. Нарушений нет — пусто (план остаётся файловым).
+    days: int
+    title_ru: str
+    title_en: str
+
+
+#: Условия записей проверки от движка: id проверки → {номер записи: условия}. Даёт вызывающий.
+TermsProvider = Callable[[str], Mapping[int, FindingTerms]]
+
+
+def prepare_rows(
+    cur: psycopg.Cursor[Any], inspection_id: str, *, terms: TermsProvider | None
+) -> tuple[NewRow, ...]:
+    """Строки для проверки: по записи D1–D3, дни и формулировки — от движка (`terms`).
+
+    Нарушений нет — пусто (план остаётся файловым). Условий нет (`terms=None`, вызов
+    без движка — MCP, сид) — тоже пусто, с предупреждением в журнале: дни строки
+    не выдумываем. Движок про запись не сказал (номер не сошёлся) — отказ: молчаливо
+    пропущенная строка — нарушение, которое в плане не окажется.
     """
     cur.execute(_FINDINGS_SQL, (inspection_id,))
     записи = cur.fetchall()
     if not записи:
         return ()
-    if book is None:
-        cur.execute(_EDITION_SQL, (inspection_id,))
-        издание = cur.fetchone()
-        if издание is None:
-            return ()
-        book = load_deadlines(str(издание[0]), str(издание[1]))
+    if terms is None:
+        logger.warning(
+            "проверка %s: условия записей от движка не переданы, план без строк", inspection_id
+        )
+        return ()
+    условия = terms(inspection_id)
     rows = []
-    for ident, code, level, zone in записи:
-        ru, en = book.wording_for(str(code))
+    for ident, number, code, level, zone in записи:
+        известно = условия.get(int(number))
+        if известно is None:
+            raise ActionPlanError(
+                f"Движок не назвал срок записи {number} проверки: строку плана не завести"
+            )
         rows.append(
             NewRow(
                 finding_id=str(ident),
                 item_code=str(code),
                 level=str(level),
                 zone=str(zone),
-                title_ru=ru,
-                title_en=en,
-                days=book.days_for(str(code), str(level)),
+                title_ru=известно.title_ru,
+                title_en=известно.title_en,
+                days=известно.days,
             )
         )
     return tuple(rows)

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from conftest import TEST_DATA, requires_db
+from conftest import requires_db
 from db_harness import set_retraction_env, привязать_страну, точка_справочника
 
 psycopg = pytest.importorskip("psycopg")
@@ -27,11 +27,9 @@ from src.db import notifications as store  # noqa: E402
 from src.db import plan_flow as flow  # noqa: E402
 from src.db.accept import accept_inspection  # noqa: E402
 from src.db.errors import ActionPlanError  # noqa: E402
-from src.db.plan_rows import PlanRow  # noqa: E402
+from src.db.plan_rows import FindingTerms, PlanRow  # noqa: E402
 from src.db.reach import reach_of  # noqa: E402
-from src.domain.config import DATA_FILES  # noqa: E402
-from src.domain.plan_due import load_deadlines, plan_due_days  # noqa: E402
-from src.domain.version import compose  # noqa: E402
+from src.domain.plan_due import plan_due_days  # noqa: E402
 
 pytestmark = requires_db
 
@@ -45,6 +43,23 @@ _чаты = iter(range(9_300_000, 9_400_000))
 ГРУЗИЯ_АННА = "ge-anna"
 ГРУЗИЯ_БОРИС = "ge-boris"
 АРМЕНИЯ_ИВАН = "am-ivan"
+
+#: Подмена ответа движка: дни записи по классу. Настоящие дни считает движок (`audit.py score`,
+#: `tests/test_report_plan_terms.py`), блок `db` их получает готовыми — здесь значения условные.
+ДНИ_ОТ_ДВИЖКА = {"D1": 14, "D2": 7, "D3": 0}
+
+
+def _условия(ident: str) -> dict[int, FindingTerms]:
+    """Поставщик условий строк вместо движка: дни по классу записи, формулировка по коду."""
+    from src.db import queries
+
+    проверка = queries.get_inspection(ident, reach=reach_of("HQ"), include_on_review=True)
+    assert проверка is not None
+    return {
+        f.n: FindingTerms(ДНИ_ОТ_ДВИЖКА[f.level], f"Пункт {f.code}", f"Item {f.code}")
+        for f in проверка.findings
+        if f.level in ДНИ_ОТ_ДВИЖКА
+    }
 
 
 @pytest.fixture
@@ -95,7 +110,7 @@ def _принятая(*уровни: str, unit: str = ТОЧКА) -> str:
     for уровень in уровни:
         add_finding(чат, code=коды[уровень], level=уровень, zone=зоны[уровень], text="запись")
     ident = push_inspection(чат)
-    accept_inspection(ident, tenant="HQ", actor="garva")
+    accept_inspection(ident, tenant="HQ", actor="garva", terms=_условия)
     return ident
 
 
@@ -197,25 +212,52 @@ def test_одна_строка_на_запись_проверки_без_рек�
     add_finding(чат, code="PRD02", level="D2", zone="fridge", text="то же в другой зоне")
     add_finding(чат, code="PRD01", level="R", zone="fridge", text="рекомендация")
     ident = push_inspection(чат)
-    accept_inspection(ident, tenant="HQ", actor="garva")
+    accept_inspection(ident, tenant="HQ", actor="garva", terms=_условия)
 
     строки = _запрос(ident).rows
 
     assert [(r.level, r.zone) for r in строки] == [("D2", "cold_kitchen"), ("D2", "fridge")]
 
 
-def test_срок_строки_это_начало_плюс_дни_методики_не_больше_потолка(
-    сеть: dict[str, str],
-) -> None:
+def test_срок_строки_это_начало_плюс_дни_от_движка(сеть: dict[str, str]) -> None:
     запрос = _запрос(_принятая("D1", "D2", "D3"))
-    книга = load_deadlines(compose(TEST_DATA, DATA_FILES))
 
     for строка in запрос.rows:
-        дни = книга.days_for(строка.item_code, строка.level)
-        assert строка.days == дни
-        assert строка.due_on == запрос.count_from + timedelta(days=дни)
+        assert строка.days == ДНИ_ОТ_ДВИЖКА[строка.level], "дни строки не те, что дал движок"
+        assert строка.due_on == запрос.count_from + timedelta(days=строка.days)
     d3 = next(r for r in запрос.rows if r.level == "D3")
-    assert d3.days == 0 and d3.due_on == запрос.count_from, "D3 — немедленно"
+    assert d3.due_on == запрос.count_from, "D3 — день начала (движок дал ноль дней)"
+
+
+def test_без_условий_от_движка_план_файловый_а_не_со_строками_на_угад(
+    сеть: dict[str, str],
+) -> None:
+    from src.db.push import push_inspection
+    from src.domain import add_finding, start_inspection
+
+    чат = next(_чаты)
+    start_inspection(чат, unit=ТОЧКА, kind="planned", report_lang="ru", tenant="HQ")
+    add_finding(чат, code="PRD02", level="D2", zone="cold_kitchen", text="нарушение")
+    ident = push_inspection(чат)
+
+    accept_inspection(ident, tenant="HQ", actor="garva")
+
+    запрос = _запрос(ident)
+    assert not запрос.electronic and запрос.rows == ()
+
+
+def test_движок_не_назвал_срок_записи_подтверждение_отказывает(сеть: dict[str, str]) -> None:
+    from src.db.errors import AcceptError
+    from src.db.push import push_inspection
+    from src.domain import add_finding, start_inspection
+
+    чат = next(_чаты)
+    start_inspection(чат, unit=ТОЧКА, kind="planned", report_lang="ru", tenant="HQ")
+    add_finding(чат, code="PRD02", level="D2", zone="cold_kitchen", text="нарушение")
+    ident = push_inspection(чат)
+
+    with pytest.raises(AcceptError):
+        accept_inspection(ident, tenant="HQ", actor="garva", terms=lambda _ident: {})
 
 
 def test_начало_отсчёта_по_умолчанию_день_подтверждения_а_срок_плана_от_него(
@@ -232,7 +274,7 @@ def test_уК_называет_начало_отсчёта_при_ручном_�
     начало = СЕГОДНЯ - timedelta(days=3)
 
     # D1 даёт электронный запрос, но авто-запроса нет: D272 только D2/D3.
-    request_id = plans.request_plan(ident, actor=УК_АДМИН, count_from=начало)
+    request_id = plans.request_plan(ident, actor=УК_АДМИН, count_from=начало, terms=_условия)
 
     запрос = _запрос(ident)
     assert запрос.id == request_id and запрос.electronic and запрос.count_from == начало
@@ -248,9 +290,9 @@ def test_ручной_запрос_по_проверке_без_нарушени
     start_inspection(чат, unit=ТОЧКА, kind="planned", report_lang="ru", tenant="HQ")
     add_finding(чат, code="PRD01", level="R", zone="fridge", text="только рекомендация")
     ident = push_inspection(чат)
-    accept_inspection(ident, tenant="HQ", actor="garva")
+    accept_inspection(ident, tenant="HQ", actor="garva", terms=_условия)
 
-    plans.request_plan(ident, actor=УК_АДМИН)
+    plans.request_plan(ident, actor=УК_АДМИН, terms=_условия)
 
     запрос = _запрос(ident)
     assert not запрос.electronic and запрос.rows == ()
@@ -709,22 +751,71 @@ def test_закрытый_план_уходит_из_очереди_в_прин�
     assert запрос.id in {r.id for r in принятые.rows}
 
 
-def test_электронный_план_файлом_и_старым_вердиктом_не_ведётся(сеть: dict[str, str]) -> None:
+class _Склад:
+    """Хранилище в памяти: ключ → байты."""
+
+    def __init__(self) -> None:
+        self.объекты: dict[str, bytes] = {}
+
+    def put(self, key: str, data: bytes, *, content_type: str) -> str:
+        self.объекты[key] = data
+        return f"s3://test/{key}"
+
+    def get(self, key: str) -> bytes:
+        return self.объекты[key]
+
+    def delete(self, key: str) -> None:
+        self.объекты.pop(key, None)
+
+
+def _загрузить(запрос: plans.PlanRequest, склад: _Склад) -> int:
+    return plans.upload_version(
+        запрос.id,
+        reach=reach_of("GE"),
+        tenant="GE",
+        actor=ГРУЗИЯ_АННА,
+        file_name="план.pdf",
+        content_type="application/pdf",
+        data=b"%PDF",
+        max_bytes=1024,
+        storage=склад,  # type: ignore[arg-type]
+    )
+
+
+def test_к_электронному_плану_файл_ложится_вложением_и_ничего_не_двигает(
+    сеть: dict[str, str],
+) -> None:
+    запрос = _запрос(_принятая("D2"))
+    склад = _Склад()
+
+    версия = _загрузить(запрос, склад)
+
+    после = _запрос(запрос.inspection_id)
+    assert версия == 1 and [f.version for f in после.files] == [1]
+    assert после.status == "requested" and _строки_не_тронуты(запрос, после)
+    assert [e.action for e in после.events][-1] == "uploaded"
+
+
+def _строки_не_тронуты(до: plans.PlanRequest, после: plans.PlanRequest) -> bool:
+    return [(r.id, r.status, r.measure) for r in до.rows] == [
+        (r.id, r.status, r.measure) for r in после.rows
+    ]
+
+
+def test_файл_не_кладут_в_план_на_согласовании(сеть: dict[str, str]) -> None:
+    запрос = _на_согласовании("D2")
+
+    with pytest.raises(ActionPlanError):
+        _загрузить(запрос, _Склад())
+
+
+def test_вердикт_по_файлу_у_электронного_плана_отказ_вердикт_идёт_по_строкам(
+    сеть: dict[str, str],
+) -> None:
     запрос = _на_согласовании("D2")
 
     with pytest.raises(ActionPlanError, match="электронный"):
         plans.review(запрос.id, actor=УК_АДМИН, verdict="accepted", comment="")
-    with pytest.raises(ActionPlanError, match="электронный"):
-        plans.upload_version(
-            запрос.id,
-            reach=reach_of("GE"),
-            tenant="GE",
-            actor=ГРУЗИЯ_АННА,
-            file_name="план.pdf",
-            content_type="application/pdf",
-            data=b"%PDF",
-            max_bytes=1024,
-        )
 
 
 # --- уведомления внутри приложения -------------------------------------------
@@ -799,16 +890,16 @@ def test_старый_открытый_запрос_без_файла_получ
     ident = _принятая("D1", "D3")
     сделать_файловым(pg_dsn, _запрос(ident).id)
 
-    сухой = backfill_rows()
+    сухой = backfill_rows(terms=_условия)
 
     assert (сухой.candidates, сухой.converted, сухой.rows, сухой.applied) == (1, 1, 2, False)
     assert not _запрос(ident).electronic, "сухой прогон записал"
 
-    backfill_rows(apply=True)
+    backfill_rows(terms=_условия, apply=True)
 
     запрос = _запрос(ident)
     assert запрос.electronic and [r.level for r in запрос.rows] == ["D3", "D1"]
     assert all(r.due_on == запрос.count_from + timedelta(days=r.days) for r in запрос.rows)
 
-    повтор = backfill_rows(apply=True)
+    повтор = backfill_rows(terms=_условия, apply=True)
     assert (повтор.candidates, повтор.converted) == (0, 0), "второй прогон взял уже готовый запрос"

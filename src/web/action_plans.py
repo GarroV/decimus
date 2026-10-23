@@ -366,7 +366,13 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         try:
             if (начало_raw and начало is None) or (срок_raw and срок is None):
                 raise ActionPlanError(t("plans.bad_date", lang))
-            новый = plans.request_plan(проверка, actor=_actor(), due_on=срок, count_from=начало)
+            новый = plans.request_plan(
+                проверка,
+                actor=_actor(),
+                due_on=срок,
+                count_from=начало,
+                terms=data.plan_terms_for(auth.current_reach()),
+            )
         except ActionPlanError as exc:
             return render_template(
                 "actions/refused.html",

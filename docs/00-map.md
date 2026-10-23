@@ -298,7 +298,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | Каталог | Файлов | Какие |
 |---|---|---|
 | `src/web/templates/` | 23 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, _pick_page.html, … (+15) |
-| `src/web/templates/actions/` | 9 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, index.html, prescription_form.html, … (+1) |
+| `src/web/templates/actions/` | 10 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_rows.html, index.html, … (+2) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
@@ -856,6 +856,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/report/info_titles.py` | Подписи полей информационной части — формулировки вопросов по кодам |
 | `src/report/letters.py` | Письмо партнёру по уже записанной проверке — пересборка, а не пересчёт |
 | `src/report/photos.py` | Где взять кадр, приложенный к записи или к информационному полю, и что считать его пропажей |
+| `src/report/plan_terms.py` | Сроки и формулировки строк экшн-плана — только из ответа движка (#1168, CLAUDE.md) |
 | `src/report/rescore.py` | Пересчёт записанной проверки движком — для правки на приёмке (D200) |
 <!-- map:end -->
 

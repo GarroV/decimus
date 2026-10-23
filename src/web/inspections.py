@@ -28,10 +28,11 @@ from src.db import letters as letters_store
 from src.db.config import load_retraction_settings
 from src.db.errors import DatabaseTargetError, DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
-from src.db.reach import Reach
+from src.db.plan_rows import TermsProvider
+from src.db.reach import Reach, reach_of
 from src.domain.models import TEXT_LANGS
 from src.domain.permissions import SIDE_HQ, side_of
-from src.report import info_titles
+from src.report import info_titles, plan_terms
 from src.report.letters import LetterError
 from src.report.letters import build as build_letter
 from src.report.letters import sources as letter_sources
@@ -269,9 +270,19 @@ def accept_card(inspection_id: str, *, tenant: str, actor: str) -> None:
     """Подтвердить проверку своего пространства на приёмке (D199).
 
     Отказ — `AcceptError` блока `db`; проверка чужого пространства отвечает
-    им же, тем же «нет», что несуществующая.
+    им же, тем же «нет», что несуществующая. Сроки строк экшн-плана, если запрос
+    заведётся, берутся у движка (`report.plan_terms`), своих чисел здесь нет.
     """
-    accept.accept_inspection(inspection_id, tenant=tenant, actor=actor)
+    terms = plan_terms_for(reach_of(tenant))
+    accept.accept_inspection(inspection_id, tenant=tenant, actor=actor, terms=terms)
+
+
+def plan_terms_for(reach: Reach) -> TermsProvider:
+    """Поставщик сроков записей для строк плана: проверку читает охват, считает движок."""
+    return plan_terms.provider(
+        lambda ident: queries.get_inspection(ident, reach=reach, include_on_review=True),
+        papers=letter_sources(),
+    )
 
 
 def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Retraction:

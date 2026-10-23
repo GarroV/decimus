@@ -37,6 +37,7 @@ from .action_plans import open_auto_request, today
 from .config import load_retraction_settings
 from .errors import AcceptError, ActionPlanError, ConfigError
 from .models import UPLOADED_ORIGINS
+from .plan_rows import TermsProvider
 from .pool import connection
 from .queries import _require_inspection_id, _require_tenant
 
@@ -58,11 +59,15 @@ where id = %(id)s and tenant_code = %(tenant)s and status = 'draft' and retracte
 """
 
 
-def accept_inspection(inspection_id: str, *, tenant: str, actor: str) -> None:
+def accept_inspection(
+    inspection_id: str, *, tenant: str, actor: str, terms: TermsProvider | None = None
+) -> None:
     """Подтвердить проверку на приёмке.
 
     Отказ — `AcceptError` с объяснением: нет проверки, она уже принята,
-    отклонена, не назван подтверждающий.
+    отклонена, не назван подтверждающий. `terms` — дни и формулировки записей от
+    движка для строк экшн-плана (`plan_rows.TermsProvider`): их даёт вызывающий,
+    блок `db` движок не зовёт; без них запрос плана заводится без строк.
     """
     ident = _require_inspection_id(inspection_id)
     tenant_code = _require_tenant(tenant)
@@ -84,7 +89,7 @@ def accept_inspection(inspection_id: str, *, tenant: str, actor: str) -> None:
             # («Ждут приёмки») и из MCP ведут себя одинаково, а переписать
             # происхождение не даёт триггер `inspections_origin_fixed` (0038).
             if происхождение not in UPLOADED_ORIGINS:
-                _open_plan_request(conn, ident, автор)
+                _open_plan_request(conn, ident, автор, terms)
             conn.commit()
     except AcceptError:
         raise
@@ -128,7 +133,9 @@ def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: s
     return str(происхождение)
 
 
-def _open_plan_request(conn: psycopg.Connection[Any], ident: str, автор: str) -> None:
+def _open_plan_request(
+    conn: psycopg.Connection[Any], ident: str, автор: str, terms: TermsProvider | None
+) -> None:
     """Запрос экшн-плана при D2/D3 (D272) — в ТОЙ ЖЕ транзакции, что подтверждение.
 
     Проверка не может оказаться принятой без запроса, которого ждёт партнёр,
@@ -139,7 +146,7 @@ def _open_plan_request(conn: psycopg.Connection[Any], ident: str, автор: st
     """
     try:
         with conn.cursor() as cur:
-            open_auto_request(cur, ident, actor=автор, on=today())
+            open_auto_request(cur, ident, actor=автор, on=today(), terms=terms)
     except (ActionPlanError, ConfigError, DomainConfigError, psycopg.Error) as exc:
         logger.error("запрос экшн-плана по проверке %s не завёлся: %r", ident, exc)
         raise AcceptError(

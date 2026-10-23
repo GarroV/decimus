@@ -315,12 +315,14 @@ def _панель(клиент: FlaskClient, lang: str = "ru") -> str:
     return клиент.get(f"/actions?tab=plans&id={ЗАПРОС}&lang={lang}").get_data(as_text=True)
 
 
-def test_партнёр_заполняет_строки_а_файла_нет(партнёр: FlaskClient) -> None:
+def test_партнёр_заполняет_строки_а_файл_принимается_вложением(партнёр: FlaskClient) -> None:
     страница = _панель(партнёр)
 
     assert "Заготовка размечена" in страница
     assert f"/actions/requests/{ЗАПРОС}/rows/{СТРОКА}/save" in страница
-    assert "/upload" not in страница and "template.xlsx" not in страница
+    # Файл — вложением и без разбора: загрузка есть, шаблона «туда и обратно» нет.
+    assert f"/actions/requests/{ЗАПРОС}/upload" in страница
+    assert "не разбирается" in страница and "template.xlsx" not in страница
     # Отправить нельзя, пока не заполнено: кнопка есть, но выключена, и сказано почему.
     assert f"/actions/requests/{ЗАПРОС}/submit" in страница
     assert "заполнено 0 из 1" in страница

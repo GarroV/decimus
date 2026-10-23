@@ -54,9 +54,10 @@
     </section>
     {% endif %}
 
-    {% if not hq and r.status == 'requested' and not r.electronic %}
+    {% if not hq and r.status == 'requested' %}
       <section class="ssec">
         <h3 class="ssec__title">{{ t('plans.upload_title') }}</h3>
+        {% if r.electronic %}<p class="ssec__text">{{ t('plans.rows.file_later') }}</p>{% endif %}
         <form class="sform" method="post" enctype="multipart/form-data" data-panel-form data-upload-form
               action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/upload') }}?lang={{ lang }}">
           <label class="supload">
@@ -92,7 +93,7 @@
       </section>
     {% endif %}
 
-    {% if not r.electronic %}
+    {% if r.files or not r.electronic %}
     <section class="ssec">
       <h3 class="ssec__title">{{ t('plans.versions.title') }}</h3>
       {{ versions(r, plan_files_path, hide_last_comment=returned_note) }}

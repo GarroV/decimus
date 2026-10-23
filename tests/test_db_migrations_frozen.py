@@ -355,7 +355,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
         "sql1:357e051c02e5e7f802f351cd0e435481429ab76de8346aaa42ab37c0b125b41e"
     ),
     "0092_action_plan_rows.sql": (
-        "sql1:498ee64f07ec5bc3b428a643c87509a46fb78048c8f5ec17e2e8a12481118b38"
+        "sql1:f63c9c30d94077b331aa092f3b2025b80010422d3d756abe87977395fc153467"
     ),
 }
 

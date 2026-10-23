@@ -117,8 +117,14 @@ PLAN_ROW_TEXTS: dict[str, dict[str, str]] = {
         "en": "Row confirmed. All rows are confirmed — the plan is closed.",
     },
     "plans.rows.file_later": {
-        "ru": "План электронный: строки заполняются здесь. Файл туда и обратно появится позже.",
-        "en": "This plan is electronic: fill in the rows here. File round-trip is coming later.",
+        "ru": "Файл принимается вложением, но не разбирается: строки плана заполняются на "
+        "экране ниже.",
+        "en": "A file is accepted as an attachment but not parsed: fill in the plan rows on "
+        "the screen below.",
+    },
+    "plans.file.not_parsed": {
+        "ru": "не разобран — заполните строки на экране",
+        "en": "not parsed — fill in the rows on screen",
     },
     # --- начало отсчёта (D613) ---------------------------------------------
     "plans.count_from.title": {"ru": "Начало отсчёта срока", "en": "Deadline start date"},
