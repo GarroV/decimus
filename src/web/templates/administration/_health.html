@@ -36,7 +36,7 @@
           </span>
           {% if row.checkable %}
             <form method="post" action="{{ users_url }}/connections/health/{{ row.code }}/check?lang={{ lang }}" class="shealth__act">
-              <button class="sbtn sbtn--ghost" type="submit">{{ t('health.check_now') }}</button>
+              <button class="sbtn" type="submit">{{ t('health.check_now') }}</button>
             </form>
           {% endif %}
         </li>
