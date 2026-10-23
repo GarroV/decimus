@@ -69,7 +69,7 @@ def test_выгрузка_кадра_кладёт_один_сжатый_объе
     склад = _Склад()
     исходный = _кадр(4000, 3000)
 
-    storage_uri, preview_uri = _put_photo(склад, "i-1", "p-1", исходный)
+    storage_uri, preview_uri = _put_photo(склад, "i-1", "p-1", исходный, stamp=None)
 
     assert len(склад.положено) == 1
     assert storage_uri == preview_uri == "s3://b/inspections/i-1/p-1.jpg"
@@ -82,7 +82,7 @@ def test_выгрузка_кадра_кладёт_один_сжатый_объе
 def test_нечитаемый_кадр_не_теряется_но_копии_не_получает() -> None:
     склад = _Склад()
 
-    storage_uri, preview_uri = _put_photo(склад, "i-1", "p-1", b"not an image")
+    storage_uri, preview_uri = _put_photo(склад, "i-1", "p-1", b"not an image", stamp="x")
 
     assert склад.положено == {"inspections/i-1/p-1.jpg": b"not an image"}
     assert storage_uri == "s3://b/inspections/i-1/p-1.jpg"
