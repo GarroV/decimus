@@ -29,7 +29,13 @@ from werkzeug.wrappers import Response
 from src.db import action_plans as plans
 from src.db import plan_rows as plan_rows_db
 from src.db.config import load_action_plan_settings
-from src.db.errors import ActionPlanError, DbError, PlanFileLimitError, StorageError
+from src.db.errors import (
+    ActionPlanError,
+    DbError,
+    PlanFileLimitError,
+    StorageConfigError,
+    StorageError,
+)
 from src.domain import list_zones
 from src.domain.errors import DomainError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
@@ -471,6 +477,10 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
             return _respond(
                 conf, request_id, failure=t("plans.failed", lang, reason=exc), status=400
             )
+        except StorageConfigError as exc:
+            # Не сбой сети, а незаданный стенд: человеку — честно, администратору — в лог.
+            logger.error("файл плана к запросу %s: хранилище не настроено: %s", request_id, exc)
+            return _respond(conf, request_id, failure=t("files.storage_unset", lang), status=503)
         except StorageError as exc:
             # Текст хранилища называет корзину и ключ — партнёру он ни к чему.
             logger.warning("файл плана к запросу %s не лёг в хранилище: %s", request_id, exc)

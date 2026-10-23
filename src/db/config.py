@@ -13,7 +13,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from .errors import ConfigError
+from .errors import ConfigError, StorageConfigError
 from .storage import StorageSettings
 
 DATABASE_URL_VAR = "DATABASE_URL"
@@ -127,7 +127,7 @@ def load_storage_settings(env: Mapping[str, str] | None = None) -> StorageSettin
         if not (src.get(name) or "").strip()
     ]
     if missing:
-        raise ConfigError(
+        raise StorageConfigError(
             f"Не заданы переменные окружения хранилища кадров: {', '.join(missing)}. "
             f"Без них кадр останется идентификатором телеграма, который снаружи "
             f"не открывается — имена и назначение в .env.example"
