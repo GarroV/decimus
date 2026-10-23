@@ -921,3 +921,63 @@ def test_старый_открытый_запрос_без_файла_получ
 
     повтор = backfill_rows(terms=_условия, apply=True)
     assert (повтор.candidates, повтор.converted) == (0, 0), "второй прогон взял уже готовый запрос"
+
+
+def _патч(запрос: Any, **поля: Any) -> None:
+    flow.patch_row(
+        запрос.id,
+        запрос.rows[0].id,
+        reach=reach_of("GE"),
+        tenant="GE",
+        actor=ГРУЗИЯ_АННА,
+        **поля,
+    )
+
+
+def test_частичная_правка_строки_не_стирает_неназванное_а_пустое_стирает(
+    сеть: dict[str, str],
+) -> None:
+    запрос = _запрос(_принятая("D1"))
+    _патч(запрос, measure="Исправим", responsible="Иван", reason="давно", own_due=СЕГОДНЯ)
+
+    _патч(запрос, measure="Другая мера")
+    строка = _запрос(запрос.inspection_id).rows[0]
+    assert (строка.measure, строка.responsible, строка.reason) == ("Другая мера", "Иван", "давно")
+    assert строка.own_due == СЕГОДНЯ
+
+    _патч(запрос, responsible="", own_due=None)
+    строка = _запрос(запрос.inspection_id).rows[0]
+    assert строка.measure == "Другая мера"
+    assert not строка.responsible
+    assert строка.own_due is None
+
+
+def test_частичная_правка_идёт_под_теми_же_сторожами_что_полная(
+    сеть: dict[str, str],
+) -> None:
+    запрос = _запрос(_принятая("D2"))
+    строка = запрос.rows[0]
+
+    with pytest.raises(ActionPlanError, match="нет"):
+        flow.patch_row(
+            запрос.id,
+            строка.id,
+            reach=reach_of("AM"),
+            tenant="AM",
+            actor=АРМЕНИЯ_ИВАН,
+            measure="чужое",
+        )
+    with pytest.raises(ActionPlanError, match="партнёр"):
+        flow.patch_row(
+            запрос.id, строка.id, reach=reach_of("HQ"), tenant="HQ", actor=УК_АДМИН, measure="x"
+        )
+    with pytest.raises(ActionPlanError, match="позже положенного"):
+        _патч(запрос, own_due=СЕГОДНЯ + timedelta(days=400))
+    assert not _запрос(запрос.inspection_id).rows[0].measure
+
+
+def test_частичная_правка_на_согласовании_отказана(сеть: dict[str, str]) -> None:
+    запрос = _на_согласовании("D2")
+
+    with pytest.raises(ActionPlanError, match="согласование"):
+        _патч(запрос, measure="задним числом")
