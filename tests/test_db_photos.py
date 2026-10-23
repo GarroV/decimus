@@ -27,7 +27,7 @@ boto3 = pytest.importorskip("boto3")
 moto = pytest.importorskip("moto")
 
 from src.db.config import load_storage_settings  # noqa: E402
-from src.db.errors import ConfigError, PushError, StorageError  # noqa: E402
+from src.db.errors import PushError, StorageConfigError, StorageError  # noqa: E402
 from src.db.photos import upload_photos  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.reach import own_reach  # noqa: E402
@@ -230,7 +230,8 @@ def test_несуществующая_проверка_это_отказ_а_не
 
 
 def test_без_доступа_к_хранилищу_отказ_с_перечислением_чего_не_хватает() -> None:
-    with pytest.raises(ConfigError, match="S3_BUCKET"):
+    # Свой тип (#1137): экран, принимающий файл, по нему говорит «хранилище не настроено».
+    with pytest.raises(StorageConfigError, match="S3_BUCKET"):
         load_storage_settings({"S3_ACCESS_KEY_ID": "k", "S3_SECRET_ACCESS_KEY": "s"})
 
 

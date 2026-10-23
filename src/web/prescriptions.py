@@ -36,7 +36,13 @@ from src.db import country_contracts as contracts_db
 from src.db import prescriptions as rx
 from src.db import prescriptions_write as rxw
 from src.db.config import load_action_plan_settings
-from src.db.errors import DbError, IssuedDraftLostError, PrescriptionError, StorageError
+from src.db.errors import (
+    DbError,
+    IssuedDraftLostError,
+    PrescriptionError,
+    StorageConfigError,
+    StorageError,
+)
 from src.domain.errors import ConfigError
 
 from . import actions_columns as columns
@@ -706,6 +712,9 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
             )
         except PrescriptionError as exc:
             return отказ(t("rx.failed", lang, reason=exc), 400)
+        except StorageConfigError as exc:
+            logger.error("файл ответа на %s: хранилище не настроено: %s", prescription_id, exc)
+            return отказ(t("files.storage_unset", lang), 503)
         except StorageError as exc:
             # Текст хранилища называет корзину и ключ — партнёру он ни к чему.
             logger.warning("файл ответа на %s не лёг в хранилище: %s", prescription_id, exc)

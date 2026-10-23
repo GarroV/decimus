@@ -598,3 +598,29 @@ def test_уК_на_заполнении_не_видит_слов_про_согл
 
     assert "Партнёр заполняет строки" in страница
     assert "План на согласовании" not in страница
+
+
+@pytest.mark.parametrize(("lang", "фраза"), [("ru", "не настроено"), ("en", "not set up")])
+def test_без_хранилища_загрузка_плана_отказывает_словами_а_не_обрывом(
+    партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch, lang: str, фраза: str
+) -> None:
+    """#1137: незаданный `S3_*` — честный отказ 503, а не 500, который экран читает как обрыв."""
+    from io import BytesIO
+
+    from src.db.errors import StorageConfigError
+
+    def без_хранилища(*_a: Any, **_k: Any) -> int:
+        raise StorageConfigError("S3_BUCKET")
+
+    monkeypatch.setattr(plans, "upload_version", без_хранилища)
+
+    ответ = партнёр.post(
+        f"/actions/requests/{ЗАПРОС}/upload?lang={lang}",
+        data={"file": (BytesIO(b"%PDF"), "plan.pdf")},
+        headers=ORIGIN,
+        content_type="multipart/form-data",
+    )
+
+    assert ответ.status_code == 503
+    assert фраза in ответ.get_data(as_text=True)
+    assert "S3_BUCKET" not in ответ.get_data(as_text=True)

@@ -49,6 +49,13 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "en": "The file is larger than {mb} MB and cannot be accepted.",
     },
     "plans.no_file": {"ru": "Файл не выбран.", "en": "No file chosen."},
+    # Общий для всех экранов, принимающих файл (#1137): чинит не человек, а администратор.
+    "files.storage_unset": {
+        "ru": "Хранилище файлов на этом сервере не настроено — файл не принят. "
+        "Сообщите администратору.",
+        "en": "File storage is not set up on this server — the file was not accepted. "
+        "Please tell the administrator.",
+    },
     "plans.storage_down": {
         "ru": "Хранилище файлов сейчас не принимает файл. Попробуйте позже.",
         "en": "File storage is not accepting files right now. Please try again later.",

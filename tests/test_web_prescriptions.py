@@ -566,3 +566,24 @@ def test_панель_согласованного_говорит_про_поч�
     на_согласовании = уК.get(f"/osb?id={ИД}").get_data(as_text=True)
     assert "Согласованное предписание можно положить в почту" not in на_согласовании
     assert "С этого момента" not in на_согласовании
+
+
+@pytest.mark.parametrize(("lang", "фраза"), [("ru", "не настроено"), ("en", "not set up")])
+def test_без_хранилища_ответ_с_файлом_отказывает_словами_а_не_обрывом(
+    партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch, lang: str, фраза: str
+) -> None:
+    """#1137: незаданный `S3_*` — честный отказ 503, а не 500, который экран читает как обрыв."""
+    from src.db.errors import StorageConfigError
+
+    def без_хранилища(*_a: Any, **_k: Any) -> None:
+        raise StorageConfigError("S3_BUCKET")
+
+    monkeypatch.setattr(rxw, "reply", без_хранилища)
+
+    ответ = партнёр.post(
+        f"/actions/prescriptions/{ИД}/reply?lang={lang}", data={"comment": "x"}, headers=ORIGIN
+    )
+
+    assert ответ.status_code == 503
+    assert фраза in ответ.get_data(as_text=True)
+    assert "S3_BUCKET" not in ответ.get_data(as_text=True)
