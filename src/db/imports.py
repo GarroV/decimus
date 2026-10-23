@@ -68,6 +68,7 @@ from .push import _INSERT_TRANSLATION_SQL
 from .queries import _read_detail, _require_inspection_id, _require_tenant
 from .reach import own_reach
 from .revise import _write_score
+from .stamp import CHANNEL_MCP
 from .storage import PhotoStorage, object_key
 
 logger = logging.getLogger(__name__)
@@ -958,9 +959,10 @@ def add_photo(
     которые не читаются как изображение, — отказ: оригинал не хранится, и
     «положить как есть» значило бы хранить то, что никто не покажет.
 
-    Кадр текущей загрузки получает видимый штамп (D619, D621) на момент
-    загрузки; кадр исторической — нет (D332): штамп снимается до сжатия, но
-    после замка, потому что режим черновика известен только из базы.
+    Кадр текущей загрузки получает видимый штамп (D619, D621, D625) с датой
+    проверки без времени и пометкой канала `MCP`: снимали не в момент загрузки;
+    кадр исторической — нет (D332). Штамп считается до сжатия, но после замка,
+    потому что режим черновика известен только из базы.
     """
     ident = _require_inspection_id(inspection_id)
     tenant_code = _require_tenant(tenant)
@@ -974,7 +976,9 @@ def add_photo(
             if cur.fetchone() is not None:
                 raise HistoryImportError(f"Этот кадр уже приложен к записи #{n}")
             try:
-                копия = make_preview(data, stamp=stamp_for(cur, ident, datetime.now(UTC)))
+                копия = make_preview(
+                    data, stamp=stamp_for(cur, ident, datetime.now(UTC), CHANNEL_MCP)
+                )
             except StorageError as exc:
                 raise HistoryImportError(
                     "Кадр не читается как изображение (ожидается JPEG, PNG или WebP) — не приложен"

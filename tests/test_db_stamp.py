@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import io
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from PIL import Image, ImageChops, ImageStat
 
 from src.db.photos import _put_photo
 from src.db.previews import make_preview
-from src.db.stamp import FONT_SHARE, StampContext, stamp_text
+from src.db.stamp import (
+    CHANNEL_APP,
+    CHANNEL_BOT,
+    CHANNEL_MCP,
+    CHANNEL_WEB,
+    FONT_SHARE,
+    StampContext,
+    stamp_text,
+)
 
 #: 22.10.2026 21:30 UTC: в Грузии (UTC+4) уже 23-е, в Сербии (UTC+2) ещё 22-е.
 _МОМЕНТ = datetime(2026, 10, 22, 21, 30, tzinfo=UTC)
@@ -102,30 +110,78 @@ def test_выгрузка_кладёт_кадр_со_штампом_а_без_ш
 
 
 class _Курсор:
-    """Курсор с одной заготовленной строкой: `(пиццерия, проверяющий, страна, происхождение)`."""
+    """Курсор с одной строкой: `(пиццерия, проверяющий, страна, происхождение, дата проверки)`."""
 
-    def __init__(self, строка: tuple[str, str, str | None, str] | None) -> None:
+    def __init__(self, строка: tuple[str, str, str | None, str, date] | None) -> None:
         self._строка = строка
 
     def execute(self, sql: str, params: tuple[str]) -> None:
         self.запрос = (sql, params)
 
-    def fetchone(self) -> tuple[str, str, str | None, str] | None:
+    def fetchone(self) -> tuple[str, str, str | None, str, date] | None:
         return self._строка
+
+
+_ДЕНЬ = date(2026, 10, 15)
+
+
+def _строка(происхождение: str) -> _Курсор:
+    return _Курсор(("Тбилиси-1", "И. Иванов", "GE", происхождение, _ДЕНЬ))
 
 
 def test_историческая_загрузка_штампа_не_получает() -> None:
     from src.db.photos import stamp_for
 
-    legacy = _Курсор(("Тбилиси-1", "И. Иванов", "GE", "legacy"))
-    assert stamp_for(legacy, "i-1", _МОМЕНТ) is None  # type: ignore[arg-type]
-    загрузка = _Курсор(("Тбилиси-1", "И. Иванов", "GE", "import"))
-    assert stamp_for(загрузка, "i-1", _МОМЕНТ) is None  # type: ignore[arg-type]
+    assert stamp_for(_строка("legacy"), "i-1", _МОМЕНТ, CHANNEL_MCP) is None  # type: ignore[arg-type]
 
 
-def test_живая_проверка_штамп_получает() -> None:
+def test_живая_проверка_штамп_с_пометкой_канала_получает() -> None:
     from src.db.photos import stamp_for
 
-    for происхождение in ("field",):
-        курсор = _Курсор(("Тбилиси-1", "И. Иванов", "GE", происхождение))
-        assert stamp_for(курсор, "i-1", _МОМЕНТ) == "23.10.2026 01:30 · Тбилиси-1 · И. Иванов"  # type: ignore[arg-type]
+    for канал in (CHANNEL_BOT, CHANNEL_APP, CHANNEL_WEB):
+        assert (
+            stamp_for(_строка("field"), "i-1", _МОМЕНТ, канал)  # type: ignore[arg-type]
+            == f"23.10.2026 01:30 · Тбилиси-1 · И. Иванов · {канал}"
+        )
+
+
+def test_загрузка_через_mcp_несёт_дату_проверки_без_времени_и_mcp() -> None:
+    from src.db.photos import stamp_for
+
+    текст = stamp_for(_строка("import"), "i-1", _МОМЕНТ, CHANNEL_MCP)  # type: ignore[arg-type]
+    assert текст == "15.10.2026 · Тбилиси-1 · И. Иванов · MCP"
+
+
+def test_пометки_канала_латиницей_и_короткие() -> None:
+    assert {CHANNEL_BOT, CHANNEL_APP, CHANNEL_WEB, CHANNEL_MCP} == {"bot", "app", "web", "MCP"}
+
+
+def test_кадры_выгрузки_помечаются_по_ссылке_бот_или_мини_апп() -> None:
+    from src.db.photos import stamps_of_pending
+
+    контекст = StampContext("Тбилиси-1", "И. Иванов", "GE", channel=CHANNEL_BOT)
+    ждут = [("p1", "AgACAgIA-telegram-id", _МОМЕНТ), ("p2", "walk:" + "a" * 32, _МОМЕНТ)]
+    штампы = stamps_of_pending(контекст, ждут)
+    assert штампы["p1"] is not None and штампы["p1"].endswith("· bot")
+    assert штампы["p2"] is not None and штампы["p2"].endswith("· app")
+    assert stamps_of_pending(None, ждут) == {"p1": None, "p2": None}
+
+
+def test_каждый_путь_сохранения_называет_канал() -> None:
+    """Вызов `stamp_for` без константы канала последним аргументом — молча без пометки."""
+    import ast
+    from pathlib import Path
+
+    корень = Path(__file__).resolve().parents[1] / "src"
+    найдено: dict[str, str] = {}
+    for файл in корень.rglob("*.py"):
+        for узел in ast.walk(ast.parse(файл.read_text(encoding="utf-8"))):
+            if (
+                isinstance(узел, ast.Call)
+                and isinstance(узел.func, ast.Name)
+                and узел.func.id == "stamp_for"
+            ):
+                последний = узел.args[-1] if узел.args else None
+                assert isinstance(последний, ast.Name), f"{файл}: канал не назван"
+                найдено[файл.name] = последний.id
+    assert найдено == {"imports.py": "CHANNEL_MCP", "review_edit.py": "CHANNEL_WEB"}
