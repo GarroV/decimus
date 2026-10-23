@@ -135,3 +135,10 @@ def test_строка_с_равно_в_начале_ложится_тексто�
     книга = load_workbook(io.BytesIO(plan_template.build(запрос(), (злая,), {}, "ru"))).active
     ячейка = next(c for row in книга.iter_rows() for c in row if c.value == злая.text)
     assert ячейка.data_type == "s"
+
+
+def test_управляющий_знак_в_тексте_записи_вычищается_а_не_роняет_выгрузку() -> None:
+    """Знак, которого книга не хранит, не должен оставить партнёра без шаблона (#1190)."""
+    с_мусором = запись(1, "D1", "X01", "Пол\x07 грязный\x1f")
+    книга = load_workbook(io.BytesIO(plan_template.build(запрос(), (с_мусором,), {}, "ru"))).active
+    assert any(c.value == "Пол грязный" for row in книга.iter_rows() for c in row)

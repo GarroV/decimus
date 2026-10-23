@@ -36,6 +36,7 @@ from src.db.action_plans import PlanRequest
 from src.db.plan_file import FileRow
 
 from .dates import human_day
+from .plan_template import CONTROL_CHARS, put_cell
 from .texts import t
 
 logger = logging.getLogger(__name__)
@@ -75,9 +76,6 @@ _PARTNER_FILL = PatternFill("solid", fgColor="FFF8E1")
 _WRAP = Alignment(wrap_text=True, vertical="top")
 _OPEN = Protection(locked=False)
 _DOTTED_DATE = re.compile(r"^(\d{1,2})[./](\d{1,2})[./](\d{4})$")
-#: Управляющие знаки, которые база не принимает; перенос строки и табуляция остаются.
-_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
-
 #: Колонки таблицы: ключ текста, ширина, колонка партнёра.
 _COLUMNS: tuple[tuple[str, int, bool], ...] = (
     ("plans.tpl.col.n", 5, False),
@@ -112,22 +110,6 @@ class ParsedSheet:
 # ── Выгрузка ────────────────────────────────────────────────────────────────
 
 
-def _put(ws: Any, row: int, col: int, value: object) -> Any:
-    """Записать значение ячейки; строка — всегда текстом, никогда формулой.
-
-    Мера, ответственный и формулировка нарушения — тексты людей и модели: «=HYPERLINK(…)»
-    в книге стал бы ссылкой, которую человек откроет одним щелчком.
-    """
-    if isinstance(value, str):
-        # Из базы текст приходит как положено, но библиотека на знаке, который книга не
-        # хранит, падает целиком, и выгрузка не получилась бы из-за одной строки.
-        value = _CONTROL.sub("", value)
-    ячейка = ws.cell(row=row, column=col, value=value)
-    if isinstance(value, str):
-        ячейка.data_type = "s"
-    return ячейка
-
-
 def _head(ws: Any, req: PlanRequest, lang: str) -> int:
     """Шапка над таблицей; возвращает номер строки заголовка таблицы."""
     итог = "—"
@@ -139,12 +121,12 @@ def _head(ws: Any, req: PlanRequest, lang: str) -> int:
         (t("plans.tpl.grade", lang), итог),
         (t("plans.tpl.plan_due", lang), human_day(req.due_on, lang)),
     )
-    _put(ws, 1, 1, t("plans.tpl.title", lang)).font = _TITLE
+    put_cell(ws, 1, 1, t("plans.tpl.title", lang)).font = _TITLE
     for i, (label, value) in enumerate(строки, start=3):
-        _put(ws, i, 1, label).font = _BOLD
-        _put(ws, i, 3, value)
+        put_cell(ws, i, 1, label).font = _BOLD
+        put_cell(ws, i, 3, value)
     подсказка = 3 + len(строки) + 1
-    _put(ws, подсказка, 1, t("plans.sheet.hint", lang))
+    put_cell(ws, подсказка, 1, t("plans.sheet.hint", lang))
     return подсказка + 2
 
 
@@ -154,12 +136,12 @@ def build(req: PlanRequest, zones: Mapping[str, str], lang: str) -> bytes:
     ws = wb.active
     ws.title = t("plans.tpl.sheet", lang)[:31]
     заголовок = _head(ws, req, lang)
-    _put(ws, ROW_MARKER, COL_ID, MARKER)
-    _put(ws, ROW_REQUEST, COL_ID, req.id)
+    put_cell(ws, ROW_MARKER, COL_ID, MARKER)
+    put_cell(ws, ROW_REQUEST, COL_ID, req.id)
     ws.cell(row=ROW_REVISION, column=COL_ID, value=req.revision)
-    _put(ws, заголовок, COL_ID, ID_HEADER)
+    put_cell(ws, заголовок, COL_ID, ID_HEADER)
     for col, (key, width, partner) in enumerate(_COLUMNS, start=1):
-        ячейка = _put(ws, заголовок, col, t(key, lang))
+        ячейка = put_cell(ws, заголовок, col, t(key, lang))
         ячейка.font = _BOLD
         ячейка.fill = _PARTNER_FILL if partner else _HEAD_FILL
         ячейка.alignment = _WRAP
@@ -175,7 +157,7 @@ def build(req: PlanRequest, zones: Mapping[str, str], lang: str) -> bytes:
             COL_REASON: row.reason or None,
         }
         for col, value in значения.items():
-            _put(ws, строка, col, value).alignment = _WRAP
+            put_cell(ws, строка, col, value).alignment = _WRAP
         сроки = (
             (COL_DUE_SYS, row.latest_own_due(req.count_from)),
             (COL_DUE_OWN, row.own_due),
@@ -183,7 +165,7 @@ def build(req: PlanRequest, zones: Mapping[str, str], lang: str) -> bytes:
         for col, срок in сроки:
             ячейка = ws.cell(row=строка, column=col, value=срок)
             ячейка.number_format = _DATE_FORMAT
-        _put(ws, строка, COL_ID, row.id)
+        put_cell(ws, строка, COL_ID, row.id)
         for col in range(COL_MEASURE, COL_DUE_OWN + 1):
             ячейка = ws.cell(row=строка, column=col)
             ячейка.fill = _PARTNER_FILL
@@ -230,7 +212,7 @@ def _clean_text(value: object) -> str:
         value = int(value)
     if isinstance(value, datetime | date):
         return value.isoformat()
-    return _CONTROL.sub("", str(value)).strip()
+    return CONTROL_CHARS.sub("", str(value)).strip()
 
 
 def _parse_due(value: object) -> tuple[date | None, bool]:
