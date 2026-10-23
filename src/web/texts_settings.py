@@ -78,6 +78,15 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "en": "What you can do there depends on your role.",
     },
     "settings.claude.title": {"ru": "Claude (MCP)", "en": "Claude (MCP)"},
+    # Пояснение к объявлению D629 (текст утверждён владельцем 23.10.2026, путь — уже внутри плитки).
+    "settings.claude.relink": {
+        "ru": "Обновили подключение Claude (MCP): теперь фото к проверке можно загружать прямо "
+        "из папки на компьютере. Чтобы это заработало, нажмите ниже «Перевыпустить команду "
+        "установки» и выполните новую команду в терминале.",
+        "en": "We updated the Claude (MCP) connection: inspection photos can now be uploaded "
+        "straight from a folder on your computer. To make it work, press «Reissue the install "
+        "command» below and run the new command in a terminal.",
+    },
     "settings.claude.lead": {
         "ru": "Claude Desktop на Mac подключается одной командой в терминале: так Claude берёт "
         "оригиналы фото из папки на вашем компьютере, а не уменьшенные копии. Что доступно, "
