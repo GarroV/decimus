@@ -1726,7 +1726,6 @@ def _card_context(
         ),
         plan_today=action_plans.today(),
         plan_state_tones=action_plans.STATE_TONES,
-        plan_due_default=action_plans.default_due(),
         plan_needed=план_нужен,
         plan_no_country=без_страны,
         # Запросить вручную (D272) — УК по своей принятой проверке без запроса.

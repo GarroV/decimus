@@ -27,13 +27,12 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.wrappers import Response
 
 from src.db import action_plans as plans
+from src.db import plan_rows as plan_rows_db
 from src.db.config import load_action_plan_settings
 from src.db.errors import ActionPlanError, DbError, StorageError
-from src.domain.errors import ConfigError as DomainConfigError
-from src.domain.plan_due import plan_due_days
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import actions_screen, auth, guard, plan_template, review, ui_lang, view
+from . import actions_screen, auth, guard, plan_rows, plan_template, review, ui_lang, view
 from . import inspections as data
 from .actions_columns import Block, RailItem, rail_codes, rail_form, sorted_rows
 from .actions_screen import TAB_PLANS
@@ -55,6 +54,8 @@ STATE_TONES = {
     plans.STATE_RETURNED: "tag--warn",
     plans.STATE_ON_REVIEW: "tag--accent",
     plans.STATE_ACCEPTED: "tag--ok",
+    plans.STATE_IN_WORK: "tag--accent",
+    plans.STATE_CLOSED: "tag--ok",
 }
 
 
@@ -114,20 +115,6 @@ def country_plans(code: str) -> tuple[plans.PlanList, plans.PlanList, bool]:
     return открытые, принятые, True
 
 
-def default_due() -> date | None:
-    """Срок по умолчанию для ручного запроса — тот же, что у автозапроса и в письме (D617).
-
-    Методика не читается — `None`: поле срока остаётся пустым и обязательным, а
-    карточка проверки открывается. Ронять всю карточку из-за подсказки в одном
-    поле нельзя; причина — в журнал.
-    """
-    try:
-        return plans.due_date(plans.today(), plan_due_days())
-    except DomainConfigError as exc:
-        logger.error("срок плана по умолчанию не прочитан из методики: %s", exc)
-        return None
-
-
 def _parse_date(raw: str) -> date | None:
     try:
         return date.fromisoformat((raw or "").strip()[:10])
@@ -150,6 +137,7 @@ def install(app: Flask, conf: Settings) -> None:
     _install_hq(app, conf)
     _install_partner(app, conf, max_bytes=max_bytes)
     _install_template(app, conf)
+    plan_rows.install(app, conf, respond=_respond)
     _install_legacy(app)
 
 
@@ -191,12 +179,14 @@ def _respond(
 #: Блоки списка запросов в порядке показа: состояние, ключ заголовка.
 _PLAN_BLOCKS = (
     (plans.STATE_ON_REVIEW, "plans.block.on_review"),
+    (plans.STATE_IN_WORK, "plans.block.in_work"),
     (plans.STATE_RETURNED, "plans.block.returned"),
     (plans.STATE_REQUESTED, "plans.block.requested"),
 )
 #: Что показывает столбец у страны: ждут приёмки, ждут партнёра (запрошены и возвращены).
 _PLAN_RAIL = (
     ((plans.STATE_ON_REVIEW,), "plans.rail.on_review"),
+    ((plans.STATE_IN_WORK,), "plans.rail.in_work"),
     ((plans.STATE_REQUESTED, plans.STATE_RETURNED), "plans.rail.waiting"),
 )
 
@@ -307,6 +297,12 @@ def panel_context(
         "gmail": "",
         "hq": is_hq(),
         "max_mb": max_bytes // (1024 * 1024),
+        "focus_row": (request.args.get("row") or "").strip(),
+        "row_limits": {
+            "measure": plan_rows_db.MAX_MEASURE,
+            "responsible": plan_rows_db.MAX_RESPONSIBLE,
+            "reason": plan_rows_db.MAX_REASON,
+        },
         "today": plans.today(),
         "state_tones": STATE_TONES,
         "grade_tone": view.grade_tone,
@@ -363,11 +359,14 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         refuse_foreign_origin()
         lang = _lang(conf)
         проверка = (request.form.get("inspection_id") or "").strip()
-        срок = _parse_date(request.form.get("due") or "")
+        начало_raw = (request.form.get("count_from") or "").strip()
+        начало = _parse_date(начало_raw)
+        срок_raw = (request.form.get("due") or "").strip()
+        срок = _parse_date(срок_raw)
         try:
-            if срок is None:
+            if (начало_raw and начало is None) or (срок_raw and срок is None):
                 raise ActionPlanError(t("plans.bad_date", lang))
-            новый = plans.request_plan(проверка, actor=_actor(), due_on=срок)
+            новый = plans.request_plan(проверка, actor=_actor(), due_on=срок, count_from=начало)
         except ActionPlanError as exc:
             return render_template(
                 "actions/refused.html",

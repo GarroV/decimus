@@ -1893,6 +1893,18 @@ a[data-zoom] { cursor: zoom-in; }
 .plan-versions__comment { font-size: var(--fs-meta); color: var(--ink-2); overflow-wrap: anywhere; }
 .plan-history { font-size: var(--fs-meta); }
 
+/* Строки электронного плана: раскрывающаяся карточка на строку. Свёрнутая — пункт,
+   срок и состояние; развёрнутая — форма партнёра или значения и кнопки вердикта. */
+.prows { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.prow { border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface); }
+.prow--late { border-color: var(--err); }
+.prow__head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2) var(--space-4); align-items: baseline; padding: var(--space-4) var(--space-5); cursor: pointer; }
+.prow__pos { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.prow__title { font-weight: var(--w-semibold); overflow-wrap: anywhere; }
+.prow__meta { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-size: var(--fs-meta); }
+.prow__due { color: var(--ink-2); }
+.prow__body { display: grid; gap: var(--space-5); padding: 0 var(--space-5) var(--space-5); }
+
 /* Поле файла — в тон кнопкам forma, а не серой кнопкой браузера. */
 .input[type="file"] { padding: var(--space-2); }
 .input[type="file"]::file-selector-button {

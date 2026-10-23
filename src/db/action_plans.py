@@ -224,6 +224,15 @@ class PlanRequest:
     def overdue(self, on: date) -> bool:
         return is_overdue(self.status, self.due_on, today=on)
 
+    def overdue_rows(self, on: date) -> int:
+        """Сколько строк просрочено на дату: по ним план в работе виден в списке как горящий."""
+        return sum(1 for row in self.rows if row.overdue(on))
+
+    @property
+    def filled_rows(self) -> int:
+        """Строк с мерой и ответственным: столько уже готово к отправке на согласование."""
+        return sum(1 for row in self.rows if row.is_filled)
+
     @property
     def last_comment(self) -> str | None:
         """Комментарий последнего возврата — его партнёр видит у запроса."""

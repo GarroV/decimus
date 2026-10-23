@@ -685,3 +685,18 @@ notifications_read
 notifications_read_all
 unread
 is_unread
+
+# Электронный план исправлений (#1168): маршруты регистрируются декораторами Flask;
+# `overdue_rows`, `filled_rows` и `latest_own_due` читают шаблоны панели и списка.
+plan_row_save
+plan_submit
+plan_row_start
+plan_row_done
+plan_accept
+plan_return
+plan_row_confirm
+plan_row_reject
+plan_count_from
+overdue_rows
+filled_rows
+latest_own_due

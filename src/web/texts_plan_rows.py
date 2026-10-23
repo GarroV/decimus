@@ -42,7 +42,8 @@ PLAN_ROW_TEXTS: dict[str, dict[str, str]] = {
     },
     "plans.rows.hint_review_hq": {
         "ru": "Проверьте меры и сроки по строкам: примите план или верните с комментарием.",
-        "en": "Check the measures and dates row by row: accept the plan or return it with a comment.",
+        "en": "Check the measures and dates row by row: accept the plan or return it "
+        "with a comment.",
     },
     "plans.rows.hint_work_partner": {
         "ru": "План принят. По каждой строке: «Взяли в работу», затем «Сделано».",
@@ -61,14 +62,26 @@ PLAN_ROW_TEXTS: dict[str, dict[str, str]] = {
     "plans.rows.overdue": {"ru": "Просрочена", "en": "Overdue"},
     "plans.rows.status.filling": {"ru": "Заполняется", "en": "Being filled in"},
     "plans.rows.status.in_work": {"ru": "В работе", "en": "In progress"},
-    "plans.rows.status.done": {"ru": "Сделано, ждёт подтверждения", "en": "Done, awaiting confirmation"},
+    "plans.rows.status.done": {
+        "ru": "Сделано, ждёт подтверждения",
+        "en": "Done, awaiting confirmation",
+    },
     "plans.rows.status.confirmed": {"ru": "Подтверждена", "en": "Confirmed"},
     "plans.rows.status.returned": {"ru": "Возвращена", "en": "Returned"},
-    "plans.rows.returned_reason": {"ru": "Причина возврата: «{reason}»", "en": "Reason for return: “{reason}”"},
+    "plans.rows.returned_reason": {
+        "ru": "Причина возврата: «{reason}»",
+        "en": "Reason for return: “{reason}”",
+    },
     "plans.rows.measure": {"ru": "Что сделаем", "en": "What we will do"},
     "plans.rows.responsible": {"ru": "Кто отвечает", "en": "Who is responsible"},
-    "plans.rows.reason": {"ru": "Почему так вышло (по желанию)", "en": "Why it happened (optional)"},
-    "plans.rows.own_due": {"ru": "Свой срок, не позже {due}", "en": "Own date, no later than {due}"},
+    "plans.rows.reason": {
+        "ru": "Почему так вышло (по желанию)",
+        "en": "Why it happened (optional)",
+    },
+    "plans.rows.own_due": {
+        "ru": "Свой срок, не позже {due}",
+        "en": "Own date, no later than {due}",
+    },
     "plans.rows.save": {"ru": "Сохранить строку", "en": "Save row"},
     "plans.rows.empty": {"ru": "Строк в плане нет.", "en": "The plan has no rows."},
     "plans.rows.not_filled": {"ru": "не заполнено", "en": "not filled in"},
@@ -76,7 +89,8 @@ PLAN_ROW_TEXTS: dict[str, dict[str, str]] = {
     # --- отправка и ход ----------------------------------------------------
     "plans.rows.submit": {"ru": "Отправить на согласование", "en": "Send for approval"},
     "plans.rows.submit_hint": {
-        "ru": "Доступно, когда у каждой строки есть мера и ответственный: заполнено {n} из {total}.",
+        "ru": "Доступно, когда у каждой строки есть мера и ответственный: "
+        "заполнено {n} из {total}.",
         "en": "Available once every row has a measure and an owner: {n} of {total} filled in.",
     },
     "plans.rows.submitted": {
@@ -94,7 +108,10 @@ PLAN_ROW_TEXTS: dict[str, dict[str, str]] = {
         "en": "Row marked done and sent for confirmation.",
     },
     "plans.rows.confirmed": {"ru": "Строка подтверждена.", "en": "Row confirmed."},
-    "plans.rows.rejected": {"ru": "Строка возвращена партнёру.", "en": "Row returned to the partner."},
+    "plans.rows.rejected": {
+        "ru": "Строка возвращена партнёру.",
+        "en": "Row returned to the partner.",
+    },
     "plans.rows.confirmed_closed": {
         "ru": "Строка подтверждена. Все строки подтверждены — план закрыт.",
         "en": "Row confirmed. All rows are confirmed — the plan is closed.",

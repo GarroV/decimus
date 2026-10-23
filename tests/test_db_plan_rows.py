@@ -784,3 +784,31 @@ def test_отказ_перехода_не_оставляет_уведомлен�
         flow.return_plan(запрос.id, actor=УК_АДМИН, comment="")
 
     assert len(store.list_for(сеть[ГРУЗИЯ_АННА])) == было
+
+
+# --- догон строк старым открытым запросам ------------------------------------
+
+
+def test_старый_открытый_запрос_без_файла_получает_строки_и_сухой_прогон_не_пишет(
+    сеть: dict[str, str], pg_dsn: str
+) -> None:
+    from db_harness import сделать_файловым
+
+    from src.db.plan_backfill import backfill_rows
+
+    ident = _принятая("D1", "D3")
+    сделать_файловым(pg_dsn, _запрос(ident).id)
+
+    сухой = backfill_rows()
+
+    assert (сухой.candidates, сухой.converted, сухой.rows, сухой.applied) == (1, 1, 2, False)
+    assert not _запрос(ident).electronic, "сухой прогон записал"
+
+    backfill_rows(apply=True)
+
+    запрос = _запрос(ident)
+    assert запрос.electronic and [r.level for r in запрос.rows] == ["D3", "D1"]
+    assert all(r.due_on == запрос.count_from + timedelta(days=r.days) for r in запрос.rows)
+
+    повтор = backfill_rows(apply=True)
+    assert (повтор.candidates, повтор.converted) == (0, 0), "второй прогон взял уже готовый запрос"

@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 179 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 188 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -40,8 +40,17 @@
 | `/actions/prescriptions/new` | GET | `rx_new` | `src/web/prescriptions.py` |
 | `/actions/request` | POST | `actions_new` | `src/web/action_plans.py` |
 | `/actions/requests/<request_id>` | GET | `actions_request` | `src/web/action_plans.py` |
+| `/actions/requests/<request_id>/accept` | POST | `plan_accept` | `src/web/plan_rows.py` |
+| `/actions/requests/<request_id>/count-from` | POST | `plan_count_from` | `src/web/plan_rows.py` |
 | `/actions/requests/<request_id>/due` | POST | `actions_due` | `src/web/action_plans.py` |
+| `/actions/requests/<request_id>/return` | POST | `plan_return` | `src/web/plan_rows.py` |
 | `/actions/requests/<request_id>/review` | POST | `actions_review` | `src/web/action_plans.py` |
+| `/actions/requests/<request_id>/rows/<row_id>/confirm` | POST | `plan_row_confirm` | `src/web/plan_rows.py` |
+| `/actions/requests/<request_id>/rows/<row_id>/done` | POST | `plan_row_done` | `src/web/plan_rows.py` |
+| `/actions/requests/<request_id>/rows/<row_id>/reject` | POST | `plan_row_reject` | `src/web/plan_rows.py` |
+| `/actions/requests/<request_id>/rows/<row_id>/save` | POST | `plan_row_save` | `src/web/plan_rows.py` |
+| `/actions/requests/<request_id>/rows/<row_id>/start` | POST | `plan_row_start` | `src/web/plan_rows.py` |
+| `/actions/requests/<request_id>/submit` | POST | `plan_submit` | `src/web/plan_rows.py` |
 | `/actions/requests/<request_id>/template.xlsx` | GET | `plan_template` | `src/web/action_plans.py` |
 | `/actions/requests/<request_id>/upload` | POST | `plans_upload` | `src/web/action_plans.py` |
 | `/admin` | GET | `methodology` | `src/web/app.py` |

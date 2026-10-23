@@ -6,6 +6,7 @@
   остаётся на месте. Без скрипта формы работают обычной отправкой.
 #}
 {% from "_plan.html" import state_tag, versions, history with context %}
+{% from "actions/_plan_rows.html" import rows_section with context %}
 
 {% macro plan_panel(r) %}
   {% set returned_note = r.state == 'returned' and r.last_comment %}
@@ -36,6 +37,7 @@
             {%- if r.grade %} · {{ r.grade }}{% if r.pct is not none %} {{ '%.1f'|format(r.pct) }}%{% endif %}{% endif %}</dd></div>
         <div><dt>{{ t('actions.col.due') }}</dt>
           <dd{% if r.overdue(today) %} class="srow__err"{% endif %}>{{ day(r.due_on) }}</dd></div>
+        {% if r.electronic %}<div><dt>{{ t('plans.count_from.shown') }}</dt><dd>{{ day(r.count_from) }}</dd></div>{% endif %}
         <div><dt>{{ t('actions.col.state') }}</dt><dd>{{ state_tag(r, today) }}</dd></div>
         <div><dt>{{ t('actions.panel.origin') }}</dt><dd>{{ t('plans.origin.' ~ r.origin) }}</dd></div>
       </dl>
@@ -44,7 +46,7 @@
     {#- Что ждём (#976): пока план ждут (в том числе после возврата) — что прислать,
         к какому сроку, и шаблон из записей проверки; формат загрузки — любой (D265).
         План на приёмке или принят — секции нет: партнёру делать нечего. -#}
-    {% if r.status == 'requested' %}
+    {% if r.status == 'requested' and not r.electronic %}
     <section class="ssec">
       <h3 class="ssec__title">{{ t('plans.ask.title') }}</h3>
       <p class="ssec__text">{{ t('plans.ask.text_hq' if hq else 'plans.ask.text', due=day(r.due_on)) }}</p>
@@ -52,7 +54,7 @@
     </section>
     {% endif %}
 
-    {% if not hq and r.status == 'requested' %}
+    {% if not hq and r.status == 'requested' and not r.electronic %}
       <section class="ssec">
         <h3 class="ssec__title">{{ t('plans.upload_title') }}</h3>
         <form class="sform" method="post" enctype="multipart/form-data" data-panel-form data-upload-form
@@ -69,17 +71,19 @@
       </section>
     {% endif %}
 
+    {% if r.electronic %}{{ rows_section(r) }}{% endif %}
+
     {% if hq and r.status == 'on_review' %}
       <section class="ssec">
         <h3 class="ssec__title">{{ t('actions.review.title') }}</h3>
         <p class="ssec__text">{{ t('actions.review.hint') }}</p>
         <form class="sform" method="post" data-panel-form
-              action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/review') }}?lang={{ lang }}">
+              action="{{ url(actions_path ~ '/requests/' ~ r.id ~ ('/accept' if r.electronic else '/review')) }}?lang={{ lang }}">
           <input type="hidden" name="verdict" value="accepted">
           <button class="sbtn sbtn--primary" type="submit">{{ t('actions.review.accept') }}</button>
         </form>
         <form class="sform sform--gap" method="post" data-panel-form
-              action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/review') }}?lang={{ lang }}">
+              action="{{ url(actions_path ~ '/requests/' ~ r.id ~ ('/return' if r.electronic else '/review')) }}?lang={{ lang }}">
           <input type="hidden" name="verdict" value="returned">
           <label><span class="sform__label">{{ t('actions.review.comment') }}</span>
             <textarea class="sinput sinput--area" name="comment" required maxlength="2000" rows="3"></textarea></label>
@@ -88,12 +92,14 @@
       </section>
     {% endif %}
 
+    {% if not r.electronic %}
     <section class="ssec">
       <h3 class="ssec__title">{{ t('plans.versions.title') }}</h3>
       {{ versions(r, plan_files_path, hide_last_comment=returned_note) }}
     </section>
+    {% endif %}
 
-    {% if hq and r.status != 'accepted' %}
+    {% if hq and r.status not in ('accepted', 'closed') %}
       <section class="ssec">
         <h3 class="ssec__title">{{ t('actions.due.title') }}</h3>
         <form class="sform sform--inline" method="post" data-panel-form
@@ -101,6 +107,14 @@
           <input class="sinput" type="date" name="due" value="{{ r.due_on }}" min="{{ today }}" required aria-label="{{ t('actions.due.title') }}">
           <button class="sbtn" type="submit">{{ t('actions.due.submit') }}</button>
         </form>
+        {% if r.electronic %}
+          <p class="ssec__text">{{ t('plans.count_from.hint') }}</p>
+          <form class="sform sform--inline" method="post" data-panel-form
+                action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/count-from') }}?lang={{ lang }}">
+            <input class="sinput" type="date" name="count_from" value="{{ r.count_from }}" required aria-label="{{ t('plans.count_from.field') }}">
+            <button class="sbtn" type="submit">{{ t('plans.count_from.submit') }}</button>
+          </form>
+        {% endif %}
       </section>
     {% endif %}
 

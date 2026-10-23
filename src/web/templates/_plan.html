@@ -35,7 +35,7 @@
   <ol class="plan-history">
     {% for e in r.events %}
       <li><span class="ov-cell__muted">{{ e.at.strftime('%Y-%m-%d %H:%M') }}</span>
-        {{ t('plans.event.' ~ e.action) }} · {{ e.actor }}{% if e.action in ('returned',) and e.detail %} · «{{ e.detail }}»{% endif %}</li>
+        {{ t('plans.event.' ~ e.action) }} · {{ e.actor }}{% if e.action in ('returned', 'row_returned') and e.detail %} · «{{ e.detail }}»{% endif %}</li>
     {% endfor %}
   </ol>
 {%- endmacro %}

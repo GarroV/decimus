@@ -148,3 +148,20 @@ class TestИзМетодики:
 
 def book_days(книга: Deadlines, код: str) -> int:
     return книга.item_days[код]
+
+
+def test_формулировка_строки_без_приставки_класса_и_пустая_для_неизвестного_пункта() -> None:
+    from src.domain.item_label import ItemTexts
+
+    книга = Deadlines(
+        max_days={"D1": 30},
+        item_days={"PRD01": 5},
+        item_texts={
+            "PRD01": ItemTexts(
+                question_ru="(D1, D2) Заготовка размечена", question_en="(D1) Prep item is tagged"
+            )
+        },
+    )
+
+    assert книга.wording_for("prd01") == ("Заготовка размечена", "Prep item is tagged")
+    assert книга.wording_for("NOPE") == ("", "")

@@ -25,7 +25,7 @@ from typing import Any
 
 import psycopg
 
-from src.domain.plan_due import Deadlines, load_deadlines
+from src.domain.plan_due import Deadlines, load_deadlines, row_due_on
 
 ROW_FILLING = "filling"
 ROW_IN_WORK = "in_work"
@@ -78,6 +78,10 @@ class PlanRow:
 
     def overdue(self, on: date) -> bool:
         return row_overdue(self.status, self.due_on, today=on)
+
+    def latest_own_due(self, count_from: date) -> date:
+        """Самая поздняя дата, которую партнёр может поставить сам: положенный срок строки."""
+        return self.extended_due or row_due_on(count_from, self.days)
 
     def title(self, lang: str) -> str:
         """Формулировка на языке; пусто — на другом, нет ни одной — код пункта."""
