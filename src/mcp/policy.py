@@ -37,6 +37,7 @@ from .catalogue import (
     KIND_IMPORT,
     KIND_INSPECTIONS,
     KIND_MOVE,
+    KIND_PLAN,
     KIND_RATINGS,
     KIND_RATINGS_READ,
     KIND_RETRACTION,
@@ -54,6 +55,8 @@ KIND_ACTIONS: Mapping[str, str] = {
     KIND_MOVE: "inspection.move",
     KIND_RATINGS: "ratings.manage",
     KIND_RATINGS_READ: "ratings.read",
+    # Чтение плана — как раздел «Действия» в вебе; запись у каждого инструмента своя.
+    KIND_PLAN: "view.actions",
 }
 
 #: Правящие инструменты методики, чьё действие — не правка пунктов.
@@ -71,6 +74,18 @@ TOOL_ACTIONS: Mapping[str, str] = {
     "apply_checklist": "checklist.apply",
     # Новая пиццерия — как кнопка «Добавить пиццерию» в вебе: только УК (D234).
     "create_unit": "unit.create",
+    # Электронный план (#1168, D620): вердикты — УК, заполнение и ход строк — партнёр.
+    # УК за партнёра не заполняет, партнёр вердиктов не выносит: границу держит матрица
+    # (`hq_only` / `partner_only`), и ещё раз — двери `plan_flow`.
+    "accept_action_plan": "plan.manage",
+    "return_action_plan": "plan.manage",
+    "confirm_plan_row": "plan.manage",
+    "return_plan_row": "plan.manage",
+    "set_plan_count_from": "plan.manage",
+    "fill_plan_row": "plan.submit",
+    "submit_action_plan": "plan.submit",
+    "start_plan_row": "plan.submit",
+    "finish_plan_row": "plan.submit",
 }
 
 

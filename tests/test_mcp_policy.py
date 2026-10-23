@@ -23,6 +23,7 @@ from src.mcp.catalogue import (
     KIND_IMPORT,
     KIND_INSPECTIONS,
     KIND_MOVE,
+    KIND_PLAN,
     KIND_RATINGS,
     KIND_RATINGS_READ,
     KIND_RETRACTION,
@@ -40,6 +41,7 @@ from src.mcp.rpc import handle
     KIND_RATINGS,
     KIND_RETRACTION,
     KIND_MOVE,
+    KIND_PLAN,
 )
 
 #: Матрица из спеки `docs/superpowers/specs/2026-10-12-claude-connect-design.md`,
@@ -55,6 +57,7 @@ _ВСЁ_УК = frozenset(
         KIND_RATINGS_READ,
         KIND_RATINGS,
         KIND_MOVE,
+        KIND_PLAN,
     }
 )
 МАТРИЦА: dict[tuple[str, str], frozenset[str]] = {
@@ -69,6 +72,7 @@ _ВСЁ_УК = frozenset(
             KIND_RATINGS_READ,
             KIND_IMPORT,
             KIND_MOVE,
+            KIND_PLAN,
         }
     ),
     # Гость (D440): только чтение проверок и рейтингов. Аудитора в УК больше нет.
@@ -77,11 +81,11 @@ _ВСЁ_УК = frozenset(
     ("HQ", "control"): frozenset({KIND_RATINGS_READ, KIND_RATINGS}),
     # Админ партнёра (D460): методика его пространства — как в вебе.
     ("RS", "admin"): frozenset(
-        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
+        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ, KIND_PLAN}
     ),
     # Сотрудник партнёра (D460): методика на чтение, как в вебе; правящие инструменты закрыты.
     ("RS", "auditor"): frozenset(
-        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
+        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ, KIND_PLAN}
     ),
 }
 
@@ -146,17 +150,28 @@ def _виды(имена: set[str]) -> set[str]:
 
 #: Инструменты открытого роли вида, закрытые ей своим действием (D440): указатель
 #: прода двигают только админы.
+#: Вид «план» открыт обеим сторонам, но каждый инструмент — своим действием: вердикты УК
+#: (`plan.manage`) партнёру закрыты, заполнение и ход строк (`plan.submit`) закрыты УК.
+ПЛАН_УК = {
+    "accept_action_plan",
+    "return_action_plan",
+    "confirm_plan_row",
+    "return_plan_row",
+    "set_plan_count_from",
+}
+ПЛАН_ПАРТНЁРА = {"fill_plan_row", "submit_action_plan", "start_plan_row", "finish_plan_row"}
 ЗАКРЫТЫЕ_ИНСТРУМЕНТЫ: dict[tuple[str, str], set[str]] = {
-    ("HQ", "developer"): {"apply_checklist"},
+    ("HQ", "superadmin"): set(ПЛАН_ПАРТНЁРА),
+    ("HQ", "admin"): set(ПЛАН_ПАРТНЁРА),
+    ("HQ", "developer"): {"apply_checklist"} | ПЛАН_ПАРТНЁРА,
     # Указатель прода один на всю сеть и в пространстве партнёра не двигается (D460).
-    ("RS", "admin"): {"apply_checklist", "uncovered_phrases"},
+    ("RS", "admin"): {"apply_checklist", "uncovered_phrases"} | ПЛАН_УК,
 }
 #: Правящие инструменты методики закрыты сотруднику партнёра (читает, но не правит).
 ПИШУЩИЕ_МЕТОДИКИ = {spec.name for spec in TOOLS if spec.kind == KIND_CHECKLIST and spec.writes}
-ЗАКРЫТЫЕ_ИНСТРУМЕНТЫ[("RS", "auditor")] = ПИШУЩИЕ_МЕТОДИКИ | {
-    "apply_checklist",
-    "uncovered_phrases",
-}
+ЗАКРЫТЫЕ_ИНСТРУМЕНТЫ[("RS", "auditor")] = (
+    ПИШУЩИЕ_МЕТОДИКИ | {"apply_checklist", "uncovered_phrases"} | ПЛАН_УК
+)
 
 
 @pytest.mark.parametrize(("арендатор", "роль"), sorted(МАТРИЦА))

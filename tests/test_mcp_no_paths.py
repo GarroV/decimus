@@ -33,7 +33,7 @@ from mcp_checklist_harness import handle_confirmed as handle
 from mcp_places import сверить
 from ratings_samples import rko_violations
 
-from src.mcp.catalogue import TOOLS
+from src.mcp.catalogue import KIND_PLAN, TOOLS
 from src.mcp.checklist import Store, current_version
 from src.mcp.checklist_tools import MAX_NOTE
 from src.mcp.errors import McpError
@@ -86,6 +86,40 @@ from src.mcp.errors import McpError
     "import_edit_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "date": "2020-01-01",
+    },
+    "list_action_plans": {"status": "on_review"},
+    "get_action_plan": {"request_id": "00000000-0000-0000-0000-000000000001"},
+    "accept_action_plan": {"request_id": "00000000-0000-0000-0000-000000000001"},
+    "return_action_plan": {
+        "request_id": "00000000-0000-0000-0000-000000000001",
+        "comment": "уточнить меры",
+    },
+    "confirm_plan_row": {
+        "request_id": "00000000-0000-0000-0000-000000000001",
+        "row_id": "00000000-0000-0000-0000-000000000001",
+    },
+    "return_plan_row": {
+        "request_id": "00000000-0000-0000-0000-000000000001",
+        "row_id": "00000000-0000-0000-0000-000000000001",
+        "reason": "нет фото",
+    },
+    "set_plan_count_from": {
+        "request_id": "00000000-0000-0000-0000-000000000001",
+        "count_from": "2026-10-01",
+    },
+    "fill_plan_row": {
+        "request_id": "00000000-0000-0000-0000-000000000001",
+        "row_id": "00000000-0000-0000-0000-000000000001",
+        "measure": "помыть",
+    },
+    "submit_action_plan": {"request_id": "00000000-0000-0000-0000-000000000001"},
+    "start_plan_row": {
+        "request_id": "00000000-0000-0000-0000-000000000001",
+        "row_id": "00000000-0000-0000-0000-000000000001",
+    },
+    "finish_plan_row": {
+        "request_id": "00000000-0000-0000-0000-000000000001",
+        "row_id": "00000000-0000-0000-0000-000000000001",
     },
     "move_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
@@ -272,6 +306,17 @@ from src.mcp.errors import McpError
     "import_edit_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": 0},
     "import_edit_inspection": {"inspection_id": "не-uuid"},
     "move_inspection": {"inspection_id": "не-uuid", "reason": "x"},
+    "list_action_plans": {"status": "не-статус"},
+    "get_action_plan": {"request_id": "не-uuid"},
+    "accept_action_plan": {"request_id": "не-uuid"},
+    "return_action_plan": {"request_id": "не-uuid", "comment": ""},
+    "confirm_plan_row": {"request_id": "не-uuid", "row_id": "не-uuid"},
+    "return_plan_row": {"request_id": "не-uuid", "row_id": "не-uuid", "reason": ""},
+    "set_plan_count_from": {"request_id": "не-uuid", "count_from": "не-дата"},
+    "fill_plan_row": {"request_id": "не-uuid", "row_id": "не-uuid", "measure": "x"},
+    "submit_action_plan": {"request_id": "не-uuid"},
+    "start_plan_row": {"request_id": "не-uuid", "row_id": "не-uuid"},
+    "finish_plan_row": {"request_id": "не-uuid", "row_id": "не-uuid"},
     "import_remove_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": -1},
     "import_get_inspection": {"inspection_id": "не-uuid"},
     "import_list_drafts": {},
@@ -583,7 +628,9 @@ def test_батарея_доходит_и_до_успешных_ответов(�
     успешные = [о for о in батарея.ответы if о.текст.startswith("{")]
     версии = [json.loads(о.текст).get("version") for о in успешные]
 
-    assert len(успешные) >= len(TOOLS), "успешных ответов слишком мало для утверждения"
+    # Инструменты плана без живой базы отвечают отказом окружения, а не JSON: их не считаем.
+    без_базы = sum(1 for spec in TOOLS if spec.kind == KIND_PLAN)
+    assert len(успешные) >= len(TOOLS) - без_базы, "успешных ответов слишком мало для утверждения"
     assert any(версия for версия in версии), "ни одна правка не дошла до новой версии"
 
 

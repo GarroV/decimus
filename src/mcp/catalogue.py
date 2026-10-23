@@ -37,6 +37,7 @@ from . import (
     checklists_tools,
     move,
     phrases,
+    plans,
     ratings_read,
     ratings_tools,
     retraction,
@@ -100,6 +101,12 @@ KIND_RATINGS_READ = "ratings_read"
 #: документ, через ту же db-функцию, что веб. Право — действие матрицы
 #: `inspection.move` (`policy.KIND_ACTIONS`); обработчик — `src.mcp.move`.
 KIND_MOVE = "move"
+
+#: Электронный план исправлений (#1168, D620). Девятый вид: читает и пишет план теми же
+#: дверьми, что веб (`src.db.action_plans`, `src.db.plan_flow`). Право решает действие
+#: каждого инструмента (`policy`): чтение — `view.actions`, вердикты УК — `plan.manage`,
+#: работа партнёра — `plan.submit`; охват — по токену. Обработчики — `src.mcp.plans`.
+KIND_PLAN = "plan"
 
 
 @dataclass(frozen=True)
@@ -2231,6 +2238,173 @@ TOOLS = (
         },
         handler=move.move_inspection,
         kind=KIND_MOVE,
+    ),
+)
+
+_PLAN_ID_PROPERTY: dict[str, object] = {
+    "type": "string",
+    "description": "Id of the action plan (request), from list_action_plans.",
+}
+_PLAN_ROW_ID_PROPERTY: dict[str, object] = {
+    "type": "string",
+    "description": "Id of the plan row, from get_action_plan.",
+}
+
+
+def _plan_tool(
+    name: str,
+    description: str,
+    properties: dict[str, object],
+    required: list[str],
+    handler: Callable[..., dict[str, object]],
+) -> ToolSpec:
+    """Инструмент плана: схема без `tenant` — пространство называет токен."""
+    return ToolSpec(
+        name=name,
+        description=description,
+        input_schema={
+            "type": "object",
+            "properties": properties,
+            "required": required,
+            "additionalProperties": False,
+        },
+        handler=handler,
+        kind=KIND_PLAN,
+    )
+
+
+TOOLS = (
+    *TOOLS,
+    _plan_tool(
+        "list_action_plans",
+        "List correction (action) plans in your scope: a partner sees plans of its countries, "
+        "the management company sees all. One short row per plan: unit, country, status, due "
+        "date, overdue flag (computed today) and counts of rows by status. Without status only "
+        "OPEN plans are listed (waiting for rows, for review, in work); status=accepted or "
+        "closed lists finished ones. Statuses: requested (partner fills rows), on_review "
+        "(waits for the management company), in_work, accepted (file plans), closed.",
+        {
+            "status": {"type": "string", "enum": list(plans.PLAN_STATUSES)},
+            "country": {"type": "string", "description": "Country code, e.g. RS."},
+            "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": plans.MAX_LIMIT,
+                "description": f"Plans to return, default {plans.DEFAULT_LIMIT}.",
+            },
+        },
+        [],
+        plans.list_action_plans,
+    ),
+    _plan_tool(
+        "get_action_plan",
+        "One action plan: header, the comment of the last return, and its rows — each with "
+        "item code, class (D1-D3), zone, the violation, measure, responsible, reason, the "
+        "partner's own due date, the effective due date, status and overdue flag (computed "
+        "today). Empty fields are omitted, long texts are cut. A file plan has no rows.",
+        {
+            "request_id": _PLAN_ID_PROPERTY,
+            "lang": {
+                "type": "string",
+                "enum": list(plans.PLAN_LANGS),
+                "description": "Language of the item wordings (ru or en). Default en; falls "
+                "back to the other language when a wording is missing.",
+            },
+        },
+        ["request_id"],
+        plans.get_action_plan,
+    ),
+    _plan_tool(
+        "accept_action_plan",
+        "Accept an action plan that waits for review: it goes to work and the partner is "
+        "notified. Management company only; same as the web button.",
+        {"request_id": _PLAN_ID_PROPERTY},
+        ["request_id"],
+        plans.accept_action_plan,
+    ),
+    _plan_tool(
+        "return_action_plan",
+        "Return an action plan that waits for review to the partner for rework, with a "
+        "mandatory comment (what to fix) the partner sees. Management company only.",
+        {
+            "request_id": _PLAN_ID_PROPERTY,
+            "comment": {"type": "string", "description": "What to fix. Required."},
+        },
+        ["request_id", "comment"],
+        plans.return_action_plan,
+    ),
+    _plan_tool(
+        "confirm_plan_row",
+        "Confirm a plan row the partner marked done; when the last row is confirmed the plan "
+        "closes. Management company only.",
+        {"request_id": _PLAN_ID_PROPERTY, "row_id": _PLAN_ROW_ID_PROPERTY},
+        ["request_id", "row_id"],
+        plans.confirm_plan_row,
+    ),
+    _plan_tool(
+        "return_plan_row",
+        "Return a plan row the partner marked done, with a mandatory reason (what is wrong) "
+        "the partner sees. Management company only.",
+        {
+            "request_id": _PLAN_ID_PROPERTY,
+            "row_id": _PLAN_ROW_ID_PROPERTY,
+            "reason": {"type": "string", "description": "What is wrong. Required."},
+        },
+        ["request_id", "row_id", "reason"],
+        plans.return_plan_row,
+    ),
+    _plan_tool(
+        "set_plan_count_from",
+        "Move the start of the countdown of an action plan (D613): the plan due date and the "
+        "due dates of all rows except extended ones are recalculated from it. Not possible "
+        "for an accepted or closed plan. Management company only.",
+        {
+            "request_id": _PLAN_ID_PROPERTY,
+            "count_from": {"type": "string", "description": "New start date, YYYY-MM-DD."},
+        },
+        ["request_id", "count_from"],
+        plans.set_plan_count_from,
+    ),
+    _plan_tool(
+        "fill_plan_row",
+        "Fill a plan row while the plan waits for rows: measure (what we do), "
+        "responsible, reason and the own due date (YYYY-MM-DD, not later than the due date "
+        "the methodology gives and not in the past). Fields you do not name stay as they "
+        "are; an empty string clears a field. Fill every row, then submit_action_plan. "
+        "Partner only.",
+        {
+            "request_id": _PLAN_ID_PROPERTY,
+            "row_id": _PLAN_ROW_ID_PROPERTY,
+            "measure": {"type": "string", "description": "What will be done."},
+            "responsible": {"type": "string", "description": "Who is responsible."},
+            "reason": {"type": "string", "description": "Why it happened."},
+            "own_due": {"type": "string", "description": "Own due date, YYYY-MM-DD."},
+        },
+        ["request_id", "row_id"],
+        plans.fill_plan_row,
+    ),
+    _plan_tool(
+        "submit_action_plan",
+        "Send the filled action plan to the management company for review. Every row needs a "
+        "measure and a responsible. Partner only.",
+        {"request_id": _PLAN_ID_PROPERTY},
+        ["request_id"],
+        plans.submit_action_plan,
+    ),
+    _plan_tool(
+        "start_plan_row",
+        "Mark a row of an accepted plan 'taken into work'. Partner only.",
+        {"request_id": _PLAN_ID_PROPERTY, "row_id": _PLAN_ROW_ID_PROPERTY},
+        ["request_id", "row_id"],
+        plans.start_plan_row,
+    ),
+    _plan_tool(
+        "finish_plan_row",
+        "Mark a plan row 'done': it goes to the management company for confirmation. The row "
+        "must be in work (or returned). Partner only.",
+        {"request_id": _PLAN_ID_PROPERTY, "row_id": _PLAN_ROW_ID_PROPERTY},
+        ["request_id", "row_id"],
+        plans.finish_plan_row,
     ),
 )
 
