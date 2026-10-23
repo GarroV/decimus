@@ -197,6 +197,29 @@ def test_кадры_в_чтении_с_размером_и_low_resolution(monkey
     ]
 
 
+def test_размер_читается_от_имени_пространства_обращения(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Потоки пула не наследуют пространство сами: на проде база отказывала всем 51 кадру."""
+    from src.db import previews, space
+
+    monkeypatch.setattr(import_photos, "_shots", lambda ident, *, tenant: {"f1": ((P1, P2), 0)})
+    monkeypatch.setattr(import_photos, "_photo_storage", lambda: object())
+
+    def копия(i: str, p: str, *, reach: Any, storage: Any) -> bytes:
+        if space.current_space() != "HQ":
+            raise previews.DbError("decimus.space is not set")
+        return _jpeg(420, 560)
+
+    monkeypatch.setattr(previews, "preview_bytes", копия)
+
+    with space.acting_space("HQ"):
+        кадры = import_photos.frames_by_finding(ID, tenant="HQ")
+
+    assert кадры is not None
+    assert [f["width"] for f in кадры["f1"]] == [420, 420]
+
+
 def test_полное_чтение_несёт_frames_а_короткие_ответы_нет(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
