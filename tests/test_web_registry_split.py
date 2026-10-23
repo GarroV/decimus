@@ -268,3 +268,45 @@ def test_без_выбора_панели_нет_и_карточка_не_чит
     страница = стенд.get("/inspections").get_data(as_text=True)
 
     assert "data-drawer" not in страница and прочитано == []
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+@pytest.mark.parametrize(("пространство", "карандаш"), [(ТЕНАНТ, True), ("GE", False)])
+def test_карандаш_у_названия_пиццерии_в_панели(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, пространство: str, карандаш: bool
+) -> None:
+    """D628: ошиблись точкой — сменить её прямо на вычитке; чужую проверку — нет (D283)."""
+    строка = шапка(tenant_code=пространство, on_review=True)
+    _ловушка(monkeypatch, rows=(строка,))
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(строка))
+    monkeypatch.setattr(data, "load_moves", lambda *_a, **_k: ())
+    monkeypatch.setattr(data, "retraction_available", lambda: True)
+    monkeypatch.setattr(
+        data, "load_units", lambda **_k: (("u-1", "Adana-3"), ("u-2", строка.unit_name))
+    )
+
+    страница = стенд.get(f"/inspections?inspection={строка.id}").get_data(as_text=True)
+
+    assert ('class="tedit"' in страница) is карандаш
+    if карандаш:
+        окно = страница.split('class="tedit"', 1)[1]
+        assert f"/inspections/{строка.id}/move" in окно and "data-panel-form" in окно
+        assert f'name="date" value="{строка.inspection_date}"' in окно
+        assert "Adana-3" in окно
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+def test_у_принятой_в_панели_карандаша_нет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Принятую в панели не правят (D465): её исправляют на странице карточки."""
+    строка = шапка(on_review=False)
+    _ловушка(monkeypatch, rows=(строка,))
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(строка))
+    monkeypatch.setattr(data, "load_moves", lambda *_a, **_k: ())
+    monkeypatch.setattr(data, "retraction_available", lambda: True)
+    monkeypatch.setattr(data, "load_units", lambda **_k: (("u-1", "Adana-3"),))
+
+    страница = стенд.get(f"/inspections?inspection={строка.id}").get_data(as_text=True)
+
+    assert 'class="tedit"' not in страница

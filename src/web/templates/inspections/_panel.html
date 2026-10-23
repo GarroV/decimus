@@ -9,7 +9,7 @@
   `split.js` отправляет фоном, а ответ (`inspections/_panel_fragment.html`)
   подменяет содержимое панели. Без скрипта формы работают как раньше — страницей.
 #}
-{% from "inspections/_card_parts.html" import card_actions, accept_badge, provenance, grade_reason, explain_block with context %}
+{% from "inspections/_card_parts.html" import card_actions, accept_badge, provenance, grade_reason, explain_block, unit_pencil with context %}
 {% from "inspections/_card_body.html" import card_body with context %}
 
 {% macro inspection_panel(c) %}
@@ -19,7 +19,7 @@
       <span class="grade grade--lg tag {{ c.grade_tone(head.grade) }}">{{ head.grade or '—' }}</span>
       <b class="mono spanel__pct">{{ head.pct }}</b>
       <div class="sdetail__who">
-        <h2 class="sdetail__title" id="inspection-title">{{ head.unit_name }}</h2>
+        <div class="tedit__row"><h2 class="sdetail__title" id="inspection-title">{{ head.unit_name }}</h2>{{ unit_pencil(c, head, True) }}</div>
         <p class="sdetail__hint"><b class="sdetail__date">{{ day(head.inspection_date) }}</b> · {{ c.kind }}</p>
         {{ provenance(head, 'sdetail__hint') }}
         {{ grade_reason(c) }}
