@@ -288,6 +288,15 @@ def test_звенья_и_их_адреса_читаются_из_окружен�
     assert настройки.trusted_proxy_addrs == ("172.19.0.0/16", "10.0.0.5")
 
 
+def test_ключ_фронта_читается_из_окружения_и_не_попадает_в_repr() -> None:
+    assert _настройки().front_key == ""
+
+    настройки = _настройки(MCP_FRONT_KEY="  секрет-фронта  ")
+
+    assert настройки.front_key == "секрет-фронта"
+    assert "секрет-фронта" not in repr(настройки)
+
+
 @pytest.mark.parametrize(
     "env",
     [

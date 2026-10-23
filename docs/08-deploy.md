@@ -720,13 +720,14 @@ docker ps --filter label=backup.pgdump=true --format "{{.Names}}"   # ждём d
 Хранилище **своё, на площадке** и **временное по решению, а не по устройству**:
 продукт говорит с ним S3-совместимым языком (`src/db/storage.py`), поэтому
 переезд на внешнее стоит правки `S3_*` в окружении и ничего больше (D054,
-D061). Служба в сборке `storage-live`, том `storage-data`, порты только на
-петлю — наружу файлы выдаёт админка, а не хранилище.
+D061).
 
-> **История.** С 30.09.2026 кадры живут в MinIO на MUSPELHEIM (D257, D259,
-> D293), служба `storage-live` и `tools/storage_env.*` удалены из репозитория
-> (#396): закреплённый образ MinIO больше не скачивается. Порядок ниже —
-> как было, для чтения старых журналов.
+> **История.** С 30.09.2026 по 23.10.2026 кадры жили в MinIO на MUSPELHEIM
+> (D257, D259, D293); с 23.10.2026 они снова на VPS (D635, подробно — §8.2
+> и §8.5): служба `storage-live` лежит в `docker-compose.prod.yml`, а не в
+> общей сборке, `tools/storage_env.*` удалены (#396) и не возвращаются — корзину
+> и пользователя заводит `storage-init`, ключи лежат в `.env` (§8.2). Порядок ниже — как было
+> на MUSPELHEIM до D293, для чтения старых журналов.
 
 **Не путать с соседней службой `storage`:** та мок, держит объекты в памяти и
 умирает вместе с контейнером. Она для прогонов и смоука, и боевым хранилищем
@@ -804,8 +805,9 @@ python tools/backfill_by_process.py --apply    # «записано: X, проп
 
 #### 4.9.2. Хранилище лежит на сдаче — дозагрузка кадров (#459)
 
-Хранилище кадров прода на MUSPELHEIM, а тот засыпает (D259). Что тогда
-происходит со сдачей:
+Хранилище кадров прода — MinIO рядом с ботом на VPS (D635; до 23.10.2026 — на
+MUSPELHEIM, а тот засыпал, D259). Если оно всё же лежит (перезапуск, сбой тома),
+происходит вот что со сдачей:
 
 | Шаг | Что происходит |
 |---|---|
@@ -1008,7 +1010,7 @@ Remove-Item -Recurse -Force C:\projects\decimus
 | Окружение | `/srv/decimus/.env`, права `600`; ключи — [`.env.example`](../.env.example) |
 | Методика | `/srv/decimus/data` (bind только на чтение, `AUDIT_DATA_DIR`) |
 | Проект compose | `decimus` → сеть `decimus_default`, тома `decimus_pgdata`, `decimus_state`, `decimus_frames`, `decimus_methodology` |
-| Кадры | **с 30.09.2026 — MinIO на MUSPELHEIM** (`C:\projects\decimus-frames`, канон — `GarroV/muspelheim-infra`), бот и админка ходят на `S3_ENDPOINT_URL=http://<TAILNET_IP>:9020` через tailnet под пользователем MinIO `decimus-app` с доступом только к корзине `inspection-frames` (политика `decimus-frames-rw`); root-ключи MinIO лежат только на MUSPELHEIM и в окружение прода не попадают (#458). Бэкапа у кадров нет (D259, #456). Пока MUSPELHEIM спит, фото на сдаче не выгружаются, а в админке не открываются; сдача при этом не встаёт, а кадры доливает сам бот, когда хранилище вернулось (§4.9.2, #459). Старое хранилище на VPS — служба `storage-live` и том `decimus_storage-data` — снято 30.09 (D293): `prod-update.sh` его не поднимает и корзину не заводит |
+| Кадры | **с 23.10.2026 — MinIO на этом же VPS (D635)**: служба `storage-live` в `docker-compose.prod.yml`, том `decimus_storage-data`, порт наружу и на хост не публикуется. Бот, админка и MCP ходят на `S3_ENDPOINT_URL=http://storage-live:9000` под пользователем MinIO `decimus-app` с доступом только к корзине `inspection-frames` (политика `decimus-frames-rw`); root-ключи MinIO (`FRAMES_ROOT_USER`, `FRAMES_ROOT_PASSWORD`) лежат только в `/srv/decimus/.env` и приложению не отдаются. Том входит в ночной бэкап VPS (§8.5), резерв — restic на MUSPELHEIM. С 30.09 по 23.10 кадры были на MUSPELHEIM (D257, D259, D293) — отменено D635. Старый MinIO на MUSPELHEIM (`C:\projects\decimus-frames`) оставлен нетронутым как страховка, прод туда больше не ходит; снести можно с 30.10.2026, если на проде не всплыло ни одной недостачи кадров |
 
 ### 8.1. Подключение к прокси — надстройка площадки
 
@@ -1087,16 +1089,42 @@ HTTPS.** Ключ велит слать `Strict-Transport-Security: max-age=3153
 умолчанию выключен; любое значение, кроме пусто, `0` и `1`, — отказ на старте.
 Включение на проде — решение владельца при раскатке, само не включается.
 
-### 8.2. Образ MinIO — перенести с MUSPELHEIM (#396)
+### 8.2. Хранилище кадров на VPS и образ MinIO (D635, #396)
+
+Службы `storage-live` (MinIO) и `storage-init` (заведение корзины и пользователя)
+описаны в `docker-compose.prod.yml`. `scripts/prod-update.sh` перед подъёмом
+приложений поднимает `storage-live` и запускает `storage-init`; тот идемпотентен:
+`mc mb --ignore-existing`, политика `decimus-frames-rw` (чтение, запись и удаление
+только в корзине `${S3_BUCKET}`), пользователь `decimus-app` с ключами
+`S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` из `.env`.
+
+Переменные `.env` на сервере (значения никуда не печатать):
+
+| Переменная | Что это |
+|---|---|
+| `FRAMES_ROOT_USER`, `FRAMES_ROOT_PASSWORD` | root MinIO; пароль от 16 знаков, без них `storage-live` не стартует (F-014). Читает только compose |
+| `S3_ENDPOINT_URL` | `http://storage-live:9000` |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | ключи приложения (`decimus-app`) |
+| `S3_BUCKET`, `S3_REGION` | `inspection-frames`, `us-east-1` |
 
 Закреплённые образы `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` и
 `quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z` реестры больше не отдают (401 /
-denied, проверено 26.09.2026). На MUSPELHEIM они в кэше. Перенос тем же тегом,
-compose менять не нужно:
+denied, проверено 26.09.2026). На VPS они уже загружены; на новом сервере их
+переносят тем же тегом с машины, где они в кэше (на 23.10.2026 это MUSPELHEIM),
+compose менять не нужно. **`docker image prune -a` на VPS их удалил бы** — чистка
+кэша сборок (`vps-infra`, `builder prune`) образов не трогает.
 
 ```bash
 ssh muspelheim docker save quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z | ssh <vps> docker load
 ```
+
+**Переезд 23.10.2026 (D635), для повторения:** `storage-live` и `storage-init`
+подняты вручную до раскатки; все объекты залиты `mc mirror --preserve` со старого
+MinIO (по ключам приложения) в новый; сверены множество ключей, размеры и etag
+1:1 и ссылки базы (`photos.storage_path`, `photos.preview_path`,
+`reports.storage_path`) против объектов нового хранилища; затем `S3_ENDPOINT_URL`
+переключён и раскатка, и ещё один `mc mirror` для кадров, пришедших между
+переливом и переключением. Откат: вернуть прежний `S3_ENDPOINT_URL` и раскатить.
 
 ### 8.3. Подъём и обновление — одна команда
 
@@ -1254,13 +1282,15 @@ docker run --rm -v decimus_storage-data:/v -v "$PWD":/in alpine:3.22 tar -xzf /i
 ### 8.5. Бэкапы на VPS
 
 **Сейчас (30.09):** ночной бэкап площадки VPS уходит restic'ом на MUSPELHEIM —
-база, `state`, `.env`; список целей — `/etc/vps-backup/targets.conf` (канон
-`GarroV/vps-infra`). Кадры не бэкапятся (D259). Ниже — что из этого закрывает сам продукт.
+база, `state`, `.env`, кадры; список целей — `/etc/vps-backup/targets.conf` (канон
+`GarroV/vps-infra`). Кадры (том `decimus_storage-data`) бэкапятся с 23.10.2026 (D635, отменил D259).
+Ниже — что из этого закрывает сам продукт.
 
 - **База:** у службы `db` метка `backup.pgdump=true` — её ищет дамп площадки.
 - **`decimus_state` — не дамп Postgres**, меткой не помечен: его берёт площадка
   строкой `vol decimus-state decimus_state` в `targets.conf`. Том кадров
-  `decimus_storage-data` оттуда убран 30.09 — живые кадры на MUSPELHEIM и без бэкапа (D259).
+  `decimus_storage-data` — строкой `vol decimus-frames decimus_storage-data` (D635); не путать
+  с томом `decimus_frames` (копии кадров бота на 7 дней, #367, в бэкап не входят намеренно).
 
 ### 8.6. Что стало с обвязкой MUSPELHEIM
 
@@ -1270,7 +1300,7 @@ docker run --rm -v decimus_storage-data:/v -v "$PWD":/in alpine:3.22 tar -xzf /i
 | Второй проект `decimus-web` с пустой базой (#352) | не воссоздаётся: веб в проекте `decimus`, база одна |
 | Звенья `web-link`, `link`, туннель | выключены, наружу — Caddy |
 | `scripts/deploy.sh` (PowerShell через ssh) | `scripts/prod-update.sh` на сервере |
-| `tools/storage_env.ps1` | не нужен: хранилище кадров на MUSPELHEIM, ключи заводит `muspelheim-infra` (оба скрипта удалены, #396) |
+| `tools/storage_env.ps1` | не нужен: ключи хранилища кадров — в `.env` (§8.2), корзину и пользователя заводит `storage-init` (оба скрипта удалены, #396) |
 | `C:\backups\pg_backup.ps1` | дамп площадки по метке |
 | Задача планировщика для `state-backup` | cron (§8.5) |
 | Деплой-скрипт с паролем в открытом виде (#395) | не переносится; учётку сменить (§8.7) |
@@ -1424,8 +1454,12 @@ wrangler.admin.jsonc < файл` и то же для `wrangler.mcp.jsonc` (зн�
 запрос из соседнего контейнера с подделанным `X-Forwarded-For` счётчик видит с
 адреса соседа. **При смене ключа** (см. выше) значение `WEB_FRONT_KEY` менять в
 том же окне, что и сниппет Caddy: пока в сниппете два ключа, у origin — один;
-ставить новый только после того, как Worker'ы перешли на него. Сервер MCP эту
-проверку не делает.
+ставить новый только после того, как Worker'ы перешли на него. Сервер MCP делает ту же сверку
+для `X-Forwarded-For` (адрес клиента в журнале действий, `src/domain/client_ip.py`):
+ключ он берёт из `MCP_FRONT_KEY`, а в `docker-compose.prod.yml` по умолчанию это
+`WEB_FRONT_KEY`, отдельной записи в `.env` не нужно; `MCP_FRONT_KEY` не задан — доверие по
+подсети и предупреждение при старте. Caddy передаёт заголовок ключа к обоим сайтам
+(`GarroV/vps-infra: edge/sites/decimus.caddy`).
 
 **Вход через Google через фронт.** Нужен второй адрес возврата: в `.env` VPS
 `GOOGLE_FRONT_REDIRECT_URI=https://decimus.vasiliy-garro.workers.dev/auth/google/callback`,
@@ -1518,8 +1552,8 @@ Funnel не зависит: `https://decimus-stand.vasiliy-garro.workers.dev`. �
    | `ATTACHMENT_MAX_MB` | `25` | Предел файла экшн-плана, МБ (D269). Целое 1–1024. Действует только на маршруте загрузки; если перед вебом стоит прокси со своим пределом тела, его поднять до этого же значения |
 
 3. **Хранилище** — то же, что у кадров (D268), префикс `action-plans/`. Веб
-   кладёт в него файлы, значит `S3_*` нужны и вебу, а не только боту. Бэкапа у
-   хранилища нет (D259) — риск принят тем же решением, что для фото.
+   кладёт в него файлы, значит `S3_*` нужны и вебу, а не только боту. Хранилище
+   в ночном бэкапе VPS (D635), как и кадры.
 4. **Подтверждение проверки идёт ролью администратора истории**
    (`DATABASE_RETRACTION_URL`) — запрос экшн-плана заводится той же ролью в той
    же транзакции, новых доступов не нужно.

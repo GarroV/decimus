@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import hmac
 import ipaddress
 from collections.abc import Iterable
 
@@ -31,20 +32,33 @@ def peer_trusted(peer: str, addrs: Iterable[str]) -> bool:
     return any(адрес in ipaddress.ip_network(сеть, strict=False) for сеть in addrs)
 
 
+def front_key_matches(expected: str, given: str | None) -> bool:
+    """Ключ фронта совпал: сравнение за постоянное время, пустой присланный — нет."""
+    return bool(given) and hmac.compare_digest(expected.encode(), (given or "").encode())
+
+
 def forwarded_client(
     peer: str,
     forwarded_for: str | None,
     *,
     trusted_proxies: int,
     trusted_addrs: tuple[str, ...],
+    front_key: str = "",
+    given_key: str | None = None,
 ) -> str:
     """Адрес клиента: по цепочке своих звеньев, а при любом сомнении — адрес соединения.
 
     Заголовок учитывается, только если звеньев обещано больше нуля, соединение пришло
     от названного звена и цепочка не короче обещанного. Иначе — `peer`: осторожный
     конец развилки (общий адрес на всех, а не выбранный отправителем).
+
+    Задан ключ фронта (`front_key`, F-107 аудита) — звено, пришедшее без верного
+    `given_key`, тоже чужое: подсеть звена делят и другие контейнеры. Не задан —
+    доверие по подсети, как раньше.
     """
     if trusted_proxies <= 0 or not peer_trusted(peer, trusted_addrs):
+        return peer
+    if front_key and not front_key_matches(front_key, given_key):
         return peer
     цепочка = [звено.strip() for звено in (forwarded_for or "").split(",") if звено.strip()]
     if len(цепочка) < trusted_proxies:
