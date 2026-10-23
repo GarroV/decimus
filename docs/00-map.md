@@ -300,7 +300,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 23 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, _pick_page.html, … (+15) |
+| `src/web/templates/` | 24 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, … (+16) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
@@ -311,7 +311,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 1 | not_found.html |
-| `src/web/templates/ratings/` | 5 | _loaded.html, _period.html, coverage.html, imports.html, index.html |
+| `src/web/templates/ratings/` | 4 | _period.html, coverage.html, imports.html, index.html |
 | `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
