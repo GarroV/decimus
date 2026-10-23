@@ -67,10 +67,10 @@ OAUTH_TEXTS: dict[str, dict[str, str]] = {
     "users.claude.copy": {"ru": "Скопировать", "en": "Copy"},
     "users.claude.copied": {"ru": "Скопировано", "en": "Copied"},
     "users.claude.step_add": {
-        "ru": "claude.ai, Claude Desktop или телефон: Настройки → Коннекторы → Добавить свой "
-        "коннектор → вставьте адрес.",
-        "en": "claude.ai, Claude Desktop or phone: Settings → Connectors → Add custom "
-        "connector → paste the address.",
+        "ru": "claude.ai в браузере или телефон: Настройки → Коннекторы → Добавить свой "
+        "коннектор → вставьте адрес. Claude Desktop — командой установки в «Настройках».",
+        "en": "claude.ai in a browser or phone: Settings → Connectors → Add custom "
+        "connector → paste the address. Claude Desktop — the install command in “Settings”.",
     },
     "users.claude.step_login": {
         "ru": "Claude откроет вход decimus: войдите своей учёткой и нажмите «Разрешить». Права "

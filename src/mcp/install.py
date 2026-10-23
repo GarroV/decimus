@@ -18,11 +18,21 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 from pathlib import Path
 
 #: Путь, по которому сервер отдаёт установщик. Выбран коротким: он попадает в
 #: строку, которую человек вставляет в терминал с телефона в руке.
 INSTALL_PATH = "/setup"
+
+#: Самообновление моста (D626): мост при старте спрашивает здесь версию и отпечаток
+#: (`BRIDGE_META_PATH`, JSON) и, если версия на сервере новее своей, скачивает файл
+#: (`BRIDGE_SCRIPT_PATH`). В отличие от `/setup` обе двери требуют токен:
+#: они отдают то, что человек потом запустит у себя, и анонимному клиенту
+#: нет причины это видеть.
+BRIDGE_META_PATH = "/bridge"
+BRIDGE_SCRIPT_PATH = "/bridge/script"
 
 #: Что отдаётся. `text/plain`, а не `application/x-sh`: файл не скачивается, а
 #: уходит в `bash` по конвейеру, и браузер, открывший адрес руками, должен
@@ -65,3 +75,33 @@ def install_script() -> str:
     if _BRIDGE_MARK in собран:
         raise InstallScriptError("место для моста осталось незаполненным: маркеров больше одного")
     return собран
+
+
+#: Строка версии в шапке моста: целое число, растёт на каждую правку, которую надо
+#: донести до уже поставленных мостов. Сравнивает его сам мост (`tools/mcp_bridge.sh`).
+_VERSION_LINE = re.compile(r"^BRIDGE_VERSION=(\d+)$", re.MULTILINE)
+
+
+def bridge_script() -> str:
+    """Мост ровно в том виде, в каком он ложится на диск человека.
+
+    Тот же текст, что установщик подставляет вместо `@BRIDGE@`
+    (`rstrip` + один перевод строки): отпечаток от него совпадает с отпечатком
+    файла, который лежит после установки, и обновление не видит «разницы»,
+    которой нет.
+    """
+    if not _BRIDGE.exists():
+        raise InstallScriptError(f"нет файла {_BRIDGE} — отдавать нечего")
+    return _BRIDGE.read_text(encoding="utf-8").rstrip("\n") + "\n"
+
+
+def bridge_meta() -> dict[str, object]:
+    """Версия и SHA-256 актуального моста. Отказ, если в мосте нет строки версии."""
+    текст = bridge_script()
+    найдено = _VERSION_LINE.search(текст)
+    if найдено is None:
+        raise InstallScriptError("в мосте нет строки BRIDGE_VERSION=<число>")
+    return {
+        "version": int(найдено.group(1)),
+        "sha256": hashlib.sha256(текст.encode("utf-8")).hexdigest(),
+    }

@@ -29,6 +29,14 @@
 # заголовок уходит файлом конфигурации curl с правами только для владельца.
 # Найдено разбором безопасности 03.09 живым запуском: `ps -eo command` печатал
 # «Authorization: Bearer <токен>» открытым текстом.
+#
+# Самообновление (D626). Установщик кладёт мост один раз, а новые возможности
+# (локальные инструменты для фото, D583) доезжают только в свежие установки. Поэтому
+# мост на старте сверяет `BRIDGE_VERSION` с сервером и, если там новее, заменяет себя
+# (self_update ниже). Работает только для моста, установленного в
+# ~/.decimus/bin/mcp_bridge.sh: запуск из рабочей копии репозитория свой файл не трогает.
+# DECIMUS_MCP_NO_UPDATE=1 выключает проверку.
+BRIDGE_VERSION=1
 set -u
 URL="${DECIMUS_MCP_URL:-${DODO_MCP_URL:-}}"
 TOKEN="${DECIMUS_MCP_TOKEN:-${DODO_MCP_TOKEN:-}}"
@@ -42,6 +50,65 @@ chmod 600 "$AUTH_FILE"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/mcp-work.XXXXXX")"
 trap 'rm -f "$AUTH_FILE"; rm -rf "$WORK"' EXIT HUP INT TERM
 printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" > "$AUTH_FILE"
+
+# --- Самообновление (D626) ------------------------------------------------------
+#
+# Когда: один раз на старте, ДО чтения первой строки stdin. Поэтому замена себя через
+# exec безопасна: сессия ещё не началась, клиент ничего не отправил и не потерял, а
+# новая версия стартует с чистого листа и читает тот же stdin. Обновление «к следующему
+# запуску» хуже: Claude Desktop держит мост запущенным часами, и человек остался бы на
+# старой версии до перезапуска приложения. Зацикливание исключено флагом
+# DECIMUS_BRIDGE_UPDATED: после exec проверка пропускается.
+#
+# Как: версия и SHA-256 берутся у сервера (GET /bridge), файл — GET /bridge/script во
+# временный файл В ТОЙ ЖЕ папке, проверяется (сумма, шебанг, маркер, версия, `bash -n`),
+# получает права 700 и переименовывается поверх себя — rename атомарен, а уже
+# запущенный bash дочитывает старый inode.
+#
+# Безопасность: только https (http — лишь на этой же машине, для проверки), токен —
+# конфигом curl, не в argv; любой сбой — одна строка в stderr и работа прежней версией.
+# Сеть: соединение 3 с, весь запрос версии 5 с — запуск MCP от сети не зависит.
+update_note() { printf 'mcp_bridge: обновление моста пропущено (%s), работаю прежней версией\n' "$1" >&2; }
+
+self_update() {
+  [ "${DECIMUS_MCP_NO_UPDATE:-}" = "1" ] && return 0
+  [ -z "${DECIMUS_BRIDGE_UPDATED:-}" ] || return 0
+  local self="$HOME/.decimus/bin/mcp_bridge.sh" base meta code remote_ver remote_sha tmp got
+  [ "$0" = "$self" ] && [ -f "$self" ] && [ ! -L "$self" ] || return 0
+  base="$(printf '%s' "$URL" | sed -E 's#^(https?://[^/?#]+).*#\1#')"
+  case "$base" in
+    *@*) update_note "адрес с логином"; return 0 ;;
+    https://*) ;;
+    http://127.0.0.1|http://127.0.0.1:[0-9]*|http://localhost|http://localhost:[0-9]*) ;;
+    *) update_note "адрес не https"; return 0 ;;
+  esac
+  meta="$(curl -sS --connect-timeout 3 --max-time 5 --config "$AUTH_FILE" -w '\n%{http_code}' \
+      "$base/bridge" </dev/null 2>&1)" || true
+  code="${meta##*$'\n'}"; meta="${meta%$'\n'*}"
+  [ "$code" = "200" ] || { update_note "сервер ответил $code"; return 0; }
+  remote_ver="$(printf '%s' "$meta" | sed -n 's/.*"version": *\([0-9][0-9]*\).*/\1/p')"
+  remote_sha="$(printf '%s' "$meta" | sed -n 's/.*"sha256": *"\([0-9a-f]\{64\}\)".*/\1/p')"
+  [ -n "$remote_ver" ] && [ -n "$remote_sha" ] || { update_note "непонятный ответ сервера"; return 0; }
+  [ "$remote_ver" -gt "$BRIDGE_VERSION" ] || return 0
+  tmp="$(mktemp "$(dirname "$self")/.mcp_bridge.XXXXXX" 2>/dev/null)" || { update_note "папка моста не доступна на запись"; return 0; }
+  if ! curl -sS -f --connect-timeout 3 --max-time 15 --config "$AUTH_FILE" -o "$tmp" \
+      "$base/bridge/script" </dev/null 2>/dev/null; then
+    rm -f "$tmp"; update_note "не скачался файл"; return 0
+  fi
+  got="$(shasum -a 256 "$tmp" 2>/dev/null | cut -d' ' -f1)"
+  if [ "$got" != "$remote_sha" ]; then rm -f "$tmp"; update_note "сумма файла не сошлась"; return 0; fi
+  if [ "$(head -n 1 "$tmp")" != "#!/bin/bash" ] \
+     || ! grep -q '^# Мост stdio ↔ HTTP для MCP-сервера проверок' "$tmp" \
+     || ! grep -qx "BRIDGE_VERSION=$remote_ver" "$tmp" \
+     || ! /bin/bash -n "$tmp" 2>/dev/null; then
+    rm -f "$tmp"; update_note "файл не похож на мост"; return 0
+  fi
+  chmod 700 "$tmp" && mv -f "$tmp" "$self" || { rm -f "$tmp"; update_note "не удалось заменить файл"; return 0; }
+  printf 'mcp_bridge: мост обновлён до версии %s\n' "$remote_ver" >&2
+  rm -f "$AUTH_FILE"; rm -rf "$WORK"; trap - EXIT HUP INT TERM
+  DECIMUS_BRIDGE_UPDATED=1 exec /bin/bash "$self"
+}
+self_update
 
 
 # --- Локальные инструменты (D583) ----------------------------------------------

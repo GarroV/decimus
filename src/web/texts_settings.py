@@ -73,10 +73,12 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     },
     "settings.claude.title": {"ru": "Claude (MCP)", "en": "Claude (MCP)"},
     "settings.claude.lead": {
-        "ru": "Подключите Claude к данным Decimus одной командой в терминале. Что доступно, "
+        "ru": "Claude Desktop на Mac подключается одной командой в терминале: так Claude берёт "
+        "оригиналы фото из папки на вашем компьютере, а не уменьшенные копии. Что доступно, "
         "решает ваша роль.",
-        "en": "Connect Claude to Decimus data with one command in a terminal. What you can "
-        "do depends on your role.",
+        "en": "Claude Desktop on a Mac connects with one command in a terminal: this way Claude "
+        "takes the original photos from a folder on your computer, not shrunken copies. What "
+        "you can do depends on your role.",
     },
     "settings.claude.get": {"ru": "Получить команду установки", "en": "Get the install command"},
     "settings.claude.reissue": {
@@ -95,8 +97,10 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "shown once; the token is personal.",
     },
     "settings.claude.address": {
-        "ru": "Или коннектором в claude.ai и Claude Code — адрес:",
-        "en": "Or as a connector in claude.ai and Claude Code — the address:",
+        "ru": "Для claude.ai в браузере и телефона — коннектор, адрес (фото из папки так "
+        "недоступны):",
+        "en": "For claude.ai in a browser and for the phone — a connector, the address (photos "
+        "from a folder are not available this way):",
     },
     "settings.claude.copy": {"ru": "Скопировать команду", "en": "Copy the command"},
     "settings.claude.copy_again": {"ru": "Скопировать ещё раз", "en": "Copy again"},
