@@ -2113,6 +2113,8 @@ a[data-zoom] { cursor: zoom-in; }
 .notif-dot { position: absolute; top: 6px; right: 8px; }
 .mbar__bell { display: inline-flex; align-items: center; padding: var(--space-2); border: 0; background: transparent; color: var(--ink); cursor: pointer; border-radius: var(--r-control); }
 .mbar__bell .bell__label { display: none; }
+/* Размер иконки в полосе телефона: у пункта панели его задаёт ядро, здесь — сами. */
+.mbar__bell svg { width: 20px; height: 20px; flex-shrink: 0; }
 .mbar__bell .bell__dot { top: 2px; left: auto; right: 2px; }
 .bell:focus-visible, .mbar__bell:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
 .tabbar__item { position: relative; }
