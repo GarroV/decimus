@@ -44,7 +44,7 @@ from typing import Any
 
 from flask import render_template, request, url_for
 
-from src.db import ratings_read
+from src.db import mcp_access, ratings_read
 from src.db.errors import DbError
 from src.domain.tenants import HQ_TENANT
 from src.ratings import report
@@ -87,6 +87,7 @@ def _board_href(kind: str) -> str:
         home_board.PLANS_DUE: f"{действия}?tab=plans",
         home_board.ORDERS_DUE: f"{действия}?tab=prescriptions",
         home_board.RATINGS_STALE: url_for("ratings_imports"),
+        home_board.MCP_RELINK: f"{section('settings').path}?tile=claude",
     }
     return куда[kind]
 
@@ -97,14 +98,25 @@ def _board(reach: Any) -> tuple[tuple[home_board.Sticker, ...], bool]:
     if вошедший is None or not home_board.SHOWN:
         return (), False
     who = home_board.Who(вошедший.role, auth.current_tenant())
+    объявления = _announcements(вошедший.id)
     if not home_board.kinds_for(who):
-        return (), False
+        return объявления, False
     try:
         counts = home_board.load_counts(reach, who, now=datetime.now(UTC))
     except DbError as exc:
         log.warning("главная: доска не прочиталась (%s)", exc.__class__.__name__)
-        return (), True
-    return home_board.compose(who, counts, _board_href), False
+        return объявления, True
+    return (*объявления, *home_board.compose(who, counts, _board_href)), False
+
+
+def _announcements(user_id: str) -> tuple[home_board.Sticker, ...]:
+    """Объявления доски (D629); ключ не прочитался — без объявления, главная живёт."""
+    try:
+        выпущен = mcp_access.live_token_issued_at(user_id)
+    except DbError as exc:
+        log.warning("главная: ключ Claude для объявления не прочитан (%s)", exc.__class__.__name__)
+        return ()
+    return home_board.announcements(выпущен, _board_href)
 
 
 def _latest_ratings(

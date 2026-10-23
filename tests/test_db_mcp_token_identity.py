@@ -29,6 +29,7 @@ from src.db.mcp_access import (  # noqa: E402
     issue_for_account,
     issue_token,
     live_token_expiry,
+    live_token_issued_at,
     resolve_token,
     revoke_tokens,
 )
@@ -359,3 +360,18 @@ def test_миграция_связывает_привязанные_и_гаси�
             (4, False, None, None, False, 0),
             (5, False, None, None, False, 7),
         ]
+
+
+def test_дата_выпуска_живого_ключа_для_объявления(учётки: dict[int, str]) -> None:
+    """D629: объявление «перепривязать Claude» смотрит, когда выпущен живой ключ."""
+    from datetime import UTC, datetime, timedelta
+
+    assert live_token_issued_at(учётки[СОТРУДНИК_ПАРТНЁРА]) is None
+    issue_for_account(учётки[СОТРУДНИК_ПАРТНЁРА])
+
+    выпущен = live_token_issued_at(учётки[СОТРУДНИК_ПАРТНЁРА])
+
+    assert выпущен is not None
+    assert abs(datetime.now(UTC) - выпущен) < timedelta(minutes=5)
+    revoke_tokens(учётки[СОТРУДНИК_ПАРТНЁРА])
+    assert live_token_issued_at(учётки[СОТРУДНИК_ПАРТНЁРА]) is None
