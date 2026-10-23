@@ -79,6 +79,8 @@ COMMAND_ACTIONS: dict[str, str] = {
     "records": FIELD_ACTION,
     "undo": FIELD_ACTION,
     "finish": FIELD_ACTION,
+    # Сменить пиццерию своей начатой проверки (D626) — часть обхода.
+    "unit": FIELD_ACTION,
     "resend": FIELD_ACTION,
     "help": FIELD_ACTION,
     "lang": FIELD_ACTION,

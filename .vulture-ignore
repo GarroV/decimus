@@ -14,6 +14,9 @@ on_resume_new
 on_unit
 on_unit_command
 on_unit_not_text
+# Смена пиццерии посреди обхода (D626, `routers/unit.py`): те же хендлеры aiogram.
+on_unit_name
+on_other
 on_kind
 on_lang
 on_photo

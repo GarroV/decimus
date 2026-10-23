@@ -22,6 +22,32 @@
   </details>
 {% endmacro %}
 
+{# Карандаш у названия пиццерии (D626): ошиблись точкой при заведении — сменить её
+   прямо на вычитке, в панели и на странице. Тот же перенос (D195, `…/move`), дата
+   остаётся прежней; повод пишется в историю переноса. #}
+{% macro unit_pencil(c, head, panel) %}
+  {% if c.may_move and c.units and (head.on_review or not panel) %}
+    {% set full = url('/inspections/' ~ head.id) %}
+    <details class="tedit" name="hact">
+      <summary class="tedit__btn" aria-label="{{ t('unit_edit.title') }}" data-tip="{{ t('unit_edit.title') }}">{{ icon('pencil') }}</summary>
+      <div class="hact__pop tedit__pop">
+        <form method="post" action="{{ full }}/move?lang={{ lang }}" class="hact__form"{% if panel %} data-panel-form{% endif %}>
+          <input type="hidden" name="date" value="{{ head.inspection_date }}">
+          <label><span class="field-label">{{ t('move.unit_label') }}</span>
+            <select class="input" name="unit" required>
+              {% for unit_id, unit_name in c.units %}
+                <option value="{{ unit_id }}"{% if unit_name == head.unit_name %} selected{% endif %}>{{ unit_name }}</option>
+              {% endfor %}
+            </select></label>
+          <label><span class="field-label">{{ t('move.reason_label') }}</span>
+            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off" placeholder="{{ t('unit_edit.reason_hint') }}"></label>
+          <button class="btn btn--primary btn--sm" type="submit">{{ t('unit_edit.submit') }}</button>
+        </form>
+      </div>
+    </details>
+  {% endif %}
+{% endmacro %}
+
 {# Ссылка-действие: в панели пиктограмма с подсказкой, на странице — с подписью. #}
 {# `short` — короткая надпись на странице (полное имя — в подсказке и aria-label). #}
 {% macro _link(href, ico, label, panel, tone='', hint='', short='', drawer=False, text=False) %}

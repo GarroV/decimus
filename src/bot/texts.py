@@ -1929,6 +1929,46 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "cmd.version": {"ru": "Версия сборки", "en": "Build version"},
+    # --- смена пиццерии начатой проверки (D626) ---
+    "cmd.unit": {"ru": "Сменить пиццерию", "en": "Change the pizzeria"},
+    "unit.ask": {
+        "ru": "Сейчас проверка заведена на «{unit}». Напишите правильное название пиццерии — "
+        "записи и фото останутся.",
+        "en": "This inspection is on “{unit}”. Type the correct pizzeria name — "
+        "records and photos stay.",
+    },
+    "unit.not_started": {
+        "ru": "Сейчас нет начатой проверки — пиццерию выбирают при старте.",
+        "en": "There is no inspection in progress — the pizzeria is chosen at the start.",
+    },
+    "unit.unknown": {
+        "ru": "Пиццерии «{name}» нет в справочнике. Проверьте название и напишите ещё раз.",
+        "en": "“{name}” is not in the pizzeria directory. Check the name and type it again.",
+    },
+    "unit.same": {
+        "ru": "Проверка и так на «{name}» — менять нечего.",
+        "en": "The inspection is already on “{name}” — nothing to change.",
+    },
+    "unit.failed": {
+        "ru": "Пиццерию сменить не вышло — сбой на моей стороне, подробности в журнале.",
+        "en": "Could not change the pizzeria — something broke on my side, see the log.",
+    },
+    "unit.cancelled": {
+        "ru": "Смену пиццерии отменил.",
+        "en": "Pizzeria change cancelled.",
+    },
+    "unit.changed": {
+        "ru": "Пиццерия сменена: «{old}» → «{new}». Записи и фото на месте.",
+        "en": "Pizzeria changed: “{old}” → “{new}”. Records and photos are kept.",
+    },
+    # Пометку повтора аудитор ставил по прошлой проверке ПРЕЖНЕЙ точки — сама она
+    # не снимается, но сказать о ней надо.
+    "unit.repeats_check": {
+        "ru": "\nЗаписей с пометкой «повтор»: {n} — их сверяли с прошлой проверкой прежней "
+        "пиццерии. Проверьте их.",
+        "en": "\nRecords marked as repeats: {n} — they were checked against the previous "
+        "pizzeria’s last inspection. Please review them.",
+    },
     # --- язык бота, выбранный человеком (D303, #411) ---
     "cmd.lang": {"ru": "Язык бота / Bot language", "en": "Bot language / Язык бота"},
     # Имя языка на нём самом — подпись кнопки выбора: «Русский» ищет глазами тот,

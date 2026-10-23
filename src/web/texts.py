@@ -859,6 +859,13 @@ TEXTS: dict[str, dict[str, str]] = {
             "history with its reason."
         ),
     },
+    # Карандаш у названия пиццерии на вычитке (D626).
+    "unit_edit.title": {"ru": "Сменить пиццерию", "en": "Change the pizzeria"},
+    "unit_edit.submit": {"ru": "Сменить", "en": "Change"},
+    "unit_edit.reason_hint": {
+        "ru": "Например: завели не на ту точку",
+        "en": "For example: started on the wrong pizzeria",
+    },
     "move.date_label": {"ru": "Дата проверки", "en": "Inspection date"},
     "move.unit_label": {"ru": "Пиццерия", "en": "Pizzeria"},
     "move.reason_label": {"ru": "Что было не так", "en": "What was wrong"},
