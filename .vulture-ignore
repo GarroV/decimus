@@ -676,3 +676,12 @@ photo_upload_post
 # фикстура карт и агрегаторов отдельных пиццерий кладёт подмену, значение тестам не нужно.
 agg_codes
 по_пиццериям
+
+# Колокольчик уведомлений (#1129, D604): маршруты и обработчик контекста регистрируются
+# декораторами Flask; `unread` и `is_unread` читают шаблоны (`base.html`, `_notifications_menu.html`).
+_notifications
+notifications_menu
+notifications_read
+notifications_read_all
+unread
+is_unread

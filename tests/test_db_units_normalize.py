@@ -47,18 +47,19 @@ def _seed(dsn: str) -> tuple[str, str]:
 
 
 def _run(dsn: str, backup: Path) -> list[str]:
+    """Запись идёт под служебной ролью, как на площадке: роли приложения delete не выдан."""
     with acting_space(SYSTEM_SPACE):
         actions, _index, _log = apply(dsn, plan, backup)
     return [f"{a.kind}:{a.unit.name}" for a in actions if a.writes]
 
 
 def test_переименование_оставляет_синоним_и_код_а_повтор_ничего_не_пишет(
-    db_env: str, tmp_path: Path
+    db_env: str, pg_dsn: str, tmp_path: Path
 ) -> None:
     web, _ = _seed(db_env)
     backup = tmp_path / "снимок.json"
 
-    сделано = _run(db_env, backup)
+    сделано = _run(pg_dsn, backup)
 
     assert any(s.startswith("rename:Bishkek — 7 Manas Ave") for s in сделано)
     with psycopg.connect(db_env) as conn:
@@ -72,16 +73,16 @@ def test_переименование_оставляет_синоним_и_ко�
     assert {u["name"] for u in снимок["units"]} >= {"Bishkek — 7 Manas Ave"}
 
     backup.unlink()
-    assert [s for s in _run(db_env, backup) if s.startswith(("rename", "fill"))] == []
+    assert [s for s in _run(pg_dsn, backup) if s.startswith(("rename", "fill"))] == []
     assert not backup.exists()
 
 
 def test_пустой_дубль_сливается_и_его_синоним_переходит_оставшейся(
-    db_env: str, tmp_path: Path
+    db_env: str, pg_dsn: str, tmp_path: Path
 ) -> None:
     web, other = _seed(db_env)
 
-    _run(db_env, tmp_path / "снимок.json")
+    _run(pg_dsn, tmp_path / "снимок.json")
 
     with psycopg.connect(db_env) as conn:
         остались = {r[0] for r in conn.execute("select id::text from units").fetchall()}

@@ -42,7 +42,9 @@ def токены(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -> d
         "super": _токен("sofia", "superadmin", "HQ"),
         "hq_admin": _токен("anna", "admin", "HQ"),
         "partner_admin": _токен("boris", "admin", "RS"),
-        "auditor": _токен("dev", "auditor", "HQ"),
+        # Аудитора в УК больше нет (D440): его место занял девелопер; аудитор бывает у партнёра.
+        "developer": _токен("dev", "developer", "HQ"),
+        "partner_auditor": _токен("vera", "auditor", "RS"),
     }
 
 
@@ -70,7 +72,7 @@ def test_админ_ук_и_главный_админ_видят_суммы_по
         assert sum(r.input_tokens for r in итог) == 200
 
 
-@pytest.mark.parametrize("кто", ["partner_admin", "auditor"])
+@pytest.mark.parametrize("кто", ["partner_admin", "developer", "partner_auditor"])
 def test_остальным_расход_не_отдаётся(токены: dict[str, str], кто: str) -> None:
     _вызов()
 
@@ -94,9 +96,11 @@ def test_период_режет_по_времени(токены: dict[str, str
 def test_у_роли_приложения_нет_права_читать_таблицу_напрямую(
     токены: dict[str, str], db_env: str
 ) -> None:
+    from src.db.errors import AccessError
     from src.db.web_access import _connected
 
-    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+    # Дверь отдаёт тип отказа базы, а не его текст: в тексте может оказаться строка подключения.
+    with pytest.raises(AccessError, match="InsufficientPrivilege"):
         with _connected("проверка прав") as conn, conn.cursor() as cur:
             cur.execute("select * from model_usage")
 

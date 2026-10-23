@@ -2048,3 +2048,32 @@ a[data-zoom] { cursor: zoom-in; }
   .demo-app__phone { padding: 0; border-radius: 0; background: none; box-shadow: none; height: 80vh; }
   .demo-app__screen { border-radius: var(--r-block); border: 1px solid var(--line); }
 }
+
+/* ── Колокольчик уведомлений (#1129, D604, D614) ─────────────────────
+   Кнопка в низу левой панели (компьютер) и в верхней полосе (телефон); окно — то же
+   `.acct-menu`/`.popover`, что у меню учётки. Красная точка — токен `--err` ядра; слово
+   «Новое» для чтения с экрана лежит рядом (`.sr-only`), цвет — не единственный признак. */
+.bell { position: relative; }
+.bell__dot, .notif-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--err); }
+.bell__dot[hidden] { display: none; }
+.bell__dot { position: absolute; top: 7px; left: 20px; }
+.notif-dot { position: absolute; top: 6px; right: 8px; }
+.mbar__bell { display: inline-flex; align-items: center; padding: var(--space-2); border: 0; background: transparent; color: var(--ink); cursor: pointer; border-radius: var(--r-control); }
+.mbar__bell .bell__label { display: none; }
+.mbar__bell .bell__dot { top: 2px; left: auto; right: 2px; }
+.bell:focus-visible, .mbar__bell:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
+.tabbar__item { position: relative; }
+.notif-menu__note { margin: 0; padding: var(--space-5) var(--space-6); font-size: var(--fs-dense); color: var(--ink-2); }
+.notif-menu__list { max-height: min(420px, calc(100vh - var(--space-11, 120px))); overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--space-3); }
+.notif-row { height: auto; min-height: 44px; align-items: flex-start; padding-top: var(--space-4); padding-bottom: var(--space-4); color: var(--ink); text-decoration: none; }
+.notif-row:hover { text-decoration: none; }
+.notif-row:focus-visible, .notif-menu__all:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
+.notif-row__dot { width: 8px; height: 8px; flex: none; margin-top: 6px; border-radius: 50%; background: transparent; }
+.notif-row.is-unread .notif-row__dot { background: var(--err); }
+.notif-row__body { display: flex; flex-direction: column; min-width: 0; }
+.notif-row__text { overflow-wrap: anywhere; line-height: 18px; }
+.notif-row.is-unread .notif-row__text { font-weight: var(--w-semibold); }
+.notif-row__time { font-size: 12px; line-height: 16px; color: var(--ink-3); }
+.notif-menu__foot { margin-top: 0; }
+.notif-menu__all { display: block; width: 100%; height: 32px; padding: 0 var(--space-5); border: 0; border-radius: var(--r-control); background: transparent; font: inherit; font-size: var(--fs-dense); color: var(--ink); text-align: left; cursor: pointer; }
+.notif-menu__all:hover { background: var(--surface); }

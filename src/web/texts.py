@@ -29,6 +29,7 @@ from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_journal import JOURNAL_TEXTS
 from .texts_master import MASTER_TEXTS
+from .texts_notifications import NOTIFICATION_TEXTS
 from .texts_oauth import OAUTH_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
@@ -1757,6 +1758,7 @@ _ЧАСТИ = (
     JOURNAL_TEXTS,
     MASTER_TEXTS,
     SERVICE_KEYS_TEXTS,
+    NOTIFICATION_TEXTS,
     PLAN_TEXTS,
     PRESCRIPTION_TEXTS,
     TRIP_TEXTS,
@@ -1790,6 +1792,7 @@ TEXTS = {
     **MASTER_TEXTS,
     **SERVICE_KEYS_TEXTS,
     **OAUTH_TEXTS,
+    **NOTIFICATION_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,
     **TRIP_TEXTS,

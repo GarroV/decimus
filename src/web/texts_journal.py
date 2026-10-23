@@ -127,6 +127,11 @@ _WEB: dict[str, tuple[str, str]] = {
     "rx_return": ("Предписание возвращено автору", "Prescription returned to author"),
     "rx_send": ("Предписание отправлено", "Prescription sent"),
     "rx_update": ("Предписание изменено", "Prescription edited"),
+    "notifications_read": ("Уведомление отмечено прочитанным", "Notification marked as read"),
+    "notifications_read_all": (
+        "Все уведомления отмечены прочитанными",
+        "All notifications marked as read",
+    ),
     "save_letter": ("Письмо сохранено", "Letter saved"),
     "settings_bot_link": ("Выпущена ссылка привязки бота", "Bot link issued"),
     "settings_bot_unlink": ("Отвязан свой бот", "Own bot unlinked"),

@@ -92,6 +92,7 @@
     sameAll(doc, ".sidenav__list");
     sameAll(doc, ".tabbar");
     sameAll(doc, ".sidenav__search");
+    sameAll(doc, "[data-bell]");
     sameAll(doc, "form.langpill");
     document.title = doc.title;
     if (push) history.pushState({ nav: true }, "", url);

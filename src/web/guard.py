@@ -62,6 +62,8 @@ EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "settings_claude_revoke": "своё подключение Claude отзывает сам (D417)",
     "settings_sign_out_everywhere": "свои входы и подключения закрывает сам (D462)",
     "settings_lang": "язык сайта своей учётки (D447)",
+    "notifications_read": "своё уведомление отмечает прочитанным сам (D604)",
+    "notifications_read_all": "свои уведомления отмечает прочитанными сам (D604)",
     "country_filter": "свой постоянный отбор стран экрана «Страны» (D536)",
     "settings_google_link": "свою почту Google привязывает сам (D447, D450)",
     "settings_google_unlink": "свою почту Google отвязывает сам (D447, D450)",
