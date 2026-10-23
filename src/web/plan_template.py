@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import io
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -55,13 +56,21 @@ _PARTNER_FILL = PatternFill("solid", fgColor="FFF8E1")
 _WRAP = Alignment(wrap_text=True, vertical="top")
 
 
-def _put(ws: Any, row: int, col: int, value: object) -> Any:
+#: Знаки, которых книга не хранит: openpyxl на них падает целиком, и выгрузка не
+#: получилась бы из-за одной строки (#1190). Общие для обеих выгрузок плана.
+CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def put_cell(ws: Any, row: int, col: int, value: object) -> Any:
     """Записать значение ячейки; строка — всегда текстом, никогда формулой.
 
     openpyxl читает строку с «=» в начале как формулу, а формулировку записи,
-    название пиццерии и зоны пишут люди и модель: «=HYPERLINK(…)» в шаблоне
-    стал бы ссылкой, которую партнёр откроет одним щелчком.
+    название пиццерии, зоны и меру пишут люди и модель: «=HYPERLINK(…)» в книге
+    стал бы ссылкой, которую партнёр откроет одним щелчком. Управляющие знаки
+    вычищаются: из базы текст приходит как положено, но книга их не хранит.
     """
+    if isinstance(value, str):
+        value = CONTROL_CHARS.sub("", value)
     ячейка = ws.cell(row=row, column=col, value=value)
     if isinstance(value, str):
         ячейка.data_type = "s"
@@ -84,12 +93,12 @@ def _head(ws: Any, req: PlanRequest, lang: str) -> int:
         (t("plans.tpl.grade", lang), итог),
         (t("plans.tpl.plan_due", lang), human_day(req.due_on, lang)),
     )
-    _put(ws, 1, 1, t("plans.tpl.title", lang)).font = _TITLE
+    put_cell(ws, 1, 1, t("plans.tpl.title", lang)).font = _TITLE
     for i, (label, value) in enumerate(строки, start=3):
-        _put(ws, i, 1, label).font = _BOLD
-        _put(ws, i, 3, value)
+        put_cell(ws, i, 1, label).font = _BOLD
+        put_cell(ws, i, 3, value)
     подсказка = 3 + len(строки) + 1
-    _put(ws, подсказка, 1, t("plans.tpl.hint", lang))
+    put_cell(ws, подсказка, 1, t("plans.tpl.hint", lang))
     return подсказка + 2
 
 
@@ -110,7 +119,7 @@ def build(
     ws.title = t("plans.tpl.sheet", lang)[:31]
     начало = _head(ws, req, lang)
     for col, (key, width) in enumerate(_COLUMNS, start=1):
-        ячейка = _put(ws, начало, col, t(key, lang))
+        ячейка = put_cell(ws, начало, col, t(key, lang))
         ячейка.font = _BOLD
         ячейка.fill = _HEAD_FILL if col <= _FILLED else _PARTNER_FILL
         ячейка.alignment = _WRAP
@@ -125,7 +134,7 @@ def build(
             f.text or "",
         )
         for col, value in enumerate(значения, start=1):
-            _put(ws, строка, col, value).alignment = _WRAP
+            put_cell(ws, строка, col, value).alignment = _WRAP
         for col in range(_FILLED + 1, len(_COLUMNS) + 1):
             ws.cell(row=строка, column=col).fill = _PARTNER_FILL
     ws.freeze_panes = ws.cell(row=начало + 1, column=1)
