@@ -1,12 +1,84 @@
 {#
-  Строки электронного плана (#1168): таблица строк в панели запроса. Партнёр
-  заполняет меру, ответственного и свой срок и ведёт строку «Взяли в работу» →
-  «Сделано»; УК подтверждает или возвращает сданную строку. Каждая строка —
-  раскрывающаяся карточка: свёрнутая показывает пункт, срок и состояние, развёрнутая —
-  форму или значения. Какие кнопки видны, решают состояние плана и сторона; право
-  всё равно держит база. Формы уходят фоном (`data-panel-form`).
+  Строки электронного плана (#1168): таблица строк в панели запроса и панель правки
+  строки справа. Таблица ограниченной ширины — пункт, срок, состояние и кнопка;
+  вся работа со строкой (форма партнёра, «Взяли в работу» / «Сделано», вердикты УК)
+  — во второй панели, которая выезжает справа поверх панели запроса, на телефоне —
+  на весь экран. Без скрипта панель открывает якорь (`:target`), с ним — `actions.js`
+  (открытие без перехода, Esc, затемнение); строка из уведомления (`?row=`) приходит
+  уже открытой. Какие кнопки видны, решают состояние плана и сторона; право всё равно
+  держит база. Формы уходят фоном (`data-panel-form`).
 #}
 {% set ROW_TONES = {'filling': 'tag--neutral', 'in_work': 'tag--accent', 'done': 'tag--warn', 'confirmed': 'tag--ok', 'returned': 'tag--warn'} %}
+
+{% macro row_panel(r, row, base) %}
+  {% set editable = (not hq) and r.status == 'requested' %}
+  {% set unfilled = row.status == 'filling' and not row.is_filled and r.status == 'requested' %}
+  {% set late = row.overdue(today) %}
+  <div class="prowpanel{% if row.id == focus_row %} is-open{% endif %}" id="row-edit-{{ row.id }}" data-row-panel>
+    <a class="prowpanel__scrim" href="#plan-rows" data-row-close tabindex="-1" aria-hidden="true"></a>
+    <aside class="prowpanel__sheet" role="dialog" aria-modal="true" aria-labelledby="row-title-{{ row.id }}">
+      <header class="prowpanel__head">
+        <div class="prowpanel__who">
+          <h4 class="prowpanel__title" id="row-title-{{ row.id }}">{{ row.position }}. {{ row.title(lang) }}</h4>
+          <p class="prowpanel__meta">
+            <span class="tag tag--micro tag--neutral">{{ row.level }}</span>
+            <span class="tag tag--micro {{ ROW_TONES[row.status] }}">{{ t('plans.rows.not_filled') if unfilled else t('plans.rows.status.' ~ row.status) }}</span>
+            {% if late %}<span class="tag tag--micro tag--err">{{ t('plans.rows.overdue') }}</span>{% endif %}
+            <span class="{% if late %}srow__err{% endif %}">{{ t('plans.rows.due_own' if row.own_due else 'plans.rows.due', date=day(row.due_on)) }}</span>
+          </p>
+        </div>
+        <a class="sdrawer__close" href="#plan-rows" data-row-close aria-label="{{ t('split.close') }}">{{ icon('x') }}</a>
+      </header>
+      <div class="prowpanel__body">
+        {% if row.status == 'returned' and row.return_reason %}
+          <div class="note note--warn"><div class="note__text">{{ t('plans.rows.returned_reason', reason=row.return_reason) }}</div></div>
+        {% endif %}
+
+        {% if editable %}
+          <form class="sform" method="post" data-panel-form
+                action="{{ url(base ~ '/rows/' ~ row.id ~ '/save') }}?lang={{ lang }}">
+            <label><span class="sform__label">{{ t('plans.rows.measure') }}</span>
+              <textarea class="sinput sinput--area" name="measure" maxlength="{{ row_limits.measure }}" rows="3">{{ row.measure }}</textarea></label>
+            <label><span class="sform__label">{{ t('plans.rows.responsible') }}</span>
+              <input class="sinput" type="text" name="responsible" maxlength="{{ row_limits.responsible }}" value="{{ row.responsible }}"></label>
+            <label><span class="sform__label">{{ t('plans.rows.reason') }}</span>
+              <textarea class="sinput sinput--area" name="reason" maxlength="{{ row_limits.reason }}" rows="2">{{ row.reason }}</textarea></label>
+            <label><span class="sform__label">{{ t('plans.rows.own_due', due=day(row.latest_own_due(r.count_from))) }}</span>
+              <input class="sinput" type="date" name="own_due" value="{{ row.own_due or '' }}" min="{{ r.count_from }}" max="{{ row.latest_own_due(r.count_from) }}"></label>
+            <button class="sbtn sbtn--primary" type="submit">{{ t('plans.rows.save') }}</button>
+          </form>
+        {% else %}
+          <dl class="sprops">
+            <div><dt>{{ t('plans.rows.measure') }}</dt><dd>{{ row.measure or '—' }}</dd></div>
+            <div><dt>{{ t('plans.rows.responsible') }}</dt><dd>{{ row.responsible or '—' }}</dd></div>
+            {% if row.reason %}<div><dt>{{ t('plans.rows.reason') }}</dt><dd>{{ row.reason }}</dd></div>{% endif %}
+          </dl>
+        {% endif %}
+
+        {% if r.status == 'in_work' %}
+          {% if not hq and row.status == 'filling' %}
+            <form class="sform" method="post" data-panel-form action="{{ url(base ~ '/rows/' ~ row.id ~ '/start') }}?lang={{ lang }}">
+              <button class="sbtn sbtn--primary" type="submit">{{ t('plans.rows.start') }}</button>
+            </form>
+          {% elif not hq and row.status in ('in_work', 'returned') %}
+            <form class="sform" method="post" data-panel-form action="{{ url(base ~ '/rows/' ~ row.id ~ '/done') }}?lang={{ lang }}">
+              <button class="sbtn sbtn--primary" type="submit">{{ t('plans.rows.finish') }}</button>
+            </form>
+          {% elif hq and row.status == 'done' %}
+            <form class="sform" method="post" data-panel-form action="{{ url(base ~ '/rows/' ~ row.id ~ '/confirm') }}?lang={{ lang }}">
+              <button class="sbtn sbtn--primary" type="submit">{{ t('plans.rows.confirm') }}</button>
+            </form>
+            <form class="sform sform--gap" method="post" data-panel-form action="{{ url(base ~ '/rows/' ~ row.id ~ '/reject') }}?lang={{ lang }}">
+              <label><span class="sform__label">{{ t('plans.rows.reject_reason') }}</span>
+                <textarea class="sinput sinput--area" name="reason" required maxlength="{{ row_limits.reason }}" rows="2"></textarea></label>
+              <button class="sbtn" type="submit">{{ t('plans.rows.reject') }}</button>
+            </form>
+          {% endif %}
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+{% endmacro %}
 
 {% macro rows_section(r) %}
   {% set base = actions_path ~ '/requests/' ~ r.id %}
@@ -20,79 +92,40 @@
   {% else %}
     {% set hint = 'plans.rows.hint_closed' %}
   {% endif %}
-  <section class="ssec">
+  <section class="ssec" id="plan-rows">
     <h3 class="ssec__title">{{ t('plans.rows.title') }}</h3>
     <p class="ssec__text">{{ t(hint) }}</p>
     {% if not r.rows %}
       <div class="ov-cell__muted">{{ t('plans.rows.empty') }}</div>
     {% else %}
-      <ol class="prows">
-        {% for row in r.rows %}
-          {% set unfilled = row.status == 'filling' and not row.is_filled and r.status == 'requested' %}
-          {% set late = row.overdue(today) %}
-          <li>
-            <details class="prow{% if late %} prow--late{% endif %}" id="row-{{ row.id }}"{% if row.id == focus_row %} open{% endif %}>
-              <summary class="prow__head">
-                <span class="prow__pos">{{ row.position }}</span>
-                <span class="prow__title">{{ row.title(lang) }}</span>
-                <span class="prow__meta">
-                  <span class="tag tag--micro tag--neutral">{{ row.level }}</span>
-                  <span class="tag tag--micro {{ ROW_TONES[row.status] }}">{{ t('plans.rows.not_filled') if unfilled else t('plans.rows.status.' ~ row.status) }}</span>
-                  {% if late %}<span class="tag tag--micro tag--err">{{ t('plans.rows.overdue') }}</span>{% endif %}
-                  <span class="prow__due{% if late %} srow__err{% endif %}">{{ t('plans.rows.due_own' if row.own_due else 'plans.rows.due', date=day(row.due_on)) }}</span>
-                </span>
-              </summary>
-              <div class="prow__body">
-                {% if row.status == 'returned' and row.return_reason %}
-                  <div class="note note--warn"><div class="note__text">{{ t('plans.rows.returned_reason', reason=row.return_reason) }}</div></div>
-                {% endif %}
-
-                {% if editable %}
-                  <form class="sform" method="post" data-panel-form
-                        action="{{ url(base ~ '/rows/' ~ row.id ~ '/save') }}?lang={{ lang }}">
-                    <label><span class="sform__label">{{ t('plans.rows.measure') }}</span>
-                      <textarea class="sinput sinput--area" name="measure" maxlength="{{ row_limits.measure }}" rows="3">{{ row.measure }}</textarea></label>
-                    <label><span class="sform__label">{{ t('plans.rows.responsible') }}</span>
-                      <input class="sinput" type="text" name="responsible" maxlength="{{ row_limits.responsible }}" value="{{ row.responsible }}"></label>
-                    <label><span class="sform__label">{{ t('plans.rows.reason') }}</span>
-                      <textarea class="sinput sinput--area" name="reason" maxlength="{{ row_limits.reason }}" rows="2">{{ row.reason }}</textarea></label>
-                    <label><span class="sform__label">{{ t('plans.rows.own_due', due=day(row.latest_own_due(r.count_from))) }}</span>
-                      <input class="sinput" type="date" name="own_due" value="{{ row.own_due or '' }}" min="{{ r.count_from }}" max="{{ row.latest_own_due(r.count_from) }}"></label>
-                    <button class="sbtn" type="submit">{{ t('plans.rows.save') }}</button>
-                  </form>
-                {% else %}
-                  <dl class="sprops">
-                    <div><dt>{{ t('plans.rows.measure') }}</dt><dd>{{ row.measure or '—' }}</dd></div>
-                    <div><dt>{{ t('plans.rows.responsible') }}</dt><dd>{{ row.responsible or '—' }}</dd></div>
-                    {% if row.reason %}<div><dt>{{ t('plans.rows.reason') }}</dt><dd>{{ row.reason }}</dd></div>{% endif %}
-                  </dl>
-                {% endif %}
-
-                {% if r.status == 'in_work' %}
-                  {% if not hq and row.status == 'filling' %}
-                    <form class="sform" method="post" data-panel-form action="{{ url(base ~ '/rows/' ~ row.id ~ '/start') }}?lang={{ lang }}">
-                      <button class="sbtn sbtn--primary" type="submit">{{ t('plans.rows.start') }}</button>
-                    </form>
-                  {% elif not hq and row.status in ('in_work', 'returned') %}
-                    <form class="sform" method="post" data-panel-form action="{{ url(base ~ '/rows/' ~ row.id ~ '/done') }}?lang={{ lang }}">
-                      <button class="sbtn sbtn--primary" type="submit">{{ t('plans.rows.finish') }}</button>
-                    </form>
-                  {% elif hq and row.status == 'done' %}
-                    <form class="sform" method="post" data-panel-form action="{{ url(base ~ '/rows/' ~ row.id ~ '/confirm') }}?lang={{ lang }}">
-                      <button class="sbtn sbtn--primary" type="submit">{{ t('plans.rows.confirm') }}</button>
-                    </form>
-                    <form class="sform sform--gap" method="post" data-panel-form action="{{ url(base ~ '/rows/' ~ row.id ~ '/reject') }}?lang={{ lang }}">
-                      <label><span class="sform__label">{{ t('plans.rows.reject_reason') }}</span>
-                        <textarea class="sinput sinput--area" name="reason" required maxlength="{{ row_limits.reason }}" rows="2"></textarea></label>
-                      <button class="sbtn" type="submit">{{ t('plans.rows.reject') }}</button>
-                    </form>
-                  {% endif %}
-                {% endif %}
-              </div>
-            </details>
-          </li>
-        {% endfor %}
-      </ol>
+      <table class="ptable">
+        <thead>
+          <tr>
+            <th scope="col" class="ptable__pos">{{ t('plans.rows.col.n') }}</th>
+            <th scope="col">{{ t('plans.rows.col.item') }}</th>
+            <th scope="col" class="ptable__due">{{ t('plans.rows.col.due') }}</th>
+            <th scope="col">{{ t('plans.rows.col.state') }}</th>
+            <th scope="col" class="ptable__act"><span class="sr-only">{{ t('plans.rows.col.action') }}</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in r.rows %}
+            {% set unfilled = row.status == 'filling' and not row.is_filled and r.status == 'requested' %}
+            {% set late = row.overdue(today) %}
+            <tr class="ptable__row{% if late %} ptable__row--late{% endif %}">
+              <td class="ptable__pos">{{ row.position }}</td>
+              <td class="ptable__item"><span class="tag tag--micro tag--neutral">{{ row.level }}</span> {{ row.title(lang) }}</td>
+              <td class="ptable__due{% if late %} srow__err{% endif %}" data-label="{{ t('plans.rows.col.due') }}">{{ day(row.due_on) }}{% if row.own_due %} <span class="ov-cell__muted">{{ t('plans.rows.own') }}</span>{% endif %}</td>
+              <td data-label="{{ t('plans.rows.col.state') }}">
+                <span class="tag tag--micro {{ ROW_TONES[row.status] }}">{{ t('plans.rows.not_filled') if unfilled else t('plans.rows.status.' ~ row.status) }}</span>
+                {% if late %}<span class="tag tag--micro tag--err">{{ t('plans.rows.overdue') }}</span>{% endif %}
+              </td>
+              <td class="ptable__act"><a class="sbtn" href="#row-edit-{{ row.id }}" data-row-open>{{ t('plans.rows.edit' if editable else 'plans.rows.open') }}</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% for row in r.rows %}{{ row_panel(r, row, base) }}{% endfor %}
     {% endif %}
 
     {% if not hq and r.status == 'requested' and r.rows %}

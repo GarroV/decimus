@@ -453,3 +453,35 @@ def test_сверх_предела_версий_файла_отказ_слова
 
     assert ответ.status_code == 400
     assert фраза in ответ.get_data(as_text=True)
+
+
+def test_строки_таблицей_а_правка_во_второй_панели_справа(партнёр: FlaskClient) -> None:
+    страница = _панель(партнёр)
+
+    # Таблица строк со ссылкой-якорем (работает и без скрипта), панель правки — рядом.
+    assert 'class="ptable"' in страница
+    assert f'href="#row-edit-{СТРОКА}"' in страница and "data-row-open" in страница
+    assert f'id="row-edit-{СТРОКА}"' in страница and "data-row-panel" in страница
+    assert 'role="dialog"' in страница.split(f'id="row-edit-{СТРОКА}"', 1)[1]
+    # Форма правки лежит внутри панели, а не в таблице.
+    панель = страница.split(f'id="row-edit-{СТРОКА}"', 1)[1]
+    assert f"/rows/{СТРОКА}/save" in панель
+    assert f"/rows/{СТРОКА}/save" not in страница.split(f'id="row-edit-{СТРОКА}"', 1)[0]
+
+
+def test_строка_из_уведомления_приходит_с_открытой_панелью(партнёр: FlaskClient) -> None:
+    с_строкой = партнёр.get(f"/actions?tab=plans&id={ЗАПРОС}&row={СТРОКА}&lang=ru")
+    без = _панель(партнёр)
+
+    assert 'class="prowpanel is-open"' in с_строкой.get_data(as_text=True)
+    assert "prowpanel is-open" not in без
+
+
+def test_у_уК_кнопка_строки_открывает_а_не_правит(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(plans, "get_request", lambda *_a, **_k: запрос(status="on_review"))
+
+    страница = _панель(уК)
+
+    assert ">Открыть<" in страница and ">Править<" not in страница
