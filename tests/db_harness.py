@@ -370,3 +370,27 @@ def привязать_бота(
             (telegram_id, учётка.id),
         )
     return учётка.id
+
+
+def сделать_файловым(pg_dsn: str, request_id: str) -> None:
+    """Запрос в том виде, какой был до `0092`: без строк, файловый (старый путь).
+
+    После `0092` каждый новый запрос с нарушениями электронный и ведётся строками. Тестам,
+    которые проверяют путь «файл → приём → вердикт» старых планов, нужен запрос без
+    строк: такие остались на площадке. Правится под ролью-владельцем с выключенным
+    заслоном (`electronic` в базе обратно не переключается) — только в этом помощнике.
+    """
+    import psycopg
+
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute("alter table action_plan_requests disable trigger action_plan_requests_guarded")
+        cur.execute(
+            "delete from action_plan_events where request_id = %s and row_id is not null",
+            (request_id,),
+        )
+        cur.execute("delete from action_plan_rows where request_id = %s", (request_id,))
+        cur.execute(
+            "update action_plan_requests set electronic = false, revision = 1 where id = %s",
+            (request_id,),
+        )
+        cur.execute("alter table action_plan_requests enable trigger action_plan_requests_guarded")

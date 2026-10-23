@@ -394,7 +394,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin files src/db/{action_plans,agg_store,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
-| `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
+| `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
 | `src/db/agg_store.py` | Оценки в агрегаторах доставки в базе (схема `agg`, миграция 0050) |
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
@@ -523,6 +523,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0088_country_contracts.sql` | Блок «Договор» в карточке страны (шаг 2 спеки 2026-10-21-osb-prescriptions-design, D603, D606): юрлицо партнёра, договор одной строкой и КОНТАКТЫ ПО ДКК — почты, которые… |
 | `0089_inspection_edits_delete.sql` | Журнал правок на приёмке (0081) принимает и снятие записи (#1164): владелец 21.10.2026 — «добавь в проверки, которые на вычитке, возможность удаления каких-то пунктов… |
 | `0090_notifications.sql` | Уведомления в приложении (#1129, D604, D614): колокольчик в левой панели и красная точка на пункте меню, где есть новое |
+| `0092_action_plan_rows.sql` | Электронный план исправлений, шаг 2 эпика #1168 (спека 2026-10-22-electronic-action-plan-design; D612, D613, D617, D618, D621) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

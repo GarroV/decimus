@@ -354,6 +354,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0090_notifications.sql": (
         "sql1:357e051c02e5e7f802f351cd0e435481429ab76de8346aaa42ab37c0b125b41e"
     ),
+    "0092_action_plan_rows.sql": (
+        "sql1:498ee64f07ec5bc3b428a643c87509a46fb78048c8f5ec17e2e8a12481118b38"
+    ),
 }
 
 

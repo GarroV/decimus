@@ -509,6 +509,7 @@
 | `0088_country_contracts.sql` | `country_contracts` |
 | `0089_inspection_edits_delete.sql` | — |
 | `0090_notifications.sql` | `notifications` |
+| `0092_action_plan_rows.sql` | `action_plan_rows` |
 <!-- map:end -->
 
 ## Makefile
