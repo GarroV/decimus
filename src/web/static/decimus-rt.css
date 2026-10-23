@@ -36,7 +36,7 @@
 }
 .rt-head__title { margin: 0; font-size: 19px; line-height: 24px; font-weight: var(--w-bold); color: var(--ink); }
 .rt-head__row { position: relative; display: flex; align-items: center; gap: var(--space-3); }
-/* Свежесть загрузок под «?» (D630): блок раскрывается наведением и фокусом, без скрипта;
+/* Свежесть загрузок под «?» (D631): блок раскрывается наведением и фокусом, без скрипта;
    на телефоне нажатие фокусирует элемент с tabindex. Блок цепляется к строке заголовка,
    а не к значку: слева он начинается от поля страницы и на 390 px не уходит за экран. */
 .rt-info { align-self: stretch; display: inline-flex; align-items: center; }
@@ -308,7 +308,7 @@
 .rt-cal__list .pickselect { width: 100%; }
 .rt-cal__nojs a { margin-right: var(--space-3); }
 /* minmax(0, 1fr) и min-width: 0 — иначе поле даты держит свою ширину и на
-   390px вылезает за окно периода (D629). */
+   390px вылезает за окно периода (D630). */
 .rt-cal__dates { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); }
 .rt-cal__dates label { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .rt-cal__dates .input { width: 100%; min-width: 0; box-sizing: border-box; }
