@@ -87,13 +87,16 @@ def polling(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> PollingSpy:
 
 
 @pytest.mark.asyncio
-async def test_updates_are_processed_one_by_one_so_a_burst_keeps_its_order(
+async def test_polling_runs_updates_as_tasks_and_the_order_is_kept_per_chat(
     polling: PollingSpy,
 ) -> None:
-    """T059: опрос поднимается без задачи на обновление — иначе пачка разберётся вперемешку."""
+    """GHSA-7gm6-hc9m-w3vc: задача на обновление — порядок T059 внутри чата держит замок чата.
+
+    Поведение (чужой чат не ждёт, свой идёт по порядку) — `test_bot_parallel_chats.py`.
+    """
     await app.start_polling()
 
-    assert polling.kwargs["handle_as_tasks"] is False
+    assert polling.kwargs["handle_as_tasks"] is True
 
 
 @pytest.mark.asyncio

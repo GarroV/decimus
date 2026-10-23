@@ -4,15 +4,16 @@
 `BOT_MODE`): постоянного публичного адреса нет ни на ноутбуке, ни на домашнем
 сервере, а вебхук без него не поднять.
 
-**Обновления обрабатываются последовательно** (`handle_as_tasks=False`). Это не
-экономия и не осторожность, а требование задачи T059: по умолчанию aiogram
-заводит задачу на каждое обновление, и пачка сообщений, пришедшая разом после
-потери связи, разбирается вперемешку — комментарии привязываются не к тем
-кадрам. Последовательная обработка даёт порядок по построению: Telegram
-сохраняет порядок доставки внутри чата, и бот его больше не перемешивает.
-Цена — пока идёт разбор одного сообщения, следующее ждёт; для проверки, где
-работает один аудитор и шаги идут строго друг за другом, это и есть желаемое
-поведение.
+**Обновления разных чатов идут параллельно, одного чата — строго по очереди**
+(GHSA-7gm6-hc9m-w3vc, `src/bot/serial.py`). Опрос заводит задачу на каждое обновление
+(`handle_as_tasks=True`), а мидлварь `ChatSerialMiddleware` берёт замок чата и
+общий предел одновременных обновлений. Порядок внутри чата обязателен — это
+требование T059: пачка сообщений, пришедшая разом после потери связи, не должна
+разбираться вперемешку (комментарии привязались бы не к тем кадрам), а состояние
+проверки — файлы с `flock` — не терпит двух гонящихся записей. Раньше порядок
+давала последовательная обработка всех чатов сразу, и голосовое одного аудитора
+(ffmpeg и расшифровка, минуты) задерживало ответы всем остальным.
+Состояние бота остаётся в одном процессе: FSM в памяти, проверки в файлах.
 """
 
 from __future__ import annotations
@@ -78,6 +79,7 @@ from .routers.records import RECORDS_COMMAND
 from .routers.resend import RESEND_COMMAND
 from .routers.unit import UNIT_COMMAND
 from .routers.version import VERSION_COMMAND
+from .serial import ChatSerialMiddleware
 from .texts import DEFAULT_UI_LANG, default_ui_lang, t
 from .version import build_version
 
@@ -179,6 +181,9 @@ def build_dispatcher(
     # Раньше роутеров: сбой в любом из них обязан дойти до аудитора, а не
     # раствориться в aiogram (T126).
     dispatcher.errors.register(on_unexpected_error)
+    # Опрос ведёт каждое обновление отдельной задачей (`start_polling`), и без
+    # замка на чат две записи одного чата погнались бы друг за другом (GHSA-7gm6-hc9m-w3vc).
+    dispatcher.update.outer_middleware(ChatSerialMiddleware())
 
     # Имя из связок, собранных по приглашениям до D286, нужно шапке отчёта; ручная
     # запись `AUDITOR_NAMES` сильнее — иначе исправить имя можно было бы только
@@ -367,6 +372,15 @@ def log_startup(settings: BotSettings) -> None:
     )
 
 
+async def run_polling(dispatcher: Dispatcher, bot: Bot) -> None:
+    """Слушать Telegram: каждое обновление — отдельной задачей (GHSA-7gm6-hc9m-w3vc).
+
+    Долгое голосовое одного чата не держит остальных. Порядок внутри чата держит
+    `ChatSerialMiddleware`, подключённый в `build_dispatcher`.
+    """
+    await dispatcher.start_polling(bot, handle_as_tasks=True)
+
+
 async def start_polling() -> None:
     """Поднять бота: проверить окружение, затем слушать Telegram."""
     settings = load_bot_settings()
@@ -400,7 +414,7 @@ async def start_polling() -> None:
     # Обучение пиццерий из iSpring — раз в сутки, только агрегаты (D574, D575, #906).
     training = asyncio.create_task(learning_loader.load_forever())
     try:
-        await dispatcher.start_polling(bot, handle_as_tasks=False)
+        await run_polling(dispatcher, bot)
     finally:
         sweeper.cancel()
         backfill.cancel()
