@@ -72,6 +72,7 @@ def test_посев_открытого_демо(
         кадров = conn.execute("select count(*) from photos").fetchone()
         логины = {r[0] for r in conn.execute("select login from web_users").fetchall()}
         планов = conn.execute("select count(*) from action_plan_requests").fetchone()
+        строк_плана = conn.execute("select count(*) from action_plan_rows").fetchone()
         поездок = conn.execute(
             "select count(*), count(distinct date_trunc('month', date_from)) from trips"
         ).fetchone()
@@ -105,6 +106,8 @@ def test_посев_открытого_демо(
     assert кадров is not None and кадров[0] > 0, "кадры из DEMO_PHOTOS_DIR не легли к записям"
     assert {r.login for r in DEMO_ROLES} <= логины
     assert планов is not None and планов[0] > 0, "D2 на приёмке не породили планов"
+    # Планы демо — электронные (#1168): строки по нарушениям, сроки от движка.
+    assert строк_плана is not None and строк_плана[0] > 0, "планы демо заведены без строк"
     assert поездок is not None and поездок[0] >= 10 and поездок[1] >= 5, (
         "в календаре демо должны быть поездки по нескольким месяцам"
     )

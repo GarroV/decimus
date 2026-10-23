@@ -54,12 +54,15 @@ import seed_demo  # noqa: E402 -- путь к репозиторию выста�
 from seed_web_demo import ADMIN_URL_VAR, _require_local_dsn  # noqa: E402
 
 from src import domain  # noqa: E402
+from src.db import queries  # noqa: E402
 from src.db.accept import accept_inspection  # noqa: E402
 from src.db.config import check_environment, load_storage_settings  # noqa: E402
 from src.db.directory import upsert_unit  # noqa: E402
 from src.db.errors import ConfigError  # noqa: E402
 from src.db.photos import upload_photos  # noqa: E402
+from src.db.plan_rows import TermsProvider  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
+from src.db.reach import reach_of  # noqa: E402
 from src.db.space import SYSTEM_SPACE, acting_space, apply_space  # noqa: E402
 from src.db.spaces import bind_countries  # noqa: E402
 from src.db.trips import Draft, StepDraft, add_step, create_trip, get_trip  # noqa: E402
@@ -68,6 +71,8 @@ from src.domain.demo import DEMO_PARTNER_TENANT, DEMO_ROLES  # noqa: E402
 from src.domain.engine import chat_dir  # noqa: E402
 from src.domain.tenants import HQ_TENANT  # noqa: E402
 from src.domain.uploads import upload_file  # noqa: E402
+from src.report import plan_terms  # noqa: E402
+from src.report.letters import sources as letter_sources  # noqa: E402
 
 PHOTOS_VAR = "DEMO_PHOTOS_DIR"
 #: Первый чат демо-проверок. Диапазон заведомо вымышленный, как у прочих сидов.
@@ -871,6 +876,15 @@ def _trips(dsn: str, units: dict[str, Unit]) -> int:
     return made
 
 
+def _plan_terms(tenant: str) -> TermsProvider:
+    """Поставщик сроков записей для строк плана — тот же, что у подтверждения в вебе."""
+    reach = reach_of(tenant)
+    return plan_terms.provider(
+        lambda ident: queries.get_inspection(ident, reach=reach, include_on_review=True),
+        papers=letter_sources(),
+    )
+
+
 def seed() -> int:
     os.environ["AUDIT_DATA_DIR"] = str(seed_demo.DEMO_DATA_DIR)
     os.environ["STATE_DIR"] = str(seed_demo.demo_state_dir())
@@ -910,7 +924,9 @@ def seed() -> int:
         if pending:
             continue
         actor = PARTNER_AUDITOR if owner == DEMO_PARTNER_TENANT else "Olivia Hart"
-        accept_inspection(ident, tenant=owner, actor=actor)
+        # Сроки строк плана — от движка, как при подтверждении в вебе: без них
+        # запрос заводился бы файловым, и электронного плана в демо не было бы.
+        accept_inspection(ident, tenant=owner, actor=actor, terms=_plan_terms(owner))
     _translate_previous(admin_dsn)
     trips = _trips(admin_dsn, units)
     network = [(u.name, u.country) for u in UNITS]
