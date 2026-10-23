@@ -103,9 +103,15 @@ x-stand: &stand
 # якорь `stand` свой `environment` у сервиса не передаёт). Владельца получает
 # один сервис — `migrate` ниже, одноразовый, и именно поэтому в нём этого
 # слияния нет. Держит это `tests/test_no_owner_dsn_in_services.py`.
+#
+# Так же гасятся root-ключи хранилища кадров (D635): они лежат в том же `.env`,
+# но нужны только `storage-live` и `storage-init` (те берут их интерполяцией, без
+# `env_file`); приложению положен пользователь `decimus-app` (`S3_*`).
 x-no-owner: &no-owner
   DATABASE_ADMIN_URL: ""
   POSTGRES_PASSWORD: ""
+  FRAMES_ROOT_USER: ""
+  FRAMES_ROOT_PASSWORD: ""
 
 # Окружение демо целиком: один якорь на оба демо-сервиса (сид и бот), чтобы
 # они не могли разъехаться между собой.
@@ -748,6 +754,9 @@ services:
     command: ["python", "-m", "src.db.migrate"]
     environment:
       TZ: ${TZ:-UTC}
+      # Владелец схемы ему нужен, root-ключи хранилища кадров — нет (D635).
+      FRAMES_ROOT_USER: ""
+      FRAMES_ROOT_PASSWORD: ""
 
   # --- выгрузка состояния в бэкап (профиль `backup`, задача #233) ------------
   #
