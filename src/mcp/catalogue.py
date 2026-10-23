@@ -2308,16 +2308,16 @@ TOOLS = (
     ),
     _plan_tool(
         "accept_action_plan",
-        "Management company only. Accept a plan that waits for review: it goes to work and "
-        "the partner is notified. Same as the web button.",
+        "Accept an action plan that waits for review: it goes to work and the partner is "
+        "notified. Management company only; same as the web button.",
         {"request_id": _PLAN_ID_PROPERTY},
         ["request_id"],
         plans.accept_action_plan,
     ),
     _plan_tool(
         "return_action_plan",
-        "Management company only. Return a plan that waits for review to the partner for "
-        "rework. The comment (what to fix) is mandatory and the partner sees it.",
+        "Return an action plan that waits for review to the partner for rework, with a "
+        "mandatory comment (what to fix) the partner sees. Management company only.",
         {
             "request_id": _PLAN_ID_PROPERTY,
             "comment": {"type": "string", "description": "What to fix. Required."},
@@ -2327,16 +2327,16 @@ TOOLS = (
     ),
     _plan_tool(
         "confirm_plan_row",
-        "Management company only. Confirm a row the partner marked done. When the last row "
-        "is confirmed the plan closes.",
+        "Confirm a plan row the partner marked done; when the last row is confirmed the plan "
+        "closes. Management company only.",
         {"request_id": _PLAN_ID_PROPERTY, "row_id": _PLAN_ROW_ID_PROPERTY},
         ["request_id", "row_id"],
         plans.confirm_plan_row,
     ),
     _plan_tool(
         "return_plan_row",
-        "Management company only. Return a row the partner marked done. The reason (what is "
-        "wrong) is mandatory and the partner sees it.",
+        "Return a plan row the partner marked done, with a mandatory reason (what is wrong) "
+        "the partner sees. Management company only.",
         {
             "request_id": _PLAN_ID_PROPERTY,
             "row_id": _PLAN_ROW_ID_PROPERTY,
@@ -2347,9 +2347,9 @@ TOOLS = (
     ),
     _plan_tool(
         "set_plan_count_from",
-        "Management company only. Move the start of the countdown (D613): the plan due date "
-        "and the due dates of all rows except extended ones are recalculated from it. Not "
-        "possible for an accepted or closed plan.",
+        "Move the start of the countdown of an action plan (D613): the plan due date and the "
+        "due dates of all rows except extended ones are recalculated from it. Not possible "
+        "for an accepted or closed plan. Management company only.",
         {
             "request_id": _PLAN_ID_PROPERTY,
             "count_from": {"type": "string", "description": "New start date, YYYY-MM-DD."},
@@ -2359,10 +2359,11 @@ TOOLS = (
     ),
     _plan_tool(
         "fill_plan_row",
-        "Partner only. Fill a row while the plan waits for rows: measure (what we do), "
+        "Fill a plan row while the plan waits for rows: measure (what we do), "
         "responsible, reason and the own due date (YYYY-MM-DD, not later than the due date "
         "the methodology gives and not in the past). Fields you do not name stay as they "
-        "are; an empty string clears a field. Fill every row, then submit_action_plan.",
+        "are; an empty string clears a field. Fill every row, then submit_action_plan. "
+        "Partner only.",
         {
             "request_id": _PLAN_ID_PROPERTY,
             "row_id": _PLAN_ROW_ID_PROPERTY,
@@ -2376,23 +2377,23 @@ TOOLS = (
     ),
     _plan_tool(
         "submit_action_plan",
-        "Partner only. Send the filled plan to the management company for review. Every row "
-        "needs a measure and a responsible.",
+        "Send the filled action plan to the management company for review. Every row needs a "
+        "measure and a responsible. Partner only.",
         {"request_id": _PLAN_ID_PROPERTY},
         ["request_id"],
         plans.submit_action_plan,
     ),
     _plan_tool(
         "start_plan_row",
-        "Partner only. Mark a row of an accepted plan 'taken into work'.",
+        "Mark a row of an accepted plan 'taken into work'. Partner only.",
         {"request_id": _PLAN_ID_PROPERTY, "row_id": _PLAN_ROW_ID_PROPERTY},
         ["request_id", "row_id"],
         plans.start_plan_row,
     ),
     _plan_tool(
         "finish_plan_row",
-        "Partner only. Mark a row 'done': it goes to the management company for "
-        "confirmation. The row must be in work (or returned).",
+        "Mark a plan row 'done': it goes to the management company for confirmation. The row "
+        "must be in work (or returned). Partner only.",
         {"request_id": _PLAN_ID_PROPERTY, "row_id": _PLAN_ROW_ID_PROPERTY},
         ["request_id", "row_id"],
         plans.finish_plan_row,

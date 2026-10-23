@@ -83,7 +83,18 @@ ratings_summary(group_by?, value?, period?, date_from?, date_to?)   # РС и Р
 ratings_units(country?, city?, unit?, period?, date_from?, date_to?, limit?)   # пиццерии: РС, РКО, карта Google, агрегаторы (as_of, stale)
 ratings_unit_periods(unit, rating_type?, period?, date_from?, date_to?)   # одна пиццерия по периодам РС и РКО: балл, флаги Д3, загрузка, period_open (#958)
 aggregators_status()                       # последний сбор, исход, ошибка, заявка в очереди
+
+# электронный план исправлений (#1168, D620) — вид KIND_PLAN: всё, что веб и бот, делается и здесь
+list_action_plans(status?, country?, limit?)   # по строке на план: статус, срок, overdue, строки по статусам; без status — открытые
+get_action_plan(request_id)                    # шапка, комментарий возврата, строки со сроками и overdue (на сегодня)
+accept_action_plan(request_id)    return_action_plan(request_id, comment)          # вердикты УК по плану, plan.manage
+confirm_plan_row(request_id, row_id)   return_plan_row(request_id, row_id, reason)  # по строке, plan.manage
+set_plan_count_from(request_id, count_from)    # начало отсчёта (D613), plan.manage
+fill_plan_row(request_id, row_id, measure?, responsible?, reason?, own_due?)   # партнёр, plan.submit
+submit_action_plan(request_id)   start_plan_row(request_id, row_id)   finish_plan_row(request_id, row_id)   # партнёр
 ```
+
+**План исправлений (`src/mcp/plans.py`, D620).** Вид `KIND_PLAN`. Читает `src.db.action_plans`, пишет только `src.db.plan_flow` — теми же дверьми, что веб; своего SQL нет, уведомления внутри приложения пишут двери. Право — действие матрицы у каждого инструмента (`policy.TOOL_ACTIONS`): чтение — `view.actions`, вердикты УК — `plan.manage` (`hq_only`), заполнение и ход строк — `plan.submit` (`partner_only`): партнёр вердиктов не выносит, УК за партнёра не заполняет, и это ещё раз держат двери и база (`0092`). Охват — `reach_of(tenant)`: партнёр видит планы своих стран, чужой план отвечает как несуществующий. Запись требует названного автора из токена (`rpc.PLAN_CLOSED`), он подписывает событие плана. Читающие инструменты (`plans.READ_TOOLS`) в журнал действий не идут. **Ответы короткие (как #1016):** список — по строке на план со счётчиками; план — строки без снимков записей и пустых полей, тексты режутся по `SHOWN_TEXT`; запись — статус плана, строки по статусам и затронутая строка, не весь план. «Просрочено» на чтении, как в вебе. **`fill_plan_row` не стирает неназванное:** веб пишет строку целиком, а агент, назвавший одну меру, стёр бы ответственного, поэтому неназванное поле берётся из строки, стереть можно пустой строкой. Спека говорила «заполнение — только веб и файл»; D620 («всё, что в боте/вебе, доступно в MCP») победил — заполнение в MCP есть.
 
 `import_ratings` зовёт тот же импортёр, что веб (`src/ratings/importer.py`), обработчик — `src/mcp/ratings_tools.py`; заслон стоит на входе (`rpc._call_tool`) и ещё раз в обработчике; автор в журнале — подпись вызова (`Access.actor`: `web:<логин>` у личного токена и входа через сайт, `mcp:HQ` у токена из `MCP_TOKENS`). Снимок идёт частями до `MCP_CHUNK_BYTES` = 300 000 байт, ответ несёт номер части; повтор того же содержимого — `duplicate`. Продуктовое описание — `docs/15-ratings.md`.
 
