@@ -138,6 +138,24 @@ def finding_previews(inspection_id: str, *, reach: Reach) -> dict[str, FindingSh
     }
 
 
+def finding_frames(inspection_id: str, n: int, *, tenant: str) -> tuple[str, ...]:
+    """Кадры с копией записи `n` проверки своего пространства, по порядку; нет записи — пусто.
+
+    Для замены кадров загрузки (D627): веб по ссылке-токену не вошёл человеком, у него
+    есть только пространство из токена. Складывается из двух читающих запросов, своих
+    SQL здесь нет.
+    """
+    from .queries import get_inspection
+    from .reach import own_reach
+
+    reach = own_reach(tenant)
+    detail = get_inspection(inspection_id, reach=reach, include_on_review=True)
+    запись = next((f for f in detail.findings if f.n == n), None) if detail else None
+    if запись is None:
+        return ()
+    return finding_previews(inspection_id, reach=reach).get(запись.id, FindingShots((), 0)).shown
+
+
 def preview_bytes(
     inspection_id: str, photo_id: str, *, reach: Reach, storage: PreviewReader | None = None
 ) -> bytes | None:

@@ -87,3 +87,31 @@ def test_нечитаемый_кадр_не_теряется_но_копии_н�
     assert склад.положено == {"inspections/i-1/p-1.jpg": b"not an image"}
     assert storage_uri == "s3://b/inspections/i-1/p-1.jpg"
     assert preview_uri is None
+
+
+def test_кадры_записи_берутся_по_её_номеру_и_только_с_копией(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`finding_frames` (замена кадров, D627): по номеру записи; нет записи — пусто."""
+    from types import SimpleNamespace
+
+    from src.db import previews, queries
+
+    детали = SimpleNamespace(
+        findings=[SimpleNamespace(n=1, id="f1"), SimpleNamespace(n=2, id="f2")]
+    )
+    monkeypatch.setattr(queries, "get_inspection", lambda *a, **k: детали)
+    monkeypatch.setattr(
+        previews,
+        "finding_previews",
+        lambda ident, *, reach: {
+            "f1": previews.FindingShots(shown=("p1", "p2"), missing=1),
+            "f2": previews.FindingShots(shown=("p3",), missing=0),
+        },
+    )
+
+    assert previews.finding_frames("i", 1, tenant="HQ") == ("p1", "p2")
+    assert previews.finding_frames("i", 2, tenant="HQ") == ("p3",)
+    assert previews.finding_frames("i", 9, tenant="HQ") == ()
+    monkeypatch.setattr(queries, "get_inspection", lambda *a, **k: None)
+    assert previews.finding_frames("i", 1, tenant="HQ") == ()

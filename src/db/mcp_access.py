@@ -119,6 +119,11 @@ select t.expires_at from mcp_tokens t join web_users u on u.id = t.user_id
  where t.user_id = %s and {_LIVE_ISSUE_SQL}
 """  # noqa: S608 — в склейке только условие модуля, данные идут параметрами
 
+_SELECT_LIVE_ISSUED_OF_USER_SQL = f"""
+select t.issued_at from mcp_tokens t join web_users u on u.id = t.user_id
+ where t.user_id = %s and {_LIVE_ISSUE_SQL}
+"""  # noqa: S608 — в склейке только условие модуля, данные идут параметрами
+
 #: Сверка предъявленного токена. Идёт по отпечатку и только среди ЖИВЫХ:
 #: отозванный токен не «находится и отклоняется», а не находится вовсе —
 #: отдельной ветки «нашли, но он отозван» здесь нет намеренно, потому что
@@ -330,6 +335,14 @@ def live_token_expiry(user_id: str) -> datetime | None:
     """До какого момента годен живой токен учётки; `None` — живого нет."""
     with _connected("прочитать токен доступа") as conn, conn.cursor() as cur:
         cur.execute(_SELECT_LIVE_OF_USER_SQL, (user_id,))
+        row = cur.fetchone()
+    return None if row is None else row[0]
+
+
+def live_token_issued_at(user_id: str) -> datetime | None:
+    """Когда выпущен живой токен учётки; `None` — живого нет (объявление D629)."""
+    with _connected("прочитать токен доступа") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_LIVE_ISSUED_OF_USER_SQL, (user_id,))
         row = cur.fetchone()
     return None if row is None else row[0]
 

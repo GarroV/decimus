@@ -8,6 +8,19 @@
 - Код: `src/db/ratings_read.py` (`rko_periods`), `src/web/ratings_calendar.py`, `src/web/ratings.py`, `src/web/texts_ratings.py`, `src/web/static/decimus-rt.css`, `src/web/templates/ratings/{index,_period,_loaded}.html`; тесты — `tests/test_web_ratings_period.py` (в фикстуры `test_web_ratings_tiles.py`, `test_web_ratings_agg_update.py` добавлена подмена `rko_periods`). Доки — `docs/15-ratings.md`.
 
 
+## 2026-10-23 — MCP: кадры черновика загрузки можно снять и заменить оригиналами (D627, #1206)
+
+- Кадры к записи черновика только добавлялись: ужатые миниатюры (Mersin-4, 51 кадр 420×560) нечем было заменить. Теперь `import_get_inspection` у каждой записи кроме числа `photos` даёт список `frames`: id кадра (для вызовов, человеку не показывается), номер по порядку, размер копии и `low_resolution`. Новые `import_remove_photo(inspection_id, n, photo)` и `import_clear_photos(inspection_id, n)` снимают кадр или все кадры записи тем же путём, что вычитка в вебе (`db.review_edit.detach_photo`, D465): строка и объекты хранилища, оригинал и превью. Только черновик своего пространства.
+- Режим замены: `replace` у `import_upload_photos`, у `local_attach_photos` и поле `replace=1` у `/photo-upload/<token>`. Новые кадры прикладываются первыми, прежние снимаются, только если легли все новые; иначе лёгшие новые снимаются обратно, старые не тронуты, ответ `replaced: false`. Мост шлёт замену одним запросом на запись (до 20 МБ) и отказывает целиком, если в наборе негодный файл.
+- Описания инструментов и `src/mcp/instructions.py` учат Claude отвечать на «перезалей фото» заменой оригиналами.
+- Код: `src/mcp/import_photos.py` (новый), `src/mcp/imports.py`, `src/mcp/import_catalogue.py`, `src/mcp/import_photo_link.py`, `src/mcp/photo_quality.py`, `src/mcp/instructions.py`, `src/db/previews.py` (`finding_frames`), `src/web/photo_upload.py`, `src/web/texts_journal.py`, `tools/mcp_bridge.sh`; тесты — `tests/test_mcp_import_photos.py`, `tests/test_web_photo_upload.py`, `tests/test_mcp_bridge_local_photos.py`, каталог — `tests/test_mcp_catalogue.py`. `docs/inventory.md`, `docs/14-history-import.md`.
+## 2026-10-23 — Мост MCP обновляет себя сам; Claude Desktop ведёт к команде установки (D626)
+
+- Причина: установщик клал мост один раз и больше не трогал, поэтому локальные инструменты фото из папки (D583) были только у свежих установок; у остальных Claude ужимал снимки в base64-миниатюры. Владелец: коллеги сидят в Desktop, доступ должен просто работать.
+- Мост: на старте сверяет `BRIDGE_VERSION` с сервером и, если там новее, скачивает файл, проверяет (SHA-256 от сервера, шебанг, маркер, версия, `bash -n`), атомарно заменяет себя и перезапускается `exec` до чтения stdin. Только https (http — на этой же машине), таймаут 3–5 с, любой сбой — строка в stderr и работа прежней версией. Только для моста из `~/.decimus/bin/`. `DECIMUS_MCP_NO_UPDATE=1` выключает. Мосты старше этой версии обновляться не умеют — им нужна одна повторная установка командой из «Настроек».
+- Сервер: `GET /bridge` (версия и SHA-256) и `GET /bridge/script` (файл) — только с токеном.
+- Веб: в «Настройках» → «Claude (MCP)» Claude Desktop ведёт к команде установки, коннектор подписан как путь для claude.ai в браузере и телефона (фото из папки там недоступны); тексты RU/EN.
+- Код: `tools/mcp_bridge.sh`, `src/mcp/{install,server}.py`, `src/web/texts_{settings,oauth}.py`; тесты — `tests/test_mcp_bridge_selfupdate.py`, `tests/test_mcp_install_endpoint.py`. Доки — `docs/inventory.md`, `docs/12-web-admin.md` (описание моста в `docs/06-mvp-bot.md` снято вместе с установкой из бота, D626).
 
 ## 2026-10-23 — Подключение Claude (MCP) убрано из мини-аппа (D626)
 
@@ -16,11 +29,19 @@
 - `src/bot/mcp_setup.py` остаётся в `src/bot`: веб не вправе импортировать `src.mcp.install`, откуда модуль берёт установщик (`tests/test_web_bounds.py`), а в `src/web` его перенос эту границу нарушил бы. Теперь он нужен только вебу.
 - Доки приведены в соответствие: `docs/13-walk-mini-app.md`, `docs/12-web-admin.md`, `docs/18-access-map.md`, `docs/00-map.md`, `docs/06-mvp-bot.md`, `docs/furca/blocks/mcp.md`.
 
+## 2026-10-23 — Доска стикеров вернулась; объявление «перепривязать Claude» (D629)
+
+- «Главная»: стикеры «Требует внимания», скрытые D542, снова показаны (`home_board.SHOWN = True`) — пока, дальше по отзывам.
+- На доске первое объявление (текст и круг утверждены владельцем): обновили подключение Claude (MCP), фото можно загружать из папки на компьютере — переподключите Claude в «Настройках» → «Claude (MCP)». Видит тот, у кого живой личный ключ выпущен до 23.10.2026 10:30 UTC; перевыпустил — стикер пропадает. Только экран, ни бота, ни писем. Ключ не прочитался — главная без объявления.
+- Код: `src/web/home_board.py` (`announcements`, `MCP_RELINK`), `home_page.py`, `texts_home.py`, `src/db/mcp_access.py` (`live_token_issued_at`); тесты — `tests/test_web_overview.py`, `tests/test_db_mcp_token_identity.py`. `docs/12-web-admin.md`.
+
+
 ## 2026-10-23 — Подключение Claude (MCP) убрано из бота (D626)
 
 - Рабочая платформа — веб, бот служит только для проведения проверок. Пункт меню «Установка MCP», команда `/mcp` и кнопка «Прислать команду настройки» сняты вместе с роутером `src/bot/routers/mcp.py`, клавиатурой, текстами `mcp.*` и `cmd.mcp` (RU/EN), тестами `tests/test_bot_mcp_setup.py` и `tests/test_bot_mcp_command.py`.
 - Подключить Claude можно в вебе: «Настройки» — коннектор через сайт (D417) и «Claude (MCP)» — команда установки с личным токеном (D447); то же в настройках мини-аппа. Отдача установщика `/setup` и сборка команды (`src/bot/mcp_setup.py`: `setup_command`, `installer_sha256`, `MCP_URL_VAR`) не тронуты; удалён только путь, обслуживавший один бот (`desktop_command`, `bridge_body` и их константы).
 - Тексты, которые отправляли человека «в бота за командой» (`tools/mcp_install.sh`, `tools/mcp_bridge.sh`), `.env.example`, `docs/06-mvp-bot.md`, `docs/08-deploy.md`, `docs/12-web-admin.md`, `docs/13-walk-mini-app.md` — приведены к вебу.
+
 ## 2026-10-23 — Сменить пиццерию проверки: в боте и карандашом на вычитке (D628)
 
 - Бот: пункт меню «Сменить пиццерию» (`/unit`) посреди обхода — если проверку завели не на ту точку. Название сверяется со справочником, как на старте; меняется только шапка (`domain.set_unit`, движок `meta --unit`), записи, кадры и оценка остаются. Записи с пометкой «повтор» бот называет числом — их сверяли с прошлой проверкой прежней точки. Команда, кадр или голос вместо названия отменяют смену.

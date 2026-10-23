@@ -29,6 +29,7 @@ from src.mcp import (
     checklists_tools,
     import_batch,
     import_photo_link,
+    import_photos,
     import_suggest,
 )
 from src.mcp import imports as imports_module
@@ -157,6 +158,8 @@ from src.mcp.catalogue import (
     "import_list_drafts",
     "import_add_photo",
     "import_upload_photos",
+    "import_remove_photo",
+    "import_clear_photos",
     "import_info_fields",
     "import_set_info",
     "import_accept_inspection",
@@ -241,17 +244,18 @@ from src.mcp.catalogue import (
 }
 
 
-def test_каталог_содержит_ровно_семьдесят_семь_инструментов_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_семьдесят_девять_инструментов_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
     инструмент, к которому агент внезапно теряет доступ.
     42 + 9 загрузки (D305) + 2 управления рейтингами (D320, D420) + 3 чтения
-    рейтингов (D420) + 1 разбивка по периодам (#958) + 11 плана исправлений (#1168)."""
+    рейтингов (D420) + 1 разбивка по периодам (#958) + 11 плана исправлений (#1168)
+    + 2 снятия кадров (D627)."""
     сверить(
         "tests/test_mcp_catalogue.py: ИМЕНА_ИНСТРУМЕНТОВ_*",
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 77
+    assert len(TOOLS) == 79
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -412,6 +416,7 @@ def test_обработчик_взят_из_правильного_модуля(
             assert spec.handler.__module__ in {
                 imports_module.__name__,
                 import_photo_link.__name__,
+                import_photos.__name__,
                 "src.mcp.import_info",
                 import_suggest.__name__,
                 "src.mcp.import_match",
@@ -446,7 +451,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 77
+    assert len(перечень) == 79
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

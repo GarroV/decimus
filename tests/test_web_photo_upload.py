@@ -158,3 +158,76 @@ def test_предел_частоты_по_токену(мир: SimpleNamespace) 
 
     assert коды[-1] == 429
     assert 429 not in коды[:-1]
+
+
+# --- replace=1 (D627, #1206): старые снимаются, только если легли все новые ---------
+
+
+@pytest.fixture
+def замена(мир: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+    мир.detached = []
+    мир.refuse_marker = None
+    счётчик = iter(range(1, 100))
+
+    def add_photo(ident: str, n: int, *, tenant: str, data: bytes, storage: object) -> str:
+        if мир.refuse_marker is not None and len(мир.added) == мир.refuse_marker:
+            raise HistoryImportError("У записи #1 уже 10 кадров")
+        мир.added.append((ident, n, tenant))
+        return f"new-{next(счётчик)}"
+
+    def detach(ident: str, photo_id: str, *, tenant: str, storage: object) -> None:
+        мир.detached.append((ident, photo_id, tenant))
+
+    monkeypatch.setattr(photo_upload.db_imports, "add_photo", add_photo)
+    monkeypatch.setattr(photo_upload.revision, "detach_photo", detach)
+    monkeypatch.setattr(photo_upload, "_frames_of", lambda grant, n: ["old-1", "old-2"])
+    return мир
+
+
+def _post_replace(мир: SimpleNamespace, files: list[tuple[str, bytes]]) -> Any:
+    data: dict[str, Any] = {
+        "n": "1",
+        "replace": "1",
+        "file": [(io.BytesIO(b), name) for name, b in files],
+    }
+    return мир.client.post(
+        f"/photo-upload/{_token()}", data=data, content_type="multipart/form-data"
+    )
+
+
+def test_замена_успех_снимает_прежние_кадры_записи(замена: SimpleNamespace) -> None:
+    ответ = _post_replace(замена, [("a.jpg", _image("JPEG")), ("b.jpg", _image("PNG"))])
+
+    assert ответ.status_code == 200
+    assert ответ.json["replaced"] is True
+    assert len(ответ.json["attached"]) == 2
+    assert [d[1] for d in замена.detached] == ["old-1", "old-2"]
+
+
+def test_замена_с_отказом_оставляет_старое_и_откатывает_новое(замена: SimpleNamespace) -> None:
+    замена.refuse_marker = 1  # первый кадр ляжет, второй — отказ базы
+
+    ответ = _post_replace(замена, [("a.jpg", _image("JPEG")), ("b.jpg", _image("PNG"))])
+
+    assert ответ.status_code == 422
+    assert ответ.json["replaced"] is False
+    assert ответ.json["attached"] == []
+    # снят только лёгший новый кадр; старые на месте
+    assert [d[1] for d in замена.detached] == ["new-1"]
+    assert {r["file"] for r in ответ.json["refused"]} == {"a.jpg", "b.jpg"}
+
+
+def test_без_replace_старые_не_трогаются(замена: SimpleNamespace) -> None:
+    ответ = _post(замена, _token(), [("a.jpg", _image("JPEG"))])
+
+    assert ответ.status_code == 200
+    assert "replaced" not in ответ.json
+    assert замена.detached == []
+
+
+def test_замена_без_годного_кадра_старое_не_снимает(замена: SimpleNamespace) -> None:
+    ответ = _post_replace(замена, [("evil.jpg", b"<html>not an image</html>")])
+
+    assert ответ.status_code == 422
+    assert ответ.json["replaced"] is False
+    assert замена.detached == []
