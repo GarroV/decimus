@@ -654,3 +654,39 @@ def test_admin_reads_state_and_only_walk_writes_it(
     assert upstream == f"http://walk:{порт}", "админка передаёт обход не туда, где он слушает"
     assert services["walk"]["environment"]["WEB_LISTEN_NETWORK"] == "1"
     assert services["walk"]["healthcheck"]["test"] == ["CMD", "python", "tools/walk_healthcheck.py"]
+
+
+# --- демо-обход не получает токен бота (#1222) -------------------------------
+
+
+@requires_docker
+def test_demo_walk_has_no_bot_token_even_from_a_production_env_file(
+    tmp_path: Path,
+) -> None:
+    """Демо поднято из каталога с боевым `.env` — токен в `walk` всё равно пуст."""
+    env_file = tmp_path / "prod.env"
+    env_file.write_text("TELEGRAM_BOT_TOKEN=prod-token-stub\n", encoding="utf-8")
+    r = subprocess.run(  # noqa: S603 — аргументы собираем сами, ввода извне нет
+        [
+            "docker", "compose", "-p", "decimus-demo-tests",  # noqa: S607
+            "-f", "docker-compose.yml", "-f", "docker-compose.prod.yml",
+            "-f", "deploy/demo/compose.demo.yaml",
+            "config", "--format", "json",
+        ],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            **os.environ,
+            "COMPOSE_PROFILES": "",
+            "DECIMUS_ENV_FILE": str(env_file),
+            "WEB_TRUSTED_PROXY_ADDR": "192.0.2.0/24",
+        },
+    )
+    assert r.returncode == 0, r.stderr
+    walk = json.loads(r.stdout)["services"]["walk"]["environment"]
+    assert walk.get("WEB_WALK_PREVIEW_CHAT"), "в демо у walk нет чата просмотра"
+    assert walk.get("TELEGRAM_BOT_TOKEN", "") == "", (
+        "токен бота доехал до демо-walk из env_file: служба откажется стартовать"
+    )
