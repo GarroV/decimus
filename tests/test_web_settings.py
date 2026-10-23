@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 from flask.testing import FlaskClient
@@ -383,6 +383,32 @@ def test_в_левой_колонке_группы_разделены_черта
         список = список[: список.index('class="sidenav__foot"')]
 
         assert список.count('class="sidenav__sep"') == 2
+
+
+@pytest.mark.parametrize(
+    ("выпущен", "видно"),
+    [
+        (datetime(2026, 10, 1, tzinfo=UTC), True),
+        (datetime(2026, 10, 24, tzinfo=UTC), False),
+        (None, False),
+    ],
+)
+def test_пояснение_объявления_claude_в_плитке_только_со_старым_ключом(
+    monkeypatch: pytest.MonkeyPatch, выпущен: datetime | None, видно: bool
+) -> None:
+    """D629: стикер «Главной» короткий, а что к чему — в плитке Claude, пока ключ старый."""
+    from src.db import mcp_access
+
+    monkeypatch.setattr(
+        users_mcp,
+        "own_status",
+        lambda _id: users_mcp.TokenStatus(known=True, expires_at=datetime(2027, 1, 1)),
+    )
+    monkeypatch.setattr(mcp_access, "live_token_issued_at", lambda _uid: выпущен)
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
+        страница = client.get("/settings?tile=claude").get_data(as_text=True)
+
+        assert ("фото к проверке можно загружать прямо из папки" in страница) is видно
 
 
 def test_перевыпуск_команды_claude_идёт_через_подтверждение(

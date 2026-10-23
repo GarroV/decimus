@@ -140,9 +140,14 @@ def announcements(
 
     Перепривязать Claude (D629) — тому, чей живой личный ключ выпущен до объявления.
     """
-    if token_issued_at is not None and token_issued_at < MCP_RELINK_BEFORE:
+    if needs_relink(token_issued_at):
         return (Sticker(MCP_RELINK, 1, href(MCP_RELINK)),)
     return ()
+
+
+def needs_relink(token_issued_at: datetime | None) -> bool:
+    """Живой личный ключ выпущен до объявления D629 — Claude пора переподключить."""
+    return token_issued_at is not None and token_issued_at < MCP_RELINK_BEFORE
 
 
 def _review(reach: Reach, who: Who) -> int:

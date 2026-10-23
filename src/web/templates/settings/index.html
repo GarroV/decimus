@@ -145,6 +145,10 @@
           </div>
           {% elif tile == 'claude' %}
           <div class="ssec" id="claude">
+            {# Объявление D629: стикер «Главной» ведёт сюда, пояснение — здесь. #}
+            {% if mcp_relink and not show.token %}
+              <div class="note note--warn"><div class="note__text">{{ t('settings.claude.relink') }}</div></div>
+            {% endif %}
             <p class="ssec__text">{{ t('settings.claude.lead') }}</p>
 
             <div id="claude-token">

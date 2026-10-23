@@ -48,6 +48,7 @@ from . import (
     auth,
     google_link,
     guard,
+    home_board,
     profile,
     reauth,
     ui_lang,
@@ -218,6 +219,19 @@ def _tile_hints(account: Any, lang: str, google_login: bool) -> dict[str, str]:
     }
 
 
+def _needs_relink(user_id: str | None) -> bool:
+    """Пояснение объявления D629 в плитке Claude; ключ не прочитался — без пояснения."""
+    if user_id is None:
+        return False
+    try:
+        return home_board.needs_relink(mcp_access.live_token_issued_at(user_id))
+    except DbError as exc:
+        logger.warning(
+            "настройки: ключ Claude для объявления не прочитан (%s)", exc.__class__.__name__
+        )
+        return False
+
+
 def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
     """Страница целиком — для GET и для ответа на любую отправку экрана."""
     show = show or Show(flash=_google_result())
@@ -255,6 +269,7 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             bot_username=current_app.config.get(BOT_USERNAME_KEY),
             bot_var=WEB_BOT_USERNAME_VAR,
             mcp=статус_токена,
+            mcp_relink=_needs_relink(user_id),
             claude=подключение,
             min_password=accounts.MIN_PASSWORD_LENGTH,
             max_password=accounts.MAX_PASSWORD_LENGTH,
