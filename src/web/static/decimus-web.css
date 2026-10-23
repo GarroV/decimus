@@ -939,7 +939,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .hact__item[open] > summary { background: var(--surface-3); }
 /* Карточка дизайн-системы режет `overflow: hidden` всё, что выходит за неё, — и
    раскрытое окно действия («Исправить», «Отклонить») обрезалось на краю карточки. */
-.card:has(.hact__item[open]) { overflow: visible; }
+.card:has(.hact__item[open]), .card:has(.tedit[open]) { overflow: visible; }
 .hact__pop { position: absolute; left: 0; right: 0; top: calc(100% + var(--space-3)); z-index: 20; max-width: 440px;
   padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .14); }
@@ -2160,3 +2160,15 @@ a[data-zoom] { cursor: zoom-in; }
 .notif-menu__foot { margin-top: 0; }
 .notif-menu__all { display: block; width: 100%; height: 32px; padding: 0 var(--space-5); border: 0; border-radius: var(--r-control); background: transparent; font: inherit; font-size: var(--fs-dense); color: var(--ink); text-align: left; cursor: pointer; }
 .notif-menu__all:hover { background: var(--surface); }
+
+/* Карандаш у названия пиццерии в шапке проверки (D626): окно смены точки — под ним. */
+.tedit__row { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.tedit { position: relative; flex: none; }
+.tedit > summary { list-style: none; }
+.tedit > summary::-webkit-details-marker { display: none; }
+.tedit__btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+  border-radius: var(--r-control); color: var(--ink-3); cursor: pointer; }
+.tedit__btn:hover, .tedit[open] > .tedit__btn { background: var(--surface-2); color: var(--ink); }
+.tedit__btn:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
+.tedit__btn svg { width: 15px; height: 15px; }
+.tedit__pop { right: auto; width: min(340px, calc(100vw - 32px)); }

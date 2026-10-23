@@ -68,6 +68,7 @@ from .routers import (
     build_resend_router,
     build_start_router,
     build_stops_router,
+    build_unit_router,
     build_version_router,
 )
 from .routers.help import HELP_COMMAND
@@ -77,6 +78,7 @@ from .routers.mcp import MCP_COMMAND
 from .routers.record import make_frame_handler, make_material_handler, make_waiting_handler
 from .routers.records import RECORDS_COMMAND
 from .routers.resend import RESEND_COMMAND
+from .routers.unit import UNIT_COMMAND
 from .routers.version import VERSION_COMMAND
 from .texts import DEFAULT_UI_LANG, default_ui_lang, t
 from .version import build_version
@@ -211,6 +213,9 @@ def build_dispatcher(
     # листа — иначе кнопка прошлой проверки выстрелит в новую (T206), а кадр
     # новой заберёт придержанные слова старой (T249).
     dispatcher.include_router(build_start_router(settings, pending, store))
+    # Сразу за стартом: ждёт текст названия, и до приёма материала, чтобы текст не
+    # стал комментарием к кадру (D626).
+    dispatcher.include_router(build_unit_router())
     dispatcher.include_router(build_edit_router())
     # Показ записанного и завершение получают ту же очередь ожидания, из которой
     # собираются записи (T241): при завершении называются не только кадры без
@@ -275,6 +280,8 @@ MENU_COMMANDS = (
     (RECORDS_COMMAND, "cmd.records"),
     ("undo", "cmd.undo"),
     ("finish", "cmd.finish"),
+    # Сменить пиццерию (D626) — за работой обхода: нужна, когда ошиблись при старте.
+    (UNIT_COMMAND, "cmd.unit"),
     # Справка и версия — не шаги обхода, поэтому стоят за работой, а не
     # посреди неё. Справка выше версии: её читает аудитор, и читает чаще.
     (HELP_COMMAND, "cmd.help"),
