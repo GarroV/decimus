@@ -27,6 +27,8 @@ SRC = ROOT / "src"
 OWNER_VAR = "DATABASE_ADMIN_URL"
 #: Всё, что собирается якорем `stand` и тем самым получает `.env` целиком.
 SERVICES_WITH_ENV_FILE = ("bot", "mcp", "web", "walk", "demo", "demo-seed", "state-backup")
+#: Root-ключи хранилища кадров (D635): в `.env` ради `storage-live`, приложению не нужны.
+FRAMES_ROOT_VARS = ("FRAMES_ROOT_USER", "FRAMES_ROOT_PASSWORD")
 #: Единственный, кому владелец нужен: накат схемы.
 MIGRATE = "migrate"
 
@@ -69,6 +71,17 @@ def test_service_does_not_receive_schema_owner(services: dict[str, dict], name: 
         f"env_file (вливайте `<<: *no-owner`)"
     )
     assert env.get("POSTGRES_PASSWORD") == "", f"{name}: пароль владельца базы не должен доезжать"
+
+
+@pytest.mark.parametrize("name", (*SERVICES_WITH_ENV_FILE, MIGRATE))
+def test_service_does_not_receive_frames_root_keys(services: dict[str, dict], name: str) -> None:
+    env = services[name].get("environment")
+    assert isinstance(env, dict), f"{name}: environment должен быть словарём"
+    for var in FRAMES_ROOT_VARS:
+        assert env.get(var) == "", (
+            f"{name}: {var} должна быть переопределена пустой строкой, иначе её отдаст "
+            f"env_file и у приложения окажется root хранилища кадров"
+        )
 
 
 def test_only_migrate_keeps_schema_owner(services: dict[str, dict]) -> None:
