@@ -287,17 +287,19 @@
 
   {% elif block == 'risk' %}
   {#- Зона риска — таблица с фильтром по странам (11.10.2026; было облако имён):
-      пиццерия, тип и оценки последних периодов подряд, старые первыми. -#}
+      пиццерия, тип, оценки последних периодов (старые первыми) и их средняя —
+      по средней пиццерия и попала в зону. -#}
   {% call tile('risk', t('ratings.block.risk')) %}
   <div class="rt-sec" data-rt-filtered>
     <div class="rt-sec__head">
       <span class="rt-sec__meta">{{ t('ratings.risk.hint', n=summary.thresholds.risk_periods|int, x=thr(summary.thresholds.risk_threshold)) }}</span></div>
     {% if summary.risk %}{{ cfilter(summary.risk|map(attribute='country')|list) }}
     <div class="rt-card rt-alert rt-alert--warn rt-scroll"><table class="rt-maps rt-list">
-      <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col" class="num">{{ t('ratings.col.scores') }}</th></tr></thead>
+      <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col" class="num">{{ t('ratings.col.scores') }}</th><th scope="col" class="num">{{ t('ratings.col.average') }}</th></tr></thead>
       <tbody>{% for u in summary.risk %}<tr data-country="{{ u.country }}">
         <th scope="row">{{ unit_link(u.unit, u.unit_name, u.rating_type) }}<small>{{ country_name(u.country) }} · <span class="rt-kind">{{ t('ratings.' ~ u.rating_type) }}</span></small></th>
-        <td class="num rt-list__scores">{% for s in u.scores %}{% if loop.last %}<b>{{ '%.1f'|format(s) }}</b>{% else %}{{ '%.1f'|format(s) }} → {% endif %}{% endfor %}</td>
+        <td class="num rt-list__scores">{% for s in u.scores %}{{ '%.1f'|format(s) }}{% if not loop.last %} → {% endif %}{% endfor %}</td>
+        <td class="num"><b>{{ '%.1f'|format(u.average) }}</b></td>
       </tr>{% endfor %}</tbody>
     </table></div>
     {% if summary.risk_short %}<div class="rt-note">{{ t('ratings.risk.short', types=risk_short_names) }}</div>{% endif %}
