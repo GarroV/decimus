@@ -250,9 +250,7 @@ def submit_plan(request_id: str, *, reach: Reach, tenant: str, actor: str) -> No
                 f"Не у каждой строки есть мера и ответственный: не заполнено {unfilled} из {total}"
             )
         cur.execute(_SIGN_SQL, (who,))
-        cur.execute(
-            _SET_PLAN_STATUS_SQL, {"id": request, "status": STATUS_ON_REVIEW, "comment": None}
-        )
+        cur.execute(_SET_PLAN_STATUS_KEEP_SQL, {"id": request, "status": STATUS_ON_REVIEW})
         note.notify_event(cur, note.KIND_SUBMITTED, request, actor=who, actor_tenant=tenant)
 
     _as_partner("Отправить план на согласование", work)

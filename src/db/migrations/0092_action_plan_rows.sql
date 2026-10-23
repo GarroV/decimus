@@ -269,6 +269,8 @@ begin
                 raise exception 'на согласование план % уходит, когда у каждой строки есть мера и ответственный', old.id
                     using errcode = 'check_violation';
             end if;
+            -- Прежний комментарий возврата снимает сам переход: колонку партнёру не выдаём.
+            new.review_comment := null;
             return new;
         end if;
         if not pg_has_role(current_user, 'dodo_audit_admin', 'member') then
