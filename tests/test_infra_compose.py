@@ -659,20 +659,31 @@ def test_admin_reads_state_and_only_walk_writes_it(
 # --- демо-обход не получает токен бота (#1222) -------------------------------
 
 
+#: docker из PATH; база стендов — тот же набор файлов, что у прода.
+DEMO_CONFIG_ARGS = (
+    "docker",
+    "compose",
+    "-p",
+    "decimus-demo-tests",
+    "-f",
+    "docker-compose.yml",
+    "-f",
+    "docker-compose.prod.yml",
+)
+
+
 @requires_docker
+@pytest.mark.parametrize(
+    "overlay", ["deploy/demo/compose.demo.yaml", "deploy/preview/compose.preview.yaml"]
+)
 def test_demo_walk_has_no_bot_token_even_from_a_production_env_file(
-    tmp_path: Path,
+    tmp_path: Path, overlay: str
 ) -> None:
-    """Демо поднято из каталога с боевым `.env` — токен в `walk` всё равно пуст."""
+    """Демо и превью подняты из каталога с боевым `.env` — токен в `walk` всё равно пуст."""
     env_file = tmp_path / "prod.env"
     env_file.write_text("TELEGRAM_BOT_TOKEN=prod-token-stub\n", encoding="utf-8")
     r = subprocess.run(  # noqa: S603 — аргументы собираем сами, ввода извне нет
-        [
-            "docker", "compose", "-p", "decimus-demo-tests",  # noqa: S607
-            "-f", "docker-compose.yml", "-f", "docker-compose.prod.yml",
-            "-f", "deploy/demo/compose.demo.yaml",
-            "config", "--format", "json",
-        ],
+        [*DEMO_CONFIG_ARGS, "-f", overlay, "config", "--format", "json"],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
@@ -682,6 +693,7 @@ def test_demo_walk_has_no_bot_token_even_from_a_production_env_file(
             "COMPOSE_PROFILES": "",
             "DECIMUS_ENV_FILE": str(env_file),
             "WEB_TRUSTED_PROXY_ADDR": "192.0.2.0/24",
+            "PREVIEW_PHOTOS_DIR": str(tmp_path),
         },
     )
     assert r.returncode == 0, r.stderr
