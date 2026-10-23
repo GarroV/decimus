@@ -53,6 +53,9 @@ services:
       # Caddy. Подсеть берётся у админки, отдельной переменной по умолчанию не нужно.
       MCP_TRUSTED_PROXIES: ${MCP_TRUSTED_PROXIES:-1}
       MCP_TRUSTED_PROXY_ADDR: ${MCP_TRUSTED_PROXY_ADDR:-${WEB_TRUSTED_PROXY_ADDR:?задайте WEB_TRUSTED_PROXY_ADDR (подсеть сети edge-decimus), docs/08-deploy.md 8.1}}
+      # Ключ фронта (F-107): по умолчанию тот же, что у админки. Задан — `X-Forwarded-For`
+      # верим только звену с верным `X-Decimus-Front-Key`. Пусто — как раньше.
+      MCP_FRONT_KEY: ${MCP_FRONT_KEY:-${WEB_FRONT_KEY:-}}
     ports: !override
       - "127.0.0.1:${MCP_HOST_PORT:-8266}:${MCP_PORT:-8265}"
     depends_on: !override

@@ -1420,8 +1420,12 @@ wrangler.admin.jsonc < файл` и то же для `wrangler.mcp.jsonc` (зн�
 запрос из соседнего контейнера с подделанным `X-Forwarded-For` счётчик видит с
 адреса соседа. **При смене ключа** (см. выше) значение `WEB_FRONT_KEY` менять в
 том же окне, что и сниппет Caddy: пока в сниппете два ключа, у origin — один;
-ставить новый только после того, как Worker'ы перешли на него. Сервер MCP эту
-проверку не делает.
+ставить новый только после того, как Worker'ы перешли на него. Сервер MCP делает ту же сверку
+для `X-Forwarded-For` (адрес клиента в журнале действий, `src/domain/client_ip.py`):
+ключ он берёт из `MCP_FRONT_KEY`, а в `docker-compose.prod.yml` по умолчанию это
+`WEB_FRONT_KEY`, отдельной записи в `.env` не нужно; `MCP_FRONT_KEY` не задан — доверие по
+подсети и предупреждение при старте. Caddy передаёт заголовок ключа к обоим сайтам
+(`GarroV/vps-infra: edge/sites/decimus.caddy`).
 
 **Вход через Google через фронт.** Нужен второй адрес возврата: в `.env` VPS
 `GOOGLE_FRONT_REDIRECT_URI=https://decimus.vasiliy-garro.workers.dev/auth/google/callback`,

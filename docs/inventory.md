@@ -389,6 +389,7 @@
 | `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 2 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_CONFIRM_SECRET` | `src/mcp/confirm.py` | да |
+| `MCP_FRONT_KEY` | `src/mcp/config.py` | да |
 | `MCP_HOST` | `src/mcp/config.py` | да |
 | `MCP_IMPORT_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_LINK_PORT` | `tools/mcp_healthcheck.py` | да |

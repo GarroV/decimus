@@ -61,6 +61,10 @@ MCP_LISTEN_NETWORK_VAR = "MCP_LISTEN_NETWORK"
 #: Без обоих заголовку `X-Forwarded-For` не верим вовсе: в журнал идёт адрес соединения.
 MCP_TRUSTED_PROXIES_VAR = "MCP_TRUSTED_PROXIES"
 MCP_TRUSTED_PROXY_ADDR_VAR = "MCP_TRUSTED_PROXY_ADDR"
+#: Ключ фронта Cloudflare (тот же, что `WEB_FRONT_KEY` админки и секрет `FRONT_KEY` у
+#: Worker'ов): задан — `X-Forwarded-For` верим только звену с верным `X-Decimus-Front-Key`
+#: (F-107 аудита, `src/domain/client_ip.py`). Не задан — доверие по подсети, как раньше.
+MCP_FRONT_KEY_VAR = "MCP_FRONT_KEY"
 
 #: Где хранилище версий методики. Пусто — инструменты методики выключены
 #: целиком: до задачи T098 весь MCP был только чтением проверок, и запись в
@@ -191,6 +195,8 @@ class Settings:
     #: клиента в журнале действий; ноль или пустой список — заголовку не верим.
     trusted_proxies: int = 0
     trusted_proxy_addrs: tuple[str, ...] = ()
+    #: Ключ фронта (`MCP_FRONT_KEY`): пусто — ключ не проверяется. Секретный: в `repr` нет.
+    front_key: str = field(default="", repr=False)
 
     @property
     def oauth_enabled(self) -> bool:
@@ -674,6 +680,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         mcp_public_url=_parse_public(src, MCP_PUBLIC_URL_VAR),
         trusted_proxies=trusted_proxies,
         trusted_proxy_addrs=trusted_proxy_addrs,
+        front_key=(src.get(MCP_FRONT_KEY_VAR) or "").strip(),
     )
 
 
