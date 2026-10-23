@@ -135,48 +135,7 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.app.web_settings": {"ru": "Все настройки на сайте", "en": "All settings on the website"},
     "walk.app.version": {"ru": "Версия", "en": "Version"},
-    # ── подключение Claude ───────────────────────────────────────────────
-    "walk.app.claude": {"ru": "Подключить Claude", "en": "Connect Claude"},
-    "walk.app.claude.text": {
-        "ru": "Команда с вашим токеном: выполните её в терминале на Mac с Claude.",
-        "en": "A command with your token: run it in a terminal on the Mac with Claude.",
-    },
-    "walk.app.claude.safety": {
-        "ru": "Токен виден один раз, новая команда гасит прежнюю. Никому не пересылайте.",
-        "en": "The token is shown once; a new command cancels the old one. Do not forward it.",
-    },
-    "walk.app.claude.issue": {"ru": "Получить команду", "en": "Get the command"},
-    "walk.app.claude.again": {"ru": "Получить новую", "en": "Get a new one"},
-    "walk.app.claude.copy": {"ru": "Скопировать", "en": "Copy"},
-    "walk.app.claude.copied": {"ru": "Скопировано", "en": "Copied"},
-    "walk.app.claude.replaced": {
-        "ru": "Прежний токен отозван — старая настройка больше не работает.",
-        "en": "The previous token is revoked — the old setup no longer works.",
-    },
-    "walk.app.claude.expires": {
-        "ru": "Токен действует до {date}. Потом получите новую команду здесь же.",
-        "en": "The token is valid until {date}. After that, get a new command here.",
-    },
-    "walk.app.err.unbound_self": {
-        "ru": (
-            "Токен Claude выпускается на учётку decimus: привяжите бота к своей учётке "
-            "в настройках на сайте — или выпустите токен прямо там."
-        ),
-        "en": (
-            "The Claude token is issued to a decimus account: link the bot to your "
-            "account in the settings on the website — or issue the token right there."
-        ),
-    },
-    "walk.app.claude.restart": {
-        "ru": "После команды полностью перезапустите Claude (Cmd+Q).",
-        "en": "After the command, fully restart Claude (Cmd+Q).",
-    },
     # ── отказы ───────────────────────────────────────────────────────────
-    # Выпуск токена — только по свежему открытию мини-аппа (F-032).
-    "walk.app.err.stale": {
-        "ru": "Мини-апп открыт давно. Закройте его и откройте снова, затем повторите.",
-        "en": "The mini-app was opened a while ago. Close it, open it again and retry.",
-    },
     # Учётка жива, но её роли проверки закрыты (контроль, D420, F-024).
     "walk.err.role": {
         "ru": (
