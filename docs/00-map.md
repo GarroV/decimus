@@ -171,7 +171,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,photo_upload,account_menu,accounts,auth,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,service_probes,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,photo_upload,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,service_probes,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -188,6 +188,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/journal.py` | Журналы входов и действий на стороне веба (D462, `0067`) |
 | `src/web/journal_screen.py` | Экраны журналов (D462): «Журнал» главного админа и «Журнал входов» человека |
 | `src/web/landing.py` | Посадочная страница продукта (D524): что такое Decimus, «Войти» и «Открыть демо» |
+| `src/web/notifications.py` | Колокольчик и красные точки: уведомления в приложении (#1129, D604, D614) |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
@@ -390,7 +391,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
@@ -404,6 +405,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/maps_store.py` | Оценки на картах в базе (схема `maps`, миграция 0044): запись снимка и чтение |
 | `src/db/model_key.py` | Ключ модели из базы (D491): тонкая обёртка над общим хранилищем `service_keys` (D576) |
 | `src/db/model_usage.py` | Расход модели (D537, `0078`): запись вызова и чтение сводки для экрана |
+| `src/db/notifications.py` | Уведомления в приложении (#1129, D604, D614): запись событий и чтение своих |
 | `src/db/oauth_store.py` | Хранилище OAuth: клиенты, коды, подключения и токены (D417, миграция `0054`) |
 | `src/db/prescriptions.py` | Предписания: черновик, согласование ОСБ, отправка через Gmail, ответ партнёра, закрытие |
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, согласование, отправка, закрытие (УК), ответ партнёра |
