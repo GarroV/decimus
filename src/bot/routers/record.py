@@ -226,6 +226,15 @@ async def _hand(
     pending.propose(chat_id, proposal, at=getattr(sent, "message_id", None))
 
 
+def _merges_into_taken(proposal: Proposal) -> bool:
+    """Нажатие на занятую пару положит кадры в занявшую запись (#443), а не даст отказ.
+
+    Так у материала с кадрами вне правки — то же условие, что у `_record` перед
+    `merged.into_taken`. Пометка занятого пункта говорит то, что нажатие сделает (#1175).
+    """
+    return bool(proposal.file_ids) and proposal.correcting is None
+
+
 def _reading_of(proposal: Proposal) -> float | None:
     """Показание термометра, прочитанное по этому материалу, — первое из предложений."""
     return next((c.reading_c for c in proposal.candidates if c.reading_c is not None), None)
@@ -245,11 +254,15 @@ async def _show_candidates(
     Занятый пункт приходит сюда штатно: сверка со списком нарушений упёрлась в
     отказ движка, и материал ушёл модели — на кадре бывает второе нарушение.
     Но модель предлагает и тот же пункт тоже, и непомеченным он неотличим от
-    остальных: нажатие даёт второй отказ подряд по поводу, о котором бот только
-    что сказал сам.
+    остальных. Пометка говорит, что сделает нажатие: с кадрами — добавит кадр к
+    занявшей записи (#443), без них и под правкой — отказ (#1175).
     """
     lines = view.candidate_lines(
-        proposal.candidates, lang, refusal.occupied_pairs(chat_id), chat_id=chat_id
+        proposal.candidates,
+        lang,
+        refusal.occupied_pairs(chat_id),
+        chat_id=chat_id,
+        merges=_merges_into_taken(proposal),
     )
     # Под правкой (T204) спрашивается другое: не «что записать», а «чем
     # поправить запись №N». Число кадров там ни при чём — кадры остались у
@@ -337,6 +350,7 @@ async def _show_manual_page(
         lang,
         refusal.occupied_pairs(message.chat.id),
         chat_id=chat_id,
+        merges=_merges_into_taken(proposal),
     )
     header = (
         t(

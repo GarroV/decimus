@@ -707,6 +707,13 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "\n   \u26d4 Уже записано — #{n}: нажатие даст отказ.",
         "en": "\n   \u26d4 Already recorded — #{n}: tapping this will be refused.",
     },
+    # Тот же пункт в той же зоне с кадром — не отказ, а ещё одно фото занятой записи
+    # (#443, D243, D247). Пометка «нажатие даст отказ» отговаривала от верного выбора,
+    # и аудитор брал соседний, неверный пункт (#1175).
+    "record.candidate_taken_merge": {
+        "ru": "\n   \U0001f4ce Уже записано — #{n}: нажатие добавит этот кадр к записи.",
+        "en": "\n   \U0001f4ce Already recorded — #{n}: tapping adds this photo to that record.",
+    },
     "record.candidate_flagged": {
         "ru": "{index}. {code} · {level} · {zone}  ⚠ проверьте формулировку\n   {wording}",
         "en": "{index}. {code} · {level} · {zone}  ⚠ check the wording\n   {wording}",
@@ -790,6 +797,11 @@ TEXTS: dict[str, dict[str, str]] = {
     "record.manual_taken": {
         "ru": "\n\n\u26d4 Уже записано в этой зоне: {items}. Нажатие даст отказ.",
         "en": "\n\n\u26d4 Already recorded in this zone: {items}. Tapping one will be refused.",
+    },
+    "record.manual_taken_merge": {
+        "ru": "\n\n\U0001f4ce Уже записано в этой зоне: {items}. Нажатие добавит кадр к записи.",
+        "en": "\n\n\U0001f4ce Already recorded in this zone: {items}. "
+        "Tapping one adds the photo to that record.",
     },
     "record.manual_taken_item": {
         "ru": "{code} — #{n}",

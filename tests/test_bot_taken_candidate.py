@@ -60,7 +60,9 @@ async def test_модель_предлагает_занятый_пункт_с_п
     await feed(dp, bot, photo_message("frame-2", message_id=501))
     await feed(dp, bot, callback("rec:analyze:501"))
 
-    assert t("record.candidate_taken", "ru", n=1) in session.last_text
+    assert t("record.candidate_taken_merge", "ru", n=1) in session.last_text
+    # Нажатие кладёт кадр в запись — пометка не пугает отказом (#1175).
+    assert "даст отказ" not in session.last_text
 
 
 async def test_пометка_ставится_по_паре_пункт_и_зона_а_не_по_коду(
@@ -76,7 +78,7 @@ async def test_пометка_ставится_по_паре_пункт_и_зо�
     await feed(dp, bot, photo_message("frame-1", message_id=501))
     await feed(dp, bot, callback("rec:analyze:501"))
 
-    assert t("record.candidate_taken", "ru", n=1) not in session.last_text
+    assert t("record.candidate_taken_merge", "ru", n=1) not in session.last_text
 
 
 async def test_занятый_кандидат_остаётся_нажимаемым(
@@ -104,7 +106,7 @@ async def test_занятый_кандидат_остаётся_нажимаем
     await feed(dp, bot, callback("rec:analyze:501"))
 
     assert session.keyboard_data()[:2] == ["rec:pick:0", "rec:pick:1"]
-    assert t("record.candidate_taken", "ru", n=1) in session.last_text
+    assert t("record.candidate_taken_merge", "ru", n=1) in session.last_text
 
 
 async def test_пометка_называет_номер_занявшей_записи(
@@ -121,8 +123,8 @@ async def test_пометка_называет_номер_занявшей_за�
     await feed(dp, bot, photo_message("frame-1", message_id=501))
     await feed(dp, bot, callback("rec:analyze:501"))
 
-    assert t("record.candidate_taken", "ru", n=2) in session.last_text
-    assert t("record.candidate_taken", "ru", n=1) not in session.last_text
+    assert t("record.candidate_taken_merge", "ru", n=2) in session.last_text
+    assert t("record.candidate_taken_merge", "ru", n=1) not in session.last_text
 
 
 async def test_пометка_переводится(domain_env: object, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -136,5 +138,5 @@ async def test_пометка_переводится(domain_env: object, monkeyp
     await feed(dp, bot, photo_message("frame-1", message_id=501))
     await feed(dp, bot, callback("rec:analyze:501"))
 
-    assert t("record.candidate_taken", "en", n=1) in session.last_text
-    assert t("record.candidate_taken", "ru", n=1) not in session.last_text
+    assert t("record.candidate_taken_merge", "en", n=1) in session.last_text
+    assert t("record.candidate_taken_merge", "ru", n=1) not in session.last_text
