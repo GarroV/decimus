@@ -505,6 +505,7 @@
 | `0087_prescription_review.sql` | — |
 | `0088_country_contracts.sql` | `country_contracts` |
 | `0089_inspection_edits_delete.sql` | — |
+| `0091_units_merge_guard_search_path.sql` | — |
 <!-- map:end -->
 
 ## Makefile
