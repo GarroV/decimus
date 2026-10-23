@@ -91,7 +91,8 @@ dictated - offer them in the one common list of findings, never add silently. Af
 findings are written, call local_attach_photos (inspection_id, items [{n, files}], \
 folder) and report how many photos were attached. Never mention addresses or links. If \
 those tools do not exist (no local bridge), use import_upload_photos from the sandbox as \
-above. Do this BEFORE import_accept_inspection.
+above. Do this BEFORE import_accept_inspection. Never pass the person's photos as \
+base64 to import_add_photo: they arrive as unreadable thumbnails.
 - Information part (current mode): before import_accept_inspection call \
 import_info_fields, ask the person every missing question in ONE message (or the \
 built-in question window), then record the answers with import_set_info. Without \
