@@ -9,6 +9,55 @@
   держит база. Формы уходят фоном (`data-panel-form`).
 #}
 {% set ROW_TONES = {'filling': 'tag--neutral', 'in_work': 'tag--accent', 'done': 'tag--warn', 'confirmed': 'tag--ok', 'returned': 'tag--warn'} %}
+{#- Шаги пути плана по состоянию запроса (макет #1168). Принятый и закрытый — последний шаг. -#}
+{% set PLAN_STEPS = ('fill', 'review', 'work', 'closed') %}
+{% set STEP_OF = {'requested': 'fill', 'on_review': 'review', 'in_work': 'work', 'accepted': 'closed', 'closed': 'closed'} %}
+
+{% macro zone_name(code) -%}
+  {%- set zt = zone_titles.get(code) -%}
+  {{- ((zt[1] if lang == 'en' else zt[0]) if zt else code) -}}
+{%- endmacro %}
+
+{#- D3 — «немедленно» (сроки строк считает движок, D3 у него — ноль дней);
+    свой срок партнёра показывается датой. -#}
+{% macro due_text(row) -%}
+  {%- if row.level == 'D3' and not row.own_due %}{{ t('plans.rows.immediate') }}{% else %}{{ day(row.due_on) }}{% endif -%}
+{%- endmacro %}
+
+{#- Шапка электронного плана: путь, счётчики и — партнёру на заполнении — баннер
+    со сроком и кнопкой отправки (D612: отправка разом, когда заполнены все строки). -#}
+{% macro plan_head(r) %}
+  {% set base = actions_path ~ '/requests/' ~ r.id %}
+  {% set current = STEP_OF.get(r.status, 'fill') %}
+  {% set reached = PLAN_STEPS.index(current) %}
+  {% set total = r.rows|length %}
+  {% set confirmed = r.rows|selectattr('status', 'equalto', 'confirmed')|list|length %}
+  {% set late = namespace(n=0) %}
+  {% for row in r.rows %}{% if row.overdue(today) %}{% set late.n = late.n + 1 %}{% endif %}{% endfor %}
+  <ol class="pstep" aria-label="{{ t('plans.step.label') }}">
+    {% for step in PLAN_STEPS %}
+      <li class="pstep__item{% if loop.index0 < reached %} is-done{% elif loop.index0 == reached %} is-current{% endif %}"
+          {%- if loop.index0 == reached %} aria-current="step"{% endif %}>{{ t('plans.step.' ~ step) }}</li>
+    {% endfor %}
+  </ol>
+  {% if total %}
+    <p class="pcount">
+      {% if r.status == 'requested' %}{{ t('plans.count.filled', n=r.filled_rows, total=total) }}
+      {% else %}{{ t('plans.count.confirmed', n=confirmed, total=total) }}{% endif %}
+      {% if late.n %}<span class="tag tag--micro tag--err">{{ t('plans.count.overdue', n=late.n) }}</span>{% endif %}
+    </p>
+  {% endif %}
+  {% if not hq and r.status == 'requested' and total %}
+    {% set ready = r.filled_rows >= total %}
+    <div class="note note--info pbanner"><div>
+      <div class="note__title">{{ t('plans.banner.fill', due=day(r.due_on)) }}</div>
+      {% if not ready %}<div class="note__text">{{ t('plans.rows.submit_hint', n=r.filled_rows, total=total) }}</div>{% endif %}
+      <form class="sform sform--gap" method="post" data-panel-form action="{{ url(base ~ '/submit') }}?lang={{ lang }}">
+        <button class="sbtn sbtn--primary" type="submit"{% if not ready %} disabled{% endif %}>{{ t('plans.rows.submit') }}</button>
+      </form>
+    </div></div>
+  {% endif %}
+{% endmacro %}
 
 {% macro row_panel(r, row, base) %}
   {% set editable = (not hq) and r.status == 'requested' %}
@@ -22,9 +71,10 @@
           <h4 class="prowpanel__title" id="row-title-{{ row.id }}">{{ row.position }}. {{ row.title(lang) }}</h4>
           <p class="prowpanel__meta">
             <span class="tag tag--micro tag--neutral">{{ row.level }}</span>
+            <span>{{ zone_name(row.zone) }}</span>
             <span class="tag tag--micro {{ ROW_TONES[row.status] }}">{{ t('plans.rows.not_filled') if unfilled else t('plans.rows.status.' ~ row.status) }}</span>
             {% if late %}<span class="tag tag--micro tag--err">{{ t('plans.rows.overdue') }}</span>{% endif %}
-            <span class="{% if late %}srow__err{% endif %}">{{ t('plans.rows.due_own' if row.own_due else 'plans.rows.due', date=day(row.due_on)) }}</span>
+            <span class="{% if late %}srow__err{% endif %}">{{ t('plans.rows.due_own' if row.own_due else 'plans.rows.due', date=due_text(row)) }}</span>
           </p>
         </div>
         <a class="sdrawer__close" href="#plan-rows" data-row-close aria-label="{{ t('split.close') }}">{{ icon('x') }}</a>
@@ -44,7 +94,7 @@
             <label><span class="sform__label">{{ t('plans.rows.reason') }}</span>
               <textarea class="sinput sinput--area" name="reason" maxlength="{{ row_limits.reason }}" rows="2">{{ row.reason }}</textarea></label>
             <label><span class="sform__label">{{ t('plans.rows.own_due', due=day(row.latest_own_due(r.count_from))) }}</span>
-              <input class="sinput" type="date" name="own_due" value="{{ row.own_due or '' }}" min="{{ r.count_from }}" max="{{ row.latest_own_due(r.count_from) }}"></label>
+              <input class="sinput" type="date" lang="{{ lang }}" name="own_due" value="{{ row.own_due or '' }}" min="{{ r.count_from }}" max="{{ row.latest_own_due(r.count_from) }}"></label>
             <button class="sbtn sbtn--primary" type="submit">{{ t('plans.rows.save') }}</button>
           </form>
         {% else %}
@@ -93,7 +143,10 @@
     {% set hint = 'plans.rows.hint_closed' %}
   {% endif %}
   <section class="ssec" id="plan-rows">
-    <h3 class="ssec__title">{{ t('plans.rows.title') }}</h3>
+    <div class="ssec__head">
+      <h3 class="ssec__title">{{ t('plans.rows.title') }}</h3>
+      {% if editable %}<a class="ssec__link" href="#plan-file">{{ icon('download') }}<span>{{ t('plans.rows.file_link') }}</span></a>{% endif %}
+    </div>
     <p class="ssec__text">{{ t(hint) }}</p>
     {% if not r.rows %}
       <div class="ov-cell__muted">{{ t('plans.rows.empty') }}</div>
@@ -114,8 +167,8 @@
             {% set late = row.overdue(today) %}
             <tr class="ptable__row{% if late %} ptable__row--late{% endif %}">
               <td class="ptable__pos">{{ row.position }}</td>
-              <td class="ptable__item"><span class="tag tag--micro tag--neutral">{{ row.level }}</span> {{ row.title(lang) }}</td>
-              <td class="ptable__due{% if late %} srow__err{% endif %}" data-label="{{ t('plans.rows.col.due') }}">{{ day(row.due_on) }}{% if row.own_due %} <span class="ov-cell__muted">{{ t('plans.rows.own') }}</span>{% endif %}</td>
+              <td class="ptable__item"><span class="tag tag--micro tag--neutral">{{ row.level }}</span> {{ row.title(lang) }}<span class="ptable__zone">{{ zone_name(row.zone) }}</span></td>
+              <td class="ptable__due{% if late %} srow__err{% endif %}" data-label="{{ t('plans.rows.col.due') }}">{{ due_text(row) }}{% if row.own_due %} <span class="ov-cell__muted">{{ t('plans.rows.own') }}</span>{% endif %}</td>
               <td data-label="{{ t('plans.rows.col.state') }}">
                 <span class="tag tag--micro {{ ROW_TONES[row.status] }}">{{ t('plans.rows.not_filled') if unfilled else t('plans.rows.status.' ~ row.status) }}</span>
                 {% if late %}<span class="tag tag--micro tag--err">{{ t('plans.rows.overdue') }}</span>{% endif %}
@@ -126,15 +179,6 @@
         </tbody>
       </table>
       {% for row in r.rows %}{{ row_panel(r, row, base) }}{% endfor %}
-    {% endif %}
-
-    {% if not hq and r.status == 'requested' and r.rows %}
-      <form class="sform sform--gap" method="post" data-panel-form action="{{ url(base ~ '/submit') }}?lang={{ lang }}">
-        <button class="sbtn sbtn--primary" type="submit"{% if r.filled_rows < r.rows|length %} disabled{% endif %}>{{ t('plans.rows.submit') }}</button>
-        {% if r.filled_rows < r.rows|length %}
-          <span class="ov-cell__muted">{{ t('plans.rows.submit_hint', n=r.filled_rows, total=r.rows|length) }}</span>
-        {% endif %}
-      </form>
     {% endif %}
   </section>
 {% endmacro %}

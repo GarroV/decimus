@@ -146,5 +146,27 @@ PLAN_ROW_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Начало отсчёта изменено, сроки пересчитаны.",
         "en": "The start date was changed and the deadlines recalculated.",
     },
-    "plans.count_from.shown": {"ru": "Отсчёт от", "en": "Counted from"},
+    "plans.count_from.shown": {"ru": "Срок считается от", "en": "Deadline counted from"},
+    "plans.count_from.section": {"ru": "Считать срок от", "en": "Count deadline from"},
+    # --- шапка экрана: путь, счётчики, баннер (макет #1168) ----------------
+    "plans.step.label": {"ru": "Ход плана", "en": "Plan progress"},
+    "plans.step.fill": {"ru": "Партнёр заполняет", "en": "Partner fills in"},
+    "plans.step.review": {"ru": "Согласование", "en": "Approval"},
+    "plans.step.work": {"ru": "Выполнение", "en": "In progress"},
+    "plans.step.closed": {"ru": "Закрыт", "en": "Closed"},
+    "plans.count.confirmed": {
+        "ru": "{n} из {total} подтверждено",
+        "en": "{n} of {total} confirmed",
+    },
+    "plans.count.filled": {"ru": "{n} из {total} заполнено", "en": "{n} of {total} filled in"},
+    "plans.count.overdue": {"ru": "просрочено {n}", "en": "overdue {n}"},
+    "plans.banner.fill": {
+        "ru": "Заполните план до {due}",
+        "en": "Fill in the plan by {due}",
+    },
+    "plans.rows.immediate": {"ru": "немедленно", "en": "immediately"},
+    "plans.rows.file_link": {
+        "ru": "Скачать / загрузить файлом",
+        "en": "Download / upload as a file",
+    },
 }

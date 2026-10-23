@@ -6,8 +6,32 @@
   остаётся на месте. Без скрипта формы работают обычной отправкой.
 #}
 {% from "_plan.html" import state_tag, versions, history with context %}
-{% from "actions/_plan_rows.html" import rows_section with context %}
+{% from "actions/_plan_rows.html" import rows_section, plan_head with context %}
 {% from "actions/_plan_file.html" import file_result_block with context %}
+
+{#- Загрузка файла плана партнёром. У электронного плана — под строками (вход к ней —
+    ссылка в шапке строк, `#plan-file`), у файлового — главное действие, выше всего. -#}
+{% macro upload_section(r) %}
+  <section class="ssec" id="plan-file">
+    <h3 class="ssec__title">{{ t('plans.file.title' if r.electronic else 'plans.upload_title') }}</h3>
+    {% if r.electronic %}
+      <p class="ssec__text">{{ t('plans.file.text') }}</p>
+      <a class="sbtn" href="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/template.xlsx') }}?lang={{ lang }}">{{ icon('download') }}<span>{{ t('plans.file.download') }}</span></a>
+    {% endif %}
+    <form class="sform" method="post" enctype="multipart/form-data" data-panel-form data-upload-form
+          action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/upload') }}?lang={{ lang }}">
+      <label class="supload">
+        <input class="supload__input" type="file" name="file" required aria-label="{{ t('plans.file_label') }}">
+        <span class="supload__icon">{{ icon('doc') }}</span>
+        <span class="supload__title">{{ t('actions.drop.title') }}</span>
+        <span class="supload__hint">{{ t('plans.hint', mb=max_mb) }}</span>
+        <span class="supload__name" data-upload-name data-empty="{{ t('actions.drop.none') }}">{{ t('actions.drop.none') }}</span>
+      </label>
+      <button class="sbtn sbtn--primary" type="submit">{{ t('plans.upload_button') }}</button>
+    </form>
+    {% if file_result %}{{ file_result_block(file_result, r) }}{% endif %}
+  </section>
+{% endmacro %}
 
 {% macro plan_panel(r) %}
   {% set returned_note = r.state == 'returned' and r.last_comment %}
@@ -29,6 +53,8 @@
         <div class="note__text">«{{ r.last_comment }}»</div>
       </div></div>
     {% endif %}
+
+    {% if r.electronic %}{{ plan_head(r) }}{% endif %}
 
     <section class="ssec">
       <h3 class="ssec__title">{{ t('actions.panel.facts') }}</h3>
@@ -55,29 +81,11 @@
     </section>
     {% endif %}
 
-    {% if not hq and r.status == 'requested' %}
-      <section class="ssec">
-        <h3 class="ssec__title">{{ t('plans.file.title' if r.electronic else 'plans.upload_title') }}</h3>
-        {% if r.electronic %}
-          <p class="ssec__text">{{ t('plans.file.text') }}</p>
-          <a class="sbtn" href="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/template.xlsx') }}?lang={{ lang }}">{{ icon('download') }}<span>{{ t('plans.file.download') }}</span></a>
-        {% endif %}
-        <form class="sform" method="post" enctype="multipart/form-data" data-panel-form data-upload-form
-              action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/upload') }}?lang={{ lang }}">
-          <label class="supload">
-            <input class="supload__input" type="file" name="file" required aria-label="{{ t('plans.file_label') }}">
-            <span class="supload__icon">{{ icon('doc') }}</span>
-            <span class="supload__title">{{ t('actions.drop.title') }}</span>
-            <span class="supload__hint">{{ t('plans.hint', mb=max_mb) }}</span>
-            <span class="supload__name" data-upload-name data-empty="{{ t('actions.drop.none') }}">{{ t('actions.drop.none') }}</span>
-          </label>
-          <button class="sbtn sbtn--primary" type="submit">{{ t('plans.upload_button') }}</button>
-        </form>
-        {% if file_result %}{{ file_result_block(file_result, r) }}{% endif %}
-      </section>
-    {% endif %}
+    {% set partner_upload = not hq and r.status == 'requested' %}
+    {% if partner_upload and not r.electronic %}{{ upload_section(r) }}{% endif %}
 
     {% if r.electronic %}{{ rows_section(r) }}{% endif %}
+    {% if partner_upload and r.electronic %}{{ upload_section(r) }}{% endif %}
 
     {% if hq and r.status == 'on_review' %}
       <section class="ssec">
@@ -110,18 +118,21 @@
         <h3 class="ssec__title">{{ t('actions.due.title') }}</h3>
         <form class="sform sform--inline" method="post" data-panel-form
               action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/due') }}?lang={{ lang }}">
-          <input class="sinput" type="date" name="due" value="{{ r.due_on }}" min="{{ today }}" required aria-label="{{ t('actions.due.title') }}">
+          <input class="sinput" type="date" lang="{{ lang }}" name="due" value="{{ r.due_on }}" min="{{ today }}" required aria-label="{{ t('actions.due.title') }}">
           <button class="sbtn" type="submit">{{ t('actions.due.submit') }}</button>
         </form>
-        {% if r.electronic %}
+      </section>
+      {% if r.electronic %}
+        <section class="ssec">
+          <h3 class="ssec__title">{{ t('plans.count_from.section') }}</h3>
           <p class="ssec__text">{{ t('plans.count_from.hint') }}</p>
           <form class="sform sform--inline" method="post" data-panel-form
                 action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/count-from') }}?lang={{ lang }}">
-            <input class="sinput" type="date" name="count_from" value="{{ r.count_from }}" required aria-label="{{ t('plans.count_from.field') }}">
+            <input class="sinput" type="date" lang="{{ lang }}" name="count_from" value="{{ r.count_from }}" required aria-label="{{ t('plans.count_from.field') }}">
             <button class="sbtn" type="submit">{{ t('plans.count_from.submit') }}</button>
           </form>
-        {% endif %}
-      </section>
+        </section>
+      {% endif %}
     {% endif %}
 
     <section class="ssec">
