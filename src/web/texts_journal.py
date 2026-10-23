@@ -99,6 +99,10 @@ _WEB: dict[str, tuple[str, str]] = {
     "oauth_token": ("Выдача токена Claude", "Claude token issued"),
     "order_reply": ("Ответ на предписание", "Prescription reply"),
     "plans_upload": ("Загружен экшн-план", "Action plan uploaded"),
+    "plan_file_apply": (
+        "Выбор по файлу плана исправлений применён",
+        "Action plan file choices applied",
+    ),
     "plan_row_save": ("Сохранена строка плана исправлений", "Action plan row saved"),
     "plan_submit": ("План исправлений отправлен на согласование", "Action plan sent for approval"),
     "plan_row_start": ("Строка плана взята в работу", "Action plan row taken into work"),

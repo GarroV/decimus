@@ -32,7 +32,18 @@ from src.db.config import load_action_plan_settings
 from src.db.errors import ActionPlanError, DbError, PlanFileLimitError, StorageError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import actions_screen, auth, guard, plan_rows, plan_template, review, ui_lang, view
+from . import (
+    actions_screen,
+    auth,
+    guard,
+    plan_roundtrip,
+    plan_rows,
+    plan_sheet,
+    plan_template,
+    review,
+    ui_lang,
+    view,
+)
 from . import inspections as data
 from .actions_columns import Block, RailItem, rail_codes, rail_form, sorted_rows
 from .actions_screen import TAB_PLANS
@@ -138,6 +149,7 @@ def install(app: Flask, conf: Settings) -> None:
     _install_partner(app, conf, max_bytes=max_bytes)
     _install_template(app, conf)
     plan_rows.install(app, conf, respond=_respond)
+    plan_roundtrip.install(app, conf, respond=_respond)
     _install_legacy(app)
 
 
@@ -167,9 +179,16 @@ def _respond(
     notice: str | None = None,
     failure: str | None = None,
     status: int = 200,
+    file_result: plan_roundtrip.FileResult | None = None,
 ) -> str | tuple[str, int]:
     return actions_screen.respond(
-        conf, TAB_PLANS, item_id=request_id, notice=notice, failure=failure, status=status
+        conf,
+        TAB_PLANS,
+        item_id=request_id,
+        notice=notice,
+        failure=failure,
+        status=status,
+        extra={"file_result": file_result} if file_result else None,
     )
 
 
@@ -280,6 +299,7 @@ def panel_context(
     notice: str | None = None,
     failure: str | None = None,
     gmail: str = "",
+    file_result: plan_roundtrip.FileResult | None = None,
 ) -> dict[str, Any]:
     """Панель запроса: сам запрос в охвате вошедшего и то, что на нём можно делать."""
     запрос = None
@@ -294,6 +314,7 @@ def panel_context(
         "failed": не_прочитан,
         "notice": notice,
         "failure": failure,
+        "file_result": file_result,
         "gmail": "",
         "hq": is_hq(),
         "max_mb": max_bytes // (1024 * 1024),
@@ -406,6 +427,13 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
         if файл is None or not файл.filename:
             return _respond(conf, request_id, failure=t("plans.no_file", lang), status=400)
         try:
+            запрос = plans.get_request(request_id, reach=auth.current_reach())
+        except DbError as exc:
+            logger.warning("запрос плана %s перед загрузкой не прочитан: %s", request_id, exc)
+            return _respond(conf, request_id, failure=t("plans.file.failed", lang), status=503)
+        данные = файл.read(max_bytes + 1)
+        книга, не_разобран = plan_roundtrip.read_sheet(запрос, request_id, данные)
+        try:
             версия = plans.upload_version(
                 request_id,
                 reach=auth.current_reach(),
@@ -413,8 +441,9 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
                 actor=_actor(),
                 file_name=файл.filename,
                 content_type=файл.mimetype or "",
-                data=файл.read(max_bytes + 1),
+                data=данные,
                 max_bytes=max_bytes,
+                parsed=книга is not None,
             )
         except PlanFileLimitError as exc:
             return _respond(
@@ -431,7 +460,15 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
             # Текст хранилища называет корзину и ключ — партнёру он ни к чему.
             logger.warning("файл плана к запросу %s не лёг в хранилище: %s", request_id, exc)
             return _respond(conf, request_id, failure=t("plans.storage_down", lang), status=503)
-        return _respond(conf, request_id, notice=t("plans.uploaded", lang, version=версия))
+        try:
+            итог = plan_roundtrip.after_upload(request_id, версия, книга, не_разобран)
+        except ActionPlanError as exc:
+            return _respond(
+                conf, request_id, failure=t("plans.failed", lang, reason=exc), status=400
+            )
+        return _respond(
+            conf, request_id, notice=t("plans.uploaded", lang, version=версия), file_result=итог
+        )
 
     @app.get(f"{путь}/plan-files/<file_id>", endpoint="plan_file")
     def plan_file(file_id: str) -> FlaskResponse | tuple[str, int]:
@@ -479,11 +516,18 @@ def _install_template(app: Flask, conf: Settings) -> None:
         лист = review.load_sheet(деталь.inspection, lang=lang)
         зоны = {z.code: z.name for z in лист.zones} if лист else {}
         метки = {p.code: p.label for p in лист.picks} if лист else {}
+        if запрос.electronic:
+            # Электронный план выгружается из его строк и только партнёру, пока план ждёт строк:
+            # УК файлы видит в версиях, а на согласовании строки уже не правятся.
+            if is_hq() or запрос.status != plans.STATUS_REQUESTED:
+                return "", 404
+            книга = plan_sheet.build(запрос, зоны, lang)
+            имя = plan_sheet.file_name(запрос)
+        else:
+            книга = plan_template.build(запрос, деталь.findings, зоны, lang, метки)
+            имя = plan_template.file_name(запрос)
         ответ = send_file(
-            io.BytesIO(plan_template.build(запрос, деталь.findings, зоны, lang, метки)),
-            mimetype=XLSX_MIME,
-            as_attachment=True,
-            download_name=plan_template.file_name(запрос),
+            io.BytesIO(книга), mimetype=XLSX_MIME, as_attachment=True, download_name=имя
         )
         ответ.headers["Cache-Control"] = "private, no-store"
         return ответ

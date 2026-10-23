@@ -7,6 +7,7 @@
 #}
 {% from "_plan.html" import state_tag, versions, history with context %}
 {% from "actions/_plan_rows.html" import rows_section with context %}
+{% from "actions/_plan_file.html" import file_result_block with context %}
 
 {% macro plan_panel(r) %}
   {% set returned_note = r.state == 'returned' and r.last_comment %}
@@ -56,8 +57,11 @@
 
     {% if not hq and r.status == 'requested' %}
       <section class="ssec">
-        <h3 class="ssec__title">{{ t('plans.upload_title') }}</h3>
-        {% if r.electronic %}<p class="ssec__text">{{ t('plans.rows.file_later') }}</p>{% endif %}
+        <h3 class="ssec__title">{{ t('plans.file.title' if r.electronic else 'plans.upload_title') }}</h3>
+        {% if r.electronic %}
+          <p class="ssec__text">{{ t('plans.file.text') }}</p>
+          <a class="sbtn" href="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/template.xlsx') }}?lang={{ lang }}">{{ icon('download') }}<span>{{ t('plans.file.download') }}</span></a>
+        {% endif %}
         <form class="sform" method="post" enctype="multipart/form-data" data-panel-form data-upload-form
               action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/upload') }}?lang={{ lang }}">
           <label class="supload">
@@ -69,6 +73,7 @@
           </label>
           <button class="sbtn sbtn--primary" type="submit">{{ t('plans.upload_button') }}</button>
         </form>
+        {% if file_result %}{{ file_result_block(file_result, r) }}{% endif %}
       </section>
     {% endif %}
 

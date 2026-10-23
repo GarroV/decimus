@@ -328,8 +328,8 @@ def test_формула_в_ячейке_не_исполняется() -> None:
         правка(данные, {f"F{первая}": "=1+1", f"G{первая}": "=SUM(1,2)"})
     ).rows
 
-    assert строки[0].measure != "2" and строки[0].responsible != "3"
-    assert строки[0].measure in ("", "=1+1")
+    # Читается сохранённое значение; у формулы, которую никто не считал, его нет.
+    assert (строки[0].measure, строки[0].responsible) == ("", "")
 
 
 def test_текст_со_знаком_равно_остаётся_текстом_и_при_выгрузке_не_становится_формулой() -> None:
@@ -381,6 +381,15 @@ def test_чужая_книга_без_нашей_метки_не_разбира�
 
     with pytest.raises(SheetError) as exc:
         plan_sheet.parse(out.getvalue())
+
+    assert exc.value.code == plan_sheet.ERR_NOT_OURS
+
+
+def test_без_метки_шаблона_книга_не_наша_даже_с_id_запроса_и_ревизией() -> None:
+    данные = правка(выгрузка(), {"J1": "чужая метка"})
+
+    with pytest.raises(SheetError) as exc:
+        plan_sheet.parse(данные)
 
     assert exc.value.code == plan_sheet.ERR_NOT_OURS
 
