@@ -93,10 +93,8 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.block.top": {"ru": "Top-10 и Bottom-10", "en": "Top 10 and bottom 10"},
     "ratings.block.hard": {"ru": "Хард-нарушения РС и РКО", "en": "Hard violations"},
     "ratings.hard.source": {
-        "ru": "Формулировки — дословно из Dodo IS. РКО — фото-проверка заказа: "
-        "«Дисквалифицировать пиццу» значит, что проверяющий забраковал пиццу на фото целиком.",
-        "en": "Wording is verbatim from Dodo IS. RKO is a photo check of an order: "
-        "“Disqualify pizza” means the checker rejected the pizza on the photo outright.",
+        "ru": "Формулировки — дословно из Dodo IS. РКО — фото-проверка заказа.",
+        "en": "Wording is verbatim from Dodo IS. RKO is a photo check of an order.",
     },
     "ratings.empty.rs_rko": {
         "ru": "За период нет данных РС и РКО.",

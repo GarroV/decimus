@@ -45,6 +45,7 @@ from .model import (
     ScoreFlags,
     UnitRef,
     Violation,
+    is_rko_service_mark,
 )
 from .sheet import Label, parse_label, period_of, score_of
 
@@ -279,7 +280,7 @@ def parse_base_collection(data: bytes, *, today: date) -> Parsed:
 def _violations(data: bytes, fmt: str, rating_type: str, today: date) -> Parsed:
     def make(row: dict[str, str], row_no: int, country: str) -> Remark | None:
         text = row.get("Нарушение", "").strip()
-        if not text:
+        if not text or (rating_type == RKO and is_rko_service_mark(text)):
             return None
         period = period_for(
             row.get("Период", ""),

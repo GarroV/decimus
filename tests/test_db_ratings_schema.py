@@ -111,8 +111,10 @@ def test_стартовые_пороги_и_хард_правила_на_мес�
             ("risk_threshold", 85.0),
             ("top_threshold", 85.0),
         ]
-        cur.execute("select count(*) from ratings.hard_rules where rating_type = 'rko'")
-        assert cur.fetchone() == (6,)
+        cur.execute("select pattern from ratings.hard_rules where rating_type = 'rko'")
+        правила = {row[0] for row in cur.fetchall()}
+        # «Дисквалифицировать пиццу» — служебная пометка, не нарушение: 0093 правило снимает.
+        assert len(правила) == 5 and "Дисквалифицировать пиццу" not in правила
 
 
 def test_журнал_загрузок_роль_приложения_правит_только_счётчики(db_env: str) -> None:

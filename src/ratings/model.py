@@ -46,6 +46,21 @@ CATEGORY_REMARK = "remark"
 # Хвостовая пометка автодетекции в тексте нарушения; нарушение то же, кто бы его ни нашёл.
 AUTO_MARKS = ("(ML)", "(ИИ)", "(AI)")
 
+#: Служебные пометки фото-проверки РКО, а не нарушения: «Дисквалифицировать пиццу»
+#: контроль ставит, когда отчёт ресторана не идёт в пул баллов по продукту. Загрузка
+#: такие строки не пишет, и ни один блок «Рейтингов» их не показывает.
+RKO_SERVICE_MARKS = frozenset({"дисквалифицировать пиццу"})
+
+
+def is_rko_service_mark(text: str) -> bool:
+    """Текст — служебная пометка РКО, а не нарушение (без учёта регистра, пробелов, (ML))."""
+    clean = " ".join(text.split())
+    for mark in AUTO_MARKS:
+        if clean.endswith(mark):
+            clean = clean[: -len(mark)].rstrip()
+    return clean.casefold() in RKO_SERVICE_MARKS
+
+
 ISSUE_UNIT_UNMATCHED = "unit_unmatched"
 ISSUE_COUNTRY_UNKNOWN = "country_unknown"
 ISSUE_BAD_ROW = "bad_row"

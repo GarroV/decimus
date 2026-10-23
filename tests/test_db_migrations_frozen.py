@@ -360,6 +360,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0092_action_plan_rows.sql": (
         "sql1:13f5b4a3d8fdde7590a2c7553eec4ec44cf55223081ab1e67a47a4d3d61a73bb"
     ),
+    "0093_ratings_rko_service_marks.sql": (
+        "sql1:e0aa4a893c3599ba955ee18f8a800690b381ec99b4a0b4a3234e74abf3461aca"
+    ),
 }
 
 

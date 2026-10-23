@@ -308,6 +308,57 @@ def test_нарушения_ркО_год_от_даты_строки() -> None:
     assert r.violation.text == "Горелый борт" and r.violation.category == "remark"
 
 
+def test_дисквалифицировать_пиццу_из_листа_не_ложится() -> None:
+    """Служебная пометка РКО в «Базе_нарушений» не нарушение: строка пропускается молча."""
+
+    def строка(текст: str) -> list[str]:
+        return [
+            "Сентябрь",
+            "07.09 — 13.09",
+            "Dev",
+            "Serbia",
+            "Testville-1",
+            "20",
+            "РКО",
+            текст,
+            SEP_8,
+        ]
+
+    data = to_csv(
+        RKO_VIOLATIONS_HEADER,
+        [
+            строка("Горелый борт"),
+            строка("Дисквалифицировать пиццу"),
+            строка("ДИСКВАЛИФИЦИРОВАТЬ ПИЦЦУ (ИИ)"),
+        ],
+    )
+    parsed = base.parse_base_rko_violations(data, today=СЕГОДНЯ)
+    assert [r.violation.text for r in parsed.sheet_remarks] == ["Горелый борт"]
+    assert parsed.issues == () and parsed.skipped == 2
+
+
+def test_в_листе_рс_та_же_формулировка_остаётся() -> None:
+    """Пометка служебная только для РКО: в нарушениях РС текст не трогается."""
+    data = to_csv(
+        RS_VIOLATIONS_HEADER,
+        [
+            [
+                "Сентябрь",
+                "Сентябрь 1",
+                "Dev",
+                "Serbia",
+                "Testville-1",
+                "РС",
+                "Дисквалифицировать пиццу",
+                "Disqualify pizza",
+                SEP_8,
+            ]
+        ],
+    )
+    parsed = base.parse_base_rs_violations(data, today=СЕГОДНЯ)
+    assert [r.violation.text for r in parsed.sheet_remarks] == ["Дисквалифицировать пиццу"]
+
+
 def test_нарушения_рс_пустое_нарушение_пропущено() -> None:
     data = to_csv(
         RS_VIOLATIONS_HEADER,

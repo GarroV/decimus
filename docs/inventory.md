@@ -520,6 +520,7 @@
 | `0090_notifications.sql` | `notifications` |
 | `0091_units_merge_guard_search_path.sql` | — |
 | `0092_action_plan_rows.sql` | `action_plan_rows` |
+| `0093_ratings_rko_service_marks.sql` | — |
 <!-- map:end -->
 
 ## Makefile
