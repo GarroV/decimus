@@ -1228,6 +1228,15 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
 
+def _move_units() -> tuple[tuple[str, str], ...]:
+    """Точки для смены пиццерии; справочник не прочитался — карандаша нет, карточка живёт."""
+    try:
+        return data.load_units(reach=auth.current_reach())
+    except DbError as exc:
+        logger.warning("справочник точек для переноса не прочитан: %s", exc)
+        return ()
+
+
 def _own(detail: Any) -> bool:
     """Проверка своего пространства: писать можно только её (D283).
 
@@ -1759,7 +1768,8 @@ def _card_context(
         moves=переносы,
         moves_known=история_известна,
         may_move=можно_переносить,
-        units=data.load_units(reach=auth.current_reach()) if можно_переносить and not panel else (),
+        # Список точек нужен и панели: карандаш у названия пиццерии (D628).
+        units=_move_units() if можно_переносить else (),
         detail=detail,
         head=detail.inspection,
         zones=zone_lines,

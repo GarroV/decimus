@@ -301,7 +301,7 @@ def walk_payload(
             "state": "none",
             "lang": lang,
             "texts": texts_for(lang),
-            "app": walk_settings.app_block(chat_id, lang, bot),
+            "app": walk_settings.app_block(chat_id, lang),
         }
     lang = chosen or (inspection.ui_lang if inspection.ui_lang in UI_LANGS else fallback_lang)
     items = list_items(chat_id=chat_id)
@@ -316,7 +316,7 @@ def walk_payload(
         info=info_fields(inspection, lang),
         sealed=handed_over(chat_id),
     )
-    app = walk_settings.app_block(chat_id, lang, bot)
+    app = walk_settings.app_block(chat_id, lang)
     out = {**payload, "texts": texts_for(lang), "app": app}
     if app["finish_mode"] == finish_modes.REPORT:
         # Языки отчёта нужны только режиму «Сразу отчёт» (D449): подтверждение
@@ -475,9 +475,7 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
         return respond(who, ui_lang)
 
     walk_write.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
-    walk_settings.install(
-        app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond, bot=bot
-    )
+    walk_settings.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
     walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_translate.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_start.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond, bot=bot)

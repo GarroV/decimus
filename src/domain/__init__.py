@@ -80,6 +80,7 @@ from .uncovered import (
     read_uncovered,
     record_uncovered,
 )
+from .unit_change import set_unit
 from .uploads import is_upload_ref, save_upload, upload_file
 
 __all__ = [
@@ -138,6 +139,7 @@ __all__ = [
     "set_info",
     "set_reading",
     "set_report_lang",
+    "set_unit",
     "settings_for",
     "start_inspection",
     "sync_checklist_version",

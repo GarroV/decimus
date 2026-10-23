@@ -8,6 +8,24 @@
 - Описания инструментов и `src/mcp/instructions.py` учат Claude отвечать на «перезалей фото» заменой оригиналами.
 - Код: `src/mcp/import_photos.py` (новый), `src/mcp/imports.py`, `src/mcp/import_catalogue.py`, `src/mcp/import_photo_link.py`, `src/mcp/photo_quality.py`, `src/mcp/instructions.py`, `src/db/previews.py` (`finding_frames`), `src/web/photo_upload.py`, `src/web/texts_journal.py`, `tools/mcp_bridge.sh`; тесты — `tests/test_mcp_import_photos.py`, `tests/test_web_photo_upload.py`, `tests/test_mcp_bridge_local_photos.py`, каталог — `tests/test_mcp_catalogue.py`. `docs/inventory.md`, `docs/14-history-import.md`.
 
+## 2026-10-23 — Подключение Claude (MCP) убрано из мини-аппа (D626)
+
+- Мини-апп проверки служит только для проведения проверок: из настроек снят пункт «Подключить Claude», экран с командой и токеном, действие `mcp_issue` в `POST /tg/walk/app` (теперь отвечает 400, как любой неизвестный `op`), поле `mcp` в блоке `app`, тексты `walk.app.claude*`, `walk.app.err.unbound_self`, `walk.app.err.stale` (RU/EN), стили `.walk-app__code`, константа `MINT_MAX_AGE_SECONDS` (короткая подпись нужна была только выпуску токена). Остальные настройки мини-аппа не тронуты; строка «Все настройки на сайте» ведёт в «Настройки» сайта.
+- Подключить Claude можно только в вебе: «Настройки» → «Claude (MCP)» (D447, D448).
+- `src/bot/mcp_setup.py` остаётся в `src/bot`: веб не вправе импортировать `src.mcp.install`, откуда модуль берёт установщик (`tests/test_web_bounds.py`), а в `src/web` его перенос эту границу нарушил бы. Теперь он нужен только вебу.
+- Доки приведены в соответствие: `docs/13-walk-mini-app.md`, `docs/12-web-admin.md`, `docs/18-access-map.md`, `docs/00-map.md`, `docs/06-mvp-bot.md`, `docs/furca/blocks/mcp.md`.
+
+## 2026-10-23 — Подключение Claude (MCP) убрано из бота (D626)
+
+- Рабочая платформа — веб, бот служит только для проведения проверок. Пункт меню «Установка MCP», команда `/mcp` и кнопка «Прислать команду настройки» сняты вместе с роутером `src/bot/routers/mcp.py`, клавиатурой, текстами `mcp.*` и `cmd.mcp` (RU/EN), тестами `tests/test_bot_mcp_setup.py` и `tests/test_bot_mcp_command.py`.
+- Подключить Claude можно в вебе: «Настройки» — коннектор через сайт (D417) и «Claude (MCP)» — команда установки с личным токеном (D447); то же в настройках мини-аппа. Отдача установщика `/setup` и сборка команды (`src/bot/mcp_setup.py`: `setup_command`, `installer_sha256`, `MCP_URL_VAR`) не тронуты; удалён только путь, обслуживавший один бот (`desktop_command`, `bridge_body` и их константы).
+- Тексты, которые отправляли человека «в бота за командой» (`tools/mcp_install.sh`, `tools/mcp_bridge.sh`), `.env.example`, `docs/06-mvp-bot.md`, `docs/08-deploy.md`, `docs/12-web-admin.md`, `docs/13-walk-mini-app.md` — приведены к вебу.
+## 2026-10-23 — Сменить пиццерию проверки: в боте и карандашом на вычитке (D628)
+
+- Бот: пункт меню «Сменить пиццерию» (`/unit`) посреди обхода — если проверку завели не на ту точку. Название сверяется со справочником, как на старте; меняется только шапка (`domain.set_unit`, движок `meta --unit`), записи, кадры и оценка остаются. Записи с пометкой «повтор» бот называет числом — их сверяли с прошлой проверкой прежней точки. Команда, кадр или голос вместо названия отменяют смену.
+- Веб: карандаш у названия пиццерии в шапке проверки — на странице карточки и в панели реестра у проверки, ждущей приёмки (после D465 переноса в панели не было). Окно — точка и повод, дата прежняя; маршрут прежний `POST /inspections/<id>/move`. Справочник точек не прочитался — карандаша нет, карточка открывается. На телефоне окно — по ширине экрана (визуальная сверка: на 390 оно уезжало за край).
+- Код: `src/bot/routers/unit.py`, `src/domain/unit_change.py`, `src/bot/{app,access,states,texts}.py`, `src/web/templates/inspections/{_card_parts,_panel,card}.html`, `src/web/app.py`, `decimus-web.css`; тесты — `tests/test_bot_unit_change.py`, `tests/test_web_registry_split.py`. Доки — `docs/06-mvp-bot.md`, `docs/12-web-admin.md`.
+
 
 ## 2026-10-23 — Загрузка файла без хранилища: честный отказ вместо «обрыва связи» (#1137)
 

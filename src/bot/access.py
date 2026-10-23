@@ -79,12 +79,12 @@ COMMAND_ACTIONS: dict[str, str] = {
     "records": FIELD_ACTION,
     "undo": FIELD_ACTION,
     "finish": FIELD_ACTION,
+    # Сменить пиццерию своей начатой проверки (D628) — часть обхода.
+    "unit": FIELD_ACTION,
     "resend": FIELD_ACTION,
     "help": FIELD_ACTION,
     "lang": FIELD_ACTION,
     "version": FIELD_ACTION,
-    # Личный токен Claude себе (D448): человек уже прошёл вход в бота.
-    "mcp": FIELD_ACTION,
     "stops": "refusals.read",
 }
 #: Сколько живёт ответ «чья привязка»: не ходить в базу на каждый кадр альбома.
