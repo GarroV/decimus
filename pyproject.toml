@@ -1,3 +1,11 @@
+# Зависимости сборки закреплены и залочены с хэшами (`requirements-build.txt`):
+# без этого раздела pip берёт setuptools и wheel из PyPI в изолированное
+# окружение БЕЗ хэшей, и `--require-hashes` у остальных пакетов ничего не
+# защищает. Ставятся отдельным шагом, сам проект — с `--no-build-isolation`.
+[build-system]
+requires = ["setuptools==84.2.1"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "decimus"
 version = "0.1.0"
@@ -14,7 +22,7 @@ dependencies = [
     # Движок: сборка PDF (D009 — рендерер зафиксирован на WeasyPrint 69.x),
     # сжатие фотографий в отчёте и импорт чек-листа из xlsx в manage.py.
     "weasyprint==70.0",
-    "pillow==12.3.0",
+    "pillow==13.0.0",
     # HEIC/HEIF с iPhone: бот (кадр файлом, #1023) и кадры из чата Claude (src/db/photo_intake.py).
     "pillow-heif==1.8.0",
     "openpyxl==3.1.5",
@@ -117,7 +125,7 @@ dependencies = [
 dev = [
     "ruff==0.16.5",
     "mypy==1.19.1",
-    "pytest==8.4.2",
+    "pytest==9.0.3",
     "pytest-cov==7.0.0",
     # Прямой импорт в sitecustomize.py: подпроцессы движка подхватывают покрытие
     # через coverage.process_startup(). Транзитивной зависимости pytest-cov тут
@@ -148,6 +156,16 @@ dev = [
     # Виртуальный ключ доступа в тестах второй ступени (D463): CBOR-разбор —
     # прямой импорт тестов, версия та же, что тянет webauthn.
     "cbor2==6.1.5",
+]
+# Цепочка поставки (см. GHSA-7gm6-hc9m-w3vc): сверка lockfile с базами advisory
+# (`make audit`) и SBOM CycloneDX (`make sbom`). Отдельная экстра, а не часть dev:
+# эти пакеты тянут lxml, а с lxml openpyxl пишет книги другим писателем, и тест
+# `test_plan_file_core` (книга с управляющим знаком в XML) падает уже при сборке
+# книги. Среда тестов не должна меняться от того, что в неё поставили сканер.
+# Ставится из своего lockfile в свой venv (`.venv-audit`), в код не импортируется.
+audit = [
+    "pip-audit==2.10.1",
+    "cyclonedx-bom==7.3.0",
 ]
 
 [tool.ruff]
@@ -262,6 +280,10 @@ DEP002 = [
     # То же самое для waitress: типов он не несёт, и без стабов
     # `mypy --strict` не разбирает точку входа веб-админки.
     "types-waitress",
+    # Экстра audit: запускаются из командной строки (`make audit`, `make sbom`),
+    # в коде не импортируются.
+    "pip-audit",
+    "cyclonedx-bom",
 ]
 
 [tool.importlinter]

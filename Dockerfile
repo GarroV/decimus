@@ -38,7 +38,7 @@ WORKDIR /app
 # `src/domain/config.py` считает корень проекта как `parents[2]` от своего
 # файла и ищет `engine/audit.py` рядом с `src/` — оба каталога обязаны лежать
 # сиблингами прямо под WORKDIR, как в самом репозитории.
-COPY pyproject.toml ./
+COPY pyproject.toml requirements.txt requirements-build.txt ./
 COPY engine ./engine
 COPY src ./src
 # Сид демо-набора (`tools/seed_demo.py`, задача T074) — тоже код продукта:
@@ -51,14 +51,23 @@ COPY tools ./tools
 # «Новый чек-лист» в контейнере отказывает «бланк неполный» (#758).
 COPY checklist-blank ./checklist-blank
 
-# Editable-установка, а не обычная: обычный `pip install .` копирует пакет в
-# site-packages, и `Path(__file__).resolve().parents[2]` из site-packages
-# промахивается мимо `engine/` — движок физически лежит в /app, а не рядом с
-# копией пакета. Editable-ссылка на /app сохраняет тот же путь для `__file__`,
-# что и в репозитории, и заодно даёт единственный источник версий зависимостей
-# — `pyproject.toml`, без второго списка в Dockerfile. `[dev]` сюда не идёт:
-# ruff/mypy/pytest в проде не нужны и увеличивают образ.
-RUN pip install --no-cache-dir --no-cache -e .
+# Зависимости — из lockfile с хэшами (`requirements.txt`, всё дерево продукта,
+# см. GHSA-7gm6-hc9m-w3vc): `--require-hashes` отказывает на любом пакете, чьего хэша нет в
+# файле или не совпал, а транзитивные версии не плавают между сборками. Файл
+# обновляется `make lock`, без экстры dev: ruff/mypy/pytest в проде не нужны и
+# увеличивают образ.
+RUN pip install --no-cache-dir --no-cache --require-hashes -r requirements.txt -r requirements-build.txt
+
+# Сам проект — editable, а не обычная установка: обычный `pip install .`
+# копирует пакет в site-packages, и `Path(__file__).resolve().parents[2]` из
+# site-packages промахивается мимо `engine/` — движок физически лежит в /app, а
+# не рядом с копией пакета. Editable-ссылка на /app сохраняет тот же путь для
+# `__file__`, что и в репозитории. `--no-deps`: зависимости уже стоят из
+# lockfile, и pip не имеет права дотянуть что-то мимо хэшей;
+# `--no-build-isolation`: зависимости сборки (setuptools из [build-system])
+# тоже стоят из lockfile с хэшами, а не скачиваются pip'ом в изолированное
+# окружение без хэшей.
+RUN pip install --no-cache-dir --no-cache --no-deps --no-build-isolation -e .
 
 # Методика — данные управляющей компании (docs/furca/plan.md, «Данные
 # предметной области лежат вне репозитория»). В образ не запекается: том

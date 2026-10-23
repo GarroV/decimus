@@ -1,6 +1,15 @@
 # Журнал изменений
 
 Формат: обратный хронологический порядок, каждая запись — что изменилось и почему.
+## 2026-10-23 — Цепочка поставки: lockfile с хэшами, сверка с базами advisory, SBOM, сверка источника (см. GHSA-7gm6-hc9m-w3vc)
+
+- `requirements.txt`, `requirements-dev.txt`, `requirements-audit.txt` — всё дерево зависимостей с хэшами (`make lock`, uv). `Dockerfile`, `make bootstrap` и CI ставят `pip install --require-hashes`, сам проект — `--no-deps -e .`.
+- `make audit` (`pip-audit`) и задание `audit` в `pr-checks.yml` (входит в ворота `main-gate`); `make sbom` — CycloneDX, в git не хранится, в CI прикладывается артефактом.
+- Версии подняты по итогам первой сверки: `pillow` 12.3.0 → 13.0.0, `pytest` 8.4.2 → 9.0.3 (dev).
+- `scripts/verify-source.sh`: `prod-update.sh` и `deploy/demo/update.sh` отказывают, если HEAD не равен `main` на GitHub или отслеживаемые файлы изменены (обход — `ALLOW_UNVERIFIED_SOURCE=1`). Подписей коммитов у проекта нет, поэтому подпись не сверяется. Подробности — `docs/08-deploy.md`, §8.23.
+- `[build-system]` закреплён (`setuptools==84.2.1`), лок сборки — `requirements-build.txt`; проект ставится с `--no-build-isolation`, иначе pip качал setuptools без хэшей.
+- Сканер вынесен в отдельный venv: с `lxml` в среде тестов падает `test_plan_file_core` (openpyxl берёт другого писателя).
+
 ## 2026-10-23 — Бот: чаты обрабатываются параллельно, один чат по порядку (GHSA-7gm6-hc9m-w3vc)
 
 - Причина: опрос шёл с `handle_as_tasks=False`, и голосовое одного аудитора (ffmpeg плюс расшифровка, минуты) задерживало ответы всем остальным чатам.

@@ -52,7 +52,11 @@ jobs:
           cache: pip
 
       - name: Зависимости
-        run: pip install -e ".[dev]"
+        # Из lockfile с хэшами (`make lock`): pip отказывает на пакете без
+        # совпавшего хэша, транзитивные версии не плавают (см. GHSA-7gm6-hc9m-w3vc).
+        run: |
+          pip install --require-hashes -r requirements-dev.txt -r requirements-build.txt
+          pip install --no-deps --no-build-isolation -e .
 
       - name: Формат
         run: ruff format --check .
@@ -82,6 +86,34 @@ jobs:
           echo "Тесты с базой здесь пропущены — они идут на MUSPELHEIM (make test)." >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
 
+  # Сверка lockfile с базами advisory и SBOM (см. GHSA-7gm6-hc9m-w3vc). Отдельное
+  # задание: новое advisory на чужой пакет краснит его, не прячась за тестами.
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Зависимости
+        run: pip install --require-hashes -r requirements-audit.txt
+
+      - name: Сверка с базами advisory
+        run: pip-audit -r requirements-dev.txt -r requirements-audit.txt -r requirements-build.txt --require-hashes --disable-pip --progress-spinner off
+
+      - name: SBOM (CycloneDX)
+        run: cyclonedx-py requirements requirements.txt --of JSON -o sbom.cdx.json
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          retention-days: 30
+
   # Установщик MCP для Mac вызывает `plutil`, которого нет на Linux: там его тест
   # пропускается с причиной, а гоняется здесь — иначе пропуск выглядел бы проверкой.
   mac-installer:
@@ -94,21 +126,25 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Зависимости
-        run: pip install -e ".[dev]"
+        # Из lockfile с хэшами (`make lock`): pip отказывает на пакете без
+        # совпавшего хэша, транзитивные версии не плавают (см. GHSA-7gm6-hc9m-w3vc).
+        run: |
+          pip install --require-hashes -r requirements-dev.txt -r requirements-build.txt
+          pip install --no-deps --no-build-isolation -e .
       - name: Установщик MCP на macOS
         run: pytest -q -p no:cacheprovider tests/test_mcp_install_endpoint.py
 
   # Ворота: вердикт обоих заданий по прогону на main доставляется задачей.
   main-gate:
     if: always() && github.event_name == 'push'
-    needs: [checks, mac-installer]
+    needs: [checks, mac-installer, audit]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
       issues: write
     steps:
       - name: Открыть задачу, если main красный
-        if: needs.checks.result != 'success' || needs['mac-installer'].result != 'success'
+        if: needs.checks.result != 'success' || needs['mac-installer'].result != 'success' || needs.audit.result != 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -123,7 +159,7 @@ jobs:
           gh issue create --title "$ISSUE_TITLE" --body-file /tmp/body.md
 
       - name: Закрыть задачу, когда main снова зелёный
-        if: needs.checks.result == 'success' && needs['mac-installer'].result == 'success'
+        if: needs.checks.result == 'success' && needs['mac-installer'].result == 'success' && needs.audit.result == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

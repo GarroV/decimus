@@ -957,6 +957,7 @@ Telegram, ни HTTP, ни SQL.
 | `scripts/deploy.sh` | Раскатка на площадку одной командой (T246, #201) |
 | `scripts/prod-update.sh` | Обновление прода на Linux (VPS) — запускается НА САМОМ СЕРВЕРЕ из каталога репозитория |
 | `scripts/smoke.sh` | Смоук раскатанного бота на целевой площадке |
+| `scripts/verify-source.sh` | Сверка источника перед сборкой образа (см |
 <!-- map:end -->
 
 ## front/ — Cloudflare Worker'ы
