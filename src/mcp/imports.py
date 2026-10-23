@@ -458,7 +458,17 @@ def _mode_of(origin: str) -> str:
     return modes.MODE_HISTORY if origin == ORIGIN_LEGACY else modes.MODE_CURRENT
 
 
-def _view(ident: str, *, tenant: str, note: str, warnings: Sequence[str] = ()) -> dict[str, object]:
+def _view(
+    ident: str,
+    *,
+    tenant: str,
+    note: str,
+    warnings: Sequence[str] = (),
+    frames: bool = False,
+) -> dict[str, object]:
+    """Вид черновика. `frames` — ещё и список кадров записей с размерами (только полное чтение)."""
+    from .import_photos import frames_by_finding
+
     detail, шапка = _read(ident, tenant=tenant)
     if шапка.origin == ORIGIN_LEGACY:
         return _legacy_view(detail, шапка, note=note, warnings=warnings)
@@ -466,6 +476,7 @@ def _view(ident: str, *, tenant: str, note: str, warnings: Sequence[str] = ()) -
     # Пункт человеку — меткой и формулировкой (`item_label`, `item_title`), не кодом.
     тексты = _item_texts_of(строка.checklist_version)
     кадры = _photo_counts(строка.id, tenant=tenant)
+    списки = frames_by_finding(строка.id, tenant=tenant) if frames else None
     return {
         "id": строка.id,
         "mode": modes.MODE_CURRENT,
@@ -490,6 +501,7 @@ def _view(ident: str, *, tenant: str, note: str, warnings: Sequence[str] = ()) -
                 **_finding(f, тексты, строка.report_lang),
                 "repeat": f.repeat,
                 **({"photos": кадры[f.id]} if кадры is not None else {}),
+                **({"frames": списки[f.id]} if списки and f.id in списки else {}),
             }
             for f in sorted(detail.findings, key=lambda f: f.n)
         ],
@@ -583,7 +595,7 @@ def import_get_inspection(
 ) -> dict[str, object]:
     """Загруженная проверка: режим, шапка, записи и оценка (как в отчёте или движка)."""
     del store, actor
-    return _view(_require_inspection_id(inspection_id), tenant=tenant, note="read")
+    return _view(_require_inspection_id(inspection_id), tenant=tenant, note="read", frames=True)
 
 
 def import_list_drafts(*, tenant: str, store: Store, actor: str) -> dict[str, object]:

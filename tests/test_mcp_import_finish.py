@@ -207,7 +207,7 @@ def test_state_json_несёт_ссылки_кадров_только_когда
     assert с["findings"][0]["photos"] == ["p.jpg"]
 
 
-def _ссылка(monkeypatch: pytest.MonkeyPatch) -> Any:
+def _ссылка(monkeypatch: pytest.MonkeyPatch, *, replace: bool = False) -> Any:
     from src.mcp import import_photo_link
 
     monkeypatch.setattr(
@@ -218,7 +218,22 @@ def _ссылка(monkeypatch: pytest.MonkeyPatch) -> Any:
         store=None,  # type: ignore[arg-type]
         actor="mcp:HQ",
         inspection_id=ID,
+        replace=replace,
     )
+
+
+def test_команда_замены_несёт_replace_а_обычная_нет(
+    мир: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("WEB_SECRET_KEY", "s" * 40)
+
+    обычная = _ссылка(monkeypatch)
+    замена = _ссылка(monkeypatch, replace=True)
+
+    assert "replace" not in str(обычная["command"])
+    assert "-F replace=1 " in str(замена["command"])
+    assert "REPLACE mode" in str(замена["status"])
+    assert "REPLACE mode" not in str(обычная["status"])
 
 
 def test_команда_загрузки_подписана_и_привязана_к_черновику(

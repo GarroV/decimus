@@ -1,4 +1,4 @@
-/* Мини-апп как приложение аудитора (D373): главная, начало проверки, настройки, Claude, доступ.
+/* Мини-апп как приложение аудитора (D373): главная, начало проверки, настройки, доступ.
  *
  * Обход — один раздел приложения. Этот файл держит всё вокруг него: куда
  * человек попадает при открытии, как возвращается назад и где настройки.
@@ -24,9 +24,9 @@
   var SUGGEST_DELAY_MS = 250;
 
   /** Куда ведёт «Назад» с каждого экрана. */
-  var PARENT = { walk: "home", start: "home", settings: "home", help: "settings", claude: "settings" };
+  var PARENT = { walk: "home", start: "home", settings: "home", help: "settings" };
 
-  var A = (W.app = { route: null, issued: null, busy: false, wiz: null });
+  var A = (W.app = { route: null, busy: false, wiz: null });
 
   function data() { return W.state.data || {}; }
   function app() { return data().app || {}; }
@@ -47,7 +47,6 @@
 
   A.go = function (route) {
     A.route = route;
-    if (route !== "claude") A.issued = null;
     if (route !== "start") A.wiz = null;
     A.syncBack();
     W.render();
@@ -222,8 +221,6 @@
     list.appendChild(translateModeRow());
     W.hints.settingsRows(list);
     list.appendChild(row(tx("walk.app.help"), null, function () { A.go("help"); }));
-    // Подключить Claude — каждому (D448): токен выпускается на свою учётку.
-    if (app().mcp) list.appendChild(row(tx("walk.app.claude"), null, function () { A.go("claude"); }));
     // Остальное подключение — на сайте, в «Настройках» (D447): пароль, Google, бот.
     if (app().settings_url) list.appendChild(row(tx("walk.app.web_settings"), null, function () { openWeb(app().settings_url); }));
     list.appendChild(row(tx("walk.app.version"), app().version || "—"));
@@ -233,48 +230,6 @@
   function help(root) {
     root.appendChild(head(tx("walk.app.help")));
     root.appendChild(el("p", "walk-app__prose", tx("walk.app.help.text")));
-  }
-
-  /* ── подключить Claude: команда показывается один раз ──────────────── */
-
-  function copy(text) {
-    var done = function () { W.haptic("success"); W.toast(tx("walk.app.claude.copied"), "ok"); };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, function () { selectCode(); });
-    } else {
-      selectCode();
-    }
-  }
-
-  function selectCode() {
-    var code = document.querySelector(".walk-app__code");
-    if (!code) return;
-    var range = document.createRange();
-    range.selectNodeContents(code);
-    var sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
-
-  function claude(root) {
-    root.appendChild(head(tx("walk.app.claude")));
-    root.appendChild(el("p", "walk-app__prose", tx("walk.app.claude.text")));
-    var got = A.issued;
-    if (got) {
-      root.appendChild(el("pre", "walk-app__code", got.command));
-      root.appendChild(W.button("walk-mark", tx("walk.app.claude.copy"), function () { copy(got.command); }));
-      root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.safety")));
-      root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.restart")));
-      if (got.expires) root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.expires", { date: got.expires })));
-      if (got.replaced) root.appendChild(el("p", "walk-banner", tx("walk.app.claude.replaced")));
-    }
-    root.appendChild(W.button(got ? "walk-btn" : "walk-mark", tx(got ? "walk.app.claude.again" : "walk.app.claude.issue"), function () {
-      act({ op: "mcp_issue" }).then(function (body) {
-        if (!body) return;
-        A.issued = body;
-        W.render();
-      });
-    }));
   }
 
   /* ── начало проверки (D392): те же шаги, что у мастера бота, — полями ── */
@@ -406,7 +361,6 @@
         // Обход новой проверки — сразу: экран данных приходит ответом на старт.
         A.wiz = null;
         A.route = "walk";
-        A.issued = null;
         A.syncBack();
         W.haptic("success");
         W.apply(res.body);
@@ -606,7 +560,7 @@
     root.appendChild(form);
   }
 
-  var SCREENS = { home: home, start: startScreen, settings: settings, help: help, claude: claude };
+  var SCREENS = { home: home, start: startScreen, settings: settings, help: help };
 
   A.render = function (root) {
     (SCREENS[A.route] || home)(root);

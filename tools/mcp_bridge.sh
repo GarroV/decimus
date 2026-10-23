@@ -29,6 +29,14 @@
 # заголовок уходит файлом конфигурации curl с правами только для владельца.
 # Найдено разбором безопасности 03.09 живым запуском: `ps -eo command` печатал
 # «Authorization: Bearer <токен>» открытым текстом.
+#
+# Самообновление (D626). Установщик кладёт мост один раз, а новые возможности
+# (локальные инструменты для фото, D583) доезжают только в свежие установки. Поэтому
+# мост на старте сверяет `BRIDGE_VERSION` с сервером и, если там новее, заменяет себя
+# (self_update ниже). Работает только для моста, установленного в
+# ~/.decimus/bin/mcp_bridge.sh: запуск из рабочей копии репозитория свой файл не трогает.
+# DECIMUS_MCP_NO_UPDATE=1 выключает проверку.
+BRIDGE_VERSION=1
 set -u
 URL="${DECIMUS_MCP_URL:-${DODO_MCP_URL:-}}"
 TOKEN="${DECIMUS_MCP_TOKEN:-${DODO_MCP_TOKEN:-}}"
@@ -42,6 +50,65 @@ chmod 600 "$AUTH_FILE"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/mcp-work.XXXXXX")"
 trap 'rm -f "$AUTH_FILE"; rm -rf "$WORK"' EXIT HUP INT TERM
 printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" > "$AUTH_FILE"
+
+# --- Самообновление (D626) ------------------------------------------------------
+#
+# Когда: один раз на старте, ДО чтения первой строки stdin. Поэтому замена себя через
+# exec безопасна: сессия ещё не началась, клиент ничего не отправил и не потерял, а
+# новая версия стартует с чистого листа и читает тот же stdin. Обновление «к следующему
+# запуску» хуже: Claude Desktop держит мост запущенным часами, и человек остался бы на
+# старой версии до перезапуска приложения. Зацикливание исключено флагом
+# DECIMUS_BRIDGE_UPDATED: после exec проверка пропускается.
+#
+# Как: версия и SHA-256 берутся у сервера (GET /bridge), файл — GET /bridge/script во
+# временный файл В ТОЙ ЖЕ папке, проверяется (сумма, шебанг, маркер, версия, `bash -n`),
+# получает права 700 и переименовывается поверх себя — rename атомарен, а уже
+# запущенный bash дочитывает старый inode.
+#
+# Безопасность: только https (http — лишь на этой же машине, для проверки), токен —
+# конфигом curl, не в argv; любой сбой — одна строка в stderr и работа прежней версией.
+# Сеть: соединение 3 с, весь запрос версии 5 с — запуск MCP от сети не зависит.
+update_note() { printf 'mcp_bridge: обновление моста пропущено (%s), работаю прежней версией\n' "$1" >&2; }
+
+self_update() {
+  [ "${DECIMUS_MCP_NO_UPDATE:-}" = "1" ] && return 0
+  [ -z "${DECIMUS_BRIDGE_UPDATED:-}" ] || return 0
+  local self="$HOME/.decimus/bin/mcp_bridge.sh" base meta code remote_ver remote_sha tmp got
+  [ "$0" = "$self" ] && [ -f "$self" ] && [ ! -L "$self" ] || return 0
+  base="$(printf '%s' "$URL" | sed -E 's#^(https?://[^/?#]+).*#\1#')"
+  case "$base" in
+    *@*) update_note "адрес с логином"; return 0 ;;
+    https://*) ;;
+    http://127.0.0.1|http://127.0.0.1:[0-9]*|http://localhost|http://localhost:[0-9]*) ;;
+    *) update_note "адрес не https"; return 0 ;;
+  esac
+  meta="$(curl -sS --connect-timeout 3 --max-time 5 --config "$AUTH_FILE" -w '\n%{http_code}' \
+      "$base/bridge" </dev/null 2>&1)" || true
+  code="${meta##*$'\n'}"; meta="${meta%$'\n'*}"
+  [ "$code" = "200" ] || { update_note "сервер ответил $code"; return 0; }
+  remote_ver="$(printf '%s' "$meta" | sed -n 's/.*"version": *\([0-9][0-9]*\).*/\1/p')"
+  remote_sha="$(printf '%s' "$meta" | sed -n 's/.*"sha256": *"\([0-9a-f]\{64\}\)".*/\1/p')"
+  [ -n "$remote_ver" ] && [ -n "$remote_sha" ] || { update_note "непонятный ответ сервера"; return 0; }
+  [ "$remote_ver" -gt "$BRIDGE_VERSION" ] || return 0
+  tmp="$(mktemp "$(dirname "$self")/.mcp_bridge.XXXXXX" 2>/dev/null)" || { update_note "папка моста не доступна на запись"; return 0; }
+  if ! curl -sS -f --connect-timeout 3 --max-time 15 --config "$AUTH_FILE" -o "$tmp" \
+      "$base/bridge/script" </dev/null 2>/dev/null; then
+    rm -f "$tmp"; update_note "не скачался файл"; return 0
+  fi
+  got="$(shasum -a 256 "$tmp" 2>/dev/null | cut -d' ' -f1)"
+  if [ "$got" != "$remote_sha" ]; then rm -f "$tmp"; update_note "сумма файла не сошлась"; return 0; fi
+  if [ "$(head -n 1 "$tmp")" != "#!/bin/bash" ] \
+     || ! grep -q '^# Мост stdio ↔ HTTP для MCP-сервера проверок' "$tmp" \
+     || ! grep -qx "BRIDGE_VERSION=$remote_ver" "$tmp" \
+     || ! /bin/bash -n "$tmp" 2>/dev/null; then
+    rm -f "$tmp"; update_note "файл не похож на мост"; return 0
+  fi
+  chmod 700 "$tmp" && mv -f "$tmp" "$self" || { rm -f "$tmp"; update_note "не удалось заменить файл"; return 0; }
+  printf 'mcp_bridge: мост обновлён до версии %s\n' "$remote_ver" >&2
+  rm -f "$AUTH_FILE"; rm -rf "$WORK"; trap - EXIT HUP INT TERM
+  DECIMUS_BRIDGE_UPDATED=1 exec /bin/bash "$self"
+}
+self_update
 
 
 # --- Локальные инструменты (D583) ----------------------------------------------
@@ -84,9 +151,10 @@ LOCAL_TOOLS='[
     "limit":{"type":"integer","minimum":1,"maximum":60,"description":"How many photos to show (default 20)"}},
    "required":["path"],"additionalProperties":false}},
  {"name":"local_attach_photos",
-  "description":"Attach photos from a folder on the person'"'"'s own computer (this tool runs on their machine) to the findings of ONE imported draft. Use the file names shown by local_photo_folder. The originals are sent, not the reduced copies. Findings must be recorded first and the draft not yet accepted. The answer says how many photos were attached to which finding and what was refused and why. Never mention addresses or links to the person.",
+  "description":"Attach photos from a folder on the person'"'"'s own computer (this tool runs on their machine) to the findings of ONE imported draft. Use the file names shown by local_photo_folder. The originals are sent, not the reduced copies. Findings must be recorded first and the draft not yet accepted. The answer says how many photos were attached to which finding and what was refused and why. Never mention addresses or links to the person. To swap reduced copies for the originals pass replace=true: for each finding the previous photos are removed ONLY if all its new photos were stored (the answer says replaced true or false per finding; on false nothing changed); give all photos of a finding together, at most 10 per finding.",
   "inputSchema":{"type":"object","properties":{
     "inspection_id":{"type":"string","description":"The imported draft"},
+    "replace":{"type":"boolean","description":"true: the photos replace the frames the listed findings already have (all-or-nothing per finding). Default: they are added."},
     "folder":{"type":"string","description":"The same folder that was given to local_photo_folder"},
     "items":{"type":"array","minItems":1,"items":{"type":"object","properties":{
       "n":{"type":"integer","minimum":1,"maximum":999,"description":"Finding number in the draft"},
@@ -99,6 +167,7 @@ LOCAL_TOOLS='[
 # без него 404 от чужого сервера, 401 и обрыв связи выглядят одинаково — пустым ответом,
 # на который клиент ждёт минуту и пишет «Request timed out», ни словом не называя
 # причину, #535: так полдня искали устаревший адрес в конфиге).
+REPLACE=""
 HTTP_CODE=""; HTTP_BODY=""
 post_server() {
   local out
@@ -235,6 +304,7 @@ send_batch() {
   local target="$1" n="$2" code body f why
   shift 2
   local -a form=() names=()
+  [ "${REPLACE:-}" = "1" ] && form+=(-F "replace=1")
   for f in "$@"; do form+=(-F "file=@\"$f\""); names+=("${f##*/}"); done
   printf 'url = "%s"\n' "$target" > "$WORK/upload.cfg"; chmod 600 "$WORK/upload.cfg"
   body="$(curl -sS --max-time 300 --config "$WORK/upload.cfg" -F "n=$n" "${form[@]}" \
@@ -243,7 +313,8 @@ send_batch() {
   code="${body##*$'\n'}"; body="${body%$'\n'*}"
   if printf '%s' "$body" | "$JQ" -e '.attached' >/dev/null 2>&1; then
     printf '%s' "$body" | "$JQ" -c --argjson n "$n" \
-      '{n:$n,attached:[.attached[].file],refused:[.refused[]|{file,reason}]}' >> "$WORK/results.ndjson"
+      '{n:$n,attached:[.attached[].file],refused:[.refused[]|{file,reason}]}
+       + (if has("replaced") then {replaced:.replaced} else {} end)' >> "$WORK/results.ndjson"
     return
   fi
   case "$code" in
@@ -259,16 +330,19 @@ send_batch() {
 }
 
 tool_attach_photos() {
-  local id="$1" args="$2" ident folder text target name size total rec rec_n
+  local id="$1" args="$2" ident folder text target name size total rec rec_n bad overflow
   local -a files=() paths=()
   ident="$(printf '%s' "$args" | "$JQ" -r '.inspection_id // ""')"
   folder="$(printf '%s' "$args" | "$JQ" -r '.folder // ""')"
   case "$ident" in ''|*[!A-Za-z0-9_.:-]*) reply_text "$id" "inspection_id is missing or malformed" 1; return ;; esac
   if ! printf '%s' "$args" | "$JQ" -e '(.items|type=="array") and (.items|length>0)
       and all(.items[]; (.n|type=="number") and (.n==(.n|floor)) and .n>=1 and .n<=999
-        and (.files|type=="array") and (.files|length>0) and all(.files[]; type=="string"))' >/dev/null 2>&1; then
-    reply_text "$id" "items must be a list of {n: finding number 1..999, files: [file names]}" 1; return
+        and (.files|type=="array") and (.files|length>0) and all(.files[]; type=="string"))
+      and ((.replace // false)|type=="boolean")' >/dev/null 2>&1; then
+    reply_text "$id" "items must be a list of {n: finding number 1..999, files: [file names]}; replace, if given, true or false" 1; return
   fi
+  # Режим замены: прежние кадры записи снимает сервер, только если легли все новые.
+  REPLACE="$(printf '%s' "$args" | "$JQ" -r 'if .replace == true then "1" else "" end')"
   resolve_dir "$folder" || { reply_text "$id" "$WHY" 1; return; }
   # Адрес загрузки выдаёт сам сервер: мост просит его тем же запросом, что и модель.
   post_server "$("$JQ" -nc --arg i "$ident" \
@@ -288,24 +362,34 @@ tool_attach_photos() {
   # Записи с одним номером сливаются: один запрос на находку (на сервере 30 запросов в минуту).
   while IFS= read -r rec; do
     rec_n="$(printf '%s' "$rec" | "$JQ" -r '.n')"
-    files=(); paths=(); size=0
+    files=(); paths=(); size=0; bad=0; overflow=0
     while IFS= read -r name; do files+=("$name"); done < <(printf '%s' "$rec" | "$JQ" -r '.files[]')
     for name in ${files[@]+"${files[@]}"}; do
       if ! safe_name "$name" || ! is_image_name "$name" || [ ! -f "$DIR/$name" ] || [ -L "$DIR/$name" ]; then
+        bad=1
+        [ "$REPLACE" = "1" ] && continue
         printf '%s' "$name" | "$JQ" -Rsc --argjson n "$rec_n" \
           '{n:$n,attached:[],refused:[{file:.,reason:"not an image file of the chosen folder"}]}' >> "$WORK/results.ndjson"
         continue
       fi
       total="$(wc -c < "$DIR/$name" | tr -d ' ')"
       if [ "${#paths[@]}" -gt 0 ] && [ $((size + total)) -gt "$BATCH_BYTES" ]; then
+        # Замена ложится одним запросом: два запроса снесли бы кадры первого вторым.
+        if [ "$REPLACE" = "1" ]; then overflow=1; break; fi
         send_batch "$target" "$rec_n" "${paths[@]}"; paths=(); size=0
       fi
       paths+=("$DIR/$name"); size=$((size + total))
     done
+    if [ "$REPLACE" = "1" ] && { [ "$bad" = "1" ] || [ "$overflow" = "1" ]; }; then
+      printf '%s\n' "${files[@]}" | "$JQ" -Rsc --argjson n "$rec_n" \
+        '{n:$n,attached:[],replaced:false,refused:(split("\n")|map(select(length>0))|map({file:.,reason:"replace needs every photo of the finding to be an image file of the folder and to go in one upload (20 MB at most); nothing was changed"}))}' >> "$WORK/results.ndjson"
+      continue
+    fi
     if [ "${#paths[@]}" -gt 0 ]; then send_batch "$target" "$rec_n" "${paths[@]}"; fi
   done < <(printf '%s' "$args" | "$JQ" -c '.items | group_by(.n) | map({n:.[0].n, files:(map(.files)|add)}) | .[]')
   text="$("$JQ" -sc --arg i "$ident" '
-    (group_by(.n) | map({n:.[0].n, attached:(map(.attached)|add), refused:(map(.refused)|add)})) as $r
+    (group_by(.n) | map({n:.[0].n, attached:(map(.attached)|add), refused:(map(.refused)|add)}
+        + (map(select(has("replaced")) | .replaced) | if length == 0 then {} else {replaced: all} end))) as $r
     | {inspection_id:$i, attached_total:($r|map(.attached|length)|add // 0),
        refused_total:($r|map(.refused|length)|add // 0), findings:$r}' "$WORK/results.ndjson")"
   reply_text "$id" "$text" 0

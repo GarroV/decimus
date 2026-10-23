@@ -364,11 +364,15 @@ def test_плитка_claude_как_в_swarm_кнопка_инструкции_�
         assert "Инструкции для проекта" in страница
         assert "decimus" in страница and "get_inspection" in страница, "текст инструкции"
         assert 'class="ssec__sub"' not in страница, "подразделы Claude Desktop / Claude Code убраны"
-        assert "Claude Desktop" not in страница
+        # D626: Desktop назван в подводке — туда ведёт команда установки (мост с фото из папки).
+        assert "Claude Desktop на Mac подключается одной командой" in страница
+        assert "оригиналы фото из папки" in страница
+        assert "Для claude.ai в браузере и телефона" not in страница, "коннектор — только при OAuth"
 
         по_английски = client.get("/settings?tile=claude&lang=en").get_data(as_text=True)
         assert "Get the install command" in по_английски
         assert "Never compute a score yourself" in по_английски
+        assert "Claude Desktop on a Mac connects with one command" in по_английски
 
 
 def test_в_левой_колонке_группы_разделены_чертами(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -141,6 +141,12 @@ from src.mcp.errors import McpError
         "mime": "image/jpeg",
     },
     "import_upload_photos": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
+    "import_remove_photo": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "n": 1,
+        "photo": "00000000-0000-0000-0000-000000000002",
+    },
+    "import_clear_photos": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": 1},
     "import_info_fields": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
     "import_set_info": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
@@ -327,6 +333,8 @@ from src.mcp.errors import McpError
         "mime": "image/gif",
     },
     "import_upload_photos": {"inspection_id": "не-uuid"},
+    "import_remove_photo": {"inspection_id": "не-uuid", "n": 1, "photo": "не-uuid"},
+    "import_clear_photos": {"inspection_id": "не-uuid", "n": 1},
     "import_info_fields": {"inspection_id": "не-uuid"},
     "import_set_info": {"inspection_id": "не-uuid", "values": {"INF03": "yes"}},
     "import_accept_inspection": {
@@ -629,7 +637,12 @@ def test_батарея_доходит_и_до_успешных_ответов(�
     версии = [json.loads(о.текст).get("version") for о in успешные]
 
     # Инструменты плана без живой базы отвечают отказом окружения, а не JSON: их не считаем.
-    без_базы = sum(1 for spec in TOOLS if spec.kind == KIND_PLAN)
+    # Так же — снятие кадров черновика загрузки (D627): без базы оно упирается в чтение черновика.
+    без_базы = sum(
+        1
+        for spec in TOOLS
+        if spec.kind == KIND_PLAN or spec.name in {"import_remove_photo", "import_clear_photos"}
+    )
     assert len(успешные) >= len(TOOLS) - без_базы, "успешных ответов слишком мало для утверждения"
     assert any(версия for версия in версии), "ни одна правка не дошла до новой версии"
 
