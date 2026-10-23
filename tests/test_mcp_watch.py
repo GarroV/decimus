@@ -15,7 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from tools.mcp_watch import WatchError, check
+from tools.mcp_watch import WatchError, check, check_admin, main
 
 
 @contextlib.contextmanager
@@ -90,3 +90,43 @@ def test_мёртвый_адрес_краснеет() -> None:
     """Уснувшая площадка: соединение не устанавливается вовсе."""
     with pytest.raises(WatchError, match="не ответил"):
         check("http://127.0.0.1:9/")
+
+
+def test_здоровая_админка_сторож_пропускает() -> None:
+    with _поднять({"/login": 200}) as адрес:
+        assert any("страница входа" in строка for строка in check_admin(адрес))
+
+
+@pytest.mark.parametrize("код", [302, 404, 502, 503])
+def test_админка_с_чужим_кодом_краснеет(код: int) -> None:
+    """Обрыв Worker → VPC → Caddy: вместо страницы входа 502, 503 или заглушка."""
+    with _поднять({"/login": код}) as адрес, pytest.raises(WatchError, match=str(код)):
+        check_admin(адрес)
+
+
+def test_мёртвый_адрес_админки_краснеет() -> None:
+    with pytest.raises(WatchError, match="не ответил"):
+        check_admin("http://127.0.0.1:9/")
+
+
+def _запустить(monkeypatch: pytest.MonkeyPatch, mcp: str, admin: str) -> int:
+    monkeypatch.setenv("MCP_PUBLIC_URL", mcp)
+    monkeypatch.setenv("ADMIN_PUBLIC_URL", admin)
+    return main()
+
+
+def test_главная_красная_если_упала_только_админка(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Дверь MCP цела, а админка снаружи мертва — прогон обязан покраснеть."""
+    with _поднять({"/": 401, "/setup": 200}) as mcp:
+        assert _запустить(monkeypatch, mcp, "http://127.0.0.1:9/") == 1
+
+
+def test_главная_красная_если_админка_не_задана(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Пустой секрет — не «нечего проверять, значит зелёно»."""
+    with _поднять({"/": 401, "/setup": 200}) as mcp:
+        assert _запустить(monkeypatch, mcp, "") == 1
+
+
+def test_главная_зелёная_когда_обе_двери_здоровы(monkeypatch: pytest.MonkeyPatch) -> None:
+    with _поднять({"/": 401, "/setup": 200, "/login": 200}) as адрес:
+        assert _запустить(monkeypatch, адрес, адрес) == 0
