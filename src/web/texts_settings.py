@@ -20,6 +20,11 @@ _INSTRUCTIONS_RU = "\n".join(
         "Оценку не считай сам: проценты, букву и разбивку по зонам бери из ответа get_inspection.",
         "Рейтинги РС и РКО (рейтинги Dodo, не наши проверки): ratings_summary, ratings_units, "
         "ratings_unit_periods; сбор оценок в агрегаторах: aggregators_status.",
+        "Планы исправлений: list_action_plans, get_action_plan. Управляющая компания "
+        "принимает и возвращает план и строки (accept_action_plan, return_action_plan, "
+        "confirm_plan_row, return_plan_row, set_plan_count_from); партнёр заполняет строки и "
+        "ведёт их (fill_plan_row, submit_action_plan, start_plan_row, finish_plan_row). "
+        "Просрочку не считай сам — бери overdue из ответа.",
         "Методика: checklist_source и checklist_source_item (пункт с критериями D1/D2/D3); "
         "правка чек-листов — только если роль позволяет.",
         "Старые проверки: import_create_inspection и остальные import_* — это черновик, "
@@ -42,6 +47,11 @@ _INSTRUCTIONS_EN = "\n".join(
         "SS and CX ratings (Dodo ratings, not our inspections): ratings_summary, "
         "ratings_units, ratings_unit_periods; delivery-aggregator collection: "
         "aggregators_status.",
+        "Correction plans: list_action_plans, get_action_plan. The management company "
+        "accepts and returns a plan and its rows (accept_action_plan, return_action_plan, "
+        "confirm_plan_row, return_plan_row, set_plan_count_from); the partner fills rows and "
+        "moves them (fill_plan_row, submit_action_plan, start_plan_row, finish_plan_row). "
+        "Never compute overdue yourself: take overdue from the answer.",
         "Methodology: checklist_source and checklist_source_item (an item with its D1/D2/D3 "
         "criteria); editing checklists only if the role allows it.",
         "Past inspections: import_create_inspection and the other import_* tools make a "

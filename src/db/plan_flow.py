@@ -186,6 +186,18 @@ def _as_partner(what: str, work: Callable[[psycopg.Cursor[Any]], None]) -> None:
         raise _translate(what, exc) from exc
 
 
+class _Keep:
+    """Поле не названо: остаётся как в строке (отличается от «названо пустым» — стереть)."""
+
+    def __repr__(self) -> str:
+        return "KEEP"
+
+
+KEEP = _Keep()
+
+_CURRENT_TEXT_SQL = "select measure, responsible, reason from action_plan_rows where id = %s"
+
+
 def save_row(
     request_id: str,
     row_id: str,
@@ -204,15 +216,72 @@ def save_row(
     начала отсчёта; позже срок ставится только переносом с согласием УК. Пустые поля
     стирают прежнее: партнёр правит строку целиком.
     """
+    _write_row(
+        request_id,
+        row_id,
+        reach=reach,
+        tenant=tenant,
+        actor=actor,
+        measure=measure,
+        responsible=responsible,
+        reason=reason,
+        own_due=own_due,
+    )
+
+
+def patch_row(
+    request_id: str,
+    row_id: str,
+    *,
+    reach: Reach,
+    tenant: str,
+    actor: str,
+    measure: str | _Keep | None = KEEP,
+    responsible: str | _Keep | None = KEEP,
+    reason: str | _Keep | None = KEEP,
+    own_due: date | _Keep | None = KEEP,
+) -> None:
+    """Частичная правка строки: названные поля пишутся, остальные остаются как есть.
+
+    Текущая строка читается под тем же замком, что и запись (`save_row`), поэтому
+    параллельная правка не теряется; права, охват, сторожа и срок — те же. Названное
+    `None` или пустая строка стирает поле. Для агента: веб пишет строку целиком, а тот,
+    кто назвал одну меру, не должен стереть ответственного.
+    """
+    _write_row(
+        request_id,
+        row_id,
+        reach=reach,
+        tenant=tenant,
+        actor=actor,
+        measure=measure,
+        responsible=responsible,
+        reason=reason,
+        own_due=own_due,
+    )
+
+
+def _write_row(
+    request_id: str,
+    row_id: str,
+    *,
+    reach: Reach,
+    tenant: str,
+    actor: str,
+    measure: str | _Keep | None,
+    responsible: str | _Keep | None,
+    reason: str | _Keep | None,
+    own_due: date | _Keep | None,
+) -> None:
     _actor(actor)
     _require_partner(tenant)
     request, row = _ids(request_id, row_id)
-    данные = {
-        "measure": _clean(measure, MAX_MEASURE, "Мера"),
-        "responsible": _clean(responsible, MAX_RESPONSIBLE, "Ответственный"),
-        "reason": _clean(reason, MAX_REASON, "Причина"),
-        "own_due": own_due,
-        "row": row,
+    named: dict[str, str | _Keep | None] = {
+        "measure": measure if isinstance(measure, _Keep) else _clean(measure, MAX_MEASURE, "Мера"),
+        "responsible": responsible
+        if isinstance(responsible, _Keep)
+        else _clean(responsible, MAX_RESPONSIBLE, "Ответственный"),
+        "reason": reason if isinstance(reason, _Keep) else _clean(reason, MAX_REASON, "Причина"),
     }
 
     def work(cur: psycopg.Cursor[Any]) -> None:
@@ -220,12 +289,22 @@ def save_row(
         plan_status, _electronic, count_from, days, extended, _row_status, before = head
         if plan_status != STATUS_REQUESTED:
             raise ActionPlanError("План уже отправлен на согласование — строки больше не правятся")
+        cur.execute(_CURRENT_TEXT_SQL, (row,))
+        current = cur.fetchone()
+        texts = dict(
+            zip(("measure", "responsible", "reason"), current or (None, None, None), strict=True)
+        )
+        данные: dict[str, Any] = {
+            name: texts[name] if isinstance(value, _Keep) else value
+            for name, value in named.items()
+        }
+        новый_срок = before if isinstance(own_due, _Keep) else own_due
         проблема = own_due_problem(
-            own_due, before, count_from=count_from, days=days, extended=extended, today=today()
+            новый_срок, before, count_from=count_from, days=days, extended=extended, today=today()
         )
         if проблема is not None:
-            raise ActionPlanError(own_due_message(own_due, *проблема))
-        cur.execute(_UPDATE_TEXT_SQL, данные)
+            raise ActionPlanError(own_due_message(новый_срок, *проблема))
+        cur.execute(_UPDATE_TEXT_SQL, {**данные, "own_due": новый_срок, "row": row})
 
     _as_partner("Сохранить строку плана", work)
 

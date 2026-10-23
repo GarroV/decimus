@@ -231,7 +231,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **66** инструментов (checklist — 33, checklist_source — 2, import — 17, inspections — 6, move — 1, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **77** инструментов (checklist — 33, checklist_source — 2, import — 17, inspections — 6, move — 1, plan — 11, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
@@ -294,6 +294,17 @@
 | `network_summary` | inspections | Summarize the caller's tenant network over a date range: how many inspections and units, total findings, the… | `src/mcp/tools.py` |
 | `unit_history` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `move_inspection` | move | Correct the date and/or the unit (pizzeria) of an inspection that is already accepted (or waiting for acceptance) — the… | `src/mcp/move.py` |
+| `accept_action_plan` | plan | Accept an action plan that waits for review: it goes to work and the partner is notified | `src/mcp/plans.py` |
+| `confirm_plan_row` | plan | Confirm a plan row the partner marked done; when the last row is confirmed the plan closes | `src/mcp/plans.py` |
+| `fill_plan_row` | plan | Fill a plan row while the plan waits for rows: measure (what we do), responsible, reason and the own due date… | `src/mcp/plans.py` |
+| `finish_plan_row` | plan | Mark a plan row 'done': it goes to the management company for confirmation | `src/mcp/plans.py` |
+| `get_action_plan` | plan | One action plan: header, the comment of the last return, and its rows — each with item code, class (D1-D3), zone, the… | `src/mcp/plans.py` |
+| `list_action_plans` | plan | List correction (action) plans in your scope: a partner sees plans of its countries, the management company sees all | `src/mcp/plans.py` |
+| `return_action_plan` | plan | Return an action plan that waits for review to the partner for rework, with a mandatory comment (what to fix) the… | `src/mcp/plans.py` |
+| `return_plan_row` | plan | Return a plan row the partner marked done, with a mandatory reason (what is wrong) the partner sees | `src/mcp/plans.py` |
+| `set_plan_count_from` | plan | Move the start of the countdown of an action plan (D613): the plan due date and the due dates of all rows except… | `src/mcp/plans.py` |
+| `start_plan_row` | plan | Mark a row of an accepted plan 'taken into work' | `src/mcp/plans.py` |
+| `submit_action_plan` | plan | Send the filled action plan to the management company for review | `src/mcp/plans.py` |
 | `import_ratings` | ratings | Upload a ratings file into Decimus (standards and customer-experience ratings, IMF only) | `src/mcp/ratings_tools.py` |
 | `request_aggregators_update` | ratings | Запросить внеочередное обновление оценок пиццерий в агрегаторах доставки (Wolt, Glovo, Bolt Food, Yemeksepeti, Trendyol… | `src/mcp/ratings_tools.py` |
 | `aggregators_status` | ratings_read | Состояние сбора оценок в агрегаторах доставки: по каждому — когда был последний сбор, чем кончился (ok, failed или… | `src/mcp/ratings_read.py` |

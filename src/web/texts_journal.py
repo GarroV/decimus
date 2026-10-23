@@ -221,6 +221,21 @@ _MCP: dict[str, tuple[str, str]] = {
     "import_edit_finding": ("Изменено нарушение в черновике", "Finding edited in a draft"),
     "import_edit_inspection": ("Исправлена шапка черновика", "Draft header edited"),
     "move_inspection": ("Перенесена проверка (дата/пиццерия)", "Inspection moved (date/unit)"),
+    "accept_action_plan": ("План исправлений принят", "Action plan accepted"),
+    "return_action_plan": ("План исправлений возвращён", "Action plan returned"),
+    "confirm_plan_row": ("Строка плана подтверждена", "Action plan row confirmed"),
+    "return_plan_row": ("Строка плана возвращена", "Action plan row returned"),
+    "set_plan_count_from": (
+        "Сдвинуто начало отсчёта срока плана",
+        "Action plan deadline start moved",
+    ),
+    "fill_plan_row": ("Сохранена строка плана исправлений", "Action plan row saved"),
+    "submit_action_plan": (
+        "План исправлений отправлен на согласование",
+        "Action plan sent for approval",
+    ),
+    "start_plan_row": ("Строка плана взята в работу", "Action plan row taken into work"),
+    "finish_plan_row": ("Строка плана отмечена сделанной", "Action plan row marked done"),
     "import_remove_finding": ("Удалено нарушение из черновика", "Finding removed from a draft"),
     "import_add_photo": ("Добавлено фото в черновик", "Photo added to a draft"),
     "import_upload_photos": (

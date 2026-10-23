@@ -34,6 +34,7 @@ from .catalogue import (
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
     KIND_MOVE,
+    KIND_PLAN,
     KIND_RATINGS,
     KIND_RATINGS_READ,
     KIND_RETRACTION,
@@ -49,6 +50,7 @@ from .checklists import PROTECTED_APPLIED, protection_of
 from .confirm import TOKEN_ARGUMENT, challenge, verify
 from .errors import McpError, ToolError
 from .instructions import IMPORT_INSTRUCTIONS
+from .plans import READ_TOOLS as READ_PLAN_TOOLS
 from .policy import action_of, may_edit_protected, permits_tool
 
 # Коды ошибок JSON-RPC 2.0. Свои коды не заводятся: клиент разбирает эти.
@@ -256,6 +258,11 @@ ROLE_CLOSED = (
 MOVE_CLOSED = (
     "Исправление проверки требует названного автора: у этого токена его нет, а история "
     "исправлений без автора неотличима от подчистки (D195)"
+)
+
+PLAN_CLOSED = (
+    "Запись в план исправлений требует названного автора: у этого токена его нет, а история "
+    "плана без автора неотличима от подчистки"
 )
 
 IMPORT_CLOSED = (
@@ -504,6 +511,12 @@ def _call_tool(
             if not actor:
                 return _tool_text(MOVE_CLOSED, failed=True)
             прочее = {"actor": actor}
+        if spec.kind == KIND_PLAN and spec.name not in READ_PLAN_TOOLS:
+            # Автор перехода — из токена: он подписывает событие плана, и без него база
+            # отказывает. Читающие инструменты плана автора не берут.
+            if not actor:
+                return _tool_text(PLAN_CLOSED, failed=True)
+            прочее = {"actor": actor}
         if spec.kind == KIND_RATINGS:
             # Кто просит — из токена, а не от собеседника: он ляжет автором заявки.
             прочее = {"actor": actor}
@@ -562,6 +575,10 @@ def _call_tool(
                 "исправление проверки",
                 "Это отказ базы, а не отказ в исправлении; сделано или нет — видно по "
                 "get_inspection",
+            ),
+            KIND_PLAN: (
+                "работу с планом исправлений",
+                "Это отказ базы, а не отказ в просьбе; сделано или нет — видно по get_action_plan",
             ),
             KIND_RETRACTION: (
                 "снятие проверки",

@@ -25,6 +25,7 @@ from src.domain.journal import DOOR_MCP, JOURNALED_ROLES, summarize_target
 
 from .catalogue import find
 from .config import Access
+from .plans import READ_TOOLS as READ_PLAN_TOOLS
 
 OUTCOME_OK = "ok"
 #: Инструмент вызван и ответил отказом или ошибкой (`isError`).
@@ -56,6 +57,7 @@ READ_ONLY_TOOLS = frozenset(
         "import_suggest_items",
         "import_match_findings",
     }
+    | READ_PLAN_TOOLS
 )
 
 
