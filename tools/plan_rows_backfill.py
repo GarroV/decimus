@@ -21,6 +21,7 @@ from src.db import queries
 from src.db.errors import ActionPlanError
 from src.db.plan_backfill import backfill_rows
 from src.db.reach import reach_of
+from src.db.space import acting_space
 from src.domain.tenants import HQ_TENANT
 from src.report import plan_terms
 from src.report.letters import sources as letter_sources
@@ -36,8 +37,11 @@ def main(argv: list[str] | None = None) -> int:
         lambda ident: queries.get_inspection(ident, reach=reach, include_on_review=True),
         papers=letter_sources(),
     )
+    # Разовая операция УК: чтение проверки и запись строк идут в пространстве УК,
+    # как у дверей веба. Без него роль приложения не читает проверку вовсе.
     try:
-        report = backfill_rows(terms=terms, apply=apply)
+        with acting_space(HQ_TENANT):
+            report = backfill_rows(terms=terms, apply=apply)
     except ActionPlanError as exc:
         print(exc, file=sys.stderr)
         return 1
