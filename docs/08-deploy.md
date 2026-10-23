@@ -1150,7 +1150,7 @@ DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 наката разом не повторят одну миграцию, откуда бы их ни запустили.
 
 [`scripts/prod-update.sh`](../scripts/prod-update.sh) делает по порядку:
-`git pull --ff-only` → проверка утечки методики (`tools/methodology_leak.py data --tracked-only`, D517: цитата останавливает раскатку, обход `LEAK_CHECK=0`) → сборка с `BUILD_SHA` (вместе с профилем `backup`) →
+`git pull --ff-only` → сверка источника (`scripts/verify-source.sh`: HEAD = `main` на GitHub, дерево чистое, §8.23) → проверка утечки методики (`tools/methodology_leak.py data --tracked-only`, D517: цитата останавливает раскатку, обход `LEAK_CHECK=0`) → сборка с `BUILD_SHA` (вместе с профилем `backup`) →
 база с ожиданием здоровья →
 накат миграций → `up -d --wait` → смоук (`/login` 200, MCP без токена 401,
 админка не пишет в `state`, сервис обхода пишет, `/tg/walk` 200 — §8.14).
@@ -1880,7 +1880,7 @@ D391) — так же: миграций нет, право — уже выдан
 | Кадры для посева | `/srv/decimus-demo-photos` — снимки Белграда-1 и -2 без метаданных (вне git: репозиторий публичный) |
 | Посев | `tools/seed_open_demo.py`: восемь точек в RS, GE, AM; проверки за полгода, календарь сдвигается к дню посева (текущий месяц всегда наполнен); поездки; рейтинги РС и РКО (`tools/open_demo_ratings.py`, импортёр продукта) и обучение из выдуманного iSpring (`tools/open_demo_training.py`, загрузчик продукта) — D590 |
 | Сброс | `deploy/demo/reset.sh`: тома `pgdata`, `state`, `methodology` заново → миграции → `tools/seed_open_demo.py` → подъём, около минуты. Cron пользователя `garva`: `17 * * * *`, лог `~/decimus-demo-reset.log` |
-| Обновление кода | `deploy/demo/update.sh`: `git pull`, сборка, сброс. Запускать **только из `/srv/decimus-demo`**: из `/srv/decimus` compose возьмёт боевой `.env` (боевые пароли, ключи хранилища, токен бота) и поднимет демо на нём. Токен бота у демо-`walk` перекрыт пустым значением в `compose.demo.yaml` (иначе `walk_auth` отказывается стартовать, #1222), остальное — нет |
+| Обновление кода | `deploy/demo/update.sh`: `git pull`, сверка источника (§8.23), сборка, сброс. Запускать **только из `/srv/decimus-demo`**: из `/srv/decimus` compose возьмёт боевой `.env` (боевые пароли, ключи хранилища, токен бота) и поднимет демо на нём. Токен бота у демо-`walk` перекрыт пустым значением в `compose.demo.yaml` (иначе `walk_auth` отказывается стартовать, #1222), остальное — нет |
 | Caddy | `vps-infra` `edge/sites/decimus-demo.caddy` (`<DEMO_ORIGIN_HOST>` → `decimus-demo-web:8267`): сайт без ключа фронта, заголовки фронта срезаются (как у стенда §8.11) |
 | Адрес | https://decimus-demo.vasiliy-garro.workers.dev — Worker `decimus-demo` (`front/deploy.sh demo`, шаблон `front/wrangler.demo.template.jsonc`, `DEMO_ORIGIN_HOST` в `front/.deploy.env`). Секрет `FRONT_KEY` свой, случайный (без него Worker отвечает 503): `openssl rand -hex 32 \| npx wrangler secret put FRONT_KEY --name decimus-demo` |
 
@@ -1932,3 +1932,51 @@ Retention (или эквивалентную политику хранения) 
 ключ лежит в `OPENAI_API_KEY`. Это решение владельца по аккаунту, не код;
 до его настройки срок хранения голоса определяют настройки организации по
 умолчанию. Перечень данных, уходящих наружу, — `docs/18-access-map.md`.
+
+### 8.23. Цепочка поставки: lockfile, сверка, SBOM, сверка источника (GHSA-7gm6-hc9m-w3vc)
+
+**Зависимости ставятся только из lockfile с хэшами.** В `pyproject.toml` прямые
+версии закреплены через `==`, а транзитивные раньше плавали между сборками. Теперь
+всё дерево зафиксировано с хэшами файлов:
+
+| Файл | Что в нём | Кто ставит |
+|---|---|---|
+| `requirements.txt` | всё дерево продукта | `Dockerfile` |
+| `requirements-dev.txt` | то же плюс экстра `dev` | `make bootstrap`, `.github/workflows/pr-checks.yml` |
+| `requirements-build.txt` | зависимости сборки из `[build-system]` (setuptools) | `Dockerfile`, `make bootstrap`, CI — вместе с остальным lockfile |
+| `requirements-audit.txt` | сканер зависимостей и генератор SBOM (экстра `audit`) | `make audit`, `make sbom` (свой venv `.venv-audit`), задание `audit` в CI |
+
+Установка — `pip install --require-hashes -r <файл> -r requirements-build.txt`, затем
+`pip install --no-deps --no-build-isolation -e .` (сам проект, без права дотянуть
+что-то мимо хэшей). Без `[build-system]` и `--no-build-isolation` pip качал бы
+setuptools и wheel в изолированное окружение сборки без хэшей — дыра в
+`--require-hashes`; версия сборки закреплена в `pyproject.toml`. Пакет без хэша в файле или с
+несовпавшим хэшем ставку обрывает. Обновление — осознанное: правка `pyproject.toml`,
+`make lock` (нужен `uv`, он только собирает файлы; ставит обычный pip), коммит
+`pyproject.toml` и всех четырёх файлов вместе. Если правишь только `pyproject.toml`,
+образ соберётся со старым lockfile — расхождение ловит человек на ревью.
+
+Сканер вынесен в отдельную экстру и отдельный venv не ради красоты: он тянет `lxml`,
+а при установленном `lxml` openpyxl пишет книги другим писателем, и тест
+`test_plan_file_core` (книга с управляющим знаком в XML) падает уже при сборке
+книги. Среда тестов не должна меняться от того, что в неё поставили сканер.
+
+**Сверка с базами advisory.** `make audit` (`pip-audit` по `requirements-dev.txt` и `requirements-audit.txt`)
+и задание `audit` в `pr-checks.yml`; находка роняет цель, а задание входит в ворота
+`main-gate`. Новое advisory на уже закреплённую версию на PR без правок не
+проявится: она всплывёт на следующем прогоне или при ручном `make audit` — раз в
+неделю и перед раскаткой его стоит запускать руками (расписания у проверки нет).
+
+**SBOM.** `make sbom` пишет `sbom.cdx.json` (CycloneDX 1.6, дерево продукта из
+`requirements.txt`); в git он не хранится (`.gitignore`), задание `audit` в CI
+прикладывает его артефактом прогона (`sbom-cyclonedx`, 30 дней).
+
+**Сверка источника перед сборкой.** `scripts/prod-update.sh` и `deploy/demo/update.sh`
+зовут `scripts/verify-source.sh` после `git pull` и до `build`: HEAD обязан
+совпадать с `main` на GitHub (адрес берётся у самого GitHub, `git ls-remote`), а
+отслеживаемые файлы — быть неизменёнными (неотслеживаемые, вроде `compose.edge.yaml`
+и `data/`, не считаются). Иначе отказ с причиной, образ не собирается. Осознанный
+обход — `ALLOW_UNVERIFIED_SOURCE=1`, он печатается. Подписей коммитов у проекта нет,
+поэтому подпись не сверяется: сверка подтверждает, что собирается ровно `main` с
+GitHub, но не автора коммита. `scripts/deploy.sh` (MUSPELHEIM) сверки пока не
+делает.
