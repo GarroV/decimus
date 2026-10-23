@@ -242,6 +242,11 @@ _MCP: dict[str, tuple[str, str]] = {
         "Выдана команда загрузки фото к черновику",
         "Photo upload command issued for a draft",
     ),
+    "import_remove_photo": ("Снято фото с записи черновика", "Photo removed from a draft finding"),
+    "import_clear_photos": (
+        "Сняты все фото записи черновика",
+        "All photos removed from a draft finding",
+    ),
     "import_info_fields": (
         "Прочитана информационная часть черновика",
         "Draft information part read",

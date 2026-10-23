@@ -1,6 +1,12 @@
 # Журнал изменений
 
 Формат: обратный хронологический порядок, каждая запись — что изменилось и почему.
+## 2026-10-23 — MCP: кадры черновика загрузки можно снять и заменить оригиналами (D627, #1206)
+
+- Кадры к записи черновика только добавлялись: ужатые миниатюры (Mersin-4, 51 кадр 420×560) нечем было заменить. Теперь `import_get_inspection` у каждой записи кроме числа `photos` даёт список `frames`: id кадра (для вызовов, человеку не показывается), номер по порядку, размер копии и `low_resolution`. Новые `import_remove_photo(inspection_id, n, photo)` и `import_clear_photos(inspection_id, n)` снимают кадр или все кадры записи тем же путём, что вычитка в вебе (`db.review_edit.detach_photo`, D465): строка и объекты хранилища, оригинал и превью. Только черновик своего пространства.
+- Режим замены: `replace` у `import_upload_photos`, у `local_attach_photos` и поле `replace=1` у `/photo-upload/<token>`. Новые кадры прикладываются первыми, прежние снимаются, только если легли все новые; иначе лёгшие новые снимаются обратно, старые не тронуты, ответ `replaced: false`. Мост шлёт замену одним запросом на запись (до 20 МБ) и отказывает целиком, если в наборе негодный файл.
+- Описания инструментов и `src/mcp/instructions.py` учат Claude отвечать на «перезалей фото» заменой оригиналами.
+- Код: `src/mcp/import_photos.py` (новый), `src/mcp/imports.py`, `src/mcp/import_catalogue.py`, `src/mcp/import_photo_link.py`, `src/mcp/photo_quality.py`, `src/mcp/instructions.py`, `src/db/previews.py` (`finding_frames`), `src/web/photo_upload.py`, `src/web/texts_journal.py`, `tools/mcp_bridge.sh`; тесты — `tests/test_mcp_import_photos.py`, `tests/test_web_photo_upload.py`, `tests/test_mcp_bridge_local_photos.py`, каталог — `tests/test_mcp_catalogue.py`. `docs/inventory.md`, `docs/14-history-import.md`.
 ## 2026-10-23 — Мост MCP обновляет себя сам; Claude Desktop ведёт к команде установки (D626)
 
 - Причина: установщик клал мост один раз и больше не трогал, поэтому локальные инструменты фото из папки (D583) были только у свежих установок; у остальных Claude ужимал снимки в base64-миниатюры. Владелец: коллеги сидят в Desktop, доступ должен просто работать.

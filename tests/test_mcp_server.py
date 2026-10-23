@@ -414,6 +414,7 @@ def test_содержимое_проверки_остаётся_нетронут
         "src.mcp.import_match",
         "src.mcp.import_batch",
         "src.mcp.import_photo_link",
+        "src.mcp.import_photos",
         "src.mcp.import_info",
     }, (
         "загрузка исторических проверок (D305) — второе названное исключение: её "

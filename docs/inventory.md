@@ -231,7 +231,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **77** инструментов (checklist — 33, checklist_source — 2, import — 17, inspections — 6, move — 1, plan — 11, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **79** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 6, move — 1, plan — 11, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
@@ -275,6 +275,7 @@
 | `import_add_finding` | import | Add one finding from the report to an imported draft | `src/mcp/imports.py` |
 | `import_add_findings` | import | Add SEVERAL findings to an imported draft in one call (up to 50) | `src/mcp/import_batch.py` |
 | `import_add_photo` | import | Attach a photo from the old report to one finding of an imported draft | `src/mcp/imports.py` |
+| `import_clear_photos` | import | Remove ALL photos of ONE finding of an imported DRAFT | `src/mcp/import_photos.py` |
 | `import_create_inspection` | import | Start entering ONE inspection after the fact: creates a DRAFT with no findings | `src/mcp/imports.py` |
 | `import_discard_draft` | import | Delete an imported DRAFT entirely, with its findings and photos — e.g | `src/mcp/imports.py` |
 | `import_edit_finding` | import | Correct one finding of an imported draft by its number n | `src/mcp/imports.py` |
@@ -284,6 +285,7 @@
 | `import_list_drafts` | import | List this space's imported drafts that are not accepted yet: mode (history/current), unit, date, checklist version… | `src/mcp/imports.py` |
 | `import_match_findings` | import | Read-only: for ALL dictated findings at once (up to 50), pick the checklist item, class and zone with the SAME pipeline… | `src/mcp/import_match.py` |
 | `import_remove_finding` | import | Remove one finding (with its photos) from an imported draft by its number n | `src/mcp/imports.py` |
+| `import_remove_photo` | import | Remove ONE photo from a finding of an imported DRAFT — e.g | `src/mcp/import_photos.py` |
 | `import_set_info` | import | Record answers to information fields of a current-mode imported DRAFT (values = {code: answer}) | `src/mcp/import_info.py` |
 | `import_suggest_items` | import | Read-only: pick the checklist item, class and zone for ONE finding — the same pipeline as import_match_findings and the… | `src/mcp/import_suggest.py` |
 | `import_upload_photos` | import | Upload the photos attached to the chat to ONE imported draft | `src/mcp/import_photo_link.py` |
@@ -321,7 +323,7 @@
 | Инструмент | Что делает | Где |
 |---|---|---|
 | `local_photo_folder` | Папка с фото на машине человека (только внутри `$HOME`, без подпапок и ссылок): имена файлов и уменьшенные копии JPEG ~768 px как ImageContent, порциями (`offset`/`limit`, до 60). HEIC конвертируется через `sips` | `tools/mcp_bridge.sh` |
-| `local_attach_photos` | Оригиналы из той же папки к находкам черновика: мост сам берёт у сервера адрес (`import_upload_photos` → поле `upload_target`, не показывается человеку) и шлёт multipart | `tools/mcp_bridge.sh` |
+| `local_attach_photos` | Оригиналы из той же папки к находкам черновика: мост сам берёт у сервера адрес (`import_upload_photos` → поле `upload_target`, не показывается человеку) и шлёт multipart. `replace: true` (D627) — кадры записи заменяются: прежние снимаются, только если легли все новые (в ответе `replaced` по записи); все кадры записи — одним запросом (до 20 МБ), иначе запись отказана целиком | `tools/mcp_bridge.sh` |
 
 **Самообновление моста (D626).** Мост, поставленный командой установки, лежит в `~/.decimus/bin/mcp_bridge.sh` и сам не менялся — поэтому новые локальные инструменты доходили только до свежих установок. Теперь на старте он спрашивает сервер и заменяет себя. Версия — строка `BRIDGE_VERSION=<число>` в шапке `tools/mcp_bridge.sh`; **правка моста, которую надо донести до уже поставленных, поднимает её на единицу** (мост без этой строки обновиться не может — такие ставятся заново командой установки). Двери сервера (`src/mcp/install.py`, `src/mcp/server.py`), обе только с токеном (401 без него, пределы как у POST):
 

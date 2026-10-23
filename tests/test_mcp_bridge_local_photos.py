@@ -85,21 +85,25 @@ def сервер() -> Iterator[tuple[str, _Seen]]:
                     b"Content-Type: " + self.headers["Content-Type"].encode() + b"\r\n\r\n" + raw
                 )
                 n = ""
+                replace = ""
                 files: list[tuple[str, int]] = []
                 for part in message.iter_parts():
                     name = part.get_param("name", header="content-disposition")
                     if name == "n":
                         n = part.get_content().strip()
+                    elif name == "replace":
+                        replace = part.get_content().strip()
                     elif name == "file":
                         files.append(
                             (part.get_filename() or "", len(part.get_payload(decode=True)))
                         )
-                seen.uploads.append({"n": n, "files": files})
+                seen.uploads.append({"n": n, "files": files, "replace": replace})
                 self._send(
                     200,
                     {
                         "attached": [{"file": f, "n": int(n)} for f, _ in files],
                         "refused": [],
+                        **({"replaced": True} if replace == "1" else {}),
                     },
                 )
                 return
@@ -344,3 +348,111 @@ def test_heic_превращается_в_jpeg(сервер: tuple[str, _Seen], 
     данные = base64.b64decode(картинка["data"])
     assert данные[:2] == b"\xff\xd8", "HEIC не стал JPEG"
     assert _jpeg_long_side(данные, tmp_path) == 768
+
+
+def test_замена_передаётся_серверу_и_итог_replaced_доходит_до_модели(
+    сервер: tuple[str, _Seen], дом: Path
+) -> None:
+    url, seen = сервер
+
+    [ответ] = _run(
+        дом,
+        url,
+        [
+            _call(
+                11,
+                "local_attach_photos",
+                {
+                    "inspection_id": INSPECTION,
+                    "folder": "Downloads/test",
+                    "replace": True,
+                    "items": [{"n": 3, "files": ["a.jpg", "wide.png"]}],
+                },
+            )
+        ],
+    )
+
+    assert "isError" not in ответ["result"], ответ  # type: ignore[operator]
+    итог = json.loads(ответ["result"]["content"][0]["text"])  # type: ignore[index]
+    assert итог["findings"][0]["replaced"] is True
+    assert [(u["n"], u["replace"]) for u in seen.uploads] == [("3", "1")]  # type: ignore[union-attr]
+
+
+def test_без_replace_кадры_добавляются_и_поля_замены_нет(
+    сервер: tuple[str, _Seen], дом: Path
+) -> None:
+    url, seen = сервер
+
+    [ответ] = _run(
+        дом,
+        url,
+        [
+            _call(
+                12,
+                "local_attach_photos",
+                {
+                    "inspection_id": INSPECTION,
+                    "folder": "Downloads/test",
+                    "items": [{"n": 3, "files": ["a.jpg"]}],
+                },
+            )
+        ],
+    )
+
+    итог = json.loads(ответ["result"]["content"][0]["text"])  # type: ignore[index]
+    assert "replaced" not in итог["findings"][0]
+    assert [u["replace"] for u in seen.uploads] == [""]  # type: ignore[union-attr]
+
+
+def test_замена_с_негодным_файлом_ничего_не_отправляет(
+    сервер: tuple[str, _Seen], дом: Path
+) -> None:
+    """Старые кадры не должны уйти из-за урезанного набора: негодный файл рушит всю замену."""
+    url, seen = сервер
+
+    [ответ] = _run(
+        дом,
+        url,
+        [
+            _call(
+                13,
+                "local_attach_photos",
+                {
+                    "inspection_id": INSPECTION,
+                    "folder": "Downloads/test",
+                    "replace": True,
+                    "items": [{"n": 4, "files": ["a.jpg", "notes.txt"]}],
+                },
+            )
+        ],
+    )
+
+    итог = json.loads(ответ["result"]["content"][0]["text"])  # type: ignore[index]
+    assert seen.uploads == [], "замена с негодным файлом ушла на сервер"
+    assert итог["attached_total"] == 0
+    assert итог["findings"][0]["replaced"] is False
+    assert {r["file"] for r in итог["findings"][0]["refused"]} == {"a.jpg", "notes.txt"}
+
+
+def test_replace_не_булев_отказ(сервер: tuple[str, _Seen], дом: Path) -> None:
+    url, seen = сервер
+
+    [ответ] = _run(
+        дом,
+        url,
+        [
+            _call(
+                14,
+                "local_attach_photos",
+                {
+                    "inspection_id": INSPECTION,
+                    "folder": "Downloads/test",
+                    "replace": "yes",
+                    "items": [{"n": 4, "files": ["a.jpg"]}],
+                },
+            )
+        ],
+    )
+
+    assert ответ["result"]["isError"] is True  # type: ignore[index]
+    assert seen.uploads == []

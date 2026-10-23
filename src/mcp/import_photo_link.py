@@ -64,7 +64,7 @@ def _base() -> str:
 
 
 def import_upload_photos(
-    *, tenant: str, store: Store, actor: str, inspection_id: str
+    *, tenant: str, store: Store, actor: str, inspection_id: str, replace: bool = False
 ) -> dict[str, object]:
     """Выдать песочнице команду загрузки кадров к черновику своего пространства."""
     del store, actor
@@ -82,7 +82,11 @@ def import_upload_photos(
         # Поле для локального моста (`tools/mcp_bridge.sh`, `local_attach_photos`): он шлёт
         # кадры сам. Модели и человеку не показывается — так же, как адрес в `command`.
         "upload_target": url,
-        "command": f'curl -sS -F n=<finding number> -F file=@{UPLOADS_DIR}<file name> "{url}"',
+        "replace": replace,
+        "command": (
+            f"curl -sS -F n=<finding number> {'-F replace=1 ' if replace else ''}"
+            f'-F file=@{UPLOADS_DIR}<file name> "{url}"'
+        ),
         "status": (
             "Run `command` in the sandbox once per photo (several photos of one finding: "
             "several -F file=@... in one command). The answer is JSON: attached / refused "
@@ -91,5 +95,12 @@ def import_upload_photos(
             f"«{NO_NETWORK_SAY.format(domain=urlparse(база).hostname)}» and give no "
             "address. `upload_target` is a machine field for the local bridge: never show or "
             "repeat it. Works only while the draft is not accepted"
+            + (
+                ". REPLACE mode: per finding ONE command with all its photos; the old "
+                "photos are removed only if all new ones were stored — the JSON says "
+                "`replaced: true/false`, on false nothing changed and `refused` says why"
+                if replace
+                else ""
+            )
         ),
     }
