@@ -2177,3 +2177,25 @@ a[data-zoom] { cursor: zoom-in; }
 @media (max-width: 719px) {
   .tedit__pop { position: fixed; left: var(--space-7); right: var(--space-7); width: auto; max-width: none; }
 }
+
+/* ── Значок пояснения «?» (D631, D632) ──────────────────────────────────
+   Служебный текст шапки — свежесть, счётчики, пояснения — лежит под значком
+   рядом с заголовком; столбик раскрывается наведением и фокусом, без скрипта,
+   на телефоне нажатие фокусирует элемент с tabindex. Блок цепляется к строке
+   заголовка `.info-row`, а не к значку: слева он начинается от поля страницы и
+   на 390 px не уходит за экран. Разметка — макрос `_info_tip.html`. */
+.info-row { position: relative; display: flex; align-items: center; gap: var(--space-3); }
+.info-tip { align-self: stretch; display: inline-flex; align-items: center; }
+.info-tip__mark {
+  display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; cursor: help;
+  border: 1px solid var(--line-control); border-radius: var(--r-pill);
+  font-size: var(--fs-meta); font-weight: var(--w-semibold); line-height: 1; color: var(--ink-3);
+}
+.info-tip__mark:hover, .info-tip:focus-within .info-tip__mark { color: var(--accent); border-color: var(--accent-line); }
+.info-tip__pop {
+  display: none; position: absolute; z-index: 30; top: 100%; left: 0;
+  width: min(20rem, calc(100vw - 2rem)); padding-bottom: var(--space-3);
+}
+.info-tip:hover .info-tip__pop, .info-tip:focus-within .info-tip__pop { display: block; }
+.info-tip__list { margin: 0; padding: var(--space-3) var(--space-5) 0; list-style: none; font-size: var(--fs-dense); color: var(--ink-2); }
+.info-tip__list li { padding: var(--space-1) 0; }

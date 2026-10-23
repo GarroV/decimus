@@ -10,6 +10,7 @@
   Выбор живёт в адресе: без скриптов строка — обычная ссылка, перезагрузка
   держит панель открытой, ссылкой можно поделиться.
 #}{% extends "_pick_page.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% from "actions/_columns.html" import country_rail, country_select, state_blocks with context %}
 {% from "actions/_list_plans.html" import plans_list with context %}
 {% from "actions/_list_rx.html" import rx_list with context %}
@@ -36,13 +37,15 @@
   <header class="pk-head">
     <div class="pk-head__main">
       <div class="pk-kicker">{{ country_title(country) or country if country else t('actions.all_countries') }}</div>
-      <h1 class="pk-title">{{ t(title_key|default('section.actions.title')) }}</h1>
+      <div class="info-row">
+        <h1 class="pk-title">{{ t(title_key|default('section.actions.title')) }}</h1>
+        {% if total %}{{ info_tip(t('tip.counts'), '', [t('actions.count', n=total)], 'actions') }}{% endif %}
+      </div>
     </div>
     {#- «Новое предписание» без проверки — только у ОСБ и главного админа; админ смотрит без кнопок. -#}
     {% if tab == 'osb' and may('prescription.manage') %}
       <div class="pk-head__actions"><a class="sbtn sbtn--primary" href="{{ new_url }}">{{ t('rx.new') }}</a></div>
     {% endif %}
-    {% if total %}<div class="pk-head__facts"><span>{{ t('actions.count', n=total) }}</span></div>{% endif %}
   </header>
   {% if truncated %}<p class="slist__note">{{ t(truncated_key, n=limit) }}</p>{% endif %}
   {{ state_blocks(plans_list if tab == 'plans' else rx_list) }}

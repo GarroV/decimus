@@ -24,14 +24,17 @@
 {% endblock %}
 {% block page_class %} page--settings{% endblock %}
 {% block body %}
-  {% from "_split_ui.html" import confirm %}
+  {% from "_info_tip.html" import info_tip %}
+{% from "_split_ui.html" import confirm %}
   {% set tile_icon = {'profile': 'team', 'language': 'flag', 'password': 'lock', 'security': 'check', 'signins': 'clock', 'signout': 'arrow', 'claude': 'spark', 'bot': 'tg', 'google': 'globe'} %}
   {% set tile_name = {'profile': 'settings.profile.title', 'language': 'settings.lang.title', 'password': 'profile.password.title', 'security': 'sf.sec.title', 'signins': 'journal.own.title', 'signout': 'settings.signout.title', 'claude': 'settings.claude.title', 'bot': 'settings.bot.title', 'google': 'settings.google.title'} %}
   {% set google_login = google_enabled and me.email %}
   <header class="shead">
     <div class="shead__main">
-      <h1 class="shead__title">{{ t('section.settings.title') }}</h1>
-      <p class="ssec__note">{{ t('settings.sub') }}</p>
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('section.settings.title') }}</h1>
+        {{ info_tip(t('tip.hint'), '', [t('settings.sub'), t('settings.sub.grant'), t('settings.sub.role')], 'settings') }}
+      </div>
     </div>
   </header>
   <article class="ssettings">

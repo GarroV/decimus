@@ -61,18 +61,18 @@
 /* отбор «Девелопер» — выпадающий список на ширину колонки (`.pickbox`, D611) */
 
 /* ── рабочая область ────────────────────────────────────────────────── */
-.pk-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main actions" "facts facts" "period period";
+.pk-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main actions" "period period";
   gap: var(--space-3) var(--space-5); align-items: start; }
 .pk-head__main { grid-area: main; min-width: 0; }
-.pk-head__facts { grid-area: facts; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6);
-  font-size: var(--fs-dense); line-height: var(--lh-dense); color: var(--ink-2); }
-.pk-head__facts .is-muted { color: var(--ink-3); }
 .pk-head__actions { grid-area: actions; display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; justify-content: flex-end; }
 .pk-head__actions .btn { text-decoration: none; width: auto; flex: none; min-height: 0; }
 .pk-head__period { grid-area: period; padding-top: var(--space-4); border-top: 1px solid var(--line); }
 .pk-kicker { font: var(--w-semibold) 10.5px / 1 var(--font-ui); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
 .pk-title { margin: var(--space-2) 0 0; font-size: 22px; line-height: 28px; font-weight: var(--w-semibold);
   letter-spacing: -.01em; color: var(--ink); overflow-wrap: anywhere; }
+
+.pk-head .info-row { margin-top: var(--space-2); }
+.pk-head .info-row .pk-title { margin: 0; }
 
 /* плитки ключевых цифр */
 .pk-tiles { display: grid; grid-template-columns: repeat(var(--pk-cols, 4), minmax(0, 1fr)); gap: var(--space-4); }

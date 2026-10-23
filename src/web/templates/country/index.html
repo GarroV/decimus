@@ -20,6 +20,7 @@
   в колонке строка «сводка по группе», справа общие цифры и строка на каждую страну.
   Строки сводки не ссылки (D527): страну выбирают в колонке слева.
 #}{% extends "_pick_page.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% from "_pick.html" import pick %}
 {% from "_pick_ui.html" import pick_item, pick_search, pick_head, pick_sub, pick_block, pick_empty, pick_tile, pick_tiles with context %}
 {% from "_period.html" import period_picker with context %}
@@ -98,8 +99,7 @@
 
   {% if combined %}
     {# ── Сводка девелопера: общие цифры его стран и строка на каждую (D527: без переходов) ── #}
-    {% call pick_head(t('country.dev.label'), dev) %}
-      <div class="pk-head__facts"><span>{{ t('country.dev.countries', n=dev_rows|length) }}</span></div>
+    {% call pick_head(t('country.dev.label'), dev, info_tip(t('tip.counts'), '', [t('country.dev.countries', n=dev_rows|length)], 'dev')) %}
       <div class="pk-head__period">
         {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), period_hidden) }}
       </div>

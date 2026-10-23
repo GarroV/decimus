@@ -10,6 +10,7 @@
   только свои входы, `own`). Кто чьи записи видит, решает база; шаблон ничего не скрывает
   сам — у обычного человека в ответе просто нет чужого.
 #}{% extends "base.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% from "_period.html" import period_picker with context %}
 {% from "users/_tabs.html" import users_tabs with context %}
 {% block title %}{{ t('journal.own.title' if own else 'section.users.title') }}{% endblock %}
@@ -22,8 +23,16 @@
 {% block body %}
   <header class="shead">
     <div class="shead__main">
-      <h1 class="shead__title">{{ t('journal.own.title' if own else 'section.users.title') }}</h1>
-      <p class="shead__sub">{{ t('journal.own.sub' if own else 'journal.sub') }}</p>
+      {% set tip_rows = [t('journal.own.sub' if own else 'journal.sub')] %}
+      {% if view == 'actions' %}
+        {% set _ = tip_rows.extend([t('journal.retention.actions'), t('journal.retention.secrets')]) %}
+      {% else %}
+        {% set _ = tip_rows.append(t('journal.retention.logins')) %}
+      {% endif %}
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('journal.own.title' if own else 'section.users.title') }}</h1>
+        {{ info_tip(t('tip.hint'), '', tip_rows, 'journal') }}
+      </div>
     </div>
     {% if own %}<a class="sbtn" href="{{ settings_url }}?lang={{ lang }}">{{ t('journal.own.back') }}</a>{% endif %}
   </header>
@@ -55,8 +64,7 @@
     {% if failed %}
       <div class="sempty"><p class="sempty__title">{{ t('journal.failed.title') }}</p><p class="sempty__text">{{ t('journal.failed.text') }}</p></div>
     {% else %}
-      <p class="jcount">{{ t('journal.count', count=rows|length) }}
-        <span class="jcount__note">{{ t('journal.retention.actions' if view == 'actions' else 'journal.retention.logins') }}</span></p>
+      <p class="jcount">{{ t('journal.count', count=rows|length) }}</p>
       {% if capped %}<p class="jcount jcount--warn">{{ t('journal.capped', count=limit) }}</p>{% endif %}
       {% if not rows %}
         <div class="sempty"><p class="sempty__title">{{ t('journal.empty.title') }}</p>

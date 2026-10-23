@@ -16,6 +16,7 @@
   в системе ещё нет (предписания, планы), честно помечен «в разработке» — так
   же, как помечены разделы в шапке.
 #}{% extends "base.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% block title %}{{ data.name }}{% endblock %}
 
 {% block body %}
@@ -29,14 +30,13 @@
     <div class="ov-head__main">
       <a class="back" href="{{ url(overview_path) }}?lang={{ lang }}">{{ t('unit.back') }}</a>
       <div class="ov-head__kicker">{{ t('unit.title') }}</div>
-      <h1 class="ov-head__title">{{ data.name }}</h1>
-      <div class="ov-head__sub">
-        {% if data.partner %}
-          {{ t('unit.meta', city=city_title(data.city) or country_title(data.country), partner=data.partner) }}
-        {% else %}
-          {{ city_title(data.city) or country_title(data.country) }}
-        {% endif %}
-        · {{ t('unit.audits', n=data.audits_count) }}
+      {#- Город, партнёр и число проверок — под «?» столбиком, в шапке только название (D632). -#}
+      {% set tip_rows = [city_title(data.city) or country_title(data.country)] %}
+      {% if data.partner %}{% set _ = tip_rows.append(t('unit.partner', partner=data.partner)) %}{% endif %}
+      {% set _ = tip_rows.append(t('unit.audits', n=data.audits_count)) %}
+      <div class="info-row">
+        <h1 class="ov-head__title">{{ data.name }}</h1>
+        {{ info_tip(t('tip.counts'), '', tip_rows, 'unit') }}
       </div>
     </div>
 

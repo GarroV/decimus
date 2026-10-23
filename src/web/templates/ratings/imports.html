@@ -6,11 +6,13 @@
   причина строки показывается по коду (P15). Вид — как у сводки (D354),
   стили — `static/decimus-rt.css`.
 #}{% extends "base.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% block title %}{{ t('ratings.imports.title') }}{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">{% endblock %}
 
 {% macro action(path) %}{{ url(ratings_path ~ path) }}?lang={{ lang }}{% endmacro %}
-{% macro sec_head(id, key, meta=none) %}<div class="rt-sec__head"><h2 class="rt-sec__title" id="{{ id }}">{{ t(key) }}</h2>{% if meta %}<span class="rt-sec__meta">{{ meta }}</span>{% endif %}</div>{% endmacro %}
+{#- Число рядом с заголовком секции остаётся числом; пояснение строкой — под «?» (D632). -#}
+{% macro sec_head(id, key, meta=none) %}<div class="rt-sec__head info-row"><h2 class="rt-sec__title" id="{{ id }}">{{ t(key) }}</h2>{% if meta is number %}<span class="rt-sec__meta">{{ meta }}</span>{% elif meta %}{{ info_tip(t('tip.hint'), '', [meta], id) }}{% endif %}</div>{% endmacro %}
 
 {% block body %}
 <div class="rt">

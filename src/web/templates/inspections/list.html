@@ -22,6 +22,7 @@
   Период — «с — по» по дате обхода со стрелками ← →, по умолчанию всё время
   (D404; `registry_period.py`).
 #}{% extends "_split_page.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% from "_pick.html" import pick %}
 {% from "_period.html" import period_picker with context %}
 {% from "inspections/_panel.html" import inspection_panel with context %}
@@ -47,18 +48,17 @@
 {% block split_top %}
   <header class="shead">
     <div class="shead__main">
-      <h1 class="shead__title">{{ t('section.registry.title') }}</h1>
-      <p class="shead__sub">
-        {%- if filters.unchecked -%}
-          {{ t('registry.unchecked.label') }} ({{ period_title }}){% if to_check.shown and not to_check.failed %}: {{ to_check.total }}{% endif %}
-        {%- else -%}
-          {#- Итоги — в счётчиках блоков «На приёмке» и «Принятые»; здесь только
-              период, к которому относятся принятые (#978: строка из четырёх
-              кусков с ISO-датами не читалась и повторяла счётчики). -#}
-          {{ t('registry.head.period', period=period_title) }}
-          {%- if registry.retracted_count %} · {{ t('registry.retracted_count', count=registry.retracted_count) }}{% endif %}
-        {%- endif %}
-      </p>
+      {#- Период в шапке не повторяем — он в переключателе ниже; служебные числа — под «?» (D632). -#}
+      {% set tip_rows = [] %}
+      {% if filters.unchecked %}
+        {% set _ = tip_rows.append(t('registry.unchecked.label') ~ ' (' ~ period_title ~ ')' ~ (': ' ~ to_check.total if to_check.shown and not to_check.failed else '')) %}
+      {% elif registry.retracted_count %}
+        {% set _ = tip_rows.append(t('registry.retracted_count', count=registry.retracted_count)) %}
+      {% endif %}
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('section.registry.title') }}</h1>
+        {% if tip_rows %}{{ info_tip(t('tip.counts'), '', tip_rows, 'registry') }}{% endif %}
+      </div>
     </div>
   </header>
 {% endblock %}

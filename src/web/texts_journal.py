@@ -343,8 +343,12 @@ _SCREEN: dict[str, dict[str, str]] = {
         "en": "Sign-ins are kept for 180 days.",
     },
     "journal.retention.actions": {
-        "ru": "Действия хранятся 365 дней. Пароли, токены и свободный текст в журнал не пишутся.",
-        "en": "Actions are kept for 365 days. Passwords, tokens and free text are not recorded.",
+        "ru": "Действия хранятся 365 дней.",
+        "en": "Actions are kept for 365 days.",
+    },
+    "journal.retention.secrets": {
+        "ru": "Пароли, токены и свободный текст в журнал не пишутся.",
+        "en": "Passwords, tokens and free text are not recorded.",
     },
     "journal.own.title": {"ru": "Журнал входов", "en": "Sign-in log"},
     "journal.own.sub": {

@@ -188,6 +188,8 @@ TEXTS: dict[str, dict[str, str]] = {
     # «всего шесть» рядом с плиткой критических по всему срезу (#503).
     "overview.attention.count": {"ru": "показано: {count}", "en": "{count} shown"},
     "overview.attention.title": {"ru": "Требует решения сегодня", "en": "Needs a decision today"},
+    "tip.hint": {"ru": "Пояснение", "en": "Explanation"},
+    "tip.counts": {"ru": "Сводка", "en": "Summary"},
     "overview.attention.hint": {
         "ru": "Критические нарушения и просевшие оценки, самое срочное сверху",
         "en": "Critical findings and dropped scores, most urgent first",
@@ -330,7 +332,7 @@ TEXTS: dict[str, dict[str, str]] = {
     # ── Карточка точки (экран «point» прототипа, T355) ──────────────────
     "unit.back": {"ru": "‹ Обзор", "en": "‹ Overview"},
     "unit.title": {"ru": "Карточка точки", "en": "Unit card"},
-    "unit.meta": {"ru": "{city} · партнёр {partner}", "en": "{city} · partner {partner}"},
+    "unit.partner": {"ru": "партнёр {partner}", "en": "partner {partner}"},
     "unit.audits": {"ru": "проверок: {n}", "en": "audits: {n}"},
     "unit.tile.score": {"ru": "Текущая оценка", "en": "Current score"},
     "unit.last": {"ru": "Последняя проверка", "en": "Last audit"},

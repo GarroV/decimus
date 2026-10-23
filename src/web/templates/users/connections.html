@@ -7,6 +7,7 @@
   форма «Подключить сервис» или страница ключа. Ключ показан ЗДЕСЬ и один раз:
   в базе от него остаётся отпечаток, в адрес он не попадает намеренно.
 #}{% extends "_split_page.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% from "users/_tabs.html" import users_tabs with context %}
 {% from "users/_connections.html" import service_card, add_card, key_card with context %}
 {% block title %}{{ t('section.users.title') }}{% endblock %}
@@ -16,8 +17,10 @@
 {% block split_top %}
   <header class="shead">
     <div class="shead__main">
-      <h1 class="shead__title">{{ t('section.users.title') }}</h1>
-      <p class="shead__sub">{{ t('connections.sub') }}</p>
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('section.users.title') }}</h1>
+        {{ info_tip(t('tip.hint'), '', [t('connections.sub')], 'connections') }}
+      </div>
     </div>
   </header>
   {{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link, has_journal_tab, has_usage_tab) }}
