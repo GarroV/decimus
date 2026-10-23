@@ -20,6 +20,11 @@ from PIL import Image, UnidentifiedImageError
 LOW_RES_LONG_SIDE = 1000
 
 
+def is_low_resolution(width: int, height: int) -> bool:
+    """Кадр мельче порога по длинной стороне (одно место для предупреждения и списка кадров)."""
+    return max(width, height) < LOW_RES_LONG_SIDE
+
+
 def low_resolution_warning(data: bytes) -> str | None:
     """Строка предупреждения, если кадр мельче `LOW_RES_LONG_SIDE`, иначе ничего.
 
@@ -31,8 +36,7 @@ def low_resolution_warning(data: bytes) -> str | None:
             ширина, высота = картинка.size
     except (UnidentifiedImageError, OSError):
         return None
-    сторона = max(ширина, высота)
-    if сторона >= LOW_RES_LONG_SIDE:
+    if not is_low_resolution(ширина, высота):
         return None
     return (
         f"low_resolution: кадр {ширина}×{высота} — мельче {LOW_RES_LONG_SIDE} px по длинной "

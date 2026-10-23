@@ -18,7 +18,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import import_batch, import_info, import_match, import_photo_link, import_suggest, imports
+from . import (
+    import_batch,
+    import_info,
+    import_match,
+    import_photo_link,
+    import_photos,
+    import_suggest,
+    imports,
+)
 
 _ID: dict[str, object] = {
     "type": "string",
@@ -557,10 +565,68 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "per request). Never show the address to the person. If the command cannot "
             "connect, say the one sentence given in `status` and nothing else. The "
             "command works until the draft is accepted, belongs to this draft only and "
-            "can be issued again at any time. Findings must be recorded first."
+            "can be issued again at any time. Findings must be recorded first. By "
+            "default photos are ADDED to the ones already there; to swap reduced "
+            "copies for originals pass replace=true: the command then carries "
+            "-F replace=1 and the finding's previous photos are removed ONLY if every "
+            "new photo of that command was stored (otherwise nothing changes and the "
+            "answer says `replaced: false`). One command with replace per finding, all "
+            "its photos in that one command."
         ),
-        input_schema=_schema({"inspection_id": _ID}, ["inspection_id"]),
+        input_schema=_schema(
+            {
+                "inspection_id": _ID,
+                "replace": {
+                    "type": "boolean",
+                    "description": (
+                        "true — the uploaded photos REPLACE the frames the findings "
+                        "already have (the command then carries -F replace=1)."
+                    ),
+                },
+            },
+            ["inspection_id"],
+        ),
         handler=import_photo_link.import_upload_photos,
+    ),
+    ImportTool(
+        name="import_remove_photo",
+        description=(
+            "Remove ONE photo from a finding of an imported DRAFT — e.g. a reduced "
+            "copy that is too small to read. Take `photo` from the `frames` list of "
+            "that finding in import_get_inspection (frames also show the size and "
+            "`low_resolution`). Never show these ids to the person: say 'photo 2 of "
+            "finding 5'. Own draft only, not an accepted inspection. To swap a photo "
+            "for the original, prefer a replace upload (import_upload_photos / "
+            "local_attach_photos with replace) — it keeps the old photo if the new "
+            "one does not arrive."
+        ),
+        input_schema=_schema(
+            {
+                "inspection_id": _ID,
+                "n": _N,
+                "photo": {
+                    "type": "string",
+                    "description": (
+                        "Frame id from the `frames` list of this finding "
+                        "(import_get_inspection), not the frame number."
+                    ),
+                },
+            },
+            ["inspection_id", "n", "photo"],
+        ),
+        handler=import_photos.import_remove_photo,
+    ),
+    ImportTool(
+        name="import_clear_photos",
+        description=(
+            "Remove ALL photos of ONE finding of an imported DRAFT. Use it only when "
+            "the person asked to drop the photos, or when a replace upload is refused "
+            "because the finding is full (10 photos): clear, then upload. Between the "
+            "two calls the finding has no photos, so tell the person if the upload then "
+            "fails. Own draft only, not an accepted inspection."
+        ),
+        input_schema=_schema({"inspection_id": _ID, "n": _N}, ["inspection_id", "n"]),
+        handler=import_photos.import_clear_photos,
     ),
     ImportTool(
         name="import_info_fields",
