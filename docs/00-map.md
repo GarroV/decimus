@@ -95,7 +95,7 @@ Flask-приложение управляющей компании и партн
 `app.py` собирает приложение и ещё держит часть экранов; остальные экраны
 подключаются своими `install(app, conf)`.
 
-<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,view,webauthn_rp}.py -->
+<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,server_limits,view,webauthn_rp}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/__main__.py` | Точка входа веб-админки: `python -m src.web` |
@@ -107,6 +107,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/errors.py` | Отказы блока `web` |
 | `src/web/icons.py` | Иконки админки — набор линейки из дизайн-системы (`static/icons.json`) |
 | `src/web/sections.py` | Разделы веб-админки и признак «построен / не построен» (D138) |
+| `src/web/server_limits.py` | Явные пределы сервера `waitress` и предел одновременных медленных запросов |
 | `src/web/view.py` | Подготовка того, что уже посчитано, к показу |
 | `src/web/webauthn_rp.py` | Ключи доступа (WebAuthn): тонкая обёртка над `webauthn` (duo-labs/py_webauthn, D463) |
 <!-- map:end -->
@@ -911,7 +912,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/mcp_healthcheck.py` | Проба здоровья MCP-сервера — изнутри его контейнера (задача T255, #210) |
 | `tools/mcp_install.sh` | Установщик подключения к MCP-серверу проверок (#244, решение D112) |
 | `tools/mcp_outside.py` | Смоук доступа к MCP-серверу С ЧУЖОЙ МАШИНЫ (задача T256, #211) |
-| `tools/mcp_watch.py` | Сторож доступности MCP снаружи (#243) |
+| `tools/mcp_watch.py` | Сторож доступности продукта снаружи: MCP (#243) и вход в админку (F-111) |
 | `tools/methodology_leak.py` | Проверка: методика управляющей компании не цитируется в репозитории (#138, #854) |
 | `tools/oauth_smoke.py` | Сквозной прогон подключения Claude входом через сайт (D417) против живого стенда |
 | `tools/open_demo_ratings.py` | Рейтинги открытого демо (D524): РС и РКО пиццерий демо-сети — тем же импортёром, что у продукта |

@@ -6,6 +6,22 @@
 - Причина: опрос шёл с `handle_as_tasks=False`, и голосовое одного аудитора (ffmpeg плюс расшифровка, минуты) задерживало ответы всем остальным чатам.
 - `src/bot/serial.py` (новый): мидлварь `ChatSerialMiddleware` — замок на чат и общий предел 16 одновременных обновлений. `src/bot/app.py`: `run_polling` с `handle_as_tasks=True`, мидлварь подключена в `build_dispatcher`. Порядок внутри чата сохранён (T059, состояние с `flock`, FSM в памяти). Тест — `tests/test_bot_parallel_chats.py`; `docs/08-deploy.md` §4.3.
 - Не сделано намеренно: FSM и состояние проверок остаются в одном процессе (перенос в общее хранилище отложен владельцем); синхронные чтения `get_state` в цикле не переносились в поток — это чтение без `flock`, около 0,1 мс (`tests/test_bot_event_loop.py`).
+## 2026-10-23 — Явные пределы сервера и сторож админки снаружи (F-121, F-111)
+
+- `src/web/server_limits.py`: админка и сервис обхода поднимаются с названными пределами `waitress` (потоки 8, соединения 100, молчание 60 с, тело до 101 МиБ — пачка кадров одной записи плюс запас, выше при поднятом `ATTACHMENT_MAX_MB`), переменные `WEB_THREADS`, `WEB_CONNECTION_LIMIT`, `WEB_CHANNEL_TIMEOUT_SEC`, `WEB_MAX_BODY_MB`. Медленный путь отделён от страниц: через админку к обходу не больше `WEB_WALK_PROXY_MAX` (4) запросов, в сервисе обхода вызовов модели не больше `WALK_MODEL_MAX_CONCURRENT` (3); лишним — 503 сразу. См. advisory GHSA-7gm6-hc9m-w3vc.
+- Сторож `mcp-outside` проверяет и страницу входа админки (секрет `ADMIN_PUBLIC_URL`), задача при провале — «Продукт снаружи недоступен».
+
+## 2026-10-23 — Ключ фронта сверяют и админка, и MCP (F-107)
+
+- MCP: `X-Forwarded-For` верим только звену с верным `X-Decimus-Front-Key` (`MCP_FRONT_KEY`, на проде по умолчанию `WEB_FRONT_KEY`); не задан — как раньше, с предупреждением при старте. Сверка общая с админкой — `src/domain/client_ip.py`. Тесты — `tests/test_domain_journal.py`, `tests/test_mcp_config.py`.
+- Прод: Caddy перестал срезать ключ (vps-infra), `WEB_FRONT_KEY` задан. См. advisory GHSA-7gm6-hc9m-w3vc.
+
+## 2026-10-23 — Кадры прода переехали с MUSPELHEIM на VPS, резерв — ночной бэкап (D635)
+
+- `docker-compose.prod.yml`: службы `storage-live` (MinIO, том `storage-data`, порт наружу не публикуется) и `storage-init` (корзина, политика `decimus-frames-rw`, пользователь `decimus-app`; профиль `storage-init`). `scripts/prod-update.sh`: шаг «хранилище кадров» между базой и накатом. Root-ключи — `FRAMES_ROOT_USER` / `FRAMES_ROOT_PASSWORD` в `.env` (`.env.example`).
+- Прод ходит на `S3_ENDPOINT_URL=http://storage-live:9000`; том `decimus_storage-data` в ночном бэкапе VPS (`vps-infra`, `targets.conf`). Старый MinIO на MUSPELHEIM не тронут, страховка до 30.10.2026.
+- `docs/08-deploy.md` (§4.9.2, §8 таблица, §8.2, §8.5): новое место кадров, переменные, порядок переезда и отката.
+- Root-ключи хранилища гасятся у приложения пустой строкой (`x-no-owner` и `migrate` в `docker-compose.yml`), как DSN владельца базы; тест — `tests/test_no_owner_dsn_in_services.py` (без правки падает).
 ## 2026-10-23 — Превью-стенд: walk тоже обнуляет токен бота (#1222)
 
 - `deploy/preview/compose.preview.yaml`: у `walk` `TELEGRAM_BOT_TOKEN: ""`, как у демо (#1223) — поднятый из каталога с боевым `.env` стенд не падает на guard просмотра без подписи. Тест `test_infra_compose.py` проверяет оба стенда; заодно снят красный линт этого теста (лишний `noqa`, формат).

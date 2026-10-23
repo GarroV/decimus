@@ -389,12 +389,13 @@
 | `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 2 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_CONFIRM_SECRET` | `src/mcp/confirm.py` | да |
+| `MCP_FRONT_KEY` | `src/mcp/config.py` | да |
 | `MCP_HOST` | `src/mcp/config.py` | да |
 | `MCP_IMPORT_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_LINK_PORT` | `tools/mcp_healthcheck.py` | да |
 | `MCP_LISTEN_NETWORK` | `src/mcp/config.py` | да |
 | `MCP_PORT` | `src/mcp/config.py` | да |
-| `MCP_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/mcp_watch.py`, `tools/oauth_smoke.py` | да |
+| `MCP_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/oauth_smoke.py` | да |
 | `MCP_RETRACTION_TOKENS` | `src/mcp/config.py` | да |
 | `MCP_TOKENS` | `src/mcp/config.py` | да |
 | `MCP_TOKEN_TTL_DAYS` | `src/db/mcp_access.py` | да |
@@ -423,19 +424,24 @@
 | `STATE_DIR` | `src/domain/config.py`, `src/report/letters.py`, `tools/state_backup.py` | да |
 | `TELEGRAM_BOT_TOKEN` | `src/bot/config.py`, `src/web/walk_auth.py` | да |
 | `WALK_MOCKUP_ZONES` | `tools/walk_mockup/build.py` | нет — ручной рычаг сборки макета (tools/walk_mockup/build.py), не настройка |
+| `WALK_MODEL_MAX_CONCURRENT` | `src/web/server_limits.py` | да |
 | `WALK_USERS` | `src/domain/walk_users.py` | да |
 | `WEBAUTHN_ORIGIN` | `src/web/config.py` | да |
 | `WEBAUTHN_RP_ID` | `src/web/config.py` | да |
 | `WEB_BOT_USERNAME` | `src/web/config.py` | да |
+| `WEB_CHANNEL_TIMEOUT_SEC` | `src/web/server_limits.py` | да |
+| `WEB_CONNECTION_LIMIT` | `src/web/server_limits.py` | да |
 | `WEB_DEMO` | `src/domain/demo.py` | да |
 | `WEB_DEMO_URL` | `src/domain/demo.py` | да |
 | `WEB_FRONT_KEY` | `src/web/config.py` | да |
 | `WEB_HOST` | `src/web/config.py` | да |
 | `WEB_HSTS` | `src/web/config.py` | да |
 | `WEB_LISTEN_NETWORK` | `src/web/config.py` | да |
+| `WEB_MAX_BODY_MB` | `src/web/server_limits.py` | да |
 | `WEB_PORT` | `src/web/config.py`, `tools/walk_healthcheck.py` | да |
 | `WEB_SECRET_KEY` | `src/mcp/import_photo_link.py`, `src/web/config.py` | да |
 | `WEB_TENANT` | `src/web/config.py` | да |
+| `WEB_THREADS` | `src/web/server_limits.py` | да |
 | `WEB_TRUSTED_PROXIES` | `src/web/config.py` | да |
 | `WEB_TRUSTED_PROXY_ADDR` | `src/web/config.py` | да |
 | `WEB_UI_LANG` | `src/web/texts.py` | да |
@@ -443,6 +449,7 @@
 | `WEB_USER_PASSWORD` | `tools/web_user.py` | да |
 | `WEB_WALK_PREVIEW_CHAT` | `src/web/walk_auth.py` | да |
 | `WEB_WALK_PREVIEW_CHAT_RU` | `src/web/walk_auth.py` | да |
+| `WEB_WALK_PROXY_MAX` | `src/web/server_limits.py` | да |
 | `WEB_WALK_UPSTREAM` | `src/web/config.py` | да |
 <!-- map:end -->
 

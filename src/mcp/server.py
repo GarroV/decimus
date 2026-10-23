@@ -33,7 +33,7 @@ from src.domain.public_urls import OAUTH_SCOPE, PROTECTED_RESOURCE_PATH
 from .audit import journal_write_call, log_write_call
 from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, space_of
-from .config import Settings, resolve_access
+from .config import MCP_FRONT_KEY_VAR, Settings, resolve_access
 from .errors import AuthError
 from .install import (
     BRIDGE_META_PATH,
@@ -51,6 +51,9 @@ from .rpc import CODE_PARSE_ERROR, handle
 #: Больше мегабайта читающему серверу присылать нечего: вопросы к базе
 #: короткие. Предел стоит до чтения тела, иначе он не предел, а пожелание.
 MAX_BODY_BYTES = 1 << 20
+
+#: Заголовок, в котором Worker фронта шлёт ключ; Caddy проверяет его и пропускает дальше.
+FRONT_KEY_HEADER = "X-Decimus-Front-Key"
 
 #: Ответ на уведомление JSON-RPC: принято, тела нет.
 _ACCEPTED = HTTPStatus.ACCEPTED
@@ -316,6 +319,8 @@ class _Handler(BaseHTTPRequestHandler):
             self.headers.get("X-Forwarded-For"),
             trusted_proxies=self._settings.trusted_proxies,
             trusted_addrs=self._settings.trusted_proxy_addrs,
+            front_key=self._settings.front_key,
+            given_key=self.headers.get(FRONT_KEY_HEADER),
         )
 
     def _send_rate_limited(self, request_id: Any = None) -> None:
@@ -526,6 +531,12 @@ def serve(settings: Settings) -> None:
         f"[mcp] слушаю http://{settings.host}:{port}/ — "
         f"арендаторов заведено: {len(settings.tenants)}"
     )
+    if settings.trusted_proxies > 0 and settings.trusted_proxy_addrs and not settings.front_key:
+        print(
+            f"[mcp] {MCP_FRONT_KEY_VAR} не задан: ключ фронта не проверяется, X-Forwarded-For "
+            f"верим любому соседу по подсети звена (docs/08-deploy.md, §8.9)",
+            file=sys.stderr,
+        )
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

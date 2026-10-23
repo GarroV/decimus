@@ -32,6 +32,7 @@ from src.domain.model_usage import KIND_SUGGEST, usage_scope
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.models import Candidate
 
+from .server_limits import walk_model_gate
 from .texts_walk import WALK_TEXTS
 from .walk_auth import SUGGEST_ENDPOINT, SUGGEST_PATH, WalkSettings
 from .walk_write import Identify, WalkRefused, _code, _refs, _text, reading_of
@@ -147,6 +148,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
     """
     busy: set[int] = set()
     guard = threading.Lock()
+    gate = walk_model_gate()
 
     def refused(key: str, lang: str, status: int = 422) -> tuple[Response, int]:
         entry = WALK_TEXTS[key]
@@ -175,6 +177,11 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             with guard:
                 busy.discard(who)
             return refused("walk.err.suggest_busy", lang, 429)
+        if not gate.try_enter():
+            hold.release()
+            with guard:
+                busy.discard(who)
+            return refused("walk.err.overloaded", lang, 503)
         try:
             words = _text(body, "words")
             # Зона на экране — только подсказка (D445). Старый клиент слал её
@@ -208,6 +215,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             logger.warning("Обход: поиск пункта для чата %s не удался: %s", log_id(who), exc)
             return refused("walk.err.recognize", lang, 503)
         finally:
+            gate.leave()
             hold.release()
             with guard:
                 busy.discard(who)

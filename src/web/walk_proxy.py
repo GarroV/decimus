@@ -26,6 +26,7 @@ from flask import Flask, Response, jsonify, request
 
 from src.domain.uploads import MAX_UPLOAD_BYTES
 
+from .server_limits import SlowGate, walk_proxy_slots
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
 from .walk_auth import (
@@ -76,6 +77,16 @@ def _unavailable(ui_lang: str) -> tuple[Response, int]:
     return jsonify({"error": "unavailable", "texts": texts}), 503
 
 
+#: Через сколько секунд повторить, когда проход занят (заголовок `Retry-After`).
+OVERLOAD_RETRY_AFTER_SEC = 5
+
+
+def _overloaded(ui_lang: str) -> tuple[Response, int]:
+    answer, status = _unavailable(ui_lang)
+    answer.headers["Retry-After"] = str(OVERLOAD_RETRY_AFTER_SEC)
+    return answer, status
+
+
 def forward(upstream: str, ui_lang: str) -> Response | tuple[Response, int]:
     """Передать текущий запрос сервису обхода и вернуть его ответ."""
     url = f"{upstream}{request.script_root}{request.path}"
@@ -109,12 +120,23 @@ def install(app: Flask, *, upstream: str | None, ui_lang: str) -> None:
     if upstream is None:
         return
     target = upstream  # сужение типа не доходит до замыкания
+    # Запрос к обходу держит поток админки до 45 с. Предел одновременных —
+    # чтобы они не заняли все потоки и страницы админки открывались (F-121).
+    gate = SlowGate(walk_proxy_slots())
 
     def route(path: str, endpoint: str, method: str, *, max_body: int | None = None) -> None:
         def view() -> Response | tuple[Response, int]:
             if max_body is not None:
                 request.max_content_length = max_body
-            return forward(target, ui_lang)
+            if not gate.try_enter():
+                logger.warning(
+                    "Обход: все %s слотов передачи заняты, отказ без ожидания", gate.slots
+                )
+                return _overloaded(ui_lang)
+            try:
+                return forward(target, ui_lang)
+            finally:
+                gate.leave()
 
         app.add_url_rule(path, endpoint=endpoint, view_func=view, methods=[method])
 

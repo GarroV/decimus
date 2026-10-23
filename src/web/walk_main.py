@@ -24,6 +24,7 @@ from waitress import serve  # noqa: E402 -- окружение читается 
 from .config import load_settings  # noqa: E402
 from .errors import WebError  # noqa: E402
 from .proxy import _proxy_options  # noqa: E402
+from .server_limits import server_options  # noqa: E402
 from .walk_app import create_walk_app  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ def main() -> int:
     )
     try:
         settings = load_settings()
+        limits = server_options()
         app = create_walk_app(settings)
     except (WebError, ValueError) as exc:
         # `ValueError` — отказ настроек обхода (`walk_auth.load_walk_settings`):
@@ -49,6 +51,7 @@ def main() -> int:
         host=settings.host,
         port=settings.port,
         ident="decimus-walk",
+        **limits,
         **_proxy_options(settings),
     )
     return 0
