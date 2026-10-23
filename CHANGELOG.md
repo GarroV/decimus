@@ -1,6 +1,11 @@
 # Журнал изменений
 
 Формат: обратный хронологический порядок, каждая запись — что изменилось и почему.
+## 2026-10-23 — Ключ фронта сверяют и админка, и MCP (F-107)
+
+- MCP: `X-Forwarded-For` верим только звену с верным `X-Decimus-Front-Key` (`MCP_FRONT_KEY`, на проде по умолчанию `WEB_FRONT_KEY`); не задан — как раньше, с предупреждением при старте. Сверка общая с админкой — `src/domain/client_ip.py`. Тесты — `tests/test_domain_journal.py`, `tests/test_mcp_config.py`.
+- Прод: Caddy перестал срезать ключ (vps-infra), `WEB_FRONT_KEY` задан. См. advisory GHSA-7gm6-hc9m-w3vc.
+
 ## 2026-10-23 — Кадры прода переехали с MUSPELHEIM на VPS, резерв — ночной бэкап (D635)
 
 - `docker-compose.prod.yml`: службы `storage-live` (MinIO, том `storage-data`, порт наружу не публикуется) и `storage-init` (корзина, политика `decimus-frames-rw`, пользователь `decimus-app`; профиль `storage-init`). `scripts/prod-update.sh`: шаг «хранилище кадров» между базой и накатом. Root-ключи — `FRAMES_ROOT_USER` / `FRAMES_ROOT_PASSWORD` в `.env` (`.env.example`).
