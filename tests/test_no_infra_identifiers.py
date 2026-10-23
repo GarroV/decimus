@@ -50,8 +50,8 @@ CLOUDFLARE_ID_LINE = re.compile(r"service_id|vpc|tunnel", re.IGNORECASE)
 #: Не адреса сервера: сама сеть CGNAT (код проверяет попадание в неё), условный адрес
 #: из тестов и публичный DNS.
 ALLOWED_ADDRESSES = frozenset({"100.64.0.0", "100.64.1.2", "8.8.8.8", "1.1.1.1"})
-#: Версия, а не адрес: `Chrome/141.0.0.0`, `socat:1.8.0.0`.
-VERSION_PREFIX = re.compile(r"[A-Za-z][/:v]$")
+#: Версия, а не адрес: `Chrome/141.0.0.0`, `socat:1.8.0.0`, пин lock-файла `brotlicffi==1.2.1.0`.
+VERSION_PREFIX = re.compile(r"(?:[A-Za-z][/:v]|[=<>~!]=)$")
 
 SELF = "tests/test_no_infra_identifiers.py"
 
@@ -129,6 +129,7 @@ def test_scanner_flags_bad_line(line: str) -> None:
 def test_scanner_ignores_public_product_address_versions_and_doc_ranges() -> None:
     text = (
         "https://decimus.vasiliy-garro.workers.dev Chrome/141.0.0.0 socat:1.8.0.0 "
+        "brotlicffi==1.2.1.0 x>=2.3.4.5 "
         "203.0.113.7 198.51.100.7 192.0.2.1 127.0.0.1 10.0.0.5 100.64.1.2 "
         '"id": "123e4567-e89b-12d3-a456-426614174000" <ORIGIN_HOST>'
     )
