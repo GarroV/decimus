@@ -47,7 +47,7 @@ def _seed(dsn: str) -> tuple[str, str]:
 
 
 def _run(dsn: str, backup: Path) -> list[str]:
-    """Запись идёт под служебной ролью, как на площадке: удаление строк `units` роли приложения не выдано."""
+    """Запись идёт под служебной ролью, как на площадке: роли приложения delete не выдан."""
     with acting_space(SYSTEM_SPACE):
         actions, _index, _log = apply(dsn, plan, backup)
     return [f"{a.kind}:{a.unit.name}" for a in actions if a.writes]
