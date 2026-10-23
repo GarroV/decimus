@@ -112,6 +112,7 @@ def _head(item: PlanRequest, *, on: date) -> dict[str, Any]:
         "state": item.state,
         "due_on": item.due_on.isoformat(),
         "overdue": item.overdue(on),
+        "returns": item.returns_count,
         "count_from": item.count_from.isoformat(),
         "electronic": item.electronic,
     }
