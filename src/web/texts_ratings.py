@@ -107,6 +107,7 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.col.violation": {"ru": "Нарушение", "en": "Violation"},
     "ratings.col.amount": {"ru": "Раз", "en": "Times"},
     "ratings.col.scores": {"ru": "Оценки по периодам", "en": "Scores by period"},
+    "ratings.col.average": {"ru": "Средняя", "en": "Average"},
     "ratings.filter.country": {"ru": "Страна", "en": "Country"},
     "ratings.filter.all": {"ru": "Все", "en": "All"},
     "ratings.layout.maps": {"ru": "Оценки на картах", "en": "Map ratings"},
@@ -151,8 +152,8 @@ _SCREEN: dict[str, dict[str, str]] = {
     },
     "ratings.block.risk": {"ru": "Стабильно ниже порога", "en": "Consistently below threshold"},
     "ratings.risk.hint": {
-        "ru": "{n} последних периода подряд ниже {x}",
-        "en": "Last {n} periods in a row below {x}",
+        "ru": "Средняя за {n} последних периода ниже {x}",
+        "en": "Average of the last {n} periods below {x}",
     },
     "ratings.empty.rs": {
         "ru": "За период нет данных РС.",
@@ -345,8 +346,8 @@ _IMPORTS: dict[str, dict[str, str]] = {
     "ratings.settings.top_threshold": {"ru": "Порог Top/Bottom", "en": "Top/bottom threshold"},
     "ratings.settings.risk_threshold": {"ru": "Порог зоны риска", "en": "Risk threshold"},
     "ratings.settings.risk_periods": {
-        "ru": "Периодов подряд для зоны риска",
-        "en": "Periods in a row for risk",
+        "ru": "Периодов в средней для зоны риска",
+        "en": "Periods averaged for risk",
     },
     "ratings.settings.save": {"ru": "Сохранить пороги", "en": "Save thresholds"},
     "ratings.saved": {"ru": "Сохранено.", "en": "Saved."},
