@@ -313,7 +313,9 @@ def test_запись_без_вычета_снимается_так_же_и_оц
     chat_id = 731 if класс == "D0" else 732
     start_inspection(chat_id, unit=ТОЧКА, kind="planned", report_lang="ru", tenant="HQ")
     walk_add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="пол в цехе")
-    walk_add_finding(chat_id, code="CLN06", level=класс, zone="dining", text="стены в зале")
+    # D0 в синтетической методике допускает только INF09 в зоне hot_kitchen; совет R — любой пункт.
+    код, зона = ("INF09", "hot_kitchen") if класс == "D0" else ("CLN06", "dining")
+    walk_add_finding(chat_id, code=код, level=класс, zone=зона, text="стены в зале")
     ident = push_inspection(chat_id)
     до = get_inspection(ident, reach=УК, include_on_review=True)
     assert до is not None
