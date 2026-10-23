@@ -30,18 +30,20 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
 import psycopg
+
+from src.domain.uploads import is_upload_ref
 
 from .config import check_environment, load_storage_settings
 from .errors import PhotosDeferredError, PushError, StorageError
 from .pool import connection
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
 from .space import SYSTEM_SPACE, acting_space
-from .stamp import StampContext, stamp_text
+from .stamp import CHANNEL_APP, CHANNEL_BOT, StampContext, stamp_text
 from .storage import PHOTO_CONTENT_TYPE, PhotoStorage, S3PhotoStorage, object_key
 
 logger = logging.getLogger(__name__)
@@ -92,16 +94,19 @@ _INSPECTION_EXISTS_SQL = "select 1 from inspections where id = %s"
 #: отчёт, страна — для местного времени. Происхождение нужно, чтобы историческая
 #: загрузка штампа не получила (D332).
 _STAMP_CONTEXT_SQL = """
-select u.name, i.auditor, u.country, i.origin
+select u.name, i.auditor, u.country, i.origin, i.inspection_date
 from inspections i
 join units u on u.id = i.unit_id
 where i.id = %s
 """
 
 #: Кадры этого происхождения штампа не получают: сегодняшняя дата на кадре
-#: старого отчёта (D332) или проверки, загруженной задним числом через MCP,
-#: была бы ложью — снимали их не сегодня.
-_UNSTAMPED_ORIGINS = frozenset({"legacy", "import"})
+#: старого отчёта (D332) была бы ложью — снимали его не сегодня.
+_UNSTAMPED_ORIGINS = frozenset({"legacy"})
+
+#: Кадры этого происхождения штамп получают с датой проверки без времени
+#: (D625): загружены задним числом, момент загрузки был бы ложью.
+_DAY_STAMPED_ORIGINS = frozenset({"import"})
 
 
 @dataclass(frozen=True)
@@ -147,27 +152,52 @@ def pending_photo_uploads(
     return [PendingUpload(key, tuple(ids), since[key]) for key, ids in by_inspection.items()]
 
 
-def stamp_context(cur: psycopg.Cursor[Any], inspection_id: str) -> StampContext | None:
+def stamp_context(
+    cur: psycopg.Cursor[Any], inspection_id: str, channel: str
+) -> StampContext | None:
     """Что идёт на штамп кадров проверки; `None` — штампа нет.
 
     Единая точка для всех путей, что кладут кадр в хранилище: выгрузка живых
-    кадров (бот, мини-апп, веб), приложенный на вычитке и загруженный через MCP.
-    Штамп нужен живым кадрам; загрузке задним числом (`origin` `legacy` и
-    `import`) — нет.
+    кадров (бот, мини-апп), приложенный на вычитке (веб) и загруженный через
+    MCP. `channel` — откуда кадр (`stamp.CHANNEL_*`): нигде не хранится, его
+    знает путь сохранения, и он передаёт его сюда (D625). Живой проверке — штамп
+    с моментом; загруженной через MCP (`import`) — с датой проверки без времени;
+    историческому импорту (`legacy`, D332) — штампа нет.
     """
     cur.execute(_STAMP_CONTEXT_SQL, (inspection_id,))
     row = cur.fetchone()
     if row is None:
         raise PushError(f"В базе нет проверки {inspection_id} — штамп кадра брать не откуда")
-    name, auditor, country, origin = row
+    name, auditor, country, origin, inspection_date = row
     if origin in _UNSTAMPED_ORIGINS:
         return None
-    return StampContext(str(name), str(auditor or ""), country)
+    day = inspection_date if origin in _DAY_STAMPED_ORIGINS else None
+    return StampContext(str(name), str(auditor or ""), country, channel=channel, day=day)
 
 
-def stamp_for(cur: psycopg.Cursor[Any], inspection_id: str, moment: datetime) -> str | None:
+def stamps_of_pending(
+    context: StampContext | None, pending: list[tuple[Any, Any, datetime]]
+) -> dict[Any, str | None]:
+    """Штамп каждого ждущего кадра: `(id, ссылка, created_at)` → текст или `None`.
+
+    Канал кадра берётся по его ссылке: «walk:…» — мини-апп, остальное — бот (D625).
+    """
+    return {
+        photo_id: None
+        if context is None
+        else stamp_text(
+            created_at,
+            replace(context, channel=CHANNEL_APP) if is_upload_ref(str(file_id)) else context,
+        )
+        for photo_id, file_id, created_at in pending
+    }
+
+
+def stamp_for(
+    cur: psycopg.Cursor[Any], inspection_id: str, moment: datetime, channel: str
+) -> str | None:
     """Текст штампа кадра проверки на момент `moment`; `None` — штампа нет."""
-    context = stamp_context(cur, inspection_id)
+    context = stamp_context(cur, inspection_id, channel)
     return None if context is None else stamp_text(moment, context)
 
 
@@ -264,11 +294,8 @@ def upload_photos(
                 pending = cur.fetchall()
                 # Время штампа — когда кадр лёг в проверку (`created_at`), а не
                 # когда его догрузили: дозагрузка идёт позже съёмки.
-                context = stamp_context(cur, inspection_id)
-                stamps = {
-                    photo_id: None if context is None else stamp_text(created_at, context)
-                    for photo_id, _file_id, created_at in pending
-                }
+                context = stamp_context(cur, inspection_id, CHANNEL_BOT)
+                stamps = stamps_of_pending(context, pending)
 
         for photo_id, file_id, _created_at in pending:
             data = fetch(file_id)

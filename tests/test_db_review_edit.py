@@ -305,6 +305,43 @@ def test_запись_снимается_номера_не_сдвигаются_
     assert "score_pct" in изменения
 
 
+@pytest.mark.parametrize("класс", ["D0", "R"])
+def test_запись_без_вычета_снимается_так_же_и_оценку_кладёт_движок(
+    сеть: None, pg_dsn: str, класс: str
+) -> None:
+    # Arrange — D1 и запись без вычета (D0 или совет R): дверь базы не смотрит на класс (D624)
+    chat_id = 731 if класс == "D0" else 732
+    start_inspection(chat_id, unit=ТОЧКА, kind="planned", report_lang="ru", tenant="HQ")
+    walk_add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="пол в цехе")
+    # D0 в синтетической методике допускает только INF09 в зоне hot_kitchen; совет R — любой пункт.
+    код, зона = ("INF09", "hot_kitchen") if класс == "D0" else ("CLN06", "dining")
+    walk_add_finding(chat_id, code=код, level=класс, zone=зона, text="стены в зале")
+    ident = push_inspection(chat_id)
+    до = get_inspection(ident, reach=УК, include_on_review=True)
+    assert до is not None
+    снимаемая = next(f for f in до.findings if f.level == класс)
+    оставшаяся = next(f for f in до.findings if f.level == "D1")
+    увиденное: list[list[str]] = []
+
+    def движок(current: InspectionDetail) -> Score:
+        увиденное.append([f.id for f in current.findings])
+        return ОЦЕНКА
+
+    # Act
+    delete_finding(
+        ident, снимаемая.id, tenant="HQ", editor=ПРАВИТ, score_of=движок, storage=Склад()
+    )
+
+    # Assert — движок видел проверку без записи, оценка от него, след в журнале
+    assert увиденное == [[оставшаяся.id]]
+    после = get_inspection(ident, reach=УК, include_on_review=True)
+    assert после is not None
+    assert [f.id for f in после.findings] == [оставшаяся.id]
+    assert (после.inspection.pct, после.inspection.grade) == (77.0, "C")
+    *_, (вид, запись, _) = _журнал_правок(pg_dsn, ident)
+    assert (вид, запись) == ("delete", снимаемая.id)
+
+
 def test_несуществующая_запись_не_снимается(сеть: None) -> None:
     ident, _ = _ждущая(722)
     with pytest.raises(ReviseError, match="записи в этой проверке нет"):

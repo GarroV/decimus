@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 from flask.testing import FlaskClient
 from PIL import Image
-from test_web_acceptance import ORIGIN, _лист, _приёмка, админ, стенд  # noqa: F401
+from test_web_acceptance import ORIGIN, ТЕНАНТ, _лист, _приёмка, админ, стенд  # noqa: F401
 from test_web_app import карточка, шапка
 
 from src.bot.propose import Offer
@@ -75,6 +75,44 @@ def test_в_панели_на_вычитке_нет_режима_исправи�
     # Удаление ошибочной записи (#1164): подтверждение раскрывающимся блоком, без alert/confirm.
     assert "/findings/" in страница and "/delete" in страница and "data-del" in страница
     assert "window.confirm" not in страница and "data-confirm" not in страница
+
+
+@админ
+@pytest.mark.parametrize("класс", ["D0", "R", "D1"])
+@pytest.mark.parametrize("адрес", ["/inspections/x", ПАНЕЛЬ])
+def test_удалить_запись_можно_у_любого_класса_включая_d0_и_r(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, класс: str, адрес: str
+) -> None:
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+    деталь = карточка(
+        шапка(on_review=True, tenant_code=ТЕНАНТ),
+        findings=(replace(ЗАПИСЬ, id="fz", level=класс),),
+    )
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)
+
+    страница = стенд.get(адрес).get_data(as_text=True)
+
+    assert "/findings/fz/delete" in страница and "data-del" in страница
+    # Правка D0/R не открывается: карандаша и формы правки у них нет, форма есть только у D1.
+    assert ("/findings/fz/revise" in страница) == (класс == "D1")
+    assert страница.count("data-del-cancel") == 1
+
+
+@админ
+def test_у_принятой_удаления_записи_нет_и_у_d0(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _приёмка(monkeypatch, ждёт=False)
+    _лист(monkeypatch)
+    деталь = карточка(
+        шапка(on_review=False, tenant_code=ТЕНАНТ), findings=(replace(ЗАПИСЬ, id="fz", level="D0"),)
+    )
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)
+
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    assert "/findings/fz/delete" not in страница and "data-del" not in страница
 
 
 # --- «+ Добавить нарушение»: кому и когда --------------------------------------

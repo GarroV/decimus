@@ -1,4 +1,4 @@
-"""Видимый штамп на кадре проверки: когда, где, кто снял (D619, D621).
+"""Видимый штамп на кадре проверки: когда, где, кто снял и откуда кадр (D619, D621, D625).
 
 Штамп вшивается в сохранённый файл на сервере, при сжатии кадра
 (`previews.make_preview`), и оригинала без него не остаётся (D250, D253).
@@ -11,6 +11,13 @@
 (Кипр, Узбекистан), — первый; иначе пояс неоднозначен, и штамп честно идёт по
 UTC с пометкой «UTC» в конце — молча подставленное чужое время хуже названного.
 
+В конце строки — короткая пометка канала, откуда пришёл кадр (D625): `bot`,
+`app` (мини-апп), `web`, `MCP`. Латиницей и одинаково на всех языках: это
+имя канала, а не фраза. Тот же размер шрифта, строка лишь на пару знаков длиннее.
+
+Кадр, загруженный через MCP по уже прошедшей проверке (`origin = 'import'`),
+несёт не момент загрузки, а дату проверки без времени: снимали не сегодня.
+
 Кадры исторической загрузки (`origin = 'legacy'`, D332) штампа не получают:
 сегодняшняя дата на кадре старого отчёта была бы ложью. Решает вызывающий —
 он просто не просит штамп.
@@ -20,7 +27,7 @@ from __future__ import annotations
 
 import zoneinfo
 from dataclasses import dataclass
-from datetime import UTC, datetime, tzinfo
+from datetime import UTC, date, datetime, tzinfo
 from functools import lru_cache
 from pathlib import Path
 
@@ -40,6 +47,13 @@ _MARGIN_SHARE = 0.8
 _BACK_RGBA = (0, 0, 0, 150)
 _TEXT_RGBA = (255, 255, 255, 255)
 
+#: Каналы кадра (D625): откуда он пришёл. Это метки на картинке, не тексты
+#: интерфейса — на всех языках одни и те же.
+CHANNEL_BOT = "bot"
+CHANNEL_APP = "app"
+CHANNEL_WEB = "web"
+CHANNEL_MCP = "MCP"
+
 _SEPARATOR = " · "
 _UTC_MARK = " UTC"
 
@@ -49,11 +63,15 @@ _ZONE_TAB = "zone.tab"
 
 @dataclass(frozen=True)
 class StampContext:
-    """Что на штампе, кроме времени: пиццерия, проверяющий, страна (для пояса)."""
+    """Что на штампе, кроме времени: пиццерия, проверяющий, страна (для пояса), канал."""
 
     unit_name: str
     auditor: str
     country: str | None
+    #: Канал кадра (`CHANNEL_*`); пусто — пометки нет.
+    channel: str = ""
+    #: Дата проверки: если задана, штамп несёт её без времени, а не момент `moment`.
+    day: date | None = None
 
 
 @lru_cache(maxsize=64)
@@ -88,11 +106,20 @@ def local_zone(country: str | None, moment: datetime) -> tzinfo | None:
 
 
 def stamp_text(moment: datetime, context: StampContext) -> str:
-    """Текст штампа. `moment` — осведомлённое время; пустое поле из штампа выпадает."""
-    zone = local_zone(context.country, moment)
-    local = moment.astimezone(zone if zone is not None else UTC)
-    parts: list[str] = [local.strftime("%d.%m.%Y %H:%M") + ("" if zone is not None else _UTC_MARK)]
-    parts.extend(x for x in (context.unit_name.strip(), context.auditor.strip()) if x)
+    """Текст штампа. `moment` — осведомлённое время; пустое поле из штампа выпадает.
+
+    С `context.day` вместо момента идёт дата проверки без времени и без пояса.
+    """
+    if context.day is not None:
+        when = context.day.strftime("%d.%m.%Y")
+    else:
+        zone = local_zone(context.country, moment)
+        local = moment.astimezone(zone if zone is not None else UTC)
+        when = local.strftime("%d.%m.%Y %H:%M") + ("" if zone is not None else _UTC_MARK)
+    parts: list[str] = [when]
+    parts.extend(
+        x for x in (context.unit_name.strip(), context.auditor.strip(), context.channel) if x
+    )
     return _SEPARATOR.join(parts)
 
 

@@ -76,6 +76,24 @@
   {% endif %}
 {% endmacro %}
 
+{# Удаление записи (#1164, D624): подтверждение — раскрывающийся блок, без окна браузера.
+   Кнопка «Да» уходит на свой адрес (`formaction`), поля формы при этом не проверяются.
+   Стоит внутри формы правки, а у записей без карандаша (D0, R, без класса) — в своей
+   форме рядом с записью (`find-del`). #}
+{% macro delete_block(head, finding) %}
+    <details class="pf__delete" data-del>
+      <summary class="btn btn--sm btn--danger">{{ t('proofread.delete') }}</summary>
+      <div class="pf__delete-body" role="group" aria-labelledby="del-{{ finding.id }}">
+        <p class="pf__delete-text" id="del-{{ finding.id }}">{{ t('proofread.delete.text') }}</p>
+        <div class="pf__actions">
+          <button class="btn btn--ghost" type="button" data-del-cancel>{{ t('proofread.delete.no') }}</button>
+          <button class="btn btn--danger" type="submit" formnovalidate
+                  formaction="{{ url('/inspections/' ~ head.id ~ '/findings/' ~ finding.id ~ '/delete') }}?lang={{ lang }}">{{ t('proofread.delete.yes') }}</button>
+        </div>
+      </div>
+    </details>
+{% endmacro %}
+
 {# Правка записи на месте (D200, D495, D535): формулировка, пункт, класс, зона,
    температура термометра (если она есть у записи), кадры. #}
 {% macro edit_form(c, finding, panel=False) %}
@@ -100,19 +118,7 @@
     {% endif %}
     <div class="pf__row"><span class="field-label">{{ t('proofread.photos') }}</span>{{ photo_editor(c, finding) }}</div>
     <p class="field-note">{{ t('revise.hint') }}</p>
-    {#- Удаление (#1164): подтверждение — раскрывающийся блок, без окна браузера. Кнопка
-        «Да» уходит на свой адрес (`formaction`), поля формы при этом не проверяются. #}
-    <details class="pf__delete" data-del>
-      <summary class="btn btn--sm btn--danger">{{ t('proofread.delete') }}</summary>
-      <div class="pf__delete-body" role="group" aria-labelledby="del-{{ finding.id }}">
-        <p class="pf__delete-text" id="del-{{ finding.id }}">{{ t('proofread.delete.text') }}</p>
-        <div class="pf__actions">
-          <button class="btn btn--ghost" type="button" data-del-cancel>{{ t('proofread.delete.no') }}</button>
-          <button class="btn btn--danger" type="submit" formnovalidate
-                  formaction="{{ url('/inspections/' ~ head.id ~ '/findings/' ~ finding.id ~ '/delete') }}?lang={{ lang }}">{{ t('proofread.delete.yes') }}</button>
-        </div>
-      </div>
-    </details>
+    {{ delete_block(head, finding) }}
     <div class="pf__actions">
       <button class="btn btn--ghost" type="button" data-proofread-cancel>{{ t('proofread.cancel') }}</button>
       <button class="btn btn--primary" type="submit" data-saving="{{ t('proofread.saving') }}">{{ t('proofread.save') }}</button>
@@ -280,6 +286,12 @@
           <button class="hbtn hbtn--icon find-item__edit" type="button" data-proofread-edit aria-expanded="false"
                   aria-controls="edit-{{ finding.id }}" aria-label="{{ t('proofread.edit', n=finding.n) }}" title="{{ t('proofread.edit', n=finding.n) }}">{{ icon('pencil') }}</button>
           {{ edit_form(c, finding, panel) }}
+        {% elif can_proof %}
+          {#- D624: удалить можно запись любого класса; правка D0/R не открывается. #}
+          <form class="find-del" method="post"{% if panel %} data-panel-form{% endif %}
+                action="{{ url('/inspections/' ~ head.id ~ '/findings/' ~ finding.id ~ '/delete') }}?lang={{ lang }}">
+            {{ delete_block(head, finding) }}
+          </form>
         {% endif %}
         </div>
       {% endfor %}

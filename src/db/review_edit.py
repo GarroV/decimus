@@ -55,6 +55,7 @@ from .push import _INSERT_TRANSLATION_SQL
 from .queries import _read_detail, _require_inspection_id, _require_tenant
 from .reach import own_reach
 from .revise import _LOCK_SQL, _PAIR_TAKEN_SQL, _refuse_lock, _write_score
+from .stamp import CHANNEL_WEB
 from .storage import PhotoStorage, object_key
 
 #: Ссылка кадра, приложенного в вебе: `web:<id кадра>`. Колонка `telegram_file_id`
@@ -367,7 +368,9 @@ def attach_photo(
                     params={"max": MAX_PHOTOS_PER_INSPECTION},
                 )
             try:
-                копия = make_preview(data, stamp=stamp_for(cur, ident, datetime.now(UTC)))
+                копия = make_preview(
+                    data, stamp=stamp_for(cur, ident, datetime.now(UTC), CHANNEL_WEB)
+                )
             except StorageError as exc:
                 raise ReviseError(
                     "Кадр не читается как изображение (ожидается JPEG, PNG или WebP) — не приложен",
