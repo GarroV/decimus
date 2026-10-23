@@ -171,7 +171,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,photo_upload,account_menu,accounts,auth,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,service_probes,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,photo_upload,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,service_probes,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -188,6 +188,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/journal.py` | Журналы входов и действий на стороне веба (D462, `0067`) |
 | `src/web/journal_screen.py` | Экраны журналов (D462): «Журнал» главного админа и «Журнал входов» человека |
 | `src/web/landing.py` | Посадочная страница продукта (D524): что такое Decimus, «Войти» и «Открыть демо» |
+| `src/web/notifications.py` | Колокольчик и красные точки: уведомления в приложении (#1129, D604, D614) |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
@@ -241,6 +242,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры |
 | `src/web/texts_journal.py` | Тексты журналов входов и действий (D462): подписи действий и экран «Журнал» |
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
+| `src/web/texts_notifications.py` | Тексты уведомлений в приложении (#1129, D604, D614): колокольчик и фразы событий |
 | `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках» |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2) и раздела «Действия» (D526): вкладка, панель, блоки, карточки |
 | `src/web/texts_prescriptions.py` | Тексты предписаний (волна 3): раздел УК, раздел партнёра, блок экрана страны |
@@ -293,7 +295,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 22 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, … (+14) |
+| `src/web/templates/` | 23 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, _pick_page.html, … (+15) |
 | `src/web/templates/actions/` | 9 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, index.html, prescription_form.html, … (+1) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
@@ -315,7 +317,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 61 | SOURCE.md, actions.js, apple-touch-icon.png, country.js, decimus-actions.css, decimus-country.css, decimus-domain.css, decimus-home.css, … (+53) |
+| `src/web/static/` | 62 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-country.css, decimus-domain.css, … (+54) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -389,7 +391,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
@@ -403,6 +405,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/maps_store.py` | Оценки на картах в базе (схема `maps`, миграция 0044): запись снимка и чтение |
 | `src/db/model_key.py` | Ключ модели из базы (D491): тонкая обёртка над общим хранилищем `service_keys` (D576) |
 | `src/db/model_usage.py` | Расход модели (D537, `0078`): запись вызова и чтение сводки для экрана |
+| `src/db/notifications.py` | Уведомления в приложении (#1129, D604, D614): запись событий и чтение своих |
 | `src/db/oauth_store.py` | Хранилище OAuth: клиенты, коды, подключения и токены (D417, миграция `0054`) |
 | `src/db/prescriptions.py` | Предписания: черновик, согласование ОСБ, отправка через Gmail, ответ партнёра, закрытие |
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, согласование, отправка, закрытие (УК), ответ партнёра |
@@ -519,6 +522,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0087_prescription_review.sql` | Согласование предписания ОСБ (D599, D600, шаг 1 спеки 2026-10-21-osb-prescriptions-design) |
 | `0088_country_contracts.sql` | Блок «Договор» в карточке страны (шаг 2 спеки 2026-10-21-osb-prescriptions-design, D603, D606): юрлицо партнёра, договор одной строкой и КОНТАКТЫ ПО ДКК — почты, которые… |
 | `0089_inspection_edits_delete.sql` | Журнал правок на приёмке (0081) принимает и снятие записи (#1164): владелец 21.10.2026 — «добавь в проверки, которые на вычитке, возможность удаления каких-то пунктов… |
+| `0090_notifications.sql` | Уведомления в приложении (#1129, D604, D614): колокольчик в левой панели и красная точка на пункте меню, где есть новое |
 | `0091_units_merge_guard_search_path.sql` | Сторож слияния точек (`units_merge_guard`, 0079) — функция владельца (`security definer`) — был заведён с путём поиска `pg_catalog, public` без `pg_temp` |
 <!-- map:end -->
 

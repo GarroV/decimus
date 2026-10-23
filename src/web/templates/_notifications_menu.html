@@ -1,0 +1,29 @@
+{#
+  Список уведомлений для окна колокольчика (#1129, D604): фрагмент `GET /settings/notifications`,
+  свои строки новые сверху. Текст собирается из вида и параметров (`notif_text`), в базе его нет.
+  Непрочитанное отмечено не цветом одним: жирным и словом «Новое» для чтения с экрана.
+  Каждая строка — ссылка (клавиатура, открытие в новой вкладке); скрипт (`bell.js`) на клик
+  отмечает строку прочитанной и ведёт по адресу.
+#}
+{% if failed %}
+  <p class="notif-menu__note" role="status">{{ t('notif.failed') }}</p>
+{% elif not rows %}
+  <p class="notif-menu__note" role="status">{{ t('notif.empty') }}</p>
+{% else %}
+  {% for row in rows %}
+    <a class="popover__row notif-row{% if row.is_unread %} is-unread{% endif %}" role="menuitem"
+       href="{{ url(row.link) }}" data-read-url="{{ url('/settings/notifications/' ~ row.id ~ '/read') }}">
+      <span class="notif-row__dot" aria-hidden="true"></span>
+      <span class="notif-row__body">
+        <span class="notif-row__text">{% if row.is_unread %}<span class="sr-only">{{ t('notif.new') }}: </span>{% endif %}{{ notif_text(row) }}</span>
+        <small class="notif-row__time">{{ day(row.created_at) }}</small>
+      </span>
+    </a>
+  {% endfor %}
+  {% if rows|selectattr('is_unread')|list %}
+    <div class="popover__foot notif-menu__foot">
+      <button class="notif-menu__all" type="button" role="menuitem"
+              data-read-all-url="{{ url('/settings/notifications/read-all') }}">{{ t('notif.read_all') }}</button>
+    </div>
+  {% endif %}
+{% endif %}

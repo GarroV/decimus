@@ -351,6 +351,9 @@ def test_загрузка_рейтингов(роль: str, можно: bool) ->
     "/settings/google-link",
     "/settings/google-unlink",
     "/settings/lang",
+    # Свои уведомления (#1129, D604): отметка «прочитано» — дело самого человека, любой роли.
+    "/settings/notifications/1/read",
+    "/settings/notifications/read-all",
     # Свой постоянный отбор стран экрана «Страны» (D536) — настройка своей учётки, как язык.
     "/country/filter",
     # Подтверждение входа перед долгоживущим доступом — своя же учётка.

@@ -78,6 +78,7 @@ from . import (
     journal,
     letter_draft,
     letter_markup,
+    notifications,
     oauth,
     osb,
     photo_upload,
@@ -233,6 +234,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     action_plans.install(app, conf)
     users_screen.install(app, conf)
     settings_screen.install(app, conf)
+    notifications.install(app, conf)
     security_screen.install(app, conf)
     prescriptions.install(app, conf)
     osb.install(app, conf)

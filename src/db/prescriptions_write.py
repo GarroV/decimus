@@ -27,6 +27,7 @@ from .config import (
     load_storage_settings,
 )
 from .errors import IssuedDraftLostError, PrescriptionError, StorageError
+from .notifications import notify, user_by_login, users_with_role
 from .prescriptions import (
     ONE_SQL,
     STATUS_APPROVED,
@@ -153,6 +154,40 @@ def _translate(what: str, exc: psycopg.Error) -> PrescriptionError:
     return PrescriptionError(f"{what} не удалось ({type(exc).__name__}). Ничего не изменено")
 
 
+#: Виды уведомлений о предписании (#1129, D604): текст по ним берёт веб из словаря.
+NOTE_REQUESTED = "rx_requested"
+NOTE_RETURNED = "rx_returned"
+NOTE_APPROVED = "rx_approved"
+NOTE_ISSUED = "rx_issued"
+_OSB_ROLE = "osb"
+_SUBJECT_SQL = "select subject, created_by from prescriptions where id = %s"
+
+
+def _notify_event(cur: psycopg.Cursor[Any], kind: str, ident: str, *, actor: str) -> None:
+    """Уведомление о переходе предписания — на курсоре самого перехода, одной транзакцией.
+
+    Запрос на согласование — всем с ролью ОСБ, остальное — автору запроса (D604).
+    Сам действующий себя не уведомляет: ОСБ, согласующий свой черновик, или ОСБ,
+    запросившая согласование, ничего от этого не получают. Адрес — путь внутри
+    приложения: ОСБ ведёт на свою страницу, автора — в «Действия».
+    """
+    cur.execute(_SUBJECT_SQL, (ident,))
+    row = cur.fetchone()
+    if row is None:
+        return
+    тема, автор = str(row[0]), str(row[1])
+    params = {"subject": тема, "by": actor}
+    if kind == NOTE_REQUESTED:
+        получатели = users_with_role(cur, _OSB_ROLE, tenant=HQ_TENANT)
+        link = f"/osb?id={ident}"
+    else:
+        найден = user_by_login(cur, автор, tenant=HQ_TENANT)
+        получатели = [найден] if найден else []
+        link = f"/actions?tab=prescriptions&id={ident}"
+    собой = user_by_login(cur, actor, tenant=HQ_TENANT)
+    notify(cur, [u for u in получатели if u != собой], kind, link, params)
+
+
 def _links(cur: psycopg.Cursor[Any], ident: str, draft: Draft) -> None:
     for unit_id in draft.unit_ids:
         cur.execute(_INSERT_UNIT_SQL, (ident, unit_id))
@@ -189,6 +224,7 @@ def create_draft(draft: Draft, *, actor: str, submit: bool = False) -> str:
             _links(cur, ident, чистый)
             if submit:
                 cur.execute(_REQUEST_SQL, (ident,))
+                _notify_event(cur, NOTE_REQUESTED, ident, actor=who)
             conn.commit()
             return ident
     except psycopg.Error as exc:
@@ -264,6 +300,7 @@ def update_draft(
             _links(cur, ident, чистый)
             if submit:
                 cur.execute(_REQUEST_SQL, (ident,))
+                _notify_event(cur, NOTE_REQUESTED, ident, actor=who)
             conn.commit()
     except psycopg.Error as exc:
         raise _translate("Сохранить предписание", exc) from exc
@@ -299,6 +336,7 @@ def request_review(prescription_id: str, *, actor: str, manager: bool = False) -
             raise PrescriptionError("Запрос на согласование отправляет автор черновика или ОСБ")
         cur.execute(_SIGN_SQL, (who,))
         cur.execute(_REQUEST_SQL, (ident,))
+        _notify_event(cur, NOTE_REQUESTED, ident, actor=who)
 
     _transition(prescription_id, "Отправить на согласование", шаг)
 
@@ -323,6 +361,7 @@ def approve(prescription_id: str, *, actor: str) -> None:
             )
         cur.execute(_SIGN_SQL, (who,))
         cur.execute(_APPROVE_SQL, {"id": ident, "actor": who})
+        _notify_event(cur, NOTE_APPROVED, ident, actor=who)
 
     _transition(prescription_id, "Согласовать предписание", шаг)
 
@@ -342,6 +381,7 @@ def return_to_author(prescription_id: str, *, actor: str, comment: str) -> None:
         cur.execute(_SIGN_SQL, (who,))
         cur.execute(_COMMENT_SQL, (текст,))
         cur.execute(_RETURN_SQL, (ident,))
+        _notify_event(cur, NOTE_RETURNED, ident, actor=who)
 
     _transition(prescription_id, "Вернуть предписание", шаг)
 
@@ -383,6 +423,9 @@ def issue(prescription_id: str, *, actor: str, put_draft: PutDraft) -> Prescript
                 raise PrescriptionError("Нет адресатов — впишите хотя бы один адрес")
             if предписание.due_on < today():
                 raise PrescriptionError("Срок уже прошёл — поправьте его и согласуйте снова")
+            # Уведомление — до перехода, той же транзакцией: последним в ней
+            # остаётся сам переход, и обрыв перед коммитом виден по нему.
+            _notify_event(cur, NOTE_ISSUED, ident, actor=who)
             cur.execute(_ISSUE_SQL, {"id": ident, "actor": who})
         except psycopg.Error as exc:
             raise _translate("Отправить предписание", exc) from exc
