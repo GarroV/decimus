@@ -1,13 +1,9 @@
-"""Мини-апп как приложение аудитора (D373): настройки и подключение Claude.
+"""Мини-апп как приложение аудитора (D373): настройки и завершение проверки.
 
 `POST /tg/walk/app` — одно действие за запрос (`op`):
 
 - `lang` — язык интерфейса человека (D303). Тот же выбор, что `/lang` бота:
   хранится за Telegram ID (`db.bot_langs`), бот подхватывает его сам;
-- `mcp_issue` — готовая команда подключения Claude с личным токеном на
-  учётку, к которой привязан бот. Токен показывается один раз и гасит прежний,
-  как прежняя кнопка бота `/mcp` (D098, снята D626). Выпускает себе каждый, кого мини-апп пускает:
-  круга доступа нет (D448), права в Claude решает роль учётки;
 - `finish_mode` — режим «Завершить» человека (D449): `summary` или `report`,
   хранится за Telegram ID (`db.finish_modes`);
 - `translate_mode` — перевод комментариев на язык отчёта (D443): `button` или
@@ -16,13 +12,10 @@
 - `finish` — «Завершить проверку» (D422, D449): в режиме `summary` итог в чат,
   как `/finish`; в `report` — отчёт сразу (`walk_finish.py`).
 
-Правила те же, что у бота, и функция выпуска та же (`db.mcp_access`):
-мини-апп — второй вход в одно и то же, а не вторая реализация.
-
-**Выпуск токена — только по свежей подписи** (аудит 12.10,
-F-032): подпись Telegram для них годна `MINT_MAX_AGE_SECONDS` (5 минут), а не
-шесть часов, как у записи проверки. Строка, утёкшая из журнала или с экрана,
-иначе шесть часов выпускала бы токены на чужое имя.
+Правила те же, что у бота: мини-апп — второй вход в одно и то же, а не вторая
+реализация. Подключения Claude (MCP) здесь нет (D626): оно только в вебе,
+«Настройки» → «Claude (MCP)» (`users_mcp.py`); мини-апп ведёт туда строкой
+«Все настройки на сайте».
 """
 
 from __future__ import annotations
@@ -35,11 +28,10 @@ from flask import Flask, Response, jsonify, request
 
 from src.bot.config import BotSettings, load_bot_settings
 from src.bot.errors import BotConfigError
-from src.bot.mcp_setup import MCP_URL_VAR, setup_command
 from src.bot.texts import t
 from src.bot.version import build_version
-from src.db import bot_langs, finish_modes, mcp_access, translate_modes
-from src.db.errors import DbError, UnboundError
+from src.db import bot_langs, finish_modes, translate_modes
+from src.db.errors import DbError
 from src.domain.log_ids import log_id
 from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, parse_public_url
 
@@ -49,11 +41,7 @@ from .texts_walk import WALK_TEXTS
 from .walk_auth import (
     APP_ENDPOINT,
     APP_PATH,
-    INIT_DATA_HEADER,
-    MINT_MAX_AGE_SECONDS,
-    WalkAccessError,
     WalkSettings,
-    chat_of,
 )
 from .walk_write import Identify, Respond
 
@@ -128,13 +116,8 @@ def web_settings_url() -> str | None:
     return f"{base}/settings" if base else None
 
 
-def app_block(chat_id: int, lang: str, bot: BotSettings | None) -> dict[str, Any]:
-    """Что знает о человеке главная и настройки.
-
-    `mcp` — показывать ли «Подключить Claude»: стенду с ботом — всем, кого
-    мини-апп пускает (D448). Учётки за чатом может не быть (сотрудник УК по
-    списку окружения) — тогда выпуск ответит словами, как привязать бота.
-    """
+def app_block(chat_id: int, lang: str) -> dict[str, Any]:
+    """Что знает о человеке главная и настройки."""
     return {
         "me": chat_id,
         "lang": lang,
@@ -142,41 +125,8 @@ def app_block(chat_id: int, lang: str, bot: BotSettings | None) -> dict[str, Any
         "finish_mode": finish_mode_of(chat_id),
         "translate_mode": translate_mode_of(chat_id),
         "version": build_version(),
-        "mcp": bot is not None,
         "settings_url": web_settings_url(),
         "sections": ["audit"],
-    }
-
-
-def _fresh(who: int, conf: WalkSettings) -> None:
-    """Подпись не старше `MINT_MAX_AGE_SECONDS` — для выпуска токена (F-032).
-
-    Просмотр без подписи (стенд без бота) свежестью не меряется: подписи нет,
-    а на проде он не включается (`walk_auth.load_walk_settings`).
-    """
-    if conf.bot_token is None:
-        return
-    try:
-        свежий = chat_of(
-            request.headers.get(INIT_DATA_HEADER, ""), conf, max_age=MINT_MAX_AGE_SECONDS
-        )
-    except WalkAccessError as exc:
-        raise Refused("walk.app.err.stale", 401) from exc
-    if свежий != who:
-        raise Refused("walk.app.err.stale", 401)
-
-
-def _issue(who: int, lang: str) -> dict[str, Any]:
-    try:
-        выпущен = mcp_access.issue_token(who)
-    except UnboundError as exc:
-        raise Refused("walk.app.err.unbound_self") from exc
-    url = (os.environ.get(MCP_URL_VAR) or "").strip() or t("mcp.url_unknown", lang)
-    return {
-        "command": setup_command(url=url, token=выпущен.value),
-        "replaced": выпущен.replaced_previous,
-        # Срок токена (`MCP_TOKEN_TTL_DAYS`): после него команду берут заново.
-        "expires": выпущен.expires_at.date().isoformat(),
     }
 
 
@@ -228,7 +178,6 @@ def install(
     ui_lang: str,
     identify: Identify,
     respond: Respond,
-    bot: BotSettings | None,
 ) -> None:
     """Повесить `POST /tg/walk/app`. Опознание — то же, что у записи."""
 
@@ -244,7 +193,7 @@ def install(
 
     @app.after_request
     def no_store(response: Response) -> Response:
-        # Команда с токеном — данные одного человека.
+        # Ответ — данные одного человека.
         if request.endpoint == APP_ENDPOINT:
             response.headers["Cache-Control"] = "no-store"
         return response
@@ -280,15 +229,7 @@ def install(
                 return respond(who, ui_lang)
             if op == "finish":
                 return _finish(who, conf, body, lang)
-            if op != "mcp_issue":
-                raise Refused("walk.err.bad_request", 400)
-            if bot is None:
-                raise Refused("walk.app.err.unavailable", 503)
-            _fresh(who, conf)
-            выпуск = _issue(who, lang)
-            # Значения токена в журнале нет: только факт выпуска.
-            logger.info("Мини-апп: чат %s выпустил себе токен MCP", log_id(who))
-            return jsonify(выпуск), 200
+            raise Refused("walk.err.bad_request", 400)
         except Refused as exc:
             return refused(exc.key, lang, exc.status, exc.extra)
         except DbError:
