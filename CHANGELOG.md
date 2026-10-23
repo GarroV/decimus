@@ -8,6 +8,19 @@
 - Код: `src/db/ratings_read.py` (`rko_periods`), `src/web/ratings_calendar.py`, `src/web/ratings.py`, `src/web/texts_ratings.py`, `src/web/static/decimus-rt.css`, `src/web/templates/ratings/{index,_period,_loaded}.html`; тесты — `tests/test_web_ratings_period.py` (в фикстуры `test_web_ratings_tiles.py`, `test_web_ratings_agg_update.py` добавлена подмена `rko_periods`). Доки — `docs/15-ratings.md`.
 
 
+
+## 2026-10-23 — Подключение Claude (MCP) убрано из мини-аппа (D626)
+
+- Мини-апп проверки служит только для проведения проверок: из настроек снят пункт «Подключить Claude», экран с командой и токеном, действие `mcp_issue` в `POST /tg/walk/app` (теперь отвечает 400, как любой неизвестный `op`), поле `mcp` в блоке `app`, тексты `walk.app.claude*`, `walk.app.err.unbound_self`, `walk.app.err.stale` (RU/EN), стили `.walk-app__code`, константа `MINT_MAX_AGE_SECONDS` (короткая подпись нужна была только выпуску токена). Остальные настройки мини-аппа не тронуты; строка «Все настройки на сайте» ведёт в «Настройки» сайта.
+- Подключить Claude можно только в вебе: «Настройки» → «Claude (MCP)» (D447, D448).
+- `src/bot/mcp_setup.py` остаётся в `src/bot`: веб не вправе импортировать `src.mcp.install`, откуда модуль берёт установщик (`tests/test_web_bounds.py`), а в `src/web` его перенос эту границу нарушил бы. Теперь он нужен только вебу.
+- Доки приведены в соответствие: `docs/13-walk-mini-app.md`, `docs/12-web-admin.md`, `docs/18-access-map.md`, `docs/00-map.md`, `docs/06-mvp-bot.md`, `docs/furca/blocks/mcp.md`.
+
+## 2026-10-23 — Подключение Claude (MCP) убрано из бота (D626)
+
+- Рабочая платформа — веб, бот служит только для проведения проверок. Пункт меню «Установка MCP», команда `/mcp` и кнопка «Прислать команду настройки» сняты вместе с роутером `src/bot/routers/mcp.py`, клавиатурой, текстами `mcp.*` и `cmd.mcp` (RU/EN), тестами `tests/test_bot_mcp_setup.py` и `tests/test_bot_mcp_command.py`.
+- Подключить Claude можно в вебе: «Настройки» — коннектор через сайт (D417) и «Claude (MCP)» — команда установки с личным токеном (D447); то же в настройках мини-аппа. Отдача установщика `/setup` и сборка команды (`src/bot/mcp_setup.py`: `setup_command`, `installer_sha256`, `MCP_URL_VAR`) не тронуты; удалён только путь, обслуживавший один бот (`desktop_command`, `bridge_body` и их константы).
+- Тексты, которые отправляли человека «в бота за командой» (`tools/mcp_install.sh`, `tools/mcp_bridge.sh`), `.env.example`, `docs/06-mvp-bot.md`, `docs/08-deploy.md`, `docs/12-web-admin.md`, `docs/13-walk-mini-app.md` — приведены к вебу.
 ## 2026-10-23 — Сменить пиццерию проверки: в боте и карандашом на вычитке (D628)
 
 - Бот: пункт меню «Сменить пиццерию» (`/unit`) посреди обхода — если проверку завели не на ту точку. Название сверяется со справочником, как на старте; меняется только шапка (`domain.set_unit`, движок `meta --unit`), записи, кадры и оценка остаются. Записи с пометкой «повтор» бот называет числом — их сверяли с прошлой проверкой прежней точки. Команда, кадр или голос вместо названия отменяют смену.

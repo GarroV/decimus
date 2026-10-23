@@ -35,7 +35,7 @@ from bot_harness import (
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import NEW_INSPECTION_CALLBACK
-from src.bot.routers.mcp import MCP_COMMAND
+from src.bot.routers.help import HELP_COMMAND
 from src.bot.routers.records import RECORDS_COMMAND
 from src.bot.routers.version import VERSION_COMMAND
 from src.bot.texts import t
@@ -152,23 +152,21 @@ async def test_start_в_мастере_работает_как_прежде(doma
     assert session.last_text == t("start.greeting", "ru")
 
 
-async def test_установка_mcp_в_мастере_работает_и_мастер_ждёт_дальше(domain_env: object) -> None:
+async def test_справка_в_мастере_работает_и_мастер_ждёт_дальше(domain_env: object) -> None:
     """Прогон из issue #203 целиком: пункт меню, с которого дефект и заметили.
 
-    До T250 бот отвечал «Вид проверки?» — то есть принимал `/mcp` названием
-    пиццерии и шёл дальше, а дальше это название уезжало в шапку отчёта.
+    До T250 бот отвечал «Вид проверки?» — то есть принимал команду меню
+    (тогда `/mcp`, ныне снятая, D626) названием пиццерии и шёл дальше, а дальше
+    это название уезжало в шапку отчёта.
     """
     dp, bot, session = await ask_unit()
 
-    await feed(dp, bot, text_message(f"/{MCP_COMMAND}"))
+    await feed(dp, bot, text_message(f"/{HELP_COMMAND}"))
 
-    assert t("start.ask_kind", "ru") not in session.texts, (
-        "«Установка MCP» принята названием пиццерии"
-    )
-    # Пункт отвечает объяснением и кнопкой (D448: каждому). Ответ взят его — то
-    # есть команда дошла до своего обработчика, а не осталась в мастере; что
-    # приходит по кнопке, проверяет `tests/test_bot_mcp_setup.py`.
-    assert t("mcp.offer", "ru") in session.texts, "пункт меню до своего обработчика не дошёл"
+    assert t("start.ask_kind", "ru") not in session.texts, "«Справка» принята названием пиццерии"
+    # Ответ взят справкой — то есть команда дошла до своего обработчика, а не
+    # осталась в мастере.
+    assert t("help.text", "ru") in session.texts, "пункт меню до своего обработчика не дошёл"
 
     await feed(dp, bot, text_message("Белград 2"))
     assert session.last_text == t("start.ask_kind", "ru"), (

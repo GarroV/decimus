@@ -622,30 +622,3 @@ def info_heard_keyboard(lang: str) -> InlineKeyboardMarkup:
     builder.button(text=t("btn.info_skip", lang), callback_data=INFO_SKIP_CALLBACK)
     builder.adjust(2)
     return builder.as_markup()
-
-
-# --- установка MCP: согласие на выпуск токена (T261 → #222) -------------------
-
-#: Код в `callback_data`, а не название: по общему принципу проекта сущности
-#: связываются кодами — надписи переводятся и правятся, коды нет.
-#:
-#: Код кнопки, по которой приходит команда настройки. Кнопка одна (#222,
-#: решение D103): развилку «какой Claude» владелец снял, поддерживается
-#: Claude Desktop. Сама кнопка осталась не для выбора, а как согласие — по
-#: нажатию выпускается токен, а выпуск гасит прежний и ломает уже работающую
-#: настройку. Надпись кнопки — в каталоге (`btn.mcp_send`), код — нет.
-MCP_SETUP_SEND = "mcp:setup:send"
-
-
-def mcp_setup_keyboard(lang: str) -> InlineKeyboardMarkup:
-    """Одна кнопка: прислать команду настройки.
-
-    Ряд из одной кнопки, а не текстовая просьба «напишите да»: нажатие видно
-    боту как событие, а «да» пришлось бы разбирать среди обычной речи аудитора
-    — в чате, где человек диктует находки, это ошибка, которую нельзя не
-    сделать.
-    """
-    builder = InlineKeyboardBuilder()
-    builder.button(text=t("btn.mcp_send", lang), callback_data=MCP_SETUP_SEND)
-    builder.adjust(1)
-    return builder.as_markup()
