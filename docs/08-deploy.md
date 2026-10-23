@@ -1835,7 +1835,7 @@ D391) — так же: миграций нет, право — уже выдан
 | Кадры для посева | `/srv/decimus-demo-photos` — снимки Белграда-1 и -2 без метаданных (вне git: репозиторий публичный) |
 | Посев | `tools/seed_open_demo.py`: восемь точек в RS, GE, AM; проверки за полгода, календарь сдвигается к дню посева (текущий месяц всегда наполнен); поездки; рейтинги РС и РКО (`tools/open_demo_ratings.py`, импортёр продукта) и обучение из выдуманного iSpring (`tools/open_demo_training.py`, загрузчик продукта) — D590 |
 | Сброс | `deploy/demo/reset.sh`: тома `pgdata`, `state`, `methodology` заново → миграции → `tools/seed_open_demo.py` → подъём, около минуты. Cron пользователя `garva`: `17 * * * *`, лог `~/decimus-demo-reset.log` |
-| Обновление кода | `deploy/demo/update.sh`: `git pull`, сборка, сброс |
+| Обновление кода | `deploy/demo/update.sh`: `git pull`, сборка, сброс. Запускать **только из `/srv/decimus-demo`**: из `/srv/decimus` compose возьмёт боевой `.env` (боевые пароли, ключи хранилища, токен бота) и поднимет демо на нём. Токен бота у демо-`walk` перекрыт пустым значением в `compose.demo.yaml` (иначе `walk_auth` отказывается стартовать, #1222), остальное — нет |
 | Caddy | `vps-infra` `edge/sites/decimus-demo.caddy` (`<DEMO_ORIGIN_HOST>` → `decimus-demo-web:8267`): сайт без ключа фронта, заголовки фронта срезаются (как у стенда §8.11) |
 | Адрес | https://decimus-demo.vasiliy-garro.workers.dev — Worker `decimus-demo` (`front/deploy.sh demo`, шаблон `front/wrangler.demo.template.jsonc`, `DEMO_ORIGIN_HOST` в `front/.deploy.env`). Секрет `FRONT_KEY` свой, случайный (без него Worker отвечает 503): `openssl rand -hex 32 \| npx wrangler secret put FRONT_KEY --name decimus-demo` |
 
