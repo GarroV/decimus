@@ -408,6 +408,7 @@
 | `WEB_DEMO` | `src/domain/demo.py` | да |
 | `WEB_DEMO_URL` | `src/domain/demo.py` | да |
 | `WEB_FRONT_KEY` | `src/web/config.py` | да |
+| `WEB_FRONT_KEY_MODE` | `src/web/config.py` | да |
 | `WEB_HOST` | `src/web/config.py` | да |
 | `WEB_HSTS` | `src/web/config.py` | да |
 | `WEB_LISTEN_NETWORK` | `src/web/config.py` | да |

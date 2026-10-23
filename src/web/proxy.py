@@ -14,6 +14,11 @@
 схему и хост — и с ним ключ счётчика перебора. Теперь адреса своих звеньев
 (адрес или подсеть, через запятую) называет `WEB_TRUSTED_PROXY_ADDR`; заголовки
 остальных вырезаются.
+
+**Подсети мало: общий секрет сверяется самим origin (F-107).** Сосед по общей
+сети тоже лежит в подсети звена, поэтому при `WEB_FRONT_KEY_MODE=enforce` верим
+только запросу с верным `X-Decimus-Front-Key`. Режимы `off` и `log` нужны порядку
+выката, чтобы не запереть живой вход, пока Caddy ключ ещё не пропускает.
 """
 
 from __future__ import annotations
@@ -21,12 +26,19 @@ from __future__ import annotations
 import hmac
 import ipaddress
 import logging
+import time
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from waitress.proxy_headers import proxy_headers_middleware
 
-from .config import ANY_PEER, WEB_FRONT_KEY_VAR, Settings
+from .config import (
+    ANY_PEER,
+    FRONT_KEY_ENFORCE,
+    FRONT_KEY_OFF,
+    WEB_FRONT_KEY_MODE_VAR,
+    Settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +50,10 @@ TRUSTED_HEADERS = frozenset({"x-forwarded-for", "x-forwarded-proto", "x-forwarde
 #: Заголовок, в котором Worker фронта шлёт ключ (`front/src/proxy.js`); Caddy
 #: проверяет его и пропускает дальше, origin сверяет ещё раз (F-107).
 FRONT_KEY_ENVIRON = "HTTP_X_DECIMUS_FRONT_KEY"
+
+#: Не чаще раза в такой срок пишем несовпадение ключа в режиме `log`: подделка
+#: иначе заливает журнал, а наблюдателю хватает первого случая и повторов раз в минуту.
+MISMATCH_LOG_INTERVAL_SECONDS = 60.0
 
 WsgiApp = Callable[[dict[str, Any], Callable[..., Any]], Iterable[bytes]]
 
@@ -137,13 +153,19 @@ def guard_forwarded(app: WsgiApp, settings: Settings) -> WsgiApp:
         return app
     addrs = settings.trusted_proxy_addrs
     front_key = settings.front_key
-    if not front_key:
+    mode = settings.front_key_mode
+    if mode == FRONT_KEY_OFF:
         logger.warning(
-            "%s не задан: origin не проверяет ключ фронта, заголовкам X-Forwarded-* верим "
-            "любому соседу по подсети звена (docs/08-deploy.md, §8.9)",
-            WEB_FRONT_KEY_VAR,
+            "%s=%s: origin не проверяет ключ фронта, заголовкам X-Forwarded-* верим любому "
+            "соседу по подсети звена (docs/08-deploy.md, §8.9)",
+            WEB_FRONT_KEY_MODE_VAR,
+            mode,
         )
-    refused_logged = False
+    # Единственное изменяемое место: момент последней записи в журнал (список из одного
+    # числа, чтобы замыкание его меняло). Гонка потоков даёт лишнюю строку, не ошибку.
+    last_logged = [float("-inf")]
+    matched_logged = [False]
+
     доверяя = proxy_headers_middleware(
         app,
         trusted_proxy=ANY_PEER,
@@ -154,18 +176,25 @@ def guard_forwarded(app: WsgiApp, settings: Settings) -> WsgiApp:
     не_доверяя = proxy_headers_middleware(app, trusted_proxy=None, clear_untrusted=True)
 
     def пропустить(запрос: dict[str, Any], start_response: Callable[..., Any]) -> Iterable[bytes]:
-        nonlocal refused_logged
         given = str(запрос.pop(FRONT_KEY_ENVIRON, "") or "")  # приложению ключ ни к чему
         свой = peer_trusted(str(запрос.get("REMOTE_ADDR") or ""), addrs)
-        if свой and front_key and not front_key_matches(front_key, given):
-            if not refused_logged:  # один раз: иначе подделка заливает журнал
-                refused_logged = True
-                logger.warning(
-                    "Сосед %s из подсети звена пришёл без верного ключа фронта: "
-                    "X-Forwarded-* отброшены (дальше такие запросы не пишутся)",
-                    запрос.get("REMOTE_ADDR"),
-                )
-            свой = False
+        if свой and mode != FRONT_KEY_OFF:
+            if front_key_matches(front_key, given):
+                if not matched_logged[0]:
+                    matched_logged[0] = True
+                    logger.info("Ключ фронта дошёл до origin и совпал (режим %s)", mode)
+            else:
+                now = time.monotonic()
+                if now - last_logged[0] >= MISMATCH_LOG_INTERVAL_SECONDS:
+                    last_logged[0] = now
+                    logger.warning(
+                        "Сосед %s из подсети звена пришёл без верного ключа фронта (режим %s%s)",
+                        запрос.get("REMOTE_ADDR"),
+                        mode,
+                        ": X-Forwarded-* отброшены" if mode == FRONT_KEY_ENFORCE else ", верим",
+                    )
+                if mode == FRONT_KEY_ENFORCE:
+                    свой = False
         if свой:
             return доверяя(запрос, start_response)
         return не_доверяя(запрос, start_response)
