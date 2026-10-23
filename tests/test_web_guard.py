@@ -241,6 +241,7 @@ def test_разделы_только_УК_партнёру_закрыты_по_�
         "actions",
         "plans_upload",
         "plan_row_save",
+        "plan_file_apply",
         "plan_submit",
         "plan_row_start",
         "plan_row_done",

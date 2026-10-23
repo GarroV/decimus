@@ -124,12 +124,6 @@ PLAN_ROW_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Строка подтверждена. Все строки подтверждены — план закрыт.",
         "en": "Row confirmed. All rows are confirmed — the plan is closed.",
     },
-    "plans.rows.file_later": {
-        "ru": "Файл принимается вложением, но не разбирается: строки плана заполняются на "
-        "экране ниже.",
-        "en": "A file is accepted as an attachment but not parsed: fill in the plan rows on "
-        "the screen below.",
-    },
     "plans.too_many_versions": {
         "ru": "У запроса уже {n} версий файла — больше не принимается.",
         "en": "The request already has {n} file versions — no more are accepted.",

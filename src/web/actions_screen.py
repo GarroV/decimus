@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -150,8 +150,11 @@ def respond(
     failure: str | None = None,
     gmail: str = "",
     status: int = 200,
+    extra: Mapping[str, Any] | None = None,
 ) -> str | tuple[str, int]:
     """Ответ экрана «Действия» — на чтение и на действие в панели.
+
+    `extra` — добавка вкладки к панели (итог загрузки файла плана): уходит в её `panel` как есть.
 
     Действие из панели (`split.js`, заголовок `X-Panel`) ждёт обратно только
     панель с итогом — со статусом 200 и для отказа, иначе скрипт примет отказ за
@@ -159,7 +162,7 @@ def respond(
     Строки нет в охвате — тот же 404, что у несуществующей: чужое от пустого не
     отличить.
     """
-    panel = _tab(tab).panel(item_id, notice=notice, failure=failure, gmail=gmail)
+    panel = _tab(tab).panel(item_id, notice=notice, failure=failure, gmail=gmail, **(extra or {}))
     posted = request.method == "POST"
     if posted and panel["item"] is None and not panel["failed"]:
         return _tab(tab).missing()

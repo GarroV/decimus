@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 188 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 189 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -43,6 +43,7 @@
 | `/actions/requests/<request_id>/accept` | POST | `plan_accept` | `src/web/plan_rows.py` |
 | `/actions/requests/<request_id>/count-from` | POST | `plan_count_from` | `src/web/plan_rows.py` |
 | `/actions/requests/<request_id>/due` | POST | `actions_due` | `src/web/action_plans.py` |
+| `/actions/requests/<request_id>/file/apply` | POST | `plan_file_apply` | `src/web/plan_roundtrip.py` |
 | `/actions/requests/<request_id>/return` | POST | `plan_return` | `src/web/plan_rows.py` |
 | `/actions/requests/<request_id>/review` | POST | `actions_review` | `src/web/action_plans.py` |
 | `/actions/requests/<request_id>/rows/<row_id>/confirm` | POST | `plan_row_confirm` | `src/web/plan_rows.py` |
@@ -521,6 +522,7 @@
 | `0091_units_merge_guard_search_path.sql` | — |
 | `0092_action_plan_rows.sql` | `action_plan_rows` |
 | `0093_ratings_rko_service_marks.sql` | — |
+| `0094_action_plan_file_parsed.sql` | — |
 <!-- map:end -->
 
 ## Makefile

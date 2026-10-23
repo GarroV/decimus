@@ -660,6 +660,10 @@ agreement
 font
 alignment
 freeze_panes
+# То же для файла плана «туда и обратно» (`src/web/plan_sheet.py`, #1168).
+number_format
+formatColumns
+formatRows
 # `plan_template_file` — выдача шаблона экшн-плана (#976), регистрирует
 # `@app.get(..., endpoint="plan_template")`.
 plan_template_file
@@ -689,6 +693,7 @@ is_unread
 # Электронный план исправлений (#1168): маршруты регистрируются декораторами Flask;
 # `overdue_rows`, `filled_rows` и `latest_own_due` читают шаблоны панели и списка.
 plan_row_save
+plan_file_apply
 plan_submit
 plan_row_start
 plan_row_done

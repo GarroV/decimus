@@ -116,6 +116,7 @@ OPEN_ENDPOINTS = frozenset(
         "actions_due",
         "actions_review",
         "plans_upload",
+        "plan_file_apply",
         "plan_row_save",
         "plan_submit",
         "plan_row_start",

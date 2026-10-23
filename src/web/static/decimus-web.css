@@ -1932,6 +1932,20 @@ a[data-zoom] { cursor: zoom-in; }
 }
 @media (prefers-reduced-motion: reduce) { .prowpanel__sheet { animation: none; } }
 
+/* Файл плана при конфликте ревизий: по строке — «на экране» и «в файле» рядом, выбор под ними.
+   Блоками ограниченной ширины, как таблица строк; на телефоне колонки встают друг под друга. */
+.pdiff { max-width: 620px; display: grid; gap: var(--space-4); }
+.pdiff__row { margin: 0; padding: var(--space-4) var(--space-5); border: 1px solid var(--line); border-radius: var(--r-block); display: grid; gap: var(--space-4); min-width: 0; }
+.pdiff__title { padding: 0 var(--space-2); font-weight: var(--w-semibold); overflow-wrap: anywhere; }
+.pdiff__cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.pdiff__col { margin: 0; display: grid; align-content: start; gap: var(--space-3); font-size: var(--fs-meta); }
+.pdiff__col dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.pdiff__side { color: var(--ink-3); font-weight: var(--w-semibold); }
+.pdiff__label { display: block; color: var(--ink-3); }
+.pdiff__pick { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); font-size: var(--fs-meta); }
+.pdiff__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+@media (max-width: 719px) { .pdiff__cols { grid-template-columns: minmax(0, 1fr); } }
+
 /* Поле файла — в тон кнопкам forma, а не серой кнопкой браузера. */
 .input[type="file"] { padding: var(--space-2); }
 .input[type="file"]::file-selector-button {

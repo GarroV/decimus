@@ -1,0 +1,76 @@
+{#
+  Файл «туда и обратно» электронного плана (#1168, шаг 3): итог загрузки и выбор при конфликте.
+  Итог живёт только в ответе на загрузку: человек читает его сразу, а дальше строки плана —
+  на экране. Конфликт — ревизия плана не совпала с той, на которой выгружен файл: ничего не
+  записано, по каждой разошедшейся строке нужен выбор. Выбор уходит формой фоном
+  (`data-panel-form`); кнопки «всё из файла» / «всё как на экране» идут без проверки радио.
+#}
+{% macro file_result_block(res, r) %}
+  {% set base = actions_path ~ '/requests/' ~ r.id %}
+  {% if res.kind == 'unparsed' or res.kind == 'other_plan' %}
+    <div class="note note--warn" role="status"><div class="note__text">{{ t('plans.file.unparsed_notice' if res.kind == 'unparsed' else 'plans.file.other_plan_notice') }}</div></div>
+  {% elif res.kind == 'applied' %}
+    {% set rc = res.applied.reconciled %}
+    {% set trouble = rc.unfilled or rc.due_refused or rc.skipped %}
+    <div class="note {{ 'note--warn' if trouble else 'note--ok' }}" role="status"><div>
+      <div class="note__title">{{ t('plans.file.result.title', n=rc.read) }}</div>
+      <ul class="note__list">
+        <li>{{ t('plans.file.result.written', n=res.applied.written) if res.applied.written else t('plans.file.result.nothing') }}</li>
+        {% if rc.unfilled %}<li>{{ t('plans.file.result.unfilled', rows=rc.unfilled|join(', ')) }}</li>{% endif %}
+        {% for d in rc.due_refused %}<li>{{ t('plans.file.due.' ~ d.code, n=d.position, bound=(day(d.bound) if d.bound else '')) }}</li>{% endfor %}
+        {% if rc.skipped %}
+          <li>{{ t('plans.file.skipped.title', n=rc.skipped|length) }}
+            <ul class="note__list">
+              {% for s in rc.skipped %}<li>{{ t('plans.file.skipped.' ~ s.code, line=s.line) }}</li>{% endfor %}
+            </ul>
+          </li>
+        {% endif %}
+        {% if rc.absent %}<li>{{ t('plans.file.result.absent', rows=rc.absent|join(', ')) }}</li>{% endif %}
+      </ul>
+    </div></div>
+  {% elif res.kind == 'conflict' %}
+    {% set changes = res.applied.reconciled.changes %}
+    <div class="note note--warn" role="status"><div>
+      <div class="note__title">{{ t('plans.file.conflict.title') }}</div>
+      <div class="note__text">{{ t('plans.file.conflict.text' if changes else 'plans.file.conflict.same') }}</div>
+    </div></div>
+    {% if changes %}
+      <form class="sform pdiff" method="post" data-panel-form action="{{ url(base ~ '/file/apply') }}?lang={{ lang }}">
+        <input type="hidden" name="file" value="{{ res.file_id }}">
+        <input type="hidden" name="revision" value="{{ res.revision }}">
+        {% for c in changes %}
+          {% set fields = [
+            ('plans.rows.measure', c.row.measure, c.measure),
+            ('plans.rows.responsible', c.row.responsible, c.responsible),
+            ('plans.rows.reason', c.row.reason, c.reason),
+            ('plans.rows.col.due', c.row.own_due, c.own_due),
+          ] %}
+          <fieldset class="pdiff__row">
+            <legend class="pdiff__title">{{ c.row.position }}. {{ c.row.title(lang) }}</legend>
+            <div class="pdiff__cols">
+              {% for side, idx in (('plans.file.conflict.screen', 1), ('plans.file.conflict.file', 2)) %}
+                <dl class="pdiff__col">
+                  <dt class="pdiff__side">{{ t(side) }}</dt>
+                  {% for f in fields if f[1] != f[2] %}
+                    {% set v = f[idx] %}
+                    <dd><span class="pdiff__label">{{ t(f[0]) }}</span>
+                      {% if v %}{{ day(v) if v is not string else v }}{% else %}<span class="ov-cell__muted">{{ t('plans.file.no_date' if f[0] == 'plans.rows.col.due' else 'plans.file.empty') }}</span>{% endif %}</dd>
+                  {% endfor %}
+                </dl>
+              {% endfor %}
+            </div>
+            <div class="pdiff__pick">
+              <label><input type="radio" name="pick_{{ c.row.id }}" value="screen" required> {{ t('plans.file.conflict.keep_screen') }}</label>
+              <label><input type="radio" name="pick_{{ c.row.id }}" value="file" required> {{ t('plans.file.conflict.keep_file') }}</label>
+            </div>
+          </fieldset>
+        {% endfor %}
+        <div class="pdiff__actions">
+          <button class="sbtn sbtn--primary" type="submit" name="mode" value="pick">{{ t('plans.file.conflict.apply_pick') }}</button>
+          <button class="sbtn" type="submit" name="mode" value="file" formnovalidate>{{ t('plans.file.conflict.all_file') }}</button>
+          <button class="sbtn" type="submit" name="mode" value="screen" formnovalidate>{{ t('plans.file.conflict.all_screen') }}</button>
+        </div>
+      </form>
+    {% endif %}
+  {% endif %}
+{% endmacro %}

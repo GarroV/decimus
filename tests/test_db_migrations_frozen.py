@@ -363,6 +363,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0093_ratings_rko_service_marks.sql": (
         "sql1:e0aa4a893c3599ba955ee18f8a800690b381ec99b4a0b4a3234e74abf3461aca"
     ),
+    "0094_action_plan_file_parsed.sql": (
+        "sql1:dde5200038f79dfed7bdf9c0c15163290c1438fca0c8613167fcfe8451f2b3de"
+    ),
 }
 
 
