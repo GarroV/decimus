@@ -18,13 +18,13 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Sequence
 from datetime import date
 from typing import Any
 
 import psycopg
 
-from src.domain.plan_due import plan_due_on, row_due_on
+from src.domain.plan_due import OWN_DUE_LATE, own_due_problem, plan_due_on
 from src.domain.tenants import HQ_TENANT
 
 from . import plan_notify as note
@@ -41,6 +41,7 @@ from .action_plans import (
 )
 from .config import check_environment
 from .errors import ActionPlanError
+from .plan_file import FileApplied, FileRow, reconcile
 from .plan_rows import (
     MAX_MEASURE,
     MAX_REASON,
@@ -51,6 +52,7 @@ from .plan_rows import (
     ROW_FILLING,
     ROW_IN_WORK,
     ROW_RETURNED,
+    read_rows,
 )
 from .pool import connection
 from .reach import REACH_SQL, Reach, require_reach
@@ -63,6 +65,18 @@ _SIGN_SQL = "select set_config('decimus.plan_actor', %s, true)"
 # Запрос плана для партнёра: охват накладывает вызывающий, замок — на строку запроса.
 _PLAN_FOR_PARTNER_SQL = f"""
 select r.status, r.electronic
+from action_plan_requests r
+join inspections i on i.id = r.inspection_id
+join units u on u.id = i.unit_id
+where {REACH_SQL}
+  and i.retracted_at is null
+  and r.id = %(request)s
+for update of r
+"""  # noqa: S608 — в склейке только условие охвата модуля, данные идут параметрами
+
+# Запрос плана под файл: то же охват и замок, плюс начало отсчёта и ревизия.
+_PLAN_FOR_FILE_SQL = f"""
+select r.status, r.electronic, r.count_from, r.revision
 from action_plan_requests r
 join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
@@ -132,6 +146,16 @@ def _clean(value: str | None, limit: int, what: str) -> str | None:
     return text or None
 
 
+def own_due_message(own_due: date | None, code: str, bound: date) -> str:
+    """Отказ по своему сроку строки словами — для формы на экране."""
+    if code == OWN_DUE_LATE:
+        return (
+            f"Срок {own_due} позже положенного ({bound.isoformat()}). "
+            f"Позже срок ставится только переносом с согласием УК"
+        )
+    return f"Срок {own_due} уже прошёл — назовите будущую дату"
+
+
 def _ids(request_id: str, row_id: str | None = None) -> tuple[str, str | None]:
     request = _uuid_or_none(request_id)
     if request is None:
@@ -196,20 +220,71 @@ def save_row(
         plan_status, _electronic, count_from, days, extended, _row_status, before = head
         if plan_status != STATUS_REQUESTED:
             raise ActionPlanError("План уже отправлен на согласование — строки больше не правятся")
-        if own_due is not None and own_due != before:
-            предел = extended or row_due_on(count_from, days)
-            if own_due > предел:
-                raise ActionPlanError(
-                    f"Срок {own_due.isoformat()} позже положенного ({предел.isoformat()}). "
-                    f"Позже срок ставится только переносом с согласием УК"
-                )
-            if own_due < max(count_from, today()):
-                raise ActionPlanError(
-                    f"Срок {own_due.isoformat()} уже прошёл — назовите будущую дату"
-                )
+        проблема = own_due_problem(
+            own_due, before, count_from=count_from, days=days, extended=extended, today=today()
+        )
+        if проблема is not None:
+            raise ActionPlanError(own_due_message(own_due, *проблема))
         cur.execute(_UPDATE_TEXT_SQL, данные)
 
     _as_partner("Сохранить строку плана", work)
+
+
+def apply_file_rows(
+    request_id: str,
+    *,
+    reach: Reach,
+    tenant: str,
+    actor: str,
+    file_rows: Sequence[FileRow],
+    expected_revision: int,
+    take: Collection[str] | None = None,
+) -> FileApplied:
+    """Положить строки файла в план — той же записью, что правка на экране, одной транзакцией.
+
+    Сверка идёт под замком запроса. Ревизия плана не равна `expected_revision` (в файле — та,
+    на которой его выгрузили; при выборе — та, на которой показали разницу) — план на экране
+    поменяли: ничего не пишется, результат говорит `conflict`. `take` — какие строки взять
+    из файла (id строк плана); `None` — все, что отличаются от экрана. Строки, совпавшие с
+    экраном, не пишутся: каждая запись растит ревизию. Срок, не принятый сверкой, остаётся
+    прежним; остальное ложится. Права и порядок держит база, как у `save_row`.
+    """
+    _actor(actor)
+    _require_partner(tenant)
+    request, _ = _ids(request_id)
+    outcome: list[FileApplied] = []
+
+    def work(cur: psycopg.Cursor[Any]) -> None:
+        cur.execute(_PLAN_FOR_FILE_SQL, {**require_reach(reach).params(), "request": request})
+        head = cur.fetchone()
+        if head is None:
+            raise ActionPlanError("Запроса нет")
+        status, electronic, count_from, revision = head
+        if not electronic:
+            raise ActionPlanError("План не электронный — строк в нём нет")
+        if status != STATUS_REQUESTED:
+            raise ActionPlanError("План уже отправлен на согласование — строки больше не правятся")
+        rows = read_rows(cur, [request]).get(request, ())
+        result = reconcile(file_rows, rows, count_from=count_from, today=today())
+        if int(revision) != expected_revision:
+            outcome.append(FileApplied(result, 0, True, int(revision)))
+            return
+        chosen = [c for c in result.changes if take is None or c.row.id in take]
+        for change in chosen:
+            cur.execute(
+                _UPDATE_TEXT_SQL,
+                {
+                    "row": change.row.id,
+                    "measure": change.measure or None,
+                    "responsible": change.responsible or None,
+                    "reason": change.reason or None,
+                    "own_due": change.own_due,
+                },
+            )
+        outcome.append(FileApplied(result, len(chosen), False, int(revision)))
+
+    _as_partner("Загрузить файл плана", work)
+    return outcome[0]
 
 
 def _partner_row(

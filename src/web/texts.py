@@ -31,6 +31,7 @@ from .texts_journal import JOURNAL_TEXTS
 from .texts_master import MASTER_TEXTS
 from .texts_notifications import NOTIFICATION_TEXTS
 from .texts_oauth import OAUTH_TEXTS
+from .texts_plan_file import PLAN_FILE_TEXTS
 from .texts_plan_rows import PLAN_ROW_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
@@ -1761,6 +1762,7 @@ _ЧАСТИ = (
     SERVICE_KEYS_TEXTS,
     NOTIFICATION_TEXTS,
     PLAN_TEXTS,
+    PLAN_FILE_TEXTS,
     PLAN_ROW_TEXTS,
     PRESCRIPTION_TEXTS,
     TRIP_TEXTS,
@@ -1796,6 +1798,7 @@ TEXTS = {
     **OAUTH_TEXTS,
     **NOTIFICATION_TEXTS,
     **PLAN_TEXTS,
+    **PLAN_FILE_TEXTS,
     **PLAN_ROW_TEXTS,
     **PRESCRIPTION_TEXTS,
     **TRIP_TEXTS,

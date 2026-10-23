@@ -172,6 +172,8 @@ class PlanFile:
     comment: str | None
     reviewed_by: str | None
     reviewed_at: datetime | None
+    #: Файл разобран как шаблон электронного плана (его строки сверены с планом); нет — вложение.
+    parsed: bool = False
 
 
 @dataclass(frozen=True)
@@ -323,7 +325,8 @@ limit 1
 
 _FILES_SQL = """
 select f.request_id, f.id, f.version, f.file_name, f.size_bytes, f.content_type,
-       f.uploaded_by, f.uploaded_at, v.verdict, v.comment, v.reviewed_by, v.reviewed_at
+       f.uploaded_by, f.uploaded_at, v.verdict, v.comment, v.reviewed_by, v.reviewed_at,
+       f.parsed
 from action_plan_files f
 left join action_plan_reviews v on v.file_id = f.id
 where f.request_id = any(%(ids)s::uuid[])
@@ -376,10 +379,10 @@ _NEXT_VERSION_SQL = (
 _INSERT_FILE_SQL = """
 insert into action_plan_files
     (id, request_id, version, storage_path, file_name, size_bytes, content_type,
-     uploaded_by, uploaded_tenant)
+     uploaded_by, uploaded_tenant, parsed)
 values
     (%(id)s, %(request_id)s, %(version)s, %(storage_path)s, %(file_name)s, %(size_bytes)s,
-     %(content_type)s, %(uploaded_by)s, %(uploaded_tenant)s)
+     %(content_type)s, %(uploaded_by)s, %(uploaded_tenant)s, %(parsed)s)
 """
 
 _SET_STATUS_SQL = "update action_plan_requests set status = %(status)s where id = %(id)s"
@@ -494,6 +497,7 @@ def _assemble(
                 comment=row[9],
                 reviewed_by=row[10],
                 reviewed_at=row[11],
+                parsed=bool(row[12]),
             )
             for row in files
             if str(row[0]) == ident
@@ -887,12 +891,14 @@ def upload_version(
     content_type: str,
     data: bytes,
     max_bytes: int,
+    parsed: bool = False,
     storage: PhotoStorage | None = None,
 ) -> int:
     """Положить новую версию плана; файловый запрос уходит на приёмку. Возвращает номер версии.
 
-    К электронному плану файл ложится вложением и ничего не двигает: строки он не
-    заполняет, их заполняют на экране (разбор файла в строки — следующий шаг).
+    К электронному плану файл ложится версией для истории и статус не двигает: согласование
+    идёт по строкам. `parsed` — вызывающий разобрал файл как наш шаблон (`plan_flow.apply_file_rows`
+    кладёт его строки в план отдельно); без него файл — вложение «не разобран».
 
     Запрос вне охвата отвечает «нет», как несуществующий. Что кладёт только
     партнёр этой страны и только в запрошенный запрос — держит ещё и триггер.
@@ -930,6 +936,7 @@ def upload_version(
                 "content_type": _clean_content_type(content_type),
                 "uploaded_by": who,
                 "uploaded_tenant": tenant,
+                "parsed": parsed,
             },
         )
     except (ActionPlanError, psycopg.Error) as exc:

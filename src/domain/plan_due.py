@@ -78,3 +78,35 @@ def effective_row_due(
     if own_due is None:
         return положенный
     return min(own_due, положенный)
+
+
+#: Срок, который партнёр ставит строке сам: позже положенного нельзя, раньше «сегодня» — тоже.
+OWN_DUE_LATE = "late"
+OWN_DUE_PAST = "past"
+
+
+def own_due_problem(
+    own_due: date | None,
+    before: date | None,
+    *,
+    count_from: date,
+    days: int,
+    extended: date | None,
+    today: date,
+) -> tuple[str, date] | None:
+    """Чем свой срок строки не годится: `(OWN_DUE_LATE | OWN_DUE_PAST, граница)` или `None`.
+
+    Одно правило для формы на экране и для файла «туда и обратно»: позже положенного
+    срока (дни пункта от начала отсчёта, либо перенос с согласием) партнёр срок не ставит,
+    раньше сегодняшнего дня и начала отсчёта — тоже. Срок, который уже стоит (`before`), не
+    проверяется заново: его не меняют.
+    """
+    if own_due is None or own_due == before:
+        return None
+    предел = extended or row_due_on(count_from, days)
+    if own_due > предел:
+        return OWN_DUE_LATE, предел
+    нижняя = max(count_from, today)
+    if own_due < нижняя:
+        return OWN_DUE_PAST, нижняя
+    return None
