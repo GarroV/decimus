@@ -113,10 +113,10 @@ def test_блок_агрегаторов_на_странице_и_сбой_ст�
         ответ = client.get("/ratings?group=country&value=RS")
         прошлый = client.get("/ratings?group=country&value=RS&period=2026-01")
     assert ответ.status_code == 200
-    блок = ответ.get_data(as_text=True).split('id="rt-maps"')[1].split("</section>")[0]
+    блок = ответ.get_data(as_text=True).split('id="rt-tp-aggregators"')[1].split("</article>")[0]
     assert '9.2<span class="rt-src__scale">/10</span>' in блок and "98.3%" in блок
     assert "Не собралось: Glovo." in блок and "HTTP 503" in блок
     assert "за выбранный период оценок нет" not in блок
     # Истории до первого сбора нет: на прошлый период — последние данные с датой.
-    блок = прошлый.get_data(as_text=True).split('id="rt-maps"')[1].split("</section>")[0]
+    блок = прошлый.get_data(as_text=True).split('id="rt-tp-aggregators"')[1].split("</article>")[0]
     assert "98.3%" in блок and "за выбранный период оценок нет" in блок

@@ -30,10 +30,19 @@ def _пространства(request: pytest.FixtureRequest) -> None:
 
 
 def _пара(dsn: str) -> tuple[str, str]:
-    """Латинская точка и её снятый кириллический дубль."""
+    """Латинская точка и её снятый кириллический дубль.
+
+    Дубль вставляется строкой, а не `upsert_unit`: с D538 заведение под кириллицей находит
+    латинскую точку и дубля не рождает — он остаётся только от времён до правила.
+    """
     латинская = upsert_unit("Tbilisi-1", country="GE", city="tbilisi", tenant=УК)
-    дубль = upsert_unit("Тбилиси-1", tenant=УК)
     with psycopg.connect(dsn) as conn:
+        дубль = str(
+            conn.execute(
+                "insert into units (tenant_code, name, name_normalized) "
+                "values ('HQ', 'Тбилиси-1', 'тбилиси-1') returning id"
+            ).fetchone()[0]  # type: ignore[index]
+        )
         conn.execute("update units set merged_into = %s where id = %s", (латинская, дубль))
         conn.execute(
             "insert into unit_aliases (tenant_code, alias_normalized, unit_id, alias) "

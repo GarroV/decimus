@@ -121,7 +121,10 @@ def test_путь_из_критерия_приёмки(как: Вход) -> None
 
     # УК видит план на приёмке и возвращает с комментарием.
     уК = как("HQ")
-    assert "Ждут приёмки · 1" in уК.get("/actions?lang=ru").get_data(as_text=True)
+    # Столбец стран и блок по состоянию (D611): «Все страны» и Грузия — «ждут приёмки 1».
+    экран = уК.get("/actions?tab=plans&lang=ru").get_data(as_text=True)
+    assert экран.count("ждут приёмки 1") == 2
+    assert "Ждут приёмки" in экран
     ответ = уК.post(
         f"/actions/requests/{запрос.id}/review?lang=ru",
         data={"verdict": "returned", "comment": "нет сроков"},
