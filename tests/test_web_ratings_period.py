@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import date, datetime
 
+import pytest
 from flask import render_template_string
+from test_web_ratings_tiles import _клиент, _страница
 from web_harness import собрать
 
 from src.ratings import periods as rp
+from src.web import ratings as screen
 from src.web import ratings_calendar as cal
 
 РС = (
@@ -95,26 +99,38 @@ def test_списки_в_окне_периода_выбран_пункт_и_за
     assert "<noscript>" in совпал
 
 
-_ШАПКА = (
-    '{% from "ratings/_loaded.html" import loaded_hint with context %}'
-    "{{ loaded_hint(last, '%d.%m.%Y %H:%M') }}"
-)
+def _шапка_экрана(monkeypatch: pytest.MonkeyPatch, last: dict[str, datetime]) -> str:
+    """Шапка живого экрана «Рейтинги» с заданной свежестью загрузок."""
+    _страница(monkeypatch, 0)
+    собрана = screen.report.build
+    monkeypatch.setattr(
+        screen.report, "build", lambda sel: dataclasses.replace(собрана(sel), last_loaded=last)
+    )
+    for client in _клиент(monkeypatch):
+        страница = client.get("/ratings?lang=ru").get_data(as_text=True)
+        начало = страница.index('<header class="rt-head">')
+        return страница[начало : страница.index("</header>", начало)]
+    raise AssertionError("клиент не создан")
 
 
-def test_шапка_свежесть_столбиком_под_знаком_вопроса_без_перечня_через_точку() -> None:
-    app = собрать(tenant="HQ")
+def test_шапка_свежесть_столбиком_под_знаком_вопроса_без_перечня_через_точку(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     last = {
         "snapshot": datetime(2026, 10, 20, 9, 5),
         "rko-evaluations": datetime(2026, 10, 21, 18, 40),
     }
-    with app.test_request_context("/?lang=ru"):
-        html = render_template_string(_ШАПКА, last=last)
-        пусто = render_template_string(_ШАПКА, last={})
+
+    html = _шапка_экрана(monkeypatch, last)
 
     assert 'aria-label="Когда обновлены данные"' in html
     assert "Последняя загрузка" in html
     assert html.count("<li>") == 2
     assert "20.10.2026 09:05</li>" in html and "21.10.2026 18:40</li>" in html
     assert " · " not in html
-    assert "Загрузок ещё не было." in пусто
-    assert "<li>" not in пусто
+
+
+def test_шапка_без_загрузок_говорит_это_одной_строкой(monkeypatch: pytest.MonkeyPatch) -> None:
+    html = _шапка_экрана(monkeypatch, {})
+
+    assert html.count("<li>") == 1 and "Загрузок ещё не было.</li>" in html

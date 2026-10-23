@@ -9,6 +9,7 @@
   Поездки своего пространства (D505, D506) — полосами в днях, над проверками;
   поездка открывается панелью справа (`calendar/_trip.html`).
 #}{% extends "_split_page.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% from "_period.html" import period_picker with context %}
 {% from "calendar/_trip.html" import trip_panel with context %}
 {% block title %}{{ t('section.calendar.title') }}{% endblock %}
@@ -18,8 +19,11 @@
 {% block split_top %}
   <header class="shead">
     <div class="shead__main">
-      <h1 class="shead__title">{{ t('section.calendar.title') }}</h1>
-      <p class="shead__sub">{{ period_title }} · {{ t('calendar.count', count=total) }} · {{ t('trip.count', count=trips_total) }}</p>
+      {#- Период — в переключателе ниже, второй раз его не пишем; числа — под «?» (D632). -#}
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('section.calendar.title') }}</h1>
+        {{ info_tip(t('tip.counts'), '', [t('calendar.count', count=total), t('trip.count', count=trips_total)], 'calendar') }}
+      </div>
     </div>
   </header>
 {% endblock %}

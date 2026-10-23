@@ -137,11 +137,13 @@ _SCREEN: dict[str, dict[str, str]] = {
         "en": "The database did not answer. It does not mean there is nobody: reload in a minute.",
     },
     "users.self.title": {"ru": "Людей добавляет админ", "en": "An admin adds people"},
-    "users.self.text": {
-        "ru": "Список людей вам не открыт. Здесь ваша учётка: роль и вход; пароль, бот и "
-        "Claude — в «Настройках».",
-        "en": "The list of people is not open to you. Here is your account: role and sign-in; "
-        "password, bot and Claude are in “Settings”.",
+    "users.self.closed": {
+        "ru": "Список людей вам не открыт.",
+        "en": "The list of people is not open to you.",
+    },
+    "users.self.here": {
+        "ru": "Здесь ваша учётка: роль и вход; пароль, бот и Claude — в «Настройках».",
+        "en": "Here is your account: role and sign-in; password, bot and Claude are in “Settings”.",
     },
     "users.forbidden.title": {"ru": "Этот раздел не для всех", "en": "This section is restricted"},
     "users.forbidden.note": {

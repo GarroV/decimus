@@ -10,6 +10,7 @@
   Ни одного вычисления: всё приходит из `src/web/training_page.py`. Данных о сотрудниках
   на экране нет — только счётчики (D575).
 #}{% extends "_pick_page.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% from "_pick_ui.html" import pick_item, pick_head, pick_sub, pick_block, pick_empty, pick_tile, pick_tiles with context %}
 {% block title %}{{ t('section.training.title') }}{% endblock %}
 {% block pick_assets %}
@@ -58,9 +59,7 @@
     </div>
   </section>
 {% else %}
-  {% call pick_head(kicker, title) %}
-    <div class="pk-head__facts"><span title="{{ t('training.asof.hint') }}">{{ t('training.asof', date=on_date.strftime('%d.%m.%Y')) }}</span></div>
-  {% endcall %}
+  {% call pick_head(kicker, title, info_tip(t('tip.hint'), '', [t('training.asof', date=on_date.strftime('%d.%m.%Y')), t('training.asof.hint')], 'training')) %}{% endcall %}
 
   {% call pick_tiles(5) %}
     {% for tile in tiles %}

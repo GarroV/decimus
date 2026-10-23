@@ -6,6 +6,7 @@
   по дням, по видам вызова, по людям, самые дорогие проверки. Деньги — оценка, подпись
   «оценка» стоит у каждой суммы. Без скриптов: период — обычные ссылки и форма.
 #}{% extends "base.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% from "_period.html" import period_picker with context %}
 {% from "users/_tabs.html" import users_tabs with context %}
 {% macro cost_cell(s) %}{{ money(s.cost) }}{% if s.cost is not none and s.cost_partial %}*{% endif %}{% endmacro %}
@@ -24,8 +25,10 @@
 {% block body %}
   <header class="shead">
     <div class="shead__main">
-      <h1 class="shead__title">{{ t('section.users.title') }}</h1>
-      <p class="shead__sub">{{ t('usage.sub') }}</p>
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('section.users.title') }}</h1>
+        {{ info_tip(t('tip.hint'), '', [t('usage.sub')], 'usage') }}
+      </div>
     </div>
   </header>
   {{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link, has_journal_tab, has_usage_tab) }}

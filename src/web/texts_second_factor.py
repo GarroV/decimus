@@ -63,10 +63,12 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
     # --- «Вход и защита» ----------------------------------------------------------------
     "sf.sec.title": {"ru": "Вход и защита", "en": "Sign-in and protection"},
     "sf.sec.sub": {
-        "ru": "Touch ID сохраняется сам после входа и снимается, если не входили 30 дней. Здесь "
-        "— запасной способ: приложение-аутентификатор и резервные коды.",
-        "en": "Touch ID saves itself after you sign in and is removed after 30 days without "
-        "use. Here is the fallback: an authenticator app and backup codes.",
+        "ru": "Touch ID сохраняется сам после входа и снимается, если не входили 30 дней.",
+        "en": "Touch ID saves itself after you sign in and is removed after 30 days without use.",
+    },
+    "sf.sec.sub.fallback": {
+        "ru": "Здесь — запасной способ: приложение-аутентификатор и резервные коды.",
+        "en": "Here is the fallback: an authenticator app and backup codes.",
     },
     "sf.sec.card": {
         "ru": "Вход по Touch ID; приложение и резервные коды — запасные.",

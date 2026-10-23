@@ -66,10 +66,16 @@ _INSTRUCTIONS_EN = "\n".join(
 SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     "section.settings.title": {"ru": "Настройки", "en": "Settings"},
     "settings.sub": {
-        "ru": "Ваш профиль: подключения и вход. Доступ к Claude и боту никто никому не "
-        "выдаёт — вы подключаете их сами; что в них доступно, решает ваша роль.",
-        "en": "Your profile: connections and sign-in. Nobody grants anyone access to Claude "
-        "or the bot — you connect them yourself; what you can do there depends on your role.",
+        "ru": "Ваш профиль: подключения и вход.",
+        "en": "Your profile: connections and sign-in.",
+    },
+    "settings.sub.grant": {
+        "ru": "Доступ к Claude и боту никто никому не выдаёт — вы подключаете их сами.",
+        "en": "Nobody grants anyone access to Claude or the bot — you connect them yourself.",
+    },
+    "settings.sub.role": {
+        "ru": "Что в них доступно, решает ваша роль.",
+        "en": "What you can do there depends on your role.",
     },
     "settings.claude.title": {"ru": "Claude (MCP)", "en": "Claude (MCP)"},
     "settings.claude.lead": {

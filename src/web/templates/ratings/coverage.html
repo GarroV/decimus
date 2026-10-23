@@ -5,6 +5,7 @@
   по ссылке — только контроль и админ УК. Устаревшие данные помечаются значком
   у числа, строка не подсвечивается: это не авария. Стили — `decimus-rt.css`.
 #}{% extends "base.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% block title %}{{ t('ratings.coverage.title') }}{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">
 <script src="{{ url_for('static', filename='decimus-rt.js') }}" defer></script>{% endblock %}
@@ -17,8 +18,16 @@
   <header class="rt-head">
     <div class="rt-head__main">
       <a class="back" href="{{ url(ratings_path) }}?lang={{ lang }}">{{ t('ratings.back') }}</a>
-      <h1 class="rt-head__title">{{ t('ratings.coverage.title') }}</h1>
-      <div class="rt-head__meta">{{ t('ratings.coverage.hint') }}</div>
+      {#- Пояснение, счётчики и расшифровка «без точки» — под одним «?», столбиком (D632). -#}
+      <div class="info-row">
+        <h1 class="rt-head__title">{{ t('ratings.coverage.title') }}</h1>
+        {{ info_tip(t('tip.hint'), '', [
+          t('ratings.coverage.hint'),
+          t('ratings.coverage.units', n=coverage.rows|length),
+          t('ratings.coverage.new_count', days=new_days, new=coverage.new),
+          t('ratings.coverage.gap_count', gap=coverage.unlinked),
+          t('ratings.coverage.gap_hint')], 'coverage') }}
+      </div>
     </div>
   </header>
   {% if notice %}<div class="note note--ok"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
@@ -33,8 +42,6 @@
       </select>
     </label>
     <noscript><button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.show') }}</button></noscript>
-    <span class="rt-head__meta rt-cov__counters">{{ t('ratings.coverage.counters', n=coverage.rows|length, days=new_days, new=coverage.new, gap=coverage.unlinked) }}
-      <span class="rt-cov__why" title="{{ t('ratings.coverage.gap_hint') }}">?</span></span>
   </form>
 
   {% if registry_empty %}<div class="rt-empty">{{ t('ratings.coverage.empty') }}</div>

@@ -35,25 +35,6 @@
   text-transform: uppercase; font-weight: var(--w-bold); color: var(--accent);
 }
 .rt-head__title { margin: 0; font-size: 19px; line-height: 24px; font-weight: var(--w-bold); color: var(--ink); }
-.rt-head__row { position: relative; display: flex; align-items: center; gap: var(--space-3); }
-/* Свежесть загрузок под «?» (D631): блок раскрывается наведением и фокусом, без скрипта;
-   на телефоне нажатие фокусирует элемент с tabindex. Блок цепляется к строке заголовка,
-   а не к значку: слева он начинается от поля страницы и на 390 px не уходит за экран. */
-.rt-info { align-self: stretch; display: inline-flex; align-items: center; }
-.rt-info__mark {
-  display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; cursor: help;
-  border: 1px solid var(--line-control); border-radius: var(--r-pill);
-  font-size: var(--fs-meta); font-weight: var(--w-semibold); line-height: 1; color: var(--ink-3);
-}
-.rt-info__mark:hover, .rt-info:focus-within .rt-info__mark { color: var(--accent); border-color: var(--accent-line); }
-.rt-info__pop {
-  display: none; position: absolute; z-index: 30; top: 100%; left: 0;
-  width: min(20rem, calc(100vw - 2rem)); padding-bottom: var(--space-3);
-}
-.rt-info:hover .rt-info__pop, .rt-info:focus-within .rt-info__pop { display: block; }
-.rt-info__list { margin: 0; padding: 0 var(--space-5); list-style: none; font-size: var(--fs-dense); color: var(--ink-2); }
-.rt-info__list li { padding: var(--space-1) 0; }
-.rt-info__none { margin: 0; padding: 0 var(--space-5); font-size: var(--fs-dense); color: var(--ink-3); }
 .rt-head__meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); }
 .rt-head__meta b { font-weight: var(--w-semibold); color: var(--ink-2); }
 
@@ -364,11 +345,6 @@
    страница на 390px не едет вбок. Устаревшее — значок у числа, строка не красится. */
 .rt-cov th[scope="row"] small { display: block; }
 .rt-cov td.num { vertical-align: top; }
-.rt-cov__counters { margin-left: auto; }
-.rt-cov__why {
-  display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: var(--space-2);
-  border: 1px solid var(--line-control); border-radius: 50%; font-size: 11px; color: var(--ink-3); cursor: help;
-}
 .rt-cov__off { color: var(--ink-empty); }
 .rt-stale { color: var(--warn-mark); font-size: .9em; cursor: help; }
 .rt-chip {
@@ -379,7 +355,6 @@
 .rt-link summary { cursor: pointer; color: var(--accent); }
 .rt-link form { display: flex; flex-direction: column; gap: var(--space-2); min-width: 13rem; margin-top: var(--space-2); }
 .rt-link .input { width: 100%; max-width: none; }
-@media (max-width: 640px) { .rt-cov__counters { margin-left: 0; } }
 
 /* Таблица-журнал на телефоне: строка — карточка «подпись — значение», а не лента с прокруткой вбок. */
 @media (max-width: 719px) {

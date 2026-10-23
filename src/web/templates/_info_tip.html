@@ -1,0 +1,26 @@
+{#
+  Значок «?» рядом с заголовком (D631, D632): всё служебное, что раньше висело под
+  шапкой облаком текста — свежесть данных, счётчики, пояснения — лежит под ним
+  столбиком, одна строка — один факт. В шапке остаются заголовок и действия.
+
+  `label` — для чтения с экрана («Пояснение», «Сводка»); `title` — надпись над
+  столбиком или пусто; `rows` — список готовых строк; `key` — различает значки на
+  одной странице (идёт в `id`).
+
+  Вызывать внутри `<div class="info-row">` рядом с заголовком: блок цепляется к этой
+  строке, а не к значку, и слева начинается от поля страницы — на 390 px не уходит
+  за экран. БЕЗ СКРИПТА: блок раскрывается наведением и фокусом (`:hover`,
+  `:focus-within`); на телефоне нажатие фокусирует элемент с `tabindex`. Стили —
+  `decimus-web.css`, раздел «Значок пояснения».
+#}
+{% macro info_tip(label, title, rows, key='tip') %}
+  <div class="info-tip">
+    <span class="info-tip__mark" tabindex="0" role="button" aria-label="{{ label }}" aria-describedby="info-{{ key }}">?</span>
+    <div class="info-tip__pop popover" id="info-{{ key }}" role="tooltip">
+      {% if title %}<div class="popover__group">{{ title }}</div>{% endif %}
+      <ul class="info-tip__list">
+        {% for row in rows %}<li>{{ row }}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+{% endmacro %}

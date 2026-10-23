@@ -14,6 +14,7 @@
   попадает намеренно — адреса остаются в истории браузера и в журнале
   обратного прокси.
 #}{% extends "_split_page.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% from "users/_card.html" import person_card, add_card with context %}
 {% from "users/_spaces.html" import spaces_list, space_card with context %}
 {% from "users/_tabs.html" import users_tabs with context %}
@@ -23,15 +24,19 @@
 {% block split_top %}
   <header class="shead">
     <div class="shead__main">
-      <h1 class="shead__title">{{ t('section.users.title') }}</h1>
       {% if manage %}
-        <p class="shead__sub">
-          {{ t('users.count', count=people_total) }}{% if people_off %} · {{ t('users.count_off', count=people_off) }}{% endif %}
-          {% if scope_kind %} · {{ t('users.scope.' ~ scope_kind) }}{% endif %}
-        </p>
+        {% set tip_rows = [t('users.count', count=people_total)] %}
+        {% if people_off %}{% set _ = tip_rows.append(t('users.count_off', count=people_off)) %}{% endif %}
+        {% if scope_kind %}{% set _ = tip_rows.append(t('users.scope.' ~ scope_kind)) %}{% endif %}
+        {% set tip_label = t('tip.counts') %}
       {% else %}
-        <p class="shead__sub">{{ t('users.self.text') }}</p>
+        {% set tip_rows = [t('users.self.closed'), t('users.self.here')] %}
+        {% set tip_label = t('tip.hint') %}
       {% endif %}
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('section.users.title') }}</h1>
+        {{ info_tip(tip_label, '', tip_rows, 'users') }}
+      </div>
     </div>
     {# На телефоне левой панели нет — своя карточка открывается отсюда. #}
     {% if manage %}<a class="sbtn shead__me" href="{{ link(person='me') }}" data-drawer-open>{{ t('profile.open') }}</a>{% endif %}

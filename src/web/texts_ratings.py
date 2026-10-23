@@ -432,9 +432,14 @@ _IMPORTS: dict[str, dict[str, str]] = {
         "ru": "На каких картах и агрегаторах есть каждая пиццерия и свежие ли там данные",
         "en": "Which maps and delivery apps list each pizzeria, and whether the data is fresh",
     },
-    "ratings.coverage.counters": {
-        "ru": "пиццерий {n} · новых за {days} дней {new} · без точки на площадках {gap}",
-        "en": "pizzerias {n} · new in {days} days {new} · missing on a platform {gap}",
+    "ratings.coverage.units": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
+    "ratings.coverage.new_count": {
+        "ru": "новых за {days} дней: {new}",
+        "en": "new in {days} days: {new}",
+    },
+    "ratings.coverage.gap_count": {
+        "ru": "без точки на площадках: {gap}",
+        "en": "missing on a platform: {gap}",
     },
     "ratings.coverage.gap_hint": {
         "ru": "Работающие пиццерии, у которых нет точки хотя бы на одном агрегаторе страны",

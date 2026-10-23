@@ -174,7 +174,9 @@ def shot_plan(page: Page, lang: str) -> Path:
     page.goto(f"{BASE}/calendar?from=2026-07-01&to=2026-07-31&lang={lang}")
     settle(page)
     hide_chrome(page)
-    text = page.inner_text("main")
+    # `text_content`, не `inner_text`: счётчик поездок лежит под значком «?» и скрыт (D632),
+    # а `inner_text` скрытого не видит — проверка молча перестала бы что-либо ловить.
+    text = page.text_content("main") or ""
     if any(mark in text for mark in EMPTY_TRIPS):
         raise RuntimeError("в календаре нет поездок: стенд без поездок в посеве?")
     return save(page, "plan", lang, main_clip(page))

@@ -16,6 +16,7 @@
   говорит. Отказ данных — наоборот, строка с ошибкой, а не тишина.
 #}{% extends "base.html" %}
 {% from "_pick.html" import pick %}
+{% from "_info_tip.html" import info_tip %}
 {% from "_period.html" import period_picker with context %}
 {% block title %}{{ t('section.overview.title') }}{% endblock %}
 {% block head %}
@@ -63,8 +64,10 @@
   {% if board_failed or stickers or data.attention %}
     <section class="hm-card hm-board">
       <header class="hm-card__head">
-        <h2 class="hm-label">{{ t('home.attention.title') }}</h2>
-        {% if data.attention %}<span class="hm-meta">{{ t('overview.attention.hint') }}</span>{% endif %}
+        <div class="info-row">
+          <h2 class="hm-label">{{ t('home.attention.title') }}</h2>
+          {% if data.attention %}{{ info_tip(t('tip.hint'), '', [t('overview.attention.hint')], 'attention') }}{% endif %}
+        </div>
       </header>
       {% if board_failed %}
         {{ empty(t('home.board.failed')) }}
@@ -241,8 +244,10 @@
           числу строк, что влезают целиком; остальное — «ещё N →» в «Проверки». #}
     <section class="hm-card">
       <header class="hm-card__head">
-        <h2 class="hm-label">{{ t('home.top.title') }}</h2>
-        <span class="hm-meta">{{ t('overview.systemic.hint') }}</span>
+        <div class="info-row">
+          <h2 class="hm-label">{{ t('home.top.title') }}</h2>
+          {{ info_tip(t('tip.hint'), '', [t('overview.systemic.hint')], 'systemic') }}
+        </div>
       </header>
       {% if not data.systemic %}
         {{ empty(t('home.top.none')) }}
@@ -263,8 +268,10 @@
     </section>
     <section class="hm-card">
       <header class="hm-card__head">
-        <h2 class="hm-label">{{ t('overview.processes.title') }}</h2>
-        <span class="hm-meta">{{ t('overview.processes.hint') }}</span>
+        <div class="info-row">
+          <h2 class="hm-label">{{ t('overview.processes.title') }}</h2>
+          {{ info_tip(t('tip.hint'), '', [t('overview.processes.hint')], 'processes') }}
+        </div>
       </header>
       {% if not data.process_losses %}
         {{ empty(t('home.processes.none')) }}

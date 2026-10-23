@@ -31,12 +31,17 @@
   </form>
 {% endmacro %}
 
-{# Шапка выбранного: надпись, заголовок; в теле — `pk-head__facts`, `pk-head__actions`, `pk-head__period`. #}
-{% macro pick_head(kicker, title) %}
+{# Шапка выбранного: надпись, заголовок; в теле — `pk-head__actions`, `pk-head__period`.
+   `tip` — готовый значок «?» из `_info_tip.html`: служебные числа и пояснения лежат под ним, а не
+   строкой в шапке (D632). #}
+{% macro pick_head(kicker, title, tip='') %}
   <header class="pk-head">
     <div class="pk-head__main">
       <div class="pk-kicker">{{ kicker }}</div>
-      <h1 class="pk-title">{{ title }}</h1>
+      <div class="info-row">
+        <h1 class="pk-title">{{ title }}</h1>
+        {{ tip }}
+      </div>
     </div>
     {{ caller() }}
   </header>

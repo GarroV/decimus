@@ -18,11 +18,14 @@
 {% endblock %}
 {% block page_class %} page--settings{% endblock %}
 {% block body %}
-  {% from "_split_ui.html" import confirm %}
+  {% from "_info_tip.html" import info_tip %}
+{% from "_split_ui.html" import confirm %}
   <header class="shead">
     <div class="shead__main">
-      <h1 class="shead__title">{{ t('sf.sec.title') }}</h1>
-      <p class="ssec__note">{{ t('sf.sec.sub') }}</p>
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('sf.sec.title') }}</h1>
+        {{ info_tip(t('tip.hint'), '', [t('sf.sec.sub'), t('sf.sec.sub.fallback')], 'security') }}
+      </div>
     </div>
   </header>
   <article class="ssettings">
