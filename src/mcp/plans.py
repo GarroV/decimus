@@ -16,8 +16,8 @@
 
 **Заполнение строки не стирает то, чего не назвали.** Дверь веба `save_row` пишет строку
 целиком (пустое поле стирает прежнее); агенту, который назвал одну меру, это стёрло бы
-ответственного. Поэтому здесь неназванное поле берётся из строки как есть, а стереть можно
-только названной пустой строкой.
+ответственного. Поэтому здесь зовётся `plan_flow.patch_row`: неназванное поле остаётся как в
+строке (чтение и запись под одним замком), а стереть можно только названной пустой строкой.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from ..db.errors import ActionPlanError, DbError
 from ..db.errors import ConfigError as DbConfigError
 from .db_target import config_refusal
 from .errors import ToolError
-from .tools import _parse_date
+from .tools import LABEL_LANG, _parse_date
 
 if TYPE_CHECKING:
     from ..db.action_plans import PlanRequest
@@ -43,7 +43,6 @@ NOT_CONNECTED = (
 )
 READ_FAILED = "Планы не прочитались: база отказала. Это отказ чтения, а не отсутствие планов"
 NO_PLAN = "Плана нет (или он вне вашего охвата)"
-NO_ROW = "В этом плане такой строки нет"
 NOTHING_TO_FILL = "Нечего записывать: назовите measure, responsible, reason или own_due"
 
 #: Статусы плана — те же, что `src.db.action_plans.STATUSES` (сверяет тест): каталог не
@@ -52,6 +51,8 @@ PLAN_STATUSES = ("requested", "on_review", "accepted", "in_work", "closed")
 #: Читающие инструменты плана: автора не берут и в журнал действий не идут
 #: (`rpc._call_tool`, `audit.READ_ONLY_TOOLS`). Остальные инструменты вида пишут.
 READ_TOOLS = frozenset({"list_action_plans", "get_action_plan"})
+#: Языки формулировок пунктов в строках плана (снимок пункта хранится на ru и en).
+PLAN_LANGS = ("ru", "en")
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
 #: Текст строки в ответе плана режется по этому числу знаков, а полный — в вебе: ответ
@@ -63,19 +64,23 @@ def _cut(text: str) -> str:
     return text if len(text) <= SHOWN_TEXT else text[: SHOWN_TEXT - 1].rstrip() + "…"
 
 
-def _row_view(row: PlanRow, *, on: date) -> dict[str, Any]:
-    """Строка плана в ответе: без снимков и пустых полей, срок — действующий."""
+def _row_view(row: PlanRow, *, on: date, lang: str | None = None) -> dict[str, Any]:
+    """Строка плана в ответе: без снимков и пустых полей, срок — действующий.
+
+    Формулировка пункта — на языке `lang`; без языка её нет (ответ записи короткий).
+    """
     view: dict[str, Any] = {
         "id": row.id,
         "n": row.position,
         "code": row.item_code,
         "level": row.level,
         "zone": row.zone,
-        "title": _cut(row.title("ru")),
         "status": row.status,
         "due_on": row.due_on.isoformat(),
         "overdue": row.overdue(on),
     }
+    if lang is not None:
+        view["title"] = _cut(row.title(lang))
     for name, value in (
         ("measure", row.measure),
         ("responsible", row.responsible),
@@ -118,6 +123,16 @@ def _head(item: PlanRequest, *, on: date) -> dict[str, Any]:
             "by_status": _row_counts(item),
         }
     return head
+
+
+def _check_lang(asked: str | None) -> str:
+    """Язык формулировок: ru или en. Незнакомый — отказ, а не молчаливая замена."""
+    if asked is None:
+        return LABEL_LANG
+    значение = asked.strip().lower()
+    if значение not in PLAN_LANGS:
+        raise ToolError(f"Язык «{asked}» не заведён. Доступны: {', '.join(PLAN_LANGS)}")
+    return значение
 
 
 def _read(work: Any) -> Any:
@@ -171,11 +186,17 @@ def list_action_plans(
     }
 
 
-def get_action_plan(*, tenant: str, request_id: str) -> dict[str, object]:
-    """Один план: шапка, комментарий последнего возврата и строки с сроками и просрочкой."""
+def get_action_plan(*, tenant: str, request_id: str, lang: str | None = None) -> dict[str, object]:
+    """Один план: шапка, комментарий последнего возврата и строки с сроками и просрочкой.
+
+    `lang` — язык формулировок пунктов (ru или en); не назван — как у соседних инструментов
+    (`tools.LABEL_LANG`): языка интерфейса учётки в токене нет. Текст строк партнёра
+    (мера, причина) приходит как он его написал.
+    """
     from ..db import action_plans as plans
     from ..db.reach import reach_of
 
+    язык = _check_lang(lang)
     reach = _read(lambda: reach_of(tenant))
     item = _read(lambda: plans.get_request(request_id, reach=reach))
     if item is None:
@@ -184,7 +205,7 @@ def get_action_plan(*, tenant: str, request_id: str) -> dict[str, object]:
     ответ: dict[str, Any] = _head(item, on=сегодня)
     if item.last_comment:
         ответ["return_comment"] = _cut(item.last_comment)
-    ответ["rows"] = [_row_view(row, on=сегодня) for row in item.rows]
+    ответ["rows"] = [_row_view(row, on=сегодня, lang=язык) for row in item.rows]
     if not item.electronic:
         ответ["note"] = (
             "Файловый план: строк нет, его принимают и возвращают по версии файла в вебе"
@@ -306,31 +327,27 @@ def fill_plan_row(
     own_due: str | None = None,
 ) -> dict[str, object]:
     """Записать меру, ответственного, причину и свой срок строки; неназванное остаётся как есть."""
-    from ..db import action_plans as plans
     from ..db import plan_flow as flow
     from ..db.reach import reach_of
 
     if measure is None and responsible is None and reason is None and own_due is None:
         raise ToolError(NOTHING_TO_FILL)
-    срок = _parse_date(own_due, field="own_due") if own_due is not None else None
-    item = _read(lambda: plans.get_request(request_id, reach=reach_of(tenant)))
-    if item is None:
-        raise ToolError(NO_PLAN)
-    строка = next((row for row in item.rows if row.id == row_id), None)
-    if строка is None:
-        raise ToolError(NO_ROW)
+    # Неназванное — `KEEP`: дверь читает текущую строку и пишет под тем же замком, что веб.
+    named: dict[str, Any] = {
+        имя: значение
+        for имя, значение in (
+            ("measure", measure),
+            ("responsible", responsible),
+            ("reason", reason),
+        )
+        if значение is not None
+    }
+    if own_due is not None:
+        named["own_due"] = _parse_date(own_due, field="own_due")
     _door(
         "Сохранить строку плана",
-        lambda: flow.save_row(
-            request_id,
-            row_id,
-            reach=reach_of(tenant),
-            tenant=tenant,
-            actor=actor,
-            measure=строка.measure if measure is None else measure,
-            responsible=строка.responsible if responsible is None else responsible,
-            reason=строка.reason if reason is None else reason,
-            own_due=строка.own_due if own_due is None else срок,
+        lambda: flow.patch_row(
+            request_id, row_id, reach=reach_of(tenant), tenant=tenant, actor=actor, **named
         ),
     )
     return _written(tenant, request_id, "row saved", row_id=row_id)

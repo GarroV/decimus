@@ -2302,7 +2302,15 @@ TOOLS = (
         "item code, class (D1-D3), zone, the violation, measure, responsible, reason, the "
         "partner's own due date, the effective due date, status and overdue flag (computed "
         "today). Empty fields are omitted, long texts are cut. A file plan has no rows.",
-        {"request_id": _PLAN_ID_PROPERTY},
+        {
+            "request_id": _PLAN_ID_PROPERTY,
+            "lang": {
+                "type": "string",
+                "enum": list(plans.PLAN_LANGS),
+                "description": "Language of the item wordings (ru or en). Default en; falls "
+                "back to the other language when a wording is missing.",
+            },
+        },
         ["request_id"],
         plans.get_action_plan,
     ),

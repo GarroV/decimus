@@ -48,7 +48,7 @@ ROW = "00000000-0000-0000-0000-0000000000b1"
     "return_row",
     "set_count_from",
 )
-ДВЕРИ_ПАРТНЁРА = ("save_row", "submit_plan", "start_row", "finish_row")
+ДВЕРИ_ПАРТНЁРА = ("patch_row", "submit_plan", "start_row", "finish_row")
 
 
 def _row(i: int = 1, **over: Any) -> PlanRow:
@@ -257,7 +257,7 @@ def test_план_читается_со_сроками_и_просрочкой_�
     assert [r["overdue"] for r in ответ["rows"]] == [True, False, False]
     assert ответ["rows"][0]["due_on"] == "2026-10-20"
     assert ответ["rows"][0]["n"] == 1
-    assert ответ["rows"][0]["title"] == "Пол в пятнах"
+    assert ответ["rows"][0]["title"] == "Dirty floor"
     assert ответ["overdue"] is False
 
 
@@ -352,14 +352,9 @@ def test_без_автора_запись_закрыта_а_чтение_нет(
 # ── Заполнение строки ───────────────────────────────────────────────────────
 
 
-def test_заполнение_не_стирает_неназванные_поля(
-    monkeypatch: pytest.MonkeyPatch, двери: list[Any]
+def test_заполнение_зовёт_частичную_дверь_только_с_названными_полями(
+    двери: list[Any],
 ) -> None:
-    была = _row(
-        measure="старая мера", responsible="Иван", reason="давно", own_due=date(2026, 10, 25)
-    )
-    monkeypatch.setattr(plans, "get_request", lambda request_id, *, reach: _plan((была,)))
-
     _call(
         "fill_plan_row",
         {"request_id": REQUEST, "row_id": ROW, "measure": "новая"},
@@ -367,19 +362,14 @@ def test_заполнение_не_стирает_неназванные_пол�
         role="admin",
     )
 
-    _, kwargs = next(в for в in двери if в[0] == "save_row")
+    _, kwargs = next(в for в in двери if в[0] == "patch_row")
     assert kwargs["measure"] == "новая"
-    assert kwargs["responsible"] == "Иван"
-    assert kwargs["reason"] == "давно"
-    assert kwargs["own_due"] == date(2026, 10, 25)
+    assert not {"responsible", "reason", "own_due"} & set(kwargs)
+    assert kwargs["args"] == (REQUEST, ROW)
+    assert not [в for в in двери if в[0] == "save_row"]
 
 
-def test_пустая_строка_стирает_поле_только_названная(
-    monkeypatch: pytest.MonkeyPatch, двери: list[Any]
-) -> None:
-    была = _row(measure="м", responsible="Иван", own_due=date(2026, 10, 25))
-    monkeypatch.setattr(plans, "get_request", lambda request_id, *, reach: _plan((была,)))
-
+def test_пустая_строка_стирает_поле_только_названная(двери: list[Any]) -> None:
     _call(
         "fill_plan_row",
         {"request_id": REQUEST, "row_id": ROW, "responsible": "", "own_due": ""},
@@ -387,10 +377,10 @@ def test_пустая_строка_стирает_поле_только_назв
         role="admin",
     )
 
-    _, kwargs = next(в for в in двери if в[0] == "save_row")
-    assert kwargs["measure"] == "м"
+    _, kwargs = next(в for в in двери if в[0] == "patch_row")
     assert kwargs["responsible"] == ""
     assert kwargs["own_due"] is None
+    assert "measure" not in kwargs
 
 
 def test_заполнение_без_полей_отказано_до_двери(двери: list[Any]) -> None:
@@ -400,32 +390,58 @@ def test_заполнение_без_полей_отказано_до_двери
 
     assert ответ["result"]["isError"] is True
     assert plans_tools.NOTHING_TO_FILL in _text(ответ)
-    assert [в for в in двери if в[0] == "save_row"] == []
+    assert [в for в in двери if в[0] == "patch_row"] == []
 
 
-def test_строка_не_из_этого_плана_отказана_до_двери(двери: list[Any]) -> None:
-    чужая = "00000000-0000-0000-0000-0000000000ff"
+def test_отказ_частичной_двери_приходит_словами(
+    monkeypatch: pytest.MonkeyPatch, двери: list[Any]
+) -> None:
+    def отказ(*a: Any, **k: Any) -> None:
+        raise ActionPlanError("Строки нет")
+
+    monkeypatch.setattr(flow, "patch_row", отказ)
 
     ответ = _call(
         "fill_plan_row",
-        {"request_id": REQUEST, "row_id": чужая, "measure": "x"},
+        {"request_id": REQUEST, "row_id": ROW, "measure": "x"},
         tenant="RS",
         role="admin",
     )
 
     assert ответ["result"]["isError"] is True
-    assert plans_tools.NO_ROW in _text(ответ)
-    assert [в for в in двери if в[0] == "save_row"] == []
+    assert "Строки нет" in _text(ответ)
 
 
-# ── Сверки ──────────────────────────────────────────────────────────────────
+# ── Язык ────────────────────────────────────────────────────────────────────
 
 
-def test_статусы_схемы_те_же_что_у_плана() -> None:
-    assert plans_tools.PLAN_STATUSES == plans.STATUSES
+def _titles(аргументы: dict[str, Any]) -> Any:
+    ответ = _call(
+        "get_action_plan", {"request_id": REQUEST, **аргументы}, tenant="HQ", role="admin"
+    )
+    return ответ, None if ответ["result"].get("isError") else json.loads(_text(ответ))
 
 
-def test_читающие_инструменты_объявлены_и_есть_в_каталоге() -> None:
-    names = {t.name for t in TOOLS}
+def test_язык_пунктов_параметр_а_не_константа(двери: list[Any]) -> None:
+    _, по_умолчанию = _titles({})
+    _, русский = _titles({"lang": "ru"})
+    _, английский = _titles({"lang": "en"})
 
-    assert plans_tools.READ_TOOLS <= names
+    assert русский["rows"][0]["title"] == "Пол в пятнах"
+    assert английский["rows"][0]["title"] == "Dirty floor"
+    assert по_умолчанию["rows"][0]["title"] == "Dirty floor"
+
+
+def test_незнакомый_язык_отказ_а_не_замена(двери: list[Any]) -> None:
+    ответ, _ = _titles({"lang": "de"})
+
+    assert ответ["result"]["isError"] is True
+    assert "не заведён" in _text(ответ)
+
+
+def test_ответ_записи_без_формулировки_пункта(двери: list[Any]) -> None:
+    ответ = json.loads(
+        _text(_call("start_plan_row", ПЛАН_ПАРТНЁРА["start_plan_row"], tenant="RS", role="admin"))
+    )
+
+    assert "title" not in ответ["row"]
