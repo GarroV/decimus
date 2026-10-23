@@ -859,7 +859,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "history with its reason."
         ),
     },
-    # Карандаш у названия пиццерии на вычитке (D626).
+    # Карандаш у названия пиццерии на вычитке (D628).
     "unit_edit.title": {"ru": "Сменить пиццерию", "en": "Change the pizzeria"},
     "unit_edit.submit": {"ru": "Сменить", "en": "Change"},
     "unit_edit.reason_hint": {
