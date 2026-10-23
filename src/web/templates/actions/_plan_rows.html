@@ -134,7 +134,7 @@
   {% set base = actions_path ~ '/requests/' ~ r.id %}
   {% set editable = (not hq) and r.status == 'requested' %}
   {% if r.status == 'requested' %}
-    {% set hint = 'plans.rows.hint_fill' if not hq else 'plans.rows.hint_review_partner' %}
+    {% set hint = 'plans.rows.hint_fill_hq' if hq else 'plans.rows.hint_fill' %}
   {% elif r.status == 'on_review' %}
     {% set hint = 'plans.rows.hint_review_hq' if hq else 'plans.rows.hint_review_partner' %}
   {% elif r.status == 'in_work' %}

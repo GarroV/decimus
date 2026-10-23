@@ -1945,7 +1945,18 @@ a[data-zoom] { cursor: zoom-in; }
 .prowpanel__body { flex: 1; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: var(--space-5); padding: var(--space-5); }
 @media (max-width: 719px) {
   .prowpanel__sheet { width: 100%; border-left: 0; }
-  .ptable__due { white-space: normal; }
+  /* Строки плана на телефоне — карточкой: нарушение во всю ширину, срок и состояние
+     под ним, кнопка справа. Подписи колонок шапки скрыты, у срока и состояния — свои. */
+  .ptable, .ptable tbody { display: block; }
+  .ptable thead { display: none; }
+  .ptable__row { display: grid; grid-template-columns: 2.2em 1fr auto; gap: var(--space-2) var(--space-3);
+    align-items: center; padding: var(--space-3) 0; border-bottom: 1px solid var(--line-2); }
+  .ptable__row td { padding: 0; border: 0; }
+  .ptable__row .ptable__pos { grid-row: 1; align-self: start; }
+  .ptable__row .ptable__item { grid-column: 2 / -1; }
+  .ptable__row .ptable__due { grid-column: 2; white-space: normal; }
+  .ptable__row td:nth-child(4) { grid-column: 2; }
+  .ptable__row .ptable__act { grid-column: 3; grid-row: 2 / span 2; }
 }
 @media (prefers-reduced-motion: reduce) { .prowpanel__sheet { animation: none; } }
 

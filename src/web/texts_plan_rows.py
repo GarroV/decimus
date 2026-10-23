@@ -36,6 +36,11 @@ PLAN_ROW_TEXTS: dict[str, dict[str, str]] = {
         "en": "For each violation, say what you will do and who is responsible. You may set your "
         "own date earlier than the standard one; later only by an extension agreed with HQ.",
     },
+    "plans.rows.hint_fill_hq": {
+        "ru": "Партнёр заполняет строки. Принять или вернуть план можно, когда он его отправит.",
+        "en": "The partner is filling in the rows. You can accept or return the plan "
+        "once they send it.",
+    },
     "plans.rows.hint_review_partner": {
         "ru": "План на согласовании. Строки снова правятся, если его вернут.",
         "en": "The plan is under review. Rows become editable again if it is returned.",
