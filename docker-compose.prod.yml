@@ -24,12 +24,13 @@
 #    `web:${WEB_PORT}` (8267) и `mcp:${MCP_PORT}` (8265). Звенья socat
 #    (`web-link`, `link`) и туннель (`tunnel`) здесь выключены.
 #
-# 3. **Постоянные сервисы без профилей.** База, бот, MCP, веб и мини-апп обхода
-#    (`walk`, D312) поднимаются всегда,
-#    а не по `COMPOSE_PROFILES`: забытый в окружении профиль тихо оставлял бы
-#    прод без базы или без админки. Демо (`demo`), мок хранилища (`storage`), бывшее хранилище
-#    кадров (`storage-live`, снято 30.09, D293) и бэкап состояния (`backup`, разовый запуск по расписанию) остаются в своих
-#    профилях.
+# 3. **Постоянные сервисы без профилей.** База, бот, MCP, веб, мини-апп обхода
+#    (`walk`, D312) и хранилище кадров (`storage-live`, D635) поднимаются
+#    всегда, а не по `COMPOSE_PROFILES`: забытый в окружении профиль тихо
+#    оставлял бы прод без базы, админки или кадров. Демо (`demo`), мок
+#    хранилища (`storage`), заведение корзины (`storage-init`, одноразовый
+#    запуск из `prod-update.sh`) и бэкап состояния (`backup`, разовый запуск по
+#    расписанию) остаются в своих профилях.
 
 name: decimus
 
@@ -112,7 +113,76 @@ services:
   # `vps-backup` кладёт его через restic на MUSPELHEIM. Меток на томах нет —
   # список целей живёт там, а не здесь (#456).
   #
-  # Хранилища кадров на VPS нет: живое — MinIO на MUSPELHEIM, приложение ходит
-  # туда по `S3_ENDPOINT_URL` (D257, D259). Служба `storage-live` снята 30.09
-  # (D293) и удалена из сборки (#396): её образ MinIO больше не скачивается.
+  # Кадры проверок (D635, с 23.10.2026): своё хранилище на VPS, MinIO в службе
+  # `storage-live` с томом `storage-data` (`decimus_storage-data`). Том в ночном
+  # бэкапе VPS (`vps-infra`, `targets.conf`) — резерв на MUSPELHEIM. Порт наружу
+  # не публикуется: приложение ходит по сети проекта, `S3_ENDPOINT_URL=http://storage-live:9000`.
+  # Образ MinIO реестр не отдаёт (#396) — он перенесён `docker save | docker load`
+  # (docs/08-deploy.md, §8.2). Профиля у службы нет: `up` поднимает её всегда.
+  storage-live:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    restart: unless-stopped
+    # Без учётки MinIO встаёт со своей общеизвестной `minioadmin` (F-014 аудита
+    # 12.10), поэтому пустая учётка — отказ подняться. Проверка в команде, а не
+    # `${VAR:?}`: Compose проверял бы её и у тех, кто хранилище не поднимает.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        if [ "$${#MINIO_ROOT_USER}" -lt 3 ] || [ "$${#MINIO_ROOT_PASSWORD}" -lt 16 ]; then
+        echo "storage-live: задайте FRAMES_ROOT_USER (от 3 знаков) и FRAMES_ROOT_PASSWORD (от 16)" >&2;
+        exit 1; fi;
+        exec minio server /data --console-address ":9001"
+    environment:
+      # Root-ключи хранилища: только в `/srv/decimus/.env`. Приложение под ними
+      # не ходит — у него свой пользователь `decimus-app` (его заводит `storage-init`).
+      MINIO_ROOT_USER: ${FRAMES_ROOT_USER:-}
+      MINIO_ROOT_PASSWORD: ${FRAMES_ROOT_PASSWORD:-}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - storage-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
+  # Заведение корзины и пользователя приложения (D635). Одноразовая служба в
+  # профиле `storage-init`, как `migrate`: её запускает `prod-update.sh`
+  # (`run --rm`), повторный запуск ничего не ломает. Пользователь `decimus-app`
+  # получает ключи приложения из `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` и
+  # политику `decimus-frames-rw` — только корзина `${S3_BUCKET}`.
+  storage-init:
+    profiles: ["storage-init"]
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    depends_on:
+      storage-live:
+        condition: service_healthy
+    environment:
+      # Готовый адрес с учёткой: `mc` берёт доступ из окружения, ключи не
+      # попадают в аргументы команды.
+      MC_HOST_own: http://${FRAMES_ROOT_USER:-}:${FRAMES_ROOT_PASSWORD:-}@storage-live:9000
+      BUCKET: ${S3_BUCKET:-inspection-frames}
+      APP_USER: ${S3_ACCESS_KEY_ID:-}
+      APP_SECRET: ${S3_SECRET_ACCESS_KEY:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        set -e;
+        if [ -z "$$APP_USER" ] || [ "$${#APP_SECRET}" -lt 8 ]; then
+        echo "storage-init: задайте S3_ACCESS_KEY_ID и S3_SECRET_ACCESS_KEY (от 8 знаков)" >&2; exit 1; fi;
+        mc mb --ignore-existing "own/$$BUCKET";
+        printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetBucketLocation","s3:ListBucket"],"Resource":["arn:aws:s3:::%s"]},{"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject"],"Resource":["arn:aws:s3:::%s/*"]}]}' "$$BUCKET" "$$BUCKET" > /tmp/policy.json;
+        mc admin policy create own decimus-frames-rw /tmp/policy.json;
+        mc admin user add own "$$APP_USER" "$$APP_SECRET";
+        mc admin policy attach own decimus-frames-rw --user "$$APP_USER";
+        mc ls own
+
+volumes:
+  storage-data:

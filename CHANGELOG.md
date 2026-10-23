@@ -1,6 +1,11 @@
 # Журнал изменений
 
 Формат: обратный хронологический порядок, каждая запись — что изменилось и почему.
+## 2026-10-23 — Кадры прода переехали с MUSPELHEIM на VPS, резерв — ночной бэкап (D635)
+
+- `docker-compose.prod.yml`: службы `storage-live` (MinIO, том `storage-data`, порт наружу не публикуется) и `storage-init` (корзина, политика `decimus-frames-rw`, пользователь `decimus-app`; профиль `storage-init`). `scripts/prod-update.sh`: шаг «хранилище кадров» между базой и накатом. Root-ключи — `FRAMES_ROOT_USER` / `FRAMES_ROOT_PASSWORD` в `.env` (`.env.example`).
+- Прод ходит на `S3_ENDPOINT_URL=http://storage-live:9000`; том `decimus_storage-data` в ночном бэкапе VPS (`vps-infra`, `targets.conf`). Старый MinIO на MUSPELHEIM не тронут, страховка до 30.10.2026.
+- `docs/08-deploy.md` (§4.9.2, §8 таблица, §8.2, §8.5): новое место кадров, переменные, порядок переезда и отката.
 ## 2026-10-23 — Превью-стенд: walk тоже обнуляет токен бота (#1222)
 
 - `deploy/preview/compose.preview.yaml`: у `walk` `TELEGRAM_BOT_TOKEN: ""`, как у демо (#1223) — поднятый из каталога с боевым `.env` стенд не падает на guard просмотра без подписи. Тест `test_infra_compose.py` проверяет оба стенда; заодно снят красный линт этого теста (лишний `noqa`, формат).
