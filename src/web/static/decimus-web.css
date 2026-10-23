@@ -2172,3 +2172,8 @@ a[data-zoom] { cursor: zoom-in; }
 .tedit__btn:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
 .tedit__btn svg { width: 15px; height: 15px; }
 .tedit__pop { right: auto; width: min(340px, calc(100vw - 32px)); }
+/* На телефоне окно от карандаша уезжало за правый край (карандаш стоит правее середины):
+   по ширине экрана с полями 16px, по высоте — там, где стояло бы в потоке. */
+@media (max-width: 719px) {
+  .tedit__pop { position: fixed; left: var(--space-7); right: var(--space-7); width: auto; max-width: none; }
+}
