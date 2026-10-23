@@ -188,7 +188,6 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "ru": "В проверке нет D2 и D3 — план можно запросить вручную.",
         "en": "The inspection has no D2 or D3 — a plan can be requested manually.",
     },
-    "card.plan.due": {"ru": "Срок ответа", "en": "Due date"},
     "card.plan.request_submit": {"ru": "Запросить экшн-план", "en": "Request action plan"},
     "card.plan.unknown": {
         "ru": "Экшн-план сейчас не прочитать.",

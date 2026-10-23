@@ -54,6 +54,11 @@ def запрос(
         grade="C",
         files=files,
         events=(),
+        count_from=date(2026, 10, 4),
+        revision=1,
+        electronic=False,
+        review_comment=None,
+        rows=(),
     )
 
 
@@ -432,4 +437,6 @@ def test_состояния_размечены_все() -> None:
         plans.STATE_RETURNED,
         plans.STATE_ON_REVIEW,
         plans.STATE_ACCEPTED,
+        plans.STATE_IN_WORK,
+        plans.STATE_CLOSED,
     }

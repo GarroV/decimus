@@ -37,4 +37,33 @@ NOTIFICATION_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Предписание «{subject}» отправлено: черновик письма лёг в почту ({by})",
         "en": "The compliance notice “{subject}” was sent: the draft is in the mailbox ({by})",
     },
+    # --- электронный план исправлений -------------------------------------
+    "notif.plan_requested": {
+        "ru": "Запрошен план исправлений: {unit} ({by})",
+        "en": "An action plan was requested: {unit} ({by})",
+    },
+    "notif.plan_submitted": {
+        "ru": "{by} отправил план исправлений на согласование: {unit}",
+        "en": "{by} sent the action plan for approval: {unit}",
+    },
+    "notif.plan_accepted": {
+        "ru": "План исправлений принят, можно браться за работу: {unit} ({by})",
+        "en": "The action plan is accepted, you can start work: {unit} ({by})",
+    },
+    "notif.plan_returned": {
+        "ru": "План исправлений вернули на доработку: {unit} ({by})",
+        "en": "The action plan was returned for rework: {unit} ({by})",
+    },
+    "notif.plan_row_done": {
+        "ru": "{by} отметил строку плана сделанной: {unit}",
+        "en": "{by} marked a plan row as done: {unit}",
+    },
+    "notif.plan_row_confirmed": {
+        "ru": "Строка плана подтверждена: {unit} ({by})",
+        "en": "A plan row was confirmed: {unit} ({by})",
+    },
+    "notif.plan_row_returned": {
+        "ru": "Строку плана вернули: {unit} ({by})",
+        "en": "A plan row was returned: {unit} ({by})",
+    },
 }

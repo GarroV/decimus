@@ -1,4 +1,4 @@
-"""Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274).
+"""Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168).
 
 Партнёр отвечает на проверку УК файлом плана (D265, D267). Запрос появляется
 сам при подтверждении проверки УК, в которой есть D2 или D3 (D272), со сроком
@@ -10,6 +10,11 @@
 Запрос, срок и вердикт — ролью администратора истории. Вставить запрос сразу
 «принятым» или перевести его в «принят» без вердикта не может никто; историю
 пишут триггеры. Здесь — понятные человеку отказы до похода в базу и охват.
+
+**Электронный план (#1168, `0092`).** Запрос, по которому заведены строки
+(`electronic`), ведётся строками, а не файлом: заполнение → согласование → в
+работе → закрыт. Строки — `plan_rows.py`, их ход и вердикты — `plan_flow.py`. Файловые
+запросы (`accepted`, старый путь) остаются как есть и идут здесь же, как раньше.
 
 **Охват.** Читают по охвату (`reach.py`): УК — все страны, партнёр — свои
 (D284, D289). Чужой запрос или файл по угаданному id отвечает тем же `None`,
@@ -29,7 +34,7 @@ from typing import Any, Protocol
 
 import psycopg
 
-from src.domain.plan_due import plan_due_days
+from src.domain.plan_due import plan_due_on
 from src.domain.tenants import HQ_TENANT
 
 from .config import (
@@ -37,8 +42,10 @@ from .config import (
     load_retraction_settings,
     load_storage_settings,
 )
-from .errors import ActionPlanError, DbError, StorageError
+from .errors import ActionPlanError, DbError, PlanFileLimitError, StorageError
 from .models import UPLOADED_ORIGINS
+from .plan_notify import KIND_REQUESTED, notify_event
+from .plan_rows import PlanRow, TermsProvider, insert_rows, prepare_rows, read_rows
 from .pool import connection
 from .reach import Reach, require_reach
 from .storage import PhotoStorage, S3PhotoStorage, key_of_uri
@@ -52,7 +59,12 @@ TRIGGER_LEVELS = ("D2", "D3")
 STATUS_REQUESTED = "requested"
 STATUS_ON_REVIEW = "on_review"
 STATUS_ACCEPTED = "accepted"
-STATUSES = (STATUS_REQUESTED, STATUS_ON_REVIEW, STATUS_ACCEPTED)
+#: Электронный план принят и выполняется строками; закрыт — все строки подтверждены.
+STATUS_IN_WORK = "in_work"
+STATUS_CLOSED = "closed"
+STATUSES = (STATUS_REQUESTED, STATUS_ON_REVIEW, STATUS_ACCEPTED, STATUS_IN_WORK, STATUS_CLOSED)
+#: Закончены: уходят из очереди в «принятые».
+FINISHED_STATUSES = (STATUS_ACCEPTED, STATUS_CLOSED)
 
 VERDICT_ACCEPTED = "accepted"
 VERDICT_RETURNED = "returned"
@@ -63,6 +75,8 @@ STATE_REQUESTED = "requested"
 STATE_RETURNED = "returned"
 STATE_ON_REVIEW = "on_review"
 STATE_ACCEPTED = "accepted"
+STATE_IN_WORK = "in_work"
+STATE_CLOSED = "closed"
 
 ORIGIN_AUTO = "auto"
 ORIGIN_MANUAL = "manual"
@@ -77,6 +91,10 @@ MAX_FILE_NAME = 255
 MAX_CONTENT_TYPE = 255
 #: Сколько запросов читается в список за раз.
 LIST_LIMIT = 500
+#: Версий файла на запрос не больше: у электронного плана статус при загрузке не
+#: меняется, и без предела вложения копились бы бесконечно; у файлового их число и так
+#: идёт кругами «загрузили — вернули». Объём одной версии — `ATTACHMENT_MAX_MB`.
+MAX_FILE_VERSIONS = 20
 
 
 def today() -> date:
@@ -114,11 +132,19 @@ def is_overdue(status: str, due_on: date, *, today: date) -> bool:
     return _require_status(status) == STATUS_REQUESTED and today > due_on
 
 
-def plan_state(status: str, last_verdict: str | None) -> str:
-    """Состояние для экрана: запрошен / вернули / на приёмке / принят."""
+def plan_state(status: str, last_verdict: str | None, *, returned: bool = False) -> str:
+    """Состояние для экрана: запрошен / вернули / на приёмке / принят / в работе / закрыт.
+
+    `returned` — электронный план вернули с комментарием: у него вердикта по файлу
+    нет, возврат виден по комментарию запроса.
+    """
     if _require_status(status) == STATUS_REQUESTED:
-        return STATE_RETURNED if last_verdict == VERDICT_RETURNED else STATE_REQUESTED
-    return STATE_ON_REVIEW if status == STATUS_ON_REVIEW else STATE_ACCEPTED
+        return STATE_RETURNED if returned or last_verdict == VERDICT_RETURNED else STATE_REQUESTED
+    return {
+        STATUS_ON_REVIEW: STATE_ON_REVIEW,
+        STATUS_IN_WORK: STATE_IN_WORK,
+        STATUS_CLOSED: STATE_CLOSED,
+    }.get(status, STATE_ACCEPTED)
 
 
 def due_date(start: date, days: int) -> date:
@@ -156,6 +182,8 @@ class PlanEvent:
     actor: str
     detail: str | None
     at: datetime
+    #: Строка плана, о которой событие; пусто — событие плана целиком.
+    row_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -179,17 +207,41 @@ class PlanRequest:
     grade: str | None
     files: tuple[PlanFile, ...]
     events: tuple[PlanEvent, ...]
+    #: Начало отсчёта срока (D613): срок плана и сроки строк считаются от него.
+    count_from: date
+    #: Растёт на каждую правку строк: по ней файл «туда и обратно» увидит, что план поменяли.
+    revision: int
+    #: Заведены строки — план электронный; нет — файловый, старый путь.
+    electronic: bool
+    #: Комментарий последнего возврата электронного плана.
+    review_comment: str | None
+    rows: tuple[PlanRow, ...]
 
     @property
     def state(self) -> str:
-        return plan_state(self.status, self.files[-1].verdict if self.files else None)
+        return plan_state(
+            self.status,
+            self.files[-1].verdict if self.files else None,
+            returned=self.electronic and bool(self.review_comment),
+        )
 
     def overdue(self, on: date) -> bool:
         return is_overdue(self.status, self.due_on, today=on)
 
+    def overdue_rows(self, on: date) -> int:
+        """Сколько строк просрочено на дату: по ним план в работе виден в списке как горящий."""
+        return sum(1 for row in self.rows if row.overdue(on))
+
+    @property
+    def filled_rows(self) -> int:
+        """Строк с мерой и ответственным: столько уже готово к отправке на согласование."""
+        return sum(1 for row in self.rows if row.is_filled)
+
     @property
     def last_comment(self) -> str | None:
         """Комментарий последнего возврата — его партнёр видит у запроса."""
+        if self.electronic:
+            return self.review_comment
         for item in reversed(self.files):
             if item.verdict == VERDICT_RETURNED:
                 return item.comment
@@ -225,12 +277,13 @@ class PlanFileRef:
 # (0036), и очередь по всем странам не читает историю.
 _OPEN_SQL = """
 select r.id, r.inspection_id, u.country, r.due_on, r.status, r.origin, r.requested_by,
-       r.requested_at, u.id, u.name, i.inspection_date, i.pct, i.grade
+       r.requested_at, u.id, u.name, i.inspection_date, i.pct, i.grade,
+       r.count_from, r.revision, r.electronic, r.review_comment
 from action_plan_requests r
 join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
-  and r.status <> 'accepted'
+  and r.status <> 'accepted' and r.status <> 'closed'
   and i.retracted_at is null
   and (%(country)s::text is null or u.country = %(country)s)
 order by r.due_on, r.requested_at
@@ -240,12 +293,13 @@ limit %(limit)s
 # Принятые — отдельно, по кнопке «Принятые»: свежие первыми.
 _ACCEPTED_SQL = """
 select r.id, r.inspection_id, u.country, r.due_on, r.status, r.origin, r.requested_by,
-       r.requested_at, u.id, u.name, i.inspection_date, i.pct, i.grade
+       r.requested_at, u.id, u.name, i.inspection_date, i.pct, i.grade,
+       r.count_from, r.revision, r.electronic, r.review_comment
 from action_plan_requests r
 join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
-  and r.status = 'accepted'
+  and (r.status = 'accepted' or r.status = 'closed')
   and i.retracted_at is null
   and (%(country)s::text is null or u.country = %(country)s)
 order by r.due_on desc, r.requested_at desc
@@ -255,7 +309,8 @@ limit %(limit)s
 # Один запрос — по id или по проверке, в любом статусе.
 _ONE_SQL = """
 select r.id, r.inspection_id, u.country, r.due_on, r.status, r.origin, r.requested_by,
-       r.requested_at, u.id, u.name, i.inspection_date, i.pct, i.grade
+       r.requested_at, u.id, u.name, i.inspection_date, i.pct, i.grade,
+       r.count_from, r.revision, r.electronic, r.review_comment
 from action_plan_requests r
 join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
@@ -276,7 +331,7 @@ order by f.request_id, f.version
 """
 
 _EVENTS_SQL = """
-select e.request_id, e.action, e.actor, e.detail, e.at
+select e.request_id, e.action, e.actor, e.detail, e.at, e.row_id
 from action_plan_events e
 where e.request_id = any(%(ids)s::uuid[])
 order by e.request_id, e.at, e.id
@@ -304,7 +359,7 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(c
 
 # Загрузка: замок строки запроса, охват — тем же литералом.
 _LOCK_FOR_UPLOAD_SQL = """
-select r.status
+select r.status, r.electronic
 from action_plan_requests r
 join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
@@ -342,13 +397,14 @@ _EXISTING_SQL = "select 1 from action_plan_requests where inspection_id = %s"
 
 _INSERT_REQUEST_SQL = """
 insert into action_plan_requests
-    (inspection_id, due_on, origin, requested_by, due_set_by)
-values (%(inspection_id)s, %(due_on)s, %(origin)s, %(actor)s, %(actor)s)
+    (inspection_id, due_on, origin, requested_by, due_set_by, count_from, electronic)
+values (%(inspection_id)s, %(due_on)s, %(origin)s, %(actor)s, %(actor)s, %(count_from)s,
+        %(electronic)s)
 on conflict (inspection_id) do nothing
 returning id
 """
 
-_LOCK_REQUEST_SQL = "select status from action_plan_requests where id = %s for update"
+_LOCK_REQUEST_SQL = "select status, electronic from action_plan_requests where id = %s for update"
 
 _LAST_FILE_SQL = """
 select f.id, v.verdict
@@ -392,18 +448,23 @@ def _read(sql: str, params: dict[str, Any]) -> tuple[PlanRequest, ...]:
             # Запросов нет — файлов и событий нет: два похода в базу «за пустым».
             files: list[tuple[Any, ...]] = []
             events: list[tuple[Any, ...]] = []
+            rows: dict[str, tuple[PlanRow, ...]] = {}
             if ids:
                 cur.execute(_FILES_SQL, {"ids": ids})
                 files = cur.fetchall()
                 cur.execute(_EVENTS_SQL, {"ids": ids})
                 events = cur.fetchall()
+                rows = read_rows(cur, ids)
     except psycopg.Error as exc:
         raise DbError(f"Не удалось прочитать экшн-планы ({type(exc).__name__})") from exc
-    return tuple(_assemble(row, files, events) for row in heads)
+    return tuple(_assemble(row, files, events, rows) for row in heads)
 
 
 def _assemble(
-    head: tuple[Any, ...], files: list[tuple[Any, ...]], events: list[tuple[Any, ...]]
+    head: tuple[Any, ...],
+    files: list[tuple[Any, ...]],
+    events: list[tuple[Any, ...]],
+    rows: dict[str, tuple[PlanRow, ...]],
 ) -> PlanRequest:
     ident = str(head[0])
     return PlanRequest(
@@ -438,10 +499,21 @@ def _assemble(
             if str(row[0]) == ident
         ),
         events=tuple(
-            PlanEvent(action=str(row[1]), actor=str(row[2]), detail=row[3], at=row[4])
+            PlanEvent(
+                action=str(row[1]),
+                actor=str(row[2]),
+                detail=row[3],
+                at=row[4],
+                row_id=None if row[5] is None else str(row[5]),
+            )
             for row in events
             if str(row[0]) == ident
         ),
+        count_from=head[13],
+        revision=int(head[14]),
+        electronic=bool(head[15]),
+        review_comment=None if head[16] is None else str(head[16]),
+        rows=rows.get(ident, ()),
     )
 
 
@@ -542,7 +614,12 @@ def fetch_file(ref: PlanFileRef, *, storage: FileReader | None = None) -> bytes:
 
 
 def open_auto_request(
-    cur: psycopg.Cursor[Any], inspection_id: str, *, actor: str, on: date
+    cur: psycopg.Cursor[Any],
+    inspection_id: str,
+    *,
+    actor: str,
+    on: date,
+    terms: TermsProvider | None = None,
 ) -> str | None:
     """Завести запрос сам — тем же курсором, что подтверждает проверку (D272).
 
@@ -550,9 +627,12 @@ def open_auto_request(
     запроса невозможно, оба ложатся вместе или не ложатся вовсе. Возвращает id
     запроса или `None`, если он не нужен (нет D2/D3, проверка не УК) или уже был.
 
-    Срок (`plan_due_days` методики, D617) читается здесь и только когда запрос
-    нужен: кривая методика роняет подтверждение проверки с D2/D3 (`ConfigError`
-    блока `domain`), а не любой проверки.
+    Срок (`plan_due_days` методики, D617) и сроки строк читаются здесь и только
+    когда запрос нужен: кривая методика роняет подтверждение проверки с D2/D3
+    (`ConfigError` блока `domain`), а не любой проверки. Начало отсчёта — день
+    подтверждения (D613: УК потом может назвать другое).
+
+    Вместе с запросом заводятся строки плана — по записи D1–D3 (#1168).
     """
     cur.execute(_INSPECTION_FOR_REQUEST_SQL, (inspection_id,))
     row = cur.fetchone()
@@ -571,17 +651,51 @@ def open_auto_request(
             inspection_id,
         )
         return None
+    return _create_request(
+        cur,
+        inspection_id,
+        origin=ORIGIN_AUTO,
+        actor=actor,
+        count_from=on,
+        due_on=plan_due_on(on),
+        terms=terms,
+    )
+
+
+def _create_request(
+    cur: psycopg.Cursor[Any],
+    inspection_id: str,
+    *,
+    origin: str,
+    actor: str,
+    count_from: date,
+    due_on: date,
+    terms: TermsProvider | None,
+) -> str | None:
+    """Запрос, его строки и уведомление партнёру — одним курсором. Уже был — `None`.
+
+    Строки — по нарушениям проверки: есть хоть одна — план электронный. Нарушений
+    нет (ручной запрос по проверке без D1–D3) — файловый, как раньше.
+    """
+    rows = prepare_rows(cur, inspection_id, terms=terms)
     cur.execute(
         _INSERT_REQUEST_SQL,
         {
             "inspection_id": inspection_id,
-            "due_on": due_date(on, plan_due_days()),
-            "origin": ORIGIN_AUTO,
+            "due_on": due_on,
+            "origin": origin,
             "actor": actor,
+            "count_from": count_from,
+            "electronic": bool(rows),
         },
     )
     created = cur.fetchone()
-    return None if created is None else str(created[0])
+    if created is None:
+        return None
+    request_id = str(created[0])
+    insert_rows(cur, request_id, rows)
+    notify_event(cur, KIND_REQUESTED, request_id, actor=actor, actor_tenant=HQ_TENANT)
+    return request_id
 
 
 # ── Запись: двери УК (администратор истории) ───────────────────────────────
@@ -606,14 +720,29 @@ def _translate(what: str, exc: psycopg.Error) -> ActionPlanError:
     return ActionPlanError(f"{what} не удалось ({type(exc).__name__}). Ничего не изменено")
 
 
-def request_plan(inspection_id: str, *, actor: str, due_on: date) -> str:
-    """Запросить план кнопкой УК по принятой проверке УК. Возвращает id запроса."""
+def request_plan(
+    inspection_id: str,
+    *,
+    actor: str,
+    due_on: date | None = None,
+    count_from: date | None = None,
+    terms: TermsProvider | None = None,
+) -> str:
+    """Запросить план кнопкой УК по принятой проверке УК. Возвращает id запроса.
+
+    `count_from` — от какой даты считать срок (D613), по умолчанию сегодня. Срок
+    ответа — от неё плюс дни методики; `due_on` перекрывает его, когда УК назвала
+    дату сама (и тогда она обязана быть не в прошлом). `terms` — дни и формулировки записей
+    от движка (`plan_rows.TermsProvider`): без них строк нет, и план файловый.
+    """
     who = _actor(actor)
     ident = _uuid_or_none(inspection_id)
     if ident is None:
         raise ActionPlanError(f"«{inspection_id}» не похоже на идентификатор проверки")
-    if due_on < today():
+    начало = count_from or today()
+    if due_on is not None and due_on < today():
         raise ActionPlanError(f"Срок {due_on.isoformat()} уже прошёл — назначьте будущую дату")
+    срок = due_on or plan_due_on(начало)
     try:
         with _admin_write("Запросить экшн-план") as conn, conn.cursor() as cur:
             cur.execute(_INSPECTION_FOR_REQUEST_SQL, (ident,))
@@ -622,20 +751,19 @@ def request_plan(inspection_id: str, *, actor: str, due_on: date) -> str:
             cur.execute(_EXISTING_SQL, (ident,))
             if cur.fetchone() is not None:
                 raise ActionPlanError("По этой проверке экшн-план уже запрошен")
-            cur.execute(
-                _INSERT_REQUEST_SQL,
-                {
-                    "inspection_id": ident,
-                    "due_on": due_on,
-                    "origin": ORIGIN_MANUAL,
-                    "actor": who,
-                },
+            created = _create_request(
+                cur,
+                ident,
+                origin=ORIGIN_MANUAL,
+                actor=who,
+                count_from=начало,
+                due_on=срок,
+                terms=terms,
             )
-            created = cur.fetchone()
             if created is None:
                 raise ActionPlanError("По этой проверке экшн-план уже запрошен")
             conn.commit()
-            return str(created[0])
+            return created
     except psycopg.Error as exc:
         raise _translate("Запросить экшн-план", exc) from exc
 
@@ -671,7 +799,7 @@ def set_due(request_id: str, *, actor: str, due_on: date) -> None:
     try:
         with _admin_write("Поправить срок") as conn, conn.cursor() as cur:
             status = _locked_status(cur, ident)
-            if status == STATUS_ACCEPTED:
+            if status in FINISHED_STATUSES:
                 raise ActionPlanError("План уже принят — срок не правится")
             cur.execute(_SIGN_DUE_SQL, (who,))
             cur.execute(_SET_DUE_SQL, {"id": ident, "due_on": due_on})
@@ -681,11 +809,16 @@ def set_due(request_id: str, *, actor: str, due_on: date) -> None:
 
 
 def _locked_status(cur: psycopg.Cursor[Any], ident: str) -> str:
+    return locked_head(cur, ident)[0]
+
+
+def locked_head(cur: psycopg.Cursor[Any], ident: str) -> tuple[str, bool]:
+    """Замок строки запроса: статус и признак электронного плана. Запроса нет — отказ."""
     cur.execute(_LOCK_REQUEST_SQL, (ident,))
     row = cur.fetchone()
     if row is None:
         raise ActionPlanError("Запроса нет")
-    return str(row[0])
+    return str(row[0]), bool(row[1])
 
 
 def review(request_id: str, *, actor: str, verdict: str, comment: str) -> None:
@@ -701,7 +834,13 @@ def review(request_id: str, *, actor: str, verdict: str, comment: str) -> None:
         raise ActionPlanError("Запроса нет")
     try:
         with _admin_write("Вынести вердикт") as conn, conn.cursor() as cur:
-            if _locked_status(cur, ident) != STATUS_ON_REVIEW:
+            status, electronic = locked_head(cur, ident)
+            if electronic:
+                raise ActionPlanError(
+                    "План электронный: его принимают и возвращают целиком, "
+                    "а строки подтверждают по одной"
+                )
+            if status != STATUS_ON_REVIEW:
                 raise ActionPlanError("План не на приёмке — принимать или возвращать нечего")
             cur.execute(_LAST_FILE_SQL, (ident,))
             last = cur.fetchone()
@@ -750,7 +889,10 @@ def upload_version(
     max_bytes: int,
     storage: PhotoStorage | None = None,
 ) -> int:
-    """Положить новую версию плана и отправить запрос на приёмку. Возвращает номер версии.
+    """Положить новую версию плана; файловый запрос уходит на приёмку. Возвращает номер версии.
+
+    К электронному плану файл ложится вложением и ничего не двигает: строки он не
+    заполняет, их заполняют на экране (разбор файла в строки — следующий шаг).
 
     Запрос вне охвата отвечает «нет», как несуществующий. Что кладёт только
     партнёр этой страны и только в запрошенный запрос — держит ещё и триггер.
@@ -812,8 +954,14 @@ def _record_version(ident: str, *, reach: Reach, row: dict[str, Any]) -> int:
         cur.execute(_NEXT_VERSION_SQL, (ident,))
         version_row = cur.fetchone()
         version = int(version_row[0]) if version_row else 1
+        if version > MAX_FILE_VERSIONS:
+            raise PlanFileLimitError(MAX_FILE_VERSIONS)
         cur.execute(_INSERT_FILE_SQL, {**row, "version": version})
-        cur.execute(_SET_STATUS_SQL, {"id": ident, "status": STATUS_ON_REVIEW})
+        if not head[1]:
+            # Файловый план уходит на приёмку с файлом. Электронный — нет: файл у него
+            # вложение («не разобран», строки заполняют на экране), согласование идёт
+            # по строкам (`plan_flow.submit_plan`).
+            cur.execute(_SET_STATUS_SQL, {"id": ident, "status": STATUS_ON_REVIEW})
         conn.commit()
         return version
 

@@ -10,6 +10,42 @@
     return node && node.closest ? node.closest(".supload") : null;
   }
 
+  // Панель правки строки плана (`.prowpanel`, `_plan_rows.html`): без скрипта её
+  // открывает якорь (:target), со скриптом — класс `is-open` без перехода по адресу.
+  // Esc закрывает сначала её, а не панель запроса под ней (слушатель в фазе захвата).
+  document.addEventListener("click", function (e) {
+    var open = e.target.closest && e.target.closest("[data-row-open]");
+    if (open) {
+      var panel = document.getElementById((open.getAttribute("href") || "").slice(1));
+      if (!panel) return;
+      e.preventDefault();
+      panel.classList.add("is-open");
+      var first = panel.querySelector("textarea, input, button");
+      if (first) first.focus({ preventScroll: true });
+      return;
+    }
+    var close = e.target.closest && e.target.closest("[data-row-close]");
+    if (close) {
+      e.preventDefault();
+      e.stopPropagation();
+      var opened = close.closest("[data-row-panel]");
+      if (opened) opened.classList.remove("is-open");
+    }
+  });
+
+  document.addEventListener(
+    "keydown",
+    function (e) {
+      if (e.key !== "Escape") return;
+      var opened = document.querySelector("[data-row-panel].is-open");
+      if (!opened) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      opened.classList.remove("is-open");
+    },
+    true
+  );
+
   document.addEventListener("change", function (e) {
     var input = e.target;
     if (!input.matches || !input.matches(".supload__input")) return;

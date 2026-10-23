@@ -25,6 +25,9 @@ from src.db import (
     imports,
     move,
     photos,
+    plan_flow,
+    plan_notify,
+    plan_rows,
     prescriptions,
     prescriptions_write,
     previews,
@@ -62,6 +65,11 @@ from src.db.reach import REACH_SQL, UNIT_REACH_SQL
         "запись, а не чтение: запрос экшн-плана заводит УК по проверке своего "
         "пространства (условие на `tenant_code` — в коде), в транзакции "
         "подтверждения или кнопкой; наружу из этой строки ничего не уходит"
+    ),
+    "plan_notify._CONTEXT_SQL": (
+        "адресаты и текст уведомления о событии плана: запрос уже прочла по охвату дверь, "
+        "которая совершает событие (`plan_flow`, `action_plans`); наружу уходит только "
+        "страна для поиска адресатов и название пиццерии для текста"
     ),
     "photos._STAMP_CONTEXT_SQL": (
         "штамп кадра (D621) берёт название пиццерии, проверяющего и страну проверки, кадр "
@@ -101,7 +109,17 @@ def _запросы(*модули: ModuleType) -> dict[str, str]:
 def test_каждое_чтение_проверок_стоит_на_охвате() -> None:
     """Запрос по проверкам без `REACH_SQL` — дыра границы, видимая только чтением."""
     запросы = _запросы(
-        queries, reports, previews, move, action_plans, prescriptions, swarm_read, photos
+        queries,
+        reports,
+        previews,
+        move,
+        action_plans,
+        plan_flow,
+        plan_notify,
+        plan_rows,
+        prescriptions,
+        swarm_read,
+        photos,
     )
     сверено = [имя for имя, текст in запросы.items() if _ПРОВЕРКИ.search(текст)]
     assert len(сверено) >= 12, f"сверка не нашла запросов — регулярное выражение сломано: {сверено}"
@@ -135,7 +153,18 @@ def test_каждое_чтение_предписаний_стоит_на_охв
 
 def test_исключения_называют_настоящие_запросы() -> None:
     """Исключение на запрос, которого больше нет, молча расширило бы будущий."""
-    запросы = _запросы(queries, reports, previews, move, directory, action_plans, photos)
+    запросы = _запросы(
+        queries,
+        reports,
+        previews,
+        move,
+        directory,
+        action_plans,
+        plan_flow,
+        plan_notify,
+        plan_rows,
+        photos,
+    )
     мёртвые = [имя for имя in (*ВНЕ_ОХВАТА, *СПРАВОЧНИК_ВНЕ_ОХВАТА) if имя not in запросы]
     assert мёртвые == []
 

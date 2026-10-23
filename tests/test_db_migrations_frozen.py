@@ -357,6 +357,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0091_units_merge_guard_search_path.sql": (
         "sql1:a08b706eb0cb3db93802ef37ce454b9435f7065b5db4a7ccec3a82b5e9072e73"
     ),
+    "0092_action_plan_rows.sql": (
+        "sql1:13f5b4a3d8fdde7590a2c7553eec4ec44cf55223081ab1e67a47a4d3d61a73bb"
+    ),
 }
 
 

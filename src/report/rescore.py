@@ -41,12 +41,11 @@ def refuse_legacy(detail: InspectionDetail) -> None:
         )
 
 
-def rescore(detail: InspectionDetail, *, papers: Papers) -> Score:
-    """Оценка проверки такой, какой её посчитает движок по её же методике.
+def engine_output(detail: InspectionDetail, *, papers: Papers) -> dict[str, Any]:
+    """Ответ `audit.py score --json` по записанной проверке — разобранный JSON, как есть.
 
-    Отказ — `LetterError` с объяснением: методики той версии нет, движок не
-    принял состояние. Молча вернуть прежнюю оценку нельзя: исправленная запись
-    с неисправленной буквой выглядела бы пересчитанной.
+    Движок идёт по методике ТОЙ версии, которой помечена проверка. Отказ —
+    `LetterError`: методики той версии нет, движок не принял состояние, ответ не JSON.
     """
     refuse_legacy(detail)
     каталог, _ = letters._methodology(detail.inspection.checklist_version, papers)
@@ -67,7 +66,19 @@ def rescore(detail: InspectionDetail, *, papers: Papers) -> Score:
         посчитано: Any = json.loads(вывод)
     except json.JSONDecodeError:
         raise LetterError("Движок ответил на пересчёт не разбираемым JSON") from None
-    return parse_score(посчитано)
+    if not isinstance(посчитано, dict):
+        raise LetterError("Движок ответил на пересчёт не объектом JSON")
+    return посчитано
+
+
+def rescore(detail: InspectionDetail, *, papers: Papers) -> Score:
+    """Оценка проверки такой, какой её посчитает движок по её же методике.
+
+    Отказ — `LetterError` с объяснением: методики той версии нет, движок не
+    принял состояние. Молча вернуть прежнюю оценку нельзя: исправленная запись
+    с неисправленной буквой выглядела бы пересчитанной.
+    """
+    return parse_score(engine_output(detail, papers=papers))
 
 
 #: Команды движка, которыми правится состав записей загружаемой проверки

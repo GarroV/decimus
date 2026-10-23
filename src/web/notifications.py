@@ -51,6 +51,13 @@ SECTION_OF_KIND: dict[str, str] = {
     "rx_returned": "actions",
     "rx_approved": "actions",
     "rx_issued": "actions",
+    "plan_requested": "actions",
+    "plan_submitted": "actions",
+    "plan_accepted": "actions",
+    "plan_returned": "actions",
+    "plan_row_done": "actions",
+    "plan_row_confirmed": "actions",
+    "plan_row_returned": "actions",
 }
 
 #: Ключ текста вида, которого словарь не знает.

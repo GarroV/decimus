@@ -13,10 +13,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Mapping
+from datetime import date, timedelta
 
 from .config import check_environment
 from .errors import ConfigError
+
+logger = logging.getLogger(__name__)
 
 PLAN_DUE_KEY = "plan_due_days"
 #: Ловушка на лишний ноль, а не предел методики.
@@ -37,3 +41,40 @@ def plan_due_days(env: Mapping[str, str] | None = None) -> int:
             f"{PLAN_DUE_KEY}={значение} в {файл.name} непригоден: нужно от 1 до {MAX_PLAN_DUE_DAYS}"
         )
     return значение
+
+
+# ── Срок строки плана (электронный план исправлений, D612, D613, D617) ─────
+#
+# Дни строки — НЕ отсюда: их считает движок (`engine/audit.py score`, поле `days`
+# у записи: дни пункта, не больше потолка класса), и продукт берёт готовое
+# (`src/report/plan_terms.py`). Здесь только сложение с началом отсчёта.
+
+
+def row_due_on(count_from: date, days: int) -> date:
+    """Положенный срок строки: начало отсчёта плюс дни; нуль дней — «немедленно», сам день."""
+    if days < 0:
+        raise ConfigError(f"Дни строки плана отрицательные ({days}) — срок не определить")
+    return count_from + timedelta(days=days)
+
+
+def plan_due_on(count_from: date, env: Mapping[str, str] | None = None) -> date:
+    """Срок ответа планом: начало отсчёта плюс `plan_due_days` методики (D613, D617)."""
+    return count_from + timedelta(days=plan_due_days(env))
+
+
+def effective_row_due(
+    count_from: date, days: int, own_due: date | None, extended_due: date | None
+) -> date:
+    """Действующий срок строки.
+
+    Перенос с согласием (`extended_due`) перекрывает всё. Иначе — срок партнёра,
+    если он поставил его РАНЬШЕ положенного (позже положенного срок не ставится,
+    только переносом с согласием); положенный, если не ставил или поставил позже
+    после того, как отсчёт сдвинули.
+    """
+    if extended_due is not None:
+        return extended_due
+    положенный = row_due_on(count_from, days)
+    if own_due is None:
+        return положенный
+    return min(own_due, положенный)

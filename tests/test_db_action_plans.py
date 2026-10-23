@@ -15,7 +15,13 @@ from typing import Any
 
 import pytest
 from conftest import requires_db, методика_со_сроком
-from db_harness import admin_role_dsn, set_retraction_env, привязать_страну, точка_справочника
+from db_harness import (
+    admin_role_dsn,
+    set_retraction_env,
+    привязать_страну,
+    сделать_файловым,
+    точка_справочника,
+)
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -34,6 +40,8 @@ pytestmark = requires_db
 СЕГОДНЯ = datetime.now(UTC).date()
 МБ = 1024 * 1024
 _чаты = iter(range(9_100_000, 9_200_000))
+#: Подключение владельца базы — для `_запрос`: см. там.
+_ВЛАДЕЛЕЦ: dict[str, str] = {}
 
 
 class Хранилище:
@@ -65,6 +73,7 @@ def сеть(pg_dsn: str, db_env: str, domain_env: Path, admin_env: str) -> None
     точка_справочника(ЧУЖАЯ_ТОЧКА, country="AM", city="Yerevan")
     привязать_страну(pg_dsn, tenant="GE", country="GE")
     привязать_страну(pg_dsn, tenant="AM", country="AM")
+    _ВЛАДЕЛЕЦ["dsn"] = pg_dsn
 
 
 @pytest.fixture
@@ -93,8 +102,17 @@ def _принятая(*уровни: str, unit: str = ТОЧКА, tenant: str = 
 
 
 def _запрос(ident: str) -> plans.PlanRequest:
+    """Запрос проверки; электронный (`0092`) тут же становится файловым, как старые планы.
+
+    Этот набор про путь «файл → приём → вердикт», он остался у запросов без строк.
+    Электронный путь — `tests/test_db_plan_rows.py`.
+    """
     найден = plans.request_of_inspection(ident, reach=reach_of("HQ"))
     assert найден is not None, "запроса по проверке нет"
+    if найден.electronic:
+        сделать_файловым(_ВЛАДЕЛЕЦ["dsn"], найден.id)
+        найден = plans.request_of_inspection(ident, reach=reach_of("HQ"))
+        assert найден is not None
     return найден
 
 

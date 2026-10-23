@@ -1893,6 +1893,45 @@ a[data-zoom] { cursor: zoom-in; }
 .plan-versions__comment { font-size: var(--fs-meta); color: var(--ink-2); overflow-wrap: anywhere; }
 .plan-history { font-size: var(--fs-meta); }
 
+/* Строки электронного плана: раскрывающаяся карточка на строку. Свёрнутая — пункт,
+   срок и состояние; развёрнутая — форма партнёра или значения и кнопки вердикта. */
+.prows { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.prow { border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface); }
+.prow--late { border-color: var(--err); }
+.prow__head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2) var(--space-4); align-items: baseline; padding: var(--space-4) var(--space-5); cursor: pointer; }
+.prow__pos { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.prow__title { font-weight: var(--w-semibold); overflow-wrap: anywhere; }
+.prow__meta { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-size: var(--fs-meta); }
+.prow__due { color: var(--ink-2); }
+
+/* Строки плана: таблица ограниченной ширины и панель правки справа поверх панели запроса
+   (на телефоне — на весь экран). Без скрипта панель открывает якорь (:target). */
+.ptable { width: 100%; max-width: 620px; border-collapse: collapse; font-size: var(--fs-meta); }
+.ptable th { text-align: left; font-weight: var(--w-semibold); color: var(--ink-3); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); }
+.ptable td { padding: var(--space-3); border-bottom: 1px solid var(--line-2); vertical-align: top; }
+.ptable__pos { width: 2.2em; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.ptable__item { overflow-wrap: anywhere; }
+.ptable__due { white-space: nowrap; }
+.ptable__act { text-align: right; white-space: nowrap; }
+.ptable__row--late td:first-child { box-shadow: inset 2px 0 0 var(--err); }
+.prowpanel { display: none; position: absolute; inset: 0; z-index: 5; }
+.prowpanel:target, .prowpanel.is-open { display: block; }
+.prowpanel__scrim { position: absolute; inset: 0; background: rgba(10, 13, 17, .12); }
+.prowpanel__sheet { position: absolute; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column;
+  width: min(100%, 440px); background: var(--surface); border-left: 1px solid var(--line);
+  box-shadow: -12px 0 40px rgba(10, 13, 17, .18); animation: mx-in 140ms ease-out; }
+.prowpanel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-4); border-bottom: 1px solid var(--line); flex: none; }
+.prowpanel__who { min-width: 0; }
+.prowpanel__title { margin: 0; font-size: var(--fs-body); overflow-wrap: anywhere; }
+.prowpanel__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: var(--space-3) 0 0; font-size: var(--fs-meta); color: var(--ink-2); }
+.prowpanel__body { flex: 1; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: var(--space-5); padding: var(--space-5); }
+@media (max-width: 719px) {
+  .prowpanel__sheet { width: 100%; border-left: 0; }
+  .ptable__due { white-space: normal; }
+}
+@media (prefers-reduced-motion: reduce) { .prowpanel__sheet { animation: none; } }
+
 /* Поле файла — в тон кнопкам forma, а не серой кнопкой браузера. */
 .input[type="file"] { padding: var(--space-2); }
 .input[type="file"]::file-selector-button {
