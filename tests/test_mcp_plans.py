@@ -261,6 +261,26 @@ def test_план_читается_со_сроками_и_просрочкой_�
     assert ответ["overdue"] is False
 
 
+def test_просрочка_плана_на_приёмке_и_число_возвратов_в_ответе(
+    monkeypatch: pytest.MonkeyPatch, двери: list[Any]
+) -> None:
+    """Просрочка и возвраты берутся из плана, а не считаются инструментом."""
+    события = tuple(
+        plans.PlanEvent(action=a, actor="hq", detail=None, at=datetime(2026, 10, 21, tzinfo=UTC))
+        for a in ("uploaded", "returned", "uploaded", "returned", "uploaded")
+    )
+    итог = _plan(status="on_review", due_on=date(2026, 10, 1), events=события)
+    monkeypatch.setattr(plans, "get_request", lambda request_id, *, reach: итог)
+    monkeypatch.setattr(plans, "today", lambda: date(2026, 10, 23))
+
+    ответ = json.loads(
+        _text(_call("get_action_plan", {"request_id": REQUEST}, tenant="HQ", role="admin"))
+    )
+
+    assert ответ["overdue"] is True
+    assert ответ["returns"] == 2
+
+
 def test_ответ_плана_короткий_без_снимков_и_пустых_полей(
     monkeypatch: pytest.MonkeyPatch, двери: list[Any]
 ) -> None:

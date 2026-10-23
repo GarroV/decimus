@@ -20,7 +20,10 @@
 (D284, D289). Чужой запрос или файл по угаданному id отвечает тем же `None`,
 что несуществующий.
 
-**«Просрочен» не хранится**, а считается на чтении (`is_overdue`).
+**«Просрочен» не хранится**, а считается на чтении (`is_overdue`) — единственным
+местом, откуда берут признак веб, MCP и счётчики. Часы идут до принятия УК:
+загрузка файла или отправка на согласование срок не останавливает, а возврат его
+не продлевает (F-135). Возвраты считаются (`PlanRequest.returns_count`) и видны УК.
 """
 
 from __future__ import annotations
@@ -63,6 +66,8 @@ STATUS_ACCEPTED = "accepted"
 STATUS_IN_WORK = "in_work"
 STATUS_CLOSED = "closed"
 STATUSES = (STATUS_REQUESTED, STATUS_ON_REVIEW, STATUS_ACCEPTED, STATUS_IN_WORK, STATUS_CLOSED)
+#: Часы срока плана идут, пока УК его не приняла: ждём от партнёра или на приёмке.
+OPEN_FOR_PARTNER_CLOCK = (STATUS_REQUESTED, STATUS_ON_REVIEW)
 #: Закончены: уходят из очереди в «принятые».
 FINISHED_STATUSES = (STATUS_ACCEPTED, STATUS_CLOSED)
 
@@ -128,8 +133,12 @@ def _require_status(status: str) -> str:
 
 
 def is_overdue(status: str, due_on: date, *, today: date) -> bool:
-    """Просрочен: срок прошёл, а план всё ещё ждут от партнёра (в т. ч. после возврата)."""
-    return _require_status(status) == STATUS_REQUESTED and today > due_on
+    """Просрочен: срок прошёл, а УК план ещё не приняла (ждём его или он на приёмке).
+
+    Файл на приёмке часы не останавливает, возврат срок не продлевает: просрочку
+    снимает только принятие УК. После принятия срок держат строки плана.
+    """
+    return _require_status(status) in OPEN_FOR_PARTNER_CLOCK and today > due_on
 
 
 def plan_state(status: str, last_verdict: str | None, *, returned: bool = False) -> str:
@@ -238,6 +247,11 @@ class PlanRequest:
     def filled_rows(self) -> int:
         """Строк с мерой и ответственным: столько уже готово к отправке на согласование."""
         return sum(1 for row in self.rows if row.is_filled)
+
+    @property
+    def returns_count(self) -> int:
+        """Сколько раз УК вернула план целиком (строки в счёт не идут): срок при этом не растёт."""
+        return sum(1 for e in self.events if e.action == "returned" and e.row_id is None)
 
     @property
     def last_comment(self) -> str | None:

@@ -2279,7 +2279,9 @@ TOOLS = (
         "list_action_plans",
         "List correction (action) plans in your scope: a partner sees plans of its countries, "
         "the management company sees all. One short row per plan: unit, country, status, due "
-        "date, overdue flag (computed today) and counts of rows by status. Without status only "
+        "date, overdue flag (computed today; the clock runs until the management company accepts "
+        "the plan, a return does not extend the due date), number of returns and counts of "
+        "rows by status. Without status only "
         "OPEN plans are listed (waiting for rows, for review, in work); status=accepted or "
         "closed lists finished ones. Statuses: requested (partner fills rows), on_review "
         "(waits for the management company), in_work, accepted (file plans), closed.",

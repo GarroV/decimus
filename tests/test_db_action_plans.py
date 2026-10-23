@@ -307,6 +307,35 @@ def test_запрос_загрузка_возврат_вторая_версия_
     assert all(ключ.startswith("action-plans/") for ключ in склад.объекты)
 
 
+def test_загрузка_файла_не_снимает_просрочку_а_возврат_не_продлевает_срок(
+    сеть: None, склад: Хранилище, admin_env: str
+) -> None:
+    """Просрочку снимает только принятие УК; возвраты считаются и видны."""
+    запрос = _запрос(_принятая("D2"))
+    срок = СЕГОДНЯ - timedelta(days=1)
+    with psycopg.connect(admin_env) as conn:
+        conn.execute("select set_config('decimus.plan_actor', 'hq', true)")
+        conn.execute("update action_plan_requests set due_on = %s where id = %s", (срок, запрос.id))
+        conn.commit()
+
+    _загрузить(склад, запрос.id, data=b"v1")
+    на_приёмке = _запрос(запрос.inspection_id)
+    plans.review(запрос.id, actor="hq-lead", verdict="returned", comment="нет сроков")
+    после_возврата = _запрос(запрос.inspection_id)
+    _загрузить(склад, запрос.id, data=b"v2")
+    plans.review(запрос.id, actor="hq-lead", verdict="accepted", comment="")
+    принят = _запрос(запрос.inspection_id)
+
+    assert (на_приёмке.status, на_приёмке.overdue(СЕГОДНЯ), на_приёмке.returns_count) == (
+        "on_review",
+        True,
+        0,
+    )
+    assert (после_возврата.due_on, после_возврата.overdue(СЕГОДНЯ)) == (срок, True)
+    assert после_возврата.returns_count == 1
+    assert (принят.overdue(СЕГОДНЯ), принят.returns_count) == (False, 1)
+
+
 def test_возврат_без_комментария_это_отказ(сеть: None, склад: Хранилище) -> None:
     запрос = _запрос(_принятая("D2"))
     _загрузить(склад, запрос.id)
