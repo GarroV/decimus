@@ -338,7 +338,7 @@ def test_готовый_план_можно_отправить(
 
     страница = _панель(партнёр)
 
-    assert "заполнено" not in страница
+    assert "Доступно, когда" not in страница
     assert "Отправить на согласование" in страница and " disabled" not in страница
 
 
@@ -485,3 +485,109 @@ def test_у_уК_кнопка_строки_открывает_а_не_прави
     страница = _панель(уК)
 
     assert ">Открыть<" in страница and ">Править<" not in страница
+
+
+# --- шапка экрана по макету: путь, счётчики, баннер, зона, «немедленно» ------
+
+
+def _шаг(страница: str) -> str:
+    """Подпись текущего шага пути плана."""
+    хвост = страница.split('aria-current="step"', 1)[1]
+    return хвост.split(">", 1)[1].split("<", 1)[0].strip()
+
+
+@pytest.mark.parametrize(
+    ("status", "шаг"),
+    [
+        ("requested", "Партнёр заполняет"),
+        ("on_review", "Согласование"),
+        ("in_work", "Выполнение"),
+        ("closed", "Закрыт"),
+    ],
+)
+def test_путь_плана_отмечает_текущий_шаг(
+    партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch, status: str, шаг: str
+) -> None:
+    monkeypatch.setattr(plans, "get_request", lambda *_a, **_k: запрос(status=status))
+
+    assert _шаг(_панель(партнёр)) == шаг
+
+
+def test_счётчики_подтверждённых_и_просроченных(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    строки = (
+        строка(status="confirmed"),
+        строка(id="s2", position=2, status="in_work"),
+        строка(id="s3", position=3, status="done"),
+    )
+    monkeypatch.setattr(
+        plans, "get_request", lambda *_a, **_k: запрос(status="in_work", rows=строки)
+    )
+    monkeypatch.setattr(plans, "today", lambda: date(2026, 10, 20))
+
+    страница = _панель(уК)
+
+    assert "1 из 3 подтверждено" in страница
+    # Срок прошёл у всех трёх, но подтверждённая и сданная (ждёт УК) — не просрочка партнёра.
+    assert "просрочено 1" in страница
+
+
+def test_баннер_партнёра_со_сроком_и_отправкой_выше_строк(партнёр: FlaskClient) -> None:
+    страница = _панель(партнёр)
+
+    баннер = страница.index("Заполните план до")
+    assert баннер < страница.index('class="ptable"')
+    assert баннер < страница.index(f"/actions/requests/{ЗАПРОС}/submit")
+    assert страница.count(f"/actions/requests/{ЗАПРОС}/submit") == 1
+
+
+def test_у_уК_баннера_заполнения_нет(уК: FlaskClient) -> None:
+    assert "Заполните план до" not in _панель(уК)
+
+
+def test_вход_к_файлу_в_шапке_строк_а_загрузка_под_ними(партнёр: FlaskClient) -> None:
+    страница = _панель(партнёр)
+
+    assert 'href="#plan-file"' in страница and 'id="plan-file"' in страница
+    assert страница.index('class="ptable"') < страница.index('id="plan-file"')
+
+
+def test_строка_показывает_зону_словом(
+    партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "src.web.action_plans._zone_titles", lambda: {"fridge": ("Холодильник", "Fridge")}
+    )
+
+    assert "Холодильник" in _панель(партнёр)
+    assert "Fridge" in _панель(партнёр, "en")
+
+
+def test_зоны_берутся_из_методики(domain_env: object) -> None:
+    from src.domain import list_zones
+    from src.web.action_plans import _zone_titles
+
+    зона = list_zones()[0]
+
+    assert _zone_titles()[зона.code] == (зона.title("ru"), зона.title("en"))
+
+
+def test_D3_без_своего_срока_немедленно(
+    партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    критичная = строка(level="D3", days=0, due_on=date(2026, 10, 4))
+    monkeypatch.setattr(plans, "get_request", lambda *_a, **_k: запрос(rows=(критичная,)))
+
+    страница = _панель(партнёр)
+
+    assert "немедленно" in страница
+    assert "Немедленно" not in страница.split('class="ptable"', 1)[0]
+
+
+def test_уК_сдвигает_отсчёт_отдельным_блоком(уК: FlaskClient) -> None:
+    страница = _панель(уК)
+
+    assert "Считать срок от" in страница and "Срок считается от" in страница
+    блок = страница.split("Считать срок от", 1)[1]
+    assert f"/actions/requests/{ЗАПРОС}/count-from" in блок

@@ -1915,6 +1915,22 @@ a[data-zoom] { cursor: zoom-in; }
 .ptable__due { white-space: nowrap; }
 .ptable__act { text-align: right; white-space: nowrap; }
 .ptable__row--late td:first-child { box-shadow: inset 2px 0 0 var(--err); }
+.ptable__zone { display: block; margin-top: 2px; color: var(--ink-3); }
+.ptable__row--late td { background: var(--err-soft, transparent); }
+/* Шапка плана: путь по шагам, счётчики, баннер партнёра со сроком и отправкой. */
+.pstep { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-5) 0 0; padding: 0; list-style: none; counter-reset: pstep; font-size: var(--fs-meta); }
+.pstep__item { counter-increment: pstep; display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line); border-radius: var(--r-control); color: var(--ink-3); }
+.pstep__item::before { content: counter(pstep); font-variant-numeric: tabular-nums; }
+.pstep__item.is-done { color: var(--ink-2); }
+.pstep__item.is-done::before { content: "✓"; color: var(--ok); }
+.pstep__item.is-current { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); font-weight: var(--w-semibold); }
+.pcount { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: var(--space-3) 0 0; font-size: var(--fs-meta); color: var(--ink-2); }
+.spanel--action > .pbanner { margin-top: var(--space-4); }
+.pbanner .sform { margin-top: var(--space-3); }
+.ssec__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.ssec__link { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-meta); }
+.ssec__link svg { width: 14px; height: 14px; }
 .prowpanel { display: none; position: absolute; inset: 0; z-index: 5; }
 .prowpanel:target, .prowpanel.is-open { display: block; }
 .prowpanel__scrim { position: absolute; inset: 0; background: rgba(10, 13, 17, .12); }
@@ -2112,7 +2128,7 @@ a[data-zoom] { cursor: zoom-in; }
 .bell__dot[hidden] { display: none; }
 .bell__dot { position: absolute; top: 7px; left: 20px; }
 .notif-dot { position: absolute; top: 6px; right: 8px; }
-.mbar__bell { display: inline-flex; align-items: center; padding: var(--space-2); border: 0; background: transparent; color: var(--ink); cursor: pointer; border-radius: var(--r-control); }
+.mbar__bell { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; padding: var(--space-2); border: 0; background: transparent; color: var(--ink); cursor: pointer; border-radius: var(--r-control); }
 .mbar__bell .bell__label { display: none; }
 /* Размер иконки в полосе телефона: у пункта панели его задаёт ядро, здесь — сами. */
 .mbar__bell svg { width: 20px; height: 20px; flex-shrink: 0; }

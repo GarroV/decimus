@@ -30,6 +30,8 @@ from src.db import action_plans as plans
 from src.db import plan_rows as plan_rows_db
 from src.db.config import load_action_plan_settings
 from src.db.errors import ActionPlanError, DbError, PlanFileLimitError, StorageError
+from src.domain import list_zones
+from src.domain.errors import DomainError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import (
@@ -292,6 +294,18 @@ def screen_context(lang: str) -> dict[str, Any]:
     }
 
 
+def _zone_titles() -> dict[str, tuple[str, str]]:
+    """Код зоны → название (ru, en) по действующей методике: строка плана показывает зону словом.
+
+    Методика не читается — пустой справочник, и строка покажет код: план важнее подписи.
+    """
+    try:
+        return {z.code: (z.title("ru"), z.title("en")) for z in list_zones()}
+    except DomainError as exc:
+        logger.warning("зоны для строк плана не прочитаны: %s", exc)
+        return {}
+
+
 def panel_context(
     request_id: str,
     *,
@@ -325,6 +339,7 @@ def panel_context(
             "reason": plan_rows_db.MAX_REASON,
         },
         "today": plans.today(),
+        "zone_titles": _zone_titles(),
         "state_tones": STATE_TONES,
         "grade_tone": view.grade_tone,
         "plan_files_path": _files_path(),
