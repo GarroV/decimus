@@ -309,11 +309,21 @@ class RiskUnit:
     rating_type: str
     scores: tuple[float, ...]
 
+    @property
+    def average(self) -> float:
+        """Средняя оценка окна — по ней пиццерия и попала в зону риска."""
+        return fmean(self.scores)
+
 
 def risk_zone(
     facts: Sequence[Fact], period_ids: Sequence[int], *, rating_type: str, threshold: float
 ) -> tuple[RiskUnit, ...]:
-    """period_ids — последние N периодов типа, старые первыми; неполное окно не судится."""
+    """period_ids — последние N периодов типа, старые первыми; неполное окно не судится.
+
+    В зоне — пиццерия, у которой СРЕДНЯЯ оценка этих N периодов ниже порога (с точностью
+    показа, P38), а не каждая из них: одна оценка на пороге или чуть выше не выводит из
+    зоны того, кто проседает (решение контролинга 23.10.2026, было «N подряд ниже»).
+    """
     if not period_ids:
         return ()
     by_unit: dict[str, dict[int, Fact]] = {}
@@ -325,7 +335,7 @@ def risk_zone(
         if len(by_period) != len(period_ids):
             continue
         scores = tuple(by_period[pid].score for pid in period_ids)
-        if all(shown(score) < threshold for score in scores):
+        if shown(fmean(scores)) < threshold:
             sample = by_period[period_ids[-1]]
             zone.append(RiskUnit(unit, sample.unit_name, sample.country, rating_type, scores))
     return tuple(sorted(zone, key=lambda u: (u.country, u.unit_name)))
