@@ -250,8 +250,8 @@
       </ol>{% endfor %}
     </div>
     {% if hard_rows|length > 20 %}<button type="button" class="btn btn--sm rt-hard__more" data-rt-more hidden>{{ t('ratings.more', n=hard_rows|length - 20) }}</button>{% endif %}
-    {#- Формулировки — дословно из Dodo IS, и «Дисквалифицировать пиццу» руководство
-        не поняло (#982): пояснение источника под списком. -#}
+    {#- Формулировки — дословно из Dodo IS (#982): пояснение источника под списком.
+        «Дисквалифицировать пиццу» сюда не доходит: это пометка, а не нарушение (0093). -#}
     <div class="rt-note">{{ t('ratings.hard.source') }}</div>
     {% else %}<div class="rt-empty">{{ t('ratings.empty.hard') }}</div>{% endif %}
     {% for kind in no_data %}<div class="rt-note">{{ t('ratings.empty.' ~ kind) }}</div>{% endfor %}

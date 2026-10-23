@@ -48,6 +48,7 @@ from .model import (
     RatingsFormatError,
     UnitRef,
     Violation,
+    is_rko_service_mark,
 )
 
 _REQUIRED: dict[str, frozenset[str]] = {
@@ -247,8 +248,11 @@ def parse_rko_violations(data: bytes) -> Parsed:
             channel = _CHANNELS.get(row.get("CheckupType", "").casefold())
             if channel is None:
                 raise _BadRow(f"неизвестный тип проверки «{row.get('CheckupType', '')}»")
-            violations = _split(row.get("Выявленные нарушения", ""), CATEGORY_VIOLATION) + _split(
-                row.get("Другие проблемы", ""), CATEGORY_OTHER
+            violations = tuple(
+                v
+                for v in _split(row.get("Выявленные нарушения", ""), CATEGORY_VIOLATION)
+                + _split(row.get("Другие проблемы", ""), CATEGORY_OTHER)
+                if not is_rko_service_mark(v.text)
             )
             checkups.append(
                 _checkup(

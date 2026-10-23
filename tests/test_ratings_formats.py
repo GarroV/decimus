@@ -118,6 +118,21 @@ def test_нарушения_ркО_разобраны() -> None:
     assert second.unit.country == "BY"
 
 
+def test_дисквалифицировать_пиццу_не_нарушение() -> None:
+    """Служебная пометка контроля (отчёт не в пул баллов по продукту) не ложится нарушением."""
+    parsed = parse_rko_violations(
+        rko_violations(
+            **{
+                "Выявленные нарушения": "Ингредиенты на бортах; Дисквалифицировать пиццу",
+                "Другие проблемы": "  дисквалифицировать   пиццу (ML) ",
+            }
+        )
+    )
+    first = parsed.checkups[0]
+    assert [v.text for v in first.violations] == ["Ингредиенты на бортах"]
+    assert parsed.issues == ()
+
+
 def test_нарушения_ркО_битая_ссылка_строкой_журнала() -> None:
     parsed = parse_rko_violations(
         rko_violations(KnowledgeBaseLink="https://dodopizza.info/rating#/xx/1")
