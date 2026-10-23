@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import io
 import logging
 from collections.abc import Sequence
@@ -94,10 +95,15 @@ def frames_by_finding(
     if хранилище is None or not пары:
         размеры: list[tuple[int, int] | None] = [None] * len(пары)
     else:
+        # Потоки пула не наследуют контекст: без копии чтение копии кадра шло бы в
+        # базу без пространства и получало отказ политики (F-037, `src/db/space.py`).
+        родитель = contextvars.copy_context()
         with ThreadPoolExecutor(max_workers=SIZE_READERS) as pool:
             размеры = list(
                 pool.map(
-                    lambda fp: _size_of(inspection_id, fp[1], tenant=tenant, storage=хранилище),
+                    lambda fp: родитель.copy().run(
+                        _size_of, inspection_id, fp[1], tenant=tenant, storage=хранилище
+                    ),
                     пары,
                 )
             )
