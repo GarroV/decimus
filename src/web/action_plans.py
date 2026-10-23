@@ -29,7 +29,7 @@ from werkzeug.wrappers import Response
 from src.db import action_plans as plans
 from src.db import plan_rows as plan_rows_db
 from src.db.config import load_action_plan_settings
-from src.db.errors import ActionPlanError, DbError, StorageError
+from src.db.errors import ActionPlanError, DbError, PlanFileLimitError, StorageError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import actions_screen, auth, guard, plan_rows, plan_template, review, ui_lang, view
@@ -415,6 +415,13 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
                 content_type=файл.mimetype or "",
                 data=файл.read(max_bytes + 1),
                 max_bytes=max_bytes,
+            )
+        except PlanFileLimitError as exc:
+            return _respond(
+                conf,
+                request_id,
+                failure=t("plans.too_many_versions", lang, n=exc.limit),
+                status=400,
             )
         except ActionPlanError as exc:
             return _respond(

@@ -42,7 +42,7 @@ from .config import (
     load_retraction_settings,
     load_storage_settings,
 )
-from .errors import ActionPlanError, DbError, StorageError
+from .errors import ActionPlanError, DbError, PlanFileLimitError, StorageError
 from .models import UPLOADED_ORIGINS
 from .plan_notify import KIND_REQUESTED, notify_event
 from .plan_rows import PlanRow, TermsProvider, insert_rows, prepare_rows, read_rows
@@ -91,6 +91,10 @@ MAX_FILE_NAME = 255
 MAX_CONTENT_TYPE = 255
 #: Сколько запросов читается в список за раз.
 LIST_LIMIT = 500
+#: Версий файла на запрос не больше: у электронного плана статус при загрузке не
+#: меняется, и без предела вложения копились бы бесконечно; у файлового их число и так
+#: идёт кругами «загрузили — вернули». Объём одной версии — `ATTACHMENT_MAX_MB`.
+MAX_FILE_VERSIONS = 20
 
 
 def today() -> date:
@@ -950,6 +954,8 @@ def _record_version(ident: str, *, reach: Reach, row: dict[str, Any]) -> int:
         cur.execute(_NEXT_VERSION_SQL, (ident,))
         version_row = cur.fetchone()
         version = int(version_row[0]) if version_row else 1
+        if version > MAX_FILE_VERSIONS:
+            raise PlanFileLimitError(MAX_FILE_VERSIONS)
         cur.execute(_INSERT_FILE_SQL, {**row, "version": version})
         if not head[1]:
             # Файловый план уходит на приёмку с файлом. Электронный — нет: файл у него

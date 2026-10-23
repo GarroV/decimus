@@ -429,3 +429,27 @@ def test_у_файлового_плана_панель_прежняя(
 
     assert f"/actions/requests/{ЗАПРОС}/upload" in страница
     assert "/rows/" not in страница
+
+
+@pytest.mark.parametrize(("lang", "фраза"), [("ru", "версий файла"), ("en", "file versions")])
+def test_сверх_предела_версий_файла_отказ_словами_на_языке_экрана(
+    партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch, lang: str, фраза: str
+) -> None:
+    from io import BytesIO
+
+    from src.db.errors import PlanFileLimitError
+
+    def отказ(*_a: Any, **_k: Any) -> int:
+        raise PlanFileLimitError(plans.MAX_FILE_VERSIONS)
+
+    monkeypatch.setattr(plans, "upload_version", отказ)
+
+    ответ = партнёр.post(
+        f"/actions/requests/{ЗАПРОС}/upload?lang={lang}",
+        data={"file": (BytesIO(b"%PDF"), "plan.pdf")},
+        headers=ORIGIN,
+        content_type="multipart/form-data",
+    )
+
+    assert ответ.status_code == 400
+    assert фраза in ответ.get_data(as_text=True)

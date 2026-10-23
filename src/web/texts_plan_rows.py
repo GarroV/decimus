@@ -83,6 +83,14 @@ PLAN_ROW_TEXTS: dict[str, dict[str, str]] = {
         "en": "Own date, no later than {due}",
     },
     "plans.rows.save": {"ru": "Сохранить строку", "en": "Save row"},
+    "plans.rows.col.n": {"ru": "№", "en": "#"},
+    "plans.rows.col.item": {"ru": "Нарушение", "en": "Violation"},
+    "plans.rows.col.due": {"ru": "Срок", "en": "Due"},
+    "plans.rows.col.state": {"ru": "Состояние", "en": "Status"},
+    "plans.rows.col.action": {"ru": "Действие", "en": "Action"},
+    "plans.rows.own": {"ru": "(свой)", "en": "(own)"},
+    "plans.rows.edit": {"ru": "Править", "en": "Edit"},
+    "plans.rows.open": {"ru": "Открыть", "en": "Open"},
     "plans.rows.empty": {"ru": "Строк в плане нет.", "en": "The plan has no rows."},
     "plans.rows.not_filled": {"ru": "не заполнено", "en": "not filled in"},
     "plans.rows.saved": {"ru": "Строка сохранена.", "en": "Row saved."},
@@ -121,6 +129,10 @@ PLAN_ROW_TEXTS: dict[str, dict[str, str]] = {
         "экране ниже.",
         "en": "A file is accepted as an attachment but not parsed: fill in the plan rows on "
         "the screen below.",
+    },
+    "plans.too_many_versions": {
+        "ru": "У запроса уже {n} версий файла — больше не принимается.",
+        "en": "The request already has {n} file versions — no more are accepted.",
     },
     "plans.file.not_parsed": {
         "ru": "не разобран — заполните строки на экране",

@@ -237,6 +237,14 @@ class ActionPlanError(DbError):
     """
 
 
+class PlanFileLimitError(ActionPlanError):
+    """У запроса уже предельное число версий файла: ещё одну не кладут (#1168)."""
+
+    def __init__(self, limit: int) -> None:
+        super().__init__(f"У запроса уже {limit} версий файла — больше не принимается")
+        self.limit = limit
+
+
 class PrescriptionError(DbError):
     """Действие с предписанием не выполнено (D266, D270): черновик, отправка, ответ, закрытие.
 

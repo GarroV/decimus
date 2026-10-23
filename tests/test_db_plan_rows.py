@@ -802,6 +802,24 @@ def _строки_не_тронуты(до: plans.PlanRequest, после: plans
     ]
 
 
+def test_сверх_предела_версий_файл_к_электронному_плану_не_принимается(
+    сеть: dict[str, str],
+) -> None:
+    """Статус при загрузке не меняется, поэтому без предела вложения копились бы бесконечно."""
+    from src.db.errors import PlanFileLimitError
+
+    запрос = _запрос(_принятая("D2"))
+    склад = _Склад()
+    for _ in range(plans.MAX_FILE_VERSIONS):
+        _загрузить(запрос, склад)
+
+    with pytest.raises(PlanFileLimitError):
+        _загрузить(запрос, склад)
+
+    assert len(_запрос(запрос.inspection_id).files) == plans.MAX_FILE_VERSIONS
+    assert len(склад.объекты) == plans.MAX_FILE_VERSIONS, "объект отказанной версии не убран"
+
+
 def test_файл_не_кладут_в_план_на_согласовании(сеть: dict[str, str]) -> None:
     запрос = _на_согласовании("D2")
 
