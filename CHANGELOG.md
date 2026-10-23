@@ -22,6 +22,13 @@
 - `src/bot/mcp_setup.py` остаётся в `src/bot`: веб не вправе импортировать `src.mcp.install`, откуда модуль берёт установщик (`tests/test_web_bounds.py`), а в `src/web` его перенос эту границу нарушил бы. Теперь он нужен только вебу.
 - Доки приведены в соответствие: `docs/13-walk-mini-app.md`, `docs/12-web-admin.md`, `docs/18-access-map.md`, `docs/00-map.md`, `docs/06-mvp-bot.md`, `docs/furca/blocks/mcp.md`.
 
+## 2026-10-23 — Доска стикеров вернулась; объявление «перепривязать Claude» (D629)
+
+- «Главная»: стикеры «Требует внимания», скрытые D542, снова показаны (`home_board.SHOWN = True`) — пока, дальше по отзывам.
+- На доске первое объявление (текст и круг утверждены владельцем): обновили подключение Claude (MCP), фото можно загружать из папки на компьютере — переподключите Claude в «Настройках» → «Claude (MCP)». Видит тот, у кого живой личный ключ выпущен до 23.10.2026 10:30 UTC; перевыпустил — стикер пропадает. Только экран, ни бота, ни писем. Ключ не прочитался — главная без объявления.
+- Код: `src/web/home_board.py` (`announcements`, `MCP_RELINK`), `home_page.py`, `texts_home.py`, `src/db/mcp_access.py` (`live_token_issued_at`); тесты — `tests/test_web_overview.py`, `tests/test_db_mcp_token_identity.py`. `docs/12-web-admin.md`.
+
+
 ## 2026-10-23 — Подключение Claude (MCP) убрано из бота (D626)
 
 - Рабочая платформа — веб, бот служит только для проведения проверок. Пункт меню «Установка MCP», команда `/mcp` и кнопка «Прислать команду настройки» сняты вместе с роутером `src/bot/routers/mcp.py`, клавиатурой, текстами `mcp.*` и `cmd.mcp` (RU/EN), тестами `tests/test_bot_mcp_setup.py` и `tests/test_bot_mcp_command.py`.

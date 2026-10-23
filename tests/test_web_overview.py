@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime, timedelta
 
 import pytest
 from flask.testing import FlaskClient
@@ -222,7 +222,6 @@ def test_карточка_требует_внимания_есть_только_
 ) -> None:
     """Нет ни заданий, ни пиццерий «куда смотреть» — карточки нет; одно задание — есть."""
     # Arrange
-    monkeypatch.setattr(home_board, "SHOWN", True)  # D542: стикеры скрыты флагом
     заголовок = t_ru("home.attention.title")
     monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
     monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts())
@@ -242,7 +241,6 @@ def test_отказ_доски_не_молчит(стенд: FlaskClient, monkey
     """Карточки нет из-за сбоя базы, а не из-за «нечего делать» — это надо сказать."""
 
     # Arrange
-    monkeypatch.setattr(home_board, "SHOWN", True)  # D542: стикеры скрыты флагом
 
     def отказ(*_: object, **__: object) -> home_board.Counts:
         raise DbError("нет связи")
@@ -776,7 +774,6 @@ def test_главная_собирает_доску_проверки_и_стра
 ) -> None:
     """Сквозной показ «Главной» (D399) со всеми блоками: шаблон не падает ни на одном."""
     # Arrange
-    monkeypatch.setattr(home_board, "SHOWN", True)  # D542: стикеры скрыты флагом
     monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
     monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=2))
 
@@ -962,20 +959,50 @@ def test_последних_проверок_на_главной_нет(
     assert "hm-card--wide" not in страница
 
 
-def test_стикеры_на_главной_скрыты_флагом(
+def test_стикеры_на_главной_снова_показаны(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """D542: задание есть, но стикера нет — и база для доски не читается."""
-    позвали: list[object] = []
-
-    def счётчики(*a: object, **_: object) -> home_board.Counts:
-        позвали.append(a)
-        return home_board.Counts(review=1)
-
+    """D629 вернул доску, скрытую D542: задание есть — стикер есть."""
     monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
-    monkeypatch.setattr(home_board, "load_counts", счётчики)
+    monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=1))
+
+    assert "Проверок ждут приёмки: 1" in показать(стенд, monkeypatch, ПУСТО)
+
+
+@pytest.mark.parametrize(
+    ("выпущен", "видно"),
+    [
+        (home_board.MCP_RELINK_BEFORE - timedelta(days=3), True),
+        (home_board.MCP_RELINK_BEFORE + timedelta(minutes=1), False),
+        (None, False),
+    ],
+)
+def test_объявление_перепривязать_claude_только_со_старым_ключом(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, выпущен: datetime | None, видно: bool
+) -> None:
+    """D629: старый ключ — объявление; перевыпустил или Claude не подключён — его нет."""
+    from src.db import mcp_access
+
+    monkeypatch.setattr(home_board, "kinds_for", lambda _who: ())
+    monkeypatch.setattr(mcp_access, "live_token_issued_at", lambda _uid: выпущен)
+
     страница = показать(стенд, monkeypatch, ПУСТО)
-    assert "Проверок ждут приёмки" not in страница and позвали == []
+
+    assert ("из папки на компьютере" in страница) is видно
+    assert ("?tile=claude" in страница) is видно
+
+
+def test_ключ_не_прочитался_главная_без_объявления(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.db import mcp_access
+
+    def отказ(_uid: str) -> None:
+        raise DbError("нет связи")
+
+    monkeypatch.setattr(mcp_access, "live_token_issued_at", отказ)
+
+    assert "из папки на компьютере" not in показать(стенд, monkeypatch, ПУСТО)
 
 
 def test_девелопер_у_ук_сужает_выборку_до_своих_стран(

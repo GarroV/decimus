@@ -29,6 +29,18 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "en": "Tasks did not load: the database did not answer. Reload the page.",
     },
     "home.board.overdue": {"ru": "просрочено: {count}", "en": "overdue: {count}"},
+    # Объявление D629 — текст утверждён владельцем 23.10.2026; путь назван по экрану
+    # («Claude (MCP)» в «Настройках»). Правка текста — только с его «да».
+    "home.board.mcp_relink.kind": {"ru": "Объявление", "en": "Announcement"},
+    "home.board.mcp_relink.title": {
+        "ru": "Обновили подключение Claude (MCP): теперь фото к проверке можно загружать "
+        "прямо из папки на компьютере. Чтобы это заработало, переподключите Claude: "
+        "Настройки → Claude (MCP) → выпустить новый ключ и заменить его в Claude Desktop.",
+        "en": "We updated the Claude (MCP) connection: inspection photos can now be uploaded "
+        "straight from a folder on your computer. To make it work, reconnect Claude: "
+        "Settings → Claude (MCP) → issue a new key and replace it in Claude Desktop.",
+    },
+    "home.board.mcp_relink.cta": {"ru": "Переподключить", "en": "Reconnect"},
     "home.board.review.kind": {"ru": "Приёмка", "en": "Review"},
     "home.board.review.title": {
         "ru": "Проверок ждут приёмки: {count}",

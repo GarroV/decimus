@@ -1,9 +1,9 @@
 """Задания карточки «Требует внимания» на «Главной» (D378, D398): стикеры по живым счётчикам.
 
 Образец — доска Swarm (`MiscWidgets.tsx`): лента бумажных стикеров. Отличие —
-только живые задания, никаких примеров и объявлений (D217; объявления — без
-«да» владельца не строятся). Стикер появляется, только когда есть что делать,
-и ведёт туда, где это делают.
+только живые задания и объявления, утверждённые владельцем (D217: без его «да» на
+текст и круг объявление не строится; первое — D629). Стикер появляется, только
+когда есть что делать, и ведёт туда, где это делают.
 
 Состав по роли — ядро: стикер не зовёт человека туда, куда его не пустят.
 Решение о составе — чистая функция `compose`; счётчики читает `load_counts`, и
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from src.db import action_plans, prescriptions, queries
 from src.db import ratings_read as ratings
@@ -35,6 +35,12 @@ PLANS_REVIEW = "plans_review"
 PLANS_DUE = "plans_due"
 ORDERS_DUE = "orders_due"
 RATINGS_STALE = "ratings_stale"
+#: Объявление (D629): перепривязать Claude ради загрузки фото из папки.
+MCP_RELINK = "mcp_relink"
+
+#: Ключи Claude, выпущенные до объявления, — у тех, кому перепривязать. Выпустил
+#: новый — стикер пропадает сам; круг объявления — подключённые личным ключом (D629).
+MCP_RELINK_BEFORE = datetime(2026, 10, 23, 10, 30, tzinfo=UTC)
 
 
 @dataclass(frozen=True)
@@ -63,10 +69,9 @@ class Counts:
     ratings_never: bool = False
 
 
-#: Показывать ли стикеры на «Главной» (D542: скрыты, но могут вернуться).
-#: Выключено — доска не строится и база для неё не читается; код, тексты и тесты
-#: живы, вернуть — одна строка.
-SHOWN = False
+#: Показывать ли стикеры на «Главной». D542 их скрыл, D629 вернул «пока, дальше по
+#: отзывам»: выключено — доска не строится и база для неё не читается.
+SHOWN = True
 
 
 @dataclass(frozen=True)
@@ -126,6 +131,18 @@ def compose(who: Who, counts: Counts, href: Callable[[str], str]) -> tuple[Stick
     ):
         out.append(Sticker(RATINGS_STALE, counts.ratings_age_days or 0, href(RATINGS_STALE)))
     return tuple(out)
+
+
+def announcements(
+    token_issued_at: datetime | None, href: Callable[[str], str]
+) -> tuple[Sticker, ...]:
+    """Объявления, утверждённые владельцем, — по признаку человека, а не по роли.
+
+    Перепривязать Claude (D629) — тому, чей живой личный ключ выпущен до объявления.
+    """
+    if token_issued_at is not None and token_issued_at < MCP_RELINK_BEFORE:
+        return (Sticker(MCP_RELINK, 1, href(MCP_RELINK)),)
+    return ()
 
 
 def _review(reach: Reach, who: Who) -> int:
