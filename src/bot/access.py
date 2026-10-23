@@ -83,8 +83,6 @@ COMMAND_ACTIONS: dict[str, str] = {
     "help": FIELD_ACTION,
     "lang": FIELD_ACTION,
     "version": FIELD_ACTION,
-    # Личный токен Claude себе (D448): человек уже прошёл вход в бота.
-    "mcp": FIELD_ACTION,
     "stops": "refusals.read",
 }
 #: Сколько живёт ответ «чья привязка»: не ходить в базу на каждый кадр альбома.

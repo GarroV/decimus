@@ -14,7 +14,6 @@ from .help import build_help_router
 from .info import build_info_router
 from .lang import build_lang_router
 from .material import build_material_router
-from .mcp import build_mcp_router
 from .record import build_record_router
 from .records import build_records_router
 from .resend import build_resend_router
@@ -31,7 +30,6 @@ __all__ = [
     "build_info_router",
     "build_lang_router",
     "build_material_router",
-    "build_mcp_router",
     "build_record_router",
     "build_records_router",
     "build_resend_router",
