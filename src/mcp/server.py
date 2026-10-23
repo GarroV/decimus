@@ -35,7 +35,16 @@ from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, space_of
 from .config import Settings, resolve_access
 from .errors import AuthError
-from .install import INSTALL_CONTENT_TYPE, INSTALL_PATH, InstallScriptError, install_script
+from .install import (
+    BRIDGE_META_PATH,
+    BRIDGE_SCRIPT_PATH,
+    INSTALL_CONTENT_TYPE,
+    INSTALL_PATH,
+    InstallScriptError,
+    bridge_meta,
+    bridge_script,
+    install_script,
+)
 from .ratelimit import CODE_RATE_LIMITED, RATE_LIMITED, McpRate, token_key
 from .rpc import CODE_PARSE_ERROR, handle
 
@@ -241,9 +250,39 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._send_text(HTTPStatus.OK, текст, INSTALL_CONTENT_TYPE)
 
+    def _authorized(self) -> bool:
+        """Токен на GET: те же правила и те же пределы, что у `_post` (401 / 429 уже отправлены)."""
+        rate: McpRate = self.server.rate  # type: ignore[attr-defined]
+        try:
+            resolve_access(self._settings, self.headers.get("Authorization"))
+        except AuthError as отказ:
+            if not rate.by_address.allow(str(self.client_address[0])):
+                self._send_rate_limited()
+                return False
+            self._send(HTTPStatus.UNAUTHORIZED, {"error": str(отказ)})
+            return False
+        _, _, bearer = (self.headers.get("Authorization") or "").partition(" ")
+        if not rate.by_token.allow(token_key(bearer.strip())):
+            self._send_rate_limited()
+            return False
+        return True
+
+    def _serve_bridge(self, script: bool) -> None:
+        """Самообновление моста (D626): версия с отпечатком или сам файл — только с токеном."""
+        if not self._authorized():
+            return
+        try:
+            if script:
+                self._send_text(HTTPStatus.OK, bridge_script(), INSTALL_CONTENT_TYPE)
+            else:
+                self._send(HTTPStatus.OK, bridge_meta())
+        except InstallScriptError as отказ:
+            print(f"[mcp] мост не отдан: {отказ}", file=sys.stderr)
+            self._send(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "Мост на сервере не собран"})
+
     # Имена do_GET/do_POST задаёт BaseHTTPRequestHandler — он ищет их по имени.
     def do_GET(self) -> None:
-        """Просматриваемых поверхностей две: скрипт установки и документ ресурса OAuth.
+        """Просматриваемых поверхностей три: установщик, мост (с токеном), документ ресурса OAuth.
 
         Остальное по-прежнему 405: сервер отвечает на JSON-RPC по POST, и
         расширять эту дверь нечем — за ней история проверок партнёров.
@@ -254,6 +293,9 @@ class _Handler(BaseHTTPRequestHandler):
         путь = self.path.split("?", 1)[0].rstrip("/") or "/"
         if путь == INSTALL_PATH:
             self._guarded(self._serve_install)
+            return
+        if путь in (BRIDGE_META_PATH, BRIDGE_SCRIPT_PATH):
+            self._guarded(lambda: self._serve_bridge(путь == BRIDGE_SCRIPT_PATH))
             return
         if self._settings.oauth_enabled and _is_resource_document(путь):
             self._guarded(lambda: self._send(HTTPStatus.OK, protected_resource(self._settings)))

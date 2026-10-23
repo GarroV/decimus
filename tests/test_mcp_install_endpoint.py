@@ -23,7 +23,14 @@ from pathlib import Path
 import pytest
 
 from src.mcp.config import Settings
-from src.mcp.install import INSTALL_PATH, install_script
+from src.mcp.install import (
+    BRIDGE_META_PATH,
+    BRIDGE_SCRIPT_PATH,
+    INSTALL_PATH,
+    bridge_meta,
+    bridge_script,
+    install_script,
+)
 from src.mcp.server import build_server
 
 ТОКЕН = "t" * 40
@@ -212,3 +219,35 @@ def test_отпечаток_в_строке_запуска_совпадает_с
     assert installer_sha256() == отдано, "отпечаток считается не от того, что отдаёт сервер"
     assert f'echo "{отдано}  $f" | shasum -a 256 -c -' in команда
     assert "| bash" not in команда, "вернулся слепой `curl | bash`"
+
+
+def _get_with_token(адрес: str, токен: str | None) -> tuple[int, str]:
+    запрос = urllib.request.Request(адрес)  # noqa: S310
+    if токен is not None:
+        запрос.add_header("Authorization", f"Bearer {токен}")
+    try:
+        with urllib.request.urlopen(запрос, timeout=10) as ответ:  # noqa: S310
+            return ответ.status, ответ.read().decode("utf-8")
+    except urllib.error.HTTPError as отказ:
+        return отказ.code, отказ.read().decode("utf-8")
+
+
+def test_мост_для_самообновления_без_токена_не_отдаётся(сервер: str) -> None:
+    """В отличие от `/setup`, мост отдаётся только с токеном (D626)."""
+    for путь in (BRIDGE_META_PATH, BRIDGE_SCRIPT_PATH):
+        assert _get_with_token(f"{сервер}{путь}", None)[0] == 401, путь
+        assert _get_with_token(f"{сервер}{путь}", "x" * 40)[0] == 401, путь
+
+
+def test_мост_отдаёт_версию_и_сумму_того_файла_что_лежит_после_установки(сервер: str) -> None:
+    """Сумма из `/bridge` обязана совпасть и с `/bridge/script`, и с мостом внутри `/setup`."""
+    код, мета = _get_with_token(f"{сервер}{BRIDGE_META_PATH}", ТОКЕН)
+    код_файла, файл = _get_with_token(f"{сервер}{BRIDGE_SCRIPT_PATH}", ТОКЕН)
+
+    assert (код, код_файла) == (200, 200)
+    данные = json.loads(мета)
+    assert данные == bridge_meta()
+    assert isinstance(данные["version"], int) and данные["version"] >= 1
+    assert hashlib.sha256(файл.encode("utf-8")).hexdigest() == данные["sha256"]
+    assert файл == bridge_script()
+    assert f"\n{файл}" in install_script(), "установщик кладёт не тот мост, что отдаёт обновление"
