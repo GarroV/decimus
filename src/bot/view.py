@@ -122,6 +122,7 @@ def candidate_lines(
     taken: Mapping[tuple[str, str], int] | None = None,
     *,
     chat_id: int,
+    merges: bool = False,
 ) -> str:
     """Пронумерованный список предложений: пункт, класс, зона, формулировка.
 
@@ -137,7 +138,12 @@ def candidate_lines(
 
     Пара, а не код: тот же пункт в другой зоне — законная и частая запись, и
     пометить её значило бы отговаривать аудитора от верного действия.
+
+    `merges` — у материала есть кадры и это не правка: нажатие на занятую пару
+    кладёт кадр в занявшую запись (#443, D243, D247), и пометка говорит об этом,
+    а не об отказе (#1175). Без кадров и под правкой занятая пара — по-прежнему отказ.
     """
+    taken_key = "record.candidate_taken_merge" if merges else "record.candidate_taken"
     titles = zone_titles(lang, chat_id=chat_id)
     labels = item_labels.chat_texts(chat_id)
     occupied = taken or {}
@@ -157,7 +163,7 @@ def candidate_lines(
             line += t("record.candidate_cue", lang)
         n = occupied.get((candidate.code, candidate.zone))
         if n is not None:
-            line += t("record.candidate_taken", lang, n=n)
+            line += t(taken_key, lang, n=n)
         lines.append(line)
     return "\n".join(lines)
 
@@ -169,6 +175,7 @@ def manual_taken_line(
     taken: Mapping[tuple[str, str], int],
     *,
     chat_id: int,
+    merges: bool = False,
 ) -> str:
     """Пометка занятых пар для страницы ручного перечня — или пусто (T173).
 
@@ -183,7 +190,8 @@ def manual_taken_line(
     страницах перечня она была бы длиннее самой страницы.
 
     Номер занявшей записи назван по той же причине, что и в перечне модели: с
-    ним аудитор идёт править запись, а без него — искать её.
+    ним аудитор идёт править запись, а без него — искать её. `merges` — как у
+    `candidate_lines`: с кадрами нажатие добавляет кадр к записи, а не даёт отказ.
     """
     labels = item_labels.chat_texts(chat_id)
     hits = [
@@ -198,7 +206,8 @@ def manual_taken_line(
     ]
     if not hits:
         return ""
-    return t("record.manual_taken", lang, items=", ".join(hits))
+    key = "record.manual_taken_merge" if merges else "record.manual_taken"
+    return t(key, lang, items=", ".join(hits))
 
 
 def zone_unusual_mark(finding: domain.Finding, lang: str) -> str:
