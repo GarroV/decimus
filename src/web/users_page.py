@@ -269,7 +269,6 @@ def _space_context(
         "partner_spaces": пространства,
         "partner_spaces_known": известны,
         "manages_spaces": круг is not None and access_policy.manages_spaces(круг),
-        "has_connections_tab": круг is not None and круг.kind == access_policy.SUPER,
         "has_journal_tab": круг is not None and круг.kind == access_policy.SUPER,
         "has_usage_tab": круг is not None and круг.kind in usage_screen.VIEWER_KINDS,
         "space_pick": _space_pick(show, пространства),

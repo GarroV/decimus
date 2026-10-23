@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 189 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 191 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -74,6 +74,15 @@
 | `/admin/zones/<code>/remove` | POST | `methodology_zone_remove` | `src/web/app.py` |
 | `/admin/zones/<code>/rename` | POST | `methodology_zone_rename` | `src/web/app.py` |
 | `/admin/zones/shares` | POST | `methodology_zone_shares` | `src/web/app.py` |
+| `/administration` | GET | `administration` | `src/web/administration.py` |
+| `/administration/connections/<int:token_id>/reissue` | POST | `connections_reissue` | `src/web/connections_screen.py` |
+| `/administration/connections/<int:token_id>/revoke` | POST | `connections_revoke` | `src/web/connections_screen.py` |
+| `/administration/connections/<int:token_id>/update` | POST | `connections_update` | `src/web/connections_screen.py` |
+| `/administration/connections/health/<code>/check` | POST | `connection_health_check` | `src/web/connections_screen.py` |
+| `/administration/connections/issue` | POST | `connections_issue` | `src/web/connections_screen.py` |
+| `/administration/connections/keys/<service_code>/check` | POST | `service_key_check` | `src/web/connections_screen.py` |
+| `/administration/connections/keys/<service_code>/delete` | POST | `service_key_delete` | `src/web/connections_screen.py` |
+| `/administration/connections/keys/<service_code>/save` | POST | `service_key_save` | `src/web/connections_screen.py` |
 | `/api/v1/aggregators/ratings` | GET | `swarm_api_aggregators` | `src/web/swarm_api.py` |
 | `/api/v1/inspections` | GET | `swarm_api_inspections` | `src/web/swarm_api.py` |
 | `/api/v1/inspections/<inspection_id>` | GET | `swarm_api_inspection` | `src/web/swarm_api.py` |
@@ -195,13 +204,6 @@
 | `/users` | GET | `users` | `src/web/users_screen.py` |
 | `/users/add` | POST | `add_user` | `src/web/users_screen.py` |
 | `/users/bot-unlink` | POST | `bot_unlink` | `src/web/users_screen.py` |
-| `/users/connections/<int:token_id>/reissue` | POST | `connections_reissue` | `src/web/connections_screen.py` |
-| `/users/connections/<int:token_id>/revoke` | POST | `connections_revoke` | `src/web/connections_screen.py` |
-| `/users/connections/<int:token_id>/update` | POST | `connections_update` | `src/web/connections_screen.py` |
-| `/users/connections/issue` | POST | `connections_issue` | `src/web/connections_screen.py` |
-| `/users/connections/keys/<service_code>/check` | POST | `service_key_check` | `src/web/connections_screen.py` |
-| `/users/connections/keys/<service_code>/delete` | POST | `service_key_delete` | `src/web/connections_screen.py` |
-| `/users/connections/keys/<service_code>/save` | POST | `service_key_save` | `src/web/connections_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
 | `/users/freeze` | POST | `freeze_user` | `src/web/users_screen.py` |
 | `/users/reset-second-factor` | POST | `reset_second_factor` | `src/web/users_screen.py` |
@@ -552,6 +554,7 @@
 | `0092_action_plan_rows.sql` | `action_plan_rows` |
 | `0093_ratings_rko_service_marks.sql` | — |
 | `0094_action_plan_file_parsed.sql` | — |
+| `0095_health_checks.sql` | `health.checks` |
 <!-- map:end -->
 
 ## Makefile

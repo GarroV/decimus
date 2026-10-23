@@ -172,18 +172,21 @@ Flask-приложение управляющей компании и партн
 ### Вход, пользователи и доступ
 
 Вход паролем и Google, сессия в подписанной куке, заслон происхождения формы,
-экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
-входом через сайт (OAuth).
+экран «Пользователи» с карточкой человека, раздел «Администрирование» (D639) с вкладкой
+«Подключения»: ключи сервисов, ключи API и состояние подключений (D638), подключение
+Claude входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,photo_upload,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,service_probes,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,photo_upload,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
 | `src/web/account_menu.py` | Меню учётки (D468): состояние подключений для строки «Подключения» |
 | `src/web/accounts.py` | Учётки админки так, как их видит экран (T338, #322) |
+| `src/web/admin_health.py` | Блок «Состояние подключений» вкладки «Подключения» (D638, #1251): строки и итог |
+| `src/web/administration.py` | Раздел «Администрирование» (D639, #1251): все настройки сервиса, вкладки по роли |
 | `src/web/auth.py` | Вход в админку: форма, сессия в подписанной куке, выход (T323, D155) |
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
-| `src/web/connections_screen.py` | Вкладка «Подключения» экрана «Пользователи»: ключи API сервисов (D425, #568) |
+| `src/web/connections_screen.py` | Вкладка «Подключения» раздела «Администрирование» (D638, D639): ключи сервисов и API |
 | `src/web/demo_entry.py` | Вход в открытое демо (D524): выбор роли и сессия без пароля — только на стенде демо |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
 | `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
@@ -207,7 +210,6 @@ Flask-приложение управляющей компании и партн
 | `src/web/security_headers.py` | Заголовки безопасности админки: один набор на КАЖДЫЙ ответ (#489) |
 | `src/web/security_screen.py` | Экран «Вход и защита» (`/settings/security`, D463): способы подтверждения входа |
 | `src/web/service_keys_screen.py` | Блок «Ключи сервисов» на вкладке «Подключения»: проверить, заменить, удалить (D491, D576) |
-| `src/web/service_probes.py` | Проверка ключа у провайдера до записи (D576): один дешёвый вызов с введённым значением |
 | `src/web/settings_screen.py` | Экран «Настройки» (`/settings`): настройки своего профиля — всё подключение в одном месте |
 | `src/web/ui_lang.py` | Язык сайта: из профиля учётки, `?lang=` — разовый перекрёсток (D447) |
 | `src/web/usage_screen.py` | Экран «Расход модели» (D537): сколько токенов и денег ушло на модель |
@@ -237,6 +239,7 @@ Flask-приложение управляющей компании и партн
 | Файл | Что делает |
 |---|---|
 | `src/web/texts.py` | Тексты веб-админки: каталог по ключам, язык — параметр |
+| `src/web/texts_administration.py` | Тексты раздела «Администрирование» (D639) и вкладки «Подключения» (D638, #1251) |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
@@ -303,6 +306,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 24 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, … (+16) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
+| `src/web/templates/administration/` | 1 | connections.html |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
@@ -317,7 +321,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/usage/` | 1 | page.html |
-| `src/web/templates/users/` | 8 | _card.html, _connections.html, _service_keys.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
+| `src/web/templates/users/` | 7 | _card.html, _connections.html, _service_keys.html, _spaces.html, _tabs.html, forbidden.html, index.html |
 <!-- map:end -->
 
 <!-- map:begin tree src/web/static -->
@@ -398,7 +402,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -406,6 +410,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
 | `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
+| `src/db/health_store.py` | Двери базы для вкладки «Подключения» (D638): исходы проб и последние заходы сборов |
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
 | `src/db/learning_store.py` | Обучение в базе (схема `learning`, миграция 0085): запись снимка дня и журнал загрузок |
@@ -539,6 +544,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0092_action_plan_rows.sql` | Электронный план исправлений, шаг 2 эпика #1168 (спека 2026-10-22-electronic-action-plan-design; D612, D613, D617, D618, D621) |
 | `0093_ratings_rko_service_marks.sql` | «Дисквалифицировать пиццу» в фото-проверке РКО — не нарушение, а служебная пометка контроля: отчёт ресторана не идёт в пул баллов по продукту |
 | `0094_action_plan_file_parsed.sql` | Файл «туда и обратно» электронного плана, шаг 3 эпика #1168 (спека 2026-10-22-electronic-action-plan-design, «Файл туда и обратно») |
+| `0095_health_checks.sql` | Постоянная проверка подключений (D638, #1251) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -619,6 +625,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/errors.py` | Отказы блока `bot` |
 | `src/bot/finish_translate.py` | Автоперевод комментариев при сборке отчёта (D443) |
 | `src/bot/frame_copies.py` | Копии присланных кадров на диске площадки, на 7 дней (#367, решение владельца D179) |
+| `src/bot/health_loader.py` | Постоянная проверка подключений (D638, #1251): раз в 15 минут — пробы ключей и служб |
 | `src/bot/image_convert.py` | Приведение присланной картинки к JPEG (#1023) |
 | `src/bot/image_input.py` | Кадр, присланный файлом, а не фото (#1023) |
 | `src/bot/info.py` | Информационная часть проверки: какие поля спрашиваются и чем они разные (T158) |
@@ -699,6 +706,20 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/learning/ispring.py` | Клиент iSpring Learn API: подразделения и результаты прохождения курсов |
 | `src/learning/keys.py` | Ключи iSpring для загрузчика: база, затем окружение (`resolve` из `src.db.service_keys`) |
 | `src/learning/sync.py` | Один заход загрузки: подразделения → результаты по пиццериям → агрегаты → база |
+<!-- map:end -->
+
+## src/health — проверка подключений
+
+Вкладка «Администрирование → Подключения» (D638, #1251): реестр подключений, пробы ключей
+и служб. Пробует бот раз в 15 минут (`src/bot/health_loader.py`) и веб по кнопке
+«Проверить сейчас»; исходы — `src/db/health_store.py` (`health.checks`), цвета —
+`src/domain/health.py`.
+
+<!-- map:begin files src/health/*.py -->
+| Файл | Что делает |
+|---|---|
+| `src/health/checks.py` | Реестр подключений вкладки «Подключения» (D638) и пробы тех, что пробуются |
+| `src/health/probes.py` | Проверка ключа у провайдера до записи (D576): один дешёвый вызов с введённым значением |
 <!-- map:end -->
 
 ## src/ratings — рейтинги и оценки площадок
@@ -785,6 +806,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/findings.py` | Операции над записями проверки: фиксация, правка, удаление, фотографии |
 | `src/domain/geo.py` | Страны и города сети: названия для людей, страна города, местные написания |
 | `src/domain/handover.py` | Сдана ли проверка: признак, который ставит бот, а читают и бот, и мини-апп (D080, D312) |
+| `src/domain/health.py` | Цвет подключения на вкладке «Подключения» (D638): правила, без базы и сети |
 | `src/domain/info.py` | Информационные поля проверки — блок `info` состояния (T158, решения D069, D070) |
 | `src/domain/info_fields.py` | Состав информационной части проверки: какие поля и каким способом вводятся (T158, D312) |
 | `src/domain/item_label.py` | Пункт чек-листа для человека: «Порядок 13», а не `CLN13` (решение владельца 20.10.2026) |

@@ -155,6 +155,7 @@ SCREENS = (
     "training",
     "admin",
     "users",
+    "administration",
     "settings",
     "actions",
     "osb",

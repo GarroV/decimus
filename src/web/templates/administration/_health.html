@@ -1,0 +1,46 @@
+{#
+  Состояние подключений (D638): итог одной строкой сверху, под ним строка на каждое
+  подключение — точка, название, причина, время проверки, «Проверить сейчас» у тех, что
+  пробуются. Цвета выводит `src/domain/health.py`; здесь только показ.
+#}
+<section class="scard shealth" id="health" aria-labelledby="health-title">
+  <header class="shealth__head">
+    <h2 class="shealth__title" id="health-title">{{ t('health.title') }}</h2>
+    {{ info_tip(t('tip.hint'), '', [t('health.sub')], 'health') }}
+  </header>
+  {% if health_flash %}
+    <div class="note {{ 'note--ok' if health_flash.ok else 'note--warn' }}"><div class="note__text">
+      {%- if health_flash.params.code is defined -%}
+        {{ t(health_flash.key, name=t('health.conn.' ~ health_flash.params.code)) }}
+      {%- else -%}
+        {{ t(health_flash.key) }}
+      {%- endif -%}
+    </div></div>
+  {% endif %}
+  {% if health_rows is none %}
+    <div class="note note--warn"><div class="note__text">{{ t('health.err.db') }}</div></div>
+  {% else %}
+    {% set bad = health_count['red'] if health_summary == 'red' else health_count['yellow'] %}
+    <p class="shealth__summary shealth__summary--{{ health_summary }}">
+      <span class="shealth__dot shealth__dot--{{ health_summary }}" aria-hidden="true"></span>
+      {{ t('health.summary.' ~ health_summary, n=bad) }}
+    </p>
+    <ul class="shealth__rows">
+      {% for row in health_rows %}
+        {% set s = row.status %}
+        <li class="shealth__row">
+          <span class="shealth__dot shealth__dot--{{ s.light }}" role="img" aria-label="{{ t('health.light.' ~ s.light) }}"></span>
+          <span class="shealth__main">
+            <b>{{ t('health.conn.' ~ row.code) }}</b>
+            <small>{{ t(s.reason, **s.params) }}{% if s.checked_at %} · {{ t('health.ran' if row.kind == 'load' else 'health.checked', at=health_stamp(s.checked_at)) }}{% endif %}</small>
+          </span>
+          {% if row.checkable %}
+            <form method="post" action="{{ users_url }}/connections/health/{{ row.code }}/check?lang={{ lang }}" class="shealth__act">
+              <button class="sbtn sbtn--ghost" type="submit">{{ t('health.check_now') }}</button>
+            </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>

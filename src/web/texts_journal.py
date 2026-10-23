@@ -30,6 +30,7 @@ _WEB: dict[str, tuple[str, str]] = {
     "connections_revoke": ("Отозван ключ API", "API key revoked"),
     "connections_update": ("Изменены права ключа API", "API key settings changed"),
     "service_key_check": ("Проверен ключ сервиса", "Service key checked"),
+    "connection_health_check": ("Проверено подключение", "Connection checked"),
     "service_key_delete": ("Удалён ключ сервиса", "Service key removed"),
     "service_key_save": ("Задан ключ сервиса", "Service key set"),
     "do_accept": ("Принята проверка", "Inspection accepted"),

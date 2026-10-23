@@ -71,8 +71,13 @@ CONFIRM_ENDPOINT = "reauth_confirm"
 REAUTH_KIND = "reauth"
 
 #: Куда можно вернуть после подтверждения: «Настройки», согласие OAuth и вкладка
-#: «Подключения» (ключ модели, D491).
-_BACK_PREFIXES = ("/settings#", "/settings?", "/oauth/authorize?", "/users?tab=connections")
+#: «Подключения» в «Администрировании» (ключ модели, D491, D639).
+_BACK_PREFIXES = (
+    "/settings#",
+    "/settings?",
+    "/oauth/authorize?",
+    "/administration?tab=connections",
+)
 
 
 def is_fresh(account: object, *, now: datetime | None = None, max_age: timedelta = MAX_AGE) -> bool:

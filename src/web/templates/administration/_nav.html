@@ -1,0 +1,18 @@
+{#
+  Столбец вкладок раздела «Администрирование» (D639). Только вкладки, открытые роли
+  (`administration.tabs_for`); выбранная — в адресе (`?tab=<код>`). На телефоне столбец
+  становится списком над содержимым — не рядом чипов.
+#}
+{% macro admin_nav() %}
+  <nav class="sadmin__nav" aria-label="{{ t('administration.tabs') }}">
+    <p class="sadmin__title">{{ t('section.administration.title') }}</p>
+    <ul class="sadmin__tabs">
+      {% for tab in admin_tabs %}
+        {% set current = tab.key == admin_tab %}
+        <li>
+          <a class="sadmin__tab{% if current %} is-current{% endif %}" href="{{ admin_url(tab.key) }}"{% if current %} aria-current="page"{% endif %}>{{ t(tab.title_key) }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </nav>
+{% endmacro %}

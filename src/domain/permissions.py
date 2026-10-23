@@ -67,6 +67,8 @@ _VIEWS: tuple[Action, ...] = (
     # УК и партнёра различают действия `plan.*` и `prescription.*`.
     Action("view.actions", "view", writes=False),
     Action("view.users", "view", writes=False),
+    # «Администрирование» (D639, #1251): все настройки сервиса, вкладки по роли.
+    Action("view.administration", "view", writes=False),
     # «ОСБ» (D599): очередь предписаний сети. Только УК; видят ОСБ, админ (без
     # действий) и главный админ — девелопер и гость страницы не видят.
     Action("view.osb", "view", hq_only=True, writes=False),
@@ -165,9 +167,15 @@ def _codes(*codes: str) -> frozenset[str]:
     return frozenset(require_action(c).code for c in codes)
 
 
-#: Разделы, которые видят все роли УК с «полным» доступом; «ОСБ» им выдаётся поимённо.
-_ALL_VIEWS_HQ = frozenset(a.code for a in _VIEWS if a.code != "view.osb")
-_ALL_VIEWS_PARTNER = frozenset(a.code for a in _VIEWS if not a.hq_only)
+#: Виды, которые выдаются поимённо, а не «всеми видами»: «ОСБ» (D599) и
+#: «Администрирование» (D639) — его вид есть только у ролей с хоть одной вкладкой.
+_NAMED_VIEWS = frozenset({"view.osb", "view.administration"})
+
+#: Разделы, которые видят все роли УК с «полным» доступом.
+_ALL_VIEWS_HQ = frozenset(a.code for a in _VIEWS if a.code not in _NAMED_VIEWS)
+_ALL_VIEWS_PARTNER = frozenset(
+    a.code for a in _VIEWS if not a.hq_only and a.code not in _NAMED_VIEWS
+)
 
 #: Работа с проверками в УК: проводить, вычитывать, принимать, править, снимать,
 #: переносить, письма, предписания, экшн-планы (D440 — и у девелопера).
@@ -240,7 +248,9 @@ _GUEST = _codes(
 #: Матрица: (сторона, роль учётки) → действия. Нет клетки — нет права.
 MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     # Главный админ — всё, что админ, и ключи API (D440).
-    (SIDE_HQ, "superadmin"): _HQ_ADMIN | _codes("api.manage", "keys.manage", "prescription.manage"),
+    # «Администрирование» на шаге 1 (#1251) — одна вкладка «Подключения» (D638).
+    (SIDE_HQ, "superadmin"): _HQ_ADMIN
+    | _codes("api.manage", "keys.manage", "prescription.manage", "view.administration"),
     (SIDE_HQ, "admin"): _HQ_ADMIN,
     # Бизнес-девелопер (D440): сервис в полном объёме, кроме главного чек-листа,
     # указателя прода, стран, людей, ключей и загрузок рейтингов.

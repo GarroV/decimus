@@ -29,9 +29,9 @@ from flask import request
 from src.db import secret_crypto, service_keys
 from src.db.errors import DbError
 from src.domain import service_keys as registry
+from src.health.probes import PROBES, KeyRejected, KeyUnverified
 
 from .db_refusal import note_target_mismatch
-from .service_probes import PROBES, KeyRejected, KeyUnverified
 
 _log = logging.getLogger(__name__)
 

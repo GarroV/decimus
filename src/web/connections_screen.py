@@ -1,4 +1,8 @@
-"""Вкладка «Подключения» экрана «Пользователи»: ключи API сервисов (D425, #568).
+"""Вкладка «Подключения» раздела «Администрирование» (D638, D639): ключи сервисов и API.
+
+Жила вкладкой экрана «Пользователи» (D425, #568), с #1251 — в «Администрировании»;
+старый адрес `/users?tab=connections` перенаправляет сюда. Сверху — состояние
+подключений (`admin_health.py`), ниже ключи внешних сервисов и ключи `/api/v1/*`.
 
 Главный админ выдаёт, правит, перевыпускает и отзывает ключи `/api/v1/*` без
 командной строки и видит, как каждый сервис ходит. Вся работа с базой — слой
@@ -32,14 +36,24 @@ from src.db import api_access, web_throttle
 from src.db import ratings_read as ratings
 from src.db.errors import DbError
 from src.domain import service_keys as registry
+from src.health import checks as health_checks
 
-from . import access_policy, auth, connections_form, guard, reauth, service_keys_screen
+from . import (
+    access_policy,
+    admin_health,
+    administration,
+    auth,
+    connections_form,
+    guard,
+    reauth,
+    service_keys_screen,
+)
 from .connections_form import Draft, Refusal
 from .db_refusal import note_target_mismatch
 from .journal import TARGET_OVERRIDE
 from .origin import refuse_foreign_origin
 from .sections import section
-from .users_view import TAB_CONNECTIONS, Filters, screen_url
+from .users_view import TAB_CONNECTIONS
 
 #: Сколько дней обращений и строк журнала показывает карточка.
 USAGE_DAYS = 14
@@ -144,8 +158,8 @@ _EMPTY_VALUES: dict[str, Any] = {
 
 
 def _link(**extra: str) -> str:
-    base = f"{request.script_root}{section('users').path}"
-    return screen_url(base, lang=request.args.get("lang") or "", f=Filters(), **extra)
+    """Адрес вкладки; `tab` в шаблонах — наследство «Пользователей», он всегда этот."""
+    return administration.url(TAB_CONNECTIONS, **{k: v for k, v in extra.items() if k != "tab"})
 
 
 def _page(
@@ -157,6 +171,7 @@ def _page(
     picked_id: int | None = None,
     add: bool = False,
     key_flash: service_keys_screen.KeyFlash | None = None,
+    health_flash: admin_health.Flash | None = None,
     code: int = 200,
 ) -> FlaskResponse:
     """Страница вкладки целиком — для GET и для ответа на любое действие."""
@@ -169,15 +184,9 @@ def _page(
     log = _lines(picked.id) if picked is not None else None
     if values is None:
         values = _values_of(picked) if picked is not None and not add else _EMPTY_VALUES
-    base = f"{request.script_root}{section('users').path}"
+    base = f"{request.script_root}{section('administration').path}"
     html = render_template(
-        "users/connections.html",
-        tab=TAB_CONNECTIONS,
-        has_spaces_tab=True,
-        manages_spaces=True,
-        has_connections_tab=True,
-        has_journal_tab=True,
-        has_usage_tab=True,
+        "administration/connections.html",
         users_url=base,
         link=_link,
         tokens_known=known,
@@ -201,6 +210,8 @@ def _page(
         split_open=issued is not None or add or picked is not None,
         split_back=_link(tab=TAB_CONNECTIONS),
         **service_keys_screen.context(key_flash),
+        **admin_health.context(health_flash),
+        **administration.nav(TAB_CONNECTIONS),
     )
     response = make_response(html, code)
     # Ключ API в теле ответа выдачи и записи о ключах сервисов: ни браузер, ни прокси не
@@ -217,7 +228,7 @@ def _int(raw: str | None) -> int | None:
 
 
 def show() -> FlaskResponse:
-    """GET `/users?tab=connections[&service=<№>|&add=1]`."""
+    """GET `/administration?tab=connections[&service=<№>|&add=1]`."""
     _boss()
     return _page(picked_id=_int(request.args.get("service")), add=request.args.get("add") == "1")
 
@@ -255,8 +266,8 @@ def _live_token(token_id: int) -> api_access.TokenRow | None:
 
 
 def install(app: Flask) -> None:
-    """Действия вкладки. Страница (GET) отдаётся маршрутом `/users` через `show()`."""
-    base = f"{section('users').path}/connections"
+    """Действия вкладки. Страница (GET) — маршрут раздела через `show()`."""
+    base = f"{section('administration').path}/connections"
 
     @app.post(f"{base}/issue")
     @guard.action("api.manage", hidden=True)
@@ -408,7 +419,7 @@ def _key_action(
         abort(404)
     setattr(g, TARGET_OVERRIDE, f"service={service.code}")
     refuse_foreign_origin()
-    back = f"{section('users').path}?tab={TAB_CONNECTIONS}"
+    back = f"{section('administration').path}?tab={TAB_CONNECTIONS}"
     refused = _key_gate(автор, back)
     if isinstance(refused, tuple):
         flash, code = refused
@@ -427,7 +438,7 @@ def _with_service(flash: service_keys_screen.KeyFlash, code: str) -> service_key
 
 def install_service_keys(app: Flask) -> None:
     """Действия блока «Ключи сервисов»: проверить, заменить, удалить."""
-    base = f"{section('users').path}/connections/keys/<service_code>"
+    base = f"{section('administration').path}/connections/keys/<service_code>"
 
     @app.post(f"{base}/check")
     @guard.action("keys.manage", hidden=True)
@@ -449,3 +460,22 @@ def install_service_keys(app: Flask) -> None:
     @guard.action("keys.manage", hidden=True)
     def service_key_delete(service_code: str) -> Response:
         return _key_action(service_code, lambda svc, _by: service_keys_screen.remove(svc))
+
+
+def install_health(app: Flask) -> None:
+    """«Проверить сейчас» у строки состояния подключений (D638).
+
+    Роль (404) → подключение из реестра и пробуемое (404) → происхождение (403) →
+    проба. Ничего не меняет, кроме исхода пробы, поэтому без подтверждения входа.
+    """
+
+    @app.post(f"{section('administration').path}/connections/health/<code>/check")
+    @guard.action("keys.manage", hidden=True)
+    def connection_health_check(code: str) -> Response:
+        _boss()
+        found = health_checks.connection(code)
+        if found is None or found.kind != health_checks.PROBE:
+            abort(404)
+        setattr(g, TARGET_OVERRIDE, f"connection={code}")
+        refuse_foreign_origin()
+        return _page(health_flash=admin_health.check_now(code))

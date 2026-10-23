@@ -26,7 +26,7 @@ from src.db import ratings_read as ratings
 from src.db.errors import AccessError
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
-ВКЛАДКА = "/users?tab=connections"
+ВКЛАДКА = "/administration?tab=connections"
 КЛЮЧ = "ключ-который-покажем-один-раз-0123456789abcdef"
 НОВЫЙ_КЛЮЧ = "новый-ключ-после-перевыпуска-fedcba9876543210"
 ИМЯ = "Свод-Swarm"
@@ -176,13 +176,19 @@ def test_вкладка_на_английском(monkeypatch: pytest.MonkeyPatc
         assert "Подключить" not in html
 
 
-def test_вкладка_в_шапке_людей_только_у_главного_админа(
+def test_вкладка_переехала_из_людей_в_администрирование(
     monkeypatch: pytest.MonkeyPatch, склад: Склад
 ) -> None:
+    # D639, #1251: в шапке «Пользователей» вкладки больше нет ни у кого; у главного
+    # админа вход в неё — пункт меню «Администрирование».
     for клиент in _стенд(monkeypatch, tenant="HQ", role="superadmin"):
-        assert "tab=connections" in клиент.get("/users").get_data(as_text=True)
+        page = клиент.get("/users").get_data(as_text=True)
+        assert "tab=connections" not in page
+        assert 'href="/administration?lang=' in page
     for клиент in _стенд(monkeypatch, tenant="HQ", role="admin"):
-        assert "tab=connections" not in клиент.get("/users").get_data(as_text=True)
+        page = клиент.get("/users").get_data(as_text=True)
+        assert "tab=connections" not in page
+        assert 'href="/administration?lang=' not in page
 
 
 @pytest.mark.parametrize(("tenant", "role"), РОЛИ)
@@ -200,8 +206,8 @@ def test_остальным_экрана_нет_на_чтение(
 @pytest.mark.parametrize(("tenant", "role"), РОЛИ)
 @pytest.mark.parametrize(
     "адрес",
-    ["/users/connections/issue"]
-    + [f"/users/connections/1/{д}" for д in ("update", "reissue", "revoke")],
+    ["/administration/connections/issue"]
+    + [f"/administration/connections/1/{д}" for д in ("update", "reissue", "revoke")],
 )
 def test_остальным_и_записи_нет_и_в_базу_ничего_не_уходит(
     monkeypatch: pytest.MonkeyPatch, склад: Склад, tenant: str, role: str, адрес: str
@@ -222,7 +228,7 @@ def test_анониму_вход_а_не_экран(monkeypatch: pytest.MonkeyPa
     with собрать(tenant="HQ").test_client() as клиент:
         for ответ in (
             клиент.get(ВКЛАДКА),
-            клиент.post("/users/connections/issue", data=_форма(), headers=ЗАГОЛОВКИ),
+            клиент.post("/administration/connections/issue", data=_форма(), headers=ЗАГОЛОВКИ),
         ):
             куда = ответ.headers["Location"]
             assert ответ.status_code == 302 and ("login" in куда or "welcome" in куда)
@@ -231,8 +237,8 @@ def test_анониму_вход_а_не_экран(monkeypatch: pytest.MonkeyPa
 
 @pytest.mark.parametrize(
     "адрес",
-    ["/users/connections/issue"]
-    + [f"/users/connections/1/{д}" for д in ("update", "reissue", "revoke")],
+    ["/administration/connections/issue"]
+    + [f"/administration/connections/1/{д}" for д in ("update", "reissue", "revoke")],
 )
 def test_отправка_без_своего_origin_отказ_и_без_записи(
     главный: FlaskClient, склад: Склад, адрес: str
@@ -251,7 +257,7 @@ def test_ключ_показан_один_раз_и_не_кэшируется(
 ) -> None:
     with caplog.at_level(logging.DEBUG):
         ответ = главный.post(
-            "/users/connections/issue",
+            "/administration/connections/issue",
             data=_форма(contact="a@b.c", countries="ge", expires="2099-01-01"),
             headers=ЗАГОЛОВКИ,
         )
@@ -271,7 +277,7 @@ def test_выдача_передаёт_базе_проверенное_и_лог
     главный: FlaskClient, склад: Склад
 ) -> None:
     главный.post(
-        "/users/connections/issue",
+        "/administration/connections/issue",
         data=_форма(
             contact=" ops@x.y ",
             scope=["maps:ratings", "ratings:scores"],
@@ -307,7 +313,7 @@ def test_отказ_формы_строкой_над_формой_без_зап�
     главный: FlaskClient, склад: Склад, поля: dict[str, Any], текст: str
 ) -> None:
     ответ = главный.post(
-        "/users/connections/issue",
+        "/administration/connections/issue",
         data=_форма(contact="сохрани-меня", **поля),
         headers=ЗАГОЛОВКИ,
     )
@@ -326,7 +332,9 @@ def test_справочник_стран_не_ответил_ничего_не_�
         raise AccessError("нет базы")
 
     monkeypatch.setattr(ratings, "countries", упал)
-    ответ = главный.post("/users/connections/issue", data=_форма(countries="GE"), headers=ЗАГОЛОВКИ)
+    ответ = главный.post(
+        "/administration/connections/issue", data=_форма(countries="GE"), headers=ЗАГОЛОВКИ
+    )
     assert ответ.status_code == 503
     assert "Не удалось сверить страны" in ответ.get_data(as_text=True)
     assert склад.пишущие_зовы() == []
@@ -357,7 +365,7 @@ def test_карточка_показывает_дни_и_последние_за
 
 def test_правка_передаёт_права_страны_срок(главный: FlaskClient, склад: Склад) -> None:
     ответ = главный.post(
-        "/users/connections/1/update",
+        "/administration/connections/1/update",
         data=_форма(scope=["ratings:scores"], countries="RS", expires="2099-05-05", contact=""),
         headers=ЗАГОЛОВКИ,
     )
@@ -370,7 +378,7 @@ def test_правка_передаёт_права_страны_срок(глав
 
 def test_правка_с_ошибкой_не_пишет_и_держит_ввод(главный: FlaskClient, склад: Склад) -> None:
     ответ = главный.post(
-        "/users/connections/1/update",
+        "/administration/connections/1/update",
         data=_форма(scope=[], title="Переименован"),
         headers=ЗАГОЛОВКИ,
     )
@@ -381,12 +389,12 @@ def test_правка_с_ошибкой_не_пишет_и_держит_ввод
 
 
 def test_отозванный_ключ_не_правится(главный: FlaskClient, склад: Склад) -> None:
-    ответ = главный.post("/users/connections/2/update", data=_форма(), headers=ЗАГОЛОВКИ)
+    ответ = главный.post("/administration/connections/2/update", data=_форма(), headers=ЗАГОЛОВКИ)
     assert ответ.status_code == 409 and склад.пишущие_зовы() == []
 
 
 def test_перевыпуск_показывает_новый_ключ_один_раз(главный: FlaskClient, склад: Склад) -> None:
-    ответ = главный.post("/users/connections/1/reissue", headers=ЗАГОЛОВКИ)
+    ответ = главный.post("/administration/connections/1/reissue", headers=ЗАГОЛОВКИ)
     html = ответ.get_data(as_text=True)
     assert ответ.status_code == 200 and html.count(НОВЫЙ_КЛЮЧ) == 1
     assert "no-store" in ответ.headers["Cache-Control"]
@@ -395,15 +403,20 @@ def test_перевыпуск_показывает_новый_ключ_один_
 
 
 def test_отзыв_с_логином_вошедшего(главный: FlaskClient, склад: Склад) -> None:
-    ответ = главный.post("/users/connections/1/revoke", headers=ЗАГОЛОВКИ)
+    ответ = главный.post("/administration/connections/1/revoke", headers=ЗАГОЛОВКИ)
     assert ответ.status_code == 200
     assert f"Ключ «{ИМЯ}» отозван" in ответ.get_data(as_text=True)
     assert склад.зовы[-1] == ("revoke", (1, "director"))
 
 
 def test_отзыв_отозванного_или_чужого_номера_отказ(главный: FlaskClient) -> None:
-    assert главный.post("/users/connections/2/revoke", headers=ЗАГОЛОВКИ).status_code == 409
-    assert главный.post("/users/connections/999/reissue", headers=ЗАГОЛОВКИ).status_code == 409
+    assert (
+        главный.post("/administration/connections/2/revoke", headers=ЗАГОЛОВКИ).status_code == 409
+    )
+    assert (
+        главный.post("/administration/connections/999/reissue", headers=ЗАГОЛОВКИ).status_code
+        == 409
+    )
 
 
 def test_отзыв_и_перевыпуск_подтверждаются_на_странице_без_confirm(главный: FlaskClient) -> None:

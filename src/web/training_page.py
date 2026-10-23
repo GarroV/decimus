@@ -160,7 +160,9 @@ def _empty(*, failed: bool) -> str:
         view=None,
         failed=failed,
         rail=(),
-        keys_path=f"{section('users').path}/connections" if guard.may("keys.manage") else "",
+        keys_path=f"{section('administration').path}?tab=connections"
+        if guard.may("keys.manage")
+        else "",
     )
 
 

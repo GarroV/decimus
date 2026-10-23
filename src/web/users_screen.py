@@ -23,8 +23,9 @@ import logging
 import re
 from collections.abc import Callable
 
-from flask import Flask, render_template, request
+from flask import Flask, redirect, render_template, request
 from flask import Response as FlaskResponse
+from werkzeug.wrappers import Response as WerkzeugResponse
 
 from src.db import bot_links, second_factor
 from src.db.errors import DbError, EmailTakenError
@@ -34,6 +35,7 @@ from src.domain.tenants import canonical_tenant
 from . import (
     access_policy,
     accounts,
+    administration,
     auth,
     connections_screen,
     guard,
@@ -94,9 +96,11 @@ def install(app: Flask, conf: Settings) -> None:
     users_path = section("users").path
 
     @app.get(users_path)
-    def users() -> FlaskResponse | tuple[str, int]:
+    def users() -> FlaskResponse | WerkzeugResponse | tuple[str, int]:
         if request.args.get("tab") == TAB_CONNECTIONS:
-            return connections_screen.show()
+            # Вкладка переехала в «Администрирование» (D639, #1251); старые ссылки живут.
+            rest = {k: v for k, v in request.args.items() if k != "tab"}
+            return redirect(administration.url(TAB_CONNECTIONS, **rest))
         if request.args.get("tab") == TAB_JOURNAL:
             return journal_screen.show_users(conf)
         if request.args.get("tab") == TAB_USAGE:
@@ -133,6 +137,8 @@ def install(app: Flask, conf: Settings) -> None:
     _install_spaces(app, users_path)
     connections_screen.install(app)
     connections_screen.install_service_keys(app)
+    connections_screen.install_health(app)
+    administration.install(app)
     journal_screen.install(app, conf)
 
 

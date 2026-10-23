@@ -21,11 +21,12 @@ from web_harness import СВОЙ, войти, подменить_двери, с�
 
 from src.db import secret_crypto, service_keys
 from src.domain import service_keys as registry
-from src.web import auth, reauth, service_probes
-from src.web.service_probes import KeyRejected, KeyUnverified
+from src.health import probes as service_probes
+from src.health.probes import KeyRejected, KeyUnverified
+from src.web import auth, reauth
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
-ВКЛАДКА = "/users?tab=connections"
+ВКЛАДКА = "/administration?tab=connections"
 ЗНАЧЕНИЕ = "sk-proj-Zq9Xw8Vv7Uu6Tt5Ss4Rr3Qq2Pp1-never-show-this"
 ID_ISPRING = "ispring-client-id-AAAA1111BBBB2222"
 SECRET_ISPRING = "ispring-client-secret-CCCC3333DDDD4444"
@@ -39,7 +40,7 @@ def _форма(сервис: str, значение: str = ЗНАЧЕНИЕ) -> 
 
 
 def _адрес(сервис: str, действие: str) -> str:
-    return f"/users/connections/keys/{сервис}/{действие}"
+    return f"/administration/connections/keys/{сервис}/{действие}"
 
 
 class Склад:
@@ -199,7 +200,7 @@ def test_остальным_экрана_нет_ни_на_чтение_ни_на
 def test_неизвестный_сервис_404_и_без_действия(главный: FlaskClient, склад: Склад) -> None:
     for действие in ДЕЙСТВИЯ:
         ответ = главный.post(
-            f"/users/connections/keys/evil/{действие}",
+            f"/administration/connections/keys/evil/{действие}",
             data={"secret_api_key": ЗНАЧЕНИЕ},
             headers=ЗАГОЛОВКИ,
         )
