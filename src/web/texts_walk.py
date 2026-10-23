@@ -443,6 +443,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Перевод сейчас недоступен. Текст остался как был — его можно перевести самому.",
         "en": "Translation is unavailable right now. Your text is unchanged — translate by hand.",
     },
+    "walk.err.overloaded": {
+        "ru": "Сервер сейчас занят другими запросами — повторите через несколько секунд.",
+        "en": "The server is busy with other requests right now — try again in a few seconds.",
+    },
     "walk.err.translate_busy": {
         "ru": "Система ещё переводит по прошлому нажатию — подождите пару секунд.",
         "en": "Still translating from your last tap — give it a few seconds.",

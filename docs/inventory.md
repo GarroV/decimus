@@ -394,7 +394,7 @@
 | `MCP_LINK_PORT` | `tools/mcp_healthcheck.py` | да |
 | `MCP_LISTEN_NETWORK` | `src/mcp/config.py` | да |
 | `MCP_PORT` | `src/mcp/config.py` | да |
-| `MCP_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/mcp_watch.py`, `tools/oauth_smoke.py` | да |
+| `MCP_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/oauth_smoke.py` | да |
 | `MCP_RETRACTION_TOKENS` | `src/mcp/config.py` | да |
 | `MCP_TOKENS` | `src/mcp/config.py` | да |
 | `MCP_TOKEN_TTL_DAYS` | `src/db/mcp_access.py` | да |
