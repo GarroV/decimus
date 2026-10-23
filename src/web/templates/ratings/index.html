@@ -11,6 +11,8 @@
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">
 <script src="{{ url_for('static', filename='decimus-rt.js') }}" defer></script>{% endblock %}
 
+{% from "ratings/_loaded.html" import loaded_hint with context %}
+{% from "ratings/_period.html" import period_lists with context %}
 {% macro thr(x) %}{{ '%.1f'|format(x) }}{% endmacro %}
 {% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
 {#- Знак и цвет — по уже округлённой дельте: −0.04 показывается и красится как +0.0 (P17). -#}
@@ -77,9 +79,9 @@
   <header class="rt-head">
     <div class="rt-head__main">
       <div class="rt-head__kicker">{{ t('ratings.kicker') }}</div>
-      <h1 class="rt-head__title">{{ t('ratings.title') }}</h1>
-      <div class="rt-head__meta">
-        {% if summary.last_loaded %}<b>{{ t('ratings.loaded.title') }}:</b> {% for fmt, at in summary.last_loaded|dictsort %}{{ t('ratings.loaded', fmt=t('ratings.format.' ~ fmt), at=at.strftime(at_format)) }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}{{ t('ratings.loaded.none') }}{% endif %}
+      <div class="rt-head__row">
+        <h1 class="rt-head__title">{{ t('ratings.title') }}</h1>
+        {{ loaded_hint(summary.last_loaded, at_format) }}
       </div>
     </div>
     {% if may_manage %}<a class="btn btn--sm" href="{{ url(ratings_path ~ '/imports') }}?lang={{ lang }}">{{ t('ratings.manage') }}</a>{% endif %}
@@ -126,6 +128,7 @@
         <details class="rt-cal__pick pick">
           <summary class="rt-cal__title">{{ calendar.title }}</summary>
           <div class="rt-cal__pop">
+            {{ period_lists(calendar, href, selection.group, selection.value) }}
             <div class="rt-cal__dates">
               <label><span class="rt-field__label">{{ t('ratings.cal.from') }}</span>
                 <input class="input" type="date" name="from" value="{{ calendar.begin.isoformat() }}"></label>

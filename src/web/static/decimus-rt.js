@@ -10,10 +10,16 @@
 
   // Подсказка свечи — сразу при наведении или фокусе (D385): системная по
   // `title` всплывает через секунду, поэтому у точки его нет — текст для экранных чтецов в `aria-label`.
+  // Подсказка уходит в <body>: тело плитки анимируется с `transform` (режим
+  // `both`), и `position: fixed` внутри него считалось бы от плитки, а не от
+  // экрана — подсказка уезжала вправо от точки (D630).
   var tip = null;
   function show(node) {
-    tip = tip || document.querySelector(".rt-tip");
-    if (!tip) return;
+    if (!tip) {
+      tip = document.querySelector(".rt-tip");
+      if (!tip) return;
+      document.body.appendChild(tip);
+    }
     tip.textContent = node.getAttribute("data-tip");
     tip.hidden = false;
     var box = node.getBoundingClientRect();

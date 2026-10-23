@@ -1,10 +1,15 @@
 """Период раздела «Рейтинги»: «‹ 2026 Q3 ›», по щелчку — календарь «с — по».
 
-Правило владельца (скилл `interface-logic`, п. 3): период — один календарь «с —
-по» и стрелки, без рядов кнопок. Прежняя сетка кварталов, месяцев и списка
-периодов РС (D357) снята 11.10.2026: «нахуя нам столько кнопок настроек
-календаря?». Месяц, квартал и период РС по-прежнему узнаются — отрезок, совпавший
-с ними, становится ими (`periods.range_period`).
+Правило владельца (скилл `interface-logic`, п. 3): период — календарь «с — по» и
+стрелки, без рядов кнопок. Прежняя сетка кварталов, месяцев и списка периодов РС
+(D357) снята 11.10.2026 (D395). 23.10.2026 (D630) в окно периода вернулись списки —
+выпадающие, не кнопки: «Период РС» и «Неделя РКО». Календарь и списки — два входа
+в один отрезок: выбор в списке ставит календарь на этот отрезок, отрезок календаря,
+совпавший с периодом РС или неделей РКО, выбран в своём списке.
+
+Месяц, квартал и период РС узнаются по отрезку (`periods.range_period`). Неделя РКО
+отдельного вида ключа не имеет — это обычный отрезок `YYYY-MM-DD..YYYY-MM-DD`
+(старые ссылки работают как были); узнаётся она здесь, по границам периода РКО.
 
 Стрелка листает на длину выбранного периода и ведёт только туда, где есть
 данные. Ни одного вычисления оценок — только ключи периодов (`periods`).
@@ -21,19 +26,44 @@ from .texts import t
 
 
 @dataclass(frozen=True)
+class Option:
+    """Пункт списка периодов: ключ для адреса, подпись, выбран ли."""
+
+    key: str
+    title: str
+    on: bool
+
+
+@dataclass(frozen=True)
 class Calendar:
     title: str
     prev: str | None
     next: str | None
     begin: date
     end: date
+    rs_options: tuple[Option, ...] = ()
+    rko_options: tuple[Option, ...] = ()
 
 
 def _rs_title(p: rp.RatingPeriod, lang: str) -> str:
     return p.title_ru if lang == "ru" else p.title_en
 
 
-def _title(period: rp.ReportPeriod, rs: tuple[rp.RatingPeriod, ...], lang: str) -> str:
+def week_title(begin: date, end: date) -> str:
+    """Неделя РКО словами: «12.10 — 18.10.2026»."""
+    return f"{begin:%d.%m} — {end:%d.%m.%Y}"
+
+
+def _is_rko_week(period: rp.ReportPeriod, rko: tuple[rp.RatingPeriod, ...]) -> bool:
+    return any((p.begin_on, p.end_on) == (period.begin, period.end) for p in rko)
+
+
+def _title(
+    period: rp.ReportPeriod,
+    rs: tuple[rp.RatingPeriod, ...],
+    rko: tuple[rp.RatingPeriod, ...],
+    lang: str,
+) -> str:
     if period.kind == rp.KIND_MONTH:
         return f"{t(f'ratings.month.{period.begin.month}', lang)} {period.begin.year}"
     if period.kind == rp.KIND_QUARTER:
@@ -41,7 +71,34 @@ def _title(period: rp.ReportPeriod, rs: tuple[rp.RatingPeriod, ...], lang: str) 
     found = next((p for p in rs if f"rs:{p.id}" == period.key), None)
     if found:
         return _rs_title(found, lang)
+    if period.kind == rp.KIND_RANGE and _is_rko_week(period, rko):
+        return week_title(period.begin, period.end)
     return f"{period.begin:%d.%m.%Y} — {period.end:%d.%m.%Y}"
+
+
+def _same_span(p: rp.RatingPeriod, selected: rp.ReportPeriod) -> bool:
+    return (p.begin_on, p.end_on) == (selected.begin, selected.end)
+
+
+def _rs_options(
+    selected: rp.ReportPeriod, rs: tuple[rp.RatingPeriod, ...], lang: str
+) -> tuple[Option, ...]:
+    """Периоды РС, новые первыми; выбран тот, что совпал с отрезком."""
+    ordered = sorted(rs, key=lambda p: p.begin_on, reverse=True)
+    return tuple(Option(f"rs:{p.id}", _rs_title(p, lang), _same_span(p, selected)) for p in ordered)
+
+
+def _rko_options(selected: rp.ReportPeriod, rko: tuple[rp.RatingPeriod, ...]) -> tuple[Option, ...]:
+    """Недели РКО, новые первыми; ключ — обычный отрезок «с..по»."""
+    ordered = sorted(rko, key=lambda p: p.begin_on, reverse=True)
+    return tuple(
+        Option(
+            f"{p.begin_on.isoformat()}..{p.end_on.isoformat()}",
+            week_title(p.begin_on, p.end_on),
+            _same_span(p, selected),
+        )
+        for p in ordered
+    )
 
 
 def build(
@@ -49,6 +106,7 @@ def build(
     data_months: tuple[date, ...],
     rs_periods: tuple[rp.RatingPeriod, ...],
     lang: str,
+    rko_periods: tuple[rp.RatingPeriod, ...] = (),
 ) -> Calendar:
     first = min(data_months, default=None)
     last = max(data_months, default=None)
@@ -62,9 +120,11 @@ def build(
         return period.key
 
     return Calendar(
-        title=_title(selected, rs_periods, lang),
+        title=_title(selected, rs_periods, rko_periods, lang),
         prev=reachable(rp.previous_period(selected, rs_periods=rs_periods)),
         next=reachable(rp.next_period(selected, rs_periods=rs_periods)),
         begin=selected.begin,
         end=selected.end,
+        rs_options=_rs_options(selected, rs_periods, lang),
+        rko_options=_rko_options(selected, rko_periods),
     )
