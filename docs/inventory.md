@@ -424,7 +424,7 @@
 | `SECRETS_KEY` | `src/db/secret_crypto.py` | да |
 | `SEED_WEB_DEMO_FORCE` | `tools/seed_web_demo.py` | да |
 | `STATE_DIR` | `src/domain/config.py`, `src/report/letters.py`, `tools/state_backup.py` | да |
-| `TELEGRAM_BOT_TOKEN` | `src/bot/config.py`, `src/web/walk_auth.py` | да |
+| `TELEGRAM_BOT_TOKEN` | `src/bot/config.py`, `src/health/checks.py`, `src/web/walk_auth.py` | да |
 | `WALK_MOCKUP_ZONES` | `tools/walk_mockup/build.py` | нет — ручной рычаг сборки макета (tools/walk_mockup/build.py), не настройка |
 | `WALK_MODEL_MAX_CONCURRENT` | `src/web/server_limits.py` | да |
 | `WALK_USERS` | `src/domain/walk_users.py` | да |
