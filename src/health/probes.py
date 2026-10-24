@@ -26,6 +26,10 @@ ISPRING_TOKEN_PATH = "/api/v3/token"  # noqa: S105 — путь запроса, 
 POINTER_PROBE_PATH = "/networks?limit=1&offset=0"
 #: Коды ответа, по которым провайдер считает значение неверным.
 REJECTED_STATUSES = frozenset({400, 401, 403})
+#: Pointer отвечает на превышение лимита кодом 400 с телом «слишком много запросов»
+#: (#1256): это не отказ в ключе. Тело читается только ради этих слов и никуда не идёт.
+RATE_LIMIT_MARKERS = ("слишком много запросов", "too many requests")
+RATE_LIMIT_BODY_BYTES = 2048
 
 
 class KeyRejected(Exception):
@@ -52,12 +56,21 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 _opener = urllib.request.build_opener(_NoRedirect)
 
 
+def _rate_limited(exc: urllib.error.HTTPError) -> bool:
+    try:
+        body = exc.read(RATE_LIMIT_BODY_BYTES) if exc.fp is not None else b""
+    except OSError:
+        return False
+    text = body.decode("utf-8", "replace").lower()
+    return any(marker in text for marker in RATE_LIMIT_MARKERS)
+
+
 def _call(request: urllib.request.Request) -> Any:
     try:
         with _opener.open(request, timeout=TIMEOUT_SEC) as response:
             return json.load(response)
     except urllib.error.HTTPError as exc:
-        if exc.code in REJECTED_STATUSES:
+        if exc.code in REJECTED_STATUSES and not _rate_limited(exc):
             raise KeyRejected(exc.code) from None
         raise KeyUnverified(exc.code) from None
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):

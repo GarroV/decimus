@@ -73,7 +73,8 @@ def rows(now: datetime | None = None) -> tuple[Row, ...] | None:
     found: list[Row] = []
     for conn in checks.CONNECTIONS:
         if conn.kind == PROBE:
-            status = health.of_probe(probes.get(conn.code), moment, every=PROBE_EVERY)
+            every = PROBE_EVERY if conn.scheduled else None
+            status = health.of_probe(probes.get(conn.code), moment, every=every)
         elif conn.kind == LOAD and conn.fresh_for is not None:
             status = health.of_loads(loads.get(conn.code), moment, fresh_for=conn.fresh_for)
         elif conn.kind == CONFIG:

@@ -60,11 +60,15 @@ class LoadFacts:
     error: str | None
 
 
-def of_probe(row: ProbeRow | None, now: datetime, *, every: timedelta) -> Status:
-    """Цвет пробы: последний исход, если он свежий, иначе «проверка не идёт»."""
+def of_probe(row: ProbeRow | None, now: datetime, *, every: timedelta | None) -> Status:
+    """Цвет пробы: последний исход, если он свежий, иначе «проверка не идёт».
+
+    `every=None` — подключение пробуется только по кнопке, а не по расписанию: исход не
+    стареет, время проверки видно рядом с ним.
+    """
     if row is None:
         return Status(GREY, "health.reason.never_checked")
-    if now - row.checked_at > STALE_AFTER_PERIODS * every:
+    if every is not None and now - row.checked_at > STALE_AFTER_PERIODS * every:
         return Status(YELLOW, "health.reason.stale", row.checked_at)
     return Status(row.light, row.reason, row.checked_at)
 

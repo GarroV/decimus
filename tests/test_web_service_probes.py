@@ -36,8 +36,9 @@ def _подменить(monkeypatch: pytest.MonkeyPatch, результат: Any
     return зовы
 
 
-def _http(code: int) -> urllib.error.HTTPError:
-    return urllib.error.HTTPError("https://x", code, "x", {}, None)  # type: ignore[arg-type]
+def _http(code: int, тело: bytes | None = None) -> urllib.error.HTTPError:
+    fp = None if тело is None else io.BytesIO(тело)
+    return urllib.error.HTTPError("https://x", code, "x", {}, fp)  # type: ignore[arg-type]
 
 
 def test_ispring_шлёт_client_credentials_на_постоянный_хост(
@@ -85,6 +86,28 @@ def test_pointer_идёт_дешёвым_вызовом_с_ключом_в_за�
 
 def test_pointer_401_отказ(monkeypatch: pytest.MonkeyPatch) -> None:
     _подменить(monkeypatch, _http(401))
+    with pytest.raises(KeyRejected):
+        service_probes.probe_pointer({"api_key": "k"})
+
+
+@pytest.mark.parametrize(
+    "тело",
+    [
+        '{"error":"слишком много запросов, попробуйте позже"}'.encode(),
+        b'{"error":"Too Many Requests"}',
+    ],
+)
+def test_pointer_лимит_кодом_400_не_отказ_в_ключе(
+    monkeypatch: pytest.MonkeyPatch, тело: bytes
+) -> None:
+    # #1256: Pointer отдаёт упор в лимит кодом 400; верный ключ не должен стать красным.
+    _подменить(monkeypatch, _http(400, тело))
+    with pytest.raises(KeyUnverified):
+        service_probes.probe_pointer({"api_key": "k"})
+
+
+def test_pointer_400_с_другим_телом_отказ(monkeypatch: pytest.MonkeyPatch) -> None:
+    _подменить(monkeypatch, _http(400, b'{"error":"invalid token"}'))
     with pytest.raises(KeyRejected):
         service_probes.probe_pointer({"api_key": "k"})
 
