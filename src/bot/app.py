@@ -40,6 +40,7 @@ from src.domain.log_ids import log_id
 from . import (
     agg_loader,
     frame_copies,
+    health_loader,
     learning_loader,
     maps_loader,
     photo_backfill,
@@ -413,6 +414,8 @@ async def start_polling() -> None:
     sheet_ratings = asyncio.create_task(sheet_loader.load_forever())
     # Обучение пиццерий из iSpring — раз в сутки, только агрегаты (D574, D575, #906).
     training = asyncio.create_task(learning_loader.load_forever())
+    # Постоянная проверка подключений — раз в 15 минут (D638, #1251).
+    health = asyncio.create_task(health_loader.check_forever())
     try:
         await run_polling(dispatcher, bot)
     finally:
@@ -423,6 +426,7 @@ async def start_polling() -> None:
         agg_ratings.cancel()
         sheet_ratings.cancel()
         training.cancel()
+        health.cancel()
         await bot.session.close()
 
 

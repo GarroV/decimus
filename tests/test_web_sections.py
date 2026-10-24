@@ -38,6 +38,7 @@ def test_sections_go_in_menu_groups_in_order() -> None:
         ("stats", "training"),
         ("admin", "admin"),
         ("admin", "users"),
+        ("admin", "administration"),
         ("admin", "settings"),
     ]
 
@@ -53,6 +54,7 @@ def test_built_keys_are_the_built_screens() -> None:
             "calendar",
             "admin",
             "users",
+            "administration",
             "settings",
             "actions",
             "osb",
@@ -95,6 +97,7 @@ def test_check_registry_accepts_exactly_the_built_sections() -> None:
             "calendar",
             "admin",
             "users",
+            "administration",
             "settings",
             "actions",
             "osb",

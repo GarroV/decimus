@@ -146,7 +146,7 @@ def test_пустое_состояние_без_загрузки(monkeypatch: py
 def test_пустое_состояние_зовёт_главного_админа_к_ключам(monkeypatch: pytest.MonkeyPatch) -> None:
     for client in _войти(monkeypatch, role="superadmin", loaded=False):
         page = client.get("/training").get_data(as_text=True)
-        assert 'href="/users/connections"' in page
+        assert 'href="/administration?tab=connections' in page
 
 
 def test_сбой_чтения_говорит_словами_а_не_500(monkeypatch: pytest.MonkeyPatch) -> None:

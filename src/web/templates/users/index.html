@@ -41,7 +41,7 @@
     {# На телефоне левой панели нет — своя карточка открывается отсюда. #}
     {% if manage %}<a class="sbtn shead__me" href="{{ link(person='me') }}" data-drawer-open>{{ t('profile.open') }}</a>{% endif %}
   </header>
-  {{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link, has_journal_tab, has_usage_tab) }}
+  {{ users_tabs(tab, has_spaces_tab, manages_spaces, link, has_journal_tab, has_usage_tab) }}
   {# Исход действия без открытой панели — над списком, иначе он потерялся бы. #}
   {% if show.flash and not split_open and tab == 'people' %}
     <div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>

@@ -213,7 +213,6 @@ def _render(*, own: bool, conf: Settings) -> FlaskResponse | tuple[str, int]:
             tab="journal",
             has_spaces_tab=not own,
             manages_spaces=True,
-            has_connections_tab=not own,
             has_journal_tab=not own,
             has_usage_tab=not own,
             link=lambda **параметры: (

@@ -57,6 +57,8 @@ LOCKED_ENDPOINTS = frozenset(
         "settings_sign_out_everywhere",
         "service_key_save",
         "service_key_check",
+        # «Проверить сейчас» (D638) — проба настоящих провайдеров настоящими ключами.
+        "connection_health_check",
         "service_key_delete",
         # Подтверждение входа и «продолжить» выполняют то же намерение, что кнопки
         # выше (`reauth.INTENT_ACTIONS`): закрыта кнопка — закрыт и обход через них.

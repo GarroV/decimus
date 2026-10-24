@@ -1,0 +1,39 @@
+/* Раздел «Администрирование» (D639): столбец вкладок слева, содержимое справа, и блок
+   «Состояние подключений» (D638). Только токены линейки (`dodo-ds.css`); своих цветов
+   и размеров нет. Блок состояния — по ширине соседних блоков вкладки. */
+
+.sadmin { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: var(--space-7); align-items: start; }
+.sadmin__nav { position: sticky; top: var(--space-6); }
+.sadmin__title { margin: 0 0 var(--space-4); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-semibold); }
+.sadmin__tabs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.sadmin__tab { display: block; padding: var(--space-3) var(--space-4); border-radius: var(--r-control); color: var(--ink-2); text-decoration: none; font-weight: var(--w-medium); transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
+.sadmin__tab:hover { background: var(--surface-2); color: var(--ink); }
+.sadmin__tab.is-current { background: var(--accent-soft); color: var(--ink); }
+.sadmin__tab:focus-visible { outline: var(--focus-outline); }
+.sadmin__main { min-width: 0; }
+
+.shealth { margin: var(--space-6) 0; }
+.shealth__head { display: flex; align-items: center; gap: var(--space-3); }
+.shealth__title { margin: 0; font-size: var(--fs-title); font-weight: var(--w-semibold); }
+.shealth__summary { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-4) 0; font-weight: var(--w-semibold); color: var(--ink); }
+.shealth__rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.shealth__row { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4) 0; border-bottom: 1px solid var(--line); }
+.shealth__main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.shealth__main small { color: var(--ink-3); font-size: var(--fs-meta); overflow-wrap: anywhere; }
+.shealth__act { margin: 0; flex: none; }
+.shealth__dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--ink-3); }
+.shealth__dot--green { background: var(--ok); }
+.shealth__dot--yellow { background: var(--warn-mark); }
+.shealth__dot--red { background: var(--err); }
+.shealth__dot--grey { background: var(--line-strong); }
+
+@media (max-width: 899px) {
+  .sadmin { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  .sadmin__nav { position: static; }
+}
+
+@media (max-width: 719px) {
+  .shealth__row { align-items: flex-start; gap: var(--space-3); }
+  .shealth__dot { margin-top: 6px; }
+  .shealth__act .sbtn { padding-inline: var(--space-3); font-size: var(--fs-meta); }
+}

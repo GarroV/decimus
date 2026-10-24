@@ -53,7 +53,7 @@ def _api(путь: str, ключ: str) -> int:
 def test_цикл_ключа_выдача_правка_перевыпуск_отзыв(экран: FlaskClient, pg_dsn: str) -> None:
     # Выдача: ключ на странице один раз, в базе — отпечаток и след выдачи.
     выдан = экран.post(
-        "/users/connections/issue",
+        "/administration/connections/issue",
         data={
             "title": "Проверочный сервис",
             "code": "probe",
@@ -73,7 +73,9 @@ def test_цикл_ключа_выдача_правка_перевыпуск_от
         номер, отпечаток, кем, строка = cur.fetchone()
     assert отпечаток == token_fingerprint(ключ) and ключ not in строка
     assert кем == ЛОГИН
-    assert ключ not in экран.get(f"/users?tab=connections&service={номер}").get_data(as_text=True)
+    assert ключ not in экран.get(f"/administration?tab=connections&service={номер}").get_data(
+        as_text=True
+    )
 
     # Выданное право открывает свой адрес, чужое — нет.
     assert _api(СПИСОК, ключ) == 200
@@ -81,7 +83,7 @@ def test_цикл_ключа_выдача_правка_перевыпуск_от
 
     # Правка: снятое право закрывает свой адрес, ключ тот же.
     правка = экран.post(
-        f"/users/connections/{номер}/update",
+        f"/administration/connections/{номер}/update",
         data={"title": "Проверочный сервис", "scope": ["ratings:scores"]},
         headers=ЗАГОЛОВКИ,
     )
@@ -90,11 +92,11 @@ def test_цикл_ключа_выдача_правка_перевыпуск_от
     assert _api(РЕЙТИНГИ, ключ) == 200
 
     # Журнал виден в карточке: ходил — путь и ответ записаны.
-    карточка = экран.get(f"/users?tab=connections&service={номер}").get_data(as_text=True)
+    карточка = экран.get(f"/administration?tab=connections&service={номер}").get_data(as_text=True)
     assert "/api/v1/inspections" in карточка
 
     # Перевыпуск: старый ключ перестаёт пускать, новый пускает с теми же правами.
-    новый_ответ = экран.post(f"/users/connections/{номер}/reissue", headers=ЗАГОЛОВКИ)
+    новый_ответ = экран.post(f"/administration/connections/{номер}/reissue", headers=ЗАГОЛОВКИ)
     assert новый_ответ.status_code == 200
     новый = _ключ(новый_ответ.get_data(as_text=True))
     assert новый != ключ
@@ -103,7 +105,7 @@ def test_цикл_ключа_выдача_правка_перевыпуск_от
 
     # Отзыв: новый ключ тоже закрыт, строка остаётся со следом.
     живой_номер = _номер_живого(pg_dsn)
-    отозван = экран.post(f"/users/connections/{живой_номер}/revoke", headers=ЗАГОЛОВКИ)
+    отозван = экран.post(f"/administration/connections/{живой_номер}/revoke", headers=ЗАГОЛОВКИ)
     assert отозван.status_code == 200 and "отозван" in отозван.get_data(as_text=True)
     assert _api(РЕЙТИНГИ, новый) == 401
     with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
@@ -127,7 +129,10 @@ def test_отказ_формы_ничего_не_пишет_в_таблицу(э
     ]
     for форма in плохие:
         assert (
-            экран.post("/users/connections/issue", data=форма, headers=ЗАГОЛОВКИ).status_code == 400
+            экран.post(
+                "/administration/connections/issue", data=форма, headers=ЗАГОЛОВКИ
+            ).status_code
+            == 400
         )
     with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
         cur.execute("select count(*) from api.tokens where consumer ilike 'probe%'")

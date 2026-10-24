@@ -118,7 +118,6 @@ def _render(conf: Settings) -> tuple[str, int]:
             tab=TAB_USAGE,
             has_spaces_tab=True,
             manages_spaces=True,
-            has_connections_tab=_is_super(),
             has_journal_tab=_is_super(),
             has_usage_tab=True,
             link=lambda **параметры: base + (f"?{urlencode(параметры)}" if параметры else ""),

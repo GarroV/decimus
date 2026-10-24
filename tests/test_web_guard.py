@@ -160,7 +160,7 @@ def test_свои_дела_открыты_гостю(monkeypatch: pytest.MonkeyP
 def test_скрытый_экран_отвечает_404(monkeypatch: pytest.MonkeyPatch, app: Flask, role: str) -> None:
     """Ключи API — экран главного админа: остальным его снаружи нет вовсе (404)."""
     for client in _клиент(monkeypatch, app, tenant="HQ", role=role):
-        ответ = client.post("/users/connections/issue", headers={"Origin": СВОЙ})
+        ответ = client.post("/administration/connections/issue", headers={"Origin": СВОЙ})
     assert ответ.status_code == 404
 
 

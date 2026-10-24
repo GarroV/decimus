@@ -22,6 +22,7 @@ import os
 from collections.abc import Mapping
 
 from .errors import WebTextError
+from .texts_administration import ADMINISTRATION_TEXTS
 from .texts_connections import CONNECTIONS_TEXTS
 from .texts_country import COUNTRY_TEXTS
 from .texts_demo import DEMO_TEXTS
@@ -1785,6 +1786,7 @@ _ЧАСТИ = (
     USAGE_TEXTS,
     USERS_TEXTS,
     WALK_TEXTS,
+    ADMINISTRATION_TEXTS,
 )
 _ПЕРЕСЕЧЕНИЕ = {
     ключ
@@ -1821,6 +1823,7 @@ TEXTS = {
     **USAGE_TEXTS,
     **USERS_TEXTS,
     **WALK_TEXTS,
+    **ADMINISTRATION_TEXTS,
 }
 
 

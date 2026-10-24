@@ -10,8 +10,8 @@ from typing import Any
 
 import pytest
 
-from src.web import service_probes
-from src.web.service_probes import KeyRejected, KeyUnverified
+from src.health import probes as service_probes
+from src.health.probes import KeyRejected, KeyUnverified
 
 
 class _Ответ(io.BytesIO):

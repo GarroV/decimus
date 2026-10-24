@@ -1,0 +1,144 @@
+"""Раздел «Администрирование» (D639) и состояние подключений (D638, #1251) — без базы.
+
+Двери базы подменены на границе модуля. Проверяется поверхность: кому раздел виден и
+открыт, что вид `view.administration` совпадает со вкладками роли, старый адрес
+вкладки перенаправляет, «Проверить сейчас» пробует и пишет исход, а цвета строк
+выводятся из фактов.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+
+import pytest
+from flask.testing import FlaskClient
+from web_harness import СВОЙ, войти, подменить_двери, собрать
+
+from src.db import api_access, health_store, model_key
+from src.domain.health import LoadFacts, ProbeRow
+from src.domain.permissions import MATRIX, SIDE_HQ, role_may
+from src.health import checks
+from src.web import administration
+
+РАЗДЕЛ = "/administration"
+СЕЙЧАС = datetime.now(UTC)
+
+
+def _стенд(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str) -> Iterator[FlaskClient]:
+    monkeypatch.setattr(api_access, "list_tokens", lambda: ())
+    monkeypatch.setattr(model_key, "status", lambda: None)
+    записано: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        health_store,
+        "probes",
+        lambda: {
+            "openai": ProbeRow("green", "health.reason.ok", СЕЙЧАС - timedelta(minutes=5)),
+            "pointer": ProbeRow("red", "health.reason.rejected", СЕЙЧАС - timedelta(minutes=5)),
+        },
+    )
+    monkeypatch.setattr(
+        health_store,
+        "loads",
+        lambda: {
+            "aggregators": LoadFacts(СЕЙЧАС - timedelta(hours=2), False, "glovo: 503"),
+            "maps": LoadFacts(СЕЙЧАС - timedelta(hours=2), True, None),
+            "learning": None,
+            "sheet": None,
+        },
+    )
+    monkeypatch.setattr(
+        health_store,
+        "record",
+        lambda code, light, reason, at: записано.append((code, light, reason)),
+    )
+    подменить_двери(monkeypatch, tenant=tenant, role=role)
+    with собрать(tenant="HQ").test_client() as client:
+        assert войти(client).status_code == 302
+        client.записано = записано  # type: ignore[attr-defined]
+        yield client
+
+
+@pytest.fixture
+def главный(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
+    yield from _стенд(monkeypatch, tenant="HQ", role="superadmin")
+
+
+@pytest.mark.parametrize(("side", "role"), sorted(MATRIX))
+def test_вид_раздела_ровно_у_ролей_с_вкладками(side: str, role: str) -> None:
+    tenant = "HQ" if side == SIDE_HQ else "RS"
+    учётка = SimpleNamespace(role=role, tenant=tenant)
+    assert role_may(role, tenant, "view.administration") == bool(administration.tabs_for(учётка)), (
+        f"{side}/{role}: вид раздела и вкладки расходятся"
+    )
+
+
+def test_главный_админ_видит_раздел_и_состояние(главный: FlaskClient) -> None:
+    ответ = главный.get(f"{РАЗДЕЛ}?tab=connections")
+    page = ответ.get_data(as_text=True)
+    assert ответ.status_code == 200
+    assert 'class="sadmin__nav"' in page
+    assert "Состояние подключений" in page
+    # Итог — худший цвет: красный ключ Pointer и упавший сбор агрегаторов.
+    assert "shealth__summary--red" in page
+    assert "Не работает: 2" in page
+    assert "Сбой: glovo: 503" in page
+    # Ключи сервисов и ключи API переехали сюда же.
+    assert 'id="service-keys"' in page or "service-keys" in page
+    # Пункт меню у главного админа есть.
+    assert f'href="{РАЗДЕЛ}?lang=' in page
+
+
+def test_раздел_без_вкладки_открывает_первую(главный: FlaskClient) -> None:
+    assert главный.get(РАЗДЕЛ).status_code == 200
+
+
+def test_неизвестная_вкладка_404(главный: FlaskClient) -> None:
+    assert главный.get(f"{РАЗДЕЛ}?tab=nope").status_code == 404
+
+
+def test_старый_адрес_вкладки_перенаправляет(главный: FlaskClient) -> None:
+    ответ = главный.get("/users?tab=connections&service=1")
+    assert ответ.status_code == 302
+    assert ответ.headers["Location"].endswith(f"{РАЗДЕЛ}?tab=connections&service=1")
+
+
+@pytest.mark.parametrize(("tenant", "role"), [("HQ", "admin"), ("HQ", "control"), ("RS", "admin")])
+def test_прочим_раздел_закрыт_и_пункта_нет(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str
+) -> None:
+    for client in _стенд(monkeypatch, tenant=tenant, role=role):
+        ответ = client.get(РАЗДЕЛ)
+        assert ответ.status_code in (403, 404), f"{tenant}/{role}: раздел открылся"
+        меню = client.get("/settings").get_data(as_text=True)
+        assert f'href="{РАЗДЕЛ}?lang=' not in меню, f"{tenant}/{role}: пункт меню виден"
+
+
+def test_проверить_сейчас_пробует_и_пишет(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(checks, "run_probe", lambda code: ("green", "health.reason.ok"))
+    ответ = главный.post(f"{РАЗДЕЛ}/connections/health/openai/check", headers={"Origin": СВОЙ})
+    assert ответ.status_code == 200
+    assert главный.записано == [("openai", "green", "health.reason.ok")]  # type: ignore[attr-defined]
+    assert "Проверено: OpenAI" in ответ.get_data(as_text=True)
+
+
+def test_проверить_сейчас_только_пробуемое(главный: FlaskClient) -> None:
+    for code in ("maps", "backup", "nope"):
+        ответ = главный.post(f"{РАЗДЕЛ}/connections/health/{code}/check", headers={"Origin": СВОЙ})
+        assert ответ.status_code == 404, code
+
+
+def test_проверить_сейчас_чужому_происхождению_отказ(главный: FlaskClient) -> None:
+    ответ = главный.post(
+        f"{РАЗДЕЛ}/connections/health/openai/check", headers={"Origin": "https://evil.example"}
+    )
+    assert ответ.status_code == 403
+
+
+def test_проверить_сейчас_не_главному_404(monkeypatch: pytest.MonkeyPatch) -> None:
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
+        ответ = client.post(f"{РАЗДЕЛ}/connections/health/openai/check", headers={"Origin": СВОЙ})
+        assert ответ.status_code == 404

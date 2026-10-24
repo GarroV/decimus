@@ -16,7 +16,11 @@ from src.domain import permissions as perm
 from src.domain.permissions import ACTION_CODES, MATRIX, SIDE_HQ, SIDE_PARTNER, validate_matrix
 from src.web.sections import OWN_SECTIONS, SECTIONS
 
-ВИДЫ_ВСЕ = {f"view.{s.key}" for s in SECTIONS if s.key not in OWN_SECTIONS}
+# «Администрирование» (D639) — вид по вкладкам роли, а не «все виды»: на шаге 1 (#1251)
+# в нём одна вкладка «Подключения» главного админа (D638).
+ВИДЫ_ВСЕ = {f"view.{s.key}" for s in SECTIONS if s.key not in OWN_SECTIONS} - {
+    "view.administration"
+}
 # «Страна» открыта и партнёру (D508): экран пиццерии, в пределах его стран.
 # «Действия» — один раздел у УК и партнёра (D526): разделов «только УК» среди видов нет.
 # «ОСБ» (D599) — страница только УК: партнёру её нет.
@@ -87,7 +91,8 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
 
 ОЖИДАНИЕ: dict[tuple[str, str], set[str]] = {
     # Главный админ = админ + ключи API (D440).
-    (SIDE_HQ, "superadmin"): АДМИН_УК | {"api.manage", "keys.manage", "prescription.manage"},
+    (SIDE_HQ, "superadmin"): АДМИН_УК
+    | {"api.manage", "keys.manage", "prescription.manage", "view.administration"},
     (SIDE_HQ, "admin"): АДМИН_УК,
     # Бизнес-девелопер: всё в работе, без главного чек-листа, прода, стран, людей,
     # ключей и загрузок рейтингов (D440); загрузка проверок через Claude — открыта
@@ -154,7 +159,7 @@ def test_оракул_не_выдумывает_действий() -> None:
 def test_разделы_веба_все_в_каталоге() -> None:
     """Новый раздел без `view.<ключ>` в каталоге — закрыт всем: тест называет его."""
     assert ВИДЫ_ВСЕ <= ACTION_CODES
-    assert {c for c in ACTION_CODES if c.startswith("view.")} == ВИДЫ_ВСЕ
+    assert {c for c in ACTION_CODES if c.startswith("view.")} == ВИДЫ_ВСЕ | {"view.administration"}
 
 
 def test_матрица_проходит_свою_сверку() -> None:

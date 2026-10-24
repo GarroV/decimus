@@ -697,3 +697,8 @@ plan_count_from
 overdue_rows
 filled_rows
 latest_own_due
+
+# «Администрирование → Подключения» (D638, #1251): `connection_health_check` зовёт Flask по
+# адресу «Проверить сейчас», `checkable` читает только `administration/_health.html`.
+connection_health_check
+checkable
