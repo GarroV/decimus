@@ -59,6 +59,7 @@ class Connection:
     code: str
     kind: str
     fresh_for: timedelta | None = None
+    scheduled: bool = True
 
 
 CONNECTIONS: tuple[Connection, ...] = (
@@ -66,7 +67,10 @@ CONNECTIONS: tuple[Connection, ...] = (
     Connection("telegram", PROBE),
     Connection("storage", PROBE),
     Connection("google", CONFIG),
-    Connection("pointer", PROBE),
+    # Pointer пробуется только по кнопке (#1256): лимит 1 запрос в секунду, и проба по
+    # расписанию попадала бы в ночной сбор карт и почасовую дозагрузку истории, роняя их.
+    # Что ключ работает каждую ночь, показывает строка «maps».
+    Connection("pointer", PROBE, scheduled=False),
     Connection("ispring", PROBE),
     Connection("aggregators", LOAD, DAILY_FRESH),
     Connection("maps", LOAD, DAILY_FRESH),
@@ -78,7 +82,8 @@ CONNECTIONS: tuple[Connection, ...] = (
     Connection("dodo_is", PENDING),
 )
 
-PROBE_CODES = tuple(c.code for c in CONNECTIONS if c.kind == PROBE)
+#: Что фоновая задача пробует раз в `PROBE_EVERY`.
+SCHEDULED_CODES = tuple(c.code for c in CONNECTIONS if c.kind == PROBE and c.scheduled)
 
 
 def connection(code: str) -> Connection | None:

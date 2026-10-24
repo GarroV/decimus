@@ -22,6 +22,11 @@ def test_probe_fresh_keeps_its_light_and_reason() -> None:
     assert (status.light, status.reason, status.checked_at) == (RED, row.reason, row.checked_at)
 
 
+def test_probe_by_button_only_never_goes_stale() -> None:
+    row = ProbeRow(GREEN, "health.reason.ok", NOW - timedelta(days=30))
+    assert health.of_probe(row, NOW, every=None).light == GREEN
+
+
 def test_probe_stale_turns_yellow_even_if_it_was_green() -> None:
     # Проверка не шла три срока подряд — значит, встал тот, кто проверяет;
     # зелёный последнего захода ничего не говорит о сейчас.
