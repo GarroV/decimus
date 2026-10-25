@@ -21,7 +21,7 @@ from src.db import api_access, health_store, model_key
 from src.domain.health import LoadFacts, ProbeRow
 from src.domain.permissions import MATRIX, SIDE_HQ, role_may
 from src.health import checks
-from src.web import accounts, administration, partner_spaces
+from src.web import accounts, administration, country, country_summary, partner_spaces
 
 РАЗДЕЛ = "/administration"
 СЕЙЧАС = datetime.now(UTC)
@@ -109,13 +109,13 @@ def test_старый_адрес_вкладки_перенаправляет(г�
 
 #: Вкладки роли в порядке столбца. Пусто — раздела у роли нет.
 ВКЛАДКИ = {
-    ("HQ", "superadmin"): ["people", "spaces", "journal", "usage", "connections"],
-    ("HQ", "admin"): ["people", "spaces", "usage"],
+    ("HQ", "superadmin"): ["people", "spaces", "countries", "journal", "usage", "connections"],
+    ("HQ", "admin"): ["people", "spaces", "countries", "usage"],
     ("HQ", "control"): ["people"],
     ("GE", "admin"): ["people", "spaces"],
     ("HQ", "developer"): [],
     ("HQ", "guest"): [],
-    ("HQ", "osb"): [],
+    ("HQ", "osb"): ["countries"],
     ("GE", "auditor"): [],
 }
 
@@ -125,6 +125,8 @@ def _без_базы(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(accounts, "everyone", lambda **_: ())
     monkeypatch.setattr(accounts, "spaces", lambda: ())
     monkeypatch.setattr(partner_spaces, "overview", lambda: ())
+    monkeypatch.setattr(country, "countries", lambda **_: ())
+    monkeypatch.setattr(country_summary, "developers_of", lambda _codes: ({}, {}, False))
 
 
 def _вкладки_на_странице(страница: str) -> list[str]:

@@ -25,6 +25,8 @@ _MAX_QUERY = 80
 #: Вкладки экрана: люди и пространства партнёров (D364).
 TAB_PEOPLE = "people"
 TAB_SPACES = "spaces"
+#: Вкладка «Страны» (D640): настройки страны, языки отчёта и договор; её ведёт `countries_screen`.
+TAB_COUNTRIES = "countries"
 #: Вкладка «Подключения» (D425): только главный админ, её ведёт `connections_screen`.
 TAB_CONNECTIONS = "connections"
 #: Вкладка «Журнал» (D462): только главный админ, её ведёт `journal_screen`.

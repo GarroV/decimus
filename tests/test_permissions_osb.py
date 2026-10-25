@@ -48,7 +48,8 @@ def test_осб_не_пишет_в_проверки_и_вообще_ничего
 def test_осб_читает_как_гость() -> None:
     читает_гость = {a.code for a in ACTIONS if not a.writes and _can("guest", a.code)}
     читает_осб = {a.code for a in ACTIONS if not a.writes and _can("osb", a.code)}
-    assert читает_осб == читает_гость | {"view.osb"}
+    # Вид «Администрирования» — вкладка «Страны» с договором (D640); других лишних видов нет.
+    assert читает_осб == читает_гость | {"view.osb", "view.administration"}
 
 
 def test_партнёру_ничего_из_предписаний_ведения_не_открыто() -> None:

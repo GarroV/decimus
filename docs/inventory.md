@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 191 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 192 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -104,6 +104,7 @@
 | `/country/<code>/settings/contract` | POST | `country_save_contract` | `src/web/country_settings.py` |
 | `/country/<code>/settings/contract/<contract_id>/delete` | POST | `country_delete_contract` | `src/web/country_settings.py` |
 | `/country/<code>/settings/developer` | POST | `country_set_developer` | `src/web/country_settings.py` |
+| `/country/<code>/settings/report-langs` | POST | `country_set_report_langs` | `src/web/country_settings.py` |
 | `/country/<code>/settings/space` | POST | `country_set_space` | `src/web/country_settings.py` |
 | `/country/<code>/units/new` | GET | `unit_new` | `src/web/unit_add.py` |
 | `/country/<code>/units/new` | POST | `unit_create` | `src/web/unit_add.py` |
@@ -555,6 +556,7 @@
 | `0093_ratings_rko_service_marks.sql` | — |
 | `0094_action_plan_file_parsed.sql` | — |
 | `0095_health_checks.sql` | `health.checks` |
+| `0096_country_report_langs.sql` | `country_report_langs` |
 <!-- map:end -->
 
 ## Makefile

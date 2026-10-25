@@ -11,6 +11,7 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "administration.tab.people": {"ru": "Люди", "en": "People"},
     "administration.tab.spaces": {"ru": "Пространства партнёров", "en": "Partner spaces"},
     "administration.tab.spaces_own": {"ru": "Ваше пространство", "en": "Your space"},
+    "administration.tab.countries": {"ru": "Страны", "en": "Countries"},
     "administration.tab.journal": {"ru": "Журнал", "en": "Log"},
     "administration.tab.usage": {"ru": "Расход модели", "en": "Model usage"},
     "administration.tab.connections": {"ru": "Подключения", "en": "Connections"},
@@ -96,5 +97,20 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "health.reason.dodo_is_pending": {
         "ru": "Подключение готовится",
         "en": "Connection in preparation",
+    },
+    # ── Вкладка «Страны» (D640) ──
+    "countries.sub": {
+        "ru": "Партнёр, девелопер, языки отчёта и договор страны. Выберите страну в списке.",
+        "en": "Partner, developer, report languages and agreement of a country. "
+        "Pick a country in the list.",
+    },
+    "countries.count": {"ru": "Стран: {count}", "en": "Countries: {count}"},
+    "countries.none": {"ru": "Стран в справочнике нет.", "en": "No countries in the directory."},
+    "countries.col.country": {"ru": "Страна", "en": "Country"},
+    "countries.col.space": {"ru": "Партнёр", "en": "Partner"},
+    "countries.col.developer": {"ru": "Девелопер", "en": "Developer"},
+    "countries.partial_failed": {
+        "ru": "Партнёры или девелоперы сейчас не прочитались: в столбцах могут быть пропуски.",
+        "en": "Partners or developers could not be read: some cells may be empty.",
     },
 }

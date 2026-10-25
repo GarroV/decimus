@@ -355,7 +355,7 @@ def test_почта_партнёра_в_карточке_только_для_у�
         assert панель.partners[0].email == ждём, (уК, панель.partners)
 
 
-def test_панель_настроек_открывается_на_этом_же_экране(
+def test_панель_настроек_на_экране_страны_только_чтение_со_ссылкой_изменить(
     админ: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.db.spaces import SpaceRow
@@ -366,11 +366,31 @@ def test_панель_настроек_открывается_на_этом_же
         lambda: (SpaceRow("HQ", "УК", (), 3), SpaceRow("LOTOS", "Лотос", (), 1)),
     )
     страница = открыть(админ, monkeypatch, данные(), "/country/GE?settings=1")
-    assert "data-drawer" in страница and "/country/GE/settings/developer" in страница
-    assert "sdrawer--wide" in страница
-    assert "/country/GE/settings/space" in страница and "Лотос" in страница
+    assert "data-drawer" in страница and "sdrawer--wide" in страница
+    # D640: правка — только во вкладке «Страны»; здесь ни одной формы, зато ссылка туда.
+    assert "/country/GE/settings/" not in страница
+    assert 'href="/administration?tab=countries&amp;country=GE"' in страница
+    assert "Изменить в «Администрировании»" in страница
     # Список проверок и плитки остаются на месте: экран тот же.
     assert "pk-tiles" in страница
+
+
+def test_панель_настроек_во_вкладке_стран_с_формами_правки(
+    админ: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.db.spaces import SpaceRow
+
+    monkeypatch.setattr(
+        partner_spaces,
+        "overview",
+        lambda: (SpaceRow("HQ", "УК", (), 3), SpaceRow("LOTOS", "Лотос", (), 1)),
+    )
+    ответ = админ.get("/administration?tab=countries&country=GE")
+    assert ответ.status_code == 200
+    страница = ответ.get_data(as_text=True)
+    assert "/country/GE/settings/developer" in страница
+    assert "/country/GE/settings/space" in страница and "Лотос" in страница
+    assert "/country/GE/settings/report-langs" in страница
 
 
 def test_девелопера_сохраняет_админ_через_справочник_рейтингов(
@@ -388,7 +408,7 @@ def test_девелопера_сохраняет_админ_через_спра�
     )
     assert (
         ответ.status_code == 302
-        and "settings=1" in ответ.headers["Location"]
+        and "/administration?tab=countries&country=GE" in ответ.headers["Location"]
         and "saved=ok" in ответ.headers["Location"]
     )
     assert записано == [("GE", "Иван", "director")]
@@ -426,9 +446,8 @@ def test_отказ_сохранения_говорит_словами(
     ответ = админ.post("/country/GE/settings/developer", data={"developer": "X"}, headers=ЗАГОЛОВКИ)
     assert "saved=failed" in ответ.headers["Location"]
     monkeypatch.setattr(partner_spaces, "overview", lambda: ())
-    assert "Не сохранилось" in открыть(
-        админ, monkeypatch, данные(), "/country/GE?settings=1&saved=failed"
-    )
+    ответ = админ.get("/administration?tab=countries&country=GE&saved=failed")
+    assert "Не сохранилось" in ответ.get_data(as_text=True)
 
 
 def test_модуль_настроек_знает_свои_исходы() -> None:

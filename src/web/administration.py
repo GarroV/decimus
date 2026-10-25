@@ -21,7 +21,14 @@ from flask import Response as FlaskResponse
 from . import access_policy, auth
 from .config import Settings
 from .sections import section
-from .users_view import TAB_CONNECTIONS, TAB_JOURNAL, TAB_PEOPLE, TAB_SPACES, TAB_USAGE
+from .users_view import (
+    TAB_CONNECTIONS,
+    TAB_COUNTRIES,
+    TAB_JOURNAL,
+    TAB_PEOPLE,
+    TAB_SPACES,
+    TAB_USAGE,
+)
 
 #: Группы вкладок: подзаголовок в столбце, если в группе у роли видно больше одной вкладки.
 GROUP_ACCESS = "access"
@@ -55,6 +62,15 @@ def _sees_spaces(account: object) -> bool:
     )
 
 
+def _sees_countries(account: object) -> bool:
+    """Главный, админ УК и ОСБ — те, у кого есть `space.manage` или `contract.manage` (D640)."""
+    from . import countries_screen  # countries_screen сам берёт адреса отсюда
+
+    return countries_screen.may_see(
+        getattr(account, "role", None), getattr(account, "tenant", None)
+    )
+
+
 def _sees_usage(account: object) -> bool:
     from . import usage_screen  # usage_screen сам берёт адреса отсюда
 
@@ -80,10 +96,11 @@ class Tab:
         return self.title_key
 
 
-#: Вкладки в порядке показа. Следом за шагом 2 встают «Страны» и «Рейтинги».
+#: Вкладки в порядке показа. Следом встают «Рейтинги».
 TABS: tuple[Tab, ...] = (
     Tab(TAB_PEOPLE, _sees_people, GROUP_ACCESS),
     Tab(TAB_SPACES, _sees_spaces, GROUP_ACCESS),
+    Tab(TAB_COUNTRIES, _sees_countries),
     Tab(TAB_JOURNAL, _is_super, GROUP_JOURNAL),
     Tab(TAB_USAGE, _sees_usage, GROUP_JOURNAL),
     # Ключи сервисов, ключи `/api/v1` и состояние подключений — главный админ (D638).
@@ -124,7 +141,7 @@ def nav(current: str) -> dict[str, object]:
 
 def install(app: Flask, conf: Settings) -> None:
     """Страница раздела. Вкладки ставят свои маршруты действий сами."""
-    from . import connections_screen, journal_screen, usage_screen, users_page
+    from . import connections_screen, countries_screen, journal_screen, usage_screen, users_page
 
     def people() -> FlaskResponse | tuple[str, int]:
         return users_page.render(users_page.Show(tab=TAB_PEOPLE))
@@ -135,6 +152,7 @@ def install(app: Flask, conf: Settings) -> None:
     shows: dict[str, Callable[[], FlaskResponse | tuple[str, int]]] = {
         TAB_PEOPLE: people,
         TAB_SPACES: spaces,
+        TAB_COUNTRIES: lambda: countries_screen.show(conf.ui_lang),
         TAB_JOURNAL: lambda: journal_screen.show_users(conf),
         TAB_USAGE: lambda: usage_screen.show(conf),
         TAB_CONNECTIONS: connections_screen.show,

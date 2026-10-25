@@ -110,9 +110,16 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
     },
     # Гость: вся сеть на чтение (D429, D440).
     (SIDE_HQ, "guest"): ГОСТЬ_УК,
-    # ОСБ (D599): права гостя на чтение + вести предписания; проверки не пишет.
+    # ОСБ (D599): права гостя на чтение + вести предписания; проверки не пишет. Вид
+    # «Администрирования» (D640) — ради вкладки «Страны» (договор, `contract.manage`).
     (SIDE_HQ, "osb"): ГОСТЬ_УК
-    | {"prescription.request", "prescription.manage", "view.osb", "contract.manage"},
+    | {
+        "prescription.request",
+        "prescription.manage",
+        "view.osb",
+        "contract.manage",
+        "view.administration",
+    },
     # Админ партнёра: сотрудник + люди, свои чек-листы, вычитка свежих (D346, D367).
     (SIDE_PARTNER, "admin"): СОТРУДНИК_ПАРТНЁРА
     | {

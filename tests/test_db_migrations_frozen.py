@@ -369,6 +369,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0095_health_checks.sql": (
         "sql1:3b27eb4f6e9255769b1280fabe5f957de31458094c077f72f56a096b8452b49c"
     ),
+    "0096_country_report_langs.sql": (
+        "sql1:16d066f57e15bba125dd079592ddbd6cd778e89e10d746a75f1028a0d4a9636d"
+    ),
 }
 
 

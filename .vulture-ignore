@@ -647,6 +647,14 @@ registration_country
 company_number
 agreement
 гость
+# Языки отчёта страны (D640, #1251): `set_report_langs` — POST, регистрирует
+# `@app.post(..., endpoint="country_set_report_langs")`; `langs_custom`, `can_langs`,
+# `lang_options` — поля `Panel`, читает шаблон `country/_settings.html` (Jinja обращается по
+# имени, в коде имя не читается).
+set_report_langs
+langs_custom
+can_langs
+lang_options
 # Свойства ячеек и листа openpyxl (`src/web/plan_template.py`, #976): присваивание
 # — это и есть запись в книгу, читает их `Workbook.save`, а не наш код.
 font

@@ -271,6 +271,7 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     # ОСБ (D599): права гостя на чтение, а пишет только предписания — на своей
     # странице — и договор страны (D603). Записи в проверки у неё нет ни одной.
     (SIDE_HQ, "osb"): _GUEST
+    | _codes("view.administration")  # D640: вкладка «Страны» — договор страны
     | _codes("prescription.request", "prescription.manage", "view.osb", "contract.manage"),
     (SIDE_PARTNER, "admin"): _PARTNER_AUDITOR
     | _CHECKLISTS
