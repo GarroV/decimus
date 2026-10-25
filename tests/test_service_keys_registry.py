@@ -8,14 +8,31 @@ from pathlib import Path
 from src.domain import service_keys as registry
 
 МИГРАЦИЯ = (
-    Path(__file__).resolve().parents[1] / "src" / "db" / "migrations" / "0084_service_keys.sql"
+    Path(__file__).resolve().parents[1] / "src" / "db" / "migrations" / "0096_dodois_logins.sql"
 )
 
 
-def test_имена_реестра_равны_check_миграции() -> None:
+def _check() -> str:
     sql = МИГРАЦИЯ.read_text(encoding="utf-8")
-    check = sql[sql.index("add constraint") :]
-    assert set(re.findall(r"'([^']+)'", check)) == set(registry.VAULT_NAMES)
+    return sql[sql.index("add constraint") :]
+
+
+def test_имена_реестра_равны_check_миграции() -> None:
+    # Список `name in (...)`; шаблон имён входов стран (`dodois.access.<cc>`) стоит отдельно.
+    список = _check().split("or name ~")[0]
+    assert set(re.findall(r"'([^']+)'", список)) == set(registry.VAULT_NAMES)
+
+
+def test_шаблон_check_принимает_имена_входов_стран_и_только_их() -> None:
+    from src.domain import dodois
+
+    шаблон = re.search(r"name ~ '([^']+)'", _check())
+    assert шаблон is not None
+    регулярка = re.compile(шаблон.group(1).replace("\\.", "\\."))
+    for имя in dodois.vault_names("SI"):
+        assert регулярка.fullmatch(имя), имя
+    for чужое in ("dodois.access.slo", "dodois.access.S1", "dodois.token.si", "x.dodois.access.si"):
+        assert not регулярка.fullmatch(чужое), чужое
 
 
 def test_имена_и_коды_не_повторяются() -> None:

@@ -68,6 +68,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import (
     demo_entry,
+    dodois_connect,
     google_link,
     google_profile,
     landing,
@@ -144,6 +145,8 @@ COOKIE_SALT = "web-session"
 #: из `api.tokens` по отпечатку (`swarm_api._authorize`, D388), а не кука; без
 #: живого токена с нужным правом каждый адрес отвечает 401/403/429.
 #:
+#: `dodois_connect*` — вход в Dodo IS по ссылке-приглашению коллеги страны (D640,
+#: `dodois_connect.py`): доступ даёт токен в адресе, а не кука; неверный — нейтральный 404.
 #: `photo_upload_*` — загрузка кадров к черновику по подписанному адресу из песочницы Claude
 #: (`photo_upload.py`): опознаёт токен в адресе, а не кука; чужой — 403.
 #:
@@ -160,6 +163,7 @@ OPEN_ENDPOINTS = (
     | oauth.ENDPOINTS
     | second_step.ENDPOINTS
     | passkey_login.ENDPOINTS
+    | dodois_connect.ENDPOINTS
 )
 
 

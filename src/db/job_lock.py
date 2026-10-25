@@ -32,6 +32,9 @@ MAPS_LOADER_LOCK_KEY = 125_0001
 SHEET_LOADER_LOCK_KEY = 125_0002
 #: Загрузчик обучения из iSpring (#906).
 LEARNING_LOADER_LOCK_KEY = 906_0001
+#: Продление и проверка входов Dodo IS (D640, #951): ключ продления одноразовый, два процесса
+#: продлили бы один вход вдвоём.
+DODOIS_LOADER_LOCK_KEY = 951_0001
 
 
 @contextmanager

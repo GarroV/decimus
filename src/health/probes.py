@@ -16,6 +16,7 @@ import urllib.request
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from src.domain import dodois as dodois_rules
 from src.domain.service_keys import ISPRING_HOST
 from src.ratings import pointer
 from src.recognize import client
@@ -97,6 +98,29 @@ def probe_ispring(values: Mapping[str, str]) -> None:
         raise KeyUnverified(None)
 
 
+def probe_dodois(values: Mapping[str, str]) -> None:
+    """`POST /connect/deviceauthorization` со scope `shared`: 200 и `user_code` — ключи верны.
+
+    Ничего не подтверждается и токенов не выдаётся: код устройства никто не вводит.
+    """
+    body = urllib.parse.urlencode(
+        {
+            "client_id": values["client_id"],
+            "client_secret": values["client_secret"],
+            "scope": dodois_rules.PROBE_SCOPE,
+        }
+    ).encode()
+    request = urllib.request.Request(  # noqa: S310
+        dodois_rules.HOSTS[dodois_rules.INTL].auth + "/connect/deviceauthorization",
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    answer = _call(request)
+    if not isinstance(answer, dict) or not answer.get("user_code"):
+        raise KeyUnverified(None)
+
+
 def probe_pointer(values: Mapping[str, str]) -> None:
     """Самый дешёвый вызов с ключом: одна сеть из списка `/networks`."""
     request = urllib.request.Request(  # noqa: S310
@@ -121,4 +145,5 @@ PROBES: Mapping[str, Callable[[Mapping[str, str]], None]] = {
     "openai": probe_openai,
     "pointer": probe_pointer,
     "ispring": probe_ispring,
+    "dodois": probe_dodois,
 }

@@ -48,6 +48,8 @@ PROBE = "probe"
 LOAD = "load"
 CONFIG = "config"
 PENDING = "pending"
+#: Входы в Dodo IS по странам (D640): строка на страну, цвет — из состояния входа.
+DODOIS = "dodois"
 
 Outcome = tuple[str, str]
 
@@ -78,8 +80,9 @@ CONNECTIONS: tuple[Connection, ...] = (
     Connection("learning", LOAD, DAILY_FRESH),
     # Бэкап делает хост (`vps-backup`, репозиторий vps-infra), приложению его не видно.
     Connection("backup", PENDING),
-    # Dodo IS по странам — окно Marketplace (#951); здесь только место под строку.
-    Connection("dodo_is", PENDING),
+    # Dodo IS по странам (D640, #951): строка на каждый вход; цвет — из `dodois.logins`,
+    # которые продлевает и проверяет бот (`src/bot/dodois_loader.py`).
+    Connection("dodo_is", DODOIS),
 )
 
 #: Что фоновая задача пробует раз в `PROBE_EVERY`.

@@ -15,21 +15,19 @@ from typing import Any
 
 from flask import current_app
 
-from src.db import health_store
+from src.db import dodois_logins, health_store
 from src.db.errors import DbError
+from src.domain import dodois as dodois_rules
 from src.domain import health
 from src.domain.health import GREEN, GREY, RED, YELLOW, Status
 from src.health import checks
-from src.health.checks import CONFIG, LOAD, PENDING, PROBE, PROBE_EVERY
+from src.health.checks import CONFIG, DODOIS, LOAD, PENDING, PROBE, PROBE_EVERY
 
 from . import auth
 
 _log = logging.getLogger(__name__)
 
-_PENDING_REASON = {
-    "backup": "health.reason.backup_host",
-    "dodo_is": "health.reason.dodo_is_pending",
-}
+_PENDING_REASON = {"backup": "health.reason.backup_host"}
 
 
 @dataclass(frozen=True)
@@ -39,6 +37,8 @@ class Row:
     code: str
     kind: str
     status: Status
+    #: Код страны у строки входа Dodo IS (D640); у остальных пусто.
+    country: str = ""
 
     @property
     def checkable(self) -> bool:
@@ -61,12 +61,23 @@ def _google() -> Status:
     return Status(GREY, "health.reason.not_configured")
 
 
+def _dodois_rows(code: str, logins: Any, moment: datetime) -> list[Row]:
+    """Строка на каждый вход Dodo IS; входов нет — одна серая строка «подключений нет»."""
+    if not logins:
+        return [Row(code, DODOIS, Status(GREY, "health.reason.dodois_none"))]
+    return [
+        Row(code, DODOIS, dodois_rules.status_of(login, moment), country=login.country)
+        for login in logins
+    ]
+
+
 def rows(now: datetime | None = None) -> tuple[Row, ...] | None:
     """Строки по реестру; `None` — база не ответила."""
     moment = now or datetime.now(UTC)
     try:
         probes = health_store.probes()
         loads = health_store.loads()
+        logins = dodois_logins.list_logins()
     except DbError:
         _log.warning("Подключения: состояние не прочиталось", exc_info=True)
         return None
@@ -77,6 +88,9 @@ def rows(now: datetime | None = None) -> tuple[Row, ...] | None:
             status = health.of_probe(probes.get(conn.code), moment, every=every)
         elif conn.kind == LOAD and conn.fresh_for is not None:
             status = health.of_loads(loads.get(conn.code), moment, fresh_for=conn.fresh_for)
+        elif conn.kind == DODOIS:
+            found.extend(_dodois_rows(conn.code, logins, moment))
+            continue
         elif conn.kind == CONFIG:
             status = _google()
         else:

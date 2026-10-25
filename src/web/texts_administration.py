@@ -61,6 +61,7 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "health.conn.learning": {"ru": "Загрузка обучения", "en": "Training load"},
     "health.conn.backup": {"ru": "Ночной бэкап", "en": "Nightly backup"},
     "health.conn.dodo_is": {"ru": "Dodo IS по странам", "en": "Dodo IS by country"},
+    "health.conn.dodo_is_country": {"ru": "Dodo IS — {name}", "en": "Dodo IS — {name}"},
     # ── Причины ──
     "health.reason.ok": {"ru": "Ответил", "en": "Responded"},
     "health.reason.rejected": {"ru": "Ключ не принят", "en": "Key rejected"},
@@ -86,8 +87,24 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Бэкап делает сервер, сюда его исход пока не приходит",
         "en": "The server makes the backup; its result doesn't reach this page yet",
     },
-    "health.reason.dodo_is_pending": {
-        "ru": "Подключение готовится",
-        "en": "Connection in preparation",
+    "health.reason.dodois_none": {
+        "ru": "Входов нет: выдайте ссылку коллеге страны",
+        "en": "No logins yet: issue a link to a colleague in the country",
+    },
+    "health.reason.dodois_ok": {
+        "ru": "Работает: открыто {open} из {total}",
+        "en": "Working: {open} of {total} open",
+    },
+    "health.reason.dodois_partial": {
+        "ru": "Открыто не всё: {open} из {total}",
+        "en": "Not everything open: {open} of {total}",
+    },
+    "health.reason.dodois_expired": {
+        "ru": "Вход истёк: продление отказано, нужна новая ссылка",
+        "en": "Login expired: renewal was refused, a new link is needed",
+    },
+    "health.reason.dodois_failed": {
+        "ru": "Сбой связи с Dodo IS при последней проверке",
+        "en": "Connection to Dodo IS failed on the last check",
     },
 }
