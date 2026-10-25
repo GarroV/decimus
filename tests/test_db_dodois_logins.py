@@ -187,7 +187,7 @@ def test_замена_пары_успех_и_устаревший_вход(ба�
 def test_состояние_пишется_и_счёт_не_затирается(база: str) -> None:
     _вход()
     store.record_state("SI", "ok", None, now=НОВАЯ, units_total=12, units_open=11)
-    store.record_state("SI", "expired", "dodois_refresh_rejected", now=НОВАЯ)
+    store.record_state("SI", "expired", "refresh_rejected", now=НОВАЯ)
     вход = store.get_login("SI")
     assert вход is not None
     assert (вход.state, вход.units_total, вход.units_open) == ("expired", 12, 11)
