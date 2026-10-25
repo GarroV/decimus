@@ -76,4 +76,4 @@ def test_админа_заслон_пропускает(админ_ук: FlaskCl
 
 def test_экран_людей_не_кэшируется(админ_ук: FlaskClient) -> None:
     """Новый пароль показывается один раз — копия страницы не должна остаться в кэше."""
-    assert админ_ук.get("/users").headers.get("Cache-Control") == "no-store"
+    assert админ_ук.get("/administration?tab=people").headers.get("Cache-Control") == "no-store"

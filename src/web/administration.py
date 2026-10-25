@@ -13,36 +13,79 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
 from flask import Flask, abort, request
 from flask import Response as FlaskResponse
 
 from . import access_policy, auth
+from .config import Settings
 from .sections import section
+from .users_view import TAB_CONNECTIONS, TAB_JOURNAL, TAB_PEOPLE, TAB_SPACES, TAB_USAGE
 
-TAB_CONNECTIONS = "connections"
+#: Группы вкладок: подзаголовок в столбце, если в группе у роли видно больше одной вкладки.
+GROUP_ACCESS = "access"
+GROUP_JOURNAL = "journal"
+
+
+def _scope(account: object) -> access_policy.Scope | None:
+    return access_policy.scope_of(getattr(account, "role", None), getattr(account, "tenant", None))
 
 
 def _is_super(account: object) -> bool:
-    охват = access_policy.scope_of(getattr(account, "role", None), getattr(account, "tenant", None))
+    охват = _scope(account)
     return охват is not None and охват.kind == access_policy.SUPER
+
+
+def _sees_people(account: object) -> bool:
+    """Главный, админ УК, админ партнёра, контроль — те, у кого есть охват людей."""
+    return _scope(account) is not None
+
+
+def manages_spaces(account: object) -> bool:
+    """Ведёт ли человек все пространства партнёров (а не только своё)."""
+    охват = _scope(account)
+    return охват is not None and access_policy.manages_spaces(охват)
+
+
+def _sees_spaces(account: object) -> bool:
+    охват = _scope(account)
+    return охват is not None and (
+        access_policy.manages_spaces(охват) or охват.kind == access_policy.PARTNER_ADMIN
+    )
+
+
+def _sees_usage(account: object) -> bool:
+    from . import usage_screen  # usage_screen сам берёт адреса отсюда
+
+    return usage_screen.may_see(getattr(account, "role", None), getattr(account, "tenant", None))
 
 
 @dataclass(frozen=True)
 class Tab:
-    """Вкладка раздела: код (он же `?tab=`), кому открыта."""
+    """Вкладка раздела: код (он же `?tab=`), кому открыта, к какой группе относится."""
 
     key: str
     open_to: Callable[[object], bool]
+    group: str | None = None
 
     @property
     def title_key(self) -> str:
         return f"administration.tab.{self.key}"
 
+    def title_key_for(self, account: object | None) -> str:
+        """Подпись для этого человека: админ партнёра видит «Ваше пространство»."""
+        if self.key == TAB_SPACES and account is not None and not manages_spaces(account):
+            return "administration.tab.spaces_own"
+        return self.title_key
 
-#: Вкладки в порядке показа. Шаги #1251 добавляют сюда «Люди и доступ», «Страны»,
-#: «Рейтинги», «Журнал».
+
+#: Вкладки в порядке показа. Следом за шагом 2 встают «Страны» и «Рейтинги».
 TABS: tuple[Tab, ...] = (
+    Tab(TAB_PEOPLE, _sees_people, GROUP_ACCESS),
+    Tab(TAB_SPACES, _sees_spaces, GROUP_ACCESS),
+    Tab(TAB_JOURNAL, _is_super, GROUP_JOURNAL),
+    Tab(TAB_USAGE, _sees_usage, GROUP_JOURNAL),
     # Ключи сервисов, ключи `/api/v1` и состояние подключений — главный админ (D638).
     Tab(TAB_CONNECTIONS, _is_super),
 )
@@ -61,27 +104,44 @@ def url(tab: str, **extra: str) -> str:
     lang = request.args.get("lang") or ""
     if lang:
         params["lang"] = lang
-    query = "&".join(f"{k}={v}" for k, v in params.items())
+    query = urlencode(params)
     return f"{request.script_root}{section('administration').path}?{query}"
 
 
 def nav(current: str) -> dict[str, object]:
     """Что нужно шаблону для столбца вкладок."""
+    account = auth.current_account()
+    tabs = tabs_for(account)
+    now = next((tab for tab in tabs if tab.key == current), None)
     return {
-        "admin_tabs": tabs_for(auth.current_account()),
+        "admin_heading": now.title_key_for(account) if now else f"administration.tab.{current}",
+        "admin_tabs": tabs,
         "admin_tab": current,
         "admin_url": url,
+        "admin_title": lambda tab: tab.title_key_for(account),
     }
 
 
-def install(app: Flask) -> None:
+def install(app: Flask, conf: Settings) -> None:
     """Страница раздела. Вкладки ставят свои маршруты действий сами."""
-    from . import connections_screen
+    from . import connections_screen, journal_screen, usage_screen, users_page
 
-    shows: dict[str, Callable[[], FlaskResponse]] = {TAB_CONNECTIONS: connections_screen.show}
+    def people() -> FlaskResponse | tuple[str, int]:
+        return users_page.render(users_page.Show(tab=TAB_PEOPLE))
+
+    def spaces() -> FlaskResponse | tuple[str, int]:
+        return users_page.render(users_page.Show(tab=TAB_SPACES))
+
+    shows: dict[str, Callable[[], FlaskResponse | tuple[str, int]]] = {
+        TAB_PEOPLE: people,
+        TAB_SPACES: spaces,
+        TAB_JOURNAL: lambda: journal_screen.show_users(conf),
+        TAB_USAGE: lambda: usage_screen.show(conf),
+        TAB_CONNECTIONS: connections_screen.show,
+    }
 
     @app.get(section("administration").path)
-    def administration() -> FlaskResponse:
+    def administration() -> FlaskResponse | tuple[str, int]:
         tabs = tabs_for(auth.current_account())
         if not tabs:
             abort(404)

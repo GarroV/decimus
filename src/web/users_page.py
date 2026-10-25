@@ -27,10 +27,10 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 from . import (
     access_policy,
     accounts,
+    administration,
     auth,
     partner_spaces,
     people,
-    usage_screen,
 )
 from .access_policy import Scope
 from .db_refusal import note_target_mismatch
@@ -194,11 +194,13 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
         вкладка = TAB_PEOPLE
     вид, строка, явно = _pick(show, люди, список, manage)
     привязки = _bindings(круг, люди)
+    # POST-формы остаются на `/users/*` (D640); экран и его ссылки живут в разделе.
     адрес = f"{request.script_root}{section('users').path}"
+    экран = f"{request.script_root}{section('administration').path}"
     язык = request.args.get("lang") or ""
 
     def link(**extra: str) -> str:
-        return screen_url(адрес, lang=язык, f=f, **extra)
+        return screen_url(экран, lang=язык, f=f, **{"tab": TAB_PEOPLE, **extra})
 
     выбрано_пространство = bool(
         show.space
@@ -210,7 +212,7 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
         render_template(
             "users/index.html",
             **_people_context(круг, люди, список, f, известны, привязки),
-            **_space_context(круг, show, пространства, пр_известны, есть_вкладка, вкладка),
+            **_space_context(круг, show, пространства, пр_известны, вкладка),
             card=вид,
             card_row=строка,
             role_choices=lambda r: role_choices(круг, r),
@@ -220,12 +222,14 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             me=auth.current_account(),
             manage=manage,
             link=link,
-            link_reset=screen_url(адрес, lang=язык, f=Filters()),
+            link_reset=screen_url(экран, lang=язык, f=Filters(), tab=TAB_PEOPLE),
             users_url=адрес,
+            screen_url=экран,
+            **administration.nav(вкладка),
             # Панель справа — только по явному выбору; без права вести людей
             # своя карточка стоит на странице, а не в панели (закрывать некуда).
             split_open=выбрано_пространство if вкладка == TAB_SPACES else явно and manage,
-            split_back=link(tab=вкладка if вкладка == TAB_SPACES else ""),
+            split_back=link(tab=вкладка),
         ),
         code,
     )
@@ -260,17 +264,13 @@ def _space_context(
     show: Show,
     пространства: tuple[Any, ...],
     известны: bool,
-    есть_вкладка: bool,
     вкладка: str,
 ) -> dict[str, Any]:
     return {
         "tab": вкладка,
-        "has_spaces_tab": есть_вкладка,
         "partner_spaces": пространства,
         "partner_spaces_known": известны,
         "manages_spaces": круг is not None and access_policy.manages_spaces(круг),
-        "has_journal_tab": круг is not None and круг.kind == access_policy.SUPER,
-        "has_usage_tab": круг is not None and круг.kind in usage_screen.VIEWER_KINDS,
         "space_pick": _space_pick(show, пространства),
         "space_add": вкладка == TAB_SPACES
         and (show.add_space or request.args.get("add_space") == "1"),

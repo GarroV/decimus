@@ -172,6 +172,13 @@ def test_все_девять_разделов_открываются(стенд:
         if раздел.key in ("osb", "administration"):
             assert стенд.get(раздел.path).status_code == 404, раздел.key
             continue
+        # «Пользователи» (D640) — адрес, который ведёт в раздел; у девелопера вкладок нет,
+        # и его отправляют в «Настройки».
+        if раздел.key == "users":
+            ответ = стенд.get(раздел.path)
+            assert ответ.status_code == 302, раздел.key
+            assert ответ.headers["Location"].endswith("/settings"), раздел.key
+            continue
         ожидаемый = 403 if раздел.admin_only else 303 if раздел.partner_only else 200
         assert стенд.get(раздел.path).status_code == ожидаемый, раздел.key
 
@@ -194,12 +201,16 @@ def test_построенный_раздел_ленты_не_несёт(стен
 
 def test_навигация_показывает_карту_продукта_целиком(стенд: FlaskClient) -> None:
     # Act — карту видно с любого экрана, а не только с главного.
-    страница = стенд.get("/users").get_data(as_text=True)
+    страница = стенд.get("/overview").get_data(as_text=True)
 
     # Assert — непостроенных разделов сейчас нет («Календарь» построен, D466);
     # когда появится, пометка «в разработке» — приглушение, а не цветная лента (D190).
     for раздел in SECTIONS:
-        if раздел.admin_only or раздел.partner_only or раздел.key in ("osb", "administration"):
+        if (
+            раздел.admin_only
+            or раздел.partner_only
+            or раздел.key in ("osb", "administration", "users")
+        ):
             # «ОСБ» девелопер не видит (нет `view.osb`, D599). Ссылка, ведущая в отказ,
             # выглядит как поломка продукта: раздел
             # с ограничением по роли не зовёт того, кого не пустят.

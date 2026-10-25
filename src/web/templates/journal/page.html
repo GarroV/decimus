@@ -12,15 +12,17 @@
 #}{% extends "base.html" %}
 {% from "_info_tip.html" import info_tip %}
 {% from "_period.html" import period_picker with context %}
-{% from "users/_tabs.html" import users_tabs with context %}
-{% block title %}{{ t('journal.own.title' if own else 'section.users.title') }}{% endblock %}
+{% from "administration/_nav.html" import admin_nav with context %}
+{% block title %}{{ t('journal.own.title') if own else t(admin_heading) ~ ' · ' ~ t('section.administration.title') }}{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-journal.css') }}">
+  {% if not own %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endif %}
 {% endblock %}
 {% block page_class %} page--split{% endblock %}
 {% block body %}
+  {% if not own %}<div class="sadmin">{{ admin_nav() }}<div class="sadmin__main">{% endif %}
   <header class="shead">
     <div class="shead__main">
       {% set tip_rows = [t('journal.own.sub' if own else 'journal.sub')] %}
@@ -30,13 +32,12 @@
         {% set _ = tip_rows.append(t('journal.retention.logins')) %}
       {% endif %}
       <div class="info-row">
-        <h1 class="shead__title">{{ t('journal.own.title' if own else 'section.users.title') }}</h1>
+        <h1 class="shead__title">{{ t('journal.own.title' if own else admin_heading) }}</h1>
         {{ info_tip(t('tip.hint'), '', tip_rows, 'journal') }}
       </div>
     </div>
     {% if own %}<a class="sbtn" href="{{ settings_url }}?lang={{ lang }}">{{ t('journal.own.back') }}</a>{% endif %}
   </header>
-  {% if not own %}{{ users_tabs(tab, has_spaces_tab, manages_spaces, link, has_journal_tab, has_usage_tab) }}{% endif %}
 
   <div class="sbox jbox">
     <div class="sbar sbar--registry jbar">
@@ -106,4 +107,5 @@
       {% endif %}
     {% endif %}
   </div>
+  {% if not own %}</div></div>{% endif %}
 {% endblock %}

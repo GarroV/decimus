@@ -107,7 +107,7 @@ def test_без_oauth_блока_нет(monkeypatch: pytest.MonkeyPatch, пам�
 
 def test_на_чужой_карточке_блока_нет(monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="superadmin"):
-        страница = client.get(f"/users?person={ЧУЖОЙ}").get_data(as_text=True)
+        страница = client.get(f"/administration?tab=people&person={ЧУЖОЙ}").get_data(as_text=True)
 
         assert 'id="claude-connect"' not in страница
 

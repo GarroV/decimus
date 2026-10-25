@@ -62,7 +62,7 @@ def test_админ_ук_видит_расход_с_итогами_срезам�
     client = _вошедший(monkeypatch, role=роль)
     спросили = _заглушка(monkeypatch)
 
-    ответ = client.get("/users?tab=usage&from=2026-10-01&to=2026-10-31")  # type: ignore[attr-defined]
+    ответ = client.get("/administration?tab=usage&from=2026-10-01&to=2026-10-31")  # type: ignore[attr-defined]
 
     assert ответ.status_code == 200
     страница = ответ.get_data(as_text=True)
@@ -78,7 +78,7 @@ def test_админ_ук_видит_расход_с_итогами_срезам�
     assert "run-abc" not in страница and "проверка в боте, не сдана" in страница
     assert "вызов без человека" in страница
     assert "Расшифровка голосового" in страница
-    assert 'href="/users?tab=usage"' in страница, "вкладки в экране нет"
+    assert 'href="/administration?tab=usage"' in страница, "вкладки в экране нет"
     # Текущий и прошлый период: два чтения, период уходит границами суток.
     assert len(спросили) == 2
 
@@ -100,8 +100,8 @@ def test_остальным_вкладки_нет_адрес_404_база_не_�
     client = _вошедший(monkeypatch, role=роль, tenant=tenant)
     спросили = _заглушка(monkeypatch)
 
-    ответ = client.get("/users?tab=usage")  # type: ignore[attr-defined]
-    главная = client.get("/users")  # type: ignore[attr-defined]
+    ответ = client.get("/administration?tab=usage")  # type: ignore[attr-defined]
+    главная = client.get("/administration?tab=people")  # type: ignore[attr-defined]
 
     assert ответ.status_code == 404
     assert спросили == [], "страница спросила расход у не-админа"
@@ -113,7 +113,7 @@ def test_без_цены_модели_показаны_токены_без_су�
     rows = (UsageRow("day", "2026-10-02", "", "неизвестная-модель", 1, 0, 1000, 10, 0.0),)
     monkeypatch.setattr(model_usage, "read", lambda token, **kw: rows)
 
-    страница = client.get("/users?tab=usage").get_data(as_text=True)  # type: ignore[attr-defined]
+    страница = client.get("/administration?tab=usage").get_data(as_text=True)  # type: ignore[attr-defined]
 
     assert "1 010" in страница
     assert "цены модели нет в прейскуранте" in страница
@@ -123,7 +123,7 @@ def test_пустой_период_говорит_что_вызовов_нет(m
     client = _вошедший(monkeypatch, role="superadmin")
     monkeypatch.setattr(model_usage, "read", lambda token, **kw: ())
 
-    ответ = client.get("/users?tab=usage")  # type: ignore[attr-defined]
+    ответ = client.get("/administration?tab=usage")  # type: ignore[attr-defined]
 
     assert ответ.status_code == 200
     assert "За этот период вызовов нет" in ответ.get_data(as_text=True)
@@ -137,7 +137,7 @@ def test_сбой_базы_это_ошибка_а_не_пустота(monkeypatc
 
     monkeypatch.setattr(model_usage, "read", упала)
 
-    ответ = client.get("/users?tab=usage")  # type: ignore[attr-defined]
+    ответ = client.get("/administration?tab=usage")  # type: ignore[attr-defined]
 
     assert ответ.status_code == 503
     assert "Расход не прочитан" in ответ.get_data(as_text=True)
@@ -147,7 +147,7 @@ def test_английский_интерфейс(monkeypatch: pytest.MonkeyPatch
     client = _вошедший(monkeypatch, role="superadmin")
     _заглушка(monkeypatch)
 
-    страница = client.get("/users?tab=usage&lang=en").get_data(as_text=True)  # type: ignore[attr-defined]
+    страница = client.get("/administration?tab=usage&lang=en").get_data(as_text=True)  # type: ignore[attr-defined]
 
     assert "Model usage" in страница and "Recognising a record" in страница
     assert "estimate" in страница

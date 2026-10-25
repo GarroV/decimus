@@ -78,7 +78,7 @@ def test_действия_прочих_ролей_в_журнал_действи
 def test_чтение_в_журнал_действий_не_идёт(monkeypatch: pytest.MonkeyPatch) -> None:
     client, зовы = _вошедший(monkeypatch, role="superadmin")
 
-    client.get("/users")
+    client.get("/administration?tab=people")
     client.get("/settings")
 
     assert зовы["action_journal"] == []
@@ -349,9 +349,9 @@ def test_главный_админ_видит_журнал_во_вкладке_�
     client, _ = _вошедший(monkeypatch, role="superadmin")
     спросили = _заглушки(monkeypatch)
 
-    входы = client.get("/users?tab=journal")
+    входы = client.get("/administration?tab=journal")
     действия = client.get(
-        "/users?tab=journal&view=actions&person=11111111-1111-1111-1111-111111111111"
+        "/administration?tab=journal&view=actions&person=11111111-1111-1111-1111-111111111111"
     )
 
     assert входы.status_code == 200 and действия.status_code == 200
@@ -359,7 +359,7 @@ def test_главный_админ_видит_журнал_во_вкладке_�
     assert "anna" in страница and "198.51.100.7" in страница and "UA-ТЕСТ" in страница
     assert "Заморожена учётка" in действия.get_data(as_text=True), "код действия без подписи"
     assert спросили["actions"][0][1]["person"] == "11111111-1111-1111-1111-111111111111"  # type: ignore[index]
-    assert 'href="/users?tab=journal"' in страница, "вкладки «Журнал» в экране нет"
+    assert 'href="/administration?tab=journal"' in страница, "вкладки «Журнал» в экране нет"
 
 
 @pytest.mark.parametrize("роль", ["admin", "developer", "control", "guest", "auditor"])
@@ -369,8 +369,8 @@ def test_вкладки_журнала_нет_ни_у_кого_кроме_гла
     client, _ = _вошедший(monkeypatch, role=роль)
     спросили = _заглушки(monkeypatch)
 
-    ответ = client.get("/users?tab=journal")
-    начальная = client.get("/users")
+    ответ = client.get("/administration?tab=journal")
+    начальная = client.get("/administration?tab=people")
 
     assert ответ.status_code == 404
     assert спросили == {"logins": [], "actions": [], "people": []}, "страница спросила журнал"
@@ -407,7 +407,7 @@ def test_сбой_базы_журнал_показывает_ошибкой_а_�
     monkeypatch.setattr(journals, "read_logins", упала)
     monkeypatch.setattr(journals, "journal_people", lambda token: ())
 
-    ответ = client.get("/users?tab=journal")
+    ответ = client.get("/administration?tab=journal")
 
     assert ответ.status_code == 503
     assert "Журнал не прочитан" in ответ.get_data(as_text=True)
@@ -417,7 +417,7 @@ def test_период_уходит_в_базу_границами_суток(mon
     client, _ = _вошедший(monkeypatch, role="superadmin")
     спросили = _заглушки(monkeypatch)
 
-    client.get("/users?tab=journal&from=2026-10-01&to=2026-10-03")
+    client.get("/administration?tab=journal&from=2026-10-01&to=2026-10-03")
 
     параметры = спросили["logins"][0][1]  # type: ignore[index]
     assert параметры["start"] == datetime(2026, 10, 1, tzinfo=UTC)  # type: ignore[index]

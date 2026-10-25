@@ -17,9 +17,18 @@
 {% from "_info_tip.html" import info_tip %}
 {% from "users/_card.html" import person_card, add_card with context %}
 {% from "users/_spaces.html" import spaces_list, space_card with context %}
-{% from "users/_tabs.html" import users_tabs with context %}
-{% block title %}{{ t('section.users.title') }}{% endblock %}
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">{% endblock %}
+{% from "administration/_nav.html" import admin_nav with context %}
+{% block title %}{{ t(admin_heading) }} · {{ t('section.administration.title') }}{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endblock %}
+
+{# Столбец вкладок слева, вся страница вкладки — справа (D639). #}
+{% block body %}
+  <div class="sadmin">
+    {{ admin_nav() }}
+    <div class="sadmin__main">{{ super() }}</div>
+  </div>
+{% endblock %}
 
 {% block split_top %}
   <header class="shead">
@@ -34,14 +43,13 @@
         {% set tip_label = t('tip.hint') %}
       {% endif %}
       <div class="info-row">
-        <h1 class="shead__title">{{ t('section.users.title') }}</h1>
+        <h1 class="shead__title">{{ t(admin_heading) }}</h1>
         {{ info_tip(tip_label, '', tip_rows, 'users') }}
       </div>
     </div>
     {# На телефоне левой панели нет — своя карточка открывается отсюда. #}
     {% if manage %}<a class="sbtn shead__me" href="{{ link(person='me') }}" data-drawer-open>{{ t('profile.open') }}</a>{% endif %}
   </header>
-  {{ users_tabs(tab, has_spaces_tab, manages_spaces, link, has_journal_tab, has_usage_tab) }}
   {# Исход действия без открытой панели — над списком, иначе он потерялся бы. #}
   {% if show.flash and not split_open and tab == 'people' %}
     <div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>
@@ -53,7 +61,8 @@
     {{ spaces_list(partner_spaces, partner_spaces_known, space_pick, manages_spaces, link) }}
   {% elif manage %}
     <div class="sbox">
-      <form class="sbar" method="get" action="{{ users_url }}" role="search" data-autosubmit>
+      <form class="sbar" method="get" action="{{ screen_url }}" role="search" data-autosubmit>
+        <input type="hidden" name="tab" value="people">
         <input type="hidden" name="lang" value="{{ lang }}">
         <label class="spill spill--search">
           {{ icon('search') }}

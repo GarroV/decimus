@@ -217,7 +217,7 @@ Claude входом через сайт (OAuth).
 | `src/web/users_claude.py` | Блок «Подключить Claude» в «Настройках» (D417): адрес MCP и подключения через сайт |
 | `src/web/users_mcp.py` | Личный токен Claude в «Настройках»: выпустить себе и отозвать (D447, D448) |
 | `src/web/users_page.py` | Сборка страницы «Пользователи»: список слева, карточка выбранного справа |
-| `src/web/users_screen.py` | Экран «Пользователи» (`/users`): один экран доступа для всех, охват по роли (#585) |
+| `src/web/users_screen.py` | Действия экрана «Люди» (`/users/*`): один экран доступа, охват по роли (#585) |
 | `src/web/users_view.py` | Вид экрана «Пользователи»: названия ролей, фильтры, выбор человека, адреса |
 <!-- map:end -->
 
@@ -321,7 +321,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/usage/` | 1 | page.html |
-| `src/web/templates/users/` | 7 | _card.html, _connections.html, _service_keys.html, _spaces.html, _tabs.html, forbidden.html, index.html |
+| `src/web/templates/users/` | 6 | _card.html, _connections.html, _service_keys.html, _spaces.html, forbidden.html, index.html |
 <!-- map:end -->
 
 <!-- map:begin tree src/web/static -->

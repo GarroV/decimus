@@ -37,3 +37,7 @@
   .shealth__dot { margin-top: 6px; }
   .shealth__act .sbtn { padding-inline: var(--space-3); font-size: var(--fs-meta); }
 }
+
+/* Подзаголовок группы вкладок («Люди и доступ», «Журнал»). */
+.sadmin__group { margin: var(--space-4) 0 var(--space-1); padding: 0 var(--space-4); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-semibold); }
+.sadmin__tabs > .sadmin__group:first-child { margin-top: 0; }

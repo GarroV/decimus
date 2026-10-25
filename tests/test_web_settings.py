@@ -96,7 +96,7 @@ def test_своя_карточка_ведёт_в_настройки_и_копи�
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
-        страница = client.get("/users?person=me").get_data(as_text=True)
+        страница = client.get("/administration?tab=people&person=me").get_data(as_text=True)
 
         assert 'href="/settings' in страница
         for копия in ("/settings/password", 'name="current"', "claude-token", "bot-link"):

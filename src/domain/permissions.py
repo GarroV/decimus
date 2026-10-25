@@ -216,6 +216,7 @@ _HQ_ADMIN = (
         "contract.manage",
         "refusals.read",
         "view.osb",  # D599: админ видит страницу «ОСБ» без действий
+        "view.administration",  # D640: «Люди», «Пространства партнёров», «Расход модели»
     )
 )
 
@@ -248,9 +249,8 @@ _GUEST = _codes(
 #: Матрица: (сторона, роль учётки) → действия. Нет клетки — нет права.
 MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     # Главный админ — всё, что админ, и ключи API (D440).
-    # «Администрирование» на шаге 1 (#1251) — одна вкладка «Подключения» (D638).
-    (SIDE_HQ, "superadmin"): _HQ_ADMIN
-    | _codes("api.manage", "keys.manage", "prescription.manage", "view.administration"),
+    # «Администрирование» (#1251): у главного админа все вкладки, «Подключения» (D638) — его одного.
+    (SIDE_HQ, "superadmin"): _HQ_ADMIN | _codes("api.manage", "keys.manage", "prescription.manage"),
     (SIDE_HQ, "admin"): _HQ_ADMIN,
     # Бизнес-девелопер (D440): сервис в полном объёме, кроме главного чек-листа,
     # указателя прода, стран, людей, ключей и загрузок рейтингов.
@@ -259,7 +259,12 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     (SIDE_HQ, "developer"): _HQ_WORK | _CHECKLISTS | _ALL_VIEWS_HQ | _codes("inspection.import"),
     # Контроль (D420): только рейтинги и свои люди (D360) — без смены ролей.
     (SIDE_HQ, "control"): _codes(
-        "ratings.read", "ratings.manage", "people.manage", "view.ratings", "view.users"
+        "ratings.read",
+        "ratings.manage",
+        "people.manage",
+        "view.ratings",
+        "view.users",
+        "view.administration",  # D640: вкладка «Люди» своего охвата
     ),
     # Гость (D429, D440): вся сеть на чтение, ничего не меняет и не отправляет.
     (SIDE_HQ, "guest"): _GUEST,
@@ -270,7 +275,14 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     (SIDE_PARTNER, "admin"): _PARTNER_AUDITOR
     | _CHECKLISTS
     | _codes("checklist.master")
-    | _codes("inspection.accept", "inspection.revise", "people.manage", "people.role", "trip.plan"),
+    | _codes(
+        "inspection.accept",
+        "inspection.revise",
+        "people.manage",
+        "people.role",
+        "trip.plan",
+        "view.administration",  # D640: «Люди» и «Пространства партнёров» своего пространства
+    ),
     (SIDE_PARTNER, "auditor"): _PARTNER_AUDITOR,
 }
 

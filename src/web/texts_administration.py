@@ -8,7 +8,14 @@ from __future__ import annotations
 ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "section.administration.title": {"ru": "Администрирование", "en": "Administration"},
     "administration.tabs": {"ru": "Разделы администрирования", "en": "Administration tabs"},
+    "administration.tab.people": {"ru": "Люди", "en": "People"},
+    "administration.tab.spaces": {"ru": "Пространства партнёров", "en": "Partner spaces"},
+    "administration.tab.spaces_own": {"ru": "Ваше пространство", "en": "Your space"},
+    "administration.tab.journal": {"ru": "Журнал", "en": "Log"},
+    "administration.tab.usage": {"ru": "Расход модели", "en": "Model usage"},
     "administration.tab.connections": {"ru": "Подключения", "en": "Connections"},
+    "administration.group.access": {"ru": "Люди и доступ", "en": "People & access"},
+    "administration.group.journal": {"ru": "Журнал", "en": "Journal"},
     "administration.sub": {
         "ru": "Все настройки сервиса в одном месте. Вкладки видны по роли.",
         "en": "All service settings in one place. Tabs depend on your role.",

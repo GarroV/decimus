@@ -179,16 +179,14 @@ def test_вкладка_на_английском(monkeypatch: pytest.MonkeyPatc
 def test_вкладка_переехала_из_людей_в_администрирование(
     monkeypatch: pytest.MonkeyPatch, склад: Склад
 ) -> None:
-    # D639, #1251: в шапке «Пользователей» вкладки больше нет ни у кого; у главного
-    # админа вход в неё — пункт меню «Администрирование».
+    # D639, D640: «Подключения» — вкладка раздела «Администрирование», только главного
+    # админа; у админа УК в столбце вкладок её нет.
     for клиент in _стенд(monkeypatch, tenant="HQ", role="superadmin"):
-        page = клиент.get("/users").get_data(as_text=True)
-        assert "tab=connections" not in page
-        assert 'href="/administration?lang=' in page
+        page = клиент.get("/administration?tab=people").get_data(as_text=True)
+        assert 'href="/administration?tab=connections"' in page
     for клиент in _стенд(monkeypatch, tenant="HQ", role="admin"):
-        page = клиент.get("/users").get_data(as_text=True)
+        page = клиент.get("/administration?tab=people").get_data(as_text=True)
         assert "tab=connections" not in page
-        assert 'href="/administration?lang=' not in page
 
 
 @pytest.mark.parametrize(("tenant", "role"), РОЛИ)
