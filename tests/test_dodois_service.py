@@ -93,6 +93,13 @@ class Хранилище:
         )
 
 
+@pytest.fixture(autouse=True)
+def _чисто() -> Any:
+    service.forget_unwritten()
+    yield
+    service.forget_unwritten()
+
+
 @pytest.fixture
 def база(monkeypatch: pytest.MonkeyPatch) -> Хранилище:
     двойник = Хранилище()
@@ -267,3 +274,46 @@ def test_истёкший_вход_заходом_не_продлевается(
     monkeypatch.setattr(service, "credentials", lambda: КЛЮЧИ)
     service.run_pass(now=СЕЙЧАС)
     assert зовы == [], "отвергнутый ключ продления не дёргаем каждый час"
+
+
+def test_незаписанная_пара_повторяется_заходами_и_к_dodois_за_новой_не_ходим(
+    база: Хранилище, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Сломанная копия: убрать `retry_unwritten` из `run_pass` — второй заход снова зовёт
+    # продление мёртвым ключом, и вход станет «истёк».
+    зовы = _продление(monkeypatch, НОВАЯ)
+    _счёт(monkeypatch, 4, 4)
+    monkeypatch.setattr(service, "credentials", lambda: КЛЮЧИ)
+    база.падает_запись = 99
+    service.run_pass(now=СЕЙЧАС, sleep=lambda _s: None)
+    assert зовы == [СТАРАЯ.refresh]
+    assert база.входы["SI"].state == rules.FAILED and база.входы["SI"].reason == "write_failed"
+
+    service.run_pass(now=СЕЙЧАС + timedelta(hours=1), sleep=lambda _s: None)
+    assert зовы == [СТАРАЯ.refresh], "за новой парой сходили повторно: ключ продления мёртв"
+    assert база.входы["SI"].state == rules.FAILED, "ожидали «запись не легла», не «истёк»"
+    assert база.ключи["SI"] == СТАРАЯ
+
+    база.падает_запись = 0
+    service.run_pass(now=СЕЙЧАС + timedelta(hours=2), sleep=lambda _s: None)
+    assert зовы == [СТАРАЯ.refresh]
+    assert база.ключи["SI"] == store.Tokens(НОВАЯ.access, НОВАЯ.refresh), "пара так и не легла"
+    assert база.входы["SI"].state == rules.OK
+    записей = база.записей_пары
+    service.run_pass(now=СЕЙЧАС + timedelta(hours=3), sleep=lambda _s: None)
+    assert база.записей_пары == записей, "лишние записи после успеха"
+
+
+def test_пара_вытесненного_входа_отбрасывается_без_записи_и_без_сбоя(
+    база: Хранилище, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _продление(monkeypatch, НОВАЯ)
+    база.падает_запись = 99
+    service.refresh(база.входы["SI"], КЛЮЧИ, now=СЕЙЧАС, sleep=lambda _s: None)
+
+    def заменён(**_п: Any) -> None:
+        raise store.LoginSuperseded("заменён")
+
+    monkeypatch.setattr(store, "replace_tokens", заменён)
+    assert service.retry_unwritten(база.входы["SI"], now=СЕЙЧАС) is True
+    assert service.retry_unwritten(база.входы["SI"], now=СЕЙЧАС) is None, "пара не забыта"

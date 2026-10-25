@@ -125,6 +125,7 @@ def ссылки(monkeypatch: pytest.MonkeyPatch) -> Ссылки:
 def вход(monkeypatch: pytest.MonkeyPatch, ссылки: Ссылки) -> Вход:
     двойник = Вход()
     monkeypatch.setattr(flow, "start", двойник.start)
+    monkeypatch.setattr(store, "check_secrets_key", lambda: None)
     monkeypatch.setattr(service, "credentials", lambda: Credentials("id", "secret"))
     return двойник
 
@@ -499,3 +500,33 @@ def test_в_демо_страница_и_кнопки_закрыты(monkeypatch
 
 def test_адреса_страницы_открыты_заслону_входа() -> None:
     assert dodois_connect.ENDPOINTS <= auth.OPEN_ENDPOINTS
+
+
+def test_без_ключа_шифрования_вход_не_начинается_до_похода_к_dodois(
+    чужой: FlaskClient, ссылки: Ссылки, вход: Вход, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Сломанная копия: убрать `check_secrets_key` из маршрута — код устройства сожжён зря.
+    from src.db.secret_crypto import SecretCryptoError
+
+    def нет_ключа() -> None:
+        raise SecretCryptoError("нет SECRETS_KEY")
+
+    monkeypatch.setattr(store, "check_secrets_key", нет_ключа)
+    токен = _ссылка_живая(ссылки)
+    ответ = чужой.post(f"/dodois/connect/{токен}/start", headers=ЗАГОЛОВКИ)
+    assert ответ.status_code == 503 and "ещё не настроен" in ответ.get_data(as_text=True)
+    assert вход.начато == [], "до проверки ключа дошли до Dodo IS"
+
+
+def test_страница_ссылки_не_трогает_общий_счёт_адреса(
+    чужой: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Сломанная копия: вернуть в `_resolve` общие `address_verdict`/`note_address_failure`.
+    from src.db import web_throttle
+
+    def нельзя(**_п: Any) -> Any:
+        raise AssertionError("страница ссылки пошла в общий счёт адреса (пароль и API)")
+
+    monkeypatch.setattr(web_throttle, "address_verdict", нельзя)
+    monkeypatch.setattr(web_throttle, "note_address_failure", нельзя)
+    assert чужой.get(f"/dodois/connect/{rules.new_token()}").status_code == 404

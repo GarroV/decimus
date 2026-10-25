@@ -15,6 +15,9 @@
           <span class="sdodois__invite-main">
             <b>{{ t('dodois.invite.status.' ~ st) }}</b>
             <small>{{ t('dodois.invite.row', issued=dodois_stamp(inv.issued_at), until=dodois_stamp(inv.expires_at)) }} · {{ inv.issued_by }}</small>
+            {% if inv.result == 'not_applied' %}
+              <small class="sdodois__warn">{{ t('dodois.invite.not_applied', who=inv.result_account or '—') }}</small>
+            {% endif %}
           </span>
           {% if st == 'active' %}
             <form method="post" action="{{ users_url }}/connections/dodois/invite/{{ inv.id }}/revoke?lang={{ lang }}">
@@ -81,6 +84,10 @@
       <div class="sconn__panel" id="dodois-link">
         <h3 class="sconn__panel__title">{{ icon('link') }}<span>{{ t('dodois.link.title', country=country_title(dv.issued.country)) }}</span></h3>
         <div class="note note--warn"><div class="note__text">{{ t('dodois.link.warn') }}</div></div>
+        {% if dv.issued.replaces %}
+          {% set cur = dv.issued.replaces %}
+          <div class="note note--warn" id="dodois-replace"><div class="note__text">{{ t('dodois.replace.warn', who=cur.account_name or cur.account_email or cur.issued_by, at=dodois_stamp(cur.linked_at)) }}</div></div>
+        {% endif %}
         <div class="ssecret">
           <code id="dodois-link-value">{{ dv.issued.url }}</code>
           <button class="sbtn" type="button" data-copy="#dodois-link-value" data-copied="{{ t('dodois.link.copied') }}" hidden>{{ t('dodois.link.copy') }}</button>
@@ -101,6 +108,9 @@
           <h3 class="sconn__panel__title"><span class="mono">{{ row.code }}</span><span>{{ country_title(row.code) }}</span>
             <small><span class="sdot{{ ' sdot--ok' if login is not none and login.state == 'ok' else '' }}"></span>{{ t('dodois.state.' ~ (login.state if login is not none else 'none')) }}</small></h3>
           {% if dodois_flash %}<div class="note {{ 'note--ok' if dodois_flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ t(dodois_flash.key, **dodois_flash.params) }}</div></div>{% endif %}
+          {% if row.latest is not none and row.latest.result == 'not_applied' %}
+            <div class="note note--warn" role="status"><div class="note__text">{{ t('dodois.invite.not_applied', who=row.latest.result_account or '—') }}</div></div>
+          {% endif %}
           {% if login is not none %}
             <dl class="sprops skeys__facts">
               <div><dt>{{ t('dodois.fact.confirmed_by') }}</dt>
@@ -121,6 +131,9 @@
           {% endif %}
           <h4 class="sdodois__sub">{{ t('dodois.invites.title') }}</h4>
           {{ invite_list(dv.invites | selectattr('country', 'equalto', row.code) | list) }}
+          {% if login is not none %}
+            <p class="ssec__note" id="dodois-replace-hint">{{ t('dodois.replace.warn', who=login.account_name or login.account_email or login.issued_by, at=dodois_stamp(login.linked_at)) }}</p>
+          {% endif %}
           {{ issue_form(row.code) }}
         </div>
       {% endfor %}

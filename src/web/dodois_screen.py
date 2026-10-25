@@ -66,6 +66,8 @@ class IssuedLink:
     country: str
     url: str
     expires_at: datetime
+    #: Рабочий вход страны, который новая привязка может заменить, — для предупреждения.
+    replaces: Login | None = None
 
     def __repr__(self) -> str:
         return "IssuedLink(<скрыто>)"
@@ -185,7 +187,11 @@ def issue(by_login: str, account: Any) -> tuple[Flash | IssuedLink, int]:
         return Flash("dodois.err.db", False, {}), 503
     # Цель журнала — номер и страна; токена в ней нет, он не попадает и в форму.
     setattr(g, TARGET_OVERRIDE, f"country={country}; invite={invite_id}")
-    return IssuedLink(country, public_link(token), now + rules.INVITE_TTL), 200
+    try:
+        replaces = dodois_logins.get_login(country)
+    except DbError:
+        replaces = None  # предупреждение — подсказка; ссылка уже выдана
+    return IssuedLink(country, public_link(token), now + rules.INVITE_TTL, replaces), 200
 
 
 def revoke(invite_id: int) -> tuple[Flash, int]:

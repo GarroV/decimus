@@ -9,6 +9,15 @@
 перезапуск процесса значит «нажмите ещё раз», пока жива ссылка. Один вход на приглашение:
 повторное нажатие при идущем входе показывает идущий, а не заводит второй.
 
+**Заглушка до сети.** `start` под замком ставит в `_flows` заглушку PENDING (она считается в
+лимит `MAX_FLOWS`) и только потом идёт в сеть: параллельные нажатия видят заглушку и получают
+тот же вход, а не заводят свои потоки. На одну ссылку — не больше `MAX_STARTS_PER_INVITE`
+удачных начал.
+
+**Новый вход не затирает рабочий.** Если у страны уже есть вход, новая пара сначала
+проверяется: учётка должна открывать хоть одну пиццерию. Иначе прежний вход остаётся, ссылка
+гасится с исходом «не применён» (`NOT_APPLIED`), имя учётки видно админу.
+
 **Ссылка гасится только записью входа** (`dodois_logins.save_login`, одна транзакция); если
 её за это время отозвали, вход не пишется (`InviteUnusable`) — состояние `revoked`.
 
@@ -21,6 +30,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 from src.db import dodois_logins as store
@@ -44,6 +54,7 @@ EXPIRED = "expired"
 DENIED = "denied"
 REVOKED = "revoked"
 FAILED = "failed"
+NOT_APPLIED = "not_applied"
 #: Состояния, после которых на той же ссылке можно начать заново.
 RESTARTABLE = frozenset({EXPIRED, DENIED, FAILED})
 
@@ -51,6 +62,8 @@ RESTARTABLE = frozenset({EXPIRED, DENIED, FAILED})
 KEEP_DONE_SEC = 600
 #: Сколько входов держим одновременно: страна одна, приглашений мало; предел — от забивания.
 MAX_FLOWS = 64
+#: Сколько раз по одной ссылке можно успешно начать вход (повтор после отказа или истечения).
+MAX_STARTS_PER_INVITE = 5
 #: Надбавка к паузе опроса при `slow_down` (требует стандарт).
 SLOW_DOWN_SEC = 5
 #: Хосты, на которые ведёт ссылка подтверждения: страница ссылки не должна уводить куда попало.
@@ -81,6 +94,7 @@ class Flow:
 
 _lock = threading.Lock()
 _flows: dict[int, Flow] = {}
+_starts: dict[int, int] = {}
 
 
 def _sweep(now: float) -> None:
@@ -121,12 +135,18 @@ def start(
             return have
         if len([f for f in _flows.values() if f.state == PENDING]) >= MAX_FLOWS:
             raise DodoisError(client.RATE_LIMITED)
-    device = client.start_device(creds, rules.INTL)
-    if not trusted_link(device.verification_uri):
-        raise DodoisError(client.NETWORK)
-    flow = _new_flow(invite, device, ip)
-    with _lock:
+        if _starts.get(invite.id, 0) >= MAX_STARTS_PER_INVITE:
+            raise DodoisError(client.RATE_LIMITED)
+        flow = Flow(invite=invite, ip=ip, started=time.monotonic())  # заглушка PENDING до сети
         _flows[invite.id] = flow
+    try:
+        device = client.start_device(creds, rules.INTL)
+        if not trusted_link(device.verification_uri):
+            raise DodoisError(client.NETWORK)
+    except BaseException:
+        _drop(flow)
+        raise
+    _fill(flow, device)
     if spawn:
         thread = threading.Thread(
             target=_run, args=(flow, creds, device), daemon=True, name="dodois-flow"
@@ -135,18 +155,20 @@ def start(
     return flow
 
 
-def _new_flow(invite: Invite, device: DeviceStart, ip: str | None) -> Flow:
-    now = time.monotonic()
-    flow = Flow(
-        invite=invite,
-        ip=ip,
-        started=now,
-        user_code=device.user_code,
-        link=device.verification_uri,
-        deadline=now + device.expires_in,
-    )
-    flow._device_code = device.device_code
-    return flow
+def _drop(flow: Flow) -> None:
+    """Убрать заглушку, если вход не начался (сеть, чужой адрес)."""
+    with _lock:
+        if _flows.get(flow.invite.id) is flow:
+            del _flows[flow.invite.id]
+
+
+def _fill(flow: Flow, device: DeviceStart) -> None:
+    with _lock:
+        flow.user_code = device.user_code
+        flow.link = device.verification_uri
+        flow.deadline = flow.started + device.expires_in
+        flow._device_code = device.device_code
+        _starts[flow.invite.id] = _starts.get(flow.invite.id, 0) + 1
 
 
 def _finish(flow: Flow, state: str, reason: str = "") -> None:
@@ -185,29 +207,54 @@ def poll_once(
     return True, interval
 
 
+def _gives_access(country: str, access: str) -> bool:
+    """Открывает ли новая пара хоть одну пиццерию страны (только чтение у Dodo IS)."""
+    units = client.working_pizzerias(country)
+    opened = client.count_open(country, rules.INTL, access, units, datetime.now(UTC).date())
+    return opened > 0
+
+
 def _complete(flow: Flow, pair: TokenPair) -> None:
     invite = flow.invite
     try:
         replaced = store.get_login(invite.country) is not None
+        name, email = client.userinfo(rules.INTL, pair.access)
+        if replaced and not _gives_access(invite.country, pair.access):
+            store.reject_invite(invite.id, invite.country, name or email, datetime.now(UTC))
+            _finish(flow, NOT_APPLIED)
+            _journal(invite, flow.ip, replaced, applied=False)
+            return
         service.attach(
             country=invite.country,
             pair=pair,
             issued_by=invite.issued_by,
             source=rules.SOURCE_INVITE,
             invite_id=invite.id,
+            account=(name, email),
         )
     except store.InviteUnusable:
         _finish(flow, REVOKED)
+        return
+    except DodoisError as exc:
+        _finish(flow, FAILED, exc.kind)
         return
     except DbError:
         logger.error("Dodo IS %s: вход по ссылке не записался", invite.country)
         _finish(flow, FAILED, "write_failed")
         return
     _finish(flow, DONE)
-    record_used(invite, flow.ip, replaced)
+    _journal(invite, flow.ip, replaced, applied=True)
 
 
-def record_used(invite: Invite, ip: str | None, replaced: bool) -> None:
+def _journal(invite: Invite, ip: str | None, replaced: bool, *, applied: bool) -> None:
+    """Запись в журнал не меняет исход: вход уже записан, «Готово» остаётся «Готово»."""
+    try:
+        record_used(invite, ip, replaced, applied=applied)
+    except Exception:
+        logger.exception("Dodo IS %s: запись в журнал действий не легла", invite.country)
+
+
+def record_used(invite: Invite, ip: str | None, replaced: bool, *, applied: bool = True) -> None:
     """Погашение ссылки — в журнал действий от имени выдавшего, без токена и без ключей."""
     journals.record_action(
         user_id=invite.issued_by_id,
@@ -216,6 +263,7 @@ def record_used(invite: Invite, ip: str | None, replaced: bool) -> None:
         action=ACTION_USED,
         target=(
             f"country={invite.country}; invite={invite.id}; replaced={'yes' if replaced else 'no'}"
+            f"; applied={'yes' if applied else 'no'}"
         ),
         outcome="ok",
         ip=ip,
@@ -230,6 +278,8 @@ def _run(flow: Flow, creds: Credentials, device: DeviceStart) -> None:
         with acting_space(SYSTEM_SPACE):
             while True:
                 time.sleep(interval)
+                if not _is_current(flow):  # осиротевший поток вход не пишет
+                    return
                 done, interval = poll_once(flow, creds, interval=interval)
                 if done:
                     return
@@ -238,7 +288,13 @@ def _run(flow: Flow, creds: Credentials, device: DeviceStart) -> None:
         _finish(flow, FAILED, "network")
 
 
+def _is_current(flow: Flow) -> bool:
+    with _lock:
+        return _flows.get(flow.invite.id) is flow
+
+
 def forget_all() -> None:
     """Забыть все входы — для тестов."""
     with _lock:
         _flows.clear()
+        _starts.clear()

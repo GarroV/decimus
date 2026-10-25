@@ -562,6 +562,7 @@
 | `0094_action_plan_file_parsed.sql` | — |
 | `0095_health_checks.sql` | `health.checks` |
 | `0096_dodois_logins.sql` | `dodois.logins`, `dodois.invites` |
+| `0097_dodois_invite_result.sql` | — |
 <!-- map:end -->
 
 ## Makefile

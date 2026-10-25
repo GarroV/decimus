@@ -25,6 +25,7 @@ import psycopg
 from src.domain.dodois import (
     CONTOURS,
     REASONS,
+    RESULT_NOT_APPLIED,
     STATES,
     Invite,
     Login,
@@ -51,7 +52,7 @@ _LOGIN_COLUMNS = (
 )
 _INVITE_COLUMNS = (
     "id, country, issued_by, issued_at, expires_at, used_at, revoked_at, token_hash, "
-    "issued_by_id::text, issued_by_role, issued_by_tenant"
+    "issued_by_id::text, issued_by_role, issued_by_tenant, result, result_account"
 )
 
 _VAULT_UPSERT = """
@@ -156,6 +157,30 @@ def _put_tokens(cur: Any, country: str, tokens: Tokens, by: str) -> None:
         )
 
 
+def check_secrets_key() -> None:
+    """Пробное шифрование: есть ли рабочий `SECRETS_KEY`. Нет — `SecretCryptoError`, база цела."""
+    secret_crypto.encrypt(vault_names("SI")[0], "probe")
+
+
+def reject_invite(invite_id: int, country: str, account: str | None, now: datetime) -> None:
+    """Погасить ссылку как «вход не применён»: прежний вход страны и его ключи не тронуты.
+
+    Ссылка гасится атомарно и только живая; иначе `InviteUnusable`.
+    """
+    vault_names(country)
+    try:
+        with _managing() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update dodois.invites set used_at = %s, result = %s, result_account = %s "
+                "where id = %s and country = %s and used_at is null and revoked_at is null",
+                (now, RESULT_NOT_APPLIED, account, invite_id, country),
+            )
+            if cur.rowcount != 1:
+                raise InviteUnusable("Ссылка уже использована или отозвана")
+    except psycopg.Error as exc:
+        raise _fail("Исход ссылки не записался", exc) from exc
+
+
 def save_login(
     *,
     country: str,
@@ -175,7 +200,8 @@ def save_login(
     Одна транзакция: ссылка погашается, только если она ещё жива; иначе `InviteUnusable` и
     не записано ничего.
     """
-    # Шифруем до соединения: нет `SECRETS_KEY` — отказ до любой записи.
+    # Пробное шифрование до соединения: нет `SECRETS_KEY` — отказ до любой записи, ссылка цела.
+    check_secrets_key()
     vault_names(country)
     if contour not in CONTOURS:
         raise ValueError("Контур не из списка")

@@ -476,6 +476,26 @@ def note_address_failure(*, tenant: str, address: str) -> Verdict:
     return verdict_of(счётчик, scope=ключ[0])
 
 
+def _link_key(address: str) -> tuple[str, str]:
+    """Счёт по адресу для ссылок-приглашений: свой отпечаток, не общий с паролем и API."""
+    return (SCOPE_ADDRESS, key_fingerprint(f"dodois-link\x1f{canonical_address(address)}"))
+
+
+def link_address_verdict(*, tenant: str, address: str) -> Verdict:
+    """Заперт ли адрес для ссылок входа Dodo IS; только чтение (D640)."""
+    scope, отпечаток = _link_key(address)
+    return verdict_of(load_counter(tenant=tenant, scope=scope, fingerprint=отпечаток), scope=scope)
+
+
+def note_link_failure(*, tenant: str, address: str) -> Verdict:
+    """Неудача по ссылке входа Dodo IS — свой счётчик: подбор токена ссылки не запирает
+    пароль с того же адреса, а подбор пароля не запирает ссылки."""
+    ключ = _link_key(address)
+    with attempt_transaction(tenant=tenant, keys=(ключ,)) as строки:
+        счётчик = строки.bump(scope=ключ[0], fingerprint=ключ[1])
+    return verdict_of(счётчик, scope=ключ[0])
+
+
 def _action_keys(login: str) -> _Keys:
     return ((SCOPE_LOGIN, key_fingerprint(f"service-keys\x1f{login}")),)
 

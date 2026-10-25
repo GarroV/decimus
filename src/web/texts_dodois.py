@@ -63,9 +63,15 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
     },
     "dodois.reason.write_failed": {
         "ru": (
-            "Новый ключ входа не записался в базу — возможно, вход потерян. Выдайте новую ссылку."
+            "Новый ключ входа выдан, но не записался в базу — запись повторяется каждый час, "
+            "пока работает бот. Если бот перезапустится раньше, вход будет потерян: "
+            "выдайте новую ссылку."
         ),
-        "en": "The new login key could not be saved — the login may be lost. Issue a new link.",
+        "en": (
+            "The new login key was issued but could not be saved — saving is retried every "
+            "hour while the bot runs. If the bot restarts first the login is lost: issue a "
+            "new link."
+        ),
     },
     "dodois.reason.no_keys": {
         "ru": "Не заданы ключи приложения Dodo IS (блок «Ключи сервисов»).",
@@ -104,11 +110,37 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
     "dodois.issue_hint": {
         "ru": (
             "Ссылка одноразовая, живёт 24 часа и откроет вход только этой страны. "
-            "Новый вход заменит прежний."
+            "Новый вход заменит прежний, только если откроет хоть одну пиццерию."
         ),
         "en": (
             "The link is single-use, valid for 24 hours and opens a login for this country "
-            "only. A new login replaces the old one."
+            "only. A new login replaces the old one only if it opens at least one pizzeria."
+        ),
+    },
+    "dodois.replace.warn": {
+        "ru": (
+            "Подключение заменит текущий вход ({who}, записан {at}), если новая учётка откроет "
+            "хотя бы одну пиццерию; иначе прежний вход останется."
+        ),
+        "en": (
+            "The connection will replace the current login ({who}, recorded {at}) if the new "
+            "account opens at least one pizzeria; otherwise the current login stays."
+        ),
+    },
+    "dodois.invite.not_applied": {
+        "ru": "Новый вход не дал доступа ни к одной пиццерии — не применён. Учётка: {who}",
+        "en": "The new login gave access to no pizzeria and was not applied. Account: {who}",
+    },
+    "dodois.page.not_applied": {
+        "ru": (
+            "Вход не применён: у этой учётки нет доступа ни к одной пиццерии страны. "
+            "Прежний вход остался. Ссылка использована; попросите выдать новую и войдите "
+            "учёткой с доступом."
+        ),
+        "en": (
+            "The login was not applied: this account has access to no pizzeria in the country. "
+            "The previous login is kept. The link is used; ask for a new one and sign in with "
+            "an account that has access."
         ),
     },
     "dodois.link.title": {"ru": "Ссылка для {country}", "en": "Link for {country}"},

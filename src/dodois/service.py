@@ -6,8 +6,11 @@
 **Продление не теряет вход.** Ключ продления у Dodo IS одноразовый: после удачного ответа
 прежний мёртв. Поэтому новая пара пишется атомарно (`replace_tokens`) и, если запись не
 легла, пробуется ещё несколько раз с той же парой в памяти; не легла совсем — состояние
-«сбой» с причиной `write_failed` и строка в журнале процесса без значений. Отказ Dodo IS в
-продлении — «вход истёк»: прежняя пара остаётся в базе, ничего не стирается.
+«запись не легла, повторяем» (`write_failed`) и строка в журнале процесса без значений.
+Незаписанная пара живёт в памяти процесса бота (`_unwritten`), и каждый следующий заход
+(раз в час) сначала повторяет запись, а к Dodo IS за новой парой не ходит: ключ продления
+в базе уже мёртв, ещё одно продление дало бы «вход истёк». Перезапуск бота эту пару теряет.
+Отказ Dodo IS в продлении — «вход истёк»: прежняя пара остаётся в базе, ничего не стирается.
 
 **Тревог наружу нет**: состояние видно на экране «Подключения»; письмо или сообщение людям —
 только по «да» владельца (D640, правило о коммуникации).
@@ -18,6 +21,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from src.db import dodois_logins as store
@@ -34,6 +38,10 @@ logger = logging.getLogger(__name__)
 #: Сколько раз пробуем записать новую пару ключей, прежде чем признать сбой, и пауза между ними.
 WRITE_TRIES = 4
 WRITE_RETRY_SECONDS = 2.0
+
+#: Пары, которые Dodo IS уже выдал, а записать не удалось: страна → (пара, когда, `linked_at`
+#: входа, которому она принадлежит). Только память процесса, значения наружу не печатаются.
+_unwritten: dict[str, tuple[TokenPair, datetime, datetime]] = {}
 
 
 def credentials() -> Credentials | None:
@@ -183,8 +191,38 @@ def refresh(
         return False
     if _write_pair(login, pair, moment, sleep):
         return True
+    _unwritten[login.country] = (pair, moment, login.linked_at)
     _note(login.country, rules.FAILED, "write_failed", moment)
     return False
+
+
+def retry_unwritten(
+    login: Login,
+    *,
+    now: datetime | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+) -> bool | None:
+    """Повторить запись пары, которую Dodo IS выдал, а база не приняла.
+
+    `None` — незаписанной пары нет; `True` — легла (или вход заменён — пара не нужна);
+    `False` — не легла, пара остаётся в памяти, состояние «запись не легла, повторяем».
+    """
+    held = _unwritten.get(login.country)
+    if held is None:
+        return None
+    pair, moment, linked_at = held
+    held_login = replace(login, linked_at=linked_at)
+    if _write_pair(held_login, pair, moment, sleep):
+        del _unwritten[login.country]
+        _note(login.country, rules.OK, None, now or datetime.now(UTC))
+        return True
+    _note(login.country, rules.FAILED, "write_failed", now or datetime.now(UTC))
+    return False
+
+
+def forget_unwritten() -> None:
+    """Забыть незаписанные пары — для тестов."""
+    _unwritten.clear()
 
 
 def run_pass(
@@ -197,8 +235,13 @@ def run_pass(
     logins = store.list_logins()
     creds: Credentials | None = None
     for login in logins:
-        if login.state != rules.EXPIRED and rules.refresh_due(
-            login.refreshed_at, login.access_expires_at, moment
+        retried = retry_unwritten(login, now=moment, sleep=sleep)
+        if retried is False:
+            continue  # пара ещё не легла: к Dodo IS за новой не ходим, ключ продления мёртв
+        if (
+            retried is None
+            and login.state != rules.EXPIRED
+            and rules.refresh_due(login.refreshed_at, login.access_expires_at, moment)
         ):
             creds = creds or credentials()
             if creds is None:

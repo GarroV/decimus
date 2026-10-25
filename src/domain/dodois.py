@@ -163,6 +163,9 @@ INVITE_TTL = timedelta(hours=24)
 TOKEN_BYTES = 32
 _TOKEN = re.compile(r"[A-Za-z0-9_-]{43}")
 
+#: Исход ссылки: вход не применён, прежний вход страны оставлен.
+RESULT_NOT_APPLIED = "not_applied"
+
 INVITE_ACTIVE = "active"
 INVITE_USED = "used"
 INVITE_EXPIRED = "expired"
@@ -204,6 +207,9 @@ class Invite:
     issued_by_id: str = ""
     issued_by_role: str = ""
     issued_by_tenant: str = ""
+    #: `not_applied` — вход по ссылке не открыл ни одной пиццерии и не заменил прежний.
+    result: str | None = None
+    result_account: str | None = None
 
     def status(self, now: datetime) -> str:
         """Погашена и отозвана — раньше срока: след важнее часов."""

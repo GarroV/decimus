@@ -23,6 +23,7 @@ from typing import Any
 
 from src.db import dodois_logins
 from src.db.errors import DbError
+from src.db.job_lock import DODOIS_LOADER_LOCK_KEY, job_lock
 from src.db.space import SYSTEM_SPACE, acting_space
 from src.dodois import service
 from src.dodois.client import TokenPair
@@ -105,8 +106,15 @@ def run(country: str, by: str, raw_json: str, *, now: datetime | None = None) ->
                     print("ключ доступа истёк, а ключей приложения Dodo IS нет", file=sys.stderr)
                     return EXIT_FAILED
                 fresh = dodois_logins.get_login(country) or login
-                if service.refresh(fresh, creds, now=moment):
-                    login = service.check(country, now=moment) or fresh
+                # Ключ продления одноразовый: продлевать вдвоём с ботом нельзя — тот же замок.
+                with job_lock(DODOIS_LOADER_LOCK_KEY, what="входы Dodo IS") as got:
+                    if not got:
+                        print(
+                            "продление ведёт бот (замок занят) — повторите позже", file=sys.stderr
+                        )
+                        return EXIT_FAILED
+                    if service.refresh(fresh, creds, now=moment):
+                        login = service.check(country, now=moment) or fresh
             login = dodois_logins.get_login(country) or login
     except DbError as exc:
         print(f"база: {type(exc).__name__}", file=sys.stderr)

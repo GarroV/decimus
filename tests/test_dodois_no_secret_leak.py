@@ -19,6 +19,7 @@ import pytest
 
 from src.db import dodois_logins as store
 from src.db.errors import AccessError
+from src.db.job_lock import DODOIS_LOADER_LOCK_KEY
 from src.dodois import client, service
 
 КОРЕНЬ = Path(__file__).resolve().parents[1]
@@ -242,3 +243,42 @@ def test_страна_в_переносе_только_из_двух_загла�
 ) -> None:
     код, вывод = _перенос(monkeypatch, capsys, _токены(), страна)
     assert код == 2 and ДОСТУП not in вывод
+
+
+def test_продление_при_переносе_идёт_под_замком_бота(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Сломанная копия: звать `service.refresh` без `job_lock` — перенос продлит вдвоём с ботом.
+    from contextlib import contextmanager
+    from datetime import timedelta
+
+    sys.path.insert(0, str(КОРЕНЬ))
+    from tools import dodois_import
+
+    записано: list[dict[str, Any]] = []
+    замки: list[int] = []
+
+    @contextmanager
+    def занят(key: int, *, what: str):  # type: ignore[no-untyped-def]
+        замки.append(key)
+        yield False
+
+    def прикрепить(**поля: Any) -> Any:
+        ожидаемые = {"scope": "openid", "now": datetime.now(UTC), "access_expires_at": None}
+        записано.append({**ожидаемые, **поля})
+        return _вход_страны(записано[-1])
+
+    monkeypatch.setattr(dodois_import, "job_lock", занят)
+    monkeypatch.setattr(service, "attach", прикрепить)
+    monkeypatch.setattr(service, "credentials", lambda: client.Credentials("id", "key"))
+    monkeypatch.setattr(store, "get_login", lambda _c: _вход_страны(записано[-1]))
+    monkeypatch.setattr(
+        service, "refresh", lambda *_a, **_k: pytest.fail("продление мимо замка бота")
+    )
+    давно = (datetime.now(UTC) - timedelta(days=3)).isoformat()
+    monkeypatch.setattr(sys, "stdin", io.StringIO(_токены(obtained_at=давно)))
+    код = dodois_import.main(["--country", "SI", "--by", "owner"])
+    вывод = capsys.readouterr()
+    assert код == 1 and "замок" in вывод.err
+    assert замки == [DODOIS_LOADER_LOCK_KEY]
+    assert ДОСТУП not in вывод.out + вывод.err

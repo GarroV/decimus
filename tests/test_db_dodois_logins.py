@@ -14,7 +14,7 @@ from conftest import requires_db
 psycopg = pytest.importorskip("psycopg")
 
 from src.db import dodois_logins as store  # noqa: E402
-from src.db import secret_crypto, service_keys  # noqa: E402
+from src.db import secret_crypto, service_keys, web_throttle  # noqa: E402
 from src.db.errors import AccessError  # noqa: E402
 from src.domain import dodois as rules  # noqa: E402
 
@@ -211,3 +211,43 @@ def test_роль_приложения_только_читает_входы(ба
 
 def test_имена_ключей_стран_строчные() -> None:
     assert rules.vault_names("SI") == ("dodois.access.si", "dodois.refresh.si")
+
+
+def test_пробное_шифрование_отказывает_без_ключа_и_save_login_ничего_не_пишет(
+    база: str, автор: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Сломанная копия: убрать `check_secrets_key()` из `save_login` — ссылка гасится до отказа.
+    номер = _ссылка(база, автор)
+    monkeypatch.delenv(secret_crypto.SECRETS_KEY_VAR)
+    with pytest.raises(secret_crypto.SecretCryptoError):
+        store.check_secrets_key()
+    with pytest.raises(secret_crypto.SecretCryptoError):
+        _вход(invite_id=номер)
+    assert store.get_invite(номер).used_at is None  # type: ignore[union-attr]
+    assert store.get_login("SI") is None
+
+
+def test_вход_не_применён_ссылка_погашена_ключи_прежние(база: str, автор: str) -> None:
+    # Сломанная копия: `reject_invite` не ставит `used_at` — ссылку можно пускать по кругу.
+    _вход()
+    номер = _ссылка(база, автор)
+    store.reject_invite(номер, "SI", "Ana Novak", НОВАЯ)
+    ссылка = store.get_invite(номер)
+    assert ссылка is not None and ссылка.used_at == НОВАЯ
+    assert (ссылка.result, ссылка.result_account) == ("not_applied", "Ana Novak")
+    assert store.read_tokens("SI") == store.Tokens(ДОСТУП, ПРОДЛЕНИЕ), "прежняя пара тронута"
+    with pytest.raises(store.InviteUnusable):
+        store.reject_invite(номер, "SI", "Ana Novak", НОВАЯ)
+    with pytest.raises(store.InviteUnusable):
+        _вход(invite_id=номер)
+
+
+def test_счёт_попыток_ссылок_свой_и_не_запирает_пароль_и_наоборот(база: str, автор: str) -> None:
+    # Сломанная копия: `_link_key` возвращает `_address_key` — счёт общий, обе половины краснеют.
+    for _n in range(25):
+        web_throttle.note_link_failure(tenant="HQ", address="203.0.113.5")
+        web_throttle.note_address_failure(tenant="HQ", address="198.51.100.9")
+    assert web_throttle.link_address_verdict(tenant="HQ", address="203.0.113.5").locked
+    assert not web_throttle.address_verdict(tenant="HQ", address="203.0.113.5").locked
+    assert web_throttle.address_verdict(tenant="HQ", address="198.51.100.9").locked
+    assert not web_throttle.link_address_verdict(tenant="HQ", address="198.51.100.9").locked

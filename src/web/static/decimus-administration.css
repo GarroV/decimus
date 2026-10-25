@@ -45,6 +45,7 @@
 .sdodois__invites li { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
 .sdodois__invites form { margin: 0; flex: none; }
 .sdodois__invite-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.sdodois__invite-main .sdodois__warn { color: var(--warn, var(--ink-2)); }
 .sdodois__invite-main small { color: var(--ink-3); font-size: var(--fs-meta); overflow-wrap: anywhere; }
 .sdodois .ssecret code { overflow-wrap: anywhere; }
 

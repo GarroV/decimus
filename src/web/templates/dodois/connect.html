@@ -18,6 +18,8 @@
     {% endif %}
     {% if state == 'done' %}
       <div class="note note--ok" role="status"><div class="note__text">{{ t('dodois.page.done') }}</div></div>
+    {% elif state == 'not_applied' %}
+      <div class="note note--warn" role="status"><div class="note__text">{{ t('dodois.page.not_applied') }}</div></div>
     {% elif state == 'pending' %}
       <p>{{ t('dodois.page.pending') }}</p>
       <p class="sdodois-page__code"><span>{{ t('dodois.page.code') }}</span> <code>{{ user_code }}</code></p>

@@ -32,7 +32,7 @@ from typing import Any
 from flask import Flask, Response, abort, jsonify, make_response, render_template, request
 
 from src.db import dodois_logins, web_throttle
-from src.db.errors import DbError
+from src.db.errors import ConfigError, DbError
 from src.dodois import flow, service
 from src.dodois.client import DodoisError
 from src.domain import dodois as rules
@@ -63,12 +63,12 @@ def _resolve(conf: Settings, token: str) -> tuple[Invite, flow.Flow | None] | No
     address = client_ip(conf) or UNKNOWN
     tenant = conf.tenant
     try:
-        if web_throttle.address_verdict(tenant=tenant, address=address).locked:
+        if web_throttle.link_address_verdict(tenant=tenant, address=address).locked:
             return None
         found = _find(token)
         shown = None if found is None else _alive(found)
         if shown is None:
-            web_throttle.note_address_failure(tenant=tenant, address=address)
+            web_throttle.note_link_failure(tenant=tenant, address=address)
         return shown
     except DbError:
         _log.warning("dodois: ссылка не проверилась (база отказала)")
@@ -85,7 +85,11 @@ def _alive(invite: Invite) -> tuple[Invite, flow.Flow | None] | None:
     current = flow.current(invite.id)
     if invite.usable(datetime.now(UTC)):
         return invite, current
-    if invite.used_at is not None and current is not None and current.state == flow.DONE:
+    if (
+        invite.used_at is not None
+        and current is not None
+        and current.state in (flow.DONE, flow.NOT_APPLIED)
+    ):
         return invite, current
     return None
 
@@ -129,6 +133,11 @@ def install(app: Flask, conf: Settings) -> None:
             abort(404)  # погашенная ссылка (даже только что) нового входа не начинает
         creds = service.credentials()
         if creds is None:
+            return _page(invite, current, token, error="no_keys")
+        try:
+            dodois_logins.check_secrets_key()  # до Dodo IS: без ключа шифрования вход не запишется
+        except ConfigError:
+            _log.warning("dodois: нет рабочего ключа шифрования, вход не начат")
             return _page(invite, current, token, error="no_keys")
         try:
             started = flow.start(invite, creds=creds, ip=client_ip(conf))
