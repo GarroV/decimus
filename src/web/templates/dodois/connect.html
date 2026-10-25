@@ -1,0 +1,40 @@
+{#
+  Вход в Dodo IS по ссылке-приглашению (D640): страница для коллеги страны, без входа в decimus.
+  Открытие страницы ничего не начинает — вход начинает только кнопка (POST). Код устройства
+  Dodo IS сюда не попадает: показываются только короткий код для человека и ссылка на
+  auth.dodois.com; результат страница узнаёт, опрашивая свой сервер (`dodois-connect.js`).
+  Сторонних ресурсов нет. Тексты — `texts_dodois.py`.
+#}{% extends "base.html" %}
+{% block title %}{{ t('dodois.page.title') }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endblock %}
+{% block body %}
+  <main class="sdodois-page" id="dodois-connect"
+        {% if state == 'pending' %}data-status-url="{{ status_url }}" data-poll-sec="{{ poll_sec }}"{% endif %}>
+    <h1 class="sdodois-page__title">{{ t('dodois.page.title') }} · {{ country_title(country) }}</h1>
+    <p>{{ t('dodois.page.lead', country=country_title(country)) }}</p>
+    <p class="sdodois-page__safe">{{ t('dodois.page.safe') }}</p>
+    {% if error %}
+      <div class="note note--warn" role="alert"><div class="note__text">{{ t('dodois.page.err.' ~ error) }}</div></div>
+    {% endif %}
+    {% if state == 'done' %}
+      <div class="note note--ok" role="status"><div class="note__text">{{ t('dodois.page.done') }}</div></div>
+    {% elif state == 'not_applied' %}
+      <div class="note note--warn" role="status"><div class="note__text">{{ t('dodois.page.not_applied') }}</div></div>
+    {% elif state == 'pending' %}
+      <p>{{ t('dodois.page.pending') }}</p>
+      <p class="sdodois-page__code"><span>{{ t('dodois.page.code') }}</span> <code>{{ user_code }}</code></p>
+      <p><a class="btn" href="{{ link }}" target="_blank" rel="noopener noreferrer">{{ t('dodois.page.open') }}</a></p>
+      <p class="sdodois-page__wait" role="status">{{ t('dodois.page.waiting') }}</p>
+    {% else %}
+      {% if state in ('expired', 'denied', 'failed') %}
+        <div class="note note--warn" role="status"><div class="note__text">{{ t('dodois.page.' ~ state) }}</div></div>
+      {% endif %}
+      {% if can_start %}
+        <form method="post" action="{{ start_url }}?lang={{ lang }}">
+          <button class="btn" type="submit">{{ t('dodois.page.start') }}</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </main>
+  <script src="{{ url_for('static', filename='dodois-connect.js') }}" defer></script>
+{% endblock %}

@@ -702,3 +702,17 @@ latest_own_due
 # адресу «Проверить сейчас», `checkable` читает только `administration/_health.html`.
 connection_health_check
 checkable
+
+# Входы в Dodo IS по странам (D640): маршруты `@app.get/post(..., endpoint=...)` и
+# `after_request` — их зовёт Flask, по имени не зовёт никто; `SOURCE_IMPORT` берёт только
+# `tools/dodois_import.py`, а `tools` vulture не сканирует.
+dodois_invite_issue
+dodois_invite_revoke
+dodois_check
+dodois_connect
+dodois_connect_start
+dodois_connect_status
+_public_headers
+SOURCE_IMPORT
+# Автоматические фикстуры pytest, сбрасывающие состояние входа по ссылке между тестами.
+_чисто

@@ -37,3 +37,21 @@
   .shealth__dot { margin-top: 6px; }
   .shealth__act .sbtn { padding-inline: var(--space-3); font-size: var(--fs-meta); }
 }
+
+/* Блок «Dodo IS» (D640): строки приглашений в панели страны; остальное — приём «Ключей сервисов». */
+.sdodois .stile__icon.mono { font-size: var(--fs-meta); font-weight: var(--w-semibold); }
+.sdodois__sub { margin: var(--space-6) 0 var(--space-3); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-semibold); }
+.sdodois__invites { list-style: none; margin: 0 0 var(--space-5); padding: 0; border-top: 1px solid var(--line); }
+.sdodois__invites li { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+.sdodois__invites form { margin: 0; flex: none; }
+.sdodois__invite-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.sdodois__invite-main .sdodois__warn { color: var(--warn, var(--ink-2)); }
+.sdodois__invite-main small { color: var(--ink-3); font-size: var(--fs-meta); overflow-wrap: anywhere; }
+.sdodois .ssecret code { overflow-wrap: anywhere; }
+
+/* Публичная страница входа в Dodo IS по ссылке: одна колонка ограниченной ширины. */
+.sdodois-page { max-width: 520px; margin: var(--space-8) auto; padding: 0 var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+.sdodois-page__title { margin: 0; font-size: var(--fs-title); font-weight: var(--w-semibold); }
+.sdodois-page__safe { color: var(--ink-3); font-size: var(--fs-meta); }
+.sdodois-page__code code { font-size: var(--fs-title); letter-spacing: 0.08em; }
+.sdodois-page__wait { color: var(--ink-3); }

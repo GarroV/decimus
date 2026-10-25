@@ -54,11 +54,21 @@ SERVICES: tuple[Service, ...] = (
             KeyField("client_secret", "ispring.client_secret", "ISPRING_CLIENT_SECRET"),
         ),
     ),
+    # Приложение Dodo IS (D640): пара ключей, под которой коллеги подтверждают входы стран.
+    Service(
+        "dodois",
+        (
+            KeyField("client_id", "dodois.client_id", "DODOIS_CLIENT_ID"),
+            KeyField("client_secret", "dodois.client_secret", "DODOIS_CLIENT_SECRET"),
+        ),
+    ),
 )
 
 _BY_CODE = {s.code: s for s in SERVICES}
 
-#: Все допустимые имена записей; ровно этот список стоит в `check` таблицы (`0084`).
+#: Имена записей реестра; они же стоят в списке `check` таблицы (`0084`, `0096`). Ключи входов
+#: стран (`dodois.access.<cc>`, `dodois.refresh.<cc>`) — не здесь: у них свой шаблон имени,
+#: `src/domain/dodois.vault_names`.
 VAULT_NAMES: frozenset[str] = frozenset(f.vault_name for s in SERVICES for f in s.fields)
 
 #: Предел длины значения: настоящие ключи — десятки знаков; больше — вставили не то.

@@ -1084,7 +1084,7 @@ docker network inspect edge-decimus --format '{{range .IPAM.Config}}{{.Subnet}}{
 (модель, Pointer, iSpring; D576), которые главный админ вставляет на вкладке «Администрирование → Подключения»; в базу он не попадает. 32 случайных
 байта в base64; один и тот же у веба, бота и обхода (все читают ключ модели из базы). Без него
 сохранить ключ на экране нельзя, а уже сохранённый не открывается — тогда работает
-`OPENAI_API_KEY`. Потерянный `SECRETS_KEY` значит «ключи на экране вставить заново», больше ничего; значения из `.env` (`OPENAI_API_KEY`, `POINTER_API_KEY`, `ISPRING_CLIENT_ID`/`ISPRING_CLIENT_SECRET`) остаются запасными.
+`OPENAI_API_KEY`. Потерянный `SECRETS_KEY` значит «ключи на экране вставить заново», больше ничего; значения из `.env` (`OPENAI_API_KEY`, `POINTER_API_KEY`, `ISPRING_CLIENT_ID`/`ISPRING_CLIENT_SECRET`, `DODOIS_CLIENT_ID`/`DODOIS_CLIENT_SECRET`) остаются запасными.
 Сгенерировать: `python3 -c "import secrets,base64;print(base64.b64encode(secrets.token_bytes(32)).decode())"`
 и положить в `.env` площадки значением `SECRETS_KEY=` (значение в репозиторий не попадает).
 

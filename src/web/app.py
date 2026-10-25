@@ -70,6 +70,7 @@ from . import (
     country_filter,
     country_page,
     country_settings,
+    dodois_connect,
     edition,
     grade_explain,
     guard,
@@ -247,6 +248,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     oauth.install(app, conf)
     # Кадры к черновику загрузки по подписанной ссылке из Claude: токен в адресе, не кука.
     photo_upload.install(app, conf)
+    # Вход в Dodo IS по ссылке-приглашению: токен в адресе, входа в decimus нет (D640).
+    dodois_connect.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:

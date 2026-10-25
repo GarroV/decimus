@@ -369,6 +369,12 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0095_health_checks.sql": (
         "sql1:3b27eb4f6e9255769b1280fabe5f957de31458094c077f72f56a096b8452b49c"
     ),
+    "0096_dodois_logins.sql": (
+        "sql1:cb16d019ed5aea37f8ec462513c60a9638ada2d0882fecdd76cc527cf50a9513"
+    ),
+    "0097_dodois_invite_result.sql": (
+        "sql1:df01e91ada74526e2c0ae4fd73c28d7df3b05d177dd554e75cf54d54a3523837"
+    ),
 }
 
 

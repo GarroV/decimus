@@ -23,6 +23,7 @@ SERVICE_KEYS_TEXTS: dict[str, dict[str, str]] = {
     "keys.service.openai": {"ru": "Нейросеть (OpenAI)", "en": "AI model (OpenAI)"},
     "keys.service.pointer": {"ru": "Pointer", "en": "Pointer"},
     "keys.service.ispring": {"ru": "iSpring", "en": "iSpring"},
+    "keys.service.dodois": {"ru": "Dodo IS (приложение)", "en": "Dodo IS (application)"},
     "keys.purpose.openai": {
         "ru": "Ключом бот и веб разбирают комментарии и голосовые.",
         "en": "The bot and the web use it to read comments and voice notes.",
@@ -30,6 +31,13 @@ SERVICE_KEYS_TEXTS: dict[str, dict[str, str]] = {
     "keys.purpose.pointer": {
         "ru": "Ключом загружаются оценки пиццерий на картах.",
         "en": "It is used to load pizzeria ratings from the maps.",
+    },
+    "keys.purpose.dodois": {
+        "ru": "Пара ключей приложения Decimus в Dodo IS: под ней коллеги подтверждают входы стран.",
+        "en": (
+            "The Decimus application key pair in Dodo IS: colleagues confirm "
+            "country logins with it."
+        ),
     },
     "keys.purpose.ispring": {
         "ru": "Пара ключей для выгрузки данных об обучении из iSpring Learn.",

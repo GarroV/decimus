@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 191 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 197 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -78,6 +78,9 @@
 | `/administration/connections/<int:token_id>/reissue` | POST | `connections_reissue` | `src/web/connections_screen.py` |
 | `/administration/connections/<int:token_id>/revoke` | POST | `connections_revoke` | `src/web/connections_screen.py` |
 | `/administration/connections/<int:token_id>/update` | POST | `connections_update` | `src/web/connections_screen.py` |
+| `/administration/connections/dodois/<country>/check` | POST | `dodois_check` | `src/web/dodois_screen.py` |
+| `/administration/connections/dodois/invite` | POST | `dodois_invite_issue` | `src/web/dodois_screen.py` |
+| `/administration/connections/dodois/invite/<int:invite_id>/revoke` | POST | `dodois_invite_revoke` | `src/web/dodois_screen.py` |
 | `/administration/connections/health/<code>/check` | POST | `connection_health_check` | `src/web/connections_screen.py` |
 | `/administration/connections/issue` | POST | `connections_issue` | `src/web/connections_screen.py` |
 | `/administration/connections/keys/<service_code>/check` | POST | `service_key_check` | `src/web/connections_screen.py` |
@@ -108,6 +111,9 @@
 | `/country/<code>/units/new` | GET | `unit_new` | `src/web/unit_add.py` |
 | `/country/<code>/units/new` | POST | `unit_create` | `src/web/unit_add.py` |
 | `/country/filter` | POST | `country_filter` | `src/web/country_filter.py` |
+| `/dodois/connect/<token>` | GET | `dodois_connect` | `src/web/dodois_connect.py` |
+| `/dodois/connect/<token>/start` | POST | `dodois_connect_start` | `src/web/dodois_connect.py` |
+| `/dodois/connect/<token>/status` | GET | `dodois_connect_status` | `src/web/dodois_connect.py` |
 | `/inspections` | GET | `registry` | `src/web/app.py` |
 | `/inspections/<inspection_id>` | GET | `card` | `src/web/app.py` |
 | `/inspections/<inspection_id>/accept` | POST | `do_accept` | `src/web/app.py` |
@@ -555,6 +561,8 @@
 | `0093_ratings_rko_service_marks.sql` | — |
 | `0094_action_plan_file_parsed.sql` | — |
 | `0095_health_checks.sql` | `health.checks` |
+| `0096_dodois_logins.sql` | `dodois.logins`, `dodois.invites` |
+| `0097_dodois_invite_result.sql` | — |
 <!-- map:end -->
 
 ## Makefile

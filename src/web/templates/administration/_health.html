@@ -31,7 +31,7 @@
         <li class="shealth__row">
           <span class="shealth__dot shealth__dot--{{ s.light }}" role="img" aria-label="{{ t('health.light.' ~ s.light) }}"></span>
           <span class="shealth__main">
-            <b>{{ t('health.conn.' ~ row.code) }}</b>
+            <b>{% if row.country %}{{ t('health.conn.dodo_is_country', name=country_title(row.country)) }}{% else %}{{ t('health.conn.' ~ row.code) }}{% endif %}</b>
             <small>{{ t(s.reason, **s.params) }}{% if s.checked_at %} · {{ t('health.ran' if row.kind == 'load' else 'health.checked', at=health_stamp(s.checked_at)) }}{% endif %}</small>
           </span>
           {% if row.checkable %}
