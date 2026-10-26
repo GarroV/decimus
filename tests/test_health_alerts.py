@@ -73,9 +73,9 @@ RS_EXPIRED = _dodois("RS", RED, "health.reason.dodois_expired")
 
 
 def test_первый_заход_фиксирует_и_молчит(box: Box) -> None:
-    sent = box.run([RS_EXPIRED, _load("aggregators", RED, "health.reason.failed")])
+    sent = box.run([RS_EXPIRED, _load("maps", RED, "health.reason.failed")])
     assert sent == 0 and box.sent == []
-    assert box.levels == {"dodo_is:RS": "red", "aggregators": "red"}
+    assert box.levels == {"dodo_is:RS": "red", "maps": "red"}
 
 
 def test_после_первого_захода_поломка_даёт_одно_сообщение_alert(box: Box) -> None:
@@ -175,9 +175,9 @@ def test_после_сбоя_отправки_остальные_сообщен�
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     box = Box(monkeypatch, fail=True)
-    box.run([RS_OK, _load("aggregators", GREEN, "health.reason.ran")])
-    box.run([RS_EXPIRED, _load("aggregators", RED, "health.reason.failed")])
-    assert box.levels == {"dodo_is:RS": "ok", "aggregators": "ok"}
+    box.run([RS_OK, _load("maps", GREEN, "health.reason.ran")])
+    box.run([RS_EXPIRED, _load("maps", RED, "health.reason.failed")])
+    assert box.levels == {"dodo_is:RS": "ok", "maps": "ok"}
 
 
 # --- канал и демо ---------------------------------------------------------------------
@@ -265,3 +265,30 @@ def test_время_последнего_удачного_берётся_из_с
     )
     assert "26.10" not in alerts.compose(signal, "alert", country_names={}, url=None)
     assert "25.10 04:10" in alerts.compose(signal, "alert", country_names={}, url=None)
+
+
+@pytest.mark.parametrize("code", ["aggregators", "learning"])
+def test_у_сборов_со_своей_тревогой_ошибка_не_оповещает_и_отбоя_без_нашей_тревоги_нет(
+    box: Box, code: str
+) -> None:
+    box.run([_load(code, GREEN, "health.reason.ran")])
+    box.run([_load(code, RED, "health.reason.failed")])
+    box.run([_load(code, GREEN, "health.reason.ran")])
+    assert box.sent == []
+
+
+@pytest.mark.parametrize("code", ["aggregators", "learning"])
+def test_у_сборов_со_своей_тревогой_срок_оповещает_и_отбой_после_нашей_тревоги(
+    box: Box, code: str
+) -> None:
+    box.run([_load(code, GREEN, "health.reason.ran")])
+    box.run([_load(code, YELLOW, "health.reason.late")])
+    box.run([_load(code, RED, "health.reason.failed")])  # ошибка состояния не меняет
+    box.run([_load(code, GREEN, "health.reason.ran")])
+    assert [kind for kind, _ in box.sent] == ["alert", "done"]
+
+
+def test_у_карт_без_своей_тревоги_ошибка_оповещает(box: Box) -> None:
+    box.run([_load("maps", GREEN, "health.reason.ran")])
+    box.run([_load("maps", RED, "health.reason.failed")])
+    assert len(box.sent) == 1

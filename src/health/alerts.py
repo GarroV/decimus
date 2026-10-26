@@ -7,7 +7,9 @@
 Правила — `src/domain/health_alerts.py`, тексты — `src/health/alert_texts.py`.
 
 **Что оповещает.** Вход Dodo IS каждой страны отдельно (`dodo_is:<страна>`): красный и жёлтый.
-Сборы (агрегаторы, карты, таблица контроля, обучение): красный и жёлтый. Ключи и службы
+Сборы (агрегаторы, карты, таблица контроля, обучение): красный и жёлтый; у агрегаторов и
+обучения, у которых есть своя тревога о сборе с ошибкой, — только «не пришёл в срок» и
+«остановился», без причины «завершился ошибкой» (чтобы не дублировать). Ключи и службы
 (OpenAI, бот, хранилище, iSpring): только красный. Pointer-ключ не пробуется по расписанию —
 его покрывает ночной сбор карт, отдельной тревоги по нему нет.
 
@@ -56,6 +58,12 @@ OWNER_LANG = "ru"
 DODOIS_TAB_PATH = "/administration?tab=dodois"
 DODOIS_PREFIX = "dodo_is:"
 
+#: Сборы, у которых уже есть своя тревога о сборе «с ошибкой» (агрегаторы — D438, обучение —
+#: `learning_loader`): здесь они оповещают только о «не пришёл в срок» и «остановился», а
+#: причина «завершился ошибкой» ничего не меняет — ни тревоги, ни отбоя.
+OWN_FAILURE_ALERT = frozenset({"aggregators", "learning"})
+FAILED_REASON = "health.reason.failed"
+
 Send = Callable[[tuple[str, str], str, str], None]
 
 
@@ -90,6 +98,8 @@ def signals(found: tuple[Row, ...]) -> list[Signal]:
                 continue  # Pointer: по кнопке; его покрывает ночной сбор карт
             code, red_only = row.code, True
         else:
+            continue
+        if row.code in OWN_FAILURE_ALERT and row.status.reason == FAILED_REASON:
             continue
         level = rules.level_of(row.status.light, red_only=red_only)
         if level is not None:
