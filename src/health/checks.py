@@ -1,7 +1,8 @@
 """Реестр подключений вкладки «Подключения» (D638) и пробы тех, что пробуются.
 
-Порядок в `CONNECTIONS` — порядок строк на экране: сначала ключи и службы, без
-которых встаёт работа аудитора, потом сборы данных, потом заготовки.
+Строки делятся на группы (`GROUPS`, порядок групп на экране): системное — ключи и
+службы, без которых встаёт работа аудитора, и бэкап; рейтинги и оценки; обучение;
+входы Dodo IS. Внутри группы — порядок в `CONNECTIONS`.
 
 Проба возвращает `(цвет, причина)`; `None` — пробовать здесь нечем (в процессе нет
 токена бота или доступа к хранилищу), и тогда исход не пишется: иначе веб, у
@@ -51,6 +52,13 @@ PENDING = "pending"
 #: Входы в Dodo IS по странам (D640): строка на страну, цвет — из состояния входа.
 DODOIS = "dodois"
 
+#: Группы плиток на экране, по порядку (ключ текста `health.group.<код>`).
+SYSTEM = "system"
+RATINGS = "ratings"
+LEARNING = "learning"
+DODO_IS = "dodo_is"
+GROUPS = (SYSTEM, RATINGS, LEARNING, DODO_IS)
+
 Outcome = tuple[str, str]
 
 
@@ -60,29 +68,30 @@ class Connection:
 
     code: str
     kind: str
+    group: str
     fresh_for: timedelta | None = None
     scheduled: bool = True
 
 
 CONNECTIONS: tuple[Connection, ...] = (
-    Connection("openai", PROBE),
-    Connection("telegram", PROBE),
-    Connection("storage", PROBE),
-    Connection("google", CONFIG),
+    Connection("storage", PROBE, SYSTEM),
+    Connection("openai", PROBE, SYSTEM),
+    Connection("telegram", PROBE, SYSTEM),
+    Connection("google", CONFIG, SYSTEM),
+    # Бэкап делает хост (`vps-backup`, репозиторий vps-infra), приложению его не видно.
+    Connection("backup", PENDING, SYSTEM),
     # Pointer пробуется только по кнопке (#1256): лимит 1 запрос в секунду, и проба по
     # расписанию попадала бы в ночной сбор карт и почасовую дозагрузку истории, роняя их.
     # Что ключ работает каждую ночь, показывает строка «maps».
-    Connection("pointer", PROBE, scheduled=False),
-    Connection("ispring", PROBE),
-    Connection("aggregators", LOAD, DAILY_FRESH),
-    Connection("maps", LOAD, DAILY_FRESH),
-    Connection("sheet", LOAD, SHEET_FRESH),
-    Connection("learning", LOAD, DAILY_FRESH),
-    # Бэкап делает хост (`vps-backup`, репозиторий vps-infra), приложению его не видно.
-    Connection("backup", PENDING),
+    Connection("pointer", PROBE, RATINGS, scheduled=False),
+    Connection("maps", LOAD, RATINGS, DAILY_FRESH),
+    Connection("aggregators", LOAD, RATINGS, DAILY_FRESH),
+    Connection("sheet", LOAD, RATINGS, SHEET_FRESH),
+    Connection("ispring", PROBE, LEARNING),
+    Connection("learning", LOAD, LEARNING, DAILY_FRESH),
     # Dodo IS по странам (D640, #951): строка на каждый вход; цвет — из `dodois.logins`,
     # которые продлевает и проверяет бот (`src/bot/dodois_loader.py`).
-    Connection("dodo_is", DODOIS),
+    Connection("dodo_is", DODOIS, DODO_IS),
 )
 
 #: Что фоновая задача пробует раз в `PROBE_EVERY`.

@@ -37,6 +37,8 @@ class Row:
     code: str
     kind: str
     status: Status
+    #: Группа плиток (`checks.GROUPS`).
+    group: str = ""
     #: Код страны у строки входа Dodo IS (D640); у остальных пусто.
     country: str = ""
 
@@ -61,12 +63,18 @@ def _google() -> Status:
     return Status(GREY, "health.reason.not_configured")
 
 
-def _dodois_rows(code: str, logins: Any, moment: datetime) -> list[Row]:
+def _dodois_rows(conn: checks.Connection, logins: Any, moment: datetime) -> list[Row]:
     """Строка на каждый вход Dodo IS; входов нет — одна серая строка «подключений нет»."""
     if not logins:
-        return [Row(code, DODOIS, Status(GREY, "health.reason.dodois_none"))]
+        return [Row(conn.code, DODOIS, Status(GREY, "health.reason.dodois_none"), conn.group)]
     return [
-        Row(code, DODOIS, dodois_rules.status_of(login, moment), country=login.country)
+        Row(
+            conn.code,
+            DODOIS,
+            dodois_rules.status_of(login, moment),
+            conn.group,
+            country=login.country,
+        )
         for login in logins
     ]
 
@@ -89,14 +97,20 @@ def rows(now: datetime | None = None) -> tuple[Row, ...] | None:
         elif conn.kind == LOAD and conn.fresh_for is not None:
             status = health.of_loads(loads.get(conn.code), moment, fresh_for=conn.fresh_for)
         elif conn.kind == DODOIS:
-            found.extend(_dodois_rows(conn.code, logins, moment))
+            found.extend(_dodois_rows(conn, logins, moment))
             continue
         elif conn.kind == CONFIG:
             status = _google()
         else:
             status = Status(GREY, _PENDING_REASON.get(conn.code, "health.reason.not_configured"))
-        found.append(Row(conn.code, conn.kind, status))
+        found.append(Row(conn.code, conn.kind, status, conn.group))
     return tuple(found)
+
+
+def grouped(found: tuple[Row, ...]) -> tuple[tuple[str, tuple[Row, ...]], ...]:
+    """Строки по группам в порядке `checks.GROUPS`; пустые группы не показываются."""
+    by_group = ((g, tuple(r for r in found if r.group == g)) for g in checks.GROUPS)
+    return tuple((g, members) for g, members in by_group if members)
 
 
 def context(flash: Flash | None = None) -> dict[str, Any]:
@@ -105,6 +119,7 @@ def context(flash: Flash | None = None) -> dict[str, Any]:
     lights = [r.status.light for r in found or ()]
     return {
         "health_rows": found,
+        "health_groups": grouped(found) if found is not None else (),
         "health_summary": health.summary(lights),
         "health_count": {
             light: sum(1 for x in lights if x == light) for light in (GREEN, YELLOW, RED, GREY)
