@@ -4,8 +4,6 @@
 .slist--users { --slist-cols: minmax(0, 1fr) 92px 104px 90px 90px; }
 .slist--users.slist--nobot { --slist-cols: minmax(0, 1fr) 92px 104px 90px; }
 .slist--spaces { --slist-cols: minmax(0, 1fr) minmax(0, 1fr) 64px; }
-.slist--countries { --slist-cols: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, .9fr) 64px 14px; }
-.slist--countries.slist--nocontract { --slist-cols: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, .9fr) 14px; }
 
 /* Роль — должность словом и одна строка, что она может (владелец 09.10.2026). */
 .sroles { display: flex; flex-direction: column; gap: var(--space-3); }

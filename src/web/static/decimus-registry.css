@@ -101,7 +101,6 @@
 .rg-filters .spill--search { display: flex; width: 100%; min-width: 0; }
 .rg-filters .spill--check { display: flex; width: 100%; min-width: 0; }
 .rg-reset { justify-self: start; }
-.rg-countries { display: grid; gap: var(--space-1); }
 .rg-country-chip { display: none; }
 @media (max-width: 1023px) {
   .rg-shell .mx-rail { display: grid; }

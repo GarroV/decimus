@@ -3,8 +3,8 @@
   админу; чужой роли адрес отвечает 404. Каркас тот же, что у «Стран» и «Ключей и API»
   (`docs/12-web-admin.md`, «Каркас вкладки администрирования»): шапка с «?» → раздел `ssec` с
   ключами приложения маркетплейса (D648, панель из `users/_service_key_panel.html`, возврат сюда)
-  → список стран (`sbox` / `slist` / `srow--go`) → панель выбранной страны справа.
-  Кнопок в строках нет: выбор — `?country=<код>`, в панели — «Сгенерировать ссылку», «Проверить
+  → страны плитками (`sbox` / `sdtiles` / `shealth__tile`; огонёк: зелёный вход в порядке, красный сбой, серый входа нет, D654) → панель выбранной страны справа.
+  Кнопок в плитках нет: выбор — `?country=<код>`, в панели — «Сгенерировать ссылку», «Проверить
   сейчас», «Отозвать» (POST `/dodois/invite`, `/dodois/<страна>/check`, `/dodois/invite/<id>/revoke`).
   Ссылка видна один раз, только в ответе на выдачу, в панели той страны. Тексты — `texts_dodois.py`.
 #}{% extends "_split_page.html" %}
@@ -74,34 +74,23 @@
       <div class="sempty"><p class="sempty__title">{{ t('dodois.empty') }}</p></div>
     {% else %}
       <div class="sbar"><span class="sbar__count">{{ t('dodois.count', count=dv.rows|length, linked=dv.rows|selectattr('login')|list|length) }}</span></div>
-      <div class="slist slist--countries slist--dodois">
-        <div class="slist__head" aria-hidden="true">
-          <span>{{ t('dodois.country') }}</span>
-          <span>{{ t('dodois.col.status') }}</span>
-          <span>{{ t('dodois.col.via') }}</span>
-          <span></span>
-        </div>
-        <ul class="slist__rows">
-          {% for row in dv.rows %}
-            {% set login = row.login %}
-            {% set latest = row.latest %}
-            {% set current = split_open and picked == row.code %}
-            <li>
-              <a class="srow srow--go{% if current %} is-current{% endif %}" id="dodois-{{ row.code }}" href="{{ link(country=row.code) }}" aria-label="{{ t('dodois.open', country=country_title(row.code)) }}"{% if current %} aria-current="true"{% endif %}>
-                <span class="srow__main"><b>{{ country_title(row.code) }}</b><small class="mono">{{ row.code }}</small></span>
-                <span class="srow__go" aria-hidden="true">›</span>
-                <span class="srow__cell" data-label="{{ t('dodois.col.status') }}">
-                  <span class="sdot{{ ' sdot--ok' if login is not none and login.state == 'ok' else '' }}" aria-hidden="true"></span>
-                  {% if login is not none %}{{ t('dodois.state.' ~ login.state) }} <small>{{ counts(login) }}</small>
-                  {% elif latest is not none %}{{ t('dodois.invite.status.' ~ latest.status(dodois_now)) }}
-                  {% else %}<span class="srow__none">{{ t('dodois.state.none') }}</span>{% endif %}
-                </span>
-                <span class="srow__cell" data-label="{{ t('dodois.col.via') }}">{{ who(login) }}</span>
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
-      </div>
+      <ul class="sdtiles">
+        {% for row in dv.rows %}
+          {% set login = row.login %}
+          {% set latest = row.latest %}
+          {% set current = split_open and picked == row.code %}
+          {% set tone = 'grey' if login is none else ('green' if login.state == 'ok' else 'red') %}
+          {% set status %}{% if login is not none %}{{ t('dodois.state.' ~ login.state) }}{% elif latest is not none %}{{ t('dodois.invite.status.' ~ latest.status(dodois_now)) }}{% else %}{{ t('dodois.state.none') }}{% endif %}{% endset %}
+          <li>
+            <a class="shealth__tile sdtile{% if current %} is-on{% endif %}" id="dodois-{{ row.code }}" href="{{ link(country=row.code) }}" data-drawer-open aria-label="{{ t('dodois.open', country=country_title(row.code)) }} · {{ status|trim }}"{% if current %} aria-current="true"{% endif %}>
+              <span class="shealth__dot shealth__dot--{{ tone }} sdtile__dot" aria-hidden="true"></span>
+              <b class="sdtile__code mono">{{ row.code }}</b>
+              <small class="sdtile__name">{{ country_title(row.code) }}</small>
+              {% if login is none and latest is not none %}<small class="sdtile__note">{{ status|trim }}</small>{% endif %}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
     {% endif %}
   </div>
 {% endblock %}

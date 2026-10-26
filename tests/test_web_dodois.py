@@ -193,12 +193,40 @@ def test_главный_админ_видит_блок(главный: FlaskClie
     assert "Словения" in html and "Болгария" in html
     assert "Входа нет" in html
     # D653: каркас «Стран»: строки-ссылки, кнопок в строках и панели без выбора нет.
-    assert 'class="slist slist--countries slist--dodois"' in html and "<table" not in html
+    assert 'class="sdtiles"' in html and "<table" not in html and "slist__head" not in html
     assert "Сгенерировать ссылку" not in html and 'class="stile' not in html
     assert 'class="sdrawer' not in html
-    assert re.search(r'<a class="srow srow--go" id="dodois-SI" href="[^"]*country=SI"', html)
-    for колонка in ("Страна", "Статус", "Через кого подключено"):
-        assert колонка in html
+    # Плитка страны: код крупно, огонёк — серый, пока входа нет (зелёный ок, красный сбой).
+    плитка = re.search(
+        r'<a class="shealth__tile sdtile" id="dodois-SI" href="[^"]*country=SI"[^>]*>(.*?)</a>',
+        html,
+        re.S,
+    )
+    assert плитка and "shealth__dot--grey" in плитка.group(1) and ">SI</b>" in плитка.group(1)
+
+
+def test_огонёк_плитки_зелёный_красный_серый(
+    главный: FlaskClient, ссылки: Ссылки, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Зелёный — вход в порядке, красный — любое другое состояние, серый — входа нет."""
+    сейчас = datetime.now(UTC)
+
+    def вход_страны(страна: str, состояние: str) -> rules.Login:
+        return rules.Login(
+            страна, "prod", "link", "a@b.c", None, None, сейчас, "s", 3, 3, None, None, None,
+            состояние, None,
+        )  # fmt: skip
+
+    монтаж = (вход_страны("SI", rules.OK), вход_страны("BG", rules.FAILED))
+    monkeypatch.setattr(store, "list_logins", lambda: монтаж)
+    html = главный.get(ВКЛАДКА).get_data(as_text=True)
+
+    def огонёк(код: str) -> str:
+        плитка = re.search(rf'id="dodois-{код}"[^>]*>(.*?)</a>', html, re.S)
+        assert плитка, код
+        return re.search(r"shealth__dot--(\w+)", плитка.group(1)).group(1)  # type: ignore[union-attr]
+
+    assert (огонёк("SI"), огонёк("BG")) == ("green", "red")
 
 
 def test_выбранная_страна_открывает_панель_с_действиями(главный: FlaskClient) -> None:
@@ -221,7 +249,7 @@ def test_блок_не_остался_во_вкладке_подключения
 def test_вкладка_стоит_после_подключений_и_ключей(главный: FlaskClient) -> None:
     html = главный.get(ВКЛАДКА).get_data(as_text=True)
     assert 'aria-current="page"' in html
-    вкладки = re.findall(r'class="sadmin__tab[^"]*" href="[^"]*\?tab=(\w+)', html)
+    вкладки = re.findall(r'class="pk-item[^"]*" href="[^"]*\?tab=(\w+)', html)
     assert вкладки[-3:] == ["connections", "keys", "dodois"]
 
 
@@ -614,5 +642,9 @@ def test_ответ_действия_это_вкладка_dodois_а_не_под
     ответ = главный.post("/administration/dodois/SI/check", headers=ЗАГОЛОВКИ)
     html = ответ.get_data(as_text=True)
     assert 'id="dodois-keys"' in html
-    assert re.search(r'aria-current="page">\s*Dodo IS', html)
+    assert re.search(
+        r'class="pk-item is-on" href="[^"]*tab=dodois"[^>]*>\s*<span class="pk-item__main">'
+        r'\s*<span class="pk-item__title">Dodo IS',
+        html,
+    )
     assert 'class="sdrawer' in html, "после действия открыта панель этой страны"

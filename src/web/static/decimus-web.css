@@ -660,7 +660,7 @@ a.ov-table__row:hover { background: var(--surface-2); }
    как ссылка в тексте (владелец 30.09.2026: «когда наводишь на город он
    отображается как гиперссылка»). Как в Swarm: строка светлеет, текст стоит. */
 a.ov-table__row:hover, a.ov-row:hover, a.ins-row:hover, a.ov-tile:hover,
-a.pick__item:hover, a.mx-row:hover, a.mx-rail__row:hover,
+a.pick__item:hover, a.mx-row:hover,
 a.tabbar__item:hover, a.pt-bars__col:hover {
   color: inherit; text-decoration: none;
 }
@@ -1437,22 +1437,6 @@ a[data-zoom] { cursor: zoom-in; }
 .mx-rail__head--list { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0 var(--space-4) var(--space-3); }
 /* На телефоне кнопки растягиваются во всю ширину (`dodo-ds`); эта — нет: она живёт в строке заголовка. */
 .mx-rail__head--list .btn { width: auto; flex: none; text-transform: none; letter-spacing: normal; }
-.mx-rail__row {
-  display: grid; gap: 2px; padding: var(--space-3) var(--space-4);
-  border-radius: var(--r-control); color: var(--ink); text-decoration: none;
-  box-shadow: inset 3px 0 0 transparent;
-  transition: background var(--t-state), box-shadow var(--t-state);
-}
-.mx-rail__row:hover { background: var(--surface-2); text-decoration: none; color: var(--ink); }
-.mx-rail__row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
-.mx-rail__row.is-on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
-.mx-rail__name { font-size: var(--fs-dense); line-height: var(--lh-dense); overflow-wrap: anywhere; }
-.mx-rail__meta { font-size: var(--fs-micro); color: var(--ink-3); font-variant-numeric: tabular-nums; }
-/* Строка колонки в одну линию (D496): название слева, число справа. Для длинных
-   списков (страны), где вторая строка удваивала высоту колонки. */
-.mx-rail__row--line { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: var(--space-4); padding-block: var(--space-2); }
-.mx-rail__count { font-size: var(--fs-micro); color: var(--ink-3); font-variant-numeric: tabular-nums; }
-.mx-rail__row.is-on .mx-rail__count { color: var(--ink-2); }
 .mx-rail__bot-mark {
   display: inline-flex; vertical-align: -2px; margin-left: var(--space-2); color: var(--ok);
 }
@@ -1750,7 +1734,6 @@ a[data-zoom] { cursor: zoom-in; }
    над подложкой (z-index 61, D222), чтобы из панели уходить в другой чек-лист. */
 @media (max-width: 1279px) {
   .mx-shell { grid-template-columns: 15rem minmax(0, 1fr); gap: var(--space-5); }
-  .mx-rail__meta { display: none; }
 }
 @media (max-width: 1023px) {
   .mx-shell { grid-template-columns: minmax(0, 1fr); }
@@ -1772,7 +1755,6 @@ a[data-zoom] { cursor: zoom-in; }
   .mx-record__row { flex-direction: column; }
   .mx-record__row .input, .mx-record__row .btn { width: 100%; }
   .mx-shell--pick .mx-rail { display: grid; position: static; max-height: none; }
-  .mx-shell--pick .mx-rail__meta { display: block; }
   .mx-shell--pick .mx-main { display: none; }
 }
 /* Шапка раздела без нижнего отступа дизайн-системы. */

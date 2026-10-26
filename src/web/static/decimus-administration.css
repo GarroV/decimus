@@ -4,12 +4,6 @@
 
 .sadmin { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: var(--space-7); align-items: start; }
 .sadmin__nav { position: sticky; top: var(--space-6); }
-.sadmin__title { margin: 0 0 var(--space-4); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-semibold); }
-.sadmin__tabs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.sadmin__tab { display: block; padding: var(--space-3) var(--space-4); border-radius: var(--r-control); color: var(--ink-2); text-decoration: none; font-weight: var(--w-medium); transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
-.sadmin__tab:hover { background: var(--surface-2); color: var(--ink); }
-.sadmin__tab.is-current { background: var(--accent-soft); color: var(--ink); }
-.sadmin__tab:focus-visible { outline: var(--focus-outline); }
 .sadmin__main { min-width: 0; }
 
 .shealth { margin: var(--space-6) 0; }
@@ -53,12 +47,7 @@
 .sdodois-page__code code { font-size: var(--fs-title); letter-spacing: 0.08em; }
 .sdodois-page__wait { color: var(--ink-3); }
 
-/* Вкладка «Страны» (D640): строка списка — ссылка со стрелкой, настройки страны — блоки-плитки. */
-.srow--go { cursor: pointer; }
-.srow--go .srow__go { order: 9; justify-self: end; color: var(--ink-3); font-size: 18px; line-height: 1; transition: transform var(--t-state) var(--ease), color var(--t-state) var(--ease); }
-.srow--go:hover .srow__go, .srow--go.is-current .srow__go { color: var(--accent); transform: translateX(2px); }
-.slist--countries .srow__cell { overflow: visible; white-space: normal; }
-.slist--countries .srow__main small { white-space: nowrap; }
+/* Вкладка «Страны» (D640): настройки страны — блоки-плитки. */
 
 .cblocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); max-width: 760px; align-items: stretch; }
 .cblock { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: var(--space-6); border: 1px solid var(--line-strong); border-radius: var(--r-block, 12px); background: var(--surface); }
@@ -83,10 +72,7 @@
   .cblock__facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .cblock__facts dd { margin-bottom: var(--space-3); }
   .cblock .sbtn { min-height: 44px; }
-  .srow--go .srow__go { order: 0; }
-  .slist--countries .srow__main { flex: 1 1 calc(100% - 28px); }
-  .slist--countries .srow__cell::before { content: attr(data-label) ": "; color: var(--ink-3); margin-right: var(--space-2); }
-}
+  }
 
 /* Вкладка «Dodo IS» (D651): сжатая панель ключей приложения и список стран и панель выбранной (D653). */
 .sdodois__app { margin: 0 0 var(--space-5); }
@@ -98,5 +84,14 @@
 #dodois-link { margin-bottom: var(--space-5); }
 #dodois-link .ssecret code { overflow-wrap: anywhere; }
 #dodois-actions { margin-top: var(--space-4); }
-.slist--dodois { --slist-cols: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1.2fr) 14px; }
-.slist--dodois .srow__cell small { color: var(--ink-3); font-size: var(--fs-meta); }
+/* Страны плитками (D654): та же плитка, что у «Состояния подключений», огонёк в углу —
+   зелёный всё хорошо, красный сбой, серый ничего не подключено. Выбранная — как `pk-item.is-on`. */
+.sdtiles { list-style: none; margin: 0; padding: var(--space-4); display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--space-3); }
+.sdtile { position: relative; height: 100%; text-decoration: none; color: var(--ink); background: var(--surface-2); transition: background var(--t-state) var(--ease); }
+.sdtile:hover { background: var(--surface); text-decoration: none; color: var(--ink); }
+.sdtile.is-on { background: var(--surface); border-color: var(--line-strong); box-shadow: 0 0 0 1px var(--line-strong); }
+.sdtile:focus-visible { outline: var(--focus-outline); }
+.sdtile__dot { position: absolute; top: var(--space-3); right: var(--space-3); }
+.sdtile__code { font-family: var(--font-num); font-size: 22px; line-height: 28px; font-weight: var(--w-semibold); letter-spacing: .02em; }
+.sdtile__name { overflow-wrap: anywhere; }
+@media (max-width: 719px) { .sdtiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); } }

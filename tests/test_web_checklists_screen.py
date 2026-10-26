@@ -275,4 +275,4 @@ def test_отказ_заведения_возвращает_на_тот_же_ч�
     )
 
     страница = ответ.get_data(as_text=True)
-    assert 'class="mx-rail__row is-on" href="/admin?checklist=rnd' in страница
+    assert 'class="pk-item is-on" href="/admin?checklist=rnd' in страница

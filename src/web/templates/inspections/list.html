@@ -24,6 +24,7 @@
 #}{% extends "_split_page.html" %}
 {% from "_info_tip.html" import info_tip %}
 {% from "_pick.html" import pick %}
+{% from "_pick_ui.html" import pick_item %}
 {% from "_period.html" import period_picker with context %}
 {% from "inspections/_panel.html" import inspection_panel with context %}
 {% from "inspections/_row.html" import inspection_row with context %}
@@ -101,14 +102,14 @@
       {% if filters.active %}<a class="sbtn sbtn--ghost rg-reset" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
     </div>
     {% if country_pick %}
-      <div class="rg-countries">
+      <div class="rg-countries pk-rail pk-rail--inline">
         <div class="mx-rail__head mx-rail__head--list"><span>{{ t('country.rail.title') }}</span></div>
-        {% for option in country_pick.options %}
-          <a class="mx-rail__row mx-rail__row--line{% if option.selected %} is-on{% endif %}" href="{{ option.href }}"{% if option.selected %} aria-current="true"{% endif %}>
-            <span class="mx-rail__name">{{ option.title }}</span>
-            {% if option.count is not none %}<span class="mx-rail__count">{{ option.count }}</span>{% endif %}
-          </a>
-        {% endfor %}
+        <div class="pk-rail__list">
+          {% for option in country_pick.options %}
+            {{ pick_item(option.href, option.title, (t('registry.rail.inspections') if option.count is not none else ''),
+                         (option.count if option.count is not none else ''), option.selected, code=(option.code or 'Σ')) }}
+          {% endfor %}
+        </div>
       </div>
     {% endif %}
   </aside>

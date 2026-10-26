@@ -23,6 +23,11 @@
   display: flex; flex-direction: column; gap: var(--space-2);
   max-height: calc(100vh - var(--topbar-h) - var(--space-9)); overflow-y: auto;
   padding: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; }
+/* колонка внутри страницы раздела («Проверки», «Методика», «Администрирование»): тот же вид,
+   но без прилипания и своей прокрутки — страница ведёт сама. Заголовок колонки — `mx-rail__head`. */
+.pk-rail--inline { position: static; max-height: none; overflow: visible; }
+.pk-rail--inline .mx-rail__head--list { padding: 4px 10px 6px; }
+.pk-rail--col { max-width: 360px; }
 .pk-rail__list { display: flex; flex-direction: column; gap: 2px; min-height: 0; }
 
 .pk-search { margin: 0; }
