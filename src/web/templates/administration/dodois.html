@@ -1,0 +1,28 @@
+{#
+  «Dodo IS» (D640, D641): вкладка раздела «Администрирование», видна только главному админу;
+  чужой роли адрес отвечает 404. Вся вкладка — блок входов по странам
+  (`administration/_dodois.html`): страны сети столбцом, у каждой состояние словами; справа
+  панель выбранной страны. Исход действий рисует тот же блок.
+#}{% extends "_split_page.html" %}
+{% from "administration/_nav.html" import admin_nav with context %}
+{% block title %}{{ t('administration.tab.dodois') }} · {{ t('section.administration.title') }}{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endblock %}
+
+{# Столбец вкладок слева, вся страница вкладки — справа (D639). #}
+{% block body %}
+  <div class="sadmin">
+    {{ admin_nav() }}
+    <div class="sadmin__main">{{ super() }}</div>
+  </div>
+{% endblock %}
+
+{% block split_top %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('administration.tab.dodois') }}</h1>
+    </div>
+  </header>
+  {% include "administration/_dodois.html" %}
+{% endblock %}

@@ -189,7 +189,7 @@ Claude входом через сайт (OAuth).
 | `src/web/connections_screen.py` | Вкладка «Подключения» раздела «Администрирование» (D638, D639): ключи сервисов и API |
 | `src/web/demo_entry.py` | Вход в открытое демо (D524): выбор роли и сессия без пароля — только на стенде демо |
 | `src/web/dodois_connect.py` | Публичная страница входа в Dodo IS по ссылке-приглашению (D640, #951) |
-| `src/web/dodois_screen.py` | Блок «Dodo IS» на вкладке «Подключения»: входы по странам и ссылки для коллег (D640, #951) |
+| `src/web/dodois_screen.py` | Вкладка «Dodo IS» раздела «Администрирование»: входы по странам и ссылки (D640, D641, #951) |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
 | `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
 | `src/web/google_profile.py` | Имя и фото из Google в учётку (D468): скачать фото один раз и записать |
@@ -309,7 +309,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 24 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, … (+16) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
-| `src/web/templates/administration/` | 5 | _dodois.html, _health.html, _nav.html, connections.html, countries.html |
+| `src/web/templates/administration/` | 6 | _dodois.html, _health.html, _nav.html, connections.html, countries.html, dodois.html |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
@@ -331,7 +331,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 66 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-administration.css, … (+58) |
+| `src/web/static/` | 64 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+56) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -553,6 +553,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0096_dodois_logins.sql` | Входы в Dodo IS по странам (D640, #951) |
 | `0097_dodois_invite_result.sql` | Новый вход заменяет рабочий вход страны только после проверки: учётка должна открывать хоть одну пиццерию |
 | `0098_country_report_langs.sql` | Языки отчёта страны, изменяемые из веба (D640, #1251, вкладка «Администрирование → Страны») |
+| `0099_health_alerts.sql` | Оповещения владельцу о смене состояния подключений (D641) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -722,18 +723,35 @@ JSON-RPC поверх одного POST на локальной петле, ли
 Вкладка «Администрирование → Подключения» (D638, #1251): реестр подключений, пробы ключей
 и служб. Пробует бот раз в 15 минут (`src/bot/health_loader.py`) и веб по кнопке
 «Проверить сейчас»; исходы — `src/db/health_store.py` (`health.checks`), цвета —
-`src/domain/health.py`.
+`src/domain/health.py`, их сборка в строки (общая для плиток и оповещений) — `rows.py`.
+Оповещения владельцу о смене состояния (D641) — `alerts.py` (правила — `src/domain/health_alerts.py`,
+последнее оповещённое — `health.alerts`).
 
 <!-- map:begin files src/health/*.py -->
 | Файл | Что делает |
 |---|---|
+| `src/health/alert_texts.py` | Тексты оповещений о подключениях (D641): ru — для владельца, en — запасной |
+| `src/health/alerts.py` | Оповещения владельцу о смене состояния подключений (D641) |
 | `src/health/checks.py` | Реестр подключений вкладки «Подключения» (D638) и пробы тех, что пробуются |
 | `src/health/probes.py` | Проверка ключа у провайдера до записи (D576): один дешёвый вызов с введённым значением |
+| `src/health/rows.py` | Строки состояния подключений: реестр + факты из базы → цвет каждой (D638, D641) |
+<!-- map:end -->
+
+## src/notify — отправка в канал FURCA
+
+Одна отправка сообщения владельцу (D438, D439, D641): адрес и ключ из `FURCA_NOTIFY_URL`,
+`FURCA_SECRET`, `POST /notify`. Зовут тревога агрегаторов, загрузка обучения и оповещения
+о подключениях (`src/health/alerts.py`).
+
+<!-- map:begin files src/notify/*.py -->
+| Файл | Что делает |
+|---|---|
+| `src/notify/furca.py` | Канал FURCA: одна отправка сообщения владельцу (D438, D439, D641) |
 <!-- map:end -->
 
 ## src/dodois — входы в Dodo IS по странам
 
-Блок «Dodo IS» на «Подключениях» (`docs/12-web-admin.md`, D640, #951): device flow
+Вкладка «Dodo IS» в «Администрировании» (`docs/12-web-admin.md`, D640, D641, #951): device flow
 `auth.dodois.com`, продление и проверка «открыто X из Y». Расписание — `src/bot/dodois_loader.py`,
 правила — `src/domain/dodois.py`, база — `src/db/dodois_logins.py`, экраны — `src/web/dodois_screen.py`,
 `src/web/dodois_connect.py`.
@@ -832,6 +850,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/geo.py` | Страны и города сети: названия для людей, страна города, местные написания |
 | `src/domain/handover.py` | Сдана ли проверка: признак, который ставит бот, а читают и бот, и мини-апп (D080, D312) |
 | `src/domain/health.py` | Цвет подключения на вкладке «Подключения» (D638): правила, без базы и сети |
+| `src/domain/health_alerts.py` | Когда подключение оповещает владельца (D641): правила, без базы и сети |
 | `src/domain/info.py` | Информационные поля проверки — блок `info` состояния (T158, решения D069, D070) |
 | `src/domain/info_fields.py` | Состав информационной части проверки: какие поля и каким способом вводятся (T158, D312) |
 | `src/domain/item_label.py` | Пункт чек-листа для человека: «Порядок 13», а не `CLN13` (решение владельца 20.10.2026) |

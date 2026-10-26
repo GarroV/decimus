@@ -24,6 +24,7 @@ from .sections import section
 from .users_view import (
     TAB_CONNECTIONS,
     TAB_COUNTRIES,
+    TAB_DODOIS,
     TAB_JOURNAL,
     TAB_PEOPLE,
     TAB_SPACES,
@@ -33,6 +34,7 @@ from .users_view import (
 #: Группы вкладок: подзаголовок в столбце, если в группе у роли видно больше одной вкладки.
 GROUP_ACCESS = "access"
 GROUP_JOURNAL = "journal"
+GROUP_CONNECTIONS = "connections"
 
 
 def _scope(account: object) -> access_policy.Scope | None:
@@ -104,7 +106,9 @@ TABS: tuple[Tab, ...] = (
     Tab(TAB_JOURNAL, _is_super, GROUP_JOURNAL),
     Tab(TAB_USAGE, _sees_usage, GROUP_JOURNAL),
     # Ключи сервисов, ключи `/api/v1` и состояние подключений — главный админ (D638).
-    Tab(TAB_CONNECTIONS, _is_super),
+    Tab(TAB_CONNECTIONS, _is_super, GROUP_CONNECTIONS),
+    # Входы Dodo IS по странам — отдельная вкладка рядом с «Подключениями» (D641); права те же.
+    Tab(TAB_DODOIS, _is_super, GROUP_CONNECTIONS),
 )
 
 
@@ -141,7 +145,14 @@ def nav(current: str) -> dict[str, object]:
 
 def install(app: Flask, conf: Settings) -> None:
     """Страница раздела. Вкладки ставят свои маршруты действий сами."""
-    from . import connections_screen, countries_screen, journal_screen, usage_screen, users_page
+    from . import (
+        connections_screen,
+        countries_screen,
+        dodois_screen,
+        journal_screen,
+        usage_screen,
+        users_page,
+    )
 
     def people() -> FlaskResponse | tuple[str, int]:
         return users_page.render(users_page.Show(tab=TAB_PEOPLE))
@@ -156,6 +167,7 @@ def install(app: Flask, conf: Settings) -> None:
         TAB_JOURNAL: lambda: journal_screen.show_users(conf),
         TAB_USAGE: lambda: usage_screen.show(conf),
         TAB_CONNECTIONS: connections_screen.show,
+        TAB_DODOIS: dodois_screen.show,
     }
 
     @app.get(section("administration").path)

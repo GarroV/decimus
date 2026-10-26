@@ -57,6 +57,33 @@ def probes() -> dict[str, ProbeRow]:
     return {r[0]: ProbeRow(light=r[1], reason=r[2], checked_at=r[3]) for r in rows}
 
 
+def alert_levels() -> dict[str, str]:
+    """Последнее оповещённое состояние каждого кода (D641); пусто — первый заход после выкатки."""
+    try:
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute("select code, level from health.alerts").fetchall()
+    except psycopg.Error as exc:
+        raise _fail("Оповещённые состояния подключений не прочитались", exc) from exc
+    return {r[0]: r[1] for r in rows}
+
+
+def save_alert_levels(levels: dict[str, str], at: datetime) -> None:
+    """Записать оповещённые состояния (код → уровень); прежнее состояние кода заменяется."""
+    if not levels:
+        return
+    try:
+        with connection(check_environment().dsn) as conn:
+            for code, level in levels.items():
+                conn.execute(
+                    "insert into health.alerts (code, level, notified_at) values (%s, %s, %s) "
+                    "on conflict (code) do update set level = excluded.level, "
+                    "notified_at = excluded.notified_at",
+                    (code, level, at),
+                )
+    except psycopg.Error as exc:
+        raise _fail("Оповещённое состояние подключения не записалось", exc) from exc
+
+
 def _single(table: str) -> LoadFacts | None:
     # Имя таблицы — только из `_LOAD_TABLES`, не из запроса.
     sql = f"select at, outcome, error from {table} order by at desc limit 1"  # noqa: S608

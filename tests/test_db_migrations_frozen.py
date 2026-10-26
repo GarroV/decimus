@@ -378,6 +378,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0098_country_report_langs.sql": (
         "sql1:16d066f57e15bba125dd079592ddbd6cd778e89e10d746a75f1028a0d4a9636d"
     ),
+    "0099_health_alerts.sql": (
+        "sql1:08ebd8b5bc08a214fd2c0bd6c289976f4889967a577ed3c7750b267ba7192de6"
+    ),
 }
 
 

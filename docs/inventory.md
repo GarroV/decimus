@@ -78,14 +78,14 @@
 | `/administration/connections/<int:token_id>/reissue` | POST | `connections_reissue` | `src/web/connections_screen.py` |
 | `/administration/connections/<int:token_id>/revoke` | POST | `connections_revoke` | `src/web/connections_screen.py` |
 | `/administration/connections/<int:token_id>/update` | POST | `connections_update` | `src/web/connections_screen.py` |
-| `/administration/connections/dodois/<country>/check` | POST | `dodois_check` | `src/web/dodois_screen.py` |
-| `/administration/connections/dodois/invite` | POST | `dodois_invite_issue` | `src/web/dodois_screen.py` |
-| `/administration/connections/dodois/invite/<int:invite_id>/revoke` | POST | `dodois_invite_revoke` | `src/web/dodois_screen.py` |
 | `/administration/connections/health/<code>/check` | POST | `connection_health_check` | `src/web/connections_screen.py` |
 | `/administration/connections/issue` | POST | `connections_issue` | `src/web/connections_screen.py` |
 | `/administration/connections/keys/<service_code>/check` | POST | `service_key_check` | `src/web/connections_screen.py` |
 | `/administration/connections/keys/<service_code>/delete` | POST | `service_key_delete` | `src/web/connections_screen.py` |
 | `/administration/connections/keys/<service_code>/save` | POST | `service_key_save` | `src/web/connections_screen.py` |
+| `/administration/dodois/<country>/check` | POST | `dodois_check` | `src/web/dodois_screen.py` |
+| `/administration/dodois/invite` | POST | `dodois_invite_issue` | `src/web/dodois_screen.py` |
+| `/administration/dodois/invite/<int:invite_id>/revoke` | POST | `dodois_invite_revoke` | `src/web/dodois_screen.py` |
 | `/api/v1/aggregators/ratings` | GET | `swarm_api_aggregators` | `src/web/swarm_api.py` |
 | `/api/v1/inspections` | GET | `swarm_api_inspections` | `src/web/swarm_api.py` |
 | `/api/v1/inspections/<inspection_id>` | GET | `swarm_api_inspection` | `src/web/swarm_api.py` |
@@ -384,8 +384,8 @@
 | `DODO_MCP_URL` | `tools/mcp_outside.py` | да |
 | `FFMPEG_BIN` | `src/recognize/config.py` | да |
 | `FRAMES_DIR` | `src/bot/frame_copies.py` | да |
-| `FURCA_NOTIFY_URL` | `src/ratings/aggregators/alert.py` | да |
-| `FURCA_SECRET` | `src/ratings/aggregators/alert.py` | да |
+| `FURCA_NOTIFY_URL` | `src/notify/furca.py` | да |
+| `FURCA_SECRET` | `src/notify/furca.py` | да |
 | `GOOGLE_CLIENT_ID` | `src/web/google_auth.py` | да |
 | `GOOGLE_CLIENT_SECRET` | `src/web/google_auth.py` | да |
 | `GOOGLE_FRONT_REDIRECT_URI` | `src/web/google_auth.py` | да |
@@ -565,6 +565,7 @@
 | `0096_dodois_logins.sql` | `dodois.logins`, `dodois.invites` |
 | `0097_dodois_invite_result.sql` | — |
 | `0098_country_report_langs.sql` | `country_report_langs` |
+| `0099_health_alerts.sql` | `health.alerts` |
 <!-- map:end -->
 
 ## Makefile

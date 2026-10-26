@@ -116,7 +116,15 @@ def test_старый_адрес_вкладки_перенаправляет(г�
 
 #: Вкладки роли в порядке столбца. Пусто — раздела у роли нет.
 ВКЛАДКИ = {
-    ("HQ", "superadmin"): ["people", "spaces", "countries", "journal", "usage", "connections"],
+    ("HQ", "superadmin"): [
+        "people",
+        "spaces",
+        "countries",
+        "journal",
+        "usage",
+        "connections",
+        "dodois",
+    ],
     ("HQ", "admin"): ["people", "spaces", "countries", "usage"],
     ("HQ", "control"): ["people"],
     ("GE", "admin"): ["people", "spaces"],
@@ -156,7 +164,7 @@ def test_каждая_роль_видит_ровно_свои_вкладки(
         assert ответ.status_code == 200, f"{tenant}/{role}"
         assert _вкладки_на_странице(ответ.get_data(as_text=True)) == ждём
         # Каждая вкладка роли открывается, чужая — нет.
-        for вкладка in ("journal", "usage", "connections"):
+        for вкладка in ("journal", "usage", "connections", "dodois"):
             открылась = client.get(f"{РАЗДЕЛ}?tab={вкладка}")
             if вкладка not in ждём:
                 assert открылась.status_code == 404, f"{tenant}/{role}: {вкладка} открылась"
@@ -164,7 +172,7 @@ def test_каждая_роль_видит_ровно_свои_вкладки(
 
 @pytest.mark.parametrize(
     ("tenant", "role", "групп"),
-    [("HQ", "superadmin", 2), ("HQ", "admin", 1), ("HQ", "control", 0), ("GE", "admin", 1)],
+    [("HQ", "superadmin", 3), ("HQ", "admin", 1), ("HQ", "control", 0), ("GE", "admin", 1)],
 )
 def test_подзаголовок_группы_только_при_двух_вкладках(
     monkeypatch: pytest.MonkeyPatch, tenant: str, role: str, групп: int
