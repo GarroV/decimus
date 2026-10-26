@@ -120,7 +120,8 @@ def propose(
     """Найти пункт по словам и кадрам тем же порядком, что у бота.
 
     `zone` — зона, которую назвал человек (остановка обхода): подсказка
-    поиску, а не ответ. `note` — сказанное дословно: при пути без модели оно
+    поиску, а не ответ. Зона, названная в словах, сильнее неё — для быстрого
+    пути и при записи (D206). `note` — сказанное дословно: при пути без модели оно
     же становится формулировкой, как у бота.
 
     `reading_c` — температура, которую аудитор исправил после неверного чтения
@@ -133,7 +134,14 @@ def propose(
     words = note.strip()
     frames = frames[:MODEL_FRAMES_MAX]
     if reading_c is None and words and not album_mode(words, len(frames)):
-        fast = fast_path(words, zone, lang=ui_lang, chat_id=chat_id).item
+        # Зона из слов — раньше зоны на экране: так же её читает вывод зоны записи
+        # (`web.walk_zone.resolve_item_zone`, D206, D445). Зона на экране — подсказка.
+        fast = fast_path(
+            words,
+            zone_from_words(words, chat_id=chat_id) or zone,
+            lang=ui_lang,
+            chat_id=chat_id,
+        ).item
         if fast is not None:
             return Offer(
                 via="fast",

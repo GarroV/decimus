@@ -41,6 +41,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
+from src.bot import journal
 from src.bot.phrases import learn
 from src.domain import (
     SOURCE_COMMENT,
@@ -208,6 +209,41 @@ def _suggested(value: Any) -> tuple[Suggestion | None, bool]:
         return None, model
 
 
+#: Сколько кодов подсказки принимает запись: столько, сколько подсказка показывает.
+_HINT_SHOWN_MAX = 3
+
+
+def _hint_shown(value: Any) -> list[str]:
+    """Коды показанной подсказки из тела записи. Не список и мусор — пусто, не отказ."""
+    if not isinstance(value, list):
+        return []
+    return [c for c in value[:_HINT_SHOWN_MAX] if isinstance(c, str) and _CODE.match(c)]
+
+
+def _note_hint_choice(chat_id: int, body: dict[str, Any], code: str) -> None:
+    """Метрика подсказки (#1267): что показали, чей ответ выбрал аудитор, совпало ли.
+
+    Пишется только когда подсказка была показана. `picked` — чьё предложение стояло
+    первой карточкой при записи: подсказки (`hint`), модели (`model`) или иное
+    (быстрый путь, ручной выбор). `match_first` — выбранный пункт равен первому из
+    показанных: так видно, угадывает ли подсказка.
+    """
+    shown = _hint_shown(body.get("hint_codes"))
+    if not shown:
+        return
+    given = body.get("suggested")
+    via = given.get("via") if isinstance(given, dict) else None
+    journal.note(
+        chat_id,
+        "walk_hint_choice",
+        shown=shown,
+        picked=via if via in ("hint", "model") else "other",
+        code=code,
+        match_first=code == shown[0],
+        match_any=code in shown,
+    )
+
+
 def reading_of(body: dict[str, Any]) -> float | None:
     """Показание термометра из тела запроса, °C: число в пределах термометра либо `null`.
 
@@ -258,6 +294,8 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         suggested=suggested,
         reading_c=reading_of(body),
     )
+    if body.get("also") is not True:
+        _note_hint_choice(chat_id, body, code)
     # «Тоже»-запись по тем же кадрам (D593): слова сказаны про основной пункт,
     # синонимом второго они не становятся.
     if words and learns and body.get("also") is not True:

@@ -515,6 +515,7 @@
     f.findId = (f.findId || 0) + 1;
     var mine = f.findId;
     f.preview = null;
+    f.hintCodes = null;
     f.pending = asked;
     if (fixed === null && asked.words) preview(mine, asked, body.zone_hint);
     W.post(W.urls.suggest, body).then(function (res) {
@@ -563,6 +564,8 @@
       var cards = (res.body && res.body.candidates) || [];
       if (!cards.length) return;
       f.preview = cards;
+      // Что показали — уходит с записью: по нему считается, угадала ли подсказка (#1267).
+      f.hintCodes = cards.map(function (c) { return c.code; });
       redraw("item");
     }).catch(function () { /* подсказка — добавка к поиску, а не его часть */ });
   }
@@ -1069,6 +1072,7 @@
         comment: f.comment.trim(), repeat: !!f.repeat && repeatOffered(),
         photos: readyPhotos().map(function (p) { return p.ref; }),
         words: f.words.trim(), suggested: suggested(), reading_c: readingValue(),
+        hint_codes: f.hintCodes || [],
       }].concat(extraOps());
     }
     var o = f.original;

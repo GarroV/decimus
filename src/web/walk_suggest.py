@@ -297,6 +297,16 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             # аудитору, модель ответит как обычно.
             logger.warning("Обход: подсказка для чата %s не собралась: %s", log_id(who), exc)
             return jsonify({"via": "hint", "candidates": []}), 200
+        if offer.candidates:
+            # Метрика (#1267): что показали. Выбор пишется при записи (`walk_hint_choice`).
+            journal.note(
+                who,
+                "walk_hint",
+                words=words,
+                zone=zone,
+                frames=_count(body.get("frames")),
+                codes=[c.code for c in offer.candidates],
+            )
         ask = Ask(
             chat_id=who,
             spoken=zone_from_words(words, chat_id=who),

@@ -48,6 +48,7 @@ def модель(monkeypatch: pytest.MonkeyPatch) -> Модель:
     monkeypatch.setattr(ядро, "classify", m)
     monkeypatch.setattr(ядро, "fast_path", lambda *a, **k: FastPath(item=None, reason="no_cue"))
     monkeypatch.setattr(ядро, "recall", lambda *a, **k: None)
+    monkeypatch.setattr(ядро, "zone_from_words", lambda *a, **k: None)
     return m
 
 
@@ -527,3 +528,102 @@ def test_подсказка_не_длиннее_предела_и_с_выуче�
     )
 
     assert [c.code for c in итог.candidates] == ["TEH05", "CLN05", "PRD06"]
+
+
+# ── метрика подсказки (#1267): журнал разбора ───────────────────────────
+
+
+@pytest.fixture
+def журнал(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, dict[str, Any]]]:
+    события: list[tuple[str, dict[str, Any]]] = []
+    for модуль in (walk_suggest, walk_write):
+        monkeypatch.setattr(
+            модуль.journal, "note", lambda chat, event, **kw: события.append((event, kw))
+        )
+    return события
+
+
+def _запись(клиент: Клиент, code: str, via: str, shown: Any) -> Any:  # noqa: F811
+    return клиент.запись(
+        op="add",
+        zone="hot_kitchen",
+        code=code,
+        level="D1",
+        words="печь в нагаре",
+        photos=[клиент.ссылка()],
+        suggested={"code": "CLN05", "level": "D1", "zone": "hot_kitchen", "via": via},
+        hint_codes=shown,
+    )
+
+
+def test_показанная_подсказка_пишется_в_журнал(
+    клиент: Клиент,  # noqa: F811
+    без_базы: Модель,
+    журнал: list[tuple[str, dict[str, Any]]],
+) -> None:
+    _подсказка(клиент, words="печь в нагаре", zone_hint="hot_kitchen", frames=1)
+
+    событие = [kw for name, kw in журнал if name == "walk_hint"]
+    assert len(событие) == 1 and событие[0]["codes"][0] == "CLN05"
+
+
+def test_пустая_подсказка_в_журнал_не_пишется(
+    клиент: Клиент,  # noqa: F811
+    без_базы: Модель,
+    журнал: list[tuple[str, dict[str, Any]]],
+) -> None:
+    _подсказка(клиент, words="ничего особенного не видно", frames=1)
+
+    assert [name for name, _ in журнал] == []
+
+
+def test_выбор_подсказки_и_совпадение_с_первой_пишутся(
+    клиент: Клиент,  # noqa: F811
+    журнал: list[tuple[str, dict[str, Any]]],
+) -> None:
+    ответ = _запись(клиент, "CLN05", "hint", ["CLN05", "TEH05"])
+
+    assert ответ.status_code == 200, ответ.get_json()
+    ((_, kw),) = [e for e in журнал if e[0] == "walk_hint_choice"]
+    assert kw["picked"] == "hint" and kw["code"] == "CLN05" and kw["shown"] == ["CLN05", "TEH05"]
+    assert kw["match_first"] is True and kw["match_any"] is True
+
+
+def test_выбор_ответа_модели_при_показанной_подсказке_пишется_как_расхождение(
+    клиент: Клиент,  # noqa: F811
+    журнал: list[tuple[str, dict[str, Any]]],
+) -> None:
+    _запись(клиент, "PRD06", "model", ["CLN05", "TEH05"])
+
+    ((_, kw),) = [e for e in журнал if e[0] == "walk_hint_choice"]
+    assert kw["picked"] == "model" and kw["match_first"] is False and kw["match_any"] is False
+
+
+def test_без_показанной_подсказки_события_нет(
+    клиент: Клиент,  # noqa: F811
+    журнал: list[tuple[str, dict[str, Any]]],
+) -> None:
+    _запись(клиент, "CLN05", "model", [])
+    _запись(клиент, "CLN05", "model", "мусор")
+
+    assert [e for e in журнал if e[0] == "walk_hint_choice"] == []
+
+
+def test_тоже_запись_в_метрику_подсказки_не_идёт(
+    клиент: Клиент,  # noqa: F811
+    журнал: list[tuple[str, dict[str, Any]]],
+) -> None:
+    """D593: вторая запись по тем же кадрам — не выбор подсказки, считать её дважды нельзя."""
+    клиент.запись(
+        op="add",
+        zone="hot_kitchen",
+        code="PRD06",
+        level="D1",
+        also=True,
+        words="печь в нагаре",
+        photos=[клиент.ссылка()],
+        suggested={"code": "PRD06", "level": "D1", "zone": "hot_kitchen", "via": "model"},
+        hint_codes=["CLN05"],
+    )
+
+    assert [e for e in журнал if e[0] == "walk_hint_choice"] == []
