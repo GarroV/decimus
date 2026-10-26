@@ -188,19 +188,34 @@ def test_остальным_блока_нет_ни_на_чтение_ни_на_�
 
 def test_главный_админ_видит_блок(главный: FlaskClient) -> None:
     html = главный.get(ВКЛАДКА).get_data(as_text=True)
-    assert 'id="dodois"' in html and 'id="dodois-countries"' in html
+    assert 'id="dodois-keys"' in html and 'id="dodois-SI"' in html
     # Вкладка своя (D641): блока нет в «Подключениях», страны сети видны и без входов.
     assert "Словения" in html and "Болгария" in html
     assert "Входа нет" in html
-    # D651: одна таблица, у каждой страны своя кнопка выдачи; карточек и выбора страны нет.
-    assert html.count("Сгенерировать ссылку") >= 2 and 'class="stile' not in html
+    # D653: каркас «Стран»: строки-ссылки, кнопок в строках и панели без выбора нет.
+    assert 'class="slist slist--countries slist--dodois"' in html and "<table" not in html
+    assert "Сгенерировать ссылку" not in html and 'class="stile' not in html
+    assert 'class="sdrawer' not in html
+    assert re.search(r'<a class="srow srow--go" id="dodois-SI" href="[^"]*country=SI"', html)
     for колонка in ("Страна", "Статус", "Через кого подключено"):
         assert колонка in html
 
 
+def test_выбранная_страна_открывает_панель_с_действиями(главный: FlaskClient) -> None:
+    """Ломали: кнопки сидели в каждой строке; теперь — только в панели выбранной страны."""
+    html = главный.get(f"{ВКЛАДКА}&country=SI").get_data(as_text=True)
+    assert 'class="sdrawer' in html and html.count("Сгенерировать ссылку") == 1
+    assert 'aria-current="true"' in html and "Вход Dodo IS · Словения" in html
+
+
+@pytest.mark.parametrize("код", ["ZZ", "XX1", "../"])
+def test_чужая_страна_в_адресе_404(главный: FlaskClient, код: str) -> None:
+    assert главный.get(f"{ВКЛАДКА}&country={код}").status_code == 404
+
+
 def test_блок_не_остался_во_вкладке_подключения(главный: FlaskClient) -> None:
     html = главный.get("/administration?tab=connections").get_data(as_text=True)
-    assert 'id="dodois"' not in html and "dodois-countries" not in html
+    assert 'id="dodois-keys"' not in html and "dodois-SI" not in html
 
 
 def test_вкладка_стоит_после_подключений_и_ключей(главный: FlaskClient) -> None:
@@ -301,7 +316,9 @@ def test_ссылка_показана_один_раз_и_не_попадает_
     # Сломанная копия: класть ссылку в `flash` или цель журнала — токен найдётся ниже.
     клиент, двери = стенд
     ответ, токен = _выдать(клиент)
-    assert токен and "Ссылка показана один раз" in ответ.get_data(as_text=True)
+    тело = ответ.get_data(as_text=True)
+    assert токен and "Ссылка показана один раз" in тело
+    assert 'class="sdrawer' in тело and 'id="dodois-link"' in тело, "ссылка — в панели страны"
     повтор = клиент.get(ВКЛАДКА).get_data(as_text=True)
     assert токен not in повтор and "Выдана" in повтор, "дальше только статус"
     for запись in двери["action_journal"]:
@@ -576,7 +593,7 @@ def test_плитка_страны_ведёт_во_вкладку_и_сбой_в
 ) -> None:
     monkeypatch.setattr(store, "list_logins", lambda: (_вход_страны("SI", rules.FAILED),))
     html = главный.get("/administration?tab=connections").get_data(as_text=True)
-    assert re.search(r'href="[^"]*\?tab=dodois[^"#]*#dodois-SI">Dodo IS — Словения', html)
+    assert re.search(r'href="[^"]*\?tab=dodois&amp;country=SI">Dodo IS — Словения', html)
     assert "shealth__dot--red" in html
 
 
@@ -596,5 +613,6 @@ def test_ответ_действия_это_вкладка_dodois_а_не_под
 ) -> None:
     ответ = главный.post("/administration/dodois/SI/check", headers=ЗАГОЛОВКИ)
     html = ответ.get_data(as_text=True)
-    assert 'id="dodois"' in html
+    assert 'id="dodois-keys"' in html
     assert re.search(r'aria-current="page">\s*Dodo IS', html)
+    assert 'class="sdrawer' in html, "после действия открыта панель этой страны"

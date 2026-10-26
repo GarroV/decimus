@@ -2,7 +2,7 @@
 
 С D641 это отдельная вкладка `?tab=dodois` рядом с «Подключениями» (раньше — блок внутри них);
 формы и POST-маршруты возвращают в неё же. Страны — одна таблица (страна · статус ·
-через кого · «Сгенерировать ссылку», D651): все страны сети из
+через кого, D651; строка открывает панель страны с действиями, D653): все страны сети из
 справочника пиццерий, у страны без входа написано «Входа нет».
 
 **Кто.** Только главный админ УК (заслон вкладки — `connections_screen._boss`, остальным
@@ -184,14 +184,21 @@ def page(
     issued: IssuedLink | None = None,
     code: int = 200,
     key_flash: service_keys_screen.KeyFlash | None = None,
+    picked: str = "",
 ) -> FlaskResponse:
-    """Вкладка целиком — для GET и для ответа на любое действие (в том числе над ключами)."""
+    """Вкладка целиком — для GET и для ответа на любое действие (в том числе над ключами).
+
+    `picked` — страна, чья панель открыта справа: выбор из адреса или страна действия.
+    """
     from . import connections_screen
 
     html = render_template(
         "administration/dodois.html",
         users_url=f"{request.script_root}{section('administration').path}",
         link=_link,
+        picked=picked,
+        split_open=bool(picked),
+        split_back=_link(),
         day=connections_screen._day,
         **context(flash, issued, key_flash),
         **administration.nav(TAB_DODOIS),
@@ -203,9 +210,12 @@ def page(
 
 
 def show() -> FlaskResponse:
-    """GET `/administration?tab=dodois`."""
+    """GET `/administration?tab=dodois[&country=<код>]`: список стран и, при выборе, панель."""
     _boss()
-    return page()
+    raw = (request.args.get("country") or "").strip().upper()
+    if raw and (not rules.is_country(raw) or raw not in {c for c, _, _ in _registry()}):
+        abort(404)
+    return page(picked=raw)
 
 
 # --- действия ------------------------------------------------------------------------
@@ -292,13 +302,17 @@ def install(app: Flask) -> None:
         refused = screen._key_gate(login, back)
         if isinstance(refused, tuple):
             flash, code = refused
-            return page(Flash(flash.key, False, flash.params or {}), code=code)
+            return page(
+                Flash(flash.key, False, flash.params or {}),
+                code=code,
+                picked=_country_from_form() or "",
+            )
         if refused is not None:
             return refused
         result, code = issue(login, auth.current_account())
         if isinstance(result, IssuedLink):
             web_throttle.note_service_key_ok(tenant=screen._stand(), login=login)
-            return page(issued=result, code=code)
+            return page(issued=result, code=code, picked=result.country)
         return page(result, code=code)
 
     @app.post(f"{base}/invite/<int:invite_id>/revoke", endpoint=REVOKE_ACTION)
@@ -307,7 +321,7 @@ def install(app: Flask) -> None:
         _boss()
         refuse_foreign_origin()
         flash, code = revoke(invite_id)
-        return page(flash, code=code)
+        return page(flash, code=code, picked=_country_from_form() or "")
 
     @app.post(f"{base}/<country>/check", endpoint=CHECK_ACTION)
     @guard.action("keys.manage", hidden=True)
@@ -317,4 +331,4 @@ def install(app: Flask) -> None:
             abort(404)
         refuse_foreign_origin()
         flash, code = check_now(country)
-        return page(flash, code=code)
+        return page(flash, code=code, picked=country)

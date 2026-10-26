@@ -9,7 +9,25 @@ from __future__ import annotations
 
 DODOIS_TEXTS: dict[str, dict[str, str]] = {
     # ── Блок на «Подключениях» ──
-    "dodois.title": {"ru": "Dodo IS", "en": "Dodo IS"},
+    "dodois.sub": {
+        "ru": (
+            "Страна подключается по ссылке: откройте страну в списке, сгенерируйте ссылку и "
+            "передайте коллеге. Он подтвердит вход на сайте Dodo IS, и здесь появится, кто "
+            "подключил страну и в каком состоянии вход."
+        ),
+        "en": (
+            "A country is connected through a link: open the country in the list, generate a "
+            "link and pass it to a colleague. They confirm the login on the Dodo IS site, and "
+            "this tab then shows who connected the country and the state of the login."
+        ),
+    },
+    "dodois.keys.title": {"ru": "Ключи приложения", "en": "App keys"},
+    "dodois.count": {
+        "ru": "Стран: {count}, подключено {linked}",
+        "en": "Countries: {count}, connected {linked}",
+    },
+    "dodois.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
+    "dodois.panel.title": {"ru": "Вход Dodo IS", "en": "Dodo IS login"},
     "dodois.app.title": {
         "ru": "Маркетплейс Dodo IS: ключи приложения Decimus",
         "en": "Dodo IS Marketplace: Decimus app keys",
@@ -85,11 +103,9 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
         "en": "The Dodo IS account did not identify itself",
     },
     "dodois.check": {"ru": "Проверить сейчас", "en": "Check now"},
-    "dodois.issue": {"ru": "Выдать ссылку", "en": "Issue a link"},
     "dodois.country": {"ru": "Страна", "en": "Country"},
     "dodois.col.status": {"ru": "Статус", "en": "Status"},
     "dodois.col.via": {"ru": "Через кого подключено", "en": "Connected via"},
-    "dodois.col.action": {"ru": "Действия", "en": "Actions"},
     "dodois.generate": {"ru": "Сгенерировать ссылку", "en": "Generate link"},
     "dodois.issue_hint": {
         "ru": (
@@ -141,7 +157,6 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
     "dodois.link.until": {"ru": "Действует до {at}", "en": "Valid until {at}"},
     "dodois.link.copy": {"ru": "Скопировать", "en": "Copy"},
     "dodois.link.copied": {"ru": "Скопировано", "en": "Copied"},
-    "dodois.link.done": {"ru": "Готово", "en": "Done"},
     "dodois.invite.status.active": {"ru": "Выдана", "en": "Issued"},
     "dodois.invite.status.used": {"ru": "Использована", "en": "Used"},
     "dodois.invite.status.expired": {"ru": "Истекла", "en": "Expired"},
