@@ -117,7 +117,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
+<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -125,6 +125,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/actions_screen.py` | Раздел «Действия»: экшн-планы и предписания — один экран у УК и партнёра (D526, D527) |
 | `src/web/calendar_screen.py` | Раздел «Календарь» (D497): сетка месяца с проверками и поездками (D505, D506) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
+| `src/web/countries_screen.py` | Вкладка «Страны» раздела «Администрирование» (D640, #1251) |
 | `src/web/country.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
 | `src/web/country_filter.py` | Постоянный отбор стран экрана «Страны» (D536): «мне нужен только Кавказ» |
 | `src/web/country_page.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
@@ -331,7 +332,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 66 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-administration.css, … (+58) |
+| `src/web/static/` | 64 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+56) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -406,7 +407,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,country_report_langs,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -414,6 +415,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
 | `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
+| `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
 | `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
 | `src/db/health_store.py` | Двери базы для вкладки «Подключения» (D638): исходы проб и последние заходы сборов |
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
