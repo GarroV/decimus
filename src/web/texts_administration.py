@@ -8,7 +8,7 @@ from __future__ import annotations
 ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "section.administration.title": {"ru": "Администрирование", "en": "Administration"},
     "administration.tabs": {"ru": "Разделы администрирования", "en": "Administration tabs"},
-    "administration.tab.people": {"ru": "Люди", "en": "People"},
+    "administration.tab.people": {"ru": "Люди и доступ", "en": "People & access"},
     "administration.tab.spaces": {"ru": "Пространства партнёров", "en": "Partner spaces"},
     "administration.tab.spaces_own": {"ru": "Ваше пространство", "en": "Your space"},
     "administration.tab.countries": {"ru": "Страны", "en": "Countries"},
@@ -16,9 +16,6 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "administration.tab.dodois": {"ru": "Dodo IS", "en": "Dodo IS"},
     "administration.tab.usage": {"ru": "Расход модели", "en": "Model usage"},
     "administration.tab.connections": {"ru": "Подключения", "en": "Connections"},
-    "administration.group.access": {"ru": "Люди и доступ", "en": "People & access"},
-    "administration.group.connections": {"ru": "Внешние сервисы", "en": "External services"},
-    "administration.group.journal": {"ru": "Журнал и расход", "en": "Journal & usage"},
     "administration.sub": {
         "ru": "Все настройки сервиса в одном месте. Вкладки видны по роли.",
         "en": "All service settings in one place. Tabs depend on your role.",
