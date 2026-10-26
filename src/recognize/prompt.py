@@ -327,6 +327,44 @@ def correction_line(reading_c: float) -> str:
     )
 
 
+def catalog_text(
+    picks: Sequence[str], zones: Sequence[Zone], lang: str, *, chat_id: int | None
+) -> str:
+    """Постоянная часть вопроса: зоны и перечень значений `item` в порядке чек-листа.
+
+    Идёт в запросе ПЕРВОЙ и не зависит ни от зоны, ни от слов, ни от кадров (#1267,
+    D646): провайдер кэширует общий префикс запроса, и всё, что стоит до первого
+    отличия, не оплачивается заново и считается быстрее. Что зависит от запроса —
+    в `question_text` после неё.
+    """
+    return (
+        f"ЗОНЫ:\n{_zone_lines(zones, lang)}\n\n"
+        f"ДОПУСТИМЫЕ ЗНАЧЕНИЯ item (пункт и класс), в порядке чек-листа:\n"
+        f"{_pick_lines(picks, lang, chat_id)}\n"
+        f"- {NONE_CODE} — ни один пункт перечня не подходит"
+    )
+
+
+def _priority_lines(zone_codes: Sequence[str], raised_codes: Sequence[str]) -> str:
+    """Порядок вероятности словами: пункты зоны и пункты, поднятые словами аудитора.
+
+    Раньше это был порядок строк перечня (`shortlist.py`): зона и слова стояли
+    впереди. Перечень теперь постоянный, и тот же сигнал называется прямо.
+    """
+    lines: list[str] = []
+    if raised_codes:
+        lines.append(
+            "ПУНКТЫ, ПОДНЯТЫЕ СЛОВАМИ АУДИТОРА (проверь первыми, в этом порядке): "
+            + ", ".join(raised_codes)
+        )
+    if zone_codes:
+        lines.append(
+            "ПУНКТЫ ЗОНЫ (следующие по вероятности; пункты других зон остаются в перечне): "
+            + ", ".join(zone_codes)
+        )
+    return "\n".join(lines)
+
+
 def question_text(
     note: str,
     picks: Sequence[str],
@@ -338,8 +376,14 @@ def question_text(
     chat_id: int | None,
     album_frames: int = 0,
     sent_at: str = "",
+    zone_codes: Sequence[str] = (),
+    raised_codes: Sequence[str] = (),
+    catalog: str | None = None,
 ) -> str:
-    """Переменная часть запроса: комментарий, подсказка зоны, перечень кандидатов.
+    """Вопрос к модели: постоянная часть (`catalog_text`), затем переменная.
+
+    Переменная часть — комментарий, подсказка зоны, пункты зоны и поднятые словами,
+    кадр: всё, что отличает запрос от соседнего. Она стоит ПОСЛЕ перечня (#1267).
 
     `album_frames` — сколько кадров ушло вместе с комментарием (D208, D209).
 
@@ -359,7 +403,7 @@ def question_text(
     hint = (
         f"Вероятная зона: {data_block(TAG_ZONE, zone_hint)}. "
         "Это подсказка порядка, а не ограничение — "
-        "перечень ниже ею не сужен. Пункт другой зоны подходит лучше — бери его, "
+        "перечень выше ею не сужен. Пункт другой зоны подходит лучше — бери его, "
         "а зону ставь ту, которая верна для него."
         if zone_hint
         else "Зона не подсказана: бери её из слов аудитора, иначе " + UNKNOWN_ZONE + "."
@@ -377,11 +421,10 @@ def question_text(
         if sent_at
         else ""
     )
+    priority = _priority_lines(zone_codes, raised_codes)
+    head = catalog if catalog is not None else catalog_text(picks, zones, lang, chat_id=chat_id)
     return (
+        f"{head}\n\n"
         f"КОММЕНТАРИЙ АУДИТОРА: {data_block(TAG_NOTE, note.strip() or '(пусто)')}\n\n"
-        f"{when}{hint}\n{photo_line}\n\n"
-        f"ЗОНЫ:\n{_zone_lines(zones, lang)}\n\n"
-        f"ДОПУСТИМЫЕ ЗНАЧЕНИЯ item (пункт и класс), в порядке вероятности:\n"
-        f"{_pick_lines(picks, lang, chat_id)}\n"
-        f"- {NONE_CODE} — ни один пункт перечня не подходит"
+        f"{when}{hint}\n{photo_line}" + (f"\n\n{priority}" if priority else "")
     )

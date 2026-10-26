@@ -21,7 +21,7 @@ from .config import DEFAULT_LANG, RecognizeSettings, load_recognize_settings
 from .cues import class_thresholds
 from .guard import MAX_QUESTION_CHARS, MAX_REASON_CHARS, MAX_WORDING_CHARS, clean_text
 from .models import ANSWER_LEVELS, NONE_CODE, UNKNOWN_ZONE, Answer, Candidate, Suggestion
-from .prompt import correction_line, instructions, question_text, readings_line
+from .prompt import catalog_text, correction_line, instructions, question_text, readings_line
 from .rules_check import check_wording
 from .schema import picks_for, response_schema, split_pick
 from .shortlist import shortlist
@@ -209,6 +209,8 @@ class AskArgs:
     photos: Sequence[bytes]
     settings: RecognizeSettings
     model: str | None
+    #: Начало `question`, неизменное от запроса к запросу, — за ним точка кэша (#1267).
+    cached_prefix: str = ""
 
     def call(self) -> ModelAnswer:
         return ask_model(
@@ -220,6 +222,7 @@ class AskArgs:
             photos=self.photos,
             settings=self.settings,
             model=self.model,
+            cached_prefix=self.cached_prefix,
         )
 
 
@@ -277,10 +280,13 @@ def prepare_request(
     album = framed(note, len(photos))
     cfg = settings or load_recognize_settings()
     picked = shortlist(note, zone_hint, chat_id=chat_id)
-    picks = picks_for(picked.codes, chat_id=chat_id)
+    # Перечень значений — в постоянном порядке чек-листа (#1267): порядок зоны и слов
+    # назван в конце запроса, чтобы общий префикс кэшировался провайдером.
+    picks = picks_for(picked.canonical, chat_id=chat_id)
     zones = list_zones(chat_id=chat_id)
     use_photo = album or (photo is not None and needs_photo(note))
     readings = readings_line(tuple(dict.fromkeys(row[0] for row in picked.cue_rows)))
+    catalog = catalog_text(picks, zones, lang, chat_id=chat_id)
     ask = AskArgs(
         kind=KIND_RECOGNIZE,
         instructions=instructions(class_thresholds(chat_id=chat_id)),
@@ -294,6 +300,9 @@ def prepare_request(
             chat_id=chat_id,
             album_frames=len(photos) if album else 0,
             sent_at=sent_at,
+            catalog=catalog,
+            zone_codes=picked.zone_codes,
+            raised_codes=picked.cue_hits,
         )
         + (f"\n\n{readings}" if readings else ""),
         schema=response_schema(picks, [z.code for z in zones], album=album),
@@ -301,6 +310,7 @@ def prepare_request(
         photos=photos if album else (),
         settings=cfg,
         model=model,
+        cached_prefix=catalog,
     )
     return PreparedRequest(
         ask=ask,
