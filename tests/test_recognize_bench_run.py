@@ -98,3 +98,30 @@ def test_средние_токены_считаются_только_по_усп
 
 def test_пустой_список_не_падает() -> None:
     assert summarize([]) == []
+
+
+def test_время_и_процентили_считаются_по_удавшимся_запросам() -> None:
+    results = [_result(seconds=float(s)) for s in range(1, 11)]
+    results.append(_result(seconds=99.0, error="сбой", got_code=None))
+
+    summary = summarize(results)[0]
+
+    assert summary.seconds_median == 5.0
+    assert summary.seconds_p90 == 9.0
+    assert summary.seconds_max == 10.0, "упавший запрос не должен считаться временем ответа"
+    assert summary.errors == 1
+
+
+def test_кэшированные_токены_и_зона_попадают_в_сводку() -> None:
+    results = [
+        _result(usage={"input": 100, "output": 10, "cached": 80, "reasoning": 4}),
+        _result(
+            usage={"input": 100, "output": 10, "cached": 0, "reasoning": 6}, got_zone="UNKNOWN"
+        ),
+    ]
+
+    summary = summarize(results)[0]
+
+    assert summary.cached_tokens_avg == 40.0
+    assert summary.reasoning_tokens_avg == 5.0
+    assert summary.zone_accuracy == 0.5
