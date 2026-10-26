@@ -88,10 +88,9 @@
    не прокручивается сама и не липнет: выпадающие списки и календарь периода
    раскрываются внутри неё и не должны обрезаться. */
 .rg-rail { position: static; max-height: none; overflow: visible; }
-.rg-filters {
-  display: grid; gap: var(--space-3); margin-bottom: var(--space-6); padding: var(--space-5);
-  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-block);
-}
+/* Карточка отбора — та же `.pk-rail` (подложка, отступ, подпись), что и колонка стран под ней. */
+.rg-filters { display: grid; gap: var(--space-3); margin-bottom: var(--space-6); }
+.rg-filters > :not(.mx-rail__head) { margin-inline: 2px; }
 /* Период в колонке — на всю её ширину (#978): подпись получает всё место между
    стрелками. Узкой колонке перенос разрешён только у тире — даты внутри
    неразрывны (`registry_view.period_title`), год не уезжает от месяца. */

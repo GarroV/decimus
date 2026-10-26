@@ -1359,6 +1359,7 @@ a[data-zoom] { cursor: zoom-in; }
   align-items: center; justify-content: space-between;
 }
 .mx-bar__title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-6); min-width: 0; }
+.mx-bar__title .section__title { align-self: flex-start; }
 .mx-bar__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .mx-bar__actions .btn.is-on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
@@ -1515,7 +1516,7 @@ a[data-zoom] { cursor: zoom-in; }
 .mx-top {
   position: sticky; top: var(--topbar-h); z-index: 4;
   background: var(--canvas);
-  padding: var(--space-4) 0 var(--space-5);
+  padding: 0 0 var(--space-5);
 }
 @media (max-width: 767px) {
   .mx-top { position: static; padding: 0; }
@@ -2167,6 +2168,10 @@ a[data-zoom] { cursor: zoom-in; }
    заголовка `.info-row`, а не к значку: слева он начинается от поля страницы и
    на 390 px не уходит за экран. Разметка — макрос `_info_tip.html`. */
 .info-row { position: relative; display: flex; align-items: center; gap: var(--space-3); }
+/* Строка заголовка в шапке экрана — без отступов и черты строки «вопрос — ответ» выше: иначе заголовок
+   съезжает от верха и левого края колонки справа (D655). */
+.shead .info-row { padding: 0 0 var(--space-4); border-bottom: 0; }
+.pk-head .info-row { padding: 0; border-bottom: 0; }
 .info-tip { align-self: stretch; display: inline-flex; align-items: center; }
 .info-tip__mark {
   display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; cursor: help;

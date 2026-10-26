@@ -64,14 +64,14 @@
   </header>
 {% endblock %}
 
-{% block split_list %}
+{% block body %}
 {# Раскладка D498: слева блок отбора и под ним колонка стран (как в «Стране» и
    «Методике»), справа — «На приёмке» и «Принятые». На узком экране колонка
    стран сворачивается обратно в чип отбора. #}
 <div class="mx-shell rg-shell">
   <aside class="mx-rail rg-rail" aria-label="{{ t('registry.filters.title') }}">
-    <div class="rg-filters">
-      <div class="mx-rail__head">{{ t('registry.filters.title') }}</div>
+    <div class="rg-filters pk-rail pk-rail--inline">
+      <div class="mx-rail__head mx-rail__head--list"><span>{{ t('registry.filters.title') }}</span></div>
       {# Период: стрелки листают на длину выбранного, по заголовку — календарь (`_period.html`). #}
       {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
                        period_hidden) }}
@@ -115,6 +115,12 @@
     {% endif %}
   </aside>
   <div class="mx-main">
+{{ super() }}
+  </div>
+</div>
+{% endblock %}
+
+{% block split_list %}
   <div class="sbox">
     {% if not filters.unchecked %}
     {# «На приёмке» (D466): мимо периода и отбора, давно ждущие первыми. #}
@@ -201,8 +207,6 @@
     </div>
     {% endif %}
   </div>
-  </div>
-</div>
 {% endblock %}
 
 {% block split_title %}{{ t('registry.drawer.title') }}{% endblock %}
