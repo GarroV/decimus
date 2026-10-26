@@ -86,6 +86,7 @@ def _render(conf: Settings) -> tuple[str, int]:
 
     total = usage_view.totals(now_rows)
     people = usage_view.by_person(now_rows)
+    days = usage_view.by_day(now_rows, start=period.start, end=period.end)
     before = None if before_rows is None else usage_view.totals(before_rows)
     base = f"{request.script_root}{section('administration').path}"
 
@@ -108,7 +109,7 @@ def _render(conf: Settings) -> tuple[str, int]:
             total=total,
             delta=usage_view.delta(total, before),
             has_previous=before is not None,
-            days=usage_view.by_day(now_rows, start=period.start, end=period.end),
+            days=days,
             kinds=usage_view.by_kind(now_rows),
             known_kinds=KINDS,
             people=people,
@@ -120,6 +121,8 @@ def _render(conf: Settings) -> tuple[str, int]:
             inspection_label=lambda line: line.label or t("usage.inspection.unsent", lang),
             inspection_href=lambda line: _inspection_href(line.key, lang),
             has_system_calls=any(line.key == "" for line in people),
+            axis_max=_axis_max(days, lang),
+            day_label=lambda day: _day_label(day, lang),
             money=usage_view.money,
             number=usage_view.number,
             percent=usage_view.percent,
@@ -127,6 +130,22 @@ def _render(conf: Settings) -> tuple[str, int]:
         ),
         503 if failed else 200,
     )
+
+
+def _day_label(day: str, lang: str) -> str:
+    """День словами для подсказки столбика: «21 окт» / «Oct 21»."""
+    one = date.fromisoformat(day)
+    return t("usage.day.fmt", lang, day=one.day, month=t(f"usage.month.{one.month}", lang))
+
+
+def _axis_max(days: list[usage_view.DayBar], lang: str) -> str:
+    """Подпись верха шкалы: «3,1 млн токенов» — наибольший день периода."""
+    mantissa, unit = usage_view.compact(max((d.sum.tokens for d in days), default=0))
+    text = f"{mantissa:g}" if unit == "" else f"{mantissa:.1f}".rstrip("0").rstrip(".")
+    if lang == "ru":
+        text = text.replace(".", ",")
+    suffix = t(f"usage.unit.{unit}", lang) if unit else ""
+    return t("usage.axis.max", lang, value=f"{text} {suffix}".strip())
 
 
 def _inspection_href(key: str, lang: str) -> str | None:
