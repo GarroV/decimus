@@ -46,6 +46,14 @@ _ВСТАВКА = (
 )
 
 
+def test_страны_с_договором_читаются_одним_запросом(база: str) -> None:
+    assert cc.countries_with_contract() == frozenset()
+    cc.save("GE", cc.ContractFields(legal_name="ООО Лотос"), actor="hq")
+    cc.save("GE", cc.ContractFields(legal_name="Второй"), actor="hq")
+    cc.save("AM", cc.ContractFields(agreement="Договор 1"), actor="hq")
+    assert cc.countries_with_contract() == frozenset({"GE", "AM"})
+
+
 def test_строки_договора_читаются_и_контакты_сливаются_без_повторов(база: str) -> None:
     cc.save(
         "GE", cc.ContractFields(legal_name="Lotos LLC", dkk_emails="a@ge.example.com"), actor="osb"

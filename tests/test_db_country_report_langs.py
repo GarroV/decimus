@@ -44,6 +44,13 @@ def test_повторная_запись_заменяет_прежнюю_а_сб
     crl.reset("GE")  # снять нечего — не ошибка
 
 
+def test_все_переопределения_читаются_одним_запросом(база: str) -> None:
+    assert crl.read_all() == {}
+    crl.save("GE", ("en", "ru"), actor="director")
+    crl.save("AM", ("ru",), actor="director")
+    assert crl.read_all() == {"GE": ("en", "ru"), "AM": ("ru",)}
+
+
 def test_эффективный_перечень_берёт_базу_и_отмечает_это(база: str) -> None:
     langs, custom = crl.resolve("GE")
     assert custom is False and langs
