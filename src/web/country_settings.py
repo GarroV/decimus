@@ -1,9 +1,12 @@
-"""«Карточка страны» на экране «Страны» (D539, прежде «Настройки страны», D536).
+"""«Карточка страны» на экране «Страны» (D539, прежде «Настройки страны», D536) и
+вкладка «Администрирование → Страны» (D640, #1251).
 
 Широкая панель справа на том же экране (D527): всё, что известно про страну, —
 партнёр и девелопер, юридические партнёры из свода, пиццерии с адресами, датами
 открытия и другими написаниями названия (D538). Видит каждый, кому видна страна;
-почта партнёра — только УК (D375), правка — только администратору (ниже).
+почта партнёра — только УК (D375). На экране страны панель — только чтение со ссылкой
+«Изменить»: настройки (девелопер, партнёр, языки отчёта, договор) меняются во вкладке
+«Страны» «Администрирования» (D640), той же панелью с формами (`settings_only`).
 
 Строки пиццерий — те же `UnitRow`, что уже прочитал экран (`country_units`): второго
 чтения базы ради панели нет. Правка — дверь веба в то, что уже есть:
@@ -15,9 +18,14 @@
   партнёр: занятую другим пространством страну отсюда не перенести, как и там;
   привязка добавляется, снять её можно только руками (`docs/18-access-map.md`).
 
-Кто вправе — по матрице: оба маршрута объявлены действием `space.manage` (главный
-админ и админ УК, D364). Кнопка на экране показывается по тому же коду, остальным
-адреса отвечают отказом заслона.
+Кто вправе — по матрице: маршруты девелопера, партнёра и языков объявлены действием
+`space.manage` (главный админ и админ УК, D364). Кнопка на экране показывается по тому же
+коду, остальным адреса отвечают отказом заслона. После действия — возврат во вкладку
+«Страны» (`administration.url`), а не на страницу страны.
+
+Языки отчёта (D640): перечень страны из базы (`db/country_report_langs.py`) перекрывает
+`report_langs.json`; выбор — из языков методики, не меньше одного; «Как по умолчанию»
+снимает переопределение. Перечень задаёт и язык отчёта в боте, и язык письма по умолчанию.
 
 Блок «Договор» (D603) — юрлицо партнёра, договор одной строкой, контакты по ДКК: список
 строк на страну (`db/country_contracts.py`). Видит только УК (почты — персональные
@@ -34,22 +42,23 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from flask import Flask, abort, redirect, request, url_for
+from flask import Flask, abort, redirect, request
 from werkzeug.wrappers import Response
 
-from src.db import agg_store, ratings_read
+from src.db import agg_store, country_report_langs, ratings_read
 from src.db import country_contracts as contracts_db
 from src.db.errors import CountryContractError, DbError
 from src.db.models import InspectionRow
-from src.domain import report_langs
 from src.domain.errors import ConfigError
+from src.domain.models import TEXT_LANGS
 from src.domain.tenants import HQ_TENANT
 
-from . import auth, guard, partner_spaces
+from . import administration, auth, guard, partner_spaces
 from . import country as country_data
 from .country_units import UnitRow, UnitsData
 from .origin import refuse_foreign_origin
 from .sections import section
+from .users_view import TAB_COUNTRIES
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +67,9 @@ SAVED = "ok"
 FAILED = "failed"
 #: Договор: ввод не прошёл проверку (почта, пустая строка) — не база, а поля.
 INVALID = "invalid"
-_OUTCOMES = frozenset({SAVED, FAILED, INVALID})
+#: Языки отчёта: пусто или язык не из методики — отказ, ничего не записано.
+LANGS_INVALID = "langs_invalid"
+_OUTCOMES = frozenset({SAVED, FAILED, INVALID, LANGS_INVALID})
 
 #: Длина имени девелопера — как у поля справочника (`country_page.DEVELOPER_MAX`).
 DEVELOPER_MAX = 120
@@ -130,8 +141,19 @@ class Panel:
     aggregators_failed: bool = False
     #: Аудиторы страны за период экрана, по числу проверок.
     auditors: tuple[Auditor, ...] = ()
-    #: Языки отчёта страны из методики (`report_langs.json`, D415) — их предлагает бот.
+    #: Языки отчёта страны — их предлагает бот и они же язык письма по умолчанию:
+    #: из базы (D640), иначе из методики (`report_langs.json`, D415).
     report_langs: tuple[str, ...] = ()
+    #: Перечень задан в базе (иначе — по умолчанию из методики).
+    langs_custom: bool = False
+    #: Форма языков — только во вкладке «Страны» и только у `space.manage`.
+    can_langs: bool = False
+    #: Какие языки можно отметить: языки методики.
+    lang_options: tuple[str, ...] = TEXT_LANGS
+    #: Панель во вкладке «Страны»: без пиццерий, аудиторов и оценок площадок — это чтение.
+    settings_only: bool = False
+    #: Адрес вкладки «Страны» для ссылки «Изменить» на экране страны; пусто — вкладки нет.
+    edit_url: str = ""
     #: Блок «Договор» (D603, D609): виден и правится только у `contract.manage`.
     show_contract: bool = False
     can_contract: bool = False
@@ -181,12 +203,14 @@ def _auditors(inspections: Sequence[InspectionRow]) -> tuple[Auditor, ...]:
     )
 
 
-def _report_langs(code: str) -> tuple[str, ...]:
+def _report_langs(code: str) -> tuple[tuple[str, ...], bool]:
+    """Языки отчёта страны и признак «заданы в базе»; методика не настроена — пусто."""
     try:
-        return tuple(report_langs.report_langs_for(code))
+        langs, custom = country_report_langs.resolve(code)
     except ConfigError:
         log.warning("Языки отчёта страны не прочитались: методика не настроена", exc_info=True)
-        return ()
+        return (), False
+    return tuple(langs), custom
 
 
 def _contracts(code: str) -> tuple[tuple[contracts_db.Contract, ...], bool]:
@@ -208,10 +232,14 @@ def load(
     show_email: bool,
     can_contract: bool = False,
     inspections: Sequence[InspectionRow] = (),
+    settings_only: bool = False,
+    edit_url: str = "",
 ) -> Panel:
     """Карточка страны `code`: партнёр и девелопер, партнёры свода, пиццерии, договор.
 
     Договор читается и показывается только там, где видны почты (`show_email`, УК, D375).
+    `settings_only` — панель вкладки «Страны» (D640): пиццерий и оценок площадок в ней нет,
+    поэтому их чтение пропускается; форма языков отчёта рисуется вместе с `can_edit`.
     """
     сведения: dict[str, Any] = {
         "code": code,
@@ -223,9 +251,13 @@ def load(
         "partners": _partners(units.rows, show_email=show_email),
         "profiles_failed": units.profiles_failed,
         "auditors": _auditors(inspections),
-        "report_langs": _report_langs(code),
+        "settings_only": settings_only,
+        "can_langs": can_edit and settings_only,
+        "edit_url": edit_url,
     }
-    сведения["aggregators"], сведения["aggregators_failed"] = _aggregators(code)
+    сведения["report_langs"], сведения["langs_custom"] = _report_langs(code)
+    if not settings_only:
+        сведения["aggregators"], сведения["aggregators_failed"] = _aggregators(code)
     # Договор и контакты по ДКК видят только те, кто их ведёт: ОСБ, админ, главный
     # админ (D609). Девелопер и гость УК блока не видят вовсе.
     if show_email and can_contract:
@@ -247,15 +279,13 @@ def load(
     )
 
 
-def _back(code: str, outcome: str, lang_in_url: str) -> Response:
-    params: dict[str, Any] = {"code": code, "settings": 1, "saved": outcome}
-    if lang_in_url:
-        params["lang"] = lang_in_url
-    return redirect(url_for("country", **params))
+def _back(code: str, outcome: str) -> Response:
+    """Возврат во вкладку «Страны» с исходом; язык — из адреса действия."""
+    return redirect(administration.url(TAB_COUNTRIES, country=code, saved=outcome))
 
 
 def install(app: Flask) -> None:
-    """Маршруты настроек страны: девелопер и партнёр. Оба — действие `space.manage`."""
+    """Маршруты настроек страны: девелопер, партнёр, языки отчёта (`space.manage`), договор."""
     base = section("country").path + "/<code>/settings"
 
     def _checked(raw: str) -> str:
@@ -280,7 +310,7 @@ def install(app: Flask) -> None:
         except (DbError, ratings_read.RatingsEditError):
             log.warning("Девелопер страны %s не сохранён", страна, exc_info=True)
             changed = False
-        return _back(страна, SAVED if changed else FAILED, request.args.get("lang", ""))
+        return _back(страна, SAVED if changed else FAILED)
 
     @app.post(base + "/space", endpoint="country_set_space")
     @guard.action("space.manage")
@@ -294,12 +324,36 @@ def install(app: Flask) -> None:
         except DbError:
             log.warning("Страна %s не закреплена за %s", страна, пространство, exc_info=True)
             outcome = FAILED
-        return _back(страна, outcome, request.args.get("lang", ""))
+        return _back(страна, outcome)
+
+    @app.post(base + "/report-langs", endpoint="country_set_report_langs")
+    @guard.action("space.manage")
+    def set_report_langs(code: str) -> Response:
+        """Языки отчёта страны: галочки из языков методики или «Как по умолчанию»."""
+        страна = _checked(code)
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        try:
+            if request.form.get("reset"):
+                country_report_langs.reset(страна)
+                return _back(страна, SAVED)
+            выбрано = request.form.getlist("langs")
+            if not выбрано or any(язык not in TEXT_LANGS for язык in выбрано):
+                return _back(страна, LANGS_INVALID)
+            country_report_langs.save(
+                страна,
+                tuple(язык for язык in TEXT_LANGS if язык in выбрано),
+                actor=вошедший.login if вошедший else "",
+            )
+        except DbError:
+            log.warning("Языки отчёта страны %s не сохранены", страна, exc_info=True)
+            return _back(страна, FAILED)
+        return _back(страна, SAVED)
 
     contract_base = base + "/contract"
 
     def _contract_back(code: str, outcome: str) -> Response:
-        return _back(code, outcome, request.args.get("lang", ""))
+        return _back(code, outcome)
 
     @app.post(contract_base, endpoint="country_save_contract")
     @guard.action("contract.manage")

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -20,7 +21,7 @@ from src.db import api_access, dodois_logins, health_store, model_key
 from src.domain.health import LoadFacts, ProbeRow
 from src.domain.permissions import MATRIX, SIDE_HQ, role_may
 from src.health import checks
-from src.web import administration
+from src.web import accounts, administration, country, country_summary, partner_spaces
 
 РАЗДЕЛ = "/administration"
 СЕЙЧАС = datetime.now(UTC)
@@ -111,15 +112,152 @@ def test_старый_адрес_вкладки_перенаправляет(г�
     assert ответ.headers["Location"].endswith(f"{РАЗДЕЛ}?tab=connections&service=1")
 
 
-@pytest.mark.parametrize(("tenant", "role"), [("HQ", "admin"), ("HQ", "control"), ("RS", "admin")])
-def test_прочим_раздел_закрыт_и_пункта_нет(
+# --- шаг 2 (D640): вкладки по ролям, старый адрес, меню
+
+#: Вкладки роли в порядке столбца. Пусто — раздела у роли нет.
+ВКЛАДКИ = {
+    ("HQ", "superadmin"): [
+        "people",
+        "spaces",
+        "countries",
+        "journal",
+        "usage",
+        "connections",
+        "dodois",
+    ],
+    ("HQ", "admin"): ["people", "spaces", "countries", "usage"],
+    ("HQ", "control"): ["people"],
+    ("GE", "admin"): ["people", "spaces"],
+    ("HQ", "developer"): [],
+    ("HQ", "guest"): [],
+    ("HQ", "osb"): ["countries"],
+    ("GE", "auditor"): [],
+}
+
+
+def _без_базы(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Вкладка «Люди» читает перечень из базы: подменяем пустым — тест про вкладки."""
+    monkeypatch.setattr(accounts, "everyone", lambda **_: ())
+    monkeypatch.setattr(accounts, "spaces", lambda: ())
+    monkeypatch.setattr(partner_spaces, "overview", lambda: ())
+    monkeypatch.setattr(country, "countries", lambda **_: ())
+    monkeypatch.setattr(country_summary, "developers_of", lambda _codes: ({}, {}, False))
+
+
+def _вкладки_на_странице(страница: str) -> list[str]:
+    return re.findall(r'class="sadmin__tab[^"]*" href="/administration\?tab=(\w+)', страница)
+
+
+@pytest.mark.parametrize(("tenant", "role"), sorted(ВКЛАДКИ))
+def test_каждая_роль_видит_ровно_свои_вкладки(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str
+) -> None:
+    _без_базы(monkeypatch)
+    ждём = ВКЛАДКИ[(tenant, role)]
+    for client in _стенд(monkeypatch, tenant=tenant, role=role):
+        ответ = client.get(РАЗДЕЛ)
+        if not ждём:
+            assert ответ.status_code in (403, 404), f"{tenant}/{role}: раздел открылся"
+            меню = client.get("/settings").get_data(as_text=True)
+            assert f'href="{РАЗДЕЛ}?lang=' not in меню, f"{tenant}/{role}: пункт меню виден"
+            continue
+        assert ответ.status_code == 200, f"{tenant}/{role}"
+        assert _вкладки_на_странице(ответ.get_data(as_text=True)) == ждём
+        # Каждая вкладка роли открывается, чужая — нет.
+        for вкладка in ("journal", "usage", "connections", "dodois"):
+            открылась = client.get(f"{РАЗДЕЛ}?tab={вкладка}")
+            if вкладка not in ждём:
+                assert открылась.status_code == 404, f"{tenant}/{role}: {вкладка} открылась"
+
+
+@pytest.mark.parametrize(
+    ("tenant", "role", "групп"),
+    [("HQ", "superadmin", 3), ("HQ", "admin", 1), ("HQ", "control", 0), ("GE", "admin", 1)],
+)
+def test_подзаголовок_группы_только_при_двух_вкладках(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str, групп: int
+) -> None:
+    _без_базы(monkeypatch)
+    for client in _стенд(monkeypatch, tenant=tenant, role=role):
+        страница = client.get(РАЗДЕЛ).get_data(as_text=True)
+        assert страница.count('class="sadmin__group"') == групп
+        assert ("Люди и доступ" in страница) == (групп > 0)
+
+
+@pytest.mark.parametrize(
+    ("старый", "новый"),
+    [
+        ("/users", "/administration?tab=people"),
+        ("/users?person=me", "/administration?tab=people&person=me"),
+        ("/users?q=petr&off=1&lang=en", "/administration?tab=people&q=petr&off=1&lang=en"),
+        ("/users?q=%D0%B0%26b", "/administration?tab=people&q=%D0%B0%26b"),
+        ("/users?tab=spaces&space_code=GE", "/administration?tab=spaces&space_code=GE"),
+        ("/users?tab=journal&view=actions", "/administration?tab=journal&view=actions"),
+        ("/users?tab=usage&from=2026-10-01", "/administration?tab=usage&from=2026-10-01"),
+    ],
+)
+def test_старый_адрес_людей_ведёт_в_раздел_с_тем_же_запросом(
+    главный: FlaskClient, старый: str, новый: str
+) -> None:
+    ответ = главный.get(старый)
+    assert ответ.status_code == 302
+    assert ответ.headers["Location"] == новый
+
+
+@pytest.mark.parametrize(
+    ("tenant", "role"), [("HQ", "developer"), ("HQ", "guest"), ("GE", "auditor")]
+)
+def test_без_вкладок_старый_адрес_ведёт_в_настройки(
     monkeypatch: pytest.MonkeyPatch, tenant: str, role: str
 ) -> None:
     for client in _стенд(monkeypatch, tenant=tenant, role=role):
-        ответ = client.get(РАЗДЕЛ)
-        assert ответ.status_code in (403, 404), f"{tenant}/{role}: раздел открылся"
+        ответ = client.get("/users?person=me&lang=en")
+        assert ответ.status_code == 302
+        assert ответ.headers["Location"] == "/settings?lang=en"
+
+
+@pytest.mark.parametrize(("tenant", "role"), sorted(ВКЛАДКИ))
+def test_пункта_пользователи_в_меню_нет_ни_у_кого(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str
+) -> None:
+    for client in _стенд(monkeypatch, tenant=tenant, role=role):
         меню = client.get("/settings").get_data(as_text=True)
-        assert f'href="{РАЗДЕЛ}?lang=' not in меню, f"{tenant}/{role}: пункт меню виден"
+        assert 'href="/users?lang=' not in меню, f"{tenant}/{role}"
+        assert (f'href="{РАЗДЕЛ}?lang=' in меню) == bool(ВКЛАДКИ[(tenant, role)]), (
+            f"{tenant}/{role}"
+        )
+
+
+def test_админ_партнёра_видит_только_своё_пространство(monkeypatch: pytest.MonkeyPatch) -> None:
+    _без_базы(monkeypatch)
+    monkeypatch.setattr(
+        partner_spaces,
+        "overview",
+        lambda: (
+            partner_spaces.SpaceRow("GE", "Партнёр Г", ("GE",), 2),
+            partner_spaces.SpaceRow("AM", "Партнёр А", ("AM",), 2),
+            partner_spaces.SpaceRow("HQ", "", (), 4),
+        ),
+    )
+    for client in _стенд(monkeypatch, tenant="GE", role="admin"):
+        страница = client.get(f"{РАЗДЕЛ}?tab=spaces").get_data(as_text=True)
+        assert "Партнёр Г" in страница
+        assert "Партнёр А" not in страница
+        assert "Ваше пространство" in страница
+
+
+@pytest.mark.parametrize(("tenant", "role"), [("HQ", "admin"), ("HQ", "control"), ("GE", "admin")])
+def test_журнал_чужой_роли_404_база_не_спрошена(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str
+) -> None:
+    for client in _стенд(monkeypatch, tenant=tenant, role=role):
+        assert client.get(f"{РАЗДЕЛ}?tab=journal").status_code == 404
+
+
+@pytest.mark.parametrize(("tenant", "role"), [("HQ", "control"), ("GE", "admin")])
+def test_расход_чужой_роли_404(monkeypatch: pytest.MonkeyPatch, tenant: str, role: str) -> None:
+    for client in _стенд(monkeypatch, tenant=tenant, role=role):
+        assert client.get(f"{РАЗДЕЛ}?tab=usage").status_code == 404
 
 
 def test_проверить_сейчас_пробует_и_пишет(

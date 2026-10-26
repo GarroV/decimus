@@ -122,7 +122,7 @@ _SELECT_USER_SQL = """
 #: (D286). Условие в тексте неизменно, охват приходит параметром (S608).
 _LIST_USERS_SQL = """
     select u.login, u.created_at, u.disabled_at, u.role, u.tenant_code, u.id, u.email,
-           f.login
+           f.login, u.display_name_latin
       from web_users u
       left join web_users f on f.id = u.disabled_by
      where (%(tenant)s::text is null or u.tenant_code = %(tenant)s)
@@ -232,6 +232,14 @@ _SET_EMAIL_SQL = """
       from прежняя
      where u.id = прежняя.id
  returning u.id, прежняя.email is distinct from u.email
+"""
+
+_SET_NAME_LATIN_SQL = """
+    update web_users
+       set display_name_latin = %(name)s
+     where tenant_code = %(tenant)s and login = %(login)s and disabled_at is null
+       and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
+ returning id
 """
 
 _SELECT_USER_BY_ID_SQL = """
@@ -413,6 +421,9 @@ class AccountRow:
     #: Логин того, кто заморозил (D462); `None` — не заморожена, заморожена
     #: командой с машины или до `0063`.
     disabled_by: str | None = None
+    #: Имя проверяющего латиницей (D644, `0100`); `None` — не задано, в отчёт идёт
+    #: автоперевод имени из Google.
+    name_latin: str | None = None
 
 
 @dataclass(frozen=True)
@@ -649,6 +660,7 @@ def list_accounts(*, tenant: str | None) -> tuple[AccountRow, ...]:
             id=str(r[5]),
             email=None if r[6] is None else str(r[6]),
             disabled_by=None if r[7] is None else str(r[7]),
+            name_latin=None if r[8] is None else str(r[8]),
         )
         for r in строки
     )
@@ -914,6 +926,27 @@ def set_email(
             cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
             _revoke_oauth(cur, строка[0], reason="email")
         return True
+
+
+def set_name_latin(
+    login: str, *, tenant: str, name: str | None, only_roles: tuple[str, ...] | None = None
+) -> bool:
+    """Записать имя проверяющего латиницей в карточку (или снять, `None`). `False` — учётки нет.
+
+    Роль владельца схемы или администратора, как почта: грант колоночный (`0100`).
+    Сессии не трогаются — имя не доступ.
+    """
+    with _managing("записать имя латиницей") as conn, conn.cursor() as cur:
+        cur.execute(
+            _SET_NAME_LATIN_SQL,
+            {
+                "tenant": tenant,
+                "login": login.strip().lower(),
+                "name": name,
+                "roles": _roles_param(only_roles),
+            },
+        )
+        return cur.fetchone() is not None
 
 
 def find_by_email(email: str) -> Account | None:

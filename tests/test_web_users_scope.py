@@ -152,7 +152,7 @@ def _записи(база: dict[str, list[Any]]) -> dict[str, list[Any]]:
 
 def добавление(client: FlaskClient) -> str:
     """Форма «Новый человек» — в правой колонке экрана по `?add=1`."""
-    страница = client.get("/users?add=1").get_data(as_text=True)
+    страница = client.get("/administration?tab=people&add=1").get_data(as_text=True)
     return страница.split('action="/users/add')[1].split("</form>")[0]
 
 
@@ -160,13 +160,13 @@ def добавление(client: FlaskClient) -> str:
 
 
 def test_главный_админ_видит_всех_и_пространства(главный: FlaskClient) -> None:
-    страница = главный.get("/users").get_data(as_text=True)
+    страница = главный.get("/administration?tab=people").get_data(as_text=True)
 
     for r in ПЕРЕЧЕНЬ:
         assert r.login in страница and r.email in страница, r.login
-    пространства = главный.get("/users?tab=spaces&space_code=GE").get_data(as_text=True)
+    пространства = главный.get("/administration?tab=spaces&space_code=GE").get_data(as_text=True)
     assert 'action="/users/spaces/countries' in пространства
-    новое = главный.get("/users?tab=spaces&add_space=1").get_data(as_text=True)
+    новое = главный.get("/administration?tab=spaces&add_space=1").get_data(as_text=True)
     assert 'action="/users/spaces/add' in новое
     форма = добавление(главный)
     assert 'value="superadmin"' in форма and 'value="admin"' in форма
@@ -237,7 +237,7 @@ def test_свою_роль_не_меняет_и_главный(главный: F
 
 
 def test_админ_уК_видит_всех_кроме_главного_админа(админ_уК: FlaskClient) -> None:
-    страница = админ_уК.get("/users").get_data(as_text=True)
+    страница = админ_уК.get("/administration?tab=people").get_data(as_text=True)
 
     for свой in ("kostya", "vika", "petr", "nino", "gia", "anahit", "aramayis"):
         assert свой in страница and f"{свой}@mail.example" in страница, свой
@@ -251,7 +251,7 @@ def test_админ_партнёра_в_общем_списке_и_карточ�
     админ_уК: FlaskClient,
 ) -> None:
     """#1122: при открытой карточке колонки списка прячутся, и «Админ · GE» читали как админа УК."""
-    страница = админ_уК.get("/users?person=id-nino").get_data(as_text=True)
+    страница = админ_уК.get("/administration?tab=people&person=id-nino").get_data(as_text=True)
 
     строка_nino = страница[страница.index("<b>nino") : страница.index("nino@mail.example")]
     assert ">GE</em>" in строка_nino, "пространство партнёра видно рядом с логином"
@@ -350,7 +350,7 @@ def test_отказ_базы_на_пространстве_сказан_и_не_
 def test_админ_партнёра_видит_только_своё_пространство(
     админ_GE: FlaskClient, база: dict[str, list[Any]]
 ) -> None:
-    страница = админ_GE.get("/users").get_data(as_text=True)
+    страница = админ_GE.get("/administration?tab=people").get_data(as_text=True)
 
     assert "gia" in страница and "gia@mail.example" in страница
     for чужое in ("boss2", "kostya", "vika", "petr", "anahit", "aramayis"):
@@ -358,7 +358,7 @@ def test_админ_партнёра_видит_только_своё_прост
         assert f"{чужое}@mail.example" not in страница, чужое
     assert база["everyone"] == ["GE"]
     # Свои страны — на чтение: формы пространств нет, чужого пространства нет.
-    своё = админ_GE.get("/users?tab=spaces").get_data(as_text=True)
+    своё = админ_GE.get("/administration?tab=spaces").get_data(as_text=True)
     for вид in (страница, своё):
         assert 'action="/users/spaces' not in вид
     assert "Партнёр Г" in своё and "Партнёр А" not in своё
@@ -442,7 +442,7 @@ def test_сотрудник_партнёра_и_аудитор_уК_не_упр�
     monkeypatch: pytest.MonkeyPatch, база: dict[str, list[Any]], tenant: str, role: str
 ) -> None:
     for client in _стенд(monkeypatch, tenant=tenant, role=role):
-        страница = client.get("/users").get_data(as_text=True)
+        страница = client.get("/administration?tab=people").get_data(as_text=True)
         ответы = [
             client.post(путь, data=форма, headers=ЗАГОЛОВКИ).status_code
             for путь, форма in (
@@ -467,7 +467,7 @@ def test_контроль_пространства_не_ведёт(
     monkeypatch: pytest.MonkeyPatch, база: dict[str, list[Any]]
 ) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="control"):
-        страница = client.get("/users").get_data(as_text=True)
+        страница = client.get("/administration?tab=people").get_data(as_text=True)
         ответ = client.post(
             "/users/spaces/add", data={"code": "KZ", "countries": "KZ"}, headers=ЗАГОЛОВКИ
         )
@@ -479,9 +479,9 @@ def test_контроль_пространства_не_ведёт(
 
 def test_главный_админ_в_навигации_видит_админские_разделы(главный: FlaskClient) -> None:
     """Главный админ — админ и больше: «Методика» и «Пользователи» в навигации на месте."""
-    страница = главный.get("/users").get_data(as_text=True)
+    страница = главный.get("/administration?tab=people").get_data(as_text=True)
 
-    for раздел in ("/users", "/admin", "/inspections", "/actions"):
+    for раздел in ("/administration", "/admin", "/inspections", "/actions"):
         assert f'href="{раздел}?lang=' in страница, раздел
     assert 'href="/tenants' not in страница
 
@@ -492,8 +492,10 @@ def test_тексты_экрана_есть_по_английски(
     подменить_двери(monkeypatch, tenant="HQ", role="superadmin")
     with собрать(tenant="HQ", ui_lang="en").test_client() as client:
         войти(client)
-        страница = client.get("/users?lang=en").get_data(as_text=True)
-        страница += client.get("/users?lang=en&tab=spaces&space_code=GE").get_data(as_text=True)
+        страница = client.get("/administration?tab=people&lang=en").get_data(as_text=True)
+        страница += client.get("/administration?tab=spaces&lang=en&space_code=GE").get_data(
+            as_text=True
+        )
 
     for текст in ("Partner spaces", "Super admin", "Add countries", "Every space"):
         assert текст in страница, текст

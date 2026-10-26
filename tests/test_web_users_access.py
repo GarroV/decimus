@@ -88,7 +88,7 @@ def админ_ук(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[
 
 
 def test_админ_уК_видит_почту_и_формы_правки(админ_ук: FlaskClient) -> None:
-    страница = админ_ук.get("/users?person=id-petr").get_data(as_text=True)
+    страница = админ_ук.get("/administration?tab=people&person=id-petr").get_data(as_text=True)
 
     assert "petr@dodobrands.io" in страница
     assert 'action="/users/role' in страница and 'action="/users/email' in страница
@@ -272,7 +272,7 @@ def test_аудитор_и_сотрудник_партнёра_не_правят
             data={"login": "petr", "tenant": tenant, "email": "me@evil.example"},
             headers=ЗАГОЛОВКИ,
         )
-        страница = client.get("/users").get_data(as_text=True)
+        страница = client.get("/administration?tab=people").get_data(as_text=True)
 
         assert (роль.status_code, почта.status_code) == (403, 403)
         assert 'action="/users/role' not in страница and 'action="/users/email' not in страница
@@ -402,7 +402,7 @@ def test_контроль_в_уК_назначается(админ_ук: FlaskC
 def test_экран_предлагает_контроль_только_людям_уК(админ_ук: FlaskClient) -> None:
     # Смена роли — в карточке человека справа (`?person=<ключ>`).
     def роли(ключ: str) -> str:
-        страница = админ_ук.get(f"/users?person={ключ}").get_data(as_text=True)
+        страница = админ_ук.get(f"/administration?tab=people&person={ключ}").get_data(as_text=True)
         return страница.split('action="/users/role')[1].split("</form>")[0]
 
     ук, партнёр = роли("id-petr"), роли("id-nino")
@@ -497,7 +497,7 @@ def test_контроль_в_проверках_не_пишет(контроль
 
 
 def test_контроль_видит_рейтинги_и_свои_дела(контроль: FlaskClient) -> None:
-    assert контроль.get("/users").status_code == 200
+    assert контроль.get("/administration?tab=people").status_code == 200
     # «Главной» у контролинга нет (D420), поэтому после входа — в «Рейтинги»,
     # а не на «Главную», как все (D378).
     вход = контроль.get("/")
@@ -505,16 +505,16 @@ def test_контроль_видит_рейтинги_и_свои_дела(ко�
 
 
 def test_контроль_в_навигации_только_свои_разделы(контроль: FlaskClient) -> None:
-    страница = контроль.get("/users").get_data(as_text=True)
+    страница = контроль.get("/administration?tab=people").get_data(as_text=True)
     assert 'href="/ratings?lang=' in страница
     for чужой in ("/overview", "/inspections", "/admin", "/actions", "/country"):
         assert f'href="{чужой}?lang=' not in страница, чужой
 
 
 def test_контроль_в_реестре_разделов_только_рейтинги_и_люди() -> None:
-    """D420: набор разделов контроля — рейтинги и «Пользователи», и ничего больше."""
+    """D420, D640: набор разделов контроля — рейтинги и «Администрирование», и ничего больше."""
     ключи = {item.key for item in visible_sections(Учётка(tenant=HQ_TENANT, role="control"))}
-    assert ключи == {"ratings", "users"}
+    assert ключи == {"ratings", "administration"}
 
 
 def test_контроль_выходит_сам(контроль: FlaskClient) -> None:
@@ -661,15 +661,15 @@ def test_контроль_не_меняет_роли_даже_своим(
 def test_контроль_видит_только_людей_контролинга(
     контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
 ) -> None:
-    страница = контроль.get("/users?person=id-vika").get_data(as_text=True)
+    страница = контроль.get("/administration?tab=people&person=id-vika").get_data(as_text=True)
 
     assert "vika" in страница and "vika@dodobrands.io" in страница
     for чужое in ("petr", "boss", "nino", "petr@dodobrands.io", "boss@dodobrands.io"):
         assert чужое not in страница, чужое
     assert 'action="/users/role' not in страница
-    assert 'href="/users?add=1"' in страница
+    assert 'href="/administration?tab=people&amp;add=1"' in страница
     assert 'action="/users/freeze' in страница
-    новый = контроль.get("/users?add=1").get_data(as_text=True)
+    новый = контроль.get("/administration?tab=people&add=1").get_data(as_text=True)
     форма = новый.split('action="/users/add')[1].split("</form>")[0]
     assert 'value="control"' in форма and 'value="HQ"' in форма
     for лишнее in ('value="admin"', 'value="auditor"', 'value="GE"'):
@@ -680,13 +680,13 @@ def test_админ_уК_видит_всех_при_людях_контроли�
     админ_ук: FlaskClient, люди_контроля: dict[str, list[Any]]
 ) -> None:
     """Админ УК видит людей УК, кроме главного админа, и партнёров (D440): «boss» вне охвата."""
-    страница = админ_ук.get("/users").get_data(as_text=True)
+    страница = админ_ук.get("/administration?tab=people").get_data(as_text=True)
 
     for свой in ("vika", "petr", "nino", "petr@dodobrands.io"):
         assert свой in страница, свой
     for чужое in ("boss", "boss@dodobrands.io"):
         assert чужое not in страница, чужое
-    карточка = админ_ук.get("/users?person=id-petr").get_data(as_text=True)
+    карточка = админ_ук.get("/administration?tab=people&person=id-petr").get_data(as_text=True)
     assert 'action="/users/role' in карточка
 
 
@@ -698,14 +698,14 @@ def админ_партнёра(monkeypatch: pytest.MonkeyPatch, зовы: Any) 
 def test_партнёру_пиццерии_в_меню_и_чужая_страна_закрыта(админ_партнёра: FlaskClient) -> None:
     """D512: «Пиццерии» — пункт меню и партнёра (свои страны); чужая страна — 404."""
     assert админ_партнёра.get("/country/RS").status_code == 404
-    страница = админ_партнёра.get("/users").get_data(as_text=True)
+    страница = админ_партнёра.get("/administration?tab=people").get_data(as_text=True)
     for свой in (
         "/country",
         "/overview",
         "/inspections",
         "/calendar",
         "/admin",
-        "/users",
+        "/administration",
         "/ratings",
     ):
         assert f'href="{свой}?lang=' in страница, свой

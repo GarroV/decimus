@@ -8,7 +8,17 @@ from __future__ import annotations
 ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "section.administration.title": {"ru": "Администрирование", "en": "Administration"},
     "administration.tabs": {"ru": "Разделы администрирования", "en": "Administration tabs"},
+    "administration.tab.people": {"ru": "Люди", "en": "People"},
+    "administration.tab.spaces": {"ru": "Пространства партнёров", "en": "Partner spaces"},
+    "administration.tab.spaces_own": {"ru": "Ваше пространство", "en": "Your space"},
+    "administration.tab.countries": {"ru": "Страны", "en": "Countries"},
+    "administration.tab.journal": {"ru": "Журнал", "en": "Log"},
+    "administration.tab.dodois": {"ru": "Dodo IS", "en": "Dodo IS"},
+    "administration.tab.usage": {"ru": "Расход модели", "en": "Model usage"},
     "administration.tab.connections": {"ru": "Подключения", "en": "Connections"},
+    "administration.group.access": {"ru": "Люди и доступ", "en": "People & access"},
+    "administration.group.connections": {"ru": "Внешние сервисы", "en": "External services"},
+    "administration.group.journal": {"ru": "Журнал и расход", "en": "Journal & usage"},
     "administration.sub": {
         "ru": "Все настройки сервиса в одном месте. Вкладки видны по роли.",
         "en": "All service settings in one place. Tabs depend on your role.",
@@ -117,5 +127,34 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "health.reason.dodois_failed": {
         "ru": "Сбой связи с Dodo IS при последней проверке",
         "en": "Connection to Dodo IS failed on the last check",
+    },
+    # Состояние канала оповещений владельцу (D641); исход пишет бот под кодом `alerts_channel`.
+    "health.conn.alerts_channel": {"ru": "Оповещения владельцу", "en": "Owner alerts"},
+    "health.reason.alerts_on": {
+        "ru": "Включены: о сбое придёт сообщение в Telegram",
+        "en": "On: a failure sends a Telegram message",
+    },
+    "health.reason.alerts_off": {
+        "ru": "Оповещения выключены: не заданы адрес и ключ канала FURCA",
+        "en": "Alerts are off: the FURCA channel address and key are not set",
+    },
+    "health.reason.alerts_demo": {
+        "ru": "Оповещения выключены: это демо",
+        "en": "Alerts are off: this is the demo",
+    },
+    # ── Вкладка «Страны» (D640) ──
+    "countries.sub": {
+        "ru": "Партнёр, девелопер, языки отчёта и договор страны. Выберите страну в списке.",
+        "en": "Partner, developer, report languages and agreement of a country. "
+        "Pick a country in the list.",
+    },
+    "countries.count": {"ru": "Стран: {count}", "en": "Countries: {count}"},
+    "countries.none": {"ru": "Стран в справочнике нет.", "en": "No countries in the directory."},
+    "countries.col.country": {"ru": "Страна", "en": "Country"},
+    "countries.col.space": {"ru": "Партнёр", "en": "Partner"},
+    "countries.col.developer": {"ru": "Девелопер", "en": "Developer"},
+    "countries.partial_failed": {
+        "ru": "Партнёры или девелоперы сейчас не прочитались: в столбцах могут быть пропуски.",
+        "en": "Partners or developers could not be read: some cells may be empty.",
     },
 }

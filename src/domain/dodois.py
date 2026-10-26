@@ -143,7 +143,7 @@ def status_of(login: Login, now: datetime) -> Status:
     if login.checked_at is None or now - login.checked_at > STALE_AFTER:
         return Status(YELLOW, "health.reason.stale", login.checked_at)
     if login.state == FAILED:
-        return Status(YELLOW, "health.reason.dodois_failed", login.checked_at)
+        return Status(RED, "health.reason.dodois_failed", login.checked_at)
     if login.state == PARTIAL:
         params = {"open": login.units_open or 0, "total": login.units_total or 0}
         return Status(YELLOW, "health.reason.dodois_partial", login.checked_at, params)

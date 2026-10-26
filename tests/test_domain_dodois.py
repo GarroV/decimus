@@ -148,7 +148,7 @@ def test_цвет_работает_открыто_не_всё_истёк_сбо�
     истёк = rules.status_of(_вход(state=rules.EXPIRED, reason="refresh_rejected"), СЕЙЧАС)
     assert (истёк.light, истёк.reason) == (RED, "health.reason.dodois_expired")
     сбой = rules.status_of(_вход(state=rules.FAILED, reason="network"), СЕЙЧАС)
-    assert (сбой.light, сбой.reason) == (YELLOW, "health.reason.dodois_failed")
+    assert (сбой.light, сбой.reason) == (RED, "health.reason.dodois_failed")
 
 
 def test_проверка_которая_не_идёт_не_остаётся_зелёной() -> None:

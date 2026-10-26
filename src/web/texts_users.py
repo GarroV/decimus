@@ -174,6 +174,19 @@ _PANEL: dict[str, dict[str, str]] = {
         "ru": "Пустое поле закрывает вход через Google; пароль продолжает работать.",
         "en": "An empty field closes Google sign-in; the password keeps working.",
     },
+    "users.panel.name_latin_title": {
+        "ru": "Имя латиницей для отчёта",
+        "en": "Name in Latin letters for reports",
+    },
+    "users.panel.name_latin_hint": {
+        "ru": "Так имя проверяющего увидит партнёр: на кадрах и в отчёте. Пусто — имя "
+        "переводится в латиницу автоматически (Жульфаев Ринат → Zhulfaev Rinat). Здесь, "
+        "в «Людях», имя показывается как записано.",
+        "en": "How the inspector's name appears to partners: on photos and in reports. "
+        "Empty: the name is transliterated automatically (Жульфаев Ринат → Zhulfaev "
+        "Rinat). Here in People the name is shown as written.",
+    },
+    "users.name_latin.placeholder": {"ru": "Rinat Zhulfaev", "en": "Rinat Zhulfaev"},
     "users.panel.bot_title": {"ru": "Бот в Telegram", "en": "Telegram bot"},
     "users.panel.bot_bound": {
         "ru": "Привязан к Telegram ID {id} с {date}.",
@@ -326,6 +339,22 @@ _OUTCOMES: dict[str, dict[str, str]] = {
     "users.email.failed": {
         "ru": "Почта не сохранена: база не ответила. Попробуйте ещё раз.",
         "en": "Email not saved: the database did not respond. Please try again.",
+    },
+    "users.name_latin.ok": {
+        "ru": "Имя латиницей сохранено: оно пойдёт в новые проверки.",
+        "en": "Latin name saved: it will be used in new inspections.",
+    },
+    "users.name_latin.removed": {
+        "ru": "Имя латиницей снято: в новых проверках имя переводится автоматически.",
+        "en": "Latin name removed: new inspections use automatic transliteration.",
+    },
+    "users.name_latin.long": {
+        "ru": "Слишком длинное имя (не больше 120 знаков) — ничего не изменено.",
+        "en": "The name is too long (120 characters at most) — nothing changed.",
+    },
+    "users.name_latin.failed": {
+        "ru": "Имя не сохранено: база не ответила. Попробуйте ещё раз.",
+        "en": "Name not saved: the database did not respond. Please try again.",
     },
     "users.freeze.ok": {
         "ru": "Заморожен. Сессии закрыты, подключения Claude и токены отозваны, бот отвязан.",

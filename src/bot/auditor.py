@@ -1,10 +1,16 @@
 """Имя проверяющего по Telegram ID (задача T063, решение D032).
 
 Аудитор своё имя не вводит: оно подставляется по ID отправителя и уходит в
-шапку отчёта партнёру. Источника два и порядок между ними жёсткий:
+шапку отчёта партнёру. Источника три и порядок между ними жёсткий (D642):
 
-1. карта `AUDITOR_NAMES` — имя в том виде, в каком его должен увидеть партнёр;
-2. имя профиля Telegram — если ID в карте нет.
+1. имя и фамилия из карточки человека, к которой привязан Telegram
+   (`src.db.auditor_card`) — одно имя для бота, мини-аппа, веба и MCP;
+2. карта `AUDITOR_NAMES` — имя в том виде, в каком его должен увидеть партнёр;
+3. имя профиля Telegram — если Telegram ни к одной карточке не привязан и ID в
+   карте нет.
+
+Карточку читает вызывающий и передаёт сюда как `card_name`: сбой чтения —
+`None`, а не отказ, поэтому старт проверки на нём не встаёт.
 
 Профиль как запасной источник выбран сознательно: карта не обязательна, и
 проверка не должна вставать из-за незаполненной переменной окружения. Цена в
@@ -22,6 +28,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+
+from src.domain.auditor_name import spell_name
 
 #: Бюджет имени аудитора В БАЙТАХ — часть общего бюджета имени файла отчёта.
 #:
@@ -47,7 +55,9 @@ _ELLIPSIS = "…"
 _WORD_BOUNDARY_LOOKBACK = 20
 
 
-def auditor_name(user_id: int, profile_name: str, names: Mapping[int, str]) -> str:
+def auditor_name(
+    user_id: int, profile_name: str, names: Mapping[int, str], card_name: str | None = None
+) -> str:
     """Как проверяющий будет назван в отчёте — уже пригодным для имени файла.
 
     Пустая строка не возвращается никогда: пустое поле в шапке отчёта выглядит
@@ -57,11 +67,13 @@ def auditor_name(user_id: int, profile_name: str, names: Mapping[int, str]) -> s
     имя файла, и оба места должны получить одно и то же уже безопасное имя.
     """
     return _fit_within_bytes(
-        _raw_auditor_name(user_id, profile_name, names), AUDITOR_NAME_BYTE_LIMIT
+        _raw_auditor_name(user_id, profile_name, names, card_name), AUDITOR_NAME_BYTE_LIMIT
     )
 
 
-def auditor_name_was_shortened(user_id: int, profile_name: str, names: Mapping[int, str]) -> bool:
+def auditor_name_was_shortened(
+    user_id: int, profile_name: str, names: Mapping[int, str], card_name: str | None = None
+) -> bool:
     """Обрезалось ли имя ради бюджета имени файла — сказать об этом аудитору.
 
     Признака обрезки в самом `auditor_name` нет — он отдаёт готовую строку, а
@@ -69,18 +81,22 @@ def auditor_name_was_shortened(user_id: int, profile_name: str, names: Mapping[i
     или нет. Этой функции он и нужен: старт проверки зовёт её отдельно, чтобы
     добавить в чат отдельную строку, а не молчать о подмене.
     """
-    raw = _raw_auditor_name(user_id, profile_name, names)
+    raw = _raw_auditor_name(user_id, profile_name, names, card_name)
     return _fit_within_bytes(raw, AUDITOR_NAME_BYTE_LIMIT) != raw
 
 
-def _raw_auditor_name(user_id: int, profile_name: str, names: Mapping[int, str]) -> str:
-    """Имя проверяющего ДО обрезки по байтам: карта, иначе профиль, иначе ID."""
-    mapped = (names.get(user_id) or "").strip()
-    if mapped:
-        return mapped
-    profile = profile_name.strip()
-    if profile:
-        return profile
+def _raw_auditor_name(
+    user_id: int, profile_name: str, names: Mapping[int, str], card_name: str | None
+) -> str:
+    """Имя проверяющего ДО обрезки по байтам: карточка, карта, профиль, иначе ID.
+
+    Написание — одной функцией `spell_name` (D644): партнёру имя уходит латиницей,
+    с какого бы источника оно ни взялось.
+    """
+    for candidate in (card_name, names.get(user_id), profile_name):
+        spelled = spell_name((candidate or "").strip())
+        if spelled:
+            return spelled
     return f"Telegram {user_id}"
 
 

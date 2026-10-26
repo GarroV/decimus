@@ -84,6 +84,15 @@
           <button class="sbtn" type="submit">{{ t('users.save') }}</button>
         </form>
         <p class="ssec__note">{{ t('users.panel.email_hint') }}</p>
+        <form method="post" action="{{ users_url }}/name-latin?lang={{ lang }}" class="sform sform--inline">
+          <input type="hidden" name="login" value="{{ row.login }}">
+          <input type="hidden" name="tenant" value="{{ row.tenant }}">
+          <label class="grow"><span class="sform__label">{{ t('users.panel.name_latin_title') }}</span>
+            <input class="sinput" name="name_latin" value="{{ row.name_latin or '' }}" maxlength="120"
+                   placeholder="{{ t('users.name_latin.placeholder') }}" autocomplete="off" spellcheck="false"></label>
+          <button class="sbtn" type="submit">{{ t('users.save') }}</button>
+        </form>
+        <p class="ssec__note">{{ t('users.panel.name_latin_hint') }}</p>
       {% endif %}
     </section>
 

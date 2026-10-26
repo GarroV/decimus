@@ -44,7 +44,6 @@ from . import (
     administration,
     auth,
     connections_form,
-    dodois_screen,
     guard,
     reauth,
     service_keys_screen,
@@ -173,8 +172,6 @@ def _page(
     add: bool = False,
     key_flash: service_keys_screen.KeyFlash | None = None,
     health_flash: admin_health.Flash | None = None,
-    dodois_flash: dodois_screen.Flash | None = None,
-    dodois_issued: dodois_screen.IssuedLink | None = None,
     code: int = 200,
 ) -> FlaskResponse:
     """Страница вкладки целиком — для GET и для ответа на любое действие."""
@@ -214,7 +211,6 @@ def _page(
         split_back=_link(tab=TAB_CONNECTIONS),
         **service_keys_screen.context(key_flash),
         **admin_health.context(health_flash),
-        **dodois_screen.context(dodois_flash, dodois_issued),
         **administration.nav(TAB_CONNECTIONS),
     )
     response = make_response(html, code)

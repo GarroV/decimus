@@ -204,9 +204,25 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     },
     "country.card.langs": {"ru": "Языки отчёта", "en": "Report languages"},
     "country.card.langs_hint": {
-        "ru": "Из методики (report_langs.json): бот предлагает их при сборке отчёта.",
-        "en": "From the methodology (report_langs.json): the bot offers them "
-        "when building a report.",
+        "ru": "Бот предлагает их при сборке отчёта; они же — язык письма по умолчанию.",
+        "en": "The bot offers them when building a report; they are also the default "
+        "letter language.",
+    },
+    "country.langs.custom": {"ru": "заданы для страны", "en": "set for the country"},
+    "country.langs.default": {
+        "ru": "как по умолчанию",
+        "en": "as default",
+    },
+    "country.langs.hint": {
+        "ru": "Отметьте языки, на которых аудитор может напечатать отчёт этой страны. "
+        "Не меньше одного, только языки методики.",
+        "en": "Tick the languages an auditor may print this country's report in. "
+        "At least one, methodology languages only.",
+    },
+    "country.langs.reset": {"ru": "Как по умолчанию", "en": "Reset to default"},
+    "country.langs.invalid": {
+        "ru": "Языки не сохранены: отметьте хотя бы один язык из методики.",
+        "en": "Languages not saved: tick at least one methodology language.",
     },
     "country.card.agg_failed": {
         "ru": "Оценки на площадках доставки сейчас не прочитались.",
@@ -251,8 +267,14 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
         "country already belongs to another partner.",
     },
     "country.settings.people": {
-        "ru": "Люди и пространства партнёров ведутся на экране «Пользователи».",
-        "en": "People and partner spaces are managed on the Users screen.",
+        "ru": "Люди и пространства партнёров ведутся во вкладках «Люди» и «Пространства "
+        "партнёров» этого раздела.",
+        "en": "People and partner spaces are managed in the People and Partner spaces "
+        "tabs of this section.",
+    },
+    "country.settings.edit_in_admin": {
+        "ru": "Изменить в «Администрировании»",
+        "en": "Change in Administration",
     },
     "country.contract.title": {"ru": "Договор", "en": "Agreement"},
     "country.contract.legal_name": {"ru": "Юрлицо партнёра", "en": "Partner legal entity"},

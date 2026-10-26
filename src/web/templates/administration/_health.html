@@ -2,7 +2,8 @@
   Состояние подключений (D638): итог одной строкой сверху, под ним группы (системное,
   рейтинги и оценки, обучение, Dodo IS) и в каждой плитка на подключение — точка,
   название, причина, время проверки, «Проверить сейчас» у тех, что пробуются. Цвета
-  выводит `src/domain/health.py`; здесь только показ.
+  выводит `src/domain/health.py`; здесь только показ. Строка Dodo IS ведёт во вкладку «Dodo IS»;
+  над группами — включены ли оповещения владельцу (D641).
 #}
 <section class="scard shealth" id="health" aria-labelledby="health-title">
   <header class="shealth__head">
@@ -26,6 +27,9 @@
       <span class="shealth__dot shealth__dot--{{ health_summary }}" aria-hidden="true"></span>
       {{ t('health.summary.' ~ health_summary, n=bad) }}
     </p>
+    {% if health_alerts %}
+      <p class="shealth__alerts"><b>{{ t('health.conn.alerts_channel') }}:</b> {{ t(health_alerts.reason) }}</p>
+    {% endif %}
     {% for group, members in health_groups %}
       <h3 class="shealth__group">{{ t('health.group.' ~ group) }}</h3>
       <ul class="shealth__tiles">
@@ -34,7 +38,7 @@
           <li class="shealth__tile">
             <span class="shealth__name">
               <span class="shealth__dot shealth__dot--{{ s.light }}" role="img" aria-label="{{ t('health.light.' ~ s.light) }}"></span>
-              <b>{% if row.country %}{{ t('health.conn.dodo_is_country', name=country_title(row.country)) }}{% else %}{{ t('health.conn.' ~ row.code) }}{% endif %}</b>
+              <b>{% if row.country %}<a href="{{ admin_url('dodois', country=row.country) }}">{{ t('health.conn.dodo_is_country', name=country_title(row.country)) }}</a>{% else %}{{ t('health.conn.' ~ row.code) }}{% endif %}</b>
             </span>
             <small>{{ t(s.reason, **s.params) }}</small>
             {% if s.checked_at or row.checkable %}

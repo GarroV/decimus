@@ -108,7 +108,7 @@ def test_расход_пояснение_под_знаком_вопроса_а_�
     client = _вошедший(monkeypatch, role="superadmin")
     _заглушка(monkeypatch)
 
-    страница = client.get("/users?tab=usage").get_data(as_text=True)  # type: ignore[attr-defined]
+    страница = client.get("/administration?tab=usage").get_data(as_text=True)  # type: ignore[attr-defined]
 
     вся, без_столбика = шапка_без_подсказки(страница, '<header class="shead">')
     assert "Сколько токенов и денег уходит на нейросеть" in вся

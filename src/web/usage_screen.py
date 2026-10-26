@@ -1,8 +1,8 @@
 """Экран «Расход модели» (D537): сколько токенов и денег ушло на модель.
 
-Вкладка экрана «Пользователи» (`/users?tab=usage`), как «Журнал»: один вопрос — «сколько
-мы тратим на модель и на что». Период один на экран (календарь «с — по», стрелки ← →,
-по умолчанию текущий месяц). Сверху итоги с изменением к прошлому периоду, ниже срезы:
+Вкладка раздела «Администрирование» (`/administration?tab=usage`), как «Журнал»: один
+вопрос — «сколько мы тратим на модель и на что». Период один на экран (календарь «с — по»,
+стрелки ← →, по умолчанию текущий месяц). Сверху итоги с изменением к прошлому периоду, ниже срезы:
 по дням, по видам вызова, по людям, самые дорогие проверки.
 
 **Видят главный админ и админ УК** (`access_policy`: охват `SUPER` и `HQ_ADMIN`); прочим
@@ -25,7 +25,15 @@ from src.db import model_usage
 from src.db.errors import DbError
 from src.domain.model_usage import KINDS
 
-from . import access_policy, auth, registry_period, registry_view, ui_lang, usage_view
+from . import (
+    access_policy,
+    administration,
+    auth,
+    registry_period,
+    registry_view,
+    ui_lang,
+    usage_view,
+)
 from .config import Settings
 from .db_refusal import note_target_mismatch
 from .sections import section
@@ -79,7 +87,7 @@ def _render(conf: Settings) -> tuple[str, int]:
     total = usage_view.totals(now_rows)
     people = usage_view.by_person(now_rows)
     before = None if before_rows is None else usage_view.totals(before_rows)
-    base = f"{request.script_root}{section('users').path}"
+    base = f"{request.script_root}{section('administration').path}"
 
     def select(**изменения: str) -> str:
         параметры = {"tab": TAB_USAGE, **period.params(), "lang": lang, **изменения}
@@ -115,12 +123,7 @@ def _render(conf: Settings) -> tuple[str, int]:
             money=usage_view.money,
             number=usage_view.number,
             percent=usage_view.percent,
-            tab=TAB_USAGE,
-            has_spaces_tab=True,
-            manages_spaces=True,
-            has_journal_tab=_is_super(),
-            has_usage_tab=True,
-            link=lambda **параметры: base + (f"?{urlencode(параметры)}" if параметры else ""),
+            **administration.nav(TAB_USAGE),
         ),
         503 if failed else 200,
     )
@@ -135,14 +138,8 @@ def _inspection_href(key: str, lang: str) -> str | None:
     return f"{request.script_root}{section('registry').path}/{number}?lang={lang}"
 
 
-def _is_super() -> bool:
-    вошедший = auth.current_account()
-    охват = None if вошедший is None else access_policy.scope_of(вошедший.role, вошедший.tenant)
-    return охват is not None and охват.kind == access_policy.SUPER
-
-
 def show(conf: Settings) -> FlaskResponse | tuple[str, int]:
-    """GET `/users?tab=usage[&from=&to=]`. Не админу УК — 404."""
+    """GET `/administration?tab=usage[&from=&to=]`. Не админу УК — 404."""
     вошедший = auth.current_account()
     if вошедший is None or not may_see(вошедший.role, вошедший.tenant):
         abort(404)

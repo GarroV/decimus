@@ -12,8 +12,9 @@ import pytest
 from conftest import TEST_DATA
 
 from src.bot import report_lang
+from src.db import country_report_langs
 from src.db.directory import Unit
-from src.db.errors import PushError
+from src.db.errors import DbError, PushError
 from src.domain import models
 from src.domain import report_langs as langs
 
@@ -83,3 +84,57 @@ def test_offered_languages_follow_the_country(
 
     assert report_lang.langs_for_inspection(_inspection()) == ["en"]
     assert report_lang.langs_for_inspection(_inspection(unit="Nowhere-9")) == ["ru", "en"]
+
+
+def _methodology(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    data = tmp_path / "methodology"
+    shutil.copytree(TEST_DATA, data)
+    (data / langs.REPORT_LANGS_FILE).write_text(
+        '{"default": ["ru", "en"], "countries": {"GE": ["ru"]}}', encoding="utf-8"
+    )
+    monkeypatch.setenv("AUDIT_DATA_DIR", str(data))
+    _units(monkeypatch, Unit(id="u1", name="Tbilisi-1", code=None, aliases=(), country="GE"))
+
+
+def test_override_from_the_database_beats_the_file(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _methodology(monkeypatch, tmp_path)
+    monkeypatch.setattr(country_report_langs, "read", lambda country: ("en", "ru"))
+
+    assert report_lang.langs_for_inspection(_inspection()) == ["en", "ru"]
+
+
+def test_without_override_the_file_list_stays(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _methodology(monkeypatch, tmp_path)
+    monkeypatch.setattr(country_report_langs, "read", lambda country: None)
+
+    assert report_lang.langs_for_inspection(_inspection()) == ["ru"]
+
+
+def test_database_failure_falls_back_to_the_file_without_refusing(
+    domain_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _methodology(monkeypatch, tmp_path)
+
+    def down(country: str) -> tuple[str, ...]:
+        raise DbError("база недоступна")
+
+    monkeypatch.setattr(country_report_langs, "read", down)
+
+    assert report_lang.langs_for_inspection(_inspection()) == ["ru"]
+    assert "из базы не прочитались" in caplog.text
+
+
+def test_override_with_only_foreign_languages_is_ignored(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _methodology(monkeypatch, tmp_path)
+    monkeypatch.setattr(country_report_langs, "read", lambda country: ("xx",))
+
+    assert report_lang.langs_for_inspection(_inspection()) == ["ru"]
