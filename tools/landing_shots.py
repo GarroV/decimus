@@ -2,10 +2,14 @@
 
     make landing-shots                       # открытое демо, ru и en
     LANDING_SHOTS_BASE=http://127.0.0.1:8080 make landing-shots
+    LANDING_SHOTS_WALK_BASE=<превью-стенд> make landing-shots
 
-Язык браузера (`locale`) ставится по языку снимка: мини-апп обхода выбирает по нему
-русскую или английскую идущую проверку демо (`WEB_WALK_PREVIEW_CHAT_RU`), поэтому
-русский снимок обхода получается целиком русским, а не с английскими записями.
+Мини-апп обхода в открытом демо английский для любого браузера (D656), поэтому русские
+снимки обхода (`walk`, `match`) берутся со стенда, где задан `WEB_WALK_PREVIEW_CHAT_RU`
+(превью-стенд, `docs/08-deploy.md` §8.22): там русский браузер (`locale`) получает русскую
+идущую проверку, и снимок целиком русский, а не с английскими записями. Адрес такого стенда —
+в `LANDING_SHOTS_WALK_BASE`; не задан — берётся `LANDING_SHOTS_BASE`, и русский снимок обхода
+с открытого демо падает на проверке языка.
 
 Скрипт сам входит на стенд открытого демо (`/demo` → роль без пароля), открывает
 настоящие экраны за «всё время» — иначе в демо-данных почти пусто, — прячет плашку
@@ -32,6 +36,7 @@ from PIL import Image
 from playwright.sync_api import Page, sync_playwright
 
 BASE = os.environ.get("LANDING_SHOTS_BASE", "https://decimus-demo.vasiliy-garro.workers.dev")
+WALK_BASE = os.environ.get("LANDING_SHOTS_WALK_BASE", BASE)
 OUT = Path(__file__).resolve().parent.parent / "src" / "web" / "static" / "landing"
 LANGS = ("ru", "en")
 LOCALES = {"ru": "ru-RU", "en": "en-US"}
@@ -122,7 +127,7 @@ def save(page: Page, name: str, lang: str, clip: dict[str, float] | None) -> Pat
 
 def shot_walk(page: Page, lang: str) -> Path:
     """Экран обхода мини-аппа: зона в работе, найденное в прошлый раз и записи."""
-    page.goto(f"{BASE}/tg/walk?lang={lang}")
+    page.goto(f"{WALK_BASE}/tg/walk?lang={lang}")
     settle(page)
     hide_chrome(page)
     if lang == "ru":
@@ -130,14 +135,15 @@ def shot_walk(page: Page, lang: str) -> Path:
         leaked = [w for w in ENGLISH_ON_RU_WALK if w in text]
         if leaked:
             raise RuntimeError(
-                f"русский снимок обхода с английским текстом {leaked}: стенд без русской проверки?"
+                f"русский снимок обхода с английским текстом {leaked}: стенд без русской проверки? "
+                "Открытое демо её не отдаёт (D656) — нужен LANDING_SHOTS_WALK_BASE"
             )
     return save(page, "walk", lang, None)
 
 
 def shot_match(page: Page, lang: str) -> Path:
     """Запись обхода: к словам проверяющего подобран пункт чек-листа, осталось подтвердить."""
-    page.goto(f"{BASE}/tg/walk?lang={lang}")
+    page.goto(f"{WALK_BASE}/tg/walk?lang={lang}")
     settle(page)
     hide_chrome(page)
     page.click(".walk-rec__open")

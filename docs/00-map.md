@@ -989,7 +989,10 @@ Telegram, ни HTTP, ни SQL.
 | `tools/mcp_watch.py` | Сторож доступности продукта снаружи: MCP (#243) и вход в админку (F-111) |
 | `tools/methodology_leak.py` | Проверка: методика управляющей компании не цитируется в репозитории (#138, #854) |
 | `tools/oauth_smoke.py` | Сквозной прогон подключения Claude входом через сайт (D417) против живого стенда |
+| `tools/open_demo_notices.py` | Предписания открытого демо: страница «ОСБ» и «Compliance notices» стран — не пустые |
+| `tools/open_demo_people.py` | Люди и партнёры открытого демо: учётки с почтой и ролями, партнёры стран, договоры |
 | `tools/open_demo_ratings.py` | Рейтинги открытого демо (D524): РС и РКО пиццерий демо-сети — тем же импортёром, что у продукта |
+| `tools/open_demo_reviews.py` | Оценки площадок открытого демо: агрегаторы доставки и карты — теми же дверями, что у сборщиков |
 | `tools/open_demo_training.py` | Обучение открытого демо (D524): тем же загрузчиком, что у продукта, из выдуманного iSpring |
 | `tools/plan_rows_backfill.py` | Строки для старых открытых запросов экшн-плана — разовый доливщик (#1168) |
 | `tools/porcha_core.py` | Порча ядра (#268): испорченный расчёт обязан уронить прогон |
@@ -1078,7 +1081,7 @@ Telegram, ни HTTP, ни SQL.
 | Загрузить историческую проверку | `src/mcp/imports.py`, `import_modes.py`, запись — `src/db/imports.py`, `imports_legacy.py`; процедура — `docs/14-history-import.md` |
 | Пространство и страны | Завести и привязать — `tools/space.py` (`make space`), логика — `src/db/spaces.py`, `src/db/reach.py` |
 | Завести учётку веб-админки или ключ API | `tools/web_user.py` (`make web-user`), `tools/web_unlock.py` (`make web-unlock`), `tools/api_token.py` |
-| Открытое демо (публичное, для коллег) | VPS, `/srv/decimus-demo`: `deploy/demo/` (надстройка, `reset.sh` раз в час, `update.sh` после выкладки прода — иначе демо отстаёт), посев `tools/seed_open_demo.py` (+ `open_demo_ratings.py`, `open_demo_training.py`), запреты демо — `src/web/demo_entry.py`; `docs/08-deploy.md` §8.21 |
+| Открытое демо (публичное, для коллег) | VPS, `/srv/decimus-demo`: `deploy/demo/` (надстройка, `reset.sh` раз в час, `update.sh` после выкладки прода — иначе демо отстаёт), посев `tools/seed_open_demo.py` (+ `open_demo_ratings.py`, `open_demo_reviews.py`, `open_demo_notices.py`, `open_demo_people.py`, `open_demo_training.py`), запреты демо — `src/web/demo_entry.py`; `docs/08-deploy.md` §8.21 |
 | Показать доработку владельцу до прода | Превью-стенд на MUSPELHEIM: `deploy/preview/compose.preview.yaml`, `C:\projects\decimus-preview`, `https://<TAILNET_HOST>:9443` (только tailnet); собирать **`web` и `walk`** — мини-апп в своём образе; `docs/08-deploy.md` §8.22 |
 | Стенд Виктории (рейтинги) | MUSPELHEIM `decimus-viktoria`, ветка `stand/viktoria`, сам обновляется раз в 2 минуты; адрес `https://decimus-stand.vasiliy-garro.workers.dev`; `docs/08-deploy.md` §8.11 |
 | Демо и стенд разработчика | `make demo` (бот), `make web-demo` и `make web-up` (админка), сиды — `tools/seed_*.py`; стенды — только на MUSPELHEIM, на Маке их нет |
