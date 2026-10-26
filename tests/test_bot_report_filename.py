@@ -94,11 +94,12 @@ async def test_имя_профиля_из_эмодзи_тоже_влезает_�
 
 async def test_живое_короткое_имя_не_трогается_вовсе(domain_env: Path) -> None:
     """Живым именам предел не должен мешать: ни обрезки, ни лишней строки в чате."""
-    session = await пройти_мастер(full_name="Владимир Гарро")
+    # Латиница (D644): кириллица переводилась бы, а тест — про обрезку, не про перевод.
+    session = await пройти_мастер(full_name="Vladimir Garro")
 
     inspection = get_state(CHAT_ID)
     assert inspection is not None
-    assert inspection.auditor == "Владимир Гарро", "короткое имя обрезалось без нужды"
+    assert inspection.auditor == "Vladimir Garro", "короткое имя обрезалось без нужды"
     assert "…" not in inspection.auditor
     предупреждение = t("start.auditor_name_shortened", "ru")
     assert предупреждение not in session.last_text, "лишняя строка про обрезку для живого имени"
