@@ -420,6 +420,7 @@
 | `RECOGNIZE_MERGE_MODEL` | `src/recognize/config.py` | да |
 | `RECOGNIZE_MIN_CONFIDENCE` | `src/recognize/config.py` | да |
 | `RECOGNIZE_MODEL` | `src/recognize/config.py` | да |
+| `RECOGNIZE_REASONING_EFFORT` | `src/recognize/config.py` | да |
 | `RECOGNIZE_TIMEOUT` | `src/recognize/config.py` | да |
 | `RECOGNIZE_TRANSCRIBE_MODEL` | `src/recognize/config.py` | да |
 | `S3_ACCESS_KEY_ID` | `src/db/config.py` | да |

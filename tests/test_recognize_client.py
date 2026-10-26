@@ -270,3 +270,119 @@ def test_обрезанный_потолком_ответ_это_ModelUnavailabl
             photo=None,
             settings=_settings(),
         )
+
+
+# --- #1267 (D646): глубина рассуждения и точка кэша -------------------------------
+
+
+def _ask(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    settings: RecognizeSettings,
+    kind: str = "recognize",
+    model: str | None = None,
+    cached_prefix: str = "",
+    question: str = "ПОСТОЯННОЕ\n\nМЕНЯЮЩЕЕСЯ",
+) -> dict[str, Any]:
+    fake = _FakeResponses(answer=_FakeResponse(output_text="{}", usage=_FakeUsage(10, 2)))
+    _patch_client(monkeypatch, _FakeClient(responses=fake))
+    ask_model(
+        kind=kind,
+        instructions="сис",
+        question=question,
+        schema=_SCHEMA,
+        photo=None,
+        settings=settings,
+        model=model,
+        cached_prefix=cached_prefix,
+    )
+    return fake.calls[0]
+
+
+def test_глубина_рассуждения_уходит_только_у_разбора_на_модели_из_настроек(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    настройки = _settings(reasoning_effort="low")
+
+    разбор = _ask(monkeypatch, settings=настройки)
+    сведение = _ask(monkeypatch, settings=настройки, kind="merge")
+    чужая_модель = _ask(monkeypatch, settings=настройки, model="gpt-4o-mini")
+
+    assert разбор["reasoning"] == {"effort": "low"}
+    assert "reasoning" not in сведение, "глубина разбора ушла в сведение комментария"
+    assert "reasoning" not in чужая_модель, "глубина разбора ушла на другую модель"
+
+
+def test_пустая_глубина_параметр_не_передаёт(monkeypatch: pytest.MonkeyPatch) -> None:
+    вызов = _ask(monkeypatch, settings=_settings(reasoning_effort=""))
+
+    assert "reasoning" not in вызов
+
+
+def test_за_постоянной_частью_вопроса_стоит_явная_точка_кэша(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    вызов = _ask(monkeypatch, settings=_settings(), cached_prefix="ПОСТОЯННОЕ")
+
+    части = вызов["input"][0]["content"]
+    assert части[0]["text"] == "ПОСТОЯННОЕ"
+    assert части[0]["prompt_cache_breakpoint"] == {"mode": "explicit"}
+    assert части[1]["text"] == "\n\nМЕНЯЮЩЕЕСЯ"
+    assert "prompt_cache_breakpoint" not in части[1]
+    assert вызов["extra_body"] == {"prompt_cache_options": {"mode": "explicit"}}
+
+
+def test_без_постоянной_части_и_на_чужой_модели_точки_кэша_нет(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    без_части = _ask(monkeypatch, settings=_settings())
+    чужая = _ask(monkeypatch, settings=_settings(), model="gpt-4o-mini", cached_prefix="ПОСТОЯННОЕ")
+
+    for вызов in (без_части, чужая):
+        assert "extra_body" not in вызов
+        assert len(вызов["input"][0]["content"]) == 1
+        assert "prompt_cache_breakpoint" not in вызов["input"][0]["content"][0]
+
+
+def test_кэш_и_рассуждение_попадают_в_расход_ответа(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    usage = SimpleNamespace(
+        input_tokens=100,
+        output_tokens=20,
+        input_tokens_details=SimpleNamespace(cached_tokens=64, cache_write_tokens=0),
+        output_tokens_details=SimpleNamespace(reasoning_tokens=7),
+    )
+    fake = _FakeResponses(answer=_FakeResponse(output_text="{}", usage=usage))  # type: ignore[arg-type]
+    _patch_client(monkeypatch, _FakeClient(responses=fake))
+
+    answer = ask_model(
+        kind="recognize",
+        instructions="с",
+        question="в",
+        schema=_SCHEMA,
+        photo=None,
+        settings=_settings(),
+    )
+
+    assert answer.usage == {
+        "input": 100,
+        "output": 20,
+        "cached": 64,
+        "reasoning": 7,
+        "cache_write": 0,
+    }
+
+
+def test_глубина_рассуждения_из_окружения() -> None:
+    from src.recognize.config import RecognizeConfigError, load_recognize_settings
+
+    def глубина(значение: str | None) -> str:
+        env = {} if значение is None else {"RECOGNIZE_REASONING_EFFORT": значение}
+        return load_recognize_settings(env).reasoning_effort
+
+    assert глубина(None) == "low", "умолчание — то, что выиграл замер"
+    assert глубина("medium") == "medium"
+    assert глубина("default") == "", "default — не передавать параметр вовсе"
+    with pytest.raises(RecognizeConfigError, match="RECOGNIZE_REASONING_EFFORT"):
+        глубина("быстро")
