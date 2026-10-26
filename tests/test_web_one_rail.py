@@ -53,3 +53,12 @@ def test_экраны_с_колонкой_берут_pick_item() -> None:
     ):
         text = (WEB / "templates" / имя).read_text(encoding="utf-8")
         assert "pick_item" in text, f"{имя}: колонка выбора рисуется не через `pick_item`"
+
+
+def test_проверки_не_кладут_шапку_над_столбцом() -> None:
+    """Столбец «Проверок» начинается с верха страницы, заголовок — в правой колонке (D655)."""
+    text = (WEB / "templates" / "inspections" / "list.html").read_text(encoding="utf-8")
+    тело = text.split("{% block body %}")[1].split("{% endblock %}")[0]
+    метки = ('class="mx-shell', "<aside", 'class="mx-main"', "super()")
+    места = [тело.index(метка) for метка in метки]
+    assert места == sorted(места), "шапка (`super()`) стоит внутри `mx-main`, после столбца"
