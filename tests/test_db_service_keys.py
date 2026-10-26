@@ -85,7 +85,10 @@ def test_список_имён_в_базе_равен_реестру(храни�
         определение = cur.fetchone()[0]
     for имя in registry.VAULT_NAMES:
         assert f"'{имя}'" in определение, f"{имя} есть в реестре, но не в check таблицы"
-    assert определение.count("::text") == len(registry.VAULT_NAMES), "в check лишнее имя"
+    # Считаем только перечень ARRAY[...]: после него в check идёт шаблон входов Dodo IS
+    # по странам (`dodois.access|refresh.<страна>`, 0096) — он тоже `::text`, но не имя.
+    перечень = определение.split("ARRAY[", 1)[1].split("]", 1)[0]
+    assert перечень.count("::text") == len(registry.VAULT_NAMES), "в check лишнее имя"
 
 
 def test_шифртекст_одного_имени_не_открывается_под_другим(хранилище: str) -> None:
