@@ -77,14 +77,28 @@
       {% else %}
         <section class="usec">
           <h2 class="usec__title">{{ t('usage.days.title') }}</h2>
-          <ol class="ubars" aria-label="{{ t('usage.days.title') }}">
-            {% for d in days %}
-              <li class="ubars__item" title="{{ d.day }}: {{ number(d.sum.tokens) }} {{ t('usage.days.unit') }}, {{ number(d.sum.calls) }} {{ t('usage.col.calls')|lower }}">
-                <span class="ubars__bar" style="height: {{ (d.height * 100)|round(1) }}%"></span>
-                <span class="ubars__day">{{ d.number }}</span>
-              </li>
-            {% endfor %}
-          </ol>
+          <div class="ubars-wrap">
+            <p class="ubars__axis">{{ axis_max }}</p>
+            <ol class="ubars" aria-label="{{ t('usage.days.title') }}">
+              {% for d in days %}
+                <li class="ubars__item{% if loop.index0 < loop.length * 0.3 %} ubars__item--l{% elif loop.index0 >= loop.length * 0.7 %} ubars__item--r{% endif %}" tabindex="0">
+                  <span class="ubars__bar" style="height: {{ (d.height * 100)|round(1) }}%"></span>
+                  <span class="ubars__day">{{ d.number }}</span>
+                  <span class="ubars__tip">
+                    <b class="ubars__tipday">{{ day_label(d.day) }}</b>
+                    {% if d.sum.calls %}
+                      <span>{{ t('usage.col.tokens') }}: <b class="mono">{{ number(d.sum.tokens) }}</b></span>
+                      <span class="ubars__tipsub">{{ t('usage.tip.in') }} {{ number(d.sum.input_tokens) }} · {{ t('usage.tip.out') }} {{ number(d.sum.output_tokens) }}</span>
+                      <span>{{ t('usage.col.calls') }}: <b class="mono">{{ number(d.sum.calls) }}</b></span>
+                      <span>{{ t('usage.stat.cost') }}: <b class="mono">{{ cost_cell(d.sum) }}</b></span>
+                    {% else %}
+                      <span>{{ t('usage.tip.none') }}</span>
+                    {% endif %}
+                  </span>
+                </li>
+              {% endfor %}
+            </ol>
+          </div>
         </section>
 
         {% macro table(title, lines, label_of, note=none, href_of=none) %}

@@ -202,6 +202,15 @@ def number(value: int | float) -> str:
     return f"{round(value):,}".replace(",", " ")
 
 
+def compact(value: int | float) -> tuple[float, str]:
+    """Число для подписи оси: мантисса и разряд (`""`, `"k"` — тысячи, `"m"` — миллионы)."""
+    if value >= 1_000_000:
+        return round(value / 1_000_000, 1), "m"
+    if value >= 1_000:
+        return round(value / 1_000, 1), "k"
+    return float(round(value)), ""
+
+
 def percent(value: float | None) -> str:
     """Изменение в процентах со знаком; нет базы сравнения — прочерк."""
     if value is None:
