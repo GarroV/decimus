@@ -26,6 +26,7 @@ from .users_view import (
     TAB_COUNTRIES,
     TAB_DODOIS,
     TAB_JOURNAL,
+    TAB_KEYS,
     TAB_PEOPLE,
     TAB_SPACES,
     TAB_USAGE,
@@ -101,8 +102,10 @@ TABS: tuple[Tab, ...] = (
     Tab(TAB_COUNTRIES, _sees_countries),
     Tab(TAB_JOURNAL, _is_super),
     Tab(TAB_USAGE, _sees_usage),
-    # Ключи сервисов, ключи `/api/v1` и состояние подключений — главный админ (D638).
+    # Состояние подключений — главный админ (D638).
     Tab(TAB_CONNECTIONS, _is_super),
+    # Ключи сервисов и ключи `/api/v1` — отдельная вкладка после «Подключений»; права те же.
+    Tab(TAB_KEYS, _is_super),
     # Входы Dodo IS по странам — отдельная вкладка рядом с «Подключениями» (D641); права те же.
     Tab(TAB_DODOIS, _is_super),
 )
@@ -163,6 +166,7 @@ def install(app: Flask, conf: Settings) -> None:
         TAB_JOURNAL: lambda: journal_screen.show_users(conf),
         TAB_USAGE: lambda: usage_screen.show(conf),
         TAB_CONNECTIONS: connections_screen.show,
+        TAB_KEYS: connections_screen.show_keys,
         TAB_DODOIS: dodois_screen.show,
     }
 

@@ -1,4 +1,4 @@
-"""Тексты раздела «Администрирование» (D639) и вкладки «Подключения» (D638, #1251).
+"""Тексты раздела «Администрирование» (D639), вкладок «Подключения» (D638) и «Ключи и API» (D650).
 
 Сливаются в общий каталог (`texts.TEXTS`) — `t()` знает один словарь.
 """
@@ -16,6 +16,7 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "administration.tab.dodois": {"ru": "Dodo IS", "en": "Dodo IS"},
     "administration.tab.usage": {"ru": "Расход модели", "en": "Model usage"},
     "administration.tab.connections": {"ru": "Подключения", "en": "Connections"},
+    "administration.tab.keys": {"ru": "Ключи и API", "en": "Keys & API"},
     "administration.sub": {
         "ru": "Все настройки сервиса в одном месте. Вкладки видны по роли.",
         "en": "All service settings in one place. Tabs depend on your role.",
@@ -36,6 +37,26 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "health.summary.red": {"ru": "Не работает: {n}", "en": "Not working: {n}"},
     "health.summary.grey": {"ru": "Проверок ещё не было", "en": "No checks yet"},
     "health.check_now": {"ru": "Проверить", "en": "Check"},
+    "health.key_link": {"ru": "Ключ", "en": "Key"},
+    # ── «Ключи и API» (D650): два блока ──
+    "keys.out.title": {"ru": "Наши ключи к внешним сервисам", "en": "Our keys to outside services"},
+    "keys.out.sub": {
+        "ru": "Ими Decimus сам ходит наружу: OpenAI, Pointer, iSpring.",
+        "en": "What Decimus itself uses to call out: OpenAI, Pointer, iSpring.",
+    },
+    "keys.api.title": {"ru": "Доступ к API Decimus", "en": "Access to the Decimus API"},
+    "keys.api.sub": {
+        "ru": (
+            "Внешний сервис получает ключ и читает данные Decimus по API; "
+            "права и страны задаются при выдаче."
+        ),
+        "en": (
+            "An outside service gets a key and reads Decimus data through the API; "
+            "rights and countries are set when the key is issued."
+        ),
+    },
+    "keys.api.add": {"ru": "Выдать ключ API", "en": "Issue API key"},
+    "keys.api.count": {"ru": "Ключей API: {count}", "en": "API keys: {count}"},
     "health.checked": {"ru": "проверено {at}", "en": "checked {at}"},
     "health.ran": {"ru": "последний прогон {at}", "en": "last run {at}"},
     "health.ok.checked": {"ru": "Проверено: {name}", "en": "Checked: {name}"},

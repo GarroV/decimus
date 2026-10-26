@@ -29,6 +29,8 @@ TAB_SPACES = "spaces"
 TAB_COUNTRIES = "countries"
 #: Вкладка «Подключения» (D425): только главный админ, её ведёт `connections_screen`.
 TAB_CONNECTIONS = "connections"
+#: Вкладка «Ключи и API» (D650): ключи сервисов и `/api/v1`, ведёт `connections_screen`.
+TAB_KEYS = "keys"
 #: Вкладка «Dodo IS» (D641): входы по странам, главный админ; её ведёт `dodois_screen`.
 TAB_DODOIS = "dodois"
 #: Вкладка «Журнал» (D462): только главный админ, её ведёт `journal_screen`.
