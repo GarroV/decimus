@@ -199,12 +199,11 @@ def test_блок_не_остался_во_вкладке_подключения
     assert 'id="dodois"' not in html and "Подключить страну" not in html
 
 
-def test_вкладка_стоит_рядом_с_подключениями_в_одной_группе(главный: FlaskClient) -> None:
+def test_вкладка_стоит_сразу_под_подключениями(главный: FlaskClient) -> None:
     html = главный.get(ВКЛАДКА).get_data(as_text=True)
     assert 'aria-current="page"' in html
     вкладки = re.findall(r'class="sadmin__tab[^"]*" href="[^"]*\?tab=(\w+)', html)
     assert вкладки[-2:] == ["connections", "dodois"]
-    assert "Внешние сервисы" in html
 
 
 @pytest.mark.parametrize(
