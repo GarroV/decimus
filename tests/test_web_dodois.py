@@ -576,7 +576,7 @@ def test_плитка_страны_ведёт_во_вкладку_и_сбой_в
 ) -> None:
     monkeypatch.setattr(store, "list_logins", lambda: (_вход_страны("SI", rules.FAILED),))
     html = главный.get("/administration?tab=connections").get_data(as_text=True)
-    assert re.search(r'href="[^"]*\?tab=dodois[^"]*country=SI[^"]*">Dodo IS — Словения', html)
+    assert re.search(r'href="[^"]*\?tab=dodois[^"#]*#dodois-SI">Dodo IS — Словения', html)
     assert "shealth__dot--red" in html
 
 
