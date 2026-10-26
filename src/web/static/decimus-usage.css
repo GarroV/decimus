@@ -9,8 +9,24 @@
 .usec__note { margin: calc(var(--space-2) * -1) 0 var(--space-4); font-size: 12px; color: var(--ink-3); }
 .usec .jlist { margin: 0 calc(var(--space-7) * -1); }
 
-.ubars { display: flex; align-items: flex-end; gap: 3px; height: 140px; margin: 0; padding: 0; list-style: none; }
-.ubars__item { display: flex; flex: 1 1 0; min-width: 0; height: 100%; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--space-2); }
+.ubars-wrap { position: relative; padding-top: var(--space-7); }
+.ubars__axis { position: absolute; top: calc(var(--space-2) * -1); left: 0; margin: 0; font-size: var(--fs-micro); color: var(--ink-3); }
+.ubars-wrap::after { content: ""; position: absolute; top: calc(var(--space-7) - 2px); left: 0; right: 0; border-top: 1px dashed var(--line); pointer-events: none; }
+.ubars { position: relative; z-index: 1; display: flex; align-items: flex-end; gap: 3px; height: 140px; margin: 0; padding: 0; list-style: none; }
+.ubars__item { position: relative; display: flex; flex: 1 1 0; min-width: 0; height: 100%; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--space-2); }
+.ubars__item:hover, .ubars__item:focus-visible { background: var(--accent-soft); }
+.ubars__item:hover .ubars__bar, .ubars__item:focus-visible .ubars__bar { background: var(--ink); }
+.ubars__item:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
+.ubars__tip { position: absolute; bottom: calc(100% + var(--space-2)); left: 50%; z-index: 2; display: flex; flex-direction: column; gap: 2px;
+  width: max-content; max-width: 220px; padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--r-control);
+  background: var(--surface); box-shadow: var(--sh-pop); color: var(--ink-2); font-size: var(--fs-meta); line-height: var(--lh-meta);
+  white-space: nowrap; transform: translateX(-50%); opacity: 0; pointer-events: none; transition: opacity var(--t-state); }
+.ubars__item--l .ubars__tip { left: 0; transform: none; }
+.ubars__item--r .ubars__tip { left: auto; right: 0; transform: none; }
+.ubars__item:hover .ubars__tip, .ubars__item:focus .ubars__tip { opacity: 1; }
+.ubars__tipday { color: var(--ink); }
+.ubars__tipsub { color: var(--ink-3); }
+.ubars__tip b { font-weight: var(--w-semibold); }
 .ubars__bar { display: block; width: 100%; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--accent); }
 .ubars__day { font-size: 10px; line-height: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 

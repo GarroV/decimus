@@ -94,6 +94,7 @@ def _login_rows(entries: tuple[journals.LoginEntry, ...]) -> list[dict[str, Any]
         {
             "time": _stamp(e.at),
             "login": e.login,
+            "name": e.name,
             "ip": e.ip,
             "browser": e.user_agent or "",
             "method": e.method,
@@ -116,6 +117,7 @@ def _action_rows(entries: tuple[journals.ActionEntry, ...], lang: str) -> list[d
         {
             "time": _stamp(e.at),
             "login": e.login,
+            "name": e.name,
             "role": e.role,
             "door": e.door,
             "ip": e.ip,
@@ -136,7 +138,7 @@ def _render(*, own: bool, conf: Settings) -> FlaskResponse | tuple[str, int]:
     начало, конец = _bounds(filters.period)
     failed = False
     rows: list[dict[str, Any]] = []
-    people: tuple[tuple[str, str], ...] = ()
+    people: tuple[tuple[str, str, str | None], ...] = ()
     try:
         if filters.view == VIEW_ACTIONS:
             rows = _action_rows(

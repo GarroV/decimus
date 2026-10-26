@@ -178,6 +178,7 @@ _WEB: dict[str, tuple[str, str]] = {
     "space_countries": ("Изменены страны пространства", "Space countries changed"),
     "unit_create": ("Заведена пиццерия", "Pizzeria created"),
     "user_email": ("Изменена почта человека", "Person's email changed"),
+    "user_name_latin": ("Изменено имя латиницей", "Latin name changed"),
     "user_role": ("Изменена роль человека", "Person's role changed"),
 }
 

@@ -37,6 +37,7 @@ LOCKED_ENDPOINTS = frozenset(
         "unfreeze_user",
         "user_role",
         "user_email",
+        "user_name_latin",
         "reset_second_factor",
         "security_backup_generate",
         "security_passkey_delete",
