@@ -19,7 +19,12 @@ import argparse
 import json
 import sys
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
+
+# Запуск файлом (`python tools/dodois_import.py`) кладёт в путь импорта `tools/`, а не корень:
+# без этой строки `src` не находится (так сорвался перенос входов 26.10.2026).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.db import dodois_logins
 from src.db.errors import DbError
