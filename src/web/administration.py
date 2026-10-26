@@ -18,6 +18,8 @@ from urllib.parse import urlencode
 from flask import Flask, abort, request
 from flask import Response as FlaskResponse
 
+from src.domain.tenants import may_manage_ratings
+
 from . import access_policy, auth
 from .config import Settings
 from .sections import section
@@ -28,6 +30,7 @@ from .users_view import (
     TAB_JOURNAL,
     TAB_KEYS,
     TAB_PEOPLE,
+    TAB_RATINGS,
     TAB_SPACES,
     TAB_USAGE,
 )
@@ -77,6 +80,13 @@ def _sees_usage(account: object) -> bool:
     return usage_screen.may_see(getattr(account, "role", None), getattr(account, "tenant", None))
 
 
+def _sees_ratings(account: object) -> bool:
+    """Те, кто ведёт рейтинги (`ratings.manage`): главный, админ УК, контроль (D319)."""
+    return may_manage_ratings(
+        str(getattr(account, "role", "") or ""), str(getattr(account, "tenant", "") or "")
+    )
+
+
 @dataclass(frozen=True)
 class Tab:
     """Вкладка раздела: код (он же `?tab=`) и кому открыта."""
@@ -100,6 +110,8 @@ TABS: tuple[Tab, ...] = (
     Tab(TAB_PEOPLE, _sees_people),
     Tab(TAB_SPACES, _sees_spaces),
     Tab(TAB_COUNTRIES, _sees_countries),
+    # Настройки рейтингов: те же роли, что вели «Загрузки» (D654).
+    Tab(TAB_RATINGS, _sees_ratings),
     Tab(TAB_JOURNAL, _is_super),
     Tab(TAB_USAGE, _sees_usage),
     # Состояние подключений — главный админ (D638).
@@ -149,6 +161,7 @@ def install(app: Flask, conf: Settings) -> None:
         countries_screen,
         dodois_screen,
         journal_screen,
+        ratings,
         usage_screen,
         users_page,
     )
@@ -163,6 +176,7 @@ def install(app: Flask, conf: Settings) -> None:
         TAB_PEOPLE: people,
         TAB_SPACES: spaces,
         TAB_COUNTRIES: lambda: countries_screen.show(conf.ui_lang),
+        TAB_RATINGS: lambda: ratings.show_admin(conf),
         TAB_JOURNAL: lambda: journal_screen.show_users(conf),
         TAB_USAGE: lambda: usage_screen.show(conf),
         TAB_CONNECTIONS: connections_screen.show,

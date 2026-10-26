@@ -86,7 +86,7 @@ def _board_href(kind: str) -> str:
         home_board.PLANS_REVIEW: f"{действия}?tab=plans",
         home_board.PLANS_DUE: f"{действия}?tab=plans",
         home_board.ORDERS_DUE: f"{действия}?tab=prescriptions",
-        home_board.RATINGS_STALE: url_for("ratings_imports"),
+        home_board.RATINGS_STALE: f"{section('administration').path}?tab=ratings",
         home_board.MCP_RELINK: f"{section('settings').path}?tile=claude",
     }
     return куда[kind]

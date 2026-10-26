@@ -47,14 +47,14 @@ def test_контроль_грузит_партнёр_видит(
             headers=ORIGIN,
         )
         assert "уже загружен" in повтор.get_data(as_text=True)
-        журнал = client.get("/ratings/imports").get_data(as_text=True)
+        журнал = client.get("/administration?tab=ratings&block=journal").get_data(as_text=True)
         assert журнал.count('title="rko-violations"') >= 2
         ответ = client.post(
             "/ratings/countries", data={"code": "RS", "developer": "Dev One"}, headers=ORIGIN
         )
         assert ответ.status_code == 200
         сводка = client.get("/ratings?group=developer&value=Dev+One&period=2026-Q3")
-        assert "/ratings/imports" in сводка.get_data(as_text=True)
+        assert "/administration?tab=ratings" in сводка.get_data(as_text=True)
         # Пустой квартал: проверок не было — каждый блок, включая хард-нарушения,
         # пишет «нет данных», а не «чисто»; зону риска не судили — «мало периодов»
         # (P16, P37). Проверяется вся страница, а не её начало.
@@ -105,7 +105,7 @@ def test_контроль_грузит_партнёр_видит(
         assert страница.status_code == 200
         текст = страница.get_data(as_text=True)
         assert "97.5" in текст
-        assert "/ratings/imports" not in текст
+        assert "/administration?tab=ratings" not in текст
         assert 'id="rt-tp-compare"' not in текст  # D551: сравнение — только УК
         assert (
             client.post(

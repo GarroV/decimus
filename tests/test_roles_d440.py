@@ -336,6 +336,31 @@ def test_загрузка_рейтингов(роль: str, можно: bool) ->
     assert may_manage_ratings(роль, "HQ") is можно
 
 
+@pytest.mark.parametrize(
+    ("роль", "можно"),
+    [
+        ("superadmin", True),
+        ("admin", True),
+        ("control", True),
+        ("developer", False),
+        ("guest", False),
+    ],
+)
+def test_вкладка_рейтинги_во_вкладках_администрирования_только_у_ratings_manage(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]], роль: str, можно: bool
+) -> None:
+    """D654: вкладка «Рейтинги» открыта ровно тем, кто мог «Загрузки» (`ratings.manage`)."""
+    monkeypatch.setattr(ratings_screen, "render_imports", lambda *_a, **_k: "<p>вкладка</p>")
+    клиент = next(_войти(monkeypatch, tenant="HQ", role=роль))
+
+    ответ = клиент.get("/administration?tab=ratings")
+
+    assert may_manage_ratings(роль, "HQ") is можно
+    assert (ответ.status_code == 200) is можно
+    if not можно:
+        assert ответ.status_code in (403, 404)
+
+
 # --- гость: всё на чтение ------------------------------------------------------
 
 #: Дела самого человека, которые гость делает и без права на запись в сеть.

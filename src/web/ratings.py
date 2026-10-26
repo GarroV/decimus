@@ -18,7 +18,7 @@ from datetime import date
 from types import ModuleType
 from urllib.parse import urlencode
 
-from flask import Flask, redirect, render_template, request
+from flask import Flask, abort, redirect, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.wrappers import Response
 
@@ -41,7 +41,7 @@ from src.ratings.model import RatingsFormatError
 from src.ratings.periods import KIND_RANGE, KIND_RATING, RatingPeriod, ReportPeriod
 from src.ratings.pointer import GOOGLE
 
-from . import auth, guard, ratings_calendar, ratings_sheet, ratings_tiles, ui_lang
+from . import administration, auth, guard, ratings_calendar, ratings_sheet, ratings_tiles, ui_lang
 from . import ratings_line as rl_chart
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
@@ -50,6 +50,7 @@ from .geo_names import country_title
 from .origin import refuse_foreign_origin
 from .sections import section
 from .texts import TEXTS, t
+from .users_view import TAB_RATINGS
 
 logger = logging.getLogger(__name__)
 
@@ -296,6 +297,7 @@ def render_summary(conf: Settings) -> str:
         previous_title=_period_title(summary.previous, found, lang),
         risk_short_names=", ".join(t(f"ratings.{kind}", lang) for kind in summary.risk_short),
         may_manage=may_manage(),
+        admin_ratings_url=admin_url(),
         unit_url=unit_rating_url,
         country_name=country_name,
         ratings_path=section("ratings").path,
@@ -303,28 +305,154 @@ def render_summary(conf: Settings) -> str:
     )
 
 
-def render_imports(conf: Settings, *, notice: str | None = None, failure: str | None = None) -> str:
+#: Блоки вкладки «Рейтинги» в «Администрировании» (D654): код — это `?block=` и пояснение к форме.
+BLOCK_SHEET = "sheet"
+BLOCK_UPLOAD = "upload"
+BLOCK_LAYOUT = "layout"
+BLOCK_JOURNAL = "journal"
+BLOCK_ISSUES = "issues"
+BLOCK_DEVELOPERS = "developers"
+BLOCK_RULES = "rules"
+BLOCK_SETTINGS = "settings"
+BLOCKS = (
+    BLOCK_SHEET,
+    BLOCK_UPLOAD,
+    BLOCK_LAYOUT,
+    BLOCK_JOURNAL,
+    BLOCK_ISSUES,
+    BLOCK_DEVELOPERS,
+    BLOCK_RULES,
+    BLOCK_SETTINGS,
+)
+
+
+def admin_url(block: str = "", **extra: str) -> str:
+    """Адрес вкладки «Рейтинги» (с открытым блоком); язык — из текущего адреса."""
+    return administration.url(TAB_RATINGS, block=block, **extra)
+
+
+def _block_states(
+    lang: str,
+    *,
+    sheet: ratings_sheet.Block,
+    journal: tuple[read.ImportRow, ...],
+    issues: tuple[read.IssueRow, ...],
+    countries: tuple[read.CountryRow, ...],
+    rules: tuple[tuple[int, str, str, str], ...],
+    layout: tuple[rl.Block, ...],
+    settings: Mapping[str, float],
+) -> dict[str, tuple[str, bool]]:
+    """Короткая строка состояния для каждого блока: `(текст, требует_внимания)`."""
+
+    def at(moment: object) -> str:
+        return f"{moment:{_AT}}" if moment else "—"
+
+    if not sheet.configured:
+        sheet_line = (t("ratings.admin.sheet.off", lang), False)
+    elif sheet.unreadable:
+        sheet_line = (t("ratings.sheet.unreadable", lang), True)
+    elif sheet.failed:
+        sheet_line = (t("ratings.admin.sheet.failed", lang, n=sheet.failed), True)
+    elif sheet.last_at:
+        sheet_line = (t("ratings.sheet.last", lang, at=at(sheet.last_at)), False)
+    else:
+        sheet_line = (t("ratings.sheet.never", lang), False)
+    last = journal[0] if journal else None
+    shown = sum(1 for b in layout if b.visible)
+    with_dev = sum(1 for c in countries if c.developer)
+    thresholds = [
+        f"{t('ratings.settings.' + key, lang)} {settings[key]:g}"
+        for key in _SETTINGS
+        if key in settings
+    ]
+    return {
+        BLOCK_SHEET: sheet_line,
+        BLOCK_UPLOAD: (
+            t("ratings.admin.upload.last", lang, at=at(last.at))
+            if last
+            else t("ratings.journal.empty", lang),
+            False,
+        ),
+        BLOCK_LAYOUT: (
+            t("ratings.admin.layout.state", lang, shown=shown, total=len(layout)),
+            False,
+        ),
+        BLOCK_JOURNAL: (t("ratings.admin.journal.state", lang, n=len(journal)), False),
+        BLOCK_ISSUES: (
+            (t("ratings.admin.issues.some", lang, n=len(issues)), True)
+            if issues
+            else (t("ratings.admin.issues.none", lang), False)
+        ),
+        BLOCK_DEVELOPERS: (
+            t("ratings.admin.developers.state", lang, set=with_dev, total=len(countries)),
+            False,
+        ),
+        BLOCK_RULES: (t("ratings.admin.rules.state", lang, n=len(rules)), False),
+        BLOCK_SETTINGS: (" · ".join(thresholds) or "—", False),
+    }
+
+
+def render_imports(
+    conf: Settings,
+    *,
+    block: str = "",
+    notice: str | None = None,
+    failure: str | None = None,
+) -> str:
+    """Вкладка «Рейтинги» в «Администрировании»: список блоков настроек, выбранный — в панели.
+    Ответ любого действия (загрузка, правило, порог…) — тоже она, с открытым блоком и исходом."""
     lang = _lang(conf)
     countries = tuple(row for row in read.countries() if row.is_imf)
     names = _country_names(countries, lang)
+    journal = read.imports()
+    issues = read.open_issues()
+    rules = read.hard_rules()
+    layout = _layout()
+    settings = read.settings()
+    sheet = ratings_sheet.build(lang)
+    states = _block_states(
+        lang,
+        sheet=sheet,
+        journal=journal,
+        issues=issues,
+        countries=countries,
+        rules=rules,
+        layout=layout,
+        settings=settings,
+    )
     return render_template(
-        "ratings/imports.html",
+        "administration/ratings.html",
+        block=block,
+        split_open=bool(block),
+        split_back=admin_url(),
+        split_wide=block in (BLOCK_SHEET, BLOCK_JOURNAL, BLOCK_ISSUES),
+        link=admin_url,
+        blocks=[(key, *states[key]) for key in BLOCKS],
         notice=notice,
         failure=failure,
-        journal=read.imports(),
-        issues=read.open_issues(),
+        journal=journal,
+        issues=issues,
         countries=countries,
-        rules=read.hard_rules(),
-        layout=_layout(),
-        settings=read.settings(),
-        sheet=ratings_sheet.build(lang),
+        rules=rules,
+        layout=layout,
+        settings=settings,
+        sheet=sheet,
         sheet_every_h=sheet_sync.SYNC_EVERY_SEC // 3600,
         sheet_notice=ratings_sheet.NOTICES.get(request.args.get(ratings_sheet.ARG, "")),
         max_mb=UPLOAD_MAX_BYTES // _MB,
         ratings_path=section("ratings").path,
         country_name=lambda code: names.get(code) or country_title(code, lang),
         at_format=_AT,
+        **administration.nav(TAB_RATINGS),
     )
+
+
+def show_admin(conf: Settings) -> tuple[str, int]:
+    """GET `/administration?tab=ratings[&block=<код>]`."""
+    block = (request.args.get("block") or "").strip()
+    if block and block not in BLOCKS:
+        abort(404)
+    return render_imports(conf, block=block), 200
 
 
 def _agg_countries() -> dict[str, frozenset[str]]:
@@ -451,33 +579,41 @@ def _upload(conf: Settings) -> tuple[str, int]:
     try:
         файл = request.files.get("file")
     except RequestEntityTooLarge:
-        return render_imports(conf, failure=too_big), 413
+        return render_imports(conf, block=BLOCK_UPLOAD, failure=too_big), 413
     if файл is None or not файл.filename:
-        return render_imports(conf, failure=t("ratings.imports.no_file", lang)), 400
+        return render_imports(
+            conf, block=BLOCK_UPLOAD, failure=t("ratings.imports.no_file", lang)
+        ), 400
     data = файл.read(UPLOAD_MAX_BYTES + 1)
     if len(data) > UPLOAD_MAX_BYTES:
-        return render_imports(conf, failure=too_big), 413
+        return render_imports(conf, block=BLOCK_UPLOAD, failure=too_big), 413
     try:
         итог = import_file(
             data, kind=None, channel=CHANNEL_WEB, actor=_actor(), file_name=файл.filename
         )
     except RatingsFormatError as exc:
         reason = _coded("ratings.error", exc.code, exc.params, lang, "ratings.error.unknown_format")
-        return render_imports(conf, failure=t("ratings.imports.failed", lang, reason=reason)), 400
+        return render_imports(
+            conf, block=BLOCK_UPLOAD, failure=t("ratings.imports.failed", lang, reason=reason)
+        ), 400
     except RatingsError as exc:
         logger.warning("рейтинги: загрузка %s не легла: %s", файл.filename, exc)
-        return render_imports(conf, failure=t("ratings.imports.db_down", lang)), 503
-    return render_imports(conf, notice=_loaded_notice(итог, lang)), 200
+        return render_imports(
+            conf, block=BLOCK_UPLOAD, failure=t("ratings.imports.db_down", lang)
+        ), 503
+    return render_imports(conf, block=BLOCK_UPLOAD, notice=_loaded_notice(итог, lang)), 200
 
 
-def _saved(conf: Settings, action: Callable[[], object]) -> tuple[str, int]:
+def _saved(conf: Settings, block: str, action: Callable[[], object]) -> tuple[str, int]:
     lang = _lang(conf)
     try:
         action()
     except RatingsEditError as exc:
         reason = _coded("ratings.refused", exc.code, exc.params, lang, "ratings.refused.db_failed")
-        return render_imports(conf, failure=t("ratings.refused", lang, reason=reason)), 400
-    return render_imports(conf, notice=t("ratings.saved", lang)), 200
+        return render_imports(
+            conf, block=block, failure=t("ratings.refused", lang, reason=reason)
+        ), 400
+    return render_imports(conf, block=block, notice=t("ratings.saved", lang)), 200
 
 
 def _threshold_values() -> dict[str, float]:
@@ -522,10 +658,11 @@ def install(app: Flask, conf: Settings) -> None:
         return _link_point(conf)
 
     @app.get(f"{путь}/imports", endpoint="ratings_imports")
-    def ratings_imports() -> str | tuple[str, int]:
+    def ratings_imports() -> Response | tuple[str, int]:
+        """Старый адрес «Загрузок» (D654): настройки переехали в «Администрирование»."""
         if not may_manage():
             return _forbidden()
-        return render_imports(conf)
+        return redirect(admin_url(), code=302)
 
     @app.post(f"{путь}/import")
     @guard.action("ratings.manage")
@@ -543,7 +680,9 @@ def install(app: Flask, conf: Settings) -> None:
         refuse_foreign_origin()
         code = (request.form.get("code") or "").strip().upper()
         developer = request.form.get("developer")
-        return _saved(conf, lambda: read.set_developer(code, developer, actor=_actor()))
+        return _saved(
+            conf, BLOCK_DEVELOPERS, lambda: read.set_developer(code, developer, actor=_actor())
+        )
 
     @app.post(f"{путь}/hard-rules")
     @guard.action("ratings.manage")
@@ -554,6 +693,7 @@ def install(app: Flask, conf: Settings) -> None:
         form = request.form
         return _saved(
             conf,
+            BLOCK_RULES,
             lambda: read.add_hard_rule(
                 form.get("rating_type", ""),
                 form.get("match", ""),
@@ -568,7 +708,7 @@ def install(app: Flask, conf: Settings) -> None:
         if not may_manage():
             return _forbidden()
         refuse_foreign_origin()
-        return _saved(conf, lambda: read.remove_hard_rule(rule_id))
+        return _saved(conf, BLOCK_RULES, lambda: read.remove_hard_rule(rule_id))
 
     @app.post(f"{путь}/aggregators/update")
     @guard.action("ratings.manage")
@@ -603,7 +743,7 @@ def install(app: Flask, conf: Settings) -> None:
             logger.warning("рейтинги: заявка на забор таблицы не легла", exc_info=True)
             outcome = "db_down"
         return redirect(
-            f"{request.script_root}{путь}/imports?{urlencode({ratings_sheet.ARG: outcome})}",
+            admin_url(BLOCK_SHEET, **{ratings_sheet.ARG: outcome}),
             code=303,
         )
 
@@ -617,6 +757,7 @@ def install(app: Flask, conf: Settings) -> None:
         blocks = _layout_from_form()
         return _saved(
             conf,
+            BLOCK_LAYOUT,
             lambda: read.save_layout([(b.key, b.visible) for b in blocks], actor=_actor()),
         )
 
@@ -626,4 +767,4 @@ def install(app: Flask, conf: Settings) -> None:
         if not may_manage():
             return _forbidden()
         refuse_foreign_origin()
-        return _saved(conf, _save_thresholds)
+        return _saved(conf, BLOCK_SETTINGS, _save_thresholds)
