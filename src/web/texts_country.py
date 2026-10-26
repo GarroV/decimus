@@ -210,8 +210,8 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     },
     "country.langs.custom": {"ru": "заданы для страны", "en": "set for the country"},
     "country.langs.default": {
-        "ru": "по умолчанию (report_langs.json)",
-        "en": "default (report_langs.json)",
+        "ru": "как по умолчанию",
+        "en": "as default",
     },
     "country.langs.hint": {
         "ru": "Отметьте языки, на которых аудитор может напечатать отчёт этой страны. "
