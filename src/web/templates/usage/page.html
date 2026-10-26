@@ -8,30 +8,31 @@
 #}{% extends "base.html" %}
 {% from "_info_tip.html" import info_tip %}
 {% from "_period.html" import period_picker with context %}
-{% from "users/_tabs.html" import users_tabs with context %}
+{% from "administration/_nav.html" import admin_nav with context %}
 {% macro cost_cell(s) %}{{ money(s.cost) }}{% if s.cost is not none and s.cost_partial %}*{% endif %}{% endmacro %}
 {% macro vs(value) %}
   {% if not has_previous or value is none %}<span class="stat__delta">{{ t('usage.stat.novs') }}</span>
   {% else %}<span class="stat__delta">{{ t('usage.stat.vs', value=percent(value)) }}</span>{% endif %}
 {% endmacro %}
-{% block title %}{{ t('section.users.title') }}{% endblock %}
+{% block title %}{{ t(admin_heading) }} · {{ t('section.administration.title') }}{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-journal.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-usage.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">
 {% endblock %}
 {% block page_class %} page--split{% endblock %}
 {% block body %}
+  <div class="sadmin">{{ admin_nav() }}<div class="sadmin__main">
   <header class="shead">
     <div class="shead__main">
       <div class="info-row">
-        <h1 class="shead__title">{{ t('section.users.title') }}</h1>
+        <h1 class="shead__title">{{ t(admin_heading) }}</h1>
         {{ info_tip(t('tip.hint'), '', [t('usage.sub')], 'usage') }}
       </div>
     </div>
   </header>
-  {{ users_tabs(tab, has_spaces_tab, manages_spaces, link, has_journal_tab, has_usage_tab) }}
 
   <div class="sbox ubox">
     <div class="sbar sbar--registry jbar">
@@ -111,4 +112,5 @@
       {% endif %}
     {% endif %}
   </div>
+  </div></div>
 {% endblock %}

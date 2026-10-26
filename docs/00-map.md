@@ -117,7 +117,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
+<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -125,10 +125,11 @@ Flask-приложение управляющей компании и партн
 | `src/web/actions_screen.py` | Раздел «Действия»: экшн-планы и предписания — один экран у УК и партнёра (D526, D527) |
 | `src/web/calendar_screen.py` | Раздел «Календарь» (D497): сетка месяца с проверками и поездками (D505, D506) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
+| `src/web/countries_screen.py` | Вкладка «Страны» раздела «Администрирование» (D640, #1251) |
 | `src/web/country.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
 | `src/web/country_filter.py` | Постоянный отбор стран экрана «Страны» (D536): «мне нужен только Кавказ» |
 | `src/web/country_page.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
-| `src/web/country_settings.py` | «Карточка страны» на экране «Страны» (D539, прежде «Настройки страны», D536) |
+| `src/web/country_settings.py` | «Карточка страны» на экране «Страны» (D539, прежде «Настройки страны», D536) и вкладка «Администрирование → Страны» (D640, #1251) |
 | `src/web/country_summary.py` | Сводка экрана «Страны» (D467): цифры периода и девелоперы стран |
 | `src/web/country_units.py` | Строки пиццерий экрана «Страны» (D467): одна строка на пиццерию |
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
@@ -189,7 +190,7 @@ Claude входом через сайт (OAuth).
 | `src/web/connections_screen.py` | Вкладка «Подключения» раздела «Администрирование» (D638, D639): ключи сервисов и API |
 | `src/web/demo_entry.py` | Вход в открытое демо (D524): выбор роли и сессия без пароля — только на стенде демо |
 | `src/web/dodois_connect.py` | Публичная страница входа в Dodo IS по ссылке-приглашению (D640, #951) |
-| `src/web/dodois_screen.py` | Блок «Dodo IS» на вкладке «Подключения»: входы по странам и ссылки для коллег (D640, #951) |
+| `src/web/dodois_screen.py` | Вкладка «Dodo IS» раздела «Администрирование»: входы по странам и ссылки (D640, D641, #951) |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
 | `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
 | `src/web/google_profile.py` | Имя и фото из Google в учётку (D468): скачать фото один раз и записать |
@@ -219,7 +220,7 @@ Claude входом через сайт (OAuth).
 | `src/web/users_claude.py` | Блок «Подключить Claude» в «Настройках» (D417): адрес MCP и подключения через сайт |
 | `src/web/users_mcp.py` | Личный токен Claude в «Настройках»: выпустить себе и отозвать (D447, D448) |
 | `src/web/users_page.py` | Сборка страницы «Пользователи»: список слева, карточка выбранного справа |
-| `src/web/users_screen.py` | Экран «Пользователи» (`/users`): один экран доступа для всех, охват по роли (#585) |
+| `src/web/users_screen.py` | Действия экрана «Люди» (`/users/*`): один экран доступа, охват по роли (#585) |
 | `src/web/users_view.py` | Вид экрана «Пользователи»: названия ролей, фильтры, выбор человека, адреса |
 <!-- map:end -->
 
@@ -309,7 +310,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 24 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, … (+16) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
-| `src/web/templates/administration/` | 4 | _dodois.html, _health.html, _nav.html, connections.html |
+| `src/web/templates/administration/` | 6 | _dodois.html, _health.html, _nav.html, connections.html, countries.html, dodois.html |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
@@ -325,7 +326,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/usage/` | 1 | page.html |
-| `src/web/templates/users/` | 7 | _card.html, _connections.html, _service_keys.html, _spaces.html, _tabs.html, forbidden.html, index.html |
+| `src/web/templates/users/` | 6 | _card.html, _connections.html, _service_keys.html, _spaces.html, forbidden.html, index.html |
 <!-- map:end -->
 
 <!-- map:begin tree src/web/static -->
@@ -406,7 +407,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,country_report_langs,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -414,6 +415,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
 | `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
+| `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
 | `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
 | `src/db/health_store.py` | Двери базы для вкладки «Подключения» (D638): исходы проб и последние заходы сборов |
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
@@ -552,6 +554,8 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0095_health_checks.sql` | Постоянная проверка подключений (D638, #1251) |
 | `0096_dodois_logins.sql` | Входы в Dodo IS по странам (D640, #951) |
 | `0097_dodois_invite_result.sql` | Новый вход заменяет рабочий вход страны только после проверки: учётка должна открывать хоть одну пиццерию |
+| `0098_country_report_langs.sql` | Языки отчёта страны, изменяемые из веба (D640, #1251, вкладка «Администрирование → Страны») |
+| `0099_health_alerts.sql` | Оповещения владельцу о смене состояния подключений (D641) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -721,18 +725,35 @@ JSON-RPC поверх одного POST на локальной петле, ли
 Вкладка «Администрирование → Подключения» (D638, #1251): реестр подключений, пробы ключей
 и служб. Пробует бот раз в 15 минут (`src/bot/health_loader.py`) и веб по кнопке
 «Проверить сейчас»; исходы — `src/db/health_store.py` (`health.checks`), цвета —
-`src/domain/health.py`.
+`src/domain/health.py`, их сборка в строки (общая для плиток и оповещений) — `rows.py`.
+Оповещения владельцу о смене состояния (D641) — `alerts.py` (правила — `src/domain/health_alerts.py`,
+последнее оповещённое — `health.alerts`).
 
 <!-- map:begin files src/health/*.py -->
 | Файл | Что делает |
 |---|---|
+| `src/health/alert_texts.py` | Тексты оповещений о подключениях (D641): ru — для владельца, en — запасной |
+| `src/health/alerts.py` | Оповещения владельцу о смене состояния подключений (D641) |
 | `src/health/checks.py` | Реестр подключений вкладки «Подключения» (D638) и пробы тех, что пробуются |
 | `src/health/probes.py` | Проверка ключа у провайдера до записи (D576): один дешёвый вызов с введённым значением |
+| `src/health/rows.py` | Строки состояния подключений: реестр + факты из базы → цвет каждой (D638, D641) |
+<!-- map:end -->
+
+## src/notify — отправка в канал FURCA
+
+Одна отправка сообщения владельцу (D438, D439, D641): адрес и ключ из `FURCA_NOTIFY_URL`,
+`FURCA_SECRET`, `POST /notify`. Зовут тревога агрегаторов, загрузка обучения и оповещения
+о подключениях (`src/health/alerts.py`).
+
+<!-- map:begin files src/notify/*.py -->
+| Файл | Что делает |
+|---|---|
+| `src/notify/furca.py` | Канал FURCA: одна отправка сообщения владельцу (D438, D439, D641) |
 <!-- map:end -->
 
 ## src/dodois — входы в Dodo IS по странам
 
-Блок «Dodo IS» на «Подключениях» (`docs/12-web-admin.md`, D640, #951): device flow
+Вкладка «Dodo IS» в «Администрировании» (`docs/12-web-admin.md`, D640, D641, #951): device flow
 `auth.dodois.com`, продление и проверка «открыто X из Y». Расписание — `src/bot/dodois_loader.py`,
 правила — `src/domain/dodois.py`, база — `src/db/dodois_logins.py`, экраны — `src/web/dodois_screen.py`,
 `src/web/dodois_connect.py`.
@@ -831,6 +852,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/geo.py` | Страны и города сети: названия для людей, страна города, местные написания |
 | `src/domain/handover.py` | Сдана ли проверка: признак, который ставит бот, а читают и бот, и мини-апп (D080, D312) |
 | `src/domain/health.py` | Цвет подключения на вкладке «Подключения» (D638): правила, без базы и сети |
+| `src/domain/health_alerts.py` | Когда подключение оповещает владельца (D641): правила, без базы и сети |
 | `src/domain/info.py` | Информационные поля проверки — блок `info` состояния (T158, решения D069, D070) |
 | `src/domain/info_fields.py` | Состав информационной части проверки: какие поля и каким способом вводятся (T158, D312) |
 | `src/domain/item_label.py` | Пункт чек-листа для человека: «Порядок 13», а не `CLN13` (решение владельца 20.10.2026) |

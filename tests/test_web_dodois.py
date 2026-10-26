@@ -29,8 +29,8 @@ from src.domain.dodois import Invite
 from src.web import auth, dodois_connect
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
-ВКЛАДКА = "/administration?tab=connections"
-ВЫДАЧА = "/administration/connections/dodois/invite"
+ВКЛАДКА = "/administration?tab=dodois"
+ВЫДАЧА = "/administration/dodois/invite"
 РОЛИ = [("HQ", "admin"), ("HQ", "control"), ("HQ", "auditor"), ("GE", "admin"), ("GE", "auditor")]
 СТРАНЫ = (
     ratings_read.CountryRow("SI", "Словения", "Slovenia", None, True),
@@ -178,8 +178,8 @@ def test_остальным_блока_нет_ни_на_чтение_ни_на_�
         assert читать.status_code == 404 and "Dodo IS" not in читать.get_data(as_text=True)
         for адрес in (
             ВЫДАЧА,
-            "/administration/connections/dodois/invite/1/revoke",
-            "/administration/connections/dodois/SI/check",
+            "/administration/dodois/invite/1/revoke",
+            "/administration/dodois/SI/check",
         ):
             ответ = клиент.post(адрес, data={"country": "SI"}, headers=ЗАГОЛОВКИ)
             assert ответ.status_code == 404, f"{role}@{tenant} достучался до {адрес}"
@@ -189,15 +189,30 @@ def test_остальным_блока_нет_ни_на_чтение_ни_на_�
 def test_главный_админ_видит_блок(главный: FlaskClient) -> None:
     html = главный.get(ВКЛАДКА).get_data(as_text=True)
     assert 'id="dodois"' in html and "Подключить страну" in html
-    assert "Входов пока нет" in html
+    # Вкладка своя (D641): блока нет в «Подключениях», страны сети видны и без входов.
+    assert "Словения" in html and "Болгария" in html
+    assert "Входа нет" in html
+
+
+def test_блок_не_остался_во_вкладке_подключения(главный: FlaskClient) -> None:
+    html = главный.get("/administration?tab=connections").get_data(as_text=True)
+    assert 'id="dodois"' not in html and "Подключить страну" not in html
+
+
+def test_вкладка_стоит_рядом_с_подключениями_в_одной_группе(главный: FlaskClient) -> None:
+    html = главный.get(ВКЛАДКА).get_data(as_text=True)
+    assert 'aria-current="page"' in html
+    вкладки = re.findall(r'class="sadmin__tab[^"]*" href="[^"]*\?tab=(\w+)', html)
+    assert вкладки[-2:] == ["connections", "dodois"]
+    assert "Внешние сервисы" in html
 
 
 @pytest.mark.parametrize(
     "адрес",
     [
         ВЫДАЧА,
-        "/administration/connections/dodois/invite/1/revoke",
-        "/administration/connections/dodois/SI/check",
+        "/administration/dodois/invite/1/revoke",
+        "/administration/dodois/SI/check",
     ],
 )
 def test_чужое_происхождение_отказ_и_без_действия(
@@ -214,10 +229,7 @@ def test_чужое_происхождение_отказ_и_без_действ
 
 
 def test_неизвестная_страна_в_проверке_404(главный: FlaskClient) -> None:
-    assert (
-        главный.post("/administration/connections/dodois/si/check", headers=ЗАГОЛОВКИ).status_code
-        == 404
-    )
+    assert главный.post("/administration/dodois/si/check", headers=ЗАГОЛОВКИ).status_code == 404
 
 
 # --- заслоны выдачи (как у ключей сервисов) -------------------------------------------------
@@ -309,7 +321,7 @@ def test_отзыв_гасит_ссылку_и_второй_раз_отказ(
 ) -> None:
     клиент, _ = стенд
     _, токен = _выдать(клиент)
-    адрес = "/administration/connections/dodois/invite/1/revoke"
+    адрес = "/administration/dodois/invite/1/revoke"
     assert клиент.post(адрес, headers=ЗАГОЛОВКИ).status_code == 200
     assert "Отозвана" in клиент.get(ВКЛАДКА + "&country=SI").get_data(as_text=True)
     assert клиент.post(адрес, headers=ЗАГОЛОВКИ).status_code == 409
@@ -530,3 +542,56 @@ def test_страница_ссылки_не_трогает_общий_счёт_�
     monkeypatch.setattr(web_throttle, "address_verdict", нельзя)
     monkeypatch.setattr(web_throttle, "note_address_failure", нельзя)
     assert чужой.get(f"/dodois/connect/{rules.new_token()}").status_code == 404
+
+
+# --- плитка «Состояние подключений» ведёт во вкладку; оповещения (D641) ----------------------
+
+
+def _вход_страны(country: str, state: str) -> rules.Login:
+    сейчас = datetime.now(UTC)
+    return rules.Login(
+        country=country,
+        contour="intl",
+        source="invite",
+        issued_by="boss",
+        account_name=None,
+        account_email=None,
+        linked_at=сейчас,
+        scope="shared",
+        units_total=5,
+        units_open=0,
+        refreshed_at=сейчас,
+        access_expires_at=None,
+        checked_at=сейчас,
+        state=state,
+        reason=None,
+    )
+
+
+def test_плитка_страны_ведёт_во_вкладку_и_сбой_входа_красный(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(store, "list_logins", lambda: (_вход_страны("SI", rules.FAILED),))
+    html = главный.get("/administration?tab=connections").get_data(as_text=True)
+    assert re.search(r'href="[^"]*\?tab=dodois[^"]*country=SI[^"]*">Dodo IS — Словения', html)
+    assert "shealth__dot--red" in html
+
+
+def test_строка_оповещений_видна_во_вкладке_подключения(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.domain.health import ProbeRow
+
+    строка = ProbeRow("grey", "health.reason.alerts_off", datetime.now(UTC))
+    monkeypatch.setattr(health_store, "probes", lambda: {"alerts_channel": строка})
+    html = главный.get("/administration?tab=connections").get_data(as_text=True)
+    assert "Оповещения выключены" in html
+
+
+def test_ответ_действия_это_вкладка_dodois_а_не_подключения(
+    главный: FlaskClient,
+) -> None:
+    ответ = главный.post("/administration/dodois/SI/check", headers=ЗАГОЛОВКИ)
+    html = ответ.get_data(as_text=True)
+    assert 'id="dodois"' in html
+    assert re.search(r'aria-current="page">\s*Dodo IS', html)

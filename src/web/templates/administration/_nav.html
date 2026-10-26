@@ -1,16 +1,24 @@
 {#
-  Столбец вкладок раздела «Администрирование» (D639). Только вкладки, открытые роли
-  (`administration.tabs_for`); выбранная — в адресе (`?tab=<код>`). На телефоне столбец
-  становится списком над содержимым — не рядом чипов.
+  Столбец вкладок раздела «Администрирование» (D639, D640). Только вкладки, открытые роли
+  (`administration.tabs_for`); выбранная — в адресе (`?tab=<код>`). Вкладки группы стоят под
+  её подзаголовком, если у роли в группе их больше одной; иначе — просто вкладка. На телефоне
+  столбец становится списком над содержимым — не рядом чипов.
 #}
 {% macro admin_nav() %}
   <nav class="sadmin__nav" aria-label="{{ t('administration.tabs') }}">
     <p class="sadmin__title">{{ t('section.administration.title') }}</p>
     <ul class="sadmin__tabs">
+      {% set seen = namespace(groups=[]) %}
       {% for tab in admin_tabs %}
         {% set current = tab.key == admin_tab %}
+        {% if tab.group and tab.group not in seen.groups %}
+          {% set _ = seen.groups.append(tab.group) %}
+          {% if admin_tabs|selectattr('group', 'equalto', tab.group)|list|length > 1 %}
+            <li class="sadmin__group" role="presentation">{{ t('administration.group.' ~ tab.group) }}</li>
+          {% endif %}
+        {% endif %}
         <li>
-          <a class="sadmin__tab{% if current %} is-current{% endif %}" href="{{ admin_url(tab.key) }}"{% if current %} aria-current="page"{% endif %}>{{ t(tab.title_key) }}</a>
+          <a class="sadmin__tab{% if current %} is-current{% endif %}" href="{{ admin_url(tab.key) }}"{% if current %} aria-current="page"{% endif %}>{{ t(admin_title(tab)) }}</a>
         </li>
       {% endfor %}
     </ul>

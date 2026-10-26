@@ -63,14 +63,14 @@ def стенд_аудитора(monkeypatch: pytest.MonkeyPatch) -> Iterator[Fla
         yield client
 
 
-def test_аудитор_видит_на_вкладке_только_себя(стенд_аудитора: FlaskClient) -> None:
-    """Вкладка открыта всем ради привязки бота (D286), людьми управляет админ УК (D288)."""
+def test_без_охвата_людей_экрана_нет_а_старый_адрес_ведёт_в_настройки(
+    стенд_аудитора: FlaskClient,
+) -> None:
+    """D640: людьми управляет админ УК (D288); своя карточка и бот — в «Настройках» (D447)."""
     ответ = стенд_аудитора.get("/users")
 
-    assert ответ.status_code == 200
-    страница = ответ.get_data(as_text=True)
-    assert ЛОГИН in страница
-    assert "/users/add" not in страница and "/users/freeze" not in страница
+    assert ответ.status_code == 302 and ответ.headers["Location"] == "/settings"
+    assert стенд_аудитора.get("/administration?tab=people").status_code in (403, 404)
 
 
 def test_аудитор_не_заводит_людей_даже_прямой_отправкой(
@@ -94,7 +94,7 @@ def test_аудитор_не_заводит_людей_даже_прямой_о�
 
 
 def test_админ_видит_живых_и_отключённых(стенд_админа: FlaskClient) -> None:
-    страница = стенд_админа.get("/users").get_data(as_text=True)
+    страница = стенд_админа.get("/administration?tab=people").get_data(as_text=True)
 
     assert "petr" in страница
     # Отключённые не прячутся: вопрос «у кого был доступ» задают после
@@ -248,7 +248,7 @@ def test_админ_уК_видит_людей_всех_пространств(m
     подменить_двери(monkeypatch, tenant="HQ", role="admin")
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
-        assert client.get("/users").status_code == 200
+        assert client.get("/administration?tab=people").status_code == 200
     assert спросили == [{"tenant": None}]
 
 
@@ -259,10 +259,10 @@ def test_не_админ_видит_только_себя(monkeypatch: pytest.Mo
     подменить_двери(monkeypatch, tenant="GE", role="auditor")
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
-        ответ = client.get("/users")
-    assert ответ.status_code == 200
-    страница = ответ.get_data(as_text=True)
-    assert ЛОГИН in страница and "/users/add" not in страница
+        старый = client.get("/users")
+        раздел = client.get("/administration?tab=people")
+    assert старый.status_code == 302 and старый.headers["Location"] == "/settings"
+    assert раздел.status_code in (403, 404)
 
 
 def test_расхождение_баз_на_вкладке_не_раскрывает_стенд(
@@ -279,7 +279,7 @@ def test_расхождение_баз_на_вкладке_не_раскрыва
 
     # Act
     with caplog.at_level("ERROR"):
-        страница = стенд_админа.get("/users").get_data(as_text=True)
+        страница = стенд_админа.get("/administration?tab=people").get_data(as_text=True)
 
     # Assert
     for деталь in ("db.example", "shared", "dodo_audit_admin", "DATABASE_RETRACTION_URL"):

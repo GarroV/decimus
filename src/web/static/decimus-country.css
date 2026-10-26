@@ -129,7 +129,7 @@
 .ccard__name { font-weight: var(--w-semibold); }
 .ccard__aliases { display: block; margin-top: var(--space-1); font-size: var(--fs-meta); color: var(--ink-2); }
 .ccard__city { display: block; font-weight: var(--w-medium); }
-.ccard__edit { margin-top: var(--space-2); }
+.ccard__edit { margin-top: var(--space-2); margin-bottom: var(--space-3); }
 .ccard__edit > summary { width: fit-content; cursor: pointer; font-size: var(--fs-dense); color: var(--accent); }
 .ccard__edit[open] > summary { margin-bottom: var(--space-3); }
 /* Блок «Договор» (D603): блоками ограниченной ширины, форма — по кнопке, не на весь экран. */

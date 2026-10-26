@@ -5,7 +5,7 @@
 на экран (календарь «с — по», стрелки ← →, по умолчанию текущий месяц), человек — один
 фильтр над таблицей.
 
-* **«Журнал»** — вкладка экрана «Пользователи», только главному админу (прочим 404, как
+* **«Журнал»** — вкладка раздела «Администрирование», только главному админу (прочим 404, как
   у «Подключений»): входы всех и действия админов, фильтр по человеку.
 * **«Журнал входов»** — `/settings/sign-ins`, любой роли: свои входы, фильтра по человеку нет.
 
@@ -29,7 +29,7 @@ from flask import Response as FlaskResponse
 from src.db import journals
 from src.db.errors import DbError
 
-from . import access_policy, auth, registry_period, registry_view, ui_lang
+from . import access_policy, administration, auth, registry_period, registry_view, ui_lang
 from .config import Settings
 from .db_refusal import note_target_mismatch
 from .sections import section
@@ -161,7 +161,7 @@ def _render(*, own: bool, conf: Settings) -> FlaskResponse | tuple[str, int]:
     base = (
         f"{request.script_root}{section('settings').path}/{OWN_PATH_SUFFIX}"
         if own
-        else f"{request.script_root}{section('users').path}"
+        else f"{request.script_root}{section('administration').path}"
     )
     fixed = {} if own else {"tab": TAB_JOURNAL}
 
@@ -209,16 +209,7 @@ def _render(*, own: bool, conf: Settings) -> FlaskResponse | tuple[str, int]:
             view_url=lambda view: select(view=view),
             base=base,
             settings_url=f"{request.script_root}{section('settings').path}",
-            # Табы «Пользователей»: журнал виден только главному админу, поэтому здесь все три.
-            tab="journal",
-            has_spaces_tab=not own,
-            manages_spaces=True,
-            has_journal_tab=not own,
-            has_usage_tab=not own,
-            link=lambda **параметры: (
-                f"{request.script_root}{section('users').path}"
-                + (f"?{urlencode(параметры)}" if параметры else "")
-            ),
+            **({} if own else administration.nav(TAB_JOURNAL)),
         ),
         503 if failed else 200,
     )
@@ -233,7 +224,7 @@ def _boss() -> None:
 
 
 def show_users(conf: Settings) -> FlaskResponse | tuple[str, int]:
-    """GET `/users?tab=journal[&view=logins|actions][&person=<id>][&from=&to=]`."""
+    """GET `/administration?tab=journal[&view=logins|actions][&person=<id>][&from=&to=]`."""
     _boss()
     return _render(own=False, conf=conf)
 

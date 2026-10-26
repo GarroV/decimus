@@ -105,8 +105,15 @@ def _клиент(role: str) -> Callable[..., Iterator[FlaskClient]]:
 
 
 def _страница(client: FlaskClient, monkeypatch: pytest.MonkeyPatch, saved: str = "") -> str:
-    адрес = "/country/GE?settings=1" + (f"&saved={saved}" if saved else "")
-    return открыть(client, monkeypatch, данные(), адрес)
+    """Вкладка «Администрирование → Страны» (D640): договор правится только в ней."""
+    адрес = "/administration?tab=countries&country=GE" + (f"&saved={saved}" if saved else "")
+    ответ = client.get(адрес)
+    assert ответ.status_code == 200, ответ.status_code
+    return ответ.get_data(as_text=True)
+
+
+def _карточка_страны(client: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> str:
+    return открыть(client, monkeypatch, данные(), "/country/GE?settings=1")
 
 
 @pytest.mark.parametrize("кто", ["осб", "админ", "главный"])
@@ -126,9 +133,26 @@ def test_остальные_роли_ук_договор_не_видят(
 ) -> None:
     """Договор — только тем, кто его ведёт: ОСБ, админ, главный админ (D609)."""
     клиент: FlaskClient = request.getfixturevalue(кто)
-    страница = _страница(клиент, монкей)
+    assert клиент.get("/administration?tab=countries&country=GE").status_code == 404
+    страница = _карточка_страны(клиент, монкей)
     assert ПОЧТА not in страница and "Lotos LLC" not in страница
     assert ФОРМА not in страница
+
+
+@pytest.mark.parametrize("кто", ["осб", "админ", "главный"])
+def test_на_странице_страны_договора_нет_даже_у_тех_кто_его_ведёт(
+    кто: str,
+    request: pytest.FixtureRequest,
+    монкей: pytest.MonkeyPatch,
+    записи: dict[str, list[Any]],
+) -> None:
+    """Договор — только во вкладке «Страны» (D640); карточка страны его не читает."""
+    клиент: FlaskClient = request.getfixturevalue(кто)
+    страница = _карточка_страны(клиент, монкей)
+    assert "Карточка страны" in страница, "карточка не открылась — проверять нечего"
+    assert ПОЧТА not in страница and "ccard__contract" not in страница
+    assert ФОРМА not in страница
+    assert записи["read"] == []
 
 
 def test_партнёр_договор_и_почты_не_видит_и_база_не_читается(
@@ -196,6 +220,7 @@ def test_осб_правит_договор_но_не_девелопера_и_н
     # Страница карточки у неё открыта, но форм девелопера и партнёра в ней нет.
     страница = _страница(осб, монкей)
     assert "/settings/developer" not in страница and "/settings/space" not in страница
+    assert "/settings/report-langs" not in страница
 
 
 def test_неверная_почта_не_доходит_до_базы_и_отвечает_словами(

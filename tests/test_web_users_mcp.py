@@ -141,7 +141,7 @@ def test_дверей_выдачи_другому_больше_нет(админ
 
 
 def test_чужая_карточка_без_блока_токена(админ_уК: FlaskClient) -> None:
-    страница = админ_уК.get("/users?person=id-petr").get_data(as_text=True)
+    страница = админ_уК.get("/administration?tab=people&person=id-petr").get_data(as_text=True)
 
     assert 'id="claude-token"' not in страница, "у чужой карточки кнопки токена"
     assert "Дать доступ" not in страница
