@@ -234,6 +234,23 @@ def _install_edits(app: Flask, users_path: str) -> None:
             )
         )
 
+    @app.post(f"{users_path}/name-latin")
+    @guard.action("people.manage")
+    def user_name_latin() -> FlaskResponse | tuple[str, int]:
+        """Имя латиницей для отчёта (D644): задать или снять (пустое поле). Цель — в охвате."""
+        вошедший = auth.current_account()
+        имя = request.form.get("name_latin") or ""
+        return _правка(
+            lambda логин, пространство, охват: people.change_name_latin(
+                login=логин,
+                tenant=пространство,
+                name=имя,
+                actor_login=вошедший.login if вошедший else "",
+                actor_tenant=вошедший.tenant if вошедший else "",
+                only_roles=охват,
+            )
+        )
+
 
 def _install_add_freeze(app: Flask, users_path: str) -> None:
     """Добавить человека, заморозить и разморозить."""

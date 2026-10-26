@@ -126,3 +126,40 @@ def change_email(
         log_id(login.strip().lower()),
     )
     return Outcome("email.ok" if почта else "email.removed", 200)
+
+
+#: Имя латиницей, как в колонке `web_users.display_name_latin` (`0100`): до 120
+#: знаков; кириллица здесь не отказ — её переведёт автоперевод при записи в проверку.
+MAX_NAME_LATIN = 120
+
+
+def change_name_latin(
+    *,
+    login: str,
+    tenant: str,
+    name: str,
+    actor_login: str,
+    actor_tenant: str,
+    only_roles: tuple[str, ...] | None = None,
+) -> Outcome:
+    """Записать имя латиницей для отчёта (D644); пустое — снять, пойдёт автоперевод."""
+    значение = " ".join(name.split())
+    if len(значение) > MAX_NAME_LATIN:
+        return Outcome("name_latin.long", 400)
+    try:
+        сделано = accounts.set_name_latin(
+            login, tenant=tenant, name=значение or None, only_roles=only_roles
+        )
+    except DbError:
+        return Outcome("name_latin.failed", 503)
+    if not сделано:
+        return Outcome("edit.missing", 200)
+    logger.info(
+        "люди: имя латиницей %s; правил %s/%s, кому %s/%s",
+        "задано" if значение else "снято",
+        log_id(actor_tenant),
+        log_id(actor_login),
+        log_id(tenant),
+        log_id(login.strip().lower()),
+    )
+    return Outcome("name_latin.ok" if значение else "name_latin.removed", 200)

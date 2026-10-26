@@ -38,6 +38,7 @@ from src.db.web_access import (
     reassign_role,
     roles_for,
     set_email,
+    set_name_latin,
     sign_out_everywhere,
     unfreeze_account,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "reassign_role",
     "roles_for",
     "set_email",
+    "set_name_latin",
     "sign_out_everywhere",
     "spaces",
     "unfreeze",

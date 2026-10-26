@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 197 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 198 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -212,6 +212,7 @@
 | `/users/bot-unlink` | POST | `bot_unlink` | `src/web/users_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
 | `/users/freeze` | POST | `freeze_user` | `src/web/users_screen.py` |
+| `/users/name-latin` | POST | `user_name_latin` | `src/web/users_screen.py` |
 | `/users/reset-second-factor` | POST | `reset_second_factor` | `src/web/users_screen.py` |
 | `/users/role` | POST | `user_role` | `src/web/users_screen.py` |
 | `/users/spaces/add` | POST | `add_space` | `src/web/users_screen.py` |
@@ -563,6 +564,7 @@
 | `0095_health_checks.sql` | `health.checks` |
 | `0096_dodois_logins.sql` | `dodois.logins`, `dodois.invites` |
 | `0097_dodois_invite_result.sql` | — |
+| `0100_web_user_name_latin.sql` | — |
 <!-- map:end -->
 
 ## Makefile

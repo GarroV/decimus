@@ -375,6 +375,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0097_dodois_invite_result.sql": (
         "sql1:df01e91ada74526e2c0ae4fd73c28d7df3b05d177dd554e75cf54d54a3523837"
     ),
+    "0100_web_user_name_latin.sql": (
+        "sql1:09fa3c3acfb53332b19cb2f270ea1c9d7c0808a1951918710e6052f8d03a226b"
+    ),
 }
 
 

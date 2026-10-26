@@ -12,11 +12,15 @@ from src.bot.auditor import auditor_name
 
 def test_name_from_map_wins_over_telegram_profile() -> None:
     names = {111: "Владимир Гарро"}
-    assert auditor_name(111, "vlad 🍕", names) == "Владимир Гарро"
+    assert auditor_name(111, "vlad 🍕", names) == "Vladimir Garro"
 
 
 def test_unknown_id_falls_back_to_telegram_profile_name() -> None:
-    assert auditor_name(222, "Пётр Петров", {111: "Владимир Гарро"}) == "Пётр Петров"
+    assert auditor_name(222, "Пётр Петров", {111: "Владимир Гарро"}) == "Petr Petrov"
+
+
+def test_latin_profile_name_is_left_alone() -> None:
+    assert auditor_name(222, "Rinat", {}) == "Rinat"
 
 
 def test_blank_profile_name_gives_id_not_empty_header() -> None:
@@ -24,8 +28,8 @@ def test_blank_profile_name_gives_id_not_empty_header() -> None:
 
 
 def test_profile_name_is_trimmed() -> None:
-    assert auditor_name(222, "  Пётр Петров  ", {}) == "Пётр Петров"
+    assert auditor_name(222, "  Пётр Петров  ", {}) == "Petr Petrov"
 
 
 def test_blank_value_in_map_is_ignored_like_absent() -> None:
-    assert auditor_name(111, "Пётр Петров", {111: "   "}) == "Пётр Петров"
+    assert auditor_name(111, "Пётр Петров", {111: "   "}) == "Petr Petrov"
