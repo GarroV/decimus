@@ -26,7 +26,7 @@ from src.db import ratings_read as ratings
 from src.db.errors import AccessError
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
-ВКЛАДКА = "/administration?tab=connections"
+ВКЛАДКА = "/administration?tab=keys"
 КЛЮЧ = "ключ-который-покажем-один-раз-0123456789abcdef"
 НОВЫЙ_КЛЮЧ = "новый-ключ-после-перевыпуска-fedcba9876543210"
 ИМЯ = "Свод-Swarm"
@@ -166,14 +166,39 @@ def test_главный_админ_видит_вкладку_и_сервисы(�
     assert ответ.status_code == 200
     assert ИМЯ in html and "swarm" in html and "42 обращ. / 3 ошиб." in html
     assert html.index(ИМЯ) < html.index("Старый BI"), "отозванные — ниже живых"
-    assert "Подключить сервис" in html
+    assert "Выдать ключ API" in html and "Ключей API: " in html
+    assert "Наши ключи к внешним сервисам" in html and "Доступ к API Decimus" in html
+    assert html.index("Наши ключи к внешним сервисам") < html.index("Доступ к API Decimus")
+    assert "Подключить сервис" not in html
 
 
 def test_вкладка_на_английском(monkeypatch: pytest.MonkeyPatch, склад: Склад) -> None:
     for клиент in _стенд(monkeypatch, tenant="HQ", role="superadmin", ui_lang="en"):
         html = клиент.get(ВКЛАДКА).get_data(as_text=True)
-        assert "Connect a service" in html and "42 calls / 3 errors" in html
+        assert "Issue API key" in html and "42 calls / 3 errors" in html
+        assert "Our keys to outside services" in html and "Access to the Decimus API" in html
         assert "Подключить" not in html
+
+
+@pytest.mark.parametrize("параметр", ["service=1", "add=1", "key=openai"])
+def test_старый_адрес_подключений_с_ключами_ведёт_на_ключи_и_api(
+    monkeypatch: pytest.MonkeyPatch, склад: Склад, параметр: str
+) -> None:
+    for клиент in _стенд(monkeypatch, tenant="HQ", role="superadmin"):
+        ответ = клиент.get(f"/administration?tab=connections&{параметр}")
+        assert ответ.status_code == 302
+        assert ответ.headers["Location"].endswith(f"/administration?tab=keys&{параметр}")
+
+
+def test_действия_с_ключами_api_отвечают_вкладкой_ключи_и_api(
+    monkeypatch: pytest.MonkeyPatch, склад: Склад
+) -> None:
+    for клиент in _стенд(monkeypatch, tenant="HQ", role="superadmin"):
+        html = клиент.post("/administration/connections/1/revoke", headers=ЗАГОЛОВКИ).get_data(
+            as_text=True
+        )
+        assert "Доступ к API Decimus" in html and "Наши ключи к внешним сервисам" in html
+        assert "Состояние подключений" not in html
 
 
 def test_вкладка_переехала_из_людей_в_администрирование(
@@ -184,6 +209,7 @@ def test_вкладка_переехала_из_людей_в_администр
     for клиент in _стенд(monkeypatch, tenant="HQ", role="superadmin"):
         page = клиент.get("/administration?tab=people").get_data(as_text=True)
         assert 'href="/administration?tab=connections"' in page
+        assert 'href="/administration?tab=keys"' in page
     for клиент in _стенд(monkeypatch, tenant="HQ", role="admin"):
         page = клиент.get("/administration?tab=people").get_data(as_text=True)
         assert "tab=connections" not in page

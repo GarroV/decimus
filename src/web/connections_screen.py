@@ -1,8 +1,10 @@
-"""Вкладка «Подключения» раздела «Администрирование» (D638, D639): ключи сервисов и API.
+"""Вкладки «Подключения» и «Ключи и API» раздела «Администрирование» (D638, D639, D650).
 
 Жила вкладкой экрана «Пользователи» (D425, #568), с #1251 — в «Администрировании»;
-старый адрес `/users?tab=connections` перенаправляет сюда. Сверху — состояние
-подключений (`admin_health.py`), ниже ключи внешних сервисов и ключи `/api/v1/*`.
+старый адрес `/users?tab=connections` перенаправляет сюда. «Подключения» — только состояние
+подключений (`admin_health.py`); «Ключи и API» — два блока: наши ключи к внешним сервисам и
+доступ к API Decimus (ключи `/api/v1/*`). Старые адреса `?tab=connections&service|add|key=`
+ведут на «Ключи и API».
 
 Главный админ выдаёт, правит, перевыпускает и отзывает ключи `/api/v1/*` без
 командной строки и видит, как каждый сервис ходит. Вся работа с базой — слой
@@ -28,7 +30,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from flask import Flask, abort, g, make_response, render_template, request
+from flask import Flask, abort, g, make_response, redirect, render_template, request
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
@@ -54,10 +56,14 @@ from .db_refusal import note_target_mismatch
 from .journal import TARGET_OVERRIDE
 from .origin import refuse_foreign_origin
 from .sections import section
-from .users_view import TAB_CONNECTIONS, TAB_DODOIS
+from .users_view import TAB_CONNECTIONS, TAB_DODOIS, TAB_KEYS
 
-#: Вкладки, с которых приходят формы ключей сервисов (скрытое поле `back`).
-KEY_TABS = (TAB_CONNECTIONS, TAB_DODOIS)
+#: Вкладки, с которых приходят формы ключей сервисов (скрытое поле `back`). `connections` —
+#: прежнее значение: ключей там больше нет, ответ идёт на «Ключи и API».
+KEY_TABS = (TAB_CONNECTIONS, TAB_KEYS, TAB_DODOIS)
+
+#: Параметры адреса, которые когда-то жили на «Подключениях»: с ними вкладка ведёт на «Ключи и API».
+_KEYS_PARAMS = ("service", "add", "key")
 
 #: Сколько дней обращений и строк журнала показывает карточка.
 USAGE_DAYS = 14
@@ -162,8 +168,8 @@ _EMPTY_VALUES: dict[str, Any] = {
 
 
 def _link(**extra: str) -> str:
-    """Адрес вкладки; `tab` в шаблонах — наследство «Пользователей», он всегда этот."""
-    return administration.url(TAB_CONNECTIONS, **{k: v for k, v in extra.items() if k != "tab"})
+    """Адрес вкладки «Ключи и API»; `tab` в шаблонах — наследство «Пользователей»."""
+    return administration.url(TAB_KEYS, **{k: v for k, v in extra.items() if k != "tab"})
 
 
 def _page(
@@ -178,7 +184,7 @@ def _page(
     health_flash: admin_health.Flash | None = None,
     code: int = 200,
 ) -> FlaskResponse:
-    """Страница вкладки целиком — для GET и для ответа на любое действие."""
+    """Страница «Ключи и API» целиком — для GET и для ответа на действие с ключами."""
     now = datetime.now(UTC)
     tokens, known = _tokens()
     живые = [t for t in tokens if status_of(t, now) == "live"]
@@ -190,7 +196,7 @@ def _page(
         values = _values_of(picked) if picked is not None and not add else _EMPTY_VALUES
     base = f"{request.script_root}{section('administration').path}"
     html = render_template(
-        "administration/connections.html",
+        "administration/keys.html",
         users_url=base,
         link=_link,
         tokens_known=known,
@@ -212,10 +218,9 @@ def _page(
         max_name=connections_form.MAX_NAME,
         max_contact=connections_form.MAX_CONTACT,
         split_open=issued is not None or add or picked is not None,
-        split_back=_link(tab=TAB_CONNECTIONS),
+        split_back=_link(),
         **service_keys_screen.context(key_flash),
-        **admin_health.context(health_flash),
-        **administration.nav(TAB_CONNECTIONS),
+        **administration.nav(TAB_KEYS),
     )
     response = make_response(html, code)
     # Ключ API в теле ответа выдачи и записи о ключах сервисов: ни браузер, ни прокси не
@@ -231,8 +236,30 @@ def _int(raw: str | None) -> int | None:
         return None
 
 
+def _health_page(*, health_flash: admin_health.Flash | None = None) -> FlaskResponse:
+    """Страница «Подключения»: только состояние подключений."""
+    html = render_template(
+        "administration/connections.html",
+        users_url=f"{request.script_root}{section('administration').path}",
+        **admin_health.context(health_flash),
+        **administration.nav(TAB_CONNECTIONS),
+    )
+    response = make_response(html)
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
 def show() -> FlaskResponse:
-    """GET `/administration?tab=connections[&service=<№>|&add=1]`."""
+    """GET `/administration?tab=connections`; со старыми параметрами ключей — на «Ключи и API»."""
+    _boss()
+    old = {k: v for k, v in request.args.items() if k in _KEYS_PARAMS}
+    if old:
+        return make_response(redirect(_link(**old)))
+    return _health_page()
+
+
+def show_keys() -> FlaskResponse:
+    """GET `/administration?tab=keys[&service=<№>|&add=1|&key=<код>]`."""
     _boss()
     return _page(picked_id=_int(request.args.get("service")), add=request.args.get("add") == "1")
 
@@ -410,7 +437,7 @@ def _stand() -> str:
 def return_tab() -> str:
     """Вкладка, с которой пришла форма ключей: `back` из формы, только из известных (D648)."""
     wanted = (request.form.get("back") or "").strip()
-    return wanted if wanted in KEY_TABS else TAB_CONNECTIONS
+    return wanted if wanted in KEY_TABS and wanted != TAB_CONNECTIONS else TAB_KEYS
 
 
 def _key_action(
@@ -496,4 +523,4 @@ def install_health(app: Flask) -> None:
             abort(404)
         setattr(g, TARGET_OVERRIDE, f"connection={code}")
         refuse_foreign_origin()
-        return _page(health_flash=admin_health.check_now(code))
+        return _health_page(health_flash=admin_health.check_now(code))

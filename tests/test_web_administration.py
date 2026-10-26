@@ -92,8 +92,11 @@ def test_главный_админ_видит_раздел_и_состояние
     рейтинги = page.index("Рейтинги и оценки")
     assert системное < page.index("Хранилище кадров") < рейтинги
     assert рейтинги < page.index("Pointer — ключ") < page.index("Pointer — ночной сбор")
-    # Ключи сервисов и ключи API переехали сюда же.
-    assert 'id="service-keys"' in page or "service-keys" in page
+    # Ключи — на «Ключах и API» (D650); со статуса пробуемых ключей ведёт «Ключ».
+    assert 'id="service-keys"' not in page and "Доступ к API Decimus" not in page
+    for код in ("openai", "pointer", "ispring"):
+        assert f'href="{РАЗДЕЛ}?tab=keys&amp;key={код}#service-keys"' in page, код
+    assert page.count("?tab=keys&amp;key=") == 3, "ссылка «Ключ» только у ключей"
     # Пункт меню у главного админа есть.
     assert f'href="{РАЗДЕЛ}?lang=' in page
 
@@ -123,6 +126,7 @@ def test_старый_адрес_вкладки_перенаправляет(г�
         "journal",
         "usage",
         "connections",
+        "keys",
         "dodois",
     ],
     ("HQ", "admin"): ["people", "spaces", "countries", "usage"],
@@ -164,7 +168,7 @@ def test_каждая_роль_видит_ровно_свои_вкладки(
         assert ответ.status_code == 200, f"{tenant}/{role}"
         assert _вкладки_на_странице(ответ.get_data(as_text=True)) == ждём
         # Каждая вкладка роли открывается, чужая — нет.
-        for вкладка in ("journal", "usage", "connections", "dodois"):
+        for вкладка in ("journal", "usage", "connections", "keys", "dodois"):
             открылась = client.get(f"{РАЗДЕЛ}?tab={вкладка}")
             if вкладка not in ждём:
                 assert открылась.status_code == 404, f"{tenant}/{role}: {вкладка} открылась"

@@ -169,7 +169,7 @@
         <button class="sbtn" type="button" data-copy="#service-key" data-copied="{{ t('connections.key.copied') }}" hidden>{{ t('connections.key.copy') }}</button>
       </div>
       <div class="sactions">
-        <a class="sbtn sbtn--primary" href="{{ link(tab='connections', service=k.id|string) }}">{{ t('connections.key.done') }}</a>
+        <a class="sbtn sbtn--primary" href="{{ link(service=k.id|string) }}">{{ t('connections.key.done') }}</a>
       </div>
     </section>
   </article>

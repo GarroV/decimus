@@ -44,6 +44,9 @@
             {% if s.checked_at or row.checkable %}
               <span class="shealth__foot">
                 {% if s.checked_at %}<small>{{ t('health.ran' if row.kind == 'load' else 'health.checked', at=health_stamp(s.checked_at)) }}</small>{% endif %}
+                {% if row.code in ('openai', 'pointer', 'ispring') %}
+                  <a class="shealth__key" href="{{ admin_url('keys', key=row.code) }}#service-keys">{{ t('health.key_link') }}</a>
+                {% endif %}
                 {% if row.checkable %}
                   <form method="post" action="{{ users_url }}/connections/health/{{ row.code }}/check?lang={{ lang }}" class="shealth__act">
                     <button class="sbtn" type="submit">{{ t('health.check_now') }}</button>

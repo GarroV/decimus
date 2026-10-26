@@ -107,10 +107,10 @@ TRAINING_TEXTS: dict[str, dict[str, str]] = {
         "load, countries and pizzerias will appear here.",
     },
     "training.empty.keys": {
-        "ru": "Ключи iSpring ставятся на экране «Подключения»",
-        "en": "The iSpring keys are set on the Connections screen",
+        "ru": "Ключи iSpring ставятся на экране «Ключи и API»",
+        "en": "The iSpring keys are set on the Keys & API screen",
     },
-    "training.empty.keys_open": {"ru": "Открыть «Подключения»", "en": "Open Connections"},
+    "training.empty.keys_open": {"ru": "Открыть «Ключи и API»", "en": "Open Keys & API"},
     "training.empty.ask": {
         "ru": "Ключи ставит главный администратор.",
         "en": "The keys are set by the main administrator.",

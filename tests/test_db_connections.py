@@ -73,9 +73,7 @@ def test_цикл_ключа_выдача_правка_перевыпуск_от
         номер, отпечаток, кем, строка = cur.fetchone()
     assert отпечаток == token_fingerprint(ключ) and ключ not in строка
     assert кем == ЛОГИН
-    assert ключ not in экран.get(f"/administration?tab=connections&service={номер}").get_data(
-        as_text=True
-    )
+    assert ключ not in экран.get(f"/administration?tab=keys&service={номер}").get_data(as_text=True)
 
     # Выданное право открывает свой адрес, чужое — нет.
     assert _api(СПИСОК, ключ) == 200
@@ -92,7 +90,7 @@ def test_цикл_ключа_выдача_правка_перевыпуск_от
     assert _api(РЕЙТИНГИ, ключ) == 200
 
     # Журнал виден в карточке: ходил — путь и ответ записаны.
-    карточка = экран.get(f"/administration?tab=connections&service={номер}").get_data(as_text=True)
+    карточка = экран.get(f"/administration?tab=keys&service={номер}").get_data(as_text=True)
     assert "/api/v1/inspections" in карточка
 
     # Перевыпуск: старый ключ перестаёт пускать, новый пускает с теми же правами.
