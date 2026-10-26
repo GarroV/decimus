@@ -404,7 +404,12 @@ def test_гость_не_пишет_ни_одним_адресом(
                 continue
             ответ = client.open(путь, method=метод, data={"a": "b"}, headers=ЗАГОЛОВКИ)
             # Скрытый экран ключей API 404 отвечает всем, кроме суперадмина.
-            ждём = 404 if путь.startswith("/administration/connections") else 403
+            # Вкладка Dodo IS (D641) — та же скрытая админка суперадмина, что «Подключения».
+            ждём = (
+                404
+                if путь.startswith(("/administration/connections", "/administration/dodois"))
+                else 403
+            )
             if ответ.status_code != ждём:
                 пропущено.append(f"{метод} {путь} -> {ответ.status_code}")
     assert not пропущено, "гостю открыта запись: " + "; ".join(пропущено)

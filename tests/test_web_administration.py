@@ -170,18 +170,17 @@ def test_каждая_роль_видит_ровно_свои_вкладки(
                 assert открылась.status_code == 404, f"{tenant}/{role}: {вкладка} открылась"
 
 
-@pytest.mark.parametrize(
-    ("tenant", "role", "групп"),
-    [("HQ", "superadmin", 3), ("HQ", "admin", 1), ("HQ", "control", 0), ("GE", "admin", 1)],
-)
-def test_подзаголовок_группы_только_при_двух_вкладках(
-    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str, групп: int
+@pytest.mark.parametrize(("tenant", "role"), [("HQ", "superadmin"), ("HQ", "admin")])
+def test_вкладки_без_подзаголовков_групп(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str
 ) -> None:
     _без_базы(monkeypatch)
     for client in _стенд(monkeypatch, tenant=tenant, role=role):
         страница = client.get(РАЗДЕЛ).get_data(as_text=True)
-        assert страница.count('class="sadmin__group"') == групп
-        assert ("Люди и доступ" in страница) == (групп > 0)
+        assert "sadmin__group" not in страница
+        assert "Журнал и расход" not in страница
+        # Что во вкладке, говорит её название, а не подпись над ней.
+        assert ">Люди и доступ</a>" in страница
 
 
 @pytest.mark.parametrize(

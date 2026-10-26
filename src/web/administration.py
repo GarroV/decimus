@@ -32,9 +32,6 @@ from .users_view import (
 )
 
 #: Группы вкладок: подзаголовок в столбце, если в группе у роли видно больше одной вкладки.
-GROUP_ACCESS = "access"
-GROUP_JOURNAL = "journal"
-GROUP_CONNECTIONS = "connections"
 
 
 def _scope(account: object) -> access_policy.Scope | None:
@@ -81,11 +78,10 @@ def _sees_usage(account: object) -> bool:
 
 @dataclass(frozen=True)
 class Tab:
-    """Вкладка раздела: код (он же `?tab=`), кому открыта, к какой группе относится."""
+    """Вкладка раздела: код (он же `?tab=`) и кому открыта."""
 
     key: str
     open_to: Callable[[object], bool]
-    group: str | None = None
 
     @property
     def title_key(self) -> str:
@@ -100,15 +96,15 @@ class Tab:
 
 #: Вкладки в порядке показа. Следом встают «Рейтинги».
 TABS: tuple[Tab, ...] = (
-    Tab(TAB_PEOPLE, _sees_people, GROUP_ACCESS),
-    Tab(TAB_SPACES, _sees_spaces, GROUP_ACCESS),
+    Tab(TAB_PEOPLE, _sees_people),
+    Tab(TAB_SPACES, _sees_spaces),
     Tab(TAB_COUNTRIES, _sees_countries),
-    Tab(TAB_JOURNAL, _is_super, GROUP_JOURNAL),
-    Tab(TAB_USAGE, _sees_usage, GROUP_JOURNAL),
+    Tab(TAB_JOURNAL, _is_super),
+    Tab(TAB_USAGE, _sees_usage),
     # Ключи сервисов, ключи `/api/v1` и состояние подключений — главный админ (D638).
-    Tab(TAB_CONNECTIONS, _is_super, GROUP_CONNECTIONS),
+    Tab(TAB_CONNECTIONS, _is_super),
     # Входы Dodo IS по странам — отдельная вкладка рядом с «Подключениями» (D641); права те же.
-    Tab(TAB_DODOIS, _is_super, GROUP_CONNECTIONS),
+    Tab(TAB_DODOIS, _is_super),
 )
 
 

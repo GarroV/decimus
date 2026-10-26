@@ -43,8 +43,6 @@
 }
 
 /* Подзаголовок группы вкладок («Люди и доступ», «Журнал»). */
-.sadmin__group { margin: var(--space-4) 0 var(--space-1); padding: 0 var(--space-4); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-semibold); }
-.sadmin__tabs > .sadmin__group:first-child { margin-top: 0; }
 
 /* Блок «Dodo IS» (D640): строки приглашений в панели страны; остальное — приём «Ключей сервисов». */
 .sdodois .stile__icon.mono { font-size: var(--fs-meta); font-weight: var(--w-semibold); }
