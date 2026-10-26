@@ -59,7 +59,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | MCP | Протокол, которым Claude у человека читает историю проверок и правит методику и рейтинги. Свой сервер, только петля, наружу — туннелем | `src/mcp/`, `docs/furca/blocks/mcp.md`, [`inventory.md`](inventory.md) |
 | Личный токен | Ключ Claude Desktop, который человек с учёткой выпускает себе сам — в своих настройках на сайте (в боте и мини-аппе подключения Claude нет, D626); никто никому его не выдаёт (D448). В базе — отпечаток, учётка, роль, срок. Права — по роли учётки и допускам пространства; срок 30 дней (`MCP_TOKEN_TTL_DAYS`); отключение учётки и смена роли гасят его сразу. Не путать со служебным токеном `MCP_TOKENS` из `.env` | `src/db/mcp_access.py`, `src/mcp/policy.py`, `docs/furca/blocks/mcp.md` |
 | Сервисный токен | Ключ внешнего сервиса к API чтения (`/api/v1/*`): только чтение, право на каждый метод, страны и срок у ключа | `src/db/api_access.py`, `tools/api_token.py`, `docs/18-access-map.md` |
-| Ключи сервисов | Ключи внешних сервисов (модель, Pointer, iSpring, приложение маркетплейса Dodo IS — реестр `src/domain/service_keys.py`): вставляются главным админом на «Подключениях» (пара Dodo IS — на вкладке «Dodo IS»), лежат в базе зашифрованными (`SECRETS_KEY` — вне базы), иначе берутся из окружения (`OPENAI_API_KEY`, `POINTER_API_KEY`, …); сохранение — после второго шага входа, свежего подтверждения и проверки у провайдера | `src/domain/service_keys.py`, `src/db/service_keys.py`, `src/db/secret_crypto.py`, `src/web/service_keys_screen.py`, `docs/12-web-admin.md` |
+| Ключи сервисов | Ключи внешних сервисов (модель, Pointer, iSpring, приложение маркетплейса Dodo IS — реестр `src/domain/service_keys.py`): вставляются главным админом на «Ключах и API» (пара Dodo IS — на вкладке «Dodo IS»), лежат в базе зашифрованными (`SECRETS_KEY` — вне базы), иначе берутся из окружения (`OPENAI_API_KEY`, `POINTER_API_KEY`, …); сохранение — после второго шага входа, свежего подтверждения и проверки у провайдера | `src/domain/service_keys.py`, `src/db/service_keys.py`, `src/db/secret_crypto.py`, `src/web/service_keys_screen.py`, `docs/12-web-admin.md` |
 | FURCA | Процесс разработки проекта: анкета, спека, блоки с контрактами, граф задач, журнал решений. Артефакты — в `docs/furca/` | `docs/furca/`, `progress.md`, `tasks.md` |
 | D###, T###, #N | Номер решения владельца (`docs/furca/decisions.md`), номер задачи стройки (`tasks.md`), номер issue на GitHub. Ссылки на них стоят в докстрингах — это «почему так» | `docs/furca/decisions.md`, `tasks.md` |
 | Тестовая база | Тесты блока `db` и всего, что ходит в Postgres, идут на отдельной базе; без неё пропускаются, а пропуск — не зелёный | `Makefile` (`make test`), `tests/db_harness.py`, `tests/conftest.py` |
@@ -174,7 +174,7 @@ Flask-приложение управляющей компании и партн
 
 Вход паролем и Google, сессия в подписанной куке, заслон происхождения формы,
 экран «Пользователи» с карточкой человека, раздел «Администрирование» (D639) с вкладкой
-«Подключения»: ключи сервисов, ключи API и состояние подключений (D638), подключение
+«Подключения» (состояние подключений, D638) и «Ключи и API» (ключи сервисов и ключи API, D650), подключение
 Claude входом через сайт (OAuth).
 
 <!-- map:begin files src/web/{access_policy,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
@@ -187,7 +187,7 @@ Claude входом через сайт (OAuth).
 | `src/web/administration.py` | Раздел «Администрирование» (D639, #1251): все настройки сервиса, вкладки по роли |
 | `src/web/auth.py` | Вход в админку: форма, сессия в подписанной куке, выход (T323, D155) |
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
-| `src/web/connections_screen.py` | Вкладка «Подключения» раздела «Администрирование» (D638, D639): ключи сервисов и API |
+| `src/web/connections_screen.py` | Вкладки «Подключения» и «Ключи и API» раздела «Администрирование» (D638, D639, D650) |
 | `src/web/demo_entry.py` | Вход в открытое демо (D524): выбор роли и сессия без пароля — только на стенде демо |
 | `src/web/dodois_connect.py` | Публичная страница входа в Dodo IS по ссылке-приглашению (D640, #951) |
 | `src/web/dodois_screen.py` | Вкладка «Dodo IS» раздела «Администрирование»: входы по странам и ссылки (D640, D641, #951) |
@@ -212,7 +212,7 @@ Claude входом через сайт (OAuth).
 | `src/web/second_step.py` | Вторая ступень входа: «Подтвердите вход» после Google или пароля (D463) |
 | `src/web/security_headers.py` | Заголовки безопасности админки: один набор на КАЖДЫЙ ответ (#489) |
 | `src/web/security_screen.py` | Экран «Вход и защита» (`/settings/security`, D463): способы подтверждения входа |
-| `src/web/service_keys_screen.py` | Блок «Ключи сервисов» на вкладке «Подключения»: проверить, заменить, удалить (D491, D576) |
+| `src/web/service_keys_screen.py` | Блок «Наши ключи к внешним сервисам» на «Ключах и API»: проверить, заменить, удалить (D576) |
 | `src/web/settings_screen.py` | Экран «Настройки» (`/settings`): настройки своего профиля — всё подключение в одном месте |
 | `src/web/ui_lang.py` | Язык сайта: из профиля учётки, `?lang=` — разовый перекрёсток (D447) |
 | `src/web/usage_screen.py` | Экран «Расход модели» (D537): сколько токенов и денег ушло на модель |
@@ -242,7 +242,7 @@ Claude входом через сайт (OAuth).
 | Файл | Что делает |
 |---|---|
 | `src/web/texts.py` | Тексты веб-админки: каталог по ключам, язык — параметр |
-| `src/web/texts_administration.py` | Тексты раздела «Администрирование» (D639) и вкладки «Подключения» (D638, #1251) |
+| `src/web/texts_administration.py` | Тексты раздела «Администрирование» (D639), вкладок «Подключения» (D638) и «Ключи и API» (D650) |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
@@ -263,7 +263,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_refusals.py` | Тексты отказов раздела «Методика»: хранилище методики и формы экрана (#475) |
 | `src/web/texts_registry.py` | Тексты раздела «Проверки» в раскладке «список слева, карточка справа» |
 | `src/web/texts_second_factor.py` | Тексты второй ступени входа (D463): «Подтвердите вход» и «Вход и защита» |
-| `src/web/texts_service_keys.py` | Тексты блока «Ключи сервисов» на вкладке «Подключения» (D491, D576) |
+| `src/web/texts_service_keys.py` | Тексты блока «Наши ключи к внешним сервисам» на вкладке «Ключи и API» (D491, D576) |
 | `src/web/texts_settings.py` | Тексты экрана «Настройки» (D447): подключения, Google, язык, пароль |
 | `src/web/texts_training.py` | Тексты экрана «Обучение» (D578, #906): колонка, плитки, списки, пустое состояние |
 | `src/web/texts_trips.py` | Тексты поездок «Календаря» (D505, D506): сетка, карточка, план, отказы |
@@ -326,7 +326,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/usage/` | 1 | page.html |
-| `src/web/templates/users/` | 6 | _card.html, _connections.html, _service_keys.html, _spaces.html, forbidden.html, index.html |
+| `src/web/templates/users/` | 7 | _card.html, _connections.html, _service_key_panel.html, _service_keys.html, _spaces.html, forbidden.html, index.html |
 <!-- map:end -->
 
 <!-- map:begin tree src/web/static -->

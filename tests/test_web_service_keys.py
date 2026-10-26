@@ -26,7 +26,7 @@ from src.health.probes import KeyRejected, KeyUnverified
 from src.web import auth, reauth
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
-ВКЛАДКА = "/administration?tab=connections"
+ВКЛАДКА = "/administration?tab=keys"
 ВКЛАДКА_DODOIS = "/administration?tab=dodois"
 ЗНАЧЕНИЕ = "sk-proj-Zq9Xw8Vv7Uu6Tt5Ss4Rr3Qq2Pp1-never-show-this"
 ID_ISPRING = "ispring-client-id-AAAA1111BBBB2222"
@@ -574,13 +574,14 @@ def test_тексты_обеих_локалей_заведены_для_кажд
     ("пришло", "вкладка"),
     [
         ("dodois", "dodois"),
-        ("connections", "connections"),
-        ("evil", "connections"),
-        ("", "connections"),
+        ("keys", "keys"),
+        ("connections", "keys"),
+        ("evil", "keys"),
+        ("", "keys"),
     ],
 )
 def test_адрес_возврата_только_из_известных_вкладок(пришло: str, вкладка: str) -> None:
-    """Ломали: `return wanted or TAB_CONNECTIONS` — чужое значение проходило как вкладка."""
+    """Ломали: `return wanted or TAB_KEYS` — чужое значение проходило как вкладка."""
     from src.web import connections_screen
 
     with собрать(tenant="HQ").test_request_context("/", method="POST", data={"back": пришло}):

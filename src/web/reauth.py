@@ -77,6 +77,7 @@ _BACK_PREFIXES = (
     "/settings?",
     "/oauth/authorize?",
     "/administration?tab=connections",
+    "/administration?tab=keys",
     "/administration?tab=dodois",
 )
 
