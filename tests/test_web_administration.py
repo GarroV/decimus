@@ -21,7 +21,15 @@ from src.db import api_access, dodois_logins, health_store, model_key
 from src.domain.health import LoadFacts, ProbeRow
 from src.domain.permissions import MATRIX, SIDE_HQ, role_may
 from src.health import checks
-from src.web import accounts, administration, country, country_summary, partner_spaces
+from src.web import (
+    accounts,
+    administration,
+    country,
+    country_summary,
+    journal_screen,
+    partner_spaces,
+    usage_screen,
+)
 
 РАЗДЕЛ = "/administration"
 СЕЙЧАС = datetime.now(UTC)
@@ -290,3 +298,28 @@ def test_проверить_сейчас_не_главному_404(monkeypatch: 
     for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
         ответ = client.post(f"{РАЗДЕЛ}/connections/health/openai/check", headers={"Origin": СВОЙ})
         assert ответ.status_code == 404
+
+
+# --- каркас вкладки (D653): шапка с заголовком, список без таблицы ---------------------------
+
+#: Вкладки-списки: строки `srow` в `slist`, таблиц нет (`docs/12-web-admin.md`, «Каркас вкладки»).
+ВКЛАДКИ_СПИСКОМ = ("countries", "keys", "dodois")
+
+
+@pytest.mark.parametrize("вкладка", [tab.key for tab in administration.TABS])
+def test_каждая_вкладка_с_шапкой_каркаса(monkeypatch: pytest.MonkeyPatch, вкладка: str) -> None:
+    """Ломали: «Dodo IS» без `h1.shead__title` и с `<table>` — не как «Страны» и «Ключи»."""
+    _без_базы(monkeypatch)
+    monkeypatch.setattr(usage_screen, "_read", lambda *_a, **_k: ())
+    monkeypatch.setattr(journal_screen.journals, "read_actions", lambda *_a, **_k: ())
+    monkeypatch.setattr(journal_screen.journals, "read_logins", lambda *_a, **_k: ())
+    monkeypatch.setattr(journal_screen.journals, "journal_people", lambda *_a, **_k: ())
+    client = next(_стенд(monkeypatch, tenant="HQ", role="superadmin"))
+    ответ = client.get(f"{РАЗДЕЛ}?tab={вкладка}")
+    assert ответ.status_code == 200, вкладка
+    html = ответ.get_data(as_text=True)
+    assert re.search(r'<h1 class="shead__title">[^<]+</h1>', html), (
+        f"вкладка {вкладка}: нет h1.shead__title (каркас: шапка с названием вкладки)"
+    )
+    if вкладка in ВКЛАДКИ_СПИСКОМ:
+        assert "<table" not in html, f"вкладка {вкладка}: список — это slist/srow, не таблица"

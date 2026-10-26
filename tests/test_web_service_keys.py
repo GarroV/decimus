@@ -174,17 +174,15 @@ def test_пары_приложения_dodois_на_подключениях_не
     assert "/connections/keys/dodois/" not in подключения
     вкладка = главный.get(ВКЛАДКА_DODOIS).get_data(as_text=True)
     assert "Маркетплейс Dodo IS: ключи приложения Decimus" in вкладка
-    assert вкладка.index("dodois-app-keys") < вкладка.index('id="dodois-title"'), (
-        "блок — над странами"
-    )
+    assert вкладка.index("dodois-app-keys") < вкладка.index('id="dodois-SI"'), "блок — над странами"
     assert (
         "/connections/keys/dodois/save" in вкладка and "/connections/keys/dodois/check" in вкладка
     )
     assert 'name="back" value="dodois"' in вкладка
     assert "Сначала задайте ключи приложения из маркетплейса" in вкладка
     assert вкладка.count("Сначала задайте ключи") == 1, "подсказка одна, над таблицей стран"
-    # D651: страны — одна таблица с кнопкой выдачи ссылки в каждой строке, карточек нет.
-    assert 'id="dodois-countries"' in вкладка and "Сгенерировать ссылку" in вкладка
+    # D653: страны — список строк-ссылок каркаса «Стран»; кнопок в строках нет, карточек нет.
+    assert 'id="dodois-SI"' in вкладка and "Сгенерировать ссылку" not in вкладка
     assert 'class="stile' not in вкладка
 
 
