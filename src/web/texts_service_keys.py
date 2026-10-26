@@ -23,7 +23,7 @@ SERVICE_KEYS_TEXTS: dict[str, dict[str, str]] = {
     "keys.service.openai": {"ru": "Нейросеть (OpenAI)", "en": "AI model (OpenAI)"},
     "keys.service.pointer": {"ru": "Pointer", "en": "Pointer"},
     "keys.service.ispring": {"ru": "iSpring", "en": "iSpring"},
-    "keys.service.dodois": {"ru": "Dodo IS (приложение)", "en": "Dodo IS (application)"},
+    "keys.service.dodois": {"ru": "Маркетплейс Dodo IS", "en": "Dodo IS Marketplace"},
     "keys.purpose.openai": {
         "ru": "Ключом бот и веб разбирают комментарии и голосовые.",
         "en": "The bot and the web use it to read comments and voice notes.",
@@ -33,10 +33,14 @@ SERVICE_KEYS_TEXTS: dict[str, dict[str, str]] = {
         "en": "It is used to load pizzeria ratings from the maps.",
     },
     "keys.purpose.dodois": {
-        "ru": "Пара ключей приложения Decimus в Dodo IS: под ней коллеги подтверждают входы стран.",
+        "ru": (
+            "Приложение Decimus, зарегистрированное в маркетплейсе Dodo IS. Одна пара на весь "
+            "сервис: под ней коллеги стран подтверждают входы; без неё страну не подключить."
+        ),
         "en": (
-            "The Decimus application key pair in Dodo IS: colleagues confirm "
-            "country logins with it."
+            "The Decimus app registered in the Dodo IS Marketplace. One pair for the whole "
+            "service: colleagues confirm country logins under it; without it a country "
+            "cannot be connected."
         ),
     },
     "keys.purpose.ispring": {

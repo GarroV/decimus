@@ -44,6 +44,7 @@ from . import (
     administration,
     auth,
     connections_form,
+    dodois_screen,
     guard,
     reauth,
     service_keys_screen,
@@ -53,7 +54,10 @@ from .db_refusal import note_target_mismatch
 from .journal import TARGET_OVERRIDE
 from .origin import refuse_foreign_origin
 from .sections import section
-from .users_view import TAB_CONNECTIONS
+from .users_view import TAB_CONNECTIONS, TAB_DODOIS
+
+#: Вкладки, с которых приходят формы ключей сервисов (скрытое поле `back`).
+KEY_TABS = (TAB_CONNECTIONS, TAB_DODOIS)
 
 #: Сколько дней обращений и строк журнала показывает карточка.
 USAGE_DAYS = 14
@@ -403,6 +407,12 @@ def _stand() -> str:
     return str(current_app.extensions["decimus_conf"].tenant)
 
 
+def return_tab() -> str:
+    """Вкладка, с которой пришла форма ключей: `back` из формы, только из известных (D648)."""
+    wanted = (request.form.get("back") or "").strip()
+    return wanted if wanted in KEY_TABS else TAB_CONNECTIONS
+
+
 def _key_action(
     service_code: str,
     do: Callable[[registry.Service, str], tuple[service_keys_screen.KeyFlash, int]],
@@ -419,16 +429,24 @@ def _key_action(
         abort(404)
     setattr(g, TARGET_OVERRIDE, f"service={service.code}")
     refuse_foreign_origin()
-    back = f"{section('administration').path}?tab={TAB_CONNECTIONS}"
+    tab = return_tab()
+    back = f"{section('administration').path}?tab={tab}"
     refused = _key_gate(автор, back)
     if isinstance(refused, tuple):
         flash, code = refused
-        return _page(key_flash=_with_service(flash, service.code), code=code)
+        return _key_answer(tab, _with_service(flash, service.code), code)
     if refused is not None:
         return refused
     flash, code = do(service, автор)
     if flash.ok:
         web_throttle.note_service_key_ok(tenant=_stand(), login=автор)
+    return _key_answer(tab, flash, code)
+
+
+def _key_answer(tab: str, flash: service_keys_screen.KeyFlash, code: int) -> FlaskResponse:
+    """Ответ на действие над ключом — вкладкой, с которой оно пришло."""
+    if tab == TAB_DODOIS:
+        return dodois_screen.page(key_flash=flash, code=code)
     return _page(key_flash=flash, code=code)
 
 

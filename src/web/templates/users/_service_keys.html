@@ -4,10 +4,12 @@
   Значение ТОЛЬКО НА ЗАПИСЬ: здесь нет ни одного места, куда подставилось бы введённое, — поля
   пустые и после отказа, и после сохранения. Форма скрыта, пока не нажато «Заменить».
   Показываются состояние, «••••» и последние четыре знака, кто и когда поставил. Список
-  сервисов и полей — реестр `src/domain/service_keys.py`.
+  сервисов и полей — реестр `src/domain/service_keys.py`. Пара ключей приложения Dodo IS
+  (маркетплейс) здесь не показывается — она на вкладке «Dodo IS» (`_dodois.html`); панель
+  одного сервиса — `_service_key_panel.html`.
 #}
 {% set ks = keys %}
-{% set key_icon = {'openai': 'spark', 'pointer': 'globe', 'ispring': 'book', 'dodois': 'link'} %}
+{% from "users/_service_key_panel.html" import key_panel, key_icon with context %}
 <section class="ssec skeys" id="service-keys" aria-labelledby="service-keys-title">
   <h2 class="ssec__title" id="service-keys-title">{{ t('keys.title') }}</h2>
   <p class="ssec__note">{{ t('keys.sub') }}</p>
@@ -34,46 +36,7 @@
       {% endfor %}
     </nav>
     {% for svc in ks.services if svc.code == keys_selected %}
-    {% set own_flash = ks.flash and ks.flash.service == svc.code %}
-    <div class="sconn__panel" id="service-key-{{ svc.code }}">
-      <h3 class="sconn__panel__title">{{ icon(key_icon[svc.code]) }}<span>{{ t('keys.service.' ~ svc.code) }}</span>
-        <small><span class="sdot{{ ' sdot--ok' if svc.state in ('db', 'env') else '' }}"></span>{{ t('keys.status.' ~ svc.state) }}</small></h3>
-      <p class="ssec__note">{{ t('keys.purpose.' ~ svc.code) }}</p>
-      {% if own_flash %}
-        <div class="note {{ 'note--ok' if ks.flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ t(ks.flash.key, **(ks.flash.params or {})) }}</div></div>
-      {% endif %}
-      <dl class="sprops skeys__facts">
-        {% for f in svc.fields %}
-          <div><dt>{{ t('keys.field.' ~ f.code) }}</dt>
-            <dd class="mono">{% if f.status %}{{ f.status.masked }} · {{ t('connections.card.issued_by', by=f.status.set_by, date=day(f.status.set_at)) }}{% elif f.in_env %}{{ t('keys.status.env') }}{% else %}—{% endif %}</dd></div>
-        {% endfor %}
-      </dl>
-      <div class="skeys__actions">
-        <details class="sfold"{% if own_flash and not ks.flash.ok %} open{% endif %}>
-          <summary class="sbtn sbtn--primary">{{ t('keys.save') }}</summary>
-          <form method="post" action="{{ users_url }}/connections/keys/{{ svc.code }}/save?lang={{ lang }}" class="sform skeys__form" autocomplete="off">
-            {% for f in svc.fields %}
-              <label><span class="sform__label">{{ t('keys.field.' ~ f.code) }}</span>
-                <input class="sinput mono" type="password" name="{{ f.form_name }}" maxlength="{{ keys_max }}" autocomplete="new-password" spellcheck="false" required>
-              </label>
-            {% endfor %}
-            <small class="sform__hint">{{ t('keys.new_hint') }}</small>
-            <div class="sactions">
-              <button class="sbtn sbtn--primary" type="submit">{{ t('keys.save') }}</button>
-              <button class="sbtn" type="submit" formaction="{{ users_url }}/connections/keys/{{ svc.code }}/check?lang={{ lang }}">{{ t('keys.check') }}</button>
-            </div>
-          </form>
-        </details>
-        {% if svc.fields | selectattr('status') | list %}
-          <form method="post" action="{{ users_url }}/connections/keys/{{ svc.code }}/delete?lang={{ lang }}" class="skeys__delete">
-            <button class="sbtn sbtn--danger" type="submit">{{ t('keys.delete') }}</button>
-          </form>
-        {% endif %}
-      </div>
-      {% if svc.fields | selectattr('status') | list %}
-        <small class="sform__hint">{{ t('keys.delete_hint') }}</small>
-      {% endif %}
-    </div>
+      {{ key_panel(svc, ks) }}
     {% endfor %}
   </div>
   {% endif %}

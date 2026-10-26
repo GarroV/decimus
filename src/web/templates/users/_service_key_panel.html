@@ -1,0 +1,53 @@
+{#
+  Панель одного сервиса из «Ключей сервисов»: состояние, «••••» и последние четыре знака, формы
+  «Заменить» / «Проверить» / «Удалить». Общая для «Подключений» и вкладки «Dodo IS» (ключи
+  приложения маркетплейса). Значение ТОЛЬКО НА ЗАПИСЬ: поля пустые и после отказа. `back` —
+  вкладка, куда вернуть после действия (скрытое поле формы; пусто — «Подключения»); принимается
+  только из известных вкладок (`connections_screen.return_tab`). `title` — заголовок панели,
+  по умолчанию название сервиса.
+#}
+{% set key_icon = {'openai': 'spark', 'pointer': 'globe', 'ispring': 'book', 'dodois': 'link'} %}
+{% macro key_panel(svc, ks, back='', title='') %}
+    {% set own_flash = ks.flash and ks.flash.service == svc.code %}
+    <div class="sconn__panel" id="service-key-{{ svc.code }}">
+      <h3 class="sconn__panel__title">{{ icon(key_icon[svc.code]) }}<span>{{ title or t('keys.service.' ~ svc.code) }}</span>
+        <small><span class="sdot{{ ' sdot--ok' if svc.state in ('db', 'env') else '' }}"></span>{{ t('keys.status.' ~ svc.state) }}</small></h3>
+      <p class="ssec__note">{{ t('keys.purpose.' ~ svc.code) }}</p>
+      {% if own_flash %}
+        <div class="note {{ 'note--ok' if ks.flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ t(ks.flash.key, **(ks.flash.params or {})) }}</div></div>
+      {% endif %}
+      <dl class="sprops skeys__facts">
+        {% for f in svc.fields %}
+          <div><dt>{{ t('keys.field.' ~ f.code) }}</dt>
+            <dd class="mono">{% if f.status %}{{ f.status.masked }} · {{ t('connections.card.issued_by', by=f.status.set_by, date=day(f.status.set_at)) }}{% elif f.in_env %}{{ t('keys.status.env') }}{% else %}—{% endif %}</dd></div>
+        {% endfor %}
+      </dl>
+      <div class="skeys__actions">
+        <details class="sfold"{% if own_flash and not ks.flash.ok %} open{% endif %}>
+          <summary class="sbtn sbtn--primary">{{ t('keys.save') }}</summary>
+          <form method="post" action="{{ users_url }}/connections/keys/{{ svc.code }}/save?lang={{ lang }}" class="sform skeys__form" autocomplete="off">
+            {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
+            {% for f in svc.fields %}
+              <label><span class="sform__label">{{ t('keys.field.' ~ f.code) }}</span>
+                <input class="sinput mono" type="password" name="{{ f.form_name }}" maxlength="{{ keys_max }}" autocomplete="new-password" spellcheck="false" required>
+              </label>
+            {% endfor %}
+            <small class="sform__hint">{{ t('keys.new_hint') }}</small>
+            <div class="sactions">
+              <button class="sbtn sbtn--primary" type="submit">{{ t('keys.save') }}</button>
+              <button class="sbtn" type="submit" formaction="{{ users_url }}/connections/keys/{{ svc.code }}/check?lang={{ lang }}">{{ t('keys.check') }}</button>
+            </div>
+          </form>
+        </details>
+        {% if svc.fields | selectattr('status') | list %}
+          <form method="post" action="{{ users_url }}/connections/keys/{{ svc.code }}/delete?lang={{ lang }}" class="skeys__delete">
+            {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
+            <button class="sbtn sbtn--danger" type="submit">{{ t('keys.delete') }}</button>
+          </form>
+        {% endif %}
+      </div>
+      {% if svc.fields | selectattr('status') | list %}
+        <small class="sform__hint">{{ t('keys.delete_hint') }}</small>
+      {% endif %}
+    </div>
+{% endmacro %}
