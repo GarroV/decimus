@@ -373,10 +373,11 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
+| `src/db/auditor_card.py` | Имя проверяющего из карточки человека (D642) |
 | `src/db/bot_langs.py` | Язык бота, выбранный человеком (D303, #411): чтение и запись |
 | `src/db/bot_links.py` | Привязка бота к учётке через веб (D286): выпуск ссылки, погашение, привязка, отвязка |
 | `src/db/checklist_langs.py` | Язык чек-листа, выбранный аудитором при старте проверки (D451): чтение и запись |
