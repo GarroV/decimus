@@ -181,10 +181,10 @@ def test_страна_где_всё_на_приёмке_есть_в_списке
 
     # Act
     страница = стенд.get("/inspections?period=all&lang=ru").get_data(as_text=True)
-    рейл = страница.split('class="rg-countries"', 1)[1].split("</aside>", 1)[0]
+    рейл = страница.split('class="rg-countries pk-rail', 1)[1].split("</aside>", 1)[0]
 
     # Assert — страна в рейле и счёт равен тому, что покажет щелчок.
     assert "Беларусь" in рейл
     беларусь = рейл.split(">Беларусь</span>", 1)[1]
-    assert беларусь.split("</a>", 1)[0].count('<span class="mx-rail__count">1</span>') == 1
+    assert беларусь.split("</a>", 1)[0].count("проверок: 1") == 1
     assert "Грузия" in рейл

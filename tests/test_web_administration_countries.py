@@ -86,7 +86,7 @@ def test_вкладку_видят_те_у_кого_есть_управлени�
 ) -> None:
     клиент: FlaskClient = request.getfixturevalue(кто)
     страница = _страница(клиент)
-    assert "tab=countries" in страница and ">Страны</a>" in страница
+    assert "tab=countries" in страница and ">Страны</span>" in страница
 
 
 def test_девелопер_вкладки_не_видит_и_адрес_закрыт(девелопер: FlaskClient) -> None:
@@ -95,8 +95,8 @@ def test_девелопер_вкладки_не_видит_и_адрес_зак�
 
 def test_список_стран_столбцом_с_партнёром_и_девелопером(главный: FlaskClient) -> None:
     страница = _страница(главный)
-    список = страница.split("slist--countries")[1].split("</ul>")[0]
-    assert список.count('<a class="srow') == 2, "каждая страна — строка вертикального списка"
+    список = страница.split("pk-rail--col")[1]
+    assert список.count('<a class="pk-item') == 2, "каждая страна — строка колонки `pick_item`"
     # Армения закреплена за пространством Лотос, девелопер — Иван; у Грузии ни того ни другого.
     строка_am = список[список.index("country=AM") :]
     assert "Лотос" in строка_am and "Иван" in строка_am
@@ -105,12 +105,12 @@ def test_список_стран_столбцом_с_партнёром_и_де�
 
 
 def test_список_показывает_что_настроено_у_каждой_страны(главный: FlaskClient) -> None:
-    список = _страница(главный).split("slist--countries")[1].split("</ul>")[0]
+    список = _страница(главный).split("pk-rail--col")[1]
     строка_am = список[список.index("country=AM") : список.index("country=GE")]
     строка_ge = список[список.index("country=GE") :]
     assert "EN · RU" in строка_am and "есть" in строка_am
     assert "по умолчанию" in строка_ge and "нет" in строка_ge and "не задан" in строка_ge
-    assert список.count("srow__go") == 2, "у каждой строки стрелка — видно, что по ней можно нажать"
+    assert список.count("data-drawer-open") == 2, "строка открывает панель справа, не страницу"
 
 
 def test_язык_и_договор_читаются_одним_запросом_на_все_страны(
@@ -146,7 +146,7 @@ def test_админ_видит_формы_девелопера_партнёра_
         assert f"/country/GE{форма}" in страница, форма
     assert 'name="langs" value="ru"' in страница and 'name="langs" value="en"' in страница
     # Список стран и панель — на одном экране.
-    assert "slist--countries" in страница and "sdrawer__panel" in страница
+    assert "pk-rail--col" in страница and "sdrawer__panel" in страница
 
 
 def test_осб_видит_договор_и_не_видит_форм_девелопера_партнёра_и_языков(

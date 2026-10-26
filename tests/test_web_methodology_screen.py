@@ -529,7 +529,7 @@ def test_колонка_называет_чек_листы_и_отмечает_�
 
     # Assert — оба чек-листа ссылками обычного перехода, показанный отмечен.
     assert 'href="/admin?checklist=bizdev' in колонка
-    assert 'class="mx-rail__row is-on" href="/admin?checklist=rnd' in колонка
+    assert 'class="pk-item is-on" href="/admin?checklist=rnd' in колонка
     assert "Аудит РНД" in колонка
     # Переход по чек-листу — полная страница: подмена слоя панели не обновила бы
     # ни колонку, ни шапку, ни список (`methodology.js`).

@@ -1,13 +1,14 @@
 {#
   «Страны» (D640, #1251): вкладка раздела «Администрирование». Слева столбцом страны охвата,
-  у каждой видно, что настроено (партнёр, девелопер, языки отчёта, договор), строка — ссылка
-  со стрелкой; справа в панели выбранной страны четыре блока-плитки: партнёр, девелопер,
+  у каждой видно, что настроено (партнёр, девелопер, языки отчёта, договор): строка — тот же
+  `pick_item`, что в «Странах», «Проверках» и «Методике» (D655); справа в панели выбранной страны четыре блока-плитки: партнёр, девелопер,
   языки отчёта, договор, форма каждого раскрывается внутри блока (`country/_settings.html`,
   режим `settings_only`; без него тот же макрос — карточка страны для чтения). Выбор живёт в адресе (`?country=<код>`).
   Открыта тем, у кого есть `space.manage` или `contract.manage`; ОСБ видит договор и не
   видит форм девелопера, партнёра и языков.
 #}{% extends "_split_page.html" %}
 {% from "_info_tip.html" import info_tip %}
+{% from "_pick_ui.html" import pick_item %}
 {% from "administration/_nav.html" import admin_nav with context %}
 {% from "country/_settings.html" import settings_panel with context %}
 {% block title %}{{ t('administration.tab.countries') }} · {{ t('section.administration.title') }}{% endblock %}
@@ -43,30 +44,16 @@
         <p class="sempty__title">{{ t('countries.none') }}</p>
       </div>
     {% else %}
-      <div class="slist slist--countries{{ '' if show_contract else ' slist--nocontract' }}">
-        <div class="slist__head" aria-hidden="true">
-          <span>{{ t('countries.col.country') }}</span>
-          <span>{{ t('countries.col.space') }}</span>
-          <span>{{ t('countries.col.developer') }}</span>
-          <span>{{ t('countries.col.langs') }}</span>
-          {% if show_contract %}<span>{{ t('countries.col.contract') }}</span>{% endif %}
-          <span></span>
-        </div>
-        <ul class="slist__rows">
+      <div class="pk-rail pk-rail--inline pk-rail--col">
+        <div class="pk-rail__list">
           {% for c in lines %}
-            {% set current = split_open and picked == c.code %}
-            <li>
-              <a class="srow srow--go{% if current %} is-current{% endif %}" href="{{ country_url(c.code) }}" aria-label="{{ t('countries.open', country=c.name) }}"{% if current %} aria-current="true"{% endif %}>
-                <span class="srow__main"><b>{{ c.name }}</b><small class="mono">{{ c.code }}</small></span>
-                <span class="srow__go" aria-hidden="true">›</span>
-                <span class="srow__cell" data-label="{{ t('countries.col.space') }}">{% if c.space %}{{ c.space }}{% else %}<span class="srow__none">{{ t('countries.unset') }}</span>{% endif %}</span>
-                <span class="srow__cell" data-label="{{ t('countries.col.developer') }}">{% if c.developer %}{{ c.developer }}{% else %}<span class="srow__none">{{ t('countries.unset') }}</span>{% endif %}</span>
-                <span class="srow__cell" data-label="{{ t('countries.col.langs') }}">{% if c.langs %}{{ c.langs|map('upper')|join(' · ') }}{% elif c.langs is none %}<span class="srow__none">—</span>{% else %}<span class="srow__none">{{ t('countries.langs.default') }}</span>{% endif %}</span>
-                {% if show_contract %}<span class="srow__cell" data-label="{{ t('countries.col.contract') }}">{% if c.has_contract %}{{ t('countries.contract.yes') }}{% elif c.has_contract is none %}<span class="srow__none">—</span>{% else %}<span class="srow__none">{{ t('countries.contract.no') }}</span>{% endif %}</span>{% endif %}
-              </a>
-            </li>
+            {% set unset = t('countries.unset') %}
+            {% set langs = (c.langs|map('upper')|join(' · ')) if c.langs else ('—' if c.langs is none else t('countries.langs.default')) %}
+            {% set contract = ('—' if c.has_contract is none else (t('countries.contract.yes') if c.has_contract else t('countries.contract.no'))) %}
+            {% set meta = (c.space or unset) ~ ' · ' ~ (c.developer or unset) ~ ' · ' ~ langs ~ ((' · ' ~ t('countries.col.contract') ~ ': ' ~ contract) if show_contract else '') %}
+            {{ pick_item(country_url(c.code), c.name, meta, on=(split_open and picked == c.code), code=c.code, drawer=true) }}
           {% endfor %}
-        </ul>
+        </div>
       </div>
     {% endif %}
   </div>

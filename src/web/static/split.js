@@ -24,9 +24,10 @@
   }
 
   function markCurrent(href) {
-    document.querySelectorAll(".split__list .srow, .pk-work .srow").forEach(function (row) {
+    document.querySelectorAll(".split__list .srow, .split__list .pk-item, .pk-work .srow").forEach(function (row) {
       var on = href !== null && row.href === href;
-      row.classList.toggle("is-current", on);
+      // Строка списка: `srow` — `is-current`, элемент колонки выбора `pk-item` — `is-on` (D655).
+      row.classList.toggle(row.classList.contains("pk-item") ? "is-on" : "is-current", on);
       if (on) row.setAttribute("aria-current", "true");
       else row.removeAttribute("aria-current");
     });
@@ -114,7 +115,7 @@
       closeDrawer(close.href, true);
       return;
     }
-    var open = e.target.closest(".split__list a.srow, a[data-drawer-open]");
+    var open = e.target.closest(".split__list a.srow, .split__list a.pk-item, a[data-drawer-open]");
     if (open && window.fetch && window.DOMParser) {
       e.preventDefault();
       openDrawer(open.href, true);

@@ -171,7 +171,7 @@ def _рейтинги_без_базы(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _вкладки_на_странице(страница: str) -> list[str]:
-    return re.findall(r'class="sadmin__tab[^"]*" href="/administration\?tab=(\w+)', страница)
+    return re.findall(r'class="pk-item[^"]*" href="/administration\?tab=(\w+)', страница)
 
 
 @pytest.mark.parametrize(("tenant", "role"), sorted(ВКЛАДКИ))
@@ -206,7 +206,7 @@ def test_вкладки_без_подзаголовков_групп(
         assert "sadmin__group" not in страница
         assert "Журнал и расход" not in страница
         # Что во вкладке, говорит её название, а не подпись над ней.
-        assert ">Люди и доступ</a>" in страница
+        assert ">Люди и доступ</span>" in страница
 
 
 @pytest.mark.parametrize(

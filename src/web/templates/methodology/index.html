@@ -22,6 +22,7 @@
   показанного чек-листа явно (#382).
 #}{% extends "base.html" %}
 {% from "_pick.html" import pick %}
+{% from "_pick_ui.html" import pick_item %}
 {% block title %}{{ t('section.admin.title') }}{% endblock %}
 {% block page_class %} page--wide{% endblock %}
 
@@ -163,10 +164,12 @@
    `data-mx-open`: подмена слоя панели не обновила бы ни колонку, ни шапку,
    ни список пунктов (`methodology.js`). #}
 {% macro rail_row(r) %}
-  <a class="mx-rail__row{% if r.code == checklist_code %} is-on{% endif %}" href="{{ url_for('methodology', checklist=r.code, space=(r.space if r.space != own_space else None), lang=lang) }}"{% if r.code == checklist_code %} aria-current="page"{% endif %}>
-    <span class="mx-rail__name">{{ r.name_ru if lang == 'ru' else (r.name_en or r.name_ru) }}</span>
-    <span class="mx-rail__meta">{{ r.items if r.items is not none else '—' }} · {{ t('checklists.state.' ~ r.state) }}{% if r.in_bot %}<span class="mx-rail__bot-mark" title="{{ t('methodology.rail.bot_mark') }}">{{ icon('tg') }}<span class="mx-sr">{{ t('methodology.rail.bot_mark') }}</span></span>{% endif %}</span>
-  </a>
+  {% call pick_item(url_for('methodology', checklist=r.code, space=(r.space if r.space != own_space else None), lang=lang),
+                    (r.name_ru if lang == 'ru' else (r.name_en or r.name_ru)),
+                    (r.items if r.items is not none else '—')|string ~ ' · ' ~ t('checklists.state.' ~ r.state),
+                    on=(r.code == checklist_code)) %}
+    {% if r.in_bot %}<span class="mx-rail__bot-mark" title="{{ t('methodology.rail.bot_mark') }}">{{ icon('tg') }}<span class="mx-sr">{{ t('methodology.rail.bot_mark') }}</span></span>{% endif %}
+  {% endcall %}
 {% endmacro %}
 
 {% block body %}
@@ -192,18 +195,22 @@
       {% endif %}
       <a class="btn btn--sm mx-botcard__btn{% if panel == 'bot' %} is-on{% endif %}" href="{{ href(panel='bot', item='') }}" data-mx-open>{{ t('methodology.rail.bot_manage') }}</a>
     </section>
-    <div class="mx-rail__head mx-rail__head--list">
-      <span>{{ t('methodology.rail.title') }}</span>
-      <a class="btn btn--sm" href="{{ href(panel='new', item='') }}" data-mx-open>{{ t('methodology.rail.new') }}</a>
+    <div class="pk-rail pk-rail--inline">
+      <div class="mx-rail__head mx-rail__head--list">
+        <span>{{ t('methodology.rail.title') }}</span>
+        <a class="btn btn--sm" href="{{ href(panel='new', item='') }}" data-mx-open>{{ t('methodology.rail.new') }}</a>
+      </div>
+      <div class="pk-rail__list">
+        {% for r in rail if r.state != 'retired' %}{{ rail_row(r) }}{% endfor %}
+        {% set retired = rail | selectattr('state', 'equalto', 'retired') | list %}
+        {% if retired %}
+          <details class="mx-more mx-rail__retired">
+            <summary>{{ t('methodology.rail.retired', count=retired|length) }}</summary>
+            <div class="pk-rail__list">{% for r in retired %}{{ rail_row(r) }}{% endfor %}</div>
+          </details>
+        {% endif %}
+      </div>
     </div>
-    {% for r in rail if r.state != 'retired' %}{{ rail_row(r) }}{% endfor %}
-    {% set retired = rail | selectattr('state', 'equalto', 'retired') | list %}
-    {% if retired %}
-      <details class="mx-more mx-rail__retired">
-        <summary>{{ t('methodology.rail.retired', count=retired|length) }}</summary>
-        {% for r in retired %}{{ rail_row(r) }}{% endfor %}
-      </details>
-    {% endif %}
   </aside>
   <div class="mx-main">
   {# --- Шапка: чек-лист, версия, действия ---------------------------------- #}

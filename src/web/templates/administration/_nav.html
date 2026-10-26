@@ -4,16 +4,14 @@
   что внутри, говорит само название вкладки (D647). На телефоне
   столбец становится списком над содержимым — не рядом чипов.
 #}
+{% from "_pick_ui.html" import pick_item %}
 {% macro admin_nav() %}
   <nav class="sadmin__nav" aria-label="{{ t('administration.tabs') }}">
-    <p class="sadmin__title">{{ t('section.administration.title') }}</p>
-    <ul class="sadmin__tabs">
-      {% for tab in admin_tabs %}
-        {% set current = tab.key == admin_tab %}
-        <li>
-          <a class="sadmin__tab{% if current %} is-current{% endif %}" href="{{ admin_url(tab.key) }}"{% if current %} aria-current="page"{% endif %}>{{ t(admin_title(tab)) }}</a>
-        </li>
-      {% endfor %}
-    </ul>
+    <div class="pk-rail pk-rail--inline">
+      <div class="mx-rail__head mx-rail__head--list"><span>{{ t('section.administration.title') }}</span></div>
+      <div class="pk-rail__list">
+        {% for tab in admin_tabs %}{{ pick_item(admin_url(tab.key), t(admin_title(tab)), on=(tab.key == admin_tab)) }}{% endfor %}
+      </div>
+    </div>
   </nav>
 {% endmacro %}

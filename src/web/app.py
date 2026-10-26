@@ -421,6 +421,8 @@ class PickOption:
     href: str
     selected: bool
     count: int | None = None
+    #: Код значения (`BG`) — для колонки стран, где он в плашке; у «все» пусто.
+    code: str = ""
 
 
 @dataclass(frozen=True)
@@ -457,7 +459,13 @@ def _pick(
     """
     опции = [PickOption(title=empty_title, href=href(""), selected=not current)]
     опции += [
-        PickOption(title=title(value), href=href(value), selected=current == value, count=count)
+        PickOption(
+            title=title(value),
+            href=href(value),
+            selected=current == value,
+            count=count,
+            code=value,
+        )
         for value, count in values
     ]
     выбранное = next((о.title for о in опции[1:] if о.selected), empty_title)
