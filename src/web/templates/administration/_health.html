@@ -1,7 +1,8 @@
 {#
-  Состояние подключений (D638): итог одной строкой сверху, под ним строка на каждое
-  подключение — точка, название, причина, время проверки, «Проверить сейчас» у тех, что
-  пробуются. Цвета выводит `src/domain/health.py`; здесь только показ.
+  Состояние подключений (D638): итог одной строкой сверху, под ним группы (системное,
+  рейтинги и оценки, обучение, Dodo IS) и в каждой плитка на подключение — точка,
+  название, причина, время проверки, «Проверить сейчас» у тех, что пробуются. Цвета
+  выводит `src/domain/health.py`; здесь только показ.
 #}
 <section class="scard shealth" id="health" aria-labelledby="health-title">
   <header class="shealth__head">
@@ -25,22 +26,30 @@
       <span class="shealth__dot shealth__dot--{{ health_summary }}" aria-hidden="true"></span>
       {{ t('health.summary.' ~ health_summary, n=bad) }}
     </p>
-    <ul class="shealth__rows">
-      {% for row in health_rows %}
-        {% set s = row.status %}
-        <li class="shealth__row">
-          <span class="shealth__dot shealth__dot--{{ s.light }}" role="img" aria-label="{{ t('health.light.' ~ s.light) }}"></span>
-          <span class="shealth__main">
-            <b>{% if row.country %}{{ t('health.conn.dodo_is_country', name=country_title(row.country)) }}{% else %}{{ t('health.conn.' ~ row.code) }}{% endif %}</b>
-            <small>{{ t(s.reason, **s.params) }}{% if s.checked_at %} · {{ t('health.ran' if row.kind == 'load' else 'health.checked', at=health_stamp(s.checked_at)) }}{% endif %}</small>
-          </span>
-          {% if row.checkable %}
-            <form method="post" action="{{ users_url }}/connections/health/{{ row.code }}/check?lang={{ lang }}" class="shealth__act">
-              <button class="sbtn" type="submit">{{ t('health.check_now') }}</button>
-            </form>
-          {% endif %}
-        </li>
-      {% endfor %}
-    </ul>
+    {% for group, members in health_groups %}
+      <h3 class="shealth__group">{{ t('health.group.' ~ group) }}</h3>
+      <ul class="shealth__tiles">
+        {% for row in members %}
+          {% set s = row.status %}
+          <li class="shealth__tile">
+            <span class="shealth__name">
+              <span class="shealth__dot shealth__dot--{{ s.light }}" role="img" aria-label="{{ t('health.light.' ~ s.light) }}"></span>
+              <b>{% if row.country %}{{ t('health.conn.dodo_is_country', name=country_title(row.country)) }}{% else %}{{ t('health.conn.' ~ row.code) }}{% endif %}</b>
+            </span>
+            <small>{{ t(s.reason, **s.params) }}</small>
+            {% if s.checked_at or row.checkable %}
+              <span class="shealth__foot">
+                {% if s.checked_at %}<small>{{ t('health.ran' if row.kind == 'load' else 'health.checked', at=health_stamp(s.checked_at)) }}</small>{% endif %}
+                {% if row.checkable %}
+                  <form method="post" action="{{ users_url }}/connections/health/{{ row.code }}/check?lang={{ lang }}" class="shealth__act">
+                    <button class="sbtn" type="submit">{{ t('health.check_now') }}</button>
+                  </form>
+                {% endif %}
+              </span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endfor %}
   {% endif %}
 </section>

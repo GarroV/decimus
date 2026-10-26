@@ -86,6 +86,11 @@ def test_главный_админ_видит_раздел_и_состояние
     assert "shealth__summary--red" in page
     assert "Не работает: 2" in page
     assert "Сбой: glovo: 503" in page
+    # Плитки разложены по группам; оба Pointer — в «Рейтингах», ключ и сбор подписаны.
+    системное = page.index("Системное: хранилище")
+    рейтинги = page.index("Рейтинги и оценки")
+    assert системное < page.index("Хранилище кадров") < рейтинги
+    assert рейтинги < page.index("Pointer — ключ") < page.index("Pointer — ночной сбор")
     # Ключи сервисов и ключи API переехали сюда же.
     assert 'id="service-keys"' in page or "service-keys" in page
     # Пункт меню у главного админа есть.
