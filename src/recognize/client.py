@@ -15,7 +15,7 @@ import base64
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from openai import AuthenticationError, OpenAI, OpenAIError, PermissionDeniedError
 from openai.types.responses import (
@@ -30,7 +30,7 @@ from openai.types.responses.response_format_text_json_schema_config_param import
 )
 
 from src.db import model_usage
-from src.domain.model_usage import build_call
+from src.domain.model_usage import KIND_RECOGNIZE, build_call
 
 from .config import RecognizeSettings
 from .errors import ModelKeyRejected, ModelUnavailable
@@ -89,10 +89,27 @@ def verify_key(api_key: str) -> None:
         raise ModelUnavailable(f"Не удалось проверить ключ модели ({type(exc).__name__})") from exc
 
 
-def _content(question: str, photos: Sequence[bytes]) -> ResponseInputMessageContentListParam:
-    content: ResponseInputMessageContentListParam = [
-        ResponseInputTextParam(type="input_text", text=question)
-    ]
+#: Явная точка кэша провайдера (GPT-5.6 и новее, документация prompt-caching, 26.10.2026):
+#: всё до неё — инструкции, схема, постоянная часть вопроса — записывается в кэш и
+#: читается следующими запросами. Неявная точка стоит в конце сообщения целиком, и общий
+#: кусок с разным хвостом так не переиспользуется (#1267). SDK 2.9 полей не знает —
+#: уходят словарём.
+CACHE_BREAKPOINT: dict[str, str] = {"mode": "explicit"}
+CACHE_OPTIONS: dict[str, Any] = {"mode": "explicit"}
+
+
+def _content(
+    question: str, photos: Sequence[bytes], cached_prefix: str = ""
+) -> ResponseInputMessageContentListParam:
+    """Текст вопроса и кадры. `cached_prefix` — начало `question`, за которым ставится
+    точка кэша: постоянная часть первой, меняющаяся после неё."""
+    content: ResponseInputMessageContentListParam = []
+    if cached_prefix and question.startswith(cached_prefix) and question != cached_prefix:
+        head = ResponseInputTextParam(type="input_text", text=cached_prefix)
+        head_extra: dict[str, Any] = {"prompt_cache_breakpoint": CACHE_BREAKPOINT}
+        content.append(cast(ResponseInputTextParam, {**head, **head_extra}))
+        question = question[len(cached_prefix) :]
+    content.append(ResponseInputTextParam(type="input_text", text=question))
     for photo in photos:
         encoded = base64.b64encode(photo).decode("ascii")
         content.append(
@@ -103,6 +120,24 @@ def _content(question: str, photos: Sequence[bytes]) -> ResponseInputMessageCont
             )
         )
     return content
+
+
+def _usage(raw_usage: Any) -> dict[str, int]:
+    """Расход ответа. `cached` и `reasoning` — для замера (#1267), в `model_usage` не пишутся."""
+    if raw_usage is None:
+        return {}
+    usage = {"input": raw_usage.input_tokens, "output": raw_usage.output_tokens}
+    cached = getattr(getattr(raw_usage, "input_tokens_details", None), "cached_tokens", None)
+    reasoning = getattr(getattr(raw_usage, "output_tokens_details", None), "reasoning_tokens", None)
+    if isinstance(cached, int):
+        usage["cached"] = cached
+    if isinstance(reasoning, int):
+        usage["reasoning"] = reasoning
+    # Поле SDK 2.9 не описано — приходит как лишнее поле ответа.
+    written = getattr(getattr(raw_usage, "input_tokens_details", None), "cache_write_tokens", None)
+    if isinstance(written, int):
+        usage["cache_write"] = written
+    return usage
 
 
 def _note(kind: str, model: str, usage: dict[str, int], *, ok: bool) -> None:
@@ -128,6 +163,7 @@ def ask_model(
     settings: RecognizeSettings,
     model: str | None = None,
     photos: Sequence[bytes] = (),
+    cached_prefix: str = "",
 ) -> ModelAnswer:
     """Спросить модель со строгой схемой ответа. Кадр уходит тем же запросом.
 
@@ -137,6 +173,10 @@ def ask_model(
     `model` перекрывает имя из настроек — это нужно замеру точности (T035),
     который гоняет один и тот же запрос по нескольким моделям. В работе бота
     имя берётся из конфига и никогда из кода.
+
+    `cached_prefix` — начало `question`, неизменное от запроса к запросу: за ним ставится
+    явная точка кэша провайдера, чтобы кэшировалось и оно, а не только инструкции (#1267).
+    Только на модели из настроек: у остальных (замер гоняет и старые) параметра может не быть.
 
     `kind` — вид вызова для учёта расхода (D537, коды — `domain.model_usage`): обязателен,
     чтобы новое место вызова не могло про учёт забыть. Каждый ушедший к провайдеру запрос
@@ -152,15 +192,31 @@ def ask_model(
     text_config: ResponseTextConfigParam = {"format": text_format}
     message: EasyInputMessageParam = {
         "role": "user",
-        "content": _content(question, (photo,) if photo is not None else tuple(photos)),
+        "content": [],
     }
     used_model = model or settings.model
+    cache_prefix = cached_prefix if used_model == settings.model else ""
+    message["content"] = _content(
+        question, (photo,) if photo is not None else tuple(photos), cache_prefix
+    )
+    # Глубина рассуждения (#1267) — только у разбора и только на модели из настроек:
+    # сведение, перевод и правка идут на своих (дешёвых) моделях и свои запросы не меняют.
+    # Значение проверено в `config`; `Reasoning.effort` в SDK — узкий Literal, а провайдер
+    # принимает больше (none, xhigh, max), поэтому словарём.
+    extra: dict[str, Any] = (
+        {"reasoning": {"effort": settings.reasoning_effort}}
+        if settings.reasoning_effort and kind == KIND_RECOGNIZE and used_model == settings.model
+        else {}
+    )
+    if cache_prefix:
+        extra["extra_body"] = {"prompt_cache_options": CACHE_OPTIONS}
     try:
         response = client.responses.create(
             model=used_model,
             instructions=instructions,
             input=[message],
             text=text_config,
+            **extra,
             # Кадры кухни (на них бывают лица) и записи не оставляем у OpenAI:
             # без `store=False` Responses хранит запрос и ответ у себя. Цепочек
             # ответов (`previous_response_id`) у нас нет, хранить незачем.
@@ -171,11 +227,7 @@ def ask_model(
         _note(kind, used_model, {}, ok=False)
         raise ModelUnavailable(f"Модель не ответила: {exc}") from exc
     raw_usage = response.usage
-    usage = (
-        {}
-        if raw_usage is None
-        else {"input": raw_usage.input_tokens, "output": raw_usage.output_tokens}
-    )
+    usage = _usage(raw_usage)
     if getattr(response, "status", None) == "incomplete":
         _note(kind, used_model, usage, ok=False)
         raise ModelUnavailable(

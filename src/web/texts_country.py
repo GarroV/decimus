@@ -266,6 +266,32 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
         "en": "Not saved: the country is not in the directory, the name is too long or the "
         "country already belongs to another partner.",
     },
+    "country.block.partner": {"ru": "Партнёр", "en": "Partner"},
+    "country.block.partner_note": {
+        "ru": "Пространство, которому принадлежит страна: оно видит её пиццерии и проверки.",
+        "en": "The space that owns the country: it sees its pizzerias and inspections.",
+    },
+    "country.block.partner_locked": {
+        "ru": "Страна принадлежит одному партнёру; закреплённую отсюда не перенести.",
+        "en": "A country belongs to one partner; an assigned one cannot be moved from here.",
+    },
+    "country.block.developer": {"ru": "Девелопер", "en": "Developer"},
+    "country.block.developer_note": {
+        "ru": "По имени страны собираются в группу девелопера на экранах рейтингов.",
+        "en": "Countries are grouped by this name on the ratings screens.",
+    },
+    "country.block.langs": {"ru": "Языки отчёта", "en": "Report languages"},
+    "country.block.langs_note": {
+        "ru": "Бот предлагает их при сборке отчёта; они же язык письма по умолчанию.",
+        "en": "The bot offers them when building a report; also the default letter language.",
+    },
+    "country.block.contract": {"ru": "Договор", "en": "Agreement"},
+    "country.block.contract_note": {
+        "ru": "Юрлицо партнёра, договор и контакты по ДКК.",
+        "en": "Partner legal entity, agreement and agreement contacts.",
+    },
+    "country.block.assign": {"ru": "Назначить", "en": "Assign"},
+    "country.block.fill": {"ru": "Заполнить", "en": "Fill in"},
     "country.settings.people": {
         "ru": "Люди и пространства партнёров ведутся во вкладках «Люди» и «Пространства "
         "партнёров» этого раздела.",

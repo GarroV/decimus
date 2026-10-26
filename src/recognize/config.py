@@ -22,6 +22,7 @@ from .errors import RecognizeConfigError
 MODEL_VAR = "RECOGNIZE_MODEL"
 TRANSCRIBE_MODEL_VAR = "RECOGNIZE_TRANSCRIBE_MODEL"
 MERGE_MODEL_VAR = "RECOGNIZE_MERGE_MODEL"
+REASONING_EFFORT_VAR = "RECOGNIZE_REASONING_EFFORT"
 API_KEY_VAR = "OPENAI_API_KEY"
 TIMEOUT_VAR = "RECOGNIZE_TIMEOUT"
 MIN_CONFIDENCE_VAR = "RECOGNIZE_MIN_CONFIDENCE"
@@ -42,6 +43,18 @@ DEFAULT_TRANSCRIBE_MODEL = "gpt-4o-mini-transcribe"
 #: флагман. Самая дешёвая текстовая модель провайдера по его каталогу на
 #: 30.09.2026 (developers.openai.com/api/docs/models): $0.1 / $0.5 за 1M токенов.
 DEFAULT_MERGE_MODEL = "gpt-6-luna"
+
+#: Глубина рассуждения модели разбора (`reasoning.effort`, #1267, D646). Значения
+#: `gpt-5.6-sol` — по документации провайдера (developers.openai.com/api/docs/models/
+#: gpt-5.6-sol, 26.10.2026): none, low, medium, high, xhigh, max; умолчание провайдера —
+#: medium, и именно на нём разбор работал до #1267 (параметр не передавался).
+#: Умолчание — `low`: замер на стенде точности (три прогона на вариант, 31 кадр) точности
+#: не потерял и сократил ответ; цифры и оговорки — `docs/05-calibration.md`. `none` на том
+#: же наборе точность роняет (77% против 87–97%), поэтому умолчанием не стал.
+#: `default` — не передавать параметр вовсе (глубину выберет провайдер).
+REASONING_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
+REASONING_PROVIDER_DEFAULT = "default"
+DEFAULT_REASONING_EFFORT = "low"
 
 DEFAULT_TIMEOUT = 90.0
 
@@ -87,6 +100,8 @@ class RecognizeSettings:
     #: С умолчанием, а не обязательным полем: настройки собирают и тесты, и
     #: замеры, и сведению комментария (#443) они не нужны.
     merge_model: str = DEFAULT_MERGE_MODEL
+    #: Пусто — параметр в запрос не передаётся (глубину выберет провайдер).
+    reasoning_effort: str = DEFAULT_REASONING_EFFORT
 
 
 def _number(env: Mapping[str, str], name: str, default: float) -> float:
@@ -101,6 +116,22 @@ def _number(env: Mapping[str, str], name: str, default: float) -> float:
             f"Молчаливый откат на {default} означал бы, что разбор работает не на тех "
             f"настройках, которые человек задал"
         ) from exc
+
+
+def _reasoning_effort(env: Mapping[str, str]) -> str:
+    raw = (env.get(REASONING_EFFORT_VAR) or "").strip().lower()
+    if not raw:
+        return DEFAULT_REASONING_EFFORT
+    if raw == REASONING_PROVIDER_DEFAULT:
+        return ""
+    if raw not in REASONING_EFFORTS:
+        raise RecognizeConfigError(
+            f"Переменная {REASONING_EFFORT_VAR} должна быть одной из "
+            f"{', '.join((*REASONING_EFFORTS, REASONING_PROVIDER_DEFAULT))} или пустой, а в "
+            f"окружении «{raw}». Молчаливый откат на умолчание означал бы, что разбор "
+            f"работает не на той глубине рассуждения, которую человек задал"
+        )
+    return raw
 
 
 def resolve_api_key(env: Mapping[str, str] | None = None) -> str:
@@ -127,4 +158,5 @@ def load_recognize_settings(env: Mapping[str, str] | None = None) -> RecognizeSe
         max_candidates=int(_number(src, MAX_CANDIDATES_VAR, DEFAULT_MAX_CANDIDATES)),
         ffmpeg=(src.get(FFMPEG_VAR) or "").strip() or "ffmpeg",
         merge_model=(src.get(MERGE_MODEL_VAR) or "").strip() or DEFAULT_MERGE_MODEL,
+        reasoning_effort=_reasoning_effort(src),
     )

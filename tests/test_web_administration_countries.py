@@ -39,6 +39,8 @@ def записи(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     )
     monkeypatch.setattr(crl, "reset", lambda c: журнал["reset"].append(c))
     monkeypatch.setattr(cc, "read", lambda _c: ())
+    monkeypatch.setattr(crl, "read_all", lambda: {"AM": ("en", "ru")})
+    monkeypatch.setattr(cc, "countries_with_contract", lambda: frozenset({"AM"}))
     monkeypatch.setattr(
         partner_spaces,
         "overview",
@@ -100,6 +102,38 @@ def test_список_стран_столбцом_с_партнёром_и_де�
     assert "Лотос" in строка_am and "Иван" in строка_am
     строка_ge = список[список.index("country=GE") : список.index("country=AM")]
     assert "Лотос" not in строка_ge and "Иван" not in строка_ge
+
+
+def test_список_показывает_что_настроено_у_каждой_страны(главный: FlaskClient) -> None:
+    список = _страница(главный).split("slist--countries")[1].split("</ul>")[0]
+    строка_am = список[список.index("country=AM") : список.index("country=GE")]
+    строка_ge = список[список.index("country=GE") :]
+    assert "EN · RU" in строка_am and "есть" in строка_am
+    assert "по умолчанию" in строка_ge and "нет" in строка_ge and "не задан" in строка_ge
+    assert список.count("srow__go") == 2, "у каждой строки стрелка — видно, что по ней можно нажать"
+
+
+def test_язык_и_договор_читаются_одним_запросом_на_все_страны(
+    главный: FlaskClient, монкей: pytest.MonkeyPatch
+) -> None:
+    вызовы: list[str] = []
+    монкей.setattr(crl, "read_all", lambda: вызовы.append("langs") or {})
+    монкей.setattr(cc, "countries_with_contract", lambda: вызовы.append("contract") or frozenset())
+    _страница(главный)
+    assert sorted(вызовы) == ["contract", "langs"]
+
+
+def test_панель_страны_четыре_блока_у_каждого_своя_кнопка(главный: FlaskClient) -> None:
+    страница = _страница(главный, "&country=GE")
+    панель = страница[страница.index('class="cblocks"') :]
+    assert панель.count('<section class="cblock') == 4, "блоков должно быть четыре"
+    блоки = панель.split('<section class="cblock')[1:]
+    assert len(блоки) == 4
+    for блок, заголовок in zip(
+        блоки, ("Партнёр", "Девелопер", "Языки отчёта", "Договор"), strict=True
+    ):
+        assert f">{заголовок}</h3>" in блок, заголовок
+        assert 'class="sbtn' in блок.split("</section>")[0] and "<summary" in блок, заголовок
 
 
 def test_без_выбора_панель_закрыта(главный: FlaskClient) -> None:

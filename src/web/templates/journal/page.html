@@ -51,7 +51,7 @@
           <label class="jbar__label" for="journal-person">{{ t('journal.filter.person') }}</label>
           <select class="sinput" id="journal-person" name="person">
             <option value="">{{ t('journal.filter.everyone') }}</option>
-            {% for pid, plogin in people %}<option value="{{ pid }}"{% if pid == person %} selected{% endif %}>{{ plogin }}</option>{% endfor %}
+            {% for pid, plogin, pname in people %}<option value="{{ pid }}"{% if pid == person %} selected{% endif %}>{{ (pname ~ ' · ' ~ plogin) if pname else plogin }}</option>{% endfor %}
           </select>
           <button class="sbtn" type="submit">{{ t('journal.filter.apply') }}</button>
         </form>
@@ -79,7 +79,7 @@
           {% for r in rows %}
             <li class="jrow{% if r.failed %} is-bad{% endif %}">
               <span class="jcell mono" data-label="{{ t('journal.col.time') }}">{{ r.time }}</span>
-              <span class="jcell" data-label="{{ t('journal.col.person') }}"><b>{{ r.login }}</b><small>{{ t('users.role.' ~ r.role) }} · {{ t('journal.door.' ~ r.door) }}</small></span>
+              <span class="jcell" data-label="{{ t('journal.col.person') }}">{% if r.name %}<b>{{ r.name }}</b><small>{{ r.login }}</small>{% else %}<b>{{ r.login }}</b>{% endif %}<small>{{ t('users.role.' ~ r.role) }} · {{ t('journal.door.' ~ r.door) }}</small></span>
               <span class="jcell" data-label="{{ t('journal.col.action') }}"><b>{{ r.label }}</b>{% if r.label != r.code %}<small class="mono">{{ r.code }}</small>{% endif %}</span>
               <span class="jcell mono jcell--target" data-label="{{ t('journal.col.target') }}">{{ r.target or '—' }}</span>
               <span class="jcell mono" data-label="{{ t('journal.col.ip') }}">{{ r.ip or t('journal.no_address') }}</span>
@@ -96,7 +96,7 @@
           {% for r in rows %}
             <li class="jrow{% if not r.ok %} is-bad{% endif %}">
               <span class="jcell mono" data-label="{{ t('journal.col.time') }}">{{ r.time }}</span>
-              <span class="jcell" data-label="{{ t('journal.col.person') }}">{% if r.login %}<b>{{ r.login }}</b>{% else %}<small>{{ t('journal.unknown_person') }}</small>{% endif %}</span>
+              <span class="jcell" data-label="{{ t('journal.col.person') }}">{% if r.login %}{% if r.name %}<b>{{ r.name }}</b><small>{{ r.login }}</small>{% else %}<b>{{ r.login }}</b>{% endif %}{% else %}<small>{{ t('journal.unknown_person') }}</small>{% endif %}</span>
               <span class="jcell" data-label="{{ t('journal.col.method') }}">{{ t('journal.method.' ~ r.method) }}</span>
               <span class="jcell" data-label="{{ t('journal.col.result') }}"><span class="sdot{% if r.ok %} sdot--ok{% endif %}"></span>{{ t('journal.result.' ~ r.result) }}</span>
               <span class="jcell mono" data-label="{{ t('journal.col.ip') }}">{{ r.ip or t('journal.no_address') }}</span>

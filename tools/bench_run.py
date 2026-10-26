@@ -37,17 +37,25 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.recognize.classify import classify
-from src.recognize.config import NO_CHAT
+from src.recognize.config import (
+    NO_CHAT,
+    REASONING_EFFORTS,
+    REASONING_PROVIDER_DEFAULT,
+    RecognizeSettings,
+    load_recognize_settings,
+)
 from src.recognize.errors import RecognizeError
+from src.recognize.pricing import estimate_cost
 from tools.bench_dataset import BenchCase, load_cases
 
 #: Флагман — конфиг блока (D013). Средняя и дешёвая — соседи по стоимости:
@@ -80,6 +88,10 @@ class CaseResult:
     needs_human: bool
     usage: dict[str, int]
     error: str = ""
+    #: Время ответа одного случая, с (#1267, D646): от вызова `classify` до разбора ответа.
+    seconds: float = 0.0
+    #: Глубина рассуждения прогона; пусто — параметр не передавался (умолчание провайдера).
+    effort: str = ""
 
 
 #: Режимы подсказки зоны. `none` — то, что происходит на точке; `reference` —
@@ -90,19 +102,28 @@ ZONE_HINT_REFERENCE = "reference"
 ZONE_HINT_MODES = (ZONE_HINT_NONE, ZONE_HINT_REFERENCE)
 
 
-def run_case(case: BenchCase, model: str, *, zone_hint: str = ZONE_HINT_NONE) -> CaseResult:
+def run_case(
+    case: BenchCase,
+    model: str,
+    *,
+    zone_hint: str = ZONE_HINT_NONE,
+    settings: RecognizeSettings | None = None,
+) -> CaseResult:
     """Один вызов `classify` — ровно то, что бот делает по кнопке «Разобрать».
 
     Отказ модели (`RecognizeError`) не прерывает замер — он такой же
     измеримый исход, как неверный код: превращается в строку `results` с
     пустым ответом и текстом ошибки, а не роняет прогон остальных кадров.
     """
+    effort = settings.reasoning_effort if settings else ""
+    started = time.monotonic()
     try:
         suggestion = classify(
             "",
             photo=case.photo.read_bytes(),
             zone_hint=case.zone if zone_hint == ZONE_HINT_REFERENCE else None,
             model=model,
+            settings=settings,
             chat_id=NO_CHAT,
         )
     except RecognizeError as exc:
@@ -121,7 +142,10 @@ def run_case(case: BenchCase, model: str, *, zone_hint: str = ZONE_HINT_NONE) ->
             needs_human=True,
             usage={},
             error=str(exc),
+            seconds=time.monotonic() - started,
+            effort=effort,
         )
+    seconds = time.monotonic() - started
     top = suggestion.top()
     got_code = top.code if top else None
     got_level = top.level if top else None
@@ -139,7 +163,17 @@ def run_case(case: BenchCase, model: str, *, zone_hint: str = ZONE_HINT_NONE) ->
         confidence=top.confidence if top else 0.0,
         needs_human=suggestion.needs_human,
         usage=dict(suggestion.usage),
+        seconds=seconds,
+        effort=effort,
     )
+
+
+def percentile(values: list[float], share: float) -> float:
+    """Процентиль по ближайшему рангу (`share` 0…1). Пусто — 0."""
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    return ordered[max(0, math.ceil(share * len(ordered)) - 1)]
 
 
 @dataclass(frozen=True)
@@ -154,6 +188,17 @@ class ModelSummary:
     errors: int
     input_tokens_avg: float
     output_tokens_avg: float
+    seconds_median: float = 0.0
+    seconds_p90: float = 0.0
+    seconds_max: float = 0.0
+    cached_tokens_avg: float = 0.0
+    reasoning_tokens_avg: float = 0.0
+    #: Цена одного случая по ценам входа и выхода из `model_prices.json`, USD. Кэшированный
+    #: вход считается по полной цене входа (скидки в файле нет) — верхняя оценка.
+    cost_avg_usd: float | None = None
+    effort: str = ""
+    #: Зона верна: без слов и без подсказки модель отвечает UNKNOWN, это её честный ответ.
+    zone_accuracy: float = 0.0
 
 
 def summarize(results: list[CaseResult]) -> list[ModelSummary]:
@@ -168,6 +213,14 @@ def summarize(results: list[CaseResult]) -> list[ModelSummary]:
         n = len(rs)
         errors = sum(1 for r in rs if r.error)
         ok = [r for r in rs if not r.error]
+        times = [r.seconds for r in ok]
+        costs = [
+            estimate_cost(
+                model, input_tokens=r.usage.get("input", 0), output_tokens=r.usage.get("output", 0)
+            )
+            for r in ok
+        ]
+        known = [c for c in costs if c is not None]
         out.append(
             ModelSummary(
                 model=model,
@@ -182,6 +235,18 @@ def summarize(results: list[CaseResult]) -> list[ModelSummary]:
                 output_tokens_avg=(
                     sum(r.usage.get("output", 0) for r in ok) / len(ok) if ok else 0.0
                 ),
+                seconds_median=percentile(times, 0.5),
+                seconds_p90=percentile(times, 0.9),
+                seconds_max=max(times, default=0.0),
+                cached_tokens_avg=(
+                    sum(r.usage.get("cached", 0) for r in ok) / len(ok) if ok else 0.0
+                ),
+                reasoning_tokens_avg=(
+                    sum(r.usage.get("reasoning", 0) for r in ok) / len(ok) if ok else 0.0
+                ),
+                cost_avg_usd=sum(known) / len(known) if known and len(known) == len(ok) else None,
+                effort=rs[0].effort,
+                zone_accuracy=sum(r.got_zone == r.zone for r in rs) / n if n else 0.0,
             )
         )
     return out
@@ -193,15 +258,24 @@ def _print_progress(done: int, total: int, started: float) -> None:
 
 
 def run_models(
-    cases: list[BenchCase], models: tuple[str, ...], *, zone_hint: str = ZONE_HINT_NONE
+    cases: list[BenchCase],
+    models: tuple[str, ...],
+    *,
+    zone_hint: str = ZONE_HINT_NONE,
+    effort: str | None = None,
 ) -> list[CaseResult]:
     """Все кадры на всех моделях, с прогрессом — чтобы не молчать долгими минутами."""
     jobs = [(case, model) for model in models for case in cases]
+    base = load_recognize_settings()
+    settings = base if effort is None else replace(base, reasoning_effort=effort)
     results: list[CaseResult] = []
     started = time.monotonic()
     with ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
         futures = {
-            pool.submit(run_case, case, model, zone_hint=zone_hint): (case, model)
+            pool.submit(run_case, case, model, zone_hint=zone_hint, settings=settings): (
+                case,
+                model,
+            )
             for case, model in jobs
         }
         for i, future in enumerate(as_completed(futures), start=1):
@@ -213,17 +287,27 @@ def run_models(
 
 def _table(summaries: list[ModelSummary]) -> str:
     lines = [
-        "| Модель | Кадров | Код верный | Код+класс верно | Нужен человек | Ошибок | "
-        "Токены вход/выход (среднее) |",
-        "|---|---|---|---|---|---|---|",
+        "| Модель | Глубина | Кадров | Код верный | Код+класс верно | Зона верна | "
+        "Нужен человек | Ошибок | "
+        "Время, с: медиана / p90 / макс | Токены вход / выход / рассужд. / кэш (среднее) | "
+        "Цена случая, $ |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for s in summaries:
         lines.append(
-            f"| `{s.model}` | {s.cases} | {s.code_accuracy:.0%} | {s.exact_accuracy:.0%} | "
+            f"| `{s.model}` | {s.effort or 'умолч.'} | {s.cases} | {s.code_accuracy:.0%} | "
+            f"{s.exact_accuracy:.0%} | {s.zone_accuracy:.0%} | "
             f"{s.needs_human_rate:.0%} | {s.errors} | "
-            f"{s.input_tokens_avg:.0f} / {s.output_tokens_avg:.0f} |"
+            f"{s.seconds_median:.1f} / {s.seconds_p90:.1f} / {s.seconds_max:.1f} | "
+            f"{s.input_tokens_avg:.0f} / {s.output_tokens_avg:.0f} / "
+            f"{s.reasoning_tokens_avg:.0f} / {s.cached_tokens_avg:.0f} | "
+            f"{'—' if s.cost_avg_usd is None else f'{s.cost_avg_usd:.3f}'} |"
         )
     return "\n".join(lines)
+
+
+def _effort_arg(value: str | None) -> str | None:
+    return "" if value == REASONING_PROVIDER_DEFAULT else value
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -241,16 +325,28 @@ def main(argv: list[str] | None = None) -> int:
             "число отчётности из него не делается (только сравнение кода с кодом)"
         ),
     )
+    parser.add_argument(
+        "--effort",
+        choices=(REASONING_PROVIDER_DEFAULT, *REASONING_EFFORTS),
+        default=None,
+        help=(
+            "глубина рассуждения (`reasoning.effort`); не задана — как в настройках, "
+            "`default` — не передавать параметр (умолчание провайдера)"
+        ),
+    )
     args = parser.parse_args(argv)
 
     cases = load_cases(args.examples)
     print(
         f"{len(cases)} кадров × {len(args.models)} моделей = "
-        f"{len(cases) * len(args.models)} запросов; подсказка зоны: {args.zone_hint}",
+        f"{len(cases) * len(args.models)} запросов; подсказка зоны: {args.zone_hint}; "
+        f"глубина: {args.effort or 'из настроек'}",
         flush=True,
     )
 
-    results = run_models(cases, tuple(args.models), zone_hint=args.zone_hint)
+    results = run_models(
+        cases, tuple(args.models), zone_hint=args.zone_hint, effort=_effort_arg(args.effort)
+    )
     summaries = summarize(results)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

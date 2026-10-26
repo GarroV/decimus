@@ -83,6 +83,26 @@ def test_админ_ук_видит_расход_с_итогами_срезам�
     assert len(спросили) == 2
 
 
+def test_столбик_дня_несёт_подсказку_с_датой_токенами_вызовами_и_ценой(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _вошедший(monkeypatch, role="superadmin")
+    _заглушка(monkeypatch)
+
+    ответ = client.get("/administration?tab=usage&from=2026-10-01&to=2026-10-31")  # type: ignore[attr-defined]
+
+    страница = ответ.get_data(as_text=True)
+    assert страница.count('class="ubars__item') == 31
+    assert 'tabindex="0"' in страница, "столбик не берёт фокус с клавиатуры"
+    подсказка = страница.split('<b class="ubars__tipday">2 окт</b>', 1)[1].split("</li>", 1)[0]
+    assert "2\xa0500\xa0000" in подсказка, "токенов дня в подсказке нет"
+    assert "вход 2\xa0000\xa0000 · выход 500\xa0000" in подсказка
+    assert "Вызовов: <b" in подсказка and ">3</b>" in подсказка
+    assert "$18.00" in подсказка, "стоимости дня в подсказке нет"
+    assert "нет вызовов" in страница, "у пустого дня подсказки нет"
+    assert "наибольший день: 2,5 млн токенов" in страница, "ось без максимума"
+
+
 @pytest.mark.parametrize(
     ("роль", "tenant"),
     [
