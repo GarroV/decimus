@@ -188,15 +188,19 @@ def test_остальным_блока_нет_ни_на_чтение_ни_на_�
 
 def test_главный_админ_видит_блок(главный: FlaskClient) -> None:
     html = главный.get(ВКЛАДКА).get_data(as_text=True)
-    assert 'id="dodois"' in html and "Подключить страну" in html
+    assert 'id="dodois"' in html and 'id="dodois-countries"' in html
     # Вкладка своя (D641): блока нет в «Подключениях», страны сети видны и без входов.
     assert "Словения" in html and "Болгария" in html
     assert "Входа нет" in html
+    # D651: одна таблица, у каждой страны своя кнопка выдачи; карточек и выбора страны нет.
+    assert html.count("Сгенерировать ссылку") >= 2 and 'class="stile' not in html
+    for колонка in ("Страна", "Статус", "Через кого подключено"):
+        assert колонка in html
 
 
 def test_блок_не_остался_во_вкладке_подключения(главный: FlaskClient) -> None:
     html = главный.get("/administration?tab=connections").get_data(as_text=True)
-    assert 'id="dodois"' not in html and "Подключить страну" not in html
+    assert 'id="dodois"' not in html and "dodois-countries" not in html
 
 
 def test_вкладка_стоит_после_подключений_и_ключей(главный: FlaskClient) -> None:
@@ -298,7 +302,7 @@ def test_ссылка_показана_один_раз_и_не_попадает_
     клиент, двери = стенд
     ответ, токен = _выдать(клиент)
     assert токен and "Ссылка показана один раз" in ответ.get_data(as_text=True)
-    повтор = клиент.get(ВКЛАДКА + "&country=SI").get_data(as_text=True)
+    повтор = клиент.get(ВКЛАДКА).get_data(as_text=True)
     assert токен not in повтор and "Выдана" in повтор, "дальше только статус"
     for запись in двери["action_journal"]:
         assert токен not in str(запись), "токен ссылки попал в журнал действий"
@@ -322,7 +326,7 @@ def test_отзыв_гасит_ссылку_и_второй_раз_отказ(
     _, токен = _выдать(клиент)
     адрес = "/administration/dodois/invite/1/revoke"
     assert клиент.post(адрес, headers=ЗАГОЛОВКИ).status_code == 200
-    assert "Отозвана" in клиент.get(ВКЛАДКА + "&country=SI").get_data(as_text=True)
+    assert "Отозвана" in клиент.get(ВКЛАДКА).get_data(as_text=True)
     assert клиент.post(адрес, headers=ЗАГОЛОВКИ).status_code == 409
     assert чужой.get(f"/dodois/connect/{токен}").status_code == 404
 
@@ -572,7 +576,7 @@ def test_плитка_страны_ведёт_во_вкладку_и_сбой_в
 ) -> None:
     monkeypatch.setattr(store, "list_logins", lambda: (_вход_страны("SI", rules.FAILED),))
     html = главный.get("/administration?tab=connections").get_data(as_text=True)
-    assert re.search(r'href="[^"]*\?tab=dodois[^"]*country=SI[^"]*">Dodo IS — Словения', html)
+    assert re.search(r'href="[^"]*\?tab=dodois[^"#]*#dodois-SI">Dodo IS — Словения', html)
     assert "shealth__dot--red" in html
 
 

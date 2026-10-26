@@ -38,7 +38,7 @@
           <li class="shealth__tile">
             <span class="shealth__name">
               <span class="shealth__dot shealth__dot--{{ s.light }}" role="img" aria-label="{{ t('health.light.' ~ s.light) }}"></span>
-              <b>{% if row.country %}<a href="{{ admin_url('dodois', country=row.country) }}">{{ t('health.conn.dodo_is_country', name=country_title(row.country)) }}</a>{% else %}{{ t('health.conn.' ~ row.code) }}{% endif %}</b>
+              <b>{% if row.country %}<a href="{{ admin_url('dodois') ~ '#dodois-' ~ row.country }}">{{ t('health.conn.dodo_is_country', name=country_title(row.country)) }}</a>{% else %}{{ t('health.conn.' ~ row.code) }}{% endif %}</b>
             </span>
             <small>{{ t(s.reason, **s.params) }}</small>
             {% if s.checked_at or row.checkable %}

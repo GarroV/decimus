@@ -18,26 +18,13 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Сначала задайте ключи приложения из маркетплейса (блок вверху вкладки).",
         "en": "First set the Marketplace app keys (the block at the top of this tab).",
     },
-    "dodois.sub": {
-        "ru": (
-            "Входы в Dodo IS по странам: продажи, стопы и доставка читаются под входом "
-            "каждой страны. Вход подтверждает коллега страны по вашей ссылке — "
-            "в админку он не заходит. Ключи входа хранятся зашифрованными и здесь не показываются."
-        ),
-        "en": (
-            "Dodo IS logins by country: sales, stop lists and delivery are read under each "
-            "country's login. A colleague in the country confirms the login via your link — "
-            "they never enter the admin. Login keys are stored encrypted and never shown here."
-        ),
-    },
     "dodois.unknown": {
         "ru": "Не удалось прочитать входы. Повторите чуть позже.",
         "en": "Could not read the logins. Try again shortly.",
     },
-    "dodois.add": {"ru": "Подключить страну", "en": "Connect a country"},
     "dodois.empty": {
-        "ru": "Входов пока нет. Выберите страну и выдайте ссылку коллеге.",
-        "en": "No logins yet. Pick a country and issue a link to a colleague.",
+        "ru": "Стран в справочнике пока нет.",
+        "en": "No countries in the registry yet.",
     },
     "dodois.tile.counts": {
         "ru": "Открыто {open} из {total}",
@@ -92,32 +79,18 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Ключи входа не нашлись или не открылись.",
         "en": "The login keys were not found or could not be opened.",
     },
-    "dodois.fact.confirmed_by": {"ru": "Кто подтвердил", "en": "Confirmed by"},
     "dodois.fact.owner": {"ru": "Владелец (перенесённый вход)", "en": "Owner (transferred login)"},
     "dodois.fact.unknown_account": {
         "ru": "Учётка Dodo IS не назвалась",
         "en": "The Dodo IS account did not identify itself",
     },
-    "dodois.fact.issued_by": {"ru": "Ссылку выдал", "en": "Link issued by"},
-    "dodois.fact.linked": {"ru": "Вход записан", "en": "Login recorded"},
-    "dodois.fact.units": {"ru": "Пиццерий открыто", "en": "Pizzerias open"},
-    "dodois.fact.units_value": {"ru": "{open} из {total}", "en": "{open} of {total}"},
-    "dodois.fact.refreshed": {"ru": "Последнее продление", "en": "Last renewal"},
-    "dodois.fact.checked": {"ru": "Последняя проверка", "en": "Last check"},
-    "dodois.fact.state": {"ru": "Состояние", "en": "State"},
-    "dodois.fact.rights": {"ru": "Права", "en": "Access"},
-    "dodois.fact.rights_value": {
-        "ru": "Чтение: продажи, стопы, доставка",
-        "en": "Read-only: sales, stop lists, delivery",
-    },
-    "dodois.fact.none": {"ru": "—", "en": "—"},
     "dodois.check": {"ru": "Проверить сейчас", "en": "Check now"},
     "dodois.issue": {"ru": "Выдать ссылку", "en": "Issue a link"},
-    "dodois.issue_again": {
-        "ru": "Выдать ссылку для нового входа",
-        "en": "Issue a link for a new login",
-    },
     "dodois.country": {"ru": "Страна", "en": "Country"},
+    "dodois.col.status": {"ru": "Статус", "en": "Status"},
+    "dodois.col.via": {"ru": "Через кого подключено", "en": "Connected via"},
+    "dodois.col.action": {"ru": "Действия", "en": "Actions"},
+    "dodois.generate": {"ru": "Сгенерировать ссылку", "en": "Generate link"},
     "dodois.issue_hint": {
         "ru": (
             "Ссылка одноразовая, живёт 24 часа и откроет вход только этой страны. "
@@ -169,12 +142,6 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
     "dodois.link.copy": {"ru": "Скопировать", "en": "Copy"},
     "dodois.link.copied": {"ru": "Скопировано", "en": "Copied"},
     "dodois.link.done": {"ru": "Готово", "en": "Done"},
-    "dodois.invites.title": {"ru": "Ссылки", "en": "Links"},
-    "dodois.invites.empty": {"ru": "Ссылок не выдавали.", "en": "No links issued."},
-    "dodois.invite.row": {
-        "ru": "Выдана {issued} · до {until}",
-        "en": "Issued {issued} · until {until}",
-    },
     "dodois.invite.status.active": {"ru": "Выдана", "en": "Issued"},
     "dodois.invite.status.used": {"ru": "Использована", "en": "Used"},
     "dodois.invite.status.expired": {"ru": "Истекла", "en": "Expired"},

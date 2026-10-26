@@ -114,6 +114,20 @@ def test_ссылка_другой_страны_не_гасится(база: st
     assert store.get_login("BG") is None and store.read_tokens("BG") is None
 
 
+def test_новая_ссылка_страны_отзывает_прежние_живые_и_только_её_страны(
+    база: str, автор: str
+) -> None:
+    # Сломанная копия: убрать `update` отзыва в `create_invite` — первая ссылка остаётся живой.
+    первая = _ссылка(база, автор, "SI", "1" * 64)
+    чужая = _ссылка(база, автор, "BG", "2" * 64)
+    вторая = _ссылка(база, автор, "SI", "3" * 64)
+    now = НОВАЯ
+    статусы = {n: store.get_invite(n).status(now) for n in (первая, вторая, чужая)}  # type: ignore[union-attr]
+    assert статусы[первая] == rules.INVITE_REVOKED, "прежняя живая ссылка осталась неотзываемой"
+    assert статусы[вторая] == rules.INVITE_ACTIVE
+    assert статусы[чужая] == rules.INVITE_ACTIVE, "отозвана ссылка другой страны"
+
+
 def test_отозванная_ссылка_не_гасится_и_отзыв_один_раз(база: str, автор: str) -> None:
     номер = _ссылка(база, автор)
     assert store.revoke_invite(номер, НОВАЯ) is True

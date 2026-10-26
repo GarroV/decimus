@@ -725,3 +725,11 @@ _public_headers
 SOURCE_IMPORT
 # Автоматические фикстуры pytest, сбрасывающие состояние входа по ссылке между тестами.
 _чисто
+
+# Имя латиницей (D644): поле `name_latin` строки людей и маршрут `user_name_latin` — их читает
+# шаблон и зовёт Flask; `has_contract` строки стран читает только `administration/countries.html`.
+name_latin
+user_name_latin
+has_contract
+# Фикстура pytest (D646): тесты получают её параметром, по имени её не зовёт никто.
+без_модели

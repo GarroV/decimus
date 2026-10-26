@@ -319,10 +319,19 @@ def create_invite(
     now: datetime,
     expires_at: datetime,
 ) -> int:
-    """Записать ссылку (хэш токена); номер приглашения."""
+    """Записать ссылку (хэш токена); номер приглашения.
+
+    Прежние живые ссылки этой страны в той же транзакции отзываются: на экране видна только
+    последняя, и невидимая живая ссылка была бы неотзываемой (D651).
+    """
     vault_names(country)
     try:
         with _managing() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update dodois.invites set revoked_at = %s where country = %s "
+                "and used_at is null and revoked_at is null",
+                (now, country),
+            )
             cur.execute(
                 "insert into dodois.invites (country, token_hash, issued_by, issued_by_id, "
                 "issued_by_role, issued_by_tenant, issued_at, expires_at) "
