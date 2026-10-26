@@ -36,6 +36,8 @@ from .walk_auth import (
     DATA_PATH,
     FINDING_ENDPOINT,
     FINDING_PATH,
+    HINT_ENDPOINT,
+    HINT_PATH,
     INFO_ENDPOINT,
     INFO_PATH,
     PAGE_ENDPOINT,
@@ -147,6 +149,7 @@ def install(app: Flask, *, upstream: str | None, ui_lang: str) -> None:
     route(FINDING_PATH, FINDING_ENDPOINT, "POST")
     route(INFO_PATH, INFO_ENDPOINT, "POST")
     route(SUGGEST_PATH, SUGGEST_ENDPOINT, "POST")
+    route(HINT_PATH, HINT_ENDPOINT, "POST")
     route(TRANSLATE_PATH, TRANSLATE_ENDPOINT, "POST")
     route(APP_PATH, APP_ENDPOINT, "POST")
     route(START_PATH, START_ENDPOINT, "POST")

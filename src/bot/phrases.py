@@ -37,11 +37,18 @@ from src.db import synonyms
 from src.db.errors import DbError
 from src.domain.errors import DomainError
 from src.domain.tenants import HQ_TENANT
+from src.recognize.cues import stems
+from src.recognize.fastpath import said_stems
 from src.recognize.shortlist import MANUAL_ONLY
 
 from .inspection import read_inspection
 
 logger = logging.getLogger(__name__)
+
+#: Сколько значимых основ должно быть во фразе, чтобы её узнавали по набору
+#: основ, а не по строке (#1267). Одна основа («нагар», «нагара») — слишком
+#: широкая сетка: она узнала бы любую фразу с этим словом.
+FUZZY_MIN_STEMS = 2
 
 #: Вид пункта, который разбор вправе поставить сам. Служебные строки (сводная
 #: по процессу) записью не бывают вовсе.
@@ -96,6 +103,54 @@ def _tenant_of(chat_id: int) -> str:
     return состояние.tenant if состояние is not None else HQ_TENANT
 
 
+def _stem_key(text: str) -> tuple[frozenset[str], frozenset[str]] | None:
+    """Набор основ фразы для узнавания «сказали иначе» — или `None`, если им нельзя.
+
+    Нельзя, когда основ меньше `FUZZY_MIN_STEMS` и когда фраза противоречива:
+    `said_stems` молча выбрасывает основу, сказанную и отрицаемую разом (T197), и
+    по остатку фразу узнавать нельзя — остаток уже не то, что сказал человек.
+    """
+    spoken, denied = said_stems(text)
+    if len(spoken) < FUZZY_MIN_STEMS or (spoken | denied) != stems(text):
+        return None
+    return spoken, denied
+
+
+def _recall_by_stems(note: str, *, lang: str, tenant: str) -> synonyms.PhraseAlias | None:
+    """Выученная фраза с тем же набором основ — «пол грязный» к «грязный пол» (#1267).
+
+    Правило выучивания не менялось (D119: после первого подтверждения аудитором),
+    не работало узнавание: ключ — строка байт в байт, и перестановка слов или
+    другое окончание отправляли аудитора к модели. Здесь решение за человека
+    принимается без модели, поэтому защита такая же строгая, как у быстрого пути:
+
+    * набор основ совпадает **целиком** и с тем же отрицанием (не пересечение);
+    * основ не меньше двух, фраза не противоречит сама себе;
+    * один пункт на весь совпавший набор: два разных — это спор, а не выбор;
+    * снятая управляющей компанией строка с тем же набором — запрет для всех
+      соседей: иначе перестановка слов возвращала бы то, что сняли (T292).
+    """
+    wanted = _stem_key(note)
+    if wanted is None:
+        return None
+    # Вся карта пространства и языка: сотни строк (`synonyms.list_phrases`).
+    live: list[synonyms.PhraseAlias] = []
+    for alias in synonyms.list_phrases(lang=lang, tenant=tenant, include_retracted=True):
+        if _stem_key(alias.phrase) != wanted:
+            continue
+        if alias.retracted_at is not None:
+            logger.info("перестановка слов совпала со снятой формулировкой «%s»", alias.phrase)
+            return None
+        live.append(alias)
+    if len({alias.item_code for alias in live}) != 1:
+        if live:
+            logger.warning(
+                "формулировка «%s» по набору слов ведёт к разным пунктам — не узнаём", note
+            )
+        return None
+    return live[0]
+
+
 def recall(note: str, *, lang: str, chat_id: int) -> Learned | None:
     """Пункт, которым эта формулировка уже кончалась. Не знаем — `None`.
 
@@ -104,14 +159,20 @@ def recall(note: str, *, lang: str, chat_id: int) -> Learned | None:
 
     `lang` — язык речи аудитора, не интерфейса и не отчёта: карта ключуется
     тем языком, на котором сказано (`inspections.speech_lang`).
+
+    Сначала точный ключ, при промахе — набор основ слов (`_recall_by_stems`,
+    #1267): «пол грязный» находит выученное «грязный пол».
     """
     сказанное = note.strip()
     if not сказанное:
         # Голый кадр без слов спрашивать не о чем. Поход в базу за пустой
         # строкой — это запрос на каждый кадр пачки впустую.
         return None
+    tenant = _tenant_of(chat_id)
     try:
-        alias = synonyms.lookup_phrase(сказанное, lang=lang, tenant=_tenant_of(chat_id))
+        alias = synonyms.lookup_phrase(сказанное, lang=lang, tenant=tenant)
+        if alias is None:
+            alias = _recall_by_stems(сказанное, lang=lang, tenant=tenant)
     except DbError as exc:
         logger.warning("карта синонимов не ответила (%s): %s", type(exc).__name__, exc)
         return None

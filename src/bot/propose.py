@@ -15,6 +15,10 @@
 Пачку с комментарием (D208) первые два шага не берут: по словам записалось бы
 то, что сказано, и кадры никто бы не посмотрел.
 
+Рядом с этим путём стоит `hint` (#1267, D646): мгновенная подсказка 2–3 пунктов
+без модели, пока модель думает. Она ничего не решает и не пишет — только
+показывает то, что уже знают быстрый путь, выученные фразы и карта слов.
+
 Чем различаются бот и мини-апп — только тем, что делается с найденным. Бот по
 быстрому пути и выученной фразе пишет запись сразу (D064) и разговаривает с
 аудитором в чате; мини-апп всё найденное только предлагает карточками, а
@@ -33,7 +37,10 @@ from src import domain
 from src.domain.errors import DomainError
 from src.recognize.classify import album_mode, classify, framed, needs_photo
 from src.recognize.fastpath import fast_path
+from src.recognize.hint import HINT_MAX
+from src.recognize.hint import rank as hint_rank
 from src.recognize.models import Candidate, Suggestion
+from src.recognize.zone_words import zone_from_words
 
 from .phrases import recall
 from .usage import chat_usage
@@ -46,7 +53,7 @@ CERTAIN = 1.0
 #: а платит каждый кадр. Лишние ракурсы остаются в записи, в модель не идут.
 MODEL_FRAMES_MAX = 10
 
-Via = Literal["fast", "learned", "model"]
+Via = Literal["fast", "learned", "model", "hint"]
 
 
 @dataclass(frozen=True)
@@ -113,7 +120,8 @@ def propose(
     """Найти пункт по словам и кадрам тем же порядком, что у бота.
 
     `zone` — зона, которую назвал человек (остановка обхода): подсказка
-    поиску, а не ответ. `note` — сказанное дословно: при пути без модели оно
+    поиску, а не ответ. Зона, названная в словах, сильнее неё — для быстрого
+    пути и при записи (D206). `note` — сказанное дословно: при пути без модели оно
     же становится формулировкой, как у бота.
 
     `reading_c` — температура, которую аудитор исправил после неверного чтения
@@ -126,7 +134,14 @@ def propose(
     words = note.strip()
     frames = frames[:MODEL_FRAMES_MAX]
     if reading_c is None and words and not album_mode(words, len(frames)):
-        fast = fast_path(words, zone, lang=ui_lang, chat_id=chat_id).item
+        # Зона из слов — раньше зоны на экране: так же её читает вывод зоны записи
+        # (`web.walk_zone.resolve_item_zone`, D206, D445). Зона на экране — подсказка.
+        fast = fast_path(
+            words,
+            zone_from_words(words, chat_id=chat_id) or zone,
+            lang=ui_lang,
+            chat_id=chat_id,
+        ).item
         if fast is not None:
             return Offer(
                 via="fast",
@@ -173,3 +188,48 @@ def propose(
         question=suggestion.question,
         suggestion=suggestion,
     )
+
+
+def hint(
+    note: str,
+    frames: int,
+    *,
+    zone: str | None,
+    chat_id: int,
+    ui_lang: str,
+    speech_lang: str,
+) -> Offer:
+    """Предварительные карточки без модели: выученная фраза → быстрый путь → карта слов.
+
+    До `HINT_MAX` пунктов, лучший первым. Выученная фраза и быстрый путь — то же,
+    что у `propose`, поэтому подсказка и итоговый ответ не расходятся там, где
+    итог получился без модели; остальное — `recognize.hint.rank`. Пусто — слова
+    ничего не подняли, и экран молча ждёт модель.
+
+    `frames` — сколько кадров в разборе. Пачка с комментарием (D208) подсказки не
+    получает так же, как не получает быстрого пути: по словам аудитор выбрал бы
+    пункт, а кадры никто бы не посмотрел.
+
+    Ничего не пишет и модель не зовёт. Уверенность карточек нулевая: её никто не
+    считал, а «предложение модели» подсказка не заменяет.
+    """
+    words = note.strip()
+    if not words or album_mode(words, frames):
+        return Offer(via="hint", candidates=())
+    found: dict[str, Candidate] = {}
+
+    def add(code: str, level: str, where: str) -> None:
+        found.setdefault(
+            code, Candidate(code=code, level=level, zone=where, wording=words, confidence=0.0)
+        )
+
+    shown_zone = zone_from_words(words, chat_id=chat_id) or zone
+    learned = recall(words, lang=speech_lang, chat_id=chat_id)
+    if learned is not None:
+        add(learned.code, _only_level(learned.code, chat_id), shown_zone or "")
+    fast = fast_path(words, shown_zone, lang=ui_lang, chat_id=chat_id).item
+    if fast is not None:
+        add(fast.code, fast.level, fast.zone)
+    for item in hint_rank(words, zone, chat_id=chat_id):
+        add(item.code, item.level, shown_zone or "")
+    return Offer(via="hint", candidates=tuple(found.values())[:HINT_MAX])

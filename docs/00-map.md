@@ -310,7 +310,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 24 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, … (+16) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
-| `src/web/templates/administration/` | 6 | _dodois.html, _health.html, _nav.html, connections.html, countries.html, dodois.html |
+| `src/web/templates/administration/` | 7 | _dodois.html, _health.html, _nav.html, connections.html, countries.html, dodois.html, keys.html |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
@@ -907,6 +907,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/errors.py` | Отказы блока `recognize` |
 | `src/recognize/fastpath.py` | T113 (D063): быстрый путь — пункт без вызова модели, когда слова однозначны |
 | `src/recognize/guard.py` | Границы на свободный текст ответа модели (F-131) |
+| `src/recognize/hint.py` | Мгновенная подсказка: 2–3 пункта по карте слов, без модели (#1267, D646 п |
 | `src/recognize/language.py` | T192 (#157): правила разбора слов аудитора — данные, а не константы в коде |
 | `src/recognize/level.py` | Класс нарушения по критериям пункта: второй, узкий вопрос к модели (#1033) |
 | `src/recognize/manual.py` | T034: модель недоступна — перечень пунктов для ручного выбора кнопками |
