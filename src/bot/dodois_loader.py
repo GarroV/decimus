@@ -12,7 +12,8 @@
 (`job_lock`), занят — пропускается. Ключей приложения нет — вход помечается «сбой», загрузка
 ждёт ключей без перезапуска.
 
-**Тревог наружу нет**: красный виден на экране; сообщение людям — только по «да» владельца.
+**Оповещения.** После захода зовётся `src/health/alerts.py`: сбой входа любой страны — одно
+сообщение владельцу в канал FURCA, починка — одно «снова работает» (D641).
 
 Служебная работа без человека: в базу — от имени служебного пространства (F-037).
 """
@@ -27,6 +28,7 @@ from src.db.job_lock import DODOIS_LOADER_LOCK_KEY, job_lock
 from src.db.space import SYSTEM_SPACE, acting_space
 from src.dodois import service
 from src.domain.dodois import CHECK_EVERY
+from src.health import alerts
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ async def run_forever() -> None:
         while True:
             try:
                 await asyncio.to_thread(run_once)
+                await asyncio.to_thread(alerts.run_pass_safely)
             except DbError:
                 logger.warning("Dodo IS: база отказала, заход пропущен", exc_info=True)
             except Exception:

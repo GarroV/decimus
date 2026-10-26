@@ -1,4 +1,8 @@
-"""Блок «Dodo IS» на вкладке «Подключения»: входы по странам и ссылки для коллег (D640, #951).
+"""Вкладка «Dodo IS» раздела «Администрирование»: входы по странам и ссылки (D640, D641, #951).
+
+С D641 это отдельная вкладка `?tab=dodois` рядом с «Подключениями» (раньше — блок внутри них);
+формы и POST-маршруты возвращают в неё же. Страны столбцом — все страны сети из справочника
+пиццерий, у страны без входа написано «Входа нет».
 
 **Кто.** Только главный админ УК (заслон вкладки — `connections_screen._boss`, остальным
 404 и на чтение, и на каждый POST). Коллеги в админку не заходят: владелец выдаёт им
@@ -25,7 +29,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from flask import Flask, abort, current_app, g, request
+from flask import Flask, abort, current_app, g, make_response, render_template, request
+from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
 from src.db import dodois_logins, web_throttle
@@ -35,11 +40,12 @@ from src.dodois import service
 from src.domain import dodois as rules
 from src.domain.dodois import Invite, Login
 
-from . import auth, guard
+from . import administration, auth, guard
 from .db_refusal import note_target_mismatch
 from .journal import TARGET_OVERRIDE
 from .origin import refuse_foreign_origin
 from .sections import section
+from .users_view import TAB_DODOIS
 
 _log = logging.getLogger(__name__)
 
@@ -109,15 +115,18 @@ def _registry() -> tuple[tuple[str, str, str], ...]:
         return ()
 
 
-def _rows(logins: tuple[Login, ...], invites: tuple[Invite, ...]) -> tuple[CountryRow, ...]:
+def _rows(
+    logins: tuple[Login, ...],
+    invites: tuple[Invite, ...],
+    network: tuple[str, ...] = (),
+) -> tuple[CountryRow, ...]:
+    """Страны сети (порядок справочника), затем прочие со входом или ссылкой — по коду."""
     by_country = {login.country: login for login in logins}
     latest: dict[str, Invite] = {}
     for invite in invites:  # свежие первыми
         latest.setdefault(invite.country, invite)
-    return tuple(
-        CountryRow(c, by_country.get(c), latest.get(c))
-        for c in sorted(set(by_country) | set(latest))
-    )
+    extra = sorted((set(by_country) | set(latest)) - set(network))
+    return tuple(CountryRow(c, by_country.get(c), latest.get(c)) for c in (*network, *extra))
 
 
 def view(flash: Flash | None = None, issued: IssuedLink | None = None) -> View:
@@ -128,13 +137,15 @@ def view(flash: Flash | None = None, issued: IssuedLink | None = None) -> View:
         note_target_mismatch(exc)
         _log.warning("dodois: входы не прочитаны (%s)", type(exc).__name__)
         return View((), (), "", False, flash, issued, ())
-    rows = _rows(logins, invites)
+    registry = _registry()
+    rows = _rows(logins, invites, tuple(code for code, _, _ in registry))
     codes = [r.code for r in rows]
     wanted = issued.country if issued else request.args.get("country") or ""
     selected = wanted if wanted in codes or wanted == "add" else ""
     if not selected and not request.args.get("country") and codes:
-        selected = codes[0]
-    return View(rows, invites, selected, True, flash, issued, _registry())
+        # Без выбора открывается первая страна, где что-то уже есть.
+        selected = next((r.code for r in rows if r.login or r.latest), codes[0])
+    return View(rows, invites, selected, True, flash, issued, registry)
 
 
 def context(flash: Flash | None = None, issued: IssuedLink | None = None) -> dict[str, Any]:
@@ -148,6 +159,40 @@ def context(flash: Flash | None = None, issued: IssuedLink | None = None) -> dic
 
 def _stamp(moment: datetime | None) -> str:
     return "" if moment is None else moment.astimezone(UTC).strftime("%d.%m %H:%M UTC")
+
+
+def _link(**extra: str) -> str:
+    """Адрес вкладки с выбором страны; `tab` в шаблонах — наследство «Подключений»."""
+    return administration.url(TAB_DODOIS, **{k: v for k, v in extra.items() if k != "tab"})
+
+
+def _boss() -> str:
+    from . import connections_screen  # connections_screen сам берёт этот модуль
+
+    return connections_screen._boss()
+
+
+def page(
+    flash: Flash | None = None, issued: IssuedLink | None = None, code: int = 200
+) -> FlaskResponse:
+    """Вкладка целиком — для GET и для ответа на любое действие."""
+    html = render_template(
+        "administration/dodois.html",
+        users_url=f"{request.script_root}{section('administration').path}",
+        link=_link,
+        **context(flash, issued),
+        **administration.nav(TAB_DODOIS),
+    )
+    response = make_response(html, code)
+    # Ссылка-приглашение в теле ответа выдачи: ни браузер, ни прокси не оставляют копии.
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+def show() -> FlaskResponse:
+    """GET `/administration?tab=dodois[&country=<код>|add]`."""
+    _boss()
+    return page()
 
 
 # --- действия ------------------------------------------------------------------------
@@ -223,40 +268,40 @@ def install(app: Flask) -> None:
     """Действия блока. Заслоны — общие с ключами сервисов (`connections_screen`)."""
     from . import connections_screen as screen
 
-    base = f"{section('administration').path}/connections/dodois"
+    base = f"{section('administration').path}/dodois"
 
     @app.post(f"{base}/invite", endpoint=ISSUE_ACTION)
     @guard.action("keys.manage", hidden=True)
     def dodois_invite_issue() -> Response:
-        login = screen._boss()
+        login = _boss()
         refuse_foreign_origin()
-        back = f"{section('administration').path}?tab=connections"
+        back = f"{section('administration').path}?tab={TAB_DODOIS}"
         refused = screen._key_gate(login, back)
         if isinstance(refused, tuple):
             flash, code = refused
-            return screen._page(dodois_flash=Flash(flash.key, False, flash.params or {}), code=code)
+            return page(Flash(flash.key, False, flash.params or {}), code=code)
         if refused is not None:
             return refused
         result, code = issue(login, auth.current_account())
         if isinstance(result, IssuedLink):
             web_throttle.note_service_key_ok(tenant=screen._stand(), login=login)
-            return screen._page(dodois_issued=result, code=code)
-        return screen._page(dodois_flash=result, code=code)
+            return page(issued=result, code=code)
+        return page(result, code=code)
 
     @app.post(f"{base}/invite/<int:invite_id>/revoke", endpoint=REVOKE_ACTION)
     @guard.action("keys.manage", hidden=True)
     def dodois_invite_revoke(invite_id: int) -> Response:
-        screen._boss()
+        _boss()
         refuse_foreign_origin()
         flash, code = revoke(invite_id)
-        return screen._page(dodois_flash=flash, code=code)
+        return page(flash, code=code)
 
     @app.post(f"{base}/<country>/check", endpoint=CHECK_ACTION)
     @guard.action("keys.manage", hidden=True)
     def dodois_check(country: str) -> Response:
-        screen._boss()
+        _boss()
         if not rules.is_country(country):
             abort(404)
         refuse_foreign_origin()
         flash, code = check_now(country)
-        return screen._page(dodois_flash=flash, code=code)
+        return page(flash, code=code)

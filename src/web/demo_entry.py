@@ -79,6 +79,8 @@ LOCKED_ENDPOINTS = frozenset(
         "add_user",
         "add_space",
         "space_countries",
+        # Языки отчёта страны общие для всех пространств и задают отчёт настоящего бота.
+        "country_set_report_langs",
         "bot_unlink",
         # Выход наружу — настоящие сервисы под настоящими ключами: ключи API на
         # данные, Google (вход, почта, таблица), сайты агрегаторов.

@@ -1,6 +1,7 @@
 """Язык отчёта в конце проверки (D415): какие языки предложить этой пиццерии.
 
-Перечень зависит от страны пиццерии и лежит в данных (`domain.report_langs`).
+Перечень зависит от страны пиццерии и лежит в данных: переопределение страны из веба
+(`db.country_report_langs`, D640), иначе файл методики (`domain.report_langs`).
 Страна проверки — из справочника точек пространства (по названию точки), а
 если точки в справочнике нет или база недоступна — по городу проверки
 (`geo.CITY_COUNTRY`). Ни того ни другого — перечень по умолчанию: не пустить
@@ -13,7 +14,7 @@ import asyncio
 import logging
 
 from src import domain
-from src.db import directory
+from src.db import country_report_langs, directory
 from src.db.errors import DbError
 from src.db.reach import reach_of
 from src.domain import report_langs
@@ -46,8 +47,11 @@ def inspection_country(inspection: domain.Inspection) -> str | None:
 
 
 def langs_for_inspection(inspection: domain.Inspection) -> list[str]:
-    """Языки отчёта для этой проверки. Синхронно: справочник и файл читаются с диска и из базы."""
-    return report_langs.report_langs_for(inspection_country(inspection))
+    """Языки отчёта для этой проверки. Синхронно: справочник и файл читаются с диска и из базы.
+
+    Перечень страны — строка из базы, если её завели в вебе (D640), иначе файл методики.
+    """
+    return country_report_langs.langs_for(inspection_country(inspection))
 
 
 async def offered_langs(inspection: domain.Inspection) -> list[str]:

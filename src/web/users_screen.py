@@ -1,4 +1,7 @@
-"""Экран «Пользователи» (`/users`): один экран доступа для всех, охват по роли (#585).
+"""Действия экрана «Люди» (`/users/*`): один экран доступа, охват по роли (#585).
+
+С D640 экран читается в «Администрировании» (`/administration?tab=people|spaces`), а `GET /users`
+только перенаправляет туда; формы действий остались на прежних путях.
 
 Вынесен из `app.py` вместе с расширением D362/D364: главный админ, админ УК,
 контроль и админ партнёра ведут людей на одном экране, каждый — в своём
@@ -43,7 +46,6 @@ from . import (
     journal_screen,
     partner_spaces,
     people,
-    usage_screen,
 )
 from .access_policy import Scope
 from .config import Settings
@@ -60,7 +62,7 @@ from .users_page import (
     render,
     source,
 )
-from .users_view import TAB_CONNECTIONS, TAB_JOURNAL, TAB_SPACES, TAB_USAGE
+from .users_view import TAB_PEOPLE, TAB_SPACES
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,12 @@ def _touchable_roles(scope: Scope, tenant: str) -> tuple[str, ...]:
     return access_policy.grantable_roles(scope, tenant)
 
 
+def _settings_url() -> str:
+    """«Настройки» с языком из запроса — туда ведёт `/users` тем, у кого нет вкладок."""
+    lang = request.args.get("lang") or ""
+    return f"{request.script_root}{section('settings').path}" + (f"?lang={lang}" if lang else "")
+
+
 def _flash(key: str, *, ok: bool, **params: object) -> Flash:
     return Flash(key, ok, dict(params))
 
@@ -97,16 +105,16 @@ def install(app: Flask, conf: Settings) -> None:
     users_path = section("users").path
 
     @app.get(users_path)
-    def users() -> FlaskResponse | WerkzeugResponse | tuple[str, int]:
-        if request.args.get("tab") == TAB_CONNECTIONS:
-            # Вкладка переехала в «Администрирование» (D639, #1251); старые ссылки живут.
-            rest = {k: v for k, v in request.args.items() if k != "tab"}
-            return redirect(administration.url(TAB_CONNECTIONS, **rest))
-        if request.args.get("tab") == TAB_JOURNAL:
-            return journal_screen.show_users(conf)
-        if request.args.get("tab") == TAB_USAGE:
-            return usage_screen.show(conf)
-        return render()
+    def users() -> WerkzeugResponse:
+        """Старый адрес экрана: всё переехало в «Администрирование» (D639, D640)."""
+        account = auth.current_account()
+        if not administration.tabs_for(account):
+            # Людьми не управляет: своя карточка — в «Настройках».
+            return redirect(_settings_url())
+        # Адрес со всем запросом (фильтры, выбор, период): ссылки в письмах и закладках живут.
+        rest = {k: v for k, v in request.args.items() if k != "tab"}
+        tab = request.args.get("tab") or TAB_PEOPLE
+        return redirect(administration.url(tab, **rest))
 
     @app.post(f"{users_path}/bot-unlink")
     @guard.action("people.manage")
@@ -140,7 +148,7 @@ def install(app: Flask, conf: Settings) -> None:
     connections_screen.install_service_keys(app)
     connections_screen.install_health(app)
     dodois_screen.install(app)
-    administration.install(app)
+    administration.install(app, conf)
     journal_screen.install(app, conf)
 
 

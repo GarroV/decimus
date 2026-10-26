@@ -223,7 +223,7 @@ def test_чужой_адрес_разморозки_отказывает(
 
 
 def _карточка(client: FlaskClient, логин: str) -> str:
-    return client.get(f"/users?off=1&person=id-{логин}").get_data(as_text=True)
+    return client.get(f"/administration?tab=people&off=1&person=id-{логин}").get_data(as_text=True)
 
 
 def test_карточка_замороженного_называет_дату_и_кто(главный: FlaskClient) -> None:
@@ -256,7 +256,9 @@ def test_у_работающего_одна_кнопка_и_это_заморо�
 
 
 def test_английская_карточка_говорит_по_английски(главный: FlaskClient) -> None:
-    страница = главный.get("/users?off=1&person=id-ghost&lang=en").get_data(as_text=True)
+    страница = главный.get("/administration?tab=people&off=1&person=id-ghost&lang=en").get_data(
+        as_text=True
+    )
 
     assert "Frozen on 2026-10-13 by boss2" in страница
     assert "Unfreeze" in страница

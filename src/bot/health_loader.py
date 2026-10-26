@@ -5,8 +5,9 @@
 ложится в `health.checks`, вкладка «Администрирование → Подключения» выводит из него цвет.
 Сборы здесь не пробуются: их цвет — из их же журналов загрузок.
 
-**Тревог наружу нет.** Красный виден на экране; сообщение в Telegram или почту — только
-по «да» владельца на текст и адресата (#1251, правило о коммуникации).
+**Оповещения.** После каждого захода `src/health/alerts.py` сверяет цвета с последним
+оповещённым состоянием и при смене пишет владельцу в канал FURCA (D641, его «да» на текст и
+адресата). Тот же заход зовёт и загрузчик входов Dodo IS (`dodois_loader.py`).
 
 Упавшая проба не роняет цикл: исход других подключений важнее одного сбоя.
 """
@@ -20,6 +21,7 @@ from datetime import UTC, datetime
 from src.db import health_store
 from src.db.errors import DbError
 from src.db.space import SYSTEM_SPACE, acting_space
+from src.health import alerts
 from src.health.checks import PROBE_EVERY, SCHEDULED_CODES, run_probe
 
 logger = logging.getLogger(__name__)
@@ -43,10 +45,12 @@ def probe_all() -> None:
 
 
 async def check_forever() -> None:
+    alerts.log_startup()
     with acting_space(SYSTEM_SPACE):
         while True:
             try:
                 await asyncio.to_thread(probe_all)
+                await asyncio.to_thread(alerts.run_pass_safely)
             except Exception:
                 # Упавшая задача asyncio молчит — поэтому ловим всё и живём дальше.
                 logger.exception("Проверка подключений: непредвиденный сбой")

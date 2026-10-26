@@ -175,8 +175,9 @@ def test_раздела_проект_нет_пространства_на_экр
     assert "tenants" not in {s.key for s in SECTIONS}
 
 
-def test_пользователи_видны_каждому() -> None:
-    assert "users" in {s.key for s in visible_sections(_Кто("GE"))}
+def test_пункта_пользователи_в_меню_нет() -> None:
+    """D640: экран переехал в «Администрирование»; секция `users` — только префикс POST-путей."""
+    assert "users" not in {s.key for s in visible_sections(_Кто("GE"))}
 
 
 # --- флаг «только УК» — механизм, которым сейчас не пользуется ни один раздел

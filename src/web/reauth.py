@@ -71,12 +71,13 @@ CONFIRM_ENDPOINT = "reauth_confirm"
 REAUTH_KIND = "reauth"
 
 #: Куда можно вернуть после подтверждения: «Настройки», согласие OAuth и вкладка
-#: «Подключения» в «Администрировании» (ключ модели, D491, D639).
+#: «Подключения» и «Dodo IS» в «Администрировании» (ключ модели, D491, D639; ссылка Dodo IS, D641).
 _BACK_PREFIXES = (
     "/settings#",
     "/settings?",
     "/oauth/authorize?",
     "/administration?tab=connections",
+    "/administration?tab=dodois",
 )
 
 

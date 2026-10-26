@@ -15,36 +15,18 @@ from typing import Any
 
 from flask import current_app
 
-from src.db import dodois_logins, health_store
+from src.db import health_store
 from src.db.errors import DbError
-from src.domain import dodois as dodois_rules
 from src.domain import health
 from src.domain.health import GREEN, GREY, RED, YELLOW, Status
-from src.health import checks
-from src.health.checks import CONFIG, DODOIS, LOAD, PENDING, PROBE, PROBE_EVERY
+from src.health import alerts, checks
+from src.health import rows as health_rows
+from src.health.checks import PENDING
+from src.health.rows import Row
 
 from . import auth
 
 _log = logging.getLogger(__name__)
-
-_PENDING_REASON = {"backup": "health.reason.backup_host"}
-
-
-@dataclass(frozen=True)
-class Row:
-    """Строка подключения на экране."""
-
-    code: str
-    kind: str
-    status: Status
-    #: Группа плиток (`checks.GROUPS`).
-    group: str = ""
-    #: Код страны у строки входа Dodo IS (D640); у остальных пусто.
-    country: str = ""
-
-    @property
-    def checkable(self) -> bool:
-        return self.kind == PROBE
 
 
 @dataclass(frozen=True)
@@ -63,54 +45,26 @@ def _google() -> Status:
     return Status(GREY, "health.reason.not_configured")
 
 
-def _dodois_rows(conn: checks.Connection, logins: Any, moment: datetime) -> list[Row]:
-    """Строка на каждый вход Dodo IS; входов нет — одна серая строка «подключений нет»."""
-    if not logins:
-        return [Row(conn.code, DODOIS, Status(GREY, "health.reason.dodois_none"), conn.group)]
-    return [
-        Row(
-            conn.code,
-            DODOIS,
-            dodois_rules.status_of(login, moment),
-            conn.group,
-            country=login.country,
-        )
-        for login in logins
-    ]
-
-
 def rows(now: datetime | None = None) -> tuple[Row, ...] | None:
     """Строки по реестру; `None` — база не ответила."""
-    moment = now or datetime.now(UTC)
-    try:
-        probes = health_store.probes()
-        loads = health_store.loads()
-        logins = dodois_logins.list_logins()
-    except DbError:
-        _log.warning("Подключения: состояние не прочиталось", exc_info=True)
-        return None
-    found: list[Row] = []
-    for conn in checks.CONNECTIONS:
-        if conn.kind == PROBE:
-            every = PROBE_EVERY if conn.scheduled else None
-            status = health.of_probe(probes.get(conn.code), moment, every=every)
-        elif conn.kind == LOAD and conn.fresh_for is not None:
-            status = health.of_loads(loads.get(conn.code), moment, fresh_for=conn.fresh_for)
-        elif conn.kind == DODOIS:
-            found.extend(_dodois_rows(conn, logins, moment))
-            continue
-        elif conn.kind == CONFIG:
-            status = _google()
-        else:
-            status = Status(GREY, _PENDING_REASON.get(conn.code, "health.reason.not_configured"))
-        found.append(Row(conn.code, conn.kind, status, conn.group))
-    return tuple(found)
+    return health_rows.build(now, google=_google())
 
 
 def grouped(found: tuple[Row, ...]) -> tuple[tuple[str, tuple[Row, ...]], ...]:
     """Строки по группам в порядке `checks.GROUPS`; пустые группы не показываются."""
     by_group = ((g, tuple(r for r in found if r.group == g)) for g in checks.GROUPS)
     return tuple((g, members) for g, members in by_group if members)
+
+
+def alerts_status() -> Status | None:
+    """Включены ли оповещения владельцу (D641): исход пишет бот под кодом канала."""
+    try:
+        row = health_store.probes().get(alerts.CHANNEL_CODE)
+    except DbError:
+        return None
+    if row is None:
+        return Status(GREY, "health.reason.never_checked")
+    return Status(row.light, row.reason, row.checked_at)
 
 
 def context(flash: Flash | None = None) -> dict[str, Any]:
@@ -124,6 +78,7 @@ def context(flash: Flash | None = None) -> dict[str, Any]:
         "health_count": {
             light: sum(1 for x in lights if x == light) for light in (GREEN, YELLOW, RED, GREY)
         },
+        "health_alerts": alerts_status(),
         "health_flash": flash,
         "health_stamp": _stamp,
         "health_pending": PENDING,

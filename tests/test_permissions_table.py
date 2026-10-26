@@ -16,8 +16,9 @@ from src.domain import permissions as perm
 from src.domain.permissions import ACTION_CODES, MATRIX, SIDE_HQ, SIDE_PARTNER, validate_matrix
 from src.web.sections import OWN_SECTIONS, SECTIONS
 
-# «Администрирование» (D639) — вид по вкладкам роли, а не «все виды»: на шаге 1 (#1251)
-# в нём одна вкладка «Подключения» главного админа (D638).
+# «Администрирование» (D639) — вид по вкладкам роли, а не «все виды»: он есть у тех, у кого
+# после шага 2 (#1251, D640) открыта хоть одна вкладка — главный админ, админ УК, контроль,
+# админ партнёра.
 ВИДЫ_ВСЕ = {f"view.{s.key}" for s in SECTIONS if s.key not in OWN_SECTIONS} - {
     "view.administration"
 }
@@ -93,7 +94,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
     # Главный админ = админ + ключи API (D440).
     (SIDE_HQ, "superadmin"): АДМИН_УК
     | {"api.manage", "keys.manage", "prescription.manage", "view.administration"},
-    (SIDE_HQ, "admin"): АДМИН_УК,
+    (SIDE_HQ, "admin"): АДМИН_УК | {"view.administration"},
     # Бизнес-девелопер: всё в работе, без главного чек-листа, прода, стран, людей,
     # ключей и загрузок рейтингов (D440); загрузка проверок через Claude — открыта
     # (владелец 20.10.2026), партнёрам закрыта (D335).
@@ -105,12 +106,20 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "people.manage",
         "view.ratings",
         "view.users",
+        "view.administration",
     },
     # Гость: вся сеть на чтение (D429, D440).
     (SIDE_HQ, "guest"): ГОСТЬ_УК,
-    # ОСБ (D599): права гостя на чтение + вести предписания; проверки не пишет.
+    # ОСБ (D599): права гостя на чтение + вести предписания; проверки не пишет. Вид
+    # «Администрирования» (D640) — ради вкладки «Страны» (договор, `contract.manage`).
     (SIDE_HQ, "osb"): ГОСТЬ_УК
-    | {"prescription.request", "prescription.manage", "view.osb", "contract.manage"},
+    | {
+        "prescription.request",
+        "prescription.manage",
+        "view.osb",
+        "contract.manage",
+        "view.administration",
+    },
     # Админ партнёра: сотрудник + люди, свои чек-листы, вычитка свежих (D346, D367).
     (SIDE_PARTNER, "admin"): СОТРУДНИК_ПАРТНЁРА
     | {
@@ -124,6 +133,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "people.manage",
         "people.role",
         "trip.plan",
+        "view.administration",
     },
     (SIDE_PARTNER, "auditor"): СОТРУДНИК_ПАРТНЁРА,
 }
