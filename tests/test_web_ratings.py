@@ -60,7 +60,6 @@ def test_сводку_видят_все(
 # Форма — фабрика (P12): Werkzeug закрывает файл после запроса, второй прогон
 # параметра с тем же BytesIO упал бы на закрытом файле.
 ПРАВЯЩИЕ: list[tuple[str, str, Callable[[], dict[str, Any]]]] = [
-    ("get", "/ratings/imports", dict),
     ("post", "/ratings/import", lambda: {"file": (io.BytesIO(b"x"), "f.csv")}),
     ("post", "/ratings/countries", lambda: {"code": "RS", "developer": "X"}),
     (
@@ -103,7 +102,7 @@ def test_контроль_и_админ_уК_загружают(
             "/ratings/import", data={"file": (io.BytesIO(b"abc"), "rs.csv")}, headers=ORIGIN
         )
         assert ответ.status_code == 200
-        assert client.get("/ratings/imports").status_code == 200
+        assert client.get("/ratings/imports").status_code == 302
     ((data, kw),) = зовы["import"]
     assert data == b"abc" and kw["channel"] == "web" and kw["file_name"] == "rs.csv"
 

@@ -31,7 +31,7 @@
     <section class="split__list">{% block split_list %}{% endblock %}</section>
   </div>
   {% if split_open %}
-    <div class="sdrawer" data-drawer>
+    <div class="sdrawer{% if split_wide %} sdrawer--wide{% endif %}" data-drawer>
       <a class="sdrawer__scrim" href="{{ split_back }}" data-drawer-close tabindex="-1" aria-hidden="true"></a>
       <aside class="sdrawer__panel" role="dialog" aria-modal="true" aria-labelledby="sdrawer-title">
         <header class="sdrawer__head">

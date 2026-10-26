@@ -33,6 +33,8 @@ TAB_CONNECTIONS = "connections"
 TAB_KEYS = "keys"
 #: Вкладка «Dodo IS» (D641): входы по странам, главный админ; её ведёт `dodois_screen`.
 TAB_DODOIS = "dodois"
+#: Вкладка «Рейтинги» (D654): настройки рейтингов, кому открыто `ratings.manage`; ведёт `ratings`.
+TAB_RATINGS = "ratings"
 #: Вкладка «Журнал» (D462): только главный админ, её ведёт `journal_screen`.
 TAB_JOURNAL = "journal"
 #: Вкладка «Расход модели» (D537): главный админ и админ УК, её ведёт `usage_screen`.

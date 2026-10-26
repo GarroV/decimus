@@ -17,6 +17,7 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "administration.tab.usage": {"ru": "Расход модели", "en": "Model usage"},
     "administration.tab.connections": {"ru": "Подключения", "en": "Connections"},
     "administration.tab.keys": {"ru": "Ключи и API", "en": "Keys & API"},
+    "administration.tab.ratings": {"ru": "Рейтинги", "en": "Ratings"},
     "administration.sub": {
         "ru": "Все настройки сервиса в одном месте. Вкладки видны по роли.",
         "en": "All service settings in one place. Tabs depend on your role.",
@@ -181,6 +182,52 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Настроить страну: {country}",
         "en": "Configure the country: {country}",
     },
+    # ── Вкладка «Рейтинги» (D654): блоки настроек и их строка состояния ──
+    "ratings.admin.sub": {
+        "ru": (
+            "Загрузка данных, справочники и пороги рейтингов. "
+            "Охват площадок и привязка Glovo — в разделе «Рейтинги»."
+        ),
+        "en": (
+            "Rating data uploads, reference lists and thresholds. "
+            "Platform coverage and the Glovo link live in the Ratings section."
+        ),
+    },
+    "ratings.admin.count": {"ru": "Блоков: {n}", "en": "Blocks: {n}"},
+    "ratings.admin.coverage": {
+        "ru": "Охват площадок и привязка Glovo →",
+        "en": "Platform coverage and the Glovo link →",
+    },
+    "ratings.admin.panel": {"ru": "Блок настроек", "en": "Settings block"},
+    "ratings.admin.block.sheet": {"ru": "Таблица контроля", "en": "Control spreadsheet"},
+    "ratings.admin.block.upload": {"ru": "Загрузка файла", "en": "File upload"},
+    "ratings.admin.block.layout": {"ru": "Компоновка страницы", "en": "Page layout"},
+    "ratings.admin.block.journal": {"ru": "Журнал загрузок", "en": "Upload log"},
+    "ratings.admin.block.issues": {"ru": "Несопоставленное", "en": "Unmatched rows"},
+    "ratings.admin.block.developers": {"ru": "Девелоперы стран", "en": "Country developers"},
+    "ratings.admin.block.rules": {"ru": "Хард-правила", "en": "Hard rules"},
+    "ratings.admin.block.settings": {"ru": "Пороги", "en": "Thresholds"},
+    "ratings.admin.sheet.off": {"ru": "Самозабор выключен", "en": "Auto-pull is off"},
+    "ratings.admin.sheet.failed": {
+        "ru": "Не удалось забрать листов: {n}",
+        "en": "Could not pull {n} sheets",
+    },
+    "ratings.admin.upload.last": {
+        "ru": "Последняя загрузка {at}",
+        "en": "Last upload {at}",
+    },
+    "ratings.admin.layout.state": {
+        "ru": "Видно блоков: {shown} из {total}",
+        "en": "Blocks shown: {shown} of {total}",
+    },
+    "ratings.admin.journal.state": {"ru": "Записей: {n}", "en": "Entries: {n}"},
+    "ratings.admin.issues.none": {"ru": "Нестыковок нет", "en": "No mismatches"},
+    "ratings.admin.issues.some": {"ru": "Нестыковок: {n}", "en": "Mismatches: {n}"},
+    "ratings.admin.developers.state": {
+        "ru": "Задан у {set} из {total} стран",
+        "en": "Set for {set} of {total} countries",
+    },
+    "ratings.admin.rules.state": {"ru": "Правил: {n}", "en": "Rules: {n}"},
     "countries.partial_failed": {
         "ru": "Партнёры или девелоперы сейчас не прочитались: в столбцах могут быть пропуски.",
         "en": "Partners or developers could not be read: some cells may be empty.",
