@@ -228,8 +228,27 @@ def test_журнал_действий_фильтруется_по_челове�
 
 
 def test_люди_для_фильтра_видны_только_главному_админу(люди: Люди) -> None:
-    assert {л for _, л in journals.journal_people(люди.токены["sofia"])} >= {"sofia", "anna"}
+    assert {л for _, л, _имя in journals.journal_people(люди.токены["sofia"])} >= {"sofia", "anna"}
     assert journals.journal_people(люди.токены["anna"]) == ()
+
+
+def test_имя_из_google_приходит_с_записями_и_в_списке_людей(люди: Люди, pg_dsn: str) -> None:
+    with psycopg.connect(pg_dsn, autocommit=True) as conn:
+        conn.execute(
+            "update web_users set display_name = 'Анна Админова' where id = %s",
+            (люди.ид["anna"],),
+        )
+    _вход(люди, "anna")
+    _вход(люди, "dev")
+    _действие(люди, "anna")
+
+    входы = {e.login: e.name for e in journals.read_logins(люди.токены["sofia"])}
+    действия = journals.read_actions(люди.токены["sofia"])
+    человек = {л: имя for _, л, имя in journals.journal_people(люди.токены["sofia"])}
+
+    assert входы["anna"] == "Анна Админова" and входы["dev"] is None
+    assert {e.name for e in действия} == {"Анна Админова"}
+    assert человек["anna"] == "Анна Админова" and человек["dev"] is None
 
 
 # --- права и срок хранения -------------------------------------------------

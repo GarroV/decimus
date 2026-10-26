@@ -16,8 +16,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from src.domain.journal import (
     DOOR_WEB,
@@ -65,6 +67,12 @@ _READ_LOGINS_SQL = "select * from login_journal_read(%s, %s, %s, %s, %s)"
 _READ_ACTIONS_SQL = "select * from action_journal_read(%s, %s, %s, %s, %s)"
 _PEOPLE_SQL = "select * from journal_people(%s)"
 _PURGE_SQL = "select purge_journals()"
+#: Имена людей из Google (`0065`) одним запросом на страницу журнала. Роль приложения читает
+#: `web_users` целиком (`0014`); ходят сюда только номера, которые схема уже отдала зрителю.
+_NAMES_SQL = """
+    select id, display_name from web_users
+     where id = any(%s::uuid[]) and display_name is not null and btrim(display_name) <> ''
+"""
 
 
 @dataclass(frozen=True)
@@ -80,6 +88,8 @@ class LoginEntry:
     method: str
     result: str
     session_id: str | None
+    #: Имя человека из Google; `None` — не известно, экран показывает логин.
+    name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -97,6 +107,16 @@ class ActionEntry:
     action: str
     target: str
     outcome: str
+    name: str | None = None
+
+
+def _names(cur: Any, user_ids: Iterable[str]) -> dict[str, str]:
+    """Имена по номерам учёток одним запросом; без имени номера в ответе нет."""
+    ids = sorted(set(user_ids))
+    if not ids:
+        return {}
+    cur.execute(_NAMES_SQL, (ids,))
+    return {str(r[0]): str(r[1]).strip() for r in cur.fetchall()}
 
 
 def failure_result(login: str | None = None, *, email: str | None = None) -> tuple[str | None, str]:
@@ -239,6 +259,7 @@ def read_logins(
     with _connected("прочитать журнал входов") as conn, conn.cursor() as cur:
         cur.execute(_READ_LOGINS_SQL, (session_token, person, start, end, limit))
         rows = cur.fetchall()
+        names = _names(cur, (str(r[2]) for r in rows if r[2]))
     return tuple(
         LoginEntry(
             id=int(r[0]),
@@ -250,6 +271,7 @@ def read_logins(
             method=str(r[6]),
             result=str(r[7]),
             session_id=str(r[8]) if r[8] else None,
+            name=names.get(str(r[2])) if r[2] else None,
         )
         for r in rows
     )
@@ -267,6 +289,7 @@ def read_actions(
     with _connected("прочитать журнал действий") as conn, conn.cursor() as cur:
         cur.execute(_READ_ACTIONS_SQL, (session_token, person, start, end, limit))
         rows = cur.fetchall()
+        names = _names(cur, (str(r[2]) for r in rows))
     return tuple(
         ActionEntry(
             id=int(r[0]),
@@ -280,16 +303,19 @@ def read_actions(
             action=str(r[8]),
             target=str(r[9]),
             outcome=str(r[10]),
+            name=names.get(str(r[2])),
         )
         for r in rows
     )
 
 
-def journal_people(session_token: str) -> tuple[tuple[str, str], ...]:
-    """Люди для фильтра «кто»: пары (номер, логин); не главному админу — пусто."""
+def journal_people(session_token: str) -> tuple[tuple[str, str, str | None], ...]:
+    """Люди для фильтра «кто»: тройки (номер, логин, имя или `None`); не главному админу — пусто."""
     with _connected("прочитать людей журнала") as conn, conn.cursor() as cur:
         cur.execute(_PEOPLE_SQL, (session_token,))
-        return tuple((str(r[0]), str(r[1])) for r in cur.fetchall())
+        rows = cur.fetchall()
+        names = _names(cur, (str(r[0]) for r in rows))
+    return tuple((str(r[0]), str(r[1]), names.get(str(r[0]))) for r in rows)
 
 
 def purge() -> int:

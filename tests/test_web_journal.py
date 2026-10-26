@@ -339,7 +339,7 @@ def _заглушки(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[object]
 
     monkeypatch.setattr(journals, "read_logins", _logins)
     monkeypatch.setattr(journals, "read_actions", _actions)
-    monkeypatch.setattr(journals, "journal_people", lambda token: (("u1", "anna"),))
+    monkeypatch.setattr(journals, "journal_people", lambda token: (("u1", "anna", None),))
     return спросили
 
 
@@ -360,6 +360,61 @@ def test_главный_админ_видит_журнал_во_вкладке_�
     assert "Заморожена учётка" in действия.get_data(as_text=True), "код действия без подписи"
     assert спросили["actions"][0][1]["person"] == "11111111-1111-1111-1111-111111111111"  # type: ignore[index]
     assert 'href="/administration?tab=journal"' in страница, "вкладки «Журнал» в экране нет"
+
+
+def test_имя_человека_жирным_а_логин_мелко_под_ним(monkeypatch: pytest.MonkeyPatch) -> None:
+    client, _ = _вошедший(monkeypatch, role="superadmin")
+    _заглушки(monkeypatch)
+    момент = datetime(2026, 10, 13, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr(
+        journals,
+        "read_logins",
+        lambda token, **kw: (
+            journals.LoginEntry(
+                1, момент, "u1", "admin", "198.51.100.7", "UA", "google", "ok", None, "Иван Петров"
+            ),
+            journals.LoginEntry(
+                2, момент, "u2", "bob", "198.51.100.8", "UA", "password", "ok", None
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        journals,
+        "read_actions",
+        lambda token, **kw: (
+            journals.ActionEntry(
+                1,
+                момент,
+                "u1",
+                "admin",
+                "admin",
+                "web",
+                None,
+                None,
+                "freeze_user",
+                "",
+                "302",
+                "Иван Петров",
+            ),
+            journals.ActionEntry(
+                2, момент, "u2", "bob", "admin", "web", None, None, "freeze_user", "", "302"
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        journals,
+        "journal_people",
+        lambda token: (("u1", "admin", "Иван Петров"), ("u2", "bob", None)),
+    )
+
+    входы = client.get("/administration?tab=journal").get_data(as_text=True)
+    действия = client.get("/administration?tab=journal&view=actions").get_data(as_text=True)
+
+    for страница in (входы, действия):
+        assert "<b>Иван Петров</b><small>admin</small>" in страница, "имя не жирным над логином"
+        assert "<b>bob</b>" in страница, "без имени должен остаться логин"
+        assert ">Иван Петров · admin</option>" in страница, "в списке людей нет «Имя · логин»"
+        assert ">bob</option>" in страница
 
 
 @pytest.mark.parametrize("роль", ["admin", "developer", "control", "guest", "auditor"])
