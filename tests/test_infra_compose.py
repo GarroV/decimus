@@ -672,6 +672,21 @@ DEMO_CONFIG_ARGS = (
 )
 
 
+def test_demo_walk_opens_one_english_inspection_for_any_browser() -> None:
+    """В открытом демо мини-апп не ведёт русский браузер в русскую проверку (D656)."""
+    # Arrange
+    строки = (ROOT / "deploy" / "demo" / "compose.demo.yaml").read_text(encoding="utf-8")
+    живые = [s.strip() for s in строки.splitlines() if not s.strip().startswith("#")]
+
+    # Act
+    чат = [s for s in живые if s.startswith("WEB_WALK_PREVIEW_CHAT:")]
+    русский = [s for s in живые if s.startswith("WEB_WALK_PREVIEW_CHAT_RU")]
+
+    # Assert
+    assert len(чат) == 1, "у демо-walk должен быть ровно один чат просмотра"
+    assert not русский, "WEB_WALK_PREVIEW_CHAT_RU вернул русскую проверку для русского браузера"
+
+
 @requires_docker
 @pytest.mark.parametrize(
     "overlay", ["deploy/demo/compose.demo.yaml", "deploy/preview/compose.preview.yaml"]

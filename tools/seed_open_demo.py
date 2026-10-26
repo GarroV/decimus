@@ -18,9 +18,13 @@
   дорогой, что кадры мини-аппа: `save_upload` → слив → `upload_photos`;
 * все проверки, кроме двух помеченных `pending`, приняты дверью продукта
   (`accept_inspection`), и D2 порождают планы действий сами (D272);
-* рейтинги РС и РКО (`tools/open_demo_ratings.py`) и обучение из выдуманного
-  iSpring (`tools/open_demo_training.py`) — теми же импортёром и загрузчиком, что у
-  продукта;
+* рейтинги РС и РКО, тяжёлые нарушения (`tools/open_demo_ratings.py`) и обучение из
+  выдуманного iSpring (`tools/open_demo_training.py`) — теми же импортёром и загрузчиком,
+  что у продукта; оценки агрегаторов доставки и карт Google/Yandex
+  (`tools/open_demo_reviews.py`) — теми же дверями записи, что у сборщиков;
+* предписания во всех состояниях для «ОСБ» и «Compliance notices» стран
+  (`tools/open_demo_notices.py`), люди с почтой и ролями, партнёры стран и договоры
+  (`tools/open_demo_people.py`);
 * по учётке на роль из `src.domain.demo.DEMO_ROLES`, пароль случайный и нигде
   не печатается — входят через `/demo`.
 
@@ -47,7 +51,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
-import open_demo_ratings  # noqa: E402 -- путь к tools выставляется выше
+import open_demo_notices  # noqa: E402 -- путь к tools выставляется выше
+import open_demo_people  # noqa: E402
+import open_demo_ratings  # noqa: E402
+import open_demo_reviews  # noqa: E402
 import open_demo_training  # noqa: E402
 import psycopg  # noqa: E402
 import seed_demo  # noqa: E402 -- путь к репозиторию выставляется выше
@@ -80,8 +87,9 @@ FIRST_CHAT = 999_000_000_601
 #: Чат идущей проверки, которую открывает приложение аудитора в демо
 #: (`WEB_WALK_PREVIEW_CHAT`); из вымышленного диапазона просмотра.
 WALK_CHAT = 999_000_000_701
-#: Та же идущая проверка по-русски — для русского браузера (`WEB_WALK_PREVIEW_CHAT_RU`):
-#: мини-апп открывается на русском целиком, и записи в нём русские.
+#: Та же идущая проверка по-русски (`WEB_WALK_PREVIEW_CHAT_RU`). Открытое демо на неё не
+#: ведёт — там мини-апп английский для любого браузера (D656); русская копия нужна
+#: стендам, где маршрут задан (превью, съёмка лендинга: `tools/landing_shots.py`).
 WALK_CHAT_RU = 999_000_000_702
 #: День, от которого написан календарь `VISITS`. Посев сдвигает все даты на
 #: расстояние от него до сегодня: свежие проверки всегда в последних неделях, и
@@ -743,8 +751,8 @@ def _walk(photos_dir: Path | None) -> None:
     """Идущая проверка Northgate-1 для приложения аудитора: в базу не сливается.
 
     У точки уже есть прошлые проверки — приложение покажет «здесь было». Проверка
-    заведена дважды: английская (основной чат просмотра) и русская (чат для русского
-    браузера), чтобы мини-апп в обоих языках был целиком на своём.
+    заведена дважды: английская (чат просмотра открытого демо, он один на любой браузер) и
+    русская (для стендов с маршрутом на неё: превью, съёмка лендинга).
     """
     unit = {u.name: u for u in UNITS}["Northgate-1"]
     today = date.today().isoformat()
@@ -901,6 +909,7 @@ def seed() -> int:
     for unit in UNITS:
         upsert_unit(unit.name, country=unit.country, city=unit.city, tenant=HQ_TENANT)
     _accounts()
+    people_n = open_demo_people.seed_people()
 
     units = {u.name: u for u in UNITS}
     seen: dict[str, set[str]] = {}
@@ -933,14 +942,19 @@ def seed() -> int:
     for line in open_demo_ratings.seed(network, date.today()):
         print(line)
     print(open_demo_training.seed(network, date.today()))
+    for line in open_demo_reviews.seed(network, date.today()):
+        print(line)
+    partnered = open_demo_people.seed_partners(network, {u.name: u.city for u in UNITS}, admin_dsn)
+    notices = open_demo_notices.seed(admin_dsn)
     _walk(photos_dir)
     print(
-        f"Auditor app: in-progress inspection in chats {WALK_CHAT} (WEB_WALK_PREVIEW_CHAT) "
-        f"and {WALK_CHAT_RU} (WEB_WALK_PREVIEW_CHAT_RU)"
+        f"Auditor app: in-progress inspection in chat {WALK_CHAT} (WEB_WALK_PREVIEW_CHAT, "
+        f"English for every browser); Russian copy in chat {WALK_CHAT_RU} "
+        "(WEB_WALK_PREVIEW_CHAT_RU, only for stands that route to it)"
     )
     print(
-        f"Open demo seeded: {len(pushed)} inspections, {trips} trips, "
-        f"{len(DEMO_ROLES)} demo accounts"
+        f"Open demo seeded: {len(pushed)} inspections, {trips} trips, {notices} compliance "
+        f"notices, {partnered} pizzerias with partners, {people_n} people"
     )
     return 0
 

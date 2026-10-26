@@ -37,8 +37,8 @@ services:
       # строка в `environment` его перекрывает.
       TELEGRAM_BOT_TOKEN: ""
       WEB_WALK_PREVIEW_CHAT: "999000000701"
-      # Русский браузер видит ту же проверку по-русски (посев: `WALK_CHAT_RU`).
-      WEB_WALK_PREVIEW_CHAT_RU: "999000000702"
+      # Один чат на любой браузер: проверка английская (D656). `WEB_WALK_PREVIEW_CHAT_RU`
+      # не задаётся — язык в мини-аппе переключается кнопкой, а не выбором чата.
       WEB_DEMO: "1"
   db:
     ports: !override []

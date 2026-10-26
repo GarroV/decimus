@@ -101,6 +101,35 @@ def test_посев_открытого_демо(
         русских = conn.execute(
             "select count(*) from translations where entity_type = 'finding' and lang = 'ru'"
         ).fetchone()
+        предписания = dict(
+            conn.execute("select status, count(*) from prescriptions group by status").fetchall()
+        )
+        доставка = dict(
+            conn.execute(
+                "select aggregator, count(distinct point_key) from agg.ratings group by 1"
+            ).fetchall()
+        )
+        карты = conn.execute(
+            "select count(distinct company_uuid), count(distinct provider_id) from maps.ratings"
+        ).fetchone()
+        связанных_карт = conn.execute(
+            "select count(*) from maps.companies where dodo_id is not null"
+        ).fetchone()
+        партнёров = conn.execute(
+            "select count(distinct country_code), count(*) from unit_profiles "
+            "where partner is not null"
+        ).fetchone()
+        без_кода = conn.execute(
+            "select count(*) from units where tenant_code = 'HQ' and code is null"
+        ).fetchone()
+        договоров = conn.execute("select count(*) from country_contracts").fetchone()
+        люди = conn.execute(
+            "select count(*), count(email), count(distinct role) from web_users"
+        ).fetchone()
+        люди_партнёра = conn.execute(
+            "select count(*) from web_users where tenant_code = 'demo'"
+        ).fetchone()
+        уведомления = conn.execute("select count(*) from notifications").fetchone()
     assert статусы.get("draft") == 2 and статусы.get("finalized", 0) >= 15, статусы
     # Хранилища в тесте нет: кадры — строками без ссылки, как при лежащем (#459).
     assert кадров is not None and кадров[0] > 0, "кадры из DEMO_PHOTOS_DIR не легли к записям"
@@ -119,6 +148,20 @@ def test_посев_открытого_демо(
     assert за_месяц is not None and за_месяц[0] >= 1, "«Главная» за текущий месяц пуста"
     assert партнёрских is not None and партнёрских[0] >= 1, "нет проверки аудитора партнёра"
     assert русских is not None and русских[0] == 2, "прошлые записи точки обхода — по-русски"
-    assert "chats 999000000701 (WEB_WALK_PREVIEW_CHAT) and 999000000702" in посев.stdout, (
-        "русская идущая проверка не заведена"
+    assert "chat 999000000701 (WEB_WALK_PREVIEW_CHAT, English for every browser)" in посев.stdout, (
+        "английская идущая проверка демо не заведена"
     )
+    # Очереди страницы «ОСБ»: все пять состояний, просроченных нет (база не даёт).
+    assert предписания == {"review": 2, "approved": 1, "issued": 3, "draft": 2, "closed": 1}, (
+        предписания
+    )
+    assert уведомления is not None and уведомления[0] > 0, "ОСБ не получила уведомлений"
+    # Агрегаторы: Wolt в двух странах (5 точек), Glovo во всех трёх (8); карты — две площадки.
+    assert доставка == {"wolt": 5, "glovo": 8}, доставка
+    assert карты == (8, 2) and связанных_карт == (8,), (карты, связанных_карт)
+    assert партнёров == (3, 8), "у каждой пиццерии демо — партнёр, в каждой стране"
+    assert без_кода == (0,), "у пиццерий нет кода Dodo: оценки площадок не найдут точку"
+    assert договоров == (3,)
+    assert люди is not None and люди[0] >= 10 and люди[1] == люди[0], "люди демо без почты"
+    assert люди[2] >= 5, "в «Людях» не показаны роли УК"
+    assert люди_партнёра is not None and люди_партнёра[0] >= 3, "у партнёра один человек"

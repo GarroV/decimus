@@ -17,7 +17,7 @@ import json
 from collections.abc import Sequence
 from datetime import date, timedelta
 
-from src.db.ratings_read import set_developer
+from src.db.ratings_read import REFUSED_RULE, RatingsEditError, add_hard_rule, set_developer
 from src.ratings.importer import CHANNEL_SEED, import_file
 
 #: Общее начало id демо-строк рейтингов, как у `tools/seed_ratings_demo.py`.
@@ -63,6 +63,14 @@ REMARKS = (
     ("Floor in the dining area not cleaned at opening", "D1"),
     ("Raw product stored above ready-to-eat toppings", "D2"),
 )
+#: Тяжёлое замечание РС — класс D3 (хард-правило `rs contains D3` из миграции 0039 берёт его
+#: по родителю). Лежит в последних периодах у слабых точек: блок «Тяжёлые нарушения»
+#: за текущий период не пуст.
+HARD_REMARK = "Rodent droppings found in the dry storage area"
+HARD_REMARK_UNITS = {"Lakeside-1": 1, "Northgate-2": 1}  # в скольких последних периодах
+#: Тяжёлое замечание РКО и правило, которое его берёт (правила миграции 0039 русские).
+HARD_RKO_TEXT = "Pizza was delivered cold"
+HARD_RKO_ORDERS = {("Lakeside-1", 0), ("Northgate-2", 0), ("Harbor Bay-1", 1)}
 #: Что контролёр РКО написал о заказе.
 RKO_TEXTS = (
     "Toppings on the crust",
@@ -97,6 +105,12 @@ def _units(units: Sequence[tuple[str, str]]) -> list[tuple[str, str, str]]:
     return [(_hex(n), name, country) for n, (name, country) in enumerate(units, start=1)]
 
 
+def unit_ids(units: Sequence[tuple[str, str]]) -> dict[str, str]:
+    """Код Dodo каждой точки демо по имени: те же, что в снимке рейтингов, — по ним
+    связываются оценки площадок (`open_demo_reviews`) и сведения о партнёрах."""
+    return {name: dodo_id for dodo_id, name, _ in _units(units)}
+
+
 def snapshot(units: Sequence[tuple[str, str]], today: date) -> bytes:
     """Снимок рейтинга: история РС и РКО по полумесяцам и замечания РС."""
     periods = halves(today)
@@ -124,20 +138,30 @@ def snapshot(units: Sequence[tuple[str, str]], today: date) -> bytes:
                 if kind != _RS:
                     continue
                 weak = 100 - scores[name][i]
+                items = [
+                    {
+                        "criterion_id": str(k + 1),
+                        "name": text,
+                        "parent": level,
+                        "amount": 1 + (n + i + k) % 2,
+                    }
+                    for k, (text, level) in enumerate(REMARKS)
+                    if (n + i + k) % 4 < 1 + weak // 6
+                ]
+                if i >= len(periods) - HARD_REMARK_UNITS.get(name, 0):
+                    items.append(
+                        {
+                            "criterion_id": str(len(REMARKS) + 1),
+                            "name": HARD_REMARK,
+                            "parent": "D3",
+                            "amount": 1,
+                        }
+                    )
                 remarks.append(
                     {
                         "period_id": period_id,
                         "checkups": 2,
-                        "items": [
-                            {
-                                "criterion_id": str(k + 1),
-                                "name": text,
-                                "parent": level,
-                                "amount": 1 + (n + i + k) % 2,
-                            }
-                            for k, (text, level) in enumerate(REMARKS)
-                            if (n + i + k) % 4 < 1 + weak // 6
-                        ],
+                        "items": items,
                     }
                 )
         docs.append(
@@ -175,9 +199,12 @@ def rko_violations(units: Sequence[tuple[str, str]], today: date) -> bytes:
         for k in range(4):
             checkup = _hex(5000 + n * 10 + k)
             day = today - timedelta(days=3 + 5 * k + n % 3)
+            texts = list(RKO_TEXTS[: (n + k) % 3])
+            if (name, k) in HARD_RKO_ORDERS:
+                texts.append(HARD_RKO_TEXT)
             writer.writerow(
                 [
-                    COUNTRIES[country][1], name, "", "; ".join(RKO_TEXTS[: (n + k) % 3]), "", "",
+                    COUNTRIES[country][1], name, "", "; ".join(texts), "", "",
                     str(1000 + n * 10 + k), f"{day.isoformat()} 12:00:00", "Pepperoni", "30 cm",
                     f"https://control.dodois.io/backoffice/checkups/{checkup}",
                     f"https://dodopizza.info/rating#/{dodo_id}/1?checkupId={checkup}",
@@ -210,6 +237,11 @@ def seed(units: Sequence[tuple[str, str]], today: date) -> list[str]:
                 f"несопоставлено {report.unmatched}, в журнале {report.issues}"
             )
         lines.append(f"{file_name}: +{report.accepted} ~{report.updated}")
+    try:
+        add_hard_rule("rko", "text", HARD_RKO_TEXT, actor="demo-seed")
+    except RatingsEditError as exc:
+        if exc.code != REFUSED_RULE:  # «уже лежит» — посев повторяется на той же базе
+            raise
     for code, (_, _, developer) in COUNTRIES.items():
         if not set_developer(code, developer, actor="demo-seed"):
             raise RuntimeError(f"девелопер страны {code} не записан")
