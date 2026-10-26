@@ -41,6 +41,7 @@ from . import (
     administration,
     auth,
     connections_screen,
+    dodois_screen,
     guard,
     journal_screen,
     partner_spaces,
@@ -146,6 +147,7 @@ def install(app: Flask, conf: Settings) -> None:
     connections_screen.install(app)
     connections_screen.install_service_keys(app)
     connections_screen.install_health(app)
+    dodois_screen.install(app)
     administration.install(app, conf)
     journal_screen.install(app, conf)
 

@@ -36,7 +36,7 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     },
     "health.summary.red": {"ru": "Не работает: {n}", "en": "Not working: {n}"},
     "health.summary.grey": {"ru": "Проверок ещё не было", "en": "No checks yet"},
-    "health.check_now": {"ru": "Проверить сейчас", "en": "Check now"},
+    "health.check_now": {"ru": "Проверить", "en": "Check"},
     "health.checked": {"ru": "проверено {at}", "en": "checked {at}"},
     "health.ran": {"ru": "последний прогон {at}", "en": "last run {at}"},
     "health.ok.checked": {"ru": "Проверено: {name}", "en": "Checked: {name}"},
@@ -53,22 +53,34 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "health.light.yellow": {"ru": "предупреждение", "en": "warning"},
     "health.light.red": {"ru": "не работает", "en": "not working"},
     "health.light.grey": {"ru": "нет данных", "en": "no data"},
+    # ── Группы ──
+    "health.group.system": {
+        "ru": "Системное: хранилище, бот, вход, бэкап",
+        "en": "System: storage, bot, sign-in, backup",
+    },
+    "health.group.ratings": {"ru": "Рейтинги и оценки", "en": "Ratings and reviews"},
+    "health.group.learning": {"ru": "Обучение", "en": "Training"},
+    "health.group.dodo_is": {"ru": "Dodo IS по странам", "en": "Dodo IS by country"},
     # ── Подключения ──
     "health.conn.openai": {"ru": "OpenAI — распознавание", "en": "OpenAI — recognition"},
     "health.conn.telegram": {"ru": "Бот в Telegram", "en": "Telegram bot"},
     "health.conn.storage": {"ru": "Хранилище кадров", "en": "Photo storage"},
     "health.conn.google": {"ru": "Вход через Google", "en": "Google sign-in"},
-    "health.conn.pointer": {"ru": "Pointer — оценки на картах", "en": "Pointer — map ratings"},
-    "health.conn.ispring": {"ru": "iSpring — обучение", "en": "iSpring — training"},
+    "health.conn.pointer": {"ru": "Pointer — ключ", "en": "Pointer — key"},
+    "health.conn.ispring": {"ru": "iSpring — ключ", "en": "iSpring — key"},
     "health.conn.aggregators": {
-        "ru": "Сбор оценок агрегаторов",
-        "en": "Aggregator ratings collection",
+        "ru": "Агрегаторы — ночной сбор оценок",
+        "en": "Aggregators — nightly ratings collection",
     },
-    "health.conn.maps": {"ru": "Сбор оценок на картах", "en": "Map ratings collection"},
-    "health.conn.sheet": {"ru": "Таблица контроля", "en": "Control spreadsheet"},
-    "health.conn.learning": {"ru": "Загрузка обучения", "en": "Training load"},
+    "health.conn.maps": {
+        "ru": "Pointer — ночной сбор оценок с карт",
+        "en": "Pointer — nightly map ratings collection",
+    },
+    "health.conn.sheet": {"ru": "Таблица контроля — загрузка", "en": "Control spreadsheet — load"},
+    "health.conn.learning": {"ru": "iSpring — ночная загрузка", "en": "iSpring — nightly load"},
     "health.conn.backup": {"ru": "Ночной бэкап", "en": "Nightly backup"},
     "health.conn.dodo_is": {"ru": "Dodo IS по странам", "en": "Dodo IS by country"},
+    "health.conn.dodo_is_country": {"ru": "Dodo IS — {name}", "en": "Dodo IS — {name}"},
     # ── Причины ──
     "health.reason.ok": {"ru": "Ответил", "en": "Responded"},
     "health.reason.rejected": {"ru": "Ключ не принят", "en": "Key rejected"},
@@ -94,9 +106,25 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Бэкап делает сервер, сюда его исход пока не приходит",
         "en": "The server makes the backup; its result doesn't reach this page yet",
     },
-    "health.reason.dodo_is_pending": {
-        "ru": "Подключение готовится",
-        "en": "Connection in preparation",
+    "health.reason.dodois_none": {
+        "ru": "Входов нет: выдайте ссылку коллеге страны",
+        "en": "No logins yet: issue a link to a colleague in the country",
+    },
+    "health.reason.dodois_ok": {
+        "ru": "Работает: открыто {open} из {total}",
+        "en": "Working: {open} of {total} open",
+    },
+    "health.reason.dodois_partial": {
+        "ru": "Открыто не всё: {open} из {total}",
+        "en": "Not everything open: {open} of {total}",
+    },
+    "health.reason.dodois_expired": {
+        "ru": "Вход истёк: продление отказано, нужна новая ссылка",
+        "en": "Login expired: renewal was refused, a new link is needed",
+    },
+    "health.reason.dodois_failed": {
+        "ru": "Сбой связи с Dodo IS при последней проверке",
+        "en": "Connection to Dodo IS failed on the last check",
     },
     # ── Вкладка «Страны» (D640) ──
     "countries.sub": {

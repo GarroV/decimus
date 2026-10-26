@@ -16,11 +16,15 @@
 .shealth__head { display: flex; align-items: center; gap: var(--space-3); }
 .shealth__title { margin: 0; font-size: var(--fs-title); font-weight: var(--w-semibold); }
 .shealth__summary { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-4) 0; font-weight: var(--w-semibold); color: var(--ink); }
-.shealth__rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-.shealth__row { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4) 0; border-bottom: 1px solid var(--line); }
-.shealth__main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.shealth__main small { color: var(--ink-3); font-size: var(--fs-meta); overflow-wrap: anywhere; }
-.shealth__act { margin: 0; flex: none; }
+.shealth__group { margin: var(--space-5) 0 var(--space-3); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-semibold); }
+.shealth__tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); }
+.shealth__tile { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface); }
+.shealth__name { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.shealth__name b { font-size: var(--fs-dense); overflow-wrap: anywhere; }
+.shealth__tile small { color: var(--ink-3); font-size: var(--fs-meta); overflow-wrap: anywhere; }
+.shealth__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: auto; padding-top: var(--space-1); }
+.shealth__act { margin: 0 0 0 auto; flex: none; }
+.shealth__act .sbtn { padding: var(--space-1) var(--space-3); font-size: var(--fs-meta); }
 .shealth__dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--ink-3); }
 .shealth__dot--green { background: var(--ok); }
 .shealth__dot--yellow { background: var(--warn-mark); }
@@ -41,3 +45,21 @@
 /* Подзаголовок группы вкладок («Люди и доступ», «Журнал»). */
 .sadmin__group { margin: var(--space-4) 0 var(--space-1); padding: 0 var(--space-4); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-semibold); }
 .sadmin__tabs > .sadmin__group:first-child { margin-top: 0; }
+
+/* Блок «Dodo IS» (D640): строки приглашений в панели страны; остальное — приём «Ключей сервисов». */
+.sdodois .stile__icon.mono { font-size: var(--fs-meta); font-weight: var(--w-semibold); }
+.sdodois__sub { margin: var(--space-6) 0 var(--space-3); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-semibold); }
+.sdodois__invites { list-style: none; margin: 0 0 var(--space-5); padding: 0; border-top: 1px solid var(--line); }
+.sdodois__invites li { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+.sdodois__invites form { margin: 0; flex: none; }
+.sdodois__invite-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.sdodois__invite-main .sdodois__warn { color: var(--warn, var(--ink-2)); }
+.sdodois__invite-main small { color: var(--ink-3); font-size: var(--fs-meta); overflow-wrap: anywhere; }
+.sdodois .ssecret code { overflow-wrap: anywhere; }
+
+/* Публичная страница входа в Dodo IS по ссылке: одна колонка ограниченной ширины. */
+.sdodois-page { max-width: 520px; margin: var(--space-8) auto; padding: 0 var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+.sdodois-page__title { margin: 0; font-size: var(--fs-title); font-weight: var(--w-semibold); }
+.sdodois-page__safe { color: var(--ink-3); font-size: var(--fs-meta); }
+.sdodois-page__code code { font-size: var(--fs-title); letter-spacing: 0.08em; }
+.sdodois-page__wait { color: var(--ink-3); }

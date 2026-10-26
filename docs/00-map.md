@@ -49,7 +49,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Legacy-проверка | Историческая проверка, загруженная из старого отчёта (`origin = 'legacy'`): оценка переносится как есть и нигде не пересчитывается | `src/db/imports_legacy.py`, `src/mcp/imports.py`, `docs/14-history-import.md` |
 | План действий (экшн-план) | Ответ партнёра на запрос УК по проверке с D2/D3: файл с версиями, приём и возврат | `src/db/action_plans.py`, `src/web/action_plans.py`, `docs/12-web-admin.md` |
 | Предписание | Письмо УК партнёру с требованием: черновик, отправка через почту сотрудника, ответ партнёра, закрытие | `src/db/prescriptions.py`, `src/web/prescriptions.py` |
-| Договор страны, контакты по ДКК | Блок «Договор» страны во вкладке «Администрирование → Страны» (D640; на экране страны его нет): юрлицо партнёра, договор одной строкой (ДКК не моделируется, D603), почты, которые форма предписания подставляет в «Кому»; видит только УК, правят ОСБ, админ, главный админ (`contract.manage`) | `src/db/country_contracts.py`, `src/web/country_settings.py` |
+| Договор страны, контакты по ДКК | Блок «Договор» в карточке страны: юрлицо партнёра, договор одной строкой (ДКК не моделируется, D603), почты, которые форма предписания подставляет в «Кому»; видит только УК, правят ОСБ, админ, главный админ (`contract.manage`) | `src/db/country_contracts.py`, `src/web/country_settings.py` |
 | РС, РКО | Рейтинг стандартов и рейтинг клиентского опыта: средние оценки по пиццериям из выгрузок Dodo IS; раздел «Рейтинги» | `docs/15-ratings.md`, `src/ratings/` |
 | Агрегатор | Площадка доставки с оценками пиццерий (Wolt, Glovo, Bolt Food, Yemeksepeti и др.); оценки собираются раз в сутки | `docs/17-aggregators.md`, `src/ratings/aggregators/` |
 | Обучение | Раздел «Обучение»: обученность пиццерий по данным iSpring LMS (завершено / назначено), снимок раз в сутки; только счётчики, данных о сотрудниках нет (D575) | `docs/20-training.md`, `src/learning/`, `src/domain/training_metrics.py` |
@@ -59,7 +59,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | MCP | Протокол, которым Claude у человека читает историю проверок и правит методику и рейтинги. Свой сервер, только петля, наружу — туннелем | `src/mcp/`, `docs/furca/blocks/mcp.md`, [`inventory.md`](inventory.md) |
 | Личный токен | Ключ Claude Desktop, который человек с учёткой выпускает себе сам — в своих настройках на сайте (в боте и мини-аппе подключения Claude нет, D626); никто никому его не выдаёт (D448). В базе — отпечаток, учётка, роль, срок. Права — по роли учётки и допускам пространства; срок 30 дней (`MCP_TOKEN_TTL_DAYS`); отключение учётки и смена роли гасят его сразу. Не путать со служебным токеном `MCP_TOKENS` из `.env` | `src/db/mcp_access.py`, `src/mcp/policy.py`, `docs/furca/blocks/mcp.md` |
 | Сервисный токен | Ключ внешнего сервиса к API чтения (`/api/v1/*`): только чтение, право на каждый метод, страны и срок у ключа | `src/db/api_access.py`, `tools/api_token.py`, `docs/18-access-map.md` |
-| Ключи сервисов | Ключи внешних сервисов (модель, Pointer, iSpring — реестр `src/domain/service_keys.py`): вставляются главным админом на «Подключениях», лежат в базе зашифрованными (`SECRETS_KEY` — вне базы), иначе берутся из окружения (`OPENAI_API_KEY`, `POINTER_API_KEY`, …); сохранение — после второго шага входа, свежего подтверждения и проверки у провайдера | `src/domain/service_keys.py`, `src/db/service_keys.py`, `src/db/secret_crypto.py`, `src/web/service_keys_screen.py`, `docs/12-web-admin.md` |
+| Ключи сервисов | Ключи внешних сервисов (модель, Pointer, iSpring, приложение Dodo IS — реестр `src/domain/service_keys.py`): вставляются главным админом на «Подключениях», лежат в базе зашифрованными (`SECRETS_KEY` — вне базы), иначе берутся из окружения (`OPENAI_API_KEY`, `POINTER_API_KEY`, …); сохранение — после второго шага входа, свежего подтверждения и проверки у провайдера | `src/domain/service_keys.py`, `src/db/service_keys.py`, `src/db/secret_crypto.py`, `src/web/service_keys_screen.py`, `docs/12-web-admin.md` |
 | FURCA | Процесс разработки проекта: анкета, спека, блоки с контрактами, граф задач, журнал решений. Артефакты — в `docs/furca/` | `docs/furca/`, `progress.md`, `tasks.md` |
 | D###, T###, #N | Номер решения владельца (`docs/furca/decisions.md`), номер задачи стройки (`tasks.md`), номер issue на GitHub. Ссылки на них стоят в докстрингах — это «почему так» | `docs/furca/decisions.md`, `tasks.md` |
 | Тестовая база | Тесты блока `db` и всего, что ходит в Postgres, идут на отдельной базе; без неё пропускаются, а пропуск — не зелёный | `Makefile` (`make test`), `tests/db_harness.py`, `tests/conftest.py` |
@@ -176,7 +176,7 @@ Flask-приложение управляющей компании и партн
 «Подключения»: ключи сервисов, ключи API и состояние подключений (D638), подключение
 Claude входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,photo_upload,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,countries_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -187,8 +187,9 @@ Claude входом через сайт (OAuth).
 | `src/web/auth.py` | Вход в админку: форма, сессия в подписанной куке, выход (T323, D155) |
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
 | `src/web/connections_screen.py` | Вкладка «Подключения» раздела «Администрирование» (D638, D639): ключи сервисов и API |
-| `src/web/countries_screen.py` | Вкладка «Страны» раздела «Администрирование» (D640, #1251) |
 | `src/web/demo_entry.py` | Вход в открытое демо (D524): выбор роли и сессия без пароля — только на стенде демо |
+| `src/web/dodois_connect.py` | Публичная страница входа в Dodo IS по ссылке-приглашению (D640, #951) |
+| `src/web/dodois_screen.py` | Блок «Dodo IS» на вкладке «Подключения»: входы по странам и ссылки для коллег (D640, #951) |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
 | `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
 | `src/web/google_profile.py` | Имя и фото из Google в учётку (D468): скачать фото один раз и записать |
@@ -245,6 +246,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
 | `src/web/texts_demo.py` | Тексты открытого демо и лендинга (D524): выбор роли, плашка, посадочная страница |
+| `src/web/texts_dodois.py` | Тексты входов в Dodo IS по странам (D640, #951): блок «Dodo IS» на «Подключениях» и публичная страница входа по ссылке |
 | `src/web/texts_grade.py` | Тексты «почему такая буква» и «расшифровка оценки» на карточке проверки (D490) |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры |
@@ -307,10 +309,11 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 24 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, … (+16) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
-| `src/web/templates/administration/` | 4 | _health.html, _nav.html, connections.html, countries.html |
+| `src/web/templates/administration/` | 5 | _dodois.html, _health.html, _nav.html, connections.html, countries.html |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
+| `src/web/templates/dodois/` | 1 | connect.html |
 | `src/web/templates/inspections/` | 10 | _card_body.html, _card_parts.html, _letter_form.html, _panel.html, _panel_fragment.html, _row.html, card.html, letter.html, … (+2) |
 | `src/web/templates/journal/` | 1 | page.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
@@ -328,7 +331,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 63 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+55) |
+| `src/web/static/` | 66 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-administration.css, … (+58) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -403,7 +406,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,country_contracts,country_report_langs,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -411,7 +414,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
 | `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
-| `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0096, D640) |
+| `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
 | `src/db/health_store.py` | Двери базы для вкладки «Подключения» (D638): исходы проб и последние заходы сборов |
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
@@ -547,7 +550,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0093_ratings_rko_service_marks.sql` | «Дисквалифицировать пиццу» в фото-проверке РКО — не нарушение, а служебная пометка контроля: отчёт ресторана не идёт в пул баллов по продукту |
 | `0094_action_plan_file_parsed.sql` | Файл «туда и обратно» электронного плана, шаг 3 эпика #1168 (спека 2026-10-22-electronic-action-plan-design, «Файл туда и обратно») |
 | `0095_health_checks.sql` | Постоянная проверка подключений (D638, #1251) |
-| `0096_country_report_langs.sql` | Языки отчёта страны, изменяемые из веба (D640, #1251, вкладка «Администрирование → Страны») |
+| `0096_dodois_logins.sql` | Входы в Dodo IS по странам (D640, #951) |
+| `0097_dodois_invite_result.sql` | Новый вход заменяет рабочий вход страны только после проверки: учётка должна открывать хоть одну пиццерию |
+| `0098_country_report_langs.sql` | Языки отчёта страны, изменяемые из веба (D640, #1251, вкладка «Администрирование → Страны») |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -625,6 +630,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/auditor.py` | Имя проверяющего по Telegram ID (задача T063, решение D032) |
 | `src/bot/config.py` | Окружение бота: токен, кому отвечать, как запускаться |
 | `src/bot/dates.py` | Разбор даты из живой фразы аудитора — перенесён в домен (`src/domain/dates.py`) |
+| `src/bot/dodois_loader.py` | Входы в Dodo IS по странам: ночью продлевает, раз в час проверяет «открыто X из Y» (D640) |
 | `src/bot/errors.py` | Отказы блока `bot` |
 | `src/bot/finish_translate.py` | Автоперевод комментариев при сборке отчёта (D443) |
 | `src/bot/frame_copies.py` | Копии присланных кадров на диске площадки, на 7 дней (#367, решение владельца D179) |
@@ -725,6 +731,21 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/health/probes.py` | Проверка ключа у провайдера до записи (D576): один дешёвый вызов с введённым значением |
 <!-- map:end -->
 
+## src/dodois — входы в Dodo IS по странам
+
+Блок «Dodo IS» на «Подключениях» (`docs/12-web-admin.md`, D640, #951): device flow
+`auth.dodois.com`, продление и проверка «открыто X из Y». Расписание — `src/bot/dodois_loader.py`,
+правила — `src/domain/dodois.py`, база — `src/db/dodois_logins.py`, экраны — `src/web/dodois_screen.py`,
+`src/web/dodois_connect.py`.
+
+<!-- map:begin files src/dodois/*.py -->
+| Файл | Что делает |
+|---|---|
+| `src/dodois/client.py` | Разговор с Dodo IS: вход устройства, продление, имя учётки, счёт открытых пиццерий (D640) |
+| `src/dodois/flow.py` | Вход по ссылке: сервер начинает device flow, сам опрашивает Dodo IS и пишет вход (D640) |
+| `src/dodois/service.py` | Входы в Dodo IS по странам: записать вход, продлить, проверить «открыто X из Y» (D640) |
+<!-- map:end -->
+
 ## src/ratings — рейтинги и оценки площадок
 
 Раздел «Рейтинги»: разбор выгрузок РС/РКО, расчёты сводки, оценки на картах
@@ -803,6 +824,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
 | `src/domain/dates.py` | Разбор даты из живой фразы аудитора (задача #220) |
 | `src/domain/demo.py` | Открытое демо: учётки ролей и переключатели — контракт между посевом и входом |
+| `src/domain/dodois.py` | Входы в Dodo IS по странам (D640, #951): правила без базы и сети |
 | `src/domain/edition.py` | Издание методики, на котором идёт проверка, и его снимок рядом с состоянием |
 | `src/domain/engine.py` | Вызов движка подпроцессом — единственный способ, которым блок его трогает |
 | `src/domain/errors.py` | Отказы блока `domain` |
@@ -928,6 +950,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/bench_run.py` | T035: замер точности разбора на боевых данных — число, а не мнение |
 | `tools/comment_only_measure.py` | T202: цена решения D081 «кадр с комментарием разбирается по комментарию» |
 | `tools/demo_refresh.sh` | Обновление демо-стенда из `main` (задача T102, решение D059) |
+| `tools/dodois_import.py` | Перенос нынешнего входа в Dodo IS в базу — разовый, по одной стране (D640, #951) |
 | `tools/fastpath_measure.py` | T113, T125: доля срабатываний быстрого пути — так, как его зовёт живой бот |
 | `tools/gen_map.py` | Карта кода: перегенерация таблиц в docs/ между маркерами (`make map`, #731) |
 | `tools/landing_shots.py` | Снимки живых экранов для посадочной страницы (D545) — одной командой |
@@ -1024,7 +1047,7 @@ Telegram, ни HTTP, ни SQL.
 | Подключить агрегатор доставки | Модуль в `src/ratings/aggregators/` по образцу `wolt.py` (поиск у координат) или `glovo.py` (известная точка), затем строка в `SEARCHERS` или `KNOWN` в `collect.py`; описание — `docs/17-aggregators.md` |
 | Метод API чтения для Swarm | Адрес и право — `src/web/swarm_api.py`, сборка ответа — `src/web/api_feed.py`, чтение — `src/db/swarm_read.py`, `src/ratings/feed.py`; права ключей — `src/db/api_access.py`; контракт — `docs/12-web-admin.md`, «API чтения для Swarm» |
 | Новая переменная окружения | Читается в `config.py` своего блока (`src/<блок>/config.py`) с понятным отказом на мусор; впишите в `.env.example` с комментарием — тест `tests/test_docs_map.py` требует; `make map` обновит `docs/inventory.md` |
-| Добавить язык интерфейса или отчёта | Интерфейс — языки в `src/web/texts*.py` и `src/bot/texts.py` (тесты требуют полноты по каждому языку); языки отчёта по странам — данные: файл `src/domain/report_langs.py` и переопределение из веба `src/db/country_report_langs.py` (D640); формулировки методики — таблица `translations` (миграция `0001`) |
+| Добавить язык интерфейса или отчёта | Интерфейс — языки в `src/web/texts*.py` и `src/bot/texts.py` (тесты требуют полноты по каждому языку); языки отчёта по странам — данные в `src/domain/report_langs.py`; формулировки методики — таблица `translations` (миграция `0001`) |
 | Роль «администратор истории»: снять, принять, перенести проверку | `src/db/retract.py`, `src/db/accept.py`, `src/db/move.py` — под `DATABASE_RETRACTION_URL`; веб-двери — `src/web/review.py`, `src/web/revision.py`; права держит база (миграции `0010`, `0025`, `0034`) |
 | Загрузить историческую проверку | `src/mcp/imports.py`, `import_modes.py`, запись — `src/db/imports.py`, `imports_legacy.py`; процедура — `docs/14-history-import.md` |
 | Пространство и страны | Завести и привязать — `tools/space.py` (`make space`), логика — `src/db/spaces.py`, `src/db/reach.py` |

@@ -17,7 +17,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.db import api_access, health_store, model_key
+from src.db import api_access, dodois_logins, health_store, model_key
 from src.domain.health import LoadFacts, ProbeRow
 from src.domain.permissions import MATRIX, SIDE_HQ, role_may
 from src.health import checks
@@ -49,6 +49,8 @@ def _стенд(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str) -> I
             "sheet": None,
         },
     )
+    monkeypatch.setattr(dodois_logins, "list_logins", lambda: ())
+    monkeypatch.setattr(dodois_logins, "list_invites", lambda limit=30: ())
     monkeypatch.setattr(
         health_store,
         "record",
@@ -85,6 +87,11 @@ def test_главный_админ_видит_раздел_и_состояние
     assert "shealth__summary--red" in page
     assert "Не работает: 2" in page
     assert "Сбой: glovo: 503" in page
+    # Плитки разложены по группам; оба Pointer — в «Рейтингах», ключ и сбор подписаны.
+    системное = page.index("Системное: хранилище")
+    рейтинги = page.index("Рейтинги и оценки")
+    assert системное < page.index("Хранилище кадров") < рейтинги
+    assert рейтинги < page.index("Pointer — ключ") < page.index("Pointer — ночной сбор")
     # Ключи сервисов и ключи API переехали сюда же.
     assert 'id="service-keys"' in page or "service-keys" in page
     # Пункт меню у главного админа есть.

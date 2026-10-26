@@ -26,6 +26,7 @@ from .texts_administration import ADMINISTRATION_TEXTS
 from .texts_connections import CONNECTIONS_TEXTS
 from .texts_country import COUNTRY_TEXTS
 from .texts_demo import DEMO_TEXTS
+from .texts_dodois import DODOIS_TEXTS
 from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_journal import JOURNAL_TEXTS
@@ -1763,6 +1764,7 @@ TEXTS: dict[str, dict[str, str]] = {
 _ЧАСТИ = (
     TEXTS,
     DEMO_TEXTS,
+    DODOIS_TEXTS,
     OAUTH_TEXTS,
     CONNECTIONS_TEXTS,
     COUNTRY_TEXTS,
@@ -1801,6 +1803,7 @@ TEXTS = {
     **CONNECTIONS_TEXTS,
     **COUNTRY_TEXTS,
     **DEMO_TEXTS,
+    **DODOIS_TEXTS,
     **GRADE_TEXTS,
     **HOME_TEXTS,
     **JOURNAL_TEXTS,

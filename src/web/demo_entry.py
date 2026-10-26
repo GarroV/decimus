@@ -60,6 +60,14 @@ LOCKED_ENDPOINTS = frozenset(
         # «Проверить сейчас» (D638) — проба настоящих провайдеров настоящими ключами.
         "connection_health_check",
         "service_key_delete",
+        # Входы в Dodo IS по странам (D640): выдача и погашение ссылок, проверка настоящим
+        # входом; публичная страница по ссылке тоже закрыта — демо ничего не подтверждает.
+        "dodois_invite_issue",
+        "dodois_invite_revoke",
+        "dodois_check",
+        "dodois_connect",
+        "dodois_connect_start",
+        "dodois_connect_status",
         # Подтверждение входа и «продолжить» выполняют то же намерение, что кнопки
         # выше (`reauth.INTENT_ACTIONS`): закрыта кнопка — закрыт и обход через них.
         "settings_continue",
