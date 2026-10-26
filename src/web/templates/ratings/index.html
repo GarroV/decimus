@@ -87,7 +87,7 @@
         {{ info_tip(t('ratings.loaded.hint'), t('ratings.loaded.title'), loaded_rows or [t('ratings.loaded.none')], 'loaded') }}
       </div>
     </div>
-    {% if may_manage %}<a class="btn btn--sm" href="{{ url(ratings_path ~ '/imports') }}?lang={{ lang }}">{{ t('ratings.manage') }}</a>{% endif %}
+    {% if may_manage %}<a class="btn btn--sm" href="{{ admin_ratings_url }}">{{ t('ratings.manage') }}</a>{% endif %}
   </header>
 
   <form class="rt-bar" id="rt-bar-form" data-rt-auto method="get" action="{{ url(ratings_path) }}" aria-label="{{ t('ratings.group') }}">

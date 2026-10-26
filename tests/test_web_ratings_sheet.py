@@ -1,4 +1,4 @@
-"""Блок «Таблица контроля» на «Загрузках» и кнопка «Забрать сейчас» (D464).
+"""Блок «Таблица контроля» вкладки «Рейтинги» (D654) и кнопка «Забрать сейчас» (D464).
 
 Видят и нажимают контроль и админ УК (те же, что загружают файлы); остальным адрес
 отвечает 403. Страница рендерится настоящая, данные подменены. Сбой забора виден
@@ -23,6 +23,8 @@ from src.web import ratings_sheet
 from src.web.texts import TEXTS
 
 ORIGIN = {"Origin": "http://localhost"}
+#: Блок «Таблица контроля» во вкладке «Рейтинги» раздела «Администрирование» (D654).
+АДРЕС_БЛОКА = "/administration?tab=ratings&block=sheet"
 КНОПКА = "Забрать сейчас"
 В_12_ЧАСОВ = datetime(2026, 10, 13, 12, 0, tzinfo=UTC)
 
@@ -35,7 +37,7 @@ def _лист(
 
 @pytest.fixture
 def экран(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    """Настоящий шаблон «Загрузок»; состояние забора — в словаре, адрес таблицы задан."""
+    """Настоящий шаблон вкладки; состояние забора — в словаре, адрес таблицы задан."""
     данные: dict[str, Any] = {"состояние": (), "открытая": None, "заявки": []}
     monkeypatch.setenv(sheet_sync.SHEET_ID_VAR, "a" * 30)
     monkeypatch.setattr(screen.read, "countries", lambda: ())
@@ -72,13 +74,13 @@ def test_без_адреса_таблицы_блок_говорит_что_за�
 ) -> None:
     monkeypatch.delenv(sheet_sync.SHEET_ID_VAR)
     for client in _клиент(monkeypatch, "HQ", "control"):
-        текст = client.get("/ratings/imports").get_data(as_text=True)
+        текст = client.get(АДРЕС_БЛОКА).get_data(as_text=True)
         assert "самозабор выключен" in текст and КНОПКА not in текст
 
 
 def test_ещё_не_забирали_кнопка_есть(monkeypatch: pytest.MonkeyPatch, экран: Any) -> None:
     for client in _клиент(monkeypatch, "HQ", "admin"):
-        текст = client.get("/ratings/imports").get_data(as_text=True)
+        текст = client.get(АДРЕС_БЛОКА).get_data(as_text=True)
         assert "Таблицу ещё не забирали" in текст and КНОПКА in текст
         assert 'action="/ratings/sheet-sync' in текст
 
@@ -92,7 +94,7 @@ def test_итог_по_листам_время_счётчики_и_причин�
         _лист("base-rs-violations", "failed", note="closed: таблица закрыта"),
     )
     for client in _клиент(monkeypatch, "HQ", "control"):
-        текст = client.get("/ratings/imports").get_data(as_text=True)
+        текст = client.get(АДРЕС_БЛОКА).get_data(as_text=True)
     assert "Последний заход по таблице: 13.10.2026 12:00" in текст
     assert "5 · 2 · 100 · 1" in текст and "без изменений" in текст
     assert "Не удалось забрать листов: 1 из 3" in текст
@@ -104,7 +106,7 @@ def test_сбой_на_английском_без_русской_подробн
 ) -> None:
     экран["состояние"] = (_лист("base-scores", "failed", note="header: в файле нет колонок: Балл"),)
     for client in _клиент(monkeypatch, "HQ", "control", ui_lang="en"):
-        текст = client.get("/ratings/imports").get_data(as_text=True)
+        текст = client.get(АДРЕС_БЛОКА).get_data(as_text=True)
     assert "Could not pull 1 of 1 sheets" in текст
     assert "the sheet header changed" in текст and "нет колонок" not in текст
 
@@ -115,7 +117,7 @@ def test_нажатие_ставит_заявку_и_возвращает_на_�
     for client in _клиент(monkeypatch, "HQ", "control"):
         ответ = client.post("/ratings/sheet-sync", headers=ORIGIN)
         assert ответ.status_code == 303
-        assert ответ.headers["Location"] == "/ratings/imports?sheet=queued"
+        assert ответ.headers["Location"] == f"{АДРЕС_БЛОКА}&sheet=queued"
         после = client.get(ответ.headers["Location"]).get_data(as_text=True)
     assert len(экран["заявки"]) == 1
     assert "Заявка принята" in после and "Заявка в очереди с 13.10.2026" in после
@@ -151,7 +153,7 @@ def test_состояние_не_прочиталось_блок_не_врёт(m
 
     monkeypatch.setattr(state, "states", отказ)
     for client in _клиент(monkeypatch, "HQ", "control"):
-        текст = client.get("/ratings/imports").get_data(as_text=True)
+        текст = client.get(АДРЕС_БЛОКА).get_data(as_text=True)
     assert "Состояние забора таблицы не прочиталось" in текст and КНОПКА not in текст
 
 

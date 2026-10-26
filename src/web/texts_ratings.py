@@ -47,7 +47,7 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.loaded.hint": {"ru": "Когда обновлены данные", "en": "When the data was updated"},
     "ratings.loaded.title": {"ru": "Последняя загрузка", "en": "Last upload"},
     "ratings.loaded.none": {"ru": "Загрузок ещё не было.", "en": "Nothing has been uploaded yet."},
-    "ratings.manage": {"ru": "Загрузки и справочники", "en": "Uploads and settings"},
+    "ratings.manage": {"ru": "Настройки рейтингов", "en": "Ratings settings"},
     "ratings.block.scores": {
         "ru": "Средний РС и РКО",
         "en": "Average standards and customer experience",
@@ -186,7 +186,6 @@ _SCREEN: dict[str, dict[str, str]] = {
 }
 
 _IMPORTS: dict[str, dict[str, str]] = {
-    "ratings.imports.title": {"ru": "Загрузки рейтингов", "en": "Rating uploads"},
     "ratings.imports.hint": {
         "ru": "CSV из Dodo IS, лист «Качество по пиццериям» или снимок рейтинга (JSON), "
         "до {mb} МБ. Формат узнаётся сам.",

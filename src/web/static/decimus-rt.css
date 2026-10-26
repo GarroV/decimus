@@ -453,3 +453,15 @@
 .rt-hard__more { margin-top: var(--space-2); }
 .rt-hard__more[hidden] { display: none; }
 @media (max-width: 719px) { .rt-hard { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── «Рейтинги» в «Администрировании» (D654): список блоков настроек и панель ───────── */
+.slist--ratings { --slist-cols: minmax(0, 1fr) minmax(0, 1.4fr) 14px; }
+.slist--ratings .srow__cell { overflow: visible; white-space: normal; }
+.slist--ratings .srow__cell--warn { color: var(--err); }
+.slist--ratings .srow__go { order: 9; justify-self: end; color: var(--ink-3); font-size: 18px; line-height: 1; }
+.slist--ratings .srow.is-current .srow__go { color: var(--accent); }
+.rt--panel { gap: var(--space-5); }
+@media (max-width: 719px) {
+  .slist--ratings .srow__main { flex: 1 1 calc(100% - 28px); }
+  .slist--ratings .srow__go { order: 0; }
+}

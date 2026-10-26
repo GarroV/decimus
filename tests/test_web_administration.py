@@ -17,7 +17,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.db import api_access, dodois_logins, health_store, model_key
+from src.db import api_access, dodois_logins, health_store, model_key, ratings_sync
 from src.domain.health import LoadFacts, ProbeRow
 from src.domain.permissions import MATRIX, SIDE_HQ, role_may
 from src.health import checks
@@ -30,6 +30,7 @@ from src.web import (
     partner_spaces,
     usage_screen,
 )
+from src.web import ratings as ratings_screen
 
 РАЗДЕЛ = "/administration"
 СЕЙЧАС = datetime.now(UTC)
@@ -131,14 +132,15 @@ def test_старый_адрес_вкладки_перенаправляет(г�
         "people",
         "spaces",
         "countries",
+        "ratings",
         "journal",
         "usage",
         "connections",
         "keys",
         "dodois",
     ],
-    ("HQ", "admin"): ["people", "spaces", "countries", "usage"],
-    ("HQ", "control"): ["people"],
+    ("HQ", "admin"): ["people", "spaces", "countries", "ratings", "usage"],
+    ("HQ", "control"): ["people", "ratings"],
     ("GE", "admin"): ["people", "spaces"],
     ("HQ", "developer"): [],
     ("HQ", "guest"): [],
@@ -154,6 +156,18 @@ def _без_базы(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(partner_spaces, "overview", lambda: ())
     monkeypatch.setattr(country, "countries", lambda **_: ())
     monkeypatch.setattr(country_summary, "developers_of", lambda _codes: ({}, {}, False))
+
+
+def _рейтинги_без_базы(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Вкладка «Рейтинги» читает справочники и таблицу контроля: подменяем пустым."""
+    monkeypatch.setattr(ratings_screen.read, "countries", lambda: ())
+    monkeypatch.setattr(ratings_screen.read, "imports", lambda: ())
+    monkeypatch.setattr(ratings_screen.read, "open_issues", lambda: ())
+    monkeypatch.setattr(ratings_screen.read, "hard_rules", lambda: ())
+    monkeypatch.setattr(ratings_screen.read, "settings", dict)
+    monkeypatch.setattr(ratings_screen.read, "layout_rows", lambda: ())
+    monkeypatch.setattr(ratings_sync, "states", lambda: ())
+    monkeypatch.setattr(ratings_sync, "open_request", lambda: None)
 
 
 def _вкладки_на_странице(страница: str) -> list[str]:
@@ -176,7 +190,7 @@ def test_каждая_роль_видит_ровно_свои_вкладки(
         assert ответ.status_code == 200, f"{tenant}/{role}"
         assert _вкладки_на_странице(ответ.get_data(as_text=True)) == ждём
         # Каждая вкладка роли открывается, чужая — нет.
-        for вкладка in ("journal", "usage", "connections", "keys", "dodois"):
+        for вкладка in ("ratings", "journal", "usage", "connections", "keys", "dodois"):
             открылась = client.get(f"{РАЗДЕЛ}?tab={вкладка}")
             if вкладка not in ждём:
                 assert открылась.status_code == 404, f"{tenant}/{role}: {вкладка} открылась"
@@ -314,6 +328,7 @@ def test_каждая_вкладка_с_шапкой_каркаса(monkeypatch:
     monkeypatch.setattr(journal_screen.journals, "read_actions", lambda *_a, **_k: ())
     monkeypatch.setattr(journal_screen.journals, "read_logins", lambda *_a, **_k: ())
     monkeypatch.setattr(journal_screen.journals, "journal_people", lambda *_a, **_k: ())
+    _рейтинги_без_базы(monkeypatch)
     client = next(_стенд(monkeypatch, tenant="HQ", role="superadmin"))
     ответ = client.get(f"{РАЗДЕЛ}?tab={вкладка}")
     assert ответ.status_code == 200, вкладка
@@ -323,3 +338,48 @@ def test_каждая_вкладка_с_шапкой_каркаса(monkeypatch:
     )
     if вкладка in ВКЛАДКИ_СПИСКОМ:
         assert "<table" not in html, f"вкладка {вкладка}: список — это slist/srow, не таблица"
+
+
+# --- вкладка «Рейтинги» (D654, #1251, шаг 3) -------------------------------------------------
+
+#: Роли с правом `ratings.manage` и без него (`domain/tenants.may_manage_ratings`).
+РЕЙТИНГИ_МОГУТ = [("HQ", "superadmin"), ("HQ", "admin"), ("HQ", "control")]
+РЕЙТИНГИ_НЕ_МОГУТ = [("GE", "admin"), ("HQ", "developer"), ("HQ", "guest"), ("HQ", "osb")]
+
+
+@pytest.mark.parametrize(("tenant", "role"), РЕЙТИНГИ_МОГУТ)
+def test_рейтинги_видны_тем_у_кого_ratings_manage(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str
+) -> None:
+    _без_базы(monkeypatch)
+    _рейтинги_без_базы(monkeypatch)
+    client = next(_стенд(monkeypatch, tenant=tenant, role=role))
+    ответ = client.get(f"{РАЗДЕЛ}?tab=ratings")
+    assert ответ.status_code == 200
+    assert "ratings" in _вкладки_на_странице(client.get(РАЗДЕЛ).get_data(as_text=True))
+
+
+@pytest.mark.parametrize(("tenant", "role"), РЕЙТИНГИ_НЕ_МОГУТ)
+def test_рейтинги_без_права_404(monkeypatch: pytest.MonkeyPatch, tenant: str, role: str) -> None:
+    _без_базы(monkeypatch)
+    _рейтинги_без_базы(monkeypatch)
+    client = next(_стенд(monkeypatch, tenant=tenant, role=role))
+    assert client.get(f"{РАЗДЕЛ}?tab=ratings").status_code == 404
+    assert client.get(f"{РАЗДЕЛ}?tab=ratings&block=rules").status_code == 404
+
+
+def test_рейтинги_блок_открывает_панель_неизвестный_404(monkeypatch: pytest.MonkeyPatch) -> None:
+    _рейтинги_без_базы(monkeypatch)
+    client = next(_стенд(monkeypatch, tenant="HQ", role="control"))
+    список = client.get(f"{РАЗДЕЛ}?tab=ratings").get_data(as_text=True)
+    assert "sdrawer" not in список and 'id="ratings-rules"' in список
+    панель = client.get(f"{РАЗДЕЛ}?tab=ratings&block=rules").get_data(as_text=True)
+    assert "sdrawer" in панель and 'action="/ratings/hard-rules' in панель
+    assert client.get(f"{РАЗДЕЛ}?tab=ratings&block=nope").status_code == 404
+
+
+def test_старый_адрес_загрузок_ведёт_во_вкладку(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = next(_стенд(monkeypatch, tenant="HQ", role="control"))
+    ответ = client.get("/ratings/imports?lang=en")
+    assert ответ.status_code == 302
+    assert ответ.headers["Location"] == "/administration?tab=ratings&lang=en"

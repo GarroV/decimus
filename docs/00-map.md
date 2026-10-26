@@ -322,7 +322,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 1 | not_found.html |
-| `src/web/templates/ratings/` | 4 | _period.html, coverage.html, imports.html, index.html |
+| `src/web/templates/ratings/` | 3 | _period.html, coverage.html, index.html |
 | `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
