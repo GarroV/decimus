@@ -23,6 +23,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from src import domain
+from src.db.auditor_card import name_by_telegram_or_none
 from src.db.directory import upsert_unit
 from src.db.errors import DbError
 from src.domain.errors import DomainError
@@ -540,14 +541,23 @@ def build_start_router(
             )
             return
 
+        # Имя из карточки человека (D642): читается в потоке, чтобы не держать
+        # бота; сбой чтения даёт `None`, и имя берётся из следующего источника.
+        card_name = await asyncio.to_thread(name_by_telegram_or_none, callback.from_user.id)
         auditor = auditor_name(
-            callback.from_user.id, callback.from_user.full_name, settings.auditor_names
+            callback.from_user.id,
+            callback.from_user.full_name,
+            settings.auditor_names,
+            card_name,
         )
         # Считаем ДО обрезки, пока имя профиля ещё под рукой: `auditor` выше
         # уже обрезан (это и есть контракт `auditor_name`), а обрезалось ли
         # оно — узнать можно только сравнением с тем же необрезанным именем.
         auditor_shortened = auditor_name_was_shortened(
-            callback.from_user.id, callback.from_user.full_name, settings.auditor_names
+            callback.from_user.id,
+            callback.from_user.full_name,
+            settings.auditor_names,
+            card_name,
         )
         try:
             # Подпроцесс — в поток: старт проверки не должен останавливать бота

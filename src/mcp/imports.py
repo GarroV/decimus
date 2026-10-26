@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING, Any, cast
 from ..db.errors import DbError
 from ..db.models import ORIGIN_IMPORT, ORIGIN_LEGACY
 from ..domain import repeat_rule
+from ..domain.auditor_name import spell_name
 from ..domain.kinds import INSPECTION_KINDS
 from ..domain.models import TEXT_LANGS
 from . import import_modes as modes
@@ -282,6 +283,20 @@ def _reported(pct: float | int | None, grade: str | None) -> tuple[float | None,
     return pct, (буква.upper() if буква else None)
 
 
+def _card_name(tenant: str, actor: str) -> str | None:
+    """Имя проверяющего из карточки вошедшего человека (D642); нет карточки — `None`.
+
+    Актор `web:<логин>` — личный токен или вход через OAuth; у служебного токена
+    (`mcp:<сторона>`) карточки нет, и имя остаётся таким, как назвал вызывающий.
+    """
+    from ..db.auditor_card import name_by_login_or_none
+
+    if not actor.startswith("web:"):
+        return None
+    name = name_by_login_or_none(tenant, actor.removeprefix("web:"))
+    return name or None
+
+
 def import_create_inspection(
     *,
     tenant: str,
@@ -310,7 +325,8 @@ def import_create_inspection(
     """
     from ..db import imports as db
 
-    del actor  # черновик подписывается на подтверждении (D199), а не здесь
+    # Черновик подписывается на подтверждении (D199); актор нужен только затем,
+    # чтобы взять имя проверяющего из карточки вошедшего человека (D642).
     режим = modes.parse_mode(mode)
     день = _parse_date(date, field="date")
     if день is None:
@@ -352,7 +368,11 @@ def import_create_inspection(
             origin=ORIGIN_IMPORT,
             checklist_code=эталон.code,
             checklist_version=эталон.version,
-            auditor=_required(auditor or "", field="auditor", limit=MAX_AUDITOR),
+            auditor=_required(
+                spell_name(_card_name(tenant, actor) or auditor or ""),
+                field="auditor",
+                limit=MAX_AUDITOR,
+            ),
         )
         with _db():
             ident = db.create_draft(черновик, apply_score=_rescorer())

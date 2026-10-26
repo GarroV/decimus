@@ -381,6 +381,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0099_health_alerts.sql": (
         "sql1:08ebd8b5bc08a214fd2c0bd6c289976f4889967a577ed3c7750b267ba7192de6"
     ),
+    "0100_web_user_name_latin.sql": (
+        "sql1:09fa3c3acfb53332b19cb2f270ea1c9d7c0808a1951918710e6052f8d03a226b"
+    ),
 }
 
 

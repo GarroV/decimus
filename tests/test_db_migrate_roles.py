@@ -485,7 +485,8 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # UPDATE на свёртку пароля — это смена пароля учётке, и грант колоночный
     # ровно затем, чтобы роль не получила права переписать логин и арендатора
     # заодно. В SELECT свёртки по-прежнему нет: менять пароль можно, не читая
-    # старый, и читать его незачем никому.
+    # старый, и читать его незачем никому. `0100` (D644) добавил имя латиницей для
+    # отчёта: читается и правится в карточке человека, как почта.
     "web_users": {
         "SELECT": {
             "id",
@@ -496,9 +497,17 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
             "role",
             "created_at",
             "email",
+            "display_name_latin",
         },
         "INSERT": {"tenant_code", "login", "password_hash", "role", "email"},
-        "UPDATE": {"disabled_at", "disabled_by", "role", "email", "password_hash"},
+        "UPDATE": {
+            "disabled_at",
+            "disabled_by",
+            "role",
+            "email",
+            "password_hash",
+            "display_name_latin",
+        },
     },
     # Смена пароля закрывает открытые сессии учётки (`0022`): иначе пароль
     # сменили, а старый вход продолжает работать — и человек, ради которого

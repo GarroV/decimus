@@ -171,7 +171,7 @@ async def test_auditor_comes_from_telegram_id_and_is_never_asked(domain_env: obj
 
     inspection = get_state(CHAT_ID)
     assert inspection is not None
-    assert inspection.auditor == "Владимир Гарро"
+    assert inspection.auditor == "Vladimir Garro", "партнёру имя уходит латиницей (D644)"
     assert not any("проверяющ" in text.lower() and "?" in text for text in session.texts[:-1])
 
 

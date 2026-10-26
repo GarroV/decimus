@@ -60,6 +60,7 @@ from src.bot.unit_pick import (
     where_suffix,
 )
 from src.db import checklist_langs
+from src.db.auditor_card import name_by_telegram_or_none
 from src.db.directory import upsert_unit
 from src.db.errors import DbError
 from src.domain import (
@@ -308,7 +309,7 @@ class _Wizard:
             raise Refused(self.say("walk.start.err.running"), 409, need="replace")
         unit = self.unit(body)
         names = self.bot.auditor_names if self.bot is not None else {}
-        auditor = auditor_name(self.who, full_name, names)
+        auditor = auditor_name(self.who, full_name, names, name_by_telegram_or_none(self.who))
         try:
             with holding_notes(self.who):
                 # Решающая проверка — под замком: ранняя выше могла пройти за

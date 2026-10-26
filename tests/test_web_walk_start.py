@@ -123,10 +123,23 @@ def test_старт_кладёт_ровно_выбранное(клиент: К�
         "en",
     ), "язык отчёта на старте равен языку чек-листа и меняется в конце (D415)"
     assert проверка.ui_lang == "ru"
-    assert проверка.auditor == "Аудитор", "имя — из профиля Telegram, как у бота"
+    assert проверка.auditor == "Auditor", "имя — из профиля Telegram, латиницей (D644)"
     assert проверка.checklist_code == "bizdev" and проверка.tenant
     assert ответ.get_json()["state"] == "active"
     assert проверка.run_id, "у начатой проверки есть личность (память бота сверяется по ней)"
+
+
+def test_старт_берёт_имя_из_карточки_человека(
+    клиент: Клиент, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D642: карточка сильнее профиля Telegram, и мини-апп пишет то же имя, что бот."""
+    monkeypatch.setattr(walk_start, "name_by_telegram_or_none", lambda _id: "Жульфаев Ринат")
+
+    ответ = клиент.старт()
+
+    assert ответ.status_code == 200, ответ.get_json()
+    проверка = get_state(АУДИТОР)
+    assert проверка is not None and проверка.auditor == "Zhulfaev Rinat"
 
 
 def test_приходящий_язык_отчёта_игнорируется(клиент: Клиент) -> None:

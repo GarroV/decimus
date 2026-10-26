@@ -373,10 +373,11 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
+| `src/db/auditor_card.py` | Имя проверяющего из карточки человека (D642) |
 | `src/db/bot_langs.py` | Язык бота, выбранный человеком (D303, #411): чтение и запись |
 | `src/db/bot_links.py` | Привязка бота к учётке через веб (D286): выпуск ссылки, погашение, привязка, отвязка |
 | `src/db/checklist_langs.py` | Язык чек-листа, выбранный аудитором при старте проверки (D451): чтение и запись |
@@ -556,6 +557,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0097_dodois_invite_result.sql` | Новый вход заменяет рабочий вход страны только после проверки: учётка должна открывать хоть одну пиццерию |
 | `0098_country_report_langs.sql` | Языки отчёта страны, изменяемые из веба (D640, #1251, вкладка «Администрирование → Страны») |
 | `0099_health_alerts.sql` | Оповещения владельцу о смене состояния подключений (D641) |
+| `0100_web_user_name_latin.sql` | Имя проверяющего латиницей в карточке человека (D644) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -837,6 +839,7 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin files src/domain/*.py -->
 | Файл | Что делает |
 |---|---|
+| `src/domain/auditor_name.py` | Написание имени проверяющего: латиницей, одно место для всех (D644) |
 | `src/domain/bot_checklists.py` | Чек-листы, по которым аудитор может начать проверку в боте (волна 3, D221) |
 | `src/domain/checklist.py` | Чтение методики: пункты чек-листа, зоны, допустимые классы, версия набора |
 | `src/domain/checklist_store.py` | Раскладка хранилища методик — та её часть, которую читает бот (#455) |
