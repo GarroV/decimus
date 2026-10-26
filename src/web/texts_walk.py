@@ -233,6 +233,11 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.find": {"ru": "Найти пункт", "en": "Find the item"},
     "walk.sheet.finding": {"ru": "Система ищет пункт…", "en": "Looking for the item…"},
     "walk.sheet.finding_short": {"ru": "Ищу…", "en": "Searching…"},
+    # Мгновенная подсказка, пока модель думает (#1267, D646).
+    "walk.sheet.preview": {
+        "ru": "Пока система уточняет — вероятно, это:",
+        "en": "While the system checks, this is likely:",
+    },
     "walk.sheet.found": {"ru": "Система предлагает", "en": "Suggested"},
     # Второе нарушение по тем же кадрам (D593).
     "walk.sheet.also": {"ru": "+ Тоже записать", "en": "+ Record this too"},

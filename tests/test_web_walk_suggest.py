@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -20,8 +21,10 @@ from src.bot import propose as ядро
 from src.bot.phrases import Learned
 from src.db.busy_lock import Hold
 from src.domain import get_state
+from src.domain.handover import HANDED_OVER_KEY, NOTES_FILE_NAME
 from src.recognize.errors import ModelUnavailable
 from src.recognize.fastpath import FastItem, FastPath
+from src.recognize.hint import HintItem
 from src.recognize.models import Candidate, Suggestion
 from src.web import walk_suggest, walk_write
 
@@ -346,3 +349,181 @@ def test_пункт_словаря_нижней_карточкой_без_фор
     assert [c["code"] for c in тело["candidates"]] == ["CLN05", "CLN06"]
     assert тело["candidates"][-1]["wording"] == ""
     assert get_state(АУДИТОР).findings == [], "запас ничего не записывает"  # type: ignore[union-attr]
+
+
+# ── мгновенная подсказка (#1267, D646 п. 3) ─────────────────────────────
+
+
+def _подсказка(клиент: Клиент, **тело: Any) -> Any:  # noqa: F811
+    return клиент.c.post(
+        walk_suggest.HINT_PATH,
+        data=json.dumps(тело),
+        content_type="application/json",
+        headers={"X-Telegram-Init-Data": клиент.init},
+    )
+
+
+@pytest.fixture
+def без_базы(monkeypatch: pytest.MonkeyPatch) -> Модель:
+    """Подсказка идёт настоящим быстрым путём и картой слов; карта синонимов молчит."""
+    m = Модель()
+    monkeypatch.setattr(ядро, "classify", m)
+    monkeypatch.setattr(ядро, "recall", lambda *a, **k: None)
+    return m
+
+
+def test_подсказка_ядро_не_зовёт_модель_и_ставит_пункт_про_пол(
+    domain_env: Path, без_базы: Модель
+) -> None:
+    итог = ядро.hint(
+        "грязный пол на тепловом участке",
+        1,
+        zone=None,
+        chat_id=АУДИТОР,
+        ui_lang="ru",
+        speech_lang="ru",
+    )
+
+    assert итог.via == "hint" and без_базы.звали == [], "подсказка не платит модели"
+    assert итог.candidates[0].code == "CLN01"
+    assert len(итог.candidates) <= 3
+
+
+def test_подсказка_выученная_фраза_стоит_первой_без_повторов(
+    domain_env: Path, без_базы: Модель, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(ядро, "recall", lambda *a, **k: Learned(code="TEH05", phrase="печка"))
+
+    итог = ядро.hint(
+        "печь в нагаре", 1, zone="hot_kitchen", chat_id=АУДИТОР, ui_lang="ru", speech_lang="ru"
+    )
+
+    коды = [c.code for c in итог.candidates]
+    assert коды[0] == "TEH05" and len(коды) == len(set(коды))
+
+
+def test_подсказка_пачке_с_комментарием_не_положена(domain_env: Path, без_базы: Модель) -> None:
+    """D208: по словам аудитор выбрал бы пункт, а кадры никто бы не посмотрел."""
+    итог = ядро.hint(
+        "грязный пол на тепловом участке",
+        3,
+        zone=None,
+        chat_id=АУДИТОР,
+        ui_lang="ru",
+        speech_lang="ru",
+    )
+
+    assert итог.candidates == ()
+
+
+def test_адрес_подсказки_отдаёт_карточки_с_зоной_и_ничего_не_пишет(
+    клиент: Клиент,  # noqa: F811
+    без_базы: Модель,
+) -> None:
+    ответ = _подсказка(клиент, words="печь в нагаре", zone_hint="hot_kitchen", frames=1)
+
+    assert ответ.status_code == 200, ответ.get_json()
+    тело = ответ.get_json()
+    assert тело["via"] == "hint" and тело["candidates"][0]["code"] == "CLN05"
+    assert тело["candidates"][0]["resolution"]["zone"] == "hot_kitchen", (
+        "зона записи выводится теми же правилами, что у поиска"
+    )
+    assert без_базы.звали == []
+    assert get_state(АУДИТОР).findings == [], "подсказка не пишет"  # type: ignore[union-attr]
+
+
+def test_адрес_подсказки_пуст_если_слова_ничего_не_подняли(
+    клиент: Клиент,  # noqa: F811
+    без_базы: Модель,
+) -> None:
+    ответ = _подсказка(клиент, words="ничего особенного не видно", frames=1)
+
+    assert ответ.status_code == 200 and ответ.get_json()["candidates"] == []
+
+
+def test_подсказка_не_ждёт_поиска_того_же_чата(
+    клиент: Клиент,  # noqa: F811
+    без_базы: Модель,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Подсказка летит параллельно с поиском: замок «один поиск за раз» её не касается."""
+    monkeypatch.setattr(walk_suggest, "try_hold", lambda *_a: Hold(acquired=False))
+
+    поиск = _поиск(клиент, zone="hot_kitchen", words="нагар", photos=[клиент.ссылка()])
+    подсказка = _подсказка(клиент, words="печь в нагаре", zone_hint="hot_kitchen", frames=1)
+
+    assert поиск.status_code == 429 and подсказка.status_code == 200
+
+
+def test_подсказка_без_подписи_не_работает(клиент: Клиент, без_базы: Модель) -> None:  # noqa: F811
+    ответ = клиент.c.post(
+        walk_suggest.HINT_PATH,
+        data=json.dumps({"words": "печь в нагаре"}),
+        content_type="application/json",
+    )
+
+    assert ответ.status_code in (401, 403)
+
+
+def test_подсказка_неизвестная_зона_не_ломает_экран(
+    клиент: Клиент,  # noqa: F811
+    без_базы: Модель,
+) -> None:
+    ответ = _подсказка(клиент, words="печь в нагаре", zone_hint="nowhere", frames=1)
+
+    assert ответ.status_code == 200 and ответ.get_json()["candidates"] == []
+
+
+def test_запись_по_подсказке_предложение_пишется_а_слова_не_учатся(
+    клиент: Клиент,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    выучено: list[str] = []
+    monkeypatch.setattr(walk_write, "learn", lambda w, **k: выучено.append(w) or "")
+
+    ответ = клиент.запись(
+        op="add",
+        zone="hot_kitchen",
+        code="CLN05",
+        level="D1",
+        words="печь в нагаре",
+        photos=[клиент.ссылка()],
+        suggested={"code": "CLN05", "level": "D1", "zone": "hot_kitchen", "via": "hint"},
+    )
+
+    assert ответ.status_code == 200, ответ.get_json()
+    запись = get_state(АУДИТОР).findings[0]  # type: ignore[union-attr]
+    assert запись.suggested_code == "CLN05" and выучено == []
+
+
+def test_подсказка_сданной_проверке_не_положена(
+    клиент: Клиент,  # noqa: F811
+    без_базы: Модель,
+    domain_env: Path,
+) -> None:
+    заметки = domain_env / f"chat_{АУДИТОР}" / NOTES_FILE_NAME
+    заметки.write_text(json.dumps({HANDED_OVER_KEY: 0}), encoding="utf-8")
+
+    ответ = _подсказка(клиент, words="печь в нагаре", zone_hint="hot_kitchen", frames=1)
+
+    assert ответ.status_code == 409
+
+
+def test_подсказка_не_длиннее_предела_и_с_выученной_и_с_быстрым_путём(
+    domain_env: Path, без_базы: Модель, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Выученная фраза, быстрый путь и карта вместе дали бы пять карточек — показываем три."""
+    monkeypatch.setattr(ядро, "recall", lambda *a, **k: Learned(code="TEH05", phrase="печка"))
+    monkeypatch.setattr(
+        ядро,
+        "hint_rank",
+        lambda *a, **k: tuple(
+            HintItem(code=c, level="D1", cue="") for c in ("PRD06", "PRD12", "TEH06")
+        ),
+    )
+
+    итог = ядро.hint(
+        "печь в нагаре", 1, zone="hot_kitchen", chat_id=АУДИТОР, ui_lang="ru", speech_lang="ru"
+    )
+
+    assert [c.code for c in итог.candidates] == ["TEH05", "CLN05", "PRD06"]

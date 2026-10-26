@@ -510,10 +510,18 @@
     // Исправленная температура (#836): тот же поиск с утверждением «реально N °C».
     var fixed = typeof reading === "number" ? reading : null;
     if (fixed !== null) body.reading_c = fixed;
+    // Номер поиска: выбор предварительной карточки увеличивает его, и ответ модели на
+    // этот поиск уже не применяется — выбор человека он не перебивает.
+    f.findId = (f.findId || 0) + 1;
+    var mine = f.findId;
+    f.preview = null;
+    f.pending = asked;
+    if (fixed === null && asked.words) preview(mine, asked, body.zone_hint);
     W.post(W.urls.suggest, body).then(function (res) {
-      if (!f) return;
+      if (!f || f.findId !== mine) return;
       if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
       f.finding = false;
+      f.preview = null;
       f.found = (res.body && res.body.candidates) || [];
       f.also = [];
       f.question = (res.body && res.body.question) || "";
@@ -537,11 +545,44 @@
         redraw.apply(null, ORDER.concat(["footer"]));
       } else { redraw("item", "footer"); }
     }).catch(function (err) {
-      if (!f) return;
+      if (!f || f.findId !== mine) return;
       f.finding = false;
       f.findError = err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network");
       redraw("item", "reading", "footer");
     });
+  }
+
+  /**
+   * Мгновенная подсказка (#1267): 2–3 пункта по словарю и выученным фразам, пока модель
+   * думает. Приходит за доли секунды и живёт, пока идёт поиск; пусто и сбой — молча,
+   * экран ждёт модель как раньше.
+   */
+  function preview(mine, asked, zone) {
+    W.post(W.urls.hint, { zone_hint: zone, words: asked.words, frames: asked.photos.length }).then(function (res) {
+      if (!f || !f.finding || f.findId !== mine || !res.ok) return;
+      var cards = (res.body && res.body.candidates) || [];
+      if (!cards.length) return;
+      f.preview = cards;
+      redraw("item");
+    }).catch(function () { /* подсказка — добавка к поиску, а не его часть */ });
+  }
+
+  /**
+   * Аудитор нажал предварительную карточку, не дожидаясь модели. Дальше — обычный
+   * выбор пункта: зона выводится теми же правилами, фиксирует человек «Сохранить».
+   */
+  function pickPreview(cand) {
+    f.findId += 1;
+    f.finding = false;
+    f.found = f.preview || [cand];
+    f.preview = null;
+    f.also = [];
+    f.question = "";
+    f.answers = [];
+    f.answered = null;
+    f.via = "hint";
+    f.asked = JSON.stringify(f.pending);
+    pick(cand.code, cand);
   }
 
   /** Слова или кадры поменялись после поиска — предложения могли устареть. */
@@ -550,7 +591,7 @@
     return f.asked !== JSON.stringify({ words: f.words.trim(), photos: readyPhotos().map(function (p) { return p.ref; }) });
   }
 
-  function proposal(cand) {
+  function proposal(cand, onPick) {
     var i = item(cand.code) || { q: cand.code };
     var on = f.code === cand.code && (!f.picked || f.picked === cand);
     var top = el("span", "walk-found__top");
@@ -575,7 +616,7 @@
       card.appendChild(line);
       return card;
     }
-    var b = W.button("walk-found__card", null, function () { pick(cand.code, cand); });
+    var b = W.button("walk-found__card", null, function () { if (onPick) onPick(cand); else pick(cand.code, cand); });
     b.setAttribute("aria-pressed", "false");
     b.appendChild(top);
     b.appendChild(el("span", "walk-found__q", i.q));
@@ -941,6 +982,12 @@
     var box = section(f.found || f.finding || f.code ? tx("walk.sheet.found") : null);
     if (f.finding) {
       box.appendChild(el("p", "walk-found__wait", tx("walk.sheet.finding")));
+      if (f.preview && f.preview.length) {
+        box.appendChild(el("p", "walk-found__preview", tx("walk.sheet.preview")));
+        var early = el("div", "walk-found");
+        f.preview.forEach(function (cand) { early.appendChild(proposal(cand, pickPreview)); });
+        box.appendChild(early);
+      }
       return box;
     }
     if (f.findError) box.appendChild(el("p", "walk-form__error", f.findError));

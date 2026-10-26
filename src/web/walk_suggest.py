@@ -8,6 +8,12 @@
 
 Опознание и замки те же, что у записи: подпись Telegram в заголовке, сданная
 проверка не ищет — после сдачи записывать уже некуда.
+
+Рядом — `POST /tg/walk/hint` (#1267, D646): мгновенная подсказка 2–3 пунктов без
+модели, пока модель думает. Отдельный адрес, а не режим поиска, по двум причинам:
+подсказка приходит параллельно с поиском того же чата, и замок «один поиск за раз»
+отклонил бы её как двойное нажатие; и она не платная, поэтому не занимает слот
+модели (`walk_model_gate`). Опознание, предел частоты и замок сданной проверки — те же.
 """
 
 from __future__ import annotations
@@ -20,7 +26,7 @@ from typing import Any
 from flask import Flask, Response, jsonify, request
 
 from src.bot import journal
-from src.bot.propose import Offer, propose
+from src.bot.propose import Offer, hint, propose
 from src.bot.zones import allowed_zones, zone_from_words
 from src.db import queries
 from src.db.busy_lock import WALK_SUGGEST, try_hold
@@ -34,7 +40,7 @@ from src.recognize.models import Candidate
 
 from .server_limits import walk_model_gate
 from .texts_walk import WALK_TEXTS
-from .walk_auth import SUGGEST_ENDPOINT, SUGGEST_PATH, WalkSettings
+from .walk_auth import HINT_ENDPOINT, HINT_PATH, SUGGEST_ENDPOINT, SUGGEST_PATH, WalkSettings
 from .walk_write import Identify, WalkRefused, _code, _refs, _text, reading_of
 from .walk_zone import resolve_item_zone
 
@@ -110,6 +116,13 @@ class Ask:
     hint: str | None
     #: Пространство проверки — для привычной зоны пункта (#1109). Пусто — не спрашивать.
     tenant: str | None = None
+
+
+def _count(value: Any) -> int:
+    """Число кадров из тела подсказки: не целое и отрицательное — ноль."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return 0
+    return int(min(value, MAX_SUGGEST_PHOTOS))
 
 
 def cap_photos(value: Any) -> tuple[Any, int]:
@@ -251,3 +264,43 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             # Не ошибка: поиск идёт по первым кадрам, клиент видит, что часть не учтена.
             reply["photos_omitted"] = omitted
         return jsonify(reply), 200
+
+    @app.post(HINT_PATH, endpoint=HINT_ENDPOINT)
+    def walk_hint() -> tuple[Response, int]:
+        who = identify(conf, ui_lang, header_only=True)
+        if not isinstance(who, int):
+            return who
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return refused("walk.err.bad_request", ui_lang, 400)
+        inspection = get_state(who)
+        if inspection is None:
+            return refused("walk.none.title", ui_lang, 409)
+        if handed_over(who):
+            return refused("walk.sealed", inspection.ui_lang, 409)
+        try:
+            words = _text(body, "words")
+            hint_key = "zone_hint" if body.get("zone_hint") else "zone"
+            zone = _code(body, hint_key) if body.get(hint_key) else None
+            offer = hint(
+                words,
+                _count(body.get("frames")),
+                zone=zone,
+                chat_id=who,
+                ui_lang=inspection.ui_lang,
+                speech_lang=inspection.speech_lang,
+            )
+        except WalkRefused as exc:
+            return refused(str(exc), inspection.ui_lang)
+        except (DomainError, DbError) as exc:
+            # Подсказка — добавка к поиску, а не его часть: сбой не показывается
+            # аудитору, модель ответит как обычно.
+            logger.warning("Обход: подсказка для чата %s не собралась: %s", log_id(who), exc)
+            return jsonify({"via": "hint", "candidates": []}), 200
+        ask = Ask(
+            chat_id=who,
+            spoken=zone_from_words(words, chat_id=who),
+            hint=zone,
+            tenant=inspection.tenant,
+        )
+        return jsonify(answer(offer, ask)), 200

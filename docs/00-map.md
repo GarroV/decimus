@@ -326,7 +326,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/usage/` | 1 | page.html |
-| `src/web/templates/users/` | 6 | _card.html, _connections.html, _service_keys.html, _spaces.html, forbidden.html, index.html |
+| `src/web/templates/users/` | 7 | _card.html, _connections.html, _service_key_panel.html, _service_keys.html, _spaces.html, forbidden.html, index.html |
 <!-- map:end -->
 
 <!-- map:begin tree src/web/static -->
@@ -907,6 +907,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/errors.py` | Отказы блока `recognize` |
 | `src/recognize/fastpath.py` | T113 (D063): быстрый путь — пункт без вызова модели, когда слова однозначны |
 | `src/recognize/guard.py` | Границы на свободный текст ответа модели (F-131) |
+| `src/recognize/hint.py` | Мгновенная подсказка: 2–3 пункта по карте слов, без модели (#1267, D646 п |
 | `src/recognize/language.py` | T192 (#157): правила разбора слов аудитора — данные, а не константы в коде |
 | `src/recognize/level.py` | Класс нарушения по критериям пункта: второй, узкий вопрос к модели (#1033) |
 | `src/recognize/manual.py` | T034: модель недоступна — перечень пунктов для ручного выбора кнопками |

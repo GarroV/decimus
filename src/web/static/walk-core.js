@@ -28,6 +28,7 @@
     finding: root.getAttribute("data-finding"),
     info: root.getAttribute("data-info"),
     suggest: root.getAttribute("data-suggest"),
+    hint: root.getAttribute("data-hint"),
     translate: root.getAttribute("data-translate"),
     app: root.getAttribute("data-app"),
     start: root.getAttribute("data-start"),

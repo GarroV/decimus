@@ -63,6 +63,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from src.domain import allowed_levels, get_item, list_items
@@ -177,6 +178,16 @@ def _said(text: str) -> tuple[frozenset[str], frozenset[str]]:
     return frozenset(spoken - contradictory), frozenset(denied - contradictory)
 
 
+def said_stems(text: str) -> tuple[frozenset[str], frozenset[str]]:
+    """Основы слов текста: сказанные утвердительно и сказанные под отрицанием.
+
+    Публичный вход в `_said` для потребителей, которым нужно то же прочтение
+    отрицания, что у быстрого пути (узнавание выученной фразы по набору основ,
+    #1267): второе прочтение разошлось бы с первым на первой же правке правил.
+    """
+    return _said(text)
+
+
 #: Заголовок колонки → **встроенный минимум** слов, которым она выбирается.
 #: Заголовок, которого нет ни здесь, ни в карте («Кандидаты»), словами не
 #: выбирается никогда: строка с двумя такими колонками останется неоднозначной,
@@ -259,6 +270,20 @@ def _resolve(
         if vocabulary.get(header.strip().lower(), frozenset()) & spoken
     ]
     return matched[0] if len(matched) == 1 else ()
+
+
+def column_resolver(note: str, *, chat_id: int | None) -> Callable[[Cue], tuple[str, ...]]:
+    """Разбор колонок строки карты по словам — тем же правилом, что у быстрого пути.
+
+    Нужен подсказке (#1267): строка «Пол | Грязь | Поломка» по словам «грязный пол»
+    — это грязь, и показывать рядом поломку незачем. Правило не дублируется:
+    слова считаются `_said`, колонки выбирает `_resolve` — как в `fast_path`.
+    Пусто — слова колонку не выбрали (или строка даёт ровно один набор кодов,
+    и тогда он и возвращается).
+    """
+    spoken, _ = _said(note)
+    vocabulary = _vocabulary_now(chat_id)
+    return lambda cue: _resolve(cue, spoken, vocabulary)
 
 
 def _offered(codes: tuple[str, ...], chat_id: int | None) -> bool:

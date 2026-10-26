@@ -148,6 +148,9 @@
   animation: walk-wait 1.4s linear infinite;
 }
 
+/* Подпись над предварительными карточками (#1267): тише, чем сами карточки. */
+.walk-found__preview { margin: 10px 0 6px; font-size: 13px; line-height: 18px; color: var(--ink-2); }
+
 @keyframes walk-wait { to { background-position: -200% 0; } }
 
 @media (prefers-reduced-motion: reduce) {
