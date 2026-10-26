@@ -61,3 +61,38 @@
 .sdodois-page__safe { color: var(--ink-3); font-size: var(--fs-meta); }
 .sdodois-page__code code { font-size: var(--fs-title); letter-spacing: 0.08em; }
 .sdodois-page__wait { color: var(--ink-3); }
+
+/* Вкладка «Страны» (D640): строка списка — ссылка со стрелкой, настройки страны — блоки-плитки. */
+.srow--go { cursor: pointer; }
+.srow--go .srow__go { order: 9; justify-self: end; color: var(--ink-3); font-size: 18px; line-height: 1; transition: transform var(--t-state) var(--ease), color var(--t-state) var(--ease); }
+.srow--go:hover .srow__go, .srow--go.is-current .srow__go { color: var(--accent); transform: translateX(2px); }
+.slist--countries .srow__cell { overflow: visible; white-space: normal; }
+.slist--countries .srow__main small { white-space: nowrap; }
+
+.cblocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); max-width: 760px; align-items: stretch; }
+.cblock { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: var(--space-6); border: 1px solid var(--line-strong); border-radius: var(--r-block, 12px); background: var(--surface); }
+.cblock--wide { grid-column: 1 / -1; }
+.cblock__title { margin: 0; font-size: var(--fs-meta); font-weight: var(--w-semibold); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); }
+.cblock__value { margin: 0; font-size: 18px; line-height: 24px; font-weight: var(--w-semibold); color: var(--ink); overflow-wrap: anywhere; }
+.cblock__value small { margin-left: var(--space-3); font-size: var(--fs-meta); font-weight: var(--w-regular); color: var(--ink-3); }
+.cblock__value--none { font-weight: var(--w-regular); color: var(--ink-3); }
+.cblock__note { margin: 0; font-size: var(--fs-dense); line-height: 18px; color: var(--ink-2); }
+.cblock > .sbtn, .cblock .sfold > summary { align-self: flex-start; margin-top: var(--space-2); }
+.cblock .sfold { margin-top: var(--space-2); }
+.cblock .sfold > summary { margin-top: 0; }
+.cblock__form { margin-top: var(--space-3); max-width: 32rem; }
+.cblock__form textarea { resize: vertical; }
+.cblock__item { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--r-md, 8px); background: var(--surface-2); }
+.cblock__facts { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr); gap: var(--space-2) var(--space-5); margin: 0; font-size: var(--fs-body); }
+.cblock__facts dt { color: var(--ink-2); font-size: var(--fs-dense); }
+.cblock__facts dd { margin: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 719px) {
+  .cblocks { grid-template-columns: minmax(0, 1fr); }
+  .cblock__facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .cblock__facts dd { margin-bottom: var(--space-3); }
+  .cblock .sbtn { min-height: 44px; }
+  .srow--go .srow__go { order: 0; }
+  .slist--countries .srow__main { flex: 1 1 calc(100% - 28px); }
+  .slist--countries .srow__cell::before { content: attr(data-label) ": "; color: var(--ink-3); margin-right: var(--space-2); }
+}

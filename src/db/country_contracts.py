@@ -153,6 +153,22 @@ def read(country: str) -> tuple[Contract, ...]:
     )
 
 
+def countries_with_contract() -> frozenset[str]:
+    """Коды стран, у которых есть хотя бы одна строка договора, одним запросом.
+
+    Не прочиталось — `CountryContractError`.
+    """
+    try:
+        with connection(check_environment().dsn) as conn, conn.cursor() as cur:
+            cur.execute("select distinct country from country_contracts")
+            rows = cur.fetchall()
+    except psycopg.Error as exc:
+        raise CountryContractError(
+            f"Не удалось прочитать договоры стран ({type(exc).__name__})"
+        ) from exc
+    return frozenset(str(r[0]) for r in rows)
+
+
 def dkk_recipients(country: str) -> str:
     """Контакты по ДКК страны одной строкой «Кому»: все строки договора, без повторов, или пусто."""
     адреса: list[str] = []

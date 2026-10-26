@@ -39,6 +39,18 @@ def read(country: str) -> tuple[str, ...] | None:
     return tuple(row[0]) if row else None
 
 
+def read_all() -> dict[str, tuple[str, ...]]:
+    """Переопределения всех стран одним запросом: `{код: языки}`. Не прочиталось — `DbError`."""
+    try:
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute("select country, langs from country_report_langs").fetchall()
+    except psycopg.Error as exc:
+        raise DbError(
+            f"Языки отчёта стран не прочитались: база отказала ({type(exc).__name__})"
+        ) from exc
+    return {str(r[0]): tuple(r[1]) for r in rows}
+
+
 def _run(sql: str, params: tuple[object, ...]) -> None:
     try:
         with psycopg.connect(load_retraction_settings().dsn) as conn:
