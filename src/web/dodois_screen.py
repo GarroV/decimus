@@ -1,8 +1,9 @@
 """Вкладка «Dodo IS» раздела «Администрирование»: входы по странам и ссылки (D640, D641, #951).
 
 С D641 это отдельная вкладка `?tab=dodois` рядом с «Подключениями» (раньше — блок внутри них);
-формы и POST-маршруты возвращают в неё же. Страны столбцом — все страны сети из справочника
-пиццерий, у страны без входа написано «Входа нет».
+формы и POST-маршруты возвращают в неё же. Страны — одна таблица (страна · статус ·
+через кого · «Сгенерировать ссылку», D651): все страны сети из
+справочника пиццерий, у страны без входа написано «Входа нет».
 
 **Кто.** Только главный админ УК (заслон вкладки — `connections_screen._boss`, остальным
 404 и на чтение, и на каждый POST). Коллеги в админку не заходят: владелец выдаёт им
@@ -88,7 +89,7 @@ class IssuedLink:
 
 @dataclass(frozen=True)
 class CountryRow:
-    """Строка страны слева: вход (если есть) и приглашения."""
+    """Строка таблицы стран: вход (если есть) и свежайшее приглашение."""
 
     code: str
     login: Login | None
@@ -100,7 +101,6 @@ class CountryRow:
 class View:
     rows: tuple[CountryRow, ...]
     invites: tuple[Invite, ...]
-    selected: str
     known: bool
     flash: Flash | None
     issued: IssuedLink | None
@@ -143,16 +143,10 @@ def view(flash: Flash | None = None, issued: IssuedLink | None = None) -> View:
     except DbError as exc:
         note_target_mismatch(exc)
         _log.warning("dodois: входы не прочитаны (%s)", type(exc).__name__)
-        return View((), (), "", False, flash, issued, ())
+        return View((), (), False, flash, issued, ())
     registry = _registry()
     rows = _rows(logins, invites, tuple(code for code, _, _ in registry))
-    codes = [r.code for r in rows]
-    wanted = issued.country if issued else request.args.get("country") or ""
-    selected = wanted if wanted in codes or wanted == "add" else ""
-    if not selected and not request.args.get("country") and codes:
-        # Без выбора открывается первая страна, где что-то уже есть.
-        selected = next((r.code for r in rows if r.login or r.latest), codes[0])
-    return View(rows, invites, selected, True, flash, issued, registry)
+    return View(rows, invites, True, flash, issued, registry)
 
 
 def context(
@@ -175,7 +169,7 @@ def _stamp(moment: datetime | None) -> str:
 
 
 def _link(**extra: str) -> str:
-    """Адрес вкладки с выбором страны; `tab` в шаблонах — наследство «Подключений»."""
+    """Адрес вкладки; `tab` в шаблонах — наследство «Подключений»."""
     return administration.url(TAB_DODOIS, **{k: v for k, v in extra.items() if k != "tab"})
 
 
@@ -209,7 +203,7 @@ def page(
 
 
 def show() -> FlaskResponse:
-    """GET `/administration?tab=dodois[&country=<код>|add]`."""
+    """GET `/administration?tab=dodois`."""
     _boss()
     return page()
 

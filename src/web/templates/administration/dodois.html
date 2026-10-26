@@ -1,8 +1,7 @@
 {#
   «Dodo IS» (D640, D641): вкладка раздела «Администрирование», видна только главному админу;
-  чужой роли адрес отвечает 404. Вся вкладка — блок входов по странам
-  (`administration/_dodois.html`): страны сети столбцом, у каждой состояние словами; справа
-  панель выбранной страны. Исход действий рисует тот же блок.
+  чужой роли адрес отвечает 404. Вся вкладка — блок `administration/_dodois.html`: сжатая панель ключей приложения и одна
+  таблица стран (D651). Исход действий рисует тот же блок.
 #}{% extends "_split_page.html" %}
 {% from "administration/_nav.html" import admin_nav with context %}
 {% block title %}{{ t('administration.tab.dodois') }} · {{ t('section.administration.title') }}{% endblock %}

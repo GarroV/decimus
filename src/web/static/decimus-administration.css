@@ -100,3 +100,27 @@
   .slist--countries .srow__main { flex: 1 1 calc(100% - 28px); }
   .slist--countries .srow__cell::before { content: attr(data-label) ": "; color: var(--ink-3); margin-right: var(--space-2); }
 }
+
+/* Вкладка «Dodo IS» (D651): сжатая панель ключей приложения и одна таблица стран. */
+.sdodois__app { margin: 0 0 var(--space-5); }
+.sconn__panel--compact .sconn__panel__title { margin-bottom: var(--space-3); }
+.skeys__facts--inline { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); margin-top: 0; }
+.skeys__facts--inline > div { border-top: 0; padding: 0; gap: var(--space-3); }
+.skeys__facts--inline dt { flex: none; }
+.sconn__panel--compact .skeys__actions { margin-top: var(--space-4); }
+.sdodois__table { width: 100%; border-collapse: collapse; font-size: var(--fs-body, 14px); }
+.sdodois__table th, .sdodois__table td { text-align: left; vertical-align: middle; padding: var(--space-3) var(--space-4) var(--space-3) 0; border-bottom: 1px solid var(--line); font-weight: normal; }
+.sdodois__table thead th { color: var(--ink-3); font-size: var(--fs-meta); font-weight: var(--w-semibold); }
+.sdodois__table tbody th { font-weight: var(--w-semibold); white-space: nowrap; }
+.sdodois__table small { display: block; color: var(--ink-3); font-size: var(--fs-meta); overflow-wrap: anywhere; }
+.sdodois__table .sdodois__warn { color: var(--warn, var(--ink-2)); }
+.sdodois__acts { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+.sdodois__acts form { margin: 0; }
+@media (max-width: 719px) {
+  .sdodois__table thead { display: none; }
+  .sdodois__table, .sdodois__table tbody, .sdodois__table tr, .sdodois__table td, .sdodois__table tbody th { display: block; }
+  .sdodois__table tr { padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+  .sdodois__table th, .sdodois__table td { border: 0; padding: 2px 0; }
+  .sdodois__table td[data-label]::before { content: attr(data-label) ": "; color: var(--ink-3); font-size: var(--fs-meta); }
+  .sdodois__acts { justify-content: flex-start; padding-top: var(--space-3); }
+}
