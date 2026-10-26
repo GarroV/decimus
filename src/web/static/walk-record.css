@@ -667,6 +667,33 @@
 
 .walk-translate [hidden] { display: none; }
 
+/* Голосовой ввод у поля (D652): кнопка «Надиктовать» под полем, при записи — «Стоп» с таймером */
+.walk-voice { margin-top: 2px; }
+
+.walk-voice__go { display: inline-flex; align-items: center; gap: 6px; }
+
+.walk-voice__go[disabled] { opacity: 0.6; cursor: progress; }
+
+.walk-voice__icon { width: 18px; height: 18px; }
+
+.walk-voice__go.is-rec { color: var(--err); }
+
+.walk-voice__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: walk-voice-pulse 1s ease-in-out infinite;
+}
+
+@keyframes walk-voice-pulse { 50% { opacity: 0.3; } }
+
+@media (prefers-reduced-motion: reduce) { .walk-voice__dot { animation: none; } }
+
+.walk-voice__error { margin: 4px 0 8px; }
+
+.walk-voice [hidden] { display: none; }
+
 /* Своя камера (D514): видоискатель на весь экран, на Android вместо `capture`. */
 .walk-camera {
   position: fixed;

@@ -30,6 +30,7 @@
     suggest: root.getAttribute("data-suggest"),
     hint: root.getAttribute("data-hint"),
     translate: root.getAttribute("data-translate"),
+    voice: root.getAttribute("data-voice"),
     app: root.getAttribute("data-app"),
     start: root.getAttribute("data-start"),
   };
@@ -101,7 +102,8 @@
       "M12 16.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8z"],
     check: ["M5 12.5l4.5 4.5L19 7.5"],
     gallery: ["M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z",
-      "M3 16l5-5 4 4 3-3 6 6", "M15.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"]
+      "M3 16l5-5 4 4 3-3 6 6", "M15.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"],
+    mic: ["M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z", "M6 11a6 6 0 0 0 12 0", "M12 17v4"]
   };
 
   W.icon = function (name, cls) {

@@ -40,6 +40,7 @@ from .walk_auth import (
     HINT_PATH,
     INFO_ENDPOINT,
     INFO_PATH,
+    MAX_VOICE_BYTES,
     PAGE_ENDPOINT,
     PAGE_PATH,
     PHOTO_ENDPOINT,
@@ -52,6 +53,8 @@ from .walk_auth import (
     SUGGEST_PATH,
     TRANSLATE_ENDPOINT,
     TRANSLATE_PATH,
+    VOICE_ENDPOINT,
+    VOICE_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,5 +154,6 @@ def install(app: Flask, *, upstream: str | None, ui_lang: str) -> None:
     route(SUGGEST_PATH, SUGGEST_ENDPOINT, "POST")
     route(HINT_PATH, HINT_ENDPOINT, "POST")
     route(TRANSLATE_PATH, TRANSLATE_ENDPOINT, "POST")
+    route(VOICE_PATH, VOICE_ENDPOINT, "POST", max_body=MAX_VOICE_BYTES)
     route(APP_PATH, APP_ENDPOINT, "POST")
     route(START_PATH, START_ENDPOINT, "POST")

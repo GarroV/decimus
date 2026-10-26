@@ -279,16 +279,17 @@ def test_страница_пускает_в_рамку_только_telegram(mon
     assert "frame-ancestors 'none'" in вход.headers["Content-Security-Policy"]
 
 
-def test_камера_открыта_только_обходу(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Своя камера мини-аппа (D514) — без `camera=(self)` getUserMedia откажет."""
+def test_камера_и_микрофон_открыты_только_обходу(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Своя камера (D514) и свой голос (D652): без `=(self)` getUserMedia откажет."""
     client = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client()
 
     обход = client.get(walk.PAGE_PATH).headers["Permissions-Policy"]
     вход = client.get("/login").headers["Permissions-Policy"]
 
     assert "camera=(self)" in обход
-    assert "microphone=()" in обход
+    assert "microphone=(self)" in обход
     assert "camera=()" in вход, "камера ушла дальше обхода"
+    assert "microphone=()" in вход, "микрофон ушёл дальше обхода"
 
 
 def _подписанный_клиент(

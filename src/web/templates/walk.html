@@ -29,6 +29,7 @@
   <script src="{{ url_for('static', filename='walk-photo.js') }}" defer></script>
   <script src="{{ url_for('static', filename='walk-offline.js') }}" defer></script>
   <script src="{{ url_for('static', filename='walk-translate.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='walk-voice.js') }}" defer></script>
   <script src="{{ url_for('static', filename='walk-menu.js') }}" defer></script>
   <script src="{{ url_for('static', filename='walk-sheet.js') }}" defer></script>
   <script src="{{ url_for('static', filename='walk-app.js') }}" defer></script>
@@ -47,6 +48,7 @@
         data-suggest="{{ url_for('walk_suggest') }}"
         data-hint="{{ url_for('walk_hint') }}"
         data-translate="{{ url_for('walk_translate') }}"
+        data-voice="{{ url_for('walk_voice') }}"
         data-app="{{ url_for('walk_app') }}"
         data-start="{{ url_for('walk_start') }}">
     <p class="walk__loading">…</p>

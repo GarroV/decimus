@@ -68,7 +68,8 @@ PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=()"
 
 #: Мини-апп обхода снимает нарушение своей камерой (D514): на Android телеграм
 #: не открывает камеру по `capture`. Камера — только своему адресу, без рамок.
-WALK_PERMISSIONS_POLICY = "camera=(self), microphone=(), geolocation=()"
+#: Микрофон — по тому же правилу, для своего голосового ввода (D652).
+WALK_PERMISSIONS_POLICY = "camera=(self), microphone=(self), geolocation=()"
 
 #: Год — срок, который браузеры и списки предзагрузки считают рабочим.
 #: Без `includeSubDomains`: стенд живёт на имени площадки, чьи соседние имена
