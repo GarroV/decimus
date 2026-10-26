@@ -106,8 +106,9 @@
         <div class="mx-rail__head mx-rail__head--list"><span>{{ t('country.rail.title') }}</span></div>
         <div class="pk-rail__list">
           {% for option in country_pick.options %}
-            {{ pick_item(option.href, option.title, (t('registry.rail.inspections') if option.count is not none else ''),
-                         (option.count if option.count is not none else ''), option.selected, code=(option.code or 'Σ')) }}
+            {{ pick_item(option.href, option.title,
+                         ((t('registry.rail.inspections', n=option.count) if option.count else t('registry.rail.none')) if option.count is not none else ''),
+                         '', option.selected, code=(option.code or 'Σ')) }}
           {% endfor %}
         </div>
       </div>

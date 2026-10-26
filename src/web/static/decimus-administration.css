@@ -2,7 +2,7 @@
    «Состояние подключений» (D638). Только токены линейки (`dodo-ds.css`); своих цветов
    и размеров нет. Блок состояния — по ширине соседних блоков вкладки. */
 
-.sadmin { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: var(--space-7); align-items: start; }
+.sadmin { display: grid; grid-template-columns: var(--rail-w, 300px) minmax(0, 1fr); gap: var(--space-7); align-items: start; }
 .sadmin__nav { position: sticky; top: var(--space-6); }
 .sadmin__main { min-width: 0; }
 

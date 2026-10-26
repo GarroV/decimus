@@ -60,7 +60,8 @@ _BAR: dict[str, dict[str, str]] = {
     "registry.search.apply": {"ru": "Найти", "en": "Search"},
     "registry.filter.reset": {"ru": "Сбросить", "en": "Reset"},
     "registry.filters.title": {"ru": "Отбор", "en": "Filters"},
-    "registry.rail.inspections": {"ru": "проверок", "en": "inspections"},
+    "registry.rail.inspections": {"ru": "проверок: {n}", "en": "inspections: {n}"},
+    "registry.rail.none": {"ru": "проверок за период нет", "en": "no inspections in the period"},
     "registry.head.period": {"ru": "Период: {period}", "en": "Period: {period}"},
     "registry.accepted.title": {"ru": "Принятые", "en": "Accepted"},
     "registry.accepted.hint": {

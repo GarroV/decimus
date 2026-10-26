@@ -13,9 +13,12 @@
    Дизайн-система (`dodo-ds.css`, `decimus-domain.css`) здесь не правится: всё
    собрано из её токенов, поэтому светлая и тёмная темы работают без правок. */
 
+/* Ширина левого столбца выбора — одна на все разделы (D655). */
+:root { --rail-w: 300px; }
+
 .page--pick { max-width: 110rem; }
 
-.pk-shell { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: var(--space-7); align-items: start; }
+.pk-shell { display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr); gap: var(--space-7); align-items: start; }
 .pk-work { min-width: 0; display: flex; flex-direction: column; gap: var(--space-6); }
 
 /* ── колонка выбора ─────────────────────────────────────────────────── */
@@ -27,7 +30,7 @@
    но без прилипания и своей прокрутки — страница ведёт сама. Заголовок колонки — `mx-rail__head`. */
 .pk-rail--inline { position: static; max-height: none; overflow: visible; }
 .pk-rail--inline .mx-rail__head--list { padding: 4px 10px 6px; }
-.pk-rail--col { max-width: 360px; }
+.pk-rail--col { max-width: var(--rail-w); }
 .pk-rail__list { display: flex; flex-direction: column; gap: 2px; min-height: 0; }
 
 .pk-search { margin: 0; }
