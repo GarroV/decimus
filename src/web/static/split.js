@@ -26,7 +26,7 @@
   function markCurrent(href) {
     document.querySelectorAll(".split__list .srow, .split__list .pk-item, .pk-work .srow").forEach(function (row) {
       var on = href !== null && row.href === href;
-      // Строка списка: `srow` — `is-current`, элемент колонки выбора `pk-item` — `is-on` (D654).
+      // Строка списка: `srow` — `is-current`, элемент колонки выбора `pk-item` — `is-on` (D655).
       row.classList.toggle(row.classList.contains("pk-item") ? "is-on" : "is-current", on);
       if (on) row.setAttribute("aria-current", "true");
       else row.removeAttribute("aria-current");
