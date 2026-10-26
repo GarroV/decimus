@@ -64,6 +64,7 @@ from . import (
     walk_suggest,
     walk_translate,
     walk_unseen,
+    walk_voice,
     walk_write,
 )
 from .errors import WebTextError
@@ -478,4 +479,5 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
     walk_settings.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
     walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_translate.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
+    walk_voice.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_start.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond, bot=bot)

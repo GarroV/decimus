@@ -469,6 +469,27 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.translate.lang.ru": {"ru": "русский", "en": "Russian"},
     "walk.translate.lang.en": {"ru": "английский", "en": "English"},
+    "walk.voice.start": {"ru": "Надиктовать", "en": "Dictate"},
+    "walk.voice.stop": {"ru": "Стоп · {time}", "en": "Stop · {time}"},
+    "walk.voice.busy": {"ru": "Расшифровываю…", "en": "Transcribing…"},
+    "walk.voice.denied": {
+        "ru": (
+            "Нет доступа к микрофону — разрешите его Telegram или используйте диктовку клавиатуры."
+        ),
+        "en": "No microphone access — allow it for Telegram or use your keyboard's dictation.",
+    },
+    "walk.err.voice": {
+        "ru": "Не разобрал запись — скажите ещё раз или напишите текстом.",
+        "en": "Couldn't make out the recording — say it again or type it.",
+    },
+    "walk.err.voice_busy": {
+        "ru": "Прошлая запись ещё расшифровывается — подождите пару секунд.",
+        "en": "The last recording is still being transcribed — give it a few seconds.",
+    },
+    "walk.err.voice_big": {
+        "ru": "Запись слишком большая — скажите короче или напишите текстом.",
+        "en": "The recording is too large — say it shorter or type it.",
+    },
     "walk.err.too_fast": {
         "ru": "Слишком много запросов подряд. Подождите минуту и повторите.",
         "en": "Too many requests in a row. Wait a minute and try again.",

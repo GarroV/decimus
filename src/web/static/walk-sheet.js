@@ -763,6 +763,11 @@
         if (was !== stale()) redraw("item", "footer");
       });
       box.appendChild(area);
+      // Голос (D652): рассказ в пустое поле сразу запускает поиск пункта — то же, что «Найти пункт».
+      var voice = W.voiceBar(area, function (_text, wasEmpty) {
+        if (wasEmpty && recognizing() && !f.code && !f.finding) find();
+      });
+      if (voice) box.appendChild(voice);
       return box;
     },
 
@@ -862,6 +867,8 @@
         if (isAdvice() && was !== !!f.text.trim()) redraw("footer");
       });
       box.appendChild(area);
+      var voice = W.voiceBar(area);
+      if (voice) box.appendChild(voice);
       // Модель вписала рассуждение вместо находки (#970): пока текст её, а не
       // аудитора, — предупреждение под полем. Запись не меняется и не блокируется.
       var flags = (f.textAuto && f.picked && f.picked.flags) || [];
@@ -889,6 +896,8 @@
       area.value = f.comment;
       area.addEventListener("input", function () { f.comment = area.value; changed(); });
       box.appendChild(area);
+      var voice = W.voiceBar(area);
+      if (voice) box.appendChild(voice);
       var bar = W.translateBar(area);
       if (bar) box.appendChild(bar);
       return box;
@@ -1153,6 +1162,7 @@
       return;
     }
     f = null;
+    if (W.voice) W.voice.cancelAll(); // идущая запись голоса выбрасывается, микрофон отпускается
     if (W.menu) W.menu.close();
     if (node) node.remove();
     node = null;

@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 200 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 201 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -205,6 +205,7 @@
 | `/tg/walk/photo/view` | POST | `walk_photo_view` | `src/web/walk_proxy.py` |
 | `/tg/walk/start` | POST | `walk_start` | `src/web/walk_proxy.py` |
 | `/tg/walk/suggest` | POST | `walk_suggest` | `src/web/walk_proxy.py` |
+| `/tg/walk/transcribe` | POST | `walk_voice` | `src/web/walk_proxy.py` |
 | `/tg/walk/translate` | POST | `walk_translate` | `src/web/walk_proxy.py` |
 | `/training` | GET | `training_index` | `src/web/training_page.py` |
 | `/training/<code>` | GET | `training` | `src/web/training_page.py` |
@@ -222,7 +223,7 @@
 | `/users/unfreeze` | POST | `unfreeze_user` | `src/web/users_screen.py` |
 | `/welcome` | GET | `landing` | `src/web/landing.py` |
 
-**Мини-апп обхода (`src/web/walk_app.py: create_walk_app`)** — 12 маршрутов
+**Мини-апп обхода (`src/web/walk_app.py: create_walk_app`)** — 13 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -237,6 +238,7 @@
 | `/tg/walk/photo/view` | POST | `walk_photo_view` | `src/web/walk_write.py` |
 | `/tg/walk/start` | POST | `walk_start` | `src/web/walk_start.py` |
 | `/tg/walk/suggest` | POST | `walk_suggest` | `src/web/walk_suggest.py` |
+| `/tg/walk/transcribe` | POST | `walk_voice` | `src/web/walk_voice.py` |
 | `/tg/walk/translate` | POST | `walk_translate` | `src/web/walk_translate.py` |
 <!-- map:end -->
 

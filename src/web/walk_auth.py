@@ -66,6 +66,10 @@ SUGGEST_ENDPOINT = "walk_suggest"
 HINT_ENDPOINT = "walk_hint"
 #: Перевод свободного текста на язык отчёта (D394): ничего не пишет.
 TRANSLATE_ENDPOINT = "walk_translate"
+#: Голос → текст в поле (D652): тело — сама запись, ничего не пишет.
+VOICE_ENDPOINT = "walk_voice"
+#: Предел записи голоса: минута Opus — сотни КБ, 5 МБ с запасом на любой формат телефона.
+MAX_VOICE_BYTES = 5 * 1024 * 1024
 #: Приложение аудитора (D373): настройки и круг доступа к MCP.
 APP_ENDPOINT = "walk_app"
 #: Начало проверки из мини-аппа (D392): мастер с полями вместо чата.
@@ -82,6 +86,7 @@ INFO_PATH = "/tg/walk/info"
 SUGGEST_PATH = "/tg/walk/suggest"
 HINT_PATH = "/tg/walk/hint"
 TRANSLATE_PATH = "/tg/walk/translate"
+VOICE_PATH = "/tg/walk/transcribe"
 APP_PATH = "/tg/walk/app"
 START_PATH = "/tg/walk/start"
 ENDPOINTS = frozenset(
@@ -95,6 +100,7 @@ ENDPOINTS = frozenset(
         SUGGEST_ENDPOINT,
         HINT_ENDPOINT,
         TRANSLATE_ENDPOINT,
+        VOICE_ENDPOINT,
         APP_ENDPOINT,
         START_ENDPOINT,
     }
