@@ -10,6 +10,14 @@ from __future__ import annotations
 DODOIS_TEXTS: dict[str, dict[str, str]] = {
     # ── Блок на «Подключениях» ──
     "dodois.title": {"ru": "Dodo IS", "en": "Dodo IS"},
+    "dodois.app.title": {
+        "ru": "Маркетплейс Dodo IS: ключи приложения Decimus",
+        "en": "Dodo IS Marketplace: Decimus app keys",
+    },
+    "dodois.need_keys": {
+        "ru": "Сначала задайте ключи приложения из маркетплейса (блок вверху вкладки).",
+        "en": "First set the Marketplace app keys (the block at the top of this tab).",
+    },
     "dodois.sub": {
         "ru": (
             "Входы в Dodo IS по странам: продажи, стопы и доставка читаются под входом "
@@ -74,8 +82,11 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "dodois.reason.no_keys": {
-        "ru": "Не заданы ключи приложения Dodo IS (блок «Ключи сервисов»).",
-        "en": "The Dodo IS application keys are not set (the 'Service keys' block).",
+        "ru": "Не заданы ключи приложения маркетплейса Dodo IS (блок вверху вкладки «Dodo IS»).",
+        "en": (
+            "The Dodo IS Marketplace app keys are not set (the block at the top of the "
+            "'Dodo IS' tab)."
+        ),
     },
     "dodois.reason.no_tokens": {
         "ru": "Ключи входа не нашлись или не открылись.",

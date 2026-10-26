@@ -1,4 +1,7 @@
 {#
+  Первым блоком — «Маркетплейс Dodo IS: ключи приложения Decimus» (D648): панель сервиса `dodois`
+  из «Ключей сервисов», те же формы и заслоны (`users/_service_key_panel.html`), возврат сюда.
+  Пока пары нет, у стран и у кнопки выдачи ссылки — подсказка «Сначала задайте ключи».
   Блок «Dodo IS» вкладки «Dodo IS» (D640, D641): страны столбцом слева, панель выбранной справа —
   приём «Ключей сервисов» (`.sconn` / `.stile`). Выбор — `?tab=dodois&country=<код>`,
   `country=add` — выдать ссылку на новую страну. Ссылку получает коллега страны; в админку он
@@ -6,6 +9,12 @@
   выдачу, дальше — статус. Тексты — `texts_dodois.py`.
 #}
 {% set dv = dodois %}
+{% from "users/_service_key_panel.html" import key_panel with context %}
+{% macro need_keys() %}
+  {% if not app_keys_ready %}
+    <div class="note note--warn sdodois__need-keys" role="status"><div class="note__text">{{ t('dodois.need_keys') }}</div></div>
+  {% endif %}
+{% endmacro %}
 {% macro invite_list(invites) %}
   {% if invites %}
     <ul class="sdodois__invites">
@@ -44,13 +53,22 @@
         </select>
       </label>
     {% endif %}
+    {{ need_keys() }}
     <small class="sform__hint">{{ t('dodois.issue_hint') }}</small>
     <div class="sactions"><button class="sbtn sbtn--primary" type="submit">{{ t('dodois.issue' if not selected_code else 'dodois.issue_again') }}</button></div>
   </form>
 {% endmacro %}
 <section class="ssec skeys sdodois" id="dodois" aria-labelledby="dodois-title">
+  {% if keys.services %}
+    <div class="sdodois__app" id="dodois-app-keys">
+      {{ key_panel(keys.services[0], keys, back='dodois', title=t('dodois.app.title')) }}
+    </div>
+  {% elif not keys.known %}
+    <p class="ssec__note">{{ t('keys.unknown') }}</p>
+  {% endif %}
   <h2 class="ssec__title" id="dodois-title">{{ t('dodois.title') }}</h2>
   <p class="ssec__note">{{ t('dodois.sub') }}</p>
+  {{ need_keys() }}
   {% if dodois_flash and not dv.selected %}
     <div class="note {{ 'note--ok' if dodois_flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ t(dodois_flash.key, **dodois_flash.params) }}</div></div>
   {% endif %}

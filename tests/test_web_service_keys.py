@@ -27,6 +27,7 @@ from src.web import auth, reauth
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 ВКЛАДКА = "/administration?tab=connections"
+ВКЛАДКА_DODOIS = "/administration?tab=dodois"
 ЗНАЧЕНИЕ = "sk-proj-Zq9Xw8Vv7Uu6Tt5Ss4Rr3Qq2Pp1-never-show-this"
 ID_ISPRING = "ispring-client-id-AAAA1111BBBB2222"
 SECRET_ISPRING = "ispring-client-secret-CCCC3333DDDD4444"
@@ -132,7 +133,10 @@ def _сессия_с(monkeypatch: pytest.MonkeyPatch, **признаки: Any) -
 
 
 def _отправить(клиент: FlaskClient, сервис: str, действие: str, значение: str = ЗНАЧЕНИЕ) -> Any:
-    return клиент.post(_адрес(сервис, действие), data=_форма(сервис, значение), headers=ЗАГОЛОВКИ)
+    данные = _форма(сервис, значение)
+    if сервис == "dodois":  # пара приложения живёт на вкладке «Dodo IS» и возвращает туда
+        данные["back"] = "dodois"
+    return клиент.post(_адрес(сервис, действие), data=данные, headers=ЗАГОЛОВКИ)
 
 
 # --- кто пройдёт ---------------------------------------------------------------------------
@@ -149,6 +153,79 @@ def test_главный_админ_видит_все_сервисы_и_поля_
     assert "Client ID" in ispring and "Client secret" in ispring
     assert 'autocomplete="new-password"' in html and 'autocomplete="off"' in html
     assert "Не задан" in html
+
+
+def test_пары_приложения_dodois_на_подключениях_нет_а_на_вкладке_dodois_первым_блоком(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ломали: убирали фильтр `app` в `service_keys_screen.view` — сервис возвращался в плитки."""
+    from src.db import dodois_logins, ratings_read
+
+    monkeypatch.setattr(dodois_logins, "list_logins", lambda: ())
+    monkeypatch.setattr(dodois_logins, "list_invites", lambda _n=30: ())
+    monkeypatch.setattr(
+        ratings_read,
+        "countries",
+        lambda: (ratings_read.CountryRow("SI", "Словения", "Slovenia", None, True),),
+    )
+    подключения = главный.get(f"{ВКЛАДКА}&key=dodois").get_data(as_text=True)
+    assert "Маркетплейс Dodo IS" not in подключения
+    assert "service-key-dodois" not in подключения
+    assert "/connections/keys/dodois/" not in подключения
+    вкладка = главный.get(ВКЛАДКА_DODOIS).get_data(as_text=True)
+    assert "Маркетплейс Dodo IS: ключи приложения Decimus" in вкладка
+    assert вкладка.index("dodois-app-keys") < вкладка.index('id="dodois-title"'), (
+        "блок — над странами"
+    )
+    assert (
+        "/connections/keys/dodois/save" in вкладка and "/connections/keys/dodois/check" in вкладка
+    )
+    assert 'name="back" value="dodois"' in вкладка
+    assert "Сначала задайте ключи приложения из маркетплейса" in вкладка
+    assert вкладка.count("Сначала задайте ключи") >= 2, "подсказка и у стран, и у кнопки выдачи"
+
+
+def test_пара_задана_подсказки_про_ключи_нет(главный: FlaskClient, склад: Склад) -> None:
+    _отправить(главный, "dodois", "save")
+    html = главный.get(ВКЛАДКА_DODOIS).get_data(as_text=True)
+    assert "Сначала задайте ключи" not in html
+    assert "••••" + ЗНАЧЕНИЕ[-4:] in html and ЗНАЧЕНИЕ not in html
+
+
+def test_на_вкладке_dodois_блок_ключей_на_английском(
+    monkeypatch: pytest.MonkeyPatch, склад: Склад
+) -> None:
+    for клиент in _стенд(monkeypatch, tenant="HQ", role="superadmin"):
+        html = клиент[0].get(f"{ВКЛАДКА_DODOIS}&lang=en").get_data(as_text=True)
+        assert "Dodo IS Marketplace: Decimus app keys" in html
+        assert "First set the Marketplace app keys" in html
+
+
+@pytest.mark.parametrize("действие", ДЕЙСТВИЯ)
+def test_после_действия_с_вкладки_dodois_возврат_на_эту_вкладку(
+    главный: FlaskClient, склад: Склад, действие: str
+) -> None:
+    """Ломали: `return_tab` всегда отдавал «Подключения» — блок маркетплейса не находился."""
+    склад.записи["dodois.client_id"] = склад.записи["dodois.client_secret"] = (
+        service_keys.KeyStatus("dodois", "AAAA", "director", datetime.now(UTC))
+    )
+    html = _отправить(главный, "dodois", действие).get_data(as_text=True)
+    assert 'id="dodois-app-keys"' in html and 'id="service-keys"' not in html
+
+
+@pytest.mark.parametrize("чужое", ["https://evil.example/", "//evil.example", "users", "", "../x"])
+def test_чужое_значение_адреса_возврата_не_принимается(
+    главный: FlaskClient, склад: Склад, чужое: str
+) -> None:
+    """Ломали: принимали любое `back` — ответ уходил не на «Подключения»."""
+    ответ = главный.post(
+        _адрес("openai", "check"),
+        data={**_форма("openai"), "back": чужое},
+        headers=ЗАГОЛОВКИ,
+    )
+    html = ответ.get_data(as_text=True)
+    assert ответ.status_code == 200 and 'id="service-keys"' in html
+    assert 'id="dodois-app-keys"' not in html and "evil.example" not in html
 
 
 def test_блок_на_английском(monkeypatch: pytest.MonkeyPatch, склад: Склад) -> None:
@@ -301,7 +378,7 @@ def test_сохранение_проверяет_шифрует_и_показы�
     assert провайдер == сервис and кто == "director"
     assert set(значения) == {f.vault_name for f in registry.service(сервис).fields}  # type: ignore[union-attr]
     assert "••••" + ЗНАЧЕНИЕ[-4:] in html
-    повтор = главный.get(ВКЛАДКА)
+    повтор = главный.get(ВКЛАДКА_DODOIS if сервис == "dodois" else ВКЛАДКА)
     for текст in (html, повтор.get_data(as_text=True), str(ответ.headers), caplog.text):
         assert ЗНАЧЕНИЕ not in текст, (
             "значение целиком попало на страницу, в заголовок или в журнал"
@@ -491,3 +568,20 @@ def test_тексты_обеих_локалей_заведены_для_кажд
         assert f"keys.purpose.{сервис.code}" in SERVICE_KEYS_TEXTS
         for поле in сервис.fields:
             assert f"keys.field.{поле.code}" in SERVICE_KEYS_TEXTS
+
+
+@pytest.mark.parametrize(
+    ("пришло", "вкладка"),
+    [
+        ("dodois", "dodois"),
+        ("connections", "connections"),
+        ("evil", "connections"),
+        ("", "connections"),
+    ],
+)
+def test_адрес_возврата_только_из_известных_вкладок(пришло: str, вкладка: str) -> None:
+    """Ломали: `return wanted or TAB_CONNECTIONS` — чужое значение проходило как вкладка."""
+    from src.web import connections_screen
+
+    with собрать(tenant="HQ").test_request_context("/", method="POST", data={"back": пришло}):
+        assert connections_screen.return_tab() == вкладка

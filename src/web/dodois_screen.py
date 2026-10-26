@@ -18,8 +18,15 @@
 `refuse_foreign_origin()` → второй шаг входа в этой сессии → свежее подтверждение → предел
 попыток. Отзыв и «Проверить сейчас» ничего не выдают: роль и происхождение.
 
-**Ключей на экране нет.** Ни ключей входа, ни ключей приложения, ни их хвостов: только
-состояние, счёт пиццерий и время.
+**Ключи приложения (D648).** Первым блоком вкладки — пара `client_id` / `client_secret`
+приложения Decimus в маркетплейсе Dodo IS (сервис `dodois` реестра `src/domain/service_keys.py`;
+на «Подключениях» её больше нет). Формы и адреса те же, что у ключей сервисов
+(`connections_screen._key_action`, заслоны те же); после действия — эта же вкладка (скрытое поле
+формы `back`, только известные вкладки). Пока пары нет, страны и выдача ссылки подсказывают
+сначала задать её.
+
+**Ключей входа на экране нет.** Ни ключей входа стран, ни значений ключей приложения: только
+состояние, «••••» и последние четыре знака пары, счёт пиццерий и время.
 """
 
 from __future__ import annotations
@@ -40,7 +47,7 @@ from src.dodois import service
 from src.domain import dodois as rules
 from src.domain.dodois import Invite, Login
 
-from . import administration, auth, guard
+from . import administration, auth, guard, service_keys_screen
 from .db_refusal import note_target_mismatch
 from .journal import TARGET_OVERRIDE
 from .origin import refuse_foreign_origin
@@ -148,10 +155,16 @@ def view(flash: Flash | None = None, issued: IssuedLink | None = None) -> View:
     return View(rows, invites, selected, True, flash, issued, registry)
 
 
-def context(flash: Flash | None = None, issued: IssuedLink | None = None) -> dict[str, Any]:
-    """Переменные шаблона блока."""
+def context(
+    flash: Flash | None = None,
+    issued: IssuedLink | None = None,
+    key_flash: service_keys_screen.KeyFlash | None = None,
+) -> dict[str, Any]:
+    """Переменные шаблона вкладки: страны, ссылки и ключи приложения маркетплейса."""
     return {
         "dodois": view(flash, issued),
+        "dodois_flash": flash,
+        **service_keys_screen.app_context(key_flash),
         "dodois_now": datetime.now(UTC),
         "dodois_stamp": _stamp,
     }
@@ -173,14 +186,20 @@ def _boss() -> str:
 
 
 def page(
-    flash: Flash | None = None, issued: IssuedLink | None = None, code: int = 200
+    flash: Flash | None = None,
+    issued: IssuedLink | None = None,
+    code: int = 200,
+    key_flash: service_keys_screen.KeyFlash | None = None,
 ) -> FlaskResponse:
-    """Вкладка целиком — для GET и для ответа на любое действие."""
+    """Вкладка целиком — для GET и для ответа на любое действие (в том числе над ключами)."""
+    from . import connections_screen
+
     html = render_template(
         "administration/dodois.html",
         users_url=f"{request.script_root}{section('administration').path}",
         link=_link,
-        **context(flash, issued),
+        day=connections_screen._day,
+        **context(flash, issued, key_flash),
         **administration.nav(TAB_DODOIS),
     )
     response = make_response(html, code)

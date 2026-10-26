@@ -35,6 +35,11 @@ from .db_refusal import note_target_mismatch
 
 _log = logging.getLogger(__name__)
 
+#: Пара ключей приложения Decimus в маркетплейсе Dodo IS: показывается на вкладке «Dodo IS»
+#: (`dodois_screen`), а не среди «Ключей сервисов» на «Подключениях». Маршруты, заслоны и
+#: проверка у неё те же — реестр и `connections_screen._key_action`.
+APP_SERVICE = "dodois"
+
 
 @dataclass(frozen=True)
 class KeyFlash:
@@ -95,14 +100,16 @@ def _row(service: registry.Service, found: dict[str, service_keys.KeyStatus]) ->
     return ServiceRow(service.code, fields, _state(fields))
 
 
-def view(flash: KeyFlash | None = None) -> KeysView:
+def view(flash: KeyFlash | None = None, *, app: bool = False) -> KeysView:
+    """Карточки сервисов: `app=False` — все, кроме приложения Dodo IS; `True` — только оно."""
     try:
         found = service_keys.statuses()
     except DbError as exc:
         note_target_mismatch(exc)
         _log.warning("service_keys: записи не прочитаны (%s)", type(exc).__name__)
         return KeysView((), False, flash)
-    return KeysView(tuple(_row(s, found) for s in registry.SERVICES), True, flash)
+    shown = tuple(_row(s, found) for s in registry.SERVICES if (s.code == APP_SERVICE) is app)
+    return KeysView(shown, True, flash)
 
 
 def _typed(service: registry.Service) -> tuple[dict[str, str] | None, str | None]:
@@ -191,6 +198,18 @@ def selected(rows: tuple[ServiceRow, ...], flash: KeyFlash | None) -> str:
             return wanted
     unset = [r.code for r in rows if r.state == "unset"]
     return (unset or codes or [""])[0]
+
+
+def is_ready(row: ServiceRow | None) -> bool:
+    """Каждое поле пары задано — в админке или в окружении сервера."""
+    return row is not None and all(f.status or f.in_env for f in row.fields)
+
+
+def app_context(flash: KeyFlash | None = None) -> dict[str, Any]:
+    """Переменные шаблона вкладки «Dodo IS»: ключи приложения и готовность пары."""
+    shown = view(flash, app=True)
+    row = shown.services[0] if shown.services else None
+    return {"keys": shown, "keys_max": registry.MAX_LENGTH, "app_keys_ready": is_ready(row)}
 
 
 def context(flash: KeyFlash | None = None) -> dict[str, Any]:
