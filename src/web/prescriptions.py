@@ -33,6 +33,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.wrappers import Response
 
 from src.db import country_contracts as contracts_db
+from src.db import mailing_cc
 from src.db import prescriptions as rx
 from src.db import prescriptions_write as rxw
 from src.db.config import load_action_plan_settings
@@ -55,6 +56,7 @@ from .config import Settings
 from .geo_names import country_title
 from .google_mail import GoogleMailError, MailAccountMismatchError, create_draft
 from .letter_draft import MAIL_CONSENT_KEY, MAIL_RETURNS_KEY, OUTCOME_WRONG_ACCOUNT, MailReturn
+from .mailing_copy import cc_for
 from .origin import refuse_foreign_origin
 from .sections import section
 from .texts import t
@@ -537,6 +539,7 @@ def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
             to=предписание.recipients,
             subject=предписание.subject,
             body=from_plain(предписание.body),
+            cc=cc_for(mailing_cc.KIND_PRESCRIPTION),
         )
 
     try:

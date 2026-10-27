@@ -55,6 +55,20 @@ MAILINGS_TEXTS: dict[str, dict[str, str]] = {
             "partners' own-space inspections do not get the HQ copy."
         ),
     },
+    "mailings.cc.hint.prescription": {
+        "ru": (
+            "Почты сотрудников УК. Подставляются в «Копию» черновика письма предписания, "
+            "когда ОСБ кладёт его в почту; письмо отправляет она сама. Шаблон документа "
+            "предписания и сопроводительное письмо появятся здесь после сборки предписания "
+            "(#1128)."
+        ),
+        "en": (
+            "HQ staff emails. They are filled into the Cc of the prescription letter draft "
+            "when the OSB puts it into the mailbox; the OSB sends the letter. The prescription "
+            "document template and the cover letter will appear here once prescription "
+            "assembly is built (#1128)."
+        ),
+    },
     "mailings.cc.hint.plan": {
         "ru": (
             "Почты сотрудников УК для «Копии» письма о запросе плана действий. Сейчас запрос "
