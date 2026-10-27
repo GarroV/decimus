@@ -608,7 +608,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "proofread.edit": {"ru": "Изменить запись {n}", "en": "Edit record {n}"},
     "proofread.save": {"ru": "Сохранить", "en": "Save"},
     "proofread.cancel": {"ru": "Отмена", "en": "Cancel"},
-    "proofread.delete": {"ru": "Удалить запись", "en": "Delete this record"},
+    "proofread.delete": {"ru": "Удалить запись {n}", "en": "Delete record {n}"},
     "proofread.delete.text": {
         "ru": "Запись уйдёт из проверки вместе с кадрами, оценка пересчитается. Номера "
         "остальных записей не изменятся. Действие остаётся в журнале правок.",
