@@ -24,3 +24,37 @@
     </div>
   </div>
 {% endmacro %}
+
+{#
+  Вариант значка для свежести данных (D659): внутри — таблица «точка · источник · за что ·
+  когда пришло», рядом со «?» — точка худшего статуса, чтобы видеть без наведения. Цвет
+  не единственный признак: у каждой точки есть слово (скрытое для глаз, но читаемое
+  с экрана, и в `title`), у худшей — тоже. `table` — `ratings_freshness.FreshTable`.
+  Раскрытие и положение — как у `info_tip` (`decimus-web.css`); таблица — `decimus-rt.css`.
+#}
+{% macro fresh_tip(label, title, table, key, heads, foot, none) %}
+  <div class="info-tip">
+    <span class="info-tip__mark" tabindex="0" role="button" aria-label="{{ label }}{% if table %}: {{ table.worst_word }}{% endif %}" aria-describedby="info-{{ key }}">?{% if table %}<i class="rt-fdot rt-fdot--{{ table.worst }} rt-fdot--mark" title="{{ table.worst_word }}" aria-hidden="true"></i>{% endif %}</span>
+    <div class="info-tip__pop info-tip__pop--fresh popover" id="info-{{ key }}" role="tooltip">
+      <div class="popover__group">{{ title }}</div>
+      {% if table %}
+      <table class="rt-fresh">
+        <thead><tr><th scope="col"><span class="sr-only">{{ heads[3] }}</span></th><th scope="col">{{ heads[0] }}</th><th scope="col">{{ heads[1] }}</th><th scope="col">{{ heads[2] }}</th></tr></thead>
+        <tbody>
+        {% for l in table.lines %}
+          <tr>
+            <td><i class="rt-fdot rt-fdot--{{ l.status }}" title="{{ l.word }}" aria-hidden="true"></i><span class="sr-only">{{ l.word }}</span></td>
+            <th scope="row">{{ l.name }}</th>
+            <td>{{ l.scope }}</td>
+            <td class="rt-fresh__at">{{ l.arrived }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="rt-fresh__foot">{{ foot }}</div>
+      {% else %}
+      <div class="rt-fresh__foot">{{ none }}</div>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}

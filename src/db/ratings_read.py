@@ -359,6 +359,35 @@ def last_loaded() -> dict[str, datetime]:
     }
 
 
+def latest_scored_periods() -> dict[str, tuple[date, date, datetime | None]]:
+    """Тип рейтинга → (начало, конец, когда пришли первые оценки) последнего периода с оценками.
+
+    Один запрос на оба типа. Периоды без оценок не считаются (#1305): у РКО рядом идёт
+    ряд вт–пн, где только сбор. `updated_at` оценок — время их записи, самое раннее из
+    них — приход периода (обновление строки его сдвигает, но не раньше первой записи).
+    """
+    return {
+        r[0]: (r[1], r[2], r[3])
+        for r in _rows(
+            "select distinct on (p.rating_type) p.rating_type, p.begin_on, p.end_on, "
+            "(select min(s.updated_at) from ratings.scores s where s.period_id = p.id) "
+            "from ratings.periods p "
+            "where exists (select 1 from ratings.scores s where s.period_id = p.id) "
+            "order by p.rating_type, p.begin_on desc"
+        )
+    }
+
+
+def sheet_last_checked() -> datetime | None:
+    """Когда бот последний раз заглянул в таблицу контроля (`None` — ни разу).
+
+    Время проверки обновляют и листы без изменений: это «бот жив и смотрит», а не
+    «пришли новые данные».
+    """
+    rows = _rows("select max(checked_at) from ratings.sheet_sync")
+    return rows[0][0] if rows else None
+
+
 def set_developer(code: str, developer: str | None, *, actor: str) -> bool:
     value = (developer or "").strip() or None
     changed = _write(

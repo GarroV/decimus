@@ -11,7 +11,7 @@
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">
 <script src="{{ url_for('static', filename='decimus-rt.js') }}" defer></script>{% endblock %}
 
-{% from "_info_tip.html" import info_tip %}
+{% from "_info_tip.html" import info_tip, fresh_tip %}
 {% from "ratings/_period.html" import period_lists with context %}
 {% macro thr(x) %}{{ '%.1f'|format(x) }}{% endmacro %}
 {% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
@@ -79,12 +79,12 @@
   <header class="rt-head">
     <div class="rt-head__main">
       <div class="rt-head__kicker">{{ t('ratings.kicker') }}</div>
-      {#- Свежесть загрузок — под «?», столбиком: одна строка — один источник (D631). -#}
-      {% set loaded_rows = [] %}
-      {% for fmt, at in (summary.last_loaded or {})|dictsort %}{% set _ = loaded_rows.append(t('ratings.loaded', fmt=t('ratings.format.' ~ fmt), at=at.strftime(at_format))) %}{% endfor %}
+      {#- Свежесть источников — под «?», таблицей: точка · источник · за что · когда пришло (D659). -#}
       <div class="info-row">
         <h1 class="rt-head__title">{{ t('ratings.title') }}</h1>
-        {{ info_tip(t('ratings.loaded.hint'), t('ratings.loaded.title'), loaded_rows or [t('ratings.loaded.none')], 'loaded') }}
+        {{ fresh_tip(t('ratings.loaded.hint'), t('ratings.fresh.title'), freshness, 'loaded',
+                     [t('ratings.fresh.col.source'), t('ratings.fresh.col.scope'), t('ratings.fresh.col.at'), t('ratings.fresh.col.status')],
+                     t('ratings.fresh.foot'), t('ratings.loaded.none')) }}
       </div>
     </div>
     {% if may_manage %}<a class="btn btn--sm" href="{{ admin_ratings_url }}">{{ t('ratings.manage') }}</a>{% endif %}

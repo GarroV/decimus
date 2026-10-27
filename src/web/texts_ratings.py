@@ -47,6 +47,35 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.loaded.hint": {"ru": "Когда обновлены данные", "en": "When the data was updated"},
     "ratings.loaded.title": {"ru": "Последняя загрузка", "en": "Last upload"},
     "ratings.loaded.none": {"ru": "Загрузок ещё не было.", "en": "Nothing has been uploaded yet."},
+    "ratings.fresh.title": {"ru": "Свежесть данных", "en": "Data freshness"},
+    "ratings.fresh.col.source": {"ru": "Источник", "en": "Source"},
+    "ratings.fresh.col.scope": {"ru": "За что", "en": "Covers"},
+    "ratings.fresh.col.at": {"ru": "Пришло", "en": "Arrived"},
+    "ratings.fresh.col.status": {"ru": "Состояние", "en": "Status"},
+    "ratings.fresh.word.fresh": {"ru": "свежие", "en": "fresh"},
+    "ratings.fresh.word.lag": {"ru": "задержка", "en": "delayed"},
+    "ratings.fresh.word.stale": {"ru": "устарели", "en": "stale"},
+    "ratings.fresh.name.rs": {"ru": "РС", "en": "Standards"},
+    "ratings.fresh.name.rko": {"ru": "РКО", "en": "Customer exp."},
+    "ratings.fresh.name.sheet": {"ru": "Таблица контроля", "en": "Control spreadsheet"},
+    "ratings.fresh.name.maps": {"ru": "Карты (Google, Яндекс)", "en": "Maps (Google, Yandex)"},
+    "ratings.fresh.scope.rs": {"ru": "за {span}", "en": "for {span}"},
+    "ratings.fresh.scope.rko": {"ru": "неделя {span}", "en": "week {span}"},
+    "ratings.fresh.scope.sheet": {"ru": "проверка бота", "en": "bot check"},
+    "ratings.fresh.scope.maps": {"ru": "сбор", "en": "collection"},
+    "ratings.fresh.scope.agg": {"ru": "сбор", "en": "collection"},
+    "ratings.fresh.none": {"ru": "нет оценок", "en": "no scores"},
+    "ratings.fresh.never": {"ru": "ни разу", "en": "never"},
+    "ratings.fresh.foot": {
+        "ru": (
+            "Время — UTC. РС выходит дважды в месяц, РКО — раз в неделю: "
+            "их цвет считается от конца периода."
+        ),
+        "en": (
+            "Times are UTC. Standards come twice a month, customer exp. weekly: "
+            "their colour counts from the period end."
+        ),
+    },
     "ratings.manage": {"ru": "Настройки рейтингов", "en": "Ratings settings"},
     "ratings.block.scores": {
         "ru": "Средний РС и РКО",

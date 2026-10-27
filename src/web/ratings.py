@@ -47,6 +47,7 @@ from . import (
     auth,
     guard,
     ratings_calendar,
+    ratings_freshness,
     ratings_risk,
     ratings_sheet,
     ratings_tiles,
@@ -345,6 +346,7 @@ def render_summary(conf: Settings) -> str:
         country_name=country_name,
         ratings_path=section("ratings").path,
         at_format=_AT,
+        freshness=ratings_freshness.build(lang, agg_names),
     )
 
 
