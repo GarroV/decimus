@@ -59,6 +59,7 @@ from src.domain.permissions import is_read_only
 from src.domain.second_factor import passkey_auto_enroll
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.domain.uploads import MAX_UPLOAD_BYTES
+from src.report import letter_markup
 from src.report.info_titles import FOUND
 
 from . import (
@@ -78,7 +79,6 @@ from . import (
     item_labels,
     journal,
     letter_draft,
-    letter_markup,
     notifications,
     oauth,
     osb,

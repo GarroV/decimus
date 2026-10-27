@@ -245,7 +245,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **79** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 6, move — 1, plan — 11, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **80** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 6, letter — 1, move — 1, plan — 11, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|
@@ -305,10 +305,11 @@
 | `import_upload_photos` | import | Upload the photos attached to the chat to ONE imported draft | `src/mcp/import_photo_link.py` |
 | `findings_by_unit` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `get_inspection` | inspections | Read one recorded inspection of the caller's tenant in full: its header, the score breakdown (percentage, letter grade… | `src/mcp/tools.py` |
-| `inspection_letter` | inspections | Rebuild the partner letter for one recorded inspection of the caller's tenant and return its text, ready for a human to… | `src/mcp/tools.py` |
+| `inspection_letter` | inspections | Read the partner letter of one recorded inspection of the caller's tenant, as text for a human to paste into mail and… | `src/mcp/tools.py` |
 | `list_inspections` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `network_summary` | inspections | Summarize the caller's tenant network over a date range: how many inspections and units, total findings, the… | `src/mcp/tools.py` |
 | `unit_history` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
+| `save_inspection_letter` | letter | Save the partner letter into one recorded inspection of the caller's space, the same way the Save button on the site… | `src/mcp/letter_save.py` |
 | `move_inspection` | move | Correct the date and/or the unit (pizzeria) of an inspection that is already accepted (or waiting for acceptance) — the… | `src/mcp/move.py` |
 | `accept_action_plan` | plan | Accept an action plan that waits for review: it goes to work and the partner is notified | `src/mcp/plans.py` |
 | `confirm_plan_row` | plan | Confirm a plan row the partner marked done; when the last row is confirmed the plan closes | `src/mcp/plans.py` |
