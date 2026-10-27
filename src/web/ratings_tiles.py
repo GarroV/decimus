@@ -16,6 +16,7 @@ from src.ratings import report
 from src.ratings.aggregators import summary as ragg
 from src.ratings.summary import ViolationBlock
 
+from . import ratings_risk
 from .texts import t
 
 #: Плитка, раскрытая без `?open=`: экран не должен открываться пустым.
@@ -120,12 +121,16 @@ def _hard(s: report.Summary, lang: str) -> Face:
     )
 
 
-def _risk(s: report.Summary, lang: str) -> Face:
-    th = s.thresholds
+def _risk(combined: ratings_risk.CombinedRisk, lang: str) -> Face:
     return Face(
-        ((t("ratings.col.unit", lang), str(len(s.risk))),),
-        t("ratings.risk.hint", lang, n=int(th["risk_periods"]), x=f"{th['risk_threshold']:.1f}"),
+        ((t("ratings.col.unit", lang), str(len(combined.rows))),),
+        t("ratings.risk.tile", lang),
     )
+
+
+def _clients(lang: str) -> Face:
+    """Оценки клиентов — из Dodo IS (#1303); пока данных нет, лицо честно пустое."""
+    return Face(((t("ratings.clients.fig", lang), _DASH),), t("ratings.clients.soon", lang))
 
 
 def _maps(rows: Sequence[rmaps.CountryMaps] | None, providers: Sequence[int], lang: str) -> Face:
@@ -164,6 +169,7 @@ def faces(
     map_providers: Sequence[int],
     aggs: tuple[tuple[str, ...], Sequence[ragg.GroupAggs], bool] | None,
     agg_names: dict[str, str],
+    risk: ratings_risk.CombinedRisk,
     lang: str,
 ) -> dict[str, Face]:
     """Лицо каждой плитки по коду блока; `compare` — только когда он есть у зрителя."""
@@ -172,7 +178,8 @@ def faces(
         "violations": _violations(summary, lang),
         "top": _top(summary, lang),
         "hard": _hard(summary, lang),
-        "risk": _risk(summary, lang),
+        "risk": _risk(risk, lang),
+        "clients": _clients(lang),
         "maps": _maps(maps, map_providers, lang),
         "aggregators": _aggs(aggs, agg_names, lang),
     }

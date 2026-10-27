@@ -225,8 +225,8 @@ def test_контроль_сдвигает_и_прячет_блок(monkeypatch:
     monkeypatch.setattr(
         screen.read, "save_layout", lambda blocks, **_: записано.append(list(blocks))
     )
-    порядок = ["scores", "violations", "top", "hard", "risk"]
-    видимые = ["scores", "violations", "hard", "risk"]
+    порядок = ["scores", "violations", "top", "maps", "risk", "hard"]
+    видимые = ["scores", "violations", "maps", "risk", "hard"]
     for client in _стенд(monkeypatch, "HQ", "control"):
         ответ = client.post(
             "/ratings/layout",
@@ -234,15 +234,18 @@ def test_контроль_сдвигает_и_прячет_блок(monkeypatch:
             headers=ORIGIN,
         )
         assert ответ.status_code == 200
+    # Ярусы (D658): «risk» поднят в своём ярусе над «maps»; блоки, не пришедшие в форме,
+    # встают в конец своего яруса без галочки.
     assert записано == [
         [
             ("scores", True),
             ("violations", True),
             ("top", False),
             ("risk", True),
-            ("hard", True),
-            ("compare", False),  # не пришли в форме — встают в конец, галочки нет
+            ("maps", True),
+            ("clients", False),
             ("aggregators", False),
-            ("maps", False),
+            ("hard", True),
+            ("compare", False),
         ]
     ]

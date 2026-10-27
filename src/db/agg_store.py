@@ -266,6 +266,60 @@ def latest(countries: Sequence[str], *, until: date | None = None) -> tuple[Late
 
 
 @dataclass(frozen=True)
+class PointHistory:
+    """Последние снимки одной точки, привязанной к пиццерии; новые первыми."""
+
+    country_code: str
+    aggregator: str
+    dodo_id: str
+    dodo_name: str
+    scale: int
+    scores: tuple[float, ...]
+
+
+_RECENT_SQL = """
+    select country_code, aggregator, point_key, dodo_id, dodo_name, scale, score
+    from (
+        select p.country_code, r.aggregator, r.point_key, p.dodo_id, p.dodo_name, r.scale, r.score,
+               row_number() over (
+                   partition by r.aggregator, r.point_key order by r.on_date desc
+               ) as n
+        from agg.ratings r
+        join agg.points p on p.aggregator = r.aggregator and p.point_key = r.point_key
+        where p.country_code = any(%s) and p.dodo_id is not null and p.excluded_reason is null
+          and (%s::date is null or r.on_date <= %s::date)
+    ) последние
+    where n <= %s
+    order by aggregator, point_key, n
+"""
+
+
+def recent(countries: Sequence[str], *, until: date | None, n: int) -> tuple[PointHistory, ...]:
+    """Последние `n` снимков каждой привязанной точки по этим странам — на `until` включительно."""
+    if not countries:
+        return ()
+    try:
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute(_RECENT_SQL, (list(countries), until, until, n)).fetchall()
+    except psycopg.Error as exc:
+        raise _fail("История оценок агрегаторов не прочиталась", exc) from exc
+    grouped: dict[tuple[str, str], list[tuple[object, ...]]] = {}
+    for r in rows:
+        grouped.setdefault((str(r[1]), str(r[2])), []).append(r)
+    return tuple(
+        PointHistory(
+            str(g[0][0]),
+            str(g[0][1]),
+            str(g[0][3]),
+            str(g[0][4] or ""),
+            int(g[0][5]),  # type: ignore[call-overload]
+            tuple(float(r[6]) for r in g),  # type: ignore[arg-type]
+        )
+        for g in grouped.values()
+    )
+
+
+@dataclass(frozen=True)
 class LoadState:
     aggregator: str
     at: datetime

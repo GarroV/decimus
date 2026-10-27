@@ -384,6 +384,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0100_web_user_name_latin.sql": (
         "sql1:09fa3c3acfb53332b19cb2f270ea1c9d7c0808a1951918710e6052f8d03a226b"
     ),
+    # Блок «Оценки клиентов» в компоновке «Рейтингов» (D658).
+    "0101_ratings_layout_clients.sql": (
+        "sql1:9764e2b874a66efb0cee4fd359f62e70006b4df4cb7b13ce3a834d02d5e4486e"
+    ),
 }
 
 
