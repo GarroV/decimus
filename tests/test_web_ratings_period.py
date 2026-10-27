@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import dataclasses
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from flask import render_template_string
 from test_web_ratings_tiles import _клиент, _страница
 from web_harness import собрать
 
+from src.ratings import freshness as fresh
 from src.ratings import periods as rp
 from src.web import ratings as screen
 from src.web import ratings_calendar as cal
@@ -99,13 +99,10 @@ def test_списки_в_окне_периода_выбран_пункт_и_за
     assert "<noscript>" in совпал
 
 
-def _шапка_экрана(monkeypatch: pytest.MonkeyPatch, last: dict[str, datetime]) -> str:
-    """Шапка живого экрана «Рейтинги» с заданной свежестью загрузок."""
+def _шапка_экрана(monkeypatch: pytest.MonkeyPatch, rows: tuple[fresh.Row, ...]) -> str:
+    """Шапка живого экрана «Рейтинги» с заданными строками свежести источников."""
     _страница(monkeypatch, 0)
-    собрана = screen.report.build
-    monkeypatch.setattr(
-        screen.report, "build", lambda sel: dataclasses.replace(собрана(sel), last_loaded=last)
-    )
+    monkeypatch.setattr(screen.ratings_freshness, "read_rows", lambda now: rows)
     for client in _клиент(monkeypatch):
         страница = client.get("/ratings?lang=ru").get_data(as_text=True)
         начало = страница.index('<header class="rt-head">')
@@ -113,24 +110,33 @@ def _шапка_экрана(monkeypatch: pytest.MonkeyPatch, last: dict[str, da
     raise AssertionError("клиент не создан")
 
 
-def test_шапка_свежесть_столбиком_под_знаком_вопроса_без_перечня_через_точку(
+def test_шапка_свежесть_таблицей_с_точкой_и_словом_у_каждой_строки(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    last = {
-        "snapshot": datetime(2026, 10, 20, 9, 5),
-        "rko-evaluations": datetime(2026, 10, 21, 18, 40),
-    }
+    rows = (
+        fresh.Row(
+            "rs",
+            fresh.Status.FRESH,
+            begin_on=date(2026, 10, 1),
+            end_on=date(2026, 10, 15),
+            arrived=datetime(2026, 10, 22, 8, 9, tzinfo=UTC),
+        ),
+        fresh.Row(
+            "agg", fresh.Status.STALE, "yandex_eda", arrived=datetime(2026, 10, 11, tzinfo=UTC)
+        ),
+    )
 
-    html = _шапка_экрана(monkeypatch, last)
+    html = _шапка_экрана(monkeypatch, rows)
 
-    assert 'aria-label="Когда обновлены данные"' in html
-    assert "Последняя загрузка" in html
-    assert html.count("<li>") == 2
-    assert "20.10.2026 09:05</li>" in html and "21.10.2026 18:40</li>" in html
+    assert 'aria-label="Когда обновлены данные: устарели"' in html  # худшая точка — и словом
+    assert html.count("<tr>") == 3  # заголовок и две строки, порядок задан
+    assert "за 1–15.10" in html and "22.10 08:09" in html and "Яндекс Еда" in html
+    assert 'class="rt-fdot rt-fdot--fresh"' in html and 'class="rt-fdot rt-fdot--stale"' in html
+    assert "свежие</span>" in html and "устарели</span>" in html  # цвет — не единственный признак
     assert " · " not in html
 
 
-def test_шапка_без_загрузок_говорит_это_одной_строкой(monkeypatch: pytest.MonkeyPatch) -> None:
-    html = _шапка_экрана(monkeypatch, {})
+def test_шапка_без_источников_говорит_это_одной_строкой(monkeypatch: pytest.MonkeyPatch) -> None:
+    html = _шапка_экрана(monkeypatch, ())
 
-    assert html.count("<li>") == 1 and "Загрузок ещё не было.</li>" in html
+    assert "<table" not in html and "Загрузок ещё не было." in html

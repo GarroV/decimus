@@ -475,3 +475,23 @@
   .slist--ratings .srow__main { flex: 1 1 calc(100% - 28px); }
   .slist--ratings .srow__go { order: 0; }
 }
+
+/* Таблица свежести под «?» у заголовка (D659, макрос fresh_tip в _info_tip.html).
+   Цвета — токены ядра ok/warn/err; цвет не единственный признак: у точки есть слово
+   (.sr-only и title). Окно шире обычного столбика, но не шире экрана: на 390 px таблица
+   сжимается и переносит подписи, а не выходит за поле страницы. */
+.info-tip__pop--fresh { width: min(30rem, calc(100vw - 2rem)); }
+.rt-fresh { width: 100%; border-collapse: collapse; font-size: var(--fs-dense); color: var(--ink-2); table-layout: auto; }
+.rt-fresh th, .rt-fresh td { padding: var(--space-1) var(--space-2); text-align: left; vertical-align: baseline; font-weight: var(--w-regular); }
+.rt-fresh thead th { font-size: var(--fs-micro); color: var(--ink-3); font-weight: var(--w-semibold); }
+.rt-fresh tbody th { color: var(--ink); font-weight: var(--w-semibold); overflow-wrap: anywhere; }
+.rt-fresh th:first-child, .rt-fresh td:first-child { width: 1.25rem; padding-left: var(--space-5); }
+.rt-fresh th:last-child, .rt-fresh td:last-child { padding-right: var(--space-5); }
+.rt-fresh__at { white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.rt-fresh__foot { padding: var(--space-2) var(--space-5) 0; font-size: var(--fs-micro); color: var(--ink-3); }
+.rt-fdot { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; background: var(--ink-3); }
+.rt-fdot--fresh { background: var(--ok); }
+.rt-fdot--lag { background: var(--warn-mark); }
+.rt-fdot--stale { background: var(--err); }
+.rt-fdot--mark { position: absolute; top: -.1rem; right: -.2rem; width: .5rem; height: .5rem; box-shadow: 0 0 0 2px var(--surface); }
+.info-tip__mark { position: relative; }

@@ -72,6 +72,7 @@ def _страница(monkeypatch: pytest.MonkeyPatch, нарушений: int) 
     monkeypatch.setattr(screen, "_agg_failures", lambda: ())
     monkeypatch.setattr(screen, "_agg_pending", lambda: None)
     monkeypatch.setattr(screen.ratings_risk, "build", lambda *_a, **_k: CombinedRisk((), ()))
+    monkeypatch.setattr(screen.ratings_freshness, "read_rows", lambda now: ())
 
 
 def _клиент(monkeypatch: pytest.MonkeyPatch, ui_lang: str = "ru") -> Iterator[FlaskClient]:

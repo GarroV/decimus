@@ -79,6 +79,7 @@ def страница(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(screen, "_maps", lambda *_a: None)
     monkeypatch.setattr(screen, "_aggs", lambda *_a: None)
     monkeypatch.setattr(screen, "_unit_maps", lambda _u: {})
+    monkeypatch.setattr(screen.ratings_freshness, "build", lambda *_a, **_k: None)
     # Плитка «Стабильно ниже порога» (D658) читает базу сама — здесь не нужна.
     monkeypatch.setattr(screen.ratings_risk, "build", lambda *_a, **_k: CombinedRisk((), ()))
     monkeypatch.setattr(agg_store, "load_states", lambda: ())

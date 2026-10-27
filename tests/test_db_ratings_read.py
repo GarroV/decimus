@@ -203,6 +203,31 @@ def test_окно_зоны_риска_берёт_периоды_с_оценка�
     assert set(ids) == set(с_оценками)
 
 
+def test_свежесть_последний_период_с_оценками_а_не_параллельный_ряд_сбора(db_env: str) -> None:
+    """D659: «за какой период данные» — по периоду с оценками; ряд вт–пн без оценок не в счёт."""
+    assert ratings_read.latest_scored_periods() == {}
+    assert ratings_read.sheet_last_checked() is None
+    _грузить(snapshot())
+    with psycopg.connect(db_env) as conn:
+        conn.execute(
+            "insert into ratings.periods (rating_type, begin_on, end_on, title_ru, title_en) "
+            "select 'rko', max(begin_on) + 1, max(begin_on) + 7, 'сбор', 'collection' "
+            "from ratings.periods where rating_type = 'rko'"
+        )
+    latest = ratings_read.latest_scored_periods()
+    scored_rko = max(ratings_read.rko_periods(), key=lambda p: p[1])
+    assert latest["rko"][:2] == (scored_rko[1], scored_rko[2])
+    assert latest["rko"][2] is not None  # когда пришли оценки
+    assert set(latest) <= {"rs", "rko"}
+    with psycopg.connect(db_env) as conn:
+        conn.execute(
+            "insert into ratings.sheet_sync (tab, checked_at, outcome) values "
+            "('a', '2026-10-20 08:00+00', 'unchanged'), ('b', '2026-10-22 09:30+00', 'loaded')"
+        )
+    checked = ratings_read.sheet_last_checked()
+    assert checked is not None and checked.isoformat().startswith("2026-10-22T09:30")
+
+
 def test_зона_риска_пуста_если_периодов_меньше_окна(db_env: str) -> None:
     _грузить(_снимок_ниже_порога())  # два периода РС, окно — три (стартовое)
     summary = report.build(report.Selection(report.GROUP_IMF, None, quarter_period(2026, 3)))
