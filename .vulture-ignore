@@ -736,6 +736,12 @@ has_contract
 # «Письма и уведомления» (D608, #1130): число адресов в строке столбца читает шаблон
 # `administration/mailings.html`; маршруты `add` и `remove` регистрирует `@app.post`.
 cc_count
+# Шаблон письма (#977, #1130): поля версии, редактора и строки читает шаблон
+# `administration/mailings.html`; маршрут `save_template` регистрирует `@app.post`.
+saved_at
+is_builtin
+builtin_failed
+save_template
 # Плашка свежести «Рейтингов»: подпись худшего состояния читает шаблон `_info_tip.html`.
 worst_word
 # Автофикстура pytest (`autouse=True`): по имени её не зовёт никто.

@@ -230,7 +230,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     unit_add.install(app, conf)
     country_filter.install(app)
     country_settings.install(app)
-    mailings_screen.install(app)
+    mailings_screen.install(app, conf.ui_lang)
     _register_registry(app, conf)
     calendar_screen.install(app, conf)
     letter_draft.install(app, conf)

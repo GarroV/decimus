@@ -192,7 +192,12 @@ def test_выбранный_язык_доезжает_до_сборщика(
     спрошено: list[str | None] = []
 
     def запомнить(
-        _detail: Any, *, lang: str | None, papers: Any, template: int | None = None
+        _detail: Any,
+        *,
+        lang: str | None,
+        papers: Any,
+        template: int | None = None,
+        bodies: Any = None,
     ) -> dict[str, object]:
         спрошено.append(lang)
         return собранное(lang=lang or "en")
@@ -214,7 +219,12 @@ def test_язык_по_умолчанию_это_язык_отчёта_пров�
     спрошено: list[str | None] = []
 
     def запомнить(
-        _detail: Any, *, lang: str | None, papers: Any, template: int | None = None
+        _detail: Any,
+        *,
+        lang: str | None,
+        papers: Any,
+        template: int | None = None,
+        bodies: Any = None,
     ) -> dict[str, object]:
         спрошено.append(lang)
         return собранное()

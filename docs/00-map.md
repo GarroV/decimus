@@ -117,7 +117,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
+<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -147,6 +147,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/letter_draft.py` | Письмо уходит в черновики почты вошедшего (T352, D174, D176, D185, #332) |
 | `src/web/mailing_copy.py` | Список копий УК для «Копии» черновика письма (D608, #1130): одна дверь на все виды |
 | `src/web/mailings_screen.py` | Вкладка «Письма и уведомления» раздела «Администрирование» (D608, #1130, #977) |
+| `src/web/mailings_template.py` | Шаблон письма партнёру по проверке во вкладке «Письма и уведомления» (D550, D608, #977, #1130) |
 | `src/web/methodology.py` | Раздел «Методика»: правка состава чек-листа той же дверью, что MCP и CLI |
 | `src/web/methodology_view.py` | Экран чек-листа (D197): отбор, группировка и соседи пункта |
 | `src/web/osb.py` | Страница «ОСБ»: очереди предписаний сети (D599, D606; шаг 1 спеки 2026-10-21-osb-prescriptions) |
@@ -416,7 +417,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,country_report_langs,mailing_cc,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,country_report_langs,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -431,6 +432,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
 | `src/db/learning_store.py` | Обучение в базе (схема `learning`, миграция 0085): запись снимка дня и журнал загрузок |
 | `src/db/mailing_cc.py` | Списки копий писем УК по видам рассылки (0103, D608, #1130) |
+| `src/db/mailing_templates.py` | Шаблоны писем УК с историей версий (0104, D550, D608, #977, #1130) |
 | `src/db/maps_store.py` | Оценки на картах в базе (схема `maps`, миграция 0044): запись снимка и чтение |
 | `src/db/model_key.py` | Ключ модели из базы (D491): тонкая обёртка над общим хранилищем `service_keys` (D576) |
 | `src/db/model_usage.py` | Расход модели (D537, `0078`): запись вызова и чтение сводки для экрана |
@@ -570,6 +572,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0101_ratings_layout_clients.sql` | D658: страница «Рейтинги» — три яруса блоков, в среднем новый блок `clients` («Оценки клиентов», источник — Dodo IS, #1303) |
 | `0102_ratings_layout_d658_order.sql` | D658: порядок блоков «Рейтингов» по ярусам — верхний «Средний», «Нарушения», «Top-10»; средний «Оценки клиентов», «Карты», «Агрегаторы», «Стабильно ниже»; нижний «Хард»… |
 | `0103_mailing_cc.sql` | Списки копий раздела «Письма и уведомления» (D608, #1130, #977): почты сотрудников УК, которые подставляются в «Копию» черновика письма |
+| `0104_mailing_templates.sql` | Шаблоны писем УК (D550, D608, #977, #1130): текст письма партнёру по проверке, который правит админ УК, с историей версий |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -878,6 +881,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/item_label.py` | Пункт чек-листа для человека: «Порядок 13», а не `CLN13` (решение владельца 20.10.2026) |
 | `src/domain/journal.py` | Что и как попадает в журналы входов и действий (D462, `0067`) |
 | `src/domain/kinds.py` | Вид проверки: код — сущность, слово — перевод (T152, задача #123) |
+| `src/domain/letter_template.py` | Шаблон письма партнёру: слоты, подстановки-блоки и проверка текста (D550, D608, #977, #1130) |
 | `src/domain/log_ids.py` | Идентификаторы людей и пространств в журнале — меткой, а не как есть (F-015) |
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |

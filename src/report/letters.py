@@ -34,6 +34,7 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import os
@@ -758,13 +759,27 @@ _letters: OrderedDict[str, tuple[str, tuple[str, ...]]] = OrderedDict()
 _letters_lock = threading.Lock()
 
 
+def _bodies_json(тексты: Mapping[str, str] | None) -> str:
+    """Тексты из админки одной строкой для ключа и файла движка; нет их — пусто."""
+    return json.dumps(dict(тексты), ensure_ascii=False, sort_keys=True) if тексты else ""
+
+
 def _letter_key(
-    вход: str, detail: InspectionDetail, *, язык: str, каталог: Path, шаблон: int
+    вход: str,
+    detail: InspectionDetail,
+    *,
+    язык: str,
+    каталог: Path,
+    шаблон: int,
+    тексты: str = "",
 ) -> str:
     # Записанная оценка — в ключе: её сверяет `_verify`, и расхождение с движком
     # обязано всплыть отказом на каждом показе, а не только на первом.
     оценка = f"{detail.inspection.pct}\0{detail.inspection.grade}"
-    return hashlib.sha256(f"{каталог}\0{язык}\0{шаблон}\0{оценка}\0{вход}".encode()).hexdigest()
+    # Сохранённые тексты — в ключе: правка шаблона в админке меняет письмо сразу.
+    return hashlib.sha256(
+        f"{каталог}\0{язык}\0{шаблон}\0{оценка}\0{тексты}\0{вход}".encode()
+    ).hexdigest()
 
 
 def clear_letter_cache() -> None:
@@ -774,7 +789,13 @@ def clear_letter_cache() -> None:
 
 
 def _letter_text(
-    вход: str, detail: InspectionDetail, *, язык: str, каталог: Path, шаблон: int
+    вход: str,
+    detail: InspectionDetail,
+    *,
+    язык: str,
+    каталог: Path,
+    шаблон: int,
+    тексты: str = "",
 ) -> tuple[str, tuple[str, ...]]:
     """Текст письма и роли обратной связи, не вставленные из-за языка (D663).
 
@@ -782,7 +803,7 @@ def _letter_text(
     JSON-ом: рядом с текстом идёт перечень не вставленного, и он обязан доехать
     до отправителя вместе с текстом, а не потеряться на stderr подпроцесса.
     """
-    ключ = _letter_key(вход, detail, язык=язык, каталог=каталог, шаблон=шаблон)
+    ключ = _letter_key(вход, detail, язык=язык, каталог=каталог, шаблон=шаблон, тексты=тексты)
     with _letters_lock:
         if ключ in _letters:
             _letters.move_to_end(ключ)
@@ -791,9 +812,14 @@ def _letter_text(
         состояние = Path(рядом) / "inspection.json"
         состояние.write_text(вход, encoding="utf-8")
         _verify(detail, каталог, состояние)
+        аргументы = ["letter", f"--lang={язык}", f"--template={шаблон}", "--json"]
+        if тексты:
+            файл = Path(рядом) / "letter-bodies.json"
+            файл.write_text(тексты, encoding="utf-8")
+            аргументы.append(f"--bodies-file={файл}")
         код, письмо, ошибки = _run(
             REPORT_SCRIPT,
-            ["letter", f"--lang={язык}", f"--template={шаблон}", "--json"],
+            аргументы,
             data_dir=каталог,
             state=состояние,
         )
@@ -817,14 +843,39 @@ def _letter_text(
     return текст, пропущено
 
 
+@functools.lru_cache(maxsize=1)
+def builtin_bodies() -> dict[str, dict[str, str]]:
+    """Встроенные тексты письма движка: `{слот: {язык: текст}}` — начало редактора шаблона.
+
+    Единственный источник — движок (`report.py letter-builtin`): копия текстов здесь
+    разошлась бы с ним молча. Состояние проверки и методика не нужны.
+    """
+    with tempfile.TemporaryDirectory(prefix="mcp-letter-builtin-") as рядом:
+        пусто = Path(рядом)
+        код, вывод, ошибки = _run(
+            REPORT_SCRIPT, ["letter-builtin"], data_dir=пусто, state=пусто / "inspection.json"
+        )
+    if код != 0:
+        raise LetterError(f"Движок не отдал встроенные тексты письма: {ошибки.strip()[:300]}")
+    try:
+        return {str(k): dict(v) for k, v in json.loads(вывод)["bodies"].items()}
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        raise LetterError("Движок отдал встроенные тексты письма не разбираемым JSON") from None
+
+
 def build(
     detail: InspectionDetail,
     *,
     lang: str | None,
     papers: Papers,
     template: int | None = None,
+    bodies: Mapping[str, Mapping[str, str]] | None = None,
 ) -> dict[str, object]:
     """Собрать письмо партнёру по записанной проверке.
+
+    `bodies` — тексты письма из админки УК (`{язык: {слот: текст}}`, D608): движок берёт
+    тексты языка письма вместо встроенных, а слот без текста собирается по встроенному, как до
+    админки. Оценку и всё, что в письме считается, даёт движок, шаблон только ставит блоки.
 
     Возвращается записанная оценка, текст письма и прямой ответ на вопрос,
     можно ли это отправлять: письмо с неполной шапкой выглядит готовым, и
@@ -888,7 +939,14 @@ def build(
     пустые = _blank_wordings(detail)
     шаблон = _template(template)
     вход = state_json(detail, lang=язык)
-    текст, обратная_связь = _letter_text(вход, detail, язык=язык, каталог=каталог, шаблон=шаблон)
+    текст, обратная_связь = _letter_text(
+        вход,
+        detail,
+        язык=язык,
+        каталог=каталог,
+        шаблон=шаблон,
+        тексты=_bodies_json((bodies or {}).get(язык)),
+    )
     не_восстановлено = [
         *шапки_нет,
         *([PLAN_DUE_FIELD] if срока_нет else []),

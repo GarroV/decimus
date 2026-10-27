@@ -107,4 +107,150 @@ MAILINGS_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Не вышло: база не ответила. Ничего не изменено.",
         "en": "Failed: the database did not answer. Nothing was changed.",
     },
+    # ── Шаблон письма по проверкам (D550, D608, #977, #1130, этап 1б) ──
+    "mailings.tpl.title": {"ru": "Шаблон письма партнёру", "en": "Partner letter template"},
+    "mailings.tpl.hint": {
+        "ru": (
+            "Текст письма по итогам проверки: свободный текст и блоки в фигурных скобках, "
+            "например {{grade}}. Блоки заполняет движок, оценку шаблон не считает. Пока шаблон "
+            "не сохранён, письмо собирается по встроенному тексту. Два шаблона на выбор "
+            "(сильные стороны до нарушений или обе части в конце) остаются: блоки {{good_block}} "
+            "и {{end_block}} кладут обратную связь аудитора по выбранному. Шаблон один на УК; "
+            "письма партнёров их же пространства идут по встроенному тексту."
+        ),
+        "en": (
+            "The text of the inspection letter: free text and blocks in curly braces, for "
+            "example {{grade}}. The engine fills the blocks; the template does not calculate the "
+            "grade. Until a template is saved the letter is built from the built-in text. The "
+            "two templates to choose from (strengths before the violations, or both parts at "
+            "the end) stay: the {{good_block}} and {{end_block}} blocks put the auditor's feedback "
+            "in the place of the chosen one. One template for HQ; letters on partners' own "
+            "inspections use the built-in text."
+        ),
+    },
+    "mailings.tpl.unreadable": {
+        "ru": "Шаблоны не прочитались. Попробуйте обновить страницу.",
+        "en": "The templates could not be read. Try reloading the page.",
+    },
+    "mailings.tpl.slot.plan": {
+        "ru": "Письмо с планом действий",
+        "en": "Letter with an action plan",
+    },
+    "mailings.tpl.slot.clean": {
+        "ru": "Письмо без существенных нарушений",
+        "en": "Letter without major violations",
+    },
+    "mailings.tpl.slot.empty": {"ru": "Письмо без нарушений", "en": "Letter without violations"},
+    "mailings.tpl.slot.plan.sub": {
+        "ru": "Есть нарушения D2 или D3: письмо просит план действий.",
+        "en": "There are D2 or D3 violations: the letter asks for an action plan.",
+    },
+    "mailings.tpl.slot.clean.sub": {
+        "ru": "Только D1: плана действий письмо не просит.",
+        "en": "D1 only: the letter does not ask for an action plan.",
+    },
+    "mailings.tpl.slot.empty.sub": {
+        "ru": "В проверке нет ни одной записи.",
+        "en": "The inspection has no records at all.",
+    },
+    "mailings.tpl.state.builtin": {"ru": "встроенный", "en": "built-in"},
+    "mailings.tpl.state.version": {
+        "ru": "версия {n} · {who} · {at}",
+        "en": "version {n} · {who} · {at}",
+    },
+    "mailings.tpl.editing_builtin": {
+        "ru": "Сейчас действует встроенный текст. Сохранение создаст версию 1 для этого слота.",
+        "en": "The built-in text is in effect now. Saving creates version 1 for this slot.",
+    },
+    "mailings.tpl.builtin_failed": {
+        "ru": "Встроенный текст движка не получен, поле пусто. Письма собираются как обычно.",
+        "en": (
+            "The built-in engine text could not be fetched, so the "
+            "field is empty. Letters are built as usual."
+        ),
+    },
+    "mailings.tpl.body": {"ru": "Текст письма", "en": "Letter text"},
+    "mailings.tpl.save": {"ru": "Сохранить новой версией", "en": "Save as a new version"},
+    "mailings.tpl.reset": {"ru": "Вернуть встроенный текст", "en": "Return to the built-in text"},
+    "mailings.tpl.fields": {"ru": "Блоки", "en": "Blocks"},
+    "mailings.tpl.fields.hint": {
+        "ru": (
+            "Неизвестный блок при сохранении отклоняется. Одиночную "
+            "скобку пишут двойной: {{{{ или }}}}."
+        ),
+        "en": (
+            "An unknown block is rejected on save. A single brace is written doubled: {{{{ or }}}}."
+        ),
+    },
+    "mailings.tpl.history": {"ru": "История версий", "en": "Version history"},
+    "mailings.tpl.history.none": {"ru": "Версий ещё нет.", "en": "No versions yet."},
+    "mailings.tpl.history.unreadable": {
+        "ru": "История не прочиталась.",
+        "en": "The history could not be read.",
+    },
+    "mailings.tpl.history.row": {
+        "ru": "Версия {n} · {who} · {at}",
+        "en": "Version {n} · {who} · {at}",
+    },
+    "mailings.tpl.err.empty": {
+        "ru": "Шаблон не сохранён: текст пуст.",
+        "en": "Not saved: the text is empty.",
+    },
+    "mailings.tpl.err.long": {
+        "ru": "Шаблон не сохранён: текст длиннее 6000 знаков.",
+        "en": "Not saved: the text is longer than 6000 characters.",
+    },
+    "mailings.tpl.err.control": {
+        "ru": "Шаблон не сохранён: в тексте недопустимые управляющие знаки.",
+        "en": "Not saved: the text has invalid control characters.",
+    },
+    "mailings.tpl.err.markup": {
+        "ru": (
+            "Не сохранено: разметка блоков нарушена. Одиночную скобку пишут двойной: {{{{ или }}}}."
+        ),
+        "en": (
+            "Not saved: the block markup is broken. A single "
+            "brace is written doubled: {{{{ or }}}}."
+        ),
+    },
+    "mailings.tpl.err.unknown": {
+        "ru": "Шаблон не сохранён: неизвестный блок {arg}. Допустимые блоки перечислены ниже.",
+        "en": "Not saved: unknown block {arg}. The allowed blocks are listed below.",
+    },
+    "mailings.tpl.err.format": {
+        "ru": "Шаблон не сохранён: у блока {arg} не бывает формата.",
+        "en": "Not saved: block {arg} takes no format.",
+    },
+    "mailings.saved.tpl_ok": {
+        "ru": "Шаблон сохранён новой версией.",
+        "en": "The template is saved as a new version.",
+    },
+    "mailings.saved.tpl_reset": {
+        "ru": "Возвращён встроенный текст (записана новая версия).",
+        "en": "The built-in text is back (a new version was recorded).",
+    },
+    "mailings.field.unit": {"ru": "название пиццерии", "en": "pizzeria name"},
+    "mailings.field.date": {"ru": "дата проверки", "en": "inspection date"},
+    "mailings.field.city": {
+        "ru": "город с запятой впереди (пусто, если города нет)",
+        "en": "city with a leading comma (empty if none)",
+    },
+    "mailings.field.type": {"ru": "вид проверки", "en": "inspection type"},
+    "mailings.field.grade": {"ru": "оценка, буква", "en": "grade letter"},
+    "mailings.field.pct": {"ru": "итоговый процент", "en": "overall percentage"},
+    "mailings.field.grade_note": {"ru": "пояснение к оценке", "en": "note on the grade"},
+    "mailings.field.summary_lines": {"ru": "сводка по зонам", "en": "summary by zone"},
+    "mailings.field.critical_block": {
+        "ru": "критичное (D3) и зоны роста по выбранному шаблону",
+        "en": "critical (D3) items and growth areas for the chosen template",
+    },
+    "mailings.field.good_block": {
+        "ru": "сильные стороны аудитора (шаблон 1; в шаблоне 2 пусто)",
+        "en": "the auditor's strengths (template 1; empty in template 2)",
+    },
+    "mailings.field.end_block": {
+        "ru": "обратная связь аудитора в конце (шаблон 2; в шаблоне 1 пусто)",
+        "en": "the auditor's feedback at the end (template 2; empty in template 1)",
+    },
+    "mailings.field.plan_due": {"ru": "срок плана действий", "en": "action plan deadline"},
 }
