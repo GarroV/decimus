@@ -188,8 +188,34 @@ def test_вид_экшн_планов_ведётся_отдельным_спис
     assert список["store"]["plan"] == [ПОЧТА] and список["store"]["inspection"] == []
     страница = client.get(f"{РАЗДЕЛ}?tab=mailings&kind=plan").get_data(as_text=True)
     assert ПОЧТА in страница and "mailings/plan/cc/remove" in страница
-    # Предписания ещё не поданы вкладкой (этап 3): вид закрыт.
-    assert client.get(f"{РАЗДЕЛ}?tab=mailings&kind=prescription").status_code == 404
+    assert client.get(f"{РАЗДЕЛ}?tab=mailings&kind=prescription").status_code == 200
+    assert client.get(f"{РАЗДЕЛ}?tab=mailings&kind=nope").status_code == 404
+
+
+def test_черновик_предписания_несёт_копию_предписаний(
+    monkeypatch: pytest.MonkeyPatch, список: dict[str, Any]
+) -> None:
+    """Копия предписаний подставляется в черновик, а список писем по проверкам — нет."""
+    from types import SimpleNamespace
+
+    from src.web import prescriptions as web_rx
+
+    список["store"]["prescription"].append("osb-copy@dodobrands.io")
+    список["store"]["inspection"].append(ПОЧТА)
+    черновики: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        web_rx, "create_draft", lambda token, **поля: черновики.append(поля) or "id"
+    )
+    предписание = SimpleNamespace(recipients="p@x.io", subject="Тема", body="Текст")
+    monkeypatch.setattr(
+        web_rx.rxw, "issue", lambda _id, *, actor, put_draft: put_draft(предписание)
+    )
+    client = next(_вошёл(monkeypatch, "HQ", "osb"))
+    with client:
+        client.get("/")
+        ответ = web_rx._finish_gmail("id-1", "ru", lambda: "токен")
+    assert ответ.status_code == 303 and "gmail=ok" in ответ.headers["Location"]
+    assert [п["cc"] for п in черновики] == [("osb-copy@dodobrands.io",)]
 
 
 def test_без_списка_заголовка_cc_нет() -> None:

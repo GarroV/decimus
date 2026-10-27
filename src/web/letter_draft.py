@@ -48,6 +48,7 @@ from .google_mail import (
     exchange_code_for_grant,
     verified_token,
 )
+from .mailing_copy import cc_for
 from .origin import over_https, refuse_foreign_origin
 from .sections import section
 
@@ -115,11 +116,7 @@ def _копия_ук(tenant_code: str) -> tuple[str, ...]:
     """
     if canonical_tenant(tenant_code) != HQ_TENANT:
         return ()
-    try:
-        return mailing_cc.read(mailing_cc.KIND_INSPECTION)
-    except DbError:
-        logger.warning("Список копий писем по проверкам не прочитался", exc_info=True)
-        return ()
+    return cc_for(mailing_cc.KIND_INSPECTION)
 
 
 def install(app: Flask, conf: Settings) -> None:
