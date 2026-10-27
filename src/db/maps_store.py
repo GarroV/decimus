@@ -39,13 +39,13 @@ on conflict (company_uuid, provider_id, on_date) do update set
 
 #: Страну филиала решает реестр пиццерий Dodo (`agg.units`) по координатам, а не
 #: Pointer: Pointer отдал Koper-1 (Словения) с кодом RS — у Сербии стало 5 филиалов,
-#: у Словении 3 (27.10.2026). Ближайшая пиццерия реестра в пределах ~1 км; нет такой —
-#: страна Pointer остаётся.
+#: у Словении 3 (27.10.2026). Ближайшая пиццерия реестра в пределах ~2 км (Lagos-5
+#: стоит в 1,2 км от карточки); нет такой — страна Pointer остаётся.
 _COUNTRY_FROM_REGISTRY = """
 with near as (
     select c.uuid, (
         select u.country_code from agg.units u
-         where abs(u.lat - c.lat) < 0.01 and abs(u.lng - c.lng) < 0.01
+         where abs(u.lat - c.lat) < 0.02 and abs(u.lng - c.lng) < 0.02
          order by (u.lat - c.lat) ^ 2 + (u.lng - c.lng) ^ 2
          limit 1
     ) as country_code
