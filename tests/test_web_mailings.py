@@ -179,6 +179,19 @@ def test_письмо_несёт_копию_в_заголовке_cc() -> None:
     assert разобрано["To"] == "p@x.io"
 
 
+def test_вид_экшн_планов_ведётся_отдельным_списком(
+    monkeypatch: pytest.MonkeyPatch, список: dict[str, Any]
+) -> None:
+    client = next(_вошёл(monkeypatch, "HQ", "admin"))
+    ответ = client.post(f"{РАЗДЕЛ}/mailings/plan/cc/add", data={"email": ПОЧТА}, headers=ЗАГОЛОВКИ)
+    assert ответ.status_code == 303
+    assert список["store"]["plan"] == [ПОЧТА] and список["store"]["inspection"] == []
+    страница = client.get(f"{РАЗДЕЛ}?tab=mailings&kind=plan").get_data(as_text=True)
+    assert ПОЧТА in страница and "mailings/plan/cc/remove" in страница
+    # Предписания ещё не поданы вкладкой (этап 3): вид закрыт.
+    assert client.get(f"{РАЗДЕЛ}?tab=mailings&kind=prescription").status_code == 404
+
+
 def test_без_списка_заголовка_cc_нет() -> None:
     письмо = google_mail.letter_message(to="p@x.io", subject="Тема", body="Здравствуйте!")
     assert письмо["Cc"] is None

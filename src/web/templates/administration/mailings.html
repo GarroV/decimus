@@ -65,7 +65,7 @@
     <p class="ssec__note">{{ t('mailings.kind.' ~ picked ~ '.sub') }}</p>
     <section class="ssec" aria-labelledby="mailings-cc-title">
       <h2 class="ssec__title" id="mailings-cc-title">{{ t('mailings.cc.title') }}</h2>
-      <p class="ssec__note">{{ t('mailings.cc.hint') }}</p>
+      <p class="ssec__note">{{ t('mailings.cc.hint.' ~ picked) }}</p>
       {% if emails is none %}
         <p class="ssec__note">{{ t('mailings.cc.unreadable') }}</p>
       {% else %}
