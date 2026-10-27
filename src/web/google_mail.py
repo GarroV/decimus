@@ -216,7 +216,7 @@ def draft_subject(*, city: str, date: str, lang: str) -> str:
     return " · ".join(часть for часть in части if часть)
 
 
-def letter_message(*, to: str, subject: str, body: str) -> EmailMessage:
+def letter_message(*, to: str, subject: str, body: str, cc: tuple[str, ...] = ()) -> EmailMessage:
     """Письмо партнёру как MIME: текстовая часть и HTML-часть одного содержания.
 
     `body` — разметка письма (`src/web/letter_markup.py`), и чистится она
@@ -241,6 +241,11 @@ def letter_message(*, to: str, subject: str, body: str) -> EmailMessage:
         # черновик неотправляемым, поэтому его просто нет.
         if to.strip():
             письмо["To"] = to.strip()
+        # «Копия» — подстановка в черновик (D608): человек видит её в письме и
+        # отправляет сам. Адреса из списка УК проверены при сохранении, но перевод
+        # строки здесь всё равно отказ того же рода, что в `To`.
+        if cc:
+            письмо["Cc"] = ", ".join(cc)
     except ValueError as сбой:
         raise GoogleMailError(
             "в теме или адресате письма перевод строки — черновик не заводится"
@@ -252,9 +257,9 @@ def letter_message(*, to: str, subject: str, body: str) -> EmailMessage:
     return письмо
 
 
-def mime_message(*, to: str, subject: str, body: str) -> str:
+def mime_message(*, to: str, subject: str, body: str, cc: tuple[str, ...] = ()) -> str:
     """Письмо как `raw` для Gmail: MIME в base64url без выравнивания."""
-    письмо = letter_message(to=to, subject=subject, body=body)
+    письмо = letter_message(to=to, subject=subject, body=body, cc=cc)
     return base64.urlsafe_b64encode(письмо.as_bytes()).decode().rstrip("=")
 
 
@@ -264,14 +269,17 @@ def create_draft(
     to: str,
     subject: str,
     body: str,
+    cc: tuple[str, ...] = (),
     opener: Callable[..., Any] = urllib.request.urlopen,
 ) -> str:
     """Положить письмо в черновики вошедшего. Возвращает номер черновика.
 
+    `cc` — адреса для «Копии» (список УК, D608): только подстановка в черновик.
+
     `opener` — точка подмены для проверки: сам разговор с Gmail тривиален, а
     вот разбор его ответов решает, увидит ли человек внятную причину отказа.
     """
-    сырое = mime_message(to=to, subject=subject, body=body)
+    сырое = mime_message(to=to, subject=subject, body=body, cc=cc)
     запрос = urllib.request.Request(
         DRAFTS_ENDPOINT,
         data=json.dumps({"message": {"raw": сырое}}).encode(),

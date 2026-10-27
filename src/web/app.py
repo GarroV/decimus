@@ -79,6 +79,7 @@ from . import (
     journal,
     letter_draft,
     letter_markup,
+    mailings_screen,
     notifications,
     oauth,
     osb,
@@ -229,6 +230,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     unit_add.install(app, conf)
     country_filter.install(app)
     country_settings.install(app)
+    mailings_screen.install(app)
     _register_registry(app, conf)
     calendar_screen.install(app, conf)
     letter_draft.install(app, conf)

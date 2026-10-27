@@ -30,6 +30,7 @@ from .texts_dodois import DODOIS_TEXTS
 from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_journal import JOURNAL_TEXTS
+from .texts_mailings import MAILINGS_TEXTS
 from .texts_master import MASTER_TEXTS
 from .texts_notifications import NOTIFICATION_TEXTS
 from .texts_oauth import OAUTH_TEXTS
@@ -1789,6 +1790,7 @@ _ЧАСТИ = (
     USERS_TEXTS,
     WALK_TEXTS,
     ADMINISTRATION_TEXTS,
+    MAILINGS_TEXTS,
 )
 _ПЕРЕСЕЧЕНИЕ = {
     ключ
@@ -1827,6 +1829,7 @@ TEXTS = {
     **USERS_TEXTS,
     **WALK_TEXTS,
     **ADMINISTRATION_TEXTS,
+    **MAILINGS_TEXTS,
 }
 
 

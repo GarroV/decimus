@@ -130,6 +130,8 @@ _WEB: dict[str, tuple[str, str]] = {
         "Изменены языки отчёта страны",
         "Country report languages changed",
     ),
+    "mailing_cc_add": ("Добавлен адрес в копию писем УК", "Address added to HQ letter Cc"),
+    "mailing_cc_remove": ("Убран адрес из копии писем УК", "Address removed from HQ letter Cc"),
     "country_save_contract": ("Сохранён договор страны", "Country agreement saved"),
     "country_delete_contract": ("Снята строка договора страны", "Country agreement row removed"),
     "ratings_layout": ("Изменён состав блока рейтингов", "Ratings layout changed"),
