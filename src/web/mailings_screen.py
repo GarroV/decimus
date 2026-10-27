@@ -36,7 +36,11 @@ log = logging.getLogger(__name__)
 
 #: Виды рассылки, которые вкладка уже ведёт, в порядке показа. Остальные виды из
 #: `mailing_cc.KINDS` добавляются сюда этапами #1130 вместе со своим экраном.
-SHOWN_KINDS: tuple[str, ...] = (mailing_cc.KIND_INSPECTION, mailing_cc.KIND_PLAN)
+SHOWN_KINDS: tuple[str, ...] = (
+    mailing_cc.KIND_INSPECTION,
+    mailing_cc.KIND_PRESCRIPTION,
+    mailing_cc.KIND_PLAN,
+)
 
 SAVED = "ok"
 EXISTS = "exists"
