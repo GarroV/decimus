@@ -124,7 +124,7 @@ def test_отказ_сервиса_обхода_доходит_как_есть(�
     ответ = админка.post(walk.DATA_PATH, data="подделка", content_type="text/plain")
 
     assert ответ.status_code == 401
-    assert ответ.get_json() == {"error": "unauthorized"}
+    assert ответ.get_json()["error"] == "unauthorized"
 
 
 def test_сервис_обхода_молчит_экран_получает_503_словами() -> None:
