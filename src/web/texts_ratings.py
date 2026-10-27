@@ -68,11 +68,10 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.fresh.never": {"ru": "ни разу", "en": "never"},
     "ratings.fresh.foot": {
         "ru": (
-            "Время — UTC. РС выходит дважды в месяц, РКО — раз в неделю: "
-            "их цвет считается от конца периода."
+            "РС выходит дважды в месяц, РКО — раз в неделю: их цвет считается от конца периода."
         ),
         "en": (
-            "Times are UTC. Standards come twice a month, customer exp. weekly: "
+            "Standards come twice a month, customer exp. weekly: "
             "their colour counts from the period end."
         ),
     },

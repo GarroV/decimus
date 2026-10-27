@@ -12,10 +12,12 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, tzinfo
 from enum import StrEnum
+from zoneinfo import ZoneInfo
 
 
 class Status(StrEnum):
@@ -64,9 +66,21 @@ def classify_period(kind: str, end_on: date, today: date) -> Status:
     return _by_limits((today - end_on).days, green, yellow)
 
 
+def local_zone() -> tzinfo:
+    """Часовой пояс сутки и время прихода: `TZ` окружения сервера, как на остальных экранах.
+
+    Не задан — UTC: так тесты не зависят от машины, на которой идут.
+    """
+    name = os.environ.get("TZ")
+    return ZoneInfo(name) if name else UTC
+
+
 def classify_age(at: datetime, today: date) -> Status:
-    """Свежесть по календарным суткам события (в UTC): сегодня, 1–3 дня, больше."""
-    days = (today - at.astimezone(UTC).date()).days
+    """Свежесть по календарным суткам события: сегодня, 1–3 дня, больше.
+
+    Сутки — в часовом поясе сервера, как время на остальных экранах.
+    """
+    days = (today - at.astimezone(local_zone()).date()).days
     return _by_limits(days, ROUTINE_GREEN_DAYS, ROUTINE_YELLOW_DAYS)
 
 

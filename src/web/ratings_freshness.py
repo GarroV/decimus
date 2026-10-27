@@ -68,7 +68,7 @@ def _name(row: fresh.Row, lang: str, agg_names: dict[str, str]) -> str:
 def _arrived(row: fresh.Row, lang: str) -> str:
     if row.arrived is None:
         return t("ratings.fresh.never", lang)
-    return row.arrived.astimezone(UTC).strftime(_AT)
+    return row.arrived.astimezone(fresh.local_zone()).strftime(_AT)
 
 
 def lines_of(
@@ -92,14 +92,17 @@ def lines_of(
 
 
 def read_rows(now: datetime) -> tuple[fresh.Row, ...]:
-    """Источники из базы и их цвет на сегодня (сутки — по UTC, как и время прихода)."""
+    """Источники из базы и их цвет на сегодня.
+
+    Сутки и время прихода — в часовом поясе сервера, как на остальных экранах.
+    """
     scored = read.latest_scored_periods()
     facts = {
         k: fresh.PeriodFact(*scored[k]) for k in (fresh.KIND_RS, fresh.KIND_RKO) if k in scored
     }
     aggregators = {s.aggregator: s.last_ok for s in agg_store.load_states() if s.last_ok}
     return fresh.build(
-        today=now.astimezone(UTC).date(),
+        today=now.astimezone(fresh.local_zone()).date(),
         rs=facts.get(fresh.KIND_RS),
         rko=facts.get(fresh.KIND_RKO),
         sheet_checked=read.sheet_last_checked(),
