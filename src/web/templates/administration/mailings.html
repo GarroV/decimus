@@ -74,9 +74,9 @@
           <ul class="slist__rows">
             {% for email in emails %}
               <li>
-                <div class="srow">
+                <div class="srow srow--cc">
                   <span class="srow__main"><b class="mono">{{ email }}</b></span>
-                  <form method="post" action="{{ cc_action('remove') }}?lang={{ lang }}">
+                  <form class="srow__cell" method="post" action="{{ cc_action('remove') }}?lang={{ lang }}">
                     <input type="hidden" name="email" value="{{ email }}">
                     <button class="sbtn" type="submit">{{ t('mailings.cc.remove') }}</button>
                   </form>
