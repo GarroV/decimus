@@ -374,7 +374,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,pushed,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -393,6 +393,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/move.py` | Перенос проверки по дате и пиццерии — с историей каждой правки (D195) |
 | `src/db/photo_intake.py` | Приём кадра по ссылке загрузки: тип — по сигнатуре байт, а не по имени и заголовку клиента |
 | `src/db/push.py` | T093: слив завершённой проверки в базу |
+| `src/db/pushed.py` | Где проверка чата лежит в истории и ждёт ли она приёмки (напоминание боту, 27.10.2026) |
 | `src/db/queries.py` | Чтение уже слитых проверок |
 | `src/db/reach.py` | Охват чтения: что видит пространство (волна 1, #340; D283, D284, D289) |
 | `src/db/retract.py` | T210, T233: снятие сданной проверки из истории |
@@ -662,6 +663,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/photo_backfill.py` | Дозагрузка кадров, не легших в хранилище на сдаче (#459) |
 | `src/bot/photos.py` | Получение файлов из телеграма: кадры для разбора и для отчёта, голос для транскрипции |
 | `src/bot/phrases.py` | Карта синонимов формулировок со стороны разговора (T285, решение D119) |
+| `src/bot/preliminary.py` | Напоминание под отчётом: он предварительный, проверку надо принять в вебе (27.10.2026) |
 | `src/bot/propose.py` | Предложения по кадрам и словам аудитора — общее ядро бота и мини-аппа (D330) |
 | `src/bot/reading.py` | Показание термометра: разбор ответа аудитора и подпись числа (#836) |
 | `src/bot/refusal.py` | Отказ движка — сырьё, а не сообщение (задача T127) |

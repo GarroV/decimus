@@ -69,6 +69,7 @@ from ..keyboards import (
 from ..lang import chat_ui_lang
 from ..material import MaterialStore
 from ..photos import download_all
+from ..preliminary import remind
 from ..report_lang import offered_langs
 from ..texts import t
 from .records import show_records
@@ -493,6 +494,9 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
             report=pdf,
             lost=len(set(refs) - set(found)),
         )
+        # Последним сообщением: отчёт предварительный, принять его надо в вебе. После
+        # слива, а не до: ссылка ведёт на строку истории, которой до него нет.
+        await remind(message, chat_id, lang)
 
 
 def build_finish_router(store: MaterialStore) -> Router:

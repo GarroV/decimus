@@ -49,6 +49,8 @@ if TYPE_CHECKING:
     from .photos import pending_photo_uploads as pending_photo_uploads
     from .photos import upload_photos as upload_photos
     from .push import push_inspection as push_inspection
+    from .pushed import PushedInspection as PushedInspection
+    from .pushed import find_pushed as find_pushed
     from .queries import findings_by_unit as findings_by_unit
     from .queries import get_inspection as get_inspection
     from .queries import list_inspections as list_inspections
@@ -100,6 +102,7 @@ __all__ = [
     "PhraseEdit",
     "PhraseMemory",
     "PushError",
+    "PushedInspection",
     "Retraction",
     "RetractionError",
     "SavedLetter",
@@ -109,6 +112,7 @@ __all__ = [
     "Unit",
     "UnitRefusedError",
     "VersionMismatchError",
+    "find_pushed",
     "findings_by_unit",
     "get_inspection",
     "latest_letter",
@@ -145,6 +149,8 @@ _LAZY = {
     "upload_report": (".reports", "upload_report"),
     "StoredReport": (".reports", "StoredReport"),
     "push_inspection": (".push", "push_inspection"),
+    "find_pushed": (".pushed", "find_pushed"),
+    "PushedInspection": (".pushed", "PushedInspection"),
     "list_inspections": (".queries", "list_inspections"),
     "get_inspection": (".queries", "get_inspection"),
     "findings_by_unit": (".queries", "findings_by_unit"),
