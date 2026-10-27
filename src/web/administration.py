@@ -18,6 +18,7 @@ from urllib.parse import urlencode
 from flask import Flask, abort, request
 from flask import Response as FlaskResponse
 
+from src.domain.permissions import role_may
 from src.domain.tenants import may_manage_ratings
 
 from . import access_policy, auth
@@ -29,6 +30,7 @@ from .users_view import (
     TAB_DODOIS,
     TAB_JOURNAL,
     TAB_KEYS,
+    TAB_MAILINGS,
     TAB_PEOPLE,
     TAB_RATINGS,
     TAB_SPACES,
@@ -87,6 +89,15 @@ def _sees_ratings(account: object) -> bool:
     )
 
 
+def _sees_mailings(account: object) -> bool:
+    """Те, кто правит письма УК (`mailing.manage`): админ УК и главный админ (D608)."""
+    return role_may(
+        str(getattr(account, "role", "") or ""),
+        str(getattr(account, "tenant", "") or ""),
+        "mailing.manage",
+    )
+
+
 @dataclass(frozen=True)
 class Tab:
     """Вкладка раздела: код (он же `?tab=`) и кому открыта."""
@@ -112,6 +123,8 @@ TABS: tuple[Tab, ...] = (
     Tab(TAB_COUNTRIES, _sees_countries),
     # Настройки рейтингов: те же роли, что вели «Загрузки» (D654).
     Tab(TAB_RATINGS, _sees_ratings),
+    # Списки копий и шаблоны писем УК (D608, #1130): админ УК и главный админ.
+    Tab(TAB_MAILINGS, _sees_mailings),
     Tab(TAB_JOURNAL, _is_super),
     Tab(TAB_USAGE, _sees_usage),
     # Состояние подключений — главный админ (D638).
@@ -161,6 +174,7 @@ def install(app: Flask, conf: Settings) -> None:
         countries_screen,
         dodois_screen,
         journal_screen,
+        mailings_screen,
         ratings,
         usage_screen,
         users_page,
@@ -177,6 +191,7 @@ def install(app: Flask, conf: Settings) -> None:
         TAB_SPACES: spaces,
         TAB_COUNTRIES: lambda: countries_screen.show(conf.ui_lang),
         TAB_RATINGS: lambda: ratings.show_admin(conf),
+        TAB_MAILINGS: lambda: mailings_screen.show(conf.ui_lang),
         TAB_JOURNAL: lambda: journal_screen.show_users(conf),
         TAB_USAGE: lambda: usage_screen.show(conf),
         TAB_CONNECTIONS: connections_screen.show,

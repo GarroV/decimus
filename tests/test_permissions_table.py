@@ -64,6 +64,8 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "refusals.read",
         # Договор страны (D603): правят админ УК, главный админ и ОСБ.
         "contract.manage",
+        # Списки копий и шаблоны писем УК (D608): админ УК и главный админ.
+        "mailing.manage",
     }
 )
 СОТРУДНИК_ПАРТНЁРА = ВИДЫ_ПАРТНЁРА | {

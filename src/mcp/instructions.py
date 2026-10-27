@@ -17,7 +17,7 @@ IMPORT_INSTRUCTIONS = """\
 Entering an inspection through Claude (import_* tools). The person sends photos and \
 dictates what they found; you turn it into checklist findings fast. You propose, \
 the person confirms. These rules win over any other skill about pizzeria \
-inspections (e.g. old pizzeria-inspection with 5-6 options per photo).
+inspections.
 
 Workflow
 1. import_create_inspection: mode=current for a recent inspection (default); \
@@ -41,8 +41,8 @@ Class in words: D1 = deviation, D2 = significant, D3 = critical (in the \
 person's language, e.g. "критическое"). No bare codes or abbreviations \
 anywhere, no "most likely", no "if ...", no explanations, no score talk.
  - A result with need_fact: ask that one question in the "Need a fact:" block.
- - Choices and fact questions: use your built-in question/choice widget if you \
-have one; each option in plain words.
+ - Choices and fact questions: use your question widget if you \
+have one; options in plain words.
  - then "Also on photos:" violations you saw but the person did not name, same \
   format; written only if the person picks them.
  - then "Need a fact:" only where the item's class criteria need a fact the material \
@@ -52,8 +52,7 @@ The person answers "yes" or corrects by number. Then ONE import_add_findings cal
 (breakage vs dirt) comes from the words; never offer the other type.
 5. import_get_inspection: show the score in one line. On "save" -> \
 import_accept_inspection (no separate review: the person already checked it). Give \
-the person the partner letter and the PDF link from its answer \
-(inspection_letter rebuilds the letter any time).
+the person the partner letter and the PDF link from its answer.
 6. Wrong date or unit: a draft -> import_edit_inspection (before accept); an \
 accepted one -> move_inspection with a reason.
 
@@ -88,8 +87,8 @@ local_photo_folder and local_attach_photos exist (they run on the person's machi
 the local bridge), call local_photo_folder, look at the photos, assign them to findings, \
 offer violations seen on photos but not dictated in the one common list, never \
 silently. After the findings are written call local_attach_photos (inspection_id, items \
-[{n, files}], folder) and report how many were attached. Never mention addresses or links. \
-Without those tools use import_upload_photos. Do this BEFORE import_accept_inspection. \
+[{n, files}], folder) and report how many were attached. \
+Without those tools use import_upload_photos. \
 Never pass the person's photos as base64 to import_add_photo: they arrive as thumbnails.
 - Reduced photos (`frames` with `low_resolution` in import_get_inspection): on "re-upload \
 the photos" upload the originals with replace=true (local_attach_photos, or \
@@ -97,7 +96,11 @@ import_upload_photos and its `command`), all photos of a finding at once; old on
 if all new ones were stored (`replaced`, false = nothing changed). import_remove_photo / \
 import_clear_photos drop frames. Never show frame ids: say "photo 2 of finding 5".
 - Information part (current mode): before import_accept_inspection call \
-import_info_fields, ask the person every missing question in ONE message (or the \
-built-in question window), then record the answers with import_set_info. Without \
-them the partner's PDF has empty fields. A skipped field is simply not passed.
+import_info_fields, ask every missing question in ONE message, \
+record the answers with import_set_info: unanswered fields stay empty in \
+the partner's PDF and are not passed.
+- Letter: inspection_letter returns the saved one (source=saved): show it, never a \
+rebuilt template. Rework it with the person; save_inspection_letter only after their \
+explicit "yes" on the final text. Then it shows in the site's inspection card and goes \
+to Gmail from there.
 """

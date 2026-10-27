@@ -610,22 +610,31 @@ def get_inspection(*, tenant: str, id: str, lang: str | None = None) -> dict[str
 
 
 def inspection_letter(
-    *, tenant: str, id: str, lang: str | None = None, template: int | None = None
+    *,
+    tenant: str,
+    id: str,
+    lang: str | None = None,
+    fresh: bool = False,
+    template: int | None = None,
 ) -> dict[str, object]:
-    """Текст письма партнёру по уже записанной проверке (T171).
+    """Письмо партнёру по записанной проверке: сохранённое людьми или заготовка (T171, D665).
 
-    Письмо отправляет человек руками из почты (Q010), и в системе оно нигде не
-    лежит: бот показывает его один раз, при завершении проверки. Поэтому здесь
-    оно собирается заново — движком, по методике ТОЙ версии, которой помечена
-    проверка, и только если посчитанное движком сошлось с записанным. Разбор —
-    `src/mcp/letters.py`; здесь тонкая обёртка, потому что обработчик
+    Если письмо у проверки сохраняли (сайт или `save_inspection_letter`), отдаётся
+    ОНО — последняя версия на запрошенном языке, а без `lang` — последняя вообще, на
+    каком бы языке её ни сохранили. Это то, что люди прочитали и согласовали;
+    пересобранная заготовка затёрла бы их правки. Нет сохранённого или `fresh=True` —
+    письмо собирается заново (`source: template`): движком, по методике ТОЙ версии,
+    которой помечена проверка, и только если посчитанное движком сошлось с записанным.
+    Разбор — `src/mcp/letters.py`; здесь тонкая обёртка, потому что обработчик
     инструмента проверок обязан лежать в этом модуле (`tests/test_mcp_server.py`).
 
     Записью это не является ни в каком виде: проверка не меняется, боевая
     методика открывается только на чтение, а состояние для движка собирается во
     временном каталоге, который тут же исчезает.
 
-    Набор ключей ответа одинаков в обоих исходах — как у `get_inspection`.
+    Сбой чтения сохранённого не заменяется заготовкой: человек принял бы её за
+    согласованный текст. Набор ключей ответа одинаков в обоих исходах нахождения
+    проверки — как у `get_inspection`.
     """
     ident = _require_inspection_id(id)
     detail = _detail(ident, tenant=tenant)
@@ -637,14 +646,40 @@ def inspection_letter(
             "status": "no inspection found with that id",
             "letter": None,
         }
-    from .letters import build, sources
-
-    return {
+    шапка: dict[str, object] = {
         "tenant": tenant,
         "id": ident,
         "found": True,
         "unit": detail.inspection.unit_name,
         "inspection_date": detail.inspection.inspection_date.isoformat(),
+    }
+    if not fresh:
+        from ..db import letters as letters_store
+
+        with _history():
+            saved = letters_store.latest_letter(ident, lang=lang)
+            версия = 0 if saved is None else letters_store.count_letters(ident, lang=saved.lang)
+        if saved is not None:
+            return {
+                **шапка,
+                "source": "saved",
+                "letter": saved.body,
+                "lang": saved.lang,
+                "report_lang": detail.inspection.report_lang,
+                "version": версия,
+                "saved_by": saved.saved_by,
+                "saved_at": saved.created_at.isoformat(),
+                "status": (
+                    "the saved letter, as people last approved it: show it, do not rebuild "
+                    "it. The text is plain lines plus <b> <i> <s> <a href> markup; & < > are "
+                    "escaped. Pass fresh=true for a new template instead"
+                ),
+            }
+    from .letters import build, sources
+
+    return {
+        **шапка,
+        "source": "template",
         **build(detail, lang=lang, papers=sources(), template=template),
     }
 

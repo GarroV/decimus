@@ -1,0 +1,96 @@
+{#
+  «Письма и уведомления» (D608, #1130): вкладка раздела «Администрирование» для админа УК и
+  главного админа (`mailing.manage`); остальным адрес отвечает 404. Каркас тот же, что у «Стран»
+  (`docs/12-web-admin.md`, «Каркас вкладки администрирования»): шапка с «?» → список видов
+  рассылки столбцом (`pick_item`, у каждого строка «в копии: N») → панель выбранного вида справа
+  (`?kind=<код>`) с разделом «Копия»: список адресов, «Убрать» и форма «Добавить в копию».
+  Вкладка только хранит настройки: ничего не отправляет, адреса идут в «Копию» черновика,
+  который человек отправляет сам.
+#}{% extends "_split_page.html" %}
+{% from "_info_tip.html" import info_tip %}
+{% from "_pick_ui.html" import pick_item %}
+{% from "administration/_nav.html" import admin_nav with context %}
+{% block title %}{{ t('administration.tab.mailings') }} · {{ t('section.administration.title') }}{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endblock %}
+
+{% macro outcome_note() %}
+  {% if outcome %}
+    <div class="note {{ 'note--ok' if outcome == 'ok' else 'note--warn' }}" role="status"><div class="note__text">{{ t('mailings.saved.' ~ outcome) }}</div></div>
+  {% endif %}
+{% endmacro %}
+
+{# Столбец вкладок слева, вся страница вкладки — справа (D639). #}
+{% block body %}
+  <div class="sadmin">
+    {{ admin_nav() }}
+    <div class="sadmin__main">{{ super() }}</div>
+  </div>
+{% endblock %}
+
+{% block split_top %}
+  <header class="shead">
+    <div class="shead__main">
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('administration.tab.mailings') }}</h1>
+        {{ info_tip(t('tip.hint'), '', [t('mailings.sub')], 'mailings') }}
+      </div>
+    </div>
+  </header>
+  {# Исход действия без открытой панели — над списком, иначе он потерялся бы. #}
+  {% if not split_open %}{{ outcome_note() }}{% endif %}
+{% endblock %}
+
+{% block split_list %}
+  <div class="sbox">
+    <div class="sbar"><span class="sbar__count">{{ t('mailings.count', count=lines|length) }}</span></div>
+    {% if partial_failed %}<p class="ssec__note">{{ t('mailings.partial_failed') }}</p>{% endif %}
+    <div class="pk-rail pk-rail--inline pk-rail--col">
+      <div class="pk-rail__list">
+        {% for line in lines %}
+          {% set meta = '—' if line.cc_count is none else (t('mailings.cc.count', count=line.cc_count) if line.cc_count else t('mailings.cc.none')) %}
+          {{ pick_item(kind_url(line.kind), t('mailings.kind.' ~ line.kind), meta, on=(split_open and picked == line.kind), drawer=true) }}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block split_title %}{% if picked %}{{ t('mailings.kind.' ~ picked) }}{% endif %}{% endblock %}
+
+{% block split_detail %}
+  {% if picked %}
+    {{ outcome_note() }}
+    <p class="ssec__note">{{ t('mailings.kind.' ~ picked ~ '.sub') }}</p>
+    <section class="ssec" aria-labelledby="mailings-cc-title">
+      <h2 class="ssec__title" id="mailings-cc-title">{{ t('mailings.cc.title') }}</h2>
+      <p class="ssec__note">{{ t('mailings.cc.hint') }}</p>
+      {% if emails is none %}
+        <p class="ssec__note">{{ t('mailings.cc.unreadable') }}</p>
+      {% else %}
+        {% if not emails %}<p class="ssec__note">{{ t('mailings.cc.empty') }}</p>{% endif %}
+        <div class="slist">
+          <ul class="slist__rows">
+            {% for email in emails %}
+              <li>
+                <div class="srow srow--cc">
+                  <span class="srow__main"><b class="mono">{{ email }}</b></span>
+                  <form class="srow__cell" method="post" action="{{ cc_action('remove') }}?lang={{ lang }}">
+                    <input type="hidden" name="email" value="{{ email }}">
+                    <button class="sbtn" type="submit">{{ t('mailings.cc.remove') }}</button>
+                  </form>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+        <form class="sform" method="post" action="{{ cc_action('add') }}?lang={{ lang }}">
+          <label><span class="sform__label">{{ t('mailings.cc.add.label') }}</span>
+            <input type="email" name="email" maxlength="200" required autocomplete="off"></label>
+          <button class="sbtn sbtn--primary" type="submit">{{ t('mailings.cc.add') }}</button>
+        </form>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

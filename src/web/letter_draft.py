@@ -30,7 +30,9 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response
 
+from src.db import mailing_cc
 from src.db.errors import DbError
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import auth, guard
 from . import inspections as data
@@ -101,6 +103,23 @@ def _токен_вошедшего(реквизиты: GoogleSettings, код: s
     """
     доступ = exchange_code_for_grant(реквизиты, code=код)
     return verified_token(доступ, expected_email=_почта_вошедшего(auth.current_account()))
+
+
+def _копия_ук(tenant_code: str) -> tuple[str, ...]:
+    """Список копий УК для письма по проверке (D608) — только проверки пространства УК.
+
+    Письмо по проверке партнёра его же пространства пишет партнёр, и почты УК в его
+    «Копию» не попадают. Список не прочитался — черновик без копии, со строкой в журнал:
+    человек видит «Копию» в черновике и допишет сам, а письмо из-за второстепенного
+    списка не теряется.
+    """
+    if canonical_tenant(tenant_code) != HQ_TENANT:
+        return ()
+    try:
+        return mailing_cc.read(mailing_cc.KIND_INSPECTION)
+    except DbError:
+        logger.warning("Список копий писем по проверкам не прочитался", exc_info=True)
+        return ()
 
 
 def install(app: Flask, conf: Settings) -> None:
@@ -331,6 +350,7 @@ def install(app: Flask, conf: Settings) -> None:
             create_draft(
                 токен,
                 to=detail.inspection.contact,
+                cc=_копия_ук(detail.inspection.tenant_code),
                 subject=draft_subject(
                     city=detail.inspection.city,
                     date=str(detail.inspection.inspection_date),

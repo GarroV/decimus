@@ -372,7 +372,7 @@ async def test_failed_letter_is_reported_after_the_pdf_was_already_sent(
 async def test_feedback_in_another_language_is_warned_next_to_the_letter(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Обратная связь аудитора записана не на языке письма — бот говорит это сразу под письмом (D663).
+    """Обратная связь записана не на языке письма — бот говорит это сразу под письмом (D663).
 
     Блок в письмо и PDF не вставлен: слова аудитора не переводятся. Молчание
     оставило бы аудитора с письмом, которое выглядит полным.

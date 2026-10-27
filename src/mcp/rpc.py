@@ -33,6 +33,7 @@ from .catalogue import (
     KIND_CHECKLIST,
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
+    KIND_LETTER,
     KIND_MOVE,
     KIND_PLAN,
     KIND_RATINGS,
@@ -258,6 +259,11 @@ ROLE_CLOSED = (
 MOVE_CLOSED = (
     "Исправление проверки требует названного автора: у этого токена его нет, а история "
     "исправлений без автора неотличима от подчистки (D195)"
+)
+
+LETTER_CLOSED = (
+    "Сохранение письма требует названного автора: у этого токена его нет, а история "
+    "писем без автора неотличима от подчистки"
 )
 
 PLAN_CLOSED = (
@@ -511,6 +517,11 @@ def _call_tool(
             if not actor:
                 return _tool_text(MOVE_CLOSED, failed=True)
             прочее = {"actor": actor}
+        if spec.kind == KIND_LETTER:
+            # Автор версии письма — из токена, а не от собеседника: он ляжет в историю.
+            if not actor:
+                return _tool_text(LETTER_CLOSED, failed=True)
+            прочее = {"actor": actor}
         if spec.kind == KIND_PLAN and spec.name not in READ_PLAN_TOOLS:
             # Автор перехода — из токена: он подписывает событие плана, и без него база
             # отказывает. Читающие инструменты плана автора не берут.
@@ -575,6 +586,11 @@ def _call_tool(
                 "исправление проверки",
                 "Это отказ базы, а не отказ в исправлении; сделано или нет — видно по "
                 "get_inspection",
+            ),
+            KIND_LETTER: (
+                "сохранение письма",
+                "Это отказ базы, а не отказ в сохранении; сохранено или нет — видно по "
+                "inspection_letter",
             ),
             KIND_PLAN: (
                 "работу с планом исправлений",

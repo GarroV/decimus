@@ -41,6 +41,7 @@ from src.mcp.catalogue import (
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
     KIND_INSPECTIONS,
+    KIND_LETTER,
     KIND_MOVE,
     KIND_PLAN,
     KIND_RATINGS,
@@ -171,6 +172,9 @@ from src.mcp.catalogue import (
 #: методику; открыта только токену УК.
 ИМЕНА_ИНСТРУМЕНТОВ_ИСПРАВЛЕНИЯ = {"move_inspection"}
 
+#: Сохранение письма партнёру в проверку (D665): пишет, автор — из токена.
+ИМЕНА_ИНСТРУМЕНТОВ_ПИСЬМА = {"save_inspection_letter"}
+
 #: Электронный план исправлений (#1168, D620): чтение, вердикты УК, работа партнёра.
 ИМЕНА_ИНСТРУМЕНТОВ_ПЛАНА = {
     "list_action_plans",
@@ -206,6 +210,7 @@ from src.mcp.catalogue import (
     | ИМЕНА_ИНСТРУМЕНТОВ_ЧЕКЛИСТОВ
     | ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ
     | ИМЕНА_ИНСТРУМЕНТОВ_ИСПРАВЛЕНИЯ
+    | ИМЕНА_ИНСТРУМЕНТОВ_ПИСЬМА
     | ИМЕНА_ИНСТРУМЕНТОВ_ПЛАНА
     | ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ
 )
@@ -244,18 +249,18 @@ from src.mcp.catalogue import (
 }
 
 
-def test_каталог_содержит_ровно_семьдесят_девять_инструментов_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_восемьдесят_инструментов_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
     инструмент, к которому агент внезапно теряет доступ.
     42 + 9 загрузки (D305) + 2 управления рейтингами (D320, D420) + 3 чтения
     рейтингов (D420) + 1 разбивка по периодам (#958) + 11 плана исправлений (#1168)
-    + 2 снятия кадров (D627)."""
+    + 2 снятия кадров (D627) + 1 сохранение письма (D665)."""
     сверить(
         "tests/test_mcp_catalogue.py: ИМЕНА_ИНСТРУМЕНТОВ_*",
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 79
+    assert len(TOOLS) == 80
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -344,6 +349,8 @@ def test_вид_инструмента_соответствует_его_гру�
             assert spec.kind == KIND_IMPORT, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ИСПРАВЛЕНИЯ:
             assert spec.kind == KIND_MOVE, spec.name
+        elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ПИСЬМА:
+            assert spec.kind == KIND_LETTER, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ПЛАНА:
             assert spec.kind == KIND_PLAN, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ:
@@ -424,6 +431,8 @@ def test_обработчик_взят_из_правильного_модуля(
             }, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ИСПРАВЛЕНИЯ:
             assert spec.handler.__module__ == "src.mcp.move", spec.name
+        elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ПИСЬМА:
+            assert spec.handler.__module__ == "src.mcp.letter_save", spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ПЛАНА:
             assert spec.handler.__module__ == "src.mcp.plans", spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ:
@@ -451,7 +460,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 79
+    assert len(перечень) == 80
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 
