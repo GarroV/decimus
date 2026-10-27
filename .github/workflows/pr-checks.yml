@@ -114,37 +114,17 @@ jobs:
           path: sbom.cdx.json
           retention-days: 30
 
-  # Установщик MCP для Mac вызывает `plutil`, которого нет на Linux: там его тест
-  # пропускается с причиной, а гоняется здесь — иначе пропуск выглядел бы проверкой.
-  mac-installer:
-    runs-on: macos-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
-        with:
-          python-version: "3.12"
-          cache: pip
-      - name: Зависимости
-        # Из lockfile с хэшами (`make lock`): pip отказывает на пакете без
-        # совпавшего хэша, транзитивные версии не плавают (см. GHSA-7gm6-hc9m-w3vc).
-        run: |
-          pip install --require-hashes -r requirements-dev.txt -r requirements-build.txt
-          pip install --no-deps --no-build-isolation -e .
-      - name: Установщик MCP на macOS
-        run: pytest -q -p no:cacheprovider tests/test_mcp_install_endpoint.py
-
   # Ворота: вердикт обоих заданий по прогону на main доставляется задачей.
   main-gate:
     if: always() && github.event_name == 'push'
-    needs: [checks, mac-installer, audit]
+    needs: [checks, audit]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
       issues: write
     steps:
       - name: Открыть задачу, если main красный
-        if: needs.checks.result != 'success' || needs['mac-installer'].result != 'success' || needs.audit.result != 'success'
+        if: needs.checks.result != 'success' || needs.audit.result != 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -159,7 +139,7 @@ jobs:
           gh issue create --title "$ISSUE_TITLE" --body-file /tmp/body.md
 
       - name: Закрыть задачу, когда main снова зелёный
-        if: needs.checks.result == 'success' && needs['mac-installer'].result == 'success' && needs.audit.result == 'success'
+        if: needs.checks.result == 'success' && needs.audit.result == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

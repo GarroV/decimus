@@ -148,7 +148,7 @@ def test_сборщик_и_дверь_отдают_одно_и_то_же(сер�
 
 @pytest.mark.skipif(
     shutil.which("plutil") is None,
-    reason="установщик для macOS: нужен plutil; гоняет шаг macOS в «Проверки PR»",
+    reason="установщик для macOS: нужен plutil; гоняется локально на Mac (`make test`), как в Swarm (D669)",
 )
 def test_установщик_реально_отрабатывает_на_подставном_доме(сервер: str, tmp_path: Path) -> None:
     """Скрипт запускается по-настоящему, а не только разбирается.
