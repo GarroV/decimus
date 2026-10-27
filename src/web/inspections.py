@@ -33,6 +33,7 @@ from src.db.reach import Reach, reach_of
 from src.domain.models import TEXT_LANGS
 from src.domain.permissions import SIDE_HQ, side_of
 from src.report import info_titles, plan_terms
+from src.report.letters import TEMPLATES as letter_templates
 from src.report.letters import LetterError
 from src.report.letters import build as build_letter
 from src.report.letters import sources as letter_sources
@@ -181,6 +182,9 @@ def load_card(inspection_id: str, *, reach: Reach) -> InspectionDetail | None:
 #: равен и равным не станет: интерфейс и письмо — разные языки (`CLAUDE.md`).
 LETTER_LANGS = TEXT_LANGS
 
+#: Шаблоны письма на выбор отправителя (D664) — перечень сборщика, а не свой список.
+LETTER_TEMPLATES = letter_templates
+
 
 @dataclass(frozen=True)
 class Letter:
@@ -221,7 +225,9 @@ class Letter:
         return self.text is not None
 
 
-def load_letter(detail: InspectionDetail, *, lang: str | None = None) -> Letter:
+def load_letter(
+    detail: InspectionDetail, *, lang: str | None = None, template: int | None = None
+) -> Letter:
     """Письмо партнёру по уже прочитанной проверке.
 
     Проверку сюда передают, а не читают второй раз: карточку экран берёт всё
@@ -244,7 +250,7 @@ def load_letter(detail: InspectionDetail, *, lang: str | None = None) -> Letter:
     Причина говорится словами.
     """
     try:
-        собранное = build_letter(detail, lang=lang, papers=letter_sources())
+        собранное = build_letter(detail, lang=lang, papers=letter_sources(), template=template)
     except LetterError as отказ:
         return Letter(
             text=None, lang=None, source=None, ready=False, caveats=(), failure=str(отказ)

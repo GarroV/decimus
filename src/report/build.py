@@ -14,9 +14,12 @@ from __future__ import annotations
 
 import json
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
+from src.domain.config import Settings
 from src.domain.engine import chat_dir
+from src.domain.state import read_state
 
 from .engine import run_report, settings
 from .errors import PdfNotBuilt, PhotoMissing, ReportError
@@ -71,7 +74,9 @@ def build_pdf(
         photo_map.write_text(json.dumps(plan.mapping, ensure_ascii=False), encoding="utf-8")
         try:
             printed = run_report(
-                ["pdf", "--photo-map", str(photo_map)], chat_id=chat_id, settings=env
+                ["pdf", "--photo-map", str(photo_map), *_speech_args(chat_id, env)],
+                chat_id=chat_id,
+                settings=env,
             ).strip()
         except PdfNotBuilt:
             raise
@@ -88,14 +93,56 @@ def build_pdf(
     return out
 
 
-def build_letter(chat_id: int) -> str:
-    """Собрать текст письма партнёру.
+def _speech_args(chat_id: int, env: Settings) -> list[str]:
+    """Язык речи аудитора для движка: на нём записана обратная связь (D663).
+
+    Язык отчёта не годится — до конца обхода он равен языку чек-листа, а потом его
+    выбирают отдельно. Состояния нет — аргумента нет, движок возьмёт язык шапки.
+    """
+    started = read_state(chat_id, env)
+    return [] if started is None else [f"--speech-lang={started.speech_lang}"]
+
+
+@dataclass(frozen=True)
+class BuiltLetter:
+    """Письмо и то, чего в него не вставили."""
+
+    text: str
+    #: Роли обратной связи (`strengths`, `growth`), записанной не на языке письма
+    #: и потому не вставленной (D663). Непусто — отправителя надо предупредить.
+    feedback_skipped: tuple[str, ...]
+    #: Язык, на котором обратная связь записана.
+    feedback_lang: str
+
+
+def build_letter_notes(chat_id: int, template: int = 1) -> BuiltLetter:
+    """Собрать письмо партнёру и вернуть вместе с перечнем не вставленного.
 
     Шаблон выбирает движок по наличию D2 и D3: чистая проверка не требует плана
-    действий по нарушениям, которых нет. Третьего шаблона здесь не заводится.
+    действий по нарушениям, которых нет. `template` — порядок обратной связи
+    аудитора (D664): 1 — сильные стороны до нарушений, зоны роста после; 2 — обе
+    части в конце. Бот собирает шаблон 1.
     """
     env = settings(chat_id)
-    text = run_report(["letter"], chat_id=chat_id, settings=env)
-    if not text.strip():
+    raw = run_report(
+        ["letter", f"--template={template}", "--json", *_speech_args(chat_id, env)],
+        chat_id=chat_id,
+        settings=env,
+    )
+    try:
+        answer = json.loads(raw)
+        text = str(answer["text"]).strip()
+        skipped = tuple(str(role) for role in answer["feedback_skipped"])
+        recorded = str(answer["feedback_lang"])
+    except (json.JSONDecodeError, KeyError, TypeError):
+        raise ReportError(
+            "Сборщик письма ответил не разбираемым JSON — отправлять нечего"
+        ) from None
+    if not text:
         raise ReportError("Сборщик письма вернул пустой текст — отправлять партнёру нечего")
-    return text.strip()
+    return BuiltLetter(text, skipped, recorded)
+
+
+def build_letter(chat_id: int, template: int = 1) -> str:
+    """Текст письма партнёру. Предупреждение о не вставленном — `build_letter_notes`."""
+    return build_letter_notes(chat_id, template).text

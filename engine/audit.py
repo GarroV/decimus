@@ -87,6 +87,11 @@ def is_comment_row(qid):
     return str(qid or "").strip().startswith(COMMENT_PREFIX)
 
 
+#: Роли пункта в письме и отчёте (D663): колонка `letter_role` чек-листа. Пусто —
+#: пункт в письмо не идёт. Тексты и порядок блоков — `engine/report.py`.
+LETTER_ROLES = ("strengths", "growth")
+
+
 def load_checklist():
     """Вопросы чек-листа. Дубль id и нечитаемый срок устранения — отказ, не подмена.
 
@@ -136,6 +141,14 @@ def load_checklist():
                     f"рядовое нарушение выглядит критическим."
                 )
         r["kind"] = (r.get("kind") or "violation").strip()
+        role = (r.get("letter_role") or "").strip().lower()
+        if role not in ("", *LETTER_ROLES):
+            sys.exit(
+                f"Неизвестная роль в письме: у пункта «{qid}» в колонке letter_role стоит "
+                f"«{role}». Файл: {path}, строка {n}. Допустимо: {', '.join(LETTER_ROLES)} "
+                f"или пусто. Опечатка здесь молча убрала бы блок из письма партнёру"
+            )
+        r["letter_role"] = role
         out.append(r)
     return out
 

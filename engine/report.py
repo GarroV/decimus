@@ -18,7 +18,8 @@ from urllib.parse import quote
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from audit import (  # noqa: E402
-    compute, info_field, inspection_date, kind_title, load_cfg, load_checklist, load_state,
+    LETTER_ROLES, compute, info_field, inspection_date, kind_title, load_cfg, load_checklist,
+    load_state,
     load_zones, state_dir,
 )
 
@@ -41,6 +42,8 @@ T = {
         "appendix_note": "Раздел носит справочный характер: перечисленные ниже записи "
                          "не являются нарушениями и не влияют на оценку.",
         "recorded": "Зафиксировано",
+        "feedback": "Обратная связь", "strengths": "Сильные стороны пиццерии",
+        "growth": "Зоны роста пиццерии",
         "method": "Методика расчёта", "zeroed": "обнулена критическим нарушением D3",
         "not_counted": "учтено в обнулении зоны", "page": "стр.",
         "repeat": "повтор — вычет удвоен",
@@ -71,6 +74,8 @@ T = {
         "appendix_note": "This section is for reference only: the records below are not "
                          "violations and do not affect the score.",
         "recorded": "Recorded",
+        "feedback": "Feedback", "strengths": "Strengths of the store",
+        "growth": "Growth areas of the store",
         "method": "Scoring method", "zeroed": "zeroed by a critical D3 violation",
         "not_counted": "covered by the zone reset", "page": "p.",
         "repeat": "repeat — deduction doubled",
@@ -346,7 +351,7 @@ def deadline_text(f, t):
     return fmt_date(f.get("due")) or t["immediately"]
 
 
-def build_html(res, lang, photos, src=None):
+def build_html(res, lang, photos, src=None, speech_lang=None):
     t = T[lang]
     src = Photos() if src is None else src
     m = res["meta"]
@@ -384,6 +389,20 @@ def build_html(res, lang, photos, src=None):
       <td class="g" style="color:{GRADE_COLOR.get(g,'#3F2A63')}">{esc(g)}</td>
       <td><div class="l">{esc(t['score'])}</div><div class="p">{res['pct']:g}%</div>
       <div class="l" style="margin-top:1mm">{esc(label)}</div></td></tr></table></div>''')
+
+    # Обратная связь аудитора (D663) — сразу под оценкой, на первой странице:
+    # партнёр читает её раньше таблиц. Текст как записан; поля с этой ролью в
+    # приложении ниже не повторяются. Язык записи не совпал — блока нет (см.
+    # `feedback_parts`), а в приложении поле тоже не печатается: роль у него
+    # прежняя, и дубль на чужом языке вернул бы то, что блок убрал.
+    fb, _skipped, _recorded = feedback_parts(res, lang, speech_lang)
+    if fb:
+        h.append(f'<h2 class="fb">{esc(t["feedback"])}</h2><div class="info fb">')
+        for role in FEEDBACK_ROLES:
+            if role in fb:
+                h.append(f'<p><span class="k">{esc(t[role])}:</span> '
+                         f'{esc(fb[role]).replace(chr(10), "<br/>")}</p>')
+        h.append("</div>")
 
     c = res["counts"]
     cfg = load_cfg()
@@ -478,7 +497,10 @@ def build_html(res, lang, photos, src=None):
     # INF06) вычёркивались списком HIDDEN_INFO: аудитор их заполнял, а в
     # отчёте они не появлялись — молча. Решение владельца D069: «Собирать и
     # печатать в отчёте» (T159).
-    info = dict(res.get("info") or {})
+    # Поля с ролью обратной связи ушли на первую страницу блоком выше (D663) и
+    # здесь не дублируются — ни при вставленном блоке, ни при несовпавшем языке.
+    fed = {r["id"] for r in load_checklist() if r.get("letter_role")}
+    info = {k: v for k, v in (res.get("info") or {}).items() if k not in fed}
     if notes or info:
         h.append(f'<h2 class="sec-findings">{esc(t["appendix"])}</h2>')
         h.append(f'<div class="note">{esc(t["appendix_note"])}</div>')
@@ -602,13 +624,13 @@ LETTER_PLAN = {
 
 Итоговая оценка — {grade} ({pct}%).{grade_note}
 
-Что зафиксировали:
+{good_block}Что зафиксировали:
 {summary_lines}
 {critical_block}Подробный отчёт с фотофиксацией, разбивкой по зонам и сроками устранения по каждому пункту — во вложении.
 
 Просим до {plan_due} прислать план действий по устранению: ответственный и дата по каждому пункту. Нарушения D2 ждём закрытыми в срок, указанный в отчёте, D3 — немедленно, с подтверждением фотографией.
 
-Спасибо за работу. Готовы обсудить любой пункт отчёта и помочь с приоритизацией.""",
+{end_block}Спасибо за работу. Готовы обсудить любой пункт отчёта и помочь с приоритизацией.""",
     "en": """Subject: Inspection results — {unit}, {date}: grade {grade} ({pct}%)
 
 Hello,
@@ -617,13 +639,13 @@ On {date} we inspected the {unit} store{city}. Inspection type: {type}.
 
 The final grade is {grade} ({pct}%).{grade_note}
 
-What we recorded:
+{good_block}What we recorded:
 {summary_lines}
 {critical_block}The full report — photo evidence, the breakdown by zone and a deadline for every item — is attached.
 
 Please send us your action plan by {plan_due}, with an owner and a date for each item. D2 violations are expected to be closed within the deadline stated in the report; D3 violations immediately, confirmed with a photo.
 
-Thank you for your work. We are happy to walk through any item in the report and help with prioritisation.""",
+{end_block}Thank you for your work. We are happy to walk through any item in the report and help with prioritisation.""",
 }
 LETTER_CLEAN = {
     "ru": """Тема: Результаты проверки — {unit}, {date}: оценка {grade} ({pct}%)
@@ -634,11 +656,11 @@ LETTER_CLEAN = {
 
 Итоговая оценка — {grade} ({pct}%).{grade_note} Существенных (D2) и критических (D3) нарушений не зафиксировано.
 
-Что отметили:
+{good_block}Что отметили:
 {summary_lines}
-Подробный отчёт с фотофиксацией, разбивкой по зонам и сроками устранения по каждому пункту — во вложении. Плана действий не ждём: перечисленные отклонения устраняются в рабочем порядке в сроки, указанные в отчёте.
+{critical_block}Подробный отчёт с фотофиксацией, разбивкой по зонам и сроками устранения по каждому пункту — во вложении. Плана действий не ждём: перечисленные отклонения устраняются в рабочем порядке в сроки, указанные в отчёте.
 
-Спасибо за работу. Готовы обсудить любой пункт отчёта.""",
+{end_block}Спасибо за работу. Готовы обсудить любой пункт отчёта.""",
     "en": """Subject: Inspection results — {unit}, {date}: grade {grade} ({pct}%)
 
 Hello,
@@ -647,11 +669,11 @@ On {date} we inspected the {unit} store{city}. Inspection type: {type}.
 
 The final grade is {grade} ({pct}%).{grade_note} No major (D2) or critical (D3) violations were recorded.
 
-What we noted:
+{good_block}What we noted:
 {summary_lines}
-The full report — photo evidence, the breakdown by zone and a deadline for every item — is attached. No action plan is expected: the deviations listed above are closed in the normal course of work within the deadlines stated in the report.
+{critical_block}The full report — photo evidence, the breakdown by zone and a deadline for every item — is attached. No action plan is expected: the deviations listed above are closed in the normal course of work within the deadlines stated in the report.
 
-Thank you for your work. We are happy to walk through any item in the report.""",
+{end_block}Thank you for your work. We are happy to walk through any item in the report.""",
 }
 # Проверка без единой записи. Отдельный шаблон, а не «чистое письмо с нулём»:
 # у чистого письма есть блок «Что отметили» и обещание, что перечисленные
@@ -666,9 +688,9 @@ LETTER_EMPTY = {
 
 Итоговая оценка — {grade} ({pct}%).{grade_note} Нарушений не зафиксировано.
 
-Отчёт с разбивкой по зонам — во вложении. Плана действий не ждём.
+{good_block}{critical_block}Отчёт с разбивкой по зонам — во вложении. Плана действий не ждём.
 
-Спасибо за работу. Готовы обсудить любой пункт отчёта.""",
+{end_block}Спасибо за работу. Готовы обсудить любой пункт отчёта.""",
     "en": """Subject: Inspection results — {unit}, {date}: grade {grade} ({pct}%)
 
 Hello,
@@ -677,9 +699,9 @@ On {date} we inspected the {unit} store{city}. Inspection type: {type}.
 
 The final grade is {grade} ({pct}%).{grade_note} No violations were recorded.
 
-The report, with the breakdown by zone, is attached. No action plan is expected.
+{good_block}{critical_block}The report, with the breakdown by zone, is attached. No action plan is expected.
 
-Thank you for your work. We are happy to walk through any item in the report.""",
+{end_block}Thank you for your work. We are happy to walk through any item in the report.""",
 }
 GRADE_NOTE = {
     "ru": {"A": " Пиццерия соответствует стандарту.",
@@ -796,7 +818,86 @@ def inspection_kind(meta, lang):
     return word
 
 
-def build_letter(res, lang):
+#: Роли информационных полей в письме и отчёте (D663): «сильные стороны» и «зоны
+#: роста» пиццерии. Роль стоит у пункта методики колонкой `letter_role`, а не
+#: ищется по тексту вопроса: чек-листы по странам разные, формулировки правятся и
+#: переводятся, а код пункта остаётся (`plan_due_date` ищет вопрос регуляркой —
+#: так делать здесь нельзя). Нет пометки ни у одного пункта — блоков нет.
+FEEDBACK_ROLES = LETTER_ROLES
+
+#: Заголовки блоков обратной связи в письме, по языкам.
+LETTER_FEEDBACK = {
+    "ru": {"strengths": "Что получается хорошо:", "growth": "Над чем стоит поработать:"},
+    "en": {"strengths": "What is going well:", "growth": "What to work on:"},
+}
+#: Шаблоны письма на выбор отправителя (D664).
+LETTER_TEMPLATES = (1, 2)
+
+#: Ведущая нумерация ответа аудитора («1. », «2) »). Срезается одна, в самом
+#: начале: «2.5 кг» и «10 пицц» — слова аудитора, и нумерацией они не являются.
+LEAD_NUMBER = re.compile(r"^\s*\d{1,2}[.)]\s*(?!\d)")
+
+
+def feedback_text(v):
+    """Ответ аудитора на информационное поле как есть: без пробелов по краям и без нумерации (D663)."""
+    return LEAD_NUMBER.sub("", info_field(v)["text"].strip(), count=1).strip()
+
+
+def feedback_lang(res, speech_lang=None):
+    """Язык, на котором записана обратная связь аудитора.
+
+    Свободный текст информационного поля записан на языке РЕЧИ аудитора
+    (`speech_lang` проверки), а не на языке отчёта. Вызывающий называет его, когда
+    знает (бот, база); иначе — `meta.speech_lang`, иначе язык шапки: до конца
+    обхода язык отчёта равен языку чек-листа (D415).
+    """
+    m = res["meta"]
+    raw = speech_lang or m.get("speech_lang") or m.get("lang") or "ru"
+    return str(raw).strip().lower()
+
+
+def feedback_parts(res, lang, speech_lang=None):
+    """Обратная связь аудитора для письма и отчёта: `(блоки, не_вставлено, язык_записи)`.
+
+    Блоки — `{роль: текст}` только для ролей, у которых есть текст. Язык записи
+    не совпал с языком документа — блок НЕ подставляется молча и текст не
+    переводится (D663: слова аудитора правит только он): роль уходит в
+    `не_вставлено`, и вызывающий обязан сказать об этом отправителю.
+    """
+    roles = {}
+    for r in load_checklist():
+        role = r.get("letter_role") or ""
+        if role:
+            roles.setdefault(role, []).append(r["id"])
+    recorded = feedback_lang(res, speech_lang)
+    blocks, skipped = {}, []
+    for role in FEEDBACK_ROLES:
+        texts = [feedback_text(res["info"][qid]) for qid in roles.get(role, ()) if qid in res["info"]]
+        text = "\n\n".join(x for x in texts if x)
+        if not text:
+            continue
+        if recorded != lang:
+            skipped.append(role)
+        else:
+            blocks[role] = text
+    return blocks, skipped, recorded
+
+
+def feedback_warning(skipped, recorded, lang):
+    """Предупреждение отправителю: обратная связь не вставлена из-за языка. Пусто — всё вставлено."""
+    if not skipped:
+        return ""
+    return (f"Обратная связь аудитора записана на языке «{recorded}», а документ собран на «{lang}» — "
+            f"она не вставлена; добавьте перевод вручную")
+
+
+def feedback_block(blocks, lang, roles):
+    """Заголовки и тексты перечисленных ролей, каждый блок с пустой строкой после."""
+    heads = LETTER_FEEDBACK[lang]
+    return "".join(f"{heads[r]}\n{blocks[r]}\n\n" for r in roles if r in blocks)
+
+
+def build_letter(res, lang, template=1, speech_lang=None):
     m = res["meta"]
     c = res["counts"]
     zk = "zone_name_en" if lang == "en" else "zone_name_ru"
@@ -812,17 +913,32 @@ def build_letter(res, lang):
         else:
             crit = ("\nКритично (D3): " + names + ". По методике нарушение D3 обнуляет всю зону, "
                     "в которой оно зафиксировано.\n\n")
+    if template not in LETTER_TEMPLATES:
+        sys.exit(f"Шаблон письма «{template}» не заведён. Доступны: "
+                 f"{', '.join(map(str, LETTER_TEMPLATES))}")
+    blocks, _, _ = feedback_parts(res, lang, speech_lang)
+    # Шаблон 1 (D664): сильные стороны сразу после оценки, зоны роста после
+    # нарушений. Шаблон 2: нарушения как были, обе части — в конце, перед
+    # благодарностью. Нет текста у роли — нет её блока, и письмо как прежде.
+    first = template == 1
+    good = feedback_block(blocks, lang, ("strengths",)) if first else ""
+    growth = feedback_block(blocks, lang, ("growth",)) if first else ""
+    end = "" if first else feedback_block(blocks, lang, FEEDBACK_ROLES)
     if clean and not res["findings"]:
-        template = LETTER_EMPTY[lang]
+        body = LETTER_EMPTY[lang]
+        after = growth
     else:
-        template = LETTER_CLEAN[lang] if clean else LETTER_PLAN[lang]
-    return template.format(
+        body = LETTER_CLEAN[lang] if clean else LETTER_PLAN[lang]
+        parts = [x.strip("\n") for x in (crit, growth) if x]
+        after = "\n" + "\n\n".join(parts) + "\n\n" if parts else ""
+    return body.format(
         unit=m.get("unit", ""), date=fmt_date(m.get("date")),
         city=(f", {m['city']}" if m.get("city") else ""),
         type=inspection_kind(m, lang),
         grade=res["grade"], pct=f"{res['pct']:g}",
         grade_note=GRADE_NOTE[lang].get(res["grade"], ""),
-        summary_lines=summary_lines(res, lang, clean), critical_block=crit,
+        summary_lines=summary_lines(res, lang, clean), critical_block=after,
+        good_block=good, end_block=end,
         plan_due=fmt_date(plan_due_date(res)))
 
 
@@ -921,9 +1037,17 @@ def main():
     a1 = s.add_parser("pdf"); a1.add_argument("--out"); a1.add_argument("--lang"); a1.add_argument("--photos", default="all")
     a1.add_argument("--out-dir", help="каталог для собранного отчёта; по умолчанию reports/ рядом с состоянием")
     a1.add_argument("--photo-map", help="JSON-карта «ссылка на кадр: путь к файлу»")
+    a1.add_argument("--speech-lang", help="язык, на котором записана обратная связь аудитора")
     a2 = s.add_parser("letter"); a2.add_argument("--lang")
+    a2.add_argument("--template", type=int, default=1,
+                    help="шаблон письма (D664): 1 — сильные стороны до нарушений, зоны роста после; "
+                         "2 — обе части в конце")
+    a2.add_argument("--speech-lang", help="язык, на котором записана обратная связь аудитора")
+    a2.add_argument("--json", action="store_true",
+                    help="отдать {text, feedback_skipped, feedback_lang} вместо голого текста")
     a3 = s.add_parser("html"); a3.add_argument("--out"); a3.add_argument("--lang")
     a3.add_argument("--photos", default="all")
+    a3.add_argument("--speech-lang", help="язык, на котором записана обратная связь аудитора")
     a3.add_argument("--photo-map", help="JSON-карта «ссылка на кадр: путь к файлу»")
     a = p.parse_args()
     st = load_state()
@@ -932,14 +1056,26 @@ def main():
     lang = report_lang(a.lang, st["meta"])
     res = compute(st, load_checklist(), load_zones(), load_cfg())
     if a.cmd == "letter":
-        text = build_letter(res, lang)
+        text = build_letter(res, lang, a.template, a.speech_lang)
         bad = letter_problems(text, res)
         if bad:
             sys.exit("Письмо не собрано: " + "; ".join(bad))
+        _, skipped, recorded = feedback_parts(res, lang, a.speech_lang)
+        if a.json:
+            print(json.dumps({"text": text, "feedback_skipped": skipped,
+                              "feedback_lang": recorded}, ensure_ascii=False))
+            return
+        warn = feedback_warning(skipped, recorded, lang)
+        if warn:
+            print(warn, file=sys.stderr)
         print(text)
         return
     src = Photos(load_photo_map(a.photo_map) if a.photo_map else None)
-    html = build_html(res, lang, a.photos, src)
+    html = build_html(res, lang, a.photos, src, a.speech_lang)
+    _, skipped, recorded = feedback_parts(res, lang, a.speech_lang)
+    warn = feedback_warning(skipped, recorded, lang)
+    if warn:
+        print(warn, file=sys.stderr)
     # Промах кадра не отменяет отчёта, но обязан быть услышан: в отчёте стоит
     # видимая отметка, здесь — строка о каждом пропавшем кадре. Молча выкинуть
     # доказательство нельзя, а решать, отдавать ли такой отчёт партнёру,

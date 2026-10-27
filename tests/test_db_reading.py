@@ -102,3 +102,20 @@ def test_правка_на_вычитке_пишет_показание(сеть
     )
 
     assert _показание(ident) == новое
+
+
+def test_язык_речи_проверки_читается_с_карточкой(сеть: None) -> None:
+    """D663: письмо сверяет язык обратной связи аудитора с языком письма — по `speech_lang`."""
+    start_inspection(
+        805, unit=ТОЧКА, kind="planned", report_lang="en", speech_lang="ru", tenant="HQ"
+    )
+    add_finding(805, code="CLN05", level="D1", zone="hot_kitchen", text="про градусы")
+    ident = push_inspection(805)
+
+    detail = get_inspection(ident, reach=УК, include_on_review=True)
+
+    assert detail is not None
+    assert detail.inspection.report_lang == "en"
+    assert detail.inspection.speech_lang == "ru", (
+        "язык речи не дочитан: письмо угадает его по находкам"
+    )

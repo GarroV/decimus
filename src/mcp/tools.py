@@ -609,7 +609,9 @@ def get_inspection(*, tenant: str, id: str, lang: str | None = None) -> dict[str
     }
 
 
-def inspection_letter(*, tenant: str, id: str, lang: str | None = None) -> dict[str, object]:
+def inspection_letter(
+    *, tenant: str, id: str, lang: str | None = None, template: int | None = None
+) -> dict[str, object]:
     """Текст письма партнёру по уже записанной проверке (T171).
 
     Письмо отправляет человек руками из почты (Q010), и в системе оно нигде не
@@ -643,7 +645,7 @@ def inspection_letter(*, tenant: str, id: str, lang: str | None = None) -> dict[
         "found": True,
         "unit": detail.inspection.unit_name,
         "inspection_date": detail.inspection.inspection_date.isoformat(),
-        **build(detail, lang=lang, papers=sources()),
+        **build(detail, lang=lang, papers=sources(), template=template),
     }
 
 
