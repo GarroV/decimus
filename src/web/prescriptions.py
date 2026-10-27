@@ -44,6 +44,7 @@ from src.db.errors import (
     StorageError,
 )
 from src.domain.errors import ConfigError
+from src.report.letter_markup import from_plain
 
 from . import actions_columns as columns
 from . import actions_screen, auth, guard, ui_lang
@@ -54,7 +55,6 @@ from .config import Settings
 from .geo_names import country_title
 from .google_mail import GoogleMailError, MailAccountMismatchError, create_draft
 from .letter_draft import MAIL_CONSENT_KEY, MAIL_RETURNS_KEY, OUTCOME_WRONG_ACCOUNT, MailReturn
-from .letter_markup import from_plain
 from .origin import refuse_foreign_origin
 from .sections import section
 from .texts import t

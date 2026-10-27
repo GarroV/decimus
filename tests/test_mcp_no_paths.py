@@ -121,6 +121,10 @@ from src.mcp.errors import McpError
         "request_id": "00000000-0000-0000-0000-000000000001",
         "row_id": "00000000-0000-0000-0000-000000000001",
     },
+    "save_inspection_letter": {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "text": "письмо",
+    },
     "move_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "date": "2020-01-01",
@@ -312,6 +316,7 @@ from src.mcp.errors import McpError
     "import_edit_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": 0},
     "import_edit_inspection": {"inspection_id": "не-uuid"},
     "move_inspection": {"inspection_id": "не-uuid", "reason": "x"},
+    "save_inspection_letter": {"id": "не-uuid", "text": "x"},
     "list_action_plans": {"status": "не-статус"},
     "get_action_plan": {"request_id": "не-uuid"},
     "accept_action_plan": {"request_id": "не-uuid"},

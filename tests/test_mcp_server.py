@@ -31,6 +31,7 @@ from src.mcp.catalogue import (
     KIND_CHECKLIST,
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
+    KIND_LETTER,
     KIND_MOVE,
     KIND_PLAN,
     KIND_RATINGS,
@@ -430,6 +431,9 @@ def test_содержимое_проверки_остаётся_нетронут
             continue
         if spec.kind == KIND_MOVE:
             assert spec.handler.__module__ == "src.mcp.move", spec.name
+            continue
+        if spec.kind == KIND_LETTER:
+            assert spec.handler.__module__ == "src.mcp.letter_save", spec.name
             continue
         if spec.kind == KIND_PLAN:
             assert spec.handler.__module__ == "src.mcp.plans", spec.name

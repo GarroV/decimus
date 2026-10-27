@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.web.letter_markup import from_plain, sanitize, to_email_html, to_plain
+from src.report.letter_markup import from_plain, sanitize, to_email_html, to_plain
 
 # --- что разрешено, доезжает ------------------------------------------------
 

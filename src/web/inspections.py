@@ -32,12 +32,10 @@ from src.db.plan_rows import TermsProvider
 from src.db.reach import Reach, reach_of
 from src.domain.models import TEXT_LANGS
 from src.domain.permissions import SIDE_HQ, side_of
-from src.report import info_titles, plan_terms
+from src.report import info_titles, letter_markup, plan_terms
 from src.report.letters import LetterError
 from src.report.letters import build as build_letter
 from src.report.letters import sources as letter_sources
-
-from . import letter_markup
 
 logger = logging.getLogger(__name__)
 
@@ -403,11 +401,12 @@ def remember_letter(
     разметки без слов уходит в запись пустым — и запись отказывает своим
     правилом «в нём нет текста», а не лежит в истории «отправленным».
     """
-    чистое = letter_markup.sanitize(body)
-    if not letter_markup.to_plain(чистое).strip():
-        чистое = ""
     return letters_store.save_letter(
-        inspection_id, tenant=tenant, body=чистое, lang=lang, saved_by=saved_by
+        inspection_id,
+        tenant=tenant,
+        body=letter_markup.for_saving(body),
+        lang=lang,
+        saved_by=saved_by,
     )
 
 
