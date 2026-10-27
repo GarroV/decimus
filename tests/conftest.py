@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import db_names
 import pytest
@@ -595,3 +597,37 @@ def model_usage_calls(monkeypatch: pytest.MonkeyPatch) -> list[object]:
     calls: list[object] = []
     monkeypatch.setattr("src.db.model_usage.record", calls.append)
     return calls
+
+
+_UNTRUSTED_BLOCK = re.compile(
+    r'\A<untrusted_data id="([0-9a-f]{32})" source="[A-Za-z0-9_-]*">\n'
+    r'(.*)\n</untrusted_data id="\1">\Z',
+    re.DOTALL,
+)
+
+
+def unwrap_untrusted(text: str) -> str:
+    """Текст результата инструмента из блока `<untrusted_data>` (#1338).
+
+    Сервер по HTTP отдаёт каждый текст результата `tools/call` в обёртке; тест,
+    которому нужен сам текст, снимает её здесь. Необёрнутый текст — провал: так
+    дверь, которая перестала оборачивать, не пройдёт незамеченной.
+    """
+    совпадение = _UNTRUSTED_BLOCK.match(text)
+    assert совпадение, f"ответ по HTTP не обёрнут в untrusted_data: {text[:100]!r}"
+    return совпадение.group(2)
+
+
+def unwrap_untrusted_answer(answer: dict[str, Any]) -> dict[str, Any]:
+    """Ответ JSON-RPC на `tools/call` с текстами результата, снятыми с обёртки.
+
+    Отказ протокола (`error`) не оборачивается и возвращается как есть.
+    """
+    if "result" not in answer:
+        return answer
+    result = answer["result"]
+    content = [
+        {**блок, "text": unwrap_untrusted(блок["text"])} if "text" in блок else блок
+        for блок in result["content"]
+    ]
+    return {**answer, "result": {**result, "content": content}}

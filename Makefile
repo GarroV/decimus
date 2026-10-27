@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest porcha porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units units-normalize demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map landing-shots lock audit sbom
+.PHONY: bootstrap check test test-honest porcha porcha-permissions porcha-mcp porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units units-normalize demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map landing-shots lock audit sbom
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -166,6 +166,9 @@ porcha:  ## порча ядра: испорченный расчёт обяза�
 
 porcha-permissions:  ## порча матрицы прав: каждая сломанная защита обязана уронить свой тест (без базы)
 	$(VENV)/python tools/porcha_permissions.py
+
+porcha-mcp:  ## порча обёртки чужого текста и аннотаций MCP: каждая сломанная защита обязана уронить свой тест (без базы)
+	$(VENV)/python tools/porcha_mcp.py
 
 porcha-second-factor: export DATABASE_URL = $(TEST_DATABASE_URL)
 porcha-second-factor: export DATABASE_APP_PASSWORD = $(TEST_APP_PASSWORD)

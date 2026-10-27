@@ -352,6 +352,11 @@ tool_attach_photos() {
     *) reply_text "$id" "The service could not be reached to prepare the upload (HTTP $HTTP_CODE)" 1; return ;;
   esac
   text="$(printf '%s' "$HTTP_BODY" | "$JQ" -r '.result.content[0].text // .error.message // ""' 2>/dev/null)"
+  # Сервер оборачивает текст результата в <untrusted_data id=…>…</…> (#1338): первая и
+  # последняя строки — теги, внутри — JSON ответа инструмента. Мост ждёт голый JSON.
+  case "$text" in
+    '<untrusted_data id='*) text="$(printf '%s\n' "$text" | sed '1d;$d')" ;;
+  esac
   if [ "$(printf '%s' "$HTTP_BODY" | "$JQ" -r '.result.isError // false' 2>/dev/null)" = "true" ] \
      || [ -z "$text" ]; then
     reply_text "$id" "${text:-upload is not available}" 1; return

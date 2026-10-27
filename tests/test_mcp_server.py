@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from conftest import requires_db
+from conftest import requires_db, unwrap_untrusted_answer
 from db_harness import accept_pushed, пространства_для_теста, точка_пространства
 
 from src.mcp.catalogue import (
@@ -124,7 +124,10 @@ def _rpc(адрес: str, метод: str, параметры: dict[str, Any] | 
 
 
 def _вызов(адрес: str, инструмент: str, аргументы: dict[str, Any], **kw: Any) -> Any:
-    return _rpc(адрес, "tools/call", {"name": инструмент, "arguments": аргументы}, **kw)
+    """Вызов инструмента по HTTP; текст результата снят с обёртки `untrusted_data` (#1338)."""
+    return unwrap_untrusted_answer(
+        _rpc(адрес, "tools/call", {"name": инструмент, "arguments": аргументы}, **kw)
+    )
 
 
 def _данные(ответ: dict[str, Any]) -> Any:

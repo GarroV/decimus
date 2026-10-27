@@ -456,13 +456,13 @@ def test_find_на_незнакомое_имя_отдаёт_none() -> None:
     assert find("несуществующий_инструмент") is None
 
 
-def test_as_list_отдаёт_ровно_три_нужных_ключа_на_запись() -> None:
+def test_as_list_отдаёт_ровно_четыре_нужных_ключа_на_запись() -> None:
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
     assert len(перечень) == 80
     for запись in перечень:
-        assert set(запись) == {"name", "description", "inputSchema"}
+        assert set(запись) == {"name", "description", "inputSchema", "annotations"}
 
 
 def test_as_list_передаёт_то_же_имя_и_ту_же_схему_что_и_toolspec() -> None:
