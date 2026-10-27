@@ -117,7 +117,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
+<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -125,6 +125,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/actions_screen.py` | Раздел «Действия»: экшн-планы и предписания — один экран у УК и партнёра (D526, D527) |
 | `src/web/calendar_screen.py` | Раздел «Календарь» (D497): сетка месяца с проверками и поездками (D505, D506) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
+| `src/web/connect_reminder.py` | Напоминание на «Главной»: привяжите бота и подключите Claude (27.10.2026) |
 | `src/web/countries_screen.py` | Вкладка «Страны» раздела «Администрирование» (D640, #1251) |
 | `src/web/country.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
 | `src/web/country_filter.py` | Постоянный отбор стран экрана «Страны» (D536): «мне нужен только Кавказ» |
@@ -157,7 +158,9 @@ Flask-приложение управляющей компании и партн
 | `src/web/proofread.py` | «Добавить нарушение» на вычитке: подбор пункта по словам и кадрам (D535) |
 | `src/web/ratings.py` | Раздел «Рейтинги» (спека 2026-10-08) и подраздел «Загрузки» |
 | `src/web/ratings_calendar.py` | Период раздела «Рейтинги»: «‹ 2026 Q3 ›», по щелчку — календарь «с — по» |
+| `src/web/ratings_freshness.py` | Таблица свежести под значком «?» у заголовка «Рейтингов» (D659) |
 | `src/web/ratings_line.py` | График средних раздела «Рейтинги» (D396): линия по периодам рейтинга |
+| `src/web/ratings_risk.py` | Плитка «Стабильно ниже порога» (D658): собирает источники и отдаёт общий список |
 | `src/web/ratings_sheet.py` | Блок «Таблица контроля» на «Загрузках»: когда забирали, чем кончилось, кнопка (D464) |
 | `src/web/ratings_tiles.py` | Плитки раздела «Рейтинги» (D585): лицо плитки — заголовок, одна-две цифры и короткая строка |
 | `src/web/registry_period.py` | Период реестра проверок: «с — по» по дате обхода |
@@ -374,7 +377,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,pushed,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,pushed,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,unit_scores,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -405,6 +408,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/translate_modes.py` | Перевод комментариев на язык отчёта, выбранный аудитором (D443): чтение и запись |
 | `src/db/trips.py` | Поездки «Календаря» (D497, D505, D506): чтение и запись |
 | `src/db/unit_profiles.py` | Справочник сведений о пиццериях (`unit_profiles`, миграция 0046): запись и чтение |
+| `src/db/unit_scores.py` | Оценки последних проверок пиццерий — для плитки «Стабильно ниже порога» (D658) |
 | `src/db/units.py` | Нормализация названия точки для сопоставления повторного ввода |
 <!-- map:end -->
 
