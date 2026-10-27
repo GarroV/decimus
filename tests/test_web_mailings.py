@@ -18,7 +18,7 @@ from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
 from src.db import mailing_cc
-from src.db.errors import MailingCcError
+from src.db.errors import ConfigError, MailingCcError
 from src.web import google_mail, letter_draft
 
 РАЗДЕЛ = "/administration"
@@ -191,9 +191,12 @@ def test_копия_ук_только_для_проверок_пространс
     assert letter_draft._копия_ук("GE") == (), "копия УК не уходит в письма партнёров"
 
 
-def test_список_не_прочитался_черновик_без_копии(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("ошибка", [MailingCcError("база не ответила"), ConfigError("нет базы")])
+def test_список_не_прочитался_черновик_без_копии(
+    monkeypatch: pytest.MonkeyPatch, ошибка: Exception
+) -> None:
     def сбой(_kind: str) -> tuple[str, ...]:
-        raise MailingCcError("база не ответила")
+        raise ошибка
 
     monkeypatch.setattr(mailing_cc, "read", сбой)
     assert letter_draft._копия_ук("HQ") == ()

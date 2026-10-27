@@ -25,7 +25,7 @@ from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
 from src.db import mailing_cc
-from src.db.errors import MailingCcError, MailingCcInputError
+from src.db.errors import DbError, MailingCcError, MailingCcInputError
 
 from . import administration, auth, guard, ui_lang
 from .origin import refuse_foreign_origin
@@ -56,7 +56,7 @@ class KindLine:
 def _cc_counts() -> dict[str, int] | None:
     try:
         return mailing_cc.counts()
-    except MailingCcError:
+    except DbError:
         log.warning("Списки копий для вкладки «Письма» не прочитались", exc_info=True)
         return None
 
@@ -79,7 +79,7 @@ def show(conf_lang: str) -> FlaskResponse | tuple[str, int]:
     if picked:
         try:
             emails = mailing_cc.read(picked)
-        except MailingCcError:
+        except DbError:
             log.warning("Список копий вида %s не прочитался", picked, exc_info=True)
             emails = None
     saved = request.args.get("saved", "")

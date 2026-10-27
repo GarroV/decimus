@@ -31,7 +31,7 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response
 
 from src.db import mailing_cc
-from src.db.errors import DbError, MailingCcError
+from src.db.errors import DbError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import auth, guard
@@ -117,7 +117,7 @@ def _копия_ук(tenant_code: str) -> tuple[str, ...]:
         return ()
     try:
         return mailing_cc.read(mailing_cc.KIND_INSPECTION)
-    except MailingCcError:
+    except DbError:
         logger.warning("Список копий писем по проверкам не прочитался", exc_info=True)
         return ()
 
