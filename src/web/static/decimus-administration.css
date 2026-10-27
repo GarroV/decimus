@@ -98,3 +98,12 @@
 /* «Письма и уведомления» (D608): строка адреса копии — адрес слева, «Убрать» справа. */
 .srow--cc { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .srow--cc .srow__main { min-width: 0; overflow-wrap: anywhere; }
+/* Шаблон письма (#977, #1130): строка слота — название слева, состояние справа; поле текста — моноширинное. */
+.srow--tpl { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.srow--tpl .srow__main { min-width: 0; }
+.srow--tpl .srow__cell--state { flex: none; font-size: 12px; color: var(--ink-3); }
+.ssec .slist { margin-top: var(--space-4); }
+.tpl-body { width: 100%; min-height: 24rem; padding: var(--space-4); font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; resize: vertical; }
+.sprops--tpl { margin-top: var(--space-4); }
+.sprops--tpl dt { flex: 0 0 150px; font-family: var(--font-mono); font-size: 12px; }
+.ssec .sform { margin-top: var(--space-4); }

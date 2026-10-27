@@ -16,7 +16,7 @@ from db_harness import set_retraction_env
 psycopg = pytest.importorskip("psycopg")
 
 from src.db import mailing_templates as store  # noqa: E402
-from src.db.errors import MailingTemplateError, MailingTemplateInputError  # noqa: E402
+from src.db.errors import MailingTemplateInputError  # noqa: E402
 
 pytestmark = requires_db
 
@@ -129,4 +129,3 @@ def test_шаблоны_видны_пространству_ук_и_не_вид�
     store.save("plan", "ru", "Свой {unit}", actor="boss")
     ук, служебное, партнёр = (_читает(db_env, space) for space in ("HQ", "*", "GE"))
     assert (ук, служебное, партнёр) == (1, 1, 0)
-
