@@ -643,10 +643,12 @@ def test_батарея_доходит_и_до_успешных_ответов(�
 
     # Инструменты плана без живой базы отвечают отказом окружения, а не JSON: их не считаем.
     # Так же — снятие кадров черновика загрузки (D627): без базы оно упирается в чтение черновика.
+    # И сохранение письма (D665): батарея зовёт его с несуществующей проверкой — отказ, не JSON.
     без_базы = sum(
         1
         for spec in TOOLS
-        if spec.kind == KIND_PLAN or spec.name in {"import_remove_photo", "import_clear_photos"}
+        if spec.kind == KIND_PLAN
+        or spec.name in {"import_remove_photo", "import_clear_photos", "save_inspection_letter"}
     )
     assert len(успешные) >= len(TOOLS) - без_базы, "успешных ответов слишком мало для утверждения"
     assert any(версия for версия in версии), "ни одна правка не дошла до новой версии"
