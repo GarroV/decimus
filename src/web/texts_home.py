@@ -32,6 +32,15 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     # Объявление D629: на стикере — только заголовок (владелец 23.10.2026: «нужно короткое
     # название, внутри уже должно быть написано, что к чему»); пояснение — в плитке Claude,
     # `settings.claude.relink`. Правка текста — только с его «да».
+    "home.board.bot_connect.kind": {"ru": "Напоминание", "en": "Reminder"},
+    "home.board.bot_connect.title": {
+        "ru": "Привяжите бота в Telegram",
+        "en": "Connect the Telegram bot",
+    },
+    "home.board.bot_connect.cta": {"ru": "Привязать", "en": "Connect"},
+    "home.board.claude_connect.kind": {"ru": "Напоминание", "en": "Reminder"},
+    "home.board.claude_connect.title": {"ru": "Подключите Claude", "en": "Connect Claude"},
+    "home.board.claude_connect.cta": {"ru": "Подключить", "en": "Connect"},
     "home.board.mcp_relink.kind": {"ru": "Объявление", "en": "Announcement"},
     "home.board.mcp_relink.title": {"ru": "Переподключите Claude", "en": "Reconnect Claude"},
     "home.board.mcp_relink.cta": {"ru": "Подробнее", "en": "Details"},

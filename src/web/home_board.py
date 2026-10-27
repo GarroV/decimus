@@ -37,6 +37,16 @@ ORDERS_DUE = "orders_due"
 RATINGS_STALE = "ratings_stale"
 #: Объявление (D629): перепривязать Claude ради загрузки фото из папки.
 MCP_RELINK = "mcp_relink"
+#: Напоминания (27.10.2026): бот не привязан, Claude не подключён — `connect_reminder`.
+BOT_CONNECT = "bot_connect"
+CLAUDE_CONNECT = "claude_connect"
+_CONNECT_KINDS = {"bot": BOT_CONNECT, "claude": CLAUDE_CONNECT}
+
+
+def connect_kinds(missing: tuple[str, ...]) -> tuple[str, ...]:
+    """Виды стикеров для неподключённых разделов «Настроек» (`bot`, `claude`)."""
+    return tuple(_CONNECT_KINDS[что] for что in missing if что in _CONNECT_KINDS)
+
 
 #: Ключи Claude, выпущенные до объявления, — у тех, кому перепривязать. Выпустил
 #: новый — стикер пропадает сам; круг объявления — подключённые личным ключом (D629).

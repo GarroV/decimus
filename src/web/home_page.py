@@ -51,6 +51,7 @@ from src.ratings import report
 
 from . import (
     auth,
+    connect_reminder,
     home_board,
     home_ratings,
     home_ratings_block,
@@ -88,6 +89,8 @@ def _board_href(kind: str) -> str:
         home_board.ORDERS_DUE: f"{действия}?tab=prescriptions",
         home_board.RATINGS_STALE: f"{section('administration').path}?tab=ratings",
         home_board.MCP_RELINK: f"{section('settings').path}?tile=claude",
+        home_board.BOT_CONNECT: f"{section('settings').path}?tile=bot",
+        home_board.CLAUDE_CONNECT: f"{section('settings').path}?tile=claude",
     }
     return куда[kind]
 
@@ -98,7 +101,7 @@ def _board(reach: Any) -> tuple[tuple[home_board.Sticker, ...], bool]:
     if вошедший is None or not home_board.SHOWN:
         return (), False
     who = home_board.Who(вошедший.role, auth.current_tenant())
-    объявления = _announcements(вошедший.id)
+    объявления = (*_connect_stickers(), *_announcements(вошедший.id))
     if not home_board.kinds_for(who):
         return объявления, False
     try:
@@ -107,6 +110,14 @@ def _board(reach: Any) -> tuple[tuple[home_board.Sticker, ...], bool]:
         log.warning("главная: доска не прочиталась (%s)", exc.__class__.__name__)
         return объявления, True
     return (*объявления, *home_board.compose(who, counts, _board_href)), False
+
+
+def _connect_stickers() -> tuple[home_board.Sticker, ...]:
+    """Напоминания подключить бота и Claude (27.10.2026) — первыми на доске."""
+    return tuple(
+        home_board.Sticker(вид, 1, _board_href(вид))
+        for вид in home_board.connect_kinds(connect_reminder.missing())
+    )
 
 
 def _announcements(user_id: str) -> tuple[home_board.Sticker, ...]:
