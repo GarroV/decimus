@@ -61,11 +61,17 @@
     return document.querySelector('[aria-controls="' + form.id + '"]');
   }
 
+  // Подтверждение удаления у строки (#1164): раскрывается корзиной, «Нет» прячет.
+  function setDeleteOpen(form, button, on) {
+    form.hidden = !on;
+    if (button) {
+      button.setAttribute("aria-expanded", on ? "true" : "false");
+      if (!on) button.focus();
+    }
+  }
+
   function resetForm(form) {
     form.reset();
-    form.querySelectorAll("[data-del]").forEach(function (d) {
-      d.open = false;
-    });
     // Скрытое поле `form.reset()` не возвращает: у него значение и есть атрибут.
     var code = form.querySelector("[data-ipick-value]");
     if (code) code.value = code.dataset.orig || "";
@@ -98,9 +104,16 @@
       if (composer) toggleForm(composer, add, composer.hidden);
       return;
     }
+    var del = e.target.closest("[data-del-open]");
+    if (del) {
+      var confirmForm = document.getElementById(del.getAttribute("aria-controls"));
+      if (confirmForm) setDeleteOpen(confirmForm, del, confirmForm.hidden);
+      return;
+    }
     var keep = e.target.closest("[data-del-cancel]");
     if (keep) {
-      keep.closest("[data-del]").open = false;
+      var confirmOpen = keep.closest("[data-del]");
+      setDeleteOpen(confirmOpen, buttonFor(confirmOpen), false);
       return;
     }
     var cancel = e.target.closest("[data-proofread-cancel]");

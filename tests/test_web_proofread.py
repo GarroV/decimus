@@ -100,6 +100,29 @@ def test_удалить_запись_можно_у_любого_класса_в�
 
 
 @админ
+@pytest.mark.parametrize("класс, есть_карандаш", [("D0", False), ("D1", True)])
+def test_у_строки_пиктограммы_а_не_большая_кнопка(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, класс: str, есть_карандаш: bool
+) -> None:
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+    деталь = карточка(
+        шапка(on_review=True, tenant_code=ТЕНАНТ),
+        findings=(replace(ЗАПИСЬ, id="fz", level=класс),),
+    )
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)
+
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Корзина есть у любого класса, карандаш только у правимого; подпись — из словаря.
+    assert страница.count("data-del-open") == 1
+    assert ("data-proofread-edit" in страница) == есть_карандаш
+    assert "Удалить запись" in страница
+    # Большой красной кнопки «Удалить запись» в строке и в форме правки нет.
+    assert "pf__delete" not in страница and '<summary class="btn' not in страница
+
+
+@админ
 def test_у_принятой_удаления_записи_нет_и_у_d0(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
