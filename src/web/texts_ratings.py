@@ -318,6 +318,7 @@ _IMPORTS: dict[str, dict[str, str]] = {
     "ratings.issues": {"ru": "Несопоставленные и битые строки", "en": "Unmatched and broken rows"},
     "ratings.issues.empty": {"ru": "Всё сопоставлено.", "en": "Everything is matched."},
     "ratings.issues.row": {"ru": "строка {n}", "en": "row {n}"},
+    "ratings.issues.rows": {"ru": "строк: {n}, первая — {first}", "en": "{n} rows, first {first}"},
     "ratings.issue.unit_unmatched": {
         "ru": "пиццерия не сопоставлена",
         "en": "pizzeria not matched",

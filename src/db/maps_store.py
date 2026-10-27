@@ -37,6 +37,28 @@ on conflict (company_uuid, provider_id, on_date) do update set
 """
 
 
+#: Страну филиала решает реестр пиццерий Dodo (`agg.units`) по координатам, а не
+#: Pointer: Pointer отдал Koper-1 (Словения) с кодом RS — у Сербии стало 5 филиалов,
+#: у Словении 3 (27.10.2026). Ближайшая пиццерия реестра в пределах ~1 км; нет такой —
+#: страна Pointer остаётся.
+_COUNTRY_FROM_REGISTRY = """
+with near as (
+    select c.uuid, (
+        select u.country_code from agg.units u
+         where abs(u.lat - c.lat) < 0.01 and abs(u.lng - c.lng) < 0.01
+         order by (u.lat - c.lat) ^ 2 + (u.lng - c.lng) ^ 2
+         limit 1
+    ) as country_code
+      from maps.companies c
+     where c.lat is not null
+)
+update maps.companies c set country_code = near.country_code
+  from near
+ where near.uuid = c.uuid and near.country_code is not null
+   and c.country_code is distinct from near.country_code
+"""
+
+
 def save(
     companies: Sequence[tuple[Any, ...]], ratings: Sequence[tuple[Any, ...]]
 ) -> tuple[int, int]:
@@ -46,6 +68,7 @@ def save(
             with conn.cursor() as cur:
                 cur.executemany(_UPSERT_COMPANY, companies)
                 cur.executemany(_UPSERT_RATING, ratings)
+                cur.execute(_COUNTRY_FROM_REGISTRY)
     except psycopg.Error as exc:
         raise RatingsError(
             f"Оценки карт не легли: база отказала ({exc.__class__.__name__})"
