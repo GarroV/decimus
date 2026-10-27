@@ -751,6 +751,13 @@ a.ov-table__row:focus-visible, a.ov-row:focus-visible, a.ins-row:focus-visible, 
 /* Вложенная страница раздела: пункт подсвечен, но это ссылка на раздел. */
 a.sidenav__current { cursor: pointer; }
 a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
+/* Подменю раздела «Рейтинги» (D660): разделы столбцом под пунктом, у каждого справа
+   точка свежести источника. Состав и порядок — код (`ratings_nav.py`). */
+.sidenav__sub { display: flex; flex-direction: column; margin: 2px 0 var(--space-3) 30px; border-left: 1px solid var(--line); }
+.sidenav__subitem { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 6px 10px; border-radius: var(--r-control); font-size: 13px; line-height: 18px; color: var(--ink-2); }
+.sidenav__subitem:hover { text-decoration: none; color: var(--ink); background: var(--surface-2); }
+.sidenav__subitem.is-on { color: var(--accent); background: var(--accent-soft); font-weight: var(--w-semibold); }
+.sidenav__subitem .rt-fdot { flex: none; }
 /* Кнопка в непостроенный раздел (D139) приглушена так же, как его пункт меню. */
 .btn.is-wip { color: var(--ink-3); background: transparent; border-style: dashed; box-shadow: none; }
 

@@ -180,7 +180,6 @@ OPEN_ENDPOINTS = frozenset(
         "ratings_rule_add",
         "ratings_rule_remove",
         "ratings_upload",
-        "ratings_layout",
         "ratings_settings",
     }
 )

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, date, datetime
 
 import pytest
 from flask import render_template_string
-from test_web_ratings_tiles import _клиент, _страница
+from ratings_page import клиент as _клиент
+from ratings_page import подготовить as _страница
 from web_harness import собрать
 
 from src.ratings import freshness as fresh
@@ -101,12 +103,14 @@ def test_списки_в_окне_периода_выбран_пункт_и_за
 
 def _шапка_экрана(monkeypatch: pytest.MonkeyPatch, rows: tuple[fresh.Row, ...]) -> str:
     """Шапка живого экрана «Рейтинги» с заданными строками свежести источников."""
-    _страница(monkeypatch, 0)
+    _страница(monkeypatch)
     monkeypatch.setattr(screen.ratings_freshness, "read_rows", lambda now: rows)
     for client in _клиент(monkeypatch):
         страница = client.get("/ratings?lang=ru").get_data(as_text=True)
         начало = страница.index('<header class="rt-head">')
-        return страница[начало : страница.index("</header>", начало)]
+        шапка = страница[начало : страница.index("</header>", начало)]
+        # Строка «данные за … · пришли …» у заголовка раздела (D660) — не таблица под «?».
+        return re.sub(r'<span class="rt-fresh-line">.*?</span>', "", шапка, flags=re.S)
     raise AssertionError("клиент не создан")
 
 

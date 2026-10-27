@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from src.db import ratings_read as read
@@ -40,6 +40,7 @@ from .summary import (
     risk_zone,
     score_lines,
     top_bottom,
+    unit_counts,
     violation_block,
 )
 
@@ -114,6 +115,9 @@ class Summary:
     risk_short: tuple[str, ...]
     thresholds: dict[str, float]
     last_loaded: dict[str, datetime]
+    #: Страна → сколько пиццерий с оценкой за период (D660: колонка «Пиццерий»).
+    rs_units: dict[str, int] = field(default_factory=dict)
+    rko_units: dict[str, int] = field(default_factory=dict)
 
 
 def choices(only: Collection[str] | None = None) -> Choices:
@@ -323,7 +327,18 @@ def build_groups(
     return group_lines(selection, found, codes, facts), prev
 
 
-def build(selection: Selection) -> Summary:
+_EMPTY_BLOCK = ViolationBlock(0, 0, None, ())
+
+
+def build(
+    selection: Selection,
+    *,
+    kinds: Collection[str] = (RS, RKO),
+    with_risk: bool = True,
+) -> Summary:
+    """Сводка за период. `kinds` и `with_risk` сужают то, что считается и читается:
+    раздел, которому нужен один источник, не платит за остальные (D660). Не
+    запрошенное остаётся пустым — читать его нельзя, оно не «нулевое», а не считалось."""
     found = choices()
     codes = group_countries(selection, found.countries)
     period = selection.period
@@ -333,17 +348,26 @@ def build(selection: Selection) -> Summary:
     groups = group_lines(selection, found, codes, (current, previous))
     limits = read.settings()
     rules = [HardRule(r[1], r[2], r[3]) for r in read.hard_rules()]
-    rko_rows, rko_counts = read.rko_violation_facts(
-        countries=codes, begin=period.begin, end=period.end
-    )
-    rs_rows, rs_counts = read.rs_remark_facts(countries=codes, begin=period.begin, end=period.end)
-    rko_facts, rs_facts = _vfacts(rko_rows), _vfacts(rs_rows)
-    rko_cluster, rko_by = _blocks(rko_facts, rko_counts, codes)
-    rs_cluster, rs_by = _blocks(rs_facts, rs_counts, codes)
     top = limits["top_threshold"]
-    rs_top, rs_bottom = top_bottom(current, RS, threshold=top, previous=previous)
-    rko_top, rko_bottom = top_bottom(current, RKO, threshold=top, previous=previous)
-    risk, risk_short = _risk(codes, period, limits)
+    cluster: dict[str, ViolationBlock] = {RS: _EMPTY_BLOCK, RKO: _EMPTY_BLOCK}
+    by_country: dict[str, dict[str, ViolationBlock]] = {RS: {}, RKO: {}}
+    best: dict[str, tuple[UnitScore, ...]] = {RS: (), RKO: ()}
+    worst: dict[str, tuple[UnitScore, ...]] = {RS: (), RKO: ()}
+    hard: dict[str, tuple[ViolationFact, ...]] = {RS: (), RKO: ()}
+    for kind in (RS, RKO):
+        if kind not in kinds:
+            continue
+        if kind == RKO:
+            rows, counts = read.rko_violation_facts(
+                countries=codes, begin=period.begin, end=period.end
+            )
+        else:
+            rows, counts = read.rs_remark_facts(countries=codes, begin=period.begin, end=period.end)
+        facts = _vfacts(rows)
+        cluster[kind], by_country[kind] = _blocks(facts, counts, codes)
+        best[kind], worst[kind] = top_bottom(current, kind, threshold=top, previous=previous)
+        hard[kind] = hard_lines(facts, rules, kind)
+    risk, risk_short = _risk(codes, period, limits) if with_risk else ((), ())
     return Summary(
         selection=selection,
         countries=codes,
@@ -351,18 +375,20 @@ def build(selection: Selection) -> Summary:
         lines=lines,
         total=total,
         previous=prev,
-        rko_cluster=rko_cluster,
-        rko_by_country=rko_by,
-        rs_cluster=rs_cluster,
-        rs_by_country=rs_by,
-        rs_top=rs_top,
-        rs_bottom=rs_bottom,
-        rs_hard=hard_lines(rs_facts, rules, RS),
-        rko_top=rko_top,
-        rko_bottom=rko_bottom,
-        rko_hard=hard_lines(rko_facts, rules, RKO),
+        rko_cluster=cluster[RKO],
+        rko_by_country=by_country[RKO],
+        rs_cluster=cluster[RS],
+        rs_by_country=by_country[RS],
+        rs_top=best[RS],
+        rs_bottom=worst[RS],
+        rs_hard=hard[RS],
+        rko_top=best[RKO],
+        rko_bottom=worst[RKO],
+        rko_hard=hard[RKO],
         risk=risk,
         risk_short=risk_short,
         thresholds=limits,
         last_loaded=read.last_loaded(),
+        rs_units=unit_counts(current, RS),
+        rko_units=unit_counts(current, RKO),
     )

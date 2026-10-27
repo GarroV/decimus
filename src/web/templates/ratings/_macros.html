@@ -1,0 +1,36 @@
+{#
+  Макросы разделов «Рейтингов» (D660). Подключаются `with context`: им нужны `t`,
+  `unit_url` и `country_name` из окружения страницы. Ни одного вычисления.
+#}
+{% macro thr(x) %}{{ '%.1f'|format(x) }}{% endmacro %}
+{% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
+{#- Знак и цвет — по уже округлённой дельте: −0.04 показывается и красится как +0.0 (P17). -#}
+{% macro dlt(x, digits=1) %}{% if x is none %}<span class="rt-delta is-empty">—</span>{% else %}{% set r = (x|round(digits)) + 0.0 %}<span class="rt-delta {{ 'rt-delta--up' if r >= 0 else 'rt-delta--down' }}"><span class="rt-delta__arrow" aria-hidden="true">{{ '▲' if r >= 0 else '▼' }}</span>{{ ('%+.' ~ digits ~ 'f')|format(r) }}</span>{% endif %}{% endmacro %}
+{% macro unit_link(unit, name, kind) %}<a href="{{ unit_url(unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ name }}</a>{% endmacro %}
+{#- Оценка агрегатора в его родной шкале: Wolt — из 10, Glovo — %, остальные — из 5. -#}
+{% macro agg_score(avg, scale) %}{% if scale == 100 %}{{ '%.1f'|format(avg) }}%{% elif scale == 10 %}{{ '%.1f'|format(avg) }}<span class="rt-src__scale">/10</span>{% else %}{{ '%.2f'|format(avg) }}{% endif %}{% endmacro %}
+{#- Плитка ключевой цифры раздела: подпись, значение, строка под ним. -#}
+{% macro stat(label, sub=none) %}<div class="pk-tile"><div class="pk-tile__label">{{ label }}</div><div class="pk-tile__value">{{ caller() }}</div>{% if sub %}<div class="pk-tile__sub">{{ sub }}</div>{% endif %}</div>{% endmacro %}
+{% macro rank_item(u, kind) %}<li>
+    {% set m = unit_maps.get(u.unit) %}
+    <span class="rt-rank__name">{{ unit_link(u.unit, u.unit_name, kind) }}<small>{{ country_name(u.country) }}{% if m %} · <span class="rt-rank__map" title="{{ t('ratings.maps.unit_title', n=m[1]) }}">Google {{ '%.1f'|format(m[0]) }}</span>{% endif %}</small></span>
+    {#- Без изменения — серый ноль без треугольника: «▲+0.0» зеленью читалось как рост. -#}
+    <span class="rt-rank__d">{% if u.delta is not none %}{% if (u.delta|round(1)) == 0 %}<span class="rt-delta">0.0</span>{% else %}{{ dlt(u.delta) }}{% endif %}{% endif %}</span>
+    <span class="rt-rank__score">{{ num(u.score) }}</span>
+  </li>
+{% endmacro %}
+{#- Фильтр по странам внутри блока (п. 7 interface-logic: действует только на свой блок,
+    стоит в нём). Без скрипта спрятан — видны все строки. -#}
+{% macro cfilter(codes) %}{% set uniq = codes|unique|sort|list %}{% if uniq|length > 1 %}
+  <div class="rt-filter" hidden>
+    <select class="pickselect" aria-label="{{ t('ratings.filter.country') }}">
+      <option value="" selected>{{ t('ratings.filter.all') }} · {{ codes|length }}</option>
+      {% for c in uniq %}<option value="{{ c }}">{{ country_name(c) }} · {{ codes|select('equalto', c)|list|length }}</option>{% endfor %}
+    </select>
+  </div>{% endif %}
+{% endmacro %}
+{#- Ячейка охвата: оценка в родной шкале (△ — новые не приходят), «—» — нет точки или оценок. -#}
+{% macro cov_cell(c) %}{%- if c.state == 'score' -%}<b>{{ agg_score(c.score, c.scale) }}</b>{% if c.stale %} <span class="rt-stale" role="img" title="{{ t('ratings.coverage.stale', date=c.on_date.strftime('%d.%m.%Y')) }}" aria-label="{{ t('ratings.coverage.stale', date=c.on_date.strftime('%d.%m.%Y')) }}">△</span>{% endif %}
+  {%- elif c.state == 'unrated' -%}<span class="is-empty" title="{{ t('ratings.coverage.unrated') }}">—</span>
+  {%- elif c.state == 'missing' -%}<span class="is-empty" title="{{ t('ratings.coverage.missing') }}">—</span>
+  {%- else -%}<span class="rt-cov__off" aria-hidden="true">·</span>{%- endif -%}{% endmacro %}

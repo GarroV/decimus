@@ -1,0 +1,77 @@
+{% from "ratings/_macros.html" import num, dlt, unit_link, stat, rank_item, cfilter, thr with context %}
+{#- РС или РКО (D660): плитки, «По странам», Top-10 и Bottom-10, хард-нарушения — одного
+    источника, сверху вниз на всю ширину. Всё из `report.Summary`: средние, дельты,
+    нарушения, Top/Bottom и хард посчитаны ядром, здесь только показ (P16: «нет данных»
+    и «нарушений нет» — разные вещи). -#}
+{% set kind = src.kind %}{% set prev = previous_title or '—' %}{% set v = src.violations %}
+{% if not v.has_data and src.avg is none and not src.top and not src.bottom %}
+  <div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>
+{% else %}
+<div class="rt-section">
+  <div class="pk-tiles" style="--pk-cols: 4">
+    {% call stat(t('ratings.src.avg'), t('ratings.src.avg.sub', n=src.units) if src.units else none) %}{{ num(src.avg) }} {{ dlt(src.avg_delta) }}{% endcall %}
+    {% call stat(t('ratings.src.viol'), t('ratings.src.viol.sub', x='%.2f'|format(v.per_checkup)) if v.per_checkup is not none else none) %}{% if v.has_data %}{{ v.total }}{% else %}<span class="is-empty">—</span>{% endif %}{% endcall %}
+    {% call stat(t('ratings.src.hard'), t('ratings.src.hard.sub', n=src.hard_units) if src.hard else none) %}{% if v.has_data %}{{ src.hard|length }}{% else %}<span class="is-empty">—</span>{% endif %}{% endcall %}
+    {% call stat(t('ratings.src.checked'), t('ratings.src.checked.sub') if src.registry else none) %}{% if src.registry %}{{ t('ratings.src.checked.of', n=src.units, m=src.registry) }}{% else %}{{ src.units }}{% endif %}{% endcall %}
+  </div>
+
+  <section class="pk-block">
+    <header class="pk-block__head"><h2 class="pk-block__title">{{ t('ratings.src.countries') }}</h2>
+      <span class="pk-block__hint">{{ t('ratings.col.delta', prev=prev) }}</span>
+      <span class="pk-block__count">{{ src.countries|length }}</span></header>
+    <div class="rt-scroll"><table class="rt-maps rt-src">
+      <thead><tr><th scope="col">{{ t('ratings.src.col.country') }}</th>
+        <th scope="col" class="num">{{ t('ratings.src.avg') }}</th>
+        <th scope="col" class="num">{{ t('ratings.col.delta', prev=prev) }}</th>
+        <th scope="col" class="num">{{ t('ratings.src.col.violations') }}</th>
+        <th scope="col" class="num">{{ t('ratings.src.col.hard') }}</th>
+        <th scope="col" class="num">{{ t('ratings.src.col.units') }}</th></tr></thead>
+      <tbody>{% for c in src.countries %}<tr>
+        <th scope="row">{{ country_name(c.code) }}</th>
+        <td class="num">{{ num(c.score) }}</td><td class="num">{{ dlt(c.delta) }}</td>
+        <td class="num">{{ c.violations }}</td><td class="num">{{ c.hard }}</td><td class="num">{{ c.units }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+
+  {#- Top-10 и Bottom-10 рядом: все десять строк сразу; у пиццерии — изменение к своей
+      средней за прошлый период. -#}
+  <div class="rt-pair rt-tb">
+  {% for side in ('top', 'bottom') %}{% set units = src[side] %}
+    <section class="pk-block">
+      <header class="pk-block__head"><h2 class="pk-block__title"><span class="rt-dot rt-dot--{{ 'ok' if side == 'top' else 'err' }}" aria-hidden="true"></span> {{ t('ratings.src.' ~ side) }}</h2>
+        <span class="pk-block__hint">{{ t('ratings.' ~ side, x=thr(thresholds.top_threshold)) }}</span></header>
+      {% if units %}<ol class="rt-rank rt-rank--{{ side }}">{% for u in units %}{{ rank_item(u, kind) }}{% endfor %}</ol>
+      {% elif not src.top and not src.bottom %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>
+      {% else %}<div class="rt-empty">{{ t('ratings.empty.' ~ side) }}</div>{% endif %}
+    </section>
+  {% endfor %}
+  </div>
+
+  {#- Хард-нарушения этого источника — фильтр по странам и два столбца по десять строк
+      (D585): первые 20 строк сразу, дальше «Показать ещё». Без проверок за период —
+      «нет данных», а не «чисто» (P16, P37). Разбивку на столбцы и страницы делает
+      сервер; скрипт перекладывает строки заново, когда выбрана страна. -#}
+  <section class="pk-block" data-rt-hard>
+    <header class="pk-block__head"><h2 class="pk-block__title">{{ t('ratings.src.hard.title') }}</h2>
+      <span class="pk-block__hint">{{ t('ratings.hard.source') }}</span>
+      <span class="pk-block__count">{{ src.hard|length }}</span></header>
+    <div class="rt-section__body">
+    {% if not v.has_data %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>
+    {% elif src.hard %}{{ cfilter(src.hard|map(attribute='country')|list) }}
+    <div class="rt-hard" data-rt-hard-list data-label="{{ t('ratings.more', n='{n}') }}">
+      {% for chunk in src.hard|batch(10) %}{% set first = loop.index0 * 10 %}
+      <ol class="rt-hard__col" start="{{ first + 1 }}">{% for f in chunk %}
+        <li class="rt-hard__row" data-country="{{ f.country }}">
+          <span class="rt-hard__who">{{ unit_link(f.unit, f.unit_name, kind) }}<small>{{ country_name(f.country) }}</small></span>
+          <span class="rt-hard__n is-bad" title="{{ t('ratings.col.amount') }}">{{ f.amount }}</span>
+          <span class="rt-hard__text">{{ f.text }}</span>
+        </li>{% endfor %}
+      </ol>{% endfor %}
+    </div>
+    {% if src.hard|length > 20 %}<button type="button" class="btn btn--sm rt-hard__more" data-rt-more hidden>{{ t('ratings.more', n=src.hard|length - 20) }}</button>{% endif %}
+    {% else %}<div class="rt-empty">{{ t('ratings.empty.hard') }}</div>{% endif %}
+    </div>
+  </section>
+</div>
+{% endif %}

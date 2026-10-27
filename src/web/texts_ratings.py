@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from .texts_ratings_sections import SECTION_TEXTS
+
 _SCREEN: dict[str, dict[str, str]] = {
     "section.ratings.title": {"ru": "Рейтинги", "en": "Ratings"},
     "ratings.kicker": {"ru": "РС и РКО", "en": "Standards and customer experience"},
@@ -76,54 +78,21 @@ _SCREEN: dict[str, dict[str, str]] = {
         ),
     },
     "ratings.manage": {"ru": "Настройки рейтингов", "en": "Ratings settings"},
-    "ratings.block.scores": {
-        "ru": "Средний РС и РКО",
-        "en": "Average standards and customer experience",
-    },
     "ratings.group.cluster": {"ru": "Кластер", "en": "Cluster"},
     "ratings.cluster.CEE": {"ru": "CEE", "en": "CEE"},
     "ratings.cluster.TR": {"ru": "Турция", "en": "Turkey"},
     "ratings.cluster.CAUCASUS": {"ru": "Кавказ", "en": "Caucasus"},
     "ratings.cluster.OTHER": {"ru": "Остальные страны", "en": "Other countries"},
     "ratings.countries.n": {"ru": "стран: {n}", "en": "countries: {n}"},
-    "ratings.line.title": {
-        "ru": "{p}: {v} · пиццерий: {n}",
-        "en": "{p}: {v} · pizzerias: {n}",
-    },
-    "ratings.line.aria": {
-        "ru": "{name}, {kind}: динамика по периодам рейтинга",
-        "en": "{name}, {kind}: trend by rating period",
-    },
-    "ratings.line.hint": {
-        "ru": "Точка — период рейтинга (РС — полмесяца, РКО — неделя), задевший выбранные "
-        "даты; подписи снизу — его даты. Красная линия — порог {x}; фон — зоны: "
-        "ниже 80, 80–90, от 90. "
-        "Подробнее по стране — фильтром «Страна».",
-        "en": "Each point is a rating period (RS — half a month, RKO — a week) that touches "
-        "the selected dates; the labels below are its dates. Red line — threshold {x}; "
-        "the background shows zones: below 80, 80–90, 90 and up. "
-        "For a single country, use the Country filter.",
-    },
-    "ratings.line.empty": {"ru": "За период нет данных.", "en": "No data for the period."},
     "ratings.col.country": {"ru": "Страна", "en": "Country"},
     "ratings.col.delta": {"ru": "Δ к {prev}", "en": "Δ vs {prev}"},
     "ratings.total": {"ru": "Итого", "en": "Total"},
-    "ratings.block.rko_violations": {"ru": "Нарушения РКО", "en": "Customer experience violations"},
-    "ratings.block.rs_violations": {"ru": "Нарушения РС", "en": "Standards violations"},
     "ratings.cluster": {"ru": "Топ-5", "en": "Top 5"},
-    "ratings.violations.total": {"ru": "Всего: {n}", "en": "Total: {n}"},
-    "ratings.violations.per": {"ru": "На проверку: {x}", "en": "Per check: {x}"},
     "ratings.top": {"ru": "Выше {x}", "en": "Above {x}"},
     "ratings.bottom": {"ru": "{x} и ниже", "en": "{x} and below"},
-    "ratings.block.compare": {
-        "ru": "Сравнение девелоперов и стран",
-        "en": "Developers and countries compared",
-    },
     "ratings.compare.developers": {"ru": "Девелопер", "en": "Developer"},
     "ratings.compare.countries": {"ru": "Страна", "en": "Country"},
     "ratings.compare.units": {"ru": "Пиццерий", "en": "Pizzerias"},
-    "ratings.block.top": {"ru": "Top-10 и Bottom-10", "en": "Top 10 and bottom 10"},
-    "ratings.block.hard": {"ru": "Хард-нарушения РС и РКО", "en": "Hard violations"},
     "ratings.hard.source": {
         "ru": "Формулировки — дословно из Dodo IS. РКО — фото-проверка заказа.",
         "en": "Wording is verbatim from Dodo IS. RKO is a photo check of an order.",
@@ -142,27 +111,7 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.filter.all": {"ru": "Все", "en": "All"},
     "ratings.layout.maps": {"ru": "Оценки на картах", "en": "Map ratings"},
     "ratings.layout.aggregators": {"ru": "Оценки в агрегаторах", "en": "Delivery app ratings"},
-    "ratings.tile.open": {"ru": "Развернуть", "en": "Expand"},
-    "ratings.tile.close": {"ru": "Свернуть", "en": "Collapse"},
     "ratings.more": {"ru": "Показать ещё ({n})", "en": "Show more ({n})"},
-    "ratings.tile.none": {"ru": "Данных за период нет", "en": "No data for the period"},
-    "ratings.tile.scores": {"ru": "Групп в сводке: {n}", "en": "Groups in the summary: {n}"},
-    "ratings.tile.developers": {"ru": "Девелоперов", "en": "Developers"},
-    "ratings.tile.countries": {"ru": "Стран", "en": "Countries"},
-    "ratings.tile.compare": {"ru": "Лучший РС: {name}, {x}", "en": "Best RS: {name}, {x}"},
-    "ratings.tile.violations": {
-        "ru": "Нарушений на проверку: РКО {rko}, РС {rs}",
-        "en": "Violations per checkup: RKO {rko}, RS {rs}",
-    },
-    "ratings.tile.best": {"ru": "{kind}, лучшая", "en": "{kind}, best"},
-    "ratings.tile.worst": {"ru": "{kind}, худшая", "en": "{kind}, worst"},
-    "ratings.tile.top": {"ru": "Лучшая по РС: {name}", "en": "Best by RS: {name}"},
-    "ratings.tile.hard": {
-        "ru": "Пиццерий с нарушениями: {n}",
-        "en": "Pizzerias with violations: {n}",
-    },
-    "ratings.tile.maps": {"ru": "Средняя по отзывам на картах", "en": "Average of map reviews"},
-    "ratings.tile.aggregators": {"ru": "Площадок доставки: {n}", "en": "Delivery apps: {n}"},
     "ratings.maps.hint": {
         "ru": "Средняя по всем отзывам и оценкам пиццерий группы",
         "en": "Average over all reviews and ratings of the group's pizzerias",
@@ -180,7 +129,6 @@ _SCREEN: dict[str, dict[str, str]] = {
             "selected period, showing data as of {date}."
         ),
     },
-    "ratings.block.risk": {"ru": "Стабильно ниже порога", "en": "Consistently below threshold"},
     "ratings.risk.tile": {
         "ru": "Пиццерии, стабильно низкие по любому источнику",
         "en": "Pizzerias consistently low by any source",
@@ -210,7 +158,6 @@ _SCREEN: dict[str, dict[str, str]] = {
         "en": "delivery app ratings",
     },
     "ratings.risk.unread.inspections": {"ru": "оценки наших проверок", "en": "inspection scores"},
-    "ratings.block.clients": {"ru": "Оценки клиентов", "en": "Customer ratings"},
     "ratings.clients.fig": {"ru": "Оценка в приложении", "en": "In-app rating"},
     "ratings.clients.soon": {
         "ru": "Появятся после подключения отзывов Dodo IS",
@@ -220,7 +167,6 @@ _SCREEN: dict[str, dict[str, str]] = {
         "ru": "Оценки клиентов из приложения появятся после подключения отзывов Dodo IS.",
         "en": "Customer ratings from the app will appear once Dodo IS feedback is connected.",
     },
-    "ratings.layout.clients": {"ru": "Оценки клиентов", "en": "Customer ratings"},
     "ratings.empty.rs": {
         "ru": "За период нет данных РС.",
         "en": "No standards data for this period.",
@@ -417,20 +363,6 @@ _IMPORTS: dict[str, dict[str, str]] = {
     },
     "ratings.settings.save": {"ru": "Сохранить пороги", "en": "Save thresholds"},
     "ratings.saved": {"ru": "Сохранено.", "en": "Saved."},
-    "ratings.layout": {"ru": "Компоновка страницы", "en": "Page layout"},
-    "ratings.layout.hint": {
-        "ru": "Что показывать и в каком порядке — для всех, кто смотрит рейтинги",
-        "en": "What to show and in which order — for everyone who views the ratings",
-    },
-    "ratings.layout.scores": {"ru": "Оценки по странам", "en": "Scores by country"},
-    "ratings.layout.violations": {"ru": "Нарушения РКО и РС", "en": "Violations"},
-    "ratings.layout.compare": {
-        "ru": "Сравнение девелоперов и стран (видит УК)",
-        "en": "Developers and countries compared (head office only)",
-    },
-    "ratings.layout.top": {"ru": "Top и Bottom", "en": "Top and bottom"},
-    "ratings.layout.hard": {"ru": "Хард-нарушения", "en": "Hard violations"},
-    "ratings.layout.risk": {"ru": "Пиццерии в зоне риска", "en": "Pizzerias at risk"},
     "ratings.maps.provider.2": {"ru": "Google", "en": "Google"},
     "ratings.maps.provider.1": {"ru": "Яндекс", "en": "Yandex"},
     "ratings.maps.unit_title": {
@@ -595,9 +527,6 @@ _IMPORTS: dict[str, dict[str, str]] = {
         "ru": "Не привязано: эта точка площадки уже привязана к другой пиццерии.",
         "en": "Not linked: this platform point is already linked to another pizzeria.",
     },
-    "ratings.layout.up": {"ru": "{name} — выше", "en": "Move {name} up"},
-    "ratings.layout.down": {"ru": "{name} — ниже", "en": "Move {name} down"},
-    "ratings.layout.save": {"ru": "Сохранить компоновку", "en": "Save layout"},
     "ratings.refused": {"ru": "Не сохранено: {reason}", "en": "Not saved: {reason}"},
 }
 
@@ -700,4 +629,5 @@ RATINGS_TEXTS: dict[str, dict[str, str]] = {
     **_FORMATS,
     **_ERRORS,
     **_REFUSALS,
+    **SECTION_TEXTS,
 }
