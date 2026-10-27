@@ -147,6 +147,18 @@ APP_TEXTS: dict[str, dict[str, str]] = {
             "to you. Ratings and connecting Claude are in the web admin."
         ),
     },
+    # Telegram не привязан к учётке или доступ снят (D372): бот молчит, а
+    # мини-апп говорит, где подключиться, не раскрывая, есть ли учётка.
+    "walk.err.not_linked": {
+        "ru": (
+            "Этот Telegram не подключён к учётке decimus. Войдите на сайт и в "
+            "«Настройках» нажмите «Привязать бота», или попросите доступ у администратора."
+        ),
+        "en": (
+            "This Telegram is not connected to a decimus account. Sign in on the website "
+            "and press “Connect the bot” in Settings, or ask an administrator for access."
+        ),
+    },
     "walk.app.err.lang": {"ru": "Такого языка нет.", "en": "No such language."},
     "walk.app.err.finish_mode": {"ru": "Такого режима нет.", "en": "No such mode."},
     "walk.app.err.translate_mode": {"ru": "Такого режима нет.", "en": "No such mode."},

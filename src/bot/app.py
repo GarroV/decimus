@@ -55,7 +55,8 @@ from .lang import chat_ui_lang
 from .lang_choice import PersonMiddleware
 from .material import MaterialStore
 from .pending import PendingStore
-from .roster import Roster
+from .pending_links import PendingUsernames
+from .roster import ROSTER_DIR, Roster
 from .routers import (
     build_correct_router,
     build_edit_router,
@@ -164,6 +165,7 @@ def build_dispatcher(
     on_material: MaterialHandler | None = None,
     roster: Roster | None = None,
     bindings: BindingCache | None = None,
+    pending: PendingUsernames | None = None,
 ) -> Dispatcher:
     """Диспетчер со всеми роутерами и мидлварью доступа.
 
@@ -199,7 +201,11 @@ def build_dispatcher(
     dispatcher.message.outer_middleware(person)
     dispatcher.callback_query.outer_middleware(person)
 
-    access = AccessMiddleware(bindings if bindings is not None else BindingCache(), roster)
+    access = AccessMiddleware(
+        bindings if bindings is not None else BindingCache(),
+        roster,
+        pending=pending,
+    )
     dispatcher.message.outer_middleware(access)
     dispatcher.callback_query.outer_middleware(access)
     # После доступа: внешние мидлвари идут в порядке регистрации, а заслону
@@ -396,7 +402,9 @@ async def start_polling() -> None:
     bot = create_bot(settings)
     await announce_commands(bot)
     await announce_app_button(bot, settings)
-    dispatcher = build_dispatcher(settings, roster=roster)
+    dispatcher = build_dispatcher(
+        settings, roster=roster, pending=PendingUsernames.at(domain_settings.state_dir, ROSTER_DIR)
+    )
     log_startup(settings)
     # Уборка копий кадров старше недели (#367, D179). Ссылка держится до конца
     # опроса: задачу без ссылки сборщик мусора снимает на середине.

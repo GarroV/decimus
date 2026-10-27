@@ -57,6 +57,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .inspection import read_inspection
 from .lang import chat_ui_lang
+from .pending_links import PendingUsernames
 from .roster import Roster
 from .texts import t
 
@@ -163,10 +164,12 @@ class AccessMiddleware(BaseMiddleware):
         bindings: BindingCache | None,
         roster: Roster | None,
         redeem: Callable[..., Binding | None] = bot_links.redeem,
+        pending: PendingUsernames | None = None,
     ) -> None:
         self._bindings = bindings
         self._roster = roster
         self._redeem = redeem
+        self._pending = pending
 
     async def __call__(
         self,
@@ -189,6 +192,12 @@ class AccessMiddleware(BaseMiddleware):
             return None
         space = space_from(user_id, положение, roster=self._roster)
         if space is None:
+            if (
+                положение is not None
+                and not положение.ever_bound
+                and await self._bind_pending(event, user)
+            ):
+                return None
             logger.warning("отклонено обновление от постороннего Telegram ID %s", log_id(user_id))
             return None
         data[SPACE_KEY] = space
@@ -217,6 +226,21 @@ class AccessMiddleware(BaseMiddleware):
             return
         logger.info("Telegram ID %s привязан к учётке %s", log_id(user_id), log_id(привязка.login))
         await _answer(event, "access.linked", login=привязка.login)
+
+    async def _bind_pending(self, event: TelegramObject, user: Any) -> bool:
+        """Юзернейм в списке ожидающих (`pending_links`) — привязать и ответить."""
+        login = self._pending.login_for(user.username) if self._pending is not None else None
+        if login is None:
+            return False
+        привязка = await asyncio.to_thread(bot_links.bind_by_login, login, telegram_id=user.id)
+        if self._bindings is not None:
+            self._bindings.forget(user.id)
+        if привязка is None:
+            logger.warning("привязка по юзернейму не удалась: Telegram ID %s", log_id(user.id))
+            return False
+        logger.info("Telegram ID %s привязан по юзернейму к %s", log_id(user.id), log_id(login))
+        await _answer(event, "access.linked", login=привязка.login)
+        return True
 
     def _standing_of(self, user_id: int) -> Standing | None:
         return self._bindings.standing_of(user_id) if self._bindings is not None else NEVER_BOUND

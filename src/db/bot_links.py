@@ -223,6 +223,19 @@ def redeem(token: str, *, telegram_id: int) -> Binding | None:
     return None
 
 
+_USER_BY_LOGIN_SQL = "select id::text from web_users where login = %s and disabled_at is null"
+
+
+def bind_by_login(login: str, *, telegram_id: int) -> Binding | None:
+    """Привязать Telegram ID к учётке по логину — той же дорогой, что ссылка (`redeem`)."""
+    with _connected("найти учётку по логину") as conn, conn.cursor() as cur:
+        cur.execute(_USER_BY_LOGIN_SQL, (login,))
+        row = cur.fetchone()
+    if row is None:
+        return None
+    return redeem(issue_link(row[0]).token, telegram_id=telegram_id)
+
+
 def resolve(telegram_id: int) -> Binding | None:
     """Живая привязка этого Telegram ID к живой учётке — или `None`."""
     return _one(_RESOLVE_BY_TELEGRAM_SQL, telegram_id, "опознать Telegram ID")

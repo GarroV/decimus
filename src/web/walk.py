@@ -374,7 +374,7 @@ def identify(
         chat_id = chat_of(init_data_of(), conf, lang=_browser_lang())
     except WalkAccessError as exc:
         logger.info("Обход: отказ в опознании — %s", exc)
-        return jsonify({"error": "unauthorized"}), 401
+        return jsonify({"error": "unauthorized", "texts": texts_for(ui_lang)}), 401
     if not walk_rate.CHAT_RATE.allow(chat_id, kind):
         logger.warning("Обход: чат %s превысил предел частоты (%s) — отказ", log_id(chat_id), kind)
         message = WALK_TEXTS["walk.err.too_fast"]
@@ -397,8 +397,17 @@ def identify(
         if space is None:
             # Бот этого человека не пускает (не привязан, доступ снят) — и
             # мини-апп тоже, хоть подпись и настоящая (D372).
+            # Словами, а не голыми ключами (27.10.2026): без словаря экран
+            # показывал «walk.error». Текст не говорит, есть ли учётка.
             logger.info("Обход: бот не пускает чат %s — отказ", log_id(chat_id))
-            return jsonify({"error": "unauthorized"}), 401
+            текст = WALK_TEXTS["walk.err.not_linked"]
+            return jsonify(
+                {
+                    "error": "unauthorized",
+                    "message": текст.get(ui_lang) or текст["en"],
+                    "texts": texts_for(ui_lang),
+                }
+            ), 401
     except DbError:
         logger.warning("Обход: снятие доступа не сверить — база молчит", exc_info=True)
         return jsonify({"error": "unavailable", "texts": texts_for(ui_lang)}), 503
