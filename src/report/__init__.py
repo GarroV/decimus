@@ -6,13 +6,15 @@
 `domain`.
 """
 
-from .build import build_letter, build_pdf
+from .build import BuiltLetter, build_letter, build_letter_notes, build_pdf
 from .errors import PdfNotBuilt, PhotoMissing, ReportError
 
 __all__ = [
+    "BuiltLetter",
     "PdfNotBuilt",
     "PhotoMissing",
     "ReportError",
     "build_letter",
+    "build_letter_notes",
     "build_pdf",
 ]

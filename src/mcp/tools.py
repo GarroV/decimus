@@ -610,7 +610,12 @@ def get_inspection(*, tenant: str, id: str, lang: str | None = None) -> dict[str
 
 
 def inspection_letter(
-    *, tenant: str, id: str, lang: str | None = None, fresh: bool = False
+    *,
+    tenant: str,
+    id: str,
+    lang: str | None = None,
+    fresh: bool = False,
+    template: int | None = None,
 ) -> dict[str, object]:
     """Письмо партнёру по записанной проверке: сохранённое людьми или заготовка (T171, D665).
 
@@ -675,7 +680,7 @@ def inspection_letter(
     return {
         **шапка,
         "source": "template",
-        **build(detail, lang=lang, papers=sources()),
+        **build(detail, lang=lang, papers=sources(), template=template),
     }
 
 

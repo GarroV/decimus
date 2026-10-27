@@ -44,7 +44,7 @@ from src.domain.errors import ChecklistVersionMismatch, DomainError
 from src.domain.handover import HandedOverError
 from src.domain.log_ids import log_id
 from src.domain.translation import untranslated
-from src.report import PhotoMissing, ReportError, build_letter, build_pdf
+from src.report import PhotoMissing, ReportError, build_letter_notes, build_pdf
 
 from .. import item_labels, sealed, sidecar, stops, view
 from ..errors import BotNotesError
@@ -474,14 +474,26 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
         except (DomainError, OSError):
             logger.exception("накопитель чата %s не уехал в историю", log_id(chat_id))
         try:
-            letter = await asyncio.to_thread(build_letter, chat_id)
+            letter = await asyncio.to_thread(build_letter_notes, chat_id)
         except ReportError:
             # Свой текст, а не тот же: отчёт аудитор к этому моменту уже
             # получил, и «отчёт не собрался» было бы неправдой (T151).
             logger.exception("письмо чата %s не собралось", log_id(chat_id))
             await message.answer(t("finish.letter_failed", lang))
         else:
-            await message.answer(t("finish.letter", lang, letter=letter))
+            await message.answer(t("finish.letter", lang, letter=letter.text))
+            # Обратная связь аудитора записана не на языке письма: в письме и в PDF
+            # её нет, и молчать об этом нельзя (D663) — отдельным сообщением под
+            # письмом, чтобы не попасть в текст, который копируют партнёру.
+            if letter.feedback_skipped:
+                await message.answer(
+                    t(
+                        "finish.feedback_skipped",
+                        lang,
+                        recorded=letter.feedback_lang,
+                        letter_lang=inspection.report_lang,
+                    )
+                )
 
         # После отчёта, а не вместо: не собравшееся письмо проверку в истории
         # не отменяет — она завершена ровно тем, что документ уже у аудитора.

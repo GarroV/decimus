@@ -1009,6 +1009,23 @@ TEXTS: dict[str, dict[str, str]] = {
             "finding wordings in any letter language: they are the auditor's own words."
         ),
     },
+    "letter.template.label": {"ru": "Шаблон", "en": "Template"},
+    "letter.template.pick": {"ru": "Шаблон письма", "en": "Letter template"},
+    "letter.template.option": {"ru": "Шаблон {n}", "en": "Template {n}"},
+    "letter.template.note": {
+        "ru": (
+            "Шаблон 1: сильные стороны после оценки, зоны роста после нарушений. "
+            "Шаблон 2: нарушения как обычно, обе части обратной связи в конце письма. "
+            "Выбор пересобирает текст в поле; сохранённое письмо остаётся, пока вы не "
+            "нажмёте «Сохранить»."
+        ),
+        "en": (
+            "Template 1: the store's strengths right after the grade, growth areas after the "
+            "violations. Template 2: violations as usual, both feedback parts at the end of "
+            "the letter. Choosing rebuilds the text in the field; the saved letter stays "
+            "until you press Save."
+        ),
+    },
     "letter.meta.source": {"ru": "Методика", "en": "Methodology"},
     "letter.meta.score": {"ru": "Оценка сошлась с записанной", "en": "Score matches the record"},
     "letter.source.snapshot": {
@@ -1067,6 +1084,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": (
             "some wordings are printed in the auditor's speech language: nobody "
             "translates them, they are the auditor's own words"
+        ),
+    },
+    "letter.caveat.feedback_lang": {
+        "ru": (
+            "обратная связь аудитора («сильные стороны» и «зоны роста») записана не на языке "
+            "письма — в письмо она не вставлена: её слова не переводит никто. Добавьте "
+            "перевод вручную или соберите письмо на языке записи"
+        ),
+        "en": (
+            "the auditor's feedback (strengths and growth areas) is recorded in a language "
+            "other than the letter's — it was not inserted: nobody translates the auditor's "
+            "words. Add a translation by hand or build the letter in the language it was "
+            "written in"
         ),
     },
     "letter.caveat.blank": {

@@ -203,7 +203,7 @@ def test_черновик_в_чужой_аккаунт_google_не_ложитс�
     monkeypatch.setattr(
         data,
         "load_letter",
-        lambda detail, *, lang=None: data.Letter(
+        lambda detail, *, lang=None, template=None: data.Letter(
             text="Заготовка", lang="ru", source="pinned", ready=True, caveats=(), failure=None
         ),
     )
@@ -250,7 +250,7 @@ def test_кнопка_есть_на_экране_письма(
     monkeypatch.setattr(
         data,
         "load_letter",
-        lambda detail, *, lang=None: data.Letter(
+        lambda detail, *, lang=None, template=None: data.Letter(
             text="Заготовка письма",
             lang="ru",
             source="pinned",
@@ -285,7 +285,7 @@ def test_у_проверки_чужого_пространства_нет_кно
     monkeypatch.setattr(
         data,
         "load_letter",
-        lambda detail, *, lang=None: data.Letter(
+        lambda detail, *, lang=None, template=None: data.Letter(
             text="Заготовка письма",
             lang="ru",
             source="pinned",

@@ -237,6 +237,7 @@ def add_checklist_item(
     days: int | None = None,
     criteria: str | None = None,
     kind: str | None = None,
+    letter_role: str | None = None,
     version_name: str | None = None,
     note: str | None = None,
 ) -> dict[str, Any]:
@@ -264,6 +265,7 @@ def add_checklist_item(
             "days": days,
             "criteria": criteria,
             "kind": _kind(kind),
+            "letter-role": letter_role,
         },
         version_name=version_name,
         note=note,
@@ -283,6 +285,7 @@ def edit_checklist_item(
     zones: str | None = None,
     days: int | None = None,
     criteria: str | None = None,
+    letter_role: str | None = None,
     version_name: str | None = None,
     note: str | None = None,
 ) -> dict[str, Any]:
@@ -307,6 +310,7 @@ def edit_checklist_item(
             "zones": zones,
             "days": days,
             "criteria": criteria,
+            "letter-role": letter_role,
         },
         version_name=version_name,
         note=note,

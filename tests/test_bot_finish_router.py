@@ -353,7 +353,7 @@ async def test_failed_letter_is_reported_after_the_pdf_was_already_sent(
     def отказ(*_a: object, **_k: object) -> str:
         raise ReportError("шаблон письма не прочитался")
 
-    monkeypatch.setattr("src.bot.routers.finish.build_letter", отказ)
+    monkeypatch.setattr("src.bot.routers.finish.build_letter_notes", отказ)
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
@@ -367,6 +367,37 @@ async def test_failed_letter_is_reported_after_the_pdf_was_already_sent(
     assert "шаблон письма не прочитался" in caplog.text, "причина не записана в журнал"
     # Свой текст, а не «отчёт не собрался»: документ аудитор уже получил (T151).
     assert session.last_text == t("finish.letter_failed", "ru")
+
+
+async def test_feedback_in_another_language_is_warned_next_to_the_letter(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Обратная связь записана не на языке письма — бот говорит это сразу под письмом (D663).
+
+    Блок в письмо и PDF не вставлен: слова аудитора не переводятся. Молчание
+    оставило бы аудитора с письмом, которое выглядит полным.
+    """
+    from src.report.build import BuiltLetter
+
+    started()
+    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+    monkeypatch.setattr(
+        "src.bot.routers.finish.build_letter_notes",
+        lambda *_a, **_k: BuiltLetter("Текст письма", ("strengths", "growth"), "en"),
+    )
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await feed(dp, bot, text_message("/finish"))
+    session.clear()
+    await build_report(dp, bot)
+
+    texts = session.texts
+    letter_at = next(i for i, x in enumerate(texts) if "Текст письма" in x)
+    assert (
+        t("finish.feedback_skipped", "ru", recorded="en", letter_lang="ru")
+        in texts[letter_at + 1 :]
+    ), "предупреждение о не вставленной обратной связи не показано"
 
 
 # --- язык отчёта спрашивается в конце (D415) ---------------------------------

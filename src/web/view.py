@@ -18,6 +18,7 @@ from typing import Any
 from src.report.letters import (
     BLANK_TEXT_FIELD,
     COVER_FIELDS,
+    FEEDBACK_LANG_FIELD,
     FINDING_TEXT_FIELD,
     FROM_LIVE,
     FROM_SHELF,
@@ -194,6 +195,7 @@ _LETTER_CAVEATS = {
     PLAN_DUE_FIELD: "letter.caveat.plan_due",
     FINDING_TEXT_FIELD: "letter.caveat.speech_lang",
     BLANK_TEXT_FIELD: "letter.caveat.blank",
+    FEEDBACK_LANG_FIELD: "letter.caveat.feedback_lang",
 }
 
 #: Откуда взята методика письма → ключ подписи. Сборщик отвечает на это

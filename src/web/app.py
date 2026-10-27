@@ -274,7 +274,7 @@ def _lang(conf: Settings) -> str:
 
 
 #: Параметры одного показа панели — на следующий адрес не переносятся.
-_PANEL_ONCE = ("saved", "gmail", "draft", "letter_lang", "view")
+_PANEL_ONCE = ("saved", "gmail", "draft", "letter_lang", "letter_template", "view")
 
 
 def _registry_here(**changes: str) -> str:
@@ -1456,10 +1456,26 @@ def _letter_panel_url(inspection_id: str, **params: Any) -> str:
     return url_for("registry", inspection=inspection_id, view="letter", **params)
 
 
+def _letter_template_arg() -> int | None:
+    """Шаблон письма из адреса: 1 или 2. Не назван или не из перечня — `None` (шаблон 1).
+
+    Ввод снаружи: незнакомое значение не ломает страницу и не выбирает что-то
+    наугад, а оставляет шаблон по умолчанию.
+    """
+    raw = request.args.get("letter_template")
+    if raw is None or not raw.isdigit() or int(raw) not in data.LETTER_TEMPLATES:
+        return None
+    return int(raw)
+
+
 def _letter_view(detail: Any, *, lang: str) -> dict[str, Any]:
     """Всё, что рисует письмо партнёру, — страницей и в панели реестра (одно тело)."""
     письмо_на = request.args.get("letter_lang") or None
-    собранное = data.load_letter(detail, lang=письмо_на)
+    # Шаблон письма (D664) выбирает отправитель. Явный выбор — действие человека:
+    # поле показывает пересобранный текст, а сохранённое письмо остаётся в
+    # истории нетронутым, пока он сам не нажмёт «Сохранить» (как «Вернуть заготовку»).
+    шаблон = _letter_template_arg()
+    собранное = data.load_letter(detail, lang=письмо_на, template=шаблон)
     # Зафиксированное письмо СИЛЬНЕЕ заготовки: у партнёра на руках лежит
     # один текст, и показать вместо него сегодняшнюю пересборку значит
     # ответить на «что мы отправили» правдоподобной неправдой. Заготовка
@@ -1483,7 +1499,7 @@ def _letter_view(detail: Any, *, lang: str) -> dict[str, Any]:
     # Поэтому режим показывает свежесобранный движком текст в поле, но
     # зафиксированное письмо остаётся на месте и остаётся видно, кем и
     # когда оно записано. Новая правка ложится новой записью.
-    показать_заготовку = request.args.get("draft") == "1"
+    показать_заготовку = request.args.get("draft") == "1" or шаблон is not None
     # Поле правит РАЗМЕТКУ письма (`letter_markup`): заготовка движка —
     # простой текст и становится разметкой экранированием, записанное
     # письмо уже разметка и проходит белый список заново.
@@ -1505,6 +1521,9 @@ def _letter_view(detail: Any, *, lang: str) -> dict[str, Any]:
         head=detail.inspection,
         letter_langs=data.LETTER_LANGS,
         letter_lang=письмо_на or detail.inspection.report_lang,
+        letter_templates=data.LETTER_TEMPLATES,
+        letter_template=шаблон or data.LETTER_TEMPLATES[0],
+        letter_template_explicit=шаблон is not None,
         caveats=view.letter_caveats(собранное.caveats, lang),
         source=None if собранное.source is None else view.letter_source(собранное.source, lang),
     )
