@@ -44,6 +44,7 @@ from . import (
     retraction,
     tools,
 )
+from .annotations import annotations_for
 from .confirm import TOKEN_ARGUMENT
 from .import_catalogue import IMPORT_TOOLS
 
@@ -2546,13 +2547,19 @@ def find(name: str) -> ToolSpec | None:
 
 
 def as_list(open_tool: Callable[[ToolSpec], bool] | None = None) -> list[dict[str, object]]:
-    """Каталог в форме ответа MCP `tools/list`: ровно `name`/`description`/`inputSchema`.
+    """Каталог в форме ответа MCP `tools/list`: `name`/`description`/`inputSchema`/`annotations`.
 
     `open_tool` — фильтр по инструменту (права роли, `policy.permits_tool`, D417);
     без него — каталог целиком, как у служебного токена `.env`.
     """
     return [
-        {"name": spec.name, "description": spec.description, "inputSchema": spec.input_schema}
+        {
+            "name": spec.name,
+            "description": spec.description,
+            "inputSchema": spec.input_schema,
+            # Класса нет только у забытого инструмента: тест его не пропустит.
+            **({"annotations": ann} if (ann := annotations_for(spec.name)) else {}),
+        }
         for spec in TOOLS
         if open_tool is None or open_tool(spec)
     ]

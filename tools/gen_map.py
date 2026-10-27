@@ -294,6 +294,7 @@ def gen_routes(_args: list[str]) -> list[str]:
 
 
 def gen_mcp(_args: list[str]) -> list[str]:
+    from src.mcp.annotations import TOOL_CLASSES
     from src.mcp.catalogue import TOOLS
 
     specs = sorted(TOOLS, key=lambda t: (t.kind, t.name))
@@ -305,6 +306,7 @@ def gen_mcp(_args: list[str]) -> list[str]:
         (
             f"`{s.name}`",
             s.kind,
+            TOOL_CLASSES[s.name].kind,
             _cell(first_sentence(s.description, 120)),
             f"`{_unwrapped_file(s.handler)}`",
         )
@@ -313,7 +315,9 @@ def gen_mcp(_args: list[str]) -> list[str]:
     return [
         f"Всего **{len(specs)}** инструментов ({summary}).",
         "",
-        *table(("Инструмент", "Вид", "Что делает (описание для агента)", "Обработчик"), rows),
+        *table(
+            ("Инструмент", "Вид", "Класс", "Что делает (описание для агента)", "Обработчик"), rows
+        ),
     ]
 
 

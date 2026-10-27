@@ -250,88 +250,88 @@
 <!-- map:begin mcp -->
 Всего **80** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 6, letter — 1, move — 1, plan — 11, ratings — 2, ratings_read — 4, retraction — 1).
 
-| Инструмент | Вид | Что делает (описание для агента) | Обработчик |
-|---|---|---|---|
-| `add_checklist_item` | checklist | Add a checklist item | `src/mcp/checklist_tools.py` |
-| `add_photo_cue` | checklist | Add one cue row to the synonym dictionary, storing a new methodology version beside the one in force — the version in… | `src/mcp/checklist_tools.py` |
-| `add_zone` | checklist | Add a physical zone (e.g | `src/mcp/checklist_tools.py` |
-| `apply_checklist` | checklist | Apply a checklist to production: inspections are scored against it from now on | `src/mcp/checklists_tools.py` |
-| `checklist_item` | checklist | Read one checklist item together with its D1/D2/D3 criteria — the only source of what makes a finding D1 versus D2… | `src/mcp/checklist_tools.py` |
-| `checklist_items` | checklist | List the checklist items of one methodology version, in file order, together with the version's zones | `src/mcp/checklist_tools.py` |
-| `checklist_meta` | checklist | Read one checklist's card: code, both names, state, whether it is applied to production and which edition it publishes | `src/mcp/checklists_tools.py` |
-| `checklist_versions` | checklist | List every stored checklist version, newest first | `src/mcp/checklist_tools.py` |
-| `checklists` | checklist | List the checklists visible to this tenant: code, names, state (draft / active / retired) and which one is applied to… | `src/mcp/checklists_tools.py` |
-| `create_checklist` | checklist | Create a new checklist from the blank: an empty item list, one zone at 100 per cent and blank scoring rates | `src/mcp/checklists_tools.py` |
-| `edit_checklist_item` | checklist | Edit fields of an existing checklist item | `src/mcp/checklist_tools.py` |
-| `edit_photo_cue` | checklist | Change one cue row of the synonym dictionary — its codes, its phrase, or both — storing a new methodology version… | `src/mcp/checklist_tools.py` |
-| `learned_phrases` | checklist | Show the synonym map: the wordings auditors actually used on site that the product has learned, and the checklist item… | `src/mcp/phrases.py` |
-| `photo_cue_suggestions` | checklist | Report where the model has been systematically wrong, and propose what to add to the synonym dictionary because of it | `src/mcp/checklist_tools.py` |
-| `photo_cues` | checklist | Read the synonym dictionary of one methodology version: the sections and the cue rows inside them, each a phrase an… | `src/mcp/checklist_tools.py` |
-| `publish_checklist_version` | checklist | Make a stored checklist version the one the audit engine scores inspections by | `src/mcp/checklist_tools.py` |
-| `remove_checklist_item` | checklist | Disable a checklist item | `src/mcp/checklist_tools.py` |
-| `remove_photo_cue` | checklist | Remove one cue row from the synonym dictionary, storing a new methodology version beside the one in force | `src/mcp/checklist_tools.py` |
-| `remove_zone` | checklist | Remove a physical zone | `src/mcp/checklist_tools.py` |
-| `rename_checklist` | checklist | Change a checklist's names | `src/mcp/checklists_tools.py` |
-| `rename_zone` | checklist | Rename a zone: change the Russian and/or English name the auditor sees on site and the partner reads in the report | `src/mcp/checklist_tools.py` |
-| `repoint_learned_phrase` | checklist | Point a learned wording at a different checklist item — and bring a retracted one back into work | `src/mcp/phrases.py` |
-| `restore_checklist_item` | checklist | Re-enable a checklist item previously disabled by remove_checklist_item | `src/mcp/checklist_tools.py` |
-| `retract_learned_phrase` | checklist | Retract a learned wording from the synonym map, so that it stops matching and stops proposing a record | `src/mcp/phrases.py` |
-| `route` | checklist | Read the walking route of one methodology version: the order in which the auditor physically walks the pizzeria … | `src/mcp/checklist_tools.py` |
-| `scoring` | checklist | Read the deduction rates of a checklist edition: the starting percentage, the price of each violation class and the… | `src/mcp/checklist_tools.py` |
-| `set_checklist_bot_access` | checklist | Open a checklist to auditors in the Telegram bot, or close it | `src/mcp/checklists_tools.py` |
-| `set_checklist_state` | checklist | Set a checklist's state: draft, active or retired | `src/mcp/checklists_tools.py` |
-| `set_photo_cue_zone` | checklist | Set the object's zone on one cue row of the synonym dictionary, storing a new methodology version beside the one in… | `src/mcp/checklist_tools.py` |
-| `set_route` | checklist | Set the walking route: the order in which the auditor goes through the pizzeria | `src/mcp/checklist_tools.py` |
-| `set_scoring` | checklist | Set the deduction rates of the checklist: starting percentage, the price of a D1 and of a D2 violation, and how much… | `src/mcp/checklist_tools.py` |
-| `set_zone_shares` | checklist | Set the share (weight in the score) of zones that already exist | `src/mcp/checklist_tools.py` |
-| `uncovered_phrases` | checklist | List the words auditors say on site that still produce no record, most frequent first, with the zone each was said in… | `src/mcp/checklist_tools.py` |
-| `checklist_source` | checklist_source | Read the checklist the caller is audited against: its items (what is checked), the violation classes each item can… | `src/mcp/checklist_source.py` |
-| `checklist_source_item` | checklist_source | Read one item of the checklist the caller is audited against, together with the D1/D2/D3 criteria that decide which… | `src/mcp/checklist_source.py` |
-| `create_unit` | import | Add a NEW unit (pizzeria) to the unit directory — for when import_create_inspection says the unit does not exist | `src/mcp/imports.py` |
-| `import_accept_inspection` | import | Accept an imported draft after the person has checked it (the person who imported it accepts it) | `src/mcp/imports.py` |
-| `import_add_finding` | import | Add one finding from the report to an imported draft | `src/mcp/imports.py` |
-| `import_add_findings` | import | Add SEVERAL findings to an imported draft in one call (up to 50) | `src/mcp/import_batch.py` |
-| `import_add_photo` | import | Attach a photo from the old report to one finding of an imported draft | `src/mcp/imports.py` |
-| `import_clear_photos` | import | Remove ALL photos of ONE finding of an imported DRAFT | `src/mcp/import_photos.py` |
-| `import_create_inspection` | import | Start entering ONE inspection after the fact: creates a DRAFT with no findings | `src/mcp/imports.py` |
-| `import_discard_draft` | import | Delete an imported DRAFT entirely, with its findings and photos — e.g | `src/mcp/imports.py` |
-| `import_edit_finding` | import | Correct one finding of an imported draft by its number n | `src/mcp/imports.py` |
-| `import_edit_inspection` | import | Correct the HEADER of an imported DRAFT before it is accepted: the inspection date, the unit (pizzeria), the auditor… | `src/mcp/imports.py` |
-| `import_get_inspection` | import | Read an imported inspection (draft or accepted): its mode, header and findings with their numbers | `src/mcp/imports.py` |
-| `import_info_fields` | import | Read the INFORMATION part of a current-mode imported DRAFT: the fields the bot asks at the end of an inspection and the… | `src/mcp/import_info.py` |
-| `import_list_drafts` | import | List this space's imported drafts that are not accepted yet: mode (history/current), unit, date, checklist version… | `src/mcp/imports.py` |
-| `import_match_findings` | import | Read-only: for ALL dictated findings at once (up to 50), pick the checklist item, class and zone with the SAME pipeline… | `src/mcp/import_match.py` |
-| `import_remove_finding` | import | Remove one finding (with its photos) from an imported draft by its number n | `src/mcp/imports.py` |
-| `import_remove_photo` | import | Remove ONE photo from a finding of an imported DRAFT — e.g | `src/mcp/import_photos.py` |
-| `import_set_info` | import | Record answers to information fields of a current-mode imported DRAFT (values = {code: answer}) | `src/mcp/import_info.py` |
-| `import_suggest_items` | import | Read-only: pick the checklist item, class and zone for ONE finding — the same pipeline as import_match_findings and the… | `src/mcp/import_suggest.py` |
-| `import_upload_photos` | import | Upload the photos attached to the chat to ONE imported draft | `src/mcp/import_photo_link.py` |
-| `findings_by_unit` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
-| `get_inspection` | inspections | Read one recorded inspection of the caller's tenant in full: its header, the score breakdown (percentage, letter grade… | `src/mcp/tools.py` |
-| `inspection_letter` | inspections | Read the partner letter of one recorded inspection of the caller's tenant, as text for a human to paste into mail and… | `src/mcp/tools.py` |
-| `list_inspections` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
-| `network_summary` | inspections | Summarize the caller's tenant network over a date range: how many inspections and units, total findings, the… | `src/mcp/tools.py` |
-| `unit_history` | inspections | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
-| `save_inspection_letter` | letter | Save the partner letter into one recorded inspection of the caller's space, the same way the Save button on the site… | `src/mcp/letter_save.py` |
-| `move_inspection` | move | Correct the date and/or the unit (pizzeria) of an inspection that is already accepted (or waiting for acceptance) — the… | `src/mcp/move.py` |
-| `accept_action_plan` | plan | Accept an action plan that waits for review: it goes to work and the partner is notified | `src/mcp/plans.py` |
-| `confirm_plan_row` | plan | Confirm a plan row the partner marked done; when the last row is confirmed the plan closes | `src/mcp/plans.py` |
-| `fill_plan_row` | plan | Fill a plan row while the plan waits for rows: measure (what we do), responsible, reason and the own due date… | `src/mcp/plans.py` |
-| `finish_plan_row` | plan | Mark a plan row 'done': it goes to the management company for confirmation | `src/mcp/plans.py` |
-| `get_action_plan` | plan | One action plan: header, the comment of the last return, and its rows — each with item code, class (D1-D3), zone, the… | `src/mcp/plans.py` |
-| `list_action_plans` | plan | List correction (action) plans in your scope: a partner sees plans of its countries, the management company sees all | `src/mcp/plans.py` |
-| `return_action_plan` | plan | Return an action plan that waits for review to the partner for rework, with a mandatory comment (what to fix) the… | `src/mcp/plans.py` |
-| `return_plan_row` | plan | Return a plan row the partner marked done, with a mandatory reason (what is wrong) the partner sees | `src/mcp/plans.py` |
-| `set_plan_count_from` | plan | Move the start of the countdown of an action plan (D613): the plan due date and the due dates of all rows except… | `src/mcp/plans.py` |
-| `start_plan_row` | plan | Mark a row of an accepted plan 'taken into work' | `src/mcp/plans.py` |
-| `submit_action_plan` | plan | Send the filled action plan to the management company for review | `src/mcp/plans.py` |
-| `import_ratings` | ratings | Upload a ratings file into Decimus (standards and customer-experience ratings, IMF only) | `src/mcp/ratings_tools.py` |
-| `request_aggregators_update` | ratings | Запросить внеочередное обновление оценок пиццерий в агрегаторах доставки (Wolt, Glovo, Bolt Food, Yemeksepeti, Trendyol… | `src/mcp/ratings_tools.py` |
-| `aggregators_status` | ratings_read | Состояние сбора оценок в агрегаторах доставки: по каждому — когда был последний сбор, чем кончился (ok, failed или… | `src/mcp/ratings_read.py` |
-| `ratings_summary` | ratings_read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
-| `ratings_unit_periods` | ratings_read | Разбивка одной пиццерии по периодам рейтинга РС и РКО — рейтингов Dodo из таблицы контроля «база рейтингов» и выгрузок… | `src/mcp/ratings_read.py` |
-| `ratings_units` | ratings_read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
-| `retract_inspection` | retraction | Retract a finalized inspection from the history | `src/mcp/retraction.py` |
+| Инструмент | Вид | Класс | Что делает (описание для агента) | Обработчик |
+|---|---|---|---|---|
+| `add_checklist_item` | checklist | write | Add a checklist item | `src/mcp/checklist_tools.py` |
+| `add_photo_cue` | checklist | write | Add one cue row to the synonym dictionary, storing a new methodology version beside the one in force — the version in… | `src/mcp/checklist_tools.py` |
+| `add_zone` | checklist | write | Add a physical zone (e.g | `src/mcp/checklist_tools.py` |
+| `apply_checklist` | checklist | destructive | Apply a checklist to production: inspections are scored against it from now on | `src/mcp/checklists_tools.py` |
+| `checklist_item` | checklist | read | Read one checklist item together with its D1/D2/D3 criteria — the only source of what makes a finding D1 versus D2… | `src/mcp/checklist_tools.py` |
+| `checklist_items` | checklist | read | List the checklist items of one methodology version, in file order, together with the version's zones | `src/mcp/checklist_tools.py` |
+| `checklist_meta` | checklist | read | Read one checklist's card: code, both names, state, whether it is applied to production and which edition it publishes | `src/mcp/checklists_tools.py` |
+| `checklist_versions` | checklist | read | List every stored checklist version, newest first | `src/mcp/checklist_tools.py` |
+| `checklists` | checklist | read | List the checklists visible to this tenant: code, names, state (draft / active / retired) and which one is applied to… | `src/mcp/checklists_tools.py` |
+| `create_checklist` | checklist | write | Create a new checklist from the blank: an empty item list, one zone at 100 per cent and blank scoring rates | `src/mcp/checklists_tools.py` |
+| `edit_checklist_item` | checklist | write | Edit fields of an existing checklist item | `src/mcp/checklist_tools.py` |
+| `edit_photo_cue` | checklist | write | Change one cue row of the synonym dictionary — its codes, its phrase, or both — storing a new methodology version… | `src/mcp/checklist_tools.py` |
+| `learned_phrases` | checklist | read | Show the synonym map: the wordings auditors actually used on site that the product has learned, and the checklist item… | `src/mcp/phrases.py` |
+| `photo_cue_suggestions` | checklist | read | Report where the model has been systematically wrong, and propose what to add to the synonym dictionary because of it | `src/mcp/checklist_tools.py` |
+| `photo_cues` | checklist | read | Read the synonym dictionary of one methodology version: the sections and the cue rows inside them, each a phrase an… | `src/mcp/checklist_tools.py` |
+| `publish_checklist_version` | checklist | destructive | Make a stored checklist version the one the audit engine scores inspections by | `src/mcp/checklist_tools.py` |
+| `remove_checklist_item` | checklist | destructive | Disable a checklist item | `src/mcp/checklist_tools.py` |
+| `remove_photo_cue` | checklist | destructive | Remove one cue row from the synonym dictionary, storing a new methodology version beside the one in force | `src/mcp/checklist_tools.py` |
+| `remove_zone` | checklist | destructive | Remove a physical zone | `src/mcp/checklist_tools.py` |
+| `rename_checklist` | checklist | write | Change a checklist's names | `src/mcp/checklists_tools.py` |
+| `rename_zone` | checklist | write | Rename a zone: change the Russian and/or English name the auditor sees on site and the partner reads in the report | `src/mcp/checklist_tools.py` |
+| `repoint_learned_phrase` | checklist | destructive | Point a learned wording at a different checklist item — and bring a retracted one back into work | `src/mcp/phrases.py` |
+| `restore_checklist_item` | checklist | write | Re-enable a checklist item previously disabled by remove_checklist_item | `src/mcp/checklist_tools.py` |
+| `retract_learned_phrase` | checklist | destructive | Retract a learned wording from the synonym map, so that it stops matching and stops proposing a record | `src/mcp/phrases.py` |
+| `route` | checklist | read | Read the walking route of one methodology version: the order in which the auditor physically walks the pizzeria … | `src/mcp/checklist_tools.py` |
+| `scoring` | checklist | read | Read the deduction rates of a checklist edition: the starting percentage, the price of each violation class and the… | `src/mcp/checklist_tools.py` |
+| `set_checklist_bot_access` | checklist | write | Open a checklist to auditors in the Telegram bot, or close it | `src/mcp/checklists_tools.py` |
+| `set_checklist_state` | checklist | destructive | Set a checklist's state: draft, active or retired | `src/mcp/checklists_tools.py` |
+| `set_photo_cue_zone` | checklist | write | Set the object's zone on one cue row of the synonym dictionary, storing a new methodology version beside the one in… | `src/mcp/checklist_tools.py` |
+| `set_route` | checklist | destructive | Set the walking route: the order in which the auditor goes through the pizzeria | `src/mcp/checklist_tools.py` |
+| `set_scoring` | checklist | destructive | Set the deduction rates of the checklist: starting percentage, the price of a D1 and of a D2 violation, and how much… | `src/mcp/checklist_tools.py` |
+| `set_zone_shares` | checklist | destructive | Set the share (weight in the score) of zones that already exist | `src/mcp/checklist_tools.py` |
+| `uncovered_phrases` | checklist | read | List the words auditors say on site that still produce no record, most frequent first, with the zone each was said in… | `src/mcp/checklist_tools.py` |
+| `checklist_source` | checklist_source | read | Read the checklist the caller is audited against: its items (what is checked), the violation classes each item can… | `src/mcp/checklist_source.py` |
+| `checklist_source_item` | checklist_source | read | Read one item of the checklist the caller is audited against, together with the D1/D2/D3 criteria that decide which… | `src/mcp/checklist_source.py` |
+| `create_unit` | import | write | Add a NEW unit (pizzeria) to the unit directory — for when import_create_inspection says the unit does not exist | `src/mcp/imports.py` |
+| `import_accept_inspection` | import | destructive | Accept an imported draft after the person has checked it (the person who imported it accepts it) | `src/mcp/imports.py` |
+| `import_add_finding` | import | write | Add one finding from the report to an imported draft | `src/mcp/imports.py` |
+| `import_add_findings` | import | write | Add SEVERAL findings to an imported draft in one call (up to 50) | `src/mcp/import_batch.py` |
+| `import_add_photo` | import | write | Attach a photo from the old report to one finding of an imported draft | `src/mcp/imports.py` |
+| `import_clear_photos` | import | destructive | Remove ALL photos of ONE finding of an imported DRAFT | `src/mcp/import_photos.py` |
+| `import_create_inspection` | import | write | Start entering ONE inspection after the fact: creates a DRAFT with no findings | `src/mcp/imports.py` |
+| `import_discard_draft` | import | destructive | Delete an imported DRAFT entirely, with its findings and photos — e.g | `src/mcp/imports.py` |
+| `import_edit_finding` | import | write | Correct one finding of an imported draft by its number n | `src/mcp/imports.py` |
+| `import_edit_inspection` | import | write | Correct the HEADER of an imported DRAFT before it is accepted: the inspection date, the unit (pizzeria), the auditor… | `src/mcp/imports.py` |
+| `import_get_inspection` | import | read | Read an imported inspection (draft or accepted): its mode, header and findings with their numbers | `src/mcp/imports.py` |
+| `import_info_fields` | import | read | Read the INFORMATION part of a current-mode imported DRAFT: the fields the bot asks at the end of an inspection and the… | `src/mcp/import_info.py` |
+| `import_list_drafts` | import | read | List this space's imported drafts that are not accepted yet: mode (history/current), unit, date, checklist version… | `src/mcp/imports.py` |
+| `import_match_findings` | import | read | Read-only: for ALL dictated findings at once (up to 50), pick the checklist item, class and zone with the SAME pipeline… | `src/mcp/import_match.py` |
+| `import_remove_finding` | import | destructive | Remove one finding (with its photos) from an imported draft by its number n | `src/mcp/imports.py` |
+| `import_remove_photo` | import | destructive | Remove ONE photo from a finding of an imported DRAFT — e.g | `src/mcp/import_photos.py` |
+| `import_set_info` | import | write | Record answers to information fields of a current-mode imported DRAFT (values = {code: answer}) | `src/mcp/import_info.py` |
+| `import_suggest_items` | import | read | Read-only: pick the checklist item, class and zone for ONE finding — the same pipeline as import_match_findings and the… | `src/mcp/import_suggest.py` |
+| `import_upload_photos` | import | write | Upload the photos attached to the chat to ONE imported draft | `src/mcp/import_photo_link.py` |
+| `findings_by_unit` | inspections | read | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
+| `get_inspection` | inspections | read | Read one recorded inspection of the caller's tenant in full: its header, the score breakdown (percentage, letter grade… | `src/mcp/tools.py` |
+| `inspection_letter` | inspections | read | Read the partner letter of one recorded inspection of the caller's tenant, as text for a human to paste into mail and… | `src/mcp/tools.py` |
+| `list_inspections` | inspections | read | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
+| `network_summary` | inspections | read | Summarize the caller's tenant network over a date range: how many inspections and units, total findings, the… | `src/mcp/tools.py` |
+| `unit_history` | inspections | read | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
+| `save_inspection_letter` | letter | write | Save the partner letter into one recorded inspection of the caller's space, the same way the Save button on the site… | `src/mcp/letter_save.py` |
+| `move_inspection` | move | write | Correct the date and/or the unit (pizzeria) of an inspection that is already accepted (or waiting for acceptance) — the… | `src/mcp/move.py` |
+| `accept_action_plan` | plan | write | Accept an action plan that waits for review: it goes to work and the partner is notified | `src/mcp/plans.py` |
+| `confirm_plan_row` | plan | write | Confirm a plan row the partner marked done; when the last row is confirmed the plan closes | `src/mcp/plans.py` |
+| `fill_plan_row` | plan | write | Fill a plan row while the plan waits for rows: measure (what we do), responsible, reason and the own due date… | `src/mcp/plans.py` |
+| `finish_plan_row` | plan | write | Mark a plan row 'done': it goes to the management company for confirmation | `src/mcp/plans.py` |
+| `get_action_plan` | plan | read | One action plan: header, the comment of the last return, and its rows — each with item code, class (D1-D3), zone, the… | `src/mcp/plans.py` |
+| `list_action_plans` | plan | read | List correction (action) plans in your scope: a partner sees plans of its countries, the management company sees all | `src/mcp/plans.py` |
+| `return_action_plan` | plan | write | Return an action plan that waits for review to the partner for rework, with a mandatory comment (what to fix) the… | `src/mcp/plans.py` |
+| `return_plan_row` | plan | write | Return a plan row the partner marked done, with a mandatory reason (what is wrong) the partner sees | `src/mcp/plans.py` |
+| `set_plan_count_from` | plan | write | Move the start of the countdown of an action plan (D613): the plan due date and the due dates of all rows except… | `src/mcp/plans.py` |
+| `start_plan_row` | plan | write | Mark a row of an accepted plan 'taken into work' | `src/mcp/plans.py` |
+| `submit_action_plan` | plan | write | Send the filled action plan to the management company for review | `src/mcp/plans.py` |
+| `import_ratings` | ratings | write | Upload a ratings file into Decimus (standards and customer-experience ratings, IMF only) | `src/mcp/ratings_tools.py` |
+| `request_aggregators_update` | ratings | write | Запросить внеочередное обновление оценок пиццерий в агрегаторах доставки (Wolt, Glovo, Bolt Food, Yemeksepeti, Trendyol… | `src/mcp/ratings_tools.py` |
+| `aggregators_status` | ratings_read | read | Состояние сбора оценок в агрегаторах доставки: по каждому — когда был последний сбор, чем кончился (ok, failed или… | `src/mcp/ratings_read.py` |
+| `ratings_summary` | ratings_read | read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
+| `ratings_unit_periods` | ratings_read | read | Разбивка одной пиццерии по периодам рейтинга РС и РКО — рейтингов Dodo из таблицы контроля «база рейтингов» и выгрузок… | `src/mcp/ratings_read.py` |
+| `ratings_units` | ratings_read | read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
+| `retract_inspection` | retraction | destructive | Retract a finalized inspection from the history | `src/mcp/retraction.py` |
 <!-- map:end -->
 
 ### Локальные инструменты моста (вручную, не из каталога)
@@ -613,6 +613,7 @@
 | `make mcp-outside` | смоук доступа к MCP с чужой машины |
 | `make migrate` | накат SQL-миграций; на накатанной базе ничего не делает |
 | `make porcha` | порча ядра: испорченный расчёт обязан уронить прогон (без базы, нужны data/ и examples/) |
+| `make porcha-mcp` | порча обёртки чужого текста и аннотаций MCP: каждая сломанная защита обязана уронить свой тест (без базы) |
 | `make porcha-permissions` | порча матрицы прав: каждая сломанная защита обязана уронить свой тест (без базы) |
 | `make porcha-second-factor` | порча второй ступени входа (D463): каждая сломанная защита обязана уронить свой тест (нужна тестовая база) |
 | `make processhint` | замер признака «<описание>, это <процесс>»: сколько раз он срабатывает зря |

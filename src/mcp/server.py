@@ -47,6 +47,7 @@ from .install import (
 )
 from .ratelimit import CODE_RATE_LIMITED, RATE_LIMITED, McpRate, token_key
 from .rpc import CODE_PARSE_ERROR, handle
+from .untrusted import wrap_call_result
 
 #: Больше мегабайта читающему серверу присылать нечего: вопросы к базе
 #: короткие. Предел стоит до чтения тела, иначе он не предел, а пожелание.
@@ -416,7 +417,8 @@ class _Handler(BaseHTTPRequestHandler):
         if answer is None:
             self._send(_ACCEPTED)
             return
-        self._send(HTTPStatus.OK, answer)
+        # Журнал выше читает голый ответ; клиенту уходит обёрнутый (#1338).
+        self._send(HTTPStatus.OK, wrap_call_result(message, answer))
 
 
 def _is_resource_document(path: str) -> bool:

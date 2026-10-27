@@ -28,6 +28,8 @@ from pathlib import Path
 
 import pytest
 
+from src.mcp.untrusted import wrap_untrusted
+
 BRIDGE = Path(__file__).resolve().parents[1] / "tools" / "mcp_bridge.sh"
 UPLOAD_PATH = "/photo-upload/SIGNED"
 INSPECTION = "IMP-1"
@@ -113,7 +115,10 @@ def сервер() -> Iterator[tuple[str, _Seen]]:
                 result: dict[str, object] = {"tools": [{"name": "route"}]}
             else:
                 target = f"http://127.0.0.1:{self.server.server_address[1]}{UPLOAD_PATH}"
-                text = json.dumps({"id": INSPECTION, "upload_target": target})
+                # Как у настоящего сервера: текст результата в блоке недоверенных данных (#1338).
+                text = wrap_untrusted(
+                    "import_upload_photos", json.dumps({"id": INSPECTION, "upload_target": target})
+                )
                 result = {"content": [{"type": "text", "text": text}]}
             self._send(200, {"jsonrpc": "2.0", "id": request["id"], "result": result})
 

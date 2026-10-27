@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from conftest import unwrap_untrusted_answer
 from mcp_checklist_harness import build_methodology
 
 from src.mcp.catalogue import KIND_CHECKLIST, TOOLS
@@ -329,7 +330,7 @@ def _спросить(адрес: str, токен: str, имя: str, аргум�
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {токен}"},
     )
     with urllib.request.urlopen(запрос, timeout=10) as ответ:  # noqa: S310
-        return json.loads(ответ.read().decode("utf-8"))
+        return unwrap_untrusted_answer(json.loads(ответ.read().decode("utf-8")))
 
 
 def test_через_сервер_методика_открыта_только_своему_токену(сервер: str) -> None:

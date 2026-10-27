@@ -50,7 +50,7 @@ from .checklist_layout import for_code as for_checklist
 from .checklists import PROTECTED_APPLIED, protection_of
 from .confirm import TOKEN_ARGUMENT, challenge, verify
 from .errors import McpError, ToolError
-from .instructions import IMPORT_INSTRUCTIONS
+from .instructions import GENERAL_INSTRUCTIONS, IMPORT_INSTRUCTIONS
 from .plans import READ_TOOLS as READ_PLAN_TOOLS
 from .policy import action_of, may_edit_protected, permits_tool
 
@@ -667,7 +667,13 @@ def handle(
                 "protocolVersion": agreed,
                 "capabilities": {"tools": {"listChanged": False}},
                 "serverInfo": {"name": SERVER_NAME, "version": _version()},
-                **({"instructions": IMPORT_INSTRUCTIONS} if может_грузить else {}),
+                # Правило про чужой текст — каждому доступу; порядок загрузки — только
+                # тому, кому открыты её инструменты.
+                "instructions": (
+                    f"{GENERAL_INSTRUCTIONS}\n\n{IMPORT_INSTRUCTIONS}"
+                    if может_грузить
+                    else GENERAL_INSTRUCTIONS
+                ),
             },
         )
     if method == "ping":
