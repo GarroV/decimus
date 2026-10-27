@@ -336,6 +336,7 @@ _OPEN_ISSUES_SQL = """
            and exists (
                select 1 from units u
                 where lower(u.name) = lower(i.detail->>'unit')
+                  and u.merged_into is null
                   and (i.detail->>'country' is null or u.country = i.detail->>'country')
            )
      )
