@@ -396,6 +396,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0103_mailing_cc.sql": (
         "sql1:e05ad23f1a6e5a1782234dab382d94723e08a15cf572c8f415fd02f6136b5e2f"
     ),
+    # Шаблоны писем УК с историей версий (#977, #1130).
+    "0104_mailing_templates.sql": (
+        "sql1:c747faee9a34af432bcf33d725768e163a7e7ebf3f4adc4dc3b0261f681134f1"
+    ),
 }
 
 

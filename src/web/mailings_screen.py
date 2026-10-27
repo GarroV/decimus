@@ -97,7 +97,8 @@ def _page(
     lines = tuple(
         KindLine(kind, None if counts is None else counts.get(kind, 0)) for kind in SHOWN_KINDS
     )
-    picked = request.args.get("kind", "").strip()
+    # Отказ сохранить шаблон приходит POST-ом без `kind`: страницу открываем на виде шаблона.
+    picked = templates_db.KIND_INSPECTION if selected else request.args.get("kind", "").strip()
     if picked and picked not in SHOWN_KINDS:
         abort(404)
     emails: tuple[str, ...] | None = ()
@@ -201,7 +202,9 @@ def install(app: Flask, conf_lang: str) -> None:
             found = letter_template.problem_of(text)
             if found is not None:
                 # Причина и введённый текст остаются на экране: правка не пропадает.
-                return _page(conf_lang, selected=(slot, lang), form_body=text, error=found, code=400)
+                return _page(
+                    conf_lang, selected=(slot, lang), form_body=text, error=found, code=400
+                )
         try:
             templates_db.save(slot, lang, None if reset else text, actor=_actor())
         except MailingTemplateInputError:
