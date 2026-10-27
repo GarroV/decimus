@@ -23,7 +23,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 
-from src.db import accept, move, previews, queries, reports, retract
+from src.db import accept, mailing_templates, move, previews, queries, reports, retract
 from src.db import letters as letters_store
 from src.db.config import load_retraction_settings
 from src.db.errors import DatabaseTargetError, DbError, MoveError
@@ -32,6 +32,7 @@ from src.db.plan_rows import TermsProvider
 from src.db.reach import Reach, reach_of
 from src.domain.models import TEXT_LANGS
 from src.domain.permissions import SIDE_HQ, side_of
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report import info_titles, letter_markup, plan_terms
 from src.report.letters import TEMPLATES as letter_templates
 from src.report.letters import LetterError
@@ -223,6 +224,22 @@ class Letter:
         return self.text is not None
 
 
+def stored_letter_bodies(tenant_code: str) -> dict[str, dict[str, str]]:
+    """Тексты письма из админки УК (D608) — только для проверок пространства УК.
+
+    Письмо по проверке партнёра его же пространства собирается по встроенному тексту: шаблон
+    УК не его. Не прочиталось — встроенный текст со строкой в журнал: письмо из-за
+    второстепенной настройки не теряется, а человек видит тот же текст, что был до админки.
+    """
+    if canonical_tenant(tenant_code) != HQ_TENANT:
+        return {}
+    try:
+        return mailing_templates.bodies()
+    except DbError:
+        logger.warning("Шаблоны писем УК не прочитались, письмо по встроенному", exc_info=True)
+        return {}
+
+
 def load_letter(
     detail: InspectionDetail, *, lang: str | None = None, template: int | None = None
 ) -> Letter:
@@ -248,7 +265,13 @@ def load_letter(
     Причина говорится словами.
     """
     try:
-        собранное = build_letter(detail, lang=lang, papers=letter_sources(), template=template)
+        собранное = build_letter(
+            detail,
+            lang=lang,
+            papers=letter_sources(),
+            template=template,
+            bodies=stored_letter_bodies(detail.inspection.tenant_code),
+        )
     except LetterError as отказ:
         return Letter(
             text=None, lang=None, source=None, ready=False, caveats=(), failure=str(отказ)

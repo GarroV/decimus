@@ -25,9 +25,16 @@ from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
 from src.db import mailing_cc
-from src.db.errors import DbError, MailingCcError, MailingCcInputError
+from src.db import mailing_templates as templates_db
+from src.db.errors import (
+    DbError,
+    MailingCcError,
+    MailingCcInputError,
+    MailingTemplateInputError,
+)
+from src.domain import letter_template
 
-from . import administration, auth, guard, ui_lang
+from . import administration, auth, guard, mailings_template, ui_lang
 from .origin import refuse_foreign_origin
 from .sections import section
 from .users_view import TAB_MAILINGS
@@ -46,7 +53,9 @@ SAVED = "ok"
 EXISTS = "exists"
 INVALID = "invalid"
 FAILED = "failed"
-OUTCOMES = frozenset({SAVED, EXISTS, INVALID, FAILED})
+TEMPLATE_SAVED = "tpl_ok"
+TEMPLATE_RESET = "tpl_reset"
+OUTCOMES = frozenset({SAVED, EXISTS, INVALID, FAILED, TEMPLATE_SAVED, TEMPLATE_RESET})
 
 
 @dataclass(frozen=True)
@@ -65,12 +74,24 @@ def _cc_counts() -> dict[str, int] | None:
         return None
 
 
-def _url(kind: str = "", saved: str = "") -> str:
-    return administration.url(TAB_MAILINGS, kind=kind, saved=saved)
+def _url(kind: str = "", saved: str = "", slot: str = "", tlang: str = "") -> str:
+    return administration.url(TAB_MAILINGS, kind=kind, saved=saved, slot=slot, tlang=tlang)
 
 
 def show(conf_lang: str) -> FlaskResponse | tuple[str, int]:
     """Страница вкладки: столбец видов и, если выбран вид, его панель."""
+    return _page(conf_lang)
+
+
+def _page(
+    conf_lang: str,
+    *,
+    selected: tuple[str, str] | None = None,
+    form_body: str | None = None,
+    error: tuple[str, str] | None = None,
+    code: int = 200,
+) -> FlaskResponse | tuple[str, int]:
+    """Вкладка целиком — для GET и для ответа на отказ сохранить шаблон (текст остаётся в поле)."""
     ui_lang.request_lang(conf_lang)
     counts = _cc_counts()
     lines = tuple(
@@ -87,11 +108,22 @@ def show(conf_lang: str) -> FlaskResponse | tuple[str, int]:
             log.warning("Список копий вида %s не прочитался", picked, exc_info=True)
             emails = None
     saved = request.args.get("saved", "")
+    template = None
+    if picked == templates_db.KIND_INSPECTION:
+        template = mailings_template.load(
+            selected or mailings_template.picked_slot(), form_body=form_body, error=error
+        )
     return (
         render_template(
             "administration/mailings.html",
             lines=lines,
             picked=picked,
+            tpl=template,
+            tpl_url=lambda slot, tlang: _url(picked, slot=slot, tlang=tlang),
+            tpl_action=(
+                f"{request.script_root}{section('administration').path}"
+                f"/mailings/{templates_db.KIND_INSPECTION}/template"
+            ),
             emails=emails,
             outcome=saved if saved in OUTCOMES else "",
             partial_failed=counts is None,
@@ -104,12 +136,12 @@ def show(conf_lang: str) -> FlaskResponse | tuple[str, int]:
             split_back=_url(),
             **administration.nav(TAB_MAILINGS),
         ),
-        200,
+        code,
     )
 
 
-def install(app: Flask) -> None:
-    """Маршруты списка копий: добавить адрес и убрать (`mailing.manage`)."""
+def install(app: Flask, conf_lang: str) -> None:
+    """Маршруты списка копий и шаблона письма (`mailing.manage`)."""
     base = section("administration").path + "/mailings/<kind>/cc"
 
     def _checked(kind: str) -> str:
@@ -150,3 +182,33 @@ def install(app: Flask) -> None:
             log.warning("Адрес копии вида %s не убран", вид, exc_info=True)
             return _back(вид, FAILED)
         return _back(вид, SAVED)
+
+    @app.post(
+        section("administration").path + "/mailings/inspection/template",
+        endpoint="mailing_template_save",
+    )
+    @guard.action("mailing.manage")
+    def save_template() -> FlaskResponse | tuple[str, int] | Response:
+        """Сохранить текст письма слота новой версией или вернуть встроенный."""
+        refuse_foreign_origin()
+        slot = (request.form.get("slot") or "").strip()
+        lang = (request.form.get("lang") or "").strip()
+        if slot not in letter_template.SLOTS or lang not in letter_template.LANGS:
+            abort(404)
+        reset = request.form.get("action") == "reset"
+        text = (request.form.get("body") or "").replace("\r\n", "\n")
+        if not reset:
+            found = letter_template.problem_of(text)
+            if found is not None:
+                # Причина и введённый текст остаются на экране: правка не пропадает.
+                return _page(conf_lang, selected=(slot, lang), form_body=text, error=found, code=400)
+        try:
+            templates_db.save(slot, lang, None if reset else text, actor=_actor())
+        except MailingTemplateInputError:
+            log.warning("Шаблон %s/%s отклонён базой", slot, lang, exc_info=True)
+            return redirect(_url(templates_db.KIND_INSPECTION, FAILED, slot, lang), code=303)
+        except DbError:
+            log.warning("Шаблон %s/%s не сохранён", slot, lang, exc_info=True)
+            return redirect(_url(templates_db.KIND_INSPECTION, FAILED, slot, lang), code=303)
+        outcome = TEMPLATE_RESET if reset else TEMPLATE_SAVED
+        return redirect(_url(templates_db.KIND_INSPECTION, outcome, slot, lang), code=303)

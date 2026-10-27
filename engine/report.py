@@ -3,7 +3,8 @@
 
   report.py pdf  [--out отчёт.pdf | --out-dir КАТАЛОГ] [--lang ru|en] [--photos all|d2d3|none]
         без --out отчёт уходит в reports/ рядом с состоянием проверки
-  report.py letter [--lang ru|en]      печатает текст письма в stdout
+  report.py letter [--lang ru|en] [--bodies-file ТЕКСТЫ.json]   печатает текст письма в stdout
+  report.py letter-builtin             встроенные тексты письма и подстановки (JSON), без проверки
   report.py html [--out отчёт.html] [--lang ru|en] [--photos ...]
         тот же HTML, из которого собирается PDF — для сверки вида и тестов
 
@@ -11,7 +12,7 @@
 в проекте (engine/assets/fonts) и подключается явным путём, чтобы вид отчёта
 не зависел от того, что установлено на машине.
 """
-import argparse, base64, json, mimetypes, os, re, sys, tempfile
+import argparse, base64, json, mimetypes, os, re, string, sys, tempfile
 from datetime import date, timedelta
 from urllib.parse import quote
 
@@ -703,6 +704,34 @@ The final grade is {grade} ({pct}%).{grade_note} No violations were recorded.
 
 {end_block}Thank you for your work. We are happy to walk through any item in the report.""",
 }
+#: Виды письма и их встроенные тексты. Название вида — «слот» шаблона: админка УК хранит
+#: свой текст на слот и язык (D608, #1130), и движок берёт его вместо встроенного.
+LETTER_BODIES = {"plan": LETTER_PLAN, "clean": LETTER_CLEAN, "empty": LETTER_EMPTY}
+#: Подстановки, которые движок умеет в тексте письма (блоки). Тот же перечень
+#: в `src/domain/letter_template.py`: проверка при сохранении там, а здесь — страховка
+#: на случай текста, лёгшего в обход экрана; расхождение ловит `tests/test_letter_template.py`.
+LETTER_FIELDS = ("unit", "date", "city", "type", "grade", "pct", "grade_note", "summary_lines",
+                 "critical_block", "good_block", "end_block", "plan_due")
+
+
+def letter_body_problem(body):
+    """Почему текст письма не годится как шаблон, или пусто. Неизвестная подстановка — отказ."""
+    if not body.strip():
+        return "текст шаблона пуст"
+    try:
+        parsed = list(string.Formatter().parse(body))
+    except ValueError as exc:
+        return f"разметка подстановок нарушена ({exc}); одиночную скобку пишут двойной"
+    for _, name, spec, conv in parsed:
+        if name is None:
+            continue
+        if name not in LETTER_FIELDS:
+            return f"неизвестная подстановка {{{name}}}; доступны: {', '.join(LETTER_FIELDS)}"
+        if spec or conv:
+            return f"у подстановки {{{name}}} не бывает формата"
+    return ""
+
+
 GRADE_NOTE = {
     "ru": {"A": " Пиццерия соответствует стандарту.",
            "B": " Пиццерия в целом соответствует стандарту, отклонения незначительные.",
@@ -897,7 +926,7 @@ def feedback_block(blocks, lang, roles):
     return "".join(f"{heads[r]}\n{blocks[r]}\n\n" for r in roles if r in blocks)
 
 
-def build_letter(res, lang, template=1, speech_lang=None):
+def build_letter(res, lang, template=1, speech_lang=None, bodies=None):
     m = res["meta"]
     c = res["counts"]
     zk = "zone_name_en" if lang == "en" else "zone_name_ru"
@@ -925,12 +954,19 @@ def build_letter(res, lang, template=1, speech_lang=None):
     growth = feedback_block(blocks, lang, ("growth",)) if first else ""
     end = "" if first else feedback_block(blocks, lang, FEEDBACK_ROLES)
     if clean and not res["findings"]:
-        body = LETTER_EMPTY[lang]
+        slot = "empty"
         after = growth
     else:
-        body = LETTER_CLEAN[lang] if clean else LETTER_PLAN[lang]
+        slot = "clean" if clean else "plan"
         parts = [x.strip("\n") for x in (crit, growth) if x]
         after = "\n" + "\n\n".join(parts) + "\n\n" if parts else ""
+    # Текст из админки (`bodies`: слот → текст на языке письма) заменяет встроенный; нет
+    # его — встроенный, и письмо такое же, как до админки.
+    body = (bodies or {}).get(slot) or LETTER_BODIES[slot][lang]
+    if (bodies or {}).get(slot):
+        bad = letter_body_problem(body)
+        if bad:
+            sys.exit(f"Шаблон письма «{slot}»: {bad}")
     return body.format(
         unit=m.get("unit", ""), date=fmt_date(m.get("date")),
         city=(f", {m['city']}" if m.get("city") else ""),
@@ -1043,20 +1079,37 @@ def main():
                     help="шаблон письма (D664): 1 — сильные стороны до нарушений, зоны роста после; "
                          "2 — обе части в конце")
     a2.add_argument("--speech-lang", help="язык, на котором записана обратная связь аудитора")
+    a2.add_argument("--bodies-file",
+                    help="JSON {слот: текст} — тексты письма из админки вместо встроенных (D608)")
     a2.add_argument("--json", action="store_true",
                     help="отдать {text, feedback_skipped, feedback_lang} вместо голого текста")
+    s.add_parser("letter-builtin")
     a3 = s.add_parser("html"); a3.add_argument("--out"); a3.add_argument("--lang")
     a3.add_argument("--photos", default="all")
     a3.add_argument("--speech-lang", help="язык, на котором записана обратная связь аудитора")
     a3.add_argument("--photo-map", help="JSON-карта «ссылка на кадр: путь к файлу»")
     a = p.parse_args()
+    if a.cmd == "letter-builtin":
+        # Встроенные тексты и подстановки — для редактора шаблона в админке, которой
+        # движок нужен как единственный источник; состояние проверки не читается.
+        print(json.dumps({"fields": list(LETTER_FIELDS), "bodies": LETTER_BODIES},
+                         ensure_ascii=False))
+        return
     st = load_state()
     # Язык проверяется до расчёта: он пришёл из командной строки, и отвечать
     # на промах разбором методики значит показать человеку не ту причину.
     lang = report_lang(a.lang, st["meta"])
     res = compute(st, load_checklist(), load_zones(), load_cfg())
     if a.cmd == "letter":
-        text = build_letter(res, lang, a.template, a.speech_lang)
+        bodies = None
+        if a.bodies_file:
+            with open(a.bodies_file, encoding="utf-8") as f:
+                bodies = json.load(f)
+            if not isinstance(bodies, dict) or not all(
+                    k in LETTER_BODIES and isinstance(v, str) for k, v in bodies.items()):
+                sys.exit("--bodies-file: нужен JSON {слот: текст}, слоты: "
+                         + ", ".join(LETTER_BODIES))
+        text = build_letter(res, lang, a.template, a.speech_lang, bodies)
         bad = letter_problems(text, res)
         if bad:
             sys.exit("Письмо не собрано: " + "; ".join(bad))
