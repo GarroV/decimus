@@ -43,7 +43,7 @@ MAILINGS_TEXTS: dict[str, dict[str, str]] = {
     "mailings.cc.count": {"ru": "В копии: {count}", "en": "In Cc: {count}"},
     "mailings.cc.none": {"ru": "В копии никого", "en": "Nobody in Cc"},
     "mailings.cc.title": {"ru": "Копия", "en": "Cc"},
-    "mailings.cc.hint": {
+    "mailings.cc.hint.inspection": {
         "ru": (
             "Почты сотрудников УК. Подставляются в «Копию» черновика письма по проверке УК, "
             "когда вы кладёте его в почту; письмо отправляете вы сами. Письма по проверкам "
@@ -53,6 +53,20 @@ MAILINGS_TEXTS: dict[str, dict[str, str]] = {
             "HQ staff emails. They are filled into the Cc of an HQ inspection letter draft "
             "when you put it into your mailbox; you send the letter yourself. Letters on "
             "partners' own-space inspections do not get the HQ copy."
+        ),
+    },
+    "mailings.cc.hint.plan": {
+        "ru": (
+            "Почты сотрудников УК для «Копии» письма о запросе плана действий. Сейчас запрос "
+            "плана идёт уведомлением внутри сервиса, письма партнёру о нём нет, поэтому "
+            "список пока только хранится: он подставится в черновик, когда такое письмо "
+            "появится. Ничего не отправляется."
+        ),
+        "en": (
+            "HQ staff emails for the Cc of an action plan request letter. Today a plan request "
+            "goes as an in-app notification and there is no letter to the partner, so the list "
+            "is only stored for now: it will be filled into the draft once such a letter "
+            "exists. Nothing is sent."
         ),
     },
     "mailings.cc.empty": {
