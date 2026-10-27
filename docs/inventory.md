@@ -152,6 +152,7 @@
 | `/prescriptions/<prescription_id>` | GET | `order` | `src/web/prescriptions.py` |
 | `/prescriptions/files/<reply_id>` | GET | `order_file_legacy` | `src/web/prescriptions.py` |
 | `/ratings` | GET | `ratings` | `src/web/ratings.py` |
+| `/ratings/<any(rs,rko,clients,maps,agg,risk,compare):key>` | GET | `ratings_section` | `src/web/ratings.py` |
 | `/ratings/aggregators/update` | POST | `ratings_agg_update` | `src/web/ratings.py` |
 | `/ratings/countries` | POST | `ratings_developer` | `src/web/ratings.py` |
 | `/ratings/coverage` | GET | `ratings_coverage` | `src/web/ratings.py` |
@@ -160,7 +161,6 @@
 | `/ratings/hard-rules/<int:rule_id>/delete` | POST | `ratings_rule_remove` | `src/web/ratings.py` |
 | `/ratings/import` | POST | `ratings_upload` | `src/web/ratings.py` |
 | `/ratings/imports` | GET | `ratings_imports` | `src/web/ratings.py` |
-| `/ratings/layout` | POST | `ratings_layout` | `src/web/ratings.py` |
 | `/ratings/settings` | POST | `ratings_settings` | `src/web/ratings.py` |
 | `/ratings/sheet-sync` | POST | `ratings_sheet_sync` | `src/web/ratings.py` |
 | `/settings` | GET | `settings_page` | `src/web/settings_screen.py` |

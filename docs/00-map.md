@@ -117,7 +117,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
+<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_line,ratings_sheet,ratings_nav,ratings_platforms,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -158,8 +158,9 @@ Flask-приложение управляющей компании и партн
 | `src/web/ratings.py` | Раздел «Рейтинги» (спека 2026-10-08) и подраздел «Загрузки» |
 | `src/web/ratings_calendar.py` | Период раздела «Рейтинги»: «‹ 2026 Q3 ›», по щелчку — календарь «с — по» |
 | `src/web/ratings_line.py` | График средних раздела «Рейтинги» (D396): линия по периодам рейтинга |
+| `src/web/ratings_nav.py` | Разделы «Рейтингов» и подменю в общей навигации (D660) |
+| `src/web/ratings_platforms.py` | Разделы «Агрегаторы» и «Карты» (D660): охват пиццерий площадками |
 | `src/web/ratings_sheet.py` | Блок «Таблица контроля» на «Загрузках»: когда забирали, чем кончилось, кнопка (D464) |
-| `src/web/ratings_tiles.py` | Плитки раздела «Рейтинги» (D585): лицо плитки — заголовок, одна-две цифры и короткая строка |
 | `src/web/registry_period.py` | Период реестра проверок: «с — по» по дате обхода |
 | `src/web/registry_view.py` | Реестр проверок: отбор строк и подписи периода — без прав и без оценок |
 | `src/web/review.py` | Чек-лист той версии, по которой считали проверку, — для правки записей на вычитке (D535) |
@@ -260,6 +261,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2) и раздела «Действия» (D526): вкладка, панель, блоки, карточки |
 | `src/web/texts_prescriptions.py` | Тексты предписаний (волна 3): раздел УК, раздел партнёра, блок экрана страны |
 | `src/web/texts_ratings.py` | Тексты раздела «Рейтинги» и подраздела «Загрузки» (спека 2026-10-08) |
+| `src/web/texts_ratings_sections.py` | Тексты разделов «Рейтингов» (D660): подменю, шапка раздела, плитки, «Агрегаторы» |
 | `src/web/texts_refusals.py` | Тексты отказов раздела «Методика»: хранилище методики и формы экрана (#475) |
 | `src/web/texts_registry.py` | Тексты раздела «Проверки» в раскладке «список слева, карточка справа» |
 | `src/web/texts_second_factor.py` | Тексты второй ступени входа (D463): «Подтвердите вход» и «Вход и защита» |
@@ -322,7 +324,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 1 | not_found.html |
-| `src/web/templates/ratings/` | 3 | _period.html, coverage.html, index.html |
+| `src/web/templates/ratings/` | 10 | _macros.html, _period.html, _s_agg.html, _s_clients.html, _s_compare.html, _s_maps.html, _s_risk.html, _s_source.html, … (+2) |
 | `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
@@ -791,7 +793,6 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/ratings/formats.py` | Три CSV-выгрузки рейтинга Dodo IS и узнавание формата по заголовку |
 | `src/ratings/freshness.py` | Свежесть источников рейтингов — таблица под значком «?» у заголовка (D659) |
 | `src/ratings/importer.py` | Дверь загрузки рейтингов: байты → разбор → одна транзакция → отчёт |
-| `src/ratings/layout.py` | Компоновка страницы «Рейтинги» (D368, D370): порядок и видимость блоков |
 | `src/ratings/links.py` | Ссылки Dodo IS в выгрузках рейтинга: id пиццерии, проверки и периода |
 | `src/ratings/maps.py` | Оценки на картах: загрузка из Pointer и сводка по странам для страницы рейтингов |
 | `src/ratings/maps_link.py` | Связь филиала Pointer с пиццерией Dodo — по координатам |
@@ -1075,7 +1076,7 @@ Telegram, ни HTTP, ни SQL.
 | Добавить или изменить пункт чек-листа, зону, критерий | Данные методики вне git; правка одной дверью — `engine/manage.py` / MCP (`src/mcp/checklist.py`) / экран «Методика» (`src/web/methodology.py`). Версии и издания — `src/domain/version.py`, `src/domain/edition.py` |
 | Новая команда или кнопка бота | Роутер в `src/bot/routers/` по образцу `version.py` или `help.py`, подключение — в `src/bot/app.py` (`include_router`); тексты — `src/bot/texts.py` |
 | Изменить разбор комментария моделью | Запрос — `src/recognize/prompt.py`, схема ответа — `schema.py`, быстрый путь без модели — `fastpath.py`, карта слов — `cues.py`; замеры — `make fastpath`, `make zonecov` |
-| Рейтинги: новый блок страницы | Состав и порядок блоков — `BLOCKS` в `src/ratings/layout.py`; расчёты — `src/ratings/summary.py`, `report.py`; экран — `src/web/ratings.py`; тексты — `src/web/texts_ratings.py`; контракт — `docs/15-ratings.md` |
+| Рейтинги: новый раздел страницы | Состав и порядок разделов — `SECTIONS` в `src/web/ratings_nav.py`; расчёты — `src/ratings/summary.py`, `report.py`; экран — `src/web/ratings.py`; тексты — `src/web/texts_ratings.py`; контракт — `docs/15-ratings.md` |
 | Рейтинги: новый формат выгрузки | Узнавание по заголовку — `src/ratings/formats.py`, разбор — `csvio.py`, загрузка в транзакции — `importer.py` |
 | Обучение (iSpring): новый показатель или страница | Определение — только в `src/domain/training_metrics.py` (и таблица в `docs/20-training.md`); загрузка — `src/learning/` (клиент `ispring.py`, дерево `departments.py`, заход `sync.py`), расписание — `src/bot/learning_loader.py`; база — `src/db/learning_store.py` (запись), `training_read.py` (чтение), миграция `0085`; экран — `src/web/training_page.py`, `templates/training/index.html`. Данных о сотрудниках в базе и логе нет (D575): новый столбец с текстом краснит `tests/test_db_learning_schema.py` |
 | Подключить агрегатор доставки | Модуль в `src/ratings/aggregators/` по образцу `wolt.py` (поиск у координат) или `glovo.py` (известная точка), затем строка в `SEARCHERS` или `KNOWN` в `collect.py`; описание — `docs/17-aggregators.md` |
