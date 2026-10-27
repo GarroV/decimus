@@ -32,7 +32,7 @@
   с экрана, и в `title`), у худшей — тоже. `table` — `ratings_freshness.FreshTable`.
   Раскрытие и положение — как у `info_tip` (`decimus-web.css`); таблица — `decimus-rt.css`.
 #}
-{% macro fresh_tip(label, title, table, key, heads, foot, none) %}
+{% macro fresh_tip(label, title, table, key, heads, foot, empty) %}
   <div class="info-tip">
     <span class="info-tip__mark" tabindex="0" role="button" aria-label="{{ label }}{% if table %}: {{ table.worst_word }}{% endif %}" aria-describedby="info-{{ key }}">?{% if table %}<i class="rt-fdot rt-fdot--{{ table.worst }} rt-fdot--mark" title="{{ table.worst_word }}" aria-hidden="true"></i>{% endif %}</span>
     <div class="info-tip__pop info-tip__pop--fresh popover" id="info-{{ key }}" role="tooltip">
@@ -53,7 +53,7 @@
       </table>
       <div class="rt-fresh__foot">{{ foot }}</div>
       {% else %}
-      <div class="rt-fresh__foot">{{ none }}</div>
+      <div class="rt-fresh__foot">{{ empty }}</div>
       {% endif %}
     </div>
   </div>
