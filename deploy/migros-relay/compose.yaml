@@ -1,4 +1,4 @@
-# Ретранслятор Migros на MUSPELHEIM (D434). Порт — только петля хоста; в сеть
+# Ретранслятор Migros и Яндекс Еды на MUSPELHEIM (D434, D661). Порт — только петля хоста; в сеть
 # Tailscale его выводит `tailscale serve --bg --tcp 9021 tcp://127.0.0.1:9021`.
 # Сборка из корня репозитория: docker compose -f deploy/migros-relay/compose.yaml up -d --build
 name: decimus-migros-relay

@@ -53,11 +53,20 @@ from .base import AggregatorError, Found
 
 logger = logging.getLogger(__name__)
 
-SEARCHERS: tuple[ModuleType, ...] = (wolt, bolt, yemeksepeti, trendyol, pyszne)
-#: Сборщики на паузе: модуль цел, но бот к агрегатору не ходит. Яндекс Еда —
-#: 429, затем 401 на поиске (#670); владелец 11.10.2026: «у яндекса в целом беда
-#: сейчас, так что давай пока его пропустим» (D397). Вернуть — перенести в SEARCHERS.
-PAUSED: tuple[ModuleType, ...] = (yandex_eda,)
+_ALWAYS: tuple[ModuleType, ...] = (wolt, bolt, yemeksepeti, trendyol, pyszne)
+
+
+def searchers(relay: bool) -> tuple[tuple[ModuleType, ...], tuple[ModuleType, ...]]:
+    """Сборщики по поиску и сборщики на паузе. Яндекс Еда — 429, затем 401 с адреса
+    сервера (#670); владелец 11.10.2026: «у яндекса в целом беда сейчас, так что
+    давай пока его пропустим» (D397). С домашнего адреса он открыт, поэтому при
+    заданном адресе ретранслятора (`MIGROS_RELAY_URL`) идёт через него (D661),
+    без адреса остаётся на паузе, чтобы не ловить 429 с прода."""
+    return ((*_ALWAYS, yandex_eda), ()) if relay else (_ALWAYS, (yandex_eda,))
+
+
+#: Сборщики на паузе: модуль цел, но бот к агрегатору не ходит; руками работает.
+SEARCHERS, PAUSED = searchers(bool(yandex_eda.relay_base()))
 #: Migros Yemek — через ретранслятор на домашнем сервере (D434, `migros.py`).
 KNOWN: tuple[ModuleType, ...] = (glovo, chowdeck, migros)
 MAX_LINK_M = 400
