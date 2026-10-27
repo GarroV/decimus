@@ -165,7 +165,7 @@ def build_dispatcher(
     on_material: MaterialHandler | None = None,
     roster: Roster | None = None,
     bindings: BindingCache | None = None,
-    pending: PendingUsernames | None = None,
+    pending_usernames: PendingUsernames | None = None,
 ) -> Dispatcher:
     """Диспетчер со всеми роутерами и мидлварью доступа.
 
@@ -204,7 +204,7 @@ def build_dispatcher(
     access = AccessMiddleware(
         bindings if bindings is not None else BindingCache(),
         roster,
-        pending=pending,
+        pending=pending_usernames,
     )
     dispatcher.message.outer_middleware(access)
     dispatcher.callback_query.outer_middleware(access)
@@ -403,7 +403,9 @@ async def start_polling() -> None:
     await announce_commands(bot)
     await announce_app_button(bot, settings)
     dispatcher = build_dispatcher(
-        settings, roster=roster, pending=PendingUsernames.at(domain_settings.state_dir, ROSTER_DIR)
+        settings,
+        roster=roster,
+        pending_usernames=PendingUsernames.at(domain_settings.state_dir, ROSTER_DIR),
     )
     log_startup(settings)
     # Уборка копий кадров старше недели (#367, D179). Ссылка держится до конца
