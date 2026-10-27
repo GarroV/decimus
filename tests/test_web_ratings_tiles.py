@@ -15,10 +15,12 @@ from src.db.ratings_read import CountryRow
 from src.ratings import compare as rcompare
 from src.ratings import layout as rl
 from src.ratings import report
+from src.ratings import risk_sources as rsrc
 from src.ratings.periods import month_period
 from src.ratings.summary import CountryLine, ViolationBlock, ViolationFact
 from src.web import ratings as screen
 from src.web import ratings_tiles
+from src.web.ratings_risk import CombinedRisk
 
 
 def _факты(n: int) -> tuple[ViolationFact, ...]:
@@ -69,6 +71,7 @@ def _страница(monkeypatch: pytest.MonkeyPatch, нарушений: int) 
     monkeypatch.setattr(screen, "_unit_maps", lambda _u: {})
     monkeypatch.setattr(screen, "_agg_failures", lambda: ())
     monkeypatch.setattr(screen, "_agg_pending", lambda: None)
+    monkeypatch.setattr(screen.ratings_risk, "build", lambda *_a, **_k: CombinedRisk((), ()))
 
 
 def _клиент(monkeypatch: pytest.MonkeyPatch, ui_lang: str = "ru") -> Iterator[FlaskClient]:
@@ -179,3 +182,37 @@ def test_open_key_выбирает_плитку() -> None:
     assert ratings_tiles.open_key("none", плитки) is None
     assert ratings_tiles.open_key("maps", плитки) == "hard"  # плитки нет на экране
     assert ratings_tiles.open_key(None, ("scores", "risk")) is None
+
+
+def test_клиенты_плитка_с_честной_пустой_плашкой_и_ярусы(monkeypatch: pytest.MonkeyPatch) -> None:
+    html = _получить(monkeypatch, 3)
+
+    assert "Оценки клиентов из приложения появятся после подключения отзывов Dodo IS" in html
+    ярусы = re.findall(
+        r'<div class="rt-tiles rt-tiles--\d">(.*?)(?=<div class="rt-tiles rt-tiles--|\Z)',
+        html,
+        flags=re.S,
+    )
+    состав = [re.findall(r'data-tile="(\w+)"', ярус) for ярус in ярусы]
+    assert состав == [
+        ["scores", "violations", "top"],
+        ["clients", "maps", "aggregators", "risk"],
+        ["hard", "compare"],
+    ]
+
+
+def test_общий_список_риска_называет_источники_словами(monkeypatch: pytest.MonkeyPatch) -> None:
+    ряд = rsrc.RiskRow(
+        "u1",
+        "Стара-Загора-1",
+        "BG",
+        (rsrc.Source("rko", (83.0, 83.5, 84.0)), rsrc.Source("wolt", (8.5, 8.6, 8.7, 8.8))),
+    )
+    _страница(monkeypatch, 3)
+    monkeypatch.setattr(screen.ratings_risk, "build", lambda *_a, **_k: CombinedRisk((ряд,), ()))
+    for client in _клиент(monkeypatch):
+        html = client.get("/ratings?open=risk").get_data(as_text=True)
+
+    assert "Стара-Загора-1" in html
+    assert "<b>РКО</b>" in html and "<b>Wolt</b>" in html
+    assert "8.5 → 8.6 → 8.7 → 8.8" in html

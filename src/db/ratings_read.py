@@ -139,10 +139,16 @@ def period_months() -> tuple[date, ...]:
 
 
 def last_period_ids(rating_type: str, *, until: date, n: int) -> tuple[int, ...]:
-    """Последние `n` периодов типа, начавшихся не позже `until`, старые первыми."""
+    """Последние `n` периодов типа с оценками, начавшихся не позже `until`, старые первыми.
+
+    Периоды без оценок не считаются: РКО идёт двумя рядами недель (пн–вс с оценками и
+    вт–пн, где только сбор, #1305) — окно из последних по началу вперемешку никогда не
+    набиралось из периодов с оценками, и зона риска РКО была пуста всегда.
+    """
     rows = _rows(
-        "select id from ratings.periods where rating_type = %s and begin_on <= %s "
-        "order by begin_on desc limit %s",
+        "select p.id from ratings.periods p where p.rating_type = %s and p.begin_on <= %s "
+        "and exists (select 1 from ratings.scores s where s.period_id = p.id) "
+        "order by p.begin_on desc limit %s",
         (rating_type, until, n),
     )
     return tuple(int(r[0]) for r in reversed(rows))

@@ -574,6 +574,7 @@
 | `0098_country_report_langs.sql` | `country_report_langs` |
 | `0099_health_alerts.sql` | `health.alerts` |
 | `0100_web_user_name_latin.sql` | — |
+| `0101_ratings_layout_clients.sql` | — |
 <!-- map:end -->
 
 ## Makefile

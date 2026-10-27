@@ -153,8 +153,10 @@
   {% else %}
   {% set prev = previous_title or '—' %}
   {#- Порядок и видимость блоков — компоновка контролинга (D368, D370). -#}
-  <div class="rt-tiles">
-  {% for block in blocks %}
+  <div class="rt-tiers">
+  {% for tier in tiers %}
+  <div class="rt-tiles rt-tiles--{{ loop.index }}">
+  {% for block in tier %}
   {% if block == 'scores' %}
   {#- Сводка по группам (D383, D384): в срезе IMF — кластеры, иначе сам срез;
       подробности по странам — фильтром, а не стеной строк. Точка — период рейтинга (D396). -#}
@@ -292,27 +294,32 @@
   </div>
   {% endcall %}
 
+  {% elif block == 'clients' %}
+  {#- Оценки клиентов (D658): то, что клиент ставит заказу в приложении; источник — только
+      Dodo IS (`customer-feedback`, #1303), пока не подключён — честная пустая плитка. -#}
+  {% call tile('clients', t('ratings.block.clients')) %}
+  <div class="rt-sec"><div class="rt-empty">{{ t('ratings.clients.empty') }}</div></div>
+  {% endcall %}
   {% elif block == 'risk' %}
-  {#- Зона риска — таблица с фильтром по странам (11.10.2026; было облако имён):
-      пиццерия, тип, оценки последних периодов (старые первыми) и их средняя —
-      по средней пиццерия и попала в зону. -#}
+  {#- «Стабильно ниже порога» (D658) — один список пиццерий, низких по любому источнику:
+      РС, РКО, площадки доставки и наши проверки; у строки — где именно ниже порога,
+      словами, и оценки (старые первыми). Правила — `src.ratings.risk_sources`. -#}
   {% call tile('risk', t('ratings.block.risk')) %}
   <div class="rt-sec" data-rt-filtered>
-    <div class="rt-sec__head">
-      <span class="rt-sec__meta">{{ t('ratings.risk.hint', n=summary.thresholds.risk_periods|int, x=thr(summary.thresholds.risk_threshold)) }}</span></div>
-    {% if summary.risk %}{{ cfilter(summary.risk|map(attribute='country')|list) }}
+    <div class="rt-sec__head"><span class="rt-sec__meta">{{ risk_hint }}</span></div>
+    {% if risk.rows %}{{ cfilter(risk.rows|map(attribute='country')|list) }}
     <div class="rt-card rt-alert rt-alert--warn rt-scroll"><table class="rt-maps rt-list">
-      <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col" class="num">{{ t('ratings.col.scores') }}</th><th scope="col" class="num">{{ t('ratings.col.average') }}</th></tr></thead>
-      <tbody>{% for u in summary.risk %}<tr data-country="{{ u.country }}">
-        <th scope="row">{{ unit_link(u.unit, u.unit_name, u.rating_type) }}<small>{{ country_name(u.country) }} · <span class="rt-kind">{{ t('ratings.' ~ u.rating_type) }}</span></small></th>
-        <td class="num rt-list__scores">{% for s in u.scores %}{{ '%.1f'|format(s) }}{% if not loop.last %} → {% endif %}{% endfor %}</td>
-        <td class="num"><b>{{ '%.1f'|format(u.average) }}</b></td>
+      <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col">{{ t('ratings.col.sources') }}</th></tr></thead>
+      <tbody>{% for u in risk.rows %}<tr data-country="{{ u.country }}">
+        <th scope="row">{{ unit_link(u.unit, u.unit_name, 'rko' if u.sources[0].code == 'rko' else 'rs') }}<small>{{ country_name(u.country) }}</small></th>
+        <td class="rt-chips">{% for s in u.sources %}<span class="rt-chip"><b>{{ risk_sources.get(s.code, s.code) }}</b> <span class="rt-chip__scores">{% for x in s.scores %}{{ ('%.1f' if x > 5 else '%.2f')|format(x) }}{% if not loop.last %} → {% endif %}{% endfor %}</span></span>{% endfor %}</td>
       </tr>{% endfor %}</tbody>
     </table></div>
     {% if summary.risk_short %}<div class="rt-note">{{ t('ratings.risk.short', types=risk_short_names) }}</div>{% endif %}
     {#- Неполное окно — тип не судили; «никого» только когда судили все (P37). -#}
     {% elif summary.risk_short %}<div class="rt-empty">{{ t('ratings.risk.short', types=risk_short_names) }}</div>
     {% else %}<div class="rt-empty">{{ t('ratings.empty.risk') }}</div>{% endif %}
+    {% if risk_unread %}<div class="rt-note">{{ t('ratings.risk.unread', names=risk_unread) }}</div>{% endif %}
   </div>
   {% endcall %}
   {% elif block == 'maps' %}
@@ -366,6 +373,8 @@
   </div>
   {% endcall %}
   {% endif %}
+  {% endfor %}
+  </div>
   {% endfor %}
   </div>
   {% endif %}

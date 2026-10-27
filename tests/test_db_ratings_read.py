@@ -187,6 +187,22 @@ def test_зона_риска_окно_старыми_первыми(db_env: str)
     assert (unit.unit, unit.rating_type, unit.scores) == (U1, "rs", (60.0, 50.0))
 
 
+def test_окно_зоны_риска_берёт_периоды_с_оценками_а_не_параллельный_ряд(db_env: str) -> None:
+    """#1305: РКО идёт двумя рядами недель (пн–вс с оценками, вт–пн только сбор), и окно из
+    последних по началу периодов никогда не набиралось из периодов с оценками."""
+    _грузить(snapshot())
+    с_оценками = tuple(int(p[0]) for p in ratings_read.rko_periods())
+    assert с_оценками
+    with psycopg.connect(db_env) as conn:
+        conn.execute(
+            "insert into ratings.periods (rating_type, begin_on, end_on, title_ru, title_en) "
+            "select 'rko', max(begin_on) + 1 + g, max(begin_on) + 7 + g, 'сбор', 'collection' "
+            "from ratings.periods p, generate_series(0, 4) g where rating_type = 'rko' group by g"
+        )
+    ids = ratings_read.last_period_ids("rko", until=date(2030, 1, 1), n=len(с_оценками))
+    assert set(ids) == set(с_оценками)
+
+
 def test_зона_риска_пуста_если_периодов_меньше_окна(db_env: str) -> None:
     _грузить(_снимок_ниже_порога())  # два периода РС, окно — три (стартовое)
     summary = report.build(report.Selection(report.GROUP_IMF, None, quarter_period(2026, 3)))

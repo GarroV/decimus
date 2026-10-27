@@ -314,6 +314,14 @@
 .rt-list th[scope="row"] a { font-weight: var(--w-semibold); }
 .rt-src tbody th { white-space: nowrap; }
 .rt-list__text { font-size: var(--fs-dense); color: var(--ink-2); overflow-wrap: anywhere; min-width: 10rem; }
+.rt-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.rt-chip {
+  display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2);
+  padding: 2px var(--space-3); border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); font-size: var(--fs-dense); line-height: var(--lh-dense);
+}
+.rt-chip b { font-weight: var(--w-semibold); color: var(--ink); }
+.rt-chip__scores { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--warn); }
 .rt-list__scores { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink-3); }
 .rt-list__scores b { color: var(--warn); }
 .rt-list .is-bad { color: var(--err); font-family: var(--font-mono); font-weight: var(--w-semibold); }
@@ -375,6 +383,8 @@
 /* ── Плитки (D585): лицо — заголовок, цифры, строка; раскрытая — на всю ширину.
    Вид плитки — по Tile хаба imf-vc (скруглённая карточка, цветное пятно в углу,
    «Подробнее ›»), раскрытие — на месте, а не окном. ───────────────────── */
+/* Три яруса плиток (D658): каждый ярус — своя сетка, ряды не смешиваются. */
+.rt-tiers { display: flex; flex-direction: column; gap: var(--rt-gap); }
 .rt-tiles {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
   grid-auto-flow: dense;  /* плитка после раскрытой занимает пустое место в ряду выше */

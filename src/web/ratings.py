@@ -32,6 +32,7 @@ from src.ratings import compare as rcompare
 from src.ratings import coverage, pointer, report, sheet_sync
 from src.ratings import layout as rl
 from src.ratings import maps as rmaps
+from src.ratings import risk_sources as rsrc
 from src.ratings.aggregators import collect, glovo_link, migros_link
 from src.ratings.aggregators import queue as agg_queue
 from src.ratings.aggregators import summary as ragg
@@ -41,7 +42,16 @@ from src.ratings.model import RatingsFormatError
 from src.ratings.periods import KIND_RANGE, KIND_RATING, RatingPeriod, ReportPeriod
 from src.ratings.pointer import GOOGLE
 
-from . import administration, auth, guard, ratings_calendar, ratings_sheet, ratings_tiles, ui_lang
+from . import (
+    administration,
+    auth,
+    guard,
+    ratings_calendar,
+    ratings_risk,
+    ratings_sheet,
+    ratings_tiles,
+    ui_lang,
+)
 from . import ratings_line as rl_chart
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
@@ -253,8 +263,25 @@ def render_summary(conf: Settings) -> str:
     blocks = tuple(
         b.key for b in _layout() if b.visible and (b.key != "compare" or comparison is not None)
     )
+    # Три яруса (D658): состав яруса задан кодом, порядок внутри — компоновка контролинга.
+    tiers = tuple(
+        tier
+        for tier in ([k for k in blocks if rl.tier_of(k) == i] for i in range(len(rl.TIERS)))
+        if tier
+    )
     groups = tuple(zip(names_of_groups, (g.countries for g in summary.groups), strict=True))
     until = min(selection.period.end, date.today())
+    risk = (
+        ratings_risk.build(
+            summary.risk,
+            countries=summary.countries,
+            until=until,
+            reach=auth.current_reach(),
+            inspection_threshold=summary.thresholds["risk_threshold"],
+        )
+        if "risk" in blocks
+        else ratings_risk.CombinedRisk((), ())
+    )
     maps = _maps(groups, until, summary.previous.end if summary.previous else None)
     aggs = _aggs(groups, until)
     faces = ratings_tiles.faces(
@@ -264,12 +291,28 @@ def render_summary(conf: Settings) -> str:
         map_providers=rmaps.SHOWN_PROVIDERS,
         aggs=aggs,
         agg_names=agg_names,
+        risk=risk,
         lang=lang,
     )
     return render_template(
         "ratings/index.html",
         blocks=blocks,
+        tiers=tiers,
         faces=faces,
+        risk=risk,
+        risk_hint=t(
+            "ratings.risk.hint",
+            lang,
+            n=int(summary.thresholds["risk_periods"]),
+            x=f"{summary.thresholds['risk_threshold']:.1f}",
+            agg=rsrc.AGG_WINDOW,
+            insp=rsrc.INSPECTION_WINDOW,
+            wolt=f"{rsrc.AGG_THRESHOLDS['wolt']:.1f}",
+            glovo=f"{rsrc.AGG_THRESHOLDS['glovo']:.0f}",
+            share=round(rsrc.AGG_OTHER_SHARE * 100),
+        ),
+        risk_unread=", ".join(t(f"ratings.risk.unread.{k}", lang) for k in risk.unread),
+        risk_sources=ratings_risk.source_names(agg_names, lang),
         open_tile=ratings_tiles.open_key(request.args.get("open"), blocks),
         maps=maps,
         map_providers=rmaps.SHOWN_PROVIDERS,

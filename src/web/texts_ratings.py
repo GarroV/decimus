@@ -153,10 +153,46 @@ _SCREEN: dict[str, dict[str, str]] = {
         ),
     },
     "ratings.block.risk": {"ru": "Стабильно ниже порога", "en": "Consistently below threshold"},
-    "ratings.risk.hint": {
-        "ru": "Средняя за {n} последних периода ниже {x}",
-        "en": "Average of the last {n} periods below {x}",
+    "ratings.risk.tile": {
+        "ru": "Пиццерии, стабильно низкие по любому источнику",
+        "en": "Pizzerias consistently low by any source",
     },
+    "ratings.risk.hint": {
+        "ru": (
+            "РС и РКО: средняя за {n} последних периода ниже {x} · площадки доставки: "
+            "{agg} последних снимка подряд ниже порога площадки (Wolt — {wolt} из 10, "
+            "Glovo — {glovo} %, остальные — {share} % шкалы) · наши проверки: "
+            "{insp} последние принятые ниже {x}"
+        ),
+        "en": (
+            "Standards and customer experience: average of the last {n} periods below {x} · "
+            "delivery apps: the last {agg} snapshots all below the app's threshold "
+            "(Wolt {wolt} of 10, Glovo {glovo}%, others {share}% of the scale) · "
+            "our inspections: the last {insp} accepted ones below {x}"
+        ),
+    },
+    "ratings.col.sources": {"ru": "Где ниже порога", "en": "Below the threshold in"},
+    "ratings.risk.src.inspections": {"ru": "Наши проверки", "en": "Our inspections"},
+    "ratings.risk.unread": {
+        "ru": "Не прочитались, в списке их нет: {names}.",
+        "en": "Could not be read, not in the list: {names}.",
+    },
+    "ratings.risk.unread.aggregators": {
+        "ru": "оценки площадок доставки",
+        "en": "delivery app ratings",
+    },
+    "ratings.risk.unread.inspections": {"ru": "оценки наших проверок", "en": "inspection scores"},
+    "ratings.block.clients": {"ru": "Оценки клиентов", "en": "Customer ratings"},
+    "ratings.clients.fig": {"ru": "Оценка в приложении", "en": "In-app rating"},
+    "ratings.clients.soon": {
+        "ru": "Появятся после подключения отзывов Dodo IS",
+        "en": "Available once Dodo IS feedback is connected",
+    },
+    "ratings.clients.empty": {
+        "ru": "Оценки клиентов из приложения появятся после подключения отзывов Dodo IS.",
+        "en": "Customer ratings from the app will appear once Dodo IS feedback is connected.",
+    },
+    "ratings.layout.clients": {"ru": "Оценки клиентов", "en": "Customer ratings"},
     "ratings.empty.rs": {
         "ru": "За период нет данных РС.",
         "en": "No standards data for this period.",
