@@ -117,7 +117,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
+<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -145,6 +145,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/inspections.py` | Раздел «Проверки»: что показать и чем это взято |
 | `src/web/item_labels.py` | Пункт чек-листа для человека на экранах веба: «Порядок 13», а не `CLN13` (20.10.2026) |
 | `src/web/letter_draft.py` | Письмо уходит в черновики почты вошедшего (T352, D174, D176, D185, #332) |
+| `src/web/mailing_copy.py` | Список копий УК для «Копии» черновика письма (D608, #1130): одна дверь на все виды |
 | `src/web/mailings_screen.py` | Вкладка «Письма и уведомления» раздела «Администрирование» (D608, #1130, #977) |
 | `src/web/methodology.py` | Раздел «Методика»: правка состава чек-листа той же дверью, что MCP и CLI |
 | `src/web/methodology_view.py` | Экран чек-листа (D197): отбор, группировка и соседи пункта |
