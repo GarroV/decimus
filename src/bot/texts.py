@@ -1267,6 +1267,29 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Письмо партнёру:\n\n{letter}",
         "en": "Letter to the partner:\n\n{letter}",
     },
+    # Последнее сообщение после отчёта (27.10.2026, текст владельца). Без адреса веба
+    # стенда — второй вариант без ссылки: сообщение без ссылки лучше падения.
+    "finish.preliminary": {
+        "ru": (
+            "Это предварительный отчёт. Чтобы проверка полностью ушла в систему, вычитайте её "
+            "в вебе и подтвердите, что всё корректно, — кнопка «Принять»: {url}"
+        ),
+        "en": (
+            "This is a preliminary report. For the inspection to fully enter the system, "
+            "proofread it on the web and confirm everything is correct (the “Accept” button): "
+            "{url}"
+        ),
+    },
+    "finish.preliminary_nolink": {
+        "ru": (
+            "Это предварительный отчёт. Чтобы проверка полностью ушла в систему, вычитайте её "
+            "в вебе и подтвердите, что всё корректно, — кнопка «Принять»."
+        ),
+        "en": (
+            "This is a preliminary report. For the inspection to fully enter the system, "
+            "proofread it on the web and confirm everything is correct (the “Accept” button)."
+        ),
+    },
     "finish.photos_missing": {
         "ru": "{reason}",
         "en": "{reason}",

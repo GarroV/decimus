@@ -37,6 +37,7 @@ from src.report import PhotoMissing, ReportError, build_pdf
 from ..inspection import read_inspection
 from ..lang import chat_ui_lang
 from ..photos import download_all
+from ..preliminary import remind
 from ..texts import t
 
 log = logging.getLogger(__name__)
@@ -78,5 +79,8 @@ def build_resend_router() -> Router:
                 await message.answer(t("resend.failed", lang))
                 return
             await message.answer_document(FSInputFile(pdf), caption=t("resend.caption", lang))
+        # Повторная отправка — тоже предварительный отчёт, пока проверку не приняли
+        # в вебе; принятой напоминание не уходит (`preliminary.remind` читает статус).
+        await remind(message, chat_id, lang)
 
     return router
