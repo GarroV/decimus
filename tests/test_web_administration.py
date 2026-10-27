@@ -17,7 +17,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.db import api_access, dodois_logins, health_store, model_key, ratings_sync
+from src.db import api_access, dodois_logins, health_store, mailing_cc, model_key, ratings_sync
 from src.domain.health import LoadFacts, ProbeRow
 from src.domain.permissions import MATRIX, SIDE_HQ, role_may
 from src.health import checks
@@ -133,13 +133,14 @@ def test_старый_адрес_вкладки_перенаправляет(г�
         "spaces",
         "countries",
         "ratings",
+        "mailings",
         "journal",
         "usage",
         "connections",
         "keys",
         "dodois",
     ],
-    ("HQ", "admin"): ["people", "spaces", "countries", "ratings", "usage"],
+    ("HQ", "admin"): ["people", "spaces", "countries", "ratings", "mailings", "usage"],
     ("HQ", "control"): ["people", "ratings"],
     ("GE", "admin"): ["people", "spaces"],
     ("HQ", "developer"): [],
@@ -156,6 +157,8 @@ def _без_базы(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(partner_spaces, "overview", lambda: ())
     monkeypatch.setattr(country, "countries", lambda **_: ())
     monkeypatch.setattr(country_summary, "developers_of", lambda _codes: ({}, {}, False))
+    monkeypatch.setattr(mailing_cc, "counts", lambda: dict.fromkeys(mailing_cc.KINDS, 0))
+    monkeypatch.setattr(mailing_cc, "read", lambda _kind: ())
 
 
 def _рейтинги_без_базы(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -317,7 +320,7 @@ def test_проверить_сейчас_не_главному_404(monkeypatch: 
 # --- каркас вкладки (D653): шапка с заголовком, список без таблицы ---------------------------
 
 #: Вкладки-списки: строки `srow` в `slist`, таблиц нет (`docs/12-web-admin.md`, «Каркас вкладки»).
-ВКЛАДКИ_СПИСКОМ = ("countries", "keys", "dodois")
+ВКЛАДКИ_СПИСКОМ = ("countries", "keys", "dodois", "mailings")
 
 
 @pytest.mark.parametrize("вкладка", [tab.key for tab in administration.TABS])

@@ -39,6 +39,8 @@ TAB_RATINGS = "ratings"
 TAB_JOURNAL = "journal"
 #: Вкладка «Расход модели» (D537): главный админ и админ УК, её ведёт `usage_screen`.
 TAB_USAGE = "usage"
+#: Вкладка «Письма и уведомления» (D608, #1130): админ и главный админ, её ведёт `mailings_screen`.
+TAB_MAILINGS = "mailings"
 
 
 class _Row(Protocol):

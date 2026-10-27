@@ -18,6 +18,7 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "administration.tab.connections": {"ru": "Подключения", "en": "Connections"},
     "administration.tab.keys": {"ru": "Ключи и API", "en": "Keys & API"},
     "administration.tab.ratings": {"ru": "Рейтинги", "en": "Ratings"},
+    "administration.tab.mailings": {"ru": "Письма и уведомления", "en": "Letters & notifications"},
     "administration.sub": {
         "ru": "Все настройки сервиса в одном месте. Вкладки видны по роли.",
         "en": "All service settings in one place. Tabs depend on your role.",

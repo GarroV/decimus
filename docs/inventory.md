@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 201 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 203 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -86,6 +86,8 @@
 | `/administration/dodois/<country>/check` | POST | `dodois_check` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite` | POST | `dodois_invite_issue` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite/<int:invite_id>/revoke` | POST | `dodois_invite_revoke` | `src/web/dodois_screen.py` |
+| `/administration/mailings/<kind>/cc/add` | POST | `mailing_cc_add` | `src/web/mailings_screen.py` |
+| `/administration/mailings/<kind>/cc/remove` | POST | `mailing_cc_remove` | `src/web/mailings_screen.py` |
 | `/api/v1/aggregators/ratings` | GET | `swarm_api_aggregators` | `src/web/swarm_api.py` |
 | `/api/v1/inspections` | GET | `swarm_api_inspections` | `src/web/swarm_api.py` |
 | `/api/v1/inspections/<inspection_id>` | GET | `swarm_api_inspection` | `src/web/swarm_api.py` |
@@ -577,6 +579,7 @@
 | `0100_web_user_name_latin.sql` | — |
 | `0101_ratings_layout_clients.sql` | — |
 | `0102_ratings_layout_d658_order.sql` | — |
+| `0103_mailing_cc.sql` | `mailing_cc` |
 <!-- map:end -->
 
 ## Makefile
