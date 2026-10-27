@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from email.message import EmailMessage
 from typing import Any
 
+from src.report.letter_markup import to_email_html, to_plain
 from src.web.google_auth import (
     AUTHORIZATION_ENDPOINT,
     NETWORK_TIMEOUT_SECONDS,
@@ -45,7 +46,6 @@ from src.web.google_auth import (
     GoogleSettings,
     identity_from_id_token,
 )
-from src.web.letter_markup import to_email_html, to_plain
 
 #: Право завести черновик и ничего больше: ни чтения ящика, ни отправки.
 #: `gmail.modify` и `https://mail.google.com/` тоже подошли бы — и оба дают
@@ -219,7 +219,7 @@ def draft_subject(*, city: str, date: str, lang: str) -> str:
 def letter_message(*, to: str, subject: str, body: str, cc: tuple[str, ...] = ()) -> EmailMessage:
     """Письмо партнёру как MIME: текстовая часть и HTML-часть одного содержания.
 
-    `body` — разметка письма (`src/web/letter_markup.py`), и чистится она
+    `body` — разметка письма (`src/report/letter_markup.py`), и чистится она
     ЗДЕСЬ, а не только при сохранении: запись могла лечь в базу в обход
     экрана, и в почту партнёра не уезжает ничего, что не прошло белый список.
     """

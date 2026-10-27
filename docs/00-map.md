@@ -117,7 +117,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
+<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -145,7 +145,6 @@ Flask-приложение управляющей компании и партн
 | `src/web/inspections.py` | Раздел «Проверки»: что показать и чем это взято |
 | `src/web/item_labels.py` | Пункт чек-листа для человека на экранах веба: «Порядок 13», а не `CLN13` (20.10.2026) |
 | `src/web/letter_draft.py` | Письмо уходит в черновики почты вошедшего (T352, D174, D176, D185, #332) |
-| `src/web/letter_markup.py` | Разметка письма партнёру: белый список из четырёх элементов (T353, D169, #332) |
 | `src/web/mailings_screen.py` | Вкладка «Письма и уведомления» раздела «Администрирование» (D608, #1130, #977) |
 | `src/web/methodology.py` | Раздел «Методика»: правка состава чек-листа той же дверью, что MCP и CLI |
 | `src/web/methodology_view.py` | Экран чек-листа (D197): отбор, группировка и соседи пункта |
@@ -608,6 +607,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/mcp/info_part.py` | Информационная часть записанной проверки в карточке чтения (T207) |
 | `src/mcp/install.py` | Скрипт установки, который сервер отдаёт по публичному GET (#244, D112) |
 | `src/mcp/instructions.py` | Текст `instructions` рукопожатия MCP: как вести загрузку проверки (#1018) |
+| `src/mcp/letter_save.py` | Инструмент «сохранить письмо партнёру в проверку» (D665) — тот же путь, что у сайта |
 | `src/mcp/letters.py` | Письмо партнёру по записанной проверке — для протокола MCP |
 | `src/mcp/methodologies.py` | Какими методиками оценены проверки ряда — справка, а не запрет (D365) |
 | `src/mcp/move.py` | Инструмент «исправить дату или пиццерию проверки» (D195) — та же функция, что у веба |
@@ -956,6 +956,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/report/errors.py` | Отказы блока `report` |
 | `src/report/explain.py` | Почему оценка такая — ответ движка по записанной проверке (D490) |
 | `src/report/info_titles.py` | Подписи полей информационной части — формулировки вопросов по кодам |
+| `src/report/letter_markup.py` | Разметка письма партнёру: белый список из четырёх элементов (T353, D169, #332) |
 | `src/report/letters.py` | Письмо партнёру по уже записанной проверке — пересборка, а не пересчёт |
 | `src/report/photos.py` | Где взять кадр, приложенный к записи или к информационному полю, и что считать его пропажей |
 | `src/report/plan_terms.py` | Сроки и формулировки строк экшн-плана — только из ответа движка (#1168, CLAUDE.md) |
@@ -1074,7 +1075,7 @@ Telegram, ни HTTP, ни SQL.
 |---|---|
 | Поправить текст экрана админки | `src/web/texts.py` или `texts_<раздел>.py`: ключ `TEXTS[ключ] = {"ru": …, "en": …}`; оба языка обязательны, `tests/test_web_texts.py` это проверяет |
 | Поправить текст бота | `src/bot/texts.py` — тот же каталог по ключам; `tests/test_bot_texts.py` |
-| Поправить текст письма партнёру или PDF | Тексты отчёта и письма — в `engine/report.py` (`letter_text`, `build_letter`); пересборка по записанной проверке — `src/report/letters.py`; разметка письма в почте — `src/web/letter_markup.py` |
+| Поправить текст письма партнёру или PDF | Тексты отчёта и письма — в `engine/report.py` (`letter_text`, `build_letter`); пересборка по записанной проверке — `src/report/letters.py`; разметка письма в почте — `src/report/letter_markup.py` |
 | Добавить страницу или маршрут веба | Модуль с `install(app, conf)` по образцу `src/web/prescriptions.py`, вызов — в `create_app` (`src/web/app.py`); шаблон — `src/web/templates/<раздел>/`; тексты — `texts_<раздел>.py` и подключение в `texts.py`. Новый раздел навигации — ещё `SECTIONS` в `src/web/sections.py`, `SCREENS` в `app.py` (приложение не соберётся, если они разошлись) и `view.<раздел>` в матрице `src/domain/permissions.py`. Пишущий маршрут объявляет действие `@guard.action(...)` — без него он закрыт (403) и роняет `tests/test_web_guard.py` |
 | Сделать адрес открытым без входа | Только через `OPEN_ENDPOINTS` в `src/web/auth.py` — по умолчанию закрыто всё; зачем и что открыто — `docs/18-access-map.md` |
 | Дать или закрыть роли действие, ограничить раздел по роли | Одна матрица «роль × действие» — `src/domain/permissions.py` (`MATRIX`, граница — `_boundary`); веб спрашивает её заслоном `src/web/guard.py`, MCP — `src/mcp/policy.py`, бот — `src/bot/access.py`. Партнёру закрыто всё, что матрица не объявила открытым его пространству (`guard.open_to_tenant`, 404 в `_install_hq_gate` `src/web/app.py`; необъявленный маршрут называет `tests/test_web_guard.py`); «кто кем управляет» — `src/web/access_policy.py`; охват чтения — `src/db/reach.py`; потом `docs/18-access-map.md` и `make porcha-permissions` |

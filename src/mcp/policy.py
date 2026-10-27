@@ -36,6 +36,7 @@ from .catalogue import (
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
     KIND_INSPECTIONS,
+    KIND_LETTER,
     KIND_MOVE,
     KIND_PLAN,
     KIND_RATINGS,
@@ -53,6 +54,7 @@ KIND_ACTIONS: Mapping[str, str] = {
     KIND_RETRACTION: "inspection.retract",
     KIND_IMPORT: "inspection.import",
     KIND_MOVE: "inspection.move",
+    KIND_LETTER: "inspection.letter",
     KIND_RATINGS: "ratings.manage",
     KIND_RATINGS_READ: "ratings.read",
     # Чтение плана — как раздел «Действия» в вебе; запись у каждого инструмента своя.

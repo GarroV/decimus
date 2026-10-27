@@ -35,6 +35,7 @@ from . import (
     checklist_source,
     checklist_tools,
     checklists_tools,
+    letter_save,
     move,
     phrases,
     plans,
@@ -107,6 +108,12 @@ KIND_MOVE = "move"
 #: каждого инструмента (`policy`): чтение — `view.actions`, вердикты УК — `plan.manage`,
 #: работа партнёра — `plan.submit`; охват — по токену. Обработчики — `src.mcp.plans`.
 KIND_PLAN = "plan"
+
+#: Сохранение письма партнёру в проверку (D665). Десятый вид: пишет в историю писем
+#: тем же путём, что кнопка «Сохранить» на сайте, и обязан знать автора (из токена).
+#: Право — действие матрицы `inspection.letter` (`policy.KIND_ACTIONS`); обработчик —
+#: `src.mcp.letter_save`. Чтение письма (`inspection_letter`) — обычный вид проверок.
+KIND_LETTER = "letter"
 
 
 @dataclass(frozen=True)
@@ -521,26 +528,35 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="inspection_letter",
         description=(
-            "Rebuild the partner letter for one recorded inspection of the "
-            "caller's tenant and return its text, ready for a human to paste "
-            "into mail and send. The letter is written by the audit engine, "
-            "not here, and it is rebuilt on the exact methodology version the "
-            "inspection was scored by — never on today's methodology, which "
-            "would silently restate the partner's grade. The score the engine "
-            "computes is checked against the one recorded in the inspection: "
-            "a mismatch is refused, not returned. 'lang' picks the language "
-            "of the letter; omit it for the language the report was issued "
-            "in. The auditor's own wording of each finding is never "
-            "translated, so a letter asked for in another language comes out "
-            "mixed: header and zone names translated, findings as recorded. "
-            "Read 'ready_to_send' and 'not_restored' before passing the text "
-            "on: fields the read layer cannot return leave gaps that the "
-            "engine fills with a blank line, and findings recorded in another "
-            "language are listed there too, with both languages named in "
-            "'status'. Returns found: false, with no error, when the id does "
-            "not match any inspection of this tenant. A current inspection "
-            "uploaded through import_* gets a letter like any other; a "
-            "historical one is refused (its score is from the old report)."
+            "Read the partner letter of one recorded inspection of the caller's "
+            "tenant, as text for a human to paste into mail and send. If people "
+            "have saved a letter for this inspection (on the site or with "
+            "save_inspection_letter), THAT letter is returned (source: 'saved', "
+            "with 'saved_by', 'saved_at' and 'version'): it is what people read "
+            "and agreed on, so show it as it is and never present a rebuilt "
+            "template in its place. 'lang' picks the language: the latest saved "
+            "letter in it; omit it for the latest saved letter in any language. "
+            "Without a saved letter, or with fresh=true, the letter is built "
+            "from the template (source: 'template') by the audit engine, not "
+            "here, on the exact methodology version the inspection was scored "
+            "by — never on today's methodology, which would silently restate "
+            "the partner's grade. The score the engine computes is checked "
+            "against the one recorded in the inspection: a mismatch is "
+            "refused, not returned. For the template 'lang' defaults to the "
+            "language the report was issued in; the auditor's own wording of "
+            "each finding is never translated, so a letter asked for in "
+            "another language comes out mixed: header and zone names "
+            "translated, findings as recorded. Read 'ready_to_send' and "
+            "'not_restored' of a template before passing the text on: fields "
+            "the read layer cannot return leave gaps that the engine fills "
+            "with a blank line, and findings recorded in another language are "
+            "listed there too, with both languages named in 'status'. A saved "
+            "letter is plain lines plus <b> <i> <s> <a href> markup, with "
+            "& < > escaped; keep that markup when you save a reworked text. "
+            "Returns found: false, with no error, when the id does not match "
+            "any inspection of this tenant. A current inspection uploaded "
+            "through import_* gets a letter like any other; a historical one "
+            "is refused (its score is from the old report)."
         ),
         input_schema={
             "type": "object",
@@ -550,10 +566,20 @@ TOOLS: tuple[ToolSpec, ...] = (
                     "type": "string",
                     "description": (
                         "Language of the letter, as a two-letter code (for "
-                        "example 'ru' or 'en'). Omit to use the language the "
-                        "report was issued in. A language the methodology "
-                        "does not carry is rejected with an explicit error "
-                        "rather than quietly answered in another language."
+                        "example 'ru' or 'en'). Omit for the latest saved "
+                        "letter in any language, or, for a template, the "
+                        "language the report was issued in. A language the "
+                        "methodology does not carry is rejected with an "
+                        "explicit error rather than quietly answered in "
+                        "another language."
+                    ),
+                },
+                "fresh": {
+                    "type": "boolean",
+                    "description": (
+                        "true: ignore the saved letter and build a new "
+                        "template from the recorded inspection (the saved "
+                        "one stays untouched). Default false."
                     ),
                 },
             },
@@ -562,6 +588,53 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=tools.inspection_letter,
         history=True,
+    ),
+    ToolSpec(
+        name="save_inspection_letter",
+        description=(
+            "Save the partner letter into one recorded inspection of the "
+            "caller's space, the same way the Save button on the site does: "
+            "the text is cleaned to the site's letter markup (plain lines "
+            "plus <b> <i> <s> <a href>, anything else is stripped), and it is "
+            "stored as a NEW version with the signed-in person as author; "
+            "earlier versions stay in the history. Afterwards it is what "
+            "inspection_letter returns, and the site shows it in the "
+            "inspection card, from where it goes to Gmail drafts. Nothing is "
+            "sent to anyone. Call it ONLY after the person has seen the "
+            "final text and said yes explicitly; show the text in the "
+            "person's words, never inspection ids, item codes or other "
+            "codes. 'text' is the whole letter, not a patch. Same rights as "
+            "saving on the site: a role that cannot save the letter there "
+            "cannot here. An inspection of another space is refused like a "
+            "missing one; so are an inspection still under review, one "
+            "uploaded through import_*, and an empty text. 'lang' is the "
+            "language the text is written in (default: the report language); "
+            "versions are kept per language."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "id": _INSPECTION_ID_PROPERTY,
+                "text": {
+                    "type": "string",
+                    "description": (
+                        "The whole letter, as the person approved it: plain "
+                        "lines, optionally <b> <i> <s> <a href> markup."
+                    ),
+                },
+                "lang": {
+                    "type": "string",
+                    "description": (
+                        "Two-letter code of the language the text is written "
+                        "in. Omit for the language the report was issued in."
+                    ),
+                },
+            },
+            "required": ["id", "text"],
+            "additionalProperties": False,
+        },
+        handler=letter_save.save_inspection_letter,
+        kind=KIND_LETTER,
     ),
     # --- методика: чтение --------------------------------------------------
     ToolSpec(

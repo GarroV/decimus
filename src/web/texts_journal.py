@@ -236,6 +236,7 @@ _MCP: dict[str, tuple[str, str]] = {
     "import_edit_finding": ("Изменено нарушение в черновике", "Finding edited in a draft"),
     "import_edit_inspection": ("Исправлена шапка черновика", "Draft header edited"),
     "move_inspection": ("Перенесена проверка (дата/пиццерия)", "Inspection moved (date/unit)"),
+    "save_inspection_letter": ("Сохранено письмо партнёру", "Partner letter saved"),
     "accept_action_plan": ("План исправлений принят", "Action plan accepted"),
     "return_action_plan": ("План исправлений возвращён", "Action plan returned"),
     "confirm_plan_row": ("Строка плана подтверждена", "Action plan row confirmed"),

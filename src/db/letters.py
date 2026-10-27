@@ -40,6 +40,11 @@ order by created_at desc, id desc
 limit 1
 """
 
+_COUNT_SQL = """
+select count(*) from partner_letters
+where inspection_id = %s and (%s::text is null or lang = %s)
+"""
+
 
 @dataclass(frozen=True)
 class SavedLetter:
@@ -124,3 +129,16 @@ def latest_letter(inspection_id: str, *, lang: str | None = None) -> SavedLetter
     return SavedLetter(
         id=str(row[0]), body=str(row[1]), lang=str(row[2]), saved_by=str(row[3]), created_at=row[4]
     )
+
+
+def count_letters(inspection_id: str, *, lang: str | None = None) -> int:
+    """Сколько версий письма записано у проверки (на языке `lang`, без него — всего).
+
+    Номер версии для того, кто показывает письмо: «версия 3» говорит, что до
+    него письмо правили дважды, а голый текст — нет. Нуль — «не фиксировали».
+    """
+    settings = check_environment()
+    with connection(settings.dsn) as conn, conn.cursor() as cur:
+        cur.execute(_COUNT_SQL, (inspection_id, lang, lang))
+        row = cur.fetchone()
+    return 0 if row is None else int(row[0])

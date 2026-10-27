@@ -22,6 +22,7 @@ from src.mcp.catalogue import (
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
     KIND_INSPECTIONS,
+    KIND_LETTER,
     KIND_MOVE,
     KIND_PLAN,
     KIND_RATINGS,
@@ -33,6 +34,7 @@ from src.mcp.policy import action_of, permits
 from src.mcp.rpc import handle
 
 ВСЕ_ВИДЫ = (
+    KIND_LETTER,
     KIND_INSPECTIONS,
     KIND_CHECKLIST_SOURCE,
     KIND_CHECKLIST,
@@ -57,6 +59,7 @@ _ВСЁ_УК = frozenset(
         KIND_RATINGS_READ,
         KIND_RATINGS,
         KIND_MOVE,
+        KIND_LETTER,
         KIND_PLAN,
     }
 )
@@ -72,6 +75,7 @@ _ВСЁ_УК = frozenset(
             KIND_RATINGS_READ,
             KIND_IMPORT,
             KIND_MOVE,
+            KIND_LETTER,
             KIND_PLAN,
         }
     ),
@@ -81,11 +85,25 @@ _ВСЁ_УК = frozenset(
     ("HQ", "control"): frozenset({KIND_RATINGS_READ, KIND_RATINGS}),
     # Админ партнёра (D460): методика его пространства — как в вебе.
     ("RS", "admin"): frozenset(
-        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ, KIND_PLAN}
+        {
+            KIND_INSPECTIONS,
+            KIND_CHECKLIST_SOURCE,
+            KIND_CHECKLIST,
+            KIND_RATINGS_READ,
+            KIND_PLAN,
+            KIND_LETTER,
+        }
     ),
     # Сотрудник партнёра (D460): методика на чтение, как в вебе; правящие инструменты закрыты.
     ("RS", "auditor"): frozenset(
-        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ, KIND_PLAN}
+        {
+            KIND_INSPECTIONS,
+            KIND_CHECKLIST_SOURCE,
+            KIND_CHECKLIST,
+            KIND_RATINGS_READ,
+            KIND_PLAN,
+            KIND_LETTER,
+        }
     ),
 }
 
