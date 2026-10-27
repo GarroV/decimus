@@ -203,11 +203,12 @@
     </div></div>{% endif %}
     {% if selection.group == 'developer' and summary.countries|length > 1 and cluster.has_data %}
     <div class="rt-viol">
-      {% for code in summary.countries %}
+      {# Страны с данными — первыми, пустые («нет данных») — в конце (27.10.2026). #}
+      {% for empty in (false, true) %}{% for code in summary.countries if (not by[code].has_data) == empty %}
       <div class="rt-card"><div class="rt-card__body">
         {{ vblock(by[code], kind, country_name(code), 4) }}
       </div></div>
-      {% endfor %}
+      {% endfor %}{% endfor %}
     </div>
     {% endif %}
   </section>

@@ -304,24 +304,43 @@ def imports(limit: int = 50) -> tuple[ImportRow, ...]:
 
 @dataclass(frozen=True)
 class IssueRow:
+    """Одна проблема загрузки, свёрнутая по причине и месту (27.10.2026).
+
+    Раньше — строка на строку файла: одна незаведённая пиццерия давала сотни
+    одинаковых строк («Подгорица-2» — 221). Теперь — группа: сколько строк
+    (`count`), первая из них (`row_no`) и последняя загрузка, где она была.
+    """
+
     import_id: int
     at: datetime
     format: str | None
     row_no: int
     reason: str
     detail: dict[str, Any]
+    count: int = 1
+
+
+#: Группа по причине, месту и формату; «пиццерия не сопоставлена», которую с тех
+#: пор завели в справочник (то же имя в той же стране), — уже не проблема.
+_OPEN_ISSUES_SQL = """
+    select max(i.import_id), max(m.at), m.format, min(i.row_no), i.reason, i.detail, count(*)
+      from ratings.import_issues i join ratings.imports m on m.id = i.import_id
+     where not (
+           i.reason = 'unit_unmatched'
+           and exists (
+               select 1 from units u
+                where lower(u.name) = lower(i.detail->>'unit')
+                  and (i.detail->>'country' is null or u.country = i.detail->>'country')
+           )
+     )
+     group by i.reason, i.detail, m.format
+     order by max(m.at) desc, i.reason
+     limit %s
+"""
 
 
 def open_issues(limit: int = 200) -> tuple[IssueRow, ...]:
-    return tuple(
-        IssueRow(*r)
-        for r in _rows(
-            "select i.import_id, m.at, m.format, i.row_no, i.reason, i.detail "
-            "from ratings.import_issues i join ratings.imports m on m.id = i.import_id "
-            "order by m.at desc, i.import_id desc, i.row_no, i.reason limit %s",
-            (limit,),
-        )
-    )
+    return tuple(IssueRow(*r) for r in _rows(_OPEN_ISSUES_SQL, (limit,)))
 
 
 def last_loaded() -> dict[str, datetime]:

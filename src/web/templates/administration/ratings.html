@@ -170,7 +170,7 @@
     <div class="rt-card rt-alert rt-alert--warn"><ul class="rt-att">{% for i in issues %}<li>
       <span class="rt-sev rt-sev--warn" aria-hidden="true">?</span>
       <div><div class="rt-att__title">{{ t('ratings.issue.' ~ i.reason) }}{% if i.detail.unit or i.detail.country %} <span class="rt-att__where">· {{ i.detail.unit or '' }}{% if i.detail.country %}{% if i.detail.unit %} · {% endif %}{{ i.detail.country }}{% endif %}</span>{% endif %}</div>
-        <div class="rt-att__sub">{{ i.at.strftime(at_format) }}{% if i.format %} · {{ t('ratings.format.' ~ i.format) }}{% endif %} · {{ t('ratings.issues.row', n=i.row_no) }}{% if lang == 'ru' and i.detail.reason %}<br>{{ i.detail.reason }}{% endif %}</div></div>
+        <div class="rt-att__sub">{{ i.at.strftime(at_format) }}{% if i.format %} · {{ t('ratings.format.' ~ i.format) }}{% endif %} · {% if i.count > 1 %}{{ t('ratings.issues.rows', n=i.count, first=i.row_no) }}{% else %}{{ t('ratings.issues.row', n=i.row_no) }}{% endif %}{% if lang == 'ru' and i.detail.reason %}<br>{{ i.detail.reason }}{% endif %}</div></div>
       <span></span>
     </li>{% endfor %}</ul></div>
     {% else %}<div class="rt-empty">{{ t('ratings.issues.empty') }}</div>{% endif %}
