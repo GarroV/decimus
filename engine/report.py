@@ -42,8 +42,8 @@ T = {
         "appendix_note": "Раздел носит справочный характер: перечисленные ниже записи "
                          "не являются нарушениями и не влияют на оценку.",
         "recorded": "Зафиксировано",
-        "feedback": "Обратная связь", "strengths": "Сильные стороны пиццерии",
-        "growth": "Зоны роста пиццерии",
+        "feedback": "Обратная связь", "strengths": "Сильные стороны",
+        "growth": "Зоны роста",
         "method": "Методика расчёта", "zeroed": "обнулена критическим нарушением D3",
         "not_counted": "учтено в обнулении зоны", "page": "стр.",
         "repeat": "повтор — вычет удвоен",
@@ -74,8 +74,8 @@ T = {
         "appendix_note": "This section is for reference only: the records below are not "
                          "violations and do not affect the score.",
         "recorded": "Recorded",
-        "feedback": "Feedback", "strengths": "Strengths of the store",
-        "growth": "Growth areas of the store",
+        "feedback": "Feedback", "strengths": "Strengths",
+        "growth": "Growth areas",
         "method": "Scoring method", "zeroed": "zeroed by a critical D3 violation",
         "not_counted": "covered by the zone reset", "page": "p.",
         "repeat": "repeat — deduction doubled",
