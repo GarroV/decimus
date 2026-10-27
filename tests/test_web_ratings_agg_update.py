@@ -22,6 +22,7 @@ from src.ratings.aggregators import queue
 from src.ratings.periods import month_period
 from src.ratings.summary import CountryLine, ViolationBlock
 from src.web import ratings as screen
+from src.web.ratings_risk import CombinedRisk
 from src.web.texts import TEXTS
 
 ORIGIN = {"Origin": "http://localhost"}
@@ -78,6 +79,8 @@ def страница(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(screen, "_maps", lambda *_a: None)
     monkeypatch.setattr(screen, "_aggs", lambda *_a: None)
     monkeypatch.setattr(screen, "_unit_maps", lambda _u: {})
+    # Плитка «Стабильно ниже порога» (D658) читает базу сама — здесь не нужна.
+    monkeypatch.setattr(screen.ratings_risk, "build", lambda *_a, **_k: CombinedRisk((), ()))
     monkeypatch.setattr(agg_store, "load_states", lambda: ())
     monkeypatch.setattr(agg_store, "open_request", lambda: состояние["открытая"])
 
