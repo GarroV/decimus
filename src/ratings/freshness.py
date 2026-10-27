@@ -142,11 +142,15 @@ def build(
     maps_loaded: datetime | None,
     aggregators: Mapping[str, datetime],
 ) -> tuple[Row, ...]:
-    """Строки в неизменном порядке: РС, РКО, таблица контроля, карты, площадки."""
+    """Строки в неизменном порядке: РС, РКО, таблица контроля, карты, площадки.
+
+    Таблицу контроля бот ни разу не проверял — она не подключена (демо, стенд):
+    строки нет, а не красная «ни разу».
+    """
     return (
         _period_row(KIND_RS, rs, today),
         _period_row(KIND_RKO, rko, today),
-        _age_row(KIND_SHEET, sheet_checked, today),
+        *((_age_row(KIND_SHEET, sheet_checked, today),) if sheet_checked else ()),
         _age_row(KIND_MAPS, maps_loaded, today),
         *(_age_row(KIND_AGG, aggregators[c], today, c) for c in sorted(aggregators, key=_agg_rank)),
     )

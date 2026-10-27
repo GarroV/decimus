@@ -73,3 +73,10 @@ def test_build_has_fixed_order_and_missing_data_is_red() -> None:
     assert [r.status.value for r in rows] == [
         *("fresh", "stale", "fresh", "lag", "lag", "fresh", "stale", "fresh"),
     ]
+
+
+def test_unconnected_control_sheet_has_no_row() -> None:
+    rows = f.build(
+        today=TODAY, rs=None, rko=None, sheet_checked=None, maps_loaded=_at(0), aggregators={}
+    )
+    assert [r.kind for r in rows] == ["rs", "rko", "maps"]

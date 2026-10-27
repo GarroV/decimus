@@ -388,6 +388,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0101_ratings_layout_clients.sql": (
         "sql1:9764e2b874a66efb0cee4fd359f62e70006b4df4cb7b13ce3a834d02d5e4486e"
     ),
+    # Порядок блоков «Рейтингов» по ярусам D658 на свежей базе (демо).
+    "0102_ratings_layout_d658_order.sql": (
+        "sql1:fe8730cc5d55c79627558de595033d23ba22582ea55f2bdb3415fdaccf4c9dc0"
+    ),
 }
 
 
