@@ -250,6 +250,9 @@ known_first_party = [
     "seed_ratings_demo",
     "open_demo_ratings",
     "open_demo_training",
+    "open_demo_notices",
+    "open_demo_people",
+    "open_demo_reviews",
 ]
 # engine/ сканируется: иначе объявленные зависимости движка выглядят
 # неиспользуемыми, и проверку пришлось бы глушить списком исключений.

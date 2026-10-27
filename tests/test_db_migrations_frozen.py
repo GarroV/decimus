@@ -392,6 +392,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0102_ratings_layout_d658_order.sql": (
         "sql1:fe8730cc5d55c79627558de595033d23ba22582ea55f2bdb3415fdaccf4c9dc0"
     ),
+    # Списки копий раздела «Письма и уведомления» (D667, #1130).
+    "0103_mailing_cc.sql": (
+        "sql1:e05ad23f1a6e5a1782234dab382d94723e08a15cf572c8f415fd02f6136b5e2f"
+    ),
 }
 
 
