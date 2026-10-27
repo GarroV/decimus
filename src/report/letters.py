@@ -169,6 +169,18 @@ FINDING_TEXT_FIELD = "finding wording in the letter language"
 #: и со смешанными языками: правило блока — «отдаётся, но НЕ молча».
 BLANK_TEXT_FIELD = "finding wording, missing in every language"
 
+#: Чего не хватает письму, когда обратная связь аудитора («сильные стороны» и «зоны
+#: роста», D663) записана не на языке письма. Слова аудитора не переводит никто,
+#: поэтому блок в письмо НЕ вставлен — молча подставить чужой язык значило бы
+#: отправить партнёру половину письма на языке, которого он может не знать.
+#: Отправитель обязан узнать об этом до отправки и добавить перевод руками.
+FEEDBACK_LANG_FIELD = "auditor feedback not in the letter language"
+
+#: Шаблоны письма (D664): 1 — сильные стороны до нарушений, зоны роста после;
+#: 2 — обе части в конце. Тексты и порядок блоков — в движке (`engine/report.py`).
+TEMPLATES = (1, 2)
+DEFAULT_TEMPLATE = 1
+
 #: Переменная, из которой берётся боевая методика. Имя названо в отказе:
 #: абсолютного пути в ответе быть не должно (T120), а чинить человеку что-то
 #: надо.
@@ -291,6 +303,33 @@ def _lang(detail: InspectionDetail, asked: str | None) -> str:
     return value
 
 
+def _template(asked: int | None) -> int:
+    """Шаблон письма: названный или первый. Незнакомый — отказ, а не молчаливая замена."""
+    if asked is None:
+        return DEFAULT_TEMPLATE
+    if asked not in TEMPLATES:
+        raise LetterError(
+            f"Шаблона письма «{asked}» нет. Доступны: {', '.join(map(str, TEMPLATES))}"
+        )
+    return asked
+
+
+def _speech_lang(detail: InspectionDetail) -> str:
+    """Язык, на котором записана обратная связь аудитора (язык речи проверки).
+
+    Карточка отдаёт его прямо (`InspectionRow.speech_lang`); а если нет — это язык
+    записанных находок: они приходят на языке речи той же проверки
+    (`FindingRow.lang`). Не нашлось ни того ни другого — пусто, и движок берёт
+    язык шапки (до конца обхода язык отчёта равен языку чек-листа, D415).
+    """
+    прямо = (getattr(detail.inspection, "speech_lang", "") or "").strip()
+    if прямо:
+        return прямо
+    языки = {(находка.lang or "").strip() for находка in detail.findings}
+    языки.discard("")
+    return next(iter(языки)) if len(языки) == 1 else ""
+
+
 def _city_word(value: str, lang: str) -> str:
     """Город для людей: код справочника — названием на языке письма (#460).
 
@@ -402,6 +441,10 @@ def state_json(
                 "type": kind_title(строка.kind, lang),
                 "date": строка.inspection_date.isoformat(),
                 "lang": lang,
+                # Язык, на котором записана обратная связь (D663): письмо на другом
+                # языке её не вставляет. Нет сведений — ключа нет, и движок
+                # сверяется с языком шапки.
+                **({"speech_lang": речь} if (речь := _speech_lang(detail)) else {}),
             },
             "findings": [
                 {
@@ -628,6 +671,7 @@ def _status(
     языки_находок: list[str],
     язык: str,
     пустые: list[int],
+    обратная_связь: list[str] | None = None,
 ) -> str:
     """Прямой ответ на вопрос «это можно отправлять».
 
@@ -652,7 +696,7 @@ def _status(
     Найти её в тексте иначе как по номеру нечем: кода пункта письмо не
     печатает вовсе.
     """
-    if not шапки_нет and not срока_нет and not языки_находок and not пустые:
+    if not шапки_нет and not срока_нет and not языки_находок and not пустые and not обратная_связь:
         return (
             "letter rebuilt on the methodology version this inspection was scored by; "
             "the score the engine computed matches the one recorded"
@@ -682,6 +726,13 @@ def _status(
             f"wording and is never machine-translated, so the letter is mixed-language by "
             f"design and the findings need a human translation before it goes to the partner."
         )
+    if обратная_связь:
+        предложения.append(
+            f"The auditor's feedback (strengths and growth areas) is recorded in a language "
+            f"other than the letter's {язык}, so it was NOT inserted into the letter and is "
+            f"never machine-translated: it is the auditor's own wording. Add a translation "
+            f"by hand before sending, or build the letter in the language it was written in."
+        )
     if пустые:
         сколько = "finding" if len(пустые) == 1 else "findings"
         предложения.append(
@@ -703,15 +754,17 @@ def _status(
 #: вход даёт тот же текст, а любая правка записи меняет вход и ключ. Кэш в
 #: процессе, ограничен по числу, при перезапуске пуст.
 LETTER_CACHE_SIZE = 256
-_letters: OrderedDict[str, str] = OrderedDict()
+_letters: OrderedDict[str, tuple[str, tuple[str, ...]]] = OrderedDict()
 _letters_lock = threading.Lock()
 
 
-def _letter_key(вход: str, detail: InspectionDetail, *, язык: str, каталог: Path) -> str:
+def _letter_key(
+    вход: str, detail: InspectionDetail, *, язык: str, каталог: Path, шаблон: int
+) -> str:
     # Записанная оценка — в ключе: её сверяет `_verify`, и расхождение с движком
     # обязано всплыть отказом на каждом показе, а не только на первом.
     оценка = f"{detail.inspection.pct}\0{detail.inspection.grade}"
-    return hashlib.sha256(f"{каталог}\0{язык}\0{оценка}\0{вход}".encode()).hexdigest()
+    return hashlib.sha256(f"{каталог}\0{язык}\0{шаблон}\0{оценка}\0{вход}".encode()).hexdigest()
 
 
 def clear_letter_cache() -> None:
@@ -720,9 +773,16 @@ def clear_letter_cache() -> None:
         _letters.clear()
 
 
-def _letter_text(вход: str, detail: InspectionDetail, *, язык: str, каталог: Path) -> str:
-    """Текст письма: из кэша по входу либо сверка оценки и сборка движком."""
-    ключ = _letter_key(вход, detail, язык=язык, каталог=каталог)
+def _letter_text(
+    вход: str, detail: InspectionDetail, *, язык: str, каталог: Path, шаблон: int
+) -> tuple[str, tuple[str, ...]]:
+    """Текст письма и роли обратной связи, не вставленные из-за языка (D663).
+
+    Из кэша по входу либо сверка оценки и сборка движком. Движок отдаёт письмо
+    JSON-ом: рядом с текстом идёт перечень не вставленного, и он обязан доехать
+    до отправителя вместе с текстом, а не потеряться на stderr подпроцесса.
+    """
+    ключ = _letter_key(вход, detail, язык=язык, каталог=каталог, шаблон=шаблон)
     with _letters_lock:
         if ключ in _letters:
             _letters.move_to_end(ключ)
@@ -732,22 +792,38 @@ def _letter_text(вход: str, detail: InspectionDetail, *, язык: str, ка
         состояние.write_text(вход, encoding="utf-8")
         _verify(detail, каталог, состояние)
         код, письмо, ошибки = _run(
-            REPORT_SCRIPT, ["letter", f"--lang={язык}"], data_dir=каталог, state=состояние
+            REPORT_SCRIPT,
+            ["letter", f"--lang={язык}", f"--template={шаблон}", "--json"],
+            data_dir=каталог,
+            state=состояние,
         )
         if код != 0:
             raise LetterError(
                 f"Движок не собрал письмо: {_clean(письмо + ошибки, каталог, состояние.parent)}"
             )
-        текст = письмо.strip()
+        try:
+            ответ = json.loads(письмо)
+            текст = str(ответ["text"]).strip()
+            пропущено = tuple(str(роль) for роль in ответ["feedback_skipped"])
+        except (json.JSONDecodeError, KeyError, TypeError):
+            raise LetterError(
+                "Движок ответил на сборку письма не разбираемым JSON — письмо не собрано"
+            ) from None
     if текст:
         with _letters_lock:
-            _letters[ключ] = текст
+            _letters[ключ] = (текст, пропущено)
             while len(_letters) > LETTER_CACHE_SIZE:
                 _letters.popitem(last=False)
-    return текст
+    return текст, пропущено
 
 
-def build(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> dict[str, object]:
+def build(
+    detail: InspectionDetail,
+    *,
+    lang: str | None,
+    papers: Papers,
+    template: int | None = None,
+) -> dict[str, object]:
     """Собрать письмо партнёру по записанной проверке.
 
     Возвращается записанная оценка, текст письма и прямой ответ на вопрос,
@@ -791,6 +867,13 @@ def build(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> dict
     может. Заметить её в тексте всё равно нечем — по виду она не отличается от
     соседних, — потому `status` и называет НОМЕРА таких находок.
 
+    **Обратная связь аудитора** («сильные стороны» и «зоны роста», D663) идёт в
+    письмо текстом аудитора как есть, роль у пункта методики — колонкой
+    `letter_role`, а не по тексту вопроса. Два шаблона на выбор отправителя
+    (`template`, D664). Записана она на языке речи аудитора; письмо на другом
+    языке её НЕ получает и об этом говорит вслух (`FEEDBACK_LANG_FIELD`): такой
+    блок — слова аудитора, и машинным переводом их не подменить.
+
     Штатным путём такая находка не получается (слив пишет строку на языке речи
     аудитора), но слой чтения к ней готов, и строка из базы не имеет права
     заставить письмо соврать.
@@ -803,14 +886,16 @@ def build(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> dict
     срока_нет = not detail.info
     языки_находок = _wording_langs(detail, lang=язык)
     пустые = _blank_wordings(detail)
+    шаблон = _template(template)
+    вход = state_json(detail, lang=язык)
+    текст, обратная_связь = _letter_text(вход, detail, язык=язык, каталог=каталог, шаблон=шаблон)
     не_восстановлено = [
         *шапки_нет,
         *([PLAN_DUE_FIELD] if срока_нет else []),
         *([FINDING_TEXT_FIELD] if языки_находок else []),
         *([BLANK_TEXT_FIELD] if пустые else []),
+        *([FEEDBACK_LANG_FIELD] if обратная_связь else []),
     ]
-    вход = state_json(detail, lang=язык)
-    текст = _letter_text(вход, detail, язык=язык, каталог=каталог)
     if not текст:
         raise LetterError(
             "Сборщик письма отчитался об успехе и вернул пустой текст — отправлять партнёру нечего"
@@ -818,6 +903,7 @@ def build(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> dict
     готово = not не_восстановлено
     return {
         "lang": язык,
+        "template": шаблон,
         "report_lang": detail.inspection.report_lang,
         "checklist_version": detail.inspection.checklist_version,
         "methodology": откуда,
@@ -833,6 +919,7 @@ def build(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> dict
             языки_находок=языки_находок,
             язык=язык,
             пустые=пустые,
+            обратная_связь=list(обратная_связь),
         ),
     }
 

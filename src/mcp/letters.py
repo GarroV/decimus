@@ -18,12 +18,14 @@ from typing import Any
 from ..db.models import InspectionDetail
 from ..report.letters import BLANK_TEXT_FIELD as BLANK_TEXT_FIELD
 from ..report.letters import COVER_FIELDS as COVER_FIELDS
+from ..report.letters import FEEDBACK_LANG_FIELD as FEEDBACK_LANG_FIELD
 from ..report.letters import FINDING_TEXT_FIELD as FINDING_TEXT_FIELD
 from ..report.letters import FROM_LIVE as FROM_LIVE
 from ..report.letters import FROM_SHELF as FROM_SHELF
 from ..report.letters import FROM_SNAPSHOT as FROM_SNAPSHOT
 from ..report.letters import PLAN_DUE_FIELD as PLAN_DUE_FIELD
 from ..report.letters import REPORT_SCRIPT as REPORT_SCRIPT
+from ..report.letters import TEMPLATES as TEMPLATES
 from ..report.letters import VERSIONS_DIR as VERSIONS_DIR
 from ..report.letters import LetterError
 from ..report.letters import Papers as Papers
@@ -63,9 +65,11 @@ def pinned(version: str, papers: Papers) -> Any:
         raise ToolError(str(отказ)) from None
 
 
-def build(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> dict[str, Any]:
+def build(
+    detail: InspectionDetail, *, lang: str | None, papers: Papers, template: int | None = None
+) -> dict[str, Any]:
     """Собрать письмо — или отказать словами, понятными клиенту протокола."""
     try:
-        return _build(detail, lang=lang, papers=papers)
+        return _build(detail, lang=lang, papers=papers, template=template)
     except LetterError as отказ:
         raise ToolError(str(отказ)) from None

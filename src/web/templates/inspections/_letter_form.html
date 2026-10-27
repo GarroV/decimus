@@ -6,6 +6,9 @@
   (`data-panel-form`), черновик в почте — обычной отправкой (окно согласия
   Google, `data-full-submit`).
 #}
+{#- Явно выбранный шаблон (D664) переезжает в адреса языка и «Вернуть заготовку»:
+    смена языка не должна молча возвращать шаблон 1. Не выбирали — в адресе его нет. -#}
+{%- set template_q = ('&amp;letter_template=' ~ letter_template)|safe if letter_template_explicit else '' %}
 {%- if in_panel %}
   {%- set letter_base = registry_here(inspection=head.id, view='letter', lang=lang) %}
   {%- set drawer_attr = ' data-drawer-open'|safe %}
@@ -57,7 +60,21 @@
           {# Выпадающий список, а не ряд кнопок (D611); значение пункта — адрес пересборки. #}
           <select class="pickselect" data-pick-nav aria-label="{{ t('letter.lang.pick') }}"{{ drawer_attr }}>
             {% for код in letter_langs %}
-              <option value="{{ letter_base }}&amp;letter_lang={{ код }}"{% if код == letter_lang %} selected{% endif %}>{{ код|upper }}</option>
+              <option value="{{ letter_base }}&amp;letter_lang={{ код }}{{ template_q }}"{% if код == letter_lang %} selected{% endif %}>{{ код|upper }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {#
+          Шаблон ПИСЬМА (D664): порядок обратной связи аудитора — сильные стороны до
+          нарушений, зоны роста после (1), либо обе части в конце (2). Выбор
+          пересобирает текст в поле, но сохранённое письмо не трогает: оно остаётся
+          в истории, пока человек сам не нажмёт «Сохранить». Тоже переход, а не поле.
+        #}
+        <div class="lt__lang" title="{{ t('letter.template.note') }}">
+          <span class="lt__lang-label">{{ t('letter.template.label') }}</span>
+          <select class="pickselect" data-pick-nav aria-label="{{ t('letter.template.pick') }}"{{ drawer_attr }}>
+            {% for номер in letter_templates %}
+              <option value="{{ letter_base }}&amp;letter_lang={{ letter_lang }}&amp;letter_template={{ номер }}"{% if номер == letter_template %} selected{% endif %}>{{ t('letter.template.option', n=номер) }}</option>
             {% endfor %}
           </select>
         </div>
@@ -78,7 +95,7 @@
             правку, даже если человек откажется в окне Google.
           #}
           {% if правится %}
-            <a class="btn btn--ghost" href="{{ letter_base }}&amp;letter_lang={{ letter_lang }}&amp;draft=1"{{ drawer_attr }}>{{ t('letter.draft.restore') }}</a>
+            <a class="btn btn--ghost" href="{{ letter_base }}&amp;letter_lang={{ letter_lang }}{{ template_q }}&amp;draft=1"{{ drawer_attr }}>{{ t('letter.draft.restore') }}</a>
           {% endif %}
           {# Черновик и фиксация — запись от имени пространства: у
              проверки, которую вошедший только читает (УК у партнёра, D283),

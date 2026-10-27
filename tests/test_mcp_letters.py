@@ -424,7 +424,8 @@ def test_пустое_письмо_с_нулевым_кодом_тоже_отк�
 
     def _подмена(script: Path, args: list[str], **kwargs: object) -> tuple[int, str, str]:
         if script == letters.REPORT_SCRIPT:
-            return 0, "   \n", ""
+            пустое = {"text": "   \n", "feedback_skipped": [], "feedback_lang": "ru"}
+            return 0, json.dumps(пустое), ""
         return настоящий(script, args, **kwargs)  # type: ignore[arg-type]
 
     monkeypatch.setattr(letters, "_run", _подмена)

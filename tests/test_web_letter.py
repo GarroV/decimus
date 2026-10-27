@@ -34,6 +34,7 @@ from web_harness import войти, подменить_двери, собрат�
 from src.domain.models import TEXT_LANGS
 from src.report.letters import (
     BLANK_TEXT_FIELD,
+    FEEDBACK_LANG_FIELD,
     FROM_SNAPSHOT,
     PLAN_DUE_FIELD,
     LetterError,
@@ -190,7 +191,9 @@ def test_выбранный_язык_доезжает_до_сборщика(
     # Arrange
     спрошено: list[str | None] = []
 
-    def запомнить(_detail: Any, *, lang: str | None, papers: Any) -> dict[str, object]:
+    def запомнить(
+        _detail: Any, *, lang: str | None, papers: Any, template: int | None = None
+    ) -> dict[str, object]:
         спрошено.append(lang)
         return собранное(lang=lang or "en")
 
@@ -210,7 +213,9 @@ def test_язык_по_умолчанию_это_язык_отчёта_пров�
     # Arrange
     спрошено: list[str | None] = []
 
-    def запомнить(_detail: Any, *, lang: str | None, papers: Any) -> dict[str, object]:
+    def запомнить(
+        _detail: Any, *, lang: str | None, papers: Any, template: int | None = None
+    ) -> dict[str, object]:
         спрошено.append(lang)
         return собранное()
 
@@ -329,3 +334,80 @@ def test_со_страницы_письма_назад_в_реестр_а_не_�
     страница = стенд.get(f"/inspections/{ПРОВЕРКА}/letter?lang=ru").get_data(as_text=True)
     назад = страница.split('class="back"', 1)[1].split(">", 1)[0]
     assert f"/inspections?inspection={ПРОВЕРКА}" in назад
+
+
+# --- шаблон письма и язык обратной связи (D663, D664) --------------------------
+
+
+def test_переключатель_шаблона_и_выбор_доезжает_до_сборщика(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Шаблон 1 и 2 предлагаются; выбранный уходит сборщику, а не теряется на странице."""
+    # Arrange
+    запросы: list[object] = []
+
+    def сборка(*_a: object, **k: object) -> dict[str, object]:
+        запросы.append(k.get("template"))
+        return собранное()
+
+    monkeypatch.setattr(data, "build_letter", сборка)
+
+    # Act
+    обычная = стенд.get(f"/inspections/{ПРОВЕРКА}/letter").get_data(as_text=True)
+    второй = стенд.get(f"/inspections/{ПРОВЕРКА}/letter?letter_template=2").get_data(as_text=True)
+
+    # Assert — оба шаблона в списке, по умолчанию не выбран явно ничего.
+    assert "Шаблон 1" in обычная and "Шаблон 2" in обычная
+    assert "letter_template=2" in обычная
+    assert запросы == [None, 2], "шаблон не дошёл до сборщика письма"
+    # Явный выбор переезжает в адреса языка: смена языка не сбрасывает шаблон.
+    assert "letter_lang=en&amp;letter_template=2" in второй
+
+
+def test_выбор_шаблона_не_трогает_сохранённое_письмо(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Сохранённое письмо правится по умолчанию; выбор шаблона — явное действие.
+
+    Он показывает в поле свежую пересборку, а запись остаётся на месте: письмо
+    партнёру могло уже уйти, и подменять его без команды человека нельзя.
+    """
+    # Arrange
+    записанное = SimpleNamespace(
+        id="1",
+        body="Правленое человеком письмо",
+        lang="en",
+        saved_by="director",
+        created_at=datetime(2026, 9, 21, 12, 0, tzinfo=UTC),
+    )
+    monkeypatch.setattr(data, "saved_letter", lambda *_a, **_k: записанное)
+
+    # Act
+    обычная = стенд.get(f"/inspections/{ПРОВЕРКА}/letter").get_data(as_text=True)
+    выбран = стенд.get(f"/inspections/{ПРОВЕРКА}/letter?letter_template=2").get_data(as_text=True)
+
+    # Assert
+    assert "Правленое человеком письмо" in обычная
+    assert "Правленое человеком письмо" not in выбран
+    assert "Your inspection scored 92%." in выбран
+    assert "director" in выбран, "запись исчезла из виду"
+
+
+def test_обратная_связь_не_на_языке_письма_называется_словами(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Блок не вставлен — отправитель видит это на экране до отправки (D663)."""
+    # Arrange
+    monkeypatch.setattr(
+        data,
+        "build_letter",
+        lambda *_a, **_k: собранное(not_restored=[FEEDBACK_LANG_FIELD], ready_to_send=False),
+    )
+
+    # Act
+    страница = стенд.get(f"/inspections/{ПРОВЕРКА}/letter").get_data(as_text=True)
+
+    # Assert
+    assert "Отправлять как есть нельзя" in страница
+    assert "обратная связь аудитора" in страница and "не вставлена" in страница
+    assert FEEDBACK_LANG_FIELD not in страница, "код сборщика попал на экран вместо слов"

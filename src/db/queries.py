@@ -163,7 +163,7 @@ select
     -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
     i.checklist_code,
     i.status, i.accepted_at, i.accepted_by,
-    i.origin,
+    i.origin, i.speech_lang,
     i.deductions, i.counts, i.by_zone, i.by_process,
     i.reported_status, i.legacy_method
 from inspections i
@@ -323,6 +323,10 @@ def _row_to_inspection(row: Mapping[str, Any]) -> InspectionRow:
         accepted_by=str(row["accepted_by"] or ""),
         # Происхождение (0042, D334): колонка `not null default 'field'`.
         origin=str(row["origin"]),
+        # Язык речи аудитора читает только карточка (`_GET_INSPECTION_SQL`): по нему
+        # письмо решает, на языке ли документа записана обратная связь (D663).
+        # В списках колонки нет — пустая строка, а не выдуманный язык.
+        speech_lang=str(row.get("speech_lang") or ""),
     )
 
 

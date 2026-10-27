@@ -326,6 +326,21 @@ _DAYS_PROPERTY: dict[str, object] = {
     "description": "Deadline to fix a violation of this item, in days.",
 }
 
+#: Роль информационного поля в письме и отчёте (D663) — общая для add_checklist_item
+#: и edit_checklist_item. Связь с письмом идёт кодом пункта, а не его текстом.
+_LETTER_ROLE_PROPERTY: dict[str, object] = {
+    "type": "string",
+    "enum": ["strengths", "growth", "none"],
+    "description": (
+        "Role of an information item in the partner letter and the report "
+        "(D663): 'strengths' puts the auditor's answer into the letter as "
+        "'what is going well' and into the report's Feedback block; 'growth' "
+        "does the same for 'what to work on'; 'none' removes the role. The "
+        "auditor's text goes in as written. Omit to keep the current value. "
+        "Meaningful only for items of kind info."
+    ),
+}
+
 #: Классы критичности — общие для add_checklist_item и edit_checklist_item;
 #: обязательность в схеме решает `required`, а не эта строка.
 _LEVELS_PROPERTY: dict[str, object] = {
@@ -557,6 +572,13 @@ TOOLS: tuple[ToolSpec, ...] = (
             "any inspection of this tenant. A current inspection uploaded "
             "through import_* gets a letter like any other; a historical one "
             "is refused (its score is from the old report)."
+            " For a template the auditor's feedback (strengths and growth areas of "
+            "the pizzeria) goes into the letter as written, never translated: "
+            "if it is recorded in a language other than the letter's, it is "
+            "NOT inserted and 'not_restored' lists "
+            "'auditor feedback not in the letter language' — add a translation "
+            "by hand or build the letter in the language it was written in. "
+            "'template' (1 or 2) picks the template's order of that feedback."
         ),
         input_schema={
             "type": "object",
@@ -580,6 +602,19 @@ TOOLS: tuple[ToolSpec, ...] = (
                         "true: ignore the saved letter and build a new "
                         "template from the recorded inspection (the saved "
                         "one stays untouched). Default false."
+                    ),
+                },
+                "template": {
+                    "type": "integer",
+                    "enum": [1, 2],
+                    "description": (
+                        "Letter template (D664). 1 (default): the auditor's "
+                        "strengths of the pizzeria right after the grade, the "
+                        "violations after them, the growth areas after the "
+                        "violations. 2: the violations as usual and both "
+                        "feedback parts at the end, before the thanks. The "
+                        "feedback text is the auditor's own, inserted as "
+                        "written; a part with no text has no block."
                     ),
                 },
             },
@@ -848,6 +883,7 @@ TOOLS: tuple[ToolSpec, ...] = (
                         "same state."
                     ),
                 },
+                "letter_role": _LETTER_ROLE_PROPERTY,
                 "version_name": _VERSION_NAME_PROPERTY,
                 "note": _NOTE_PROPERTY,
             },
@@ -910,6 +946,7 @@ TOOLS: tuple[ToolSpec, ...] = (
                         "New D1/D2/D3 criteria text for this item. Omit to keep the current value."
                     ),
                 },
+                "letter_role": _LETTER_ROLE_PROPERTY,
                 "version_name": _VERSION_NAME_PROPERTY,
                 "note": _NOTE_PROPERTY,
             },

@@ -10,6 +10,8 @@
   manage.py remove PRD42 [--hard]          выключить вопрос (или удалить строку совсем)
   manage.py restore PRD42                  включить обратно
   manage.py edit PRD42 --levels D1;D2;D3 --days 7 --zones "*"
+  manage.py edit INF01 --letter-role strengths   роль информационного поля в письме и отчёте:
+                strengths | growth | none (D663); колонка letter_role
   manage.py zone-add --code terrace --name-ru "Терраса" [--name-en "Terrace"] \
                 (--share 5 | --equal-shares)
   manage.py zone-remove terrace (--keep-shares | --equal-shares)
@@ -47,7 +49,7 @@ import argparse, csv, json, os, re, shutil, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from audit import (  # noqa: E402
-    ZONE_SHARE_TOLERANCE, ZONE_SHARE_TOTAL, active_dir, data_path, is_comment_row, load_zones,
+    LETTER_ROLES, ZONE_SHARE_TOLERANCE, ZONE_SHARE_TOTAL, active_dir, data_path, is_comment_row, load_zones,
 )
 
 PLUGIN_DATA = os.path.normpath(os.path.join(HERE, os.pardir, "data"))
@@ -249,6 +251,9 @@ def cmd_add(a):
            "process_en": a.process_en or a.process or "", "question_ru": a.question_ru or "",
            "question_en": a.question_en or "", "levels": levels, "zones": zones,
            "days": a.days if a.days is not None else 10}
+    role = letter_role_arg(a.letter_role)
+    if role:
+        row["letter_role"] = role
     rows.append(row)
     write_rows(rows, d)
     if a.criteria:
@@ -300,6 +305,23 @@ def check_zone_codes(zones):
         sys.exit(f"Неизвестные зоны: {', '.join(bad)}. Доступны: {', '.join(sorted(zc))}")
 
 
+def letter_role_arg(value):
+    """Роль пункта в письме и отчёте (D663): `strengths`, `growth` или `none` — снять.
+
+    Возвращает значение для колонки `letter_role`; пусто — роли нет. Опечатка —
+    отказ: молча принятая, она убрала бы блок из письма партнёру.
+    """
+    if value is None:
+        return ""
+    v = value.strip().lower()
+    if v in ("", "none"):
+        return ""
+    if v not in LETTER_ROLES:
+        sys.exit(f"Неизвестная роль в письме «{value}». Допустимо: {', '.join(LETTER_ROLES)}, "
+                 f"none — снять")
+    return v
+
+
 def cmd_edit(a):
     check_zone_codes(a.zones)
     d = target_dir(create=True)
@@ -320,6 +342,8 @@ def cmd_edit(a):
             r["levels"] = ";".join(x.strip().upper() for x in re.split(r"[;,]", a.levels) if x.strip())
         if a.days is not None:
             r["days"] = a.days
+        if a.letter_role is not None:
+            r["letter_role"] = letter_role_arg(a.letter_role)
     if not found:
         sys.exit(f"Нет вопроса {a.id}")
     write_rows(rows, d)
@@ -869,13 +893,15 @@ def main():
     f = s.add_parser("fork"); f.add_argument("--dir"); f.set_defaults(fn=cmd_fork)
     l = s.add_parser("list"); l.add_argument("--process"); l.add_argument("--q"); l.set_defaults(fn=cmd_list)
     ad = s.add_parser("add")
-    for x in ("id", "process", "process-en", "question-ru", "question-en", "levels", "zones", "criteria", "kind"):
+    for x in ("id", "process", "process-en", "question-ru", "question-en", "levels", "zones", "criteria", "kind",
+              "letter-role"):
         ad.add_argument("--" + x)
     ad.add_argument("--days", type=int); ad.set_defaults(fn=cmd_add)
     rm = s.add_parser("remove"); rm.add_argument("id"); rm.add_argument("--hard", action="store_true"); rm.set_defaults(fn=cmd_remove)
     rs = s.add_parser("restore"); rs.add_argument("id"); rs.set_defaults(fn=cmd_restore)
     ed = s.add_parser("edit"); ed.add_argument("id")
-    for x in ("process", "process-en", "question-ru", "question-en", "levels", "zones", "criteria", "kind"):
+    for x in ("process", "process-en", "question-ru", "question-en", "levels", "zones", "criteria", "kind",
+              "letter-role"):
         ed.add_argument("--" + x)
     ed.add_argument("--days", type=int); ed.set_defaults(fn=cmd_edit)
     za = s.add_parser("zone-add"); za.add_argument("--code", required=True); za.add_argument("--name-ru", required=True); za.add_argument("--name-en")
