@@ -28,6 +28,8 @@ from src.dodois import client, service
     "src/dodois/service.py",
     "src/dodois/flow.py",
     "src/db/dodois_logins.py",
+    "src/dodois/metrics.py",
+    "src/bot/dodois_metrics_loader.py",
     "src/web/dodois_screen.py",
     "src/web/dodois_connect.py",
     "src/bot/dodois_loader.py",

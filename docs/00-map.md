@@ -418,7 +418,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,country_report_langs,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,dodois_metrics,dodois_metrics_store,country_contracts,country_report_langs,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -428,6 +428,8 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
 | `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
 | `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
+| `src/db/dodois_metrics.py` | Чтение данных Dodo IS для страницы «Качество» (D671, миграция `0105`): продажи, агрегаторы, КР |
+| `src/db/dodois_metrics_store.py` | Запись данных Dodo IS для «Качества» (D671, миграция `0105`): замена месяца и журнал загрузки |
 | `src/db/health_store.py` | Двери базы для вкладки «Подключения» (D638): исходы проб и последние заходы сборов |
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
@@ -574,6 +576,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0102_ratings_layout_d658_order.sql` | D658: порядок блоков «Рейтингов» по ярусам — верхний «Средний», «Нарушения», «Top-10»; средний «Оценки клиентов», «Карты», «Агрегаторы», «Стабильно ниже»; нижний «Хард»… |
 | `0103_mailing_cc.sql` | Списки копий раздела «Письма и уведомления» (D608, #1130, #977): почты сотрудников УК, которые подставляются в «Копию» черновика письма |
 | `0104_mailing_templates.sql` | Шаблоны писем УК (D550, D608, #977, #1130): текст письма партнёру по проверке, который правит админ УК, с историей версий |
+| `0105_dodois_metrics.sql` | Данные Dodo IS для страницы «Качество» по пиццериям и месяцам (D671): продажи по источнику и каналу, заказы агрегаторов, оценки клиентов (КР), оценки РКО и РС по… |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -655,6 +658,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/config.py` | Окружение бота: токен, кому отвечать, как запускаться |
 | `src/bot/dates.py` | Разбор даты из живой фразы аудитора — перенесён в домен (`src/domain/dates.py`) |
 | `src/bot/dodois_loader.py` | Входы в Dodo IS по странам: ночью продлевает, раз в час проверяет «открыто X из Y» (D640) |
+| `src/bot/dodois_metrics_loader.py` | Данные Dodo IS для «Качества» по странам: продажи, агрегаторы, оценки клиентов (D671) |
 | `src/bot/errors.py` | Отказы блока `bot` |
 | `src/bot/finish_translate.py` | Автоперевод комментариев при сборке отчёта (D443) |
 | `src/bot/frame_copies.py` | Копии присланных кадров на диске площадки, на 7 дней (#367, решение владельца D179) |
@@ -781,11 +785,26 @@ JSON-RPC поверх одного POST на локальной петле, ли
 правила — `src/domain/dodois.py`, база — `src/db/dodois_logins.py`, экраны — `src/web/dodois_screen.py`,
 `src/web/dodois_connect.py`.
 
+Те же входы кормят страницу «Качество» (D671): раз в сутки бот (`src/bot/dodois_metrics_loader.py`,
+замок `DODOIS_METRICS_LOCK_KEY`) собирает по странам продажи по источнику и каналу
+(`finances/sales/units`), заказы агрегаторов (`accounting/sales`, `orderSource=Aggregator`) и оценки
+клиентов (`customer-feedback/customer-ratings`) в агрегаты «пиццерия × месяц»: сбор —
+`src/dodois/metrics.py`, разбор и суммы — `src/domain/dodois_metrics.py`, запись —
+`src/db/dodois_metrics_store.py`, чтение для страницы — `src/db/dodois_metrics.py`, таблицы —
+миграция `0105` (`dodois.unit_sales_month`, `unit_aggregator_month`, `unit_kr_month`,
+`unit_rating_period`, `unit_checkup_period`, `metric_loads`); к ним — оценки РКО и РС по неделям и
+счёт проверок (`controlling/ratings/{customer-experience,standards}/history`, `controlling/checkups`,
+без префикса страны, вид загрузки `ratings`). Ключи сбор не продлевает: это дело `service.run_pass`. Первая удачная загрузка вида
+берёт 12 полных месяцев и текущий, дальше — прошлый и текущий, месяц заменяется целиком. Формат
+ответов продаж и заказов в открытой документации не расписан полем за полем: разбор терпимый, а
+непонятная форма пишется неудачей загрузки с именами ключей (без значений).
+
 <!-- map:begin files src/dodois/*.py -->
 | Файл | Что делает |
 |---|---|
 | `src/dodois/client.py` | Разговор с Dodo IS: вход устройства, продление, имя учётки, счёт открытых пиццерий (D640) |
 | `src/dodois/flow.py` | Вход по ссылке: сервер начинает device flow, сам опрашивает Dodo IS и пишет вход (D640) |
+| `src/dodois/metrics.py` | Суточный сбор данных Dodo IS для «Качества» по странам (D671): продажи, агрегаторы, КР |
 | `src/dodois/service.py` | Входы в Dodo IS по странам: записать вход, продлить, проверить «открыто X из Y» (D640) |
 <!-- map:end -->
 
@@ -871,6 +890,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/dates.py` | Разбор даты из живой фразы аудитора (задача #220) |
 | `src/domain/demo.py` | Открытое демо: учётки ролей и переключатели — контракт между посевом и входом |
 | `src/domain/dodois.py` | Входы в Dodo IS по странам (D640, #951): правила без базы и сети |
+| `src/domain/dodois_metrics.py` | Данные Dodo IS для страницы «Качество» (D671): разбор ответов и свёртка в «пиццерия × месяц» |
 | `src/domain/edition.py` | Издание методики, на котором идёт проверка, и его снимок рядом с состоянием |
 | `src/domain/engine.py` | Вызов движка подпроцессом — единственный способ, которым блок его трогает |
 | `src/domain/errors.py` | Отказы блока `domain` |
