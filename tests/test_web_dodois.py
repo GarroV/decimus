@@ -320,7 +320,12 @@ def test_второй_шаг_не_пройден_в_этой_сессии_отк
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _сессия_с(monkeypatch, passed_second_step=False)
-    assert _выдать(стенд[0])[0].status_code == 403 and ссылки.зовы == []
+    ответ, _ = _выдать(стенд[0], "BG")
+    assert ответ.status_code == 403 and ссылки.зовы == []
+    # Отказ несёт кнопку «Подтвердить» с возвратом на вкладку с выбранной страной (D670).
+    html = ответ.get_data(as_text=True)
+    assert "подтвердите, что это вы" in html
+    assert 'href="/settings/security?next=%2Fadministration%3Ftab%3Ddodois%26country%3DBG"' in html
 
 
 # --- выдача: ссылка видна один раз, токена нигде нет ---------------------------------------

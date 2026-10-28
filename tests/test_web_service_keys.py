@@ -345,7 +345,8 @@ def test_без_второго_шага_входа_отказ_с_понятны�
     ответ = _отправить(стенд[0], "pointer", действие)
     html = ответ.get_data(as_text=True)
     assert ответ.status_code == 403
-    assert "Включите второй шаг входа в Настройки → Безопасность" in html
+    assert "включите второй шаг входа" in html
+    assert 'href="/settings/security"' in html and "Включить" in html
     assert склад.зовы == []
 
 
@@ -359,7 +360,10 @@ def test_второй_шаг_не_пройден_в_этой_сессии_отк
     _сессия_с(monkeypatch, passed_second_step=False)
     ответ = _отправить(стенд[0], "pointer", "save")
     assert ответ.status_code == 403
-    assert "Подтвердите второй шаг входа" in ответ.get_data(as_text=True)
+    html = ответ.get_data(as_text=True)
+    assert "подтвердите, что это вы" in html
+    # Кнопка «Подтвердить» ведёт на защиту с возвратом на ту же вкладку (D670).
+    assert 'href="/settings/security?next=%2Fadministration%3Ftab%3Dkeys"' in html
     assert склад.зовы == []
 
 

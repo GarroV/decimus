@@ -8,6 +8,7 @@
   подсказки об удалении, состояние ключей одной строкой.
 #}
 {% set key_icon = {'openai': 'spark', 'pointer': 'globe', 'ispring': 'book', 'dodois': 'link'} %}
+{% from "users/_key_refusal.html" import refusal_text with context %}
 {% macro key_panel(svc, ks, back='', title='', compact=false) %}
     {% set own_flash = ks.flash and ks.flash.service == svc.code %}
     <div class="sconn__panel{{ ' sconn__panel--compact' if compact else '' }}" id="service-key-{{ svc.code }}">
@@ -15,7 +16,7 @@
         <small><span class="sdot{{ ' sdot--ok' if svc.state in ('db', 'env') else '' }}"></span>{{ t('keys.status.' ~ svc.state) }}</small></h3>
       {% if not compact %}<p class="ssec__note">{{ t('keys.purpose.' ~ svc.code) }}</p>{% endif %}
       {% if own_flash %}
-        <div class="note {{ 'note--ok' if ks.flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ t(ks.flash.key, **(ks.flash.params or {})) }}</div></div>
+        <div class="note {{ 'note--ok' if ks.flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ refusal_text(ks.flash.key, ks.flash.params) }}</div></div>
       {% endif %}
       <dl class="sprops skeys__facts{{ ' skeys__facts--inline' if compact else '' }}">
         {% for f in svc.fields %}

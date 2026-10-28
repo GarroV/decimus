@@ -54,7 +54,7 @@
         {% if can_prove_with_key %}
           <div class="sform" data-passkey-login
                data-options-url="{{ url('/login/passkey/options') }}"
-               data-verify-url="{{ url('/login/passkey/verify') }}?next={{ '/settings/security?proved=1'|urlencode }}"
+               data-verify-url="{{ url('/login/passkey/verify') }}?next={{ (prove_next or '/settings/security?proved=1')|urlencode }}"
                data-msg-failed="{{ t('sf.login.passkey_failed') }}"
                data-msg-unavailable="{{ t('sf.pk.unavailable') }}">
             <button class="sbtn sbtn--primary" type="button" data-passkey-button>{{ t('sf.sec.prove_key') }}</button>
@@ -65,6 +65,7 @@
         {% endif %}
         {% if can_prove_with_code %}
           <form method="post" action="{{ base }}/prove?lang={{ lang }}" class="sform">
+            {% if prove_next %}<input type="hidden" name="next" value="{{ prove_next }}">{% endif %}
             <label><span class="sform__label">{{ t('sf.sec.prove_code') }}</span>
               <input class="sinput" type="text" name="code" autocomplete="one-time-code"
                      autocapitalize="characters" spellcheck="false" maxlength="40" required></label>

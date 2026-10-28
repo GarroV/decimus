@@ -10,6 +10,7 @@
 #}{% extends "_split_page.html" %}
 {% from "_info_tip.html" import info_tip %}
 {% from "administration/_nav.html" import admin_nav with context %}
+{% from "users/_key_refusal.html" import refusal_text with context %}
 {% from "users/_service_key_panel.html" import key_panel with context %}
 {% set dv = dodois %}
 {% block title %}{{ t('administration.tab.dodois') }} · {{ t('section.administration.title') }}{% endblock %}
@@ -28,7 +29,7 @@
 {% endmacro %}
 {% macro flash_note() %}
   {% if dodois_flash and not dv.issued %}
-    <div class="note {{ 'note--ok' if dodois_flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ t(dodois_flash.key, **dodois_flash.params) }}</div></div>
+    <div class="note {{ 'note--ok' if dodois_flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ refusal_text(dodois_flash.key, dodois_flash.params) }}</div></div>
   {% endif %}
 {% endmacro %}
 
