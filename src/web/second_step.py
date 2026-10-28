@@ -34,6 +34,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import quote
 
 from flask import (
     Flask,
@@ -70,7 +71,7 @@ from src.domain.second_factor import (
 )
 
 from . import journal as web_journal
-from . import webauthn_rp
+from . import prove_return, webauthn_rp
 from .config import Settings
 from .origin import over_https, refuse_foreign_origin
 from .remote import client_address
@@ -387,6 +388,7 @@ def install(
         if account is None:
             return redirect(url_for("login"))
         назад = f"{request.script_root}{SECURITY_PATH}"
+        вернуться = prove_return.checked(request.form.get(prove_return.NEXT_PARAM))
         status = store.status_of(account.id)
         допущена, _, _ = _admit(account)
         результат = (
@@ -401,7 +403,10 @@ def install(
                 ip=откуда,
                 user_agent=браузер,
             )
-            return open_response(redirect(f"{назад}?prove=bad"))
+            плохой = f"{назад}?prove=bad"
+            if вернуться:
+                плохой += f"&{prove_return.NEXT_PARAM}={quote(вернуться, safe='')}"
+            return open_response(redirect(плохой))
         откуда, браузер = web_journal.login_origin(conf)
         прежний = auth.current_session_token()
         session = open_session(account, ip=откуда, user_agent=браузер, second_step=True)
@@ -415,7 +420,8 @@ def install(
             session_id=session.session_id,
         )
         note_success(tenant=stand, login=throttle_key(account.login))
-        return open_response(remember(redirect(f"{назад}?proved=1"), session))
+        куда = f"{request.script_root}{вернуться}" if вернуться else f"{назад}?proved=1"
+        return open_response(remember(redirect(куда), session))
 
     def open_response(response: Response) -> Response:
         response.headers["Cache-Control"] = "no-store"

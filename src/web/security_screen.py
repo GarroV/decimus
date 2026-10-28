@@ -60,7 +60,7 @@ from src.domain.second_factor import (
     totp_uri,
 )
 
-from . import auth, webauthn_rp
+from . import auth, prove_return, webauthn_rp
 from .config import Settings
 from .db_refusal import note_target_mismatch
 from .origin import refuse_foreign_origin
@@ -197,6 +197,8 @@ def render_page(
             max_passkeys=MAX_PASSKEYS,
             base=f"{request.script_root}{SECURITY_PATH}",
             show_required=request.args.get("required") == "1" and not status.has_factor,
+            # Куда вернуть после подтверждения второго шага: только свой путь (D670).
+            prove_next=prove_return.checked(request.values.get(prove_return.NEXT_PARAM)),
         ),
         code,
     )

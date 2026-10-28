@@ -132,22 +132,15 @@ SERVICE_KEYS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Nothing is set in the admin: the server environment value is in use.",
     },
     "keys.err.no_factor": {
-        "ru": "Включите второй шаг входа в Настройки → Безопасность. Без него ключи не меняются.",
-        "en": (
-            "Turn on the second sign-in step in Settings → Security. "
-            "Keys cannot be changed without it."
-        ),
+        "ru": "Чтобы выдать ссылку или изменить ключи, включите второй шаг входа.",
+        "en": "To issue a link or change keys, turn on the second sign-in step.",
     },
     "keys.err.prove_step": {
-        "ru": (
-            "Подтвердите второй шаг входа: Настройки → Безопасность → «Подтвердите, что это "
-            "вы», затем вернитесь сюда (в течение 10 минут)."
-        ),
-        "en": (
-            "Confirm the second sign-in step: Settings → Security → “Confirm it is you”, then "
-            "come back here (within 10 minutes)."
-        ),
+        "ru": "Чтобы выдать ссылку или изменить ключи, подтвердите, что это вы.",
+        "en": "To issue a link or change keys, confirm it is you.",
     },
+    "keys.act.prove": {"ru": "Подтвердить", "en": "Confirm"},
+    "keys.act.enable": {"ru": "Включить", "en": "Turn on"},
     "keys.err.rate": {
         "ru": "Слишком много попыток подряд. Повторите через {minutes} мин.",
         "en": "Too many attempts in a row. Try again in {minutes} min.",

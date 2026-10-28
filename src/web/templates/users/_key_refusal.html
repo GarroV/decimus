@@ -1,0 +1,11 @@
+{#
+  Текст отказа действия над ключом и, если у отказа есть шаг, ссылка-кнопка на него (D670):
+  «Подтвердить» ведёт на «Вход и защиту» с возвратом на эту вкладку, «Включить» — туда же
+  без возврата. Адрес собирает `key_refusal_href` (`prove_return.py`); у прочих текстов
+  ссылки нет. Общий для «Ключей и API», ключей приложения и выдачи ссылки Dodo IS.
+#}
+{% macro refusal_text(key, params=none) %}
+  {{ t(key, **(params or {})) }}
+  {%- set href = key_refusal_href(key) %}
+  {%- if href %} <a class="sbtn" href="{{ href }}">{{ t('keys.act.prove' if key == 'keys.err.prove_step' else 'keys.act.enable') }}</a>{% endif %}
+{% endmacro %}

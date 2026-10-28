@@ -86,6 +86,7 @@ from . import (
     photo_upload,
     prescriptions,
     proofread,
+    prove_return,
     ratings,
     registry_period,
     registry_view,
@@ -339,6 +340,8 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # человека в корень площадки, то есть в чужой продукт, который там
             # стоит: страница открывается, а первая же кнопка выносит наружу.
             "url": lambda path: f"{request.script_root}{path}",
+            # Действие у отказа над ключом: «Подтвердить» / «Включить» (`prove_return`, D670).
+            "key_refusal_href": prove_return.refusal_href,
             # Кто вошёл — берётся из того же ответа, что пропустил запрос
             # через заслон, а не спрашивается у базы второй раз.
             "account": account,
