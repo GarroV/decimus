@@ -22,6 +22,10 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.month.label": {"ru": "Месяц", "en": "Month"},
     "quality.month.prev": {"ru": "Предыдущий месяц", "en": "Previous month"},
     "quality.month.next": {"ru": "Следующий месяц", "en": "Next month"},
+    "quality.month.in_progress": {
+        "ru": "{title} · месяц идёт",
+        "en": "{title} · month in progress",
+    },
     "quality.month.title": {"ru": "{month} {year}", "en": "{month} {year}"},
     "quality.failed": {
         "ru": "Данные качества сейчас не прочитались: база не ответила. Попробуйте позже.",

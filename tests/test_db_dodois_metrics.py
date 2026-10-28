@@ -141,14 +141,14 @@ def test_страна_без_ошибок_отдаёт_ошибку_none(пиц�
     assert состояние.last_ok_at is not None
 
 
-def test_оценки_периодов_читаются_с_числом_проверок_по_месяцу_начала(пиццерии: str) -> None:
+def test_оценки_периодов_читаются_с_числом_проверок(пиццерии: str) -> None:
     store.replace_rating_periods(
         date(2026, 9, 1),
         date(2026, 10, 28),
         [А, В],
         [
             RatingPeriod(
-                А, "rs", date(2026, 9, 28), date(2026, 10, 4), Decimal("88.5"), "Published"
+                А, "rs", date(2026, 9, 14), date(2026, 10, 4), Decimal("88.5"), "Published"
             ),
             RatingPeriod(А, "rko", date(2026, 10, 5), date(2026, 10, 11), Decimal("91"), None),
             RatingPeriod(В, "rs", date(2026, 10, 5), date(2026, 10, 11), Decimal("70"), None),
@@ -160,7 +160,7 @@ def test_оценки_периодов_читаются_с_числом_пров
         [А],
         [
             CheckupPeriod(
-                А, "rs", date(2026, 9, 28), date(2026, 10, 4), 3, {"Completed": 2, "Started": 1}
+                А, "rs", date(2026, 9, 14), date(2026, 10, 4), 3, {"Completed": 2, "Started": 1}
             )
         ],
     )
@@ -170,7 +170,7 @@ def test_оценки_периодов_читаются_с_числом_пров
 
     assert сентябрь == [
         read.UnitRatingPeriod(
-            А, "rs", date(2026, 9, 28), date(2026, 10, 4), Decimal("88.50"), "Published", 3
+            А, "rs", date(2026, 9, 14), date(2026, 10, 4), Decimal("88.50"), "Published", 3
         )
     ]
     assert [(p.kind, p.checkups) for p in октябрь] == [("rko", None)]  # чужая страна не видна
@@ -188,3 +188,29 @@ def test_повторная_загрузка_периодов_заменяет_�
     store.replace_rating_periods(date(2026, 10, 1), date(2026, 10, 28), [А], [])
 
     assert read.unit_rating_periods("BG", ОКТЯБРЬ) == []
+
+
+def test_рс_уходит_в_месяц_большинства_дней_а_рко_в_месяц_начала(пиццерии: str) -> None:
+    # Живые периоды Dodo IS (28.10.2026): РС не по календарным половинам.
+    store.replace_rating_periods(
+        date(2026, 8, 1),
+        date(2026, 10, 28),
+        [А],
+        [
+            RatingPeriod(А, "rko", date(2026, 8, 31), date(2026, 9, 6), Decimal("83.5"), None),
+            RatingPeriod(А, "rko", date(2026, 9, 28), date(2026, 10, 4), Decimal("84.33"), None),
+            RatingPeriod(А, "rs", date(2026, 8, 31), date(2026, 9, 13), Decimal(92), None),
+            RatingPeriod(А, "rs", date(2026, 9, 14), date(2026, 10, 4), Decimal(88), None),
+            RatingPeriod(А, "rs", date(2026, 10, 5), date(2026, 10, 18), Decimal(70), None),
+        ],
+    )
+
+    сентябрь = [(p.kind, p.period_from, p.rate) for p in read.unit_rating_periods("BG", СЕНТЯБРЬ)]
+    август = [(p.kind, p.period_from) for p in read.unit_rating_periods("BG", date(2026, 8, 1))]
+
+    assert сентябрь == [
+        ("rko", date(2026, 9, 28), Decimal("84.33")),
+        ("rs", date(2026, 8, 31), Decimal("92.00")),
+        ("rs", date(2026, 9, 14), Decimal("88.00")),
+    ]
+    assert август == [("rko", date(2026, 8, 31))]

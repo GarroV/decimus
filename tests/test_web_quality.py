@@ -99,6 +99,8 @@ def чтения(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
     monkeypatch.setattr(dodois_metrics, "load_states", lambda: [])
+    monkeypatch.setattr(dodois_metrics, "months_with_data", lambda code: [MONTH])
+    monkeypatch.setattr(dodois_metrics, "unit_rating_periods", lambda code, month: [])
     monkeypatch.setattr(ratings_freshness, "build", lambda *_a, **_k: None)
 
 
@@ -159,6 +161,20 @@ def test_month_without_data_is_an_honest_empty_state(ук: FlaskClient) -> None:
     assert "нет данных качества" in html
 
 
+def test_default_month_is_the_current_one_and_marked_in_progress(ук: FlaskClient) -> None:
+    html = ук.get("/quality").get_data(as_text=True)
+
+    assert "месяц идёт" in html
+    assert f"?month={date.today():%Y-%m}" in html or f"month={date.today():%Y-%m}" in html
+
+
+def test_past_month_is_not_marked_in_progress(ук: FlaskClient) -> None:
+    html = ук.get("/quality?month=2026-09").get_data(as_text=True)
+
+    # Выбран прошлый месяц: пометка только у текущего в списке выбора.
+    assert html.count("месяц идёт") == 1
+
+
 def test_foreign_country_is_404(ук: FlaskClient) -> None:
     assert ук.get("/quality?country=RU").status_code == 404
 
@@ -196,3 +212,19 @@ def test_dodois_not_collected_for_connected_country(
     monkeypatch.setattr(dodois_logins, "list_logins", lambda: (login,))
     html = ук.get("/quality?country=BG&month=2026-09").get_data(as_text=True)
     assert "ещё не собраны" in html
+
+
+def test_quality_renders_on_demo_stand_without_dodois_data(
+    monkeypatch: pytest.MonkeyPatch, чтения: None
+) -> None:
+    # Демо: данных Dodo IS нет (сборщик на демо не засеян), рейтинги и карты — как есть.
+    monkeypatch.setattr(dodois_metrics, "unit_sales", lambda code, month: [])
+    monkeypatch.setattr(dodois_metrics, "unit_aggregator_orders", lambda code, month: [])
+    monkeypatch.setattr(dodois_metrics, "unit_kr", lambda code, month: [])
+    подменить_двери(monkeypatch, tenant="HQ", role="admin")
+    with собрать(tenant="HQ", demo=True).test_client() as client:
+        assert войти(client).status_code == 302
+        for url in ("/quality", "/quality?country=PL", "/quality?country=BG&month=2026-09"):
+            response = client.get(url)
+            assert response.status_code == 200, url
+            assert "не прочитались" not in response.get_data(as_text=True), url

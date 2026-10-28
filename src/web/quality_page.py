@@ -6,7 +6,7 @@
 справа сводка сети или страна целиком — итог, разбивка, затем строки.
 
 Состояние в адресе: `/quality?country=<код>&month=<ГГГГ-ММ>`. Период — один месяц на экран,
-по умолчанию последний полный. Доступ как у «Рейтингов»: УК видит страны IMF, партнёр — те,
+по умолчанию текущий (идёт, помечен). Доступ как у «Рейтингов»: УК видит страны IMF, партнёр — те,
 что в охвате его пространства (`auth.current_reach`); чужая страна в адресе — 404.
 
 Ничего не считает сам: формулы — `src/domain/quality.py`, сборка входов — `quality_data`.
@@ -96,13 +96,12 @@ def delta(now: Decimal | None, before: Decimal | None, places: int) -> Delta:
 
 
 def default_month(today: date) -> date:
-    """Последний полный месяц."""
-    first = today.replace(day=1)
-    return date(first.year - (first.month == 1), (first.month - 2) % 12 + 1, 1)
+    """Текущий месяц: он ещё идёт, и экран помечает его «месяц идёт» (данные неполные)."""
+    return today.replace(day=1)
 
 
 def parse_month(raw: str, today: date) -> date:
-    """Месяц из адреса `ГГГГ-ММ`; мусор и будущее — последний полный месяц."""
+    """Месяц из адреса `ГГГГ-ММ`; мусор и будущее — текущий месяц."""
     try:
         picked = datetime.strptime(raw.strip()[:7], "%Y-%m").date()
     except ValueError:
@@ -121,13 +120,21 @@ def month_title(month: date, lang: str) -> str:
     )
 
 
+def month_label(month: date, lang: str, today: date) -> str:
+    """Название месяца; текущий, ещё не закончившийся, помечен «месяц идёт»."""
+    title = month_title(month, lang)
+    if month < today.replace(day=1):
+        return title
+    return t("quality.month.in_progress", lang, title=title)
+
+
 def _scope(reach_countries: tuple[str, ...] | None) -> tuple[str, ...]:
     imf = [row.code for row in read.countries() if row.is_imf]
     return tuple(c for c in imf if reach_countries is None or c in reach_countries)
 
 
 def _available_months(today: date, scope: tuple[str, ...]) -> tuple[date, ...]:
-    """Месяцы выбора: те, где у рейтингов или у Dodo IS что-то есть, плюс последний полный."""
+    """Месяцы выбора: те, где у рейтингов или у Dodo IS что-то есть, плюс текущий."""
     found = set(read.period_months())
     for code in scope:
         found.update(dodois_metrics.months_with_data(code))
@@ -398,7 +405,8 @@ def render(lang: str) -> str:
         )
     )
     options = tuple(
-        {"href": link(code, m), "title": month_title(m, lang), "on": m == month} for m in months
+        {"href": link(code, m), "title": month_label(m, lang, today), "on": m == month}
+        for m in months
     )
     prev_month, next_month = shift(month, -1), shift(month, 1)
     view: dict[str, Any] | None = None
@@ -419,7 +427,7 @@ def render(lang: str) -> str:
         kicker=t("quality.kicker.country" if code else "quality.kicker.network", lang),
         network_href=link(None),
         month_options=options,
-        month_title=month_title(month, lang),
+        month_title=month_label(month, lang, today),
         prev_href=link(code, prev_month),
         next_href=link(code, next_month) if next_month <= today.replace(day=1) else None,
         tip_rows=_freshness_rows(lang, show_audit, view_source),

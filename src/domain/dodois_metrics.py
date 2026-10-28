@@ -415,6 +415,24 @@ def checkup_periods(body: Any) -> list[CheckupPeriod]:
     ]
 
 
+def rating_month(kind: str, period_from: date, period_to: date) -> date:
+    """Месяц, к которому относится период оценки.
+
+    РКО — по началу периода, как в таблице контроля. Периоды РС в Dodo IS не календарные
+    половины (31.08–13.09 и 14.09–04.10, а таблица зовёт их «Сентябрь 1/2»), поэтому РС
+    относится к месяцу, на который падает большинство его дней; при равенстве — месяц начала.
+    """
+    start_month = first_of_month(period_from)
+    if kind != RATING_RS:
+        return start_month
+    end_month = first_of_month(period_to)
+    if end_month == start_month:
+        return start_month
+    in_start = (next_month(start_month) - period_from).days
+    total = (period_to - period_from).days + 1
+    return end_month if total - in_start > in_start else start_month
+
+
 def merge_rating_periods(rows: Iterable[RatingPeriod]) -> list[RatingPeriod]:
     """Одна строка на пиццерию, вид и начало периода: окна запроса могут вернуть период дважды."""
     unique = {(r.dodo_id, r.kind, r.period_from): r for r in rows}

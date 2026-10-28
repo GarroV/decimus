@@ -174,11 +174,21 @@ def test_заказы_агрегаторов_листаются_пострани
     страницы = iter(
         [
             {
-                "sales": [{"unitId": А, "aggregatorName": "Glovo", }],
+                "sales": [
+                    {
+                        "unitId": А,
+                        "aggregatorName": "Glovo",
+                    }
+                ],
                 "isEndOfListReached": False,
             },
             {
-                "sales": [{"unitId": А, "aggregatorName": "Glovo", }],
+                "sales": [
+                    {
+                        "unitId": А,
+                        "aggregatorName": "Glovo",
+                    }
+                ],
                 "isEndOfListReached": True,
             },
         ]

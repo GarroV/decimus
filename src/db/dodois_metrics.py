@@ -16,7 +16,7 @@ from typing import Any
 
 import psycopg
 
-from src.domain.dodois_metrics import KINDS
+from src.domain.dodois_metrics import KINDS, rating_month
 
 from .config import check_environment
 from .errors import RatingsError
@@ -113,9 +113,11 @@ def unit_kr(country_code: str, month: date) -> list[UnitKr]:
 
 
 def unit_rating_periods(country_code: str, month: date) -> list[UnitRatingPeriod]:
-    """Оценки РКО и РС пиццерий страны по периодам, начавшимся в месяце, и число проверок в них.
+    """Оценки РКО и РС пиццерий страны за месяц и число проверок в периодах.
 
-    `kind` — `rko` или `rs`; `checkups` — `None`, если счёта проверок за период нет.
+    РКО — недели, начавшиеся в месяце; РС — периоды, большинство дней которых в месяце
+    (`rating_month`: границы РС не календарные). `kind` — `rko` или `rs`; `checkups` — `None`,
+    если счёта проверок за период нет.
     """
     rows = _rows(
         "select r.dodo_id, r.kind, r.period_from, r.period_to, r.rate, r.publish_status, "
@@ -123,12 +125,14 @@ def unit_rating_periods(country_code: str, month: date) -> list[UnitRatingPeriod
         "join ratings.units u on u.dodo_id = r.dodo_id "
         "left join dodois.unit_checkup_period c on c.dodo_id = r.dodo_id and c.kind = r.kind "
         "and c.period_from = r.period_from "
-        "where u.country_code = %s and r.period_from >= %s "
+        "where u.country_code = %s "
+        "and r.period_from >= (%s::date - interval '1 month')::date "
         "and r.period_from < (%s::date + interval '1 month')::date "
         "order by r.dodo_id, r.kind, r.period_from",
         (country_code, month, month),
     )
-    return [UnitRatingPeriod(*r) for r in rows]
+    periods = [UnitRatingPeriod(*r) for r in rows]
+    return [p for p in periods if rating_month(p.kind, p.period_from, p.period_to) == month]
 
 
 def months_with_data(country_code: str) -> list[date]:
