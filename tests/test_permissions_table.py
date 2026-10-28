@@ -88,6 +88,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
     "view.calendar",
     "view.country",
     "view.ratings",
+    "view.quality",
     "view.training",
     "view.users",
 }
@@ -107,6 +108,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "ratings.manage",
         "people.manage",
         "view.ratings",
+        "view.quality",
         "view.users",
         "view.administration",
     },
