@@ -124,36 +124,70 @@ def ук(monkeypatch: pytest.MonkeyPatch, чтения: None) -> Iterator[FlaskC
     yield from _client(monkeypatch)
 
 
-def test_network_summary_ranks_countries_and_skips_non_imf(ук: FlaskClient) -> None:
+def test_network_table_has_one_row_per_country_and_skips_non_imf(ук: FlaskClient) -> None:
     html = ук.get("/quality?month=2026-09").get_data(as_text=True)
     assert "Poland" not in html and "Польша" in html and "Болгария" in html
     assert "Россия" not in html
-    # Польша имеет ЛКО (РКО, карты, агрегаторы, КР), Болгария — тоже; сводка со страницы сети
     assert "Все страны" in html and "country=PL" in html
+    # Столбцы здоровья; сводной оценки и мест нет (D677).
+    for column in ("РКО", "РС", "Пров./нед.", "КР", "Карты", "Агрег.", "Выручка: зал", "Проверка"):
+        assert column in html, column
 
 
 def test_country_page_shows_all_blocks_and_core_numbers(ук: FlaskClient) -> None:
     html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
     for block in (
-        "Из чего складывается ЛКО",
-        "Каналы заказов",
-        "Выручка по каналам продаж",
+        "Пиццерии",
+        "Агрегаторы",
+        "Выручка",
+        "Источник заказа",
         "Клиентский рейтинг",
         "Карты",
+        "Периоды РКО и РС",
     ):
         assert block in html, block
     assert "Warsaw-1" in html and "Krakow-1" in html
     assert "PLN" in html and "Зал" in html and "Доставка" in html
     assert "4.68" in html or "4.67" in html  # КР: (4.6*10 + 4.7*30) / 40, не прочерк
     assert "Wolt" in html and "Pyszne" in html
+    assert "Приложение" in html  # источник заказа переведён, а не «MobileApp»
 
 
 def test_country_without_dodois_says_it_is_not_connected(ук: FlaskClient) -> None:
     html = ук.get("/quality?country=BG&month=2026-09").get_data(as_text=True)
     assert "страна не подключена" in html
     assert "Sofia-1" in html
-    # сумма весов меньше 100% — пометка, а не пересчёт
-    assert "Сумма весов" in html
+
+
+def test_no_composite_score_or_ranking_anywhere(ук: FlaskClient) -> None:
+    """D677: ни ЛКО, ни ЭС, ни «Общего рейтинга», ни мест, ни весов — на обоих языках."""
+    banned = ("ЛКО", "ЭС", "LKO", "Лучший клиентский", "Эталон стандартов", "Общий рейтинг")
+    for url in (
+        "/quality?month=2026-09",
+        "/quality?country=PL&month=2026-09",
+        "/quality?month=2026-09&lang=en",
+        "/quality?country=PL&month=2026-09&lang=en",
+    ):
+        html = ук.get(url).get_data(as_text=True)
+        for word in banned:
+            assert word not in html, (url, word)
+        assert "Сумма весов" not in html and "Σ весов" not in html and "место" not in html
+
+
+def test_rko_below_thresholds_is_tinted_like_ratings(ук: FlaskClient) -> None:
+    html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
+
+    assert "qa-tone--mid" in html  # Krakow-1: РКО 80 — жёлтая зона (80–90)
+    assert "qa-tone--bad" not in html  # красного (ниже 80) здесь нет
+
+
+def test_units_sort_by_column_with_missing_values_last(ук: FlaskClient) -> None:
+    desc = ук.get("/quality?country=PL&month=2026-09&sort=rko&dir=desc").get_data(as_text=True)
+    asc = ук.get("/quality?country=PL&month=2026-09&sort=rko&dir=asc").get_data(as_text=True)
+
+    assert desc.index("Warsaw-1") < desc.index("Krakow-1")  # РКО 90.89 против 80
+    assert asc.index("Krakow-1") < asc.index("Warsaw-1")
+    assert "aria-sort" in desc
 
 
 def test_month_without_data_is_an_honest_empty_state(ук: FlaskClient) -> None:
@@ -181,7 +215,7 @@ def test_foreign_country_is_404(ук: FlaskClient) -> None:
 
 def test_english_texts_exist(ук: FlaskClient) -> None:
     html = ук.get("/quality?country=PL&month=2026-09&lang=en").get_data(as_text=True)
-    assert "Order channels" in html and "Revenue by sales channel" in html
+    assert "Order source" in html and "Pizzerias" in html and "Revenue" in html
 
 
 def test_partner_sees_only_own_countries(monkeypatch: pytest.MonkeyPatch, чтения: None) -> None:

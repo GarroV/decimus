@@ -5,6 +5,7 @@
 .qa-scroll { overflow-x: auto; max-width: 100%; }
 .qa-table { border-collapse: collapse; font-size: 13px; width: 100%; }
 .qa-table--wide th, .qa-table--wide td { padding: 8px; }
+.qa-table--wide { font-size: 12px; }
 .qa-table--narrow { max-width: 30rem; }
 .qa-table--mid { max-width: 44rem; }
 .qa-table th, .qa-table td { padding: 8px 12px; border-bottom: 1px solid var(--line-2);
@@ -14,7 +15,11 @@
 .qa-table tbody tr:last-child td { border-bottom: 0; }
 .qa-table a { color: var(--ink); font-weight: var(--w-semibold); white-space: nowrap; }
 .qa-num { text-align: right !important; font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.qa-num--warn { color: var(--warn-ink); font-weight: var(--w-semibold); }
+.qa-sort { color: inherit !important; text-decoration: none; }
+.qa-sort:hover { text-decoration: underline; }
+.qa-tone--bad { background: var(--err-soft); }
+.qa-tone--mid, .qa-tone--worse { background: var(--warn-soft); }
+.qa-delta:empty { display: none; }
 .qa-total td { font-weight: var(--w-semibold); background: var(--surface-2); }
 .qa-dim { color: var(--ink-3); font-size: var(--fs-meta); }
 .qa-delta { font-family: var(--font-num); font-size: 12px; margin-left: 4px; color: var(--ink-3); }

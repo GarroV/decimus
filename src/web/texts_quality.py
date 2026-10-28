@@ -1,4 +1,4 @@
-"""Тексты экрана «Качество»: колонка стран, блоки, пояснение формулы, пустые состояния.
+"""Тексты экрана «Качество»: колонка стран, таблицы, блоки, пояснение, пустые состояния.
 
 Отдельным модулем, как у «Обучения» (`texts_training.py`): `texts.py` уже длиннее предела
 файла. Сливаются в общий каталог (`texts.TEXTS`) — `t()` знает один словарь.
@@ -13,12 +13,8 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.kicker.country": {"ru": "Качество · страна", "en": "Quality · country"},
     "quality.network": {"ru": "Все страны", "en": "All countries"},
     "quality.filter.title": {"ru": "Страны", "en": "Countries"},
-    "quality.rail.line": {"ru": "ЛКО {lko} · ЭС {es}", "en": "LKO {lko} · ES {es}"},
-    "quality.rail.lko": {"ru": "ЛКО {lko}", "en": "LKO {lko}"},
+    "quality.rail.line": {"ru": "РКО {rko} · РС {rs}", "en": "RKO {rko} · RS {rs}"},
     "quality.rail.none": {"ru": "нет данных", "en": "no data"},
-    "quality.place": {"ru": "{n}-е место", "en": "place {n}"},
-    "quality.place.of": {"ru": "место {n} из {total}", "en": "place {n} of {total}"},
-    "quality.units": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
     "quality.month.label": {"ru": "Месяц", "en": "Month"},
     "quality.month.prev": {"ru": "Предыдущий месяц", "en": "Previous month"},
     "quality.month.next": {"ru": "Следующий месяц", "en": "Next month"},
@@ -43,55 +39,57 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
         "en": "There are no countries with quality data in your access.",
     },
     # --- пояснение под «?»
-    "quality.tip.title": {"ru": "Как считается", "en": "How it is calculated"},
+    "quality.tip.title": {"ru": "Как читать таблицу", "en": "How to read the table"},
     "quality.tip.unit": {
-        "ru": "Единица расчёта — пиццерия за месяц; страна — простое среднее своих пиццерий.",
+        "ru": (
+            "Единица — пиццерия за месяц. Страна: оценки — простое среднее её пиццерий, "
+            "доли заказов и выручка — по суммам. Под числом — движение к прошлому месяцу."
+        ),
         "en": (
-            "The unit is one pizzeria for one month; a country is the plain mean of its pizzerias."
+            "The unit is one pizzeria for one month. A country: ratings are the plain mean of "
+            "its pizzerias, order shares and revenue are totals. Under a number — the change "
+            "from the previous month."
         ),
     },
-    "quality.tip.lko": {
+    "quality.tip.scores": {
         "ru": (
-            "ЛКО, пять баллов: РКО (оценка / 20, вес по числу проверок в неделю: "
-            "0 — 0%, до 2 — 10%, от 2 до 5 — 30%, от 5 — 50%), карты (среднее Google и "
-            "Яндекса по числу оценок, вес 20%), КР и агрегаторы делят остаток веса по долям "
-            "заказов "
-            "приложения и сайта и агрегаторов. Итог — сумма «вес × оценка», без пересчёта."
+            "РКО, РС и проверка — сто баллов; КР, карты и агрегаторы — пять. КР: зал и "
+            "доставка, среднее по числу оценок. Карты: Google и Яндекс, среднее по числу "
+            "оценок. Агрегаторы: оценки площадок в пяти баллах, среднее по заказам среди "
+            "площадок с оценкой. Проверок РКО в неделю — среднее по неделям месяца."
         ),
         "en": (
-            "LKO, five points: RKO (score / 20, weight by checks per week: 0 — 0%, under 2 — "
-            "10%, 2 to 5 — 30%, 5 and up — 50%), maps (mean of Google and Yandex "
-            "weighted by rating counts, weight 20%), "
-            "CR and aggregators split the remaining weight by the order shares of the app and "
-            "website versus aggregators. The total is the sum of weight x score, not rescaled."
+            "RKO, RS and inspection are out of 100; CR, maps and aggregators out of 5. CR: "
+            "dine-in and delivery, mean weighted by rating counts. Maps: Google and Yandex, "
+            "mean weighted by rating counts. Aggregators: platform ratings in five points, "
+            "mean weighted by orders among rated platforms. RKO checks per week — the mean "
+            "over the weeks of the month."
         ),
     },
-    "quality.tip.es": {
+    "quality.tip.tone": {
         "ru": (
-            "ЭС: половина — оценка последней проверки decimus в месяце, половина — РС. "
-            "Нет проверки в месяце — ЭС нет, вес на РС не переносится."
+            "Цвет ячейки: РКО и РС — как в «Рейтингах» (ниже 80 красный, ниже 90 жёлтый); "
+            "остальные показатели — жёлтым, если стали хуже прошлого месяца. Доли заказов "
+            "не подсвечиваются."
         ),
         "en": (
-            "ES: half is the score of the last decimus inspection in the month, half is RS. "
-            "No inspection in the month — no ES; the weight is not moved to RS."
+            "Cell colour: RKO and RS as in Ratings (below 80 red, below 90 amber); other "
+            "figures turn amber when worse than the previous month. Order shares are not "
+            "coloured."
         ),
     },
-    "quality.tip.kr": {
-        "ru": (
-            "КР из Dodo IS приходит отдельно для зала и доставки; здесь они сведены в одну "
-            "оценку средним, взвешенным числом оценок (допущение, согласовать с аналитиком)."
-        ),
-        "en": (
-            "CR from Dodo IS comes separately for dine-in and delivery; here they are combined "
-            "as a mean weighted by the number of ratings (an assumption to confirm with the "
-            "analyst)."
-        ),
+    "quality.tip.audit": {
+        "ru": "Проверка — процент последней принятой проверки decimus в месяце.",
+        "en": "Inspection — the percentage of the last accepted decimus inspection in the month.",
     },
     "quality.tip.fresh": {
-        "ru": "РКО и РС — по дате начала периода; карты и агрегаторы — последняя оценка в месяце.",
+        "ru": (
+            "РКО — по дате начала недели; РС — по месяцу, на который падает большинство его "
+            "дней; карты и агрегаторы — последняя оценка в месяце."
+        ),
         "en": (
-            "RKO and RS go by the period start date; maps and "
-            "aggregators use the last rating in the month."
+            "RKO goes by the week start date; RS by the month holding most of its days; maps "
+            "and aggregators use the last rating in the month."
         ),
     },
     "quality.tip.dodois": {"ru": "Dodo IS: собрано {at}", "en": "Dodo IS: collected {at}"},
@@ -112,98 +110,73 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Dodo IS: сбор ещё не запускался",
         "en": "Dodo IS: collection has not run yet",
     },
-    # --- плитки и сводка
-    "quality.tile.lko": {"ru": "Лучший клиентский опыт", "en": "Best customer experience"},
-    "quality.tile.es": {"ru": "Эталон стандартов", "en": "Standards benchmark"},
-    "quality.tile.lko_sub": {
-        "ru": "{place} · пиццерий с ЛКО: {n}",
-        "en": "{place} · pizzerias with LKO: {n}",
-    },
-    "quality.tile.es_sub": {
-        "ru": "пиццерий с ЭС: {n} из {total}",
-        "en": "pizzerias with ES: {n} of {total}",
-    },
-    "quality.tile.delta": {"ru": "к прошлому месяцу {d}", "en": "vs previous month {d}"},
-    "quality.block.network": {"ru": "Страны по качеству", "en": "Countries by quality"},
-    "quality.col.place": {"ru": "Место", "en": "Place"},
-    "quality.col.country": {"ru": "Страна", "en": "Country"},
-    "quality.col.lko": {"ru": "ЛКО", "en": "LKO"},
-    "quality.col.es": {"ru": "ЭС", "en": "ES"},
-    "quality.col.delta": {"ru": "Δ", "en": "Δ"},
-    "quality.col.units": {"ru": "Пиццерий", "en": "Pizzerias"},
-    # --- страна
-    "quality.block.lko": {"ru": "Из чего складывается ЛКО", "en": "What LKO is made of"},
-    "quality.block.lko_hint": {
-        "ru": "среднее по пиццериям страны",
-        "en": "mean over the country's pizzerias",
-    },
-    "quality.col.component": {"ru": "Компонент", "en": "Component"},
-    "quality.col.score": {"ru": "Оценка", "en": "Score"},
-    "quality.col.weight": {"ru": "Вес", "en": "Weight"},
-    "quality.comp.rko": {"ru": "РКО (в пяти баллах)", "en": "RKO (five points)"},
-    "quality.comp.kr": {"ru": "КР: приложение и сайт", "en": "CR: app and website"},
-    "quality.comp.maps": {"ru": "Карты", "en": "Maps"},
-    "quality.comp.aggregators": {"ru": "Агрегаторы", "en": "Aggregators"},
-    "quality.comp.sum": {"ru": "Сумма весов", "en": "Sum of weights"},
-    "quality.warn.sum": {
-        "ru": "Сумма весов {sum} — часть веса выпала (нет данных по компоненту), итог занижен.",
-        "en": (
-            "Sum of weights {sum} — part of the weight dropped (a "
-            "component has no data), the total is understated."
-        ),
-    },
-    "quality.block.es": {"ru": "Из чего складывается ЭС", "en": "What ES is made of"},
-    "quality.es.audit": {"ru": "Проверка decimus", "en": "decimus inspection"},
-    "quality.es.rs": {"ru": "Рейтинг стандартов (РС)", "en": "Standards rating (RS)"},
-    "quality.es.share": {"ru": "{pct} веса", "en": "{pct} of the weight"},
-    "quality.es.no_audit": {"ru": "— нет проверки", "en": "— no inspection"},
-    "quality.es.no_rs": {"ru": "— нет РС", "en": "— no RS"},
-    "quality.es.missing": {
-        "ru": "Без проверки в месяце ЭС не считается: пиццерий без ЭС — {n}.",
-        "en": (
-            "Without an inspection in the month ES is not calculated: pizzerias without ES — {n}."
-        ),
-    },
+    # --- таблица
+    "quality.block.network": {"ru": "Страны", "en": "Countries"},
     "quality.block.units": {"ru": "Пиццерии", "en": "Pizzerias"},
+    "quality.col.country": {"ru": "Страна", "en": "Country"},
     "quality.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "quality.total": {"ru": "Вся страна", "en": "Whole country"},
     "quality.col.rko": {"ru": "РКО", "en": "RKO"},
-    "quality.col.checks": {"ru": "Пров./нед.", "en": "Checks/wk"},
     "quality.col.rs": {"ru": "РС", "en": "RS"},
-    "quality.col.audit": {"ru": "Проверка", "en": "Inspection"},
+    "quality.col.checks": {"ru": "Пров./нед.", "en": "Checks/wk"},
     "quality.col.kr": {"ru": "КР", "en": "CR"},
     "quality.col.maps": {"ru": "Карты", "en": "Maps"},
     "quality.col.aggs": {"ru": "Агрег.", "en": "Aggr."},
-    "quality.col.wsum": {"ru": "Σ весов", "en": "Σ weights"},
-    "quality.block.orders": {"ru": "Каналы заказов", "en": "Order channels"},
+    "quality.col.share_agg": {"ru": "Агрегаторы, %", "en": "Aggregators, %"},
+    "quality.col.share_app": {"ru": "Прилож. и сайт, %", "en": "App and site, %"},
+    "quality.col.share_other": {"ru": "Прочее, %", "en": "Other, %"},
+    "quality.col.rev_dine": {"ru": "Выручка: зал", "en": "Revenue: dine-in"},
+    "quality.col.rev_delivery": {"ru": "Выручка: доставка", "en": "Revenue: delivery"},
+    "quality.col.audit": {"ru": "Проверка", "en": "Inspection"},
+    # --- страна
+    "quality.col.score": {"ru": "Оценка", "en": "Score"},
     "quality.col.orders": {"ru": "Заказов", "en": "Orders"},
-    "quality.col.n": {"ru": "Агрегаторы", "en": "Aggregators"},
-    "quality.col.o": {"ru": "Приложение и сайт", "en": "App and website"},
-    "quality.col.p": {"ru": "Прочее", "en": "Other"},
-    "quality.total": {"ru": "Вся страна", "en": "Whole country"},
-    "quality.block.revenue": {"ru": "Выручка по каналам продаж", "en": "Revenue by sales channel"},
-    "quality.col.channel": {"ru": "Канал", "en": "Channel"},
-    "quality.col.revenue": {"ru": "Выручка", "en": "Revenue"},
     "quality.col.share": {"ru": "Доля", "en": "Share"},
+    "quality.col.units_n": {"ru": "Пиццерий", "en": "Pizzerias"},
+    "quality.col.reviews": {"ru": "Отзывов", "en": "Reviews"},
+    "quality.col.avg": {"ru": "Средняя", "en": "Average"},
+    "quality.col.count": {"ru": "Оценок", "en": "Ratings"},
+    "quality.col.channel": {"ru": "Канал продаж", "en": "Sales channel"},
+    "quality.col.source": {"ru": "Источник заказа", "en": "Order source"},
+    "quality.col.revenue": {"ru": "Выручка", "en": "Revenue"},
+    "quality.col.aggregator": {"ru": "Агрегатор", "en": "Aggregator"},
+    "quality.col.agg_score": {"ru": "Оценка", "en": "Rating"},
+    "quality.col.agg_score5": {"ru": "В пяти баллах", "en": "Five-point"},
+    "quality.col.provider": {"ru": "Карта", "en": "Map"},
+    "quality.col.period": {"ru": "Период", "en": "Period"},
+    "quality.col.span": {"ru": "Даты", "en": "Dates"},
+    "quality.col.status": {"ru": "Статус", "en": "Status"},
     "quality.channel.dine_in": {"ru": "Зал", "en": "Dine-in"},
     "quality.channel.takeaway": {"ru": "Самовывоз", "en": "Takeaway"},
     "quality.channel.delivery": {"ru": "Доставка", "en": "Delivery"},
     "quality.channel.other": {"ru": "Другое", "en": "Other"},
+    "quality.source.dinein": {"ru": "Зал", "en": "Dine-in"},
+    "quality.source.mobileapp": {"ru": "Приложение", "en": "Mobile app"},
+    "quality.source.website": {"ru": "Сайт", "en": "Website"},
+    "quality.source.kiosk": {"ru": "Киоск", "en": "Kiosk"},
+    "quality.source.manager": {"ru": "Менеджер", "en": "Manager"},
+    "quality.source.callcenter": {"ru": "Колл-центр", "en": "Call center"},
+    "quality.source.aggregator": {"ru": "Агрегаторы", "en": "Aggregators"},
+    "quality.block.revenue": {"ru": "Выручка", "en": "Revenue"},
     "quality.block.aggs": {"ru": "Агрегаторы", "en": "Aggregators"},
-    "quality.col.aggregator": {"ru": "Агрегатор", "en": "Aggregator"},
-    "quality.col.agg_score": {"ru": "Оценка", "en": "Rating"},
-    "quality.col.agg_score5": {"ru": "В пяти баллах", "en": "Five-point"},
     "quality.agg.no_collector": {"ru": "нет сбора оценок", "en": "no ratings collector"},
     "quality.agg.no_score": {"ru": "оценок за месяц нет", "en": "no ratings this month"},
     "quality.block.kr": {"ru": "Клиентский рейтинг (КР)", "en": "Customer rating (CR)"},
-    "quality.col.avg": {"ru": "Средняя", "en": "Average"},
-    "quality.col.count": {"ru": "Оценок", "en": "Ratings"},
     "quality.kr.dine_in": {"ru": "Зал", "en": "Dine-in"},
     "quality.kr.delivery": {"ru": "Доставка", "en": "Delivery"},
     "quality.block.maps": {"ru": "Карты", "en": "Maps"},
-    "quality.col.provider": {"ru": "Карта", "en": "Map"},
-    "quality.col.reviews": {"ru": "Отзывов", "en": "Reviews"},
-    "quality.maps.google": {"ru": "Google", "en": "Google"},
-    "quality.maps.yandex": {"ru": "Яндекс", "en": "Yandex"},
+    "quality.block.periods": {"ru": "Периоды РКО и РС", "en": "RKO and RS periods"},
+    "quality.block.periods_hint": {
+        "ru": "из Dodo IS; «предварительно» — оценка ещё не опубликована",
+        "en": "from Dodo IS; “preliminary” — the rating is not published yet",
+    },
+    "quality.period.rko": {"ru": "РКО, неделя", "en": "RKO, week"},
+    "quality.period.rs": {"ru": "РС", "en": "RS"},
+    "quality.period.preliminary": {
+        "ru": "предварительно: {n} из {total}",
+        "en": "preliminary: {n} of {total}",
+    },
+    "quality.period.published": {"ru": "опубликовано", "en": "published"},
     "quality.nothing": {"ru": "нет данных", "en": "no data"},
     # --- Dodo IS
     "quality.dodois.not_connected": {
