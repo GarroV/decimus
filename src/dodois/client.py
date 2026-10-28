@@ -19,7 +19,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
@@ -368,6 +368,34 @@ def count_open(
         else:
             raise _failure(response)
     return opened
+
+
+def api_get(
+    contour: str,
+    path: str,
+    query: Mapping[str, str],
+    access_token: str,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Response:
+    """Прочитать данные: один GET к `api` с ключом входа; 429 — один повтор после `Retry-After`.
+
+    Отказ по доступу к части пиццерий (403 `NoAccessToUnit`) отдаётся ответом: решает вызывающий.
+    Остальные отказы — `DodoisError`.
+    """
+    url = _hosts(contour).api + path + "?" + urllib.parse.urlencode(query, safe=",:")
+    response = _get(url, access_token)
+    if response.status == 429:
+        wait = _wait_seconds(response)
+        if wait > MAX_RETRY_WAIT_SEC:
+            raise DodoisError(RATE_LIMITED)
+        sleep(wait)
+        response = _get(url, access_token)
+    if response.status == 200 or (response.status == 403 and _no_access(response)):
+        return response
+    if response.status == 401:
+        raise DodoisError(UNAUTHORIZED)
+    raise _failure(response)
 
 
 def _no_access(response: Response) -> bool:

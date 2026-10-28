@@ -400,6 +400,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0104_mailing_templates.sql": (
         "sql1:c747faee9a34af432bcf33d725768e163a7e7ebf3f4adc4dc3b0261f681134f1"
     ),
+    # Данные Dodo IS для «Качества» по пиццериям и месяцам (D671).
+    "0105_dodois_metrics.sql": (
+        "sql1:359e2deb9936cbd470a2fa55604cd94cfb37d4313d803b01a282b47e25376cc7"
+    ),
 }
 
 
