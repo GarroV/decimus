@@ -66,6 +66,8 @@ class UnitQuality:
     orders: q.Orders
     revenue: dict[str, Decimal]
     aggs: tuple[AggLine, ...]
+    #: Откуда РКО и РС: `dodois` (API), `sheet` (таблица контроля) или пусто.
+    rating_source: str = ""
 
     @property
     def rko(self) -> Decimal | None:
@@ -123,6 +125,7 @@ class CountryQuality:
     kr: KrTotal
     maps: tuple[MapTotal, ...]
     dodois: str
+    rating_source: str = ""
     place_lko: int | None = None
 
 
@@ -185,10 +188,22 @@ def _unit(
     agg_orders: Sequence[dodois_metrics.UnitAggregatorOrders],
     kr: dodois_metrics.UnitKr | None,
     agg_scores: dict[str, tuple[Decimal, int]],
+    periods: Sequence[dodois_metrics.UnitRatingPeriod] = (),
 ) -> UnitQuality:
     rko_rows = [r for r in scores if r.rating_type == "rko"]
-    rko = _mean(r.score for r in rko_rows)
-    rs = _mean(r.score for r in scores if r.rating_type == "rs")
+    d_rko = [p for p in periods if p.kind == "rko"]
+    d_rs = [p for p in periods if p.kind == "rs"]
+    # Периоды из Dodo IS — первичны; нет их — таблица контроля (docs/21-quality.md).
+    rko = _mean(p.rate for p in d_rko) if d_rko else _mean(r.score for r in rko_rows)
+    rs = (
+        _mean(p.rate for p in d_rs)
+        if d_rs
+        else _mean(r.score for r in scores if r.rating_type == "rs")
+    )
+    checks = _mean(Decimal(p.checkups) for p in d_rko if p.checkups is not None)
+    if checks is None:
+        checks = _checks_per_week(rko_rows)
+    source = "dodois" if d_rko or d_rs else ("sheet" if scores else "")
     by_group: dict[str, int] = defaultdict(int)
     revenue: dict[str, Decimal] = defaultdict(Decimal)
     for s in sales:
@@ -211,7 +226,7 @@ def _unit(
     agg5 = q.aggregator_score([(line.score5, line.orders) for line in lines.values()])
     result = q.lko(
         rko=rko,
-        rko_checks_per_week=_checks_per_week(rko_rows),
+        rko_checks_per_week=checks,
         kr=_kr(kr),
         maps=q.maps_score([(m[1], m[2]) for m in maps]),
         aggregators=agg5,
@@ -223,12 +238,13 @@ def _unit(
         country,
         result,
         q.es(audit=audit, rs=rs),
-        _checks_per_week(rko_rows),
+        checks,
         kr,
         maps,
         orders,
         dict(revenue),
         tuple(sorted(lines.values(), key=lambda x: -x.orders)),
+        source,
     )
 
 
@@ -294,6 +310,14 @@ def _maps_total(units: Sequence[UnitQuality]) -> tuple[MapTotal, ...]:
     )
 
 
+def _source_of(units: Sequence[UnitQuality]) -> str:
+    """Источник РКО и РС страны: `dodois`, `sheet`, `mixed` или пусто."""
+    found = {u.rating_source for u in units if u.rating_source}
+    if len(found) > 1:
+        return "mixed"
+    return next(iter(found), "")
+
+
 def _country(
     code: str, units: Sequence[UnitQuality], currency: str | None, state: str
 ) -> CountryQuality:
@@ -333,6 +357,7 @@ def _country(
         kr=_kr_total(units),
         maps=_maps_total(units),
         dodois=state,
+        rating_source=_source_of(units),
     )
 
 
@@ -360,8 +385,12 @@ def _fresh_maps(provider: int, month: date) -> dict[str, tuple[float, int]]:
     }
 
 
-def load_month(reach: Reach, countries: Sequence[str], month: date) -> dict[str, CountryQuality]:
-    """«Качество» стран за месяц. Бросает `RatingsError`/`DbError`, если база не ответила."""
+def load_month(
+    reach: Reach, countries: Sequence[str], month: date, *, with_audit: bool = True
+) -> dict[str, CountryQuality]:
+    """«Качество» стран за месяц. Бросает `RatingsError`/`DbError`, если база не ответила.
+
+    `with_audit=False` — проверки decimus не читаются вовсе (контроль их не видит, D420)."""
     until = _month_end(month)
     scores: dict[str, list[quality_read.PeriodScore]] = defaultdict(list)
     names: dict[str, tuple[str, str]] = {}
@@ -370,7 +399,7 @@ def load_month(reach: Reach, countries: Sequence[str], month: date) -> dict[str,
         names[row.unit] = (row.name, row.country)
     for reg in agg_store.units(countries):
         names.setdefault(reg.dodo_id, (reg.name, reg.country))
-    audits = quality_read.audit_pcts(reach, countries, month)
+    audits = quality_read.audit_pcts(reach, countries, month) if with_audit else {}
     maps_by_provider = {
         "Google": _fresh_maps(pointer.GOOGLE, month),
         "Yandex": _fresh_maps(pointer.YANDEX, month),
@@ -404,12 +433,14 @@ def _load_country(
     sales = dodois_metrics.unit_sales(code, month)
     agg_orders = dodois_metrics.unit_aggregator_orders(code, month)
     krs = {k.dodo_id: k for k in dodois_metrics.unit_kr(code, month)}
+    rated = dodois_metrics.unit_rating_periods(code, month)
     in_country = {u for u, (_, c) in names.items() if c == code}
     ids = (
         in_country & (set(scores) | set(audits))
         | {s.dodo_id for s in sales}
         | {a.dodo_id for a in agg_orders}
         | set(krs)
+        | {p.dodo_id for p in rated}
     )
     units = []
     for uid in sorted(ids):
@@ -431,6 +462,7 @@ def _load_country(
                 agg_orders=[a for a in agg_orders if a.dodo_id == uid],
                 kr=krs.get(uid),
                 agg_scores=agg_scores.get(uid, {}),
+                periods=[p for p in rated if p.dodo_id == uid],
             )
         )
     has_dodois = bool(sales or agg_orders or krs)

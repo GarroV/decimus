@@ -14,6 +14,7 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.network": {"ru": "Все страны", "en": "All countries"},
     "quality.filter.title": {"ru": "Страны", "en": "Countries"},
     "quality.rail.line": {"ru": "ЛКО {lko} · ЭС {es}", "en": "LKO {lko} · ES {es}"},
+    "quality.rail.lko": {"ru": "ЛКО {lko}", "en": "LKO {lko}"},
     "quality.rail.none": {"ru": "нет данных", "en": "no data"},
     "quality.place": {"ru": "{n}-е место", "en": "place {n}"},
     "quality.place.of": {"ru": "место {n} из {total}", "en": "place {n} of {total}"},
@@ -93,6 +94,15 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.tip.dodois_error": {
         "ru": "Dodo IS: последний сбор упал — {countries}",
         "en": "Dodo IS: the last collection failed — {countries}",
+    },
+    "quality.tip.source.dodois": {"ru": "РКО и РС: Dodo IS", "en": "RKO and RS: Dodo IS"},
+    "quality.tip.source.sheet": {
+        "ru": "РКО и РС: таблица контроля",
+        "en": "RKO and RS: the control table",
+    },
+    "quality.tip.source.mixed": {
+        "ru": "РКО и РС: Dodo IS, где есть, иначе таблица контроля",
+        "en": "RKO and RS: Dodo IS where available, otherwise the control table",
     },
     "quality.tip.dodois_none": {
         "ru": "Dodo IS: сбор ещё не запускался",

@@ -69,6 +69,18 @@ def test_aggregator_score_is_weighted_by_orders_of_rated_aggregators() -> None:
     assert q.aggregator_score([]) is None
 
 
+def test_aggregator_score_renormalises_over_rated_aggregators() -> None:
+    # Словения у аналитика: Wolt 9.8 из 10 на 41 985 заказов, Ehrana 500 заказов без оценки
+    wolt = q.five_point(D("9.8"), 10)
+    assert q.aggregator_score([(wolt, 41985), (None, 500)]) == D("4.90")
+    # две площадки с оценкой: Wolt 9.0/10 ×300 и Glovo 90% ×100 — обе 4.5
+    two = q.aggregator_score([(q.five_point(D("9.0"), 10), 300), (q.five_point(D("90"), 100), 100)])
+    assert two == D("4.5")
+    # Bolt 4.0/5 ×100 и Wolt 10/10 ×300: 0.25 × 4 + 0.75 × 5
+    mixed = q.aggregator_score([(q.five_point(D("4.0"), 5), 100), (q.five_point(D("10"), 10), 300)])
+    assert mixed == D("4.75")
+
+
 def test_poland_example_from_analyst() -> None:
     orders = q.Orders(aggregators=35, app_site=25, other=40)
     r = q.lko(

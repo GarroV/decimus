@@ -29,7 +29,7 @@ from src.db.errors import DbError, RatingsError
 from src.domain import quality as q
 from src.ratings.countries import country_names
 
-from . import auth, quality_data, ratings_freshness, ui_lang
+from . import auth, guard, quality_data, ratings_freshness, ui_lang
 from .config import Settings
 from .geo_names import country_title as geo_title
 from .quality_data import CountryQuality, UnitQuality
@@ -312,7 +312,15 @@ def _network_rows(
     ]
 
 
-def _freshness_rows(lang: str) -> tuple[str, ...]:
+def _rail_line(c: CountryQuality, lang: str, show_audit: bool) -> str:
+    if c.lko is None and (c.es is None or not show_audit):
+        return t("quality.rail.none", lang)
+    if not show_audit:
+        return t("quality.rail.lko", lang, lko=lko_text(c.lko))
+    return t("quality.rail.line", lang, lko=lko_text(c.lko), es=es_text(c.es))
+
+
+def _freshness_rows(lang: str, show_audit: bool, source: str = "") -> tuple[str, ...]:
     try:
         states = dodois_metrics.load_states()
     except DbError:
@@ -329,11 +337,12 @@ def _freshness_rows(lang: str) -> tuple[str, ...]:
     return (
         t("quality.tip.unit", lang),
         t("quality.tip.lko", lang),
-        t("quality.tip.es", lang),
+        *((t("quality.tip.es", lang),) if show_audit else ()),
         t("quality.tip.kr", lang),
         t("quality.tip.fresh", lang),
         dodois,
         *errors,
+        *((t(f"quality.tip.source.{source}", lang),) if source else ()),
     )
 
 
@@ -345,6 +354,9 @@ def render(lang: str) -> str:
     month = parse_month(request.args.get("month", ""), today)
     base = section("quality").path
     keep_lang = request.args.get("lang", "")
+    #: Контроль проверок decimus не видит (D420, `inspection.read`): без права ни чтения
+    #: проверок, ни ЭС, ни колонки проверки — остаются ЛКО и рейтинги.
+    show_audit = guard.may("inspection.read")
 
     def link(country: str | None, to_month: date | None = None) -> str:
         params: dict[str, Any] = {"month": f"{(to_month or month):%Y-%m}"}
@@ -359,8 +371,8 @@ def render(lang: str) -> str:
         if code and code not in scope:
             abort(404)
         months = _available_months(today, scope)
-        now = quality_data.rank(quality_data.load_month(reach, scope, month))
-        before = quality_data.load_month(reach, scope, shift(month, -1))
+        now = quality_data.rank(quality_data.load_month(reach, scope, month, with_audit=show_audit))
+        before = quality_data.load_month(reach, scope, shift(month, -1), with_audit=show_audit)
     except (DbError, RatingsError):
         log.exception("Качество: данные не прочитались")
         return render_template(
@@ -371,11 +383,7 @@ def render(lang: str) -> str:
         {
             "code": c.code,
             "title": country_title(c.code, lang),
-            "meta": (
-                t("quality.rail.line", lang, lko=lko_text(c.lko), es=es_text(c.es))
-                if c.lko is not None or c.es is not None
-                else t("quality.rail.none", lang)
-            ),
+            "meta": _rail_line(c, lang, show_audit),
             "count": c.place_lko if c.place_lko else "",
             "href": link(c.code),
             "on": c.code == code,
@@ -394,6 +402,7 @@ def render(lang: str) -> str:
     )
     prev_month, next_month = shift(month, -1), shift(month, 1)
     view: dict[str, Any] | None = None
+    view_source = now[code].rating_source if code else ""
     network: list[dict[str, Any]] = []
     if code:
         view = _country_view(now[code], before.get(code), lang, ranked_total)
@@ -413,7 +422,8 @@ def render(lang: str) -> str:
         month_title=month_title(month, lang),
         prev_href=link(code, prev_month),
         next_href=link(code, next_month) if next_month <= today.replace(day=1) else None,
-        tip_rows=_freshness_rows(lang),
+        tip_rows=_freshness_rows(lang, show_audit, view_source),
+        show_audit=show_audit,
         freshness=ratings_freshness.build(lang, {}),
         section_path=base,
     )

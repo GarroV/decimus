@@ -746,3 +746,7 @@ save_template
 worst_word
 # Автофикстура pytest (`autouse=True`): по имени её не зовёт никто.
 _чистое_окружение
+# Поля контракта `UnitRatingPeriod` (сборщик Dodo IS): заглушка их не читает, настоящий модуль приходит со сборщиком.
+period_to
+publish_status
+period_from

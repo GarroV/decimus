@@ -54,6 +54,19 @@ class LoadState:
     last_error: str | None
 
 
+@dataclass(frozen=True)
+class UnitRatingPeriod:
+    """РКО (неделя) или РС (полумесяц) пиццерии из Dodo IS: оценка и число проверок периода."""
+
+    dodo_id: str
+    kind: str  # 'rko' | 'rs'
+    period_from: date
+    period_to: date
+    rate: Decimal
+    publish_status: str | None
+    checkups: int | None
+
+
 def unit_sales(country_code: str, month: date) -> list[UnitSales]:
     """Заказы и выручка пиццерий страны за месяц."""
     return []
@@ -66,6 +79,11 @@ def unit_aggregator_orders(country_code: str, month: date) -> list[UnitAggregato
 
 def unit_kr(country_code: str, month: date) -> list[UnitKr]:
     """КР пиццерий страны за месяц."""
+    return []
+
+
+def unit_rating_periods(country_code: str, month: date) -> list[UnitRatingPeriod]:
+    """Периоды РКО и РС пиццерий страны, начавшиеся в месяце."""
     return []
 
 

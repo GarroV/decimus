@@ -53,11 +53,11 @@
   {% if not view %}
     {% call pick_block(t('quality.block.network'), '', network|length) %}
       {% if network %}
-      <div class="qa-scroll"><table class="qa-table qa-table--narrow">
+      <div class="qa-scroll"><table class="qa-table qa-table--mid">
         <thead><tr>
           <th>{{ t('quality.col.place') }}</th><th>{{ t('quality.col.country') }}</th>
           <th class="qa-num">{{ t('quality.col.lko') }}</th><th class="qa-num">{{ t('quality.col.delta') }}</th>
-          <th class="qa-num">{{ t('quality.col.es') }}</th><th class="qa-num">{{ t('quality.col.delta') }}</th>
+          {% if show_audit %}<th class="qa-num">{{ t('quality.col.es') }}</th><th class="qa-num">{{ t('quality.col.delta') }}</th>{% endif %}
           <th class="qa-num">{{ t('quality.col.units') }}</th>
         </tr></thead>
         <tbody>
@@ -66,7 +66,7 @@
             <td>{{ r.place }}</td>
             <td><a href="{{ r.href }}">{{ r.title }}</a></td>
             <td class="qa-num">{{ r.lko }}</td><td class="qa-num">{{ delta(r.lko_delta) }}</td>
-            <td class="qa-num">{{ r.es }}</td><td class="qa-num">{{ delta(r.es_delta) }}</td>
+            {% if show_audit %}<td class="qa-num">{{ r.es }}</td><td class="qa-num">{{ delta(r.es_delta) }}</td>{% endif %}
             <td class="qa-num">{{ r.units }}</td>
           </tr>
         {% endfor %}
@@ -82,9 +82,9 @@
     {% endif %}
     {% if view.dodois_note %}<p class="note note--warn qa-note" role="status">{{ view.dodois_note }}</p>{% endif %}
 
-    {% call pick_tiles(2) %}
+    {% call pick_tiles(2 if show_audit else 1) %}
       {% call pick_tile(t('quality.tile.lko'), '', t('quality.tile.lko_sub', place=view.place, n=view.lko_units)) %}{{ view.lko }} {{ delta(view.lko_delta) }}{% endcall %}
-      {% call pick_tile(t('quality.tile.es'), '', t('quality.tile.es_sub', n=view.es_units, total=view.units_total)) %}{{ view.es }} {{ delta(view.es_delta) }}{% endcall %}
+      {% if show_audit %}{% call pick_tile(t('quality.tile.es'), '', t('quality.tile.es_sub', n=view.es_units, total=view.units_total)) %}{{ view.es }} {{ delta(view.es_delta) }}{% endcall %}{% endif %}
     {% endcall %}
 
     {% call pick_block(t('quality.block.lko'), t('quality.block.lko_hint')) %}
@@ -98,6 +98,7 @@
       {% if view.wsum_low %}<p class="pk-note qa-warn">{{ t('quality.warn.sum', sum=view.wsum) }}</p>{% endif %}
     {% endcall %}
 
+    {% if show_audit %}
     {% call pick_block(t('quality.block.es')) %}
       <div class="qa-scroll"><table class="qa-table qa-table--narrow">
         <thead><tr><th>{{ t('quality.col.component') }}</th><th class="qa-num">{{ t('quality.col.score') }}</th><th class="qa-num">{{ t('quality.col.weight') }}</th></tr></thead>
@@ -108,14 +109,15 @@
       </table></div>
       {% if view.es_missing %}<p class="pk-note">{{ t('quality.es.missing', n=view.es_missing) }}</p>{% endif %}
     {% endcall %}
+    {% endif %}
 
     {% if view.units %}
     {% call pick_block(t('quality.block.units'), '', view.units|length) %}
-      <div class="qa-scroll"><table class="qa-table">
+      <div class="qa-scroll"><table class="qa-table qa-table--wide">
         <thead><tr>
-          <th>{{ t('quality.col.unit') }}</th><th class="qa-num">{{ t('quality.col.lko') }}</th><th class="qa-num">{{ t('quality.col.es') }}</th>
+          <th>{{ t('quality.col.unit') }}</th><th class="qa-num">{{ t('quality.col.lko') }}</th>{% if show_audit %}<th class="qa-num">{{ t('quality.col.es') }}</th>{% endif %}
           <th class="qa-num">{{ t('quality.col.rko') }}</th><th class="qa-num">{{ t('quality.col.checks') }}</th>
-          <th class="qa-num">{{ t('quality.col.rs') }}</th><th class="qa-num">{{ t('quality.col.audit') }}</th>
+          <th class="qa-num">{{ t('quality.col.rs') }}</th>{% if show_audit %}<th class="qa-num">{{ t('quality.col.audit') }}</th>{% endif %}
           <th class="qa-num">{{ t('quality.col.kr') }}</th><th class="qa-num">{{ t('quality.col.maps') }}</th>
           <th class="qa-num">{{ t('quality.col.aggs') }}</th><th class="qa-num">{{ t('quality.col.wsum') }}</th>
         </tr></thead>
@@ -123,9 +125,9 @@
         {% for u in view.units %}
           <tr>
             <td>{{ u.name }}</td><td class="qa-num">{{ u.lko }}</td>
-            <td class="qa-num">{% if u.es_status == 'no_audit' %}<span class="qa-dim">{{ t('quality.es.no_audit') }}</span>{% elif u.es_status == 'no_rs' %}<span class="qa-dim">{{ t('quality.es.no_rs') }}</span>{% else %}{{ u.es }}{% endif %}</td>
+            {% if show_audit %}<td class="qa-num">{% if u.es_status == 'no_audit' %}<span class="qa-dim">{{ t('quality.es.no_audit') }}</span>{% elif u.es_status == 'no_rs' %}<span class="qa-dim">{{ t('quality.es.no_rs') }}</span>{% else %}{{ u.es }}{% endif %}</td>{% endif %}
             <td class="qa-num">{{ u.rko }}</td><td class="qa-num">{{ u.checks }}</td>
-            <td class="qa-num">{{ u.rs }}</td><td class="qa-num">{{ u.audit }}</td>
+            <td class="qa-num">{{ u.rs }}</td>{% if show_audit %}<td class="qa-num">{{ u.audit }}</td>{% endif %}
             <td class="qa-num">{{ u.kr }}</td><td class="qa-num">{{ u.maps }}</td><td class="qa-num">{{ u.aggs }}</td>
             <td class="qa-num{{ warn(u.wsum_low) }}">{{ u.wsum }}</td>
           </tr>
