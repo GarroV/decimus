@@ -92,39 +92,103 @@ def test_пустой_ответ_продаж_это_ноль_строк_а_не
     assert m.sales_rows({"result": []}) == []
 
 
-def test_агрегаторы_считают_заказы_и_выручку_по_пиццерии_и_агрегатору() -> None:
+def test_агрегаторы_считают_заказы_по_пиццерии_и_агрегатору_а_выручки_нет() -> None:
+    # Форма заказа `accounting/sales` (сверена на живом ответе 28.10): денежного поля верхнего
+    # уровня нет, сумма лежит внутри `products`.
+    def заказ(unit: str, name: str | None) -> dict:
+        return {
+            "unitId": unit,
+            "aggregatorName": name,
+            "orderSource": "Aggregator",
+            "salesChannel": "Delivery",
+            "paymentMethod": "Cash",
+            "soldAt": "2026-09-03T12:00:00",
+            "products": [{"price": 10}],
+        }
+
     страница = {
-        "sales": [
-            {"unitId": А, "aggregatorName": "Glovo", "price": 10},
-            {"unitId": А, "aggregatorName": "Glovo", "price": 5.5},
-            {"unitId": А, "aggregatorName": "Wolt", "price": 7},
-            {"unitId": Б, "aggregatorName": "Glovo", "price": 1},
-        ],
+        "sales": [заказ(А, "Glovo"), заказ(А, "Glovo"), заказ(А, "Wolt"), заказ(Б, "Glovo")],
         "isEndOfListReached": True,
     }
 
     итог = m.sum_aggregators(m.aggregator_orders(страница))
 
     assert итог == [
-        m.AggregatorMonth(А, "Glovo", 2, Decimal("15.5")),
-        m.AggregatorMonth(А, "Wolt", 1, Decimal("7")),
-        m.AggregatorMonth(Б, "Glovo", 1, Decimal("1")),
+        m.AggregatorMonth(А, "Glovo", 2),
+        m.AggregatorMonth(А, "Wolt", 1),
+        m.AggregatorMonth(Б, "Glovo", 1),
     ]
+    assert all(r.revenue is None for r in итог)
 
 
 def test_строки_без_агрегатора_не_попадают_в_заказы_агрегаторов() -> None:
     страница = {
         "sales": [
-            {"unitId": А, "aggregatorName": "Undefined", "price": 10},
-            {"unitId": А, "aggregatorName": None, "price": 10},
-            {"unitId": А, "price": 10},
-            {"unitId": А, "aggregatorName": "JustEat", "price": 4},
+            {"unitId": А, "aggregatorName": "Undefined"},
+            {"unitId": А, "aggregatorName": None},
+            {"unitId": А, "aggregatorName": ""},
+            {"unitId": А},
+            {"unitId": А, "aggregatorName": "JustEat"},
         ]
     }
 
-    assert m.sum_aggregators(m.aggregator_orders(страница)) == [
-        m.AggregatorMonth(А, "JustEat", 1, Decimal("4"))
+    assert m.sum_aggregators(m.aggregator_orders(страница)) == [m.AggregatorMonth(А, "JustEat", 1)]
+
+
+def test_продажи_живой_формы_суммируются_по_источнику_и_каналу_сквозь_способы_оплаты() -> None:
+    # Форма `finances/sales/units` (сверена на живом ответе 28.10, сентябрь 2026): строки
+    # `salesBreakdown` повторяются по способу оплаты, а на странице нужна сумма по
+    # (источник, канал). Числа строк синтетические, но дают те же итоги, что и живой ответ.
+    def строка(source: str, channel: str, pay: str, sales: float, count: int) -> dict:
+        return {
+            "orderSource": source,
+            "salesChannel": channel,
+            "paymentMethod": pay,
+            "sales": sales,
+            "ordersCount": count,
+        }
+
+    разбивка = [
+        строка("Aggregator", "Delivery", "Online", 5000.0, 200),
+        строка("Aggregator", "Delivery", "Cash", 3000.0, 120),
+        строка("Aggregator", "Dine-in", "Online", 20225.5, 1075),
+        строка("MobileApp", "Dine-in", "Online", 10526.34, 583),
+        строка("MobileApp", "Delivery", "Card", 3389.97, 133),
+        строка("Dine-in", "Dine-in", "Cash", 6225.34, 632),
+        строка("Dine-in", "Dine-in", "Card", 10000.0, 1000),
+        строка("Kiosk", "Dine-in", "Card", 7681.04, 440),
+        строка("Manager", "Dine-in", "Cash", 2189.66, 57),
+        строка("CallCenter", "Delivery", "Cash", 3107.15, 118),
+        строка("Website", "Delivery", "Online", 1535.04, 64),
     ]
+    тело = {
+        "result": [
+            {"unitId": А, "sales": 72880.04, "ordersCount": 4422, "salesBreakdown": разбивка}
+        ]
+    }
+
+    строки = m.merge_sales(m.sales_rows(тело))
+
+    по_источнику: dict[str, tuple[int, Decimal]] = {}
+    по_каналу: dict[str, tuple[int, Decimal]] = {}
+    for r in строки:
+        for ключ, куда in ((r.order_source, по_источнику), (r.sales_channel, по_каналу)):
+            n, v = куда.get(ключ, (0, Decimal(0)))
+            куда[ключ] = (n + r.orders, v + r.revenue)
+    assert len(строки) == len({(r.order_source, r.sales_channel) for r in строки})
+    assert sum((r.revenue for r in строки), Decimal(0)) == Decimal("72880.04")
+    assert sum(r.orders for r in строки) == 4422
+    assert по_каналу == {
+        "Dine-in": (3787, Decimal("56847.88")),
+        "Delivery": (635, Decimal("16032.16")),
+    }
+    assert по_источнику["Aggregator"] == (1395, Decimal("28225.5"))
+    assert по_источнику["MobileApp"] == (716, Decimal("13916.31"))
+    assert по_источнику["Dine-in"] == (1632, Decimal("16225.34"))
+    assert по_источнику["Kiosk"] == (440, Decimal("7681.04"))
+    assert по_источнику["Manager"] == (57, Decimal("2189.66"))
+    assert по_источнику["CallCenter"] == (118, Decimal("3107.15"))
+    assert по_источнику["Website"] == (64, Decimal("1535.04"))
 
 
 def test_оценки_клиентов_по_документации() -> None:

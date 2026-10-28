@@ -52,6 +52,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Договор страны, контакты по ДКК | Блок «Договор» в карточке страны: юрлицо партнёра, договор одной строкой (ДКК не моделируется, D603), почты, которые форма предписания подставляет в «Кому»; видит только УК, правят ОСБ, админ, главный админ (`contract.manage`) | `src/db/country_contracts.py`, `src/web/country_settings.py` |
 | РС, РКО | Рейтинг стандартов и рейтинг клиентского опыта: средние оценки по пиццериям из выгрузок Dodo IS; раздел «Рейтинги» | `docs/15-ratings.md`, `src/ratings/` |
 | Агрегатор | Площадка доставки с оценками пиццерий (Wolt, Glovo, Bolt Food, Yemeksepeti и др.); оценки собираются раз в сутки | `docs/17-aggregators.md`, `src/ratings/aggregators/` |
+| Качество, ЛКО, ЭС | Раздел «Качество»: два рейтинга по методике аналитика — «Лучший клиентский опыт» (РКО, КР, карты, агрегаторы) и «Эталон стандартов» (проверки + РС), пиццерия × месяц, свод по странам | `docs/21-quality.md`, `src/domain/quality.py`, `src/web/quality_page.py` |
 | Обучение | Раздел «Обучение»: обученность пиццерий по данным iSpring LMS (завершено / назначено), снимок раз в сутки; только счётчики, данных о сотрудниках нет (D575) | `docs/20-training.md`, `src/learning/`, `src/domain/training_metrics.py` |
 | Pointer | Внешний API оценок и отзывов с карт | `docs/09-pointer-api.md`, `src/ratings/pointer.py` |
 | Свод пиццерий | Таблица сведений о пиццериях, из которой наполняется справочник профилей | `docs/16-unit-profiles.md`, `src/ratings/svod.py` |
@@ -117,7 +118,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page}.py -->
+<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_tiles,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -158,6 +159,8 @@ Flask-приложение управляющей компании и партн
 | `src/web/plan_template.py` | Шаблон экшн-плана — `.xlsx` из записей проверки (#976, ступень 1) |
 | `src/web/prescriptions.py` | Предписания в вебе: вкладка «Предписания» «Действий» и записи (D266, D270, D275, D526, D599) |
 | `src/web/proofread.py` | «Добавить нарушение» на вычитке: подбор пункта по словам и кадрам (D535) |
+| `src/web/quality_data.py` | Сборка данных «Качества» за месяц: из чтений — пиццерии и страны (docs/21-quality.md) |
+| `src/web/quality_page.py` | Экран «Качество»: ЛКО и ЭС по странам и пиццериям за месяц (docs/21-quality.md) |
 | `src/web/ratings.py` | Раздел «Рейтинги» (спека 2026-10-08) и подраздел «Загрузки» |
 | `src/web/ratings_calendar.py` | Период раздела «Рейтинги»: «‹ 2026 Q3 ›», по щелчку — календарь «с — по» |
 | `src/web/ratings_freshness.py` | Таблица свежести под значком «?» у заголовка «Рейтингов» (D659) |
@@ -266,6 +269,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_plan_rows.py` | Тексты электронного плана исправлений (#1168): строки, путь, начало отсчёта, события |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2) и раздела «Действия» (D526): вкладка, панель, блоки, карточки |
 | `src/web/texts_prescriptions.py` | Тексты предписаний (волна 3): раздел УК, раздел партнёра, блок экрана страны |
+| `src/web/texts_quality.py` | Тексты экрана «Качество»: колонка стран, блоки, пояснение формулы, пустые состояния |
 | `src/web/texts_ratings.py` | Тексты раздела «Рейтинги» и подраздела «Загрузки» (спека 2026-10-08) |
 | `src/web/texts_refusals.py` | Тексты отказов раздела «Методика»: хранилище методики и формы экрана (#475) |
 | `src/web/texts_registry.py` | Тексты раздела «Проверки» в раскладке «список слева, карточка справа» |
@@ -329,6 +333,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 1 | not_found.html |
+| `src/web/templates/quality/` | 1 | index.html |
 | `src/web/templates/ratings/` | 3 | _period.html, coverage.html, index.html |
 | `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/training/` | 1 | index.html |
@@ -340,7 +345,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 65 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+57) |
+| `src/web/static/` | 66 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+58) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -418,7 +423,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,dodois_metrics,dodois_metrics_store,country_contracts,country_report_langs,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,country_report_langs,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -429,7 +434,6 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
 | `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
 | `src/db/dodois_metrics.py` | Чтение данных Dodo IS для страницы «Качество» (D671, миграция `0105`): продажи, агрегаторы, КР |
-| `src/db/dodois_metrics_store.py` | Запись данных Dodo IS для «Качества» (D671, миграция `0105`): замена месяца и журнал загрузки |
 | `src/db/health_store.py` | Двери базы для вкладки «Подключения» (D638): исходы проб и последние заходы сборов |
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
@@ -448,6 +452,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/plan_rows.py` | Строки электронного плана исправлений: модель, чтение, заведение (шаг 2 эпика #1168) |
 | `src/db/prescriptions.py` | Предписания: черновик, согласование ОСБ, отправка через Gmail, ответ партнёра, закрытие |
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, согласование, отправка, закрытие (УК), ответ партнёра |
+| `src/db/quality_read.py` | Чтения для экрана «Качество» (docs/21-quality.md): РКО, РС и проверки по месяцам |
 | `src/db/rate_window.py` | Общее скользящее окно частоты запросов (F-110, миграция `0082`) |
 | `src/db/ratings.py` | Запись рейтингов РС/РКО: журнал загрузок и строки схемы `ratings` (0039) |
 | `src/db/ratings_read.py` | Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039) |
@@ -785,20 +790,6 @@ JSON-RPC поверх одного POST на локальной петле, ли
 правила — `src/domain/dodois.py`, база — `src/db/dodois_logins.py`, экраны — `src/web/dodois_screen.py`,
 `src/web/dodois_connect.py`.
 
-Те же входы кормят страницу «Качество» (D671): раз в сутки бот (`src/bot/dodois_metrics_loader.py`,
-замок `DODOIS_METRICS_LOCK_KEY`) собирает по странам продажи по источнику и каналу
-(`finances/sales/units`), заказы агрегаторов (`accounting/sales`, `orderSource=Aggregator`) и оценки
-клиентов (`customer-feedback/customer-ratings`) в агрегаты «пиццерия × месяц»: сбор —
-`src/dodois/metrics.py`, разбор и суммы — `src/domain/dodois_metrics.py`, запись —
-`src/db/dodois_metrics_store.py`, чтение для страницы — `src/db/dodois_metrics.py`, таблицы —
-миграция `0105` (`dodois.unit_sales_month`, `unit_aggregator_month`, `unit_kr_month`,
-`unit_rating_period`, `unit_checkup_period`, `metric_loads`); к ним — оценки РКО и РС по неделям и
-счёт проверок (`controlling/ratings/{customer-experience,standards}/history`, `controlling/checkups`,
-без префикса страны, вид загрузки `ratings`). Ключи сбор не продлевает: это дело `service.run_pass`. Первая удачная загрузка вида
-берёт 12 полных месяцев и текущий, дальше — прошлый и текущий, месяц заменяется целиком. Формат
-ответов продаж и заказов в открытой документации не расписан полем за полем: разбор терпимый, а
-непонятная форма пишется неудачей загрузки с именами ключей (без значений).
-
 <!-- map:begin files src/dodois/*.py -->
 | Файл | Что делает |
 |---|---|
@@ -912,6 +903,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/photo_upload_link.py` | Адрес загрузки кадров к черновику загрузки проверки: подписанный токен без срока |
 | `src/domain/plan_due.py` | Срок ответа партнёра планом исправлений — один на письмо, бот и веб (D617) |
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
+| `src/domain/quality.py` | Расчёт «Качества»: ЛКО и ЭС — ядро (D561–D566; docs/21-quality.md) |
 | `src/domain/repeat_rule.py` | Правило «пункт уже был нарушением в прошлой проверке» (D191, D255) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
 | `src/domain/route.py` | Маршрут обхода: в каком порядке аудитор идёт по зонам и по пунктам внутри них |

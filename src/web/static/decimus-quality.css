@@ -1,0 +1,31 @@
+/* Экран «Качество»: таблицы блоков. Каркас — `decimus-pick.css`; всё из токенов дизайн-системы,
+   поэтому тёмная тема работает без правок. Таблицы ограничены по ширине (блоки, не простыня);
+   широкая таблица пиццерий на телефоне прокручивается внутри блока. */
+
+.qa-scroll { overflow-x: auto; max-width: 100%; }
+.qa-table { border-collapse: collapse; font-size: 13px; width: 100%; }
+.qa-table--wide th, .qa-table--wide td { padding: 8px; }
+.qa-table--narrow { max-width: 30rem; }
+.qa-table--mid { max-width: 44rem; }
+.qa-table th, .qa-table td { padding: 8px 12px; border-bottom: 1px solid var(--line-2);
+  text-align: left; vertical-align: baseline; overflow-wrap: anywhere; }
+.qa-table thead th { background: var(--surface-3); font: var(--w-semibold) var(--fs-micro) / 1.2 var(--font-ui);
+  letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
+.qa-table tbody tr:last-child td { border-bottom: 0; }
+.qa-table a { color: var(--ink); font-weight: var(--w-semibold); white-space: nowrap; }
+.qa-num { text-align: right !important; font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.qa-num--warn { color: var(--warn-ink); font-weight: var(--w-semibold); }
+.qa-total td { font-weight: var(--w-semibold); background: var(--surface-2); }
+.qa-dim { color: var(--ink-3); font-size: var(--fs-meta); }
+.qa-delta { font-family: var(--font-num); font-size: 12px; margin-left: 4px; color: var(--ink-3); }
+.qa-delta--up { color: var(--ok-ink, var(--ink-2)); }
+.qa-delta--down { color: var(--warn-ink); }
+.qa-body { padding: 16px; }
+.qa-note { margin: 0; max-width: 60ch; }
+.qa-warn { color: var(--warn-ink); }
+.qa-scroll + .qa-scroll { margin-top: var(--space-4); }
+
+@media (max-width: 719px) {
+  .qa-table th, .qa-table td { padding: 8px; }
+  .qa-table thead th { letter-spacing: .02em; }
+}

@@ -174,11 +174,11 @@ def test_заказы_агрегаторов_листаются_пострани
     страницы = iter(
         [
             {
-                "sales": [{"unitId": А, "aggregatorName": "Glovo", "price": 3}],
+                "sales": [{"unitId": А, "aggregatorName": "Glovo", }],
                 "isEndOfListReached": False,
             },
             {
-                "sales": [{"unitId": А, "aggregatorName": "Glovo", "price": 4}],
+                "sales": [{"unitId": А, "aggregatorName": "Glovo", }],
                 "isEndOfListReached": True,
             },
         ]
@@ -195,7 +195,7 @@ def test_заказы_агрегаторов_листаются_пострани
     metrics.collect_country(_вход(), [parse.KIND_AGGREGATORS], today=СЕГОДНЯ, sleep=_без_сна)
 
     октябрь = next(p for p in мир.агрегаторы if p[0] == date(2026, 10, 1))
-    assert [(r.aggregator, r.orders, str(r.revenue)) for r in октябрь[2]] == [("Glovo", 2, "7")]
+    assert [(r.aggregator, r.orders, r.revenue) for r in октябрь[2]] == [("Glovo", 2, None)]
 
 
 def test_неизвестная_форма_ответа_пишется_неудачей_с_именами_ключей(мир: Мир) -> None:

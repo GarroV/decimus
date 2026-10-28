@@ -40,7 +40,7 @@ create table dodois.unit_aggregator_month (
     month date not null check (month = date_trunc('month', month)::date),
     aggregator text not null check (aggregator <> ''),
     orders integer not null check (orders >= 0),
-    revenue numeric(16, 2) not null,
+    revenue numeric(16, 2),
     loaded_at timestamptz not null default now(),
     primary key (dodo_id, month, aggregator)
 );

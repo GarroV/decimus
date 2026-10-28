@@ -1,0 +1,203 @@
+{#
+  Экран «Качество»: ЛКО и ЭС по странам и пиццериям за месяц (docs/21-quality.md). Каркас —
+  общий шаблон «выбор слева — рабочая область справа» (`_pick_page.html`, D474, D655), как у
+  «Стран» и «Обучения»: слева страны (код, итог строкой, место), справа сводка сети или страна:
+  итог, разбивка, затем строки. Ни одного вычисления — всё приходит из `quality_page.py`.
+#}{% extends "_pick_page.html" %}
+{% from "_info_tip.html" import info_tip, fresh_tip %}
+{% from "_pick_ui.html" import pick_item, pick_head, pick_block, pick_empty, pick_tile, pick_tiles with context %}
+{% block title %}{{ t('section.quality.title') }}{% endblock %}
+{% block pick_assets %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-quality.css') }}">
+  <script src="{{ url_for('static', filename='pick.js') }}" defer></script>
+{% endblock %}
+
+{% block pick_label %}{{ t('quality.filter.title') }}{% endblock %}
+
+{% block pick_list %}
+  {% if not failed %}
+    {{ pick_item(network_href, t('quality.network'), '', '', not code, code='Σ') }}
+    {% for row in rail %}
+      {{ pick_item(row.href, row.title, row.meta, row.count, row.on, code=row.code) }}
+    {% endfor %}
+  {% endif %}
+{% endblock %}
+
+{% macro delta(d) %}{% if d.kind %}<span class="qa-delta qa-delta--{{ d.kind }}">{{ d.text }}</span>{% endif %}{% endmacro %}
+{% macro warn(on) %}{% if on %} qa-num--warn{% endif %}{% endmacro %}
+
+{% block pick_work %}
+{% if failed %}
+  <section class="pk-block"><div class="qa-body"><p class="note note--warn" role="status">{{ t('quality.failed') }}</p></div></section>
+{% else %}
+  {% set tips = info_tip(t('tip.hint'), t('quality.tip.title'), tip_rows, 'quality') ~ fresh_tip(t('ratings.loaded.hint'), t('ratings.fresh.title'), freshness, 'qfresh',
+        [t('ratings.fresh.col.source'), t('ratings.fresh.col.scope'), t('ratings.fresh.col.at'), t('ratings.fresh.col.status')],
+        t('ratings.fresh.foot'), t('ratings.loaded.none')) %}
+  {% call pick_head(kicker, title, tips) %}
+    <div class="pk-head__period">
+      <div class="speriod" role="group" aria-label="{{ t('quality.month.label') }}">
+        <a class="speriod__arrow" href="{{ prev_href }}" aria-label="{{ t('quality.month.prev') }}">{{ icon('cleft') }}</a>
+        <label class="pickbox">
+          <select class="pickselect pickbox__select" data-pick-nav aria-label="{{ t('quality.month.label') }}">
+            {% if not month_options|selectattr('on')|list %}<option value="" selected disabled>{{ month_title }}</option>{% endif %}
+            {% for o in month_options %}<option value="{{ o.href }}"{% if o.on %} selected{% endif %}>{{ o.title }}</option>{% endfor %}
+          </select>
+        </label>
+        {% if next_href %}<a class="speriod__arrow" href="{{ next_href }}" aria-label="{{ t('quality.month.next') }}">{{ icon('cright') }}</a>
+        {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cright') }}</span>{% endif %}
+      </div>
+    </div>
+  {% endcall %}
+
+  {% if not view %}
+    {% call pick_block(t('quality.block.network'), '', network|length) %}
+      {% if network %}
+      <div class="qa-scroll"><table class="qa-table qa-table--mid">
+        <thead><tr>
+          <th>{{ t('quality.col.place') }}</th><th>{{ t('quality.col.country') }}</th>
+          <th class="qa-num">{{ t('quality.col.lko') }}</th><th class="qa-num">{{ t('quality.col.delta') }}</th>
+          {% if show_audit %}<th class="qa-num">{{ t('quality.col.es') }}</th><th class="qa-num">{{ t('quality.col.delta') }}</th>{% endif %}
+          <th class="qa-num">{{ t('quality.col.units') }}</th>
+        </tr></thead>
+        <tbody>
+        {% for r in network %}
+          <tr>
+            <td>{{ r.place }}</td>
+            <td><a href="{{ r.href }}">{{ r.title }}</a></td>
+            <td class="qa-num">{{ r.lko }}</td><td class="qa-num">{{ delta(r.lko_delta) }}</td>
+            {% if show_audit %}<td class="qa-num">{{ r.es }}</td><td class="qa-num">{{ delta(r.es_delta) }}</td>{% endif %}
+            <td class="qa-num">{{ r.units }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% else %}
+        {% call pick_empty() %}{{ t('quality.empty.scope') }}{% endcall %}
+      {% endif %}
+    {% endcall %}
+  {% else %}
+    {% if view.units_total == 0 %}
+      {% call pick_empty() %}{{ t('quality.empty.country') }}{% endcall %}
+    {% endif %}
+    {% if view.dodois_note %}<p class="note note--warn qa-note" role="status">{{ view.dodois_note }}</p>{% endif %}
+
+    {% call pick_tiles(2 if show_audit else 1) %}
+      {% call pick_tile(t('quality.tile.lko'), '', t('quality.tile.lko_sub', place=view.place, n=view.lko_units)) %}{{ view.lko }} {{ delta(view.lko_delta) }}{% endcall %}
+      {% if show_audit %}{% call pick_tile(t('quality.tile.es'), '', t('quality.tile.es_sub', n=view.es_units, total=view.units_total)) %}{{ view.es }} {{ delta(view.es_delta) }}{% endcall %}{% endif %}
+    {% endcall %}
+
+    {% call pick_block(t('quality.block.lko'), t('quality.block.lko_hint')) %}
+      <div class="qa-scroll"><table class="qa-table qa-table--narrow">
+        <thead><tr><th>{{ t('quality.col.component') }}</th><th class="qa-num">{{ t('quality.col.score') }}</th><th class="qa-num">{{ t('quality.col.weight') }}</th></tr></thead>
+        <tbody>
+        {% for c in view.comps %}<tr><td>{{ c.name }}</td><td class="qa-num">{{ c.score }}</td><td class="qa-num">{{ c.weight }}</td></tr>{% endfor %}
+          <tr class="qa-total"><td>{{ t('quality.comp.sum') }}</td><td></td><td class="qa-num{{ warn(view.wsum_low) }}">{{ view.wsum }}</td></tr>
+        </tbody>
+      </table></div>
+      {% if view.wsum_low %}<p class="pk-note qa-warn">{{ t('quality.warn.sum', sum=view.wsum) }}</p>{% endif %}
+    {% endcall %}
+
+    {% if show_audit %}
+    {% call pick_block(t('quality.block.es')) %}
+      <div class="qa-scroll"><table class="qa-table qa-table--narrow">
+        <thead><tr><th>{{ t('quality.col.component') }}</th><th class="qa-num">{{ t('quality.col.score') }}</th><th class="qa-num">{{ t('quality.col.weight') }}</th></tr></thead>
+        <tbody>
+          <tr><td>{{ t('quality.es.audit') }}</td><td class="qa-num">{{ view.es_audit }}</td><td class="qa-num">{{ view.es_share }}</td></tr>
+          <tr><td>{{ t('quality.es.rs') }}</td><td class="qa-num">{{ view.es_rs }}</td><td class="qa-num">{{ view.es_rs_share }}</td></tr>
+        </tbody>
+      </table></div>
+      {% if view.es_missing %}<p class="pk-note">{{ t('quality.es.missing', n=view.es_missing) }}</p>{% endif %}
+    {% endcall %}
+    {% endif %}
+
+    {% if view.units %}
+    {% call pick_block(t('quality.block.units'), '', view.units|length) %}
+      <div class="qa-scroll"><table class="qa-table qa-table--wide">
+        <thead><tr>
+          <th>{{ t('quality.col.unit') }}</th><th class="qa-num">{{ t('quality.col.lko') }}</th>{% if show_audit %}<th class="qa-num">{{ t('quality.col.es') }}</th>{% endif %}
+          <th class="qa-num">{{ t('quality.col.rko') }}</th><th class="qa-num">{{ t('quality.col.checks') }}</th>
+          <th class="qa-num">{{ t('quality.col.rs') }}</th>{% if show_audit %}<th class="qa-num">{{ t('quality.col.audit') }}</th>{% endif %}
+          <th class="qa-num">{{ t('quality.col.kr') }}</th><th class="qa-num">{{ t('quality.col.maps') }}</th>
+          <th class="qa-num">{{ t('quality.col.aggs') }}</th><th class="qa-num">{{ t('quality.col.wsum') }}</th>
+        </tr></thead>
+        <tbody>
+        {% for u in view.units %}
+          <tr>
+            <td>{{ u.name }}</td><td class="qa-num">{{ u.lko }}</td>
+            {% if show_audit %}<td class="qa-num">{% if u.es_status == 'no_audit' %}<span class="qa-dim">{{ t('quality.es.no_audit') }}</span>{% elif u.es_status == 'no_rs' %}<span class="qa-dim">{{ t('quality.es.no_rs') }}</span>{% else %}{{ u.es }}{% endif %}</td>{% endif %}
+            <td class="qa-num">{{ u.rko }}</td><td class="qa-num">{{ u.checks }}</td>
+            <td class="qa-num">{{ u.rs }}</td>{% if show_audit %}<td class="qa-num">{{ u.audit }}</td>{% endif %}
+            <td class="qa-num">{{ u.kr }}</td><td class="qa-num">{{ u.maps }}</td><td class="qa-num">{{ u.aggs }}</td>
+            <td class="qa-num{{ warn(u.wsum_low) }}">{{ u.wsum }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+    {% endcall %}
+    {% endif %}
+
+    {% call pick_block(t('quality.block.orders')) %}
+      {% if view.dodois_note %}{% call pick_empty() %}{{ view.dodois_note }}{% endcall %}{% else %}
+      <div class="qa-scroll"><table class="qa-table qa-table--mid">
+        <thead><tr><th>{{ t('quality.col.unit') }}</th><th class="qa-num">{{ t('quality.col.orders') }}</th><th class="qa-num">{{ t('quality.col.n') }}</th><th class="qa-num">{{ t('quality.col.o') }}</th><th class="qa-num">{{ t('quality.col.p') }}</th></tr></thead>
+        <tbody>
+          <tr class="qa-total"><td>{{ t('quality.total') }}</td><td class="qa-num">{{ view.orders_total.orders }}</td><td class="qa-num">{{ view.orders_total.n }}</td><td class="qa-num">{{ view.orders_total.o }}</td><td class="qa-num">{{ view.orders_total.p }}</td></tr>
+        {% for r in view.orders %}<tr><td>{{ r.name }}</td><td class="qa-num">{{ r.orders }}</td><td class="qa-num">{{ r.n }}</td><td class="qa-num">{{ r.o }}</td><td class="qa-num">{{ r.p }}</td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+      {% endif %}
+    {% endcall %}
+
+    {% call pick_block(t('quality.block.revenue')) %}
+      {% if view.dodois_note or not view.revenue %}{% call pick_empty() %}{{ view.dodois_note or t('quality.nothing') }}{% endcall %}{% else %}
+      <div class="qa-scroll"><table class="qa-table qa-table--narrow">
+        <thead><tr><th>{{ t('quality.col.channel') }}</th><th class="qa-num">{{ t('quality.col.revenue') }}</th><th class="qa-num">{{ t('quality.col.share') }}</th></tr></thead>
+        <tbody>{% for r in view.revenue %}<tr><td>{{ r.name }}</td><td class="qa-num">{{ r.amount }}</td><td class="qa-num">{{ r.share }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% if view.revenue_units %}
+      <div class="qa-scroll"><table class="qa-table qa-table--mid">
+        <thead><tr><th>{{ t('quality.col.unit') }}</th><th class="qa-num">{{ t('quality.col.revenue') }}</th><th class="qa-num">{{ t('quality.channel.dine_in') }}</th><th class="qa-num">{{ t('quality.channel.takeaway') }}</th><th class="qa-num">{{ t('quality.channel.delivery') }}</th></tr></thead>
+        <tbody>{% for r in view.revenue_units %}<tr><td>{{ r.name }}</td><td class="qa-num">{{ r.total }}</td>{% for c in r.cells %}<td class="qa-num">{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+      </table></div>
+      {% endif %}
+      {% endif %}
+    {% endcall %}
+
+    {% call pick_block(t('quality.block.aggs')) %}
+      {% if view.dodois_note or not view.aggs %}{% call pick_empty() %}{{ view.dodois_note or t('quality.nothing') }}{% endcall %}{% else %}
+      <div class="qa-scroll"><table class="qa-table qa-table--mid">
+        <thead><tr><th>{{ t('quality.col.aggregator') }}</th><th class="qa-num">{{ t('quality.col.orders') }}</th><th class="qa-num">{{ t('quality.col.share') }}</th><th class="qa-num">{{ t('quality.col.agg_score') }}</th><th class="qa-num">{{ t('quality.col.agg_score5') }}</th></tr></thead>
+        <tbody>
+        {% for a in view.aggs %}
+          <tr><td>{{ a.name }}{% if a.no_collector %} <span class="qa-dim">· {{ t('quality.agg.no_collector') }}</span>{% elif a.no_score %} <span class="qa-dim">· {{ t('quality.agg.no_score') }}</span>{% endif %}</td>
+          <td class="qa-num">{{ a.orders }}</td><td class="qa-num">{{ a.share }}</td><td class="qa-num">{{ a.score }}</td><td class="qa-num">{{ a.score5 }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% endif %}
+    {% endcall %}
+
+    {% call pick_block(t('quality.block.kr')) %}
+      {% if view.dodois_note %}{% call pick_empty() %}{{ view.dodois_note }}{% endcall %}{% else %}
+      <div class="qa-scroll"><table class="qa-table qa-table--narrow">
+        <thead><tr><th></th><th class="qa-num">{{ t('quality.col.avg') }}</th><th class="qa-num">{{ t('quality.col.count') }}</th></tr></thead>
+        <tbody>
+          <tr><td>{{ t('quality.kr.dine_in') }}</td><td class="qa-num">{{ view.kr.dine_avg }}</td><td class="qa-num">{{ view.kr.dine_count }}</td></tr>
+          <tr><td>{{ t('quality.kr.delivery') }}</td><td class="qa-num">{{ view.kr.delivery_avg }}</td><td class="qa-num">{{ view.kr.delivery_count }}</td></tr>
+        </tbody>
+      </table></div>
+      {% endif %}
+    {% endcall %}
+
+    {% call pick_block(t('quality.block.maps')) %}
+      {% if view.maps %}
+      <div class="qa-scroll"><table class="qa-table qa-table--narrow">
+        <thead><tr><th>{{ t('quality.col.provider') }}</th><th class="qa-num">{{ t('quality.col.score') }}</th><th class="qa-num">{{ t('quality.col.units') }}</th><th class="qa-num">{{ t('quality.col.reviews') }}</th></tr></thead>
+        <tbody>{% for m in view.maps %}<tr><td>{{ m.name }}</td><td class="qa-num">{{ m.score }}</td><td class="qa-num">{{ m.units }}</td><td class="qa-num">{{ m.reviews }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% else %}{% call pick_empty() %}{{ t('quality.nothing') }}{% endcall %}{% endif %}
+    {% endcall %}
+  {% endif %}
+{% endif %}
+{% endblock %}

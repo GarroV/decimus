@@ -37,6 +37,7 @@ def test_у_админа_ук_четыре_пункта_и_ещё_с_остал�
         "osb",
         "country",
         "ratings",
+        "quality",
         "training",
         "admin",
         "administration",
@@ -62,5 +63,6 @@ def test_пять_и_меньше_разделов_без_ещё(monkeypatch: py
     assert "tabbar__more" not in панель
     assert re.findall(r'class="tabbar__item[^"]*"\s+href="/(\w+)', панель) == [
         "ratings",
+        "quality",
         "administration",
     ]

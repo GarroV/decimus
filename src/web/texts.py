@@ -38,6 +38,7 @@ from .texts_plan_file import PLAN_FILE_TEXTS
 from .texts_plan_rows import PLAN_ROW_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
+from .texts_quality import QUALITY_TEXTS
 from .texts_ratings import RATINGS_TEXTS
 from .texts_refusals import REFUSAL_TEXTS
 from .texts_registry import REGISTRY_TEXTS
@@ -1808,6 +1809,7 @@ _ЧАСТИ = (
     PLAN_FILE_TEXTS,
     PLAN_ROW_TEXTS,
     PRESCRIPTION_TEXTS,
+    QUALITY_TEXTS,
     TRIP_TEXTS,
     RATINGS_TEXTS,
     REFUSAL_TEXTS,
@@ -1847,6 +1849,7 @@ TEXTS = {
     **PLAN_FILE_TEXTS,
     **PLAN_ROW_TEXTS,
     **PRESCRIPTION_TEXTS,
+    **QUALITY_TEXTS,
     **TRIP_TEXTS,
     **RATINGS_TEXTS,
     **REFUSAL_TEXTS,

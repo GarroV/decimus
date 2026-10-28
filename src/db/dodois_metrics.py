@@ -38,7 +38,7 @@ class UnitAggregatorOrders:
     dodo_id: str
     aggregator: str
     orders: int
-    revenue: Decimal
+    revenue: Decimal | None  # выручки по агрегатору Dodo IS не отдаёт: всегда `None`
 
 
 @dataclass(frozen=True)

@@ -89,7 +89,6 @@ class AggregatorOrder:
 
     dodo_id: str
     aggregator: str
-    revenue: Decimal
 
 
 @dataclass(frozen=True)
@@ -97,7 +96,9 @@ class AggregatorMonth:
     dodo_id: str
     aggregator: str
     orders: int
-    revenue: Decimal
+    #: Выручки по агрегатору нет: у заказа `accounting/sales` денежного поля верхнего уровня
+    #: нет (сумма внутри `products`), форма `products` в документации не расписана — не гадаем.
+    revenue: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -245,35 +246,35 @@ def merge_sales(rows: Iterable[SalesRow]) -> list[SalesRow]:
 
 
 def aggregator_orders(body: Any) -> list[AggregatorOrder]:
-    """Разобрать страницу `accounting/sales`: строки с непустым агрегатором, остальные — мимо."""
+    """Разобрать страницу `accounting/sales`: строки с непустым агрегатором, остальные — мимо.
+
+    Ключи заказа: `unitId`, `aggregatorName`, `orderSource`, `salesChannel`, `paymentMethod`,
+    `soldAt`, `products`. Денежного поля верхнего уровня нет, поэтому берётся только счёт.
+    """
     items = items_of(body)
     found: list[AggregatorOrder] = []
     shaped = False
     unread: Any = None
     for item in items:
         unit = unit_id(item.get("unitId")) if isinstance(item, dict) else None
-        revenue = _first_number(item, _REVENUE_KEYS) if isinstance(item, dict) else None
-        if unit is None or revenue is None:
+        if unit is None:
             unread = unread if unread is not None else item
             continue
         shaped = True
         name = _text(item.get("aggregatorName"))
         if name and name.lower() != UNDEFINED_AGGREGATOR:
-            found.append(AggregatorOrder(unit, name[:60], revenue))
+            found.append(AggregatorOrder(unit, name[:60]))
     if items and not shaped:
         raise ShapeError(f"заказы не разобрались; ключи строки: {_shape_note(unread)}")
     return found
 
 
 def sum_aggregators(orders: Iterable[AggregatorOrder]) -> list[AggregatorMonth]:
-    """Свернуть строки заказов в «пиццерия × агрегатор»: сколько заказов и на какую сумму."""
+    """Свернуть строки заказов в «пиццерия × агрегатор»: сколько заказов."""
     counts: dict[tuple[str, str], int] = defaultdict(int)
-    sums: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
     for order in orders:
-        key = (order.dodo_id, order.aggregator)
-        counts[key] += 1
-        sums[key] += order.revenue
-    return [AggregatorMonth(*key, counts[key], sums[key]) for key in sorted(counts)]
+        counts[(order.dodo_id, order.aggregator)] += 1
+    return [AggregatorMonth(*key, counts[key]) for key in sorted(counts)]
 
 
 def kr_rows(body: Any) -> list[KrRow]:

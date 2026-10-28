@@ -86,8 +86,8 @@ def test_агрегаторы_и_оценки_читаются(пиццерии:
         СЕНТЯБРЬ,
         [А],
         [
-            AggregatorMonth(А, "Glovo", 5, Decimal("55.5")),
-            AggregatorMonth(А, "Wolt", 1, Decimal(9)),
+            AggregatorMonth(А, "Glovo", 5),
+            AggregatorMonth(А, "Wolt", 1),
         ],
     )
     store.replace_kr(
