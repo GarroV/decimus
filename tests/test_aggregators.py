@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 
@@ -15,6 +16,7 @@ from src.db import agg_store
 from src.db.agg_store import LatestRating, PointRow
 from src.db.errors import RatingsError
 from src.ratings.aggregators import (
+    base,
     bolt,
     chowdeck,
     collect,
@@ -269,6 +271,32 @@ def test_привязка_ближайшая_и_одна_к_одной() -> None
          ("c", "u3", 401.0)]
     )  # fmt: skip
     assert пары == {"a": ("u1", 10), "b": ("u2", 60)}
+
+
+def test_точка_у_пиццерии_привязывается_даже_если_её_принёс_каталог_другой_пиццерии() -> None:
+    # #1344: Wolt-точка `dodo-pizza` стоит в ~10 м от Ljubljana-1, но каталог Wolt у координат
+    # Ljubljana-1 её не отдал (запрос упал), а каталог у соседней пиццерии отдал. Расстояние до
+    # справочной точки — факт; привязка не должна зависеть от того, чей запрос принёс точку.
+    любляна_1 = collect.DodoUnit("1" * 32, "Ljubljana-1", 46.0528392, 14.5144148, "SI")
+    любляна_2 = collect.DodoUnit("2" * 32, "Ljubljana-2", 46.0770, 14.5500, "SI")
+    точка = base.Found(
+        "dodo-pizza", "Dodo Pizza Center", "https://wolt.com/x", 46.05292, 14.51448,
+        8.6, 10, 100, True, True, {},
+    )  # fmt: skip
+
+    def поиск(http: object, lat: float, lng: float, country: str, cache: object) -> list:
+        if lat == любляна_1.lat:
+            raise AggregatorError("временный сбой каталога")
+        return [точка]
+
+    модуль = SimpleNamespace(KEY="wolt", GAP_SEC=0, COUNTRIES={"SI": "svn"}, search=поиск)
+
+    points, _, errors, _, _ = collect._search_one(модуль, [любляна_1, любляна_2], ДЕНЬ)
+
+    assert errors == 1
+    (строка,) = points
+    assert строка.dodo_id == "1" * 32 and строка.dodo_name == "Ljubljana-1"
+    assert строка.link_distance_m is not None and строка.link_distance_m <= 15
 
 
 def test_страж_пустого_ответа() -> None:

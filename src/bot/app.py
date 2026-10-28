@@ -40,6 +40,7 @@ from src.domain.log_ids import log_id
 from . import (
     agg_loader,
     dodois_loader,
+    dodois_metrics_loader,
     frame_copies,
     health_loader,
     learning_loader,
@@ -429,6 +430,8 @@ async def start_polling() -> None:
     health = asyncio.create_task(health_loader.check_forever())
     # Входы в Dodo IS по странам: продление ночью, проверка раз в час (D640, #951).
     dodois = asyncio.create_task(dodois_loader.run_forever())
+    # Данные Dodo IS для «Качества» по странам — раз в сутки (D671).
+    dodois_metrics = asyncio.create_task(dodois_metrics_loader.run_forever())
     try:
         await run_polling(dispatcher, bot)
     finally:
@@ -441,6 +444,7 @@ async def start_polling() -> None:
         training.cancel()
         health.cancel()
         dodois.cancel()
+        dodois_metrics.cancel()
         await bot.session.close()
 
 

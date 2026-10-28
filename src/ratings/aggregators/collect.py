@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import contextvars
 import logging
-from collections.abc import Callable, MutableMapping, Sequence
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date
@@ -96,6 +96,25 @@ def assign(
     return taken_points
 
 
+def _candidates(
+    seen: Mapping[str, tuple[Found, str]], units: Sequence[DodoUnit]
+) -> list[tuple[str, str, float]]:
+    """Пары (точка, пиццерия, метры) по координатам — для каждой пары точка × пиццерия страны.
+
+    Не только для той пиццерии, у чьих координат точку нашёл каталог: каталог агрегатора
+    отдаёт заведения, что доставляют на адрес, и точка, стоящая в 10 м от пиццерии, может в её
+    выдачу не попасть (сбой запроса, обрезанная страница), хотя расстояние до неё — факт
+    справочника. Привязка по расстоянию не должна зависеть от того, чей запрос её принёс (#1344).
+    """
+    return [
+        (key, unit.dodo_id, maps_link.distance_m(unit.lat, unit.lng, point.lat, point.lng))
+        for key, (point, country) in seen.items()
+        if point.lat is not None and point.lng is not None
+        for unit in units
+        if unit.country == country
+    ]
+
+
 def verdict(points: int, errors: int, attempts: int, last_ok_points: int) -> str | None:
     """Почему сбор считать сбоем, или None — удался."""
     if attempts and errors == attempts:
@@ -128,7 +147,6 @@ def _search_one(
     cache: MutableMapping[str, object] = {}
     mine = [u for u in units if u.working and u.country in module.COUNTRIES]
     seen: dict[str, tuple[Found, str]] = {}
-    candidates: list[tuple[str, str, float]] = []
     errors, first_error = 0, None
     for unit in mine:
         try:
@@ -140,10 +158,7 @@ def _search_one(
             continue
         for point in found:
             seen.setdefault(point.point_key, (point, unit.country))
-            if point.lat is not None and point.lng is not None:
-                far = maps_link.distance_m(unit.lat, unit.lng, point.lat, point.lng)
-                candidates.append((point.point_key, unit.dodo_id, far))
-    links = assign(candidates)
+    links = assign(_candidates(seen, mine))
     names = {u.dodo_id: u.name for u in mine}
     points, ratings = [], []
     for key, (point, country) in seen.items():

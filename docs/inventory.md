@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 204 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 205 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -154,6 +154,7 @@
 | `/prescriptions` | GET | `orders` | `src/web/prescriptions.py` |
 | `/prescriptions/<prescription_id>` | GET | `order` | `src/web/prescriptions.py` |
 | `/prescriptions/files/<reply_id>` | GET | `order_file_legacy` | `src/web/prescriptions.py` |
+| `/quality` | GET | `quality` | `src/web/quality_page.py` |
 | `/ratings` | GET | `ratings` | `src/web/ratings.py` |
 | `/ratings/aggregators/update` | POST | `ratings_agg_update` | `src/web/ratings.py` |
 | `/ratings/countries` | POST | `ratings_developer` | `src/web/ratings.py` |
@@ -582,6 +583,7 @@
 | `0102_ratings_layout_d658_order.sql` | — |
 | `0103_mailing_cc.sql` | `mailing_cc` |
 | `0104_mailing_templates.sql` | `mailing_templates` |
+| `0105_dodois_metrics.sql` | `dodois.unit_sales_month`, `dodois.unit_aggregator_month`, `dodois.unit_kr_month`, `dodois.unit_rating_period`, `dodois.unit_checkup_period`, `dodois.metric_loads` |
 <!-- map:end -->
 
 ## Makefile
