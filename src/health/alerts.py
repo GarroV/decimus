@@ -18,6 +18,12 @@
 когда канал включат, первый заход зафиксирует то, что уже есть, и не пришлёт пачку.
 **В демо не уходит ничего никогда** (`WEB_DEMO=1`), даже если канал задан.
 
+**Склейка.** За один заход сигналы входа Dodo IS одного вида (тревога красная / жёлтая / «снова
+работает») уходят ОДНИМ сообщением со списком стран (D678): при общем сбое Dodo IS не приходит
+по сообщению на каждую из ~20 стран. Внутри тревоги страны сгруппированы по причине, у каждой
+причины своя строка. Один сигнал в виде — прежний текст. Остальные подключения (сборы, ключи)
+по-прежнему по одному сообщению. Учёт оповещённого — на каждый сигнал отдельно.
+
 **Сбой отправки не роняет цикл**: строка в журнал, состояние не помечается оповещённым,
 следующий заход повторит; остальные сообщения этого захода не шлются, чтобы не ждать таймаут
 на каждом.
@@ -111,21 +117,30 @@ def _stamp(moment: datetime | None) -> str:
     return "—" if moment is None else moment.astimezone(UTC).strftime("%d.%m %H:%M")
 
 
+def _dodois_reason(signal: Signal, lang: str) -> str:
+    """Причина поломки входа Dodo IS словами, без хвоста со ссылкой."""
+    suffix = signal.row.status.reason.removeprefix("health.reason.")
+    key = f"alert.dodois.{suffix}"
+    if key not in texts.ALERT_TEXTS:
+        key = "alert.dodois.dodois_failed"
+    return texts.text(key, lang, **signal.row.status.params)
+
+
+def _dodois_tail(lang: str, url: str | None) -> str:
+    return (
+        texts.text("alert.dodois_tail", lang, url=url)
+        if url
+        else texts.text("alert.dodois_tail_nourl", lang)
+    )
+
+
 def _body(signal: Signal, lang: str, url: str | None) -> str:
     """Что сказать в сообщении о поломке."""
     status = signal.row.status
     suffix = status.reason.removeprefix("health.reason.")
     row = signal.row
     if row.kind == checks.DODOIS:
-        key = f"alert.dodois.{suffix}"
-        if key not in texts.ALERT_TEXTS:
-            key = "alert.dodois.dodois_failed"
-        tail = (
-            texts.text("alert.dodois_tail", lang, url=url)
-            if url
-            else texts.text("alert.dodois_tail_nourl", lang)
-        )
-        return texts.text(key, lang, **status.params) + tail
+        return _dodois_reason(signal, lang) + _dodois_tail(lang, url)
     if row.kind == checks.LOAD:
         key = (
             f"alert.load.{suffix}" if suffix in ("late", "stopped", "failed") else "alert.load.late"
@@ -159,6 +174,43 @@ def compose(
     return texts.text(frame, lang, subject=subject, body=body)
 
 
+def compose_group(
+    group: list[Signal],
+    send_kind: str,
+    *,
+    country_names: Mapping[str, str],
+    url: str | None,
+    lang: str = OWNER_LANG,
+) -> str:
+    """Одно сообщение о нескольких входах Dodo IS: страны списком, в тревоге — по причинам."""
+    if len(group) == 1:
+        return compose(group[0], send_kind, country_names=country_names, url=url, lang=lang)
+    subject = texts.text("alert.subject.dodois_all", lang)
+
+    def names(members: list[Signal]) -> str:
+        return ", ".join(country_names.get(s.row.country, s.row.country) for s in members)
+
+    if send_kind == rules.SEND_DONE:
+        return texts.text("alert.done_group", lang, subject=subject, countries=names(group))
+    by_reason: dict[str, list[Signal]] = {}
+    for signal in group:
+        reason = _dodois_reason(signal, lang).rstrip(".")
+        by_reason.setdefault(reason, []).append(signal)
+    lines = [
+        texts.text("alert.group.line", lang, reason=reason, countries=names(members))
+        for reason, members in by_reason.items()
+    ]
+    tail = _dodois_tail(lang, url)
+    if len(lines) == 1:
+        body = lines[0] + tail
+    else:
+        bullets = [texts.text("alert.group.bullet", lang, line=line) for line in lines]
+        body = "\n" + "\n".join(bullets) + "\n" + tail.lstrip()
+    frame = "alert.red" if group[0].level == rules.LEVEL_RED else "alert.yellow"
+    # Рамка кончается пробелом перед {body}; перенос строки его не должен оставлять висеть.
+    return texts.text(frame, lang, subject=subject, body=body).replace(" \n", "\n")
+
+
 def process(
     found: list[Signal],
     previous: Mapping[str, str],
@@ -173,24 +225,38 @@ def process(
     baseline = not previous
     saved: dict[str, str] = {}
     sent = 0
+    # Сообщения в порядке появления: вход Dodo IS склеивается по (действие, цвет),
+    # остальное — по одному на сигнал.
+    batches: dict[tuple[str, ...], list[Signal]] = {}
     for signal in sorted(found, key=lambda s: s.code):
         action = rules.decide(previous.get(signal.code), signal.level, baseline=baseline)
         if action is None:
             if previous.get(signal.code) != signal.level:
                 saved[signal.code] = signal.level
             continue
+        key: tuple[str, ...] = (
+            ("dodois", action, signal.level)
+            if signal.row.kind == checks.DODOIS
+            else (signal.code, action)
+        )
+        batches.setdefault(key, []).append(signal)
+    for key, members in batches.items():
+        action = key[1]
         kind = furca.DONE if action == rules.SEND_DONE else furca.ALERT
-        text = compose(signal, action, country_names=country_names, url=url)
+        text = compose_group(members, action, country_names=country_names, url=url)
         try:
             send(target, text, kind)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             # Состояние не помечено оповещённым — следующий заход повторит. Ключа в тексте
             # исключения нет: он только в заголовке запроса.
             logger.warning(
-                "Оповещение %s не ушло (%s), повтор на следующем заходе", signal.code, exc
+                "Оповещение %s не ушло (%s), повтор на следующем заходе",
+                ", ".join(s.code for s in members),
+                exc,
             )
             break
-        saved[signal.code] = signal.level
+        for signal in members:
+            saved[signal.code] = signal.level
         sent += 1
     health_store.save_alert_levels(saved, now)
     return sent
