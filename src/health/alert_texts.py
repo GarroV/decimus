@@ -32,6 +32,14 @@ ALERT_TEXTS: dict[str, dict[str, str]] = {
         "en": " Administration → Dodo IS.",
     },
     "alert.subject.dodois": {"ru": "Dodo IS, {country}", "en": "Dodo IS, {country}"},
+    # ── Склейка входов Dodo IS нескольких стран в одно сообщение (D678) ──
+    "alert.subject.dodois_all": {"ru": "Dodo IS", "en": "Dodo IS"},
+    "alert.done_group": {
+        "ru": "🟢 Decimus · {subject} снова работает: {countries}.",
+        "en": "🟢 Decimus · {subject} working again: {countries}.",
+    },
+    "alert.group.line": {"ru": "{reason}: {countries}.", "en": "{reason}: {countries}."},
+    "alert.group.bullet": {"ru": "• {line}", "en": "• {line}"},
     # ── Что сказать по причине (ключ — причина плитки без префикса `health.reason.`) ──
     "alert.dodois.dodois_expired": {
         "ru": "вход не работает — вход истёк, продление отказано, нужна новая ссылка.",

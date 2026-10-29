@@ -19,7 +19,7 @@ from src.health.rows import Row
 NOW = datetime(2026, 10, 26, 12, 0, tzinfo=UTC)
 LAST_OK = datetime(2026, 10, 25, 3, 10, tzinfo=UTC)
 TARGET = ("http://ch:8090/notify", "секрет-канала")
-NAMES = {"RS": "Сербия", "SI": "Словения"}
+NAMES = {"RS": "Сербия", "SI": "Словения", "ME": "Черногория"}
 URL = "https://decimus.example/administration?tab=dodois"
 
 
@@ -292,3 +292,78 @@ def test_у_карт_без_своей_тревоги_ошибка_оповещ�
     box.run([_load("maps", GREEN, "health.reason.ran")])
     box.run([_load("maps", RED, "health.reason.failed")])
     assert len(box.sent) == 1
+
+
+# --- склейка (D678) -------------------------------------------------------------------
+
+ME_OK = _dodois("ME", GREEN, "health.reason.dodois_ok", open=2, total=2)
+RS_FAILED = _dodois("RS", RED, "health.reason.dodois_failed")
+ME_FAILED = _dodois("ME", RED, "health.reason.dodois_failed")
+
+
+def test_общий_сбой_нескольких_стран_одно_сообщение_со_списком(box: Box) -> None:
+    box.run([RS_OK, ME_OK])
+    sent = box.run([RS_FAILED, ME_FAILED])
+    assert sent == 1 and len(box.sent) == 1
+    kind, text = box.sent[0]
+    assert kind == "alert"
+    assert text.startswith("🔴 Decimus · Dodo IS: вход не работает — сбой связи")
+    assert text.count("Администрирование → Dodo IS") == 1
+    assert "Сербия" in text and "Черногория" in text
+
+
+def test_учёт_отправленного_остаётся_на_каждую_страну(box: Box) -> None:
+    box.run([RS_OK, ME_OK])
+    box.run([RS_FAILED, ME_FAILED])
+    assert box.levels == {"dodo_is:RS": "red", "dodo_is:ME": "red"}
+    box.run([RS_FAILED, ME_FAILED])  # повтора нет
+    assert len(box.sent) == 1
+
+
+def test_снова_работает_нескольких_стран_одно_сообщение(box: Box) -> None:
+    box.run([RS_OK, ME_OK])
+    box.run([RS_FAILED, ME_FAILED])
+    box.run([RS_OK, ME_OK])
+    kind, text = box.sent[-1]
+    assert len(box.sent) == 2 and kind == "done"
+    assert text == "🟢 Decimus · Dodo IS снова работает: Черногория, Сербия."
+
+
+def test_разные_причины_одна_строка_на_причину_и_один_хвост(box: Box) -> None:
+    box.run([RS_OK, ME_OK])
+    box.run([RS_EXPIRED, ME_FAILED])
+    assert len(box.sent) == 1
+    text = box.sent[0][1]
+    lines = text.splitlines()
+    assert lines[0] == "🔴 Decimus · Dodo IS:"
+    # страны идут по коду: ME раньше RS
+    assert lines[1].startswith("• вход не работает — сбой связи") and lines[1].endswith(
+        ": Черногория."
+    )
+    assert lines[2].startswith("• вход не работает — вход истёк") and lines[2].endswith(": Сербия.")
+    assert lines[3].startswith("Администрирование → Dodo IS: ") and len(lines) == 4
+
+
+def test_разный_цвет_и_разный_вид_не_склеиваются(box: Box) -> None:
+    box.run([RS_OK, ME_OK, _load("maps", GREEN, "health.reason.ran")])
+    partial = _dodois("ME", YELLOW, "health.reason.dodois_partial", open=1, total=2)
+    box.run([RS_FAILED, partial, _load("maps", RED, "health.reason.failed")])
+    assert len(box.sent) == 3
+    assert sorted(t.split()[0] for _, t in box.sent) == ["🔴", "🔴", "🟡"]
+
+
+def test_один_сигнал_в_виде_остаётся_прежним_текстом(box: Box) -> None:
+    box.run([RS_OK, ME_OK])
+    box.run([RS_FAILED, ME_OK])
+    assert box.sent[0][1].startswith("🔴 Decimus · Dodo IS, Сербия: вход не работает — ")
+
+
+def test_сбой_отправки_склейки_не_помечает_ни_одну_страну(monkeypatch: pytest.MonkeyPatch) -> None:
+    box = Box(monkeypatch)
+    box.run([RS_OK, ME_OK])
+    box.fail = True
+    box.run([RS_FAILED, ME_FAILED])
+    assert box.levels == {"dodo_is:RS": "ok", "dodo_is:ME": "ok"}
+    box.fail = False
+    box.run([RS_FAILED, ME_FAILED])
+    assert len(box.sent) == 1 and box.levels["dodo_is:RS"] == "red"
