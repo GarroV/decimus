@@ -105,7 +105,7 @@
 
 | есть? | что именно | имя переменной | где значение | смоук-команда | результат |
 |---|---|---|---|---|---|
-| да | VPS Contabo, Linux/Docker, `/srv/decimus`, текущая площадка по `docs/08-deploy.md` §8 (домашний сервер ниже — историческое состояние сентября) | — | SSH alias `contabo`, окружение `/srv/decimus/.env` | `ssh contabo 'cd /srv/decimus && git rev-parse --short HEAD && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f compose.edge.yaml ps'` | ✅ 30.10.2026: 74100508 перед раскаткой P0; web/bot/mcp/walk/db/storage-live healthy |
+| да | VPS Contabo, Linux/Docker, `/srv/decimus`, текущая площадка по `docs/08-deploy.md` §8 (домашний сервер ниже — историческое состояние сентября) | — | SSH alias `contabo`, окружение `/srv/decimus/.env` | `ssh contabo 'cd /srv/decimus && git rev-parse --short HEAD && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f compose.edge.yaml ps'` | ✅ 30.10.2026: P0 b714dc8e; web/bot/mcp/walk/db/storage-live healthy, BUILD_SHA приложений совпадает, внешний HTTP-смоук прошёл |
 
 **Что уже живёт на площадке (выяснено смоуком, не со слов):** площадка не пустая — на ней работает около двух десятков контейнеров других проектов. Часть популярных портов занята, в том числе два порта Postgres, проброшенных наружу; свободные порты подобраны отдельно. Бэкапы Postgres идут по расписанию ночью, ретеншн две недели. **Ничего чужого не трогаем**: свои контейнеры получают собственный префикс проекта, свою папку и свободные порты.
 
