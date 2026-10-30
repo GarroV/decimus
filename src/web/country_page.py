@@ -52,6 +52,7 @@ from . import (
     country_summary,
     country_units,
     home_ratings_block,
+    inspection_timeline,
     prescriptions,
     registry_period,
     registry_view,
@@ -538,6 +539,11 @@ def _one_country(
         "history": история,
         "trend": _trend(история),
         "country_inspections": проверки,
+        "timeline": inspection_timeline.load(
+            reach=reach, countries=(вид.code,), args=request.args, today=today
+        )
+        if вид.code and открытая is None
+        else None,
         "can_settings": can_settings,
         "settings_url": select(settings="1", inspection="", saved=""),
         "can_add_units": can_add_here(вид.code),

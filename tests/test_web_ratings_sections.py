@@ -17,7 +17,7 @@ from src.web import ratings as screen
 from src.web import ratings_nav
 from src.web.ratings_risk import CombinedRisk
 
-РАЗДЕЛЫ = ("rs", "rko", "clients", "maps", "agg", "risk", "compare")
+РАЗДЕЛЫ = ("rs", "rko", "clients", "maps", "agg", "risk", "compare", "inspections")
 ЗАЯВЛЕНИЕ = {"Origin": "http://localhost"}
 
 
@@ -282,7 +282,7 @@ def test_подменю_не_попадает_на_чужие_страницы(m
 
 
 def test_видимость_разделов_по_пространству() -> None:
-    assert ratings_nav.visible(True) == ratings_nav.SECTIONS
+    assert ratings_nav.visible(True, inspections=True) == ratings_nav.SECTIONS
     assert "compare" not in ratings_nav.visible(False)
     assert ratings_nav.DEFAULT == "rs"
 

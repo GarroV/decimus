@@ -29,6 +29,7 @@ from src.db import ratings_read as read
 from src.db import ratings_sync as sheet_state
 from src.db.errors import RatingsError
 from src.db.ratings_read import REFUSED_SETTING, RatingsEditError
+from src.domain.permissions import role_may
 from src.domain.tenants import HQ_TENANT, may_manage_ratings
 from src.ratings import compare as rcompare
 from src.ratings import maps as rmaps
@@ -53,6 +54,7 @@ from . import (
     administration,
     auth,
     guard,
+    inspection_timeline,
     ratings_calendar,
     ratings_freshness,
     ratings_nav,
@@ -295,6 +297,13 @@ def _section_data(
 ) -> dict[str, object]:
     """Данные только открытого раздела (D660): остальные не читаются."""
     sel, lang, codes = frame.selection, frame.lang, frame.codes
+    if key == ratings_nav.INSPECTIONS:
+        return {
+            "no_countries": not codes,
+            "timeline": inspection_timeline.load(
+                reach=auth.current_reach(), countries=codes, args=request.args, today=date.today()
+            ),
+        }
     if key in (ratings_nav.RS, ratings_nav.RKO):
         kind = RS if key == ratings_nav.RS else RKO
         summary = report.build(sel, kinds=(kind,), with_risk=False)
@@ -375,7 +384,9 @@ def render_section(
     """Раздел «Рейтингов» (D660): шапка, отбор, подменю и данные открытого раздела."""
     lang = _lang(conf)
     is_hq = auth.current_tenant() == HQ_TENANT
-    if key not in ratings_nav.visible(is_hq):
+    account = auth.current_account()
+    inspections = bool(account and role_may(account.role, account.tenant, "view.registry"))
+    if key not in ratings_nav.visible(is_hq, inspections=inspections):
         abort(404)
     today = date.today()
     selection, found = report.select(request.args, today=today)
@@ -398,7 +409,13 @@ def render_section(
         "ratings/index.html",
         section_key=key,
         subnav=ratings_nav.items(
-            root, is_hq=is_hq, current=key, selection=selection, lang=lang, rows=rows
+            root,
+            is_hq=is_hq,
+            current=key,
+            selection=selection,
+            lang=lang,
+            rows=rows,
+            inspections=inspections,
         ),
         section_title=t(f"ratings.sec.{key}", lang),
         section_line=ratings_freshness.section_line(rows, key, lang),

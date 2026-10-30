@@ -116,3 +116,16 @@
 
 /* список без родителя (партнёр с одной страной): пиццерии без отступа и черты */
 .pk-rail__list > .pk-sub:first-child { margin-left: 0; padding-left: 0; border-left: 0; }
+
+/* История проверок: одинаковый блок на стране и в рейтингах. */
+.ih-controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5); }
+.ih-controls label { display: flex; flex-direction: column; gap: var(--space-2);
+  font-size: var(--fs-meta); color: var(--ink-2); }
+.ih-plot { overflow-x: auto; padding: var(--space-4); }
+.ih-plot svg { display: block; min-width: 640px; color: var(--accent); }
+.ih-data { padding: var(--space-4) var(--space-5); font-size: var(--fs-meta); }
+.ih-data summary { cursor: pointer; }
+.ih-data table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.ih-data th, .ih-data td { padding: var(--space-2); text-align: right; border-bottom: 1px solid var(--line); }
+.ih-data th:first-child { text-align: left; }

@@ -1,0 +1,49 @@
+{# Общий блок; работает без JavaScript, таблица доступна с телефона и клавиатуры. #}
+{% if timeline %}
+{% from "_pick_ui.html" import pick_block with context %}
+{% call pick_block(t('history.title'), '', '' if timeline.failed else timeline.count) %}
+  <p class="pk-empty pk-empty--pad">{{ t('history.note') }}</p>
+  {% if timeline.failed %}<p class="pk-empty pk-empty--pad" role="alert">{{ t('history.failed') }}</p>
+  {% elif not timeline.years %}<p class="pk-empty pk-empty--pad">{{ t('history.empty') }}</p>
+  {% else %}
+    <form method="get" class="ih-controls">
+      {% for key, value in request.args.items() %}{% if key not in ('history_grain', 'history_year', 'inspection', 'settings') %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
+      <label>{{ t('history.period') }}
+        <select name="history_grain" class="pickselect">
+          <option value="year"{% if timeline.grain == 'year' %} selected{% endif %}>{{ t('history.years') }}</option>
+          <option value="month"{% if timeline.grain == 'month' %} selected{% endif %}>{{ t('history.months') }}</option>
+        </select>
+      </label>
+      <label>{{ t('history.year') }}
+        <select name="history_year" class="pickselect">{% for year in timeline.years|reverse %}<option{% if year == timeline.year %} selected{% endif %}>{{ year }}</option>{% endfor %}</select>
+      </label>
+      <button class="btn btn--sm" type="submit">{{ t('history.show') }}</button>
+    </form>
+    <p class="pk-empty pk-empty--pad">{{ t('history.count') }}: <strong>{{ timeline.count }}</strong> · {{ t('history.average') }}: <strong>{{ '%.1f'|format(timeline.average) if timeline.average is not none else '—' }}</strong></p>
+    <div class="ih-plot"><svg viewBox="0 0 640 265" width="100%" role="img" aria-label="{{ t('history.title') }}">
+      <text x="12" y="15" fill="currentColor" font-size="12">{{ t('history.count') }}</text>
+      <text x="12" y="140" fill="currentColor" font-size="12">{{ t('history.average') }} (0–100)</text>
+      <line x1="25" x2="620" y1="105" y2="105" stroke="currentColor" opacity=".2"/>
+      {% for y, label in ((150, 100), (190, 50), (230, 0)) %}
+        <line x1="25" x2="620" y1="{{ y }}" y2="{{ y }}" stroke="currentColor" opacity=".15"/>
+        <text x="22" y="{{ y + 4 }}" text-anchor="end" fill="currentColor" font-size="10">{{ label }}</text>
+      {% endfor %}
+      {% for b in timeline.buckets %}
+        <rect x="{{ b.x - 7 }}" y="{{ 105 - b.count_height }}" width="14" height="{{ b.count_height }}" fill="currentColor" opacity=".5"><title>{{ b.label }} · {{ t('history.count') }}: {{ b.count }}</title></rect>
+        {% if b.score_y is not none %}
+          {% if not loop.first %}{% set prev = timeline.buckets[loop.index0 - 1] %}{% if prev.score_y is not none %}<line x1="{{ prev.x }}" y1="{{ prev.score_y }}" x2="{{ b.x }}" y2="{{ b.score_y }}" stroke="currentColor" stroke-width="2"/>{% endif %}{% endif %}
+          <text x="{{ b.x + 8 }}" y="{{ b.score_y + 3 }}" text-anchor="start" fill="currentColor" font-size="10">{{ b.average }}</text>
+          <circle cx="{{ b.x }}" cy="{{ b.score_y }}" r="4" fill="currentColor"><title>{{ b.label }} · {{ b.average }}%</title></circle>
+        {% endif %}
+        <text x="{{ b.x }}" y="122" text-anchor="middle" fill="currentColor" font-size="11">{{ b.count }}</text>
+        <text x="{{ b.x }}" y="253" text-anchor="middle" fill="currentColor" font-size="11">{{ b.label }}</text>
+      {% endfor %}
+    </svg></div>
+    <details class="ih-data"><summary>{{ t('history.table') }}</summary>
+      <table class="table"><thead><tr><th>{{ t('history.period') }}</th><th>{{ t('history.count') }}</th><th>{{ t('history.average') }}</th></tr></thead><tbody>
+        {% for b in timeline.buckets %}<tr><th>{{ b.label }}{% if timeline.grain == 'month' %}.{{ timeline.year }}{% endif %}</th><td>{{ b.count }}</td><td>{{ '%.1f'|format(b.average) if b.average is not none else '—' }}</td></tr>{% endfor %}
+      </tbody></table>
+    </details>
+  {% endif %}
+{% endcall %}
+{% endif %}

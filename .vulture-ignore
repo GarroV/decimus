@@ -746,3 +746,12 @@ save_template
 worst_word
 # Автофикстура pytest (`autouse=True`): по имени её не зовёт никто.
 _чистое_окружение
+
+# D660: маршрут Flask и поля, которые читают шаблоны разделов рейтингов.
+ratings_section
+avg_delta
+hard_units
+dot_word
+tiles
+# D679: высоту столбца читает _inspection_timeline.html.
+count_height

@@ -26,9 +26,10 @@ MAPS = "maps"
 AGG = "agg"
 RISK = "risk"
 COMPARE = "compare"
+INSPECTIONS = "inspections"
 
 #: Разделы в порядке подменю.
-SECTIONS: tuple[str, ...] = (RS, RKO, CLIENTS, MAPS, AGG, RISK, COMPARE)
+SECTIONS: tuple[str, ...] = (RS, RKO, CLIENTS, MAPS, AGG, RISK, COMPARE, INSPECTIONS)
 DEFAULT = RS
 #: Видны только УК (D551): партнёру чужие страны и девелоперов не показываем.
 HQ_ONLY = frozenset({COMPARE})
@@ -46,9 +47,10 @@ class Item:
     dot_word: str
 
 
-def visible(is_hq: bool) -> tuple[str, ...]:
+def visible(is_hq: bool, *, inspections: bool = False) -> tuple[str, ...]:
     """Разделы, доступные вошедшему."""
-    return tuple(key for key in SECTIONS if is_hq or key not in HQ_ONLY)
+    keys = SECTIONS if inspections else tuple(k for k in SECTIONS if k != INSPECTIONS)
+    return tuple(key for key in keys if is_hq or key not in HQ_ONLY)
 
 
 def query(selection: report.Selection, lang: str, **extra: str) -> str:
@@ -73,10 +75,11 @@ def items(
     selection: report.Selection,
     lang: str,
     rows: tuple[fresh.Row, ...],
+    inspections: bool = False,
 ) -> tuple[Item, ...]:
     """Подменю для вошедшего: пункты, адреса с текущим отбором, точки свежести."""
     result = []
-    for key in visible(is_hq):
+    for key in visible(is_hq, inspections=inspections):
         status = ratings_freshness.section_status(rows, key)
         result.append(
             Item(

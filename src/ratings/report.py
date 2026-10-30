@@ -28,7 +28,6 @@ from .summary import (
     CountryLine,
     Fact,
     HardRule,
-    Point,
     RiskUnit,
     UnitScore,
     ViolationBlock,
@@ -36,7 +35,6 @@ from .summary import (
     delta,
     group_average,
     hard_lines,
-    points,
     risk_zone,
     score_lines,
     top_bottom,
@@ -52,9 +50,6 @@ GROUPS = (GROUP_IMF, GROUP_CLUSTER, GROUP_DEVELOPER, GROUP_COUNTRY)
 #: Кластеры IMF (D502, вместо двух D384): CEE — Европа, TR — Турция, CAUCASUS —
 #: Кавказ, OTHER — остальные страны. Порядок — порядок колонок и выбора.
 CLUSTERS = ("CEE", "TR", "CAUCASUS", "OTHER")
-#: Сколько месяцев на графике свечей — по конец выбранного периода.
-
-
 LEVEL_CLUSTER = "cluster"
 LEVEL_SLICE = "slice"
 LEVEL_COUNTRY = "country"
@@ -72,8 +67,6 @@ class GroupLine:
     rs_delta: float | None
     rko: float | None
     rko_delta: float | None
-    rs_points: tuple[Point, ...]
-    rko_points: tuple[Point, ...]
     level: str = LEVEL_SLICE
 
 
@@ -263,8 +256,6 @@ def group_lines(
                 rs_delta=delta(values[RS], before[RS]),
                 rko=values[RKO],
                 rko_delta=delta(values[RKO], before[RKO]),
-                rs_points=points(current, RS, part),
-                rko_points=points(current, RKO, part),
                 level=level,
             )
         )

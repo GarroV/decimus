@@ -74,7 +74,7 @@
       </select>
     </label>
     {% endif %}
-    <div class="rt-field">
+    {% if section_key != 'inspections' %}<div class="rt-field">
       <span class="rt-field__label">{{ t('ratings.period') }}</span>
       <div class="rt-cal">
         {% if calendar.prev %}<a class="rt-cal__arrow" href="{{ href(selection.group, selection.value, calendar.prev) }}" aria-label="{{ t('ratings.cal.prev') }}">‹</a>
@@ -98,6 +98,7 @@
         {% else %}<span class="rt-cal__arrow" aria-disabled="true">›</span>{% endif %}
       </div>
     </div>
+    {% else %}<input type="hidden" name="period" value="{{ selection.period.key }}">{% endif %}
     <noscript><button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.show') }}</button></noscript>
   </form>
 
@@ -107,6 +108,7 @@
   {% if no_countries and section_key != 'clients' %}
     <div class="rt-empty">{{ t('ratings.empty.countries') }}</div>
   {% elif section_key in ('rs', 'rko') %}{% include "ratings/_s_source.html" %}
+  {% elif section_key == 'inspections' %}{% include '_inspection_timeline.html' %}
   {% elif section_key == 'clients' %}{% include "ratings/_s_clients.html" %}
   {% elif section_key == 'maps' %}{% include "ratings/_s_maps.html" %}
   {% elif section_key == 'agg' %}{% include "ratings/_s_agg.html" %}

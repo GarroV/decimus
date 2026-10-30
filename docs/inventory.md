@@ -156,7 +156,7 @@
 | `/prescriptions/files/<reply_id>` | GET | `order_file_legacy` | `src/web/prescriptions.py` |
 | `/quality` | GET | `quality` | `src/web/quality_page.py` |
 | `/ratings` | GET | `ratings` | `src/web/ratings.py` |
-| `/ratings/<any(rs,rko,clients,maps,agg,risk,compare):key>` | GET | `ratings_section` | `src/web/ratings.py` |
+| `/ratings/<any(rs,rko,clients,maps,agg,risk,compare,inspections):key>` | GET | `ratings_section` | `src/web/ratings.py` |
 | `/ratings/aggregators/update` | POST | `ratings_agg_update` | `src/web/ratings.py` |
 | `/ratings/countries` | POST | `ratings_developer` | `src/web/ratings.py` |
 | `/ratings/coverage` | GET | `ratings_coverage` | `src/web/ratings.py` |
