@@ -48,7 +48,7 @@ def test_no_database_keeps_standalone_path(
 
 
 def test_no_exact_binding_keeps_local_path(linked: SimpleNamespace) -> None:
-    linked.lookup.return_value = None
+    linked.lookup.configure_mock(return_value=None)
     assert resend._linked_report(123, space="actor") is None
     linked.get.assert_not_called()
 
@@ -58,13 +58,13 @@ def test_configured_failure_never_returns_local_fallback(
     linked: SimpleNamespace, failure: str
 ) -> None:
     if failure == "database":
-        linked.lookup.side_effect = DbError("unavailable")
+        linked.lookup.configure_mock(side_effect=DbError("unavailable"))
     elif failure == "inaccessible":
-        linked.get.return_value = None
+        linked.get.configure_mock(return_value=None)
     elif failure == "build":
-        linked.ensure.side_effect = DbError("busy")
+        linked.ensure.configure_mock(side_effect=DbError("busy"))
     elif failure == "fetch":
-        linked.fetch.side_effect = DbError("missing")
+        linked.fetch.configure_mock(side_effect=DbError("missing"))
     with pytest.raises(DbError):
         resend._linked_report(123, space=None if failure == "scope" else "actor")
     if failure != "fetch":
