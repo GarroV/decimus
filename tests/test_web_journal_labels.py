@@ -87,3 +87,11 @@ def test_названные_владельцем_действия_читаемы
 
 def test_незнакомый_код_показывается_как_есть() -> None:
     assert action_label("новый_маршрут", "ru") == "новый_маршрут"
+
+
+def test_old_ratings_layout_events_keep_readable_labels() -> None:
+    from src.web.journal_screen import action_label
+
+    assert "ratings_layout" not in WEB_ACTION_CODES
+    assert action_label("ratings_layout", "ru") == "Изменён состав блока рейтингов"
+    assert action_label("ratings_layout", "en") == "Ratings layout changed"

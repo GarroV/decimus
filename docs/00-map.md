@@ -325,7 +325,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 24 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, _pick.html, … (+16) |
+| `src/web/templates/` | 25 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _inspection_timeline.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, … (+17) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
 | `src/web/templates/administration/` | 8 | _health.html, _nav.html, connections.html, countries.html, dodois.html, keys.html, mailings.html, ratings.html |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
@@ -1021,6 +1021,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/dodois_import.py` | Перенос нынешнего входа в Dodo IS в базу — разовый, по одной стране (D640, #951) |
 | `tools/fastpath_measure.py` | T113, T125: доля срабатываний быстрого пути — так, как его зовёт живой бот |
 | `tools/gen_map.py` | Карта кода: перегенерация таблиц в docs/ между маркерами (`make map`, #731) |
+| `tools/inspection_release_smoke.py` | Живой смоук перед выездами: демо-вход и экраны, публичные двери прода |
 | `tools/landing_shots.py` | Снимки живых экранов для посадочной страницы (D545) — одной командой |
 | `tools/loadcheck.py` | Замер потолка нагрузки: сколько одновременных проверок продукт держит |
 | `tools/loadcheck_live.py` | Живой замер: настоящие вызовы модели, настоящие кадры (T101, решение D062) |
@@ -1128,7 +1129,7 @@ Telegram, ни HTTP, ни SQL.
 | Показать доработку владельцу до прода | Превью-стенд на MUSPELHEIM: `deploy/preview/compose.preview.yaml`, `C:\projects\decimus-preview`, `https://<TAILNET_HOST>:9443` (только tailnet); собирать **`web` и `walk`** — мини-апп в своём образе; `docs/08-deploy.md` §8.22 |
 | Стенд Виктории (рейтинги) | MUSPELHEIM `decimus-viktoria`, ветка `stand/viktoria`, сам обновляется раз в 2 минуты; адрес `https://decimus-stand.vasiliy-garro.workers.dev`; `docs/08-deploy.md` §8.11 |
 | Демо и стенд разработчика | `make demo` (бот), `make web-demo` и `make web-up` (админка), сиды — `tools/seed_*.py`; стенды — только на MUSPELHEIM, на Маке их нет |
-| Раскатка и откат | `docs/08-deploy.md`; на VPS — `cd /srv/decimus && git pull --ff-only && scripts/prod-update.sh` (надстройку площадки `compose.edge.yaml` скрипт подключает сам; без неё `web` теряет сеть прокси — 502), затем `deploy/demo/update.sh` в `/srv/decimus-demo`; смоук — `scripts/smoke.sh` |
+| Раскатка и откат | `docs/08-deploy.md`; на VPS — `cd /srv/decimus && git pull --ff-only && scripts/prod-update.sh` (надстройку площадки `compose.edge.yaml` скрипт подключает сам; без неё `web` теряет сеть прокси — 502), затем `deploy/demo/update.sh` в `/srv/decimus-demo`; внешний HTTP-смоук — `tools/inspection_release_smoke.py` |
 | Мини-апп обхода: экран, форма записи | Отдельный сервис `walk` (`src/web/walk_main.py`, свой образ — пересобирать вместе с `web`); экран — `src/web/static/walk.js`, форма — `walk-sheet.js`, «Ещё не смотрели» — `walk-unseen.js`, старт — `walk-app.js` + `src/web/walk_start.py`; запись — `walk_write.py`, поиск пункта — `walk_suggest.py`; тексты — `texts_walk.py`, `texts_app.py`; описание — `docs/13-walk-mini-app.md` |
 | Посадочная страница | `src/web/landing.py`, `templates/landing.html`, `static/decimus-landing.css`, `static/landing.js`; снимки — `make landing-shots`; `docs/12-web-admin.md`, раздел о посадочной |
 | Написать тест | Блоки без базы — `tests/test_<блок>_*.py` с общей оснасткой `tests/*_harness.py`; с базой — `tests/test_db_*.py` (`tests/db_harness.py`), на CI пропускаются; методика тестов — `tests/methodology/` |

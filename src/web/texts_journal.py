@@ -135,7 +135,6 @@ _WEB: dict[str, tuple[str, str]] = {
     "mailing_template_save": ("Сохранён шаблон письма УК", "HQ letter template saved"),
     "country_save_contract": ("Сохранён договор страны", "Country agreement saved"),
     "country_delete_contract": ("Снята строка договора страны", "Country agreement row removed"),
-    "ratings_layout": ("Изменён состав блока рейтингов", "Ratings layout changed"),
     "ratings_rule_add": ("Добавлено жёсткое правило", "Hard rule added"),
     "ratings_rule_remove": ("Удалено жёсткое правило", "Hard rule removed"),
     "ratings_settings": ("Изменены настройки рейтингов", "Ratings settings changed"),
@@ -186,6 +185,12 @@ _WEB: dict[str, tuple[str, str]] = {
 }
 
 #: Действия без маршрута веба: команда с сервера (`tools/web_user.py`) и проход уборки бота.
+# Снятые маршруты не участвуют в перечне действующих дверей, но старые события
+# журнала должны сохранить человекочитаемую подпись (D660).
+_LEGACY_WEB: dict[str, tuple[str, str]] = {
+    "ratings_layout": ("Изменён состав блока рейтингов", "Ratings layout changed"),
+}
+
 _CLI: dict[str, tuple[str, str]] = {
     "passkey_expired": (
         "Сняты ключи доступа, которыми не входили 30 дней",
@@ -390,7 +395,7 @@ _SCREEN: dict[str, dict[str, str]] = {
 def _build() -> dict[str, dict[str, str]]:
     return {
         **_SCREEN,
-        **_pairs("journal.action", {**_MCP, **_WEB, **_CLI}),
+        **_pairs("journal.action", {**_MCP, **_LEGACY_WEB, **_WEB, **_CLI}),
         **_pairs("journal.method", _METHODS),
         **_pairs("journal.result", _RESULTS),
         **_pairs("journal.door", _DOORS),
