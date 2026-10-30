@@ -765,17 +765,9 @@
   .walk-toast { transition: none; }
 }
 
-/* «Ещё не смотрели» (#837): тот же вид, что у чек-листа зоны; формулировка — не длиннее двух строк */
+/* «Ещё не смотрели» (#837): формулировка целиком, в том числе на телефоне. */
 
 .walk-cl--unseen { margin-bottom: 10px; }
-
-.walk-cl__text--short {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
 
 .walk-unseen__info {
   display: flex;

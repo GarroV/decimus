@@ -136,6 +136,26 @@ def test_письмо_несёт_html_и_честный_текст() -> None:
     assert '<a href="https://dodo.example/p">ссылка</a>' in разметка
 
 
+def test_pdf_attachment_preserves_both_letter_bodies() -> None:
+    pdf = b"%PDF-1.7\n\x00\xff\n%%EOF"
+    raw = mime_message(
+        to="partner@example.com",
+        cc=("hq@example.com",),
+        subject="Проверка",
+        body="<b>Все записи</b>",
+        attachments=(("report.pdf", pdf, "application/pdf"),),
+    )
+    message = _разобрать(raw)
+    assert message.get_content_type() == "multipart/mixed"
+    assert message["Cc"] == "hq@example.com"
+    assert message.get_body(preferencelist=("plain",)).get_content().strip() == "Все записи"
+    assert "<b>Все записи</b>" in message.get_body(preferencelist=("html",)).get_content()
+    (attachment,) = message.iter_attachments()
+    assert attachment.get_content_type() == "application/pdf"
+    assert attachment.get_filename() == "report.pdf"
+    assert attachment.get_payload(decode=True) == pdf
+
+
 def test_в_письмо_не_уезжает_неочищенное() -> None:
     """Сборка письма чистит сама: запись могла лечь в базу в обход сохранения."""
     сырое = mime_message(

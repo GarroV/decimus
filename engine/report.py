@@ -759,7 +759,7 @@ ITEM_REF = {"ru": "пункт стандарта «{q}»", "en": "standard item 
 def letter_text(f, qk, lang):
     """Строка записи в письме: слова аудитора, а нет их — ссылка на пункт стандарта.
 
-    Письмо перечисляет находки одной строкой на зону, без класса и без
+    Письмо перечисляет находки по зонам, без класса и без
     структуры отчёта, поэтому формулировка пункта, поставленная сюда без
     оговорки, читается как утверждение о состоянии дел (пункты написаны в
     форме «такое-то делается по стандарту») — то есть как «всё в порядке» на
@@ -791,8 +791,8 @@ def summary_lines(res, lang, clean):
         if f["level"] in shown:
             by_zone.setdefault(f[zk], []).append(f)
     for z, lst in by_zone.items():
-        names = "; ".join(letter_text(x, qk, lang) for x in lst)
-        lines.append(f"— {z}: {names}")
+        lines.extend(("", f"— {z}:"))
+        lines.extend(f"• {letter_text(x, qk, lang)}" for x in lst)
     return "\n".join(lines)
 
 

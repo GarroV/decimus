@@ -13,19 +13,26 @@
 
 from __future__ import annotations
 
+import base64
+import email.policy
+import json
 import urllib.parse
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import date, datetime
+from email.parser import BytesParser
 from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
+from src.db.errors import DbError, StorageError
 from src.db.letters import SavedLetter
 from src.db.models import InspectionDetail, InspectionRow
+from src.db.reports import ReportRef
 from src.domain.tenants import canonical_tenant
+from src.report.letters import LetterError
 from src.web import inspections as data
 from src.web import letter_draft
 from src.web.google_mail import DRAFT_SCOPE, MailGrant
@@ -36,6 +43,7 @@ from src.web.texts import t
 ЗАФИКСИРОВАННОЕ = "Здравствуйте! Это письмо человек подтвердил."
 #: Почта входа через Google у вошедшего: черновик ложится только в неё (D176).
 ПОЧТА = "director@example.com"
+PDF = b"%PDF-1.7\ncurrent inspection report\n%%EOF"
 
 
 def карточка() -> InspectionDetail:
@@ -65,9 +73,24 @@ def карточка() -> InspectionDetail:
 @pytest.fixture
 def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[FlaskClient, dict[str, list[Any]]]]:
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, email=ПОЧТА)
-    следы: dict[str, list[Any]] = {"remember": [], "draft": [], "token": []}
+    следы: dict[str, list[Any]] = {
+        "remember": [],
+        "draft": [],
+        "token": [],
+        "report": [],
+        "attachments": [],
+    }
 
     monkeypatch.setattr(data, "load_card", lambda _id, *, reach: карточка())
+    ref = ReportRef("report.pdf", "application/pdf", len(PDF), datetime.now())
+
+    def _ensure(detail: InspectionDetail, *, reach: Any) -> ReportRef:
+        следы["report"].append((detail, reach))
+        return ref
+
+    # Общий helper интегрируется из соседней ветки PDF.
+    monkeypatch.setattr(data, "ensure_report", _ensure, raising=False)
+    monkeypatch.setattr(data, "report_bytes", lambda actual: PDF if actual == ref else b"")
 
     def _remember(
         inspection_id: str, *, tenant: str, body: str, lang: str, saved_by: str
@@ -94,8 +117,9 @@ def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[FlaskClient,
         letter_draft, "exchange_code_for_grant", lambda _s, *, code: MailGrant("токен", ПОЧТА)
     )
 
-    def _create(token: str, *, to: str, subject: str, body: str, **_: Any) -> str:
+    def _create(token: str, *, to: str, subject: str, body: str, **extra: Any) -> str:
         следы["draft"].append((token, to, subject, body))
+        следы["attachments"].append(extra.get("attachments", ()))
         return "r-1"
 
     monkeypatch.setattr(letter_draft, "create_draft", _create)
@@ -180,6 +204,95 @@ def test_черновик_собирается_из_зафиксированно
     assert тело == ЗАФИКСИРОВАННОЕ
     assert кому == "partner@example.com"
     assert тема == "Проверка пиццерии · Белград · 2026-09-12"
+    assert следы["report"][0][0].inspection.id == ПРОВЕРКА
+    assert следы["attachments"] == [(("Demo Pizzeria #1 2026-09-12.pdf", PDF, "application/pdf"),)]
+
+
+@pytest.mark.parametrize("failure", [DbError("db"), StorageError("storage"), LetterError("pdf")])
+def test_pdf_failure_does_not_create_draft(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]],
+    monkeypatch: pytest.MonkeyPatch,
+    failure: Exception,
+) -> None:
+    включить_почту(monkeypatch)
+    client, следы = клиент
+
+    def broken(*args: Any, **kwargs: Any) -> Any:
+        raise failure
+
+    monkeypatch.setattr(data, "ensure_report", broken)
+    уход = увести(client)
+    state = urllib.parse.parse_qs(urllib.parse.urlparse(уход.location).query)["state"][0]
+    ответ = client.get("/auth/google/mail", query_string={"state": state, "code": "code"})
+    assert "gmail=pdf_failed" in ответ.headers["Location"]
+    assert not следы["draft"]
+    assert следы["remember"], "сохранённый текст должен пережить отказ PDF"
+
+
+@pytest.mark.parametrize("content", [b"", b"<html>storage error</html>"])
+def test_invalid_pdf_does_not_create_draft(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]],
+    monkeypatch: pytest.MonkeyPatch,
+    content: bytes,
+) -> None:
+    включить_почту(monkeypatch)
+    client, следы = клиент
+    monkeypatch.setattr(data, "report_bytes", lambda ref: content)
+    уход = увести(client)
+    state = urllib.parse.parse_qs(urllib.parse.urlparse(уход.location).query)["state"][0]
+    ответ = client.get("/auth/google/mail", query_string={"state": state, "code": "code"})
+    assert "gmail=pdf_failed" in ответ.headers["Location"]
+    assert not следы["draft"]
+
+
+def test_callback_sends_current_pdf_in_gmail_mime(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.web import google_mail
+
+    включить_почту(monkeypatch)
+    client, следы = клиент
+    sent: list[Any] = []
+
+    class Reply:
+        def __enter__(self) -> Reply:
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b'{"id":"draft-with-report"}'
+
+    def opener(request: Any, **kwargs: Any) -> Reply:
+        sent.append(request)
+        return Reply()
+
+    monkeypatch.setattr(
+        letter_draft,
+        "create_draft",
+        lambda token, **fields: google_mail.create_draft(token, opener=opener, **fields),
+    )
+    уход = увести(client)
+    # Между уходом и возвратом могли исправить проверку: helper получает
+    # свежую карточку, а текст по-прежнему берётся из saved_letter.
+    current = replace(карточка(), inspection=replace(карточка().inspection, city="Новый город"))
+    monkeypatch.setattr(data, "load_card", lambda _id, *, reach: current)
+    state = urllib.parse.parse_qs(urllib.parse.urlparse(уход.location).query)["state"][0]
+    ответ = client.get("/auth/google/mail", query_string={"state": state, "code": "code"})
+    assert "gmail=ok" in ответ.headers["Location"]
+    assert следы["report"][0][0] is current
+    assert len(sent) == 1
+    raw = json.loads(sent[0].data)["message"]["raw"]
+    message = BytesParser(policy=email.policy.default).parsebytes(
+        base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
+    )
+    assert "Новый город" in str(message["Subject"])
+    assert message.get_body(preferencelist=("plain",)).get_content().strip() == ЗАФИКСИРОВАННОЕ
+    assert ЗАФИКСИРОВАННОЕ in message.get_body(preferencelist=("html",)).get_content()
+    (attachment,) = message.iter_attachments()
+    assert attachment.get_content_type() == "application/pdf"
+    assert attachment.get_payload(decode=True) == PDF
 
 
 def test_черновик_в_чужой_аккаунт_google_не_ложится(

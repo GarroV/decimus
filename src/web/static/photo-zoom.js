@@ -37,6 +37,12 @@
     box.className = "zoom";
     box.setAttribute("aria-label", img.alt);
     box.appendChild(img);
+    if (link.dataset.caption) {
+      var caption = document.createElement("span");
+      caption.className = "zoom__caption";
+      caption.textContent = link.dataset.caption;
+      box.appendChild(caption);
+    }
     box.addEventListener("click", close);
     document.body.appendChild(box);
     box.focus({ preventScroll: true });

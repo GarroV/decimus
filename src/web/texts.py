@@ -610,6 +610,8 @@ TEXTS: dict[str, dict[str, str]] = {
     # --- правка прямо в записях и «Добавить нарушение» на вычитке (D535) ------
     "proofread.edit": {"ru": "Изменить запись {n}", "en": "Edit record {n}"},
     "proofread.save": {"ru": "Сохранить", "en": "Save"},
+    "proofread.open_all": {"ru": "Открыть все фото", "en": "Expand all photos"},
+    "proofread.close_all": {"ru": "Закрыть все фото", "en": "Collapse all photos"},
     "proofread.cancel": {"ru": "Отмена", "en": "Cancel"},
     "proofread.delete": {"ru": "Удалить запись {n}", "en": "Delete record {n}"},
     "proofread.delete.text": {
@@ -1160,6 +1162,12 @@ TEXTS: dict[str, dict[str, str]] = {
     "letter.gmail.failed": {
         "ru": "Черновик не создан. Письмо сохранено — попробуйте ещё раз.",
         "en": "The draft was not created. The letter is saved — please try again.",
+    },
+    "letter.gmail.pdf_failed": {
+        "ru": "Черновик не создан: актуальный PDF отчёта недоступен. "
+        "Письмо сохранено — попробуйте ещё раз.",
+        "en": "The draft was not created: the current PDF report is unavailable. "
+        "The letter is saved — please try again.",
     },
     "letter.gmail.denied": {
         "ru": "Доступ к почте не выдан — черновика нет. Письмо сохранено.",

@@ -41,6 +41,11 @@ def _стенд(monkeypatch: pytest.MonkeyPatch, *, report: ReportRef | None) ->
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка(), info=ПОЛЯ))
     monkeypatch.setattr(data, "load_moves", lambda *_a, **_k: ())
     monkeypatch.setattr(data, "load_report", lambda *_a, **_k: report)
+    monkeypatch.setattr(
+        data,
+        "ensure_report",
+        lambda detail, **kwargs: data.load_report(detail.inspection.id, **kwargs),
+    )
     monkeypatch.setattr(data, "report_bytes", lambda _ref: ОТЧЁТ)
     monkeypatch.setattr(data, "load_previews", lambda *_a, **_k: {})
     monkeypatch.setattr(data.info_titles, "titles", lambda *_a, **_k: (ВОПРОСЫ, FOUND))

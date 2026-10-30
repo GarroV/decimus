@@ -32,6 +32,7 @@ Rust-овым `ammonia`) — компилируемая зависимость �
 from __future__ import annotations
 
 import html
+import re
 from html.parser import HTMLParser
 from urllib.parse import parse_qsl, urlsplit
 
@@ -323,6 +324,41 @@ def for_saving(raw: str) -> str:
 def from_plain(text: str) -> str:
     """Простой текст (заготовка движка) → разметка: экранирование и только."""
     return _escape_text(text)
+
+
+_GENERATED_VALUE = re.compile(
+    r"\b\d+(?:[.,]\d+)?\s*%"
+    r"|\b(?:\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4})\b"
+    r"|\b[A-D](?=\s*\(\d+(?:[.,]\d+)?\s*%\))"
+)
+
+
+def from_generated(text: str) -> str:
+    """Разметить заготовку: пункты, заголовки, оценка и даты; слова не меняются.
+
+    Только заготовки движка, не сохранённые человеком письма. Любой исходный
+    текст сначала экранируется: разметку аудитора/пункта не принимаем за HTML.
+    `to_plain` возвращает исходный текст, включая переносы строк.
+    """
+    out: list[str] = []
+    for raw in text.splitlines(keepends=True):
+        line = raw.rstrip("\r\n")
+        ending = raw[len(line) :]
+        important = (
+            line.startswith(("Тема:", "Subject:", "• "))
+            or line.rstrip().endswith(":")
+            or (line.startswith("— ") and re.search(r"\bD[123]\b", line))
+        )
+        if important and line:
+            out.append(f"<b>{_escape_text(line)}</b>{ending}")
+            continue
+        offset = 0
+        for match in _GENERATED_VALUE.finditer(line):
+            out.append(_escape_text(line[offset : match.start()]))
+            out.append(f"<b>{_escape_text(match.group())}</b>")
+            offset = match.end()
+        out.append(_escape_text(line[offset:]) + ending)
+    return "".join(out)
 
 
 class _PlainText(HTMLParser):

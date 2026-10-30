@@ -51,7 +51,7 @@
         var b = W.button("walk-cl__item", null, function () {
           W.sheet.open({ mode: "violation", zone: zone.code, code: i.code, level: i.levels.length === 1 ? i.levels[0] : null });
         });
-        b.appendChild(el("span", "walk-cl__text walk-cl__text--short", i.q));
+        b.appendChild(el("span", "walk-cl__text", i.q));
         b.appendChild(el("span", "walk-cl__act", "+"));
         li.appendChild(b);
         list.appendChild(li);

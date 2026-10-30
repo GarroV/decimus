@@ -17,6 +17,7 @@ from test_web_walk_write import Клиент, клиент  # noqa: F401 -- фи
 from src.bot import propose as ядро
 from src.db.queries import pick_usual_zone
 from src.recognize.fastpath import FastItem, FastPath
+from src.recognize.models import Candidate
 from src.web import walk_suggest, walk_zone
 from src.web.walk_zone import resolve_item_zone
 
@@ -35,12 +36,14 @@ def test_зона_названная_человеком_сильнее_един�
     итог = resolve_item_zone(ПЕЧЬ, spoken="hall", model="cold_kitchen", hint="hot_kitchen")
 
     assert (итог.zone, итог.source) == ("hall", "words")
+    assert итог.options == (*ПЕЧЬ, "hall")
 
 
 def test_слова_аудитора_сильнее_модели_и_экрана() -> None:
     итог = resolve_item_zone(НЕСКОЛЬКО, spoken="cold_kitchen", model="hall", hint="hot_kitchen")
 
     assert (итог.zone, итог.source) == ("cold_kitchen", "words")
+    assert итог.options == НЕСКОЛЬКО, "названная типичная зона не дублируется"
 
 
 def test_без_слов_берётся_зона_модели_если_она_в_списке_пункта() -> None:
@@ -143,6 +146,41 @@ def test_ответ_поиска_несёт_зону_и_источник(
     итог = _разбор(клиент, zone_hint="cold_kitchen", words="нагар")
 
     assert итог == {"zone": "hot_kitchen", "source": "model", "options": list(НЕСКОЛЬКО)}
+
+
+@pytest.mark.parametrize("confidence", [0.1, 0.59])
+def test_слабая_догадка_модели_не_переносит_запись_в_другую_зону(
+    monkeypatch: pytest.MonkeyPatch, confidence: float
+) -> None:
+    monkeypatch.setattr(walk_suggest, "allowed_zones", lambda code, chat_id: НЕСКОЛЬКО)
+    candidate = Candidate(
+        code="CLN05", level="D1", zone="hot_kitchen", wording="Налёт", confidence=confidence
+    )
+    offer = ядро.Offer(via="model", candidates=(candidate,))
+    answer = walk_suggest.answer(
+        offer, walk_suggest.Ask(chat_id=1, spoken=None, hint="cold_kitchen")
+    )
+
+    found = answer["candidates"][0]["resolution"]
+    assert (found["zone"], found["source"]) == ("cold_kitchen", "hint")
+
+
+def test_названная_касса_остаётся_в_вариантах_вне_списка_пункта(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    options = ("dry_storage", "freezer", "fridge")
+    monkeypatch.setattr(walk_suggest, "allowed_zones", lambda code, chat_id: options)
+    candidate = Candidate(
+        code="SFT04", level="D1", zone="dry_storage", wording="Тара рядом с химией", confidence=0.9
+    )
+    offer = ядро.Offer(via="model", candidates=(candidate,))
+    answer = walk_suggest.answer(
+        offer, walk_suggest.Ask(chat_id=1, spoken="dining", hint="dry_storage")
+    )
+
+    found = answer["candidates"][0]["resolution"]
+    assert (found["zone"], found["source"]) == ("dining", "words")
+    assert found["options"] == [*options, "dining"]
 
 
 def test_ответ_поиска_экран_не_пишется_зоной_записи_если_пункт_в_другой_зоне(

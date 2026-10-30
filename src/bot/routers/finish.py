@@ -37,7 +37,7 @@ from pathlib import Path
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, FSInputFile, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, FSInputFile, Message
 
 from src import db, domain
 from src.domain.errors import ChecklistVersionMismatch, DomainError
@@ -75,6 +75,22 @@ from ..texts import t
 from .records import show_records
 
 logger = logging.getLogger(__name__)
+
+#: Считаем UTF-16 units: эмодзи за пределами BMP не должны протолкнуть длинное
+#: письмо в сообщение, которое Telegram откажется принять.
+_MESSAGE_TEXT_LIMIT = 4096
+
+
+async def deliver_letter(message: Message, letter: str, lang: str) -> None:
+    """Короткое письмо — сообщением, длинное — полным UTF-8 файлом, без обрезки."""
+    text = t("finish.letter", lang, letter=letter)
+    if len(text.encode("utf-16-le")) // 2 <= _MESSAGE_TEXT_LIMIT:
+        await message.answer(text)
+        return
+    await message.answer_document(
+        BufferedInputFile(letter.encode("utf-8"), filename="letter.txt"),
+        caption=t("finish.letter_file", lang),
+    )
 
 
 async def refuse_if_sealed(message: Message, chat_id: int, lang: str) -> bool:
@@ -481,7 +497,7 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
             logger.exception("письмо чата %s не собралось", log_id(chat_id))
             await message.answer(t("finish.letter_failed", lang))
         else:
-            await message.answer(t("finish.letter", lang, letter=letter.text))
+            await deliver_letter(message, letter.text, lang)
             # Обратная связь аудитора записана не на языке письма: в письме и в PDF
             # её нет, и молчать об этом нельзя (D663) — отдельным сообщением под
             # письмом, чтобы не попасть в текст, который копируют партнёру.

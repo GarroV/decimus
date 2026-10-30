@@ -27,7 +27,7 @@ from flask import Flask, Response, jsonify, request
 
 from src.bot import journal
 from src.bot.propose import Offer, hint, propose
-from src.bot.zones import allowed_zones, zone_from_words
+from src.bot.zones import MODEL_ZONE_MIN_CONFIDENCE, allowed_zones, zone_from_words
 from src.db import queries
 from src.db.busy_lock import WALK_SUGGEST, try_hold
 from src.db.errors import DbError
@@ -72,7 +72,9 @@ def _card(c: Candidate, offer: Offer, ask: Ask) -> dict[str, Any]:
     found = resolve_item_zone(
         options,
         spoken=ask.spoken,
-        model=c.zone if offer.via == "model" else None,
+        model=(
+            c.zone if offer.via == "model" and c.confidence >= MODEL_ZONE_MIN_CONFIDENCE else None
+        ),
         hint=ask.hint,
         usual=lambda: _usual_zone(ask.tenant, c.code),
     )

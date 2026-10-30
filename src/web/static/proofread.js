@@ -14,6 +14,33 @@
 
   var dataCache = new WeakMap();
 
+  // Раскрываются только фото записей этой карточки; формы правки остаются
+  // закрытыми. Если часть записей раскрыли вручную, кнопка открывает остальные.
+  function syncPhotos(section) {
+    var button = section.querySelector("[data-findings-toggle]");
+    if (!button) return;
+    var rows = Array.from(section.querySelectorAll("details.find-row--photos"));
+    var allOpen = rows.length > 0 && rows.every(function (row) { return row.open; });
+    button.textContent = allOpen ? button.dataset.labelClose : button.dataset.labelOpen;
+    button.setAttribute("aria-expanded", String(allOpen));
+  }
+
+  document.addEventListener("toggle", function (e) {
+    if (!e.target.matches("details.find-row--photos")) return;
+    var section = e.target.closest("[data-findings]");
+    if (section) syncPhotos(section);
+  }, true);
+
+  document.addEventListener("click", function (e) {
+    var button = e.target.closest("[data-findings-toggle]");
+    if (!button) return;
+    var section = button.closest("[data-findings]");
+    var rows = Array.from(section.querySelectorAll("details.find-row--photos"));
+    var open = !rows.every(function (row) { return row.open; });
+    rows.forEach(function (row) { row.open = open; });
+    syncPhotos(section);
+  });
+
   // ── Данные версии: пункты, классы, зоны, тексты ────────────────────────────
   function sectionOf(el) {
     return el.closest("[data-proofread]");

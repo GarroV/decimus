@@ -216,7 +216,14 @@ def draft_subject(*, city: str, date: str, lang: str) -> str:
     return " · ".join(часть for часть in части if часть)
 
 
-def letter_message(*, to: str, subject: str, body: str, cc: tuple[str, ...] = ()) -> EmailMessage:
+def letter_message(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    cc: tuple[str, ...] = (),
+    attachments: tuple[tuple[str, bytes, str], ...] = (),
+) -> EmailMessage:
     """Письмо партнёру как MIME: текстовая часть и HTML-часть одного содержания.
 
     `body` — разметка письма (`src/report/letter_markup.py`), и чистится она
@@ -254,12 +261,27 @@ def letter_message(*, to: str, subject: str, body: str, cc: tuple[str, ...] = ()
     # к богатой, и клиент показывает последнюю, которую умеет.
     письмо.set_content(текст)
     письмо.add_alternative(to_email_html(body), subtype="html")
+    for filename, content, content_type in attachments:
+        if not content:
+            raise GoogleMailError("вложение пустое — черновик не заводится")
+        try:
+            maintype, subtype = content_type.split("/", 1)
+            письмо.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
+        except ValueError as сбой:
+            raise GoogleMailError("вложение некорректно — черновик не заводится") from сбой
     return письмо
 
 
-def mime_message(*, to: str, subject: str, body: str, cc: tuple[str, ...] = ()) -> str:
+def mime_message(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    cc: tuple[str, ...] = (),
+    attachments: tuple[tuple[str, bytes, str], ...] = (),
+) -> str:
     """Письмо как `raw` для Gmail: MIME в base64url без выравнивания."""
-    письмо = letter_message(to=to, subject=subject, body=body, cc=cc)
+    письмо = letter_message(to=to, subject=subject, body=body, cc=cc, attachments=attachments)
     return base64.urlsafe_b64encode(письмо.as_bytes()).decode().rstrip("=")
 
 
@@ -270,6 +292,7 @@ def create_draft(
     subject: str,
     body: str,
     cc: tuple[str, ...] = (),
+    attachments: tuple[tuple[str, bytes, str], ...] = (),
     opener: Callable[..., Any] = urllib.request.urlopen,
 ) -> str:
     """Положить письмо в черновики вошедшего. Возвращает номер черновика.
@@ -279,7 +302,7 @@ def create_draft(
     `opener` — точка подмены для проверки: сам разговор с Gmail тривиален, а
     вот разбор его ответов решает, увидит ли человек внятную причину отказа.
     """
-    сырое = mime_message(to=to, subject=subject, body=body, cc=cc)
+    сырое = mime_message(to=to, subject=subject, body=body, cc=cc, attachments=attachments)
     запрос = urllib.request.Request(
         DRAFTS_ENDPOINT,
         data=json.dumps({"message": {"raw": сырое}}).encode(),

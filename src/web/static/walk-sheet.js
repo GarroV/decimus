@@ -42,6 +42,7 @@
   var node = null;
   var parts = {};
   var seq = 0;
+  var returnScrollY = 0;
 
   /* ── данные формы ─────────────────────────────────────────────────── */
 
@@ -704,6 +705,9 @@
     itemZones(f.code).forEach(function (z) {
       pills.appendChild(W.button("walk-ctx__pill walk-ctx__pill--zone", z.title, function () { setZone(z.code, "pick"); }));
     });
+    if (itemZones(f.code).length < realZones().length) {
+      pills.appendChild(W.button("walk-ctx__pill walk-ctx__pill--zone", tx("walk.sheet.zone_other"), fullZoneMenu));
+    }
     row.appendChild(pills);
     return row;
   }
@@ -886,7 +890,10 @@
           f.commentOpen = true;
           redraw("comment");
           var a = node.querySelector(".walk-area--comment");
-          if (a) a.focus();
+          if (a) {
+            a.focus({ preventScroll: true });
+            a.scrollIntoView({ block: "nearest" });
+          }
         }));
         return box;
       }
@@ -894,6 +901,7 @@
       area.rows = 3;
       area.maxLength = 1000;
       area.value = f.comment;
+      area.setAttribute("aria-label", tx("walk.sheet.comment"));
       area.addEventListener("input", function () { f.comment = area.value; changed(); });
       box.appendChild(area);
       var voice = W.voiceBar(area);
@@ -1026,7 +1034,7 @@
 
   // Имя пометки — из `src/recognize/rules_check.py` (`SERVICE_ASIDE`).
   var ASIDE_FLAG = "служебная-оговорка";
-  var ORDER = ["context", "photos", "words", "item", "reading", "level", "text", "comment", "repeat", "danger"];
+  var ORDER = ["context", "photos", "words", "item", "text", "comment", "reading", "level", "repeat", "danger"];
 
   function redraw() {
     var names = Array.prototype.slice.call(arguments);
@@ -1164,9 +1172,13 @@
     f = null;
     if (W.voice) W.voice.cancelAll(); // идущая запись голоса выбрасывается, микрофон отпускается
     if (W.menu) W.menu.close();
+    // Закрываем клавиатуру до снятия блокировки страницы: иначе iOS меняет
+    // позицию обхода вслед за исчезнувшим полем и сохранение «прыгает».
+    if (node && node.contains(document.activeElement)) document.activeElement.blur();
     if (node) node.remove();
     node = null;
     document.documentElement.classList.remove("has-sheet");
+    window.scrollTo(0, returnScrollY);
     if (W.tg && W.supports("6.1")) {
       W.tg.BackButton.offClick(onBack);
       W.app.syncBack();
@@ -1249,9 +1261,19 @@
   }
 
   function build() {
+    returnScrollY = window.scrollY;
     node = el("div", "walk-sheet");
     node.setAttribute("role", "dialog");
     node.setAttribute("aria-modal", "true");
+    node.addEventListener("keydown", function (e) {
+      // Enter — то же явное подтверждение, что кнопка. Shift+Enter оставляет
+      // перенос строки; завершение ввода через IME записью не считается.
+      if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey ||
+          e.isComposing || e.keyCode === 229 || e.target.tagName !== "TEXTAREA") return;
+      if (blocker() || f.saving || f.finding) return;
+      e.preventDefault();
+      save_();
+    });
     var head = el("header", "walk-sheet__head");
     // «Назад» видна всегда, а не только кнопкой Telegram в его шапке: в
     // браузере её нет вовсе, а в Telegram её не все замечают.

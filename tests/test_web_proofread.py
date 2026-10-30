@@ -21,6 +21,7 @@ from test_web_app import карточка, шапка
 from src.bot.propose import Offer
 from src.db.busy_lock import Hold
 from src.db.errors import ReviseError
+from src.db.previews import FindingShots
 from src.recognize.errors import ModelUnavailable
 from src.recognize.models import Candidate
 from src.web import inspections as data
@@ -30,6 +31,64 @@ from src.web.guard import ACTIONS_ATTR, OBJECT_IN_ROUTE_ATTR
 ПАНЕЛЬ = "/inspections?inspection=x"
 ЗАПИСЬ = карточка(шапка()).findings[0]
 ФОРМА = {"code": "CLN02", "level": "D2", "zone": "KITCHEN", "text": "пол в зале"}
+
+
+@админ
+@pytest.mark.parametrize("адрес", ["/inspections/x", ПАНЕЛЬ])
+def test_вычитка_выделяет_пункт_и_даёт_формулировку_на_фото(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, адрес: str
+) -> None:
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+    деталь = карточка(шапка(on_review=True, tenant_code=ТЕНАНТ))
+    запись = replace(деталь.findings[0], code="CLN02", text='Пыль <слева> и "сверху"')
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: replace(деталь, findings=(запись,)))
+    monkeypatch.setattr(
+        data,
+        "load_previews",
+        lambda *_a, **_k: {запись.id: FindingShots(shown=("photo-1",), missing=0)},
+    )
+
+    страница = стенд.get(адрес).get_data(as_text=True)
+
+    assert '<span class="find-row__title">Пол</span>' in страница
+    assert 'data-caption="Пыль &lt;слева&gt; и &#34;сверху&#34;"' in страница
+    assert "data-findings-toggle" in страница
+    assert "Открыть все фото" in страница and "Закрыть все фото" in страница
+
+
+@админ
+def test_без_кадров_формулировка_остаётся_в_строке_и_нет_пустого_тумблера(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+    monkeypatch.setattr(data, "load_previews", lambda *_a, **_k: {})
+
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    assert 'class="find-row__text"' in страница
+    assert "data-findings-toggle" not in страница
+
+
+@админ
+def test_у_принятой_проверки_формулировка_с_фото_остаётся_в_строке(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _приёмка(monkeypatch, ждёт=False)
+    _лист(monkeypatch)
+    запись = карточка(шапка()).findings[0]
+    monkeypatch.setattr(
+        data,
+        "load_previews",
+        lambda *_a, **_k: {запись.id: FindingShots(shown=("photo-1",), missing=0)},
+    )
+
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    assert 'class="find-row__text"' in страница
+    assert 'class="find-row__title"' not in страница
+    assert "data-findings-toggle" not in страница
 
 
 def _jpeg() -> bytes:
