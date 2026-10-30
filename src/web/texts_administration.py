@@ -217,10 +217,6 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Последняя загрузка {at}",
         "en": "Last upload {at}",
     },
-    "ratings.admin.layout.state": {
-        "ru": "Видно блоков: {shown} из {total}",
-        "en": "Blocks shown: {shown} of {total}",
-    },
     "ratings.admin.journal.state": {"ru": "Записей: {n}", "en": "Entries: {n}"},
     "ratings.admin.issues.none": {"ru": "Нестыковок нет", "en": "No mismatches"},
     "ratings.admin.issues.some": {"ru": "Нестыковок: {n}", "en": "Mismatches: {n}"},

@@ -173,6 +173,7 @@
     {% if truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=limit) }}</div></div></div>{% endif %}
     {{ nothing(summary) }}
     {{ key_figures(summary, column, true) }}
+    {% include '_inspection_timeline.html' %}
     {% if ratings_failed %}{% call pick_empty() %}{{ t('home.ratings.failed') }}{% endcall %}{% endif %}
     {% if summary.has_inspections %}{{ hurt(data) }}{% endif %}
     {% call pick_block(t('country.list.title'), t('country.list.country_hint') ~ ' · ' ~ period_title, country_inspections|length) %}

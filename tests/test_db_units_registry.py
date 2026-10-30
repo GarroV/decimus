@@ -122,37 +122,51 @@ def test_охват_читается_с_последней_оценкой_каж
     assert agg_store.point_keys("glovo") == {"306069"}
 
 
-def _страница(client: Any, path: str = "/ratings/coverage") -> str:
+def _страны(dsn: str, *коды: str) -> None:
+    """Страны IMF справочника рейтингов: раздел «Агрегаторы» показывает только их (D660)."""
+    import psycopg
+
+    with psycopg.connect(dsn) as conn:
+        for код in коды:
+            conn.execute(
+                "insert into ratings.countries (code, name_ru, name_en, is_imf) "
+                "values (%s, %s, %s, true) on conflict (code) do update set is_imf = true",
+                (код, код, код),
+            )
+
+
+def _страница(client: Any, path: str = "/ratings/agg") -> str:
     ответ = client.get(path)
     assert ответ.status_code == 200
     return ответ.get_data(as_text=True)
 
 
-def test_экран_охвата_значок_устаревших_прочерк_и_счётчики(
+def test_агрегаторы_значок_устаревших_прочерк_и_причины(
     db_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _наполнить()
+    _страны(db_env, "RO", "PL")
 
     подменить_двери(monkeypatch, tenant="HQ", role="developer")
     with собрать(tenant="HQ").test_client() as client:
         assert войти(client).status_code == 302
         html = _страница(client)
-        польша = _страница(client, "/ratings/coverage?country=PL")
+        страница_охвата = client.get("/ratings/coverage?country=PL")
 
-    # Счётчики — под «?» столбиком, по строке на счётчик (D632).
-    for строка in ("пиццерий: 2", "новых за 30 дней: 1", "без точки на площадках: 2"):
-        assert строка in html, строка
-    # Обе без Bolt Food (он в Румынии ожидается); у «Новой» ещё нет Glovo.
-    assert html.count("rt-chip") >= 1  # «новая» — у Новая, не у Старая
-    # Glovo у «Старой» старше недели: значок с датой. Свежий Wolt — без значка.
+    # Старая страница охвата ведёт сюда, страна не теряется.
+    assert страница_охвата.status_code == 302
+    assert страница_охвата.headers["Location"].endswith("/ratings/agg?country=PL")
+    # Glovo у «Старой» старше недели: значок с датой и причина словами. Свежий Wolt — без значка.
     устарел = (СЕГОДНЯ - timedelta(days=9)).strftime("%d.%m.%Y")
     assert f"Данные от {устарел}, новые не приходят" in html
     assert html.count('class="rt-stale"') == 1
-    assert "Нет на площадке" in html  # у «Новой» нет Glovo
+    assert f"Glovo: оценка не обновляется с {устарел}" in html
+    assert "Glovo: не привязана" in html  # у «Новой» нет Glovo
     assert "98.3%" in html and "9.2<span" in html
     # Гость-не-управляющий формы привязки не видит.
     assert "привязать" not in html
-    assert "В этой стране нет работающих пиццерий." in польша
+    # Польша в справочнике есть, пиццерий в реестре нет — страна раскрывается пустой строкой.
+    assert "В реестре нет работающих пиццерий этой страны." in html
 
 
 def test_привязка_glovo_по_ссылке_только_управляющим_и_пишет_точку(
@@ -163,6 +177,7 @@ def test_привязка_glovo_по_ссылке_только_управляю�
     from src.web import ratings as screen
 
     _наполнить()
+    _страны(db_env, "RO")
     настоящая = glovo_link.link_by_url
     страница = (
         '<script>"cityCode":"BUC" https://api.glovoapp.com/v4/stores/555/addresses/777/x</script>'
@@ -225,6 +240,7 @@ def test_привязка_migros_по_ссылке_с_экрана(db_env: str, 
         migros.KEY, "dodo-pizza-x", "TR", "Dodo", None, None, None, ВТОРОЙ, "x", None, {}
     )
     agg_store.save([известная], [])
+    _страны(db_env, "TR")
     monkeypatch.setenv(migros.RELAY_VAR, "http://100.64.1.2:9021")
     настоящая = migros_link.link_by_url
     карточка = {"storeDTO": {"title": "Dodo Pizza, Çukurova", "rating": {"score": "4,6"}}}
@@ -247,7 +263,7 @@ def test_привязка_migros_по_ссылке_с_экрана(db_env: str, 
     подменить_двери(monkeypatch, tenant="HQ", role="control")
     with собрать(tenant="HQ").test_client() as client:
         assert войти(client).status_code == 302
-        экран = _страница(client, "/ratings/coverage?country=TR")
+        экран = _страница(client, "/ratings/agg?country=TR")
         плохая = client.post(
             "/ratings/coverage/link",
             data={**форма, "url": "https://glovoapp.com/x"},

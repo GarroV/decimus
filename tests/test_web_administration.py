@@ -168,7 +168,6 @@ def _рейтинги_без_базы(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ratings_screen.read, "open_issues", lambda: ())
     monkeypatch.setattr(ratings_screen.read, "hard_rules", lambda: ())
     monkeypatch.setattr(ratings_screen.read, "settings", dict)
-    monkeypatch.setattr(ratings_screen.read, "layout_rows", lambda: ())
     monkeypatch.setattr(ratings_sync, "states", lambda: ())
     monkeypatch.setattr(ratings_sync, "open_request", lambda: None)
 

@@ -29,6 +29,7 @@ from .texts_demo import DEMO_TEXTS
 from .texts_dodois import DODOIS_TEXTS
 from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
+from .texts_inspection_timeline import TIMELINE_TEXTS
 from .texts_journal import JOURNAL_TEXTS
 from .texts_mailings import MAILINGS_TEXTS
 from .texts_master import MASTER_TEXTS
@@ -1913,3 +1914,8 @@ def lang_or_default(lang: str | None, *, fallback: str) -> str:
     настройка стенда, и на границе он приводится к допустимому.
     """
     return lang if lang in UI_LANGS else fallback
+
+
+# Общая история проверок на стране и в рейтингах.
+
+TEXTS.update(TIMELINE_TEXTS)

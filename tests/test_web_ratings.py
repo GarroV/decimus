@@ -32,7 +32,7 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         return f"<p>загрузки {kw.get('notice') or ''}{kw.get('failure') or ''}</p>"
 
     monkeypatch.setattr(screen, "import_file", грузить)
-    monkeypatch.setattr(screen, "render_summary", lambda *a, **k: "<p>сводка</p>")
+    monkeypatch.setattr(screen, "render_section", lambda *a, **k: "<p>сводка</p>")
     monkeypatch.setattr(screen, "render_imports", загрузки)
     return журнал
 
@@ -69,7 +69,6 @@ def test_сводку_видят_все(
     ),
     ("post", "/ratings/hard-rules/1/delete", dict),
     ("post", "/ratings/settings", lambda: {"top_threshold": "80"}),
-    ("post", "/ratings/layout", lambda: {"order": "scores", "show": "scores"}),
 ]
 
 
@@ -217,35 +216,3 @@ def test_каждый_код_отказа_есть_на_обоих_языках(
     assert len(коды) == 11 + 5 + 7 + 9
     for ключ in коды:
         assert set(TEXTS.get(ключ, {})) >= {"ru", "en"}, ключ
-
-
-def test_контроль_сдвигает_и_прячет_блок(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> None:
-    """D368: порядок — из формы, «risk» поднят на одно место, «top» спрятан."""
-    записано: list[Any] = []
-    monkeypatch.setattr(
-        screen.read, "save_layout", lambda blocks, **_: записано.append(list(blocks))
-    )
-    порядок = ["scores", "violations", "top", "maps", "risk", "hard"]
-    видимые = ["scores", "violations", "maps", "risk", "hard"]
-    for client in _стенд(monkeypatch, "HQ", "control"):
-        ответ = client.post(
-            "/ratings/layout",
-            data={"order": порядок, "show": видимые, "move": "risk:-1"},
-            headers=ORIGIN,
-        )
-        assert ответ.status_code == 200
-    # Ярусы (D658): «risk» поднят в своём ярусе над «maps»; блоки, не пришедшие в форме,
-    # встают в конец своего яруса без галочки.
-    assert записано == [
-        [
-            ("scores", True),
-            ("violations", True),
-            ("top", False),
-            ("risk", True),
-            ("maps", True),
-            ("clients", False),
-            ("aggregators", False),
-            ("hard", True),
-            ("compare", False),
-        ]
-    ]

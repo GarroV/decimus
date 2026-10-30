@@ -123,7 +123,7 @@ def test_разделы_по_матрице(
     from src.web import ratings as ratings_screen
 
     monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
-    monkeypatch.setattr(ratings_screen, "render_summary", lambda *_a, **_k: "<p>сводка</p>")
+    monkeypatch.setattr(ratings_screen, "render_section", lambda *_a, **_k: "<p>сводка</p>")
     for client in _клиент(monkeypatch, app, tenant=tenant, role=role):
         ответ = client.get(путь)
     assert ответ.status_code == код, ответ.get_data(as_text=True)[:300]

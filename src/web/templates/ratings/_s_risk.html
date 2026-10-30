@@ -1,0 +1,20 @@
+{% from "ratings/_macros.html" import unit_link, cfilter with context %}
+{#- «Стабильно ниже порога» (D658) — один список пиццерий, низких по любому источнику:
+    РС, РКО, площадки доставки и наши проверки; у строки — где именно ниже порога,
+    словами, и оценки (старые первыми). Правила — `src.ratings.risk_sources`. -#}
+<div class="rt-sec" data-rt-filtered>
+  <div class="rt-sec__head"><span class="rt-sec__meta">{{ risk_hint }}</span></div>
+  {% if risk.rows %}{{ cfilter(risk.rows|map(attribute='country')|list) }}
+  <div class="rt-card rt-alert rt-alert--warn rt-scroll"><table class="rt-maps rt-list">
+    <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col">{{ t('ratings.col.sources') }}</th></tr></thead>
+    <tbody>{% for u in risk.rows %}<tr data-country="{{ u.country }}">
+      <th scope="row">{{ unit_link(u.unit, u.unit_name, 'rko' if u.sources[0].code == 'rko' else 'rs') }}<small>{{ country_name(u.country) }}</small></th>
+      <td class="rt-chips">{% for s in u.sources %}<span class="rt-chip"><b>{{ risk_sources.get(s.code, s.code) }}</b> <span class="rt-chip__scores">{% for x in s.scores %}{{ ('%.1f' if x > 5 else '%.2f')|format(x) }}{% if not loop.last %} → {% endif %}{% endfor %}</span></span>{% endfor %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% if risk_short %}<div class="rt-note">{{ t('ratings.risk.short', types=risk_short_names) }}</div>{% endif %}
+  {#- Неполное окно — тип не судили; «никого» только когда судили все (P37). -#}
+  {% elif risk_short %}<div class="rt-empty">{{ t('ratings.risk.short', types=risk_short_names) }}</div>
+  {% else %}<div class="rt-empty">{{ t('ratings.empty.risk') }}</div>{% endif %}
+  {% if risk_unread %}<div class="rt-note">{{ t('ratings.risk.unread', names=risk_unread) }}</div>{% endif %}
+</div>

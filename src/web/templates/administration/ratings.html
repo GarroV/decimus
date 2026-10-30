@@ -4,10 +4,11 @@
   что у «Ключей и API» и «Dodo IS»: шапка с «?» → список блоков настроек (`sbox` / `slist` /
   `srow--go`, у каждого строка состояния) → панель выбранного блока справа (`?block=<код>`).
   Блоки — то, что раньше было на экране «Загрузки» (`/ratings/imports`, теперь отсылает сюда):
-  таблица контроля, загрузка файла, компоновка страницы, журнал загрузок, несопоставленное,
+  таблица контроля, загрузка файла, журнал загрузок, несопоставленное,
   девелоперы стран, хард-правила, пороги. Формы шлют POST на прежние адреса `/ratings/…`; ответ
-  — эта же вкладка с открытым блоком и исходом. Охват площадок и привязка Glovo остаются в
-  «Рейтингах» (`/ratings/coverage`): это правка там, где виден пробел. Примечания журнала и
+  — эта же вкладка с открытым блоком и исходом. Компоновки страницы больше нет (D660):
+  порядок разделов «Рейтингов» задаёт код. Охват площадок и привязка Glovo — в разделе
+  «Агрегаторы» (`/ratings/agg`): это правка там, где виден пробел. Примечания журнала и
   причины строк пишет импортёр по-русски, поэтому в другой язык они не идут (P15). Стили списка
   и панели — `static/decimus-rt.css` и каркас `decimus-split.css`.
 #}{% extends "_split_page.html" %}
@@ -65,7 +66,7 @@
       </ul>
     </div>
   </div>
-  <p class="ssec__note"><a href="{{ url(ratings_path ~ '/coverage') }}?lang={{ lang }}">{{ t('ratings.admin.coverage') }}</a></p>
+  <p class="ssec__note"><a href="{{ url(ratings_path ~ '/agg') }}?lang={{ lang }}">{{ t('ratings.admin.coverage') }}</a></p>
 {% endblock %}
 
 {% block split_title %}{% if block %}{{ t('ratings.admin.block.' ~ block) }}{% endif %}{% endblock %}
@@ -120,27 +121,6 @@
         <label class="rt-field--grow"><span class="rt-field__label">{{ t('ratings.imports.file') }}</span>
           <input class="input" type="file" name="file" accept=".csv,.json,text/csv,application/json" required></label>
         <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.imports.submit') }}</button>
-      </form>
-    </div></div>
-
-  {% elif block == 'layout' %}
-    {#- Компоновка страницы (D368, D370): видимость и порядок готовых блоков. -#}
-    {{ hint(t('ratings.layout.hint'), 'rt-layout') }}
-    <div class="rt-card"><div class="rt-card__body">
-      <form method="post" action="{{ action('/layout') }}">
-        <ol class="rt-layout">
-          {% for b in layout %}
-          <li class="rt-layout__row">
-            <input type="hidden" name="order" value="{{ b.key }}">
-            <label class="rt-layout__name"><input type="checkbox" name="show" value="{{ b.key }}"{% if b.visible %} checked{% endif %}> {{ t('ratings.layout.' ~ b.key) }}</label>
-            <span class="rt-layout__moves">
-              <button class="btn btn--sm" type="submit" name="move" value="{{ b.key }}:-1"{% if loop.first %} disabled{% endif %} aria-label="{{ t('ratings.layout.up', name=t('ratings.layout.' ~ b.key)) }}">↑</button>
-              <button class="btn btn--sm" type="submit" name="move" value="{{ b.key }}:1"{% if loop.last %} disabled{% endif %} aria-label="{{ t('ratings.layout.down', name=t('ratings.layout.' ~ b.key)) }}">↓</button>
-            </span>
-          </li>
-          {% endfor %}
-        </ol>
-        <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.layout.save') }}</button>
       </form>
     </div></div>
 

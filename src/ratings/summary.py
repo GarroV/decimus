@@ -83,6 +83,15 @@ def unit_averages(facts: Sequence[Fact], rating_type: str) -> dict[str, float]:
     return {unit: fmean(scores) for unit, scores in by_unit.items()}
 
 
+def unit_counts(facts: Sequence[Fact], rating_type: str) -> dict[str, int]:
+    """Страна → сколько пиццерий с оценкой этого типа в фактах."""
+    where = _countries(facts)
+    counts: dict[str, int] = {}
+    for unit in unit_averages(facts, rating_type):
+        counts[where[unit]] = counts.get(where[unit], 0) + 1
+    return counts
+
+
 def _countries(facts: Sequence[Fact]) -> dict[str, str]:
     return {fact.unit: fact.country for fact in facts}
 

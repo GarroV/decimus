@@ -1,71 +1,22 @@
-// Отбор раздела «Рейтинги» применяется сразу (D357): сменил девелопера или
-// страну — страница перестраивается без кнопки. Срез и период — ссылки, им
-// скрипт не нужен. Не загрузился — под <noscript> остаётся кнопка «Показать».
+// Разделы «Рейтингов» (D660). Что делает скрипт:
+//  1. Переходы без перезагрузки: щелчок по пункту подменю, по срезу, стрелкам и выбору
+//     периода, отправка календаря «с — по» — `fetch` того же адреса, замена содержимого
+//     раздела и подсветки подменю, `history.pushState`, `popstate`. Содержимое плавно
+//     тускнеет на время запроса, страница не мигает целиком. Не получилось — обычный
+//     переход по ссылке. БЕЗ СКРИПТА всё это — обычные ссылки и форма.
+//  2. Отбор раздела применяется сразу (D357): сменил девелопера или страну — пересчёт
+//     без кнопки; под <noscript> остаётся кнопка «Показать».
+//  3. Фильтр по странам внутри блока и хард-нарушения столбцами с «Показать ещё».
+//  4. «Агрегаторы»: страна раскрывается пиццериями (без скрипта — ссылка `?country=`).
 (function () {
   "use strict";
-  document.addEventListener("change", function (event) {
-    var form = event.target.closest && event.target.closest("form[data-rt-auto]");
-    if (form && event.target.tagName === "SELECT" && !event.target.hasAttribute("data-pick-nav")) form.submit();
-  });
 
-  // Подсказка свечи — сразу при наведении или фокусе (D385): системная по
-  // `title` всплывает через секунду, поэтому у точки его нет — текст для экранных чтецов в `aria-label`.
-  // Подсказка уходит в <body>: тело плитки анимируется с `transform` (режим
-  // `both`), и `position: fixed` внутри него считалось бы от плитки, а не от
-  // экрана — подсказка уезжала вправо от точки (D630).
-  var tip = null;
-  function show(node) {
-    if (!tip) {
-      tip = document.querySelector(".rt-tip");
-      if (!tip) return;
-      document.body.appendChild(tip);
-    }
-    tip.textContent = node.getAttribute("data-tip");
-    tip.hidden = false;
-    var box = node.getBoundingClientRect();
-    var left = Math.min(box.left, window.innerWidth - tip.offsetWidth - 8);
-    var top = box.top - tip.offsetHeight - 8;
-    tip.style.left = Math.max(8, left) + "px";
-    tip.style.top = (top < 8 ? box.bottom + 8 : top) + "px";
-  }
-  function hide() { if (tip) tip.hidden = true; }
-  function candle(event) {
-    return event.target.closest && event.target.closest("[data-tip]");
-  }
-  ["mouseover", "focusin"].forEach(function (type) {
-    document.addEventListener(type, function (event) {
-      var node = candle(event);
-      if (node) show(node);
-    });
-  });
-  ["mouseout", "focusout"].forEach(function (type) {
-    document.addEventListener(type, function (event) { if (candle(event)) hide(); });
-  });
-  document.addEventListener("scroll", hide, true);
-
-  // Фильтр по странам в блоке (зона риска, хард-нарушения): прячет строки чужих
-  // стран только в своём блоке. Без скрипта фильтр скрыт — видны все строки.
-  document.querySelectorAll(".rt-filter").forEach(function (bar) { bar.hidden = false; });
-  document.addEventListener("change", function (event) {
-    var select = event.target.closest && event.target.closest(".rt-filter select");
-    if (!select) return;
-    var code = select.value;
-    var hardBox = select.closest("[data-rt-hard]");
-    if (hardBox) { hardBox.rtHard.filter(code); return; }
-    var block = select.closest("[data-rt-filtered]");
-    block.querySelectorAll("tr[data-country]").forEach(function (row) {
-      row.hidden = code !== "" && row.getAttribute("data-country") !== code;
-    });
-  });
-
-  // Хард-нарушения (D585): столбцы по десять строк, на широком экране по два
-  // столбца, на узком по одному; «Показать ещё» открывает следующие столбцы.
-  // Сервер уже разложил строки так же — скрипт раскладывает заново под выбранную
-  // страну и прячет то, что дальше первой страницы.
+  // ── Фильтр по странам и хард-нарушения: настраиваются заново после каждой замены ──
   var COLUMN = 10;
   var WIDE = window.matchMedia("(min-width: 720px)");
   function columnsPerPage() { return WIDE.matches ? 2 : 1; }
-  document.querySelectorAll("[data-rt-hard]").forEach(function (box) {
+
+  function setUpHard(box) {
     var list = box.querySelector("[data-rt-hard-list]");
     if (!list) return;
     var rows = Array.prototype.slice.call(list.querySelectorAll(".rt-hard__row"));
@@ -106,82 +57,139 @@
       filter: function (code) { state.code = code; state.shown = columnsPerPage(); render(); }
     };
     render();
+  }
+
+  function setUp(root) {
+    root.querySelectorAll(".rt-filter").forEach(function (bar) { bar.hidden = false; });
+    root.querySelectorAll("[data-rt-hard]").forEach(setUpHard);
+  }
+
+  // ── Отбор ───────────────────────────────────────────────────────────────────────
+  document.addEventListener("change", function (event) {
+    var form = event.target.closest && event.target.closest("form[data-rt-auto]");
+    if (form && event.target.tagName === "SELECT" && !event.target.hasAttribute("data-pick-nav")) {
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+    }
   });
 
-  // Плитки (D585): раскрываются на месте, открыта одна; открытая — в адресе
-  // (`?open=`), чтобы ссылка и перезагрузка её сохраняли. Остальные плитки
-  // переезжают плавно (FLIP); раскрывающаяся — вырастает из своего прежнего места.
-  var grid = document.querySelector(".rt-tiles");
-  if (!grid) return;
-  var still = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var cards = Array.prototype.slice.call(grid.querySelectorAll(".rt-tile"));
-  function openCard() { return grid.querySelector(".rt-tile.is-open"); }
-  function swap(card, on) {
-    var face = card.querySelector(".rt-tile__face");
-    card.classList.toggle("is-open", on);
-    face.setAttribute("aria-expanded", on ? "true" : "false");
-    face.value = on ? "none" : card.getAttribute("data-tile");
-    card.querySelector(".rt-tile__body").hidden = !on;
-    var text = card.querySelector(".rt-tile__more-text");
-    var next = text.getAttribute(on ? "data-close" : "data-open");
-    if (next) text.textContent = next;
-  }
-  function remember(key) {
-    var url = new URL(window.location.href);
-    url.searchParams.set("open", key || "none");
-    window.history.replaceState(null, "", url);
-    document.querySelectorAll('.rt-bar a[href*="open="]').forEach(function (link) {
-      var to = new URL(link.href, window.location.href);
-      to.searchParams.set("open", key || "none");
-      link.setAttribute("href", to.pathname + to.search);
+  document.addEventListener("change", function (event) {
+    var select = event.target.closest && event.target.closest(".rt-filter select");
+    if (!select) return;
+    var code = select.value;
+    var hardBox = select.closest("[data-rt-hard]");
+    if (hardBox) { hardBox.rtHard.filter(code); return; }
+    var block = select.closest("[data-rt-filtered]");
+    block.querySelectorAll("tr[data-country]").forEach(function (row) {
+      row.hidden = code !== "" && row.getAttribute("data-country") !== code;
     });
-  }
-  function glide(before, target) {
-    cards.forEach(function (card) {
-      var was = before.get(card);
-      var now = card.getBoundingClientRect();
-      var dx = was.left - now.left;
-      var dy = was.top - now.top;
-      if (card === target) {
-        var grew = dx >= 0 && dy >= 0 && now.right >= was.right && now.bottom >= was.bottom;
-        if (!grew) return;
-        var from = "inset(" + dy + "px " + (now.right - was.right) + "px " +
-          (now.bottom - was.bottom) + "px " + dx + "px round 12px)";
-        card.animate({ clipPath: [from, "inset(0 0 0 0 round 12px)"] },
-          { duration: 280, easing: "cubic-bezier(.2,.7,.2,1)" });
-      } else if (dx || dy) {
-        card.animate({ transform: ["translate(" + dx + "px," + dy + "px)", "none"] },
-          { duration: 280, easing: "cubic-bezier(.2,.7,.2,1)" });
-      }
-    });
-  }
-  function toggle(card) {
-    var key = card.classList.contains("is-open") ? null : card.getAttribute("data-tile");
-    var before = new Map();
-    cards.forEach(function (c) { before.set(c, c.getBoundingClientRect()); });
-    cards.forEach(function (c) { swap(c, c.getAttribute("data-tile") === key); });
-    remember(key);
-    if (still.matches) return;
-    glide(before, key ? grid.querySelector('[data-tile="' + key + '"]') : null);
-    if (key) {
-      var top = grid.querySelector('[data-tile="' + key + '"]').getBoundingClientRect().top;
-      if (top < 0 || top > window.innerHeight * 0.7) {
-        grid.querySelector('[data-tile="' + key + '"]').scrollIntoView({ block: "start", behavior: "smooth" });
-      }
-    }
-  }
-  grid.addEventListener("click", function (event) {
-    var face = event.target.closest && event.target.closest(".rt-tile__face");
-    if (!face) return;
+  });
+
+  // ── «Агрегаторы»: страна раскрывается пиццериями ────────────────────────────────
+  document.addEventListener("click", function (event) {
+    var row = event.target.closest && event.target.closest(".rt-group__row");
+    if (!row || event.defaultPrevented) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
-    toggle(face.closest(".rt-tile"));
+    var group = row.closest(".rt-group");
+    var open = group.classList.toggle("is-open");
+    var toggle = row.querySelector("[data-rt-country]");
+    if (toggle) toggle.setAttribute("aria-expanded", open ? "true" : "false");
   });
-  document.addEventListener("keydown", function (event) {
-    if (event.key !== "Escape" || event.defaultPrevented) return;
-    if (document.querySelector(".rt-cal__pick[open]")) return;
-    var card = openCard();
-    if (!card) return;
-    toggle(card);
-    card.querySelector(".rt-tile__face").focus();
+
+  // ── Переходы без перезагрузки ───────────────────────────────────────────────────
+  function page() { return document.querySelector(".rt[data-rt-section]"); }
+  var ticket = 0;
+
+  function ours(url) {
+    return url.origin === window.location.origin &&
+      (url.pathname === "/ratings" || url.pathname.indexOf("/ratings/") === 0);
+  }
+
+  function swap(html, finalUrl) {
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    var next = doc.querySelector(".rt[data-rt-section]");
+    var current = page();
+    if (!next || !current) return false;
+    var sub = doc.querySelector("[data-rt-subnav]");
+    var here = document.querySelector("[data-rt-subnav]");
+    if (sub && here) here.replaceWith(sub);
+    next.classList.add("is-loading");
+    current.replaceWith(next);
+    setUp(next);
+    document.title = doc.title;
+    // Одна перерисовка со сниженной непрозрачностью — и плавное проявление, а не вспышка.
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(function () { next.classList.remove("is-loading"); });
+    });
+    return true;
+  }
+
+  function go(target, push) {
+    var url = new URL(target, window.location.href);
+    if (!ours(url)) { window.location.href = url.href; return; }
+    var mine = ++ticket;
+    var current = page();
+    var sameSection = current && url.pathname.replace(/\/$/, "") === window.location.pathname.replace(/\/$/, "");
+    if (current) current.classList.add("is-loading");
+    fetch(url.href, { credentials: "same-origin", headers: { "X-Requested-With": "decimus-rt" } })
+      .then(function (res) {
+        if (!res.ok) throw new Error("status " + res.status);
+        return res.text().then(function (text) { return { text: text, url: res.url }; });
+      })
+      .then(function (got) {
+        if (mine !== ticket) return;
+        var landed = new URL(got.url);
+        if (!ours(landed) || !swap(got.text, landed)) throw new Error("not a ratings page");
+        if (push) window.history.pushState({ rt: 1 }, "", landed.pathname + landed.search);
+        if (!sameSection) window.scrollTo(0, 0);
+      })
+      .catch(function () {
+        if (mine === ticket) window.location.href = url.href;
+      });
+  }
+
+  function plainClick(event) {
+    return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+  }
+
+  document.addEventListener("click", function (event) {
+    var link = event.target.closest && event.target.closest("a[href]");
+    if (!link || event.defaultPrevented || !plainClick(event)) return;
+    if (link.target && link.target !== "_self") return;
+    if (!link.hasAttribute("data-rt-nav") &&
+        !(link.classList.contains("rt-cal__arrow") && link.closest(".rt-bar"))) return;
+    event.preventDefault();
+    go(link.href, true);
   });
+
+  // Выбор в списке: срез и период (`.rt-bar`) и раздел на телефоне (`data-rt-nav`).
+  // Обработчик у `document` в фазе захвата идёт раньше общего `pick.js`, который
+  // сделал бы обычный переход, — поэтому ловим первыми и не пускаем дальше.
+  document.addEventListener("change", function (event) {
+    var select = event.target;
+    if (!select.matches || !select.matches("select[data-pick-nav]") || !select.value) return;
+    if (!select.closest(".rt") || select.hasAttribute("data-drawer-open")) return;
+    event.stopImmediatePropagation();
+    go(select.value, true);
+  }, true);
+
+  // Календарь «с — по» и выбор значения среза — обычная форма отбора: собираем адрес сами.
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!form.matches || !form.matches("form.rt-bar[data-rt-auto]") || event.defaultPrevented) return;
+    event.preventDefault();
+    var url = new URL(form.getAttribute("action") || window.location.pathname, window.location.href);
+    new FormData(form).forEach(function (value, name) {
+      if (typeof value === "string" && value !== "") url.searchParams.set(name, value);
+    });
+    go(url.href, true);
+  });
+
+  window.addEventListener("popstate", function () {
+    if (page() && ours(new URL(window.location.href))) go(window.location.href, false);
+  });
+
+  // Первая запись истории помечена — к ней можно вернуться кнопкой «Назад» без перезагрузки.
+  if (page()) window.history.replaceState({ rt: 1 }, "", window.location.pathname + window.location.search);
+  setUp(document);
 })();

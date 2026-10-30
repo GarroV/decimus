@@ -1,0 +1,39 @@
+{% from "ratings/_macros.html" import dlt, cfilter, cov_cell with context %}
+{#- Карты (D660): оценки Pointer по группам сводки и — ниже — каждая пиццерия на Google и
+    Яндексе (бывшая страница охвата). Средняя по всем отзывам на конец периода. -#}
+{% set prev = previous_title or '—' %}
+<div class="rt-section">
+<section class="pk-block">
+  <header class="pk-block__head"><h2 class="pk-block__title">{{ t('ratings.layout.maps') }}</h2>
+    <span class="pk-block__hint">{{ t('ratings.maps.hint') }}</span></header>
+  {% if not maps %}<div class="rt-empty">{{ t('ratings.empty.maps') }}</div>
+  {% else %}<div class="rt-scroll"><table class="rt-maps rt-src">
+    <thead><tr><th scope="col"></th>
+      {% for p in map_providers %}<th scope="col" class="num">{{ t('ratings.maps.provider.' ~ p) }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for name in map_names %}{% set mr = maps[loop.index0] %}<tr>
+      <th scope="row">{{ name }}<small>{{ t('ratings.maps.branches_n', n=mr.scores.values()|map(attribute='branches')|max) }}</small></th>
+      {% for p in map_providers %}{% set s = mr.scores[p] %}<td class="num">{% if s.avg is none %}<span class="is-empty">—</span>{% else %}<b>{{ '%.2f'|format(s.avg) }}</b>{% if s.delta is not none %} {{ dlt(s.delta, 2) }}{% endif %}<small>{{ t('ratings.maps.reviews', n=s.reviews) }}</small>{% endif %}</td>{% endfor %}
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <div class="rt-note">{{ t('ratings.col.delta', prev=prev) }}</div>{% endif %}
+</section>
+
+<section class="pk-block" data-rt-filtered>
+  <header class="pk-block__head"><h2 class="pk-block__title">{{ t('ratings.maps.units') }}</h2>
+    <span class="pk-block__hint">{{ t('ratings.maps.units.hint') }}</span>
+    {% if map_units %}<span class="pk-block__count">{{ map_units.rows|length }}</span>{% endif %}</header>
+  {% if map_units is none %}<div class="rt-empty">{{ t('ratings.coverage.db_down') }}</div>
+  {% elif not map_units.rows %}<div class="rt-empty">{{ t('ratings.maps.units.none') }}</div>
+  {% else %}
+  {{ cfilter(map_units.rows|map(attribute='unit.country')|list) }}
+  <div class="rt-scroll"><table class="rt-maps rt-src rt-cov">
+    <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th>
+      {% for p in map_units.platforms %}<th scope="col" class="num">{{ t('ratings.maps.provider.' ~ p.key) }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for row in map_units.rows %}<tr data-country="{{ row.unit.country }}">
+      <th scope="row">{{ row.unit.name }}{% if row.is_new %} <span class="rt-chip" title="{{ t('ratings.coverage.new_title', days=30) }}">{{ t('ratings.coverage.new') }}</span>{% endif %}<small>{{ country_name(row.unit.country) }}</small></th>
+      {% for p in map_units.platforms %}<td class="num">{{ cov_cell(row.cells[p.key]) }}</td>{% endfor %}
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+</section>
+</div>
