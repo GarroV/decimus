@@ -334,7 +334,7 @@ _GENERATED_VALUE = re.compile(
 
 
 def from_generated(text: str) -> str:
-    """Разметить заготовку: пункты, заголовки, оценка и даты; слова не меняются.
+    """Разметить заготовку: заголовки, оценка и даты; описания обычным шрифтом.
 
     Только заготовки движка, не сохранённые человеком письма. Любой исходный
     текст сначала экранируется: разметку аудитора/пункта не принимаем за HTML.
@@ -344,8 +344,11 @@ def from_generated(text: str) -> str:
     for raw in text.splitlines(keepends=True):
         line = raw.rstrip("\r\n")
         ending = raw[len(line) :]
+        if line.startswith("• "):
+            out.append(_escape_text(line) + ending)
+            continue
         important = (
-            line.startswith(("Тема:", "Subject:", "• "))
+            line.startswith(("Тема:", "Subject:"))
             or line.rstrip().endswith(":")
             or (line.startswith("— ") and re.search(r"\bD[123]\b", line))
         )
