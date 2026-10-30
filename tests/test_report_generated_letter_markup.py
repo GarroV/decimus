@@ -1,4 +1,4 @@
-"""Generated letters emphasise findings/results without changing or trusting their text."""
+"""Generated letters emphasise headings/results and keep finding descriptions plain."""
 
 import pytest
 
@@ -28,10 +28,30 @@ def test_generated_letter_has_safe_emphasis_and_lossless_plain_text(
     assert "<b>87%</b>" in markup
     assert "<b>2026-10-30</b>" in markup
     assert "<b>— Зона:</b>" in markup
-    assert "<b>• R&amp;D" in markup
+    assert "• R&amp;D и t&lt;5°C, &lt;script&gt;alert(1)&lt;/script&gt;" in markup
     assert "<script>" not in markup
-    assert "<b>• Полное второе замечание.</b>" in markup
+    assert "• Полное второе замечание.\n" in markup
+    assert "<b>• " not in markup
     assert "<b>" in letter_markup.to_email_html(markup)
+
+
+@pytest.mark.parametrize(
+    ("heading", "description"),
+    [
+        ("— Зона:", "• Полное описание: 87%, 30.10.2026, D1:"),
+        ("— Zone:", "• Full description: 87%, 2026-10-30, D1:"),
+    ],
+)
+def test_finding_descriptions_never_receive_automatic_bold(heading: str, description: str) -> None:
+    text = f"{heading}\r\n{description}\r\n"
+    markup = letter_markup.from_generated(text)
+    assert markup == f"<b>{heading}</b>\r\n{description}\r\n"
+    assert letter_markup.to_plain(markup) == text
+    assert letter_markup.sanitize(markup) == markup
+    email_html = letter_markup.to_email_html(markup)
+    assert description in email_html
+    assert "<b>• " not in email_html
+    assert "<b>87%" not in email_html
 
 
 def test_plain_text_conversion_stays_plain_for_other_document_types() -> None:
