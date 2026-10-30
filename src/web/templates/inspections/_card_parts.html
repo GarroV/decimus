@@ -195,7 +195,7 @@
 {# Записи по классам — метками в шапке списка записей; класс без записей
    (D3 0) не показывается. Сводки отдельной строкой нет: одно место. #}
 {% macro level_chips(c) %}
-  {% for line in c.counts if line.count|int > 0 %}
+  {% for line in c.counts if line.count|int > 0 and line.level not in ('D0', 'R') %}
     <span class="tag tag--micro {{ line.tone }}">{{ t('card.findings.no_class') if line.level == 'NC' else line.level }}<span class="tag__note">{{ line.count }}</span></span>
   {% endfor %}
 {% endmacro %}

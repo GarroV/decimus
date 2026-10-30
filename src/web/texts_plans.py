@@ -16,8 +16,8 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
     "plans.state.accepted": {"ru": "Принят", "en": "Accepted"},
     "plans.overdue": {"ru": "Просрочен", "en": "Overdue"},
     "plans.origin.auto": {
-        "ru": "запрошен автоматически: в проверке D2 или D3",
-        "en": "requested automatically: the inspection has D2 or D3",
+        "ru": "запрошен автоматически: в проверке есть D1, D2 или D3",
+        "en": "requested automatically: the inspection has D1, D2 or D3",
     },
     "plans.origin.manual": {"ru": "запрошен вручную", "en": "requested manually"},
     "plans.version": {"ru": "Версия {n}", "en": "Version {n}"},
@@ -192,8 +192,8 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
     # --- карточка проверки и экран страны --------------------------------
     "card.plan.title": {"ru": "Экшн-план", "en": "Action plan"},
     "card.plan.request_hint": {
-        "ru": "В проверке нет D2 и D3 — план можно запросить вручную.",
-        "en": "The inspection has no D2 or D3 — a plan can be requested manually.",
+        "ru": "В проверке нет D1, D2 и D3 — план можно запросить вручную.",
+        "en": "The inspection has no D1, D2 or D3 — a plan can be requested manually.",
     },
     "card.plan.request_submit": {"ru": "Запросить экшн-план", "en": "Request action plan"},
     "card.plan.unknown": {
@@ -208,17 +208,17 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "en": "Action plans cannot be read right now.",
     },
     "card.plan.request_hint_needed": {
-        "ru": "В проверке есть D2 или D3, а запроса нет — запросите план.",
-        "en": "The inspection has D2 or D3 but no request — request a plan.",
+        "ru": "В проверке есть D1, D2 или D3, а запроса нет — запросите план.",
+        "en": "The inspection has D1, D2 or D3 but no request — request a plan.",
     },
     "card.plan.no_country": {
         "ru": "Нужен экшн-план, у точки не задана страна",
         "en": "Action plan needed, the unit has no country set",
     },
     "card.plan.no_country_hint": {
-        "ru": "В проверке есть D2 или D3, но партнёр не увидит запрос: у точки не задана "
+        "ru": "В проверке есть D1, D2 или D3, но партнёр не увидит запрос: у точки не задана "
         "страна. Задайте точке страну в справочнике — после этого запросите план здесь.",
-        "en": "The inspection has D2 or D3, but no partner will see the request: the unit "
+        "en": "The inspection has D1, D2 or D3, but no partner will see the request: the unit "
         "has no country. Set the unit's country in the directory, then request the plan here.",
     },
     # --- открытые и принятые -----------------------------------------------

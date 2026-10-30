@@ -137,17 +137,23 @@ MAILINGS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Letter with an action plan",
     },
     "mailings.tpl.slot.clean": {
-        "ru": "Письмо без существенных нарушений",
-        "en": "Letter without major violations",
+        "ru": "Письмо с информацией и рекомендациями",
+        "en": "Letter with information and recommendations",
     },
     "mailings.tpl.slot.empty": {"ru": "Письмо без нарушений", "en": "Letter without violations"},
     "mailings.tpl.slot.plan.sub": {
-        "ru": "Есть нарушения D2 или D3: письмо просит план действий.",
-        "en": "There are D2 or D3 violations: the letter asks for an action plan.",
+        "ru": "Есть D1, D2 или D3: письмо просит план действий независимо от оценки.",
+        "en": (
+            "There are D1, D2 or D3 violations: the letter asks for an action plan "
+            "regardless of grade."
+        ),
     },
     "mailings.tpl.slot.clean.sub": {
-        "ru": "Только D1: плана действий письмо не просит.",
-        "en": "D1 only: the letter does not ask for an action plan.",
+        "ru": "Только информация и рекомендации (D0/R): письмо не просит план действий.",
+        "en": (
+            "Information and recommendations only (D0/R): "
+            "the letter does not ask for an action plan."
+        ),
     },
     "mailings.tpl.slot.empty.sub": {
         "ru": "В проверке нет ни одной записи.",

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import string
 
-#: Слоты шаблона: письмо с планом действий, «чистое» (без D2 и D3), без единой записи.
+#: Слоты: план при D1/D2/D3, информационные/рекомендательные записи, без записей.
 SLOT_PLAN = "plan"
 SLOT_CLEAN = "clean"
 SLOT_EMPTY = "empty"

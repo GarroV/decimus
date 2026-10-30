@@ -1,7 +1,7 @@
 """Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168).
 
 Партнёр отвечает на проверку УК файлом плана (D265, D267). Запрос появляется
-сам при подтверждении проверки УК, в которой есть D2 или D3 (D272), со сроком
+сам при подтверждении проверки УК с любым нарушением D1/D2/D3, со сроком
 из настройки (D274), — или кнопкой УК. Партнёр кладёт версию, УК принимает её
 или возвращает с комментарием, партнёр кладёт следующую.
 
@@ -34,6 +34,7 @@ from typing import Any, Protocol
 
 import psycopg
 
+from src.domain.action_plan_rule import needs_action_plan as _needs_action_plan
 from src.domain.plan_due import plan_due_on
 from src.domain.tenants import HQ_TENANT
 
@@ -51,10 +52,6 @@ from .reach import Reach, require_reach
 from .storage import PhotoStorage, S3PhotoStorage, key_of_uri
 
 logger = logging.getLogger(__name__)
-
-#: Классы, при которых запрос появляется сам (D272) — решение владельца, а не
-#: ставка методики: вычеты и буквы по-прежнему только в `data/scoring.json`.
-TRIGGER_LEVELS = ("D2", "D3")
 
 STATUS_REQUESTED = "requested"
 STATUS_ON_REVIEW = "on_review"
@@ -106,19 +103,11 @@ def today() -> date:
 
 
 def needs_action_plan(counts: Mapping[str, Any]) -> bool:
-    """Нужен ли запрос сам: в счётчиках движка есть D2 или D3 (D272)."""
-    for level in TRIGGER_LEVELS:
-        raw = counts.get(level, 0)
-        try:
-            number = int(raw)
-        except (TypeError, ValueError) as exc:
-            raise ActionPlanError(
-                f"Счётчик {level} у проверки не число ({raw!r}) — нужен ли экшн-план, "
-                f"не понять. Счётчики кладёт движок; такой ответ — поломка, а не ноль"
-            ) from exc
-        if number > 0:
-            return True
-    return False
+    """Общее правило D1/D2/D3 с прежним типом отказа DB-интерфейса."""
+    try:
+        return _needs_action_plan(counts)
+    except ValueError as exc:
+        raise ActionPlanError(str(exc)) from exc
 
 
 def _require_status(status: str) -> str:
@@ -351,7 +340,7 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(c
   and f.id = %(id)s
 """  # noqa: E501
 
-# Карточка: у точки проверки нет страны — запрос с D2/D3 не завёлся (ревью #495).
+# Карточка: у точки проверки нет страны — запрос с нарушениями не завёлся (ревью #495).
 _UNIT_COUNTRY_MISSING_SQL = """
 select u.country is null
 from inspections i
@@ -629,10 +618,10 @@ def open_auto_request(
 
     Зовётся из `accept.py` внутри транзакции подтверждения: подтверждение без
     запроса невозможно, оба ложатся вместе или не ложатся вовсе. Возвращает id
-    запроса или `None`, если он не нужен (нет D2/D3, проверка не УК) или уже был.
+    запроса или `None`, если он не нужен (нет D1/D2/D3, проверка не УК) или уже был.
 
     Срок (`plan_due_days` методики, D617) и сроки строк читаются здесь и только
-    когда запрос нужен: кривая методика роняет подтверждение проверки с D2/D3
+    когда запрос нужен: кривая методика роняет подтверждение проверки с нарушением
     (`ConfigError` блока `domain`), а не любой проверки. Начало отсчёта — день
     подтверждения (D613: УК потом может назвать другое).
 
@@ -651,7 +640,8 @@ def open_auto_request(
         # Без страны запрос некому показать. Подтверждение не роняем: проверка
         # принята верно, а страну точке дописывают в справочнике.
         logger.warning(
-            "проверка %s с D2/D3 принята, но у её точки нет страны — запрос экшн-плана не заведён",
+            "проверка %s с нарушениями принята, но у её точки нет страны — "
+            "запрос экшн-плана не заведён",
             inspection_id,
         )
         return None
