@@ -161,14 +161,29 @@ def test_потерянный_кадр_поля_не_пропадает_молч
 
 
 def test_срок_плана_действий_читается_из_поля_с_кадром(
-    started: Callable[..., Run], report: Callable[..., Run]
+    started: Callable[..., Run], report: Callable[..., Run], workdir: Path
 ) -> None:
-    """Письмо берёт срок плана из информационного поля — форма поля его не ломает."""
+    """Поле с кадром сохраняется, а custom plan_due читает его вместо расчётного срока."""
     assert started("info", "--qid", "INF07", "--text", "2026-09-15", "--photo", "a.jpg").code == 0
-    started("add", "--qid", "PRD09", "--level", "D2", "--zone", "fridge")
+    assert started("add", "--qid", "PRD09", "--level", "D2", "--zone", "fridge").code == 0
+    expected_field = {"text": "2026-09-15", "photos": ["a.jpg"]}
+    assert info_of(workdir)["INF07"] == expected_field
+    source = (workdir / "inspection.json").read_bytes()
     r = report("letter")
     assert r.code == 0, r.text
-    assert "15.09.2026" in r.out, f"срок плана из поля не подставлен: {r.out!r}"
+    assert (
+        "Во вложении — подробный отчёт с фотографиями. По результатам проверки "
+        "просим подготовить план устранения выявленных отклонений."
+    ) in r.out
+    assert "15.09.2026" not in r.out
+    assert "сроками устранения по каждому пункту" not in r.out
+    bodies = workdir / "custom-letter.json"
+    bodies.write_text(json.dumps({"plan": "CUSTOM_REPLY_BY {plan_due}"}), encoding="utf-8")
+    custom = report("letter", "--bodies-file", str(bodies))
+    assert custom.code == 0, custom.text
+    assert custom.out.strip() == "CUSTOM_REPLY_BY 15.09.2026"
+    assert info_of(workdir)["INF07"] == expected_field
+    assert (workdir / "inspection.json").read_bytes() == source
 
 
 def test_score_json_отдаёт_поле_с_кадрами(started: Callable[..., Run]) -> None:
