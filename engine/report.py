@@ -791,8 +791,8 @@ def summary_lines(res, lang, clean):
         if f["level"] in shown:
             by_zone.setdefault(f[zk], []).append(f)
     for z, lst in by_zone.items():
-        names = "; ".join(letter_text(x, qk, lang) for x in lst[:3])
-        lines.append(f"— {z}: {names}" + (" …" if len(lst) > 3 else ""))
+        names = "; ".join(letter_text(x, qk, lang) for x in lst)
+        lines.append(f"— {z}: {names}")
     return "\n".join(lines)
 
 
