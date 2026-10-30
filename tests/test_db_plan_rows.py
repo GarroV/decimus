@@ -269,11 +269,16 @@ def test_начало_отсчёта_по_умолчанию_день_подтв
     assert запрос.due_on == СЕГОДНЯ + timedelta(days=plan_due_days())
 
 
-def test_уК_называет_начало_отсчёта_при_ручном_запросе(сеть: dict[str, str]) -> None:
-    ident = _принятая("D1")
+def test_уК_называет_начало_отсчёта_при_ручном_запросе(
+    сеть: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Старая принятая D1 без автозапроса: новую политику не бэкфиллят в историю.
+    with monkeypatch.context() as patch:
+        patch.setattr("src.db.accept.open_auto_request", lambda *_a, **_k: None)
+        ident = _принятая("D1")
     начало = СЕГОДНЯ - timedelta(days=3)
 
-    # D1 даёт электронный запрос, но авто-запроса нет: D272 только D2/D3.
+    # Ручной запрос всё так же получает строки D1 и явно названное начало.
     request_id = plans.request_plan(ident, actor=УК_АДМИН, count_from=начало, terms=_условия)
 
     запрос = _запрос(ident)
@@ -937,7 +942,7 @@ def _патч(запрос: Any, **поля: Any) -> None:
 def test_частичная_правка_строки_не_стирает_неназванное_а_пустое_стирает(
     сеть: dict[str, str],
 ) -> None:
-    # Запрос плана заводится сам только с D2/D3 (D272).
+    # Запрос плана заводится сам при любом нарушении D1/D2/D3.
     запрос = _запрос(_принятая("D2"))
     _патч(запрос, measure="Исправим", responsible="Иван", reason="давно", own_due=СЕГОДНЯ)
 

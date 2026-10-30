@@ -4,7 +4,8 @@
   словаря `c` (`app._card_context`); `panel=True` помечает формы (`data-panel-form`),
   которые `split.js` отправляет фоном, не уводя со страницы.
 
-  Каждое число здесь записано в базе движком; ни сложения, ни процентов нет.
+  Оценка и потери записаны в базе движком; здесь они не пересчитываются.
+  Счётчик каждого блока отражает только состав строк, которые в нём показаны.
   Формулировки — на языке РЕЧИ той проверки, подписи — на языке интерфейса.
 #}
 {% from "inspections/_card_parts.html" import loss_zone_list, level_chips with context %}
@@ -158,6 +159,83 @@
   </form>
 {% endmacro %}
 
+{# Одна запись: нарушения и справочные записи сохраняют фото и свои действия. #}
+{% macro finding_card(c, finding, can_proof, panel=False, informational=False) %}
+  {% set head = c.head %}
+  {% set photos = c.photos %}
+  {% set sheet = c.sheet %}
+  {% set level_tone = c.level_tone %}
+  {% set item_label = c.item_label %}
+  {% set mixed_speech = c.detail.findings|map(attribute='lang')|unique|list|length > 1 %}
+  {% set zone_names = {} %}
+  {% for zone in c.zones %}{% set _ = zone_names.update({zone.code: zone.name}) %}{% endfor %}
+  {% set entry = photos.get(finding.id) %}
+  {% set shots = entry.shown if entry else () %}
+  {% set lost = entry.missing if entry else 0 %}
+  {% set editable = can_proof and finding.level in c.levels %}
+  {% set pick = (sheet.picks|selectattr('code', 'equalto', finding.code)|first) if sheet else None %}
+  <div class="find-item{% if can_proof %} find-item--acts{% endif %}" data-finding="{{ finding.id }}">
+  {% if shots %}<details class="find-row find-row--photos"><summary class="find-row__summary">{% else %}<div class="find-row">{% endif %}
+    {% if informational %}
+      <span class="tag tag--neutral find-row__level" aria-label="{{ t('card.findings.advice') if finding.level == 'R' else t('card.info.record') }}" title="{{ t('card.findings.advice') if finding.level == 'R' else t('card.info.record') }}">i</span>
+    {% else %}
+      <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.no_class') if finding.level == 'NC' else finding.level }}</span>
+    {% endif %}
+    <span class="find-row__num">{{ finding.n }}</span>
+    <span class="find-row__main">
+      {% if can_proof and not informational %}<span class="find-row__title">{{ pick.question if pick else (t('card.findings.note') if finding.code == 'NOTE' else item_label(finding.code)) }}</span>{% endif %}
+      {% if informational or not can_proof or not shots %}<span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>{% endif %}
+      <span class="find-row__meta">
+        {% if informational and finding.level == 'R' %}{{ t('card.findings.advice') }} · {% endif %}
+        {#- Маркеры исторической записи (D332): LEGACY — пункт не назван, пустая зона — не названа. #}
+        {{ t('card.findings.note') if finding.code == 'NOTE' else (t('card.findings.no_item') if finding.code == 'LEGACY' else item_label(finding.code)) }} · {{ zone_names.get(finding.zone, finding.zone) if finding.zone else t('card.findings.no_zone') }}
+        {%- if finding.zone_unusual %} · {{ t('card.findings.zone_unusual') }}{% endif %}
+        {%- if mixed_speech %} · {{ t('card.findings.speech_lang', lang=finding.lang) }}{% endif %}
+        {%- if finding.reading_c is not none %} · {{ t('card.findings.reading', value='%g' % finding.reading_c) }}{% endif %}
+      </span>
+    </span>
+  {% if shots %}
+      {#- Часть кадров показать нечем — сказано уже в свёрнутой строке, а не только под раскрытием. #}
+      <span class="find-row__shots{% if lost %} find-row__shots--partial{% endif %}">{% if lost %}{{ t('card.findings.photos_partial', n=shots|length, lost=lost) }}{% else %}{{ t('card.findings.photos', n=shots|length) }}{% endif %}</span>
+    </summary>
+    <div class="find-row__gallery">
+      {% for shot in shots %}
+        {% set src = url('/inspections/' ~ head.id ~ '/photos/' ~ shot) %}
+        <a href="{{ src }}" data-zoom data-caption="{{ finding.text or '' }}" title="{{ finding.text or '' }}"><img src="{{ src }}" loading="lazy" alt="{{ item_label(finding.code) }} · {{ loop.index }}"></a>
+      {% endfor %}
+    </div>
+  </details>
+  {% else %}
+    {% if lost %}<span class="find-row__shots find-row__lost">{{ t('card.findings.photos_lost', n=lost) }}</span>{% endif %}
+  </div>
+  {% endif %}
+  {% if can_proof %}
+    {#- Пиктограммы у строки: правка (D535; у D0, R, без класса её нет — D624) и удаление (любой класс). -#}
+    <div class="find-item__acts">
+      {% if editable %}
+      <button class="hbtn hbtn--icon" type="button" data-proofread-edit aria-expanded="false"
+              aria-controls="edit-{{ finding.id }}" aria-label="{{ t('proofread.edit', n=finding.n) }}" title="{{ t('proofread.edit', n=finding.n) }}">{{ icon('pencil') }}</button>
+      {% endif %}
+      <button class="hbtn hbtn--icon find-item__del" type="button" data-del-open aria-expanded="false"
+              aria-controls="del-{{ finding.id }}" aria-label="{{ t('proofread.delete', n=finding.n) }}" title="{{ t('proofread.delete', n=finding.n) }}">{{ icon('trash') }}</button>
+    </div>
+    {{ delete_confirm(head, finding, panel) }}
+    {% if editable %}{{ edit_form(c, finding, panel) }}{% endif %}
+  {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro photos_toggle(findings, photos) %}
+  {% set state = namespace(has_photos=False) %}
+  {% for finding in findings %}
+    {% if photos.get(finding.id) and photos.get(finding.id).shown %}{% set state.has_photos = True %}{% endif %}
+  {% endfor %}
+  {% if state.has_photos %}
+    <button class="hbtn" type="button" data-findings-toggle aria-expanded="false"
+            data-label-open="{{ t('proofread.open_all') }}" data-label-close="{{ t('proofread.close_all') }}">{{ t('proofread.open_all') }}</button>
+  {% endif %}
+{% endmacro %}
+
 {% macro card_body(c, panel=False) %}
   {% set head = c.head %}
   {% set detail = c.detail %}
@@ -170,6 +248,12 @@
   {% set may_revise = c.may_revise %}
   {% set info = c.info %}
   {% set info_titles_found = c.info_titles_found %}
+  {% set violations = detail.findings|rejectattr('level', 'in', ('D0', 'R'))|list %}
+  {% set information = detail.findings|selectattr('level', 'in', ('D0', 'R'))|list %}
+  {% set recommendations = [] %}
+  {% for finding in detail.findings if finding.comment and finding.comment.strip() %}
+    {% set _ = recommendations.append(finding) %}
+  {% endfor %}
   {# Пункт — меткой («Порядок 13»), не кодом: решение владельца 20.10.2026. Код остаётся в формах. #}
   {% set item_label = c.item_label %}
   {% set moves = c.moves %}
@@ -218,28 +302,20 @@
       'max_photos': 10,
     } %}
   {% endif %}
-  <section class="ov-card ov-card--wide" data-findings{% if can_proof %} data-proofread data-proofread-data='{{ proof_data|tojson }}'{% endif %}>
+  <section class="ov-card ov-card--wide" data-violations data-findings{% if can_proof %} data-proofread data-proofread-data='{{ proof_data|tojson }}'{% endif %}>
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('card.findings.title') }}</div>
       {{ level_chips(c) }}
-      {% if can_proof and photos.values()|selectattr('shown')|list %}
-        <button class="hbtn" type="button" data-findings-toggle aria-expanded="false"
-                data-label-open="{{ t('proofread.open_all') }}" data-label-close="{{ t('proofread.close_all') }}">{{ t('proofread.open_all') }}</button>
-      {% endif %}
+      {% if can_proof %}{{ photos_toggle(violations, photos) }}{% endif %}
       {% if can_proof %}
         <button class="hbtn hbtn--primary" type="button" data-proofread-add aria-controls="compose-{{ head.id }}" aria-expanded="false">{{ icon('plus') }}<span>{{ t('proofread.add') }}</span></button>
       {% endif %}
-      <div class="ov-card__count">{{ head.findings_count }}</div>
+      <div class="ov-card__count">{{ violations|length }}</div>
     </div>
     {% if can_proof %}
       {{ composer(c, panel) }}
     {% endif %}
-    {% if detail.findings %}
-      {# Язык речи — только когда он в проверке не один: иначе это одна и та
-         же пометка в каждой строке. Зона — именем, а не кодом. #}
-      {% set mixed_speech = detail.findings|map(attribute='lang')|unique|list|length > 1 %}
-      {% set zone_names = {} %}
-      {% for zone in zones %}{% set _ = zone_names.update({zone.code: zone.name}) %}{% endfor %}
+    {% if violations %}
       {#
         Кадры записи (D219) — под раскрытием: развернул запись — видишь фото.
         Сжатая копия, достаточная, чтобы было видно; по щелчку открывается
@@ -249,56 +325,8 @@
       {% if not photos_known %}
         <div class="ov-card__empty">{{ t('card.findings.photos_unknown') }}</div>
       {% endif %}
-      {% for finding in by_severity(detail.findings) %}
-        {% set entry = photos.get(finding.id) %}
-        {% set shots = entry.shown if entry else () %}
-        {% set lost = entry.missing if entry else 0 %}
-        {% set editable = can_proof and finding.level in c.levels %}
-        {% set pick = (sheet.picks|selectattr('code', 'equalto', finding.code)|first) if sheet else None %}
-        <div class="find-item{% if can_proof %} find-item--acts{% endif %}" data-finding="{{ finding.id }}">
-        {% if shots %}<details class="find-row find-row--photos"><summary class="find-row__summary">{% else %}<div class="find-row">{% endif %}
-          <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.advice') if finding.level == 'R' else (t('card.findings.no_class') if finding.level == 'NC' else finding.level) }}</span>
-          <span class="find-row__num">{{ finding.n }}</span>
-          <span class="find-row__main">
-            {% if can_proof %}<span class="find-row__title">{{ pick.question if pick else (t('card.findings.note') if finding.code == 'NOTE' else item_label(finding.code)) }}</span>{% endif %}
-            {% if not can_proof or not shots %}<span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>{% endif %}
-            <span class="find-row__meta">
-              {#- Маркеры исторической записи (D332): LEGACY — пункт не назван, пустая зона — не названа. #}
-              {{ t('card.findings.note') if finding.code == 'NOTE' else (t('card.findings.no_item') if finding.code == 'LEGACY' else item_label(finding.code)) }} · {{ zone_names.get(finding.zone, finding.zone) if finding.zone else t('card.findings.no_zone') }}
-              {%- if finding.zone_unusual %} · {{ t('card.findings.zone_unusual') }}{% endif %}
-              {%- if mixed_speech %} · {{ t('card.findings.speech_lang', lang=finding.lang) }}{% endif %}
-              {%- if finding.reading_c is not none %} · {{ t('card.findings.reading', value='%g' % finding.reading_c) }}{% endif %}
-            </span>
-          </span>
-        {% if shots %}
-            {#- Часть кадров показать нечем — сказано уже в свёрнутой строке, а не только под раскрытием. #}
-            <span class="find-row__shots{% if lost %} find-row__shots--partial{% endif %}">{% if lost %}{{ t('card.findings.photos_partial', n=shots|length, lost=lost) }}{% else %}{{ t('card.findings.photos', n=shots|length) }}{% endif %}</span>
-          </summary>
-          <div class="find-row__gallery">
-            {% for shot in shots %}
-              {% set src = url('/inspections/' ~ head.id ~ '/photos/' ~ shot) %}
-              <a href="{{ src }}" data-zoom data-caption="{{ finding.text or '' }}" title="{{ finding.text or '' }}"><img src="{{ src }}" loading="lazy" alt="{{ item_label(finding.code) }} · {{ loop.index }}"></a>
-            {% endfor %}
-          </div>
-        </details>
-        {% else %}
-          {% if lost %}<span class="find-row__shots find-row__lost">{{ t('card.findings.photos_lost', n=lost) }}</span>{% endif %}
-        </div>
-        {% endif %}
-        {% if can_proof %}
-          {#- Пиктограммы у строки: правка (D535; у D0, R, без класса её нет — D624) и удаление (любой класс). -#}
-          <div class="find-item__acts">
-            {% if editable %}
-            <button class="hbtn hbtn--icon" type="button" data-proofread-edit aria-expanded="false"
-                    aria-controls="edit-{{ finding.id }}" aria-label="{{ t('proofread.edit', n=finding.n) }}" title="{{ t('proofread.edit', n=finding.n) }}">{{ icon('pencil') }}</button>
-            {% endif %}
-            <button class="hbtn hbtn--icon find-item__del" type="button" data-del-open aria-expanded="false"
-                    aria-controls="del-{{ finding.id }}" aria-label="{{ t('proofread.delete', n=finding.n) }}" title="{{ t('proofread.delete', n=finding.n) }}">{{ icon('trash') }}</button>
-          </div>
-          {{ delete_confirm(head, finding, panel) }}
-          {% if editable %}{{ edit_form(c, finding, panel) }}{% endif %}
-        {% endif %}
-        </div>
+      {% for finding in by_severity(violations) %}
+        {{ finding_card(c, finding, can_proof, panel) }}
       {% endfor %}
     {% else %}
       <div class="ov-card__empty">{{ t('card.findings.empty') }}</div>
@@ -310,13 +338,14 @@
      без вопроса не значит ничего (замечание владельца 28.09). Вопрос — из
      методики ТОЙ версии, по которой прошла проверка; код остаётся мелкой
      пометкой для сверки. Ответ дословно, на языке записи. #}
-  {% if info %}
-    <section class="ov-card ov-card--wide">
+  {% if info or information or recommendations %}
+    <section class="ov-card ov-card--wide" data-information data-findings{% if can_proof %} data-proofread data-proofread-data='{{ proof_data|tojson }}'{% endif %}>
       <div class="ov-card__head">
         <div class="ov-card__title">{{ t('card.info.title') }}</div>
-        <div class="ov-card__count">{{ info|length }}</div>
+        {% if can_proof %}{{ photos_toggle(information, photos) }}{% endif %}
+        <div class="ov-card__count">{{ info|length + information|length + recommendations|length }}</div>
       </div>
-      {% if not info_titles_found %}
+      {% if info and not info_titles_found %}
         <div class="ov-card__empty">{{ t('card.info.no_methodology') }}</div>
       {% endif %}
       {% for row in info %}
@@ -326,6 +355,18 @@
             <span class="info-row__code">{{ item_label(row.code) }}{% if info_titles_found and not row.question %} · {{ t('card.info.no_question') }}{% endif %}</span>
           </div>
           <div class="info-row__answer">{{ day(row.answer) if row.answer else '—' }}</div>
+        </div>
+      {% endfor %}
+      {% if information %}
+        {% if not photos_known %}<div class="ov-card__empty">{{ t('card.findings.photos_unknown') }}</div>{% endif %}
+        {% for finding in information %}
+          {{ finding_card(c, finding, can_proof, panel, informational=True) }}
+        {% endfor %}
+      {% endif %}
+      {% for finding in recommendations %}
+        <div class="info-row">
+          <div class="info-row__question">{{ t('card.info.recommendation_for', n=finding.n, item=item_label(finding.code)) }}</div>
+          <div class="info-row__answer" lang="{{ finding.lang }}">{{ finding.comment }}</div>
         </div>
       {% endfor %}
     </section>

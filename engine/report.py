@@ -772,7 +772,7 @@ def letter_text(f, qk, lang):
 
 
 def summary_lines(res, lang, clean):
-    """Сводка нарушений. При чистой проверке перечисляем зоны с D1, а не D2/D3."""
+    """Сводка всех нарушений D1/D2/D3, включая D1 в письме с планом."""
     c = res["counts"]
     zk = "zone_name_en" if lang == "en" else "zone_name_ru"
     qk = "question_en" if lang == "en" else "question_ru"
@@ -785,7 +785,7 @@ def summary_lines(res, lang, clean):
                  if lang == "en"
                  else f"— критических D3: {c['D3']}, значительных D2: {c['D2']}, "
                       f"незначительных D1: {c['D1']}."]
-        shown = ("D2", "D3")
+        shown = ("D1", "D2", "D3")
     by_zone = {}
     for f in res["findings"]:
         if f["level"] in shown:
@@ -931,7 +931,7 @@ def build_letter(res, lang, template=1, speech_lang=None, bodies=None):
     c = res["counts"]
     zk = "zone_name_en" if lang == "en" else "zone_name_ru"
     qk = "question_en" if lang == "en" else "question_ru"
-    clean = not c["D2"] and not c["D3"]
+    clean = not any(c[level] > 0 for level in ("D1", "D2", "D3"))
     crit = ""
     d3 = [f for f in res["findings"] if f["level"] == "D3"]
     if d3:

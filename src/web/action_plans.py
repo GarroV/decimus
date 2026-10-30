@@ -98,7 +98,7 @@ def card_plan(inspection_id: str) -> tuple[plans.PlanRequest | None, bool]:
 
 
 def needs_plan(counts: Mapping[str, Any]) -> bool:
-    """D2 или D3 в счётчиках движка — то же правило, что у автозапроса (D272)."""
+    """Любой D1/D2/D3 в счётчиках движка — то же правило, что у автозапроса."""
     return plans.needs_action_plan(counts or {})
 
 

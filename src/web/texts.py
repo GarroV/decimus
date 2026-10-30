@@ -737,7 +737,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.act.plan": {"ru": "План", "en": "Plan"},
     "card.zones.total": {"ru": "итого потеряно: {loss}", "en": "total lost: {loss}"},
     "card.zones.zeroed": {"ru": "обнулена", "en": "zeroed"},
-    "card.findings.title": {"ru": "Записи проверки", "en": "Inspection findings"},
+    "card.findings.title": {"ru": "Нарушения", "en": "Violations"},
     "card.findings.col.n": {"ru": "№", "en": "No."},
     "card.findings.col.code": {"ru": "Пункт", "en": "Item"},
     "card.findings.col.level": {"ru": "Класс", "en": "Class"},
@@ -779,10 +779,15 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "card.findings.speech_lang": {"ru": "язык речи: {lang}", "en": "speech language: {lang}"},
     "card.findings.empty": {
-        "ru": "Записей у проверки нет.",
-        "en": "This inspection has no findings.",
+        "ru": "Нарушений не зафиксировано.",
+        "en": "No violations were recorded.",
     },
-    "card.info.title": {"ru": "Информационная часть", "en": "Information part"},
+    "card.info.title": {"ru": "Информация", "en": "Information"},
+    "card.info.record": {"ru": "Информация", "en": "Information"},
+    "card.info.recommendation_for": {
+        "ru": "Рекомендация к записи №{n} · {item}",
+        "en": "Recommendation for record {n} · {item}",
+    },
     "card.findings.photos": {"ru": "Фото: {n}", "en": "Photos: {n}"},
     "card.findings.photos_lost": {"ru": "Фото недоступно: {n}", "en": "Photos unavailable: {n}"},
     "card.findings.photos_partial": {

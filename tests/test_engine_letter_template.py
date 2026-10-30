@@ -34,12 +34,12 @@ def _начать(прогон: Callable[..., Run], вид: str) -> None:
     assert r.code == 0, r.text
     if вид == "empty":
         return
-    уровень = "D2" if вид == "plan" else "D1"
+    уровень = "D2" if вид == "plan" else "D0"
     r = прогон(
         AUDIT,
         "add",
         "--qid",
-        "PRD01",
+        "PRD01" if вид == "plan" else "INF10",
         "--level",
         уровень,
         "--zone",

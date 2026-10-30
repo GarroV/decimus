@@ -165,8 +165,8 @@ def test_срок_не_печатается_у_информационных_за
 def test_письмо_чистой_проверки_без_плана_действий(
     started: Callable[..., Run], report: Callable[..., Run]
 ) -> None:
-    """Обе боевые проверки были такими, и оба письма пришлось переписывать руками."""
-    started("add", "--qid", "CLN05", "--level", "D1", "--zone", "hot_kitchen")
+    """Информационный замер сам по себе не требует плана действий."""
+    started("add", "--qid", "INF10", "--level", "D0", "--zone", "fridge")
     r = report("letter")
     assert r.code == 0, r.text
     low = r.out.lower()
@@ -191,7 +191,7 @@ def test_письмо_с_нарушениями_требует_план_дейс
 def test_английское_письмо_чистой_проверки_без_плана(
     started: Callable[..., Run], report: Callable[..., Run]
 ) -> None:
-    started("add", "--qid", "CLN05", "--level", "D1", "--zone", "hot_kitchen")
+    started("add", "--qid", "INF10", "--level", "D0", "--zone", "fridge")
     r = report("letter", "--lang", "en")
     assert r.code == 0, r.text
     low = r.out.lower()

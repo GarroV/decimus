@@ -88,8 +88,8 @@ def _проверка(*уровни: str, unit: str = ТОЧКА, tenant: str = 
 
     чат = next(_чаты)
     start_inspection(чат, unit=unit, kind="planned", report_lang="ru", tenant=tenant)
-    коды = {"D1": "PRD01", "D2": "PRD02", "D3": "PRD04"}
-    зоны = {"D1": "fridge", "D2": "cold_kitchen", "D3": "dry_storage"}
+    коды = {"D0": "INF10", "D1": "PRD01", "D2": "PRD02", "D3": "PRD04"}
+    зоны = {"D0": "fridge", "D1": "fridge", "D2": "cold_kitchen", "D3": "dry_storage"}
     for уровень in уровни:
         add_finding(чат, code=коды[уровень], level=уровень, zone=зоны[уровень], text="запись")
     return push_inspection(чат)
@@ -166,8 +166,22 @@ def test_срок_по_умолчанию_берётся_из_методики(
     assert _запрос(_принятая("D2")).due_on == СЕГОДНЯ + timedelta(days=12)
 
 
-def test_подтверждение_без_d2_d3_запроса_не_заводит(сеть: None) -> None:
+def test_подтверждение_с_d1_заводит_запрос_независимо_от_оценки(сеть: None) -> None:
+    from src.db.queries import get_inspection
+
     ident = _принятая("D1")
+    inspection = get_inspection(ident, reach=reach_of("HQ"))
+    assert inspection is not None and inspection.inspection.grade == "A"
+    запрос = _запрос(ident)
+    assert запрос.origin == "auto" and запрос.status == "requested"
+    assert запрос.due_on == СЕГОДНЯ + timedelta(days=10)
+
+
+@pytest.mark.parametrize("уровни", [(), ("D0",)])
+def test_подтверждение_без_нарушений_запроса_не_заводит(
+    сеть: None, уровни: tuple[str, ...]
+) -> None:
+    ident = _принятая(*уровни)
     assert plans.request_of_inspection(ident, reach=reach_of("HQ")) is None
 
 
@@ -410,9 +424,9 @@ def test_файл_скачивают_своя_страна_и_уК_а_чужая
 # --- ручной запрос и срок ---------------------------------------------------------
 
 
-def test_уК_запрашивает_план_по_проверке_без_d2_со_сроком(сеть: None) -> None:
+def test_уК_запрашивает_план_по_проверке_без_нарушений_со_сроком(сеть: None) -> None:
     # Arrange
-    ident = _принятая("D1")
+    ident = _принятая("D0")
     срок = СЕГОДНЯ + timedelta(days=14)
 
     # Act
@@ -423,8 +437,9 @@ def test_уК_запрашивает_план_по_проверке_без_d2_с
     assert (запрос.origin, запрос.due_on, запрос.requested_by) == ("manual", срок, "hq-lead")
 
 
-def test_второй_запрос_по_той_же_проверке_это_отказ(сеть: None) -> None:
-    ident = _принятая("D2")
+@pytest.mark.parametrize("level", ["D1", "D2", "D3"])
+def test_второй_запрос_по_той_же_проверке_это_отказ(сеть: None, level: str) -> None:
+    ident = _принятая(level)
     with pytest.raises(ActionPlanError, match="уже"):
         plans.request_plan(ident, actor="hq", due_on=СЕГОДНЯ + timedelta(days=3))
 
@@ -524,7 +539,7 @@ def test_перенос_внутри_страны_с_планом_проходи
 
 
 def test_перенос_без_плана_в_другую_страну_проходит(сеть: None) -> None:
-    ident = _принятая("D1")
+    ident = _принятая("D0")
     ереван = точка_справочника(ЧУЖАЯ_ТОЧКА, country="AM", city="Yerevan")
     assert move_inspection(
         ident, tenant="HQ", new_date=СЕГОДНЯ, new_unit_id=ереван, reason="не та", actor="hq"
@@ -652,19 +667,20 @@ def test_подпись_срока_берётся_из_транзакции(се
 # --- настройка срока читается, только когда запрос нужен (ревью #495, п.5) -----
 
 
-def test_кривая_настройка_срока_не_мешает_принять_проверку_без_d2(
+def test_кривая_настройка_срока_не_мешает_принять_проверку_без_нарушений(
     сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("AUDIT_DATA_DIR", str(методика_со_сроком(tmp_path, "семь")))
-    ident = _принятая("D1")
+    ident = _принятая("D0")
     assert _статус(admin_env, ident) == "finalized"
 
 
-def test_кривая_настройка_при_d2_это_понятный_отказ_и_проверка_ждёт(
-    сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str, tmp_path: Path
+@pytest.mark.parametrize("level", ["D1", "D2", "D3"])
+def test_кривая_настройка_при_нарушении_это_понятный_отказ_и_проверка_ждёт(
+    сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str, tmp_path: Path, level: str
 ) -> None:
     monkeypatch.setenv("AUDIT_DATA_DIR", str(методика_со_сроком(tmp_path, "семь")))
-    ident = _проверка("D2")
+    ident = _проверка(level)
 
     with pytest.raises(AcceptError, match="запрос экшн-плана, а он не завёлся") as отказ:
         accept_inspection(ident, tenant="HQ", actor="garva")
