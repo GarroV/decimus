@@ -2,10 +2,33 @@
 
 import json
 from collections.abc import Callable
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
 from conftest import AUDIT, REPORT, Run, run_engine
+
+PLAN_FOOTER = {
+    "ru": (
+        "Во вложении — подробный отчёт с фотографиями. По результатам проверки "
+        "просим подготовить план устранения выявленных отклонений."
+    ),
+    "en": (
+        "Attached is the detailed report with photographs. Following the inspection, "
+        "please prepare an action plan to address the identified deviations."
+    ),
+}
+
+CLEAN_FOOTER = {
+    "ru": (
+        "Нарушений не зафиксировано. Во вложении — подробный отчёт с фотографиями. "
+        "План устранения нарушений не требуется."
+    ),
+    "en": (
+        "No violations were recorded. Attached is the detailed report with photographs. "
+        "No action plan to address violations is required."
+    ),
+}
 
 
 @pytest.fixture
@@ -81,7 +104,7 @@ def test_plan_and_stored_slot_follow_violation_classes_not_grade(
     assert json.loads(before.out)["grade"] == grade
     letter = invoke(REPORT, "letter", "--lang", lang, "--template", template)
     assert letter.code == 0, letter.text
-    request = "Просим до" if lang == "ru" else "Please send us your action plan by"
+    request = PLAN_FOOTER[lang]
     assert (request in letter.out) is (slot == "plan")
     if grade == "C":
         assert (
@@ -90,16 +113,29 @@ def test_plan_and_stored_slot_follow_violation_classes_not_grade(
             else "This is below standard and requires an action plan."
         ) in letter.out
     if slot == "plan":
+        assert letter.out.count(PLAN_FOOTER[lang]) == 1
+        assert "Просим до" not in letter.out
+        assert "сроками устранения по каждому пункту" not in letter.out
+        assert "Нарушения D2 ждём закрытыми" not in letter.out
+        assert "Please send us your action plan by" not in letter.out
+        assert "a deadline for every item" not in letter.out
+        assert "D2 violations are expected to be closed" not in letter.out
+        assert "31.08.2026" not in letter.out
         assert "Плана действий не ждём" not in letter.out
         assert "No action plan is expected" not in letter.out
         for evidence in observations:
             assert evidence in letter.out
+    elif slot == "clean":
+        assert letter.out.count(CLEAN_FOOTER[lang]) == 1
+        assert "перечисленные отклонения" not in letter.out
+        assert "the deviations listed above" not in letter.out
+        assert "в сроки, указанные в отчёте" not in letter.out
+        assert "within the deadlines stated in the report" not in letter.out
+        assert "31.08.2026" not in letter.out
     bodies_file = tmp_path / "bodies.json"
-    bodies_file.write_text(
-        json.dumps(
-            {name: f"SELECTED_{name.upper()} {{unit}}" for name in ("plan", "clean", "empty")}
-        )
-    )
+    bodies = {name: f"SELECTED_{name.upper()} {{unit}}" for name in ("plan", "clean", "empty")}
+    bodies["plan"] += " CUSTOM_REPLY_BY {plan_due}"
+    bodies_file.write_text(json.dumps(bodies))
     stored = invoke(
         REPORT,
         "letter",
@@ -111,7 +147,12 @@ def test_plan_and_stored_slot_follow_violation_classes_not_grade(
         str(bodies_file),
     )
     assert stored.code == 0, stored.text
-    assert stored.out.strip() == f"SELECTED_{slot.upper()} Synthetic"
+    expected_stored = f"SELECTED_{slot.upper()} Synthetic"
+    if slot == "plan":
+        configured_days = json.loads((data_copy / "scoring.json").read_text())["plan_due_days"]
+        due = date(2026, 8, 21) + timedelta(days=configured_days)
+        expected_stored += f" CUSTOM_REPLY_BY {due:%d.%m.%Y}"
+    assert stored.out.strip() == expected_stored
     after = invoke(AUDIT, "score", "--json")
     assert after.code == 0, after.text
     assert json.loads(after.out) == json.loads(before.out)

@@ -182,10 +182,12 @@ def test_письмо_с_нарушениями_требует_план_дейс
     r = report("letter")
     assert r.code == 0, r.text
     low = r.out.lower()
-    assert "просим до" in low and "план действий" in low, (
+    assert "просим подготовить план устранения выявленных отклонений" in low, (
         "при D2 письмо обязано требовать план действий"
     )
-    assert "31.08.2026" in r.out, "срок плана (дата проверки + 10 дней) не подставлен"
+    assert "во вложении — подробный отчёт с фотографиями" in low
+    assert "31.08.2026" not in r.out, "срок ответа планом не печатается во встроенном письме"
+    assert "сроками устранения по каждому пункту" not in low
 
 
 def test_английское_письмо_чистой_проверки_без_плана(
@@ -206,9 +208,11 @@ def test_английское_письмо_с_нарушениями_требу�
     r = report("letter", "--lang", "en")
     assert r.code == 0, r.text
     low = r.out.lower()
-    assert "please send us your action plan" in low, (
+    assert "please prepare an action plan to address the identified deviations" in low, (
         "при D2 английское письмо обязано требовать план"
     )
+    assert "attached is the detailed report with photographs" in low
+    assert "a deadline for every item" not in low
 
 
 def test_шаблоны_письма_разные_а_не_один_с_вставками(

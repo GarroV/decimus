@@ -627,9 +627,7 @@ LETTER_PLAN = {
 
 {good_block}Что зафиксировали:
 {summary_lines}
-{critical_block}Подробный отчёт с фотофиксацией, разбивкой по зонам и сроками устранения по каждому пункту — во вложении.
-
-Просим до {plan_due} прислать план действий по устранению: ответственный и дата по каждому пункту. Нарушения D2 ждём закрытыми в срок, указанный в отчёте, D3 — немедленно, с подтверждением фотографией.
+{critical_block}Во вложении — подробный отчёт с фотографиями. По результатам проверки просим подготовить план устранения выявленных отклонений.
 
 {end_block}Спасибо за работу. Готовы обсудить любой пункт отчёта и помочь с приоритизацией.""",
     "en": """Subject: Inspection results — {unit}, {date}: grade {grade} ({pct}%)
@@ -642,9 +640,7 @@ The final grade is {grade} ({pct}%).{grade_note}
 
 {good_block}What we recorded:
 {summary_lines}
-{critical_block}The full report — photo evidence, the breakdown by zone and a deadline for every item — is attached.
-
-Please send us your action plan by {plan_due}, with an owner and a date for each item. D2 violations are expected to be closed within the deadline stated in the report; D3 violations immediately, confirmed with a photo.
+{critical_block}Attached is the detailed report with photographs. Following the inspection, please prepare an action plan to address the identified deviations.
 
 {end_block}Thank you for your work. We are happy to walk through any item in the report and help with prioritisation.""",
 }
@@ -659,7 +655,7 @@ LETTER_CLEAN = {
 
 {good_block}Что отметили:
 {summary_lines}
-{critical_block}Подробный отчёт с фотофиксацией, разбивкой по зонам и сроками устранения по каждому пункту — во вложении. Плана действий не ждём: перечисленные отклонения устраняются в рабочем порядке в сроки, указанные в отчёте.
+{critical_block}Нарушений не зафиксировано. Во вложении — подробный отчёт с фотографиями. План устранения нарушений не требуется.
 
 {end_block}Спасибо за работу. Готовы обсудить любой пункт отчёта.""",
     "en": """Subject: Inspection results — {unit}, {date}: grade {grade} ({pct}%)
@@ -672,14 +668,13 @@ The final grade is {grade} ({pct}%).{grade_note} No major (D2) or critical (D3) 
 
 {good_block}What we noted:
 {summary_lines}
-{critical_block}The full report — photo evidence, the breakdown by zone and a deadline for every item — is attached. No action plan is expected: the deviations listed above are closed in the normal course of work within the deadlines stated in the report.
+{critical_block}No violations were recorded. Attached is the detailed report with photographs. No action plan to address violations is required.
 
 {end_block}Thank you for your work. We are happy to walk through any item in the report.""",
 }
 # Проверка без единой записи. Отдельный шаблон, а не «чистое письмо с нулём»:
-# у чистого письма есть блок «Что отметили» и обещание, что перечисленные
-# отклонения устраняются в рабочем порядке — при нуле находок и то и другое
-# ложь, и партнёр идёт искать в отчёте нарушения, которых нет (T128).
+# блок «Что отметили» при отсутствии записей заставляет партнёра искать
+# в отчёте находки, которых нет (T128).
 LETTER_EMPTY = {
     "ru": """Тема: Результаты проверки — {unit}, {date}: оценка {grade} ({pct}%)
 
