@@ -33,6 +33,7 @@ from werkzeug.wrappers import Response
 from src.db import mailing_cc
 from src.db.errors import DbError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.report.letters import LetterError
 
 from . import auth, guard
 from . import inspections as data
@@ -344,6 +345,21 @@ def install(app: Flask, conf: Settings) -> None:
 
         try:
             токен = _токен_вошедшего(реквизиты, код)
+            отчёт = data.ensure_report(detail, reach=auth.current_reach())
+            файл = data.report_bytes(отчёт)
+            if not файл.startswith(b"%PDF-"):
+                raise LetterError("отчёт пуст или не является PDF")
+        except MailAccountMismatchError as сбой:
+            logger.warning("черновик письма не создан: %s", сбой)
+            return к_письму(inspection_id, lang=письмо_на, исход=OUTCOME_WRONG_ACCOUNT)
+        except GoogleMailError as сбой:
+            logger.warning("доступ к Gmail для черновика не получен: %s", сбой)
+            return к_письму(inspection_id, lang=письмо_на, исход="failed")
+        except (DbError, LetterError):
+            logger.warning("PDF для черновика проверки %s недоступен", inspection_id)
+            return к_письму(inspection_id, lang=письмо_на, исход="pdf_failed")
+
+        try:
             create_draft(
                 токен,
                 to=detail.inspection.contact,
@@ -354,6 +370,7 @@ def install(app: Flask, conf: Settings) -> None:
                     lang=письмо_на,
                 ),
                 body=записанное.body,
+                attachments=((data.report_name(detail.inspection), файл, "application/pdf"),),
             )
         except MailAccountMismatchError as сбой:
             logger.warning("черновик письма не создан: %s", сбой)

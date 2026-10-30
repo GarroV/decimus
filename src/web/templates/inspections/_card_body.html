@@ -218,10 +218,14 @@
       'max_photos': 10,
     } %}
   {% endif %}
-  <section class="ov-card ov-card--wide"{% if can_proof %} data-proofread data-proofread-data='{{ proof_data|tojson }}'{% endif %}>
+  <section class="ov-card ov-card--wide" data-findings{% if can_proof %} data-proofread data-proofread-data='{{ proof_data|tojson }}'{% endif %}>
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('card.findings.title') }}</div>
       {{ level_chips(c) }}
+      {% if can_proof and photos.values()|selectattr('shown')|list %}
+        <button class="hbtn" type="button" data-findings-toggle aria-expanded="false"
+                data-label-open="{{ t('proofread.open_all') }}" data-label-close="{{ t('proofread.close_all') }}">{{ t('proofread.open_all') }}</button>
+      {% endif %}
       {% if can_proof %}
         <button class="hbtn hbtn--primary" type="button" data-proofread-add aria-controls="compose-{{ head.id }}" aria-expanded="false">{{ icon('plus') }}<span>{{ t('proofread.add') }}</span></button>
       {% endif %}
@@ -250,12 +254,14 @@
         {% set shots = entry.shown if entry else () %}
         {% set lost = entry.missing if entry else 0 %}
         {% set editable = can_proof and finding.level in c.levels %}
+        {% set pick = (sheet.picks|selectattr('code', 'equalto', finding.code)|first) if sheet else None %}
         <div class="find-item{% if can_proof %} find-item--acts{% endif %}" data-finding="{{ finding.id }}">
         {% if shots %}<details class="find-row find-row--photos"><summary class="find-row__summary">{% else %}<div class="find-row">{% endif %}
           <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.advice') if finding.level == 'R' else (t('card.findings.no_class') if finding.level == 'NC' else finding.level) }}</span>
           <span class="find-row__num">{{ finding.n }}</span>
           <span class="find-row__main">
-            <span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>
+            {% if can_proof %}<span class="find-row__title">{{ pick.question if pick else (t('card.findings.note') if finding.code == 'NOTE' else item_label(finding.code)) }}</span>{% endif %}
+            {% if not can_proof or not shots %}<span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>{% endif %}
             <span class="find-row__meta">
               {#- Маркеры исторической записи (D332): LEGACY — пункт не назван, пустая зона — не названа. #}
               {{ t('card.findings.note') if finding.code == 'NOTE' else (t('card.findings.no_item') if finding.code == 'LEGACY' else item_label(finding.code)) }} · {{ zone_names.get(finding.zone, finding.zone) if finding.zone else t('card.findings.no_zone') }}
@@ -271,7 +277,7 @@
           <div class="find-row__gallery">
             {% for shot in shots %}
               {% set src = url('/inspections/' ~ head.id ~ '/photos/' ~ shot) %}
-              <a href="{{ src }}" data-zoom><img src="{{ src }}" loading="lazy" alt="{{ item_label(finding.code) }} · {{ loop.index }}"></a>
+              <a href="{{ src }}" data-zoom data-caption="{{ finding.text or '' }}" title="{{ finding.text or '' }}"><img src="{{ src }}" loading="lazy" alt="{{ item_label(finding.code) }} · {{ loop.index }}"></a>
             {% endfor %}
           </div>
         </details>

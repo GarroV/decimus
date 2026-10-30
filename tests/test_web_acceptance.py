@@ -22,6 +22,7 @@ from src.db.errors import AcceptError, ReviseError
 from src.db.inspection_edits import Editor
 from src.db.previews import FindingShots
 from src.domain.tenants import canonical_tenant
+from src.report.letter_markup import to_plain
 from src.report.letters import Papers
 from src.web import country as country_data
 from src.web import inspections as data
@@ -358,7 +359,9 @@ def test_письмо_открывается_и_у_ждущей_приёмки(
 
     # Assert — смотреть можно; отказ сохранения и почты объясняется словами.
     assert ответ.status_code == 200
-    assert "Your inspection scored 92%." in ответ.get_data(as_text=True)
+    editor = re.search(r"data-letter-editor[^>]*>(.*?)</div>", ответ.get_data(as_text=True), re.S)
+    assert editor is not None
+    assert "Your inspection scored 92%." in to_plain(editor.group(1))
     for отказ in ("saved=on_review", "gmail=on_review"):
         страница = стенд.get(f"/inspections/x/letter?{отказ}").get_data(as_text=True)
         assert "Проверка ещё не подтверждена" in страница, отказ

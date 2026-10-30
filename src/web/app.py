@@ -61,6 +61,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.domain.uploads import MAX_UPLOAD_BYTES
 from src.report import letter_markup
 from src.report.info_titles import FOUND
+from src.report.letters import LetterError
 
 from . import (
     action_plans,
@@ -805,11 +806,11 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.get(f"{section('registry').path}/<inspection_id>/report")
     def report(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Готовый PDF проверки — тот самый файл, что получил аудитор (D204).
+        """Актуальный PDF проверки; предыдущие сохранённые версии остаются историей.
 
-        Пересборки нет намеренно: она дала бы второй документ, и вопрос «что
-        на руках у партнёра» снова остался бы без ответа (T336). Проверка
-        спрашивается ДО файла — она же проверяет арендатора.
+        Проверка источника выполняется до ETag: правки записей, шапки и кадров
+        должны попасть в выдаваемый файл. Legacy остаётся исходным документом.
+        Охват проверки сверяется до чтения файла и до любой пересборки.
         """
         lang = _lang(conf)
         detail = data.load_card(inspection_id, reach=auth.current_reach())
@@ -817,10 +818,14 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             return render_template("inspections/not_found.html"), 404
         try:
             ref = data.load_report(inspection_id, reach=auth.current_reach())
+            if not detail.inspection.is_legacy:
+                ref = data.ensure_report(detail, reach=auth.current_reach())
             if ref is None:
                 return _card_refusal(
                     inspection_id, conf=conf, text=t("card.report.none", lang), status=404
                 )
+            # Сохранённый предварительный PDF мог предшествовать правкам на
+            # приёмке. Проверяем исходный снимок ДО ETag и выдачи байтов.
             # Метка версии — по ссылке на файл, а не по его байтам: совпала —
             # хранилище не читается вовсе (#697, ~300 мс на чтение). Новый отчёт
             # (финальный после приёмки, D203) — новая ссылка и новая метка.
@@ -831,7 +836,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 не_изменён.headers["Cache-Control"] = REPORT_CACHE_CONTROL
                 return не_изменён
             файл = data.report_bytes(ref)
-        except DbError as exc:
+        except (DbError, LetterError) as exc:
             logger.warning("отчёт проверки %s не выдан: %s", inspection_id, exc)
             return _card_refusal(
                 inspection_id, conf=conf, text=t("card.report.failed", lang), status=503
@@ -1513,7 +1518,7 @@ def _letter_view(detail: Any, *, lang: str) -> dict[str, Any]:
     разметка = (
         letter_markup.sanitize(записанное.body)
         if правится and записанное is not None
-        else letter_markup.from_plain(собранное.text or "")
+        else letter_markup.from_generated(собранное.text or "")
     )
     return dict(
         letter=собранное,
@@ -2739,13 +2744,8 @@ def report_etag(ref: ReportRef) -> str:
 
 
 def _report_name(head: InspectionRow) -> str:
-    """Имя файла отчёта для человека: точка и дата, как их ищут в папке загрузок.
-
-    Кавычки и переводы строки из названия точки убраны: название приходит из
-    справочника, и в заголовке ответа оно не должно становиться разметкой.
-    """
-    точка = "".join(знак for знак in head.unit_name if знак.isprintable() and знак not in '"\\/')
-    return f"{точка.strip() or 'inspection'} {head.inspection_date}.pdf"
+    """Имя PDF для скачивания и вложения берётся из одного правила."""
+    return data.report_name(head)
 
 
 def _kind_title(code: str, lang: str) -> str:

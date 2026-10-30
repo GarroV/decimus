@@ -405,7 +405,11 @@ def _blank_wordings(detail: InspectionDetail) -> list[int]:
 
 
 def state_json(
-    detail: InspectionDetail, *, lang: str, photos: Mapping[int, Sequence[str]] | None = None
+    detail: InspectionDetail,
+    *,
+    lang: str,
+    photos: Mapping[int, Sequence[str]] | None = None,
+    info_photos: Mapping[str, Sequence[str]] | None = None,
 ) -> str:
     """Записанная проверка в форме файла состояния, который читает движок.
 
@@ -465,9 +469,14 @@ def state_json(
                 for находка in detail.findings
             ],
             # Форма поля — пара «текст + кадры», та же, что пишет движок с T172.
-            # Кадры пусты по той же причине, что и у находок: письмо их не
-            # печатает, а лежат они в хранилище за ссылками.
-            "info": {поле.code: {"text": поле.text, "photos": []} for поле in detail.info},
+            # Письмо кадров не печатает; сборщик PDF передаёт локальные ссылки.
+            "info": {
+                поле.code: {
+                    "text": поле.text,
+                    "photos": list((info_photos or {}).get(поле.code, ())),
+                }
+                for поле in detail.info
+            },
         },
         ensure_ascii=False,
     )

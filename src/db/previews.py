@@ -118,6 +118,45 @@ class FindingShots:
     missing: int
 
 
+@dataclass(frozen=True)
+class ReportPhoto:
+    """Неизменяемый источник кадра для PDF, включая информационные поля."""
+
+    id: str
+    finding_n: int | None
+    info_code: str | None
+    storage_path: str | None
+    preview_path: str | None
+
+
+_REPORT_PHOTOS_SQL = """
+select p.id, f.n, answer.code, p.storage_path, p.preview_path
+from photos p
+join inspections i on i.id = p.inspection_id
+join units u on u.id = i.unit_id
+left join findings f on f.id = p.finding_id
+left join inspection_info answer on answer.id = p.info_id
+where p.inspection_id = %(id)s and p.purged_at is null
+  and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+order by p.created_at, p.id
+"""
+
+
+def report_photos(inspection_id: str, *, reach: Reach) -> tuple[ReportPhoto, ...]:
+    """Источники всех активных кадров видимой проверки; снятые кадры не возвращаются."""
+    return tuple(
+        ReportPhoto(
+            str(row[0]),
+            int(row[1]) if row[1] is not None else None,
+            str(row[2]) if row[2] is not None else None,
+            str(row[3]) if row[3] is not None else None,
+            str(row[4]) if row[4] is not None else None,
+        )
+        for row in _read(_REPORT_PHOTOS_SQL, {"id": inspection_id, **require_reach(reach).params()})
+    )
+
+
 def finding_previews(inspection_id: str, *, reach: Reach) -> dict[str, FindingShots]:
     """Кадры по записям: идентификатор записи → показываемые кадры по порядку и
     число кадров без копии. Запись без единого кадра в словарь не попадает."""

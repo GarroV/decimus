@@ -33,7 +33,7 @@ from src.db.reach import Reach, reach_of
 from src.domain.models import TEXT_LANGS
 from src.domain.permissions import SIDE_HQ, side_of
 from src.domain.tenants import HQ_TENANT, canonical_tenant
-from src.report import info_titles, letter_markup, plan_terms
+from src.report import current_pdf, info_titles, letter_markup, plan_terms
 from src.report.letters import TEMPLATES as letter_templates
 from src.report.letters import LetterError
 from src.report.letters import build as build_letter
@@ -478,9 +478,19 @@ def load_report(inspection_id: str, *, reach: Reach) -> reports.ReportRef | None
     return reports.latest_report(inspection_id, reach=reach)
 
 
+def report_name(head: InspectionRow) -> str:
+    """Единое безопасное имя PDF для скачивания и почтового вложения."""
+    return current_pdf.report_name(head)
+
+
 def report_bytes(ref: reports.ReportRef) -> bytes:
-    """Сам файл отчёта из хранилища — ТОТ, что получил аудитор, без пересборки."""
+    """Байты выбранной сохранённой версии; актуальность проверяет `ensure_report`."""
     return reports.fetch_report(ref)
+
+
+def ensure_report(detail: InspectionDetail, *, reach: Reach) -> reports.ReportRef:
+    """Общий актуальный PDF для скачивания и почты; старые версии остаются историей."""
+    return current_pdf.ensure_report(detail, reach=reach)
 
 
 def load_previews(inspection_id: str, *, reach: Reach) -> dict[str, previews.FindingShots]:

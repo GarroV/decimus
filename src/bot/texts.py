@@ -1267,6 +1267,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Письмо партнёру:\n\n{letter}",
         "en": "Letter to the partner:\n\n{letter}",
     },
+    "finish.letter_file": {
+        "ru": "Письмо длиннее сообщения Telegram. Полный текст — в приложенном файле.",
+        "en": (
+            "The letter exceeds Telegram's message limit. The complete text is attached as a file."
+        ),
+    },
     # Последнее сообщение после отчёта (27.10.2026, текст владельца). Без адреса веба
     # стенда — второй вариант без ссылки: сообщение без ссылки лучше падения.
     "finish.preliminary": {

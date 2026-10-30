@@ -18,6 +18,7 @@ PDF собирается при завершении и уходит аудит�
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
@@ -61,7 +62,9 @@ class StoredReport:
     already: bool
 
 
-def report_object_key(inspection_id: str, digest: str) -> str:
+def report_object_key(
+    inspection_id: str, digest: str, *, source_fingerprint: str | None = None
+) -> str:
     """Ключ отчёта в хранилище — только из идентификаторов.
 
     Ни названия точки, ни даты, ни имени аудитора: сущности связываются кодами
@@ -71,6 +74,10 @@ def report_object_key(inspection_id: str, digest: str) -> str:
     Отпечаток в имени, а не порядковый номер: он делает ключ повторяемым, и
     повторная выгрузка того же файла попадает в тот же объект, а не в новый.
     """
+    if source_fingerprint is not None:
+        if re.fullmatch(r"[0-9a-f]{64}", source_fingerprint) is None:
+            raise PushError("Неверный отпечаток исходных данных отчёта")
+        return f"inspections/{inspection_id}/reports/{source_fingerprint}/{digest}.pdf"
     return f"inspections/{inspection_id}/reports/{digest}.pdf"
 
 
@@ -80,12 +87,16 @@ def upload_report(
     data: bytes,
     storage: PhotoStorage | None = None,
     content_type: str = REPORT_CONTENT_TYPE,
+    source_fingerprint: str | None = None,
 ) -> StoredReport:
     """Положить готовый отчёт в хранилище и записать ссылку на него.
 
     Пустые байты — отказ, а не пустой объект: отчёт нулевого размера выглядит
     в истории как сохранённый документ и обнаруживается ровно тогда, когда его
     открывает человек.
+
+    `source_fingerprint` привязывает файл к снимку проверки и кадров. Такой
+    отпечаток хранится в ключе объекта; другой снимок не подменяет старую версию.
 
     `storage` подменяется только проверками; в работе драйвер собирается из
     окружения (`S3_*`), как и у кадров.
@@ -99,7 +110,7 @@ def upload_report(
     )
 
     digest = hashlib.sha256(data).hexdigest()[:32]
-    key = report_object_key(inspection_id, digest)
+    key = report_object_key(inspection_id, digest, source_fingerprint=source_fingerprint)
 
     with connection(settings.dsn) as conn:
         with conn.cursor() as cur:

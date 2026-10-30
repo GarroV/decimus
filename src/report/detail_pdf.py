@@ -1,4 +1,4 @@
-"""PDF-отчёт по записанной в базе проверке — для загруженной «текущей» (D334).
+"""PDF-отчёт из актуального снимка проверки в базе, по её версии методики.
 
 У проверки из бота отчёт собирается из состояния чата (`build.build_pdf`). У
 загруженной через MCP чата нет, есть только строки базы, поэтому состояние для
@@ -41,6 +41,7 @@ def build_bytes(
     lang: str | None,
     papers: Papers,
     photos: Mapping[int, Sequence[bytes]] | None = None,
+    info_photos: Mapping[str, Sequence[bytes]] | None = None,
 ) -> bytes:
     """Собрать PDF по записанной проверке и вернуть его байты — или `LetterError`."""
     язык = _lang(detail, lang)
@@ -48,6 +49,7 @@ def build_bytes(
     with tempfile.TemporaryDirectory(prefix="mcp-report-") as рядом:
         состояние = Path(рядом) / "inspection.json"
         ссылки: dict[int, list[str]] = {}
+        инфо_ссылки: dict[str, list[str]] = {}
         карта: dict[str, str] = {}
         for n, кадры in (photos or {}).items():
             for i, байты in enumerate(кадры, 1):
@@ -55,7 +57,15 @@ def build_bytes(
                 файл_кадра.write_bytes(байты)
                 ссылки.setdefault(n, []).append(файл_кадра.name)
                 карта[файл_кадра.name] = str(файл_кадра)
-        состояние.write_text(state_json(detail, lang=язык, photos=ссылки), encoding="utf-8")
+        for field_index, (code, frames) in enumerate((info_photos or {}).items(), 1):
+            for frame_index, data in enumerate(frames, 1):
+                photo_file = Path(рядом) / f"info-{field_index}-{frame_index}.jpg"
+                photo_file.write_bytes(data)
+                инфо_ссылки.setdefault(code, []).append(photo_file.name)
+                карта[photo_file.name] = str(photo_file)
+        состояние.write_text(
+            state_json(detail, lang=язык, photos=ссылки, info_photos=инфо_ссылки), encoding="utf-8"
+        )
         аргументы = ["pdf", f"--lang={язык}", "--out", str(Path(рядом) / REPORT_FILE)]
         if карта:
             файл_карты = Path(рядом) / "photo-map.json"
@@ -74,6 +84,6 @@ def build_bytes(
                 f"Движок не собрал отчёт: {_clean(вывод + ошибки, каталог, состояние.parent)}"
             )
         данные = файл.read_bytes()
-    if not данные:
-        raise LetterError("Движок отчитался об успехе, но отчёт пуст")
+    if not данные.startswith(b"%PDF-"):
+        raise LetterError("Движок отчитался об успехе, но файл не является PDF")
     return данные

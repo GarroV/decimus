@@ -1078,6 +1078,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 }
 .find-row__main { flex: 1; min-width: 12rem; }
 .find-row__text { font-size: var(--fs-dense); line-height: var(--lh-body); }
+.find-row__title { display: block; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: var(--w-semibold); }
 .find-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-2); }
 
 /* Запись с кадрами раскрывается (D219): строка та же, что у записи без них,
@@ -1113,7 +1114,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 /* Фото записи раскрывается поверх страницы по клику, ещё клик — свернуть (D534). */
 .zoom {
   position: fixed; inset: 0; z-index: 90;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-5);
   padding: var(--space-5);
   border: 0; margin: 0;
   background: var(--scrim, rgba(0, 0, 0, 0.78));
@@ -1121,10 +1122,11 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 }
 .zoom__img {
   display: block;
-  max-width: 100%; max-height: 100%;
+  max-width: 100%; max-height: 100%; min-height: 0; object-fit: contain;
   width: auto; height: auto;
   border-radius: var(--r-control);
 }
+.zoom__caption { flex: none; max-width: 60rem; max-height: 25vh; overflow-y: auto; color: var(--ink-inverse); font: inherit; font-size: var(--fs-body); line-height: var(--lh-body); text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
 .zoom:focus-visible { outline: 2px solid var(--line-2); outline-offset: -4px; }
 a[data-zoom] { cursor: zoom-in; }
 .find-row__gallery img {
