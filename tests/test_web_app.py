@@ -142,7 +142,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     # Раздел действий УК (волна 2) читает запросы экшн-плана из базы.
     monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: action_plans.EMPTY)
     # Сводка рейтингов читает базу; её путь на настоящей базе — test_web_ratings_flow.
-    monkeypatch.setattr(ratings_screen, "render_summary", lambda *_a, **_k: "<p>сводка</p>")
+    monkeypatch.setattr(ratings_screen, "render_section", lambda *_a, **_k: "<p>сводка</p>")
     роль = getattr(request, "param", "developer")
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
     with собрать(tenant=ТЕНАНТ).test_client() as client:

@@ -175,6 +175,8 @@
                  href="{{ url(item.path) }}?lang={{ lang }}"
                  title="{{ title }}{% if not item.built %} · {{ t('nav.wip') }}{% endif %}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</a>
             {% endif %}
+            {#- Подменю раздела (D660): раскрыто, пока открыт сам раздел; его собирает экран. -#}
+            {% if item.key == current_key and subnav is defined and subnav %}{% include "ratings/_subnav.html" %}{% endif %}
           {% endfor %}
         </div>
 

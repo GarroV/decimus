@@ -45,7 +45,6 @@ def экран(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(screen.read, "open_issues", lambda: ())
     monkeypatch.setattr(screen.read, "hard_rules", lambda: ())
     monkeypatch.setattr(screen.read, "settings", dict)
-    monkeypatch.setattr(screen.read, "layout_rows", lambda: ())
     monkeypatch.setattr(state, "states", lambda: данные["состояние"])
     monkeypatch.setattr(state, "open_request", lambda: данные["открытая"])
 

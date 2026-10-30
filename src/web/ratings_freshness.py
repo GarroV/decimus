@@ -121,3 +121,63 @@ def build(
         logger.warning("Свежесть источников рейтингов не прочиталась", exc_info=True)
         return None
     return lines_of(rows, lang, agg_names)
+
+
+#: Источники раздела (D660): по ним считается точка в подменю и строка в шапке. У
+#: «Стабильно ниже порога» и «Девелоперов и стран» своего источника нет — берётся худший
+#: из тех, из которых они сделаны; у «Оценок клиентов» источника ещё нет — точки нет.
+SECTION_SOURCES: dict[str, tuple[str, ...]] = {
+    "rs": (fresh.KIND_RS,),
+    "rko": (fresh.KIND_RKO,),
+    "maps": (fresh.KIND_MAPS,),
+    "agg": (fresh.KIND_AGG,),
+    "risk": (fresh.KIND_RS, fresh.KIND_RKO, fresh.KIND_AGG),
+    "compare": (fresh.KIND_RS, fresh.KIND_RKO),
+}
+
+
+def safe_rows(now: datetime | None = None) -> tuple[fresh.Row, ...]:
+    """Строки свежести; база не ответила — пусто и след в журнале."""
+    try:
+        return read_rows(now or datetime.now(UTC))
+    except RatingsError:
+        logger.warning("Свежесть источников рейтингов не прочиталась", exc_info=True)
+        return ()
+
+
+def _of_section(rows: tuple[fresh.Row, ...], section: str) -> tuple[fresh.Row, ...]:
+    kinds = SECTION_SOURCES.get(section, ())
+    return tuple(r for r in rows if r.kind in kinds)
+
+
+def section_status(rows: tuple[fresh.Row, ...], section: str) -> str | None:
+    """Цвет точки раздела — худший по его источникам; `None` — точки нет."""
+    worst = fresh.worst(r.status for r in _of_section(rows, section))
+    return worst.value if worst else None
+
+
+def section_line(rows: tuple[fresh.Row, ...], section: str, lang: str) -> str | None:
+    """Строка шапки «данные за … · пришли …» (РС, РКО) или «пришли …» (сборы).
+
+    У сборов из нескольких площадок — самое раннее приходы: строка не обещает
+    свежее, чем есть у самой отстающей. У разделов без своего источника строки нет."""
+    if section not in (fresh.KIND_RS, fresh.KIND_RKO, fresh.KIND_MAPS, fresh.KIND_AGG):
+        return None
+    mine = _of_section(rows, section)
+    if not mine:
+        return None
+    if section in (fresh.KIND_RS, fresh.KIND_RKO):
+        row = mine[0]
+        if not (row.begin_on and row.end_on):
+            return t("ratings.sec.fresh.none", lang)
+        return t(
+            f"ratings.sec.fresh.{section}",
+            lang,
+            span=_span(row.begin_on, row.end_on),
+            at=_arrived(row, lang),
+        )
+    arrived = [r.arrived for r in mine if r.arrived]
+    if len(arrived) < len(mine):
+        return t("ratings.sec.fresh.pull", lang, at=t("ratings.fresh.never", lang))
+    oldest = min(arrived)
+    return t("ratings.sec.fresh.pull", lang, at=oldest.astimezone(fresh.local_zone()).strftime(_AT))

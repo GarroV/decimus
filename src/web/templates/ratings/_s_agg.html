@@ -1,0 +1,80 @@
+{% from "ratings/_macros.html" import agg_score, stat, cfilter, cov_cell with context %}
+{#- Агрегаторы (D660): плитки по площадкам, «страна × площадка» (нажатие на страну —
+    её пиццерии с оценками по каждой площадке) и «Чего не хватает» — у каждой пиццерии
+    без точки причина словами. Привязка точки по ссылке — здесь же (бывшая страница
+    охвата, `/ratings/coverage` теперь ведёт сюда). Без скрипта страна — ссылка с
+    `?country=`: сервер раскрывает её сам. -#}
+{% set platform_names = agg_names %}
+{% if agg is none %}<div class="rt-empty">{{ t('ratings.coverage.db_down') }}</div>
+{% elif not agg.platforms %}<div class="rt-empty">{{ t('ratings.empty.aggregators') }}</div>
+{% else %}
+<div class="rt-section">
+  <div class="pk-tiles" style="--pk-cols: {{ [agg.tiles|length, 6]|min }}">
+    {% for tl in agg.tiles %}
+    {% call stat(platform_names.get(tl.platform, tl.platform), t('ratings.agg.tile.sub', n=tl.linked, m=tl.expected)) %}{% if tl.score %}{{ agg_score(tl.score.avg, tl.score.scale) }}{% else %}<span class="is-empty">—</span>{% endif %}{% endcall %}
+    {% endfor %}
+  </div>
+
+  <section class="pk-block">
+    <header class="pk-block__head"><h2 class="pk-block__title">{{ t('ratings.agg.by_country') }}</h2>
+      <span class="pk-block__hint">{{ t('ratings.agg.by_country.hint') }}{% if agg.as_of %} · {{ t('ratings.agg.as_of', date=agg.as_of.strftime('%d.%m.%Y')) }}{% endif %}</span>
+      <span class="pk-block__count">{{ agg.countries|length }}</span></header>
+    <div class="rt-scroll"><table class="rt-maps rt-src rt-bycountry">
+      <thead><tr><th scope="col">{{ t('ratings.src.col.country') }}</th>
+        {% for p in agg.platforms %}<th scope="col" class="num">{{ platform_names.get(p, p) }}</th>{% endfor %}</tr></thead>
+      {% for c in agg.countries %}{% set is_open = open_country == c.code %}
+      <tbody class="rt-group{% if is_open %} is-open{% endif %}" data-country="{{ c.code }}">
+        <tr class="rt-group__row">
+          <th scope="row"><a class="rt-group__toggle" data-rt-country href="{{ url(ratings_path) }}/agg?group={{ selection.group }}{% if selection.value %}&amp;value={{ selection.value|urlencode }}{% endif %}&amp;period={{ selection.period.key|urlencode }}&amp;lang={{ lang }}&amp;country={{ c.code }}" aria-expanded="{{ 'true' if is_open else 'false' }}"><span class="rt-group__caret" aria-hidden="true">▸</span> {{ country_name(c.code) }}</a><small>{{ t('ratings.coverage.units', n=c.units|length) }}</small></th>
+          {% for p in agg.platforms %}{% set s = c.scores.get(p) %}<td class="num">{% if s %}<b>{{ agg_score(s.avg, s.scale) }}</b><small>{{ t('ratings.agg.points', n=s.points) }}</small>{% else %}<span class="is-empty">—</span>{% endif %}</td>{% endfor %}
+        </tr>
+        {% for row in c.units %}<tr class="rt-group__sub">
+          <th scope="row">{{ row.unit.name }}</th>
+          {% for p in agg.platforms %}<td class="num">{{ cov_cell(row.cells[p]) }}</td>{% endfor %}
+        </tr>{% else %}<tr class="rt-group__sub"><td colspan="{{ agg.platforms|length + 1 }}" class="rt-empty">{{ t('ratings.agg.no_units') }}</td></tr>{% endfor %}
+      </tbody>
+      {% endfor %}
+    </table></div>
+    {% if agg.later and agg.as_of %}<div class="rt-note">{{ t('ratings.agg.later', date=agg.as_of.strftime('%d.%m.%Y')) }}</div>{% endif %}
+  </section>
+
+  <section class="pk-block" data-rt-filtered>
+    <header class="pk-block__head"><h2 class="pk-block__title">{{ t('ratings.agg.gaps') }}</h2>
+      <span class="pk-block__hint">{{ t('ratings.agg.gaps.hint') }}</span>
+      <span class="pk-block__count">{{ agg.gaps|length }}</span></header>
+    {% if not agg.gaps %}<div class="rt-empty">{{ t('ratings.agg.gaps.none') }}</div>
+    {% else %}
+    {{ cfilter(agg.gaps|map(attribute='unit.country')|list) }}
+    <div class="rt-scroll"><table class="rt-maps rt-list">
+      <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col">{{ t('ratings.agg.gaps') }}</th></tr></thead>
+      <tbody>{% for g in agg.gaps %}<tr data-country="{{ g.unit.country }}">
+        <th scope="row">{{ g.unit.name }}<small>{{ country_name(g.unit.country) }}</small></th>
+        <td><ul class="rt-reasons">{% for r in g.reasons %}<li>
+          {% if r.code == 'stale' %}{{ t('ratings.agg.reason.stale', platform=platform_names.get(r.platform, r.platform), date=r.on_date.strftime('%d.%m.%Y')) }}
+          {% else %}{{ t('ratings.agg.reason.' ~ r.code, platform=platform_names.get(r.platform, r.platform)) }}{% endif %}
+          {%- if r.code == 'unlinked' and may_manage and r.platform in link_platforms %}
+          <details class="rt-link"><summary>{{ t('ratings.coverage.link.summary') }}</summary>
+            <form method="post" action="{{ url(ratings_path) }}/coverage/link?{{ request.query_string.decode() }}">
+              <input type="hidden" name="dodo_id" value="{{ g.unit.dodo_id }}">
+              <input type="hidden" name="country" value="{{ open_country }}">
+              <input type="hidden" name="aggregator" value="{{ r.platform }}">
+              <label class="rt-field__label" for="rt-link-{{ r.platform }}-{{ g.unit.dodo_id }}">{{ t('ratings.coverage.link.label.' ~ r.platform) }}</label>
+              <input class="input input--sm" id="rt-link-{{ r.platform }}-{{ g.unit.dodo_id }}" type="url" name="url" required placeholder="{{ link_platforms[r.platform] }}">
+              <button class="btn btn--sm" type="submit">{{ t('ratings.coverage.link.submit') }}</button>
+            </form></details>
+          {%- endif %}</li>{% endfor %}</ul></td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+  </section>
+</div>
+{% endif %}
+<div class="rt-section">
+  {% if agg_update_notice %}<div class="rt-note" role="status">{{ t(agg_update_notice) }}</div>{% endif %}
+  {% if may_manage %}<div class="rt-note">
+    {% if agg_pending %}{{ t('ratings.agg.update.pending', at=agg_pending.requested_at.strftime(at_format), by=agg_pending.requested_by) }}
+    {% else %}<form method="post" action="{{ url(ratings_path) }}/aggregators/update?{{ request.query_string.decode() }}" class="rt-form">
+      <button class="btn btn--sm" type="submit">{{ t('ratings.agg.update') }}</button> <span class="rt-maps__n">{{ t('ratings.agg.update.hint') }}</span></form>{% endif %}</div>{% endif %}
+  {% if agg_failures %}<div class="rt-note">{{ t('ratings.agg.failed', names=agg_failed_names) }}
+    {% if may_manage %}<ul>{% for f in agg_failures %}<li title="{{ f.error or '' }}">{{ t('ratings.agg.failed_one', name=agg_names.get(f.aggregator, f.aggregator), at=f.at.strftime(at_format), ok=(t('ratings.agg.last_ok', at=f.last_ok.strftime(at_format)) if f.last_ok else t('ratings.agg.never_ok'))) }}{% if f.error %} — {{ f.error }}{% endif %}</li>{% endfor %}</ul>{% endif %}</div>{% endif %}
+</div>

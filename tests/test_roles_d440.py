@@ -97,7 +97,7 @@ def _двери(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     monkeypatch.setattr(overview_data, "load", lambda **_: ПУСТАЯ_СЕТЬ)
     monkeypatch.setattr(country_data, "countries", lambda **_: ())
     monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: action_plans.EMPTY)
-    monkeypatch.setattr(ratings_screen, "render_summary", lambda *_a, **_k: "<p>сводка</p>")
+    monkeypatch.setattr(ratings_screen, "render_section", lambda *_a, **_k: "<p>сводка</p>")
     for имя in ("retract_card", "accept_card", "move_card"):
 
         def дверь(*_a: object, _имя: str = имя, **_k: object) -> SimpleNamespace:

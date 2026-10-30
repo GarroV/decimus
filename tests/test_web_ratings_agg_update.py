@@ -10,19 +10,14 @@ from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
+from ratings_page import подготовить
 from web_harness import войти, подменить_двери, собрать
 
 from src.db import agg_store
 from src.db.agg_store import UpdateRequest
 from src.db.errors import RatingsError
-from src.db.ratings_read import CountryRow
-from src.ratings import compare as rcompare
-from src.ratings import report
 from src.ratings.aggregators import queue
-from src.ratings.periods import month_period
-from src.ratings.summary import CountryLine, ViolationBlock
 from src.web import ratings as screen
-from src.web.ratings_risk import CombinedRisk
 from src.web.texts import TEXTS
 
 ORIGIN = {"Origin": "http://localhost"}
@@ -36,54 +31,13 @@ def _заявка(by: str = "anna") -> UpdateRequest:
 
 @pytest.fixture
 def страница(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    """Настоящий шаблон «Рейтингов» над пустой сводкой; состояние заявки — в словаре."""
+    """Настоящий раздел «Агрегаторы» над пустым охватом; состояние заявки — в словаре."""
     состояние: dict[str, Any] = {"открытая": None, "заявки": []}
-    период = month_period(2026, 9)
-    страна = CountryRow("RS", "Сербия", "Serbia", None, True, "CEE")
-    пустой = ViolationBlock(0, 0, None, ())
-    сводка = report.Summary(
-        selection=report.Selection(report.GROUP_IMF, None, период),
-        countries=("RS",),
-        groups=(),
-        lines=(),
-        total=CountryLine("", None, None, None, None),
-        previous=None,
-        rko_cluster=пустой,
-        rko_by_country={},
-        rs_cluster=пустой,
-        rs_by_country={},
-        rs_top=(),
-        rs_bottom=(),
-        rs_hard=(),
-        rko_top=(),
-        rko_bottom=(),
-        rko_hard=(),
-        risk=(),
-        risk_short=(),
-        thresholds={"top_threshold": 80.0, "risk_threshold": 70.0, "risk_periods": 3.0},
-        last_loaded={},
-    )
-    monkeypatch.setattr(
-        screen.report,
-        "select",
-        lambda *_a, **_k: (
-            сводка.selection,
-            report.Choices((), (страна,), ()),
-        ),
-    )
-    monkeypatch.setattr(screen.report, "build", lambda _s: сводка)
-    monkeypatch.setattr(screen.rcompare, "build", lambda *_a: rcompare.Comparison((), ()))
-    monkeypatch.setattr(screen.read, "layout_rows", lambda: (("aggregators", 0, True),))
-    monkeypatch.setattr(screen.read, "period_months", lambda: ())
-    monkeypatch.setattr(screen.read, "rko_periods", lambda: ())
-    monkeypatch.setattr(screen, "_maps", lambda *_a: None)
-    monkeypatch.setattr(screen, "_aggs", lambda *_a: None)
-    monkeypatch.setattr(screen, "_unit_maps", lambda _u: {})
-    monkeypatch.setattr(screen.ratings_freshness, "build", lambda *_a, **_k: None)
-    # Плитка «Стабильно ниже порога» (D658) читает базу сама — здесь не нужна.
-    monkeypatch.setattr(screen.ratings_risk, "build", lambda *_a, **_k: CombinedRisk((), ()))
+    подготовить(monkeypatch)
     monkeypatch.setattr(agg_store, "load_states", lambda: ())
     monkeypatch.setattr(agg_store, "open_request", lambda: состояние["открытая"])
+    # `подготовить` подменила `_agg_pending` пустышкой — здесь нужна настоящая очередь.
+    monkeypatch.setattr(screen, "_agg_pending", lambda: agg_store.open_request())
 
     def поставить(names: Any, *, by: str) -> tuple[UpdateRequest, bool]:
         if состояние["открытая"] is not None:
@@ -110,7 +64,7 @@ def test_кнопка_есть_у_контроля_и_админа_уК(
     monkeypatch: pytest.MonkeyPatch, страница: Any, tenant: str, role: str
 ) -> None:
     for client in _клиенты(monkeypatch, tenant, role):
-        текст = client.get("/ratings").get_data(as_text=True)
+        текст = client.get("/ratings/agg").get_data(as_text=True)
         assert КНОПКА in текст and 'action="/ratings/aggregators/update' in текст
 
 
@@ -121,7 +75,7 @@ def test_у_остальных_кнопки_нет_и_адрес_закрыт(
     monkeypatch: pytest.MonkeyPatch, страница: Any, tenant: str, role: str
 ) -> None:
     for client in _клиенты(monkeypatch, tenant, role):
-        assert КНОПКА not in client.get("/ratings").get_data(as_text=True)
+        assert КНОПКА not in client.get("/ratings/agg").get_data(as_text=True)
         ответ = client.post("/ratings/aggregators/update", headers=ORIGIN)
         assert ответ.status_code == 403
     assert страница["заявки"] == []
@@ -136,7 +90,7 @@ def test_нажатие_ставит_заявку_от_имени_учётки_�
         )
         assert ответ.status_code == 303
         куда = ответ.headers["Location"]
-        assert куда.startswith("/ratings?") and "agg=queued" in куда
+        assert куда.startswith("/ratings/agg?") and "agg=queued" in куда
         assert "group=country" in куда and "period=2026-09" in куда  # срез не потерян
         после = client.get(куда).get_data(as_text=True)
     ((имена, кто),) = страница["заявки"]
@@ -181,7 +135,7 @@ def test_чужой_origin_отказ(monkeypatch: pytest.MonkeyPatch, стра�
 
 def test_кнопка_на_английском(monkeypatch: pytest.MonkeyPatch, страница: Any) -> None:
     for client in _клиенты(monkeypatch, "HQ", "control", ui_lang="en"):
-        текст = client.get("/ratings").get_data(as_text=True)
+        текст = client.get("/ratings/agg").get_data(as_text=True)
         assert КНОПКА_EN in текст and КНОПКА not in текст
 
 

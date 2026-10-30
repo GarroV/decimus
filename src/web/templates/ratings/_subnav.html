@@ -1,0 +1,13 @@
+{#
+  Подменю «Рейтингов» в общей левой панели (D660), под пунктом «Рейтинги». Состав,
+  порядок и точки свежести приходят из `src.web.ratings_nav`; ссылки несут срез и
+  период. Скрипт `decimus-rt.js` перехватывает щелчок и меняет содержимое без
+  перезагрузки — без него это обычные ссылки.
+#}
+<nav class="sidenav__sub" aria-label="{{ t('ratings.sec.nav') }}" data-rt-subnav>
+  {% for i in subnav %}
+  <a class="sidenav__subitem{% if i.current %} is-on{% endif %}" href="{{ i.href }}" data-rt-nav{% if i.current %} aria-current="page"{% endif %}>
+    <span>{{ i.title }}</span>{% if i.dot %}<i class="rt-fdot rt-fdot--{{ i.dot }}" title="{{ i.dot_word }}" role="img" aria-label="{{ i.dot_word }}"></i>{% endif %}
+  </a>
+  {% endfor %}
+</nav>

@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import logging
 import math
+from collections import Counter
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from datetime import date
 from types import ModuleType
 from urllib.parse import urlencode
@@ -29,18 +31,23 @@ from src.db.errors import RatingsError
 from src.db.ratings_read import REFUSED_SETTING, RatingsEditError
 from src.domain.tenants import HQ_TENANT, may_manage_ratings
 from src.ratings import compare as rcompare
-from src.ratings import coverage, pointer, report, sheet_sync
-from src.ratings import layout as rl
 from src.ratings import maps as rmaps
+from src.ratings import report, sheet_sync
 from src.ratings import risk_sources as rsrc
-from src.ratings.aggregators import collect, glovo_link, migros_link
+from src.ratings.aggregators import glovo_link, migros_link
 from src.ratings.aggregators import queue as agg_queue
-from src.ratings.aggregators import summary as ragg
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
-from src.ratings.model import RatingsFormatError
-from src.ratings.periods import KIND_RANGE, KIND_RATING, RatingPeriod, ReportPeriod
+from src.ratings.model import RKO, RS, RatingsFormatError
+from src.ratings.periods import (
+    KIND_RANGE,
+    KIND_RATING,
+    RatingPeriod,
+    ReportPeriod,
+    previous_period,
+)
 from src.ratings.pointer import GOOGLE
+from src.ratings.summary import UnitScore, ViolationBlock, ViolationFact
 
 from . import (
     administration,
@@ -48,9 +55,10 @@ from . import (
     guard,
     ratings_calendar,
     ratings_freshness,
+    ratings_nav,
+    ratings_platforms,
     ratings_risk,
     ratings_sheet,
-    ratings_tiles,
     ui_lang,
 )
 from . import ratings_line as rl_chart
@@ -120,29 +128,6 @@ def _period_title(period: ReportPeriod | None, found: report.Choices, lang: str)
     return period.key
 
 
-def _layout() -> tuple[rl.Block, ...]:
-    """Компоновка из базы (D368). База не ответила — порядок по умолчанию и след
-    в журнале: страница рейтингов не должна падать из-за расстановки блоков."""
-    try:
-        return rl.arrange(read.layout_rows())
-    except RatingsError:
-        logger.warning("Компоновка рейтингов не прочиталась — порядок по умолчанию", exc_info=True)
-        return rl.arrange(())
-
-
-def _layout_from_form() -> tuple[rl.Block, ...]:
-    """Порядок — скрытые поля `order`, видимость — галочки `show`, сдвиг — кнопка
-    `move` вида `<блок>:-1|1`. Незнакомое отбрасывает `arrange`."""
-    form = request.form
-    shown = set(form.getlist("show"))
-    blocks = tuple(
-        rl.Block(b.key, b.key in shown)
-        for b in rl.arrange((key, i, True) for i, key in enumerate(form.getlist("order")))
-    )
-    key, _, step = (form.get("move") or "").partition(":")
-    return rl.moved(blocks, key, 1 if step == "1" else -1) if step in ("1", "-1") else blocks
-
-
 def _maps(
     groups: tuple[tuple[str, tuple[str, ...]], ...], until: date, before: date | None
 ) -> tuple[rmaps.CountryMaps, ...] | None:
@@ -153,17 +138,6 @@ def _maps(
         return rmaps.compare(groups, until=until, before=before)
     except RatingsError:
         logger.warning("Оценки карт не прочитались", exc_info=True)
-        return None
-
-
-def _aggs(
-    groups: tuple[tuple[str, tuple[str, ...]], ...], until: date
-) -> tuple[tuple[str, ...], tuple[ragg.GroupAggs, ...], bool] | None:
-    """`ragg.for_groups`; база не ответила — `None` и след в журнале."""
-    try:
-        return ragg.for_groups(groups, until=until, today=date.today())
-    except RatingsError:
-        logger.warning("Оценки агрегаторов не прочитались", exc_info=True)
         return None
 
 
@@ -228,106 +202,211 @@ def _group_name(
     return selection.value or t("ratings.group.imf", lang)
 
 
-def _chart(summary: report.Summary, names: list[str], lang: str) -> dict[str, object]:
-    """Строки сводки с линией по периодам рейтинга (D396). Шкала — своя у каждой
-    строки: общая растягивалась выбросом соседней группы, и линия ложилась в черту;
-    группы сравнивают по числу слева, а не по высоте графика."""
-    threshold = summary.thresholds["top_threshold"]
-    title = TEXTS["ratings.line.title"][lang]  # шаблон: поля заполняет `line`
-    kinds = {}
-    for kind in ("rs", "rko"):
-        series = [g.rs_points if kind == "rs" else g.rko_points for g in summary.groups]
-        scales = [rl_chart.scale([p.avg for p in s], threshold) for s in series]
-        kinds[kind] = {
-            "scales": scales,
-            "rows": [
-                rl_chart.line(s, sc, title=title) for s, sc in zip(series, scales, strict=True)
-            ],
+@dataclass(frozen=True)
+class SourceCountry:
+    """Строка «По странам» раздела РС или РКО: всё, что уже посчитала сводка."""
+
+    code: str
+    score: float | None
+    delta: float | None
+    violations: int
+    hard: int
+    units: int
+
+
+@dataclass(frozen=True)
+class SourceView:
+    """Раздел РС или РКО (D660): плитки, страны, Top/Bottom, хард — одного источника."""
+
+    kind: str
+    avg: float | None
+    avg_delta: float | None
+    units: int
+    violations: ViolationBlock
+    hard: tuple[ViolationFact, ...]
+    hard_units: int
+    registry: int | None
+    countries: tuple[SourceCountry, ...]
+    top: tuple[UnitScore, ...]
+    bottom: tuple[UnitScore, ...]
+
+
+def _registry_units(codes: tuple[str, ...]) -> int | None:
+    """Работающих пиццерий в реестре этих стран — знаменатель плитки «Проверено».
+    Реестр не прочитался — `None`, плитка покажет одно число."""
+    try:
+        return sum(1 for u in agg_store.units(codes) if u.working)
+    except RatingsError:
+        logger.warning("Реестр пиццерий для плитки «Проверено» не прочитался", exc_info=True)
+        return None
+
+
+def _source(summary: report.Summary, kind: str) -> SourceView:
+    """Раздел источника из `report.Summary` — ни одного нового расчёта оценки."""
+    is_rs = kind == RS
+    block = summary.rs_cluster if is_rs else summary.rko_cluster
+    by_country = summary.rs_by_country if is_rs else summary.rko_by_country
+    hard = summary.rs_hard if is_rs else summary.rko_hard
+    counts = summary.rs_units if is_rs else summary.rko_units
+    hard_by_country = Counter(f.country for f in hard)
+    rows = [
+        SourceCountry(
+            line.country,
+            line.rs if is_rs else line.rko,
+            line.rs_delta if is_rs else line.rko_delta,
+            by_country[line.country].total if line.country in by_country else 0,
+            hard_by_country[line.country],
+            counts.get(line.country, 0),
+        )
+        for line in summary.lines
+    ]
+    # Лучшая средняя сверху; без оценки — внизу: таблица сравнивает, а не перечисляет.
+    rows.sort(key=lambda r: (r.score is None, -(r.score or 0.0), r.code))
+    return SourceView(
+        kind=kind,
+        avg=summary.total.rs if is_rs else summary.total.rko,
+        avg_delta=summary.total.rs_delta if is_rs else summary.total.rko_delta,
+        units=sum(counts.values()),
+        violations=block,
+        hard=hard,
+        hard_units=len({f.unit for f in hard}),
+        registry=_registry_units(summary.countries),
+        countries=tuple(rows),
+        top=summary.rs_top if is_rs else summary.rko_top,
+        bottom=summary.rs_bottom if is_rs else summary.rko_bottom,
+    )
+
+
+@dataclass(frozen=True)
+class _Frame:
+    """Что нужно любому разделу: отбор, страны среза, период и язык."""
+
+    lang: str
+    selection: report.Selection
+    found: report.Choices
+    codes: tuple[str, ...]
+    until: date
+    previous: ReportPeriod | None
+    country_name: Callable[[str], str]
+
+
+def _section_data(
+    key: str, frame: _Frame, *, agg_failures: tuple[agg_store.LoadState, ...]
+) -> dict[str, object]:
+    """Данные только открытого раздела (D660): остальные не читаются."""
+    sel, lang, codes = frame.selection, frame.lang, frame.codes
+    if key in (ratings_nav.RS, ratings_nav.RKO):
+        kind = RS if key == ratings_nav.RS else RKO
+        summary = report.build(sel, kinds=(kind,), with_risk=False)
+        return {
+            "src": _source(summary, kind),
+            "thresholds": summary.thresholds,
+            "unit_maps": _unit_maps(frame.until),
+            "no_countries": not summary.countries,
         }
-    return {"names": names, "kinds": kinds, "width": rl_chart.WIDTH, "height": rl_chart.HEIGHT}
+    if key == ratings_nav.RISK:
+        summary = report.build(sel, kinds=(), with_risk=True)
+        agg_names = _agg_names(lang)
+        risk = ratings_risk.build(
+            summary.risk,
+            countries=summary.countries,
+            until=frame.until,
+            reach=auth.current_reach(),
+            inspection_threshold=summary.thresholds["risk_threshold"],
+        )
+        return {
+            "no_countries": not summary.countries,
+            "risk": risk,
+            "risk_short": summary.risk_short,
+            "risk_hint": t(
+                "ratings.risk.hint",
+                lang,
+                n=int(summary.thresholds["risk_periods"]),
+                x=f"{summary.thresholds['risk_threshold']:.1f}",
+                agg=rsrc.AGG_WINDOW,
+                insp=rsrc.INSPECTION_WINDOW,
+                wolt=f"{rsrc.AGG_THRESHOLDS['wolt']:.1f}",
+                glovo=f"{rsrc.AGG_THRESHOLDS['glovo']:.0f}",
+                share=round(rsrc.AGG_OTHER_SHARE * 100),
+            ),
+            "risk_unread": ", ".join(t(f"ratings.risk.unread.{k}", lang) for k in risk.unread),
+            "risk_sources": ratings_risk.source_names(agg_names, lang),
+            "risk_short_names": ", ".join(
+                t(f"ratings.{kind}", lang) for kind in summary.risk_short
+            ),
+        }
+    if key == ratings_nav.COMPARE:
+        return {"no_countries": not codes, "comparison": rcompare.build(sel, frame.found)}
+    if key == ratings_nav.MAPS:
+        groups_lines, _ = report.build_groups(sel, frame.found)
+        groups = tuple(
+            (_group_name(g, sel, lang, frame.country_name), g.countries) for g in groups_lines
+        )
+        maps = _maps(groups, frame.until, frame.previous.end if frame.previous else None)
+        return {
+            "no_countries": not codes,
+            "maps": maps if maps and any(m.as_of for m in maps) else (),
+            "map_names": [name for name, _ in groups],
+            "map_providers": rmaps.SHOWN_PROVIDERS,
+            "map_units": ratings_platforms.build_maps(codes, today=date.today()),
+            "agg_names": _agg_names(lang),
+        }
+    if key == ratings_nav.AGG:
+        agg_names = _agg_names(lang)
+        return {
+            "no_countries": not codes,
+            "agg": ratings_platforms.build_agg(codes, until=frame.until, today=date.today()),
+            "agg_names": agg_names,
+            "agg_failures": agg_failures,
+            "agg_failed_names": ", ".join(
+                agg_names.get(f.aggregator, f.aggregator) for f in agg_failures
+            ),
+            "agg_pending": _agg_pending() if may_manage() else None,
+            "agg_update_notice": _AGG_UPDATE_NOTICES.get(request.args.get("agg", "")),
+            "open_country": (request.values.get("country") or "").strip().upper(),
+            "link_platforms": LINK_PLACEHOLDERS,
+        }
+    return {"no_countries": not codes}  # «Оценки клиентов»: источника ещё нет
 
 
-def render_summary(conf: Settings) -> str:
+def render_section(
+    conf: Settings, key: str, *, notice: str | None = None, failure: str | None = None
+) -> str:
+    """Раздел «Рейтингов» (D660): шапка, отбор, подменю и данные открытого раздела."""
     lang = _lang(conf)
-    selection, found = report.select(request.args, today=date.today())
-    summary = report.build(selection)
+    is_hq = auth.current_tenant() == HQ_TENANT
+    if key not in ratings_nav.visible(is_hq):
+        abort(404)
+    today = date.today()
+    selection, found = report.select(request.args, today=today)
     names = _country_names(found.countries, lang)
-    # Сравнение девелоперов и стран — только УК (D551): партнёру чужие страны не показываем.
-    comparison = rcompare.build(selection, found) if auth.current_tenant() == HQ_TENANT else None
 
     def country_name(code: str) -> str:
         return names.get(code) or country_title(code, lang)
 
-    names_of_groups = [_group_name(g, selection, lang, country_name) for g in summary.groups]
-    agg_failures, agg_names = _agg_failures(), _agg_names(lang)
-    # «Сравнение» есть только у УК; плитки — по тем же блокам компоновки (D585).
-    blocks = tuple(
-        b.key for b in _layout() if b.visible and (b.key != "compare" or comparison is not None)
+    codes = report.group_countries(selection, found.countries)
+    previous = previous_period(selection.period, rs_periods=found.rs_periods)
+    frame = _Frame(
+        lang, selection, found, codes, min(selection.period.end, today), previous, country_name
     )
-    # Три яруса (D658): состав яруса задан кодом, порядок внутри — компоновка контролинга.
-    tiers = tuple(
-        tier
-        for tier in ([k for k in blocks if rl.tier_of(k) == i] for i in range(len(rl.TIERS)))
-        if tier
-    )
-    groups = tuple(zip(names_of_groups, (g.countries for g in summary.groups), strict=True))
-    until = min(selection.period.end, date.today())
-    risk = (
-        ratings_risk.build(
-            summary.risk,
-            countries=summary.countries,
-            until=until,
-            reach=auth.current_reach(),
-            inspection_threshold=summary.thresholds["risk_threshold"],
-        )
-        if "risk" in blocks
-        else ratings_risk.CombinedRisk((), ())
-    )
-    maps = _maps(groups, until, summary.previous.end if summary.previous else None)
-    aggs = _aggs(groups, until)
-    faces = ratings_tiles.faces(
-        summary,
-        comparison,
-        maps=maps,
-        map_providers=rmaps.SHOWN_PROVIDERS,
-        aggs=aggs,
-        agg_names=agg_names,
-        risk=risk,
-        lang=lang,
-    )
+    root = section("ratings").path
+    rows = ratings_freshness.safe_rows()
+    agg_failures = _agg_failures() if key == ratings_nav.AGG else ()
+    data = _section_data(key, frame, agg_failures=agg_failures)
+    agg_names = _agg_names(lang)
     return render_template(
         "ratings/index.html",
-        blocks=blocks,
-        tiers=tiers,
-        faces=faces,
-        risk=risk,
-        risk_hint=t(
-            "ratings.risk.hint",
-            lang,
-            n=int(summary.thresholds["risk_periods"]),
-            x=f"{summary.thresholds['risk_threshold']:.1f}",
-            agg=rsrc.AGG_WINDOW,
-            insp=rsrc.INSPECTION_WINDOW,
-            wolt=f"{rsrc.AGG_THRESHOLDS['wolt']:.1f}",
-            glovo=f"{rsrc.AGG_THRESHOLDS['glovo']:.0f}",
-            share=round(rsrc.AGG_OTHER_SHARE * 100),
+        section_key=key,
+        subnav=ratings_nav.items(
+            root, is_hq=is_hq, current=key, selection=selection, lang=lang, rows=rows
         ),
-        risk_unread=", ".join(t(f"ratings.risk.unread.{k}", lang) for k in risk.unread),
-        risk_sources=ratings_risk.source_names(agg_names, lang),
-        open_tile=ratings_tiles.open_key(request.args.get("open"), blocks),
-        maps=maps,
-        map_providers=rmaps.SHOWN_PROVIDERS,
-        aggs=aggs,
-        agg_failures=agg_failures,
-        agg_failed_names=", ".join(agg_names.get(f.aggregator, f.aggregator) for f in agg_failures),
-        agg_names=agg_names,
-        agg_pending=_agg_pending() if may_manage() else None,
-        agg_update_notice=_AGG_UPDATE_NOTICES.get(request.args.get("agg", "")),
-        unit_maps=_unit_maps(min(selection.period.end, date.today())),
-        chart=_chart(summary, names_of_groups, lang),
+        section_title=t(f"ratings.sec.{key}", lang),
+        section_line=ratings_freshness.section_line(rows, key, lang),
+        section_dot=ratings_freshness.section_status(rows, key),
+        freshness=ratings_freshness.lines_of(rows, lang, agg_names),
+        notice=notice,
+        failure=failure,
         clusters=report.CLUSTERS,
-        summary=summary,
-        comparison=comparison,
         score_tone=rl_chart.tone,
         choices=found,
         selection=selection,
@@ -338,22 +417,20 @@ def render_summary(conf: Settings) -> str:
             lang,
             tuple(RatingPeriod(*p) for p in read.rko_periods()),
         ),
-        previous_title=_period_title(summary.previous, found, lang),
-        risk_short_names=", ".join(t(f"ratings.{kind}", lang) for kind in summary.risk_short),
+        previous_title=_period_title(previous, found, lang),
         may_manage=may_manage(),
         admin_ratings_url=admin_url(),
         unit_url=unit_rating_url,
         country_name=country_name,
-        ratings_path=section("ratings").path,
+        ratings_path=root,
         at_format=_AT,
-        freshness=ratings_freshness.build(lang, agg_names),
+        **data,
     )
 
 
 #: Блоки вкладки «Рейтинги» в «Администрировании» (D654): код — это `?block=` и пояснение к форме.
 BLOCK_SHEET = "sheet"
 BLOCK_UPLOAD = "upload"
-BLOCK_LAYOUT = "layout"
 BLOCK_JOURNAL = "journal"
 BLOCK_ISSUES = "issues"
 BLOCK_DEVELOPERS = "developers"
@@ -362,7 +439,6 @@ BLOCK_SETTINGS = "settings"
 BLOCKS = (
     BLOCK_SHEET,
     BLOCK_UPLOAD,
-    BLOCK_LAYOUT,
     BLOCK_JOURNAL,
     BLOCK_ISSUES,
     BLOCK_DEVELOPERS,
@@ -384,7 +460,6 @@ def _block_states(
     issues: tuple[read.IssueRow, ...],
     countries: tuple[read.CountryRow, ...],
     rules: tuple[tuple[int, str, str, str], ...],
-    layout: tuple[rl.Block, ...],
     settings: Mapping[str, float],
 ) -> dict[str, tuple[str, bool]]:
     """Короткая строка состояния для каждого блока: `(текст, требует_внимания)`."""
@@ -403,7 +478,6 @@ def _block_states(
     else:
         sheet_line = (t("ratings.sheet.never", lang), False)
     last = journal[0] if journal else None
-    shown = sum(1 for b in layout if b.visible)
     with_dev = sum(1 for c in countries if c.developer)
     thresholds = [
         f"{t('ratings.settings.' + key, lang)} {settings[key]:g}"
@@ -416,10 +490,6 @@ def _block_states(
             t("ratings.admin.upload.last", lang, at=at(last.at))
             if last
             else t("ratings.journal.empty", lang),
-            False,
-        ),
-        BLOCK_LAYOUT: (
-            t("ratings.admin.layout.state", lang, shown=shown, total=len(layout)),
             False,
         ),
         BLOCK_JOURNAL: (t("ratings.admin.journal.state", lang, n=len(journal)), False),
@@ -452,7 +522,6 @@ def render_imports(
     journal = read.imports()
     issues = read.open_issues()
     rules = read.hard_rules()
-    layout = _layout()
     settings = read.settings()
     sheet = ratings_sheet.build(lang)
     states = _block_states(
@@ -462,7 +531,6 @@ def render_imports(
         issues=issues,
         countries=countries,
         rules=rules,
-        layout=layout,
         settings=settings,
     )
     return render_template(
@@ -479,7 +547,6 @@ def render_imports(
         issues=issues,
         countries=countries,
         rules=rules,
-        layout=layout,
         settings=settings,
         sheet=sheet,
         sheet_every_h=sheet_sync.SYNC_EVERY_SEC // 3600,
@@ -498,62 +565,6 @@ def show_admin(conf: Settings) -> tuple[str, int]:
     if block and block not in BLOCKS:
         abort(404)
     return render_imports(conf, block=block), 200
-
-
-def _agg_countries() -> dict[str, frozenset[str]]:
-    """Где агрегатор ожидается: поисковый — в странах сборщика, известной точки
-    (Glovo, Chowdeck) — там, где у него есть точки; на паузе — только где точки
-    остались (D397)."""
-    expected = {m.KEY: frozenset(m.COUNTRIES) for m in collect.SEARCHERS}
-    for module in collect.KNOWN + collect.PAUSED:
-        has = agg_store.point_countries(module.KEY)
-        expected[module.KEY] = has if module in collect.KNOWN else has & frozenset(module.COUNTRIES)
-    return expected
-
-
-def render_coverage(
-    conf: Settings, *, notice: str | None = None, failure: str | None = None
-) -> str:
-    """«Пиццерии на площадках»: реестр пиццерий и их охват картами и агрегаторами.
-    База не ответила — пустой экран с причиной, страница живёт."""
-    lang = _lang(conf)
-    today = date.today()
-    wanted = (request.values.get("country") or "").strip().upper() or None
-    units: tuple[agg_store.UnitRow, ...] = ()
-    result = coverage.build((), (), (), {}, today)
-    names: dict[str, str] = {}
-    try:
-        names = _country_names(read.countries(), lang)
-        units = agg_store.units()
-        maps = [
-            (str(p), maps_store.unit_latest(p))
-            for p in (pointer.GOOGLE, pointer.YANDEX)  # порядок колонок: Google, Яндекс
-        ]
-        result = coverage.build(
-            units, maps, agg_store.coverage(), _agg_countries(), today, country=wanted
-        )
-    except RatingsError:
-        logger.warning("Охват площадок не прочитался", exc_info=True)
-        failure = failure or t("ratings.coverage.db_down", lang)
-    present = sorted({u.country for u in units if u.working})
-    return render_template(
-        "ratings/coverage.html",
-        coverage=result,
-        notice=notice,
-        failure=failure,
-        registry_empty=not units,
-        country=wanted,
-        country_codes=present,
-        country_name=lambda code: names.get(code) or country_title(code, lang),
-        agg_names=_agg_names(lang),
-        may_manage=may_manage(),
-        stale_days=coverage.STALE_DAYS,
-        link_platforms=LINK_PLACEHOLDERS,
-        new_days=coverage.NEW_DAYS,
-        ratings_path=section("ratings").path,
-        at_format=_AT,
-        today=today,
-    )
 
 
 #: Площадки, к которым пиццерия привязывается ссылкой: модуль с `link_by_url` и ключ
@@ -576,7 +587,9 @@ def _link_point(conf: Settings) -> tuple[str, int]:
     lang = _lang(conf)
     aggregator = (request.form.get("aggregator") or "glovo").strip()
     if aggregator not in _LINKERS:
-        return render_coverage(conf, failure=t("ratings.coverage.link.failed", lang)), 400
+        return render_section(
+            conf, ratings_nav.AGG, failure=t("ratings.coverage.link.failed", lang)
+        ), 400
     linker, bad_url = _LINKERS[aggregator]
     unit_id = (request.form.get("dodo_id") or "").strip().lower()
     today = date.today()
@@ -589,14 +602,16 @@ def _link_point(conf: Settings) -> tuple[str, int]:
             agg_store.save([point], [rating] if rating else [])
     except RatingsError:
         logger.warning("рейтинги: привязка %s не легла", aggregator, exc_info=True)
-        return render_coverage(conf, failure=t("ratings.coverage.db_down", lang)), 503
+        return render_section(
+            conf, ratings_nav.AGG, failure=t("ratings.coverage.db_down", lang)
+        ), 503
     platform = _agg_names(lang).get(aggregator, aggregator)
     if result.code == glovo_link.OK and unit is not None:
         notice = t("ratings.coverage.link.ok", lang, platform=platform, name=unit.name)
-        return render_coverage(conf, notice=notice), 200
+        return render_section(conf, ratings_nav.AGG, notice=notice), 200
     code = bad_url if result.code == glovo_link.BAD_URL else result.code
     reason = _coded("ratings.coverage.link", code, {}, lang, "ratings.coverage.link.failed")
-    return render_coverage(conf, failure=reason), 400
+    return render_section(conf, ratings_nav.AGG, failure=reason), 400
 
 
 def _loaded_notice(итог: ImportReport, lang: str) -> str:
@@ -688,11 +703,22 @@ def install(app: Flask, conf: Settings) -> None:
 
     @app.get(путь, endpoint="ratings")
     def ratings_index() -> str:
-        return render_summary(conf)
+        """Голый `/ratings` — первый раздел (D660)."""
+        return render_section(conf, ratings_nav.DEFAULT)
+
+    # Только известные разделы: остальной `/ratings/<что-то>` — свои маршруты или 404.
+    names = ",".join(ratings_nav.SECTIONS)
+
+    @app.get(f"{путь}/<any({names}):key>", endpoint="ratings_section")
+    def ratings_section(key: str) -> str:
+        return render_section(conf, key)
 
     @app.get(f"{путь}/coverage", endpoint="ratings_coverage")
-    def ratings_coverage() -> str:
-        return render_coverage(conf)
+    def ratings_coverage() -> Response:
+        """Старая страница охвата (D660): «по пиццериям» ушло внутрь «Агрегаторов»."""
+        args = {k: v for k, v in request.args.items() if k in ("country", "lang")}
+        query = f"?{urlencode(args)}" if args else ""
+        return redirect(f"{request.script_root}{путь}/{ratings_nav.AGG}{query}", code=302)
 
     @app.post(f"{путь}/coverage/link")
     @guard.action("ratings.manage")
@@ -769,9 +795,11 @@ def install(app: Flask, conf: Settings) -> None:
         except RatingsError:
             logger.warning("рейтинги: заявка на обновление агрегаторов не легла", exc_info=True)
             outcome = "db_down"
-        # Исход виден в плитке агрегаторов: возвращаем человека к раскрытой.
-        args = {**request.args.to_dict(), "agg": outcome, "open": "aggregators"}
-        return redirect(f"{request.script_root}{путь}?{urlencode(args)}", code=303)
+        # Исход виден в разделе «Агрегаторы»: возвращаем человека туда, с тем же отбором.
+        args = {**request.args.to_dict(), "agg": outcome}
+        return redirect(
+            f"{request.script_root}{путь}/{ratings_nav.AGG}?{urlencode(args)}", code=303
+        )
 
     @app.post(f"{путь}/sheet-sync")
     @guard.action("ratings.manage")
@@ -790,20 +818,6 @@ def install(app: Flask, conf: Settings) -> None:
         return redirect(
             admin_url(BLOCK_SHEET, **{ratings_sheet.ARG: outcome}),
             code=303,
-        )
-
-    @app.post(f"{путь}/layout")
-    @guard.action("ratings.manage")
-    def ratings_layout() -> tuple[str, int]:
-        """Компоновка страницы (D368, D370) — тот же круг, что ведёт рейтинги."""
-        if not may_manage():
-            return _forbidden()
-        refuse_foreign_origin()
-        blocks = _layout_from_form()
-        return _saved(
-            conf,
-            BLOCK_LAYOUT,
-            lambda: read.save_layout([(b.key, b.visible) for b in blocks], actor=_actor()),
         )
 
     @app.post(f"{путь}/settings")

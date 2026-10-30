@@ -22,6 +22,7 @@ from src.ratings.summary import (
     risk_zone,
     score_lines,
     top_bottom,
+    unit_counts,
     violation_block,
 )
 
@@ -44,6 +45,13 @@ def test_страна_среднее_пиццерий_группа_средне�
     assert country_average(ТЕКУЩИЙ, "rs", "SI") == pytest.approx(77.5)
     assert group_average(ТЕКУЩИЙ, "rs", ["SI", "RS"]) == pytest.approx(85.0)
     assert country_average(ТЕКУЩИЙ, "rs", "BG") is None
+
+
+def test_пиццерий_с_оценкой_по_странам_считается_пиццерия_а_не_строка() -> None:
+    # у «a» две строки РС (два периода) и одна РКО — пиццерия одна; у «c» РКО нет вовсе
+    assert unit_counts(ТЕКУЩИЙ, "rs") == {"SI": 2, "RS": 1}
+    assert unit_counts(ТЕКУЩИЙ, "rko") == {"SI": 1}
+    assert unit_counts([], "rs") == {}
 
 
 def test_дельта_к_прошлому_периоду() -> None:

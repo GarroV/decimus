@@ -77,55 +77,6 @@
 .rt-delta--down { color: var(--err); }
 .rt-delta__arrow { font-size: .75em; margin-right: 2px; }
 
-/* ── Кластеры: строка — группа, у РС и РКО число, изменение и свечи по
-   месяцам (D383, D384). Свеча — средняя группы по периодам месяца: тело от
-   первого периода к последнему, тени — лучший и худший. Месяцы вне выбранного
-   периода приглушены, пунктир — порог Top/Bottom. */
-.rt-cl { display: grid; grid-template-columns: minmax(6rem, 9rem) repeat(2, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface); }
-.rt-cl > * { padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--line); min-width: 0; }
-.rt-cl > :nth-last-child(-n+3) { border-bottom: 0; }
-.rt-cl__head { font-size: var(--fs-meta); color: var(--ink-3); padding-bottom: var(--space-2); }
-.rt-cl__name { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink); display: flex; flex-direction: column; justify-content: center; }
-.rt-cl__name.is-sub { font-weight: var(--w-regular); color: var(--ink-2); padding-left: var(--space-6); }
-.rt-cl__name small { font-weight: var(--w-regular); color: var(--ink-3); font-size: var(--fs-meta); }
-.rt-cl__kpi { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
-.rt-cl__kpi b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: var(--w-semibold); color: var(--ink); }
-.rt-cl__kpi .rt-delta { font-size: var(--fs-meta); }
-.rt-cl__k { display: none; font-size: var(--fs-meta); color: var(--ink-3); min-width: 2.2rem; }
-.rt-cl__plot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2); }
-.rt-cl__y { display: flex; flex-direction: column; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); padding: 2px 0; }
-.rt-cl__y i { font-style: normal; }
-.rt-more summary { cursor: pointer; font-size: var(--fs-meta); color: var(--ink-3); padding: var(--space-2) 0 0; list-style: none; }
-.rt-more summary::-webkit-details-marker { display: none; }
-.rt-more summary:hover { color: var(--accent); }
-.rt-tip { position: fixed; z-index: 50; pointer-events: none; max-width: 22rem; padding: var(--space-2) var(--space-3); border-radius: var(--r-control); background: var(--ink); color: var(--surface); font-size: var(--fs-meta); line-height: 1.35; box-shadow: 0 4px 16px rgba(0, 0, 0, .25); }
-/* Линия по периодам рейтинга (D396): SVG тянется по ширине, точки и подписи —
-   HTML в процентах поверх, чтобы не сплющивались вместе с viewBox. */
-.rt-line { position: relative; height: 80px; }
-.rt-line__svg { display: block; width: 100%; height: 100%; overflow: visible; }
-/* Порог Top/Bottom — красной линией (D560): поверх цветных зон пунктир терялся. */
-.rt-line__thr { stroke: var(--err); stroke-width: 1.5; }
-.rt-line__path { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.rt-line__dot { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
-  background: var(--surface); border: 2px solid var(--accent); cursor: default; outline: none; }
-.rt-line__dot:hover, .rt-line__dot:focus-visible { background: var(--accent); }
-/* Цвет по значению (D552): фон — полосами зон, точка — цветом своей зоны. */
-.rt-line__band.is-bad { fill: var(--err-line); }
-.rt-line__band.is-mid { fill: var(--warn-line); }
-.rt-line__band.is-good { fill: var(--ok-line); }
-.rt-line__band { opacity: .55; }
-.rt-line__dot.is-bad { border-color: var(--err); background: var(--err); }
-.rt-line__dot.is-mid { border-color: var(--warn); background: var(--warn); }
-.rt-line__dot.is-good { border-color: var(--ok); background: var(--ok); }
-.rt-line__dot[class*="is-"]:hover, .rt-line__dot[class*="is-"]:focus-visible { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px currentColor; }
-/* Свеча показывает свою подсказку `.rt-tip` (decimus-rt.js); общая CSS-подсказка
-   `[data-tip]::after` легла бы под неё вторым таким же текстом. */
-.rt-line__dot[data-tip]::after { display: none; }
-.rt-line__axis { position: relative; height: 16px; margin-top: 4px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
-.rt-line__axis span { position: absolute; transform: translateX(-50%); }
-.rt-line__empty { font-size: var(--fs-meta); color: var(--ink-3); padding: var(--space-4) 0; }
-.rt-cl__note { font-size: var(--fs-meta); color: var(--ink-3); margin: var(--space-2) 0 0; }
-
 /* Пары РС | РКО: блоки нижней части встают рядом, а не лентой */
 .rt-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6) var(--space-7); align-items: start; }
 .rt-pair .rt-two { grid-template-columns: 1fr; }
@@ -240,13 +191,6 @@
   .rt-split { grid-template-columns: 1fr; }
 }
 @media (max-width: 719px) {
-  .rt-line__axis span:nth-child(even) { display: none; }  /* узко: каждая вторая подпись, иначе налезают */
-  .rt-cl { grid-template-columns: 1fr; }
-  .rt-cl__head { display: none; }
-  .rt-cl__k { display: inline; }
-  .rt-cl > * { border-bottom: 0; }
-  .rt-cl__name { border-top: 1px solid var(--line); flex-direction: row; gap: var(--space-3); align-items: baseline; }
-  .rt-cl__name:first-of-type { border-top: 0; }
   .rt { --rt-bar-w: 64px; --rt-cell: var(--space-3) var(--space-3); gap: var(--space-7); }
   .rt-head__title { font-size: var(--fs-display); line-height: var(--lh-display); }
   .rt-sec__title { font-size: var(--fs-title); line-height: var(--lh-title); }
@@ -341,14 +285,6 @@
 /* Top-10 и Bottom-10: изменение пиццерии к прошлому периоду. */
 .rt-rank__d { font-size: var(--fs-meta); white-space: nowrap; text-align: right; min-width: 4.5em; }
 
-/* Компоновка страницы на «Загрузках» (D368). */
-.rt-layout { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-1); }
-.rt-layout__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-1) 0; border-bottom: 1px solid var(--line); }
-.rt-layout__row:last-child { border-bottom: 0; }
-.rt-layout__name { display: flex; flex: 1; min-width: 0; align-items: center; gap: var(--space-2); }
-.rt-layout__moves { display: flex; flex: none; gap: var(--space-1); }
-.rt-layout__moves .btn--sm { width: auto; min-width: 44px; padding: 0 var(--space-3); }  /* ↑/↓ без запаса под подпись: на 390px строка помещается в карточку */
-
 /* «Пиццерии на площадках»: таблица охвата. Таблица прокручивается внутри .rt-scroll,
    страница на 390px не едет вбок. Устаревшее — значок у числа, строка не красится. */
 .rt-cov th[scope="row"] small { display: block; }
@@ -378,70 +314,6 @@
   /* Длинная подпись (счётчики, формат, примечание) — строкой над значением, иначе значение уезжает за край. */
   .rt-tbl--stack .rt-stack__wide { flex-direction: column; align-items: flex-start; gap: 0; text-align: left; }
   .rt-tbl--stack .rt-stack__empty { display: none; }
-}
-
-/* ── Плитки (D585): лицо — заголовок, цифры, строка; раскрытая — на всю ширину.
-   Вид плитки — по Tile хаба imf-vc (скруглённая карточка, цветное пятно в углу,
-   «Подробнее ›»), раскрытие — на месте, а не окном. ───────────────────── */
-/* Три яруса плиток (D658): каждый ярус — своя сетка, ряды не смешиваются. */
-.rt-tiers { display: flex; flex-direction: column; gap: var(--rt-gap); }
-.rt-tiles {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
-  grid-auto-flow: dense;  /* плитка после раскрытой занимает пустое место в ряду выше */
-  gap: var(--rt-gap); align-items: stretch;
-}
-.rt-tile {
-  position: relative; min-width: 0; overflow: hidden; isolation: isolate;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
-  transition: border-color .15s ease, box-shadow .15s ease;
-}
-.rt-tile::after {  /* цветное пятно в углу, как у плитки хаба */
-  content: ""; position: absolute; z-index: -1; right: -18%; bottom: -38%;
-  width: 46%; aspect-ratio: 1; border-radius: 50%; background: var(--accent-soft); opacity: .6;
-}
-.rt-tile:hover { border-color: var(--accent-line); }
-.rt-tile__h { margin: 0; font: inherit; }
-.rt-tile__face {
-  all: unset; box-sizing: border-box; width: 100%; min-height: 9.5rem; cursor: pointer;
-  padding: var(--space-6) var(--space-6) var(--space-5);
-  display: flex; flex-direction: column; gap: var(--space-3); text-align: left;
-}
-.rt-tile__face:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 12px; }
-.rt-tile__title { font-size: var(--fs-body); line-height: var(--lh-body); font-weight: var(--w-bold); color: var(--ink); }
-.rt-tile__figs { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); }
-.rt-tile__fig { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
-.rt-tile__fig b { font-family: var(--font-sans, inherit); font-variant-numeric: tabular-nums; font-size: 26px; line-height: 30px; font-weight: var(--w-semibold); color: var(--ink); }
-.rt-tile__fig small { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); }
-.rt-tile__note { font-size: var(--fs-dense); line-height: var(--lh-dense); color: var(--ink-2); max-width: 30ch; text-wrap: pretty; }
-.rt-tile__more {
-  margin-top: auto; display: inline-flex; align-items: center; gap: var(--space-2);
-  font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--accent);
-}
-.rt-tile__chev {
-  width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
-  transform: rotate(45deg) translate(-1px, -1px); transition: transform .2s ease;
-}
-.rt-tile.is-open { grid-column: 1 / -1; border-color: var(--accent-line); }
-.rt-tile.is-open::after { display: none; }
-.rt-tile.is-open .rt-tile__face {
-  min-height: 0; flex-direction: row; flex-wrap: wrap; align-items: baseline;
-  gap: var(--space-2) var(--space-7); background: var(--accent-soft);
-}
-.rt-tile.is-open .rt-tile__title { font-size: 17px; line-height: 22px; }
-.rt-tile.is-open .rt-tile__fig { flex-direction: row; align-items: baseline; gap: var(--space-2); }
-.rt-tile.is-open .rt-tile__fig b { font-size: var(--fs-body); line-height: var(--lh-body); }
-.rt-tile.is-open .rt-tile__more { margin: 0 0 0 auto; }
-.rt-tile.is-open .rt-tile__chev { transform: rotate(-135deg) translate(-1px, -1px); }
-.rt-tile__body { padding: var(--space-6); border-top: 1px solid var(--line); min-width: 0; }
-.rt-tile__body[hidden] { display: none; }
-@media (prefers-reduced-motion: no-preference) {
-  .rt-tile.is-open .rt-tile__body { animation: rt-tile-in .24s ease both; }
-  @keyframes rt-tile-in { from { opacity: 0; transform: translateY(-6px); } }
-}
-@media (max-width: 719px) {
-  .rt-tile__face { min-height: 0; padding: var(--space-5); }
-  .rt-tile.is-open .rt-tile__more { margin-left: 0; }
-  .rt-tile__body { padding: var(--space-5) var(--space-4); }
 }
 
 /* Хард-нарушения (D585): столбцы по десять строк, на широком экране по два. */
@@ -495,3 +367,34 @@
 .rt-fdot--stale { background: var(--err); }
 .rt-fdot--mark { position: absolute; top: -.1rem; right: -.2rem; width: .5rem; height: .5rem; box-shadow: 0 0 0 2px var(--surface); }
 .info-tip__mark { position: relative; }
+
+/* ── Разделы «Рейтингов» (D660): содержимое на всю ширину, сверху вниз ─────────── */
+.rt-section { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.rt-section__body { padding: var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
+.rt-section .pk-block > .rt-note:last-child { border-top: 1px solid var(--line); }
+.rt-section .pk-block > .rt-empty { margin: var(--space-5); }
+.rt-section .pk-block > .rt-filter { margin: var(--space-3) var(--space-5) 0; }
+.rt-section .pk-block .rt-rank { padding: 0 var(--space-5); }
+.rt-section .pk-tiles .rt-delta { font-size: var(--fs-meta); }
+/* Строка свежести раздела рядом с заголовком: точка и «данные за … · пришли …». */
+.rt-fresh-line { display: inline-flex; align-items: center; gap: var(--space-3); margin-left: var(--space-3); font-size: var(--fs-meta); color: var(--ink-3); }
+/* Переход между разделами без перезагрузки: старое содержимое тускнеет, пока идёт запрос. */
+.rt { transition: opacity .12s ease; }
+.rt.is-loading { opacity: .55; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .rt { transition: none; } }
+/* Список разделов для телефона: боковой панели нет, подменю там не видно. */
+.rt-subpick { display: none; }
+@media (max-width: 719px) { .rt-subpick { display: flex; } .rt-subpick .pickselect { flex: 1 1 auto; min-width: 0; } }
+/* «Агрегаторы»: страна раскрывается пиццериями; без скрипта — ссылкой `?country=`. */
+.rt-group__row th a { color: var(--ink); font-weight: var(--w-semibold); }
+.rt-group__row th small { margin-left: calc(1ch + var(--space-3)); }
+.rt-group__row { cursor: pointer; }
+.rt-group__row:hover > * { background: var(--surface-2); }
+.rt-group__caret { display: inline-block; width: 1ch; color: var(--ink-3); transition: transform .15s ease; }
+.rt-group.is-open .rt-group__caret { transform: rotate(90deg); }
+.rt-group__sub { display: none; }
+.rt-group.is-open .rt-group__sub { display: table-row; }
+.rt-group__sub th { font-weight: var(--w-regular); color: var(--ink-2); padding-left: calc(var(--space-6) + 2ch); }
+.rt-bycountry tbody { border-bottom: 1px solid var(--line); }
+.rt-bycountry tbody:last-child { border-bottom: 0; }
+.rt-reasons { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--fs-dense); color: var(--ink-2); }
