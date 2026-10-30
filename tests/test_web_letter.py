@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -32,6 +33,7 @@ from test_web_app import ТЕНАНТ, карточка, шапка
 from web_harness import войти, подменить_двери, собрать
 
 from src.domain.models import TEXT_LANGS
+from src.report.letter_markup import to_plain
 from src.report.letters import (
     BLANK_TEXT_FIELD,
     FEEDBACK_LANG_FIELD,
@@ -47,6 +49,12 @@ from src.web import inspections as data
 #: (`src/web/origin.py`) без него отправку не пропустит — и правильно делает.
 СВОЙ = {"Origin": "http://localhost"}
 ТЕКСТ = "Dear partner,\n\nYour inspection scored 92%.\n\nRegards"
+
+
+def editor_text(page: str) -> str:
+    editor = re.search(r"data-letter-editor[^>]*>(.*?)</div>", page, re.S)
+    assert editor is not None
+    return to_plain(editor.group(1)).strip()
 
 
 def собранное(**поля: Any) -> dict[str, object]:
@@ -87,7 +95,7 @@ def test_готовое_письмо_показывается_целиком(с�
     страница = стенд.get(f"/inspections/{ПРОВЕРКА}/letter").get_data(as_text=True)
 
     # Assert — текст движка уезжает на экран как есть, без склейки в шаблоне.
-    assert "Your inspection scored 92%." in страница
+    assert editor_text(страница) == ТЕКСТ
     assert "готово к отправке" in страница
 
 
@@ -277,7 +285,7 @@ def test_возврат_к_заготовке_показывает_её_не_т�
     assert "Вернуть заготовку" in обычная
 
     # А по прямой просьбе в поле — свежая заготовка движка.
-    assert "Your inspection scored 92%." in заготовка
+    assert editor_text(заготовка) == ТЕКСТ
 
     # При этом запись НЕ исчезла и не подменена: письмо партнёру могло уже
     # уйти, и вынуть его из истории нельзя ничем. На экране по-прежнему видно,
@@ -296,7 +304,7 @@ def test_письмо_открывается_в_панели_реестра(ст
 
     # Assert — письмо в панели, переходы остаются в ней, сохранение — фоном.
     панель = страница.split("spanel--letter", 1)[1]
-    assert "Your inspection scored 92%." in панель
+    assert editor_text(панель) == ТЕКСТ
     assert "lt--panel" in панель and "data-panel-form" in панель
     назад = панель.split('class="back"', 1)[1].split(">", 1)[0]
     assert f"inspection={ПРОВЕРКА}" in назад and "view=letter" not in назад
@@ -399,7 +407,7 @@ def test_выбор_шаблона_не_трогает_сохранённое_п
     # Assert
     assert "Правленое человеком письмо" in обычная
     assert "Правленое человеком письмо" not in выбран
-    assert "Your inspection scored 92%." in выбран
+    assert editor_text(выбран) == ТЕКСТ
     assert "director" in выбран, "запись исчезла из виду"
 
 
