@@ -144,3 +144,18 @@ def test_успех_движка_без_кадра_это_отказ(
         set_info(CHAT, "INF01", "текст", photos=["AgACfoto1"])
 
     assert "AgACfoto1" in str(exc.value), "в отказе не названо, какой кадр не доехал"
+
+
+def test_photo_only_text_answer_preserves_real_photos_without_caption(domain_env: Path) -> None:
+    _начатая()
+    set_info(CHAT, "INF08", "", photos=["AgACone", "AgACtwo"])
+    answer = get_state(CHAT).info["INF08"]
+    assert answer.text == "" and answer.photos == ["AgACone", "AgACtwo"]
+
+
+@pytest.mark.parametrize("code", ["INF03", "INF05", "INF07"])
+def test_photo_only_cannot_replace_boolean_or_date_answer(domain_env: Path, code: str) -> None:
+    _начатая()
+    with pytest.raises(ValidationError):
+        set_info(CHAT, code, "", photos=["AgACone"])
+    assert code not in get_state(CHAT).info

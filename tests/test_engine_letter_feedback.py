@@ -306,3 +306,44 @@ def test_неизвестный_шаблон_отказ(прогон: Callable[.
     _начать(прогон, вид="plan")
     r = прогон(REPORT, "letter", "--lang", "ru", "--template", "3")
     assert r.code != 0 and "Шаблон письма" in r.text
+
+
+@pytest.mark.parametrize("caption", ["", "Synthetic role caption"])
+@pytest.mark.parametrize("code", [СИЛЬНЫЕ, РОСТ])
+@pytest.mark.parametrize("lang", ["ru", "en"])
+def test_feedback_role_photo_packet_survives_without_repeating_feedback_text(
+    прогон: Callable[..., Run], workdir: Path, caption: str, code: str, lang: str
+) -> None:
+    from test_engine_info_photo import кадр
+
+    _начать(прогон, вид="empty", сильные=None, рост=None)
+    mapping = {
+        "synthetic-ref-a": str(кадр(workdir / "a.jpg")),
+        "synthetic-ref-b": str(кадр(workdir / "b.jpg")),
+    }
+    photo_map = workdir / "photos.json"
+    photo_map.write_text(json.dumps(mapping))
+    saved = прогон(
+        AUDIT,
+        "info",
+        "--qid",
+        code,
+        "--text",
+        caption,
+        "--photo",
+        "synthetic-ref-a",
+        "--photo",
+        "synthetic-ref-b",
+    )
+    assert saved.code == 0, saved.text
+    source = (workdir / "inspection.json").read_bytes()
+    score = прогон(AUDIT, "score", "--json").out
+    result = прогон(
+        REPORT, "html", "--lang", lang, "--photo-map", str(photo_map), "--photos", "none"
+    )
+    assert result.code == 0, result.text
+    assert result.out.count("data:image/") == 2
+    if caption:
+        assert result.out.count(caption) == (1 if lang == "ru" else 0)
+    assert (workdir / "inspection.json").read_bytes() == source
+    assert прогон(AUDIT, "score", "--json").out == score
