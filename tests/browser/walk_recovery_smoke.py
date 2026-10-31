@@ -175,5 +175,21 @@ with sync_playwright() as p:
         assert resumed["local"]["run_id"] == "run-a"
         assert resumed["local"]["photos"] == ["uploaded-once"]
         print(f"{lang} {viewport['width']}: real IDB receipt/blob, reload, own-field retry: PASS")
+        batch = page.evaluate("""async() => {
+          var W=DecimusWalk;var release;var began;
+          var started=new Promise(resolve=>{began=resolve;});var calls=0;
+          W.photo.upload=async()=>{calls++;
+            if(calls===1){began();return new Promise(resolve=>{release=resolve;});}
+            return 'batch-second';
+          };
+          await W.offline.put('key-run-a_info_INF02','info',new Blob(['first']),'run-a');
+          var running=W.offline.kick();await started;
+          await W.offline.put('key-run-a_info_INF02','info',new Blob(['second']),'run-a');
+          await W.offline.kick();W.offline.watch();release('batch-first');await running;
+          return {calls:calls,pending:(await W.offline.list('key-run-a_info_INF02')).length,
+            photos:W.local.get('key-run-a_info_INF02').photos};
+        }""")
+        assert batch == {"calls": 2, "pending": 0, "photos": ["batch-first", "batch-second"]}
+        print(f"{lang} {viewport['width']}: real IDB enqueue while upload is pending: PASS")
         page.close()
     browser.close()

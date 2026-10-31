@@ -34,6 +34,7 @@
   var timer = null;
   var attempt = 0;
   var busy = false;
+  var requested = false;
   var started = false;
   var consumers = Object.create(null);
 
@@ -225,16 +226,22 @@
   }
 
   function cycle() {
-    if (busy) return Promise.resolve();
+    if (busy) { requested = true; return Promise.resolve(); }
     clearTimeout(timer);
     timer = null;
     busy = true;
     var inMemory = W.offline.onTick ? W.offline.onTick() : 0;
     return purgeOld().then(function () { return flush(); }).then(function (left) {
       busy = false;
-      if (left + inMemory > 0) schedule();
+      var again = requested;
+      requested = false;
+      // A frame can arrive after flush took its snapshot. Consume coalesced
+      // kicks once, with a new snapshot; offline only gets a timed retry.
+      if (again && navigator.onLine !== false) return cycle();
+      if (again || left + inMemory > 0) schedule();
     }, function () {
       busy = false;
+      requested = false;
       schedule();
     });
   }
@@ -255,7 +262,8 @@
 
   /** Есть что ждать: поставить таймер, если его нет. */
   function watch() {
-    if (!timer && !busy) schedule();
+    if (busy) { requested = true; return; }
+    if (!timer) schedule();
   }
 
   function start() {

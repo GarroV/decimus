@@ -35,12 +35,14 @@ test('unknown legacy draft stays recoverable; only matching run migrates', () =>
 });
 function offline(records, run = 'run-a', storage = new Map()) {
   let uploads = 0;
+  const navigator = {onLine:true}; const timers=[];
   const W = {state: {data: {key: 'key-' + run, run_id: run}}, local: {
     get: key => storage.get(key), set: (key, value) => storage.set(key, value)
   }, photo: {upload: async () => { uploads++; return 'uploaded'; }}, toast() {}, tx() {}};
   const db = {transaction() {
     const tx = {objectStore() { return {
       getAll() { const req = {result: records.slice()}; queueMicrotask(() => tx.oncomplete()); return req; },
+      add(row) { records.push(row); queueMicrotask(() => tx.oncomplete()); return {result:row.id}; },
       put(row) {
         const at = records.findIndex(r => r.id === row.id);
         if (at === -1) records.push(row); else records[at] = row;
@@ -52,9 +54,11 @@ function offline(records, run = 'run-a', storage = new Map()) {
   const indexedDB = {open() {const req = {result: db}; queueMicrotask(() => req.onsuccess()); return req; }};
   vm.runInNewContext(fs.readFileSync(path.join(root, 'src/web/static/walk-offline.js'), 'utf8'), {
     window: {DecimusWalk: W, indexedDB, addEventListener() {}}, document: {addEventListener() {}},
-    navigator: {onLine: true}, Blob, setTimeout() {}, clearTimeout() {}, Date, Promise
+    navigator, Blob,
+    FileReader: class {readAsArrayBuffer(blob) {blob.arrayBuffer().then(bytes=>{this.result=bytes;this.onload();});}},
+    setTimeout(callback,ms) {timers.push({callback,ms});return timers.length;}, clearTimeout() {}, Date, Promise
   });
-  return {W, storage, uploads: () => uploads};
+  return {W, storage, navigator, timers, uploads: () => uploads};
 }
 test('offline flush uploads only current run; unknown and other run photos survive', async () => {
   const frame = (id, run_id) => ({id, run_id, key: 'key-' + run_id + '_draft', mode: 'violation', at: Date.now(), bytes: new ArrayBuffer(1)});
@@ -165,4 +169,32 @@ test('a seal conflict also keeps pending bytes if a concurrent replacement hid t
   await env.W.offline.kick();
   assert.equal(records.length,1);
   assert.equal(records[0].bytes.byteLength,7);
+});
+test('enqueue during a pending upload coalesces a second pass without waiting for online', async () => {
+  const records=[infoFrame('first')];const env=offline(records);
+  let release;let calls=0;
+  env.W.photo.upload=async()=>{calls++;if(calls===1)return new Promise(resolve=>{release=resolve;});return 'second-ref';};
+  const running=env.W.offline.kick();
+  while(!release)await new Promise(setImmediate);
+  await env.W.offline.put('key-run-a_info_INF01','info',new Blob(['second-frame']),'run-a');
+  await env.W.offline.kick();env.W.offline.watch();
+  release('first-ref');await running;
+  assert.equal(records.length,0);
+  assert.equal(calls,2);
+  assert.deepEqual(Array.from(env.storage.get('key-run-a_info_INF01').photos),['first-ref','second-ref']);
+});
+test('a busy enqueue followed by offline schedules a bounded retry and keeps the second blob', async () => {
+  const records=[infoFrame('first')];const env=offline(records);
+  let release;let calls=0;
+  env.W.photo.upload=async()=>{calls++;return new Promise(resolve=>{release=resolve;});};
+  const running=env.W.offline.kick();
+  while(!release)await new Promise(setImmediate);
+  await env.W.offline.put('key-run-a_info_INF01','info',new Blob(['second-frame']),'run-a');
+  env.navigator.onLine=false;
+  await env.W.offline.kick();env.W.offline.watch();
+  release('first-ref');await running;
+  assert.equal(calls,1);
+  assert.equal(records.length,1);
+  assert.equal(records[0].bytes.byteLength,12);
+  assert.equal(env.timers.length,1);
 });
