@@ -66,7 +66,12 @@ UPSTREAM_TIMEOUT_SEC = 45.0
 
 #: Заголовки запроса, которые нужны сервису обхода. Остальное не передаётся:
 #: куки админки и прочее сервису не нужны и не должны до него доходить.
-FORWARDED_REQUEST_HEADERS = ("Content-Type", "X-Telegram-Init-Data", "Accept-Language")
+FORWARDED_REQUEST_HEADERS = (
+    "Content-Type",
+    "X-Telegram-Init-Data",
+    "X-Walk-Run-Id",
+    "Accept-Language",
+)
 
 #: Заголовки ответа, которые возвращаются как есть.
 FORWARDED_RESPONSE_HEADERS = ("Content-Type", "Cache-Control")
