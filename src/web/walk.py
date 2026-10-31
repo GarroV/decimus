@@ -40,6 +40,7 @@ from src.db.errors import DbError
 from src.db.models import PreviousFindings
 from src.db.space import enter_space, leave_space
 from src.domain import (
+    finding_revision,
     get_item,
     get_state,
     handed_over,
@@ -202,7 +203,9 @@ def build_walk(
         slot(finding.zone)["recorded"].append(
             {
                 "n": finding.n,
+                "revision": finding_revision(finding),
                 "code": finding.code,
+                "zone": finding.zone,
                 "level": finding.level,
                 "text": finding.text,
                 "comment": finding.comment,
@@ -241,6 +244,7 @@ def build_walk(
             "server_now": utc_now().isoformat(),
         },
         "legacy_key": legacy_mark_key(inspection),
+        "finding_history": inspection.finding_history,
         "sealed": sealed,
         "previous": (
             {"date": found.date.isoformat(), "count": len(found.findings)} if found else None

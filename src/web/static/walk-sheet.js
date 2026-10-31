@@ -1015,6 +1015,13 @@
     danger: function () {
       if (!f.n) return null;
       var box = section(null);
+      if (W.split) {
+        var split = W.button("walk-link", tx("walk.split.open"), function () {
+          if (dirty()) { W.toast(tx("walk.split.save_first"), "warn"); return; }
+          var source = f.source_record; close(true); W.split.open(source);
+        });
+        box.appendChild(split);
+      }
       if (!f.confirmDelete) {
         box.appendChild(W.button("walk-link walk-link--danger", tx("walk.sheet.delete"), function () {
           f.confirmDelete = true;
@@ -1286,6 +1293,7 @@
     if (f) close(true);
     var rec = opts.record;
     f = {
+      source_record: rec || null,
       run_id: W.state.data.run_id,
       draftKey: W.state.data.key + "_draft",
       mode: opts.mode || "violation",

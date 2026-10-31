@@ -1,0 +1,27 @@
+{% if head.finding_history %}
+<details class="mx-more">
+  <summary>{{ t('walk.split.history') }}</summary>
+  {% for event in head.finding_history %}
+  {% set original = event.before %}
+  <section class="section">
+    <h3>{{ t('walk.split.source') }} #{{ original.n }}</h3>
+    <div class="meta"><time datetime="{{ event.at }}">{{ event.at }}</time></div>
+    <p>{{ original.code }} · {{ original.level }} · {{ original.zone }}</p>
+    <p>{{ original.text }}</p>
+    {% if original.comment %}<p>{{ original.comment }}</p>{% endif %}
+    <p>{{ t('walk.split.photo_count', n=original.photos|length) }}</p>
+    {% for part in event.after %}
+    <div class="card"><div class="card__body">
+      <h4>{{ t('walk.split.part', n=loop.index) }} · #{{ part.n }}</h4>
+      <p>{{ part.code }} · {{ part.level }} · {{ part.zone }}</p>
+      <p>{{ part.text }}</p>
+      {% if part.comment %}<p>{{ part.comment }}</p>{% endif %}
+      {% for ref in part.photos %}
+      <span class="meta">{{ t('walk.split.photo', n=original.photos.index(ref) + 1) }}</span>
+      {% endfor %}
+    </div></div>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</details>
+{% endif %}

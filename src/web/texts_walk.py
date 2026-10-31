@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from .texts_app import APP_TEXTS
 from .texts_hints import HINT_TEXTS
+from .texts_split import SPLIT_TEXTS
 
 WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.err.run_changed": {
@@ -676,3 +677,5 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
 # Главная и настройки приложения (D373) — тем же каталогом, одним ответом.
 WALK_TEXTS.update(APP_TEXTS)
 WALK_TEXTS.update(HINT_TEXTS)
+
+WALK_TEXTS.update(SPLIT_TEXTS)

@@ -810,6 +810,8 @@
     var zones = S.data.zones;
     var zone = current();
     root.appendChild(renderTop(zones));
+    var history = W.split && W.split.historyPanel();
+    if (history) root.appendChild(history);
     var recovery = renderMarksRecovery();
     if (recovery) root.appendChild(recovery);
     if (zone) {
@@ -840,6 +842,7 @@
     var first = !S.data || S.data.key !== body.key;
     if (first && S.data && W.sheet.isOpen()) W.sheet.close(true);
     if (first && S.info) closeInfo();
+    if (first && W.split && W.split.isOpen()) W.split.close();
     S.data = body;
     S.data = withEquipment(body);
     if (first && W.offline && body.state === "active") W.offline.start();

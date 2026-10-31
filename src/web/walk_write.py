@@ -46,6 +46,8 @@ from src.bot.phrases import learn
 from src.domain import (
     SOURCE_COMMENT,
     HandedOverError,
+    SplitConflict,
+    SplitPart,
     add_finding,
     attach_photo,
     check_environment,
@@ -59,6 +61,7 @@ from src.domain import (
     save_upload,
     set_info,
     set_reading,
+    split_finding,
     upload_file,
     while_open,
 )
@@ -344,9 +347,55 @@ def _edit(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         set_reading(chat_id, n, reading)
 
 
+def _split_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
+    raw_parts = body.get("parts")
+    shared = body.get("shared_photos", [])
+    if (
+        not isinstance(body.get("run_id"), str)
+        or not isinstance(raw_parts, list)
+        or not 2 <= len(raw_parts) <= 5
+        or not isinstance(shared, list)
+        or not all(isinstance(ref, str) for ref in shared)
+    ):
+        raise WalkRefused("walk.err.bad_request")
+    parts = []
+    for raw in raw_parts:
+        if not isinstance(raw, dict):
+            raise WalkRefused("walk.err.bad_request")
+        photos = raw.get("photos")
+        if not isinstance(photos, list) or not all(isinstance(ref, str) for ref in photos):
+            raise WalkRefused("walk.err.bad_request")
+        if not isinstance(raw.get("repeat"), bool):
+            raise WalkRefused("walk.err.bad_request")
+        parts.append(
+            SplitPart(
+                code=_code(raw, "code"),
+                level=_code(raw, "level", _LEVEL),
+                zone=_code(raw, "zone"),
+                text=_text(raw, "text", required=True),
+                comment=_text(raw, "comment"),
+                repeat=raw["repeat"],
+                reading_c=reading_of(raw),
+                photos=tuple(photos),
+            )
+        )
+    split_finding(
+        chat_id,
+        _number(body),
+        parts,
+        expected_run_id=body["run_id"],
+        source_revision=_text(body, "source_revision", required=True),
+        request_id=_text(body, "request_id", required=True),
+        shared_photos=shared,
+        confirmed=body.get("confirmed") is True,
+    )
+
+
 def _finding_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     op = body.get("op")
-    if op == "add":
+    if op == "split":
+        _split_op(chat_id, inspection, body)
+    elif op == "add":
         _add(chat_id, inspection, body)
     elif op == "edit":
         _edit(chat_id, inspection, body)
@@ -445,19 +494,26 @@ def install(
             lang = inspection.ui_lang
             # Решающая проверка сдачи — под замком заметок вместе с записью:
             # ранняя выше могла пройти за миг до того, как бот отдал отчёт.
-            with while_open(who):
-                # A new start uses the same notes lock. Never use the snapshot
-                # taken before acquiring it to authorize a delayed mutation.
-                current = get_state(who)
-                if current is None:
-                    return refused(said("walk.none.title", lang), 409)
-                inspection = current
-                if not run_matches(inspection, body):
-                    return changed(inspection.ui_lang)
+            if op is _finding_op and body.get("op") == "split":
+                # Public split owns notes + state locks, including the run check.
+                # Taking notes twice would deadlock its independent domain API.
                 op(who, inspection, body)
+            else:
+                with while_open(who):
+                    current = get_state(who)
+                    if current is None:
+                        return refused(said("walk.none.title", lang), 409)
+                    inspection = current
+                    if not run_matches(inspection, body):
+                        return changed(inspection.ui_lang)
+                    op(who, inspection, body)
         except HandedOverError:
             logger.info("Обход: чат %s сдал проверку во время записи — отказ", log_id(who))
             return refused(said("walk.sealed", lang), 409)
+        except SplitConflict:
+            return jsonify(
+                {"error": "split_conflict", "message": said("walk.split.conflict", lang)}
+            ), 409
         except WalkRefused as exc:
             return refused(said(str(exc), lang))
         except (ValidationError, EngineError) as exc:
