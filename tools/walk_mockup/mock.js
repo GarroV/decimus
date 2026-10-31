@@ -96,6 +96,12 @@
   /* ── приложение: настройки и подключение Claude (D373, D448) ─────── */
 
   function appOp(data) {
+    if (["finish_review", "finish_submit", "finish_status"].indexOf(data.op) !== -1) {
+      // The standalone mock has no engine/server: never invent a score or delivery.
+      throw new Refused(S.lang === "en"
+        ? "Reports are not generated in this mock. Complete the inspection in the working application."
+        : "В макете отчёт не формируется. Завершение доступно в рабочем приложении.", 422);
+    }
     if (data.op === "lang") {
       if (["ru", "en"].indexOf(data.lang) === -1) throw new Refused(said("walk.app.err.lang"), 422);
       S.lang = data.lang;
