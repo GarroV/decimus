@@ -72,6 +72,7 @@ from src.domain.models import READING_MAX_C, READING_MIN_C, Inspection, Suggesti
 from src.domain.uploads import MAX_UPLOAD_BYTES, UploadQuotaError, own_upload
 from src.recognize.models import UNKNOWN_ZONE
 from src.recognize.provenance import frame_indices
+from src.recognize.timing import measure
 
 from . import walk_rate
 from .texts_walk import WALK_TEXTS
@@ -86,6 +87,7 @@ from .walk_auth import (
     PHOTO_VIEW_PATH,
     WalkSettings,
 )
+from .walk_write_timing import FINDING, INFO, PHOTO, timed_write
 
 logger = logging.getLogger(__name__)
 
@@ -563,7 +565,8 @@ def install(
         return entry.get(lang) or entry[ui_lang]
 
     def writable(chat_id: int, identity: dict[str, Any]) -> Inspection | tuple[Response, int]:
-        inspection = get_state(chat_id)
+        with measure("lookup"):
+            inspection = get_state(chat_id)
         if inspection is None:
             return refused(said("walk.none.title", ui_lang), 409)
         if not run_matches(inspection, identity):
@@ -590,16 +593,19 @@ def install(
             if op is _finding_op and body.get("op") == "split":
                 # Public split owns notes + state locks, including the run check.
                 # Taking notes twice would deadlock its independent domain API.
-                op(who, inspection, body)
+                with measure("mutation"):
+                    op(who, inspection, body)
             else:
                 with while_open(who):
-                    current = get_state(who)
+                    with measure("lookup"):
+                        current = get_state(who)
                     if current is None:
                         return refused(said("walk.none.title", lang), 409)
                     inspection = current
                     if not run_matches(inspection, body):
                         return changed(inspection.ui_lang)
-                    op(who, inspection, body)
+                    with measure("mutation"):
+                        op(who, inspection, body)
         except HandedOverError:
             logger.info("Обход: чат %s сдал проверку во время записи — отказ", log_id(who))
             return refused(said("walk.sealed", lang), 409)
@@ -629,9 +635,11 @@ def install(
             # пути и подробности в журнал, аудитору — общее «не вышло».
             logger.exception("Обход: запись чата %s не удалась", log_id(who))
             return refused(said("walk.err.server", lang), 500)
-        return respond(who, ui_lang)
+        with measure("render"):
+            return respond(who, ui_lang)
 
     @app.post(PHOTO_PATH, endpoint=PHOTO_ENDPOINT)
+    @timed_write(PHOTO)
     def walk_photo() -> tuple[Response, int]:
         request.max_content_length = MAX_UPLOAD_BYTES
         who = identify(conf, ui_lang, header_only=True, kind=walk_rate.PHOTO)
@@ -647,13 +655,15 @@ def install(
             if not isinstance(inspection, Inspection):
                 return inspection
             with while_open(who):
-                current = get_state(who)
+                with measure("lookup"):
+                    current = get_state(who)
                 if current is None:
                     return refused(said("walk.none.title", ui_lang), 409)
                 inspection = current
                 if not run_matches(inspection, identity):
                     return changed(inspection.ui_lang)
-                ref = save_upload(request.get_data(cache=False), check_environment(), owner=who)
+                with measure("mutation"):
+                    ref = save_upload(request.get_data(cache=False), check_environment(), owner=who)
         except HandedOverError:
             return refused(said("walk.sealed", ui_lang), 409)
         except UploadQuotaError as exc:
@@ -663,7 +673,8 @@ def install(
             logger.info("Обход: кадр чата %s не принят — %s", log_id(who), exc)
             return refused(said("walk.err.photo_bad", ui_lang))
         logger.info("Обход: чат %s прислал кадр %s", log_id(who), ref)
-        return jsonify({"ref": ref}), 201
+        with measure("render"):
+            return jsonify({"ref": ref}), 201
 
     @app.post(PHOTO_VIEW_PATH, endpoint=PHOTO_VIEW_ENDPOINT)
     def walk_photo_view() -> Response | tuple[Response, int]:
@@ -685,9 +696,11 @@ def install(
         return ответ
 
     @app.post(FINDING_PATH, endpoint=FINDING_ENDPOINT)
+    @timed_write(FINDING)
     def walk_finding() -> tuple[Response, int]:
         return write(_finding_op)
 
     @app.post(INFO_PATH, endpoint=INFO_ENDPOINT)
+    @timed_write(INFO)
     def walk_info() -> tuple[Response, int]:
         return write(_info_op)
