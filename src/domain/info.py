@@ -70,7 +70,9 @@ def set_info(chat_id: int, code: str, text: str, *, photos: Sequence[str] = ()) 
     if not text.strip():
         field = next((field for field in FIELDS if field.code == clean_code.upper()), None)
         if not shots or field is None or field.kind != KIND_TEXT:
-            raise ValidationError("Пустой ответ допустим только для текстового поля с фотографиями")
+            raise ValidationError(
+                f"Пустой ответ поля {clean_code} допустим только для текстового поля с фотографиями"
+            )
         if get_item(clean_code, chat_id=chat_id).kind != "info":
             raise ValidationError("Фотоответ должен относиться к информационному пункту методики")
     settings = settings_for(chat_id)

@@ -24,6 +24,7 @@ def bridge(browser, client, *, fault=None):
         "photo": walk_auth.PHOTO_PATH,
         "photo-view": walk_auth.PHOTO_VIEW_PATH,
         "finding": walk_auth.FINDING_PATH,
+        "level": walk_auth.LEVEL_PATH,
         "info": walk_auth.INFO_PATH,
         "app": walk_auth.APP_PATH,
     }
@@ -42,6 +43,13 @@ def bridge(browser, client, *, fault=None):
         if not path.startswith("/tg/walk"):
             request_route.fulfill(status=404, body="")
             return
+        if path == walk_auth.LEVEL_PATH:
+            request_route.fulfill(
+                status=503,
+                content_type="application/json",
+                body=json.dumps({"error": "unavailable", "status": "unavailable"}),
+            )
+            return  # Manual-class QA never calls a provider.
         raw = request.post_data_buffer
         body = (
             json.loads(raw)
@@ -106,10 +114,14 @@ def bootstrap(browser, *, sheet=False):
     browser.add_script_tag(path=str(STATIC / "walk-offline.js"))
     if sheet:
         browser.add_script_tag(path=str(STATIC / "walk-menu.js"))
+        browser.add_script_tag(path=str(STATIC / "walk-class-review.js"))
         source = (
             (STATIC / "walk-sheet.js")
             .read_text()
-            .replace("W.sheet = {", "W.testSubmit={submit:submit,form:()=>f}; W.sheet = {")
+            .replace(
+                "W.sheet = {",
+                "W.testSubmit={submit:submit,form:()=>f,pick:pick,setZone:setZone}; W.sheet = {",
+            )
         )
         browser.add_script_tag(content=source)
         browser.evaluate("DecimusWalk.sheet.open({mode:'violation',zone:'hot_kitchen'})")
@@ -190,11 +202,12 @@ def test_partial_multi_save_reconciles_real_flask_before_explicit_retry(
         "()=>DecimusWalk.testSubmit.form().photos.filter(p=>p.state==='done').length===3"
     )
     refs = page.evaluate("DecimusWalk.testSubmit.form().photos.map(p=>p.ref)")
+    authorize_manual_classes(page, words="Source words kept")
     page.evaluate(
         """refs=>{const W=DecimusWalk;const f=W.testSubmit.form();
-      f.code='CLN01';f.level='D1';f.text='Synthetic A';f.words='Source words kept';
+      f.words='Source words kept';
       window.plan=['CLN01','CLN03','CLN05'].map((code,index)=>({op:'add',code,
-        zone:'hot_kitchen',level:'D1',text:'Synthetic '+['A','B','C'][index],
+        zone:'hot_kitchen',level:manualLevels[code],text:'Synthetic '+['A','B','C'][index],
         words:f.words,comment:'',repeat:false,photos:[refs[index]],reading_c:null}));
       W.testSubmit.submit(plan);
     }""",
@@ -217,6 +230,21 @@ def test_partial_multi_save_reconciles_real_flask_before_explicit_retry(
     )
 
 
+def authorize_manual_classes(browser, *, words="All original human words"):
+    browser.locator(".walk-area--words").fill(words)
+    browser.evaluate("window.manualLevels={}")
+    for code in ("CLN01", "CLN03", "CLN05", "CLN01"):
+        browser.evaluate(
+            "code=>{DecimusWalk.testSubmit.pick(code);DecimusWalk.testSubmit.setZone('hot_kitchen','pick')}",
+            code,
+        )
+        label = browser.evaluate("DecimusWalk.tx('walk.sheet.class_review.manual')")
+        browser.get_by_role("button", name=label, exact=True).click()
+        browser.locator('[data-manual-class="D1"]').click()
+        browser.evaluate("code=>manualLevels[code]=DecimusWalk.testSubmit.form().level", code)
+    assert browser.evaluate("Object.values(manualLevels).every(level=>level==='D1')")
+
+
 def submit_plan(browser, count=3):
     browser.locator(".walk-pick--gallery input").set_input_files(
         [picture(index + 1) for index in range(count)]
@@ -231,14 +259,16 @@ def submit_plan(browser, count=3):
         arg=count,
     )
     refs = browser.evaluate("DecimusWalk.testSubmit.form().photos.map(p=>p.ref)")
+    authorize_manual_classes(browser)
     browser.evaluate(
         """refs=>{const W=DecimusWalk;const f=W.testSubmit.form();
-      f.code='CLN01';f.level='D1';f.text='Synthetic A';f.words='All original human words';
-      const key=f.draftKey;W.local.set(key,{...W.local.get(key),class_facts:[{
+      f.words='All original human words';
+      const key=f.draftKey;f.savedClassFacts=[{
         code:'CLN05',zone:'hot_kitchen',answer:'Human fact retained',
-        words:f.words,photos:[refs[2]]}]});
+        words:f.words,photos:[refs[2]]}];
+      W.local.set(key,{...W.local.get(key),class_facts:f.savedClassFacts});
       window.plan=['CLN01','CLN03','CLN05'].map((code,index)=>({op:'add',code,
-        zone:'hot_kitchen',level:'D1',text:'Synthetic '+['A','B','C'][index],
+        zone:'hot_kitchen',level:manualLevels[code],text:'Synthetic '+['A','B','C'][index],
         words:f.words,comment:'',repeat:false,photos:[refs[index]],reading_c:null}));
       W.testSubmit.submit(plan);
     }""",
