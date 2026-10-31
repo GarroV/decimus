@@ -47,9 +47,30 @@
       if (owned(raw)) { done(parseMarks(raw)); return; }
       // Unknown legacy data stays at its original key for recovery.
       W.storedGet(data.legacy_key, function (legacy) {
-        done(owned(legacy) ? parseMarks(legacy) : { z: [], f: [] });
+        var recovered = parseMarks(legacy);
+        done(owned(legacy) ? recovered : { z: [], f: [] },
+          !owned(legacy) && (recovered.z.length || recovered.f.length) ? recovered : null);
       });
     });
+  }
+
+  function renderMarksRecovery() {
+    var marks = S.recoveryMarks;
+    if (!marks) return null;
+    var panel = el("details", "walk-form__note walk-form__note--info");
+    panel.appendChild(el("summary", "", tx("walk.draft.marks")));
+    panel.appendChild(el("p", "", tx("walk.draft.unknown")));
+    panel.appendChild(el("pre", "", tx("walk.draft.marks_preview", {
+      zones: marks.z.join(", "), findings: marks.f.join(", ")
+    })));
+    panel.appendChild(W.button("walk-btn", tx("walk.draft.copy"), function () {
+      if (!window.confirm(tx("walk.draft.marks_confirm"))) return;
+      S.marks = {z: marks.z.slice(), f: marks.f.slice()};
+      saveMarks();
+      S.recoveryMarks = null;
+      render();
+    }));
+    return panel;
   }
 
   function saveMarks() {
@@ -784,6 +805,8 @@
     var zones = S.data.zones;
     var zone = current();
     root.appendChild(renderTop(zones));
+    var recovery = renderMarksRecovery();
+    if (recovery) root.appendChild(recovery);
     if (zone) {
       root.appendChild(renderSwitch(zones, zone));
       root.appendChild(renderStage(zone));
@@ -816,7 +839,7 @@
     if (first && W.offline && body.state === "active") W.offline.start();
     document.documentElement.lang = body.lang;
     if (body.state !== "active") { if (!keepSheet) W.sheet.close(true); render(); return; }
-    if (first) loadMarks(body, function (m) { if (S.data.key !== body.key) return; S.marks = m; S.open = null; render(); });
+    if (first) loadMarks(body, function (m, recovery) { if (S.data.key !== body.key) return; S.recoveryMarks = recovery; S.marks = m; S.open = null; render(); });
     else render();
   };
 
