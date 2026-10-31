@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 
@@ -452,9 +453,18 @@ class InfoLine:
     code: str
     question: str | None
     answer: str
+    shown_photos: tuple[str, ...] = ()
+    missing_photos: int = 0
+    photos_known: bool = True
 
 
-def load_info(detail: InspectionDetail, *, lang: str) -> tuple[tuple[InfoLine, ...], str]:
+def load_info(
+    detail: InspectionDetail,
+    *,
+    lang: str,
+    photo_map: Mapping[str, previews.FindingShots] | None = None,
+    photos_known: bool = True,
+) -> tuple[tuple[InfoLine, ...], str]:
     """Поля информационной части с формулировками вопросов и исход поиска методики.
 
     Язык вопроса — язык интерфейса, если методика на нём заведена, иначе язык
@@ -466,11 +476,25 @@ def load_info(detail: InspectionDetail, *, lang: str) -> tuple[tuple[InfoLine, .
     подписи, исход = info_titles.titles(
         detail.inspection.checklist_version, lang=язык, papers=letter_sources()
     )
-    строки = tuple(
-        InfoLine(code=row.code, question=подписи.get(row.code.strip().upper()), answer=row.text)
-        for row in detail.info
-    )
-    return строки, исход
+    строки = []
+    for row in detail.info:
+        кадры = (photo_map or {}).get(row.code, previews.FindingShots((), 0))
+        строки.append(
+            InfoLine(
+                code=row.code,
+                question=подписи.get(row.code.strip().upper()),
+                answer=row.text,
+                shown_photos=кадры.shown,
+                missing_photos=кадры.missing,
+                photos_known=photos_known,
+            )
+        )
+    return tuple(строки), исход
+
+
+def load_info_previews(inspection_id: str, *, reach: Reach) -> dict[str, previews.FindingShots]:
+    """Кадры информационных ответов одной проверкой охвата, без внутренних путей S3."""
+    return previews.info_previews(inspection_id, reach=reach)
 
 
 def load_report(inspection_id: str, *, reach: Reach) -> reports.ReportRef | None:

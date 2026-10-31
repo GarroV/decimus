@@ -1741,7 +1741,19 @@ def _card_context(
     except DbError:
         отчёт = None
         отчёт_известен = False
-    поля, методика_полей = data.load_info(detail, lang=lang)
+    кадры_ответов: dict[str, Any] = {}
+    кадры_ответов_известны = True
+    if detail.info:
+        try:
+            кадры_ответов = data.load_info_previews(inspection_id, reach=auth.current_reach())
+        except DbError as exc:
+            кадры_ответов_известны = False
+            logger.warning(
+                "Фотографии информационных ответов не прочитались (%s)", type(exc).__name__
+            )
+    поля, методика_полей = data.load_info(
+        detail, lang=lang, photo_map=кадры_ответов, photos_known=кадры_ответов_известны
+    )
     # Пункт на экран идёт меткой «Порядок 13», а не кодом (20.10.2026); тексты —
     # методики версии этой проверки.
     метка_пункта, метка_с_текстом = item_labels.pinned(detail.inspection.checklist_version, lang)

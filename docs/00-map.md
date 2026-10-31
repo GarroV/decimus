@@ -302,7 +302,8 @@ Claude входом через сайт (OAuth).
 | `src/web/walk_access.py` | Кого пускает мини-апп — ровно тех, кого пускает бот (D372) |
 | `src/web/walk_app.py` | Сервис мини-аппа обхода: только адреса `/tg/walk*` и статика к ним |
 | `src/web/walk_auth.py` | Кто открыл мини-апп обхода — по подписи Telegram, а не по куке админки (#418) |
-| `src/web/walk_finish.py` | «Завершить проверку» из приложения (D422, D449): сводка или сразу отчёт |
+| `src/web/walk_finish.py` | Общая сборка отчёта для miniapp и запасного завершения через чат |
+| `src/web/walk_finish_review.py` | Read-only miniapp review of the current run; the engine owns every score |
 | `src/web/walk_main.py` | Точка входа сервиса мини-аппа обхода: `python -m src.web.walk_main` |
 | `src/web/walk_proxy.py` | Адреса мини-аппа обхода в админке — передача сервису обхода, без своей логики |
 | `src/web/walk_rate.py` | Предел частоты запросов мини-аппа обхода по чату (#529, #710) |
@@ -350,7 +351,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 66 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+58) |
+| `src/web/static/` | 68 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+60) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -589,6 +590,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0103_mailing_cc.sql` | Списки копий раздела «Письма и уведомления» (D608, #1130, #977): почты сотрудников УК, которые подставляются в «Копию» черновика письма |
 | `0104_mailing_templates.sql` | Шаблоны писем УК (D550, D608, #977, #1130): текст письма партнёру по проверке, который правит админ УК, с историей версий |
 | `0105_dodois_metrics.sql` | Данные Dodo IS для страницы «Качество» по пиццериям и месяцам (D671): продажи по источнику и каналу, заказы агрегаторов, оценки клиентов (КР), оценки РКО и РС по… |
+| `0106_inspection_timing.sql` | Historical rows deliberately stay NULL; no inference or backfill |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -920,6 +922,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/shape.py` | Оценочная форма издания: чем считали, а не что написано (T349, #337) |
 | `src/domain/state.py` | Состояние проверки: чтение, старт и собственные поля блока |
 | `src/domain/tenants.py` | Код тенанта управляющей компании и перевод старого кода (D234, #439) |
+| `src/domain/timing.py` | Server visit timestamps; elapsed time is derived once from the primary pair |
 | `src/domain/training_metrics.py` | Метрики экрана «Обучение» — определения в одном месте (D574, D575, #906; docs/20-training.md) |
 | `src/domain/translation.py` | Поля методики, заполненные не на том языке, на котором их напечатают (T186) |
 | `src/domain/uncovered.py` | Накопитель непокрытых формулировок — случай, когда записи не появилось |
@@ -963,6 +966,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/rules_check.py` | T032: страховка после модели — код-уровневая проверка формулировки |
 | `src/recognize/schema.py` | T031: схема ответа модели |
 | `src/recognize/shortlist.py` | T030: перечень кандидатов, который уходит в запрос к модели |
+| `src/recognize/timing.py` | #1253: monotonic request-local timing; never captures input or model output |
 | `src/recognize/transcribe.py` | T033: голосовое сообщение аудитора → текст |
 | `src/recognize/translate.py` | Перевод свободного текста аудитора на язык отчёта (D394, #542) |
 | `src/recognize/zone_words.py` | Зона из слов аудитора: обиходные названия мест и разбор текста (T124, D047, D048) |

@@ -584,6 +584,7 @@
 | `0103_mailing_cc.sql` | `mailing_cc` |
 | `0104_mailing_templates.sql` | `mailing_templates` |
 | `0105_dodois_metrics.sql` | `dodois.unit_sales_month`, `dodois.unit_aggregator_month`, `dodois.unit_kr_month`, `dodois.unit_rating_period`, `dodois.unit_checkup_period`, `dodois.metric_loads` |
+| `0106_inspection_timing.sql` | — |
 <!-- map:end -->
 
 ## Makefile

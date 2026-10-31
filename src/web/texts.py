@@ -806,6 +806,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "No violations were recorded.",
     },
     "card.info.title": {"ru": "Информация", "en": "Information"},
+    "card.info.photos": {"ru": "Фотографии: {n}", "en": "Photos: {n}"},
     "card.info.record": {"ru": "Информация", "en": "Information"},
     "card.info.recommendation_for": {
         "ru": "Рекомендация к записи №{n} · {item}",
