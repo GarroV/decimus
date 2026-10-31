@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from src.domain import allowed_levels
+from src.domain import allowed_levels, list_items
 
 from .errors import RecognizeConfigError
 from .models import ANSWER_LEVELS, NONE_CODE, UNKNOWN_ZONE
@@ -45,9 +45,13 @@ def picks_for(codes: Sequence[str], *, chat_id: int | None) -> tuple[str, ...]:
     ТОЙ проверки (T169). Класс из действующей методики движок у этой проверки
     не примет, и починить это с точки нельзя.
     """
+    # Один свежий снимок на сборку. get_item перечитывает весь CSV; вызов на
+    # каждый код превращал подготовку запроса в квадратичное чтение методики.
+    items = {item.code: item for item in list_items(chat_id=chat_id)} if codes else {}
     picks: list[str] = []
     for code in codes:
-        levels = allowed_levels(code, chat_id=chat_id)
+        item = items.get(code.strip().upper())
+        levels = item.levels if item is not None else allowed_levels(code, chat_id=chat_id)
         if not levels:
             raise RecognizeConfigError(
                 f"У пункта {code} в методике нет ни одного допустимого класса. "

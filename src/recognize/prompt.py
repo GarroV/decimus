@@ -21,7 +21,7 @@ import re
 import unicodedata
 from collections.abc import Sequence
 
-from src.domain import Zone, get_item
+from src.domain import Zone, get_item, list_items
 
 from .models import NONE_CODE, UNKNOWN_ZONE
 from .schema import PICK_SEP
@@ -235,12 +235,19 @@ def _pick_lines(picks: Sequence[str], lang: str, chat_id: int | None) -> str:
     по нему же, и подписать его словами другого издания значило бы показать
     модели один пункт под названием другого.
     """
+    # Перечень одного запроса — свежий снимок издания, без кеша между
+    # обращениями. Раньше каждый класс заново читал и разбирал весь CSV.
+    has_items = any(pick.partition(PICK_SEP)[2] for pick in picks)
+    items = {item.code: item for item in list_items(chat_id=chat_id)} if has_items else {}
     lines: list[str] = []
     for pick in picks:
         code, _, level = pick.partition(PICK_SEP)
         if not level:
             continue
-        question = get_item(code, chat_id=chat_id).question(lang)
+        item = items.get(code.strip().upper())
+        if item is None:
+            item = get_item(code, chat_id=chat_id)
+        question = item.question(lang)
         lines.append(f"- {pick} — {data_block(TAG_ITEM, question)}")
     return "\n".join(lines)
 
