@@ -38,7 +38,7 @@ def confirm(page, index):
 def save_two(page):
     row_for_zone(page, "Zone B").locator(".walk-found__also").click()
     page.get_by_role("button", name="Save 2", exact=True).click()
-    page.wait_for_function("ops.length === 2")
+    page.wait_for_function("ops.length === 2 && !document.querySelector('.walk-sheet')")
     return page.evaluate("ops")
 
 

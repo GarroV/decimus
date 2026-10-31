@@ -265,7 +265,7 @@ def test_extra_question_and_answer_do_not_change_primary_class_or_reading(browse
     assert page.evaluate("levelCalls[2].reading_c") is None
     resolve(page, 2, level="D2")
     page.get_by_role("button", name="Save 2", exact=True).click()
-    page.wait_for_function("ops.length === 2")
+    page.wait_for_function("ops.length === 2 && !document.querySelector('.walk-sheet')")
     assert [(op["code"], op["level"]) for op in page.evaluate("ops")] == [
         ("SYN01", "D1"),
         ("SYN02", "D2"),
@@ -297,7 +297,7 @@ def test_each_selected_item_confirms_its_own_reading_without_copying_primary_num
     assert page.evaluate("levelCalls[1].reading_source") == "human"
     resolve(page, 1, level="D2")
     page.get_by_role("button", name="Save 2", exact=True).click()
-    page.wait_for_function("ops.length === 2")
+    page.wait_for_function("ops.length === 2 && !document.querySelector('.walk-sheet')")
     assert [op["reading_c"] for op in page.evaluate("ops")] == [0, 9]
 
 
@@ -533,7 +533,7 @@ def test_extra_finding_exposes_full_independent_editable_description(browser_pag
     editor.fill("Human fact for second item only")
     assert page.evaluate("cards[1].wording") == "ANOTHER MODEL WORDING"
     page.get_by_role("button", name="Save 2", exact=True).click()
-    page.wait_for_function("ops.length === 2")
+    page.wait_for_function("ops.length === 2 && !document.querySelector('.walk-sheet')")
     assert [op["text"] for op in page.evaluate("ops")] == [
         "MODEL WORDING MUST NOT BECOME FACTS",
         "Human fact for second item only",
