@@ -1036,6 +1036,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                     tenant=auth.current_tenant(),
                     lang=lang,
                     editor=_editor(),
+                    code_text_reviewed=request.form.get("code_text_reviewed") == "1",
                     **поля,
                 )
                 notice = t("revise.done", lang)

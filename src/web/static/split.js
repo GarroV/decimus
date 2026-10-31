@@ -168,7 +168,7 @@
   // на том же месте. Не вышло дойти до сервера — сказано в панели, форма цела.
   document.addEventListener("submit", function (e) {
     var form = e.target;
-    if (!form.matches || !form.matches("[data-drawer] form[data-panel-form]")) return;
+    if (e.defaultPrevented || !form.matches || !form.matches("[data-drawer] form[data-panel-form]")) return;
     if (!window.fetch || !window.FormData) return;
     // Кнопка, которая уводит со страницы (черновик в почте — через окно согласия
     // Google), уходит обычной отправкой: фоном за чужим сайтом не сходить.
@@ -181,6 +181,12 @@
     // Правка записи на вычитке (D535): что человек вписал — запоминается, чтобы при
     // отказе сервера форма раскрылась снова с его словами, а не пустой.
     var kept = window.Proofread ? window.Proofread.snapshot(form) : null;
+    var panel = body.querySelector(".spanel");
+    var others = window.Proofread ? Array.from(panel.querySelectorAll("form[data-proofread-form]"))
+      .filter(function (other) { return other !== form && window.Proofread.dirty(other); })
+      .map(function (other) { return window.Proofread.snapshot(other); }) : [];
+    panel.setAttribute("data-proofread-busy", "");
+    panel.inert = true;
     var buttons = form.querySelectorAll("button[type=submit]");
     buttons.forEach(function (b) {
       b.disabled = true;
@@ -214,6 +220,7 @@
         var node = document.importNode(next, true);
         body.querySelector(".spanel").replaceWith(node);
         bind(node);
+        others.forEach(function (state) { window.Proofread.restore(node, state); });
         body.scrollTop = top;
         var note = node.querySelector(".note--ok, .note--error");
         if (kept && note && note.classList.contains("note--error")) window.Proofread.restore(node, kept);
@@ -221,8 +228,11 @@
         refreshList();
       })
       .catch(function () {
+        panel.inert = false;
+        panel.removeAttribute("data-proofread-busy");
         buttons.forEach(function (b) {
           b.disabled = false;
+          if (b.dataset.idle) b.textContent = b.dataset.idle;
         });
         panelFailed(body);
       });

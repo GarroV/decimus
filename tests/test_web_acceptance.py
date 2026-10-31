@@ -271,6 +271,7 @@ def test_администратор_исправляет_запись_своег
             ),
             **ИСПРАВЛЕНИЕ,
             "reading": "",
+            "code_text_reviewed": False,
         }
     ]
     assert "Запись исправлена, оценка пересчитана." in ответ.get_data(as_text=True)
@@ -383,8 +384,8 @@ def test_панель_ждущей_принимает_и_правит_на_ме�
     страница = стенд.get(ПАНЕЛЬ).get_data(as_text=True)
 
     assert (
-        'action="/inspections/11111111-1111-1111-1111-111111111111/accept?lang=ru" data-panel-form'
-        in страница
+        'action="/inspections/11111111-1111-1111-1111-111111111111/accept?lang=ru" '
+        "data-panel-form data-accept-guard" in страница
     )
     assert "Принять проверку" in страница
     assert "/findings/f1/revise?lang=ru" in страница
@@ -457,3 +458,15 @@ def test_действие_без_скрипта_отвечает_страниц�
     текст = стенд.post("/inspections/x/accept", headers=ORIGIN).get_data(as_text=True)
 
     assert "<html" in текст and "Проверка принята." in текст
+
+
+@админ
+def test_explicit_code_text_review_reaches_revision(стенд, monkeypatch):
+    calls = _правка(monkeypatch)
+    response = стенд.post(
+        "/inspections/x/findings/f1/revise",
+        data={**ИСПРАВЛЕНИЕ, "code_text_reviewed": "1"},
+        headers=ORIGIN,
+    )
+    assert response.status_code == 200
+    assert calls[0]["code_text_reviewed"] is True

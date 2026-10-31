@@ -219,6 +219,7 @@ def revise_card(
     zone: str,
     text: str,
     reading: str = "",
+    code_text_reviewed: bool = False,
 ) -> None:
     """Исправить запись ждущей проверки и пересчитать её. Отказ — `ReviseError`.
 
@@ -231,6 +232,14 @@ def revise_card(
     код, класс, зона, слова, необычная = _checked_entry(
         detail, inspection_id, lang=lang, code=code, level=level, zone=zone, text=text
     )
+
+    if (
+        прежняя.code != code.strip()
+        and (прежняя.text or "").strip()
+        and (прежняя.text or "").strip() == text.strip()
+        and not code_text_reviewed
+    ):
+        raise ReviseError(t("proofread.review_required", lang), code="revise_text_review")
 
     бумаги = letter_sources()
     try:

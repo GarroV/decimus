@@ -626,6 +626,29 @@ TEXTS: dict[str, dict[str, str]] = {
     "proofread.add": {"ru": "Добавить нарушение", "en": "Add a violation"},
     "proofread.add.title": {"ru": "Новое нарушение", "en": "New violation"},
     "proofread.add.submit": {"ru": "Добавить", "en": "Add"},
+    "proofread.save_error": {
+        "ru": "Не удалось сохранить правку. Введённые данные сохранены в форме; повторите попытку.",
+        "en": "Could not save the edit. Your input is still in the form; please try again.",
+    },
+    "proofread.review_required": {
+        "ru": (
+            "Пункт изменён. Отредактируйте описание факта или подтвердите, "
+            "что оно соответствует новому пункту."
+        ),
+        "en": "The item changed. Edit the factual description or confirm it matches the new item.",
+    },
+    "proofread.review_confirm": {
+        "ru": "Проверил: описание соответствует выбранному пункту",
+        "en": "I checked: the description matches the selected item",
+    },
+    "proofread.unsaved": {
+        "ru": "Сначала сохраните или отмените правки записей, затем примите проверку.",
+        "en": "Save or cancel your finding edits before accepting the inspection.",
+    },
+    "proofread.inflight": {
+        "ru": "Дождитесь завершения сохранения правок.",
+        "en": "Wait for the edits to finish saving.",
+    },
     "proofread.what": {"ru": "Что не так", "en": "What is wrong"},
     "proofread.what.hint": {
         "ru": "Своими словами, как сказал бы аудитор. Пункт, класс и зону подберёт система.",
