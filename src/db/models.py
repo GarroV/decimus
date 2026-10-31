@@ -122,6 +122,7 @@ class InspectionRow:
     speech_lang: str = ""
     started_at: str | None = None
     finished_at: str | None = None
+    finding_history: list[dict[str, Any]] | None = None
 
     @property
     def duration_seconds(self) -> float | None:

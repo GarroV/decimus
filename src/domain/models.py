@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass, field
+from typing import Any
 
 from .errors import ValidationError
 
@@ -227,6 +228,7 @@ class Inspection:
     run_id: str = ""
     started_at: datetime.datetime | None = None
     finished_at: datetime.datetime | None = None
+    finding_history: list[dict[str, Any]] = field(default_factory=list)
 
     def visit_date(self) -> datetime.date | None:
         """Дата обхода датой; нечитаемая строка — `None` (сравнивать не с чем)."""

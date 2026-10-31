@@ -564,6 +564,7 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
         run_id=str(block.get("run_id") or ""),
         started_at=parse_timestamp(block.get("started_at")),
         finished_at=parse_timestamp(block.get("finished_at")),
+        finding_history=list(block.get("finding_history") or []),
     )
 
 

@@ -55,6 +55,7 @@ from .models import (
     ZoneScore,
 )
 from .scoring import score
+from .split import SplitConflict, SplitPart, finding_revision, split_finding
 from .state import (
     drop_inspection,
     get_state,
@@ -106,6 +107,8 @@ __all__ = [
     "HandedOverError",
     "Inspection",
     "Score",
+    "SplitConflict",
+    "SplitPart",
     "Suggestion",
     "UncoveredEntry",
     "Zone",
@@ -120,6 +123,7 @@ __all__ = [
     "drop_finding",
     "drop_inspection",
     "edit_finding",
+    "finding_revision",
     "get_item",
     "get_state",
     "guard_writable",
@@ -141,6 +145,7 @@ __all__ = [
     "set_report_lang",
     "set_unit",
     "settings_for",
+    "split_finding",
     "start_inspection",
     "sync_checklist_version",
     "upload_file",

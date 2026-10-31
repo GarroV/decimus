@@ -58,13 +58,13 @@ _INSERT_INSPECTION_SQL = """
 insert into inspections (
     tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
     ui_lang, speech_lang, checklist_version, checklist_code, auditor, city, partner, contact,
-    started_at, finished_at, pct, grade, deductions, counts, by_zone, by_process,
+    started_at, finished_at, finding_history, pct, grade, deductions, counts, by_zone, by_process,
     source_fingerprint, status
 ) values (
     %(tenant_code)s, %(unit_id)s, %(chat_id)s, %(kind)s, %(inspection_date)s,
     %(report_lang)s, %(ui_lang)s, %(speech_lang)s, %(checklist_version)s,
     %(checklist_code)s, %(auditor)s, %(city)s, %(partner)s, %(contact)s,
-    %(started_at)s, %(finished_at)s, %(pct)s, %(grade)s,
+    %(started_at)s, %(finished_at)s, %(finding_history)s, %(pct)s, %(grade)s,
     %(deductions)s, %(counts)s, %(by_zone)s, %(by_process)s, %(source_fingerprint)s, 'draft'
 )
 on conflict (source_fingerprint) where retracted_at is null do nothing
@@ -369,6 +369,9 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
                     "inspection_date": inspection_date,
                     "started_at": inspection.started_at,
                     "finished_at": inspection.finished_at,
+                    "finding_history": Json(inspection.finding_history)
+                    if inspection.finding_history
+                    else None,
                     "report_lang": inspection.report_lang,
                     "ui_lang": inspection.ui_lang,
                     "speech_lang": inspection.speech_lang,
