@@ -158,3 +158,11 @@ test('in-flight old info upload settles only into original key after active run 
   assert.equal(env.storage.get('key-run-a_info_INF01').photos[0],'old-completed');
   assert.equal(env.storage.has('key-run-b_info_INF01'),false);
 });
+test('a seal conflict also keeps pending bytes if a concurrent replacement hid the run error', async () => {
+  const records = [infoFrame('a')];
+  const env = offline(records);
+  env.W.photo.upload=async()=>{throw {status:409,retryable:false};};
+  await env.W.offline.kick();
+  assert.equal(records.length,1);
+  assert.equal(records[0].bytes.byteLength,7);
+});

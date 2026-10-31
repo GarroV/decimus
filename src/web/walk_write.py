@@ -420,10 +420,12 @@ def install(
         entry = WALK_TEXTS[key]
         return entry.get(lang) or entry[ui_lang]
 
-    def writable(chat_id: int) -> Inspection | tuple[Response, int]:
+    def writable(chat_id: int, identity: dict[str, Any]) -> Inspection | tuple[Response, int]:
         inspection = get_state(chat_id)
         if inspection is None:
             return refused(said("walk.none.title", ui_lang), 409)
+        if not run_matches(inspection, identity):
+            return changed(inspection.ui_lang)
         if handed_over(chat_id):
             return refused(said("walk.sealed", inspection.ui_lang), 409)
         return inspection
@@ -437,7 +439,7 @@ def install(
             return refused(said("walk.err.bad_request", ui_lang), 400)
         lang = ui_lang
         try:
-            inspection = writable(who)
+            inspection = writable(who, body)
             if not isinstance(inspection, Inspection):
                 return inspection
             lang = inspection.ui_lang
@@ -482,8 +484,13 @@ def install(
         who = identify(conf, ui_lang, header_only=True, kind=walk_rate.PHOTO)
         if not isinstance(who, int):
             return who
+        identity = (
+            {"run_id": request.headers["X-Walk-Run-Id"]}
+            if "X-Walk-Run-Id" in request.headers
+            else {}
+        )
         try:
-            inspection = writable(who)
+            inspection = writable(who, identity)
             if not isinstance(inspection, Inspection):
                 return inspection
             with while_open(who):
@@ -491,11 +498,6 @@ def install(
                 if current is None:
                     return refused(said("walk.none.title", ui_lang), 409)
                 inspection = current
-                identity = (
-                    {"run_id": request.headers["X-Walk-Run-Id"]}
-                    if "X-Walk-Run-Id" in request.headers
-                    else {}
-                )
                 if not run_matches(inspection, identity):
                     return changed(inspection.ui_lang)
                 ref = save_upload(request.get_data(cache=False), check_environment(), owner=who)

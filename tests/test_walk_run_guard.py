@@ -80,3 +80,30 @@ def test_matching_run_and_legacy_without_run_still_write(клиент: Клие�
     assert клиент.запись(**_совет(text="matching run", run_id=run_id)).status_code == 200
     assert клиент.запись(**_совет(text="legacy client")).status_code == 200
     assert len(get_state(АУДИТОР).findings) == 2
+
+
+def test_stale_run_precedes_new_run_seal_and_keeps_upload_retryable(
+    клиент: Клиент,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.bot import sidecar
+
+    old_run = get_state(АУДИТОР).run_id
+    start_inspection(АУДИТОР, unit="replacement", kind="planned", report_lang="ru")
+    sidecar.mark_handed_over(АУДИТОР, 0)
+    monkeypatch.setattr(walk_write, "save_upload", lambda *a, **k: pytest.fail("stale photo saved"))
+    reply = клиент.c.post(
+        walk_write.PHOTO_PATH,
+        data=JPEG,
+        content_type="image/jpeg",
+        headers={
+            "X-Telegram-Init-Data": клиент.init,
+            "X-Walk-Run-Id": old_run,
+        },
+    )
+    assert reply.status_code == 409
+    assert reply.get_json()["error"] == "run_changed"
+    reply = клиент.сведение(code="INF01", value="old answer", run_id=old_run)
+    assert reply.status_code == 409
+    assert reply.get_json()["error"] == "run_changed"
+    assert get_state(АУДИТОР).info == {}

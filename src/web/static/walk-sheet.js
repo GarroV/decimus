@@ -292,7 +292,7 @@
       changed();
       redraw("photos", "item", "footer");
     }, function (err) {
-      if (err && (err.retryable || err.code === "run_changed") && p.blob) { park(p, file); return; }
+      if (err && (err.retryable || err.code === "run_changed" || err.status === 409) && p.blob) { park(p, file); return; }
       if (!f || f.photos.indexOf(p) === -1) return;
       p.state = "failed";
       p.error = err && err.message;

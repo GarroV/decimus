@@ -28,7 +28,7 @@
   var DAY_MS = 24 * 60 * 60 * 1000;
   var RETRY_PAUSES_MS = [5000, 15000, 30000, 60000, 120000];
   /** Сервер отказал по существу (кадр не годится, проверки нет или она сдана): ждать нечего. */
-  var FINAL_STATUSES = [400, 409, 413, 415, 422];
+  var FINAL_STATUSES = [400, 413, 415, 422];
 
   var dbPromise = null;
   var timer = null;
@@ -208,7 +208,7 @@
             return next(i + 1);
           });
         }, function (err) {
-          if (err && err.code === "run_changed") return queue.length - i;
+          if (err && (err.code === "run_changed" || err.status === 409)) return queue.length - i;
           if (err && !err.retryable && FINAL_STATUSES.indexOf(err.status) !== -1) {
             dropped += 1;
             return remove(entry.id).then(function () { return next(i + 1); });
