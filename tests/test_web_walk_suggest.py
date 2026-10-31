@@ -230,17 +230,20 @@ def test_выученная_фраза_второй_раз_не_учится(
 ) -> None:
     выучено: list[str] = []
     monkeypatch.setattr(walk_write, "learn", lambda w, **k: выучено.append(w) or "")
-    клиент.запись(
+    ответ = клиент.запись(
         op="add",
         zone="hot_kitchen",
         code="CLN05",
         level="D1",
+        text="На поверхности печи обнаружен нагар.",
         words="нагар",
         photos=[клиент.ссылка()],
         suggested={"code": "CLN05", "level": "D1", "zone": "hot_kitchen", "via": "learned"},
     )
 
+    assert ответ.status_code == 200, ответ.get_json()
     запись = get_state(АУДИТОР).findings[0]  # type: ignore[union-attr]
+    assert запись.text == "На поверхности печи обнаружен нагар."
     assert выучено == [] and запись.suggested_code == "", (
         "как у бота: выученное не пишется предложением"
     )
@@ -314,12 +317,18 @@ def test_второе_нарушение_по_тем_же_кадрам_пише�
         return {"code": code, "level": level, "zone": "hot_kitchen", "via": "model"}
 
     первая = клиент.запись(
-        op="add", code="CLN05", level="D1", suggested=предложено("CLN05", "D1"), **общее
+        op="add",
+        code="CLN05",
+        level="D1",
+        text="На поверхности печи обнаружен нагар.",
+        suggested=предложено("CLN05", "D1"),
+        **общее,
     )
     вторая = клиент.запись(
         op="add",
         code="PRD06",
         level="D1",
+        text="Контейнер с заготовкой хранится без крышки.",
         also=True,
         photo_assignment={
             "source_photos": [кадр],
@@ -337,6 +346,8 @@ def test_второе_нарушение_по_тем_же_кадрам_пише�
     записи = {f.code: f for f in get_state(АУДИТОР).findings}  # type: ignore[union-attr]
     assert set(записи) == {"CLN05", "PRD06"}
     assert записи["PRD06"].photos == записи["CLN05"].photos == [кадр], "кадр общий у обеих"
+    assert записи["CLN05"].text == "На поверхности печи обнаружен нагар."
+    assert записи["PRD06"].text == "Контейнер с заготовкой хранится без крышки."
     assert записи["PRD06"].suggested_code == "PRD06", "предложение второй — её карточка"
     assert выучено == [("дозатор", "CLN05")], "синонимом второго пункта слова не становятся"
 
@@ -497,6 +508,7 @@ def test_запись_по_подсказке_предложение_пишет�
         zone="hot_kitchen",
         code="CLN05",
         level="D1",
+        text="На поверхности печи обнаружен нагар.",
         words="печь в нагаре",
         photos=[клиент.ссылка()],
         suggested={"code": "CLN05", "level": "D1", "zone": "hot_kitchen", "via": "hint"},
@@ -559,6 +571,10 @@ def _запись(клиент: Клиент, code: str, via: str, shown: Any) -
         zone="hot_kitchen",
         code=code,
         level="D1",
+        text={
+            "CLN05": "На поверхности печи обнаружен нагар.",
+            "PRD06": "Контейнер с заготовкой хранится без крышки.",
+        }[code],
         words="печь в нагаре",
         photos=[клиент.ссылка()],
         suggested={"code": "CLN05", "level": "D1", "zone": "hot_kitchen", "via": via},
@@ -603,7 +619,8 @@ def test_выбор_ответа_модели_при_показанной_под
     клиент: Клиент,  # noqa: F811
     журнал: list[tuple[str, dict[str, Any]]],
 ) -> None:
-    _запись(клиент, "PRD06", "model", ["CLN05", "TEH05"])
+    ответ = _запись(клиент, "PRD06", "model", ["CLN05", "TEH05"])
+    assert ответ.status_code == 200, ответ.get_json()
 
     ((_, kw),) = [e for e in журнал if e[0] == "walk_hint_choice"]
     assert kw["picked"] == "model" and kw["match_first"] is False and kw["match_any"] is False
@@ -625,11 +642,12 @@ def test_тоже_запись_в_метрику_подсказки_не_идё�
 ) -> None:
     """D593: вторая запись по тем же кадрам — не выбор подсказки, считать её дважды нельзя."""
     ref = клиент.ссылка()
-    клиент.запись(
+    ответ = клиент.запись(
         op="add",
         zone="hot_kitchen",
         code="PRD06",
         level="D1",
+        text="Контейнер с заготовкой хранится без крышки.",
         also=True,
         photo_assignment={
             "source_photos": [ref],
@@ -644,6 +662,7 @@ def test_тоже_запись_в_метрику_подсказки_не_идё�
         hint_codes=["CLN05"],
     )
 
+    assert ответ.status_code == 200, ответ.get_json()
     assert [e for e in журнал if e[0] == "walk_hint_choice"] == []
 
 
