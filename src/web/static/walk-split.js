@@ -153,12 +153,23 @@
   }
   function historyPanel() {
     var history=W.state.data.finding_history || [];if(!history.length)return null;
-    var panel=el("details", "walk-form__section");panel.appendChild(el("summary", "",tx("walk.split.history")));
+    var panel=el("details", "walk-form__section");panel.appendChild(el("summary", "",tx(history.some(function (event) {return event.kind === "edit" || event.kind === "clarification";}) ? "walk.edit.history" : "walk.split.history")));
     history.forEach(function (event) {
-      var source=event.before;var item=el("section", "walk-form__section");item.appendChild(el("h3", "",tx("walk.split.source")+" #"+source.n+" · "+event.at));
+      if(event.kind === "clarification") {
+        var note=el("section", "walk-form__section");
+        note.appendChild(el("h3", "",tx("walk.edit.clarification")+" #"+event.n+" · "+event.at));
+        (event.clarifications || []).forEach(function (fact) {
+          note.appendChild(el("p", "",tx("walk.edit.question")+": "+fact.question));
+          note.appendChild(el("p", "",tx("walk.edit.answer")+": "+fact.answer));
+        });panel.appendChild(note);return;
+      }
+      var source=event.before;var item=el("section", "walk-form__section");item.appendChild(el("h3", "",tx(event.kind === "edit" ? "walk.edit.before" : "walk.split.source")+" #"+source.n+" · "+event.at));
       item.appendChild(el("p", "",source.code+" · "+source.level+" · "+source.zone+" · "+source.text));
-      var origin={photos:source.photos.map(function (ref) {return {ref:ref};})};
-      event.after.forEach(function (part) {item.appendChild(el("p", "","#"+part.n+" · "+part.code+" · "+part.level+" · "+part.zone+" · "+part.text+" · "+photoNumbers(part.photos,origin)));});panel.appendChild(item);
+      if(event.kind === "edit")item.appendChild(el("p", "",tx("walk.edit.photo_refs",{n:source.photos.length})));
+      if(source.repeat)item.appendChild(el("p", "",tx("walk.rec.repeat")));
+      if(source.comment)item.appendChild(el("p", "",source.comment));
+      if(source.reading_c !== null && source.reading_c !== undefined)item.appendChild(el("p", "",source.reading_c+" °C"));
+      event.after.forEach(function (part) {item.appendChild(el("p", "",(event.kind === "edit" ? tx("walk.edit.after")+" · " : "")+"#"+part.n+" · "+part.code+" · "+part.level+" · "+part.zone+" · "+part.text+" · "+tx(event.kind === "edit" ? "walk.edit.photo_refs" : "walk.split.photo_count",{n:part.photos.length})));if(part.repeat)item.appendChild(el("p", "",tx("walk.rec.repeat")));if(part.comment)item.appendChild(el("p", "",part.comment));if(part.reading_c !== null && part.reading_c !== undefined)item.appendChild(el("p", "",part.reading_c+" °C"));});panel.appendChild(item);
     });return panel;
   }
   W.split={open:open,close:close,historyPanel:historyPanel,isOpen:function () {return !!current;}};

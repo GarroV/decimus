@@ -261,7 +261,7 @@
   }
 
   function saveDraft() {
-    if (f.n) return;
+    if (f.n) { if (W.editDraft) W.editDraft.save(f); return; }
     W.local.set(draftKey(), Object.assign({}, W.local.get(draftKey()) || {}, {
       run_id: f.run_id, mode: f.mode, zone: f.zone, code: f.code,
       level: f.level || f.legacyLevel || null, text: f.text,
@@ -1664,6 +1664,7 @@
         var row = el("div", "walk-row");
         row.appendChild(W.button("walk-btn walk-btn--danger", tx("walk.sheet.discard_yes"), function () {
           if (!f.n) W.local.drop(draftKey());
+          else if (W.editDraft) W.editDraft.clear(f);
           f.photos.forEach(function (p) { (p.receiptIds || (p.entryId ? [p.entryId] : [])).forEach(function (id) { W.offline.remove(id); }); });
           close(true);
         }));
@@ -1817,10 +1818,13 @@
     if (f.comment.trim() !== o.comment) { edit.comment = f.comment.trim(); any = true; }
     if (!!f.repeat !== !!o.repeat) { edit.repeat = !!f.repeat; any = true; }
     if (hasReading() && readingValue() !== o.reading) { edit.reading_c = readingValue(); any = true; }
-    var list = refs.map(function (ref) { return { op: "attach", n: f.n, ref: ref }; });
-    if (any) list.unshift(edit);
-    // Снимать — после того, как новые кадры легли: запись ни на миг без фото.
-    return list.concat(f.removed.map(function (ref) { return { op: "detach", n: f.n, ref: ref }; }));
+    if (refs.length || f.removed.length) {
+      edit.new_refs = refs;
+      edit.remove_photos = f.removed.slice();
+      any = true;
+    }
+    if (!any) return [];
+    return [W.editDraft ? W.editDraft.body(f, edit) : edit];
   }
 
   function save_() {
@@ -1832,7 +1836,7 @@
       if (fixed !== null) { find(fixed); return; }
     }
     var list = ops();
-    if (!list.length) { close(true); return; }
+    if (!list.length) { if (f.n && W.editDraft) W.editDraft.clear(f); close(true); return; }
     submit(list);
   }
 
@@ -1901,7 +1905,7 @@
           queued: remaining.filter(function (p) { return p.ref; }).map(function (p) { return p.ref; }),
           reconcile: false, submitted_ops: [],
         }));
-      }
+      } else if (W.editDraft) W.editDraft.clear(form);
       W.haptic("success");
       if (remaining && remaining.length) W.toast(tx("walk.sheet.remaining_material", { n: remaining.length }), "warn");
       else savedToast(at);
@@ -1928,6 +1932,8 @@
       if (!form.draftKey || !refs.length || !W.offline.ack) return Promise.resolve();
       return W.offline.list(form.draftKey).then(function (rows) {
         return W.offline.ack(form.draftKey, runId, rows.filter(function (r) { return refs.indexOf(r.uploaded_ref) !== -1; }).map(function (r) { return r.id; }));
+      }).then(function () {
+        if (form.n && W.editDraft) return W.editDraft.ack(form, refs);
       });
     }
 
@@ -1988,6 +1994,7 @@
       redraw("footer");
       return;
     }
+    if (f.n && W.editDraft) W.editDraft.release(f);
     f = null;
     if (W.voice) W.voice.cancelAll(); // идущая запись голоса выбрасывается, микрофон отпускается
     if (W.menu) W.menu.close();
@@ -2059,6 +2066,7 @@
       f.words = rec.words || "";
       if (rec.reading_c !== null && rec.reading_c !== undefined) setReading(rec.reading_c);
       f.original = { code: rec.code, level: rec.level, zone: opts.zone, text: rec.text, comment: rec.comment || "", repeat: !!rec.repeat, reading: rec.reading_c === undefined ? null : rec.reading_c };
+      if (W.editDraft) W.editDraft.init(f, rec);
     } else {
       var draft = loadDraft();
       if (draft && !opts.code && draft.mode === f.mode && (draft.code || draft.words || draft.text || draft.comment || (draft.photos || []).length)) {
@@ -2089,6 +2097,10 @@
     }
     build();
     restoreWaiting();
+    if (f.n && W.editDraft) {
+      var editForm = f;
+      W.editDraft.activate(editForm, function () { changed(); redraw("photos", "footer"); }, function () {return f === editForm;});
+    }
   }
 
   function build() {
@@ -2124,6 +2136,10 @@
     node.appendChild(parts.footer);
     redraw.apply(null, ORDER.concat(["footer"]));
     recoveryPanel(body);
+    if (f.n && W.editDraft) {
+      var editRecovery = W.editDraft.panel(f, function () { changed(); redraw.apply(null, ORDER.concat(["footer"])); });
+      if (editRecovery) body.appendChild(editRecovery);
+    }
     document.body.appendChild(node);
     document.documentElement.classList.add("has-sheet");
     if (W.tg && W.supports("6.1")) {

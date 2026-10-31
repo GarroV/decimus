@@ -605,7 +605,7 @@ def install(
             return refused(said("walk.sealed", lang), 409)
         except EditConflict:
             return jsonify(
-                {"error": "edit_conflict", "message": said("walk.split.conflict", lang)}
+                {"error": "edit_conflict", "message": said("walk.edit.conflict", lang)}
             ), 409
         except SplitConflict:
             return jsonify(
