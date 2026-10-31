@@ -151,3 +151,33 @@ def test_push_roundtrip_keeps_photo_only_packet_and_is_idempotent(
             "select telegram_file_id from photos where inspection_id=%s order by telegram_file_id",
             (inspection,),
         ).fetchall() == [("ref-a",), ("ref-b",)]
+
+
+def test_two_transactions_cannot_each_delete_one_of_last_two_photos(domain_env: Path, db_env: str):
+    inspection = pending(domain_env, 793010708)
+    with psycopg.connect(db_env, autocommit=True) as setup:
+        owner = info_id(setup, inspection)
+        with setup.transaction():
+            setup.execute("update inspection_info set text='' where id=%s", (owner,))
+            for ref in ("concurrent-a", "concurrent-b"):
+                setup.execute(
+                    "insert into photos(info_id,inspection_id,telegram_file_id) values(%s,%s,%s)",
+                    (owner, inspection, ref),
+                )
+    with psycopg.connect(db_env) as first, psycopg.connect(db_env) as second:
+        first.execute("set local lock_timeout='5s'")
+        second.execute("set local lock_timeout='5s'")
+        first.execute(
+            "delete from photos where info_id=%s and telegram_file_id='concurrent-a'", (owner,)
+        )
+        second.execute(
+            "delete from photos where info_id=%s and telegram_file_id='concurrent-b'", (owner,)
+        )
+        first.commit()
+        with pytest.raises(psycopg.errors.CheckViolation):
+            second.commit()
+        second.rollback()
+    with psycopg.connect(db_env) as verify:
+        assert verify.execute(
+            "select telegram_file_id from photos where info_id=%s", (owner,)
+        ).fetchall() == [("concurrent-b",)]
