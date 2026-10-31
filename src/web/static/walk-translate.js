@@ -35,6 +35,7 @@
   W.translateBar = function (area) {
     var lang = W.state.data && W.state.data.translate_lang;
     if (!lang || area.disabled) return null;
+    var runId = W.state.data.run_id;
 
     var el = W.el;
     var bar = el("div", "walk-translate");
@@ -56,6 +57,11 @@
     var original = null;
     var busy = false;
 
+    function active() {
+      return area.isConnected && bar.isConnected && W.state.data &&
+        W.state.data.run_id === runId && W.state.data.translate_lang === lang;
+    }
+
     function sync() { go.hidden = !area.value.trim(); }
 
     function setValue(value) {
@@ -71,7 +77,7 @@
     }
 
     function ask() {
-      if (busy) return;
+      if (busy || !active()) return;
       var sent = area.value;
       if (!sent.trim()) return;
       busy = true;
@@ -80,6 +86,7 @@
       go.textContent = W.tx("walk.translate.busy");
       area.readOnly = true;
       W.post(W.urls.translate, { text: sent }).then(function (res) {
+        if (!active() || area.value !== sent) return;
         if (!res.ok || !res.body || typeof res.body.text !== "string") {
           throw new Error((res.body && res.body.message) || W.tx("walk.error"));
         }
@@ -91,9 +98,12 @@
         note.hidden = false;
         W.haptic("success");
       }).catch(function (e) {
-        fail(e && e.message ? e.message : W.tx("walk.error"));
+        if (active() && area.value === sent) {
+          fail(e && e.message ? e.message : W.tx("walk.error"));
+        }
       }).then(function () {
         busy = false;
+        if (!active()) return;
         area.readOnly = false;
         go.disabled = false;
         go.textContent = W.tx("walk.translate.btn", { lang: langName(lang) });
@@ -103,7 +113,7 @@
 
     go.addEventListener("click", ask);
     undo.addEventListener("click", function () {
-      if (original === null) return;
+      if (original === null || !active()) return;
       setValue(original);
       original = null;
       undo.hidden = true;

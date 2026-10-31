@@ -12,7 +12,7 @@
 {% from "inspections/_card_parts.html" import card_actions, accept_badge, provenance, grade_reason, explain_block, unit_pencil with context %}
 {% from "inspections/_card_body.html" import card_body with context %}
 {% block title %}{{ head.unit_name }}{% endblock %}
-{% block head %}{% if may_revise %}<script src="{{ url_for('static', filename='proofread.js') }}" defer></script>{% endif %}{% endblock %}
+{% block head %}<script src="{{ url_for('static', filename='proofread.js') }}" defer></script>{% endblock %}
 
 {% block body %}
  <div class="icard">

@@ -10,6 +10,7 @@ import pytest
 from flask.testing import FlaskClient
 from test_web_acceptance import админ, стенд  # noqa: F401
 from test_web_information_section import _mixed, _section
+from test_web_proofread_browser import ROOT, browser_page  # noqa: F401
 
 from src.db.errors import DbError
 from src.db.models import InfoRow
@@ -99,3 +100,31 @@ def test_missing_info_photos_do_not_render_empty_gallery(
         else "Photos unavailable: 2"
     )
     assert expected in information
+
+
+@админ
+@pytest.mark.parametrize("path", ["/inspections/x", "/inspections?inspection=x"])
+def test_accepted_photo_toggle_loads_its_handler_and_keeps_read_only(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, browser_page, path: str
+) -> None:
+    _mixed(monkeypatch, on_review=False)
+    monkeypatch.setattr(
+        data,
+        "load_info_previews",
+        lambda *_a, **_k: {"INF01": FindingShots(("info-photo",), 0)},
+    )
+    html = стенд.get(path).get_data(as_text=True)
+    assert "proofread.js" in html, "The actual response must load the photo-toggle handler"
+    browser_page.set_content(html)
+    browser_page.add_script_tag(path=str(ROOT / "src/web/static/proofread.js"))
+    section = browser_page.locator("[data-information]")
+    assert section.locator("[data-proofread-form], [data-del]").count() == 0
+    button = section.locator("[data-findings-toggle]")
+    rows = section.locator("details.find-row--photos")
+    assert rows.count() == 3
+    button.click()
+    assert rows.evaluate_all("items=>items.every(item=>item.open)")
+    assert button.get_attribute("aria-expanded") == "true"
+    button.click()
+    assert rows.evaluate_all("items=>items.every(item=>!item.open)")
+    assert button.get_attribute("aria-expanded") == "false"
