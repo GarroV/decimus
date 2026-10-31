@@ -592,6 +592,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0105_dodois_metrics.sql` | Данные Dodo IS для страницы «Качество» по пиццериям и месяцам (D671): продажи по источнику и каналу, заказы агрегаторов, оценки клиентов (КР), оценки РКО и РС по… |
 | `0106_inspection_timing.sql` | Historical rows deliberately stay NULL; no inference or backfill |
 | `0107_inspection_info_photo_answers.sql` | Info and photo metadata are inserted in the same push transaction, so this invariant is checked at commit rather than before the photo INSERT exists |
+| `0108_finding_split_history.sql` | Existing rows and legacy remain NULL; no accepted inspection is rewritten |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -921,6 +922,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/second_factor.py` | Вторая ступень входа (D463): правила без базы и без веба |
 | `src/domain/service_keys.py` | Реестр ключей внешних сервисов, которые главный админ ставит на экране (D576, #906) |
 | `src/domain/shape.py` | Оценочная форма издания: чем считали, а не что написано (T349, #337) |
+| `src/domain/split.py` | Human-confirmed split, staged through the existing engine and committed once |
 | `src/domain/state.py` | Состояние проверки: чтение, старт и собственные поля блока |
 | `src/domain/tenants.py` | Код тенанта управляющей компании и перевод старого кода (D234, #439) |
 | `src/domain/timing.py` | Server visit timestamps; elapsed time is derived once from the primary pair |

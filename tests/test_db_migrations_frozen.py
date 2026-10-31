@@ -410,6 +410,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0107_inspection_info_photo_answers.sql": (
         "sql1:99f5e802243cc7cf6f7ff3aef97b89e30b4da6a346776833752eccbf588c34ab"
     ),
+    "0108_finding_split_history.sql": (
+        "sql1:fae2c3f06273b3dc9ff227c62a12decef0eea32430c36769465d7bc91489e012"
+    ),
 }
 
 
