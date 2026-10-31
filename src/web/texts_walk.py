@@ -99,6 +99,14 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.tile.done": {"ru": "осмотрено", "en": "checked"},
     "walk.tile.todo": {"ru": "не были", "en": "not yet"},
     "walk.tile.started": {"ru": "в работе", "en": "in progress"},
+    "walk.sheet.context_other_zone": {
+        "ru": "Перейти к замерам другой зоны",
+        "en": "Go to measurements in another zone",
+    },
+    "walk.sheet.context_kept": {
+        "ru": "Текущий черновик останется в зоне «{zone}».",
+        "en": "The current draft will stay in “{zone}”.",
+    },
     "walk.zone.measure_here": {"ru": "Измерения в этой зоне", "en": "Measurements in this zone"},
     "walk.zone.measure_add": {"ru": "внести", "en": "add"},
     "walk.zone.need_prev": {

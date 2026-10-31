@@ -524,6 +524,13 @@
   }
 
   function setZone(code, source) {
+    if (f.contextZone && !f.n && code !== f.contextZone) {
+      if (f.saving) { W.toast(tx("walk.sheet.saving"), "warn"); return; }
+      if (f.photos.some(function (p) { return !p.ref && !p.entryId; })) { W.toast(tx("walk.sheet.need_upload"), "warn"); return; }
+      saveDraft();
+      open({mode: "measure", zone: code, contextZone: code});
+      return;
+    }
     f.zone = code;
     f.zoneSource = source;
     W.haptic();
@@ -534,7 +541,7 @@
 
   function fullZoneMenu() {
     W.menu.open({
-      title: tx("walk.sheet.zone"),
+      title: tx(f.contextZone && !f.n ? "walk.sheet.context_other_zone" : "walk.sheet.zone"),
       options: realZones().map(function (z) { return { label: z.title, value: z.code, on: z.code === f.zone }; }),
       onPick: function (code) { setZone(code, "pick"); },
     });
@@ -1438,12 +1445,13 @@
       if (!recognizing()) {
         var z = zoneOf(f.zone);
         var zb = W.hinted(W.button("walk-ctx__pill walk-ctx__pill--zone" + (z ? "" : " is-empty"),
-          (z ? z.title : tx("walk.sheet.pick_zone")), zoneMenu), "zonepill");
-        zb.setAttribute("aria-label", tx("walk.sheet.zone") + ": " + (z ? z.title : tx("walk.sheet.pick_zone")));
+          (f.contextZone && !f.n ? tx("walk.sheet.context_other_zone") : z ? z.title : tx("walk.sheet.pick_zone")), zoneMenu), "zonepill");
+        zb.setAttribute("aria-label", f.contextZone && !f.n ? tx("walk.sheet.context_other_zone") : tx("walk.sheet.zone") + ": " + (z ? z.title : tx("walk.sheet.pick_zone")));
         row.appendChild(zb);
       }
       var box = el("div", "walk-ctx__box");
       box.appendChild(row);
+      if (f.contextZone && !f.n) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.context_kept", {zone: z ? z.title : f.contextZone})));
       if (isMeasure() && !f.n) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.measure_hint")));
       if (isAdvice() && !f.n) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.advice_hint")));
       if (unusual()) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.unusual")));
