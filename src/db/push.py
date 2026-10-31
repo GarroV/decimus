@@ -258,16 +258,14 @@ def _push_info(cur: psycopg.Cursor[Any], inspection: Inspection, *, inspection_i
     партнёра спросят. Подправленный по дороге, он перестаёт быть тем, что было
     названо, а расхождение видно только когда обе бумаги уже на руках.
 
-    Пустой ответ не пишется вовсе. Пропущенное поле по решению D070 не
-    печатается, и пустая строка в базе выглядела бы ответом, которого не было:
-    в выборке она неотличима от заполненного поля. Домен пустое и не пропустит
-    (`domain.set_info` отказывает), но состояние — обычный JSON на диске, и
-    сюда доезжает то, что в нём лежит; отказать в сливе всей проверки из-за
-    пустого поля значило бы потерять документ целиком ради одной строки.
+    Empty text with real photo references is a photo answer, without an invented
+    caption. Only a field with neither text nor photos is omitted (D070).
+    Metadata references and their info owner are inserted in this transaction;
+    the deferred schema rule validates the evidence when the transaction commits.
     """
     место = 0
     for code, answer in inspection.info.items():
-        if not answer.text.strip():
+        if not answer.text.strip() and not answer.photos:
             continue
         cur.execute(
             _INSERT_INFO_SQL,
