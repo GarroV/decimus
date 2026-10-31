@@ -208,6 +208,14 @@ def _native_finish(
         raise Refused("walk.err.bad_request", 400)
     if body["op"] == "finish_status":
         status = walk_finish.report_status(who, run)
+    elif body["op"] == "finish_prepare":
+        language = body.get("report_lang")
+        if not isinstance(language, str):
+            raise Refused("walk.finish.err.lang", 409)
+        prepared = walk_finish.prepare_report(who, language, run)
+        status = prepared.status
+        if status == walk_finish.READY:
+            return jsonify({"status": status, "data": payload()}), 200
     else:
         if body.get("confirmed") is not True or not isinstance(body.get("revision"), str):
             raise Refused("walk.err.bad_request", 400)
@@ -304,7 +312,7 @@ def install(
                 return respond(who, ui_lang)
             if op == "finish":
                 return _finish(who, conf, body, lang)
-            if op in ("finish_review", "finish_submit", "finish_status"):
+            if op in ("finish_review", "finish_prepare", "finish_submit", "finish_status"):
                 return _native_finish(who, conf, body, lang)
             raise Refused("walk.err.bad_request", 400)
         except Refused as exc:

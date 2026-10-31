@@ -309,3 +309,39 @@ def report_status(chat_id: int, expected_run_id: str) -> str:
         if chat_id in _building:
             return STARTED
     return SEALED if handed_over(chat_id) else READY
+
+
+def prepare_report(chat_id: int, report_lang: str, expected_run_id: str) -> ReportStart:
+    """Choose the report language before typed info answers, without delivery."""
+    from src.domain import while_open
+
+    initial = get_state(chat_id)
+    if initial is None:
+        return ReportStart(NO_INSPECTION)
+    if initial.run_id != expected_run_id:
+        return ReportStart(STALE)
+    if initial.finished_at is not None:
+        return ReportStart(COMPLETED)
+    with _building_lock:
+        if chat_id in _building:
+            return ReportStart(BUSY)
+    hold = try_hold(WALK_REPORT, str(chat_id))
+    if not hold.acquired:
+        return ReportStart(BUSY)
+    try:
+        with while_open(chat_id):
+            current = get_state(chat_id)
+            if current is None:
+                return ReportStart(NO_INSPECTION)
+            if current.run_id != expected_run_id:
+                return ReportStart(STALE)
+            if current.finished_at is not None:
+                return ReportStart(COMPLETED)
+            if report_lang not in (_offered(chat_id) or []):
+                return ReportStart(LANG_GONE)
+            set_report_lang(chat_id, report_lang)
+        return ReportStart(READY)
+    except HandedOverError:
+        return ReportStart(SEALED)
+    finally:
+        hold.release()
