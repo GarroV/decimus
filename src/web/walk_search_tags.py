@@ -11,7 +11,7 @@ from src.recognize.cues import load_cue_snapshot, stems
 TAG_QUERIES = {
     "dirty": ("грязно", "грязь", "dirty", "dirt"),
     "expired": ("просрочка", "просроченный", "expired", "expiry", "срок годности", "shelf life"),
-    "segregation": ("товарное соседство", "соседство", "food segregation", "cross contamination"),
+    "segregation": ("соседство", "food segregation", "cross contamination"),
     "labels": ("маркировки", "маркировка", "labels", "label", "labelling", "labeling"),
 }
 
