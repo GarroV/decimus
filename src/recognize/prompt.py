@@ -153,7 +153,8 @@ def rules_text() -> str:
 TAG_NOTE = "untrusted_auditor_note"
 TAG_ITEM = "checklist_item_text"
 TAG_ZONE = "zone_title"
-_DATA_TAGS = (TAG_NOTE, TAG_ITEM, TAG_ZONE)
+TAG_CLARIFICATIONS = "untrusted_clarifications"
+_DATA_TAGS = (TAG_NOTE, TAG_ITEM, TAG_ZONE, TAG_CLARIFICATIONS)
 _TAG_LIKE = re.compile(r"<(\s*/?\s*(?:" + "|".join(_DATA_TAGS) + r")\b)", re.IGNORECASE)
 
 DATA_BLOCKS_LINE = (

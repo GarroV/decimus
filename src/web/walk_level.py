@@ -133,6 +133,7 @@ def install(
                     photo_refs=canonical,
                     photos=images,
                     selection_revision=revision,
+                    clarifications=body.get("clarifications", []),
                     reading_c=reading_of(body),
                     reading_confirmed=body.get("reading_confirmed") is True,
                     reading_source=body.get("reading_source"),

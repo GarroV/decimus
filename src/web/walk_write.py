@@ -343,6 +343,8 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     assignment = _photo_assignment(chat_id, inspection, body, photos)
     words = _text(body, "words")
     suggested, learns = _suggested(body.get("suggested"))
+    if "class_context" in body and not isinstance(body["class_context"], dict):
+        raise WalkRefused("walk.err.bad_request")
     added = add_finding(
         chat_id,
         code=code,
@@ -358,6 +360,7 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         words=words,
         suggested=suggested,
         reading_c=reading_of(body),
+        **({"class_context": body["class_context"]} if "class_context" in body else {}),
     )
     if assignment is not None:
         _note_photo_assignment(

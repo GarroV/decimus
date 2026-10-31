@@ -15,7 +15,9 @@ from collections.abc import Sequence
 from dataclasses import asdict, replace
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
+from .clarifications import bound_class_context
 from .config import Settings
 from .engine import DOMAIN_KEY, option, run_audit, state_file
 from .errors import EngineError, ValidationError
@@ -125,6 +127,7 @@ def add_finding(
     repeat: bool = False,
     photos: Sequence[str] = (),
     reading_c: float | None = None,
+    class_context: dict[str, Any] | None = None,
 ) -> Finding:
     """Зафиксировать запись.
 
@@ -182,35 +185,73 @@ def add_finding(
         check_confidence(suggested.confidence, "в предложении к новой записи")
     check_reading(reading_c)
     frames = [_clean_photo(photo, "новой записи") for photo in photos]
-    out = run_audit(
-        [
-            "add",
-            option("qid", code),
-            option("level", level),
-            option("zone", zone),
-            option("evidence", text),
-            option("comment", comment),
-            *(["--zone-by-person"] if zone_by_person else []),
-            # Повтор — решение аудитора о цене записи, а не наблюдение системы
-            # (D191). Флаг передаётся движку, потому что удваивает он.
-            *(["--repeat"] if repeat else []),
-            *([option("photo", ",".join(frames))] if frames else []),
-        ],
-        chat_id=chat_id,
-        settings=settings,
-    )
-    n = _number(out, "add")
-    path = state_file(chat_id, settings)
-    remember_source(path, n, source)
-    remember_words(path, n, words)
-    remember_reading(path, n, reading_c)
-    remember_suggestion(path, n, suggested)
-    after = _finding_after(chat_id, settings, n, "add")
-    if any(frame not in after.photos for frame in frames):
-        raise EngineError(
-            f"Движок завёл запись #{n}, но кадры в неё не легли", code=0, command="add"
+
+    def perform(target: Settings) -> Finding:
+        out = run_audit(
+            [
+                "add",
+                option("qid", code),
+                option("level", level),
+                option("zone", zone),
+                option("evidence", text),
+                option("comment", comment),
+                *(["--zone-by-person"] if zone_by_person else []),
+                # Повтор — решение аудитора о цене записи, а не наблюдение системы
+                # (D191). Флаг передаётся движку, потому что удваивает он.
+                *(["--repeat"] if repeat else []),
+                *([option("photo", ",".join(frames))] if frames else []),
+            ],
+            chat_id=chat_id,
+            settings=target,
         )
-    return after
+        n = _number(out, "add")
+        path = state_file(chat_id, target)
+        remember_source(path, n, source)
+        remember_words(path, n, words)
+        remember_reading(path, n, reading_c)
+        remember_suggestion(path, n, suggested)
+        after = _finding_after(chat_id, target, n, "add")
+        if any(frame not in after.photos for frame in frames):
+            raise EngineError(
+                f"Движок завёл запись #{n}, но кадры в неё не легли", code=0, command="add"
+            )
+        return after
+
+    if class_context is None:
+        return perform(settings)
+    path = state_file(chat_id, settings)
+    with state_lock(path):
+        raw = _read_raw(path)
+        inspection = _inspection(chat_id, raw, path)
+        chain = bound_class_context(
+            class_context,
+            run_id=inspection.run_id,
+            checklist_version=inspection.checklist_version,
+            code=code,
+            zone=zone,
+            photos=frames,
+            words=words,
+        )
+        with tempfile.TemporaryDirectory(prefix=".clarification-", dir=path.parent) as temp:
+            staged = replace(settings, state_dir=Path(temp))
+            staged_path = state_file(chat_id, staged)
+            staged_path.parent.mkdir(parents=True)
+            _write_atomic(staged_path, raw)
+            after = perform(staged)
+            result = _read_raw(staged_path)
+            block = dict(result.get(DOMAIN_KEY) or {})
+            event = {
+                "kind": "clarification",
+                "n": after.n,
+                "run_id": inspection.run_id,
+                "at": utc_now().isoformat(),
+                "clarifications": chain,
+                "after": [asdict(after)],
+            }
+            block["finding_history"] = [*inspection.finding_history, event]
+            result[DOMAIN_KEY] = block
+            _write_atomic(path, result)
+            return after
 
 
 class EditConflict(ValidationError):

@@ -379,3 +379,82 @@ def test_search_and_level_share_total_slots_across_auditors(
         ).status_code
         == 200
     )
+
+
+@pytest.mark.parametrize("question,status", [("", "not_established"), ("How many?", "needs_fact")])
+def test_null_violation_and_clarification_echo(клиент: Клиент, model, question, status):
+    calls, payload = model
+    payload.update(
+        level=None, need_fact=question, reason="Synthetic facts do not establish a violation"
+    )
+    chain = [{"question": "Was production stopped?", "answer": "yes"}]
+    reply = post(клиент, body() | {"clarifications": chain})
+    assert reply.status_code == 200
+    got = reply.get_json()
+    assert got["status"] == status and got["level"] is None
+    assert got["clarifications"] == chain and len(got["clarification_hash"]) == 64
+    assert "yes" in calls[0][0].question
+    assert get_state(АУДИТОР).findings == []
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"level": None, "need_fact": None},
+        {"level": "D0"},
+        {"level": None, "reason": ""},
+        {"unexpected": True},
+    ],
+)
+def test_selected_malformed_null_is_error_not_no_violation(клиент: Клиент, model, change):
+    _, payload = model
+    payload.update(change)
+    reply = post(клиент, body())
+    assert reply.status_code == 503 and reply.get_json()["status"] == "unavailable"
+
+
+def test_confirmed_add_saves_bound_chain_and_human_words_together(клиент: Клиент):
+    ref = клиент.ссылка()
+    state = get_state(АУДИТОР)
+    chain = [{"question": "Was production stopped?", "answer": "yes"}]
+    context = {
+        "run_id": state.run_id,
+        "checklist_version": state.checklist_version,
+        "code": "CLN05",
+        "zone": "hot_kitchen",
+        "photo_refs": [ref],
+        "clarifications": chain,
+    }
+    body = dict(
+        op="add",
+        code="CLN05",
+        zone="hot_kitchen",
+        level="D1",
+        text="Human description",
+        photos=[ref],
+        words="Original observation\nyes",
+        class_context=context,
+        run_id=state.run_id,
+    )
+    result = клиент.запись(**body)
+    assert result.status_code == 200, result.get_json()
+    saved = get_state(АУДИТОР)
+    assert saved.findings[0].words == body["words"]
+    assert saved.finding_history[0]["clarifications"] == chain
+    assert saved.finding_history[0]["after"][0]["n"] == saved.findings[0].n
+
+
+@pytest.mark.parametrize("context_value", [None, {}, {"clarifications": []}])
+def test_invalid_add_context_does_not_create_finding(клиент: Клиент, context_value):
+    ref = клиент.ссылка()
+    result = клиент.запись(
+        op="add",
+        code="CLN05",
+        zone="hot_kitchen",
+        level="D1",
+        text="Human description",
+        photos=[ref],
+        class_context=context_value,
+    )
+    assert result.status_code in (400, 422)
+    assert get_state(АУДИТОР).findings == []
