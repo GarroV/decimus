@@ -16,7 +16,7 @@ from .findings import _number, check_reading
 from .handover import while_open
 from .models import ADVICE_LEVEL, SOURCE_COMMENT, Finding
 from .revisions import digest as _digest
-from .revisions import finding_revision
+from .revisions import finding_revision as finding_revision
 from .state import (
     READINGS_KEY,
     SOURCES_KEY,
