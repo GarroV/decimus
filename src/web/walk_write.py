@@ -400,6 +400,11 @@ def _owns(inspection: Inspection, ref: str) -> bool:
     return any(ref in answer.photos for answer in inspection.info.values())
 
 
+def run_matches(inspection: Inspection, body: dict[str, Any]) -> bool:
+    """Old clients omit identity; new clients must match the current server run."""
+    return "run_id" not in body or body["run_id"] == inspection.run_id
+
+
 def install(
     app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify, respond: Respond
 ) -> None:
@@ -407,6 +412,9 @@ def install(
 
     def refused(text: str, status: int = 422) -> tuple[Response, int]:
         return jsonify({"error": "refused", "message": text}), status
+
+    def changed(lang: str) -> tuple[Response, int]:
+        return jsonify({"error": "run_changed", "message": said("walk.err.run_changed", lang)}), 409
 
     def said(key: str, lang: str) -> str:
         entry = WALK_TEXTS[key]
@@ -436,6 +444,14 @@ def install(
             # Решающая проверка сдачи — под замком заметок вместе с записью:
             # ранняя выше могла пройти за миг до того, как бот отдал отчёт.
             with while_open(who):
+                # A new start uses the same notes lock. Never use the snapshot
+                # taken before acquiring it to authorize a delayed mutation.
+                current = get_state(who)
+                if current is None:
+                    return refused(said("walk.none.title", lang), 409)
+                inspection = current
+                if not run_matches(inspection, body):
+                    return changed(inspection.ui_lang)
                 op(who, inspection, body)
         except HandedOverError:
             logger.info("Обход: чат %s сдал проверку во время записи — отказ", log_id(who))
@@ -470,7 +486,21 @@ def install(
             inspection = writable(who)
             if not isinstance(inspection, Inspection):
                 return inspection
-            ref = save_upload(request.get_data(cache=False), check_environment(), owner=who)
+            with while_open(who):
+                current = get_state(who)
+                if current is None:
+                    return refused(said("walk.none.title", ui_lang), 409)
+                inspection = current
+                identity = (
+                    {"run_id": request.headers["X-Walk-Run-Id"]}
+                    if "X-Walk-Run-Id" in request.headers
+                    else {}
+                )
+                if not run_matches(inspection, identity):
+                    return changed(inspection.ui_lang)
+                ref = save_upload(request.get_data(cache=False), check_environment(), owner=who)
+        except HandedOverError:
+            return refused(said("walk.sealed", ui_lang), 409)
         except UploadQuotaError as exc:
             logger.warning("Обход: кадр чата %s не принят — %s", log_id(who), exc)
             return refused(said("walk.err.photo_quota", ui_lang))

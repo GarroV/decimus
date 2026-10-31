@@ -283,7 +283,7 @@
     blob.then(function (b) {
       p.blob = b;
       if (navigator.onLine === false) throw W.photo.offline();
-      return W.photo.upload(b);
+      return W.photo.upload(b, p.run_id);
     }).then(function (ref) {
       if (!f || f.photos.indexOf(p) === -1) return;
       p.ref = ref;
@@ -292,7 +292,7 @@
       changed();
       redraw("photos", "item", "footer");
     }, function (err) {
-      if (err && err.retryable && p.blob) { park(p, file); return; }
+      if (err && (err.retryable || err.code === "run_changed") && p.blob) { park(p, file); return; }
       if (!f || f.photos.indexOf(p) === -1) return;
       p.state = "failed";
       p.error = err && err.message;
@@ -338,7 +338,7 @@
     if (f.gone.indexOf(entry.id) !== -1) return true;
     var p = f.photos.filter(function (x) { return x.entryId === entry.id; })[0];
     if (!p) {
-      p = { id: ++seq, fresh: true, own: true, draftKey: entry.key, mode: entry.mode, url: URL.createObjectURL(entry.blob) };
+      p = { id: ++seq, fresh: true, own: true, draftKey: entry.key, run_id: entry.run_id, mode: entry.mode, url: URL.createObjectURL(entry.blob) };
       f.photos.push(p);
     }
     p.ref = ref;
@@ -369,7 +369,7 @@
         if (e.mode !== f.mode || f.gone.indexOf(e.id) !== -1) return;
         if (f.photos.some(function (x) { return x.entryId === e.id; })) return;
         f.photos.push({
-          id: ++seq, state: "waiting", fresh: true, own: true, entryId: e.id, draftKey: e.key,
+          id: ++seq, state: "waiting", fresh: true, own: true, entryId: e.id, draftKey: e.key, run_id: e.run_id,
           mode: e.mode, blob: e.blob, url: URL.createObjectURL(e.blob),
         });
         added = true;
@@ -1189,6 +1189,8 @@
   }
 
   function submit(list) {
+    var form = f;
+    var runId = form.run_id;
     f.saving = true;
     f.error = null;
     redraw("footer");
@@ -1196,19 +1198,21 @@
     var at = f.zone;
     var chain = list.reduce(function (p, body) {
       return p.then(function () {
-        return W.post(W.urls.finding, body).then(function (res) {
+        return W.api.write(W.urls.finding, body, runId).then(function (res) {
           if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
           last = res.body;
         });
       });
     }, Promise.resolve());
     chain.then(function () {
+      if (f !== form || W.state.data.run_id !== runId) return;
       if (!f.n) W.local.drop(draftKey());
       W.haptic("success");
       savedToast(at);
       close(true);
       if (last) W.apply(last);
     }, function (err) {
+      if (f !== form || W.state.data.run_id !== runId) return;
       W.haptic("error");
       f.saving = false;
       f.error = err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network");

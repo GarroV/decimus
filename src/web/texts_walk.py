@@ -14,6 +14,13 @@ from .texts_app import APP_TEXTS
 from .texts_hints import HINT_TEXTS
 
 WALK_TEXTS: dict[str, dict[str, str]] = {
+    "walk.err.run_changed": {
+        "ru": "Начата другая проверка. Обновите экран; черновик прежней сохранён на устройстве.",
+        "en": (
+            "Another inspection has started. Refresh the screen; "
+            "the old draft is kept on this device."
+        ),
+    },
     "walk.draft.marks": {"ru": "Отметки прежнего обхода", "en": "Marks from an earlier walk"},
     "walk.draft.marks_preview": {
         "ru": "Осмотренные зоны: {zones}\nПерепроверенные пункты: {findings}",

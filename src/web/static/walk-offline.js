@@ -164,9 +164,10 @@
       function next(i) {
         if (i >= queue.length || navigator.onLine === false || !owns(queue[i])) return Promise.resolve(queue.length - i);
         var entry = queue[i];
-        return W.photo.upload(entry.blob).then(function (ref) {
+        return W.photo.upload(entry.blob, entry.run_id).then(function (ref) {
           return settle(entry, ref).then(function (taken) { if (!taken) sent += 1; return next(i + 1); });
         }, function (err) {
+          if (err && err.code === "run_changed") return queue.length - i;
           if (err && !err.retryable && FINAL_STATUSES.indexOf(err.status) !== -1) {
             dropped += 1;
             return remove(entry.id).then(function () { return next(i + 1); });

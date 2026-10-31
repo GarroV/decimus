@@ -672,7 +672,7 @@
 
   /* ── сведения о визите: отдельный лист, вход — в шапке ─────────────── */
 
-  function infoInput(field) {
+  function infoInput(field, runId) {
     if (field.kind === "yes_no") {
       var seg = el("div", "walk-seg");
       var yes = tx("walk.info.yes");
@@ -680,7 +680,7 @@
       [["yes", yes], ["no", no]].forEach(function (pair) {
         var on = field.value === pair[1];
         var b = W.button("walk-seg__opt" + (on ? " is-on" : ""), pair[1], function () {
-          if (writable()) saveInfo(field.code, pair[0]);
+          if (writable()) saveInfo(field.code, pair[0], runId);
         });
         b.disabled = !writable();
         seg.appendChild(b);
@@ -712,12 +712,13 @@
   }
 
   function renderInfoFields(box) {
+    var runId = S.infoRunId;
     box.appendChild(el("p", "walk-info__hint", tx("walk.info.hint")));
     S.data.info.forEach(function (field) {
       var row = el("div", "walk-info__field");
       var label = el("label", "walk-form__label", field.q);
       row.appendChild(label);
-      var made = infoInput(field);
+      var made = infoInput(field, runId);
       if (made.input) label.htmlFor = made.input.id;
       row.appendChild(made.node);
       if (made.input && made.input.tagName === "TEXTAREA") {
@@ -726,7 +727,7 @@
       }
       if (made.input && writable()) {
         var save = W.button("walk-btn walk-btn--small", tx("walk.info.save"), function () {
-          saveInfo(field.code, made.input.value);
+          saveInfo(field.code, made.input.value, runId);
         });
         save.hidden = true;
         made.input.addEventListener("input", function () { save.hidden = made.input.value === field.value; });
@@ -741,6 +742,7 @@
   function onInfoBack() { closeInfo(); }
 
   function openInfo() {
+    S.infoRunId = S.data.run_id;
     S.info = true;
     renderInfoSheet();
     if (W.supports("6.1")) {
@@ -785,12 +787,12 @@
     document.documentElement.classList.add("has-sheet");
   }
 
-  function saveInfo(code, value) {
-    W.post(W.urls.info, { code: code, value: value }).then(function (res) {
+  function saveInfo(code, value, runId) {
+    W.api.write(W.urls.info, { code: code, value: value }, runId).then(function (res) {
       if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
       W.haptic("success");
       W.toast(tx("walk.info.saved"), "ok");
-      W.apply(res.body);
+      if (S.data.run_id === runId) W.apply(res.body);
     }).catch(function (err) {
       W.haptic("error");
       W.toast(err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network"), "err");
@@ -837,6 +839,7 @@
   W.apply = function (body, keepSheet) {
     var first = !S.data || S.data.key !== body.key;
     if (first && S.data && W.sheet.isOpen()) W.sheet.close(true);
+    if (first && S.info) closeInfo();
     S.data = body;
     S.data = withEquipment(body);
     if (first && W.offline && body.state === "active") W.offline.start();

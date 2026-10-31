@@ -61,3 +61,18 @@ test('offline flush uploads only current run; unknown and other run photos survi
   assert.equal(env.storage.get('key-run-a_draft').run_id, 'run-a');
   assert.equal(env.storage.get('key-run-a_draft').photos[0], 'uploaded');
 });
+test('stale upload conflict retains original bytes and permits a later retry once', async () => {
+  const records = [{id:'a', run_id:'run-a', key:'key-run-a_draft', mode:'violation', at:Date.now(), bytes:new ArrayBuffer(5)}];
+  const env = offline(records);
+  env.W.photo.upload = async () => { throw {status:409, code:'run_changed', retryable:false}; };
+  await env.W.offline.kick();
+  assert.equal(records.length, 1);
+  assert.equal(records[0].bytes.byteLength, 5);
+  let uploads = 0;
+  env.W.photo.upload = async (blob, runId) => {uploads++; assert.equal(runId,'run-a'); return 'retry-photo';};
+  await env.W.offline.kick();
+  await env.W.offline.kick();
+  assert.equal(uploads, 1);
+  assert.equal(records.length, 0);
+  assert.equal(env.storage.get('key-run-a_draft').photos[0], 'retry-photo');
+});

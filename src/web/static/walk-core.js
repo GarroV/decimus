@@ -144,9 +144,10 @@
 
   /** POST с подписью Telegram. Ответ — { ok, status, body } или отказ сети.
    *  `signal` — необязательный AbortSignal: обрыв по сроку (кадры на слабой связи, D442). */
-  W.post = function (url, body, contentType, signal) {
+  W.post = function (url, body, contentType, signal, runId) {
     var headers = { "X-Telegram-Init-Data": (tg && tg.initData) || "" };
     headers["Content-Type"] = contentType || "application/json";
+    if (runId !== undefined) headers["X-Walk-Run-Id"] = runId;
     return fetch(url, {
       method: "POST",
       headers: headers,
@@ -160,6 +161,19 @@
       }
       return r.json().then(function (json) { return { ok: r.ok, status: r.status, body: json }; });
     });
+  };
+
+  W.api = W.api || {};
+  /** Identity is captured before asynchronous work, never taken from a later run. */
+  W.api.write = function (url, body, runId, contentType, signal) {
+    if (runId === undefined && body && Object.prototype.hasOwnProperty.call(body, "run_id")) runId = body.run_id;
+    if (runId === undefined && W.state.data) runId = W.state.data.run_id;
+    if (url === W.urls.photo) return W.post(url, body, contentType, signal, runId);
+    var payload = body;
+    if ((url === W.urls.finding || url === W.urls.info) && runId !== undefined) {
+      payload = Object.assign({}, body, {run_id: runId});
+    }
+    return W.post(url, payload, contentType, signal);
   };
 
   /* ── черновик и личные пометки: per-viewer, переживают закрытие окна ── */

@@ -87,10 +87,11 @@
     return PROFILES[Math.max(rankByConnection(), rankBySamples())];
   }
 
-  function failure(message, retryable, status) {
+  function failure(message, retryable, status, code) {
     var err = new Error(message);
     err.retryable = retryable;
     err.status = status;
+    err.code = code;
     return err;
   }
 
@@ -137,11 +138,12 @@
 
   /** Отправить кадр. Ответ — ссылка `walk:…`. Отказ — Error с текстом для аудитора;
    *  `retryable` — не дошло из-за сети или сервер не дотянулся: кадр стоит отправить позже. */
-  function upload(blob) {
+  function upload(blob, runId) {
+    if (runId === undefined && W.state.data) runId = W.state.data.run_id;
     var ctl = window.AbortController ? new AbortController() : null;
     var timer = ctl ? setTimeout(function () { ctl.abort(); }, UPLOAD_TIMEOUT_MS) : null;
     var started = Date.now();
-    return W.post(W.urls.photo, blob, "image/jpeg", ctl && ctl.signal).then(function (res) {
+    return W.api.write(W.urls.photo, blob, runId, "image/jpeg", ctl && ctl.signal).then(function (res) {
       clearTimeout(timer);
       if (res.ok && res.body && res.body.ref) {
         note(blob.size, Date.now() - started);
@@ -149,7 +151,7 @@
       }
       if (RETRY_STATUSES.indexOf(res.status) !== -1) throw failure(W.tx("walk.err.network"), true, res.status);
       var msg = res.body && res.body.message;
-      throw failure(msg || W.tx("walk.err.photo_bad"), false, res.status);
+      throw failure(msg || W.tx("walk.err.photo_bad"), false, res.status, res.body && res.body.error);
     }, function (err) {
       clearTimeout(timer);
       // Оборвали по сроку — связь слабая, следующие кадры сожмём сильнее.
