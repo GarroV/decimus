@@ -33,14 +33,19 @@ test('unknown legacy draft stays recoverable; only matching run migrates', () =>
   assert.equal(sheet(storage).test.loadDraft().photos[0], 'photo-old');
   assert.equal(storage.get('old_draft'), old);
 });
-function offline(records, run = 'run-a') {
-  const storage = new Map(); let uploads = 0;
+function offline(records, run = 'run-a', storage = new Map()) {
+  let uploads = 0;
   const W = {state: {data: {key: 'key-' + run, run_id: run}}, local: {
     get: key => storage.get(key), set: (key, value) => storage.set(key, value)
   }, photo: {upload: async () => { uploads++; return 'uploaded'; }}, toast() {}, tx() {}};
   const db = {transaction() {
     const tx = {objectStore() { return {
       getAll() { const req = {result: records.slice()}; queueMicrotask(() => tx.oncomplete()); return req; },
+      put(row) {
+        const at = records.findIndex(r => r.id === row.id);
+        if (at === -1) records.push(row); else records[at] = row;
+        queueMicrotask(() => tx.oncomplete()); return {result: row.id};
+      },
       delete(id) { records.splice(records.findIndex(r => r.id === id), 1); queueMicrotask(() => tx.oncomplete()); return {}; }
     }; }}; return tx;
   }};
@@ -75,4 +80,81 @@ test('stale upload conflict retains original bytes and permits a later retry onc
   assert.equal(uploads, 1);
   assert.equal(records.length, 0);
   assert.equal(env.storage.get('key-run-a_draft').photos[0], 'retry-photo');
+});
+function infoFrame(id, code = 'INF01', run = 'run-a') {
+  return {id, run_id:run, key:'key-' + run + '_info_' + code, mode:'info', at:Date.now(), bytes:new ArrayBuffer(7)};
+}
+test('registered info consumer receives only its own key; closed fields persist separately', async () => {
+  const records = [infoFrame('a'), infoFrame('b','INF02'), infoFrame('foreign','INF01','run-b'),
+    {...infoFrame('unknown'), key:'key-run-a_finish_run-a', at:0}];
+  const env = offline(records);
+  const calls = [];
+  env.W.offline.onUploaded = () => {throw new Error('info leaked into finding consumer');};
+  const unregister = env.W.offline.register('key-run-a_info_INF01', {
+    uploaded(entry, ref) {calls.push([entry.key,entry.run_id,ref]); return true;}
+  });
+  await env.W.offline.kick();
+  assert.equal(calls.length,1);
+  assert.deepEqual(calls[0],['key-run-a_info_INF01','run-a','uploaded']);
+  assert.equal(env.storage.get('key-run-a_info_INF02').photos[0],'uploaded');
+  assert.equal(records.length,2);
+  assert.deepEqual(records.map(r=>r.id),['foreign','unknown']);
+  unregister();
+});
+test('successful info upload preserves original bytes until verified local persistence, reload avoids reupload', async () => {
+  const records = [infoFrame('a')];
+  const env = offline(records);
+  env.W.local.set = () => {}; // device storage full
+  await env.W.offline.kick();
+  assert.equal(env.uploads(),1);
+  assert.equal(records.length,1);
+  assert.equal(records[0].bytes.byteLength,7);
+  assert.equal(records[0].uploaded_ref,'uploaded');
+  const reloaded = offline(records); // new module, same durable IDB rows
+  await reloaded.W.offline.kick();
+  await reloaded.W.offline.kick();
+  assert.equal(reloaded.uploads(),0);
+  assert.equal(records.length,0);
+  assert.equal(reloaded.storage.get('key-run-a_info_INF01').photos.length,1);
+});
+test('unregistered info consumer falls back to durable merge, preserving other payload properties', async () => {
+  const records = [infoFrame('a')];
+  const env = offline(records);
+  const original = {run_id:'run-a',photos:['already'],queued:['already'],other:'kept'};
+  env.storage.set('key-run-a_info_INF01', original);
+  const unregister = env.W.offline.register('key-run-a_info_INF01', () => {throw new Error('unregistered');});
+  unregister();
+  await env.W.offline.kick();
+  const draft = env.storage.get('key-run-a_info_INF01');
+  assert.equal(draft.other,'kept');
+  assert.equal(draft.photos.filter(ref=>ref==='uploaded').length,1);
+  assert.equal(records.length,0);
+});
+test('info network failure keeps original blob; retry appends exactly once', async () => {
+  const records = [infoFrame('a')];
+  const env = offline(records);
+  let calls=0;
+  env.W.photo.upload = async () => {if (++calls === 1) throw {retryable:true}; return 'later';};
+  await env.W.offline.kick();
+  assert.equal(records.length,1);
+  assert.equal(records[0].bytes.byteLength,7);
+  assert.equal(records[0].uploaded_ref,undefined);
+  await env.W.offline.kick();await env.W.offline.kick();
+  assert.equal(calls,2);
+  assert.equal(env.storage.get('key-run-a_info_INF01').photos.filter(ref=>ref==='later').length,1);
+});
+test('in-flight old info upload settles only into original key after active run changes', async () => {
+  const records = [infoFrame('a')];
+  const env = offline(records);
+  let adopted=0;
+  env.W.offline.register('key-run-a_info_INF01',()=>{adopted++;return true;});
+  env.W.photo.upload=async () => {
+    env.W.state.data={key:'key-run-b',run_id:'run-b'};
+    return 'old-completed';
+  };
+  await env.W.offline.kick();
+  assert.equal(adopted,0);
+  assert.equal(env.storage.get('key-run-a_info_INF01').run_id,'run-a');
+  assert.equal(env.storage.get('key-run-a_info_INF01').photos[0],'old-completed');
+  assert.equal(env.storage.has('key-run-b_info_INF01'),false);
 });

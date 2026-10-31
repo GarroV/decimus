@@ -336,7 +336,7 @@
   function adopt(entry, ref) {
     if (!f || f.n || f.run_id !== entry.run_id || draftKey() !== entry.key) return false;
     if (f.gone.indexOf(entry.id) !== -1) return true;
-    var p = f.photos.filter(function (x) { return x.entryId === entry.id; })[0];
+    var p = f.photos.filter(function (x) { return x.entryId === entry.id || x.ref === ref; })[0];
     if (!p) {
       p = { id: ++seq, fresh: true, own: true, draftKey: entry.key, run_id: entry.run_id, mode: entry.mode, url: URL.createObjectURL(entry.blob) };
       f.photos.push(p);

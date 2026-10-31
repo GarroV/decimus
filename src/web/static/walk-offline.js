@@ -35,6 +35,7 @@
   var attempt = 0;
   var busy = false;
   var started = false;
+  var consumers = Object.create(null);
 
   /* ── хранилище ─────────────────────────────────────────────────────── */
 
@@ -75,7 +76,7 @@
   }
 
   function fromRow(row) {
-    return { id: row.id, key: row.key, run_id: row.run_id, mode: row.mode, at: row.at, bytes: row.bytes.byteLength,
+    return { id: row.id, key: row.key, run_id: row.run_id, uploaded_ref: row.uploaded_ref, mode: row.mode, at: row.at, bytes: row.bytes.byteLength,
       blob: new Blob([row.bytes], { type: row.type }) };
   }
 
@@ -132,14 +133,17 @@
    *  аудитор увидит кадр готовым. `queued` — кадры, пришедшие уже после закрытия формы. */
   function owns(entry) {
     var data = W.state.data;
-    return !!data && !!data.run_id && entry.run_id === data.run_id && entry.key === data.key + "_draft";
+    if (!data || !data.run_id || entry.run_id !== data.run_id) return false;
+    if (entry.key === data.key + "_draft") return true;
+    var prefix = data.key + "_info_";
+    return entry.key.indexOf(prefix) === 0 && /^[A-Za-z0-9_-]+$/.test(entry.key.slice(prefix.length));
   }
 
   function mergeDraft(entry, ref) {
     var draft = W.local.get(entry.key) || {
       run_id: entry.run_id, mode: entry.mode, zone: null, code: null, level: null, text: "", comment: "", repeat: false, words: "", photos: [],
     };
-    if (draft.run_id !== entry.run_id) return;
+    if (draft.run_id !== entry.run_id) return false;
     var refs = draft.photos || [];
     var queued = draft.queued || [];
     if (refs.indexOf(ref) === -1) refs.push(ref);
@@ -147,11 +151,39 @@
     draft.photos = refs;
     draft.queued = queued;
     W.local.set(entry.key, draft);
+    var saved = W.local.get(entry.key);
+    return !!saved && saved.run_id === entry.run_id && Array.isArray(saved.photos) &&
+      saved.photos.indexOf(ref) !== -1;
+  }
+
+  /** Persist the upload receipt before local adoption; reload can finish without reuploading. */
+  function rememberUploaded(entry, ref) {
+    return rows().then(function (all) {
+      var row = all.filter(function (r) { return r.id === entry.id; })[0];
+      if (!row) return false;
+      var updated = Object.assign({}, row, {uploaded_ref: ref});
+      return run("readwrite", function (s) { return s.put(updated); }).then(function () { return true; });
+    });
+  }
+
+  /** Register an active field consumer. Unregistering never deletes its durable draft. */
+  function register(key, consumer) {
+    var registration = {consumer: consumer, run_id: W.state.data && W.state.data.run_id};
+    consumers[key] = registration;
+    return function () { if (consumers[key] === registration) delete consumers[key]; };
   }
 
   function settle(entry, ref) {
-    var taken = W.offline.onUploaded && W.offline.onUploaded(entry, ref);
-    if (!taken) mergeDraft(entry, ref);
+    // Keep original bytes until the reference was actually saved on this device.
+    if (!mergeDraft(entry, ref)) return Promise.resolve(null);
+    var taken = false;
+    var registration = consumers[entry.key];
+    if (owns(entry) && registration && registration.run_id === entry.run_id) {
+      var consumer = registration.consumer;
+      taken = !!(typeof consumer === "function" ? consumer(entry, ref) : consumer.uploaded(entry, ref));
+    } else if (owns(entry) && entry.key === W.state.data.key + "_draft") {
+      taken = !!(W.offline.onUploaded && W.offline.onUploaded(entry, ref));
+    }
     return remove(entry.id).then(function () { return taken; });
   }
 
@@ -164,8 +196,17 @@
       function next(i) {
         if (i >= queue.length || navigator.onLine === false || !owns(queue[i])) return Promise.resolve(queue.length - i);
         var entry = queue[i];
-        return W.photo.upload(entry.blob, entry.run_id).then(function (ref) {
-          return settle(entry, ref).then(function (taken) { if (!taken) sent += 1; return next(i + 1); });
+        var uploaded = entry.uploaded_ref ? Promise.resolve(entry.uploaded_ref) :
+          W.photo.upload(entry.blob, entry.run_id).then(function (ref) {
+            return rememberUploaded(entry, ref).then(function (saved) { return saved ? ref : null; });
+          });
+        return uploaded.then(function (ref) {
+          if (!ref) return next(i + 1);
+          return settle(entry, ref).then(function (taken) {
+            if (taken === null) return queue.length - i;
+            if (!taken) sent += 1;
+            return next(i + 1);
+          });
         }, function (err) {
           if (err && err.code === "run_changed") return queue.length - i;
           if (err && !err.retryable && FINAL_STATUSES.indexOf(err.status) !== -1) {
@@ -231,6 +272,7 @@
     recovery: function (key) { return rows().then(function (all) {
       return all.filter(function (r) { return r.key === key; }).map(fromRow);
     }, function () { return []; }); },
+    register: register,
     available: available, put: put, list: list, remove: remove, start: start, kick: kick, watch: watch,
     onUploaded: null, onTick: null,
     limits: { frames: MAX_FRAMES, bytes: MAX_BYTES, days: MAX_AGE_DAYS },

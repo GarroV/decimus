@@ -130,5 +130,50 @@ with sync_playwright() as p:
             f"{lang} {viewport['width']}: marks preview, decline/confirm, "
             "run identity, original retained: PASS"
         )
+        # Real IndexedDB receipt survives reload and localStorage failure.
+        runtime = """
+          window.__uploads=0;window.__adoptions=0;window.__full=false;
+          window.DecimusWalk={state:{data:{key:'key-run-a',run_id:'run-a'}},
+            local:{get:key=>JSON.parse(localStorage.getItem(key)||'null'),
+              set:(key,value)=>{if(!__full)localStorage.setItem(key,JSON.stringify(value));}},
+            photo:{upload:async(blob,run)=>{if(run!=='run-a')throw Error('wrong run');
+              __uploads++;return 'uploaded-once';}},toast(){},tx:key=>key};
+        """
+        offline_source = (root / "src/web/static/walk-offline.js").read_text()
+        page.evaluate(runtime)
+        page.add_script_tag(content=offline_source)
+        first = page.evaluate("""async() => {
+          var W=DecimusWalk;__full=true;
+          await W.offline.put('key-run-a_info_INF01','info',new Blob(['original-bytes']),'run-a');
+          await W.offline.put('key-run-b_info_INF01','info',new Blob(['foreign-bytes']),'run-b');
+          W.offline.register('key-run-a_info_INF01',()=>{__adoptions++;return true;});
+          await W.offline.kick();
+          var entries=await W.offline.list('key-run-a_info_INF01');
+          return {uploads:__uploads,adoptions:__adoptions,receipt:entries[0].uploaded_ref,
+            bytes:await entries[0].blob.text()};
+        }""")
+        assert first == {
+            "uploads": 1,
+            "adoptions": 0,
+            "receipt": "uploaded-once",
+            "bytes": "original-bytes",
+        }
+        page.reload()
+        page.evaluate(runtime)
+        page.add_script_tag(content=offline_source)
+        resumed = page.evaluate("""async() => {
+          var W=DecimusWalk;
+          W.offline.register('key-run-a_info_INF01',()=>{__adoptions++;return true;});
+          await W.offline.kick();await W.offline.kick();
+          return {uploads:__uploads,adoptions:__adoptions,
+            local:W.local.get('key-run-a_info_INF01'),
+            pending:(await W.offline.list('key-run-a_info_INF01')).length,
+            foreign:(await W.offline.recovery('key-run-b_info_INF01')).length};
+        }""")
+        assert resumed["uploads"] == 0 and resumed["adoptions"] == 1
+        assert resumed["pending"] == 0 and resumed["foreign"] == 1
+        assert resumed["local"]["run_id"] == "run-a"
+        assert resumed["local"]["photos"] == ["uploaded-once"]
+        print(f"{lang} {viewport['width']}: real IDB receipt/blob, reload, own-field retry: PASS")
         page.close()
     browser.close()
