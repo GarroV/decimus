@@ -246,4 +246,17 @@ def test_info_owned_previews_keep_country_scope_and_separate_finding_owners(
         "SYN_INFO": previews.FindingShots((str(shown),), 1)
     }
     assert previews.info_previews(ident, reach=reach_of("GE")) == {}
+    from src.db.reach import own_reach
+
+    assert previews.info_previews(ident, reach=own_reach("not-owner")) == {}
     assert previews.finding_previews(ident, reach=reach_of("HQ")) == {}
+
+    class Reader:
+        def get(self, key: str) -> bytes:
+            assert key == "info.jpg"
+            return b"synthetic-info-preview"
+
+    assert previews.preview_bytes(ident, str(shown), reach=reach_of("HQ"), storage=Reader()) == (
+        b"synthetic-info-preview"
+    )
+    assert previews.preview_bytes(ident, str(shown), reach=reach_of("GE"), storage=Reader()) is None
