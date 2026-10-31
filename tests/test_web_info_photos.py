@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from flask.testing import FlaskClient
@@ -14,6 +15,26 @@ from src.db.errors import DbError
 from src.db.models import InfoRow
 from src.db.previews import FindingShots
 from src.web import inspections as data
+
+
+@админ
+@pytest.mark.parametrize("path", ["/inspections/x", "/inspections?inspection=x"])
+@pytest.mark.parametrize("recorded", [False, True])
+def test_card_duration_uses_persisted_timestamps(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, path: str, recorded: bool
+) -> None:
+    detail = _mixed(monkeypatch, on_review=False)
+    start = datetime(2026, 10, 31, 10, tzinfo=UTC)
+    head = replace(
+        detail.inspection,
+        started_at=start if recorded else None,
+        finished_at=start + timedelta(hours=1, minutes=2, seconds=3) if recorded else None,
+    )
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: replace(detail, inspection=head))
+    monkeypatch.setattr(data, "load_info_previews", lambda *_a, **_k: {})
+    html = стенд.get(f"{path}{'&' if '?' in path else '?'}lang=en").get_data(as_text=True)
+    assert "Inspection duration" in html
+    assert ("01:02:03" if recorded else "Not recorded") in html
 
 
 @админ

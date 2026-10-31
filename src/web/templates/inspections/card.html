@@ -97,6 +97,10 @@
 
     <div class="card__facts">
       <div class="card__fact">
+        <div class="card__fact-label">{{ t('card.fact.duration') }}</div>
+        <div>{{ duration(head.duration_seconds) }}</div>
+      </div>
+      <div class="card__fact">
         <div class="card__fact-label">{{ t('card.fact.auditor') }}</div>
         <div>{{ head.auditor or '—' }}</div>
       </div>

@@ -50,6 +50,7 @@
     <section class="ssec">
       <h3 class="ssec__title">{{ t('registry.panel.facts') }}</h3>
       <dl class="sprops">
+        <div><dt>{{ t('card.fact.duration') }}</dt><dd>{{ duration(head.duration_seconds) }}</dd></div>
         <div><dt>{{ t('card.fact.auditor') }}</dt><dd>{{ head.auditor or '—' }}</dd></div>
         <div><dt>{{ t('card.fact.city') }}</dt><dd>{{ city_title(head.city) or '—' }}</dd></div>
         {% if head.partner %}<div><dt>{{ t('card.fact.partner') }}</dt><dd>{{ head.partner }}</dd></div>{% endif %}

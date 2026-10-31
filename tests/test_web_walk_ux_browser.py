@@ -183,7 +183,8 @@ def test_item_menu_uses_payload_process_and_kind_without_setting_class(page):
         {code:'TEST02',q:'Synthetic issue',label:'Cleanliness 2',process:'Cleanliness',
           zones:['dining'],levels:['D1','D2'],measure:false}];
       W.photo={block:()=>W.el('div'),closeCamera:()=>false};
-      W.offline={available:()=>false}; W.voiceBar=()=>null; W.translateBar=()=>null;
+          W.offline={available:()=>false,recovery:async()=>[]};
+          W.voiceBar=()=>null; W.translateBar=()=>null;
       W.local.drop=()=>{};
     }""")
     page.add_script_tag(path=str(STATIC / "walk-menu.js"))

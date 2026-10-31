@@ -742,6 +742,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "date.mon.11": {"ru": "ноя", "en": "Nov"},
     "date.mon.12": {"ru": "дек", "en": "Dec"},
     "card.fact.auditor": {"ru": "Аудитор", "en": "Auditor"},
+    "card.fact.duration": {"ru": "Длительность проверки", "en": "Inspection duration"},
+    "card.fact.duration_unknown": {"ru": "Не зафиксирована", "en": "Not recorded"},
     "card.fact.city": {"ru": "Город", "en": "City"},
     "card.fact.partner": {"ru": "Партнёр", "en": "Partner"},
     "card.fact.report_lang": {"ru": "Язык отчёта", "en": "Report language"},
