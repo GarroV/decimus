@@ -19,7 +19,6 @@
 from __future__ import annotations
 
 import logging
-import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
@@ -42,9 +41,9 @@ from src.recognize.models import Candidate
 from src.recognize.provenance import frame_indices
 from src.recognize.timing import collect, measure, report
 
-from .server_limits import walk_model_gate
 from .texts_walk import WALK_TEXTS
 from .walk_auth import HINT_ENDPOINT, HINT_PATH, SUGGEST_ENDPOINT, SUGGEST_PATH, WalkSettings
+from .walk_model_session import ModelSession
 from .walk_write import Identify, WalkRefused, _code, _refs, _text, reading_of
 from .walk_zone import resolve_item_zone
 
@@ -191,7 +190,14 @@ def answer(offer: Offer, ask: Ask) -> dict[str, Any]:
     }
 
 
-def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify) -> None:
+def install(
+    app: Flask,
+    *,
+    conf: WalkSettings,
+    ui_lang: str,
+    identify: Identify,
+    session: ModelSession | None = None,
+) -> None:
     """Повесить поиск пункта. Опознание — то же, что у записи.
 
     Один поиск на чат за раз: каждый — оплачиваемый вызов модели, и второй,
@@ -199,9 +205,8 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
     работа аудитора. «За раз» — на все процессы: внутри процесса держит набор,
     между процессами — замок в базе (`src/db/busy_lock.py`, F-110).
     """
-    busy: set[int] = set()
-    guard = threading.Lock()
-    gate = walk_model_gate()
+    resources = session or ModelSession()
+    busy, guard, gate = resources.busy, resources.guard, resources.gate
 
     def refused(key: str, lang: str, status: int = 422) -> tuple[Response, int]:
         entry = WALK_TEXTS[key]

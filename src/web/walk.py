@@ -60,6 +60,7 @@ from src.domain.walk_users import walk_open_to
 from . import (
     walk_access,
     walk_finish,
+    walk_level,
     walk_rate,
     walk_settings,
     walk_start,
@@ -83,6 +84,7 @@ from .walk_auth import (
     chat_of,
     load_walk_settings,
 )
+from .walk_model_session import ModelSession
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +239,7 @@ def build_walk(
         "date": str(inspection.date),
         "key": mark_key(inspection),
         "run_id": inspection.run_id,
+        "checklist_version": inspection.checklist_version,
         "timing": {
             "started_at": inspection.started_at.isoformat() if inspection.started_at else None,
             "finished_at": inspection.finished_at.isoformat() if inspection.finished_at else None,
@@ -508,7 +511,9 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
 
     walk_write.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
     walk_settings.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
-    walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
+    model_session = ModelSession()
+    walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify, session=model_session)
+    walk_level.install(app, conf=conf, ui_lang=ui_lang, identify=identify, session=model_session)
     walk_translate.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_voice.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_start.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond, bot=bot)

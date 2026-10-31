@@ -62,6 +62,7 @@ FINDING_ENDPOINT = "walk_finding"
 INFO_ENDPOINT = "walk_info"
 #: Поиск пункта по кадру и словам (D330) — распознавание бота.
 SUGGEST_ENDPOINT = "walk_suggest"
+LEVEL_ENDPOINT = "walk_level"
 #: Мгновенная подсказка пункта, пока модель думает (#1267, D646): без модели.
 HINT_ENDPOINT = "walk_hint"
 #: Перевод свободного текста на язык отчёта (D394): ничего не пишет.
@@ -84,6 +85,7 @@ PHOTO_VIEW_PATH = "/tg/walk/photo/view"
 FINDING_PATH = "/tg/walk/finding"
 INFO_PATH = "/tg/walk/info"
 SUGGEST_PATH = "/tg/walk/suggest"
+LEVEL_PATH = "/tg/walk/level"
 HINT_PATH = "/tg/walk/hint"
 TRANSLATE_PATH = "/tg/walk/translate"
 VOICE_PATH = "/tg/walk/transcribe"
@@ -98,6 +100,7 @@ ENDPOINTS = frozenset(
         FINDING_ENDPOINT,
         INFO_ENDPOINT,
         SUGGEST_ENDPOINT,
+        LEVEL_ENDPOINT,
         HINT_ENDPOINT,
         TRANSLATE_ENDPOINT,
         VOICE_ENDPOINT,
