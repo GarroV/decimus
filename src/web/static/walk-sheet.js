@@ -1117,6 +1117,7 @@
   }
   function classSaveContext(cand) {
     var body = classContext(cand).body;
+    if (!body.clarifications.length) return null;
     return {clarifications:body.clarifications, run_id:body.run_id, checklist_version:body.checklist_version,
       code:body.code, zone:body.zone, photo_refs:body.photos};
   }
