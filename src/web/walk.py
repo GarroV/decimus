@@ -62,6 +62,7 @@ from . import (
     walk_finish,
     walk_level,
     walk_rate,
+    walk_search_tags,
     walk_settings,
     walk_start,
     walk_suggest,
@@ -343,6 +344,7 @@ def walk_payload(
         info=info_fields(inspection, lang),
         sealed=handed_over(chat_id),
     )
+    payload["item_search_tags"] = walk_search_tags.search_tags(items, chat_id=chat_id)
     app = walk_settings.app_block(chat_id, lang)
     out = {**payload, "texts": texts_for(lang), "app": app}
     if app["finish_mode"] == finish_modes.REPORT:

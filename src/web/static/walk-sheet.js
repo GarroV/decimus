@@ -554,9 +554,17 @@
       title: isMeasure() ? tx("walk.sheet.item_measure") : isAdvice() ? tx("walk.sheet.item_advice") : tx("walk.sheet.item"),
       placeholder: isMeasure() ? tx("walk.sheet.search_measure") : tx("walk.sheet.search"),
       lead: lead,
+      semanticTags: isMeasure() || isAdvice() ? [] : (W.state.data.item_search_tags || []).map(function (tag) {
+        return {id:tag.id, label:tx("walk.sheet.search_tag." + tag.id), codes:tag.codes};
+      }),
       tags: choices("").map(function (i) { return i.process; }).filter(function (p, at, all) { return p && all.indexOf(p) === at; }),
-      list: function (q) {
-        return choices(q).map(function (i) {
+      list: function (q, filters) {
+        filters = filters || {};
+        var selectedTag = (W.state.data.item_search_tags || []).filter(function (tag) {return tag.id === filters.semantic;})[0];
+        return choices(q).filter(function (i) {
+          return (!filters.process || i.process === filters.process) &&
+            (!selectedTag || selectedTag.codes.indexOf(i.code) !== -1);
+        }).map(function (i) {
           return { code: i.label, kind: isAdvice() ? "advice" : i.measure ? "info" : "violation", label: i.q, value: i.code, on: i.code === f.code, badge: previousHere(i.code) ? tx("walk.sheet.was_here") : null };
         });
       },

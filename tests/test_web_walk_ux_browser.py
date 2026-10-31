@@ -93,11 +93,12 @@ def test_process_tags_only_filter_and_keep_manual_query(page):
     page.evaluate("""() => {
       window.picks=[];
       DecimusWalk.menu.search({title:'Items',placeholder:'Search',tags:['Cleanliness','Продукты'],
-        list:q=>[{code:'Item 1',label:'Synthetic '+q,value:'TEST01',kind:'info'}],
+        list:(q,filters)=>[{code:'Item 1',label:'Synthetic '+(filters.process||q),
+          value:'TEST01',kind:'info'}],
         onPick:code=>picks.push(code)});
     }""")
     page.get_by_role("button", name="Продукты", exact=True).click()
-    assert page.locator("input").input_value() == "Продукты"
+    assert page.locator("input").input_value() == ""
     assert page.locator(".walk-option__text").inner_text() == "Synthetic Продукты"
     assert page.locator(".walk-item-kind--info").inner_text() == "Information"
     assert page.evaluate("picks") == []

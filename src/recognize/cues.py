@@ -251,10 +251,14 @@ def load_cues(path: Path | None = None, *, chat_id: int | None) -> tuple[Cue, ..
     была («Грязь», «Поломка», «Кандидаты»). Заголовком считается первая строка
     таблицы без кодов — тот же признак, по которому она сегодня пропускается.
     """
+    return _parse_cues(_read(path, chat_id))
+
+
+def _parse_cues(text: str) -> tuple[Cue, ...]:
     cues: list[Cue] = []
     skipping = False
     headers: tuple[str, ...] = ()
-    for line in _read(path, chat_id).splitlines():
+    for line in text.splitlines():
         if line.startswith("## "):
             skipping = line.strip().startswith(_NOT_CUES)
             headers = ()
@@ -410,10 +414,14 @@ def column_words(path: Path | None = None, *, chat_id: int | None) -> dict[str, 
     Читаются строки таблицы после разделителя — как в любой другой таблице
     этого документа, поэтому шапка в словарь не попадает.
     """
+    return _parse_column_words(_read(path, chat_id))
+
+
+def _parse_column_words(text: str) -> dict[str, frozenset[str]]:
     picked: dict[str, set[str]] = {}
     collecting = False
     after_separator = False
-    for line in _read(path, chat_id).splitlines():
+    for line in text.splitlines():
         if line.startswith("## "):
             if collecting:
                 break
@@ -435,3 +443,9 @@ def column_words(path: Path | None = None, *, chat_id: int | None) -> dict[str, 
         if header and words:
             picked.setdefault(header, set()).update(words)
     return {header: frozenset(words) for header, words in picked.items()}
+
+
+def load_cue_snapshot(*, chat_id: int) -> tuple[tuple[Cue, ...], dict[str, frozenset[str]]]:
+    """Read the pinned cue file once for a consistent, uncached UI lookup."""
+    text = _read(None, chat_id)
+    return _parse_cues(text), _parse_column_words(text)
