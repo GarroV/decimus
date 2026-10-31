@@ -138,7 +138,7 @@ def test_single_manual_finding_does_not_require_second_photo_confirmation(browse
     page.evaluate("""() => {
       const W = DecimusWalk;
       W.sheet.close(true);
-      W.local.get = () => ({mode:'violation',
+      W.local.get = () => ({run_id:'synthetic-run',mode:'violation',
         queued:['synthetic-first-ref','synthetic-second-ref']});
       W.sheet.open({mode:'violation',code:'SYN01',level:'D1',zone:'zone_a'});
     }""")

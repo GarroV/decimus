@@ -42,7 +42,8 @@ def load_sheet(page, cards, photos=None, confirm=True):
         zones:[{code:'zone_a',title:'Zone A',recorded:[],previous:[]},
                {code:'zone_b',title:'Zone B',recorded:[],previous:[]}]
       };
-      const draft = {run_id:'synthetic-run',mode:'violation', words:'Synthetic observation',photos:photos};
+      const draft = {run_id:'synthetic-run',mode:'violation',
+        words:'Synthetic observation',photos:photos};
       W.local = {get:()=>draft,set:()=>{},drop:()=>{}};
       W.photo = {block:(photos, opts)=>{
         const box = W.el('div');
