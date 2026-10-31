@@ -498,3 +498,43 @@ def test_chain_survives_reload_without_restoring_a_model_class(browser_page):
     assert page.evaluate("levelCalls[2].clarifications") == [
         {"question": "Synthetic saved question?", "answer": "Saved human answer"}
     ]
+
+
+def test_primary_violation_blank_text_cannot_save_a_checklist_question(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, level="D1")
+    editor = page.locator("[data-finding-text]")
+    editor.fill("   ")
+    assert page.get_by_role("button", name="Save", exact=True).is_disabled()
+    editor.fill("Human observed condition")
+    page.get_by_role("button", name="Save", exact=True).click()
+    page.wait_for_function("ops.length === 1")
+    assert page.evaluate("ops[0].text") == "Human observed condition"
+
+
+def test_extra_finding_exposes_full_independent_editable_description(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, level="D1")
+    confirm_assignment(page, 1)
+    page.locator(".walk-found__row").filter(has_text="Synthetic second item").locator(
+        ".walk-found__also"
+    ).click()
+    page.wait_for_function("levelCalls.length === 2")
+    resolve(page, 1, level="D2")
+    editor = page.locator('[data-extra-text="SYN02"]')
+    assert editor.is_visible()
+    assert editor.input_value() == "ANOTHER MODEL WORDING"
+    editor.fill("")
+    assert page.get_by_role("button", name="Save 2", exact=True).is_disabled()
+    editor.fill("Human fact for second item only")
+    assert page.evaluate("cards[1].wording") == "ANOTHER MODEL WORDING"
+    page.get_by_role("button", name="Save 2", exact=True).click()
+    page.wait_for_function("ops.length === 2")
+    assert [op["text"] for op in page.evaluate("ops")] == [
+        "MODEL WORDING MUST NOT BECOME FACTS",
+        "Human fact for second item only",
+    ]

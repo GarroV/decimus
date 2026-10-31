@@ -244,6 +244,8 @@
     if (assignmentEnabled() && (!assignmentReady(primaryPhotoCandidate()) ||
         extras().some(function (c) { return !assignmentReady(c); }))) return "walk.sheet.photo_assignment.need";
     if (isAdvice()) return f.text.trim() ? null : "walk.sheet.need_advice";
+    if (!f.n && !taken() && ["D1", "D2", "D3"].indexOf(f.level) !== -1 && !f.text.trim()) return "walk.sheet.need_factual_text";
+    if (extras().some(function (cand) {return ["D1", "D2", "D3"].indexOf(extraLevel(cand)) !== -1 && !extraText(cand).trim();})) return "walk.sheet.need_factual_text";
     var classWhy = classBlocker();
     if (classWhy) return classWhy;
     if (!taken() && !f.level) return "walk.sheet.need_level";
@@ -1002,6 +1004,8 @@
       cand.classReview.clarifications = [];
       cand.classReview.answerQuestion = "";
       cand.classReview.additionalWords = "";
+      cand.classReview.humanText = cand.wording || "";
+      cand.classReview.textEdited = false;
       cand.classReview.reading = cand.reading_c == null ? "" : String(cand.reading_c);
       cand.classReview.readingConfirmed = false;
       cand.classReview.readingSource = "model";
@@ -1034,6 +1038,7 @@
     }) : [];
     state.answerQuestion = saved[0].answer_question || "";
     state.additionalWords = saved[0].additional_words || "";
+    if (typeof saved[0].human_text === "string") {state.humanText = saved[0].human_text; state.textEdited = true;}
     state.clarificationScope = saved[0].clarification_scope || null;
     if (!state.readingEdited && saved[0].reading != null) {
       state.reading = String(saved[0].reading);
@@ -1056,10 +1061,10 @@
       var primary = classIsPrimary(cand);
       var zone = primary ? f.zone : extraZone(cand);
       var reading = primary ? f.reading : state.reading;
-      if (!state.answer && !state.additionalWords && !state.clarifications.length && (reading == null || !String(reading).trim())) return;
+      if (!state.textEdited && !state.answer && !state.additionalWords && !state.clarifications.length && (reading == null || !String(reading).trim())) return;
       var entry = { code:cand.code, zone:zone || null, checklist_version:W.state.data.checklist_version, answer:state.answer, reading:reading,
         words:primary ? f.words.trim() : "", photos:classPhotoRefs(cand),
-        additional_words:state.additionalWords, clarifications:state.clarifications, answer_question:state.answerQuestion, clarification_scope:state.clarificationScope,
+        human_text:state.textEdited ? state.humanText : null, additional_words:state.additionalWords, clarifications:state.clarifications, answer_question:state.answerQuestion, clarification_scope:state.clarificationScope,
         reading_source:primary ? f.readingSource : state.readingSource,
         reading_confirmed:primary ? !!f.readingConfirmed : !!state.readingConfirmed };
       // Preserve ambiguous/unmatched facts instead of moving them to another item.
@@ -1226,14 +1231,15 @@
     var zone = classIsPrimary(cand) ? f.zone : extraZone(cand);
     var unmatched = (f.savedClassFacts || []).filter(function (entry) {
       return entry.code === cand.code && entry.zone === zone && entry !== state.restoredEntry &&
-        (entry.answer || entry.additional_words || (entry.clarifications || []).length || entry.reading != null);
+        (typeof entry.human_text === "string" || entry.answer || entry.additional_words || (entry.clarifications || []).length || entry.reading != null);
     });
     if (unmatched.length && !state.answer) {
       var recovery = el("details", "walk-form__hint");
       recovery.appendChild(el("summary", null, tx("walk.sheet.class_review.saved_facts")));
       unmatched.forEach(function (entry) {
-        recovery.appendChild(el("pre", null, [entry.additional_words, entry.answer].concat((entry.clarifications || []).map(function (pair) {return pair.question + "\n" + pair.answer;}), [entry.reading]).filter(function (v) { return v != null && v !== ""; }).join("\n")));
-        if (entry.answer || entry.additional_words || (entry.clarifications || []).length) recovery.appendChild(W.button("walk-link", tx("walk.sheet.class_review.use_saved_facts"), function () {
+        recovery.appendChild(el("pre", null, [entry.human_text, entry.additional_words, entry.answer].concat((entry.clarifications || []).map(function (pair) {return pair.question + "\n" + pair.answer;}), [entry.reading]).filter(function (v) { return v != null && v !== ""; }).join("\n")));
+        if (typeof entry.human_text === "string" || entry.answer || entry.additional_words || (entry.clarifications || []).length) recovery.appendChild(W.button("walk-link", tx("walk.sheet.class_review.use_saved_facts"), function () {
+          if (typeof entry.human_text === "string") {state.humanText = entry.human_text; state.textEdited = true;}
           state.answer = entry.answer || "";
           state.additionalWords = entry.additional_words || "";
           state.answerQuestion = entry.answer_question || "";
@@ -1293,11 +1299,30 @@
       readingLabel.appendChild(el("span", null, tx("walk.sheet.class_review.reading_checked")));
       box.appendChild(readingLabel);
   }
+  function extraText(cand) { return classState(cand).humanText; }
+  function extraTextEditor(cand) {
+    var state = classState(cand);
+    var label = el("label", "walk-form__hint", tx("walk.sheet.extra_text"));
+    var area = el("textarea", "walk-area");
+    area.rows = 4;
+    area.maxLength = 1000;
+    area.value = state.humanText;
+    area.setAttribute("data-extra-text", cand.code);
+    area.addEventListener("input", function () {
+      state.humanText = area.value;
+      state.textEdited = true;
+      changed();
+      redraw("footer");
+    });
+    label.appendChild(area);
+    label.appendChild(el("p", "walk-form__hint", tx("walk.sheet.text_model_review")));
+    return label;
+  }
   function classReviewBox(cand) {
     if ((item(cand.code) || {}).measure) {
       var info = section(tx("walk.sheet.level"));
       info.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", {level:"D0"})));
-      if (!classIsPrimary(cand)) addExtraReadingControls(info, cand);
+      if (!classIsPrimary(cand)) {addExtraReadingControls(info, cand); info.appendChild(extraTextEditor(cand));}
       return info;
     }
     var state = classState(cand);
@@ -1309,7 +1334,7 @@
     feedback.setAttribute("data-class-feedback", "");
     feedback.setAttribute("role", "status");
     box.appendChild(feedback);
-    if (!classIsPrimary(cand)) addExtraReadingControls(box, cand);
+    if (!classIsPrimary(cand)) {addExtraReadingControls(box, cand); box.appendChild(extraTextEditor(cand));}
     var label = el("label", "walk-form__hint", tx("walk.sheet.class_review.facts"));
     var facts = el("textarea", "walk-area walk-class-review__facts");
     facts.rows = 2;
@@ -1317,7 +1342,7 @@
     facts.value = state.answer;
     facts.addEventListener("input", function () {
       if (!state.answerQuestion && state.needFact) {
-        state.answerQuestion = state.needFact;
+        state.answerQuestion = state.needFact.trim();
         state.clarificationScope = classContext(cand).scope;
       }
       state.answer = facts.value;
@@ -1556,15 +1581,17 @@
       area.maxLength = 1000;
       area.placeholder = tx(label + "_hint");
       area.value = f.text;
+      area.setAttribute("data-finding-text", "");
       area.addEventListener("input", function () {
         var was = !!f.text.trim();
         f.text = area.value;
         f.textAuto = false;
         changed();
         // У рекомендации текст обязателен: кнопка оживает с первым словом.
-        if (isAdvice() && was !== !!f.text.trim()) redraw("footer");
+        if ((isAdvice() || !f.n) && was !== !!f.text.trim()) redraw("footer");
       });
       box.appendChild(area);
+      if (!f.n && !isAdvice() && !isMeasure()) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.text_model_review")));
       var voice = W.voiceBar(area);
       if (voice) box.appendChild(voice);
       // Модель вписала рассуждение вместо находки (#970): пока текст её, а не
@@ -1598,6 +1625,7 @@
       area.setAttribute("aria-label", tx("walk.sheet.comment"));
       area.addEventListener("input", function () { f.comment = area.value; changed(); });
       box.appendChild(area);
+      if (!f.n && !isAdvice() && !isMeasure()) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.text_model_review")));
       var voice = W.voiceBar(area);
       if (voice) box.appendChild(voice);
       var bar = W.translateBar(area);
@@ -1773,7 +1801,7 @@
   function extraOps() {
     return extras().map(function (c) {
       return {
-        op: "add", zone: extraZone(c), code: c.code, level: extraLevel(c), text: (c.wording || "").trim(),
+        op: "add", zone: extraZone(c), code: c.code, level: extraLevel(c), text: extraText(c).trim(),
         comment: "", repeat: false, photos: assignedPhotos(c), words: classSaveWords(c), also: true,
         photo_assignment: assignmentPayload(c),
         class_context: classSaveContext(c),

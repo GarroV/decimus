@@ -146,6 +146,7 @@ def test_single_manual_finding_does_not_require_second_photo_confirmation(browse
     assert page.locator("[data-photo-assignment]").count() == 0
     page.get_by_role("button", name="walk.sheet.class_review.manual", exact=True).click()
     page.locator('[data-manual-class="D1"]').click()
+    page.locator("[data-finding-text]").fill("Synthetic human observation")
     page.get_by_role("button", name="Save", exact=True).click()
     page.wait_for_function("ops.length === 1")
     assert page.evaluate("ops[0].photos") == PHOTOS

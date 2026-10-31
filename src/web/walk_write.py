@@ -336,7 +336,7 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     photos = (
         [] if advice and not body.get("photos") else _refs(body.get("photos"), chat_id, inspection)
     )
-    if advice:
+    if advice or level in {"D1", "D2", "D3"}:
         text = _text(body, "text", required=True)
     else:
         text = _text(body, "text") or _default_text(chat_id, code, inspection.report_lang)

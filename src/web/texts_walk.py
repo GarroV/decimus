@@ -534,6 +534,24 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.sheet.need_item": {"ru": "Выберите пункт", "en": "Choose an item"},
     "walk.sheet.need_level": {"ru": "Выберите класс", "en": "Choose a class"},
+    "walk.sheet.need_factual_text": {
+        "ru": "Опишите наблюдаемый факт для каждой записи о нарушении",
+        "en": "Describe the observed fact for each violation",
+    },
+    "walk.sheet.extra_text": {
+        "ru": "Факт для дополнительной записи",
+        "en": "Fact for the extra finding",
+    },
+    "walk.sheet.text_model_review": {
+        "ru": (
+            "Проверьте полный текст факта. Предложение модели можно изменить; "
+            "вопрос методики не заменяет наблюдение."
+        ),
+        "en": (
+            "Review the full factual description. Edit the model suggestion; "
+            "a checklist question is not an observation."
+        ),
+    },
     "walk.sheet.class_review.not_established": {
         "ru": (
             "Нарушение по этим фактам не установлено. "

@@ -91,7 +91,14 @@ def клиент(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> Клие�
 
 
 def _нарушение(ref: str, **сверх: Any) -> dict[str, Any]:
-    тело = {"op": "add", "zone": "hot_kitchen", "code": "CLN05", "level": "D1", "photos": [ref]}
+    тело = {
+        "op": "add",
+        "zone": "hot_kitchen",
+        "code": "CLN05",
+        "level": "D1",
+        "photos": [ref],
+        "text": "Synthetic observed condition",
+    }
     return тело | сверх
 
 
@@ -115,28 +122,32 @@ def test_нарушение_с_кадром_и_рекомендацией_лож
     assert горячий["recorded"][0]["photos"] == [{"ref": ref, "own": True}]
 
 
-def test_без_своих_слов_формулировка_пункта_без_классов(клиент: Клиент) -> None:
-    клиент.запись(**_нарушение(клиент.ссылка()))
+@pytest.mark.parametrize("level", ["D1", "D2", "D3"])
+@pytest.mark.parametrize("blank", [None, "", "   "])
+def test_new_violation_requires_explicit_factual_description(
+    клиент: Клиент, level: str, blank: str | None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        walk_write,
+        "_default_text",
+        lambda *_: pytest.fail("blank factual text reached checklist fallback"),
+    )
+    body = _нарушение(клиент.ссылка(), level=level)
+    if blank is None:
+        body.pop("text")
+    else:
+        body["text"] = blank
+    response = клиент.запись(**body)
+    assert response.status_code == 422
+    assert get_state(АУДИТОР).findings == []
 
-    текст = get_state(АУДИТОР).findings[0].text  # type: ignore[union-attr]
 
-    assert текст and not текст.startswith("("), "служебный префикс класса ушёл бы партнёру"
-
-
-@pytest.mark.parametrize(
-    "фото",
-    [
-        pytest.param([], id="без-кадра"),
-        pytest.param(["walk:" + "0" * 32], id="кадр-не-загружен"),
-        pytest.param(["AgACAgIAAxkBAAI"], id="кадр-телеграма"),
-        pytest.param(["walk:../../inspection"], id="путь-вместо-ссылки"),
-    ],
-)
-def test_запись_без_настоящего_кадра_не_заводится(клиент: Клиент, фото: list[str]) -> None:
-    ответ = клиент.запись(op="add", zone="hot_kitchen", code="CLN05", level="D1", photos=фото)
-
-    assert ответ.status_code == 422
-    assert get_state(АУДИТОР).findings == [], "D078: записи без фотофиксации быть не может"  # type: ignore[union-attr]
+def test_information_entry_keeps_existing_default_description(клиент: Клиент) -> None:
+    response = клиент.запись(
+        op="add", zone="fridge", code="INF10", level="D0", photos=[клиент.ссылка()]
+    )
+    assert response.status_code == 200
+    assert get_state(АУДИТОР).findings[0].text
 
 
 def test_отказ_движка_приходит_общим_текстом(клиент: Клиент) -> None:
