@@ -34,6 +34,7 @@ from src.domain.model_usage import KIND_RECOGNIZE, build_call
 
 from .config import RecognizeSettings
 from .errors import ModelKeyRejected, ModelUnavailable
+from .timing import measure
 
 #: Имя схемы в запросе. Провайдеру оно нужно, на содержание не влияет.
 SCHEMA_NAME = "audit_suggestions"
@@ -211,18 +212,19 @@ def ask_model(
     if cache_prefix:
         extra["extra_body"] = {"prompt_cache_options": CACHE_OPTIONS}
     try:
-        response = client.responses.create(
-            model=used_model,
-            instructions=instructions,
-            input=[message],
-            text=text_config,
-            **extra,
-            # Кадры кухни (на них бывают лица) и записи не оставляем у OpenAI:
-            # без `store=False` Responses хранит запрос и ответ у себя. Цепочек
-            # ответов (`previous_response_id`) у нас нет, хранить незачем.
-            store=False,
-            max_output_tokens=MAX_OUTPUT_TOKENS,
-        )
+        with measure("model"):
+            response = client.responses.create(
+                model=used_model,
+                instructions=instructions,
+                input=[message],
+                text=text_config,
+                **extra,
+                # Кадры кухни (на них бывают лица) и записи не оставляем у OpenAI:
+                # без `store=False` Responses хранит запрос и ответ у себя. Цепочек
+                # ответов (`previous_response_id`) у нас нет, хранить незачем.
+                store=False,
+                max_output_tokens=MAX_OUTPUT_TOKENS,
+            )
     except OpenAIError as exc:
         _note(kind, used_model, {}, ok=False)
         raise ModelUnavailable(f"Модель не ответила: {exc}") from exc

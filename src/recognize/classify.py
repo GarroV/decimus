@@ -25,6 +25,7 @@ from .prompt import catalog_text, correction_line, instructions, question_text, 
 from .rules_check import check_wording
 from .schema import picks_for, response_schema, split_pick
 from .shortlist import shortlist
+from .timing import measure
 
 
 def _clamp(value: Any) -> float:
@@ -428,16 +429,19 @@ def classify(
     в `AUDIT_DATA_DIR` сейчас. Пустой чат (`config.NO_CHAT`) — законное
     «проверки нет»: так зовут замеры по выгрузкам `examples/`.
     """
-    request = prepare_request(
-        note,
-        photo,
-        zone_hint,
-        lang=lang,
-        settings=settings,
-        model=model,
-        chat_id=chat_id,
-        photos=photos,
-        sent_at=sent_at,
-        reading_c=reading_c,
-    )
-    return finish(request, request.ask.call())
+    with measure("prepare"):
+        request = prepare_request(
+            note,
+            photo,
+            zone_hint,
+            lang=lang,
+            settings=settings,
+            model=model,
+            chat_id=chat_id,
+            photos=photos,
+            sent_at=sent_at,
+            reading_c=reading_c,
+        )
+    answer = request.ask.call()
+    with measure("parse"):
+        return finish(request, answer)

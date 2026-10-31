@@ -627,3 +627,73 @@ def test_тоже_запись_в_метрику_подсказки_не_идё�
     )
 
     assert [e for e in журнал if e[0] == "walk_hint_choice"] == []
+
+
+def test_search_journal_contains_monotonic_stage_timings(клиент, модель, monkeypatch):  # noqa: F811
+    from src.recognize.timing import measure, report
+
+    events = []
+    original = walk_suggest.propose
+
+    def measured(*args, **kwargs):
+        with measure("model"):
+            return original(*args, **kwargs)
+
+    monkeypatch.setattr(walk_suggest, "propose", measured)
+    monkeypatch.setattr(
+        walk_suggest.journal, "note", lambda chat, event, **fields: events.append((event, fields))
+    )
+    response = _поиск(клиент, zone="hot_kitchen", words="synthetic", photos=[клиент.ссылка()])
+    assert response.status_code == 200
+    fields = next(fields for event, fields in events if event == "walk_suggest")
+    assert isinstance(fields["ms"], int) and fields["ms"] >= fields["model_ms"] >= 0
+    assert set(fields["timings_ms"]) == {"frames", "propose", "model", "resolution"}
+    assert all(isinstance(value, int) and value >= 0 for value in fields["timings_ms"].values())
+    assert report() == {"ms": 0, "model_ms": 0, "timings_ms": {}}
+
+
+@pytest.mark.parametrize("failure", ["auth", "body", "frames", "model"])
+def test_failed_search_logs_timing_without_input(клиент, модель, monkeypatch, caplog, failure):  # noqa: F811
+    import logging
+
+    from src.recognize.timing import report
+
+    caplog.set_level(logging.INFO, logger=walk_suggest.__name__)
+    private_marker = "synthetic-private-input-marker"
+    if failure == "frames":
+
+        def missing(*args, **kwargs):
+            raise walk_write.WalkRefused("walk.err.photo_lost")
+
+        monkeypatch.setattr(walk_suggest, "_frames", missing)
+    if failure == "model":
+
+        def unavailable(*args, **kwargs):
+            raise ModelUnavailable(private_marker)
+
+        monkeypatch.setattr(walk_suggest, "propose", unavailable)
+    if failure == "auth":
+        response = клиент.c.post(walk_suggest.SUGGEST_PATH, json={"words": private_marker})
+    elif failure == "body":
+        response = клиент.c.post(
+            walk_suggest.SUGGEST_PATH,
+            json=[],
+            headers={"X-Telegram-Init-Data": клиент.init},
+        )
+    else:
+        response = _поиск(
+            клиент, zone="hot_kitchen", words=private_marker, photos=[клиент.ссылка()]
+        )
+    assert response.status_code >= 400
+    records = [r for r in caplog.records if r.msg.startswith("Обход: время поиска")]
+    assert len(records) == 1
+    record = records[0]
+    assert private_marker not in record.getMessage()
+    status, metrics = record.args
+    assert status == response.status_code
+    assert metrics["ms"] >= metrics["model_ms"] >= 0
+    if failure in {"frames", "model"}:
+        assert "frames" in metrics["timings_ms"]
+    if failure == "model":
+        assert "propose" in metrics["timings_ms"]
+    assert report() == {"ms": 0, "model_ms": 0, "timings_ms": {}}

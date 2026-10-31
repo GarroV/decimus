@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
+from functools import wraps
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
@@ -37,6 +39,7 @@ from src.domain.log_ids import log_id
 from src.domain.model_usage import KIND_SUGGEST, usage_scope
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.models import Candidate
+from src.recognize.timing import collect, measure, report
 
 from .server_limits import walk_model_gate
 from .texts_walk import WALK_TEXTS
@@ -50,6 +53,23 @@ logger = logging.getLogger(__name__)
 #: отправляется в платный вызов модели; настоящий запрос несёт два-три кадра,
 #: двадцать — с большим запасом. Остальные не отправляются, ответ говорит об этом.
 MAX_SUGGEST_PHOTOS = 20
+
+
+def _timed_search(search: Callable[[], tuple[Response, int]]) -> Callable[[], tuple[Response, int]]:
+    @wraps(search)
+    def measured() -> tuple[Response, int]:
+        with collect() as timing:
+            status = 500
+            try:
+                result = search()
+                status = result[1]
+                return result
+            finally:
+                # Все пути, включая auth/busy/provider failures. Только статус и
+                # числовые длительности: ни слова, ни ссылки на кадры сюда не идут.
+                logger.info("Обход: время поиска status=%s timing=%s", status, timing.report())
+
+    return measured
 
 
 def _frames(refs: list[str]) -> list[bytes]:
@@ -170,6 +190,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
         return jsonify({"error": "refused", "message": entry.get(lang) or entry[ui_lang]}), status
 
     @app.post(SUGGEST_PATH, endpoint=SUGGEST_ENDPOINT)
+    @_timed_search
     def walk_suggest() -> tuple[Response, int]:
         who = identify(conf, ui_lang, header_only=True)
         if not isinstance(who, int):
@@ -204,9 +225,13 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             hint_key = "zone_hint" if body.get("zone_hint") else "zone"
             zone = _code(body, hint_key) if body.get(hint_key) else None
             photos, omitted = cap_photos(body.get("photos"))
-            frames = _frames(_refs(photos, who, inspection))
+            with measure("frames"):
+                frames = _frames(_refs(photos, who, inspection))
             # Расход модели (D537): подбор на экране — свой вид вызова.
-            with usage_scope(kind=KIND_SUGGEST, telegram_id=who, tenant=inspection.tenant):
+            with (
+                measure("propose"),
+                usage_scope(kind=KIND_SUGGEST, telegram_id=who, tenant=inspection.tenant),
+            ):
                 offer = propose(
                     words,
                     frames,
@@ -234,6 +259,14 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             hold.release()
             with guard:
                 busy.discard(who)
+        with measure("resolution"):
+            ask = Ask(
+                chat_id=who,
+                spoken=zone_from_words(words, chat_id=who),
+                hint=zone,
+                tenant=inspection.tenant,
+            )
+            reply = answer(offer, ask)
         # Что ушло в поиск и что вернулось (#367) — тем же журналом, что у
         # бота: промах разбирается по нему, а не по скриншотам.
         journal.note(
@@ -248,6 +281,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             also_seen=journal.candidates(offer.also_seen),
             question=offer.question,
             usage=offer.suggestion.usage if offer.suggestion else {},
+            **report(),
         )
         logger.info(
             "Обход: чат %s — поиск пункта %s, предложений %s",
@@ -255,13 +289,6 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             offer.via,
             len(offer.candidates),
         )
-        ask = Ask(
-            chat_id=who,
-            spoken=zone_from_words(words, chat_id=who),
-            hint=zone,
-            tenant=inspection.tenant,
-        )
-        reply = answer(offer, ask)
         if omitted:
             # Не ошибка: поиск идёт по первым кадрам, клиент видит, что часть не учтена.
             reply["photos_omitted"] = omitted
