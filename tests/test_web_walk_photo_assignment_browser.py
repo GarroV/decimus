@@ -125,8 +125,9 @@ def test_new_search_with_same_photos_needs_a_new_confirmation(browser_page):
     cards[0]["reading_c"] = 5
     load_sheet(page, cards, photos=PHOTOS, confirm=False)
     confirm(page, 0)
-    page.locator(".walk-input--reading").fill("6")
-    page.get_by_role("button", name="walk.sheet.recheck", exact=True).click()
+    page.locator(".walk-area--words").fill("New synthetic search facts")
+    page.get_by_role("button", name="walk.sheet.find_again", exact=True).click()
+    page.locator(".walk-found__card").first.click()
     assert not box(page, 0).locator("[data-photo-confirm]").is_checked()
     assert page.get_by_role("button", name="Save", exact=True).is_disabled()
     assert page.evaluate("ops") == []
@@ -143,6 +144,8 @@ def test_single_manual_finding_does_not_require_second_photo_confirmation(browse
       W.sheet.open({mode:'violation',code:'SYN01',level:'D1',zone:'zone_a'});
     }""")
     assert page.locator("[data-photo-assignment]").count() == 0
+    page.get_by_role("button", name="walk.sheet.class_review.manual", exact=True).click()
+    page.locator('[data-manual-class="D1"]').click()
     page.get_by_role("button", name="Save", exact=True).click()
     page.wait_for_function("ops.length === 1")
     assert page.evaluate("ops[0].photos") == PHOTOS

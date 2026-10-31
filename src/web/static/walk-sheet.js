@@ -147,9 +147,11 @@
 
   function hasNoViolation() { return f.noViolation !== null && f.noViolation !== undefined; }
 
-  function setReading(value) {
+  function setReading(value, source, confirmed) {
     f.reading = value === null || value === undefined ? null : String(value);
     f.readingBase = value === null || value === undefined ? null : value;
+    f.readingSource = source || "human";
+    f.readingConfirmed = confirmed === true || (!!f.n && confirmed === undefined);
     f.noViolation = null;
   }
 
@@ -192,7 +194,13 @@
     var list = W.state.data.items.filter(function (i) {
       if (i.measure !== isMeasure()) return false;
       if (q) return (i.q + " " + i.code + " " + i.process).toLowerCase().indexOf(q) !== -1;
-      return !f.zone || !i.zones.length || i.zones.indexOf(f.zone) !== -1;
+      return true;
+    });
+    var hint = f.zone || f.hint;
+    list.sort(function (a, b) {
+      var aHere = !hint || !a.zones.length || a.zones.indexOf(hint) !== -1;
+      var bHere = !hint || !b.zones.length || b.zones.indexOf(hint) !== -1;
+      return Number(bHere) - Number(aHere);
     });
     var before = list.filter(function (i) { return previousHere(i.code); });
     return before.concat(list.filter(function (i) { return !previousHere(i.code); }));
@@ -236,6 +244,8 @@
     if (assignmentEnabled() && (!assignmentReady(primaryPhotoCandidate()) ||
         extras().some(function (c) { return !assignmentReady(c); }))) return "walk.sheet.photo_assignment.need";
     if (isAdvice()) return f.text.trim() ? null : "walk.sheet.need_advice";
+    var classWhy = classBlocker();
+    if (classWhy) return classWhy;
     if (!taken() && !f.level) return "walk.sheet.need_level";
     return null;
   }
@@ -253,14 +263,18 @@
   function saveDraft() {
     if (f.n) return;
     W.local.set(draftKey(), Object.assign({}, W.local.get(draftKey()) || {}, {
-      run_id: f.run_id, mode: f.mode, zone: f.zone, code: f.code, level: f.level, text: f.text,
+      run_id: f.run_id, mode: f.mode, zone: f.zone, code: f.code,
+      level: f.level || f.legacyLevel || null, text: f.text,
       comment: f.comment, repeat: f.repeat, words: f.words, reading: f.reading,
+      reading_source: f.readingSource || "model", reading_confirmed: !!f.readingConfirmed,
+      class_facts: classFactDrafts(),
       photos: readyPhotos().map(function (p) { return p.ref; }),
       reconcile: !!f.reconcile, submitted_ops: f.submitted_ops || [],
     }));
   }
 
   function changed() {
+    syncClassSelections();
     saveDraft();
     if (W.tg && W.supports("6.2")) {
       if (dirty()) W.tg.enableClosingConfirmation(); else W.tg.disableClosingConfirmation();
@@ -493,6 +507,7 @@
     W.haptic();
     changed();
     redraw.apply(null, ORDER.concat(["footer"]));
+    if (recognizing() && f.code) requestClass(primaryClassCandidate());
   }
 
   function fullZoneMenu() {
@@ -571,6 +586,13 @@
   function pick(code, cand) {
     var i = item(code);
     if (!i) return;
+    if (recognizing() && f.code) {
+      f.savedClassFacts = classFactDrafts();
+      var old = classState(primaryClassCandidate());
+      old.reading = f.reading == null ? "" : f.reading;
+      old.readingSource = f.readingSource || "human";
+      old.readingConfirmed = !!f.readingConfirmed;
+    }
     // Явный выбор зоны сохраняется у кандидата, когда человек переходит к
     // другому варианту. Исходная model zone (cand.zone) остаётся нетронутой.
     if (f.picked && f.zone && f.zoneSource === "pick") {
@@ -584,25 +606,40 @@
     if (recognizing()) applyResolution(i, cand);
     // Основной стала одна пара «пункт + зона»; другие зоны остаются в «тоже».
     f.also = f.also.filter(function (c) { return !isPrimary(c); });
-    if (i.measure) f.level = "D0";
-    else if (isAdvice() || i.note) f.level = ADVICE_LEVEL;
-    else if (cand && i.levels.indexOf(cand.level) !== -1) f.level = cand.level;
-    else if (i.levels.length === 1) f.level = i.levels[0];
-    else if (i.levels.indexOf(f.level) === -1) f.level = null;
-    var before = previousHere(code);
-    if (before && !isAdvice() && !f.level && i.levels.indexOf(before.level) !== -1) f.level = before.level;
+    if (recognizing() && !i.measure && !i.note) {
+      var review = classState(primaryClassCandidate());
+      review.key = null;
+      review.manualMode = false;
+      f.level = null;
+      f.legacyLevel = null;
+    } else {
+      if (i.measure) f.level = "D0";
+      else if (isAdvice() || i.note) f.level = ADVICE_LEVEL;
+      else if (cand && i.levels.indexOf(cand.level) !== -1) f.level = cand.level;
+      else if (i.levels.length === 1) f.level = i.levels[0];
+      else if (i.levels.indexOf(f.level) === -1) f.level = null;
+      var before = previousHere(code);
+      if (before && !isAdvice() && !f.level && i.levels.indexOf(before.level) !== -1) f.level = before.level;
+    }
     if (cand && cand.wording && (!f.text.trim() || f.textAuto)) { f.text = cand.wording; f.textAuto = true; }
-    if (cand && cand.reading_c !== null && cand.reading_c !== undefined) setReading(cand.reading_c);
-    else if (cand && !f.n) setReading(null);
+    if (recognizing()) {
+      var ownReading = classState(primaryClassCandidate());
+      setReading(ownReading.reading === "" ? null : ownReading.reading,
+        ownReading.readingSource, ownReading.readingConfirmed);
+    } else if (cand && cand.reading_c != null) setReading(cand.reading_c);
     W.haptic();
     changed();
     redraw.apply(null, ORDER.concat(["footer"]));
+    if (recognizing()) requestClass(primaryClassCandidate());
   }
 
   /* ── система ищет пункт (D330) ─────────────────────────────────────── */
 
   function find(reading) {
     if (findBlocker() || f.finding) return;
+    if (recognizing() && f.code) f.savedClassFacts = classFactDrafts();
+    var form = f;
+    var runId = f.run_id;
     f.finding = true;
     f.findError = null;
     // Простой поиск (без исправленного числа) начинает разговор заново.
@@ -622,7 +659,7 @@
     f.pending = asked;
     if (fixed === null && asked.words) preview(mine, asked, body.zone_hint);
     W.post(W.urls.suggest, body).then(function (res) {
-      if (!f || f.findId !== mine) return;
+      if (f !== form || W.state.data.run_id !== runId || f.findId !== mine) return;
       if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
       f.finding = false;
       f.preview = null;
@@ -633,7 +670,12 @@
       f.answered = null;
       f.via = (res.body && res.body.via) || "model";
       f.asked = JSON.stringify(asked);
-      if (f.found.length) {
+      if (recognizing()) {
+        f.code = null; f.zone = null; f.level = null; f.picked = null;
+        f.legacyLevel = null;
+        f.question = ""; f.answers = [];
+        redraw.apply(null, ORDER.concat(["footer"]));
+      } else if (f.found.length) {
         if (fixed !== null) {
           // Предложение посчитано заново: формулировка и класс — новые, число — аудитора.
           f.textAuto = true;
@@ -649,7 +691,7 @@
         redraw.apply(null, ORDER.concat(["footer"]));
       } else { redraw("item", "footer"); }
     }).catch(function (err) {
-      if (!f || f.findId !== mine) return;
+      if (f !== form || W.state.data.run_id !== runId || f.findId !== mine) return;
       f.finding = false;
       f.findError = err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network");
       redraw("item", "reading", "footer");
@@ -662,8 +704,10 @@
    * экран ждёт модель как раньше.
    */
   function preview(mine, asked, zone) {
+    var form = f;
+    var runId = f.run_id;
     W.post(W.urls.hint, { zone_hint: zone, words: asked.words, frames: asked.photos.length }).then(function (res) {
-      if (!f || !f.finding || f.findId !== mine || !res.ok) return;
+      if (f !== form || W.state.data.run_id !== runId || !f.finding || f.findId !== mine || !res.ok) return;
       var cards = (res.body && res.body.candidates) || [];
       if (!cards.length) return;
       f.preview = cards;
@@ -704,7 +748,7 @@
     var kind = cand.level === ADVICE_LEVEL ? "advice" : cand.level === "D0" || i.measure ? "info" : /^D[1-3]$/.test(cand.level || "") ? "violation" : null;
     top.appendChild(el("span", "walk-option__code" + (kind ? " walk-item-code--" + kind : ""), i.label || cand.code));
     if (kind) top.appendChild(el("span", "walk-item-kind walk-item-kind--" + kind, tx("walk.item.kind." + kind)));
-    if (cand.level && cand.level !== ADVICE_LEVEL) top.appendChild(W.level(cand.level));
+    if (!recognizing() && cand.level && cand.level !== ADVICE_LEVEL) top.appendChild(W.level(cand.level));
     if (on) {
       // Выбранная карточка — результат «пункт · зона» (D445): зона — пилюля с
       // меню. Не вывелась — пилюли нет, под карточкой строка «Где?».
@@ -742,10 +786,12 @@
     row.appendChild(b);
     row.appendChild(t);
     var assigned = photoAssignmentControl(cand);
-    if (!assigned) return row;
+    var extraClass = also ? classReviewBox(cand) : null;
+    if (!assigned && !extraClass) return row;
     var group = el("div", "walk-form__part");
     group.appendChild(row);
-    group.appendChild(assigned);
+    if (assigned) group.appendChild(assigned);
+    if (extraClass) group.appendChild(extraClass);
     return group;
   }
 
@@ -828,7 +874,8 @@
         if (input.checked) state.assigned_frame_indices.push(index);
         state.assigned_frame_indices.sort(function (a, b) { return a - b; });
         state.confirmed = false;
-        redraw("item", "footer");
+        classSelectionChanged();
+        redraw("item", "level", "footer");
       });
       label.appendChild(input);
       var photo = readyPhotos().filter(function (p) { return p.ref === ref; })[0];
@@ -844,7 +891,9 @@
     confirm.disabled = !state.assigned_frame_indices.length;
     confirm.addEventListener("change", function () {
       state.confirmed = confirm.checked;
-      redraw("item", "footer");
+      classSelectionChanged();
+      if (confirm.checked && classSelected(cand)) requestClass(cand);
+      redraw("item", "level", "footer");
     });
     label.appendChild(confirm);
     label.appendChild(el("span", null, tx("walk.sheet.photo_assignment.confirm")));
@@ -869,7 +918,9 @@
     if (!isAlso(cand) && (!extraZone(cand) || isPrimary(cand) || (assignmentEnabled() && !assignmentReady(cand)))) return;
     f.also = isAlso(cand) ? f.also.filter(function (c) { return !sameCandidate(c, cand); }) : f.also.concat([cand]);
     W.haptic();
-    redraw("item", "footer");
+    changed();
+    if (isAlso(cand)) requestClass(cand);
+    redraw("item", "level", "footer");
   }
 
   /** Отмеченные «тоже» — только у свежего поиска нового нарушения. */
@@ -888,6 +939,8 @@
   function extraLevel(cand) {
     var i = item(cand.code);
     if (i.note) return ADVICE_LEVEL;
+    if (i.measure) return "D0";
+    if (recognizing()) return classState(cand).level;
     if (i.levels.indexOf(cand.level) !== -1) return cand.level;
     return i.levels.length === 1 ? i.levels[0] : cand.level;
   }
@@ -941,6 +994,310 @@
 
   /* ── секции ───────────────────────────────────────────────────────── */
 
+  /* ── пункт выбран человеком → класс по его фактам и этому изданию ───── */
+  function classState(cand) {
+    if (!cand.classReview) {
+      cand.classReview = W.classReview.fresh();
+      cand.classReview.answer = "";
+      cand.classReview.reading = cand.reading_c == null ? "" : String(cand.reading_c);
+      cand.classReview.readingConfirmed = false;
+      cand.classReview.readingSource = "model";
+    }
+    restoreClassFacts(cand, cand.classReview);
+    return cand.classReview;
+  }
+
+  function classPhotoRefs(cand) {
+    if (assignmentEnabled()) return assignmentReady(cand) ? assignedPhotos(cand) : null;
+    return readyPhotos().map(function (p) { return p.ref; }).filter(function (ref, i, all) { return all.indexOf(ref) === i; });
+  }
+  function restoreClassFacts(cand, state) {
+    if (state.factsEdited || state.restoredEntry) return;
+    var primary = cand === f.picked || cand === f.manualPhotoCandidate;
+    var zone = primary ? f.zone : extraZone(cand);
+    var refs = classPhotoRefs(cand);
+    if (!zone || refs === null) return;
+    var words = primary ? f.words.trim() : "";
+    var saved = (f.savedClassFacts || []).filter(function (entry) {
+      return entry.code === cand.code && entry.zone === zone && entry.words === words &&
+        entry.checklist_version === W.state.data.checklist_version &&
+        JSON.stringify(entry.photos) === JSON.stringify(refs);
+    });
+    if (saved.length !== 1) return;
+    state.restoredEntry = saved[0];
+    state.answer = typeof saved[0].answer === "string" ? saved[0].answer : "";
+    if (!state.readingEdited && saved[0].reading != null) {
+      state.reading = String(saved[0].reading);
+      state.readingSource = saved[0].reading_source === "human" ? "human" : "model";
+      state.readingConfirmed = saved[0].reading_confirmed === true;
+      if (primary) {
+        f.reading = state.reading;
+        f.readingSource = state.readingSource;
+        f.readingConfirmed = state.readingConfirmed;
+      }
+    }
+  }
+  function classFactDrafts() {
+    var facts = (f.savedClassFacts || []).slice();
+    if (!recognizing() || !f.code) return facts;
+    var candidates = (f.found || []).filter(function (cand) { return !!cand.classReview; });
+    if (f.code && candidates.indexOf(primaryClassCandidate()) === -1) candidates.push(primaryClassCandidate());
+    candidates.forEach(function (cand) {
+      var state = classState(cand);
+      var primary = classIsPrimary(cand);
+      var zone = primary ? f.zone : extraZone(cand);
+      var reading = primary ? f.reading : state.reading;
+      if (!state.answer && (reading == null || !String(reading).trim())) return;
+      var entry = { code:cand.code, zone:zone || null, checklist_version:W.state.data.checklist_version, answer:state.answer, reading:reading,
+        words:primary ? f.words.trim() : "", photos:classPhotoRefs(cand),
+        reading_source:primary ? f.readingSource : state.readingSource,
+        reading_confirmed:primary ? !!f.readingConfirmed : !!state.readingConfirmed };
+      // Preserve ambiguous/unmatched facts instead of moving them to another item.
+      if (state.restoredEntry) facts = facts.filter(function (old) { return old !== state.restoredEntry; });
+      var same = facts.some(function (old) { return JSON.stringify(old) === JSON.stringify(entry); });
+      if (!same) facts.push(entry);
+    });
+    return facts;
+  }
+  function primaryClassCandidate() { return primaryPhotoCandidate(); }
+  function classIsPrimary(cand) { return cand === primaryClassCandidate(); }
+  function selectedClassCandidates() {
+    if (!recognizing() || !f.code) return [];
+    return [primaryClassCandidate()].concat(extras());
+  }
+  function classReading(cand) {
+    var state = classState(cand);
+    var primary = classIsPrimary(cand);
+    var raw = primary ? f.reading : state.reading;
+    var value = raw == null || !String(raw).trim() ? null : parseReading(raw);
+    return { raw: raw, value: value, confirmed: primary ? !!f.readingConfirmed : state.readingConfirmed,
+      source: primary ? f.readingSource || "human" : state.readingSource };
+  }
+  function classContext(cand) {
+    var state = classState(cand);
+    var primary = classIsPrimary(cand);
+    var zone = primary ? f.zone : extraZone(cand);
+    var reading = classReading(cand);
+    var words = [primary ? f.words.trim() : "", state.answer.trim()].filter(Boolean).join("\n");
+    var confirmed = !assignmentEnabled() || assignmentReady(cand);
+    var photos = assignmentEnabled() ? (confirmed ? assignedPhotos(cand) : [])
+      : readyPhotos().map(function (p) { return p.ref; }).filter(function (ref, i, all) { return all.indexOf(ref) === i; });
+    var body = { run_id: f.run_id, checklist_version: W.state.data.checklist_version,
+      code: cand.code, zone: zone || null, words: words, photos: photos,
+      reading_c: reading.confirmed ? reading.value : null,
+      reading_confirmed: reading.value !== null && reading.confirmed };
+    if (body.reading_c !== null) body.reading_source = reading.source;
+    var blocked = "";
+    if (f.run_id !== W.state.data.run_id) blocked = tx("walk.sheet.class_review.context_changed");
+    else if (!zone) blocked = tx("walk.sheet.need_zone");
+    else if (!confirmed || uploading() || waitingPhotos().length) blocked = tx("walk.sheet.photo_assignment.need");
+    else if (reading.raw != null && String(reading.raw).trim() && reading.value === null) blocked = tx("walk.err.reading");
+    else if (reading.value !== null && !reading.confirmed) blocked = tx("walk.sheet.class_review.confirm_reading");
+    else if (words.length > 1000) blocked = tx("walk.sheet.class_review.facts_limit");
+    else if (photos.length > 10) blocked = tx("walk.sheet.class_review.photos_limit");
+    return { body: body, levels: (item(cand.code) || {levels: []}).levels,
+      key: JSON.stringify({body: body, reading: reading, assigned: confirmed, search: f.findId || 0,
+        currentRun: W.state.data.run_id, blocked: blocked}), blocked: blocked };
+  }
+  function syncClassSelections() {
+    if (!f || !recognizing() || !f.code) return;
+    selectedClassCandidates().forEach(function (cand) {
+      W.classReview.sync(classState(cand), classContext(cand));
+    });
+    var primary = item(f.code);
+    f.level = primary && primary.measure ? "D0" : classState(primaryClassCandidate()).level;
+  }
+  function classSelectionChanged() {
+    if (!f || !recognizing()) return;
+    syncClassSelections();
+    updateClassPanels();
+    saveDraft();
+  }
+  function classSelected(cand) {
+    return !!f && recognizing() && !!f.code &&
+      (cand === primaryClassCandidate() || extras().indexOf(cand) !== -1);
+  }
+  function requestClass(cand) {
+    if (!classSelected(cand) || (item(cand.code) || {}).measure || (classIsPrimary(cand) && taken())) return;
+    var form = f;
+    var context = classContext(cand);
+    W.classReview.request(classState(cand), context, function (key) {
+      return f === form && classSelected(cand) && f.run_id === W.state.data.run_id && classContext(cand).key === key;
+    }, function () {
+      if (f !== form || !classSelected(cand)) return;
+      syncClassSelections();
+      updateClassPanels();
+      changed();
+      redraw("repeat", "footer");
+    });
+  }
+  function classBlocker() {
+    if (!recognizing() || !f.code) return null;
+    if (f.run_id !== W.state.data.run_id) return "walk.sheet.class_review.context_changed";
+    syncClassSelections();
+    var candidates = selectedClassCandidates();
+    for (var i = 0; i < candidates.length; i++) {
+      var cand = candidates[i];
+      var reading = classReading(cand);
+      if (reading.raw != null && String(reading.raw).trim() && reading.value === null) return "walk.err.reading";
+      if (classContext(cand).body.words.length > 1000) return "walk.sheet.class_review.facts_limit";
+      if (reading.value !== null && !reading.confirmed) return "walk.sheet.class_review.confirm_reading";
+      if ((item(cand.code) || {}).measure || (classIsPrimary(cand) && taken())) continue;
+      if (!classState(cand).level) return "walk.sheet.class_review.need_class";
+    }
+    return null;
+  }
+  function updateClassPanels() {
+    if (!node) return;
+    node.querySelectorAll("[data-class-review]").forEach(function (panel) {
+      var cand = panel._candidate;
+      if (!classSelected(cand)) return;
+      renderClassFeedback(panel, cand);
+    });
+  }
+  function renderClassFeedback(panel, cand) {
+    var state = classState(cand);
+    var feedback = panel.querySelector("[data-class-feedback]");
+    feedback.textContent = "";
+    var text = state.status === "pending" ? tx("walk.sheet.class_review.pending")
+      : state.status === "manual" ? tx("walk.sheet.class_review.manual_active")
+      : state.status === "ready" ? tx("walk.sheet.class_review.proposed", {level:state.level})
+      : state.status === "needs_fact" ? state.needFact
+      : state.message || classContext(cand).blocked || tx("walk.sheet.class_review.check_hint");
+    feedback.appendChild(el("p", "walk-form__hint", text));
+    if (state.status === "needs_fact" && state.provisional) {
+      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.provisional", {level:state.provisional})));
+    }
+    if (state.reason) feedback.appendChild(el("p", "walk-form__hint", state.reason));
+    var zone = classIsPrimary(cand) ? f.zone : extraZone(cand);
+    var unmatched = (f.savedClassFacts || []).filter(function (entry) {
+      return entry.code === cand.code && entry.zone === zone && entry !== state.restoredEntry &&
+        (entry.answer || entry.reading != null);
+    });
+    if (unmatched.length && !state.answer) {
+      var recovery = el("details", "walk-form__hint");
+      recovery.appendChild(el("summary", null, tx("walk.sheet.class_review.saved_facts")));
+      unmatched.forEach(function (entry) {
+        recovery.appendChild(el("pre", null, [entry.answer, entry.reading].filter(function (v) { return v != null && v !== ""; }).join("\n")));
+        if (entry.answer) recovery.appendChild(W.button("walk-link", tx("walk.sheet.class_review.use_saved_facts"), function () {
+          state.answer = entry.answer;
+          state.factsEdited = true;
+          classSelectionChanged();
+          redraw("item", "level", "footer");
+        }));
+      });
+      feedback.appendChild(recovery);
+    }
+    if (classIsPrimary(cand) && f.legacyLevel && !state.level) {
+      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.draft_level", {level:f.legacyLevel})));
+    }
+    var check = panel.querySelector("[data-class-check]");
+    check.disabled = state.status === "pending" || !!classContext(cand).blocked;
+    panel.querySelectorAll("[data-manual-class]").forEach(function (button) {
+      var on = state.manualMode && state.level === button.dataset.manualClass;
+      button.setAttribute("aria-pressed", String(on));
+      button.classList.toggle("is-on", on);
+    });
+  }
+  function addExtraReadingControls(box, cand) {
+    var state = classState(cand);
+      var numberLabel = el("label", "walk-form__hint", tx("walk.sheet.reading"));
+      var number = el("input", "walk-input");
+      number.inputMode = "decimal";
+      number.value = state.reading;
+      number.setAttribute("data-extra-reading", "");
+      number.addEventListener("input", function () {
+        state.reading = number.value;
+        state.readingSource = "human";
+        state.readingEdited = true;
+        state.readingConfirmed = false;
+        var confirm = box.querySelector("[data-extra-reading-confirm]");
+        confirm.checked = false;
+        confirm.disabled = parseReading(number.value) === null;
+        classSelectionChanged();
+        redraw("footer");
+      });
+      numberLabel.appendChild(number);
+      box.appendChild(numberLabel);
+      var readingLabel = el("label", "walk-option");
+      var readingConfirm = document.createElement("input");
+      readingConfirm.type = "checkbox";
+      readingConfirm.checked = state.readingConfirmed;
+      readingConfirm.disabled = parseReading(state.reading) === null;
+      readingConfirm.setAttribute("data-extra-reading-confirm", "");
+      readingConfirm.addEventListener("change", function () {
+        state.readingConfirmed = readingConfirm.checked;
+        classSelectionChanged();
+        if (readingConfirm.checked) requestClass(cand);
+        redraw("footer");
+      });
+      readingLabel.appendChild(readingConfirm);
+      readingLabel.appendChild(el("span", null, tx("walk.sheet.class_review.reading_checked")));
+      box.appendChild(readingLabel);
+  }
+  function classReviewBox(cand) {
+    if ((item(cand.code) || {}).measure) {
+      var info = section(tx("walk.sheet.level"));
+      info.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", {level:"D0"})));
+      if (!classIsPrimary(cand)) addExtraReadingControls(info, cand);
+      return info;
+    }
+    var state = classState(cand);
+    W.classReview.sync(state, classContext(cand));
+    var box = section(tx("walk.sheet.level"));
+    box.setAttribute("data-class-review", cand.code);
+    box._candidate = cand;
+    var feedback = el("div");
+    feedback.setAttribute("data-class-feedback", "");
+    feedback.setAttribute("role", "status");
+    box.appendChild(feedback);
+    if (!classIsPrimary(cand)) addExtraReadingControls(box, cand);
+    var label = el("label", "walk-form__hint", tx("walk.sheet.class_review.facts"));
+    var facts = el("textarea", "walk-area walk-class-review__facts");
+    facts.rows = 2;
+    facts.maxLength = 1000;
+    facts.value = state.answer;
+    facts.addEventListener("input", function () {
+      state.answer = facts.value;
+      state.factsEdited = true;
+      classSelectionChanged();
+      redraw("repeat", "footer");
+    });
+    label.appendChild(facts);
+    box.appendChild(label);
+    var check = W.button("walk-link", tx("walk.sheet.class_review.check"), function () {
+      state.manualMode = false;
+      requestClass(cand);
+      redraw("item", "level", "footer");
+    });
+    check.setAttribute("data-class-check", "");
+    box.appendChild(check);
+    if (!state.manualMode) {
+      box.appendChild(W.button("walk-link", tx("walk.sheet.class_review.manual"), function () {
+        W.classReview.enterManual(state, classContext(cand));
+        syncClassSelections();
+        changed();
+        redraw("item", "level", "footer");
+      }));
+    } else {
+      var seg = el("div", "walk-seg");
+      (item(cand.code) || {levels:[]}).levels.forEach(function (level) {
+        var button = W.button("walk-seg__opt walk-seg__opt--" + level.toLowerCase(), level, function () {
+          W.classReview.chooseManual(state, classContext(cand), level);
+          syncClassSelections();
+          changed();
+          updateClassPanels();
+          redraw("repeat", "footer");
+        });
+        button.dataset.manualClass = level;
+        seg.appendChild(button);
+      });
+      box.appendChild(seg);
+    }
+    renderClassFeedback(box, cand);
+    return box;
+  }
+
   var draw = {
     context: function () {
       var row = el("div", "walk-ctx");
@@ -991,7 +1348,8 @@
         var was = stale();
         f.words = area.value;
         changed();
-        if (was !== stale() || assignmentEnabled()) redraw("item", "footer");
+        classSelectionChanged();
+        if (was !== stale() || assignmentEnabled()) redraw("item", "level", "footer");
       });
       box.appendChild(area);
       // Голос (D652): рассказ в пустое поле сразу запускает поиск пункта — то же, что «Найти пункт».
@@ -1029,6 +1387,17 @@
 
     reading: function () {
       var none = f.noViolation !== null && f.noViolation !== undefined;
+      if (!hasReading() && recognizing() && f.code) {
+        var empty = section(tx("walk.sheet.reading"));
+        empty.appendChild(W.button("walk-link", tx("walk.sheet.class_review.add_reading"), function () {
+          setReading("", "human", false);
+          changed();
+          redraw("reading", "level", "footer");
+          var field = node.querySelector(".walk-input--reading");
+          if (field) field.focus({preventScroll:true});
+        }));
+        return empty;
+      }
       if (!hasReading() || (!f.code && !none)) return null;
       var box = section(tx("walk.sheet.reading"), tx("walk.sheet.reading_hint"));
       if (none) {
@@ -1045,10 +1414,43 @@
       input.addEventListener("input", function () {
         var was = readingChanged() || readingInvalid();
         f.reading = input.value;
-        changed();
-        if (was !== (readingChanged() || readingInvalid())) redraw("footer");
+        if (recognizing()) {
+          f.readingSource = "human";
+          var own = classState(primaryClassCandidate());
+          own.readingEdited = true;
+          own.reading = input.value;
+          own.readingSource = "human";
+          own.readingConfirmed = false;
+          f.readingConfirmed = false;
+          readingConfirm.checked = false;
+          readingConfirm.disabled = parseReading(input.value) === null;
+          classSelectionChanged();
+          redraw("repeat", "footer");
+        } else {
+          changed();
+          if (was !== (readingChanged() || readingInvalid())) redraw("footer");
+        }
       });
       box.appendChild(input);
+      var readingConfirm;
+      if (recognizing()) {
+        var checkedLabel = el("label", "walk-option");
+        readingConfirm = document.createElement("input");
+        readingConfirm.type = "checkbox";
+        readingConfirm.checked = !!f.readingConfirmed;
+        readingConfirm.disabled = parseReading(f.reading) === null;
+        readingConfirm.setAttribute("data-reading-confirm", "");
+        readingConfirm.addEventListener("change", function () {
+          f.readingConfirmed = readingConfirm.checked;
+          classState(primaryClassCandidate()).readingConfirmed = readingConfirm.checked;
+          classSelectionChanged();
+          if (readingConfirm.checked) requestClass(primaryClassCandidate());
+          redraw("repeat", "footer");
+        });
+        checkedLabel.appendChild(readingConfirm);
+        checkedLabel.appendChild(el("span", null, tx("walk.sheet.class_review.reading_checked")));
+        box.appendChild(checkedLabel);
+      }
       if (none && recognizing()) {
         box.appendChild(W.button("walk-link", tx("walk.sheet.reading_reset"), function () {
           setReading(null);
@@ -1061,6 +1463,7 @@
     level: function () {
       var it = item(f.code);
       if (!it || isMeasure() || isAdvice() || taken()) return null;
+      if (recognizing()) return classReviewBox(primaryClassCandidate());
       var box = section(tx("walk.sheet.level"));
       if (it.levels.length === 1) {
         box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", { level: it.levels[0] })));
@@ -1219,7 +1622,7 @@
         return box;
       }
       var why = blocker();
-      var recheck = readingChanged() && !readingInvalid();
+      var recheck = !recognizing() && readingChanged() && !readingInvalid();
       var label = f.saving ? tx("walk.sheet.saving")
         : f.finding ? tx("walk.sheet.rechecking")
         : recheck ? tx("walk.sheet.recheck")
@@ -1253,9 +1656,10 @@
     var fromList = (f.found || []).some(function (c) { return f.picked ? c === f.picked : isPrimary(c); });
     if (manual && !fromList) list.appendChild(proposal({ code: f.code, level: f.level, zone: f.zone, resolution: { zone: f.zone } }));
     if (list.childNodes.length) box.appendChild(list);
+    if (f.found && f.found.length && !f.code) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.choose_item")));
     if (f.code && !f.zone && item(f.code) && !isAdvice() && !isMeasure()) box.appendChild(whereRow());
     if (f.found && !f.found.length && !hasNoViolation()) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.found_none")));
-    if (f.question) box.appendChild(questionBox());
+    if (f.question && !recognizing()) box.appendChild(questionBox());
     if (stale()) {
       var again = el("p", "walk-form__note walk-form__note--info");
       again.appendChild(document.createTextNode(tx("walk.sheet.found_stale") + " "));
@@ -1307,10 +1711,10 @@
     return extras().map(function (c) {
       return {
         op: "add", zone: extraZone(c), code: c.code, level: extraLevel(c), text: (c.wording || "").trim(),
-        comment: "", repeat: false, photos: assignedPhotos(c), words: f.words.trim(), also: true,
+        comment: "", repeat: false, photos: assignedPhotos(c), words: classContext(c).body.words, also: true,
         photo_assignment: assignmentPayload(c),
         suggested: { code: c.code, level: c.level, zone: c.zone, confidence: c.confidence, via: f.via },
-        reading_c: c.reading_c === undefined ? null : c.reading_c,
+        reading_c: classReading(c).confirmed ? classReading(c).value : null,
       };
     });
   }
@@ -1334,7 +1738,8 @@
         comment: f.comment.trim(), repeat: !!f.repeat && repeatOffered(),
         photos: photos,
         photo_assignment: assigned ? assignmentPayload(assigned) : null,
-        words: f.words.trim(), suggested: suggested(), reading_c: readingValue(),
+        words: recognizing() ? classContext(primaryClassCandidate()).body.words : f.words.trim(),
+        suggested: suggested(), reading_c: readingValue(),
         hint_codes: f.hintCodes || [],
       }].concat(extraOps());
     }
@@ -1356,7 +1761,7 @@
 
   function save_() {
     if (blocker()) return;
-    if (readingChanged()) {
+    if (!recognizing() && readingChanged()) {
       // Число поправлено — это не запись, а пересчёт предложения (#836): новое
       // предложение ждёт «Сохранить». Стёртое поле — «замера нет», пересчитывать нечего.
       var fixed = readingValue();
@@ -1600,6 +2005,9 @@
         f.comment = draft.comment || "";
         f.words = draft.words || "";
         if (draft.reading !== null && draft.reading !== undefined) { f.reading = String(draft.reading); f.readingBase = parseReading(draft.reading); }
+        f.savedClassFacts = Array.isArray(draft.class_facts) ? draft.class_facts : [];
+        f.readingSource = draft.reading_source === "human" ? "human" : "model";
+        f.readingConfirmed = draft.reading_confirmed === true;
         f.commentOpen = !!draft.comment;
         f.repeat = !!draft.repeat;
         f.reconcile = !!draft.reconcile; f.submitted_ops = draft.submitted_ops || [];
@@ -1610,6 +2018,10 @@
         f.photos = draft.queued.map(function (ref) { return { id: ++seq, ref: ref, own: true, state: "done", fresh: true }; });
         f.restored = true;
       }
+    }
+    if (!rec && f.mode === "violation" && f.code) {
+      f.legacyLevel = f.level;
+      f.level = null;
     }
     build();
     restoreWaiting();

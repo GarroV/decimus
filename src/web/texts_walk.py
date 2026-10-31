@@ -533,6 +533,80 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.sheet.need_item": {"ru": "Выберите пункт", "en": "Choose an item"},
     "walk.sheet.need_level": {"ru": "Выберите класс", "en": "Choose a class"},
+    "walk.sheet.class_review.choose_item": {
+        "ru": "Сначала выберите пункт. Класс определим по его критериям после выбора.",
+        "en": "Choose an item first. Its class will be checked against that item's criteria.",
+    },
+    "walk.sheet.class_review.check_hint": {
+        "ru": "Проверьте факты и определите класс по критериям выбранного пункта.",
+        "en": "Check the facts, then determine the class for the selected item.",
+    },
+    "walk.sheet.class_review.pending": {"ru": "Определяем класс…", "en": "Checking the class…"},
+    "walk.sheet.class_review.proposed": {
+        "ru": "Предложенный класс: {level}",
+        "en": "Proposed class: {level}",
+    },
+    "walk.sheet.class_review.provisional": {
+        "ru": "Предварительно: {level}. Этот класс пока не выбран — нужен ответ на вопрос.",
+        "en": "Provisional: {level}. This class is not selected; answer the question first.",
+    },
+    "walk.sheet.class_review.manual": {
+        "ru": "Выбрать класс вручную",
+        "en": "Choose class manually",
+    },
+    "walk.sheet.class_review.manual_active": {
+        "ru": "Класс выбирает аудитор",
+        "en": "The auditor selects the class",
+    },
+    "walk.sheet.class_review.check": {
+        "ru": "Определить класс по фактам",
+        "en": "Check class against the facts",
+    },
+    "walk.sheet.class_review.facts": {
+        "ru": "Уточнение фактов для этого пункта",
+        "en": "Facts for this item",
+    },
+    "walk.sheet.class_review.need_class": {
+        "ru": "Определите или явно выберите класс",
+        "en": "Determine or explicitly select a class",
+    },
+    "walk.sheet.class_review.unavailable": {
+        "ru": "Проверить класс не удалось. Повторите или выберите его вручную.",
+        "en": "Could not check the class. Retry or select it manually.",
+    },
+    "walk.sheet.class_review.confirm_reading": {
+        "ru": "Проверьте и подтвердите показание термометра или очистите поле",
+        "en": "Check and confirm the thermometer reading, or clear it",
+    },
+    "walk.sheet.class_review.reading_checked": {
+        "ru": "Проверил показание: это число относится к выбранному пункту",
+        "en": "I checked: this reading belongs to the selected item",
+    },
+    "walk.sheet.class_review.add_reading": {"ru": "Указать показание", "en": "Add a reading"},
+    "walk.sheet.class_review.context_changed": {
+        "ru": "Проверка изменилась. Откройте запись в текущей проверке заново.",
+        "en": "The inspection changed. Reopen the finding in the current inspection.",
+    },
+    "walk.sheet.class_review.facts_limit": {
+        "ru": "Сократите слова и уточнение до 1000 знаков",
+        "en": "Shorten the words and clarification to 1000 characters",
+    },
+    "walk.sheet.class_review.photos_limit": {
+        "ru": "Для проверки класса выберите до 10 кадров или выберите класс вручную",
+        "en": "Choose up to 10 photos for the class check, or select the class manually",
+    },
+    "walk.sheet.class_review.saved_facts": {
+        "ru": "Сохранённые уточнения требуют проверки",
+        "en": "Saved facts need review",
+    },
+    "walk.sheet.class_review.use_saved_facts": {
+        "ru": "Использовать этот текст для выбранного пункта",
+        "en": "Use this text for the selected item",
+    },
+    "walk.sheet.class_review.draft_level": {
+        "ru": "В черновике был {level}. Подтвердите класс вручную или проверьте по фактам.",
+        "en": "The draft had {level}. Select the class explicitly or check it against the facts.",
+    },
     "walk.sheet.photo_assignment.title": {
         "ru": "Фото этой записи",
         "en": "Photos for this finding",

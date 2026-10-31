@@ -23,28 +23,31 @@ def card(zone, text, raw="raw-model-zone"):
     }
 
 
-def load_sheet(page, cards, photos=None, confirm=True):
+def load_sheet(page, cards, photos=None, confirm=True, choose=True, items=None, defer_levels=False):
     page.set_default_timeout(3000)
     page.set_content(
-        '<div id="walk" data-suggest="suggest" data-hint="hint" data-finding="finding"></div>'
+        '<div id="walk" data-suggest="suggest" data-hint="hint" '
+        'data-level="level" data-finding="finding"></div>'
     )
     page.add_script_tag(path=str(ROOT / "src/web/static/walk-core.js"))
     page.evaluate(
-        """({cards, photos}) => {
+        """({cards, photos, items, deferLevels}) => {
       const W = window.DecimusWalk;
       window.cards = cards;
-      window.ops = [];
+      window.ops = []; window.levelCalls=[]; window.levelPending=[];
+      window.deferLevels=deferLevels;
       W.state.data = {
-        key:'synthetic', run_id:'synthetic-run', lang:'en',
+        key:'synthetic', run_id:'synthetic-run', checklist_version:'synthetic-edition', lang:'en',
         texts:{'walk.sheet.save_n':'Save {n}', 'walk.sheet.save':'Save'},
-        items:[{code:'SYN01', q:'Synthetic item', process:'Synthetic', levels:['D1'],
+        items:items || [{code:'SYN01', q:'Synthetic item', process:'Synthetic', levels:['D1'],
                 zones:['zone_a','zone_b'], measure:false}],
         zones:[{code:'zone_a',title:'Zone A',recorded:[],previous:[]},
                {code:'zone_b',title:'Zone B',recorded:[],previous:[]}]
       };
       const draft = {run_id:'synthetic-run',mode:'violation',
         words:'Synthetic observation',photos:photos};
-      W.local = {get:()=>draft,set:()=>{},drop:()=>{}};
+      W.local = {get:()=>draft,
+        set:(key,value)=>window.lastDraft=JSON.parse(JSON.stringify(value)),drop:()=>{}};
       W.photo = {block:(photos, opts)=>{
         const box = W.el('div');
         photos.forEach((photo, index)=>box.appendChild(
@@ -55,7 +58,22 @@ def load_sheet(page, cards, photos=None, confirm=True):
       W.voiceBar = W.translateBar = ()=>null;
       W.menu = {close:()=>{},open:opts=>window.menu=opts};
       W.toast = W.apply = ()=>{};
+      window.levelResult = (body, extra={})=>Object.assign({
+        status:'ready',level:'D1',provisional_level:null,need_fact:'',reason:'Synthetic criterion',
+        run_id:body.run_id,checklist_version:body.checklist_version,code:body.code,zone:body.zone,
+        selection_revision:body.selection_revision,facts_key:'synthetic-facts',criteria_hash:'synthetic-criteria',
+        photo_refs:body.photos,facts_from:{words:!!body.words,confirmed_reading:!!body.reading_confirmed,photos:body.photos.length}
+      },extra);
+      window.levelReply = (index, extra={}, ok=true)=>{
+        const request=levelPending[index];
+        request.resolve({ok,body:levelResult(request.body,extra)});
+      };
       W.post = (url, body) => {
+        if (url === 'level') {
+          levelCalls.push(JSON.parse(JSON.stringify(body)));
+          if (window.deferLevels) return new Promise(resolve=>levelPending.push({body,resolve}));
+          return Promise.resolve({ok:true,body:levelResult(body)});
+        }
         if (url === 'suggest') {
           return Promise.resolve({ok:true, body:{via:'model',candidates:cards}});
         }
@@ -64,13 +82,21 @@ def load_sheet(page, cards, photos=None, confirm=True):
         return Promise.resolve({ok:true,body:{}});
       };
     }""",
-        {"cards": cards, "photos": photos or ["synthetic-ref"]},
+        {
+            "cards": cards,
+            "photos": photos or ["synthetic-ref"],
+            "items": items,
+            "deferLevels": defer_levels,
+        },
     )
+    page.add_script_tag(path=str(ROOT / "src/web/static/walk-class-review.js"))
     page.add_script_tag(path=str(ROOT / "src/web/static/walk-sheet.js"))
     page.evaluate("DecimusWalk.sheet.open({hint:'zone_a'})")
     page.locator(".walk-mark--find").click()
-    page.wait_for_selector(".walk-found__card.is-on")
-    if confirm:
+    page.wait_for_selector(".walk-found__card")
+    if choose:
+        page.locator(".walk-found__card").first.click()
+    if confirm and choose:
         for index in range(page.locator("[data-photo-assignment]").count()):
             confirm_assignment(page, index)
 
