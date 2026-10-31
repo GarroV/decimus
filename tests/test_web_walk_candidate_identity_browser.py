@@ -61,6 +61,7 @@ def load_sheet(page, cards, photos=None, confirm=True, choose=True, items=None, 
       window.levelResult = (body, extra={})=>Object.assign({
         status:'ready',level:'D1',provisional_level:null,need_fact:'',reason:'Synthetic criterion',
         run_id:body.run_id,checklist_version:body.checklist_version,code:body.code,zone:body.zone,
+        clarifications:body.clarifications,clarification_hash:"synthetic-chain-hash",
         selection_revision:body.selection_revision,facts_key:'synthetic-facts',criteria_hash:'synthetic-criteria',
         photo_refs:body.photos,facts_from:{words:!!body.words,confirmed_reading:!!body.reading_confirmed,photos:body.photos.length}
       },extra);

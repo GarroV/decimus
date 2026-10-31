@@ -999,6 +999,9 @@
     if (!cand.classReview) {
       cand.classReview = W.classReview.fresh();
       cand.classReview.answer = "";
+      cand.classReview.clarifications = [];
+      cand.classReview.answerQuestion = "";
+      cand.classReview.additionalWords = "";
       cand.classReview.reading = cand.reading_c == null ? "" : String(cand.reading_c);
       cand.classReview.readingConfirmed = false;
       cand.classReview.readingSource = "model";
@@ -1026,6 +1029,12 @@
     if (saved.length !== 1) return;
     state.restoredEntry = saved[0];
     state.answer = typeof saved[0].answer === "string" ? saved[0].answer : "";
+    state.clarifications = Array.isArray(saved[0].clarifications) ? saved[0].clarifications.filter(function (pair) {
+      return pair && typeof pair.question === "string" && typeof pair.answer === "string";
+    }) : [];
+    state.answerQuestion = saved[0].answer_question || "";
+    state.additionalWords = saved[0].additional_words || "";
+    state.clarificationScope = saved[0].clarification_scope || null;
     if (!state.readingEdited && saved[0].reading != null) {
       state.reading = String(saved[0].reading);
       state.readingSource = saved[0].reading_source === "human" ? "human" : "model";
@@ -1047,9 +1056,10 @@
       var primary = classIsPrimary(cand);
       var zone = primary ? f.zone : extraZone(cand);
       var reading = primary ? f.reading : state.reading;
-      if (!state.answer && (reading == null || !String(reading).trim())) return;
+      if (!state.answer && !state.additionalWords && !state.clarifications.length && (reading == null || !String(reading).trim())) return;
       var entry = { code:cand.code, zone:zone || null, checklist_version:W.state.data.checklist_version, answer:state.answer, reading:reading,
         words:primary ? f.words.trim() : "", photos:classPhotoRefs(cand),
+        additional_words:state.additionalWords, clarifications:state.clarifications, answer_question:state.answerQuestion, clarification_scope:state.clarificationScope,
         reading_source:primary ? f.readingSource : state.readingSource,
         reading_confirmed:primary ? !!f.readingConfirmed : !!state.readingConfirmed };
       // Preserve ambiguous/unmatched facts instead of moving them to another item.
@@ -1078,26 +1088,41 @@
     var primary = classIsPrimary(cand);
     var zone = primary ? f.zone : extraZone(cand);
     var reading = classReading(cand);
-    var words = [primary ? f.words.trim() : "", state.answer.trim()].filter(Boolean).join("\n");
+    var words = [primary ? f.words.trim() : "", state.additionalWords, state.answerQuestion ? "" : state.answer.trim()].filter(Boolean).join("\n");
+    var chain = state.clarifications.slice();
+    if (state.answerQuestion && state.answer.trim()) chain.push({question:state.answerQuestion, answer:state.answer.trim()});
     var confirmed = !assignmentEnabled() || assignmentReady(cand);
     var photos = assignmentEnabled() ? (confirmed ? assignedPhotos(cand) : [])
       : readyPhotos().map(function (p) { return p.ref; }).filter(function (ref, i, all) { return all.indexOf(ref) === i; });
     var body = { run_id: f.run_id, checklist_version: W.state.data.checklist_version,
-      code: cand.code, zone: zone || null, words: words, photos: photos,
+      code: cand.code, zone: zone || null, words: words, photos: photos, clarifications:chain,
       reading_c: reading.confirmed ? reading.value : null,
       reading_confirmed: reading.value !== null && reading.confirmed };
     if (body.reading_c !== null) body.reading_source = reading.source;
+    var scope = JSON.stringify({run:f.run_id, edition:body.checklist_version, code:cand.code, zone:zone || null,
+      words:words, photos:photos, reading:reading, assigned:confirmed});
+    var total = words.length + chain.reduce(function (n, pair) {return n + pair.question.length + pair.answer.length;}, 0);
     var blocked = "";
-    if (f.run_id !== W.state.data.run_id) blocked = tx("walk.sheet.class_review.context_changed");
+    if ((chain.length || state.answerQuestion) && state.clarificationScope && state.clarificationScope !== scope) blocked = tx("walk.sheet.class_review.review_changed");
+    else if (f.run_id !== W.state.data.run_id) blocked = tx("walk.sheet.class_review.context_changed");
     else if (!zone) blocked = tx("walk.sheet.need_zone");
     else if (!confirmed || uploading() || waitingPhotos().length) blocked = tx("walk.sheet.photo_assignment.need");
     else if (reading.raw != null && String(reading.raw).trim() && reading.value === null) blocked = tx("walk.err.reading");
     else if (reading.value !== null && !reading.confirmed) blocked = tx("walk.sheet.class_review.confirm_reading");
-    else if (words.length > 1000) blocked = tx("walk.sheet.class_review.facts_limit");
+    else if (total > 1000 || chain.length > 6 || chain.some(function (pair) {return pair.question.length > 500 || pair.answer.length > 1000;})) blocked = tx("walk.sheet.class_review.facts_limit");
     else if (photos.length > 10) blocked = tx("walk.sheet.class_review.photos_limit");
-    return { body: body, levels: (item(cand.code) || {levels: []}).levels,
+    return { body: body, scope:scope, total:total, levels: (item(cand.code) || {levels: []}).levels,
       key: JSON.stringify({body: body, reading: reading, assigned: confirmed, search: f.findId || 0,
         currentRun: W.state.data.run_id, blocked: blocked}), blocked: blocked };
+  }
+  function classSaveContext(cand) {
+    var body = classContext(cand).body;
+    return {clarifications:body.clarifications, run_id:body.run_id, checklist_version:body.checklist_version,
+      code:body.code, zone:body.zone, photo_refs:body.photos};
+  }
+  function classSaveWords(cand) {
+    var body = classContext(cand).body;
+    return [body.words].concat(body.clarifications.map(function (pair) {return pair.answer;})).filter(Boolean).join("\n");
   }
   function syncClassSelections() {
     if (!f || !recognizing() || !f.code) return;
@@ -1121,10 +1146,21 @@
     if (!classSelected(cand) || (item(cand.code) || {}).measure || (classIsPrimary(cand) && taken())) return;
     var form = f;
     var context = classContext(cand);
-    W.classReview.request(classState(cand), context, function (key) {
+    var requestedState = classState(cand);
+    W.classReview.request(requestedState, context, function (key) {
       return f === form && classSelected(cand) && f.run_id === W.state.data.run_id && classContext(cand).key === key;
     }, function () {
       if (f !== form || !classSelected(cand)) return;
+      if (["ready", "needs_fact", "not_established"].indexOf(requestedState.status) !== -1 && requestedState.answer.trim()) {
+        if (requestedState.answerQuestion) requestedState.clarifications = context.body.clarifications;
+        else requestedState.additionalWords = [requestedState.additionalWords, requestedState.answer.trim()].filter(Boolean).join("\n");
+        requestedState.answer = "";
+        requestedState.answerQuestion = "";
+        requestedState.clarificationScope = context.scope;
+        if (node) node.querySelectorAll("[data-class-review]").forEach(function (panel) {
+          if (panel._candidate === cand) panel.querySelector(".walk-class-review__facts").value = "";
+        });
+      }
       syncClassSelections();
       updateClassPanels();
       changed();
@@ -1140,7 +1176,8 @@
       var cand = candidates[i];
       var reading = classReading(cand);
       if (reading.raw != null && String(reading.raw).trim() && reading.value === null) return "walk.err.reading";
-      if (classContext(cand).body.words.length > 1000) return "walk.sheet.class_review.facts_limit";
+      if (classContext(cand).total > 1000 || classContext(cand).body.clarifications.length > 6) return "walk.sheet.class_review.facts_limit";
+      if (classContext(cand).blocked === tx("walk.sheet.class_review.review_changed")) return "walk.sheet.class_review.review_changed";
       if (reading.value !== null && !reading.confirmed) return "walk.sheet.class_review.confirm_reading";
       if ((item(cand.code) || {}).measure || (classIsPrimary(cand) && taken())) continue;
       if (!classState(cand).level) return "walk.sheet.class_review.need_class";
@@ -1163,24 +1200,44 @@
       : state.status === "manual" ? tx("walk.sheet.class_review.manual_active")
       : state.status === "ready" ? tx("walk.sheet.class_review.proposed", {level:state.level})
       : state.status === "needs_fact" ? state.needFact
+      : state.status === "not_established" ? tx("walk.sheet.class_review.not_established")
       : state.message || classContext(cand).blocked || tx("walk.sheet.class_review.check_hint");
     feedback.appendChild(el("p", "walk-form__hint", text));
     if (state.status === "needs_fact" && state.provisional) {
       feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.provisional", {level:state.provisional})));
     }
+    if (state.clarifications.length) {
+      var chainReview = el("details");
+      chainReview.appendChild(el("summary", null, tx("walk.sheet.class_review.history")));
+      state.clarifications.forEach(function (pair) { chainReview.appendChild(el("p", null, pair.question)); chainReview.appendChild(el("p", null, pair.answer)); });
+      feedback.appendChild(chainReview);
+    }
+    if (classContext(cand).blocked === tx("walk.sheet.class_review.review_changed")) {
+      feedback.appendChild(W.button("walk-link", tx("walk.sheet.class_review.reaffirm"), function () {
+        state.clarificationScope = classContext(cand).scope;
+        state.factsEdited = true;
+        classSelectionChanged();
+        redraw("item", "level", "footer");
+      }));
+    }
+    if (state.answerQuestion) feedback.appendChild(el("p", "walk-form__hint", state.answerQuestion));
     if (state.reason) feedback.appendChild(el("p", "walk-form__hint", state.reason));
     var zone = classIsPrimary(cand) ? f.zone : extraZone(cand);
     var unmatched = (f.savedClassFacts || []).filter(function (entry) {
       return entry.code === cand.code && entry.zone === zone && entry !== state.restoredEntry &&
-        (entry.answer || entry.reading != null);
+        (entry.answer || entry.additional_words || (entry.clarifications || []).length || entry.reading != null);
     });
     if (unmatched.length && !state.answer) {
       var recovery = el("details", "walk-form__hint");
       recovery.appendChild(el("summary", null, tx("walk.sheet.class_review.saved_facts")));
       unmatched.forEach(function (entry) {
-        recovery.appendChild(el("pre", null, [entry.answer, entry.reading].filter(function (v) { return v != null && v !== ""; }).join("\n")));
-        if (entry.answer) recovery.appendChild(W.button("walk-link", tx("walk.sheet.class_review.use_saved_facts"), function () {
-          state.answer = entry.answer;
+        recovery.appendChild(el("pre", null, [entry.additional_words, entry.answer].concat((entry.clarifications || []).map(function (pair) {return pair.question + "\n" + pair.answer;}), [entry.reading]).filter(function (v) { return v != null && v !== ""; }).join("\n")));
+        if (entry.answer || entry.additional_words || (entry.clarifications || []).length) recovery.appendChild(W.button("walk-link", tx("walk.sheet.class_review.use_saved_facts"), function () {
+          state.answer = entry.answer || "";
+          state.additionalWords = entry.additional_words || "";
+          state.answerQuestion = entry.answer_question || "";
+          state.clarifications = entry.clarifications || [];
+          state.clarificationScope = classContext(cand).scope;
           state.factsEdited = true;
           classSelectionChanged();
           redraw("item", "level", "footer");
@@ -1258,6 +1315,10 @@
     facts.maxLength = 1000;
     facts.value = state.answer;
     facts.addEventListener("input", function () {
+      if (!state.answerQuestion && state.needFact) {
+        state.answerQuestion = state.needFact;
+        state.clarificationScope = classContext(cand).scope;
+      }
       state.answer = facts.value;
       state.factsEdited = true;
       classSelectionChanged();
@@ -1711,8 +1772,9 @@
     return extras().map(function (c) {
       return {
         op: "add", zone: extraZone(c), code: c.code, level: extraLevel(c), text: (c.wording || "").trim(),
-        comment: "", repeat: false, photos: assignedPhotos(c), words: classContext(c).body.words, also: true,
+        comment: "", repeat: false, photos: assignedPhotos(c), words: classSaveWords(c), also: true,
         photo_assignment: assignmentPayload(c),
+        class_context: classSaveContext(c),
         suggested: { code: c.code, level: c.level, zone: c.zone, confidence: c.confidence, via: f.via },
         reading_c: classReading(c).confirmed ? classReading(c).value : null,
       };
@@ -1738,7 +1800,8 @@
         comment: f.comment.trim(), repeat: !!f.repeat && repeatOffered(),
         photos: photos,
         photo_assignment: assigned ? assignmentPayload(assigned) : null,
-        words: recognizing() ? classContext(primaryClassCandidate()).body.words : f.words.trim(),
+        words: recognizing() ? classSaveWords(primaryClassCandidate()) : f.words.trim(),
+        class_context: recognizing() ? classSaveContext(primaryClassCandidate()) : null,
         suggested: suggested(), reading_c: readingValue(),
         hint_codes: f.hintCodes || [],
       }].concat(extraOps());

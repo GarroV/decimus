@@ -42,15 +42,18 @@
         result.checklist_version !== body.checklist_version || !sameArray(result.photo_refs, body.photos) ||
         typeof result.facts_key !== "string" || !result.facts_key ||
         typeof result.criteria_hash !== "string" || !result.criteria_hash ||
-        typeof result.need_fact !== "string" || typeof result.reason !== "string") return false;
+        typeof result.clarification_hash !== "string" || !result.clarification_hash ||
+        JSON.stringify(result.clarifications) !== JSON.stringify(body.clarifications) ||
+        (result.need_fact !== null && typeof result.need_fact !== "string") || typeof result.reason !== "string") return false;
     if (!result.facts_from || result.facts_from.words !== !!body.words.trim() ||
         result.facts_from.confirmed_reading !== (body.reading_c !== null) ||
         result.facts_from.photos !== body.photos.length) return false;
     if (result.provisional_level !== null && context.levels.indexOf(result.provisional_level) === -1) return false;
     if (result.status === "ready") {
-      return context.levels.indexOf(result.level) !== -1 && !result.need_fact.trim();
+      return context.levels.indexOf(result.level) !== -1 && result.need_fact === "";
     }
-    return result.status === "needs_fact" && result.level === null && !!result.need_fact.trim() &&
+    if (result.status === "not_established") return result.level === null && result.provisional_level === null && result.need_fact === null;
+    return result.status === "needs_fact" && result.level === null && typeof result.need_fact === "string" && !!result.need_fact.trim() &&
       (result.provisional_level === null || context.levels.indexOf(result.provisional_level) !== -1);
   }
   function request(state, context, current, changed) {
@@ -84,7 +87,8 @@
         state.status = result.status;
         state.level = result.status === "ready" ? result.level : null;
         state.provisional = result.provisional_level;
-        state.needFact = result.need_fact;
+        state.needFact = result.need_fact || "";
+        state.clarificationHash = result.clarification_hash;
         state.reason = result.reason;
       }
       changed();

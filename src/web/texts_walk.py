@@ -533,6 +533,28 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.sheet.need_item": {"ru": "Выберите пункт", "en": "Choose an item"},
     "walk.sheet.need_level": {"ru": "Выберите класс", "en": "Choose a class"},
+    "walk.sheet.class_review.not_established": {
+        "ru": (
+            "Нарушение по этим фактам не установлено. "
+            "Проверьте пункт и факты или явно выберите класс вручную."
+        ),
+        "en": (
+            "These facts do not establish a violation. "
+            "Review the item and facts, or explicitly select a class manually."
+        ),
+    },
+    "walk.sheet.class_review.history": {
+        "ru": "Вопросы и ответы по этому пункту",
+        "en": "Questions and answers for this item",
+    },
+    "walk.sheet.class_review.review_changed": {
+        "ru": "Факты или фото изменились. Проверьте прежние ответы перед повторным использованием.",
+        "en": "The facts or photos changed. Review the earlier answers before using them again.",
+    },
+    "walk.sheet.class_review.reaffirm": {
+        "ru": "Проверил: ответы относятся к текущим фактам",
+        "en": "I checked: the answers apply to the current facts",
+    },
     "walk.sheet.class_review.choose_item": {
         "ru": "Сначала выберите пункт. Класс определим по его критериям после выбора.",
         "en": "Choose an item first. Its class will be checked against that item's criteria.",

@@ -94,10 +94,10 @@ def test_needs_fact_never_applies_provisional_class_and_answer_is_scoped(browser
     assert page.evaluate("levelCalls.length") == 1  # Typing is not a paid request.
     page.locator("[data-class-check]").click()
     page.wait_for_function("levelCalls.length === 2")
-    assert (
-        page.evaluate("levelCalls[1].words")
-        == "Synthetic observation\nHuman answer for the first item"
-    )
+    assert page.evaluate("levelCalls[1].words") == "Synthetic observation"
+    assert page.evaluate("levelCalls[1].clarifications") == [
+        {"question": "Synthetic missing fact?", "answer": "Human answer for the first item"}
+    ]
     resolve(page, 1, level="D1")
     page.get_by_role("button", name="Save", exact=True).click()
     page.wait_for_function("ops.length === 1")
@@ -258,7 +258,10 @@ def test_extra_question_and_answer_do_not_change_primary_class_or_reading(browse
     extra.locator(".walk-class-review__facts").press_sequentially("Only second-item answer")
     extra.locator("[data-class-check]").click()
     page.wait_for_function("levelCalls.length === 3")
-    assert page.evaluate("levelCalls[2].words") == "Only second-item answer"
+    assert page.evaluate("levelCalls[2].words") == ""
+    assert page.evaluate("levelCalls[2].clarifications") == [
+        {"question": "Fact for second item only?", "answer": "Only second-item answer"}
+    ]
     assert page.evaluate("levelCalls[2].reading_c") is None
     resolve(page, 2, level="D2")
     page.get_by_role("button", name="Save 2", exact=True).click()
@@ -364,3 +367,134 @@ def test_information_candidate_does_not_enter_normative_class_endpoint(browser_p
     page.wait_for_function("ops.length === 1")
     assert page.evaluate("ops[0].level") == "D0"
     assert page.evaluate("ops[0].reading_c") == 0
+
+
+def test_repeated_clarification_chain_stays_scoped_and_is_saved_as_human_evidence(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, status="needs_fact", level=None, need_fact="First synthetic question?")
+    page.locator(".walk-class-review__facts").fill("First human answer")
+    page.locator("[data-class-check]").click()
+    page.wait_for_function("levelCalls.length === 2")
+    resolve(page, 1, status="needs_fact", level=None, need_fact="Second synthetic question?")
+    assert page.locator(".walk-class-review__facts").input_value() == ""
+    page.locator(".walk-class-review__facts").fill("Second human answer")
+    page.locator("[data-class-check]").click()
+    page.wait_for_function("levelCalls.length === 3")
+    chain = [
+        {"question": "First synthetic question?", "answer": "First human answer"},
+        {"question": "Second synthetic question?", "answer": "Second human answer"},
+    ]
+    assert page.evaluate("levelCalls[2].clarifications") == chain
+    assert page.evaluate("levelCalls[2].words") == "Synthetic observation"
+    resolve(page, 2, level="D1")
+    page.get_by_role("button", name="Save", exact=True).click()
+    page.wait_for_function("ops.length === 1")
+    assert page.evaluate("ops[0].class_context") == {
+        "clarifications": chain,
+        "run_id": "synthetic-run",
+        "checklist_version": "synthetic-edition",
+        "code": "SYN01",
+        "zone": "zone_a",
+        "photo_refs": ["synthetic-ref"],
+    }
+    assert (
+        page.evaluate("ops[0].words")
+        == "Synthetic observation\nFirst human answer\nSecond human answer"
+    )
+    assert "question" not in page.evaluate("ops[0].words")
+
+
+def test_not_established_does_not_create_d0_or_coarse_fallback(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(
+        page,
+        status="not_established",
+        level=None,
+        provisional_level=None,
+        need_fact=None,
+        reason="Synthetic facts do not establish this violation",
+    )
+    assert (
+        "walk.sheet.class_review.not_established"
+        in page.locator("[data-class-feedback]").inner_text()
+    )
+    assert page.get_by_role("button", name="Save", exact=True).is_disabled()
+    page.get_by_role("button", name="walk.sheet.class_review.manual", exact=True).click()
+    page.locator('[data-manual-class="D1"]').click()
+    page.get_by_role("button", name="Save", exact=True).click()
+    page.wait_for_function("ops.length === 1")
+    assert page.evaluate("ops[0].level") == "D1"
+
+
+@pytest.mark.parametrize("invalid", [{"clarifications": []}, {"clarification_hash": ""}])
+def test_mismatched_clarification_response_cannot_assign_class(browser_page, invalid):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, status="needs_fact", level=None, need_fact="Scoped question?")
+    page.locator(".walk-class-review__facts").fill("Scoped answer")
+    page.locator("[data-class-check]").click()
+    page.wait_for_function("levelCalls.length === 2")
+    resolve(page, 1, **invalid)
+    assert page.get_by_role("button", name="Save", exact=True).is_disabled()
+
+
+def test_changed_facts_require_explicit_review_before_reusing_chain(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, status="needs_fact", level=None, need_fact="Question about original facts?")
+    page.locator(".walk-class-review__facts").fill("Answer about original facts")
+    page.locator("[data-class-check]").click()
+    page.wait_for_function("levelCalls.length === 2")
+    resolve(page, 1, level="D1")
+    page.locator(".walk-area--words").fill("Changed human observation")
+    assert page.locator("[data-class-check]").is_disabled()
+    assert page.get_by_role("button", name="Save", exact=True).is_disabled()
+    confirm_assignment(page, 0)
+    page.get_by_role("button", name="walk.sheet.class_review.reaffirm", exact=True).click()
+    page.locator("[data-class-check]").click()
+    page.wait_for_function("levelCalls.length === 3")
+    assert page.evaluate("levelCalls[2].words") == "Changed human observation"
+    assert page.evaluate("levelCalls[2].clarifications[0].answer") == "Answer about original facts"
+
+
+def test_chain_uses_one_bounded_budget_without_sending_a_partial_answer(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, status="needs_fact", level=None, need_fact="Synthetic question?")
+    page.locator(".walk-class-review__facts").fill("x" * 990)
+    assert page.locator("[data-class-check]").is_disabled()
+    assert page.get_by_role("button", name="Save", exact=True).is_disabled()
+    assert page.evaluate("levelCalls.length") == 1
+    assert page.locator(".walk-class-review__facts").input_value() == "x" * 990
+
+
+def test_chain_survives_reload_without_restoring_a_model_class(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, status="needs_fact", level=None, need_fact="Synthetic saved question?")
+    page.locator(".walk-class-review__facts").fill("Saved human answer")
+    page.locator("[data-class-check]").click()
+    page.wait_for_function("levelCalls.length === 2")
+    resolve(page, 1, level="D1")
+    page.evaluate("window.savedDraft=JSON.parse(JSON.stringify(lastDraft))")
+    page.evaluate("""() => {
+      const W=DecimusWalk; W.sheet.close(true);
+      W.local.get=key=>key==='synthetic_draft'?savedDraft:null;
+      W.sheet.open({mode:'violation'});
+    }""")
+    assert page.get_by_role("button", name="Save", exact=True).is_disabled()
+    page.locator("[data-class-feedback] summary").first.click()
+    assert "Saved human answer" in page.locator("[data-class-feedback]").inner_text()
+    page.locator("[data-class-check]").click()
+    page.wait_for_function("levelCalls.length === 3")
+    assert page.evaluate("levelCalls[2].clarifications") == [
+        {"question": "Synthetic saved question?", "answer": "Saved human answer"}
+    ]
