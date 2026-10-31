@@ -37,6 +37,7 @@
   var requested = false;
   var started = false;
   var consumers = Object.create(null);
+  var removed = Object.create(null);
 
   /* ── хранилище ─────────────────────────────────────────────────────── */
 
@@ -77,14 +78,34 @@
   }
 
   function fromRow(row) {
-    return { id: row.id, key: row.key, run_id: row.run_id, uploaded_ref: row.uploaded_ref, mode: row.mode, at: row.at, bytes: row.bytes.byteLength,
+    return { id: row.id, key: row.key, run_id: row.run_id, uploaded_ref: row.uploaded_ref, upload_error: row.upload_error, mode: row.mode, at: row.at, bytes: row.bytes.byteLength,
       blob: new Blob([row.bytes], { type: row.type }) };
   }
 
   function rows() { return run("readonly", function (s) { return s.getAll(); }); }
 
   function remove(id) {
+    removed[id] = true;
     return run("readwrite", function (s) { return s.delete(id); }).catch(function () { /* уже нет */ });
+  }
+
+  /** Only exact uploaded receipts of this still-current run can be acknowledged. */
+  function ack(key, runId, ids) {
+    return rows().then(function (all) {
+      var accepted = all.filter(function (r) { return owns(r) && r.key === key && r.run_id === runId && r.uploaded_ref && ids.indexOf(r.id) !== -1; });
+      if (!accepted.length) return 0;
+      accepted.forEach(function (r) { removed[r.id] = true; });
+      return run("readwrite", function (s) { accepted.forEach(function (r) { s.delete(r.id); }); }).then(function () { return accepted.length; });
+    });
+  }
+
+  function retry(id, key, runId) {
+    return rows().then(function (all) {
+      var row = all.filter(function (r) { return r.id === id && r.key === key && r.run_id === runId && owns(r); })[0];
+      if (!row || row.uploaded_ref) return false;
+      var copy = Object.assign({}, row); delete copy.upload_error; delete removed[id];
+      return run("readwrite", function (s) { return s.put(copy); }).then(function () { return true; });
+    });
   }
 
   /** Сколько кадров просрочено и снято; о них аудитору сказать. */
@@ -137,7 +158,9 @@
     if (!data || !data.run_id || entry.run_id !== data.run_id) return false;
     if (entry.key === data.key + "_draft") return true;
     var prefix = data.key + "_info_";
-    return entry.key.indexOf(prefix) === 0 && /^[A-Za-z0-9_-]+$/.test(entry.key.slice(prefix.length));
+    if (entry.key.indexOf(prefix) === 0 && /^[A-Za-z0-9_-]+$/.test(entry.key.slice(prefix.length))) return true;
+    var edit = data.key + "_edit_";
+    return entry.key.indexOf(edit) === 0 && /^[1-9][0-9]*_[a-f0-9]{64}$/.test(entry.key.slice(edit.length));
   }
 
   function mergeDraft(entry, ref) {
@@ -159,6 +182,7 @@
 
   /** Persist the upload receipt before local adoption; reload can finish without reuploading. */
   function rememberUploaded(entry, ref) {
+    if (removed[entry.id]) return Promise.resolve(false);
     return rows().then(function (all) {
       var row = all.filter(function (r) { return r.id === entry.id; })[0];
       if (!row) return false;
@@ -175,8 +199,9 @@
   }
 
   function settle(entry, ref) {
+    if (removed[entry.id]) return Promise.resolve(true);
     // Keep original bytes until the reference was actually saved on this device.
-    if (!mergeDraft(entry, ref)) return Promise.resolve(null);
+    var merged = mergeDraft(entry, ref);
     var taken = false;
     var registration = consumers[entry.key];
     if (owns(entry) && registration && registration.run_id === entry.run_id) {
@@ -185,18 +210,36 @@
     } else if (owns(entry) && entry.key === W.state.data.key + "_draft") {
       taken = !!(W.offline.onUploaded && W.offline.onUploaded(entry, ref));
     }
-    return remove(entry.id).then(function () { return taken; });
+    // The blob is also the only authorized offline preview before attachment.
+    // Saving a local ref is not a server-save acknowledgement.
+    return Promise.resolve(merged || taken ? taken : null);
+  }
+
+  function block(entry, status) {
+    return rows().then(function (all) {
+      var row = all.filter(function (r) { return r.id === entry.id; })[0];
+      if (!row || removed[entry.id]) return;
+      return run("readwrite", function (s) { return s.put(Object.assign({}, row, {upload_error: status})); });
+    }).then(function () {
+      var registration = consumers[entry.key];
+      if (owns(entry) && registration && registration.run_id === entry.run_id && registration.consumer.failed) registration.consumer.failed(entry, status);
+      else if (owns(entry) && W.offline.onFailed) W.offline.onFailed(entry, status);
+    });
   }
 
   /** Отправить всё, что ждёт. Первая же сеть-неудача останавливает: остальным она не лучше. */
   function flush() {
     var sent = 0;
-    var dropped = 0;
     return rows().then(function (all) {
       var queue = all.filter(owns).map(fromRow).sort(function (a, b) { return a.at - b.at; });
+      function pending(at) { return queue.slice(at).filter(function (e) { return !e.uploaded_ref && !e.upload_error && !removed[e.id]; }).length; }
       function next(i) {
-        if (i >= queue.length || navigator.onLine === false || !owns(queue[i])) return Promise.resolve(queue.length - i);
+        if (i >= queue.length) return Promise.resolve(0);
+        if (!owns(queue[i])) return Promise.resolve(0);
         var entry = queue[i];
+        if (removed[entry.id] || entry.upload_error) return next(i + 1);
+        if (navigator.onLine === false && !entry.uploaded_ref) return Promise.resolve(pending(i));
+        var wasUploaded = !!entry.uploaded_ref;
         var uploaded = entry.uploaded_ref ? Promise.resolve(entry.uploaded_ref) :
           W.photo.upload(entry.blob, entry.run_id).then(function (ref) {
             return rememberUploaded(entry, ref).then(function (saved) { return saved ? ref : null; });
@@ -204,23 +247,20 @@
         return uploaded.then(function (ref) {
           if (!ref) return next(i + 1);
           return settle(entry, ref).then(function (taken) {
-            if (taken === null) return queue.length - i;
-            if (!taken) sent += 1;
+            if (!taken && !wasUploaded) sent += 1;
             return next(i + 1);
           });
         }, function (err) {
-          if (err && (err.code === "run_changed" || err.status === 409)) return queue.length - i;
+          if (err && (err.code === "run_changed" || err.status === 409)) return pending(i);
           if (err && !err.retryable && FINAL_STATUSES.indexOf(err.status) !== -1) {
-            dropped += 1;
-            return remove(entry.id).then(function () { return next(i + 1); });
+            return block(entry, err.status).then(function () { return next(i + 1); });
           }
-          return queue.length - i;
+          return pending(i);
         });
       }
       return next(0);
     }).then(function (left) {
       if (sent) W.toast(W.tx("walk.offline.sent", { n: sent }), "ok");
-      if (dropped) W.toast(W.tx("walk.offline.dropped", { n: dropped }), "warn");
       return left;
     });
   }
@@ -281,8 +321,8 @@
       return all.filter(function (r) { return r.key === key; }).map(fromRow);
     }, function () { return []; }); },
     register: register,
-    available: available, put: put, list: list, remove: remove, start: start, kick: kick, watch: watch,
-    onUploaded: null, onTick: null,
+    available: available, put: put, list: list, remove: remove, ack: ack, retry: retry, start: start, kick: kick, watch: watch,
+    onUploaded: null, onFailed: null, onTick: null,
     limits: { frames: MAX_FRAMES, bytes: MAX_BYTES, days: MAX_AGE_DAYS },
   };
 })();

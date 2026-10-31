@@ -306,6 +306,7 @@ def info_fields(inspection: Inspection, lang: str) -> list[dict[str, Any]]:
                 "kind": field.kind,
                 "q": _question_text(asked),
                 "value": answer.text if answer else "",
+                "photos": [_photo(ref) for ref in answer.photos] if answer else [],
             }
         )
     return out

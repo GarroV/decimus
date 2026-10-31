@@ -107,3 +107,44 @@ def test_native_chat_remains_an_explicit_fallback(page):  # noqa: F811
     page.get_by_role("button", name="Продолжить в чате", exact=True).click()
     assert page.evaluate("chatFallback") == 1
     assert page.locator(".walk-finish").count() == 0
+
+
+def test_native_report_language_is_chosen_before_existing_boolean_is_saved(page):  # noqa: F811
+    native(page)
+    page.evaluate("""() => {
+      const W=DecimusWalk;
+      W.state.data.info[0].value='Human text stays unchanged';
+      W.state.data.info.push({code:'INF03',kind:'yes_no',q:'Synthetic yes/no',value:'Да'});
+      const previousReview=review;
+      window.review=()=>({...previousReview(),report_langs:[
+        {code:'ru',label:'Русский'},{code:'en',label:'English'}]});
+      const previousPost=W.post;
+      W.post=(url,body)=>previousPost(url,body).then(res=>{
+        if(body.op==='finish_prepare'){
+          W.state.data.report_lang=body.report_lang;res.body={status:'ready',data:W.state.data};
+        }
+        if(url==='/info'&&body.code==='INF03'){
+          W.state.data.info.find(field=>field.code==='INF03').value='Yes';
+        }
+        return res;
+      });
+    }""")
+    page.keyboard.press("Escape")
+    page.evaluate("DecimusWalk.finish.ask()")
+    page.wait_for_selector("#finish-report-lang")
+    page.locator("#finish-report-lang").select_option("en")
+    page.keyboard.press("Escape")
+    page.evaluate("DecimusWalk.finish.ask()")
+    page.wait_for_selector("#finish-report-lang")
+    assert page.locator("#finish-report-lang").input_value() == "en"
+    page.get_by_role("button", name="Проверить итог", exact=True).click()
+    page.wait_for_selector("#finish-consent")
+    requests = page.evaluate("ops")
+    prepared = next(i for i, op in enumerate(requests) if op["body"].get("op") == "finish_prepare")
+    answered = next(i for i, op in enumerate(requests) if op["url"] == "/info")
+    assert prepared < answered
+    assert requests[answered]["body"]["value"] == "yes"
+    assert all(op["body"].get("code") != "INF01" for op in requests if op["url"] == "/info")
+    assert "English" in page.locator(".walk-finish__language").inner_text()
+    assert "Human text stays unchanged" in page.locator(".walk-finish__answer").first.inner_text()
+    assert page.locator("#finish-report-lang").count() == 0

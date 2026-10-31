@@ -445,3 +445,48 @@ def test_проверка_чужого_пространства_не_читае�
     assert (экран.status_code, запись.status_code, сведение.status_code) == (403, 403, 403)
     assert запись.get_json() == {"error": "forbidden"}, "отказ с подробностями"
     assert get_state(ЧУЖОЙ) == до
+
+
+def test_info_photo_packet_is_append_only_and_keeps_telegram_refs(клиент: Клиент) -> None:
+    from src.domain import set_info
+
+    set_info(АУДИТОР, "INF08", "Saved caption", photos=["AgACexisting"])
+    first = клиент.ссылка()
+    second = клиент.ссылка(ДРУГОЙ_JPEG)
+    response = клиент.сведение(code="INF08", value="New caption", photos=[first, second, first])
+    assert response.status_code == 200, response.get_json()
+    answer = get_state(АУДИТОР).info["INF08"]
+    assert answer.photos == ["AgACexisting", first, second]
+    assert answer.text == "New caption"
+    field = next(field for field in response.get_json()["info"] if field["code"] == "INF08")
+    assert field["photos"] == [
+        {"ref": "AgACexisting", "own": False},
+        {"ref": first, "own": True},
+        {"ref": second, "own": True},
+    ]
+    assert клиент.сведение(code="INF08", value="Text edit only").status_code == 200
+    assert get_state(АУДИТОР).info["INF08"].photos == ["AgACexisting", first, second]
+
+
+def test_info_photo_only_text_answer_and_empty_without_evidence(клиент: Клиент) -> None:
+    ref = клиент.ссылка()
+    response = клиент.сведение(code="INF08", value="", photos=[ref])
+    assert response.status_code == 200, response.get_json()
+    assert get_state(АУДИТОР).info["INF08"].text == ""
+    assert get_state(АУДИТОР).info["INF08"].photos == [ref]
+    assert клиент.сведение(code="INF01", value="", photos=[]).status_code == 422
+
+
+@pytest.mark.parametrize("code", ["INF03", "INF05", "INF07"])
+def test_info_photos_do_not_invent_date_or_boolean(клиент: Клиент, code: str) -> None:
+    ref = клиент.ссылка()
+    assert клиент.сведение(code=code, value="", photos=[ref]).status_code == 422
+    assert code not in get_state(АУДИТОР).info
+
+
+def test_info_rejects_another_chat_upload_without_writing_partial_answer(клиент: Клиент) -> None:
+    start_inspection(777, unit="Other synthetic", kind="planned", report_lang="ru")
+    stranger = Клиент(клиент.c, 777)
+    ref = stranger.ссылка()
+    assert клиент.сведение(code="INF08", value="Synthetic caption", photos=[ref]).status_code == 422
+    assert "INF08" not in get_state(АУДИТОР).info

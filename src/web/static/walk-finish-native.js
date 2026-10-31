@@ -14,13 +14,14 @@
   function data() { return W.state.data || {}; }
   function tx(key, args) { return W.tx("walk.finish.native." + key, args); }
   function key() { return flow.key + "_finish_" + flow.run; }
-  function keep() { W.local.set(key(), { run_id: flow.run, fields: flow.fields }); }
+  function keep() { W.local.set(key(), { run_id: flow.run, fields: flow.fields, language: flow.language }); }
   function current() { return flow && data().run_id === flow.run; }
   function close() {
     if (flow && flow.busy) return;
     if (poll) window.clearTimeout(poll);
     poll = null;
     if (view) view.remove();
+    if (W.photo && W.photo.closeCamera) W.photo.closeCamera();
     view = null;
     document.removeEventListener("keydown", onKey);
   }
@@ -63,16 +64,19 @@
     return body;
   }
   function loading() { frame(W.tx("walk.finish.title")).appendChild(el("p", null, tx("loading"))); }
-  function apply(body) { if (body && W.apply) W.apply(body); }
+  function apply(body) {
+    if (!current() || (body && body.run_id !== flow.run)) throw new Error(W.tx("walk.finish.err.stale"));
+    if (body && W.apply) W.apply(body);
+  }
   function fetchReview() {
     if (!current()) return Promise.reject(new Error(W.tx("walk.finish.err.stale")));
     var mine = flow;
     return post({ op: "finish_review" }).then(function (review) {
-      if (flow !== mine || !view) throw new Error(W.tx("walk.sheet.cancel"));
+      if (flow !== mine || !view || !current()) throw new Error(W.tx("walk.sheet.cancel"));
       if (review.run_id !== flow.run) throw new Error(W.tx("walk.finish.err.stale"));
       flow.review = review;
       apply(review.data);
-      return review;
+      return W.finish.photos ? W.finish.photos.start(review.data).then(function () { return review; }) : review;
     });
   }
   function iso(value) {
@@ -100,9 +104,27 @@
     node.addEventListener("change", function () { flow.fields[field.code] = node.value; keep(); });
     return node;
   }
+  function valueOf(field) {
+    if (Object.prototype.hasOwnProperty.call(flow.fields, field.code)) return flow.fields[field.code];
+    if (field.kind === "yes_no") return /^(yes|да)$/i.test(field.value) ? "yes" : /^(no|нет)$/i.test(field.value) ? "no" : "";
+    if (field.kind === "date") return iso(field.value) || field.value || "";
+    return field.value || "";
+  }
   function info() {
     if (!view) return;
     var body = frame(tx("details"));
+    if (flow.review) {
+      var languages = flow.review.report_langs || [];
+      var select = el("select", "walk-input"); select.id = "finish-report-lang";
+      var languageLabel = el("label", "walk-form__label", W.tx("walk.finish.report_lang"));
+      languageLabel.htmlFor = select.id;
+      if (languages.length !== 1) { var empty = el("option", null, tx("pick_language")); empty.value = ""; select.appendChild(empty); }
+      languages.forEach(function (l) { var option = el("option", null, l.label); option.value = l.code; select.appendChild(option); });
+      if (flow.language && languages.some(function (l) { return l.code === flow.language; })) select.value = flow.language;
+      flow.language = select.value;
+      select.addEventListener("change", function () { flow.language = select.value; keep(); });
+      body.appendChild(languageLabel); body.appendChild(select);
+    }
     body.appendChild(el("p", "walk-form__hint", tx("optional")));
     (data().info || []).forEach(function (field) {
       var row = el("section", "walk-finish__field");
@@ -110,6 +132,7 @@
       var area = input(field); label.htmlFor = area.id;
       row.appendChild(label); row.appendChild(area);
       if (field.value) row.appendChild(el("p", "walk-form__hint", tx("saved", { value: field.value })));
+      if (W.finish.photos) row.appendChild(W.finish.photos.render(field));
       body.appendChild(row);
     });
     var next = button(tx("review"), function () { saveDetails(next); });
@@ -118,22 +141,52 @@
   }
   function saveDetails(next) {
     if (flow.busy) return;
+    var mine = flow;
+    if (!flow.review) {
+      flow.busy = true; next.disabled = true;
+      fetchReview().then(function () { flow.busy = false; info(); }).catch(function (err) {
+        flow.busy = false; next.disabled = false; error(err);
+      });
+      return;
+    }
+    if (!flow.language) { error(new Error(W.tx("walk.finish.err.lang"))); return; }
+    if (W.finish.photos && W.finish.photos.pending()) { error(new Error(tx("photos_pending"))); return; }
+    if (W.finish.photos && (data().info || []).some(function (field) {
+      return field.kind !== "text" && W.finish.photos.hasNew(field.code) && !valueOf(field).trim();
+    })) { error(new Error(tx("photo_value_required"))); return; }
     flow.busy = true; next.disabled = true;
     var fields = (data().info || []).filter(function (f) {
-      return Object.prototype.hasOwnProperty.call(flow.fields, f.code) && flow.fields[f.code].trim();
+      return (Object.prototype.hasOwnProperty.call(flow.fields, f.code) && flow.fields[f.code].trim()) ||
+        (f.kind === "yes_no" && valueOf(f)) || (W.finish.photos && W.finish.photos.hasNew(f.code));
     });
-    var chain = Promise.resolve();
+    var chain = post({ op: "finish_prepare", run_id: flow.run, report_lang: flow.language }).then(function (res) {
+      if (flow !== mine || !current()) throw new Error(W.tx("walk.finish.err.stale"));
+      if (res.status !== "ready") { var pending = new Error("pending"); pending.reportStatus = res; throw pending; }
+      if (res.data) apply(res.data);
+    });
     fields.forEach(function (field) {
       chain = chain.then(function () {
         if (!current()) throw new Error(W.tx("walk.finish.err.stale"));
-        return W.post(W.urls.info, { code: field.code, value: flow.fields[field.code], run_id: flow.run }).then(function (res) {
+        var refs = W.finish.photos ? W.finish.photos.refs(field.code) : [];
+        var fresh = (data().info || []).filter(function (f) { return f.code === field.code; })[0] || field;
+        var value = valueOf(fresh);
+        return W.api.write(W.urls.info, { code: field.code, value: value, photos: refs }, flow.run).then(function (res) {
+          if (flow !== mine || !current()) throw new Error(W.tx("walk.finish.err.stale"));
           if (!res.ok) throw new Error(res.body && res.body.message || W.tx("walk.error"));
-          delete flow.fields[field.code]; keep(); apply(res.body);
+          apply(res.body);
+          return Promise.resolve(W.finish.photos ? W.finish.photos.ack(field.code, refs) : null).then(function () {
+            delete flow.fields[field.code]; keep();
+          });
         });
       });
     });
-    chain.then(fetchReview).then(function () { flow.busy = false; summary(); }).catch(function (err) {
-      flow.busy = false; next.disabled = false; error(err);
+    chain.then(function () {
+      if (flow !== mine || !current()) throw new Error(W.tx("walk.finish.err.stale"));
+      return fetchReview();
+    }).then(function () { if (flow === mine) { flow.busy = false; summary(); } }).catch(function (err) {
+      if (flow !== mine) return;
+      flow.busy = false; next.disabled = false;
+      if (err.reportStatus) status(err.reportStatus); else error(err);
     });
   }
   function edit(record, zone) {
@@ -152,6 +205,9 @@
     var body = frame(tx("review"));
     var score = review.summary;
     body.appendChild(el("p", "walk-finish__score", String(score.pct) + "% · " + score.grade + " · " + score.label));
+    if (score.feedback_skipped && score.feedback_skipped.length) {
+      body.appendChild(el("p", "walk-form__note", tx("feedback_language", { lang: score.feedback_lang })));
+    }
     body.appendChild(el("p", "walk-form__hint", tx("records", { count: score.total })));
     Object.keys(score.counts || {}).forEach(function (level) {
       body.appendChild(el("span", "walk-finish__count", level + ": " + score.counts[level]));
@@ -172,22 +228,17 @@
     (data().info || []).forEach(function (field) {
       var row = el("div", "walk-finish__answer");
       row.appendChild(el("strong", null, field.q));
-      row.appendChild(el("p", null, field.value || tx("not_answered")));
+      row.appendChild(el("p", null, field.value || ((field.photos || []).length ? tx("photo_answer") : tx("not_answered"))));
+      if (W.finish.photos && (field.photos || []).length) row.appendChild(W.finish.photos.render(field, true));
       body.appendChild(row);
     });
     body.appendChild(button(tx("details"), info, true));
     var zone = (data().zones || []).filter(function (z) { return !z.equipment; })[0];
     if (zone) body.appendChild(button(tx("advice"), function () { edit(null, zone.code); }, true));
     var languages = review.report_langs || [];
-    var select = el("select", "walk-input");
-    select.id = "finish-report-lang";
-    var label = el("label", "walk-form__label", W.tx("walk.finish.report_lang")); label.htmlFor = select.id;
-    if (languages.length !== 1) { var empty = el("option", null, tx("pick_language")); empty.value = ""; select.appendChild(empty); }
-    languages.forEach(function (l) { var option = el("option", null, l.label); option.value = l.code; select.appendChild(option); });
-    if (flow.language) select.value = flow.language;
-    select.addEventListener("change", function () { flow.language = select.value; });
-    body.appendChild(label); body.appendChild(select);
-    var missing = (data().info || []).some(function (f) { return !f.value; });
+    var chosenLanguage = languages.filter(function (l) { return l.code === flow.language; })[0];
+    body.appendChild(el("p", "walk-finish__language", W.tx("walk.finish.report_lang") + ": " + (chosenLanguage ? chosenLanguage.label : flow.language || "")));
+    var missing = (data().info || []).some(function (f) { return !f.value && !(f.photos || []).length; });
     var skip = el("input"); skip.type = "checkbox"; skip.id = "finish-skip";
     if (missing) {
       var skipLabel = el("label", "walk-finish__consent");
@@ -200,8 +251,8 @@
     body.appendChild(consent);
     var yes = button(tx("submit"), function () {
       if (!confirm.checked || (missing && !skip.checked)) { error(new Error(tx("confirm_required"))); return; }
-      if (!select.value) { error(new Error(W.tx("walk.finish.err.lang"))); return; }
-      submit(yes, select.value, missing && skip.checked);
+      if (!flow.language) { error(new Error(W.tx("walk.finish.err.lang"))); return; }
+      submit(yes, flow.language, missing && skip.checked);
     });
     body.appendChild(yes);
     body.appendChild(button(tx("chat"), function () { close(); chatAsk(); }, true));
@@ -247,10 +298,12 @@
     var saved = W.local.get(key());
     if (saved && saved.run_id === flow.run && saved.fields && typeof saved.fields === "object") {
       Object.keys(saved.fields).forEach(function (code) { if (typeof saved.fields[code] === "string") flow.fields[code] = saved.fields[code]; });
+      if (typeof saved.language === "string") flow.language = saved.language;
     }
     loading();
     var mine = flow;
-    post({ op: "finish_status", run_id: flow.run }).then(function (res) {
+    var prepared = W.finish.photos ? W.finish.photos.start(d) : Promise.resolve();
+    prepared.then(function () { return post({ op: "finish_status", run_id: flow.run }); }).then(function (res) {
       if (flow !== mine || !view) return;
       if (res.status !== "ready") { status(res); return; }
       return fetchReview().then(info);

@@ -133,6 +133,42 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "в работе, нарушений: {count}",
         "en": "in progress, issues: {count}",
     },
+    "walk.finish.native.photos_pending": {
+        "ru": "Дождитесь загрузки кадров, повторите отправку или отмените вложение.",
+        "en": "Wait for the photos, retry their upload or remove the attachment.",
+    },
+    "walk.finish.native.photo_answer": {"ru": "Ответ фотографиями", "en": "Photo answer"},
+    "walk.finish.native.photo_value_required": {
+        "ru": "К фото даты или ответа «да/нет» добавьте значение либо отмените вложение.",
+        "en": "Enter the date or yes/no answer for these photos, or remove the attachment.",
+    },
+    "walk.finish.photos.hint": {
+        "ru": "Фото к этому ответу. Подпись — только ваши слова; сохранённые кадры остаются.",
+        "en": "Photos for this answer. Captions use your words only; saved photos are retained.",
+    },
+    "walk.finish.photos.add": {"ru": "Добавить фото ответа", "en": "Add answer photos"},
+    "walk.sheet.remaining_material": {
+        "ru": "Запись сохранена. Неиспользованных кадров в черновике: {n}.",
+        "en": "Record saved. Unused photos remaining in the draft: {n}.",
+    },
+    "walk.sheet.save_conflict": {
+        "ru": (
+            "Запись изменилась. Сверьте сохранённые записи перед повтором; "
+            "ввод и кадры остаются в черновике."
+        ),
+        "en": (
+            "The record changed. Review saved records before retrying; "
+            "your input and photos remain in the draft."
+        ),
+    },
+    "walk.finish.photos.failed": {"ru": "Повторите отправку", "en": "Retry upload"},
+    "walk.finish.photos.no_storage": {
+        "ru": (
+            "Хранилище телефона недоступно. Не закрывайте форму: повторите загрузку "
+            "или отмените вложение."
+        ),
+        "en": "Device storage is unavailable. Keep this form open; retry or remove the attachment.",
+    },
     "walk.finish.native.loading": {
         "ru": "Загружаем актуальную проверку…",
         "en": "Loading the current inspection…",
@@ -144,11 +180,21 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.finish.native.optional": {
         "ru": (
             "Все поля необязательны. Заполните известное; пустые ответы можно пропустить. "
-            "Сильные стороны и зоны роста попадут партнёру в отчёт."
+            "Текст обратной связи сохраняется без автоматического перевода."
         ),
         "en": (
             "All fields are optional. Record what you know; unanswered fields can be skipped. "
-            "Strengths and growth areas are included in the partner report."
+            "Feedback text is saved without automatic translation."
+        ),
+    },
+    "walk.finish.native.feedback_language": {
+        "ru": (
+            "Текст обратной связи на языке {lang} не включается в отчёт и письмо "
+            "на выбранном языке. Вернитесь к сведениям для смены языка отчёта."
+        ),
+        "en": (
+            "Feedback text recorded in {lang} is omitted from the report and letter "
+            "in the selected language. Return to details to change the report language."
         ),
     },
     "walk.finish.native.skip": {"ru": "Не отвечать", "en": "No answer"},

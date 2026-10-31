@@ -227,6 +227,7 @@
     if (uploading()) return "walk.sheet.need_upload";
     // Кадр, ждущий связи, нельзя бросить за порогом записи: она ушла бы без него.
     if (waitingPhotos().length) return "walk.sheet.need_online";
+    if (f.photos.some(function (p) { return p.state === "failed" && !p.entryId; })) return "walk.offline.nostore";
     // Число после «нарушения нет» поправлено: «Пересчитать» доступно без пункта.
     if (f.noViolation !== null && readingChanged() && !readingInvalid()) return null;
     if (!f.zone) return recognizing() && f.code ? "walk.sheet.need_where" : "walk.sheet.need_zone";
@@ -251,11 +252,12 @@
 
   function saveDraft() {
     if (f.n) return;
-    W.local.set(draftKey(), {
+    W.local.set(draftKey(), Object.assign({}, W.local.get(draftKey()) || {}, {
       run_id: f.run_id, mode: f.mode, zone: f.zone, code: f.code, level: f.level, text: f.text,
       comment: f.comment, repeat: f.repeat, words: f.words, reading: f.reading,
       photos: readyPhotos().map(function (p) { return p.ref; }),
-    });
+      reconcile: !!f.reconcile, submitted_ops: f.submitted_ops || [],
+    }));
   }
 
   function changed() {
@@ -269,7 +271,7 @@
 
   function addFiles(files) {
     // Кадр новой записи при обрыве связи переживёт закрытие формы: он привязан к черновику.
-    var key = f.n ? null : draftKey();
+    var key = !f.n || hasEditDraft() ? draftKey() : null;
     var mode = f.mode;
     files.forEach(function (file) {
       var p = { id: ++seq, state: "uploading", fresh: true, own: true, url: URL.createObjectURL(file), draftKey: key, run_id: f.run_id, mode: mode };
@@ -281,6 +283,26 @@
 
   function send(p, file) {
     p.state = "uploading";
+    if (p.draftKey) {
+      var stored = p.entryId && W.offline.retry ? W.offline.retry(p.entryId, p.draftKey, p.run_id) :
+        (p.blob ? Promise.resolve(p.blob) : W.photo.compress(file)).then(function (blob) {
+          p.blob = blob;
+          if (!W.offline.available()) throw new Error("storage");
+          return W.offline.put(p.draftKey, p.mode, blob, p.run_id).then(function (entry) {
+            p.entryId = entry.id; p.receiptIds = [entry.id];
+          });
+        });
+      stored.then(function () {
+        p.state = "waiting";
+        if (f && f.photos.indexOf(p) !== -1) redraw("photos", "item", "footer");
+        W.offline.kick(); W.offline.watch();
+      }, function () {
+        p.state = "failed"; p.file = file;
+        W.toast(tx("walk.offline.nostore"), "warn");
+        if (f && f.photos.indexOf(p) !== -1) redraw("photos", "item", "footer");
+      });
+      return;
+    }
     var blob = p.blob ? Promise.resolve(p.blob) : W.photo.compress(file);
     blob.then(function (b) {
       p.blob = b;
@@ -336,19 +358,34 @@
 
   /** Фон отправил кадр из хранилища. Форма на том же черновике открыта — кадр становится готовым в ней. */
   function adopt(entry, ref) {
-    if (!f || f.n || f.run_id !== entry.run_id || draftKey() !== entry.key) return false;
+    if (!f || (f.n && !hasEditDraft()) || f.run_id !== entry.run_id || draftKey() !== entry.key) return false;
     if (f.gone.indexOf(entry.id) !== -1) return true;
-    var p = f.photos.filter(function (x) { return x.entryId === entry.id || x.ref === ref; })[0];
+    var exact = f.photos.filter(function (x) { return x.entryId === entry.id; })[0];
+    var existing = f.photos.filter(function (x) { return x.ref === ref; })[0];
+    if (exact && existing && exact !== existing) {
+      f.photos = f.photos.filter(function (x) { return x !== exact; });
+      if (exact.url) URL.revokeObjectURL(exact.url);
+    }
+    var p = existing || exact;
     if (!p) {
       p = { id: ++seq, fresh: true, own: true, draftKey: entry.key, run_id: entry.run_id, mode: entry.mode, url: URL.createObjectURL(entry.blob) };
       f.photos.push(p);
     }
     p.ref = ref;
     p.state = "done";
-    p.entryId = null;
+    p.entryId = entry.id;
+    p.receiptIds = (p.receiptIds || []).concat(exact && exact.receiptIds || [], [entry.id]).filter(function (id, at, all) { return all.indexOf(id) === at; });
+    if (!p.url) p.url = URL.createObjectURL(entry.blob);
     W.photo.remember(ref, p.url);
     changed();
     redraw("photos", "item", "footer");
+    return true;
+  }
+
+  function uploadFailed(entry) {
+    if (!f || (f.n && !hasEditDraft()) || f.run_id !== entry.run_id || draftKey() !== entry.key) return false;
+    var p = f.photos.filter(function (p) { return p.entryId === entry.id; })[0];
+    if (p) { p.state = "failed"; redraw("photos", "item", "footer"); }
     return true;
   }
 
@@ -362,16 +399,17 @@
 
   /** Форма открылась: кадры этого черновика, дожидавшиеся связи, возвращаются в неё. */
   function restoreWaiting() {
-    if (f.n || !W.offline.available()) return;
+    if ((f.n && !hasEditDraft()) || !W.offline.available()) return;
     var mine = f;
     W.offline.list(draftKey()).then(function (entries) {
       if (f !== mine) return;
       var added = false;
       entries.forEach(function (e) {
         if (e.mode !== f.mode || f.gone.indexOf(e.id) !== -1) return;
+        if (e.uploaded_ref) { adopt(e, e.uploaded_ref); return; }
         if (f.photos.some(function (x) { return x.entryId === e.id; })) return;
         f.photos.push({
-          id: ++seq, state: "waiting", fresh: true, own: true, entryId: e.id, draftKey: e.key, run_id: e.run_id,
+          id: ++seq, state: e.upload_error ? "failed" : "waiting", fresh: true, own: true, entryId: e.id, receiptIds: [e.id], draftKey: e.key, run_id: e.run_id,
           mode: e.mode, blob: e.blob, url: URL.createObjectURL(e.blob),
         });
         added = true;
@@ -390,7 +428,7 @@
       return;
     }
     if (!p.fresh && p.ref) f.removed.push(p.ref);
-    if (p.entryId) { f.gone.push(p.entryId); W.offline.remove(p.entryId); }
+    (p.receiptIds || (p.entryId ? [p.entryId] : [])).forEach(function (id) { f.gone.push(id); W.offline.remove(id); });
     f.photos = left;
     changed();
     redraw("photos", "item", "footer");
@@ -1161,7 +1199,7 @@
         var row = el("div", "walk-row");
         row.appendChild(W.button("walk-btn walk-btn--danger", tx("walk.sheet.discard_yes"), function () {
           if (!f.n) W.local.drop(draftKey());
-          waitingPhotos().forEach(function (p) { if (p.entryId) W.offline.remove(p.entryId); });
+          f.photos.forEach(function (p) { (p.receiptIds || (p.entryId ? [p.entryId] : [])).forEach(function (id) { W.offline.remove(id); }); });
           close(true);
         }));
         row.appendChild(W.button("walk-btn", tx("walk.sheet.cancel"), function () {
@@ -1345,31 +1383,131 @@
     f.error = null;
     redraw("footer");
     var last = null;
+    var confirmed = [];
     var at = f.zone;
+    var beginning = Promise.resolve();
+    if (form.reconcile) beginning = W.post(W.urls.data, {}).then(function (res) {
+      if (!res.ok || f !== form || W.state.data.run_id !== runId || !res.body || res.body.run_id !== runId) throw new Error(tx("walk.err.run_changed"));
+      last = res.body;
+      (form.submitted_ops || []).forEach(function (attempt) {
+        var matches = matching(last, attempt.body, attempt);
+        if (attempt.confirmed_n && !matches.some(function (record) { return record.n === attempt.confirmed_n; })) throw new Error(tx("walk.sheet.save_conflict"));
+        if (/^D[1-3]$/.test(attempt.body.level) && records(last, attempt.body).length && !matches.length) throw new Error(tx("walk.sheet.save_conflict"));
+        if (!/^D[1-3]$/.test(attempt.body.level) && !matches.length && records(last, attempt.body).some(function (record) { return (attempt.before_ids || []).indexOf(record.n) === -1; })) throw new Error(tx("walk.sheet.save_conflict"));
+      });
+      W.apply(last, true);
+    });
     var chain = list.reduce(function (p, body) {
       return p.then(function () {
-        return W.api.write(W.urls.finding, body, runId).then(function (res) {
+        if (f !== form || W.state.data.run_id !== runId) throw new Error(tx("walk.err.run_changed"));
+        if (body.op === "add") {
+          form.submitted_ops = form.submitted_ops || [];
+          if (!form.submitted_ops.some(function (attempt) { return JSON.stringify(attempt.body) === JSON.stringify(body); })) {
+            form.submitted_ops.push({body: body, before_ids: records(last || W.state.data, body).map(function (record) { return record.n; })});
+          }
+          saveDraft();
+        }
+        return writeOperation(body).then(function (res) {
+          if (!res) return;
           if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
-          last = res.body;
+          var refs = body.op === "add" ? body.photos || [] : body.op === "attach" ? [body.ref] : body.op === "edit" ? body.new_refs || [] : [];
+          if (!res.body || res.body.run_id !== runId || f !== form || W.state.data.run_id !== runId) throw new Error(tx("walk.err.run_changed"));
+          if (body.op === "add") {
+            var recorded = matching(res.body, body, attemptFor(body))[0];
+            form.submitted_ops.forEach(function (attempt) { if (JSON.stringify(attempt.body) === JSON.stringify(body) && recorded) attempt.confirmed_n = recorded.n; });
+            saveDraft();
+          }
+          return accept(res, refs, body);
         });
       });
-    }, Promise.resolve());
+    }, beginning);
     chain.then(function () {
       if (f !== form || W.state.data.run_id !== runId) return;
-      if (!f.n) W.local.drop(draftKey());
+      if (!f.n) {
+        var remaining = f.photos.filter(function (p) { return !p.ref || confirmed.indexOf(p.ref) === -1; });
+        if (!remaining.length) W.local.drop(draftKey());
+        else W.local.set(draftKey(), Object.assign({}, W.local.get(draftKey()) || {}, {
+          run_id: runId, mode: f.mode, zone: null, code: null, level: null, text: "", comment: "", repeat: false,
+          reading: null, words: f.words, photos: remaining.filter(function (p) { return p.ref; }).map(function (p) { return p.ref; }),
+          queued: remaining.filter(function (p) { return p.ref; }).map(function (p) { return p.ref; }),
+          reconcile: false, submitted_ops: [],
+        }));
+      }
       W.haptic("success");
-      savedToast(at);
+      if (remaining && remaining.length) W.toast(tx("walk.sheet.remaining_material", { n: remaining.length }), "warn");
+      else savedToast(at);
       close(true);
       if (last) W.apply(last);
     }, function (err) {
       if (f !== form || W.state.data.run_id !== runId) return;
       W.haptic("error");
       f.saving = false;
+      f.reconcile = true; saveDraft();
       f.error = err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network");
       // Часть шагов могла пройти — данные экрана подтягиваются заново.
       if (last) W.apply(last, true);
       redraw("footer");
     });
+
+    function accept(res, refs, body) {
+      if (f !== form || W.state.data.run_id !== runId || !res.body || res.body.run_id !== runId) return Promise.reject(new Error(tx("walk.err.run_changed")));
+      var targets = body && body.op === "add" ? matching(res.body, body, attemptFor(body)) :
+        (res.body.zones || []).reduce(function (all, zone) { return all.concat(zone.recorded); }, []).filter(function (record) { return body && record.n === body.n; });
+      if (refs.length && !targets.some(function (record) { return refs.every(function (ref) { return record.photos.some(function (p) { return p.ref === ref; }); }); })) return Promise.reject(new Error(tx("walk.sheet.save_conflict")));
+      last = res.body;
+      refs.forEach(function (ref) { if (confirmed.indexOf(ref) === -1) confirmed.push(ref); });
+      if (!form.draftKey || !refs.length || !W.offline.ack) return Promise.resolve();
+      return W.offline.list(form.draftKey).then(function (rows) {
+        return W.offline.ack(form.draftKey, runId, rows.filter(function (r) { return refs.indexOf(r.uploaded_ref) !== -1; }).map(function (r) { return r.id; }));
+      });
+    }
+
+    function attemptFor(body) {
+      return (form.submitted_ops || []).filter(function (attempt) { return JSON.stringify(attempt.body) === JSON.stringify(body); })[0];
+    }
+
+    function matching(data, body, attempt) {
+      return records(data, body).filter(function (record) {
+        return sameFacts(record, body) && (/^D[1-3]$/.test(body.level) || !attempt || (attempt.before_ids || []).indexOf(record.n) === -1);
+      });
+    }
+
+    function writeOperation(body) {
+      // A prior step can have succeeded before a later request failed. Use
+      // the existing same-point attach path instead of adding it again.
+      if (body.op === "add") {
+        var candidates = records(last || W.state.data, body);
+        var exists = matching(last || W.state.data, body, attemptFor(body))[0];
+        if (candidates.length && /^D[1-3]$/.test(body.level) && !exists) return Promise.reject(new Error(tx("walk.sheet.save_conflict")));
+        if (!form.reconcile && !/^D[1-3]$/.test(body.level)) exists = null;
+        if (exists) {
+          return Promise.resolve({ok: true, body: last || W.state.data});
+        }
+      }
+      return W.api.write(W.urls.finding, body, runId);
+    }
+  }
+
+  function records(data, body) {
+    return (data.zones || []).reduce(function (all, zone) {
+      return all.concat(zone.recorded.filter(function (record) { return (record.zone || zone.code) === body.zone && record.code === body.code &&
+        (/^D[1-3]$/.test(body.level) ? /^D[1-3]$/.test(record.level) : record.level === body.level); }));
+    }, []);
+  }
+
+  function hasEditDraft() {
+    var prefix = f.run_key + "_edit_" + f.n + "_";
+    return f.draftKey.indexOf(prefix) === 0 && /^[a-f0-9]{64}$/.test(f.draftKey.slice(prefix.length));
+  }
+
+  function sameFacts(record, body) {
+    var known = item(body.code);
+    var expectedText = body.text || (known && known.q) || "";
+    function refs(values) { return values.filter(function (ref, at, all) { return all.indexOf(ref) === at; }).sort().join("|"); }
+    return record.level === body.level && record.text === expectedText && (record.comment || "") === (body.comment || "") &&
+      (record.words || "") === (body.words || "") && !!record.repeat === !!body.repeat &&
+      (record.reading_c == null ? null : record.reading_c) === (body.reading_c == null ? null : body.reading_c) &&
+      refs((record.photos || []).map(function (p) { return p.ref; })) === refs(body.photos || []);
   }
 
   /* ── открыть и закрыть ────────────────────────────────────────────── */
@@ -1417,6 +1555,7 @@
     f = {
       source_record: rec || null,
       run_id: W.state.data.run_id,
+      run_key: W.state.data.key,
       draftKey: W.state.data.key + "_draft",
       mode: opts.mode || "violation",
       n: rec ? rec.n : null,
@@ -1463,6 +1602,7 @@
         if (draft.reading !== null && draft.reading !== undefined) { f.reading = String(draft.reading); f.readingBase = parseReading(draft.reading); }
         f.commentOpen = !!draft.comment;
         f.repeat = !!draft.repeat;
+        f.reconcile = !!draft.reconcile; f.submitted_ops = draft.submitted_ops || [];
         f.photos = (draft.photos || []).map(function (ref) { return { id: ++seq, ref: ref, own: true, state: "done", fresh: true }; });
         f.restored = true;
       } else if (draft && draft.mode === f.mode && (draft.queued || []).length) {
@@ -1518,6 +1658,7 @@
   }
 
   W.offline.onUploaded = adopt;
+  W.offline.onFailed = uploadFailed;
   W.offline.onTick = retryInMemory;
 
   W.sheet = { open: open, close: close, isOpen: function () { return !!f; } };

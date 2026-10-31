@@ -519,7 +519,18 @@ def _info_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None
     field = next((f for f in FIELDS if f.code == code), None)
     if field is None:
         raise WalkRefused("walk.err.bad_request")
-    set_info(chat_id, code, _info_value(field.kind, body.get("value"), inspection.report_lang))
+    raw_photos = body.get("photos", [])
+    if not isinstance(raw_photos, list):
+        raise WalkRefused("walk.err.bad_request")
+    added = _refs(raw_photos, chat_id, inspection) if raw_photos else []
+    previous = inspection.info.get(code)
+    photos = list(dict.fromkeys([*(previous.photos if previous else []), *added]))
+    raw_value = body.get("value")
+    if field.kind == KIND_TEXT and photos and isinstance(raw_value, str) and not raw_value.strip():
+        value = ""
+    else:
+        value = _info_value(field.kind, raw_value, inspection.report_lang)
+    set_info(chat_id, code, value, photos=photos)
 
 
 def _owns(inspection: Inspection, ref: str) -> bool:
