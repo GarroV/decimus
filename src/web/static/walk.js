@@ -506,6 +506,9 @@
       if (was[i.code]) b.appendChild(el("span", "walk-cl__was", tx("walk.cl.was")));
       b.appendChild(el("span", "walk-cl__act", done ? "✓" : "+"));
       li.appendChild(b);
+      li.dataset.code = i.code;
+      li.dataset.zone = zone.code;
+      if (W.hints && W.hints.decorateChecklist) W.hints.decorateChecklist(li, { code: i.code, zone: zone.code, recorded: !!done });
       list.appendChild(li);
     });
     inner.appendChild(list);

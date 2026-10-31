@@ -59,9 +59,10 @@
         close();
         onPick(o.value);
       });
-      if (o.code || o.badge) {
+      if (o.code || o.badge || o.kind) {
         var top = el("span", "walk-option__top");
-        if (o.code) top.appendChild(el("span", "walk-option__code", o.code));
+        if (o.code) top.appendChild(el("span", "walk-option__code" + (o.kind ? " walk-item-code--" + o.kind : ""), o.code));
+        if (o.kind) top.appendChild(el("span", "walk-item-kind walk-item-kind--" + o.kind, tx("walk.item.kind." + o.kind)));
         if (o.badge) top.appendChild(el("span", "walk-option__was", o.badge));
         b.appendChild(top);
       }
@@ -89,12 +90,26 @@
     input.placeholder = opts.placeholder;
     input.setAttribute("enterkeyhint", "search");
     var list = el("ul", "walk-options walk-menu__list");
+    var tags = el("div", "walk-search-tags");
+    tags.setAttribute("role", "group");
+    tags.setAttribute("aria-label", tx("walk.sheet.search_tags"));
+    (opts.tags || []).forEach(function (tag) {
+      if (!tag) return;
+      var b = W.button("walk-search-tags__tag", tag, function () {
+        input.value = input.value === tag ? "" : tag;
+        refresh();
+      });
+      b.setAttribute("aria-pressed", "false");
+      tags.appendChild(b);
+    });
     function refresh() {
       var q = input.value.trim();
+      Array.prototype.forEach.call(tags.children, function (b) { b.setAttribute("aria-pressed", String(b.textContent === q)); });
       fill(list, (q ? [] : opts.lead || []).concat(opts.list(q)), opts.onPick);
     }
     input.addEventListener("input", refresh);
     panel.appendChild(input);
+    if (tags.children.length) panel.appendChild(tags);
     panel.appendChild(list);
     refresh();
     input.focus();

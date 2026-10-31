@@ -497,9 +497,10 @@
       title: isMeasure() ? tx("walk.sheet.item_measure") : isAdvice() ? tx("walk.sheet.item_advice") : tx("walk.sheet.item"),
       placeholder: isMeasure() ? tx("walk.sheet.search_measure") : tx("walk.sheet.search"),
       lead: lead,
+      tags: choices("").map(function (i) { return i.process; }).filter(function (p, at, all) { return p && all.indexOf(p) === at; }),
       list: function (q) {
         return choices(q).map(function (i) {
-          return { code: i.label, label: i.q, value: i.code, on: i.code === f.code, badge: previousHere(i.code) ? tx("walk.sheet.was_here") : null };
+          return { code: i.label, kind: isAdvice() ? "advice" : i.measure ? "info" : "violation", label: i.q, value: i.code, on: i.code === f.code, badge: previousHere(i.code) ? tx("walk.sheet.was_here") : null };
         });
       },
       onPick: function (code) { pick(code, null); },
@@ -652,7 +653,9 @@
     var i = item(cand.code) || { q: cand.code };
     var on = f.code === cand.code && (!f.picked || f.picked === cand);
     var top = el("span", "walk-found__top");
-    top.appendChild(el("span", "walk-option__code", cand.code));
+    var kind = cand.level === ADVICE_LEVEL ? "advice" : cand.level === "D0" || i.measure ? "info" : /^D[1-3]$/.test(cand.level || "") ? "violation" : null;
+    top.appendChild(el("span", "walk-option__code" + (kind ? " walk-item-code--" + kind : ""), i.label || cand.code));
+    if (kind) top.appendChild(el("span", "walk-item-kind walk-item-kind--" + kind, tx("walk.item.kind." + kind)));
     if (cand.level && cand.level !== ADVICE_LEVEL) top.appendChild(W.level(cand.level));
     if (on) {
       // Выбранная карточка — результат «пункт · зона» (D445): зона — пилюля с
@@ -838,7 +841,9 @@
       }
       var card = el("div", "walk-choice");
       var line = el("div", "walk-choice__line");
-      if (!chosen.note) line.appendChild(el("span", "walk-choice__code", chosen.code));
+      var kind = isAdvice() ? "advice" : chosen.measure ? "info" : "violation";
+      if (!chosen.note) line.appendChild(el("span", "walk-choice__code walk-item-code--" + kind, chosen.label || chosen.code));
+      line.appendChild(el("span", "walk-item-kind walk-item-kind--" + kind, tx("walk.item.kind." + kind)));
       line.appendChild(el("span", "walk-choice__text", chosen.q));
       card.appendChild(line);
       if (chosen.note) card.appendChild(el("p", "walk-form__hint", tx("walk.note.hint")));

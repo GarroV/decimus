@@ -219,6 +219,44 @@
 
   function onHidden() { if (document.visibilityState === "hidden") closeCamera(); }
 
+  /** Torch доступен только у живого track нашей камеры, не у внешнего capture. */
+  function setupTorch(c) {
+    var track = c.stream.getVideoTracks()[0];
+    if (track) track.addEventListener("ended", function () { if (camera === c) closeCamera(); }, { once: true });
+    var supported = false;
+    try {
+      var torch = track && track.getCapabilities && track.getCapabilities().torch;
+      // W3C: обе возможности в sequence<boolean>; старые Chromium возвращают boolean.
+      var switchable = torch === true || (Array.isArray(torch) && torch.indexOf(true) !== -1 && torch.indexOf(false) !== -1);
+      supported = !!(track && track.readyState === "live" && switchable && track.applyConstraints);
+    }
+    catch (e) { /* WebView не даёт capabilities — фонарик не обещаем. */ }
+    c.torchNote.hidden = supported;
+    if (!supported) return;
+    c.torch.hidden = false;
+    try { c.torchOn = !!(track.getSettings && track.getSettings().torch); } catch (e) { /* начальное состояние неизвестно */ }
+    c.torch.setAttribute("aria-pressed", String(c.torchOn));
+    c.torch.textContent = W.tx(c.torchOn ? "walk.camera.torch.off" : "walk.camera.torch.on");
+    c.torch.addEventListener("click", function () {
+      if (camera !== c || c.torch.disabled) return;
+      var next = !c.torchOn;
+      c.torch.disabled = true;
+      Promise.resolve().then(function () { return track.applyConstraints({ advanced: [{ torch: next }] }); }).then(function () {
+        if (camera !== c) return;
+        c.torchOn = next;
+        c.torch.setAttribute("aria-pressed", String(next));
+        c.torch.textContent = W.tx(next ? "walk.camera.torch.off" : "walk.camera.torch.on");
+        c.torch.disabled = false;
+      }, function () {
+        if (camera !== c) return;
+        // Если выключение не подтвердилось, stop() гарантированно освобождает свет.
+        if (c.torchOn) closeCamera();
+        else { c.torch.hidden = true; c.torchNote.hidden = false; }
+        W.toast(W.tx("walk.camera.torch.unavailable"), "err");
+      });
+    });
+  }
+
   /** Камера не далась: сказать и оставить «Галерею». */
   function cameraFailed() {
     closeCamera();
@@ -257,11 +295,18 @@
     var shutter = W.button("walk-camera__shutter", "", function () { snap(onFiles); });
     shutter.setAttribute("aria-label", W.tx("walk.camera.shoot"));
     shutter.disabled = true;
+    var torch = W.button("walk-camera__torch", W.tx("walk.camera.torch.on"));
+    torch.hidden = true;
+    torch.setAttribute("aria-pressed", "false");
+    var torchNote = W.el("p", "walk-camera__torch-note", W.tx("walk.camera.torch.unavailable"));
+    torchNote.hidden = true;
+    node.appendChild(torch);
+    node.appendChild(torchNote);
     node.appendChild(video);
     node.appendChild(close);
     node.appendChild(shutter);
     document.body.appendChild(node);
-    camera = { node: node, video: video, stream: null };
+    camera = { node: node, video: video, stream: null, torch: torch, torchNote: torchNote, torchOn: false };
     document.addEventListener("visibilitychange", onHidden);
     window.addEventListener("pagehide", closeCamera);
 
@@ -274,6 +319,7 @@
       clearTimeout(timer);
       if (camera !== mine) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
       mine.stream = stream;
+      setupTorch(mine);
       video.srcObject = stream;
       video.addEventListener("loadedmetadata", function () { shutter.disabled = false; }, { once: true });
     }, function () {
