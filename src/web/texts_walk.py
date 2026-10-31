@@ -19,7 +19,7 @@ from .texts_split import SPLIT_TEXTS
 WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.search_tag.dirty": {"ru": "Грязно", "en": "Dirty"},
     "walk.sheet.search_tag.expired": {"ru": "Просрочка", "en": "Expired"},
-    "walk.sheet.search_tag.segregation": {"ru": "Товарное соседство", "en": "Food segregation"},
+    "walk.sheet.search_tag.segregation": {"ru": "Соседство", "en": "Food segregation"},
     "walk.sheet.search_tag.labels": {"ru": "Маркировки", "en": "Labels"},
     "walk.sheet.search_clear_tags": {"ru": "Снять фильтры", "en": "Clear filters"},
     "walk.err.run_changed": {
