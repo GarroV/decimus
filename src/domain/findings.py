@@ -10,14 +10,23 @@
 from __future__ import annotations
 
 import re
+import tempfile
 from collections.abc import Sequence
+from dataclasses import asdict, replace
+from enum import Enum
+from pathlib import Path
 
 from .config import Settings
-from .engine import option, run_audit, state_file
+from .engine import DOMAIN_KEY, option, run_audit, state_file
 from .errors import EngineError, ValidationError
 from .handover import guard_writable
 from .models import READING_MAX_C, READING_MIN_C, SOURCES, Finding, Suggestion
+from .revisions import digest, finding_revision
 from .state import (
+    READINGS_KEY,
+    _inspection,
+    _read_raw,
+    _write_atomic,
     check_confidence,
     forget_source,
     forget_suggestion,
@@ -28,7 +37,9 @@ from .state import (
     remember_suggestion,
     remember_words,
     settings_for,
+    state_lock,
 )
+from .timing import utc_now
 
 #: Номер записи в ответе движка: «#3 CLN05 D1 / hot_kitchen: …».
 NUMBER = re.compile(r"#(\d+)")
@@ -202,12 +213,27 @@ def add_finding(
     return after
 
 
+class EditConflict(ValidationError):
+    """The authoritative record changed, or an operation ID was reused."""
+
+
+class _Unset(Enum):
+    VALUE = "unchanged"
+
+
+_UNSET = _Unset.VALUE
+
+
 def edit_finding(
     chat_id: int,
     n: int,
     *,
     zone_by_person: bool = False,
     repeat: bool | None = None,
+    reading_c: float | _Unset | None = _UNSET,
+    photos: Sequence[str] | None = None,
+    source_revision: str | None = None,
+    request_id: str | None = None,
     **fields: str,
 ) -> Finding:
     """Поправить запись: `code`, `level`, `zone`, `text`, `comment`, `repeat`.
@@ -228,20 +254,105 @@ def edit_finding(
             f"Неизвестные поля записи: {', '.join(unknown)}. "
             f"Менять можно: {', '.join(sorted(FIELD_OPTIONS))}"
         )
-    if not fields and repeat is None:
+    if not fields and repeat is None and reading_c is _UNSET and photos is None:
         raise ValidationError(
             f"Нечего менять в записи #{n}: укажите хотя бы одно из "
             f"{', '.join(sorted(FIELD_OPTIONS))} или пометку повтора"
         )
-    args = ["edit", option("n", str(n))]
-    args += [option(FIELD_OPTIONS[name], value) for name, value in sorted(fields.items())]
-    if zone_by_person:
-        # Зону назвал человек — вне списка пункта она принимается с пометкой (D206).
-        args.append("--zone-by-person")
-    if repeat is not None:
-        args.append("--repeat" if repeat else "--no-repeat")
-    run_audit(args, chat_id=chat_id, settings=settings)
-    return _finding_after(chat_id, settings, n, "edit")
+    if request_id is not None and not re.fullmatch(r"[a-f0-9]{32}", request_id):
+        raise ValidationError("Некорректный идентификатор правки")
+    if not isinstance(reading_c, _Unset):
+        check_reading(reading_c)
+    final_photos = None if photos is None else [_clean_photo(ref, f"записи #{n}") for ref in photos]
+    if final_photos is not None and len(set(final_photos)) != len(final_photos):
+        raise ValidationError("Кадр повторён в записи")
+    signature = digest(
+        {
+            "n": n,
+            "fields": fields,
+            "repeat": repeat,
+            "reading": "unchanged" if reading_c is _UNSET else reading_c,
+            "photos": final_photos,
+            "source_revision": source_revision,
+            "zone_by_person": zone_by_person,
+        }
+    )
+    path = state_file(chat_id, settings)
+    with state_lock(path):
+        raw = _read_raw(path)
+        inspection = _inspection(chat_id, raw, path)
+        source = inspection.finding(n)
+        if request_id is not None:
+            for event in inspection.finding_history:
+                if event.get("request_id") == request_id:
+                    if event.get("signature") != signature or event.get("kind") != "edit":
+                        raise EditConflict("Идентификатор правки уже использован иначе")
+                    if source is None:
+                        raise EditConflict("Запись больше не существует")
+                    return source
+        if source is None:
+            if fields or repeat is not None:
+                numbers = ", ".join(f"#{item.n}" for item in inspection.findings)
+                raise EngineError(
+                    f"Записи #{n} нет. Записи проверки: {numbers}", code=1, command="edit"
+                )
+            raise ValidationError(f"Записи #{n} в проверке нет")
+        if source_revision is not None and finding_revision(source) != source_revision:
+            raise EditConflict("Исходная запись изменилась; перечитайте её")
+        with tempfile.TemporaryDirectory(prefix=".edit-", dir=path.parent) as temp:
+            staged = replace(settings, state_dir=Path(temp))
+            staged_path = state_file(chat_id, staged)
+            staged_path.parent.mkdir(parents=True)
+            _write_atomic(staged_path, raw)
+            if fields or repeat is not None:
+                args = ["edit", option("n", str(n))]
+                args += [
+                    option(FIELD_OPTIONS[name], value) for name, value in sorted(fields.items())
+                ]
+                if zone_by_person:
+                    args.append("--zone-by-person")
+                if repeat is not None:
+                    args.append("--repeat" if repeat else "--no-repeat")
+                run_audit(args, chat_id=chat_id, settings=staged)
+            if final_photos is not None:
+                # Add first: preserve the engine's existing last-photo protection.
+                for ref in final_photos:
+                    if ref not in source.photos:
+                        run_audit(
+                            ["photo", str(n), option("add", ref)], chat_id=chat_id, settings=staged
+                        )
+                for ref in source.photos:
+                    if ref not in final_photos:
+                        run_audit(
+                            ["photo", str(n), option("remove", ref)],
+                            chat_id=chat_id,
+                            settings=staged,
+                        )
+            result = _read_raw(staged_path)
+            block = dict(result.get(DOMAIN_KEY) or {})
+            if not isinstance(reading_c, _Unset):
+                readings = dict(block.get(READINGS_KEY) or {})
+                if reading_c is None:
+                    readings.pop(str(n), None)
+                else:
+                    readings[str(n)] = reading_c
+                block[READINGS_KEY] = readings
+            result[DOMAIN_KEY] = block
+            after = _inspection(chat_id, result, staged_path).finding(n)
+            if after is None or (final_photos is not None and after.photos != final_photos):
+                raise ValidationError("Движок не подтвердил правку записи")
+            event = {
+                "kind": "edit",
+                "run_id": inspection.run_id,
+                "at": utc_now().isoformat(),
+                "before": asdict(source),
+                "after": [asdict(after)],
+            }
+            if request_id is not None:
+                event.update(request_id=request_id, signature=signature)
+            block["finding_history"] = [*inspection.finding_history, event]
+            _write_atomic(path, result)
+            return after
 
 
 def set_reading(chat_id: int, n: int, reading_c: float | None) -> Finding:
@@ -251,14 +362,7 @@ def set_reading(chat_id: int, n: int, reading_c: float | None) -> Finding:
     правка идёт мимо `edit`. Записи нет — отказ, а не тихий успех: показание
     чужой или удалённой записи осталось бы мусором внутри проверки.
     """
-    guard_writable(chat_id)
-    settings = settings_for(chat_id)
-    check_reading(reading_c)
-    state = read_state(chat_id, settings)
-    if state is None or state.finding(n) is None:
-        raise ValidationError(f"Записи #{n} в проверке нет — показание ставить некуда")
-    remember_reading(state_file(chat_id, settings), n, reading_c)
-    return _finding_after(chat_id, settings, n, "reading")
+    return edit_finding(chat_id, n, reading_c=reading_c)
 
 
 def drop_finding(chat_id: int, n: int) -> None:

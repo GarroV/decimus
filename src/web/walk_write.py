@@ -60,12 +60,12 @@ from src.domain import (
     is_upload_ref,
     save_upload,
     set_info,
-    set_reading,
     split_finding,
     upload_file,
     while_open,
 )
 from src.domain.errors import DomainError, EngineError, ValidationError
+from src.domain.findings import EditConflict
 from src.domain.info_fields import FIELDS, KIND_DATE, KIND_TEXT, KIND_YES_NO
 from src.domain.log_ids import log_id
 from src.domain.models import READING_MAX_C, READING_MIN_C, Inspection, Suggestion
@@ -396,21 +396,34 @@ def _edit(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     # такой снимает прежний явно.
     if repeat is True and level not in REPEAT_LEVELS:
         raise WalkRefused("walk.err.repeat_level")
-    if repeat is None and current.repeat and level not in REPEAT_LEVELS:
+    if repeat is None and (current.repeat or "level" in fields) and level not in REPEAT_LEVELS:
         repeat = False
-    reading = reading_of(body) if "reading_c" in body else None
-    if fields or isinstance(repeat, bool):
-        edit_finding(
-            chat_id,
-            n,
-            zone_by_person="zone" in fields,
-            repeat=repeat if isinstance(repeat, bool) else None,
-            **fields,
-        )
+    kwargs: dict[str, Any] = {}
     if "reading_c" in body:
-        # Показание лежит мимо движка (#836): число аудитор правит отдельно от
-        # формулировки, и правка одного не должна требовать другого.
-        set_reading(chat_id, n, reading)
+        kwargs["reading_c"] = reading_of(body)
+    for key in ("source_revision", "request_id"):
+        if key in body:
+            kwargs[key] = _text(body, key, required=True)
+    if "new_refs" in body or "remove_photos" in body:
+        new_refs = body.get("new_refs", [])
+        removed = body.get("remove_photos", [])
+        if (
+            not isinstance(new_refs, list)
+            or not isinstance(removed, list)
+            or not all(isinstance(ref, str) for ref in removed)
+        ):
+            raise WalkRefused("walk.err.bad_request")
+        added = _refs(new_refs, chat_id, inspection) if new_refs else []
+        kwargs["photos"] = list(
+            dict.fromkeys([ref for ref in current.photos if ref not in removed] + added)
+        )
+    edit_finding(
+        chat_id,
+        n,
+        zone_by_person="zone" in fields,
+        repeat=repeat if isinstance(repeat, bool) else None,
+        **(kwargs | fields),
+    )
 
 
 def _split_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
@@ -576,6 +589,10 @@ def install(
         except HandedOverError:
             logger.info("Обход: чат %s сдал проверку во время записи — отказ", log_id(who))
             return refused(said("walk.sealed", lang), 409)
+        except EditConflict:
+            return jsonify(
+                {"error": "edit_conflict", "message": said("walk.split.conflict", lang)}
+            ), 409
         except SplitConflict:
             return jsonify(
                 {"error": "split_conflict", "message": said("walk.split.conflict", lang)}

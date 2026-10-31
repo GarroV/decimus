@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 import tempfile
 from collections import Counter
@@ -17,6 +15,8 @@ from .errors import ValidationError
 from .findings import _number, check_reading
 from .handover import while_open
 from .models import ADVICE_LEVEL, SOURCE_COMMENT, Finding
+from .revisions import digest as _digest
+from .revisions import finding_revision
 from .state import (
     READINGS_KEY,
     SOURCES_KEY,
@@ -47,16 +47,6 @@ class SplitPart:
     repeat: bool = False
     reading_c: float | None = None
     photos: tuple[str, ...] = ()
-
-
-def _digest(value: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(value, sort_keys=True, ensure_ascii=False).encode()
-    ).hexdigest()
-
-
-def finding_revision(finding: Finding) -> str:
-    return _digest(asdict(finding))
 
 
 def _validate_parts(
