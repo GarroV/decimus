@@ -108,6 +108,12 @@ class PreviousOutcome:
     unavailable: bool = False
 
 
+def legacy_mark_key(inspection: Inspection) -> str:
+    """Старый ключ: только адрес восстановления, без автоматического переноса."""
+    raw = f"{inspection.tenant}|{inspection.unit}|{inspection.date}|{inspection.kind}"
+    return "walk_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+
+
 def mark_key(inspection: Inspection) -> str:
     """Ключ личных пометок обхода в облачном хранилище Telegram.
 
@@ -115,7 +121,7 @@ def mark_key(inspection: Inspection) -> str:
     листа, а не с прошлых галочек. Хранилище принимает только `[A-Za-z0-9_-]`
     до 128 знаков — поэтому отпечаток, а не название точки.
     """
-    raw = f"{inspection.tenant}|{inspection.unit}|{inspection.date}|{inspection.kind}"
+    raw = f"{inspection.tenant}|{inspection.unit}|{inspection.date}|{inspection.kind}|{inspection.run_id}"
     return "walk_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
@@ -223,6 +229,8 @@ def build_walk(
         "unit": inspection.unit,
         "date": str(inspection.date),
         "key": mark_key(inspection),
+        "run_id": inspection.run_id,
+        "legacy_key": legacy_mark_key(inspection),
         "sealed": sealed,
         "previous": (
             {"date": found.date.isoformat(), "count": len(found.findings)} if found else None

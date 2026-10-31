@@ -46,7 +46,19 @@
 
   /* ── данные формы ─────────────────────────────────────────────────── */
 
-  function draftKey() { return W.state.data.key + "_draft"; }
+  function draftKey() { return f.draftKey; }
+
+  function loadDraft() {
+    var data = W.state.data;
+    var draft = W.local.get(draftKey());
+    if (draft && data.run_id && draft.run_id === data.run_id) return draft;
+    var legacy = W.local.get(data.legacy_key + "_draft");
+    if (legacy && data.run_id && legacy.run_id === data.run_id) {
+      W.local.set(draftKey(), legacy);
+      return legacy;
+    }
+    return null; // Unknown legacy drafts stay untouched for recovery.
+  }
 
   function zoneOf(code) {
     return W.state.data.zones.filter(function (z) { return z.code === code; })[0] || null;
@@ -197,7 +209,7 @@
   function saveDraft() {
     if (f.n) return;
     W.local.set(draftKey(), {
-      mode: f.mode, zone: f.zone, code: f.code, level: f.level, text: f.text,
+      run_id: f.run_id, mode: f.mode, zone: f.zone, code: f.code, level: f.level, text: f.text,
       comment: f.comment, repeat: f.repeat, words: f.words, reading: f.reading,
       photos: readyPhotos().map(function (p) { return p.ref; }),
     });
@@ -217,7 +229,7 @@
     var key = f.n ? null : draftKey();
     var mode = f.mode;
     files.forEach(function (file) {
-      var p = { id: ++seq, state: "uploading", fresh: true, own: true, url: URL.createObjectURL(file), draftKey: key, mode: mode };
+      var p = { id: ++seq, state: "uploading", fresh: true, own: true, url: URL.createObjectURL(file), draftKey: key, run_id: f.run_id, mode: mode };
       f.photos.push(p);
       send(p, file);
     });
@@ -268,7 +280,7 @@
       W.offline.watch();
       return;
     }
-    W.offline.put(p.draftKey, p.mode, p.blob).then(function (entry) {
+    W.offline.put(p.draftKey, p.mode, p.blob, p.run_id).then(function (entry) {
       p.entryId = entry.id;
       if (shown()) {
         p.state = "waiting";
@@ -281,7 +293,7 @@
 
   /** Фон отправил кадр из хранилища. Форма на том же черновике открыта — кадр становится готовым в ней. */
   function adopt(entry, ref) {
-    if (!f || f.n || draftKey() !== entry.key) return false;
+    if (!f || f.n || f.run_id !== entry.run_id || draftKey() !== entry.key) return false;
     if (f.gone.indexOf(entry.id) !== -1) return true;
     var p = f.photos.filter(function (x) { return x.entryId === entry.id; })[0];
     if (!p) {
@@ -1203,6 +1215,8 @@
     if (f) close(true);
     var rec = opts.record;
     f = {
+      run_id: W.state.data.run_id,
+      draftKey: W.state.data.key + "_draft",
       mode: opts.mode || "violation",
       n: rec ? rec.n : null,
       zone: opts.zone || null,
@@ -1237,8 +1251,8 @@
       if (rec.reading_c !== null && rec.reading_c !== undefined) setReading(rec.reading_c);
       f.original = { code: rec.code, level: rec.level, zone: opts.zone, text: rec.text, comment: rec.comment || "", repeat: !!rec.repeat, reading: rec.reading_c === undefined ? null : rec.reading_c };
     } else {
-      var draft = W.local.get(draftKey());
-      if (draft && !opts.code && draft.mode === f.mode && (draft.code || draft.words || (draft.photos || []).length)) {
+      var draft = loadDraft();
+      if (draft && !opts.code && draft.mode === f.mode && (draft.code || draft.words || draft.text || draft.comment || (draft.photos || []).length)) {
         f.zone = draft.zone || f.zone;
         f.code = draft.code;
         f.level = draft.level;

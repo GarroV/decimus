@@ -38,12 +38,22 @@
     }
   }
 
-  function loadMarks(key, done) {
-    W.storedGet(key, function (raw) { done(parseMarks(raw)); });
+  function loadMarks(data, done) {
+    function owned(raw) {
+      try { var v = JSON.parse(raw || "null"); return v && data.run_id && v.run_id === data.run_id; }
+      catch (e) { return false; }
+    }
+    W.storedGet(data.key, function (raw) {
+      if (owned(raw)) { done(parseMarks(raw)); return; }
+      // Unknown legacy data stays at its original key for recovery.
+      W.storedGet(data.legacy_key, function (legacy) {
+        done(owned(legacy) ? parseMarks(legacy) : { z: [], f: [] });
+      });
+    });
   }
 
   function saveMarks() {
-    var raw = JSON.stringify(S.marks);
+    var raw = JSON.stringify({ z: S.marks.z, f: S.marks.f, run_id: S.data.run_id });
     if (hasCloud()) { tg.CloudStorage.setItem(S.data.key, raw); return; }
     try { window.localStorage.setItem(S.data.key, raw); } catch (e) { /* живёт до закрытия */ }
   }
@@ -800,12 +810,13 @@
   /** Принять свежие данные с сервера (ответ на чтение или запись). */
   W.apply = function (body, keepSheet) {
     var first = !S.data || S.data.key !== body.key;
-    if (first && W.offline) W.offline.start();
+    if (first && S.data && W.sheet.isOpen()) W.sheet.close(true);
     S.data = body;
     S.data = withEquipment(body);
+    if (first && W.offline && body.state === "active") W.offline.start();
     document.documentElement.lang = body.lang;
     if (body.state !== "active") { if (!keepSheet) W.sheet.close(true); render(); return; }
-    if (first) loadMarks(body.key, function (m) { S.marks = m; S.open = null; render(); });
+    if (first) loadMarks(body, function (m) { if (S.data.key !== body.key) return; S.marks = m; S.open = null; render(); });
     else render();
   };
 

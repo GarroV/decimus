@@ -75,7 +75,7 @@
   }
 
   function fromRow(row) {
-    return { id: row.id, key: row.key, mode: row.mode, at: row.at, bytes: row.bytes.byteLength,
+    return { id: row.id, key: row.key, run_id: row.run_id, mode: row.mode, at: row.at, bytes: row.bytes.byteLength,
       blob: new Blob([row.bytes], { type: row.type }) };
   }
 
@@ -89,7 +89,7 @@
   function purgeOld() {
     var limit = Date.now() - MAX_AGE_DAYS * DAY_MS;
     return rows().then(function (all) {
-      var old = all.filter(function (r) { return r.at < limit; });
+      var old = all.filter(function (r) { return owns(r) && r.at < limit; });
       return Promise.all(old.map(function (r) { return remove(r.id); })).then(function () { return old.length; });
     }).then(function (n) {
       if (n) W.toast(W.tx("walk.offline.expired", { n: n, days: MAX_AGE_DAYS }), "warn");
@@ -97,14 +97,14 @@
   }
 
   /** Положить кадр новой записи. Отказ — Error с `reason`: "full" или "unavailable". */
-  function put(key, mode, blob) {
+  function put(key, mode, blob, runId) {
     return Promise.all([rows(), toBytes(blob)]).then(function (got) {
       var count = got[0].length;
       var total = got[0].reduce(function (sum, r) { return sum + r.bytes.byteLength; }, 0);
       if (count >= MAX_FRAMES || total + got[1].byteLength > MAX_BYTES) throw reasoned("full");
       var row = {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
-        key: key, mode: mode, at: Date.now(), type: blob.type || "image/jpeg", bytes: got[1],
+        key: key, run_id: runId, mode: mode, at: Date.now(), type: blob.type || "image/jpeg", bytes: got[1],
       };
       return run("readwrite", function (s) { return s.add(row); }).then(function () { return fromRow(row); });
     }).then(null, function (err) {
@@ -121,7 +121,7 @@
   /** Кадры черновика (по ключу), старые вперёд. */
   function list(key) {
     return purgeOld().then(rows).then(function (all) {
-      return all.filter(function (r) { return r.key === key; })
+      return all.filter(function (r) { return r.key === key && owns(r); })
         .sort(function (a, b) { return a.at - b.at; }).map(fromRow);
     }, function () { return []; });
   }
@@ -130,10 +130,16 @@
 
   /** Ссылка на кадр — в черновик, когда форма закрыта: открыв её (в том числе по пункту чек-листа),
    *  аудитор увидит кадр готовым. `queued` — кадры, пришедшие уже после закрытия формы. */
+  function owns(entry) {
+    var data = W.state.data;
+    return !!data && !!data.run_id && entry.run_id === data.run_id && entry.key === data.key + "_draft";
+  }
+
   function mergeDraft(entry, ref) {
     var draft = W.local.get(entry.key) || {
-      mode: entry.mode, zone: null, code: null, level: null, text: "", comment: "", repeat: false, words: "", photos: [],
+      run_id: entry.run_id, mode: entry.mode, zone: null, code: null, level: null, text: "", comment: "", repeat: false, words: "", photos: [],
     };
+    if (draft.run_id !== entry.run_id) return;
     var refs = draft.photos || [];
     var queued = draft.queued || [];
     if (refs.indexOf(ref) === -1) refs.push(ref);
@@ -154,9 +160,9 @@
     var sent = 0;
     var dropped = 0;
     return rows().then(function (all) {
-      var queue = all.map(fromRow).sort(function (a, b) { return a.at - b.at; });
+      var queue = all.filter(owns).map(fromRow).sort(function (a, b) { return a.at - b.at; });
       function next(i) {
-        if (i >= queue.length || navigator.onLine === false) return Promise.resolve(queue.length - i);
+        if (i >= queue.length || navigator.onLine === false || !owns(queue[i])) return Promise.resolve(queue.length - i);
         var entry = queue[i];
         return W.photo.upload(entry.blob).then(function (ref) {
           return settle(entry, ref).then(function (taken) { if (!taken) sent += 1; return next(i + 1); });
@@ -211,7 +217,7 @@
   }
 
   function start() {
-    if (started) return;
+    if (started) { kick(); return; }
     started = true;
     window.addEventListener("online", kick);
     document.addEventListener("visibilitychange", function () {
