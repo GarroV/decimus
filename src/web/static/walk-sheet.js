@@ -14,7 +14,7 @@
  * Одним кадром бывает видно два нарушения (сломанный дозатор и в нём нет мыла):
  * у невыбранной карточки есть «Тоже записать» (D593) — отмеченные пункты
  * сохраняются отдельными записями с теми же кадрами и словами, следом за
- * основной; зона — своя у пункта, а не вывелась — та же, что у основной.
+ * основной; дополнительная запись требует своей явно выведенной зоны.
  * Рекомендация (D201, класс R) и общая заметка (D314, код NOTE) — без вычета,
  * текст обязателен. Замер (D0) — со стоянки «Печь и холодильники» (D315).
  *
@@ -531,11 +531,19 @@
   function pick(code, cand) {
     var i = item(code);
     if (!i) return;
+    // Явный выбор зоны сохраняется у кандидата, когда человек переходит к
+    // другому варианту. Исходная model zone (cand.zone) остаётся нетронутой.
+    if (f.picked && f.zone && f.zoneSource === "pick") {
+      var previous = f.picked.resolution || {};
+      previous.zone = f.zone;
+      previous.source = "pick";
+      f.picked.resolution = previous;
+    }
     f.code = code;
     f.picked = cand ? cand : null;
-    // Ставший основным пункт из «тоже» уходит: одна запись на пункт.
-    f.also = f.also.filter(function (c) { return c.code !== code; });
     if (recognizing()) applyResolution(i, cand);
+    // Основной стала одна пара «пункт + зона»; другие зоны остаются в «тоже».
+    f.also = f.also.filter(function (c) { return !isPrimary(c); });
     if (i.measure) f.level = "D0";
     else if (isAdvice() || i.note) f.level = ADVICE_LEVEL;
     else if (cand && i.levels.indexOf(cand.level) !== -1) f.level = cand.level;
@@ -651,7 +659,7 @@
 
   function proposal(cand, onPick) {
     var i = item(cand.code) || { q: cand.code };
-    var on = f.code === cand.code && (!f.picked || f.picked === cand);
+    var on = f.picked ? f.picked === cand : isPrimary(cand);
     var top = el("span", "walk-found__top");
     var kind = cand.level === ADVICE_LEVEL ? "advice" : cand.level === "D0" || i.measure ? "info" : /^D[1-3]$/.test(cand.level || "") ? "violation" : null;
     top.appendChild(el("span", "walk-option__code" + (kind ? " walk-item-code--" + kind : ""), i.label || cand.code));
@@ -679,22 +687,37 @@
     var b = W.button("walk-found__card", null, function () { if (onPick) onPick(cand); else pick(cand.code, cand); });
     b.setAttribute("aria-pressed", "false");
     b.appendChild(top);
-    b.appendChild(el("span", "walk-found__q", i.q));
+    var resolved = zoneOf(extraZone(cand));
+    b.appendChild(el("span", "walk-found__q", i.q + " · " + (resolved ? resolved.title : tx("walk.sheet.where"))));
     if (!recognizing() || !f.code || !item(cand.code)) return b;
     // «Тоже записать» (D593) — рядом с карточкой, а не в ней: кнопка в кнопке недопустима.
     var row = el("div", "walk-found__row");
     var also = isAlso(cand);
     var t = W.button("walk-found__also" + (also ? " is-on" : ""), tx(also ? "walk.sheet.also_on" : "walk.sheet.also"), function () { toggleAlso(cand); });
     t.setAttribute("aria-pressed", String(also));
+    t.disabled = !extraZone(cand) || isPrimary(cand);
+    if (!extraZone(cand)) t.title = tx("walk.sheet.need_zone");
     row.appendChild(b);
     row.appendChild(t);
     return row;
   }
 
-  function isAlso(cand) { return f.also.some(function (c) { return c.code === cand.code; }); }
+  /** Равенство кандидатов: известная пара «пункт + зона», либо тот же объект. */
+  function sameCandidate(a, b) {
+    if (a === b) return true;
+    var zone = extraZone(a);
+    return !!zone && a.code === b.code && zone === extraZone(b);
+  }
+
+  function isPrimary(cand) {
+    return cand === f.picked || (!!f.zone && cand.code === f.code && extraZone(cand) === f.zone);
+  }
+
+  function isAlso(cand) { return f.also.some(function (c) { return sameCandidate(c, cand); }); }
 
   function toggleAlso(cand) {
-    f.also = isAlso(cand) ? f.also.filter(function (c) { return c.code !== cand.code; }) : f.also.concat([cand]);
+    if (!extraZone(cand) || isPrimary(cand)) return;
+    f.also = isAlso(cand) ? f.also.filter(function (c) { return !sameCandidate(c, cand); }) : f.also.concat([cand]);
     W.haptic();
     redraw("item", "footer");
   }
@@ -702,16 +725,14 @@
   /** Отмеченные «тоже» — только у свежего поиска нового нарушения. */
   function extras() {
     if (!recognizing() || !f.found || stale()) return [];
-    return f.also.filter(function (c) { return item(c.code) && c.code !== f.code; });
+    return f.also.filter(function (c) { return item(c.code) && !isPrimary(c) && !!extraZone(c); });
   }
 
-  /** Зона «тоже»-записи: своя у пункта, иначе — та же, что у основной (D593). */
+  /** Неопределённая зона дополнительного кандидата требует выбора человека. */
   function extraZone(cand) {
-    var r = cand.resolution;
-    var own = itemZones(cand.code);
-    var z = r && r.zone && zoneOf(r.zone) && !zoneOf(r.zone).equipment ? r.zone
-      : own.length === 1 ? own[0].code : null;
-    return z || f.zone;
+    var r = cand && cand.resolution;
+    var z = r && r.zone && zoneOf(r.zone);
+    return z && !z.equipment ? z.code : null;
   }
 
   function extraLevel(cand) {
@@ -1072,8 +1093,8 @@
     var list = el("div", "walk-found");
     (f.found || []).forEach(function (cand) { list.appendChild(proposal(cand)); });
     var manual = item(f.code);
-    var fromList = (f.found || []).some(function (c) { return c.code === f.code; });
-    if (manual && !fromList) list.appendChild(proposal({ code: f.code, level: f.level, zone: f.zone }));
+    var fromList = (f.found || []).some(function (c) { return f.picked ? c === f.picked : isPrimary(c); });
+    if (manual && !fromList) list.appendChild(proposal({ code: f.code, level: f.level, zone: f.zone, resolution: { zone: f.zone } }));
     if (list.childNodes.length) box.appendChild(list);
     if (f.code && !f.zone && item(f.code) && !isAdvice() && !isMeasure()) box.appendChild(whereRow());
     if (f.found && !f.found.length && !hasNoViolation()) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.found_none")));

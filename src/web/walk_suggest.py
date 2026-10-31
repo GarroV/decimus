@@ -155,15 +155,24 @@ def cap_photos(value: Any) -> tuple[Any, int]:
 
 
 def answer(offer: Offer, ask: Ask) -> dict[str, Any]:
-    # Увиденное на кадрах сверх сказанного (D208) — после найденного по
-    # словам: у бота это отдельное предложение, здесь — нижние карточки.
-    seen = [c for c in offer.also_seen if all(c.code != x.code for x in offer.candidates)]
-    # Пункты словаря, которых модель не назвала, задав вопрос (D597), — в самом низу.
+    # Основные варианты сохраняют порядок модели. Дополнительные дублируют
+    # запись только при совпадении пункта И выведенной зоны (D206/D445).
+    # Пока зоны нет, разные кандидаты не считаются одной находкой.
+    cards = [_card(c, offer, ask) for c in offer.candidates]
+    known = {(c["code"], c["resolution"]["zone"]) for c in cards if c["resolution"]["zone"]}
     cue = offer.suggestion.cue_extras if offer.suggestion else ()
-    extras = [c for c in cue if all(c.code != x.code for x in (*offer.candidates, *seen))]
+    for candidate in (*offer.also_seen, *cue):
+        card = _card(candidate, offer, ask)
+        zone = card["resolution"]["zone"]
+        key = (card["code"], zone)
+        if zone and key in known:
+            continue
+        cards.append(card)
+        if zone:
+            known.add(key)
     return {
         "via": offer.via,
-        "candidates": [_card(c, offer, ask) for c in (*offer.candidates, *seen, *extras)],
+        "candidates": cards,
         "question": offer.question,
         # Ответы на вопрос о классе первой карточки — кнопками (#1107).
         "answers": [
