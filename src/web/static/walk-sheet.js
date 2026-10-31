@@ -1684,7 +1684,7 @@
         return box;
       }
       var why = blocker();
-      var recheck = !recognizing() && readingChanged() && !readingInvalid();
+      var recheck = !f.n && !recognizing() && readingChanged() && !readingInvalid();
       var label = f.saving ? tx("walk.sheet.saving")
         : f.finding ? tx("walk.sheet.rechecking")
         : recheck ? tx("walk.sheet.recheck")
@@ -1825,7 +1825,7 @@
 
   function save_() {
     if (blocker()) return;
-    if (!recognizing() && readingChanged()) {
+    if (!f.n && !recognizing() && readingChanged()) {
       // Число поправлено — это не запись, а пересчёт предложения (#836): новое
       // предложение ждёт «Сохранить». Стёртое поле — «замера нет», пересчитывать нечего.
       var fixed = readingValue();

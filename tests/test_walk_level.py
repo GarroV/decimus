@@ -347,7 +347,7 @@ def test_search_and_level_share_total_slots_across_auditors(
     )
     nested = []
 
-    def ask(ask_args):
+    def ask(_ask_args):
         reply = other.c.post(
             walk_suggest.SUGGEST_PATH,
             json={"words": "Synthetic", "photos": [ref]},
