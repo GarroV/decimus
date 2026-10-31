@@ -1,4 +1,12 @@
-"""«Завершить проверку» из приложения (D422, D449): сводка или сразу отчёт.
+"""Общая сборка отчёта для miniapp и запасного завершения через чат.
+
+Native miniapp сначала заполняет сведения и показывает итог движка
+(`walk_finish_review`), затем явно подтверждает сдачу. `allow_missing_info`
+доступен только при явном пропуске необязательных полей; отсутствие фотографий
+этот флаг не разрешает. Повтор того же run с frozen finished_at не собирает
+документы повторно.
+
+Запасной путь D422, D449: сводка или сразу отчёт.
 
 `POST /tg/walk/app {op: "finish"}` (адрес и опознание — `walk_settings`). Что
 уходит в чат, решает режим человека (`db.finish_modes`, выбирается в настройках
@@ -20,11 +28,10 @@
 * **Сообщение уходит только по явному нажатию человека и его подтверждению в
   приложении (D449) — и только в чат из подписанного initData.** Чужой чат
   назвать нельзя: номер берётся из подписи, а не из тела запроса.
-* **Информационную часть отсюда не провести.** Её вопросы живут в
-  конечном автомате бота (память другого процесса), веб его не запускает.
-  Остались неотвеченные поля — отчёт не собирается, приложение просит
-  заполнить «Сведения» (их можно заполнить и в приложении, D312) и нажать ещё
-  раз. Это предел решения, а не недосмотр.
+* **Запасной чатовый путь** не запускает конечный автомат бота из веб-процесса.
+  Native miniapp сохраняет ответы штатным walk_info и отдельно подтверждает
+  пропуск оставшихся полей (D070); старый вызов без такого подтверждения
+  по-прежнему требует предварительно заполненные сведения.
 * **Очередь ожидания бота** (кадры и слова без пары, `MaterialStore`) тоже в
   памяти бота. Итог из приложения собирается с пустой очередью; кадры,
   присланные в чат без записи, он не назовёт. См. `docs/13-walk-mini-app.md`.
@@ -66,6 +73,9 @@ STARTED = "started"
 LANG_GONE = "lang_gone"
 INFO_MISSING = "info_missing"
 BUSY = "busy"
+COMPLETED = "completed"
+STALE = "stale"
+READY = "ready"
 
 #: Чаты, у которых сейчас собирается отчёт, в этом процессе. Между процессами то же
 #: держит замок в базе (`src/db/busy_lock.py`, F-110): он берётся в запросе и
@@ -204,7 +214,16 @@ def _missing_info(chat_id: int, ui_lang: str) -> int:
     return len(fields_to_ask(ui_lang, chat_id=chat_id))
 
 
-def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str) -> ReportStart:
+def start_report(
+    token: str,
+    chat_id: int,
+    report_lang: str | None,
+    ui_lang: str,
+    *,
+    allow_missing_info: bool = False,
+    expected_run_id: str | None = None,
+    expected_revision: str | None = None,
+) -> ReportStart:
     """Запустить сборку отчёта. Ничего не отправляется, пока не пройдены все проверки.
 
     Порядок: проверка есть → язык из перечня страны (перечень считается заново, а
@@ -213,6 +232,21 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
     последнего состояния проверки не меняет.
     """
     try:
+        if expected_run_id is not None:
+            from .walk_finish_review import revision
+
+            inspection = get_state(chat_id)
+            if inspection is None:
+                return ReportStart(NO_INSPECTION)
+            if inspection.run_id != expected_run_id:
+                return ReportStart(STALE)
+            if inspection.finished_at is not None:
+                return ReportStart(COMPLETED)
+            with _building_lock:
+                if chat_id in _building:
+                    return ReportStart(BUSY)
+            if expected_revision is not None and revision(inspection) != expected_revision:
+                return ReportStart(STALE)
         offered = _offered(chat_id)
         if offered is None:
             return ReportStart(NO_INSPECTION)
@@ -222,7 +256,7 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
         if chosen is None or chosen not in offered:
             return ReportStart(LANG_GONE)
         missing = _missing_info(chat_id, ui_lang)
-        if missing:
+        if missing and not allow_missing_info:
             return ReportStart(INFO_MISSING, missing)
         with _building_lock:
             if chat_id in _building:
@@ -260,3 +294,18 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
         return ReportStart(FAILED)
     logger.info("Завершение из приложения: сборка отчёта чата %s запущена", log_id(chat_id))
     return ReportStart(STARTED)
+
+
+def report_status(chat_id: int, expected_run_id: str) -> str:
+    """HTTP acceptance/seal alone is not proof that a report was delivered."""
+    inspection = get_state(chat_id)
+    if inspection is None:
+        return NO_INSPECTION
+    if inspection.run_id != expected_run_id:
+        return STALE
+    if inspection.finished_at is not None:
+        return COMPLETED
+    with _building_lock:
+        if chat_id in _building:
+            return STARTED
+    return SEALED if handed_over(chat_id) else READY

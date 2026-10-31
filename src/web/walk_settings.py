@@ -9,7 +9,11 @@
 - `translate_mode` — перевод комментариев на язык отчёта (D443): `button` или
   `auto`, хранится за Telegram ID (`db.translate_modes`); перевод идёт при
   сборке отчёта (`bot.finish_translate`);
-- `finish` — «Завершить проверку» (D422, D449): в режиме `summary` итог в чат,
+- `finish_review` — актуальная предвычитка в приложении, без отправок;
+- `finish_submit` — явная сдача просмотренного run/revision; optional info
+  пропускается только по явному выбору;
+- `finish_status` — сборка идёт или подтверждена frozen finished_at;
+- `finish` — запасной путь через чат (D422, D449): в режиме `summary` итог в чат,
   как `/finish`; в `report` — отчёт сразу (`walk_finish.py`).
 
 Правила те же, что у бота: мини-апп — второй вход в одно и то же, а не вторая
@@ -32,6 +36,7 @@ from src.bot.texts import t
 from src.bot.version import build_version
 from src.db import bot_langs, finish_modes, translate_modes
 from src.db.errors import DbError
+from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
 from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, parse_public_url
 
@@ -171,6 +176,76 @@ def _finish_report(who: int, token: str, body: dict[str, Any], lang: str) -> tup
     return jsonify({"sent": True, "mode": finish_modes.REPORT}), 200
 
 
+def _native_finish(
+    who: int, conf: WalkSettings, body: dict[str, Any], lang: str
+) -> tuple[Response, int]:
+    """Review is read-only; report delivery requires explicit run-bound confirmation."""
+    from src.bot.keyboards import LANG_LABELS
+    from src.domain import get_state
+
+    from .walk import walk_payload
+    from .walk_finish_review import review, revision
+
+    def payload() -> dict[str, Any]:
+        return walk_payload(who, fallback_lang=lang, bot=bot_settings())
+
+    if body["op"] == "finish_review":
+        result = review(who, lang)
+        if result is None:
+            raise Refused("walk.finish.err.none", 409)
+        data = payload()
+        current = get_state(who)
+        if current is None or revision(current) != result["revision"]:
+            raise Refused("walk.finish.err.stale", 409)
+        result["data"] = data
+        result["report_langs"] = [
+            {"code": code, "label": LANG_LABELS.get(code, code)}
+            for code in walk_finish.offered_report_langs(who)
+        ]
+        return jsonify(result), 200
+    run = body.get("run_id")
+    if not isinstance(run, str):
+        raise Refused("walk.err.bad_request", 400)
+    if body["op"] == "finish_status":
+        status = walk_finish.report_status(who, run)
+    else:
+        if body.get("confirmed") is not True or not isinstance(body.get("revision"), str):
+            raise Refused("walk.err.bad_request", 400)
+        if conf.bot_token is None:
+            raise Refused("walk.finish.err.failed", 503)
+        language = body.get("report_lang")
+        if language is not None and not isinstance(language, str):
+            raise Refused("walk.finish.err.lang", 409)
+        skip = body.get("skip_missing_info", False)
+        if not isinstance(skip, bool):
+            raise Refused("walk.err.bad_request", 400)
+        started = walk_finish.start_report(
+            conf.bot_token,
+            who,
+            language,
+            lang,
+            allow_missing_info=skip,
+            expected_run_id=run,
+            expected_revision=body["revision"],
+        )
+        status = started.status
+        if status == walk_finish.INFO_MISSING:
+            raise Refused("walk.finish.err.info", 409, count=started.missing, reason="info")
+    if status in (walk_finish.NO_INSPECTION, walk_finish.STALE):
+        raise Refused("walk.finish.err.stale", 409, reason="stale")
+    if status not in (
+        walk_finish.STARTED,
+        walk_finish.BUSY,
+        walk_finish.COMPLETED,
+        walk_finish.READY,
+    ):
+        key, code = _REPORT_REFUSALS[status]
+        raise Refused(key, code)
+    return jsonify(
+        {"status": status, **({"data": payload()} if status == walk_finish.COMPLETED else {})}
+    ), 200
+
+
 def install(
     app: Flask,
     *,
@@ -229,9 +304,14 @@ def install(
                 return respond(who, ui_lang)
             if op == "finish":
                 return _finish(who, conf, body, lang)
+            if op in ("finish_review", "finish_submit", "finish_status"):
+                return _native_finish(who, conf, body, lang)
             raise Refused("walk.err.bad_request", 400)
         except Refused as exc:
             return refused(exc.key, lang, exc.status, exc.extra)
+        except DomainError:
+            logger.exception("Мини-апп: завершение чата %s — состояние недоступно", log_id(who))
+            return refused("walk.finish.err.failed", lang, 503)
         except DbError:
             logger.exception("Мини-апп: действие %s чата %s — база не ответила", op, log_id(who))
             return refused("walk.app.err.unavailable", lang, 503)

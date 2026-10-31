@@ -154,3 +154,16 @@
 }
 .walk-timing__value { color: var(--ink); font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .walk-app__card > .walk-timing { margin-bottom: 12px; }
+
+.walk-finish { z-index: 32; }
+.walk-finish__body { display: flex; flex-direction: column; gap: 16px; }
+.walk-finish__meta { margin: 0; color: var(--ink-3); }
+.walk-finish__error { margin: 0; color: var(--err); }
+.walk-finish__error:empty { display: none; }
+.walk-finish__field { display: grid; gap: 8px; }
+.walk-finish__score { margin: 0; font-size: 22px; font-weight: 600; }
+.walk-finish__record, .walk-finish__answer { border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.walk-finish__record p, .walk-finish__answer p { margin: 8px 0; white-space: pre-wrap; }
+.walk-finish__count { color: var(--ink-2); }
+.walk-finish__consent { display: flex; gap: 12px; align-items: flex-start; }
+.walk-finish__consent input { width: 22px; height: 22px; flex-shrink: 0; }

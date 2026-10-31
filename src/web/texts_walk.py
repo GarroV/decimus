@@ -131,6 +131,81 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "в работе, нарушений: {count}",
         "en": "in progress, issues: {count}",
     },
+    "walk.finish.native.loading": {
+        "ru": "Загружаем актуальную проверку…",
+        "en": "Loading the current inspection…",
+    },
+    "walk.finish.native.details": {
+        "ru": "Сведения и обратная связь",
+        "en": "Visit details and feedback",
+    },
+    "walk.finish.native.optional": {
+        "ru": (
+            "Все поля необязательны. Заполните известное; пустые ответы можно пропустить. "
+            "Сильные стороны и зоны роста попадут партнёру в отчёт."
+        ),
+        "en": (
+            "All fields are optional. Record what you know; unanswered fields can be skipped. "
+            "Strengths and growth areas are included in the partner report."
+        ),
+    },
+    "walk.finish.native.skip": {"ru": "Не отвечать", "en": "No answer"},
+    "walk.finish.native.saved": {"ru": "Сохранено: {value}", "en": "Saved: {value}"},
+    "walk.finish.native.review": {"ru": "Проверить итог", "en": "Review the summary"},
+    "walk.finish.native.chat": {"ru": "Продолжить в чате", "en": "Continue in chat"},
+    "walk.finish.native.records": {
+        "ru": "Зафиксировано записей: {count}",
+        "en": "Recorded entries: {count}",
+    },
+    "walk.finish.native.not_answered": {
+        "ru": "Не заполнено — в отчёте не печатается",
+        "en": "Unanswered — omitted from the report",
+    },
+    "walk.finish.native.advice": {
+        "ru": "Добавить рекомендацию или заметку",
+        "en": "Add a recommendation or note",
+    },
+    "walk.finish.native.pick_language": {"ru": "Выберите язык", "en": "Choose a language"},
+    "walk.finish.native.skip_confirm": {
+        "ru": "Пропустить незаполненные сведения; не добавлять ответы за меня.",
+        "en": "Skip unanswered visit details; do not invent answers.",
+    },
+    "walk.finish.native.confirm": {
+        "ru": "Я проверил записи и обратную связь. Подтверждаю завершение и формирование отчёта.",
+        "en": (
+            "I reviewed the records and feedback. I confirm finishing the inspection "
+            "and building the report."
+        ),
+    },
+    "walk.finish.native.confirm_required": {
+        "ru": "Подтвердите итог и пропуск незаполненных полей.",
+        "en": "Confirm the summary and any unanswered fields you want to skip.",
+    },
+    "walk.finish.native.submit": {
+        "ru": "Подтвердить и сформировать отчёт",
+        "en": "Confirm and build the report",
+    },
+    "walk.finish.native.status": {"ru": "Завершение проверки", "en": "Finishing the inspection"},
+    "walk.finish.native.completed": {
+        "ru": "Проверка завершена. Отчёт передан в ваш чат.",
+        "en": "The inspection is complete. The report was delivered to your chat.",
+    },
+    "walk.finish.native.retry": {
+        "ru": "Сборка не завершилась. Записи сохранены; проверьте итог и повторите.",
+        "en": "The report was not completed. Your records are saved; review the summary and retry.",
+    },
+    "walk.finish.native.building": {
+        "ru": (
+            "Отчёт собирается. Оставайтесь здесь или вернитесь позже — повторная "
+            "сборка не запускается."
+        ),
+        "en": "Building the report. Stay here or return later; this does not start another build.",
+    },
+    "walk.finish.native.check_status": {"ru": "Проверить состояние", "en": "Check status"},
+    "walk.finish.err.stale": {
+        "ru": "Проверка изменилась. Откройте итог заново и подтвердите актуальные записи.",
+        "en": "The inspection changed. Reopen the summary and confirm the current records.",
+    },
     "walk.finish.title": {"ru": "Завершить проверку", "en": "Finish the inspection"},
     # Короткая подпись для нижней кнопки: полная не влезает в строку на 390px.
     "walk.finish.dock": {"ru": "Завершить", "en": "Finish"},
