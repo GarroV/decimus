@@ -586,7 +586,7 @@
     if (writable()) {
       if (S.data.items.some(function (i) { return i.measure; })) {
         extra.appendChild(W.button("walk-link", tx("walk.zone.measure_here"), function () {
-          W.sheet.open({ mode: "measure", zone: zone.code });
+          W.sheet.open({ mode: "measure", zone: zone.code, contextZone: zone.code });
         }));
       }
       extra.appendChild(W.button("walk-link", "+ " + tx("walk.add.short_advice"), function () {

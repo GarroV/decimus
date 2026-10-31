@@ -48,10 +48,30 @@
 
   function draftKey() { return f.draftKey; }
 
+  function contextZone(opts) {
+    var zone = opts.mode === "measure" && opts.contextZone === opts.zone && zoneOf(opts.contextZone);
+    return zone && !zone.equipment ? zone.code : null;
+  }
+
+  function openingDraftKey(opts) {
+    var data = W.state.data;
+    var globalKey = data.key + "_draft";
+    var zone = contextZone(opts);
+    if (!zone) return globalKey;
+    var key = data.key + "_draft_measure_" + zone;
+    var scoped = W.local.get(key);
+    if (scoped && scoped.run_id === data.run_id) return key;
+    var old = W.local.get(globalKey);
+    // Resume a matching global draft in place; never move its receipt IDs.
+    if (old && old.run_id === data.run_id && old.mode === "measure" && old.zone === zone) return globalKey;
+    return key;
+  }
+
   function loadDraft() {
     var data = W.state.data;
     var draft = W.local.get(draftKey());
     if (draft && data.run_id && draft.run_id === data.run_id) return draft;
+    if (f.contextZone) return null; // Context entry never imports another location implicitly.
     var legacy = W.local.get(data.legacy_key + "_draft");
     if (legacy && data.run_id && legacy.run_id === data.run_id) {
       W.local.set(draftKey(), legacy);
@@ -2044,6 +2064,7 @@
       return;
     }
     if (f.n && W.editDraft) W.editDraft.release(f);
+    if (f.unregisterDraft) f.unregisterDraft();
     f = null;
     if (W.voice) W.voice.cancelAll(); // идущая запись голоса выбрасывается, микрофон отпускается
     if (W.menu) W.menu.close();
@@ -2081,7 +2102,8 @@
       source_record: rec || null,
       run_id: W.state.data.run_id,
       run_key: W.state.data.key,
-      draftKey: W.state.data.key + "_draft",
+      draftKey: openingDraftKey(opts),
+      contextZone: contextZone(opts),
       mode: opts.mode || "violation",
       n: rec ? rec.n : null,
       zone: opts.zone || null,
@@ -2144,6 +2166,9 @@
     if (!rec && f.mode === "violation" && f.code) {
       f.legacyLevel = f.level;
       f.level = null;
+    }
+    if (f.contextZone && f.draftKey !== W.state.data.key + "_draft" && W.offline.register) {
+      f.unregisterDraft = W.offline.register(f.draftKey, {uploaded: adopt, failed: uploadFailed});
     }
     build();
     restoreWaiting();

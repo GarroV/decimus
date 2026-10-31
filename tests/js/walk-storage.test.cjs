@@ -240,3 +240,19 @@ test('discard during upload does not resurrect a reference in the draft',async()
   await env.W.offline.remove('a');release('discarded-ref');await running;
   assert.equal(records.length,0);assert.equal(env.storage.has('key-run-a_info_INF01'),false);
 });
+test('context measurement receipts require the exact real physical zone, key and run', async () => {
+  const frame = (id, key, run_id='run-a') => ({id, key, run_id, mode:'measure', at:Date.now(),
+    bytes:new ArrayBuffer(3),uploaded_ref:'ref-'+id});
+  const base='key-run-a_draft_measure_';
+  const records=[frame('a',base+'zone_a'),frame('b',base+'zone_b'),frame('unknown',base+'unknown'),
+    frame('virtual',base+'__equipment'),frame('foreign',base+'zone_a','run-b')];
+  const env=offline(records);env.W.state.data.zones=[{code:'zone_a'},{code:'zone_b'},{code:'__equipment',equipment:true}];
+  assert.equal((await env.W.offline.list(base+'zone_a')).length,1);
+  assert.equal((await env.W.offline.list(base+'unknown')).length,0);
+  assert.equal((await env.W.offline.list(base+'__equipment')).length,0);
+  assert.equal(await env.W.offline.ack(base+'zone_b','run-a',['a']),0);
+  assert.equal(await env.W.offline.ack(base+'zone_a','run-b',['a']),0);
+  assert.equal(await env.W.offline.ack(base+'zone_a','run-a',['a']),1);
+  assert.deepEqual(records.map(r=>r.id),['b','unknown','virtual','foreign']);
+  await env.W.offline.kick();assert.equal(env.uploads(),0);
+});

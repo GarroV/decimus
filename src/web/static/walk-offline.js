@@ -157,6 +157,11 @@
     var data = W.state.data;
     if (!data || !data.run_id || entry.run_id !== data.run_id) return false;
     if (entry.key === data.key + "_draft") return true;
+    var context = data.key + "_draft_measure_";
+    if (entry.key.indexOf(context) === 0) {
+      var zone = entry.key.slice(context.length);
+      return /^[A-Za-z0-9_-]+$/.test(zone) && (data.zones || []).some(function (z) { return z.code === zone && !z.equipment; });
+    }
     var prefix = data.key + "_info_";
     if (entry.key.indexOf(prefix) === 0 && /^[A-Za-z0-9_-]+$/.test(entry.key.slice(prefix.length))) return true;
     var edit = data.key + "_edit_";
