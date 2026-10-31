@@ -347,3 +347,64 @@ def test_feedback_role_photo_packet_survives_without_repeating_feedback_text(
         assert result.out.count(caption) == (1 if lang == "ru" else 0)
     assert (workdir / "inspection.json").read_bytes() == source
     assert прогон(AUDIT, "score", "--json").out == score
+
+
+@pytest.mark.parametrize("lang", ["ru", "en"])
+def test_large_feedback_photo_packets_keep_heading_with_owned_first_image(
+    прогон: Callable[..., Run], workdir: Path, с_ролями: Path, lang: str
+) -> None:
+    import importlib.util
+    import shutil
+    import subprocess
+
+    from PIL import Image
+
+    pdfimages = shutil.which("pdfimages")
+    pdftotext = shutil.which("pdftotext")
+    if not pdfimages or not pdftotext:
+        pytest.skip("Poppler is required for the report pagination check")
+    if importlib.util.find_spec("weasyprint") is None:
+        pytest.skip("WeasyPrint is required for the actual PDF report")
+    _начать(прогон, вид="empty", сильные=None, рост=None)
+    mapping = {}
+    per_packet = 18
+    for offset, code in enumerate((СИЛЬНЫЕ, РОСТ)):
+        args = ["info", "--qid", code, "--text", ""]
+        for number in range(per_packet):
+            ref = f"qa-{code}-{number}"
+            target = workdir / f"{ref}.jpg"
+            Image.new("RGB", (900, 1250), (number * 10, 80 + offset * 80, 140)).save(target)
+            mapping[ref] = str(target)
+            args.extend(("--photo", ref))
+        saved = прогон(AUDIT, *args)
+        assert saved.code == 0, saved.text
+    photo_map = workdir / "photo-map.json"
+    photo_map.write_text(json.dumps(mapping))
+    pdf = workdir / "feedback-packets.pdf"
+    state = workdir / "inspection.json"
+    source = state.read_bytes()
+    score = прогон(AUDIT, "score", "--json").out
+    result = прогон(REPORT, "pdf", "--out", str(pdf), "--lang", lang, "--photo-map", str(photo_map))
+    assert result.code == 0, result.text
+    # Commands and the PDF path belong to this local synthetic fixture.
+    pages = subprocess.check_output([pdftotext, "-layout", str(pdf), "-"], text=True).split("\f")  # noqa: S603
+    image_pages = [
+        int(line.split()[0])
+        for line in subprocess.check_output(  # noqa: S603
+            [pdfimages, "-list", str(pdf)], text=True
+        ).splitlines()
+        if line.split() and line.split()[0].isdigit()
+    ]
+    assert len(image_pages) == 2 * per_packet
+    with (с_ролями / "checklist.csv").open(encoding="utf-8-sig") as stream:
+        questions = {row["id"]: row for row in csv.DictReader(stream)}
+    for index, code in enumerate((СИЛЬНЫЕ, РОСТ)):
+        title = questions[code][f"question_{lang}"] or questions[code]["question_ru"]
+        heading_pages = [
+            index + 1 for index, text in enumerate(pages) if title in " ".join(text.split())
+        ]
+        owned = image_pages[index * per_packet : (index + 1) * per_packet]
+        assert owned[0] in heading_pages, (code, heading_pages, owned[0])
+        assert len(set(owned)) > 1, "Large packets must remain able to span pages"
+    assert state.read_bytes() == source
+    assert прогон(AUDIT, "score", "--json").out == score

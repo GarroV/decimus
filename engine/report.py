@@ -341,6 +341,7 @@ tr.z0 td { background:#FCEFEF; }
 .zh { margin:4.5mm 0 1mm 0; font-weight:bold; color:#3F2A63; font-size:11pt; page-break-after:avoid; page-break-inside:avoid; }
 .note { color:#6F6880; font-size:8.8pt; margin-top:3mm; line-height:1.35; }
 .info p { margin:1.2mm 0; }
+.info p.info-photo-heading { break-after:avoid; page-break-after:avoid; }
 .info .k { color:#6F6880; }
 """
 
@@ -536,7 +537,7 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
         for k, shots in feedback_photos.items():
             q = (cl.get(k, {}).get(qk) or cl.get(k, {}).get("question_ru")
                  or item_label(k, cl.get(k), lang))
-            h.append('<div class="info"><p><span class="k">'
+            h.append('<div class="info"><p class="info-photo-heading"><span class="k">'
                      + esc(clean_q(q)) + ':</span></p><div class="shots">'
                      + "".join(src.html(ref, t) for ref in shots) + '</div></div>')
         for f in sorted(notes, key=lambda x: x["n"]):
