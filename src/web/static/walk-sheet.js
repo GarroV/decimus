@@ -60,6 +60,47 @@
     return null; // Unknown legacy drafts stay untouched for recovery.
   }
 
+  function recoveryPanel(body) {
+    var data = W.state.data;
+    var oldKey = data.legacy_key + "_draft";
+    var old = W.local.get(oldKey);
+    var current = f;
+    var panel = el("details", "walk-form__note walk-form__note--info");
+    var summary = el("summary", "", tx("walk.draft.recovery"));
+    panel.appendChild(summary);
+    function show(entries) {
+      if (!f || f !== current || (!old && !entries.length)) return;
+      panel.appendChild(el("p", "", tx("walk.draft.unknown")));
+      if (old) panel.appendChild(el("pre", "", [old.code, old.words, old.text, old.comment].filter(Boolean).join("\n")));
+      ((old && old.photos) || []).forEach(function (ref) {
+        panel.appendChild(W.photo.thumb({ref: ref, own: true}));
+      });
+      entries.forEach(function (entry) {
+        var url = URL.createObjectURL(entry.blob);
+        var img = el("img", "walk-thumb__img");
+        img.alt = tx("walk.draft.recovery"); img.src = url;
+        img.onload = function () { URL.revokeObjectURL(url); };
+        panel.appendChild(img);
+      });
+      var button = W.button("walk-btn", tx("walk.draft.copy"), function () {
+        if (!window.confirm(tx("walk.draft.confirm"))) return;
+        button.disabled = true;
+        var copied = Object.assign({}, old || {mode: current.mode}, {run_id: current.run_id});
+        W.local.set(current.draftKey, copied);
+        // Copy bytes, keeping all original keys and frames as a recovery source.
+        Promise.all(entries.map(function (entry) {
+          return W.offline.put(current.draftKey, entry.mode, entry.blob, current.run_id);
+        })).then(function () {
+          if (f !== current) return;
+          open({mode: copied.mode || current.mode});
+        }, function () { button.disabled = false; W.toast(tx("walk.offline.nostore"), "warn"); });
+      });
+      panel.appendChild(button);
+      body.insertBefore(panel, body.firstChild);
+    }
+    W.offline.recovery(oldKey).then(show);
+  }
+
   function zoneOf(code) {
     return W.state.data.zones.filter(function (z) { return z.code === code; })[0] || null;
   }
@@ -1306,6 +1347,7 @@
     parts.footer = el("div");
     node.appendChild(parts.footer);
     redraw.apply(null, ORDER.concat(["footer"]));
+    recoveryPanel(body);
     document.body.appendChild(node);
     document.documentElement.classList.add("has-sheet");
     if (W.tg && W.supports("6.1")) {

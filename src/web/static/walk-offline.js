@@ -227,6 +227,9 @@
   }
 
   W.offline = {
+    recovery: function (key) { return rows().then(function (all) {
+      return all.filter(function (r) { return r.key === key; }).map(fromRow);
+    }, function () { return []; }); },
     available: available, put: put, list: list, remove: remove, start: start, kick: kick, watch: watch,
     onUploaded: null, onTick: null,
     limits: { frames: MAX_FRAMES, bytes: MAX_BYTES, days: MAX_AGE_DAYS },

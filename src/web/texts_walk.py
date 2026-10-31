@@ -14,6 +14,16 @@ from .texts_app import APP_TEXTS
 from .texts_hints import HINT_TEXTS
 
 WALK_TEXTS: dict[str, dict[str, str]] = {
+    "walk.draft.recovery": {"ru": "Черновик прежнего обхода", "en": "Draft from an earlier walk"},
+    "walk.draft.unknown": {
+        "ru": "Начало этого черновика неизвестно. Проверьте текст и кадры перед переносом в текущую проверку. Исходная копия сохранится.",
+        "en": "This draft's inspection is unknown. Review its text and photos before copying into this inspection. The original will be kept.",
+    },
+    "walk.draft.copy": {"ru": "Перенести в эту проверку…", "en": "Copy into this inspection…"},
+    "walk.draft.confirm": {
+        "ru": "Заменить текущую незавершённую форму этим черновиком и перенести показанные кадры? Подтвердите, что они относятся к этой проверке.",
+        "en": "Replace the current unsaved form with this draft and copy the photos shown? Confirm they belong to this inspection.",
+    },
     "walk.progress": {
         "ru": "Осмотрено зон: {done} из {total}",
         "en": "Zones checked: {done} of {total}",
