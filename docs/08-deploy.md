@@ -2036,3 +2036,26 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml -f compose.edge.
 После отката — те же проверки здоровья и внешний HTTP-смоук. Дамп базы для
 этого отката не восстанавливается: записи, сделанные аудиторами после раскатки,
 должны сохраниться.
+
+### Резерв и откат пакета обратной связи 31.10.2026
+
+Полный пакет #1378/#1379 раскатан в `992755bb` по D686; миграции 0106–0108
+применены. Перед раскаткой сохранены дамп (проверен `pg_restore --list`) и
+четыре точных прежних образа `12c3b379` в
+`~/.local/state/decimus/rollbacks/feedback-20261031-192311/` на VPS.
+`manifest.json` содержит исходные image ID, `rollback.yaml` — неизменяемые теги.
+Вернуть приложения, сохранив поступившие после раскатки записи:
+
+```bash
+cd /srv/decimus
+docker compose -f docker-compose.yml -f docker-compose.prod.yml -f compose.edge.yaml \
+  -f "$HOME/.local/state/decimus/rollbacks/feedback-20261031-192311/rollback.yaml" \
+  up -d --no-deps --no-build --pull never bot web walk mcp
+```
+
+Миграции добавляют nullable-поля и допускают фотоответы с отложенной проверкой
+целостности. При откате приложений схема и новые записи сохраняются;
+дамп поверх рабочей БД не восстанавливается, столбцы/история не удаляются.
+После отката — health всех служб, BUILD_SHA четырёх приложений, внешний
+`python -m tools.inspection_release_smoke`, чтение карточки и актуальный PDF.
+Сам откат на живых данных не выполнялся.
