@@ -140,6 +140,9 @@ def test_поиск_отдаёт_карточки_и_ничего_не_запи�
     карточка = тело["candidates"][0]
     assert {k: v for k, v in карточка.items() if k != "resolution"} | {"confidence": 0} == {
         "reading_c": None,
+        "frame_count": 0,
+        "frame_indices": None,
+        "frame_refs": [],
         "code": "CLN05",
         "level": "D2",
         "zone": "hot_kitchen",
@@ -318,6 +321,13 @@ def test_второе_нарушение_по_тем_же_кадрам_пише�
         code="PRD06",
         level="D1",
         also=True,
+        photo_assignment={
+            "source_photos": [кадр],
+            "model_source_photos": [кадр],
+            "model_frame_indices": [0],
+            "assigned_frame_indices": [0],
+            "confirmed": True,
+        },
         suggested=предложено("PRD06", "D1"),
         **общее,
     )
@@ -614,14 +624,22 @@ def test_тоже_запись_в_метрику_подсказки_не_идё�
     журнал: list[tuple[str, dict[str, Any]]],
 ) -> None:
     """D593: вторая запись по тем же кадрам — не выбор подсказки, считать её дважды нельзя."""
+    ref = клиент.ссылка()
     клиент.запись(
         op="add",
         zone="hot_kitchen",
         code="PRD06",
         level="D1",
         also=True,
+        photo_assignment={
+            "source_photos": [ref],
+            "model_source_photos": [ref],
+            "model_frame_indices": [0],
+            "assigned_frame_indices": [0],
+            "confirmed": True,
+        },
         words="печь в нагаре",
-        photos=[клиент.ссылка()],
+        photos=[ref],
         suggested={"code": "PRD06", "level": "D1", "zone": "hot_kitchen", "via": "model"},
         hint_codes=["CLN05"],
     )
@@ -697,3 +715,30 @@ def test_failed_search_logs_timing_without_input(клиент, модель, mon
     if failure == "model":
         assert "propose" in metrics["timings_ms"]
     assert report() == {"ms": 0, "model_ms": 0, "timings_ms": {}}
+
+
+@pytest.mark.parametrize("words, expected_count", [("Synthetic", 2), ("", 1)])
+def test_evidence_refs_follow_canonical_actually_sent_images(
+    клиент,  # noqa: F811
+    модель,
+    monkeypatch,
+    words,
+    expected_count,
+):
+    from dataclasses import replace
+
+    from test_web_walk_write import ДРУГОЙ_JPEG
+
+    def classify(note, photo, zone, **kwargs):
+        images = (photo,) if photo is not None else kwargs["photos"]
+        c = replace(МОДЕЛЬ, frame_indices=(len(images) - 1,))
+        return Suggestion(candidates=(c,), needs_human=False, frame_count=len(images))
+
+    monkeypatch.setattr(ядро, "classify", classify)
+    first, second = клиент.ссылка(), клиент.ссылка(ДРУГОЙ_JPEG)
+    response = _поиск(клиент, words=words, photos=[first, first, second])
+    assert response.status_code == 200
+    card = response.get_json()["candidates"][0]
+    assert card["frame_count"] == expected_count
+    assert card["frame_refs"] == [first, second][:expected_count]
+    assert card["frame_indices"] == [expected_count - 1]

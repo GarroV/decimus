@@ -23,14 +23,14 @@ def card(zone, text, raw="raw-model-zone"):
     }
 
 
-def load_sheet(page, cards):
+def load_sheet(page, cards, photos=None, confirm=True):
     page.set_default_timeout(3000)
     page.set_content(
         '<div id="walk" data-suggest="suggest" data-hint="hint" data-finding="finding"></div>'
     )
     page.add_script_tag(path=str(ROOT / "src/web/static/walk-core.js"))
     page.evaluate(
-        """(cards) => {
+        """({cards, photos}) => {
       const W = window.DecimusWalk;
       window.cards = cards;
       window.ops = [];
@@ -42,10 +42,14 @@ def load_sheet(page, cards):
         zones:[{code:'zone_a',title:'Zone A',recorded:[],previous:[]},
                {code:'zone_b',title:'Zone B',recorded:[],previous:[]}]
       };
-      const draft = {run_id:'synthetic-run',mode:'violation',
-        words:'Synthetic observation',photos:['synthetic-ref']};
+      const draft = {run_id:'synthetic-run',mode:'violation', words:'Synthetic observation',photos:photos};
       W.local = {get:()=>draft,set:()=>{},drop:()=>{}};
-      W.photo = {block:()=>W.el('div'),closeCamera:()=>false};
+      W.photo = {block:(photos, opts)=>{
+        const box = W.el('div');
+        photos.forEach((photo, index)=>box.appendChild(
+          W.button('test-remove-photo', 'Remove frame '+index, ()=>opts.onRemove(photo))));
+        return box;
+      },thumb:()=>W.el('span'),closeCamera:()=>false};
       W.offline = {available:()=>false,recovery:async()=>[]};
       W.voiceBar = W.translateBar = ()=>null;
       W.menu = {close:()=>{},open:opts=>window.menu=opts};
@@ -59,12 +63,22 @@ def load_sheet(page, cards):
         return Promise.resolve({ok:true,body:{}});
       };
     }""",
-        cards,
+        {"cards": cards, "photos": photos or ["synthetic-ref"]},
     )
     page.add_script_tag(path=str(ROOT / "src/web/static/walk-sheet.js"))
     page.evaluate("DecimusWalk.sheet.open({hint:'zone_a'})")
     page.locator(".walk-mark--find").click()
     page.wait_for_selector(".walk-found__card.is-on")
+    if confirm:
+        for index in range(page.locator("[data-photo-assignment]").count()):
+            confirm_assignment(page, index)
+
+
+def confirm_assignment(page, index, frames=(0,)):
+    box = page.locator("[data-photo-assignment]").nth(index)
+    for frame in frames:
+        box.locator(f'[data-frame-index="{frame}"]').check()
+    box.locator("[data-photo-confirm]").check()
 
 
 def row_for_zone(page, zone):

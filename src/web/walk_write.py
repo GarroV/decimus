@@ -71,6 +71,7 @@ from src.domain.log_ids import log_id
 from src.domain.models import READING_MAX_C, READING_MIN_C, Inspection, Suggestion
 from src.domain.uploads import MAX_UPLOAD_BYTES, UploadQuotaError, own_upload
 from src.recognize.models import UNKNOWN_ZONE
+from src.recognize.provenance import frame_indices
 
 from . import walk_rate
 from .texts_walk import WALK_TEXTS
@@ -267,6 +268,66 @@ def reading_of(body: dict[str, Any]) -> float | None:
     return float(value)
 
 
+def _photo_assignment(
+    chat_id: int, inspection: Inspection, body: dict[str, Any], photos: list[str]
+) -> dict[str, Any] | None:
+    value = body.get("photo_assignment")
+    if value is None and body.get("also") is not True:
+        return None  # Compatible single manual finding: its photos were chosen directly.
+    if not isinstance(value, dict) or value.get("confirmed") is not True:
+        raise WalkRefused("walk.err.photo_assignment")
+    raw_source = value.get("source_photos")
+    if not isinstance(raw_source, list):
+        raise WalkRefused("walk.err.photo_assignment")
+    source = _refs(raw_source, chat_id, inspection)
+    if len(source) != len(raw_source):
+        raise WalkRefused("walk.err.photo_assignment")
+    raw_model_source = value.get("model_source_photos")
+    if not isinstance(raw_model_source, list):
+        raise WalkRefused("walk.err.photo_assignment")
+    model_source = _refs(raw_model_source, chat_id, inspection) if raw_model_source else []
+    if len(model_source) != len(raw_model_source):
+        raise WalkRefused("walk.err.photo_assignment")
+    raw_model = value.get("model_frame_indices")
+    model = frame_indices(raw_model, len(model_source))
+    assigned = frame_indices(value.get("assigned_frame_indices"), len(source))
+    if (raw_model is not None and model is None) or not assigned:
+        raise WalkRefused("walk.err.photo_assignment")
+    if photos != [source[i] for i in assigned]:
+        raise WalkRefused("walk.err.photo_assignment")
+    return {
+        "model_source_photos": model_source,
+        "model_frame_indices": list(model) if model is not None else None,
+        "source_photos": source,
+        "assigned_frame_indices": list(assigned),
+        "confirmed": True,
+    }
+
+
+def _note_photo_assignment(
+    chat_id: int, n: int, code: str, zone: str, assignment: dict[str, Any], *, also: bool = False
+) -> None:
+    # Audit failure never changes the outcome of an already committed operation.
+    try:
+        journal.note(
+            chat_id, "walk_photo_assignment", n=n, code=code, zone=zone, also=also, **assignment
+        )
+    except Exception:
+        logger.exception("Обход: журнал привязки фото не записан для %s", log_id(chat_id))
+
+
+def _attach_assigned(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
+    n = _number(body)
+    current = inspection.finding(n)
+    if current is None:
+        raise WalkRefused("walk.err.bad_request")
+    ref = _ref(body, chat_id, inspection)
+    assignment = _photo_assignment(chat_id, inspection, body, [ref])
+    attach_photo(chat_id, n, ref)
+    if assignment is not None:
+        _note_photo_assignment(chat_id, n, current.code, current.zone, assignment)
+
+
 def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     code = _code(body, "code")
     level = _code(body, "level", _LEVEL)
@@ -279,9 +340,10 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         text = _text(body, "text", required=True)
     else:
         text = _text(body, "text") or _default_text(chat_id, code, inspection.report_lang)
+    assignment = _photo_assignment(chat_id, inspection, body, photos)
     words = _text(body, "words")
     suggested, learns = _suggested(body.get("suggested"))
-    add_finding(
+    added = add_finding(
         chat_id,
         code=code,
         level=level,
@@ -297,6 +359,10 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         suggested=suggested,
         reading_c=reading_of(body),
     )
+    if assignment is not None:
+        _note_photo_assignment(
+            chat_id, added.n, code, zone, assignment, also=body.get("also") is True
+        )
     if body.get("also") is not True:
         _note_hint_choice(chat_id, body, code)
     # «Тоже»-запись по тем же кадрам (D593): слова сказаны про основной пункт,
@@ -402,7 +468,7 @@ def _finding_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> N
     elif op == "drop":
         drop_finding(chat_id, _number(body))
     elif op == "attach":
-        attach_photo(chat_id, _number(body), _ref(body, chat_id, inspection))
+        _attach_assigned(chat_id, inspection, body)
     elif op == "detach":
         ref = body.get("ref")
         if not isinstance(ref, str):

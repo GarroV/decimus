@@ -75,7 +75,15 @@ def _record_schema(picks: Sequence[str], zones: Sequence[str]) -> dict[str, Any]
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["item", "zone", "wording", "reason", "confidence", "reading_c"],
+        "required": [
+            "item",
+            "zone",
+            "wording",
+            "reason",
+            "confidence",
+            "reading_c",
+            "frame_indices",
+        ],
         "properties": {
             "item": {
                 "type": "string",
@@ -104,6 +112,15 @@ def _record_schema(picks: Sequence[str], zones: Sequence[str]) -> dict[str, Any]
             "confidence": {
                 "type": "number",
                 "description": "Уверенность от 0 до 1.",
+            },
+            "frame_indices": {
+                "type": ["array", "null"],
+                "items": {"type": "integer"},
+                "description": (
+                    "Индексы кадров, на которых виден именно этот факт, с нуля в порядке "
+                    "передачи изображений. Не привязывай чужие кадры по одному коду пункта. "
+                    "Привязка неясна — null; изображений нет — пустой список."
+                ),
             },
             "reading_c": {
                 "type": ["number", "null"],

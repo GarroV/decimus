@@ -13,7 +13,7 @@
  * Результат — одна строка «пункт · зона», зона в ней — пилюля с меню.
  * Одним кадром бывает видно два нарушения (сломанный дозатор и в нём нет мыла):
  * у невыбранной карточки есть «Тоже записать» (D593) — отмеченные пункты
- * сохраняются отдельными записями с теми же кадрами и словами, следом за
+ * сохраняются отдельными записями с подтверждёнными кадрами, следом за
  * основной; дополнительная запись требует своей явно выведенной зоны.
  * Рекомендация (D201, класс R) и общая заметка (D314, код NOTE) — без вычета,
  * текст обязателен. Замер (D0) — со стоянки «Печь и холодильники» (D315).
@@ -232,6 +232,8 @@
     if (!f.zone) return recognizing() && f.code ? "walk.sheet.need_where" : "walk.sheet.need_zone";
     if (!f.code) return "walk.sheet.need_item";
     if (readingInvalid()) return "walk.err.reading";
+    if (assignmentEnabled() && (!assignmentReady(primaryPhotoCandidate()) ||
+        extras().some(function (c) { return !assignmentReady(c); }))) return "walk.sheet.photo_assignment.need";
     if (isAdvice()) return f.text.trim() ? null : "walk.sheet.need_advice";
     if (!taken() && !f.level) return "walk.sheet.need_level";
     return null;
@@ -682,6 +684,8 @@
         line.appendChild(pill);
       }
       card.appendChild(line);
+      var assigned = photoAssignmentControl(f.picked || primaryPhotoCandidate());
+      if (assigned) card.appendChild(assigned);
       return card;
     }
     var b = W.button("walk-found__card", null, function () { if (onPick) onPick(cand); else pick(cand.code, cand); });
@@ -695,11 +699,119 @@
     var also = isAlso(cand);
     var t = W.button("walk-found__also" + (also ? " is-on" : ""), tx(also ? "walk.sheet.also_on" : "walk.sheet.also"), function () { toggleAlso(cand); });
     t.setAttribute("aria-pressed", String(also));
-    t.disabled = !extraZone(cand) || isPrimary(cand);
+    t.disabled = !also && (!extraZone(cand) || isPrimary(cand) || (assignmentEnabled() && !assignmentReady(cand)));
     if (!extraZone(cand)) t.title = tx("walk.sheet.need_zone");
     row.appendChild(b);
     row.appendChild(t);
-    return row;
+    var assigned = photoAssignmentControl(cand);
+    if (!assigned) return row;
+    var group = el("div", "walk-form__part");
+    group.appendChild(row);
+    group.appendChild(assigned);
+    return group;
+  }
+
+  /** Модель предлагает кадры; выбранная человеком привязка хранится отдельно. */
+  function assignmentEnabled() { return recognizing() && f.found && f.found.length > 1; }
+
+  function primaryPhotoCandidate() {
+    if (f.picked) return f.picked;
+    if (!f.manualPhotoCandidate || f.manualPhotoCandidate.code !== f.code) {
+      f.manualPhotoCandidate = { code: f.code, frame_indices: null, frame_count: 0 };
+    }
+    return f.manualPhotoCandidate;
+  }
+
+  function validFrameIndices(value, count) {
+    if (!Array.isArray(value)) return null;
+    var seen = [];
+    for (var i = 0; i < value.length; i++) {
+      var n = value[i];
+      if (typeof n !== "number" || Math.floor(n) !== n || n < 0 || n >= count || seen.indexOf(n) !== -1) return null;
+      seen.push(n);
+    }
+    return seen;
+  }
+
+  function frameAssignment(cand) {
+    var refs = readyPhotos().map(function (p) { return p.ref; });
+    var snapshot = JSON.stringify({ words: f.words.trim(), photos: refs });
+    var key = String(f.findId || 0) + ":" + snapshot;
+    if (cand.photoAssignment && cand.photoAssignment.key === key) return cand.photoAssignment;
+    var source = refs.filter(function (ref, i) { return refs.indexOf(ref) === i; });
+    var modelRefs = Array.isArray(cand.frame_refs) ? cand.frame_refs.slice() : [];
+    var count = cand.frame_count;
+    if (typeof count !== "number" || Math.floor(count) !== count || count < 0 || count !== modelRefs.length) {
+      count = 0; modelRefs = [];
+    }
+    var raw = validFrameIndices(cand.frame_indices, count);
+    var proposed = raw ? raw.map(function (i) { return source.indexOf(modelRefs[i]); }) : [];
+    if (proposed.some(function (i) { return i < 0; })) proposed = [];
+    cand.photoAssignment = {
+      key: key, source_photos: source, model_source_photos: modelRefs,
+      model_frame_indices: raw,
+      assigned_frame_indices: snapshot === f.asked ? proposed : [], confirmed: false,
+    };
+    return cand.photoAssignment;
+  }
+
+  function assignmentReady(cand) {
+    var state = frameAssignment(cand);
+    return state.confirmed && state.assigned_frame_indices.length > 0;
+  }
+
+  function assignmentPayload(cand) {
+    var state = frameAssignment(cand);
+    return {
+      source_photos: state.source_photos.slice(), model_source_photos: state.model_source_photos.slice(),
+      model_frame_indices: state.model_frame_indices ? state.model_frame_indices.slice() : null,
+      assigned_frame_indices: state.assigned_frame_indices.slice(), confirmed: state.confirmed,
+    };
+  }
+
+  function assignedPhotos(cand) {
+    var state = frameAssignment(cand);
+    return state.assigned_frame_indices.map(function (i) { return state.source_photos[i]; });
+  }
+
+  function photoAssignmentControl(cand) {
+    if (!assignmentEnabled()) return null;
+    var state = frameAssignment(cand);
+    var box = section(tx("walk.sheet.photo_assignment.title"), tx("walk.sheet.photo_assignment.hint"));
+    box.setAttribute("data-photo-assignment", cand.code);
+    state.source_photos.forEach(function (ref, index) {
+      var label = el("label", "walk-option");
+      var input = document.createElement("input");
+      input.type = "checkbox";
+      input.setAttribute("data-frame-index", String(index));
+      input.checked = state.assigned_frame_indices.indexOf(index) !== -1;
+      input.addEventListener("change", function () {
+        state.assigned_frame_indices = state.assigned_frame_indices.filter(function (i) { return i !== index; });
+        if (input.checked) state.assigned_frame_indices.push(index);
+        state.assigned_frame_indices.sort(function (a, b) { return a - b; });
+        state.confirmed = false;
+        redraw("item", "footer");
+      });
+      label.appendChild(input);
+      var photo = readyPhotos().filter(function (p) { return p.ref === ref; })[0];
+      if (photo && W.photo.thumb) label.appendChild(W.photo.thumb(photo));
+      label.appendChild(el("span", null, tx("walk.sheet.photo_assignment.frame", { n: index + 1 })));
+      box.appendChild(label);
+    });
+    var label = el("label", "walk-option");
+    var confirm = document.createElement("input");
+    confirm.type = "checkbox";
+    confirm.setAttribute("data-photo-confirm", "");
+    confirm.checked = state.confirmed;
+    confirm.disabled = !state.assigned_frame_indices.length;
+    confirm.addEventListener("change", function () {
+      state.confirmed = confirm.checked;
+      redraw("item", "footer");
+    });
+    label.appendChild(confirm);
+    label.appendChild(el("span", null, tx("walk.sheet.photo_assignment.confirm")));
+    box.appendChild(label);
+    return box;
   }
 
   /** Равенство кандидатов: известная пара «пункт + зона», либо тот же объект. */
@@ -716,7 +828,7 @@
   function isAlso(cand) { return f.also.some(function (c) { return sameCandidate(c, cand); }); }
 
   function toggleAlso(cand) {
-    if (!extraZone(cand) || isPrimary(cand)) return;
+    if (!isAlso(cand) && (!extraZone(cand) || isPrimary(cand) || (assignmentEnabled() && !assignmentReady(cand)))) return;
     f.also = isAlso(cand) ? f.also.filter(function (c) { return !sameCandidate(c, cand); }) : f.also.concat([cand]);
     W.haptic();
     redraw("item", "footer");
@@ -841,7 +953,7 @@
         var was = stale();
         f.words = area.value;
         changed();
-        if (was !== stale()) redraw("item", "footer");
+        if (was !== stale() || assignmentEnabled()) redraw("item", "footer");
       });
       box.appendChild(area);
       // Голос (D652): рассказ в пустое поле сразу запускает поиск пункта — то же, что «Найти пункт».
@@ -1152,13 +1264,13 @@
     return parseReading(f.reading);
   }
 
-  /** «Тоже»-записи (D593): те же кадры и слова, синоним по ним не учится — слова про основной пункт. */
+  /** «Тоже»-записи (D593): свои подтверждённые кадры; слова не учат синоним второго пункта. */
   function extraOps() {
-    var photos = readyPhotos().map(function (p) { return p.ref; });
     return extras().map(function (c) {
       return {
         op: "add", zone: extraZone(c), code: c.code, level: extraLevel(c), text: (c.wording || "").trim(),
-        comment: "", repeat: false, photos: photos, words: f.words.trim(), also: true,
+        comment: "", repeat: false, photos: assignedPhotos(c), words: f.words.trim(), also: true,
+        photo_assignment: assignmentPayload(c),
         suggested: { code: c.code, level: c.level, zone: c.zone, confidence: c.confidence, via: f.via },
         reading_c: c.reading_c === undefined ? null : c.reading_c,
       };
@@ -1166,14 +1278,24 @@
   }
 
   function ops() {
-    var refs = readyPhotos().filter(function (p) { return p.fresh; }).map(function (p) { return p.ref; });
+    var assigned = assignmentEnabled() ? primaryPhotoCandidate() : null;
+    var photos = assigned ? assignedPhotos(assigned) : readyPhotos().map(function (p) { return p.ref; });
+    var refs = readyPhotos().filter(function (p) { return p.fresh && photos.indexOf(p.ref) !== -1; }).map(function (p) { return p.ref; });
     var t = taken();
-    if (t) return refs.map(function (ref) { return { op: "attach", n: t.n, ref: ref }; }).concat(extraOps());
+    if (t) return refs.map(function (ref) {
+      var body = { op: "attach", n: t.n, ref: ref };
+      if (assigned) {
+        body.photo_assignment = assignmentPayload(assigned);
+        body.photo_assignment.assigned_frame_indices = [body.photo_assignment.source_photos.indexOf(ref)];
+      }
+      return body;
+    }).concat(extraOps());
     if (!f.n) {
       return [{
         op: "add", zone: f.zone, code: f.code, level: isAdvice() ? ADVICE_LEVEL : f.level, text: f.text.trim(),
         comment: f.comment.trim(), repeat: !!f.repeat && repeatOffered(),
-        photos: readyPhotos().map(function (p) { return p.ref; }),
+        photos: photos,
+        photo_assignment: assigned ? assignmentPayload(assigned) : null,
         words: f.words.trim(), suggested: suggested(), reading_c: readingValue(),
         hint_codes: f.hintCodes || [],
       }].concat(extraOps());

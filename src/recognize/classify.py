@@ -22,6 +22,7 @@ from .cues import class_thresholds
 from .guard import MAX_QUESTION_CHARS, MAX_REASON_CHARS, MAX_WORDING_CHARS, clean_text
 from .models import ANSWER_LEVELS, NONE_CODE, UNKNOWN_ZONE, Answer, Candidate, Suggestion
 from .prompt import catalog_text, correction_line, instructions, question_text, readings_line
+from .provenance import frame_indices
 from .rules_check import check_wording
 from .schema import picks_for, response_schema, split_pick
 from .shortlist import shortlist
@@ -86,7 +87,7 @@ def framed(note: str, frames: int) -> bool:
     return bool(note.strip()) and frames >= 1
 
 
-def _candidate(record: dict[str, Any]) -> Candidate | None:
+def _candidate(record: dict[str, Any], frame_count: int = 0) -> Candidate | None:
     """Один кандидат из ответа модели. Зона берётся её ответом, и только им.
 
     `UNKNOWN` подсказкой НЕ подменяется (T264, #218). Раньше подменялся, и это
@@ -111,6 +112,7 @@ def _candidate(record: dict[str, Any]) -> Candidate | None:
         confidence=_clamp(record.get("confidence")),
         reason=reason,
         reading_c=_reading(record.get("reading_c")),
+        frame_indices=frame_indices(record.get("frame_indices"), frame_count),
         # Промпт запрещает додумывать масштаб, повреждение и похвалу (правила
         # 2-4), но у текста нет enum — соблюдение проверяется здесь, вторым
         # слоем, а не только просьбой в инструкции.
@@ -131,14 +133,16 @@ def _reading(value: Any) -> float | None:
     return reading if READING_MIN_C <= reading <= READING_MAX_C else None
 
 
-def _candidates(raw: Any, settings: RecognizeSettings) -> tuple[Candidate, ...]:
+def _candidates(
+    raw: Any, settings: RecognizeSettings, frame_count: int = 0
+) -> tuple[Candidate, ...]:
     """Кандидаты из списка записей ответа; мусор и NONE отбрасываются."""
     records = raw if isinstance(raw, list) else []
     return tuple(
         c
         for record in records
         if isinstance(record, dict)
-        for c in (_candidate(record),)
+        for c in (_candidate(record, frame_count),)
         if c is not None
     )[: settings.max_candidates]
 
@@ -177,8 +181,9 @@ def _suggestion(
     settings: RecognizeSettings,
     *,
     used_photo: bool,
+    frame_count: int = 0,
 ) -> Suggestion:
-    candidates = _candidates(payload.get("records"), settings)
+    candidates = _candidates(payload.get("records"), settings, frame_count)
     question = clean_text(str(payload.get("question", "")), MAX_QUESTION_CHARS)
     top = candidates[0] if candidates else None
     needs_human = (
@@ -237,6 +242,7 @@ class PreparedRequest:
     used_photo: bool
     album: bool
     reading_c: float | None
+    frame_count: int = 0
     #: Строки словаря подсказок, поднятые словами аудитора, — пункты с первым
     #: допустимым классом; запас на случай, когда модель спрашивает (D597).
     cue_rows: tuple[tuple[tuple[str, str], ...], ...] = ()
@@ -320,6 +326,7 @@ def prepare_request(
         used_photo=use_photo,
         album=album,
         reading_c=reading_c,
+        frame_count=len(ask.photos) + int(ask.photo is not None),
         cue_rows=tuple(
             tuple((code, get_item(code, chat_id=chat_id).levels[0]) for code in row)
             for row in picked.cue_rows
@@ -381,10 +388,19 @@ def with_cue_extras(found: Suggestion, cue_rows: Sequence[Sequence[tuple[str, st
 def finish(request: PreparedRequest, answer: ModelAnswer) -> Suggestion:
     """Разобрать ответ модели на собранный запрос в предложение."""
     found = replace(
-        _suggestion(answer.payload, answer.usage, request.settings, used_photo=request.used_photo),
+        _suggestion(
+            answer.payload,
+            answer.usage,
+            request.settings,
+            used_photo=request.used_photo,
+            frame_count=request.frame_count,
+        ),
         shortlist=request.shortlist,
+        frame_count=request.frame_count,
         also_seen=(
-            _candidates(answer.payload.get("also_seen"), request.settings) if request.album else ()
+            _candidates(answer.payload.get("also_seen"), request.settings, request.frame_count)
+            if request.album
+            else ()
         ),
     )
     found = with_cue_extras(found, request.cue_rows)

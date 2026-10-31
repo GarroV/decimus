@@ -39,6 +39,7 @@ from src.domain.log_ids import log_id
 from src.domain.model_usage import KIND_SUGGEST, usage_scope
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.models import Candidate
+from src.recognize.provenance import frame_indices
 from src.recognize.timing import collect, measure, report
 
 from .server_limits import walk_model_gate
@@ -98,6 +99,10 @@ def _card(c: Candidate, offer: Offer, ask: Ask) -> dict[str, Any]:
         hint=ask.hint,
         usual=lambda: _usual_zone(ask.tenant, c.code),
     )
+    count = offer.suggestion.frame_count if offer.suggestion else 0
+    model_refs = ask.frame_refs[:count]
+    count = len(model_refs)
+    proposed_frames = frame_indices(c.frame_indices, count)
     return {
         "code": c.code,
         "level": c.level,
@@ -107,6 +112,9 @@ def _card(c: Candidate, offer: Offer, ask: Ask) -> dict[str, Any]:
         # Показание термометра, прочитанное моделью (#836): форма показывает его
         # числовым полем, и аудитор его правит.
         "reading_c": c.reading_c,
+        "frame_indices": list(proposed_frames) if proposed_frames is not None else None,
+        "frame_count": count,
+        "frame_refs": list(model_refs),
         # Пометки проверки правил (`rules_check`): бот их показывал, а обход —
         # нет, и служебная оговорка модели уехала в отчёт как текст записи (#970).
         "flags": list(c.flags),
@@ -138,6 +146,7 @@ class Ask:
     hint: str | None
     #: Пространство проверки — для привычной зоны пункта (#1109). Пусто — не спрашивать.
     tenant: str | None = None
+    frame_refs: tuple[str, ...] = ()
 
 
 def _count(value: Any) -> int:
@@ -235,7 +244,8 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             zone = _code(body, hint_key) if body.get(hint_key) else None
             photos, omitted = cap_photos(body.get("photos"))
             with measure("frames"):
-                frames = _frames(_refs(photos, who, inspection))
+                frame_refs = _refs(photos, who, inspection)
+                frames = _frames(frame_refs)
             # Расход модели (D537): подбор на экране — свой вид вызова.
             with (
                 measure("propose"),
@@ -274,6 +284,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
                 spoken=zone_from_words(words, chat_id=who),
                 hint=zone,
                 tenant=inspection.tenant,
+                frame_refs=tuple(frame_refs),
             )
             reply = answer(offer, ask)
         # Что ушло в поиск и что вернулось (#367) — тем же журналом, что у
