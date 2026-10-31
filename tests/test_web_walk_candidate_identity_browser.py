@@ -35,17 +35,17 @@ def load_sheet(page, cards):
       window.cards = cards;
       window.ops = [];
       W.state.data = {
-        key:'synthetic', lang:'en',
+        key:'synthetic', run_id:'synthetic-run', lang:'en',
         texts:{'walk.sheet.save_n':'Save {n}', 'walk.sheet.save':'Save'},
         items:[{code:'SYN01', q:'Synthetic item', process:'Synthetic', levels:['D1'],
                 zones:['zone_a','zone_b'], measure:false}],
         zones:[{code:'zone_a',title:'Zone A',recorded:[],previous:[]},
                {code:'zone_b',title:'Zone B',recorded:[],previous:[]}]
       };
-      const draft = {mode:'violation', words:'Synthetic observation',photos:['synthetic-ref']};
+      const draft = {run_id:'synthetic-run',mode:'violation', words:'Synthetic observation',photos:['synthetic-ref']};
       W.local = {get:()=>draft,set:()=>{},drop:()=>{}};
       W.photo = {block:()=>W.el('div'),closeCamera:()=>false};
-      W.offline = {available:()=>false};
+      W.offline = {available:()=>false,recovery:async()=>[]};
       W.voiceBar = W.translateBar = ()=>null;
       W.menu = {close:()=>{},open:opts=>window.menu=opts};
       W.toast = W.apply = ()=>{};

@@ -140,7 +140,7 @@ def test_push_roundtrip_keeps_photo_only_packet_and_is_idempotent(
     monkeypatch.setattr("src.db.push.get_state", lambda _: snapshot)
     inspection = push_inspection(chat)
     assert push_inspection(chat) == inspection
-    detail = get_inspection(inspection, reach=own_reach("HQ"))
+    detail = get_inspection(inspection, reach=own_reach("HQ"), include_on_review=True)
     assert detail is not None
     assert [(field.code, field.text) for field in detail.info] == [("INF08", "")]
     with psycopg.connect(db_env) as conn:
