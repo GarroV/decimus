@@ -591,6 +591,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0104_mailing_templates.sql` | Шаблоны писем УК (D550, D608, #977, #1130): текст письма партнёру по проверке, который правит админ УК, с историей версий |
 | `0105_dodois_metrics.sql` | Данные Dodo IS для страницы «Качество» по пиццериям и месяцам (D671): продажи по источнику и каналу, заказы агрегаторов, оценки клиентов (КР), оценки РКО и РС по… |
 | `0106_inspection_timing.sql` | Historical rows deliberately stay NULL; no inference or backfill |
+| `0107_inspection_info_photo_answers.sql` | Info and photo metadata are inserted in the same push transaction, so this invariant is checked at commit rather than before the photo INSERT exists |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
