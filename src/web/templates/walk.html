@@ -2,7 +2,7 @@
   Мини-апп обхода в Telegram (#418). Страница пустая и одинаковая для всех:
   данные приходят из `walk_data` после того, как скрипт предъявит подпись
   Telegram, а рисуют их скрипты `static/walk-*.js` (порядок подключения важен:
-  core → photo → menu → sheet → app → finish → hints → walk). Адреса записи (D312) — в атрибутах `main`. Своего каркаса админки (панель,
+  core → photo → menu → sheet → app → finish → hints → walk → timing). Адреса записи (D312) — в атрибутах `main`. Своего каркаса админки (панель,
   поиск, тема) здесь нет — это второй экран аудитора, а не раздел админки.
 
   `telegram-web-app.js` — с telegram.org и без `integrity`: Telegram требует
@@ -37,6 +37,7 @@
   <script src="{{ url_for('static', filename='walk-hints.js') }}" defer></script>
   <script src="{{ url_for('static', filename='walk-unseen.js') }}" defer></script>
   <script src="{{ url_for('static', filename='walk.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='walk-timing.js') }}" defer></script>
 </head>
 <body class="walk">
   <main id="walk" class="walk__root"

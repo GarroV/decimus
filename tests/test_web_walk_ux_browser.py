@@ -240,3 +240,111 @@ def test_kind_labels_and_code_tokens_distinguish_information_and_violations(page
         "nodes=>nodes.map(node=>getComputedStyle(node).backgroundColor)"
     )
     assert len(set(backgrounds)) == 3
+
+
+def timing_ui(page, timing, sealed=False, home=False):
+    page.evaluate(
+        """({timing,sealed,home}) => {
+          window.mono=0; window.tick=null; window.intervals=0; window.clears=0;
+          Object.defineProperty(performance,'now',{configurable:true,value:()=>mono});
+          window.setInterval=callback=>{tick=callback;intervals++;return intervals;};
+          window.clearInterval=()=>clears++;
+          const W=DecimusWalk;
+          W.state.data.timing=timing; W.state.data.state='active'; W.state.data.sealed=sealed;
+          W.app={route:home?'home':'walk'};
+          window.redrawTiming=()=>{
+            W.root.innerHTML=home?'<section class="walk-app__card"></section>':
+              '<header class="walk-top"><div class="walk-top__row"></div></header>';
+          };
+          redrawTiming();
+          const translate=W.tx;
+          W.tx=key=>({'walk.timing.active':'Идёт проверка',
+            'walk.timing.finished':'Длительность проверки',
+            'walk.timing.unknown':'Время не фиксировалось',
+            'walk.timing.unavailable':'Время недоступно'}[key]||translate(key));
+        }""",
+        {"timing": timing, "sealed": sealed, "home": home},
+    )
+    page.add_script_tag(path=str(STATIC / "walk-timing.js"))
+
+
+def active_timing():
+    return {
+        "started_at": "2026-10-31T11:59:30+00:00",
+        "finished_at": None,
+        "duration_seconds": None,
+        "server_now": "2026-10-31T12:00:00+00:00",
+    }
+
+
+def test_active_timing_uses_server_offset_and_monotonic_elapsed_across_render(page):
+    timing_ui(page, active_timing())
+    assert page.locator(".walk-timing__value").inner_text() == "≈ 00:00:30"
+    page.evaluate("mono=5000; Date.now=()=>0; tick()")
+    assert page.locator(".walk-timing__value").inner_text() == "≈ 00:00:35"
+    page.evaluate("mono=10000; redrawTiming()")
+    page.wait_for_function(
+        "document.querySelector('.walk-timing__value')?.textContent==='≈ 00:00:40'"
+    )
+    page.evaluate("""() => {
+      DecimusWalk.state.data.timing={...DecimusWalk.state.data.timing,
+        server_now:'2026-10-31T12:00:20+00:00'};
+      redrawTiming();
+    }""")
+    page.wait_for_function(
+        "document.querySelector('.walk-timing__value')?.textContent==='≈ 00:00:50'"
+    )
+
+
+def test_finished_timing_is_authoritative_and_frozen_on_home(page):
+    timing = active_timing() | {
+        "finished_at": "2026-10-31T12:10:00+00:00",
+        "duration_seconds": 95.8,
+    }
+    timing_ui(page, timing, sealed=True, home=True)
+    assert page.locator(".walk-timing__value").inner_text() == "00:01:35"
+    assert page.locator(".walk-timing__label").inner_text() == "Длительность проверки"
+    assert page.evaluate("intervals") == 0
+    page.evaluate("mono=999999999; redrawTiming()")
+    page.wait_for_function(
+        "document.querySelector('.walk-timing__value')?.textContent==='00:01:35'"
+    )
+
+
+@pytest.mark.parametrize(
+    "change,label",
+    [
+        ({"started_at": None}, "Время не фиксировалось"),
+        ({"started_at": "broken"}, "Время недоступно"),
+        ({"started_at": "2026-02-31T11:59:30Z"}, "Время недоступно"),
+        ({"server_now": "broken"}, "Время недоступно"),
+        ({"server_now": "2026-10-31T11:58:00Z"}, "Время недоступно"),
+        ({"started_at": "2026-10-31T11:59:30"}, "Время недоступно"),
+        ({"finished_at": "2026-10-31T12:10:00Z", "duration_seconds": -1}, "Время недоступно"),
+        ({"finished_at": "2026-10-31T12:10:00Z", "duration_seconds": None}, "Время недоступно"),
+    ],
+)
+def test_unknown_and_invalid_timing_do_not_fabricate_zero(page, change, label):
+    timing_ui(page, active_timing() | change)
+    assert page.locator(".walk-timing").inner_text() == label
+    assert page.locator(".walk-timing__value").count() == 0
+    assert page.evaluate("intervals") == 0
+
+
+def test_timing_route_and_page_lifecycle_stop_interval_and_keep_monotonic_anchor(page):
+    timing_ui(page, active_timing())
+    assert page.evaluate("intervals") == 1
+    page.evaluate("window.dispatchEvent(new Event('pagehide'))")
+    assert page.evaluate("clears") == 1
+    page.evaluate("mono=5000; window.dispatchEvent(new Event('pageshow'))")
+    assert page.locator(".walk-timing__value").inner_text() == "≈ 00:00:35"
+    assert page.evaluate("intervals") == 2
+    page.evaluate("DecimusWalk.root.innerHTML='<div>Settings</div>'")
+    page.wait_for_function("clears===2")
+    assert page.locator(".walk-timing").count() == 0
+
+
+def test_missing_timing_does_not_invent_a_clock(page):
+    timing_ui(page, None)
+    assert page.locator(".walk-timing").count() == 0
+    assert page.evaluate("intervals") == 0
