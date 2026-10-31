@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Literal, TypedDict
 
 from src import domain
 from src.db import translate_modes
@@ -53,9 +54,14 @@ def mode_of(chat_id: int) -> str:
     return mode if mode in translate_modes.MODES else translate_modes.DEFAULT_MODE
 
 
-def _fields(finding: domain.Finding) -> dict[str, str]:
+class _TranslatedFields(TypedDict, total=False):
+    comment: str
+    text: str
+
+
+def _fields(finding: domain.Finding) -> dict[Literal["comment", "text"], str]:
     """Поля записи со свободным текстом аудитора и их значения; пустые не берём."""
-    fields = {"comment": finding.comment}
+    fields: dict[Literal["comment", "text"], str] = {"comment": finding.comment}
     if finding.level == ADVICE_LEVEL:
         fields["text"] = finding.text
     return {name: value for name, value in fields.items() if value.strip()}
@@ -77,7 +83,7 @@ def translate_comments(chat_id: int, inspection: domain.Inspection) -> int:
 def _translate_findings(chat_id: int, inspection: domain.Inspection, target: str) -> int:
     failed = 0
     for finding in inspection.findings:
-        done: dict[str, str] = {}
+        done: _TranslatedFields = {}
         for name, source in _fields(finding).items():
             try:
                 translated = translate_text(source, lang=target)
