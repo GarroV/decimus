@@ -87,13 +87,13 @@
        а выполняется на месте. На странице карточки — раскрывающимся подтверждением. #}
     {% if c.may_accept %}
       {% if panel %}
-        <form method="post" action="{{ full }}/accept?lang={{ lang }}" data-panel-form>
+        <form method="post" action="{{ full }}/accept?lang={{ lang }}" data-panel-form data-accept-guard data-unsaved="{{ t('proofread.unsaved') }}" data-inflight="{{ t('proofread.inflight') }}">
           <button class="hbtn hbtn--primary" type="submit">{{ icon('check') }}<span>{{ t('accept.title') }}</span></button>
         </form>
       {% else %}
         {% call _pop('accept', 'check', t('accept.title'), 'hbtn--primary') %}
           <p class="field-note">{{ t('accept.hint') }}</p>
-          <form method="post" action="{{ full }}/accept?lang={{ lang }}" class="hact__form">
+          <form method="post" action="{{ full }}/accept?lang={{ lang }}" class="hact__form" data-accept-guard data-unsaved="{{ t('proofread.unsaved') }}" data-inflight="{{ t('proofread.inflight') }}">
             <button class="btn btn--primary btn--sm" type="submit">{{ t('accept.submit') }}</button>
           </form>
         {% endcall %}

@@ -21,7 +21,7 @@ import re
 import unicodedata
 from collections.abc import Sequence
 
-from src.domain import Zone, get_item
+from src.domain import Zone, get_item, list_items
 
 from .models import NONE_CODE, UNKNOWN_ZONE
 from .schema import PICK_SEP
@@ -153,7 +153,8 @@ def rules_text() -> str:
 TAG_NOTE = "untrusted_auditor_note"
 TAG_ITEM = "checklist_item_text"
 TAG_ZONE = "zone_title"
-_DATA_TAGS = (TAG_NOTE, TAG_ITEM, TAG_ZONE)
+TAG_CLARIFICATIONS = "untrusted_clarifications"
+_DATA_TAGS = (TAG_NOTE, TAG_ITEM, TAG_ZONE, TAG_CLARIFICATIONS)
 _TAG_LIKE = re.compile(r"<(\s*/?\s*(?:" + "|".join(_DATA_TAGS) + r")\b)", re.IGNORECASE)
 
 DATA_BLOCKS_LINE = (
@@ -214,6 +215,10 @@ def instructions(thresholds: str) -> str:
         f"{thresholds}\n\n"
         "Формулировку пиши на языке, на котором задан перечень пунктов. Пиши только "
         "то, что видно в кадре или сказано аудитором.\n\n"
+        "ПРИВЯЗКА ФОТО. Для каждой записи перечисли в frame_indices только индексы "
+        "кадров, подтверждающих этот факт. Индексы с нуля, в порядке изображений; "
+        "один кадр может подтверждать несколько фактов. Не назначай все фото всем "
+        "записям. Если привязку установить нельзя — null.\n\n"
         "ТЕМПЕРАТУРА. Показание термометра или щупа с кадра отдай в поле `reading_c` "
         "числом в градусах Цельсия — ровно то, что видишь; нет замера или цифры не видно — "
         "null. Класс по температуре выбирай по этому числу и порогам выше. Температура, "
@@ -235,12 +240,19 @@ def _pick_lines(picks: Sequence[str], lang: str, chat_id: int | None) -> str:
     по нему же, и подписать его словами другого издания значило бы показать
     модели один пункт под названием другого.
     """
+    # Перечень одного запроса — свежий снимок издания, без кеша между
+    # обращениями. Раньше каждый класс заново читал и разбирал весь CSV.
+    has_items = any(pick.partition(PICK_SEP)[2] for pick in picks)
+    items = {item.code: item for item in list_items(chat_id=chat_id)} if has_items else {}
     lines: list[str] = []
     for pick in picks:
         code, _, level = pick.partition(PICK_SEP)
         if not level:
             continue
-        question = get_item(code, chat_id=chat_id).question(lang)
+        item = items.get(code.strip().upper())
+        if item is None:
+            item = get_item(code, chat_id=chat_id)
+        question = item.question(lang)
         lines.append(f"- {pick} — {data_block(TAG_ITEM, question)}")
     return "\n".join(lines)
 

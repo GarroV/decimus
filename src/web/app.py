@@ -113,7 +113,7 @@ from . import methodology as method
 from . import methodology_view as mview
 from . import unit_card as unit_data
 from .config import Settings, load_settings
-from .dates import human_day
+from .dates import human_day, human_duration
 from .db_refusal import domain_reason, public_reason
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
@@ -314,6 +314,7 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "country_title": lambda code: country_title(code, lang),
             # Дата на экран — месяцем словом: `10.12.2026` путают с октябрём (#963).
             "day": lambda value: human_day(value, lang),
+            "duration": lambda seconds: human_duration(seconds, lang),
             # Пункт чек-листа на экран — меткой «Порядок 13», не кодом (20.10.2026);
             # по действующей методике. Карточка проверки подставляет свои — по версии проверки.
             "item_label": lambda code: item_labels.current_label(code, lang),
@@ -1036,6 +1037,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                     tenant=auth.current_tenant(),
                     lang=lang,
                     editor=_editor(),
+                    code_text_reviewed=request.form.get("code_text_reviewed") == "1",
                     **поля,
                 )
                 notice = t("revise.done", lang)
@@ -1740,7 +1742,19 @@ def _card_context(
     except DbError:
         отчёт = None
         отчёт_известен = False
-    поля, методика_полей = data.load_info(detail, lang=lang)
+    кадры_ответов: dict[str, Any] = {}
+    кадры_ответов_известны = True
+    if detail.info:
+        try:
+            кадры_ответов = data.load_info_previews(inspection_id, reach=auth.current_reach())
+        except DbError as exc:
+            кадры_ответов_известны = False
+            logger.warning(
+                "Фотографии информационных ответов не прочитались (%s)", type(exc).__name__
+            )
+    поля, методика_полей = data.load_info(
+        detail, lang=lang, photo_map=кадры_ответов, photos_known=кадры_ответов_известны
+    )
     # Пункт на экран идёт меткой «Порядок 13», а не кодом (20.10.2026); тексты —
     # методики версии этой проверки.
     метка_пункта, метка_с_текстом = item_labels.pinned(detail.inspection.checklist_version, lang)

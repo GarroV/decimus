@@ -11,9 +11,61 @@
 from __future__ import annotations
 
 from .texts_app import APP_TEXTS
+from .texts_edit import EDIT_TEXTS
 from .texts_hints import HINT_TEXTS
+from .texts_level import LEVEL_TEXTS
+from .texts_split import SPLIT_TEXTS
 
 WALK_TEXTS: dict[str, dict[str, str]] = {
+    "walk.sheet.search_tag.dirty": {"ru": "Грязно", "en": "Dirty"},
+    "walk.sheet.search_tag.expired": {"ru": "Просрочка", "en": "Expired"},
+    "walk.sheet.search_tag.segregation": {"ru": "Товарное соседство", "en": "Food segregation"},
+    "walk.sheet.search_tag.labels": {"ru": "Маркировки", "en": "Labels"},
+    "walk.sheet.search_clear_tags": {"ru": "Снять фильтры", "en": "Clear filters"},
+    "walk.err.run_changed": {
+        "ru": "Начата другая проверка. Обновите экран; черновик прежней сохранён на устройстве.",
+        "en": (
+            "Another inspection has started. Refresh the screen; "
+            "the old draft is kept on this device."
+        ),
+    },
+    "walk.draft.marks": {"ru": "Отметки прежнего обхода", "en": "Marks from an earlier walk"},
+    "walk.draft.marks_preview": {
+        "ru": "Осмотренные зоны: {zones}\nПерепроверенные пункты: {findings}",
+        "en": "Checked zones: {zones}\nRechecked items: {findings}",
+    },
+    "walk.draft.marks_confirm": {
+        "ru": (
+            "Перенести эти отметки в текущую проверку? Подтвердите, что они относятся "
+            "к ней. Исходная копия сохранится."
+        ),
+        "en": (
+            "Copy these marks into the current inspection? Confirm they belong to it. "
+            "The original will be kept."
+        ),
+    },
+    "walk.draft.recovery": {"ru": "Черновик прежнего обхода", "en": "Draft from an earlier walk"},
+    "walk.draft.unknown": {
+        "ru": (
+            "Начало этого черновика неизвестно. Проверьте текст и кадры перед "
+            "переносом в текущую проверку. Исходная копия сохранится."
+        ),
+        "en": (
+            "This draft's inspection is unknown. Review its text and photos before "
+            "copying into this inspection. The original will be kept."
+        ),
+    },
+    "walk.draft.copy": {"ru": "Перенести в эту проверку…", "en": "Copy into this inspection…"},
+    "walk.draft.confirm": {
+        "ru": (
+            "Заменить текущую незавершённую форму этим черновиком и перенести "
+            "показанные кадры? Подтвердите, что они относятся к этой проверке."
+        ),
+        "en": (
+            "Replace the current unsaved form with this draft and copy the photos "
+            "shown? Confirm they belong to this inspection."
+        ),
+    },
     "walk.progress": {
         "ru": "Осмотрено зон: {done} из {total}",
         "en": "Zones checked: {done} of {total}",
@@ -47,6 +99,15 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.tile.done": {"ru": "осмотрено", "en": "checked"},
     "walk.tile.todo": {"ru": "не были", "en": "not yet"},
     "walk.tile.started": {"ru": "в работе", "en": "in progress"},
+    "walk.sheet.context_other_zone": {
+        "ru": "Перейти к замерам другой зоны",
+        "en": "Go to measurements in another zone",
+    },
+    "walk.sheet.context_kept": {
+        "ru": "Текущий черновик останется в зоне «{zone}».",
+        "en": "The current draft will stay in “{zone}”.",
+    },
+    "walk.zone.measure_here": {"ru": "Измерения в этой зоне", "en": "Measurements in this zone"},
     "walk.zone.measure_add": {"ru": "внести", "en": "add"},
     "walk.zone.need_prev": {
         "ru": "Сначала отметьте прошлое замечание: исправлено или нет.",
@@ -62,6 +123,16 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Нажмите пункт, чтобы записать по нему нарушение.",
         "en": "Tap an item to record a finding against it.",
     },
+    "walk.timing.active": {"ru": "Идёт проверка", "en": "Inspection in progress"},
+    "walk.timing.finished": {"ru": "Длительность проверки", "en": "Inspection duration"},
+    "walk.timing.unknown": {"ru": "Время не фиксировалось", "en": "Time was not recorded"},
+    "walk.timing.unavailable": {"ru": "Время недоступно", "en": "Time unavailable"},
+    "walk.cl.hide": {"ru": "Скрыть пункт памятки", "en": "Hide checklist item"},
+    "walk.cl.show": {"ru": "Показать скрытый пункт", "en": "Show hidden item"},
+    "walk.item.kind.info": {"ru": "Информация", "en": "Information"},
+    "walk.item.kind.violation": {"ru": "Нарушение", "en": "Violation"},
+    "walk.item.kind.advice": {"ru": "Рекомендация", "en": "Recommendation"},
+    "walk.sheet.search_tags": {"ru": "Поиск по процессу", "en": "Search by process"},
     "walk.cl.was": {"ru": "было", "en": "last time"},
     "walk.unseen.title": {"ru": "Ещё не смотрели", "en": "Not looked at yet"},
     "walk.unseen.info": {"ru": "Замеры без баллов:", "en": "Readings, no points:"},
@@ -76,6 +147,127 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.zone.ic.found_open": {
         "ru": "в работе, нарушений: {count}",
         "en": "in progress, issues: {count}",
+    },
+    "walk.finish.native.photos_pending": {
+        "ru": "Дождитесь загрузки кадров, повторите отправку или отмените вложение.",
+        "en": "Wait for the photos, retry their upload or remove the attachment.",
+    },
+    "walk.finish.native.photo_answer": {"ru": "Ответ фотографиями", "en": "Photo answer"},
+    "walk.finish.native.photo_value_required": {
+        "ru": "К фото даты или ответа «да/нет» добавьте значение либо отмените вложение.",
+        "en": "Enter the date or yes/no answer for these photos, or remove the attachment.",
+    },
+    "walk.finish.photos.hint": {
+        "ru": "Фото к этому ответу. Подпись — только ваши слова; сохранённые кадры остаются.",
+        "en": "Photos for this answer. Captions use your words only; saved photos are retained.",
+    },
+    "walk.finish.photos.add": {"ru": "Добавить фото ответа", "en": "Add answer photos"},
+    "walk.sheet.remaining_material": {
+        "ru": "Запись сохранена. Неиспользованных кадров в черновике: {n}.",
+        "en": "Record saved. Unused photos remaining in the draft: {n}.",
+    },
+    "walk.sheet.save_conflict": {
+        "ru": (
+            "Запись изменилась. Сверьте сохранённые записи перед повтором; "
+            "ввод и кадры остаются в черновике."
+        ),
+        "en": (
+            "The record changed. Review saved records before retrying; "
+            "your input and photos remain in the draft."
+        ),
+    },
+    "walk.finish.photos.failed": {"ru": "Повторите отправку", "en": "Retry upload"},
+    "walk.finish.photos.no_storage": {
+        "ru": (
+            "Хранилище телефона недоступно. Не закрывайте форму: повторите загрузку "
+            "или отмените вложение."
+        ),
+        "en": "Device storage is unavailable. Keep this form open; retry or remove the attachment.",
+    },
+    "walk.finish.native.loading": {
+        "ru": "Загружаем актуальную проверку…",
+        "en": "Loading the current inspection…",
+    },
+    "walk.finish.native.details": {
+        "ru": "Сведения и обратная связь",
+        "en": "Visit details and feedback",
+    },
+    "walk.finish.native.optional": {
+        "ru": (
+            "Все поля необязательны. Заполните известное; пустые ответы можно пропустить. "
+            "Текст обратной связи сохраняется без автоматического перевода."
+        ),
+        "en": (
+            "All fields are optional. Record what you know; unanswered fields can be skipped. "
+            "Feedback text is saved without automatic translation."
+        ),
+    },
+    "walk.finish.native.feedback_language": {
+        "ru": (
+            "Текст обратной связи на языке {lang} не включается в отчёт и письмо "
+            "на выбранном языке. Вернитесь к сведениям для смены языка отчёта."
+        ),
+        "en": (
+            "Feedback text recorded in {lang} is omitted from the report and letter "
+            "in the selected language. Return to details to change the report language."
+        ),
+    },
+    "walk.finish.native.skip": {"ru": "Не отвечать", "en": "No answer"},
+    "walk.finish.native.saved": {"ru": "Сохранено: {value}", "en": "Saved: {value}"},
+    "walk.finish.native.review": {"ru": "Проверить итог", "en": "Review the summary"},
+    "walk.finish.native.chat": {"ru": "Продолжить в чате", "en": "Continue in chat"},
+    "walk.finish.native.records": {
+        "ru": "Зафиксировано записей: {count}",
+        "en": "Recorded entries: {count}",
+    },
+    "walk.finish.native.not_answered": {
+        "ru": "Не заполнено — в отчёте не печатается",
+        "en": "Unanswered — omitted from the report",
+    },
+    "walk.finish.native.advice": {
+        "ru": "Добавить рекомендацию или заметку",
+        "en": "Add a recommendation or note",
+    },
+    "walk.finish.native.pick_language": {"ru": "Выберите язык", "en": "Choose a language"},
+    "walk.finish.native.skip_confirm": {
+        "ru": "Пропустить незаполненные сведения; не добавлять ответы за меня.",
+        "en": "Skip unanswered visit details; do not invent answers.",
+    },
+    "walk.finish.native.confirm": {
+        "ru": "Я проверил записи и обратную связь. Подтверждаю завершение и формирование отчёта.",
+        "en": (
+            "I reviewed the records and feedback. I confirm finishing the inspection "
+            "and building the report."
+        ),
+    },
+    "walk.finish.native.confirm_required": {
+        "ru": "Подтвердите итог и пропуск незаполненных полей.",
+        "en": "Confirm the summary and any unanswered fields you want to skip.",
+    },
+    "walk.finish.native.submit": {
+        "ru": "Подтвердить и сформировать отчёт",
+        "en": "Confirm and build the report",
+    },
+    "walk.finish.native.status": {"ru": "Завершение проверки", "en": "Finishing the inspection"},
+    "walk.finish.native.completed": {
+        "ru": "Проверка завершена. Отчёт передан в ваш чат.",
+        "en": "The inspection is complete. The report was delivered to your chat.",
+    },
+    "walk.finish.native.retry": {
+        "ru": "Сборка не завершилась. Записи сохранены; проверьте итог и повторите.",
+        "en": "The report was not completed. Your records are saved; review the summary and retry.",
+    },
+    "walk.finish.native.building": {
+        "ru": (
+            "Отчёт собирается. Оставайтесь здесь или вернитесь позже — повторная "
+            "сборка не запускается."
+        ),
+        "en": "Building the report. Stay here or return later; this does not start another build.",
+    },
+    "walk.finish.native.check_status": {"ru": "Проверить состояние", "en": "Check status"},
+    "walk.finish.err.stale": {
+        "ru": "Проверка изменилась. Откройте итог заново и подтвердите актуальные записи.",
+        "en": "The inspection changed. Reopen the summary and confirm the current records.",
     },
     "walk.finish.title": {"ru": "Завершить проверку", "en": "Finish the inspection"},
     # Короткая подпись для нижней кнопки: полная не влезает в строку на 390px.
@@ -221,6 +413,12 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.camera.title": {"ru": "Камера", "en": "Camera"},
     "walk.camera.shoot": {"ru": "Снять", "en": "Take photo"},
     "walk.camera.close": {"ru": "Закрыть камеру", "en": "Close camera"},
+    "walk.camera.torch.on": {"ru": "Включить фонарик", "en": "Turn torch on"},
+    "walk.camera.torch.off": {"ru": "Выключить фонарик", "en": "Turn torch off"},
+    "walk.camera.torch.unavailable": {
+        "ru": "Фонарик этой камеры недоступен",
+        "en": "Torch is unavailable for this camera",
+    },
     "walk.camera.denied": {
         "ru": "Камера недоступна — выберите снимок в «Галерее»",
         "en": "Camera unavailable — pick a photo from the Gallery",
@@ -350,6 +548,141 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.sheet.need_item": {"ru": "Выберите пункт", "en": "Choose an item"},
     "walk.sheet.need_level": {"ru": "Выберите класс", "en": "Choose a class"},
+    "walk.sheet.need_factual_text": {
+        "ru": "Опишите наблюдаемый факт для каждой записи о нарушении",
+        "en": "Describe the observed fact for each violation",
+    },
+    "walk.sheet.extra_text": {
+        "ru": "Факт для дополнительной записи",
+        "en": "Fact for the extra finding",
+    },
+    "walk.sheet.text_model_review": {
+        "ru": (
+            "Проверьте полный текст факта. Предложение модели можно изменить; "
+            "вопрос методики не заменяет наблюдение."
+        ),
+        "en": (
+            "Review the full factual description. Edit the model suggestion; "
+            "a checklist question is not an observation."
+        ),
+    },
+    "walk.sheet.class_review.not_established": {
+        "ru": (
+            "Нарушение по этим фактам не установлено. "
+            "Проверьте пункт и факты или явно выберите класс вручную."
+        ),
+        "en": (
+            "These facts do not establish a violation. "
+            "Review the item and facts, or explicitly select a class manually."
+        ),
+    },
+    "walk.sheet.class_review.history": {
+        "ru": "Вопросы и ответы по этому пункту",
+        "en": "Questions and answers for this item",
+    },
+    "walk.sheet.class_review.review_changed": {
+        "ru": "Факты или фото изменились. Проверьте прежние ответы перед повторным использованием.",
+        "en": "The facts or photos changed. Review the earlier answers before using them again.",
+    },
+    "walk.sheet.class_review.reaffirm": {
+        "ru": "Проверил: ответы относятся к текущим фактам",
+        "en": "I checked: the answers apply to the current facts",
+    },
+    "walk.sheet.class_review.choose_item": {
+        "ru": "Сначала выберите пункт. Класс определим по его критериям после выбора.",
+        "en": "Choose an item first. Its class will be checked against that item's criteria.",
+    },
+    "walk.sheet.class_review.check_hint": {
+        "ru": "Проверьте факты и определите класс по критериям выбранного пункта.",
+        "en": "Check the facts, then determine the class for the selected item.",
+    },
+    "walk.sheet.class_review.pending": {"ru": "Определяем класс…", "en": "Checking the class…"},
+    "walk.sheet.class_review.proposed": {
+        "ru": "Предложенный класс: {level}",
+        "en": "Proposed class: {level}",
+    },
+    "walk.sheet.class_review.provisional": {
+        "ru": "Предварительно: {level}. Этот класс пока не выбран — нужен ответ на вопрос.",
+        "en": "Provisional: {level}. This class is not selected; answer the question first.",
+    },
+    "walk.sheet.class_review.manual": {
+        "ru": "Выбрать класс вручную",
+        "en": "Choose class manually",
+    },
+    "walk.sheet.class_review.manual_active": {
+        "ru": "Класс выбирает аудитор",
+        "en": "The auditor selects the class",
+    },
+    "walk.sheet.class_review.check": {
+        "ru": "Определить класс по фактам",
+        "en": "Check class against the facts",
+    },
+    "walk.sheet.class_review.facts": {
+        "ru": "Уточнение фактов для этого пункта",
+        "en": "Facts for this item",
+    },
+    "walk.sheet.class_review.need_class": {
+        "ru": "Определите или явно выберите класс",
+        "en": "Determine or explicitly select a class",
+    },
+    "walk.sheet.class_review.unavailable": {
+        "ru": "Проверить класс не удалось. Повторите или выберите его вручную.",
+        "en": "Could not check the class. Retry or select it manually.",
+    },
+    "walk.sheet.class_review.confirm_reading": {
+        "ru": "Проверьте и подтвердите показание термометра или очистите поле",
+        "en": "Check and confirm the thermometer reading, or clear it",
+    },
+    "walk.sheet.class_review.reading_checked": {
+        "ru": "Проверил показание: это число относится к выбранному пункту",
+        "en": "I checked: this reading belongs to the selected item",
+    },
+    "walk.sheet.class_review.add_reading": {"ru": "Указать показание", "en": "Add a reading"},
+    "walk.sheet.class_review.context_changed": {
+        "ru": "Проверка изменилась. Откройте запись в текущей проверке заново.",
+        "en": "The inspection changed. Reopen the finding in the current inspection.",
+    },
+    "walk.sheet.class_review.facts_limit": {
+        "ru": "Сократите слова и уточнение до 1000 знаков",
+        "en": "Shorten the words and clarification to 1000 characters",
+    },
+    "walk.sheet.class_review.photos_limit": {
+        "ru": "Для проверки класса выберите до 10 кадров или выберите класс вручную",
+        "en": "Choose up to 10 photos for the class check, or select the class manually",
+    },
+    "walk.sheet.class_review.saved_facts": {
+        "ru": "Сохранённые уточнения требуют проверки",
+        "en": "Saved facts need review",
+    },
+    "walk.sheet.class_review.use_saved_facts": {
+        "ru": "Использовать этот текст для выбранного пункта",
+        "en": "Use this text for the selected item",
+    },
+    "walk.sheet.class_review.draft_level": {
+        "ru": "В черновике был {level}. Подтвердите класс вручную или проверьте по фактам.",
+        "en": "The draft had {level}. Select the class explicitly or check it against the facts.",
+    },
+    "walk.sheet.photo_assignment.title": {
+        "ru": "Фото этой записи",
+        "en": "Photos for this finding",
+    },
+    "walk.sheet.photo_assignment.hint": {
+        "ru": "Выберите кадры, подтверждающие именно этот факт, и проверьте привязку.",
+        "en": "Choose the photos supporting this particular fact and check the assignment.",
+    },
+    "walk.sheet.photo_assignment.frame": {"ru": "Кадр {n}", "en": "Frame {n}"},
+    "walk.sheet.photo_assignment.confirm": {
+        "ru": "Проверил: выбранные фото относятся к этой записи",
+        "en": "I checked: the selected photos belong to this finding",
+    },
+    "walk.sheet.photo_assignment.need": {
+        "ru": "Выберите и подтвердите фото для каждой выбранной записи",
+        "en": "Choose and confirm photos for each selected finding",
+    },
+    "walk.err.photo_assignment": {
+        "ru": "Привязка фото устарела или не подтверждена. Выберите фото записи заново.",
+        "en": "Photo assignment is stale or unconfirmed. Select this finding's photos again.",
+    },
     "walk.sheet.need_zone": {"ru": "Выберите зону", "en": "Choose a zone"},
     "walk.sheet.delete": {"ru": "Удалить запись", "en": "Delete the record"},
     "walk.sheet.delete_confirm": {"ru": "Удалить насовсем?", "en": "Delete for good?"},
@@ -541,3 +874,9 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
 # Главная и настройки приложения (D373) — тем же каталогом, одним ответом.
 WALK_TEXTS.update(APP_TEXTS)
 WALK_TEXTS.update(HINT_TEXTS)
+
+WALK_TEXTS.update(SPLIT_TEXTS)
+
+WALK_TEXTS.update(LEVEL_TEXTS)
+
+WALK_TEXTS.update(EDIT_TEXTS)

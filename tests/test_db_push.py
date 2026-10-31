@@ -247,3 +247,49 @@ def test_проверка_ложится_в_базу_со_своим_чек_ли
         db_env, "select checklist_code from inspections where id = %s", (inspection_id,)
     )
     assert код == ("rnd",)
+
+
+def test_visit_timing_roundtrip_and_stateless_retry(domain_env: Path, db_env: str) -> None:
+    from datetime import timedelta
+
+    from src.db.queries import get_inspection
+    from src.domain import get_state
+    from src.domain.state import finish_inspection
+
+    _начать(1)
+    start = get_state(1)
+    end = start.started_at + timedelta(seconds=135)
+    finish_inspection(1, start.run_id, end)
+    first_id = push_inspection(1)
+    row = _строки(
+        db_env, "select started_at, finished_at from inspections where id = %s", (first_id,)
+    )
+    assert row == [(start.started_at, end)]
+    accept_pushed(first_id)
+    detail = get_inspection(first_id, reach=own_reach("default"))
+    assert detail is not None
+    assert detail.inspection.duration_seconds == 135
+    path = state_file(1, check_environment())
+    raw = json.loads(path.read_text())
+    # Push has no local id marker: reread persisted timing in a fresh call.
+    assert "pushed" not in raw["domain"]
+    path.write_text(json.dumps(raw))
+    assert push_inspection(1) == first_id
+    assert (
+        _строки(
+            db_env, "select started_at, finished_at from inspections where id = %s", (first_id,)
+        )
+        == row
+    )
+
+
+def test_historical_unknown_timing_stays_null(domain_env: Path, db_env: str) -> None:
+    _начать(1)
+    path = state_file(1, check_environment())
+    raw = json.loads(path.read_text())
+    raw["domain"].pop("started_at")
+    path.write_text(json.dumps(raw))
+    ident = push_inspection(1)
+    assert _строки(
+        db_env, "select started_at, finished_at from inspections where id = %s", (ident,)
+    ) == [(None, None)]

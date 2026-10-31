@@ -38,12 +38,43 @@
     }
   }
 
-  function loadMarks(key, done) {
-    W.storedGet(key, function (raw) { done(parseMarks(raw)); });
+  function loadMarks(data, done) {
+    function owned(raw) {
+      try { var v = JSON.parse(raw || "null"); return v && data.run_id && v.run_id === data.run_id; }
+      catch (e) { return false; }
+    }
+    W.storedGet(data.key, function (raw) {
+      if (owned(raw)) { done(parseMarks(raw)); return; }
+      // Unknown legacy data stays at its original key for recovery.
+      W.storedGet(data.legacy_key, function (legacy) {
+        var recovered = parseMarks(legacy);
+        done(owned(legacy) ? recovered : { z: [], f: [] },
+          !owned(legacy) && (recovered.z.length || recovered.f.length) ? recovered : null);
+      });
+    });
+  }
+
+  function renderMarksRecovery() {
+    var marks = S.recoveryMarks;
+    if (!marks) return null;
+    var panel = el("details", "walk-form__note walk-form__note--info");
+    panel.appendChild(el("summary", "", tx("walk.draft.marks")));
+    panel.appendChild(el("p", "", tx("walk.draft.unknown")));
+    panel.appendChild(el("pre", "", tx("walk.draft.marks_preview", {
+      zones: marks.z.join(", "), findings: marks.f.join(", ")
+    })));
+    panel.appendChild(W.button("walk-btn", tx("walk.draft.copy"), function () {
+      if (!window.confirm(tx("walk.draft.marks_confirm"))) return;
+      S.marks = {z: marks.z.slice(), f: marks.f.slice()};
+      saveMarks();
+      S.recoveryMarks = null;
+      render();
+    }));
+    return panel;
   }
 
   function saveMarks() {
-    var raw = JSON.stringify(S.marks);
+    var raw = JSON.stringify({ z: S.marks.z, f: S.marks.f, run_id: S.data.run_id });
     if (hasCloud()) { tg.CloudStorage.setItem(S.data.key, raw); return; }
     try { window.localStorage.setItem(S.data.key, raw); } catch (e) { /* живёт до закрытия */ }
   }
@@ -475,6 +506,9 @@
       if (was[i.code]) b.appendChild(el("span", "walk-cl__was", tx("walk.cl.was")));
       b.appendChild(el("span", "walk-cl__act", done ? "✓" : "+"));
       li.appendChild(b);
+      li.dataset.code = i.code;
+      li.dataset.zone = zone.code;
+      if (W.hints && W.hints.decorateChecklist) W.hints.decorateChecklist(li, { code: i.code, zone: zone.code, recorded: !!done });
       list.appendChild(li);
     });
     inner.appendChild(list);
@@ -550,6 +584,11 @@
 
     var extra = el("div", "walk-stage__extra");
     if (writable()) {
+      if (S.data.items.some(function (i) { return i.measure; })) {
+        extra.appendChild(W.button("walk-link", tx("walk.zone.measure_here"), function () {
+          W.sheet.open({ mode: "measure", zone: zone.code, contextZone: zone.code });
+        }));
+      }
       extra.appendChild(W.button("walk-link", "+ " + tx("walk.add.short_advice"), function () {
         W.sheet.open({ mode: "advice", zone: zone.code });
       }));
@@ -638,7 +677,7 @@
 
   /* ── сведения о визите: отдельный лист, вход — в шапке ─────────────── */
 
-  function infoInput(field) {
+  function infoInput(field, runId) {
     if (field.kind === "yes_no") {
       var seg = el("div", "walk-seg");
       var yes = tx("walk.info.yes");
@@ -646,7 +685,7 @@
       [["yes", yes], ["no", no]].forEach(function (pair) {
         var on = field.value === pair[1];
         var b = W.button("walk-seg__opt" + (on ? " is-on" : ""), pair[1], function () {
-          if (writable()) saveInfo(field.code, pair[0]);
+          if (writable()) saveInfo(field.code, pair[0], runId);
         });
         b.disabled = !writable();
         seg.appendChild(b);
@@ -678,12 +717,13 @@
   }
 
   function renderInfoFields(box) {
+    var runId = S.infoRunId;
     box.appendChild(el("p", "walk-info__hint", tx("walk.info.hint")));
     S.data.info.forEach(function (field) {
       var row = el("div", "walk-info__field");
       var label = el("label", "walk-form__label", field.q);
       row.appendChild(label);
-      var made = infoInput(field);
+      var made = infoInput(field, runId);
       if (made.input) label.htmlFor = made.input.id;
       row.appendChild(made.node);
       if (made.input && made.input.tagName === "TEXTAREA") {
@@ -692,7 +732,7 @@
       }
       if (made.input && writable()) {
         var save = W.button("walk-btn walk-btn--small", tx("walk.info.save"), function () {
-          saveInfo(field.code, made.input.value);
+          saveInfo(field.code, made.input.value, runId);
         });
         save.hidden = true;
         made.input.addEventListener("input", function () { save.hidden = made.input.value === field.value; });
@@ -707,6 +747,7 @@
   function onInfoBack() { closeInfo(); }
 
   function openInfo() {
+    S.infoRunId = S.data.run_id;
     S.info = true;
     renderInfoSheet();
     if (W.supports("6.1")) {
@@ -751,12 +792,12 @@
     document.documentElement.classList.add("has-sheet");
   }
 
-  function saveInfo(code, value) {
-    W.post(W.urls.info, { code: code, value: value }).then(function (res) {
+  function saveInfo(code, value, runId) {
+    W.api.write(W.urls.info, { code: code, value: value }, runId).then(function (res) {
       if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
       W.haptic("success");
       W.toast(tx("walk.info.saved"), "ok");
-      W.apply(res.body);
+      if (S.data.run_id === runId) W.apply(res.body);
     }).catch(function (err) {
       W.haptic("error");
       W.toast(err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network"), "err");
@@ -774,6 +815,10 @@
     var zones = S.data.zones;
     var zone = current();
     root.appendChild(renderTop(zones));
+    var history = W.split && W.split.historyPanel();
+    if (history) root.appendChild(history);
+    var recovery = renderMarksRecovery();
+    if (recovery) root.appendChild(recovery);
     if (zone) {
       root.appendChild(renderSwitch(zones, zone));
       root.appendChild(renderStage(zone));
@@ -800,12 +845,15 @@
   /** Принять свежие данные с сервера (ответ на чтение или запись). */
   W.apply = function (body, keepSheet) {
     var first = !S.data || S.data.key !== body.key;
-    if (first && W.offline) W.offline.start();
+    if (first && S.data && W.sheet.isOpen()) W.sheet.close(true);
+    if (first && S.info) closeInfo();
+    if (first && W.split && W.split.isOpen()) W.split.close();
     S.data = body;
     S.data = withEquipment(body);
+    if (first && W.offline && body.state === "active") W.offline.start();
     document.documentElement.lang = body.lang;
     if (body.state !== "active") { if (!keepSheet) W.sheet.close(true); render(); return; }
-    if (first) loadMarks(body.key, function (m) { S.marks = m; S.open = null; render(); });
+    if (first) loadMarks(body, function (m, recovery) { if (S.data.key !== body.key) return; S.recoveryMarks = recovery; S.marks = m; S.open = null; render(); });
     else render();
   };
 

@@ -8,17 +8,19 @@
 
 from __future__ import annotations
 
-import threading
-from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
+from urllib.error import URLError
+from urllib.parse import urlsplit
 
 import pytest
 from bot_harness import bound_only
 from flask import Flask
+from flask.testing import FlaskClient
 from test_web_walk import АУДИТОР, ТОКЕН, подписать
 from test_web_walk_write import JPEG
 from web_harness import СЕКРЕТ
-from werkzeug.serving import BaseWSGIServer, make_server
 
 from src.domain import get_state, start_inspection
 from src.web import walk, walk_access, walk_proxy, walk_write
@@ -44,23 +46,29 @@ def _маршруты(app: Flask) -> dict[str, object]:
 
 
 @pytest.fixture
-def сервис_обхода(
-    domain_env: Path, monkeypatch: pytest.MonkeyPatch
-) -> Iterator[tuple[str, BaseWSGIServer]]:
-    """Настоящий сервис обхода на свободном порту петли — как контейнер `walk`."""
+def сервис_обхода(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[str, FlaskClient]:
+    """Настоящие Flask routes/auth через proxy transport seam, без слушающего сервера."""
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", ТОКЕН)
     monkeypatch.delenv("WEB_WALK_PREVIEW_CHAT", raising=False)
     monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
     monkeypatch.setattr(walk_access.bot_links, "standing", bound_only(АУДИТОР))
     start_inspection(АУДИТОР, unit="Белград-1", kind="planned", report_lang="ru", ui_lang="ru")
-    сервер = make_server("127.0.0.1", 0, create_walk_app(_настройки()), threaded=True)
-    поток = threading.Thread(target=сервер.serve_forever, daemon=True)
-    поток.start()
-    try:
-        yield f"http://127.0.0.1:{сервер.server_port}", сервер
-    finally:
-        сервер.shutdown()
-        поток.join(timeout=5)
+    сервис = create_walk_app(_настройки()).test_client()
+
+    @contextmanager
+    def передать(запрос, **_):
+        адрес = urlsplit(запрос.full_url)
+        путь = адрес.path + ("?" + адрес.query if адрес.query else "")
+        ответ = сервис.open(
+            путь,
+            method=запрос.get_method(),
+            data=запрос.data,
+            headers=dict(запрос.header_items()),
+        )
+        yield SimpleNamespace(status=ответ.status_code, read=ответ.get_data, headers=ответ.headers)
+
+    monkeypatch.setattr(walk_proxy._OPENER, "open", передать)
+    return "http://walk.invalid", сервис
 
 
 def test_сервис_обхода_не_отвечает_ничем_кроме_обхода(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -93,7 +101,7 @@ def test_админка_сама_не_пишет_а_передаёт(monkeypatch
 
 
 def test_запись_через_админку_доходит_до_сервиса_обхода(
-    сервис_обхода: tuple[str, BaseWSGIServer],
+    сервис_обхода: tuple[str, FlaskClient],
 ) -> None:
     адрес, _ = сервис_обхода
     админка = create_app(_настройки(walk_upstream=адрес)).test_client()
@@ -106,7 +114,14 @@ def test_запись_через_админку_доходит_до_сервис
     ref = кадр.get_json()["ref"]
     запись = админка.post(
         walk_write.FINDING_PATH,
-        json={"op": "add", "zone": "hot_kitchen", "code": "CLN05", "level": "D1", "photos": [ref]},
+        json={
+            "op": "add",
+            "zone": "hot_kitchen",
+            "code": "CLN05",
+            "level": "D1",
+            "text": "На поверхности печи обнаружен нагар.",
+            "photos": [ref],
+        },
         headers=подпись,
     )
 
@@ -115,9 +130,10 @@ def test_запись_через_админку_доходит_до_сервис
     assert "frame-ancestors https://web.telegram.org" in запись.headers["Content-Security-Policy"]
     проверка = get_state(АУДИТОР)
     assert проверка is not None and [f.code for f in проверка.findings] == ["CLN05"]
+    assert проверка.findings[0].text == "На поверхности печи обнаружен нагар."
 
 
-def test_отказ_сервиса_обхода_доходит_как_есть(сервис_обхода: tuple[str, BaseWSGIServer]) -> None:
+def test_отказ_сервиса_обхода_доходит_как_есть(сервис_обхода: tuple[str, FlaskClient]) -> None:
     адрес, _ = сервис_обхода
     админка = create_app(_настройки(walk_upstream=адрес)).test_client()
 
@@ -127,9 +143,12 @@ def test_отказ_сервиса_обхода_доходит_как_есть(�
     assert ответ.get_json()["error"] == "unauthorized"
 
 
-def test_сервис_обхода_молчит_экран_получает_503_словами() -> None:
-    # Порт 9 на петле никто не слушает: соединение отклоняется сразу.
-    админка = create_app(_настройки(walk_upstream="http://127.0.0.1:9")).test_client()
+def test_сервис_обхода_молчит_экран_получает_503_словами(monkeypatch: pytest.MonkeyPatch) -> None:
+    def недоступен(*_, **__):
+        raise URLError("synthetic connection refusal")
+
+    monkeypatch.setattr(walk_proxy._OPENER, "open", недоступен)
+    админка = create_app(_настройки(walk_upstream="http://walk.invalid")).test_client()
 
     ответ = админка.post(walk.DATA_PATH, data="x", content_type="text/plain")
 

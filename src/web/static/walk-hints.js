@@ -357,6 +357,49 @@
     list.appendChild(again);
   }
 
-  W.hints = { afterRender: afterRender, settingsRows: settingsRows, startTour: startTour };
+  // Скрытие касается только памятки: запись и её кнопка остаются неизменными.
+  var hiddenChecklist = {};
+  function decorateChecklist(row, opts) {
+    var item = row.querySelector(".walk-cl__item");
+    if (!item) return;
+    var key = (W.state.data.key || "") + "|" + opts.zone + "|" + opts.code;
+    var toggle = W.button("walk-cl__visibility", null, function () { setHidden(!hiddenChecklist[key]); });
+    function setHidden(hidden) {
+      hiddenChecklist[key] = hidden;
+      item.hidden = hidden;
+      row.classList.toggle("is-hidden", hidden);
+      toggle.textContent = tx(hidden ? "walk.cl.show" : "walk.cl.hide");
+      toggle.setAttribute("aria-expanded", String(!hidden));
+      toggle.setAttribute("aria-label", toggle.textContent + ": " + item.querySelector(".walk-cl__text").textContent);
+    }
+    row.appendChild(toggle);
+    setHidden(!!hiddenChecklist[key]);
+    var touch = null;
+    var suppressClick = false;
+    row.addEventListener("touchstart", function (e) {
+      touch = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+    }, { passive: true });
+    row.addEventListener("touchcancel", function () { touch = null; }, { passive: true });
+    row.addEventListener("touchend", function (e) {
+      if (!touch) return;
+      var dx = e.changedTouches[0].clientX - touch.x;
+      var dy = e.changedTouches[0].clientY - touch.y;
+      touch = null;
+      if (Math.abs(dx) < 60 || Math.abs(dx) <= Math.abs(dy) * 1.5) return;
+      // Не переключать зону тем же жестом, которым скрыли пункт.
+      e.stopPropagation();
+      suppressClick = true;
+      window.setTimeout(function () { suppressClick = false; }, 600);
+      setHidden(dx < 0);
+    }, { passive: true });
+    row.addEventListener("click", function (e) {
+      if (!suppressClick) return;
+      suppressClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
+  }
+
+  W.hints = { afterRender: afterRender, settingsRows: settingsRows, startTour: startTour, decorateChecklist: decorateChecklist };
   loadPrefs();
 })();

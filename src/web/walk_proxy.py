@@ -40,6 +40,8 @@ from .walk_auth import (
     HINT_PATH,
     INFO_ENDPOINT,
     INFO_PATH,
+    LEVEL_ENDPOINT,
+    LEVEL_PATH,
     MAX_VOICE_BYTES,
     PAGE_ENDPOINT,
     PAGE_PATH,
@@ -66,7 +68,12 @@ UPSTREAM_TIMEOUT_SEC = 45.0
 
 #: Заголовки запроса, которые нужны сервису обхода. Остальное не передаётся:
 #: куки админки и прочее сервису не нужны и не должны до него доходить.
-FORWARDED_REQUEST_HEADERS = ("Content-Type", "X-Telegram-Init-Data", "Accept-Language")
+FORWARDED_REQUEST_HEADERS = (
+    "Content-Type",
+    "X-Telegram-Init-Data",
+    "X-Walk-Run-Id",
+    "Accept-Language",
+)
 
 #: Заголовки ответа, которые возвращаются как есть.
 FORWARDED_RESPONSE_HEADERS = ("Content-Type", "Cache-Control")
@@ -152,6 +159,7 @@ def install(app: Flask, *, upstream: str | None, ui_lang: str) -> None:
     route(FINDING_PATH, FINDING_ENDPOINT, "POST")
     route(INFO_PATH, INFO_ENDPOINT, "POST")
     route(SUGGEST_PATH, SUGGEST_ENDPOINT, "POST")
+    route(LEVEL_PATH, LEVEL_ENDPOINT, "POST")
     route(HINT_PATH, HINT_ENDPOINT, "POST")
     route(TRANSLATE_PATH, TRANSLATE_ENDPOINT, "POST")
     route(VOICE_PATH, VOICE_ENDPOINT, "POST", max_body=MAX_VOICE_BYTES)

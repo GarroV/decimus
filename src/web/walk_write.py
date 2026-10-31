@@ -46,6 +46,8 @@ from src.bot.phrases import learn
 from src.domain import (
     SOURCE_COMMENT,
     HandedOverError,
+    SplitConflict,
+    SplitPart,
     add_finding,
     attach_photo,
     check_environment,
@@ -58,16 +60,19 @@ from src.domain import (
     is_upload_ref,
     save_upload,
     set_info,
-    set_reading,
+    split_finding,
     upload_file,
     while_open,
 )
 from src.domain.errors import DomainError, EngineError, ValidationError
+from src.domain.findings import EditConflict
 from src.domain.info_fields import FIELDS, KIND_DATE, KIND_TEXT, KIND_YES_NO
 from src.domain.log_ids import log_id
 from src.domain.models import READING_MAX_C, READING_MIN_C, Inspection, Suggestion
 from src.domain.uploads import MAX_UPLOAD_BYTES, UploadQuotaError, own_upload
 from src.recognize.models import UNKNOWN_ZONE
+from src.recognize.provenance import frame_indices
+from src.recognize.timing import measure
 
 from . import walk_rate
 from .texts_walk import WALK_TEXTS
@@ -82,6 +87,7 @@ from .walk_auth import (
     PHOTO_VIEW_PATH,
     WalkSettings,
 )
+from .walk_write_timing import FINDING, INFO, PHOTO, timed_write
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +270,66 @@ def reading_of(body: dict[str, Any]) -> float | None:
     return float(value)
 
 
+def _photo_assignment(
+    chat_id: int, inspection: Inspection, body: dict[str, Any], photos: list[str]
+) -> dict[str, Any] | None:
+    value = body.get("photo_assignment")
+    if value is None and body.get("also") is not True:
+        return None  # Compatible single manual finding: its photos were chosen directly.
+    if not isinstance(value, dict) or value.get("confirmed") is not True:
+        raise WalkRefused("walk.err.photo_assignment")
+    raw_source = value.get("source_photos")
+    if not isinstance(raw_source, list):
+        raise WalkRefused("walk.err.photo_assignment")
+    source = _refs(raw_source, chat_id, inspection)
+    if len(source) != len(raw_source):
+        raise WalkRefused("walk.err.photo_assignment")
+    raw_model_source = value.get("model_source_photos")
+    if not isinstance(raw_model_source, list):
+        raise WalkRefused("walk.err.photo_assignment")
+    model_source = _refs(raw_model_source, chat_id, inspection) if raw_model_source else []
+    if len(model_source) != len(raw_model_source):
+        raise WalkRefused("walk.err.photo_assignment")
+    raw_model = value.get("model_frame_indices")
+    model = frame_indices(raw_model, len(model_source))
+    assigned = frame_indices(value.get("assigned_frame_indices"), len(source))
+    if (raw_model is not None and model is None) or not assigned:
+        raise WalkRefused("walk.err.photo_assignment")
+    if photos != [source[i] for i in assigned]:
+        raise WalkRefused("walk.err.photo_assignment")
+    return {
+        "model_source_photos": model_source,
+        "model_frame_indices": list(model) if model is not None else None,
+        "source_photos": source,
+        "assigned_frame_indices": list(assigned),
+        "confirmed": True,
+    }
+
+
+def _note_photo_assignment(
+    chat_id: int, n: int, code: str, zone: str, assignment: dict[str, Any], *, also: bool = False
+) -> None:
+    # Audit failure never changes the outcome of an already committed operation.
+    try:
+        journal.note(
+            chat_id, "walk_photo_assignment", n=n, code=code, zone=zone, also=also, **assignment
+        )
+    except Exception:
+        logger.exception("Обход: журнал привязки фото не записан для %s", log_id(chat_id))
+
+
+def _attach_assigned(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
+    n = _number(body)
+    current = inspection.finding(n)
+    if current is None:
+        raise WalkRefused("walk.err.bad_request")
+    ref = _ref(body, chat_id, inspection)
+    assignment = _photo_assignment(chat_id, inspection, body, [ref])
+    attach_photo(chat_id, n, ref)
+    if assignment is not None:
+        _note_photo_assignment(chat_id, n, current.code, current.zone, assignment)
+
+
 def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     code = _code(body, "code")
     level = _code(body, "level", _LEVEL)
@@ -272,13 +338,16 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     photos = (
         [] if advice and not body.get("photos") else _refs(body.get("photos"), chat_id, inspection)
     )
-    if advice:
+    if advice or level in {"D1", "D2", "D3"}:
         text = _text(body, "text", required=True)
     else:
         text = _text(body, "text") or _default_text(chat_id, code, inspection.report_lang)
+    assignment = _photo_assignment(chat_id, inspection, body, photos)
     words = _text(body, "words")
     suggested, learns = _suggested(body.get("suggested"))
-    add_finding(
+    if "class_context" in body and not isinstance(body["class_context"], dict):
+        raise WalkRefused("walk.err.bad_request")
+    added = add_finding(
         chat_id,
         code=code,
         level=level,
@@ -293,7 +362,12 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         words=words,
         suggested=suggested,
         reading_c=reading_of(body),
+        **({"class_context": body["class_context"]} if "class_context" in body else {}),
     )
+    if assignment is not None:
+        _note_photo_assignment(
+            chat_id, added.n, code, zone, assignment, also=body.get("also") is True
+        )
     if body.get("also") is not True:
         _note_hint_choice(chat_id, body, code)
     # «Тоже»-запись по тем же кадрам (D593): слова сказаны про основной пункт,
@@ -327,33 +401,92 @@ def _edit(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     # такой снимает прежний явно.
     if repeat is True and level not in REPEAT_LEVELS:
         raise WalkRefused("walk.err.repeat_level")
-    if repeat is None and current.repeat and level not in REPEAT_LEVELS:
+    if repeat is None and (current.repeat or "level" in fields) and level not in REPEAT_LEVELS:
         repeat = False
-    reading = reading_of(body) if "reading_c" in body else None
-    if fields or isinstance(repeat, bool):
-        edit_finding(
-            chat_id,
-            n,
-            zone_by_person="zone" in fields,
-            repeat=repeat if isinstance(repeat, bool) else None,
-            **fields,
-        )
+    kwargs: dict[str, Any] = {}
     if "reading_c" in body:
-        # Показание лежит мимо движка (#836): число аудитор правит отдельно от
-        # формулировки, и правка одного не должна требовать другого.
-        set_reading(chat_id, n, reading)
+        kwargs["reading_c"] = reading_of(body)
+    for key in ("source_revision", "request_id"):
+        if key in body:
+            kwargs[key] = _text(body, key, required=True)
+    if "new_refs" in body or "remove_photos" in body:
+        new_refs = body.get("new_refs", [])
+        removed = body.get("remove_photos", [])
+        if (
+            not isinstance(new_refs, list)
+            or not isinstance(removed, list)
+            or not all(isinstance(ref, str) for ref in removed)
+        ):
+            raise WalkRefused("walk.err.bad_request")
+        added = _refs(new_refs, chat_id, inspection) if new_refs else []
+        kwargs["photos"] = list(
+            dict.fromkeys([ref for ref in current.photos if ref not in removed] + added)
+        )
+    edit_finding(
+        chat_id,
+        n,
+        zone_by_person="zone" in fields,
+        repeat=repeat if isinstance(repeat, bool) else None,
+        **(kwargs | fields),
+    )
+
+
+def _split_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
+    raw_parts = body.get("parts")
+    shared = body.get("shared_photos", [])
+    if (
+        not isinstance(body.get("run_id"), str)
+        or not isinstance(raw_parts, list)
+        or not 2 <= len(raw_parts) <= 5
+        or not isinstance(shared, list)
+        or not all(isinstance(ref, str) for ref in shared)
+    ):
+        raise WalkRefused("walk.err.bad_request")
+    parts = []
+    for raw in raw_parts:
+        if not isinstance(raw, dict):
+            raise WalkRefused("walk.err.bad_request")
+        photos = raw.get("photos")
+        if not isinstance(photos, list) or not all(isinstance(ref, str) for ref in photos):
+            raise WalkRefused("walk.err.bad_request")
+        if not isinstance(raw.get("repeat"), bool):
+            raise WalkRefused("walk.err.bad_request")
+        parts.append(
+            SplitPart(
+                code=_code(raw, "code"),
+                level=_code(raw, "level", _LEVEL),
+                zone=_code(raw, "zone"),
+                text=_text(raw, "text", required=True),
+                comment=_text(raw, "comment"),
+                repeat=raw["repeat"],
+                reading_c=reading_of(raw),
+                photos=tuple(photos),
+            )
+        )
+    split_finding(
+        chat_id,
+        _number(body),
+        parts,
+        expected_run_id=body["run_id"],
+        source_revision=_text(body, "source_revision", required=True),
+        request_id=_text(body, "request_id", required=True),
+        shared_photos=shared,
+        confirmed=body.get("confirmed") is True,
+    )
 
 
 def _finding_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     op = body.get("op")
-    if op == "add":
+    if op == "split":
+        _split_op(chat_id, inspection, body)
+    elif op == "add":
         _add(chat_id, inspection, body)
     elif op == "edit":
         _edit(chat_id, inspection, body)
     elif op == "drop":
         drop_finding(chat_id, _number(body))
     elif op == "attach":
-        attach_photo(chat_id, _number(body), _ref(body, chat_id, inspection))
+        _attach_assigned(chat_id, inspection, body)
     elif op == "detach":
         ref = body.get("ref")
         if not isinstance(ref, str):
@@ -391,13 +524,29 @@ def _info_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None
     field = next((f for f in FIELDS if f.code == code), None)
     if field is None:
         raise WalkRefused("walk.err.bad_request")
-    set_info(chat_id, code, _info_value(field.kind, body.get("value"), inspection.report_lang))
+    raw_photos = body.get("photos", [])
+    if not isinstance(raw_photos, list):
+        raise WalkRefused("walk.err.bad_request")
+    added = _refs(raw_photos, chat_id, inspection) if raw_photos else []
+    previous = inspection.info.get(code)
+    photos = list(dict.fromkeys([*(previous.photos if previous else []), *added]))
+    raw_value = body.get("value")
+    if field.kind == KIND_TEXT and photos and isinstance(raw_value, str) and not raw_value.strip():
+        value = ""
+    else:
+        value = _info_value(field.kind, raw_value, inspection.report_lang)
+    set_info(chat_id, code, value, photos=photos)
 
 
 def _owns(inspection: Inspection, ref: str) -> bool:
     if any(ref in f.photos for f in inspection.findings):
         return True
     return any(ref in answer.photos for answer in inspection.info.values())
+
+
+def run_matches(inspection: Inspection, body: dict[str, Any]) -> bool:
+    """Old clients omit identity; new clients must match the current server run."""
+    return "run_id" not in body or body["run_id"] == inspection.run_id
 
 
 def install(
@@ -408,14 +557,20 @@ def install(
     def refused(text: str, status: int = 422) -> tuple[Response, int]:
         return jsonify({"error": "refused", "message": text}), status
 
+    def changed(lang: str) -> tuple[Response, int]:
+        return jsonify({"error": "run_changed", "message": said("walk.err.run_changed", lang)}), 409
+
     def said(key: str, lang: str) -> str:
         entry = WALK_TEXTS[key]
         return entry.get(lang) or entry[ui_lang]
 
-    def writable(chat_id: int) -> Inspection | tuple[Response, int]:
-        inspection = get_state(chat_id)
+    def writable(chat_id: int, identity: dict[str, Any]) -> Inspection | tuple[Response, int]:
+        with measure("lookup"):
+            inspection = get_state(chat_id)
         if inspection is None:
             return refused(said("walk.none.title", ui_lang), 409)
+        if not run_matches(inspection, identity):
+            return changed(inspection.ui_lang)
         if handed_over(chat_id):
             return refused(said("walk.sealed", inspection.ui_lang), 409)
         return inspection
@@ -429,17 +584,39 @@ def install(
             return refused(said("walk.err.bad_request", ui_lang), 400)
         lang = ui_lang
         try:
-            inspection = writable(who)
+            inspection = writable(who, body)
             if not isinstance(inspection, Inspection):
                 return inspection
             lang = inspection.ui_lang
             # Решающая проверка сдачи — под замком заметок вместе с записью:
             # ранняя выше могла пройти за миг до того, как бот отдал отчёт.
-            with while_open(who):
-                op(who, inspection, body)
+            if op is _finding_op and body.get("op") == "split":
+                # Public split owns notes + state locks, including the run check.
+                # Taking notes twice would deadlock its independent domain API.
+                with measure("mutation"):
+                    op(who, inspection, body)
+            else:
+                with while_open(who):
+                    with measure("lookup"):
+                        current = get_state(who)
+                    if current is None:
+                        return refused(said("walk.none.title", lang), 409)
+                    inspection = current
+                    if not run_matches(inspection, body):
+                        return changed(inspection.ui_lang)
+                    with measure("mutation"):
+                        op(who, inspection, body)
         except HandedOverError:
             logger.info("Обход: чат %s сдал проверку во время записи — отказ", log_id(who))
             return refused(said("walk.sealed", lang), 409)
+        except EditConflict:
+            return jsonify(
+                {"error": "edit_conflict", "message": said("walk.edit.conflict", lang)}
+            ), 409
+        except SplitConflict:
+            return jsonify(
+                {"error": "split_conflict", "message": said("walk.split.conflict", lang)}
+            ), 409
         except WalkRefused as exc:
             return refused(said(str(exc), lang))
         except (ValidationError, EngineError) as exc:
@@ -458,19 +635,37 @@ def install(
             # пути и подробности в журнал, аудитору — общее «не вышло».
             logger.exception("Обход: запись чата %s не удалась", log_id(who))
             return refused(said("walk.err.server", lang), 500)
-        return respond(who, ui_lang)
+        with measure("render"):
+            return respond(who, ui_lang)
 
     @app.post(PHOTO_PATH, endpoint=PHOTO_ENDPOINT)
+    @timed_write(PHOTO)
     def walk_photo() -> tuple[Response, int]:
         request.max_content_length = MAX_UPLOAD_BYTES
         who = identify(conf, ui_lang, header_only=True, kind=walk_rate.PHOTO)
         if not isinstance(who, int):
             return who
+        identity = (
+            {"run_id": request.headers["X-Walk-Run-Id"]}
+            if "X-Walk-Run-Id" in request.headers
+            else {}
+        )
         try:
-            inspection = writable(who)
+            inspection = writable(who, identity)
             if not isinstance(inspection, Inspection):
                 return inspection
-            ref = save_upload(request.get_data(cache=False), check_environment(), owner=who)
+            with while_open(who):
+                with measure("lookup"):
+                    current = get_state(who)
+                if current is None:
+                    return refused(said("walk.none.title", ui_lang), 409)
+                inspection = current
+                if not run_matches(inspection, identity):
+                    return changed(inspection.ui_lang)
+                with measure("mutation"):
+                    ref = save_upload(request.get_data(cache=False), check_environment(), owner=who)
+        except HandedOverError:
+            return refused(said("walk.sealed", ui_lang), 409)
         except UploadQuotaError as exc:
             logger.warning("Обход: кадр чата %s не принят — %s", log_id(who), exc)
             return refused(said("walk.err.photo_quota", ui_lang))
@@ -478,7 +673,8 @@ def install(
             logger.info("Обход: кадр чата %s не принят — %s", log_id(who), exc)
             return refused(said("walk.err.photo_bad", ui_lang))
         logger.info("Обход: чат %s прислал кадр %s", log_id(who), ref)
-        return jsonify({"ref": ref}), 201
+        with measure("render"):
+            return jsonify({"ref": ref}), 201
 
     @app.post(PHOTO_VIEW_PATH, endpoint=PHOTO_VIEW_ENDPOINT)
     def walk_photo_view() -> Response | tuple[Response, int]:
@@ -500,9 +696,11 @@ def install(
         return ответ
 
     @app.post(FINDING_PATH, endpoint=FINDING_ENDPOINT)
+    @timed_write(FINDING)
     def walk_finding() -> tuple[Response, int]:
         return write(_finding_op)
 
     @app.post(INFO_PATH, endpoint=INFO_ENDPOINT)
+    @timed_write(INFO)
     def walk_info() -> tuple[Response, int]:
         return write(_info_op)

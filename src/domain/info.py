@@ -19,9 +19,11 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from .checklist import get_item
 from .engine import option, run_audit
 from .errors import EngineError, ValidationError
 from .handover import guard_writable
+from .info_fields import FIELDS, KIND_TEXT
 from .state import read_state, settings_for
 
 
@@ -40,10 +42,10 @@ def set_info(chat_id: int, code: str, text: str, *, photos: Sequence[str] = ()) 
     правят расшифровку голоса (D069), и кадр к этой правке отношения не имеет —
     так же читает свой `--photo` и движок.
 
-    Пустой текст — отказ, а не запись пустоты: в отчёте партнёру это выглядело
-    бы как «поле спросили и оно ничего не значит», а пропущенное поле по
-    решению D070 не печатается вовсе. Пропуск — это отсутствие вызова, а не
-    вызов с пустой строкой.
+    Пустой текст допустим только для реального текстового поля с кадрами:
+    фотография — ответ, а подпись за аудитора не сочиняется. Пустота без кадров
+    остаётся отказом. Даты и да/нет требуют собственного ответа: фотография
+    не должна превращаться в пустую дату плана или выдуманное согласие.
 
     Код приводится к верхнему регистру самим движком; здесь он только
     проверяется на непустоту, потому что пустой `--qid` движок принял бы за
@@ -53,11 +55,6 @@ def set_info(chat_id: int, code: str, text: str, *, photos: Sequence[str] = ()) 
     clean_code = code.strip()
     if not clean_code:
         raise ValidationError("Код информационного пункта пустой: записывать нечего")
-    if not text.strip():
-        raise ValidationError(
-            f"Текст информационного поля {clean_code} пустой. Пропущенное поле не "
-            f"записывается вовсе, а не записывается пустым"
-        )
     shots = [str(ref).strip() for ref in photos]
     for ref in shots:
         if not ref:
@@ -70,6 +67,14 @@ def set_info(chat_id: int, code: str, text: str, *, photos: Sequence[str] = ()) 
                 f"В ссылке на кадр поля {clean_code} запятая: «{ref}». Движок разрежет её "
                 f"по запятой на два кадра, и оба окажутся несуществующими"
             )
+    if not text.strip():
+        field = next((field for field in FIELDS if field.code == clean_code.upper()), None)
+        if not shots or field is None or field.kind != KIND_TEXT:
+            raise ValidationError(
+                f"Пустой ответ поля {clean_code} допустим только для текстового поля с фотографиями"
+            )
+        if get_item(clean_code, chat_id=chat_id).kind != "info":
+            raise ValidationError("Фотоответ должен относиться к информационному пункту методики")
     settings = settings_for(chat_id)
     run_audit(
         ["info", option("qid", clean_code), option("text", text)]

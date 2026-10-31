@@ -58,11 +58,13 @@ _INSERT_INSPECTION_SQL = """
 insert into inspections (
     tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
     ui_lang, speech_lang, checklist_version, checklist_code, auditor, city, partner, contact,
-    pct, grade, deductions, counts, by_zone, by_process, source_fingerprint, status
+    started_at, finished_at, finding_history, pct, grade, deductions, counts, by_zone, by_process,
+    source_fingerprint, status
 ) values (
     %(tenant_code)s, %(unit_id)s, %(chat_id)s, %(kind)s, %(inspection_date)s,
     %(report_lang)s, %(ui_lang)s, %(speech_lang)s, %(checklist_version)s,
-    %(checklist_code)s, %(auditor)s, %(city)s, %(partner)s, %(contact)s, %(pct)s, %(grade)s,
+    %(checklist_code)s, %(auditor)s, %(city)s, %(partner)s, %(contact)s,
+    %(started_at)s, %(finished_at)s, %(finding_history)s, %(pct)s, %(grade)s,
     %(deductions)s, %(counts)s, %(by_zone)s, %(by_process)s, %(source_fingerprint)s, 'draft'
 )
 on conflict (source_fingerprint) where retracted_at is null do nothing
@@ -256,16 +258,14 @@ def _push_info(cur: psycopg.Cursor[Any], inspection: Inspection, *, inspection_i
     партнёра спросят. Подправленный по дороге, он перестаёт быть тем, что было
     названо, а расхождение видно только когда обе бумаги уже на руках.
 
-    Пустой ответ не пишется вовсе. Пропущенное поле по решению D070 не
-    печатается, и пустая строка в базе выглядела бы ответом, которого не было:
-    в выборке она неотличима от заполненного поля. Домен пустое и не пропустит
-    (`domain.set_info` отказывает), но состояние — обычный JSON на диске, и
-    сюда доезжает то, что в нём лежит; отказать в сливе всей проверки из-за
-    пустого поля значило бы потерять документ целиком ради одной строки.
+    Empty text with real photo references is a photo answer, without an invented
+    caption. Only a field with neither text nor photos is omitted (D070).
+    Metadata references and their info owner are inserted in this transaction;
+    the deferred schema rule validates the evidence when the transaction commits.
     """
     место = 0
     for code, answer in inspection.info.items():
-        if not answer.text.strip():
+        if not answer.text.strip() and not answer.photos:
             continue
         cur.execute(
             _INSERT_INFO_SQL,
@@ -367,6 +367,11 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
                     "chat_id": inspection.chat_id,
                     "kind": inspection.kind,
                     "inspection_date": inspection_date,
+                    "started_at": inspection.started_at,
+                    "finished_at": inspection.finished_at,
+                    "finding_history": Json(inspection.finding_history)
+                    if inspection.finding_history
+                    else None,
                     "report_lang": inspection.report_lang,
                     "ui_lang": inspection.ui_lang,
                     "speech_lang": inspection.speech_lang,

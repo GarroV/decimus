@@ -374,3 +374,21 @@ def test_запись_без_изменений_распознаётся_и_с_�
     assert revision.is_unchanged(запись, **одно)
     assert not revision.is_unchanged(запись, **{**одно, "text": "иначе"})
     assert not revision.is_unchanged(запись, **одно, reading="3,5")
+
+
+@pytest.mark.parametrize(
+    "reviewed, text, allowed",
+    [(False, "грязный пол", False), (True, "грязный пол", True), (False, "грязная стена", True)],
+)
+def test_changed_item_requires_review_or_edited_fact(стенд, reviewed, text, allowed):
+    # The stored code differs from a valid selected item. No database is touched.
+    detail = стенд["проверка"]
+    стенд["проверка"] = replace(detail, findings=(replace(detail.findings[0], code="OLD01"),))
+    if not allowed:
+        with pytest.raises(ReviseError) as exc:
+            _исправить(text=text, code_text_reviewed=reviewed)
+        assert exc.value.code == "revise_text_review"
+        assert "записано" not in стенд and "посчитано" not in стенд
+    else:
+        _исправить(text=text, code_text_reviewed=reviewed)
+        assert стенд["записано"]["revision"].text == text

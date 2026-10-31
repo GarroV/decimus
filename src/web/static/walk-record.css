@@ -732,3 +732,42 @@
   cursor: pointer;
 }
 .walk-camera__shutter:disabled { opacity: 0.4; }
+
+/* Управление только фонариком активной встроенной камеры. */
+.walk-camera__torch,
+.walk-camera__torch-note {
+  position: absolute;
+  z-index: 1;
+  left: 16px;
+  top: calc(20px + env(safe-area-inset-top, 0px));
+  max-width: calc(100% - 88px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+.walk-camera__torch[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.walk-camera__torch-note { margin: 0; font-size: 13px; }
+.walk-camera__torch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.walk-search-tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px; max-height: 132px; overflow-y: auto; flex-shrink: 0; }
+.walk-search-tags__tag {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.walk-search-tags__tag[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+.walk-search-tags__tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.walk-item-kind,
+[class*="walk-item-code--"] { display: inline-block; padding: 2px 6px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; line-height: 18px; font-family: var(--font-ui); }
+.walk-item-kind--info, .walk-item-code--info { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
+.walk-item-kind--violation, .walk-item-code--violation { background: var(--err-soft); color: var(--err); border-color: var(--err-line); }
+.walk-item-kind--advice, .walk-item-code--advice { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
+.walk-choice__line { flex-wrap: wrap; }

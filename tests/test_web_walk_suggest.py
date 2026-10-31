@@ -140,6 +140,9 @@ def test_поиск_отдаёт_карточки_и_ничего_не_запи�
     карточка = тело["candidates"][0]
     assert {k: v for k, v in карточка.items() if k != "resolution"} | {"confidence": 0} == {
         "reading_c": None,
+        "frame_count": 0,
+        "frame_indices": None,
+        "frame_refs": [],
         "code": "CLN05",
         "level": "D2",
         "zone": "hot_kitchen",
@@ -227,17 +230,20 @@ def test_выученная_фраза_второй_раз_не_учится(
 ) -> None:
     выучено: list[str] = []
     monkeypatch.setattr(walk_write, "learn", lambda w, **k: выучено.append(w) or "")
-    клиент.запись(
+    ответ = клиент.запись(
         op="add",
         zone="hot_kitchen",
         code="CLN05",
         level="D1",
+        text="На поверхности печи обнаружен нагар.",
         words="нагар",
         photos=[клиент.ссылка()],
         suggested={"code": "CLN05", "level": "D1", "zone": "hot_kitchen", "via": "learned"},
     )
 
+    assert ответ.status_code == 200, ответ.get_json()
     запись = get_state(АУДИТОР).findings[0]  # type: ignore[union-attr]
+    assert запись.text == "На поверхности печи обнаружен нагар."
     assert выучено == [] and запись.suggested_code == "", (
         "как у бота: выученное не пишется предложением"
     )
@@ -311,13 +317,26 @@ def test_второе_нарушение_по_тем_же_кадрам_пише�
         return {"code": code, "level": level, "zone": "hot_kitchen", "via": "model"}
 
     первая = клиент.запись(
-        op="add", code="CLN05", level="D1", suggested=предложено("CLN05", "D1"), **общее
+        op="add",
+        code="CLN05",
+        level="D1",
+        text="На поверхности печи обнаружен нагар.",
+        suggested=предложено("CLN05", "D1"),
+        **общее,
     )
     вторая = клиент.запись(
         op="add",
         code="PRD06",
         level="D1",
+        text="Контейнер с заготовкой хранится без крышки.",
         also=True,
+        photo_assignment={
+            "source_photos": [кадр],
+            "model_source_photos": [кадр],
+            "model_frame_indices": [0],
+            "assigned_frame_indices": [0],
+            "confirmed": True,
+        },
         suggested=предложено("PRD06", "D1"),
         **общее,
     )
@@ -327,6 +346,8 @@ def test_второе_нарушение_по_тем_же_кадрам_пише�
     записи = {f.code: f for f in get_state(АУДИТОР).findings}  # type: ignore[union-attr]
     assert set(записи) == {"CLN05", "PRD06"}
     assert записи["PRD06"].photos == записи["CLN05"].photos == [кадр], "кадр общий у обеих"
+    assert записи["CLN05"].text == "На поверхности печи обнаружен нагар."
+    assert записи["PRD06"].text == "Контейнер с заготовкой хранится без крышки."
     assert записи["PRD06"].suggested_code == "PRD06", "предложение второй — её карточка"
     assert выучено == [("дозатор", "CLN05")], "синонимом второго пункта слова не становятся"
 
@@ -487,6 +508,7 @@ def test_запись_по_подсказке_предложение_пишет�
         zone="hot_kitchen",
         code="CLN05",
         level="D1",
+        text="На поверхности печи обнаружен нагар.",
         words="печь в нагаре",
         photos=[клиент.ссылка()],
         suggested={"code": "CLN05", "level": "D1", "zone": "hot_kitchen", "via": "hint"},
@@ -549,6 +571,10 @@ def _запись(клиент: Клиент, code: str, via: str, shown: Any) -
         zone="hot_kitchen",
         code=code,
         level="D1",
+        text={
+            "CLN05": "На поверхности печи обнаружен нагар.",
+            "PRD06": "Контейнер с заготовкой хранится без крышки.",
+        }[code],
         words="печь в нагаре",
         photos=[клиент.ссылка()],
         suggested={"code": "CLN05", "level": "D1", "zone": "hot_kitchen", "via": via},
@@ -593,7 +619,8 @@ def test_выбор_ответа_модели_при_показанной_под
     клиент: Клиент,  # noqa: F811
     журнал: list[tuple[str, dict[str, Any]]],
 ) -> None:
-    _запись(клиент, "PRD06", "model", ["CLN05", "TEH05"])
+    ответ = _запись(клиент, "PRD06", "model", ["CLN05", "TEH05"])
+    assert ответ.status_code == 200, ответ.get_json()
 
     ((_, kw),) = [e for e in журнал if e[0] == "walk_hint_choice"]
     assert kw["picked"] == "model" and kw["match_first"] is False and kw["match_any"] is False
@@ -614,16 +641,123 @@ def test_тоже_запись_в_метрику_подсказки_не_идё�
     журнал: list[tuple[str, dict[str, Any]]],
 ) -> None:
     """D593: вторая запись по тем же кадрам — не выбор подсказки, считать её дважды нельзя."""
-    клиент.запись(
+    ref = клиент.ссылка()
+    ответ = клиент.запись(
         op="add",
         zone="hot_kitchen",
         code="PRD06",
         level="D1",
+        text="Контейнер с заготовкой хранится без крышки.",
         also=True,
+        photo_assignment={
+            "source_photos": [ref],
+            "model_source_photos": [ref],
+            "model_frame_indices": [0],
+            "assigned_frame_indices": [0],
+            "confirmed": True,
+        },
         words="печь в нагаре",
-        photos=[клиент.ссылка()],
+        photos=[ref],
         suggested={"code": "PRD06", "level": "D1", "zone": "hot_kitchen", "via": "model"},
         hint_codes=["CLN05"],
     )
 
+    assert ответ.status_code == 200, ответ.get_json()
     assert [e for e in журнал if e[0] == "walk_hint_choice"] == []
+
+
+def test_search_journal_contains_monotonic_stage_timings(клиент, модель, monkeypatch):  # noqa: F811
+    from src.recognize.timing import measure, report
+
+    events = []
+    original = walk_suggest.propose
+
+    def measured(*args, **kwargs):
+        with measure("model"):
+            return original(*args, **kwargs)
+
+    monkeypatch.setattr(walk_suggest, "propose", measured)
+    monkeypatch.setattr(
+        walk_suggest.journal, "note", lambda chat, event, **fields: events.append((event, fields))
+    )
+    response = _поиск(клиент, zone="hot_kitchen", words="synthetic", photos=[клиент.ссылка()])
+    assert response.status_code == 200
+    fields = next(fields for event, fields in events if event == "walk_suggest")
+    assert isinstance(fields["ms"], int) and fields["ms"] >= fields["model_ms"] >= 0
+    assert set(fields["timings_ms"]) == {"frames", "propose", "model", "resolution"}
+    assert all(isinstance(value, int) and value >= 0 for value in fields["timings_ms"].values())
+    assert report() == {"ms": 0, "model_ms": 0, "timings_ms": {}}
+
+
+@pytest.mark.parametrize("failure", ["auth", "body", "frames", "model"])
+def test_failed_search_logs_timing_without_input(клиент, модель, monkeypatch, caplog, failure):  # noqa: F811
+    import logging
+
+    from src.recognize.timing import report
+
+    caplog.set_level(logging.INFO, logger=walk_suggest.__name__)
+    private_marker = "synthetic-private-input-marker"
+    if failure == "frames":
+
+        def missing(*args, **kwargs):
+            raise walk_write.WalkRefused("walk.err.photo_lost")
+
+        monkeypatch.setattr(walk_suggest, "_frames", missing)
+    if failure == "model":
+
+        def unavailable(*args, **kwargs):
+            raise ModelUnavailable(private_marker)
+
+        monkeypatch.setattr(walk_suggest, "propose", unavailable)
+    if failure == "auth":
+        response = клиент.c.post(walk_suggest.SUGGEST_PATH, json={"words": private_marker})
+    elif failure == "body":
+        response = клиент.c.post(
+            walk_suggest.SUGGEST_PATH,
+            json=[],
+            headers={"X-Telegram-Init-Data": клиент.init},
+        )
+    else:
+        response = _поиск(
+            клиент, zone="hot_kitchen", words=private_marker, photos=[клиент.ссылка()]
+        )
+    assert response.status_code >= 400
+    records = [r for r in caplog.records if r.msg.startswith("Обход: время поиска")]
+    assert len(records) == 1
+    record = records[0]
+    assert private_marker not in record.getMessage()
+    status, metrics = record.args
+    assert status == response.status_code
+    assert metrics["ms"] >= metrics["model_ms"] >= 0
+    if failure in {"frames", "model"}:
+        assert "frames" in metrics["timings_ms"]
+    if failure == "model":
+        assert "propose" in metrics["timings_ms"]
+    assert report() == {"ms": 0, "model_ms": 0, "timings_ms": {}}
+
+
+@pytest.mark.parametrize("words, expected_count", [("Synthetic", 2), ("", 1)])
+def test_evidence_refs_follow_canonical_actually_sent_images(
+    клиент,  # noqa: F811
+    модель,
+    monkeypatch,
+    words,
+    expected_count,
+):
+    from dataclasses import replace
+
+    from test_web_walk_write import ДРУГОЙ_JPEG
+
+    def classify(note, photo, zone, **kwargs):
+        images = (photo,) if photo is not None else kwargs["photos"]
+        c = replace(МОДЕЛЬ, frame_indices=(len(images) - 1,))
+        return Suggestion(candidates=(c,), needs_human=False, frame_count=len(images))
+
+    monkeypatch.setattr(ядро, "classify", classify)
+    first, second = клиент.ссылка(), клиент.ссылка(ДРУГОЙ_JPEG)
+    response = _поиск(клиент, words=words, photos=[first, first, second])
+    assert response.status_code == 200
+    card = response.get_json()["candidates"][0]
+    assert card["frame_count"] == expected_count
+    assert card["frame_refs"] == [first, second][:expected_count]
+    assert card["frame_indices"] == [expected_count - 1]

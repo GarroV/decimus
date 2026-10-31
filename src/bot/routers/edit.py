@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from functools import partial
+from typing import TypedDict, Unpack
 
 from aiogram import F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
@@ -91,6 +92,14 @@ def _finding(chat_id: int, n: int) -> domain.Finding | None:
     return None if inspection is None else inspection.finding(n)
 
 
+class _EditFields(TypedDict, total=False):
+    code: str
+    level: str
+    zone: str
+    text: str
+    comment: str
+
+
 async def apply_edit(
     message: Message,
     chat_id: int,
@@ -99,7 +108,7 @@ async def apply_edit(
     *,
     zone_by_person: bool = False,
     repeat: bool | None = None,
-    **fields: str,
+    **fields: Unpack[_EditFields],
 ) -> None:
     """Поправить запись и показать её заново; отказ движка — аудитору как есть.
 

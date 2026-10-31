@@ -115,6 +115,7 @@
     if (status) status.textContent = "";
     closePicker(form.querySelector("[data-ipick]"));
     initPicker(form);
+    updateReview(form);
     refreshAdd(form);
   }
 
@@ -244,7 +245,24 @@
     showChosen(picker, item);
     closePicker(picker);
     narrowByItem(form, item, true);
+    var review = form.querySelector("[data-code-review]");
+    if (review) {
+      var text = form.elements.text;
+      review.dataset.text = text.value.trim();
+      review.querySelector("input").checked = false;
+      updateReview(form);
+    }
     refreshAdd(form);
+  }
+
+  function updateReview(form) {
+    var review = form.querySelector("[data-code-review]");
+    if (!review) return;
+    var code = form.querySelector("[data-ipick-value]");
+    var needed = code.value !== code.dataset.orig && !!review.dataset.text &&
+      form.elements.text.value.trim() === review.dataset.text;
+    review.hidden = !needed;
+    review.querySelector("input").required = needed;
   }
 
   // Классы, которых у пункта нет, гасятся; выбранный, ставший недопустимым, снимается.
@@ -291,7 +309,10 @@
     var search = e.target.closest && e.target.closest("[data-ipick-search]");
     if (search) renderList(search.closest("[data-ipick]"), search.value);
     var form = e.target.closest && e.target.closest("form[data-proofread-form]");
-    if (form) refreshAdd(form);
+    if (form) {
+      refreshAdd(form);
+      updateReview(form);
+    }
   });
 
   document.addEventListener("change", function (e) {
@@ -603,18 +624,96 @@
       });
   });
 
+  function scopeOf(form) {
+    return form.closest(".spanel, .icard") || document;
+  }
+
+  function dirty(form) {
+    return Array.from(form.elements).some(function (field) {
+      if (!field.name || field.name === "code_text_reviewed") return false;
+      if (field.type === "file") return field.files.length > 0;
+      if (field.type === "checkbox" || field.type === "radio") return field.checked !== field.defaultChecked;
+      if (field.tagName === "SELECT") {
+        var initial = Array.from(field.options).find(function (o) { return o.defaultSelected; }) || field.options[0];
+        return field.value !== (initial ? initial.value : "");
+      }
+      return field.value !== (field.dataset.orig === undefined ? field.defaultValue : field.dataset.orig);
+    });
+  }
+
+  // Capture runs before split.js: a prevented accept must never start a request.
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    var scope = scopeOf(form);
+    if (scope.querySelector("[data-proofread-busy]")) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (form.matches("[data-accept-guard]")) window.alert(form.dataset.inflight);
+      return;
+    }
+    if (!form.matches("[data-accept-guard]")) return;
+    var pending = Array.from(scope.querySelectorAll("form[data-proofread-form]")).find(dirty);
+    if (!pending) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    window.alert(form.dataset.unsaved);
+    toggleForm(pending, buttonFor(pending), true);
+  }, true);
+
   // ── Отправка и возврат формы после отказа ──────────────────────────────────
   document.addEventListener("submit", function (e) {
     var form = e.target;
     if (!form.matches || !form.matches("form[data-proofread-form]")) return;
     var submit = form.querySelector("button[type=submit]");
-    if (submit && submit.dataset.saving) submit.textContent = submit.dataset.saving;
+    var idle = submit ? submit.textContent : "";
+    if (submit && submit.dataset.saving) {
+      submit.dataset.idle = idle;
+      submit.textContent = submit.dataset.saving;
+    }
+    if (form.hasAttribute("data-panel-form") || !window.fetch || !window.FormData) return;
+    var scope = scopeOf(form);
+    if (scope === document) return;
+    e.preventDefault();
+    var kept = window.Proofread.snapshot(form);
+    var others = Array.from(scope.querySelectorAll("form[data-proofread-form]"))
+      .filter(function (other) { return other !== form && dirty(other); })
+      .map(function (other) { return window.Proofread.snapshot(other); });
+    var payload = new FormData(form);
+    form.setAttribute("data-proofread-busy", "");
+    scope.inert = true;
+    fetch(form.action, { method: "POST", body: payload, credentials: "same-origin" })
+      .then(function (response) {
+        if (response.redirected && new URL(response.url).pathname.endsWith("/login")) {
+          window.location.href = response.url;
+          return null;
+        }
+        if (!response.ok) throw new Error("status");
+        return response.text();
+      })
+      .then(function (html) {
+        if (html === null) return;
+        var parsed = new DOMParser().parseFromString(html, "text/html");
+        var next = parsed.querySelector(".icard");
+        if (!next) throw new Error("card");
+        var node = document.importNode(next, true);
+        scope.replaceWith(node);
+        others.forEach(function (state) { window.Proofread.restore(node, state); });
+        var note = node.querySelector(".note--error, .note--ok");
+        if (note && note.classList.contains("note--error")) window.Proofread.restore(node, kept);
+        if (note) note.scrollIntoView({ block: "nearest" });
+      })
+      .catch(function () {
+        scope.inert = false;
+        form.removeAttribute("data-proofread-busy");
+        if (submit) submit.textContent = idle;
+        window.alert(form.dataset.saveError);
+      });
   });
 
   // Что вписано в форму — запоминается перед отправкой (`split.js`), чтобы при отказе
-  // сервера форма раскрылась снова со словами человека. Кадры не возвращаются:
-  // браузер не даёт подставить файлы обратно.
+  // сервера форма раскрылась снова со словами человека и выбранными кадрами.
   window.Proofread = {
+    dirty: dirty,
     snapshot: function (form) {
       if (!form.matches || !form.matches("form[data-proofread-form]")) return null;
       var pick = function (name) {
@@ -624,6 +723,10 @@
       var level = form.querySelector("[data-lvls] input:checked");
       return {
         id: form.id,
+        files: form.querySelector("[data-pshots-input]") ? Array.from(form.querySelector("[data-pshots-input]").files) : [],
+        removed: Array.from(form.querySelectorAll("[data-pshot-remove]:checked")).map(function (el) { return el.value; }),
+        reviewText: form.querySelector("[data-code-review]") ? form.querySelector("[data-code-review]").dataset.text : "",
+        reviewed: form.elements.code_text_reviewed ? form.elements.code_text_reviewed.checked : false,
         text: pick("text"),
         code: pick("code"),
         level: level ? level.value : "",
@@ -644,6 +747,19 @@
       if (state.code) chooseItem(form, state.code);
       var level = form.querySelector('[data-lvls] input[value="' + state.level + '"]');
       if (level && !level.disabled) level.checked = true;
+      if (form.elements.code_text_reviewed) {
+        form.querySelector("[data-code-review]").dataset.text = state.reviewText;
+        form.elements.code_text_reviewed.checked = state.reviewed;
+        updateReview(form);
+      }
+      form.querySelectorAll("[data-pshot-remove]").forEach(function (el) {
+        var checked = state.removed.indexOf(el.value) !== -1;
+        if (el.checked !== checked) {
+          el.checked = checked;
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      });
+      if (state.files.length) addFiles(form, state.files);
       refreshAdd(form);
     },
   };

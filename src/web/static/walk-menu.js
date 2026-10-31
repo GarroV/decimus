@@ -5,10 +5,11 @@
  * выбора. Форма остаётся про главное: кадр, слова, что нашла система.
  *
  *   W.menu.open({ title, options: [{ label, hint, code, on, value }], onPick })
- *   W.menu.search({ title, placeholder, lead, list(query), onPick })
+ *   W.menu.search({ title, placeholder, lead, tags, semanticTags, list(query, filters), onPick })
  *
- * `list(query)` отдаёт варианты так же, как `options`; `lead` — варианты,
+ * `list(query, filters)` отдаёт варианты так же, как `options`; `lead` — варианты,
  * которые стоят первыми без запроса (общая заметка у рекомендации).
+ * filters хранит process/semantic отдельно от текста: ярлык не выбирает пункт.
  */
 (function () {
   "use strict";
@@ -16,7 +17,6 @@
   var W = window.DecimusWalk;
   var tx = W.tx;
   var el = W.el;
-  var LIMIT = 60;
   var node = null;
 
   function close() {
@@ -52,16 +52,17 @@
   function fill(list, options, onPick) {
     list.textContent = "";
     if (!options.length) list.appendChild(el("li", "walk-options__empty", tx("walk.sheet.search_empty")));
-    options.slice(0, LIMIT).forEach(function (o) {
+    options.forEach(function (o) {
       var li = el("li");
       var b = W.button("walk-option" + (o.on ? " is-on" : "") + (o.lead ? " walk-option--note" : ""), null, function () {
         W.haptic();
         close();
         onPick(o.value);
       });
-      if (o.code || o.badge) {
+      if (o.code || o.badge || o.kind) {
         var top = el("span", "walk-option__top");
-        if (o.code) top.appendChild(el("span", "walk-option__code", o.code));
+        if (o.code) top.appendChild(el("span", "walk-option__code" + (o.kind ? " walk-item-code--" + o.kind : ""), o.code));
+        if (o.kind) top.appendChild(el("span", "walk-item-kind walk-item-kind--" + o.kind, tx("walk.item.kind." + o.kind)));
         if (o.badge) top.appendChild(el("span", "walk-option__was", o.badge));
         b.appendChild(top);
       }
@@ -89,12 +90,45 @@
     input.placeholder = opts.placeholder;
     input.setAttribute("enterkeyhint", "search");
     var list = el("ul", "walk-options walk-menu__list");
+    var tags = el("div", "walk-search-tags");
+    tags.setAttribute("role", "group");
+    tags.setAttribute("aria-label", tx("walk.sheet.search_tags"));
+    var process = null;
+    var semantic = null;
+    (opts.semanticTags || []).forEach(function (tag) {
+      var b = W.button("walk-search-tags__tag", tag.label, function () {
+        semantic = semantic === tag.id ? null : tag.id;
+        refresh();
+      });
+      b.dataset.searchTag = tag.id;
+      tags.appendChild(b);
+    });
+    (opts.tags || []).forEach(function (tag) {
+      if (!tag) return;
+      var b = W.button("walk-search-tags__tag", tag, function () {
+        process = process === tag ? null : tag;
+        refresh();
+      });
+      b.dataset.processTag = tag;
+      tags.appendChild(b);
+    });
+    var clear = W.button("walk-link", tx("walk.sheet.search_clear_tags"), function () {
+      process = null;
+      semantic = null;
+      refresh();
+    });
     function refresh() {
       var q = input.value.trim();
-      fill(list, (q ? [] : opts.lead || []).concat(opts.list(q)), opts.onPick);
+      Array.prototype.forEach.call(tags.children, function (b) {
+        b.setAttribute("aria-pressed", String(b.dataset.searchTag ? b.dataset.searchTag === semantic : b.dataset.processTag === process));
+      });
+      clear.hidden = !process && !semantic;
+      var filters = {process:process, semantic:semantic};
+      fill(list, (!q && !process && !semantic ? opts.lead || [] : []).concat(opts.list(semantic ? "" : q, filters)), opts.onPick);
     }
-    input.addEventListener("input", refresh);
+    input.addEventListener("input", function () {semantic = null; refresh();});
     panel.appendChild(input);
+    if (tags.children.length) {panel.appendChild(tags); panel.appendChild(clear);}
     panel.appendChild(list);
     refresh();
     input.focus();

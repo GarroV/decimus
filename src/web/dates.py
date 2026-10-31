@@ -14,8 +14,19 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from math import isfinite
 
 from .texts import t
+
+
+def human_duration(seconds: float | None, lang: str) -> str:
+    """Format the authoritative elapsed duration without estimating missing timestamps."""
+    if seconds is None or not isfinite(seconds) or seconds < 0:
+        return t("card.fact.duration_unknown", lang)
+    hours, rest = divmod(int(seconds), 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours:02}:{minutes:02}:{secs:02}"
+
 
 _ISO = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}:\d{2}))?")
 _DOTTED = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}:\d{2}))?$")

@@ -246,6 +246,12 @@ async def test_report_is_delivered_as_a_file_and_the_letter_as_a_message(
     assert len(документы) == 1, "отчёт не доехал файлом"
     проверить_pdf(Path(документы[0].document.path))
     assert session.last_text.startswith(t("finish.letter", "ru", letter="").strip())
+    finished = get_state(CHAT_ID)
+    assert finished is not None and finished.finished_at is not None
+    assert finished.finished_at >= finished.started_at
+    # Repeated final action does not change the first successful finish.
+    await feed(dp, bot, callback("fin:nophoto"))
+    assert get_state(CHAT_ID).finished_at == finished.finished_at
 
 
 async def test_lost_photo_stops_the_build_and_leaves_the_choice_to_the_auditor(
@@ -524,3 +530,48 @@ async def test_несобранный_отчёт_снимает_печать(
     await build_report(dp, bot)
 
     assert not sidecar.handed_over(CHAT_ID), "несобранный отчёт оставил проверку запечатанной"
+    assert get_state(CHAT_ID).finished_at is None
+
+
+async def test_photo_download_failure_unseals_and_retry_commits_end(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    started()
+    original = finish_module.download_all
+
+    async def fail(*_a: object, **_k: object) -> dict[str, str]:
+        raise RuntimeError("download failed")
+
+    monkeypatch.setattr(finish_module, "download_all", fail)
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+    await feed(dp, bot, text_message("/finish"))
+    await build_report(dp, bot)
+    assert session.documents == []
+    assert not sidecar.handed_over(CHAT_ID)
+    assert get_state(CHAT_ID).finished_at is None
+    monkeypatch.setattr(finish_module, "download_all", original)
+    await feed(dp, bot, callback("fin:nophoto"))
+    assert len(session.documents) == 1
+    assert get_state(CHAT_ID).finished_at is not None
+
+
+async def test_failed_repeat_delivery_keeps_confirmed_finish(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    started()
+    bot, _session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+    await feed(dp, bot, text_message("/finish"))
+    await build_report(dp, bot)
+    finished = get_state(CHAT_ID).finished_at
+    assert finished is not None
+    sidecar.unmark_handed_over(CHAT_ID)
+
+    async def fail(*_a: object, **_k: object) -> dict[str, str]:
+        raise RuntimeError("repeat delivery failed")
+
+    monkeypatch.setattr(finish_module, "download_all", fail)
+    await feed(dp, bot, callback("fin:nophoto"))
+    assert not sidecar.handed_over(CHAT_ID)
+    assert get_state(CHAT_ID).finished_at == finished

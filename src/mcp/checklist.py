@@ -56,6 +56,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from ..domain.config import DATA_FILES, REQUIRED_DATA_FILES
+from ..domain.criteria import criteria_section
 from ..domain.engine import ENGINE_ATTEMPTS, pause_before_retry
 from ..domain.version import (
     VERSION_FILE,
@@ -739,12 +740,7 @@ def read_item(store: Store, *, code: str, version: str | None = None) -> dict[st
 
 def _criteria(каталог: Path, code: str) -> str:
     """Критерии пункта из `criteria.md`. Нет раздела — пустая строка, а не отказ."""
-    path = каталог / "criteria.md"
-    if not path.is_file():
-        return ""
-    тело = path.read_text(encoding="utf-8")
-    найдено = re.search(rf"(?:^|\n)## {re.escape(code)}\n(.*?)(?=\n## |\Z)", тело, re.S)
-    return найдено.group(1).strip() if найдено else ""
+    return criteria_section(каталог, code)
 
 
 # --- правка -------------------------------------------------------------------

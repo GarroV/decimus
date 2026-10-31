@@ -98,11 +98,15 @@
 {% macro edit_form(c, finding, panel=False) %}
   {% set head = c.head %}
   <form class="pf find-edit" method="post" enctype="multipart/form-data" hidden
-        id="edit-{{ finding.id }}" data-proofread-form="edit"{% if panel %} data-panel-form{% endif %}
+        id="edit-{{ finding.id }}" data-proofread-form="edit" data-save-error="{{ t('proofread.save_error') }}"{% if panel %} data-panel-form{% endif %}
         action="{{ url('/inspections/' ~ head.id ~ '/findings/' ~ finding.id ~ '/revise') }}?lang={{ lang }}">
     <label class="pf__row"><span class="field-label">{{ t('revise.text') }}</span>
       <textarea class="input" name="text" required maxlength="1000" rows="3" lang="{{ finding.lang }}">{{ finding.text or '' }}</textarea></label>
     <div class="pf__row"><span class="field-label">{{ t('proofread.item') }}</span>{{ item_picker(c, finding.code) }}</div>
+    <div class="pf__row" data-code-review hidden>
+      <p class="field-note" role="status">{{ t('proofread.review_required') }}</p>
+      <label><input type="checkbox" name="code_text_reviewed" value="1"> {{ t('proofread.review_confirm') }}</label>
+    </div>
     <div class="pf__cols">
       <div class="pf__row"><span class="field-label">{{ t('revise.level') }}</span>{{ level_radios(c, finding.level) }}</div>
       <label class="pf__row"><span class="field-label">{{ t('revise.zone') }}</span>
@@ -131,7 +135,7 @@
 {% macro composer(c, panel=False) %}
   {% set head = c.head %}
   <form class="pf find-compose" method="post" enctype="multipart/form-data" hidden
-        id="compose-{{ head.id }}" data-proofread-form="add"{% if panel %} data-panel-form{% endif %}
+        id="compose-{{ head.id }}" data-proofread-form="add" data-save-error="{{ t('proofread.save_error') }}"{% if panel %} data-panel-form{% endif %}
         data-suggest-url="{{ url('/inspections/' ~ head.id ~ '/suggest') }}?lang={{ lang }}"
         action="{{ url('/inspections/' ~ head.id ~ '/findings') }}?lang={{ lang }}">
     <div class="pf__title">{{ t('proofread.add.title') }}</div>
@@ -160,6 +164,15 @@
 {% endmacro %}
 
 {# Одна запись: нарушения и справочные записи сохраняют фото и свои действия. #}
+{% macro photo_gallery(inspection_id, shots, caption, label) %}
+  <div class="find-row__gallery">
+    {% for shot in shots %}
+      {% set src = url('/inspections/' ~ inspection_id ~ '/photos/' ~ shot) %}
+      <a href="{{ src }}" data-zoom data-caption="{{ caption }}" title="{{ caption }}"><img src="{{ src }}" loading="lazy" alt="{{ label }} · {{ loop.index }}"></a>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
 {% macro finding_card(c, finding, can_proof, panel=False, informational=False) %}
   {% set head = c.head %}
   {% set photos = c.photos %}
@@ -198,12 +211,7 @@
       {#- Часть кадров показать нечем — сказано уже в свёрнутой строке, а не только под раскрытием. #}
       <span class="find-row__shots{% if lost %} find-row__shots--partial{% endif %}">{% if lost %}{{ t('card.findings.photos_partial', n=shots|length, lost=lost) }}{% else %}{{ t('card.findings.photos', n=shots|length) }}{% endif %}</span>
     </summary>
-    <div class="find-row__gallery">
-      {% for shot in shots %}
-        {% set src = url('/inspections/' ~ head.id ~ '/photos/' ~ shot) %}
-        <a href="{{ src }}" data-zoom data-caption="{{ finding.text or '' }}" title="{{ finding.text or '' }}"><img src="{{ src }}" loading="lazy" alt="{{ item_label(finding.code) }} · {{ loop.index }}"></a>
-      {% endfor %}
-    </div>
+    {{ photo_gallery(head.id, shots, finding.text or '', item_label(finding.code)) }}
   </details>
   {% else %}
     {% if lost %}<span class="find-row__shots find-row__lost">{{ t('card.findings.photos_lost', n=lost) }}</span>{% endif %}
@@ -225,10 +233,13 @@
   </div>
 {% endmacro %}
 
-{% macro photos_toggle(findings, photos) %}
+{% macro photos_toggle(findings, photos, answers=()) %}
   {% set state = namespace(has_photos=False) %}
   {% for finding in findings %}
     {% if photos.get(finding.id) and photos.get(finding.id).shown %}{% set state.has_photos = True %}{% endif %}
+  {% endfor %}
+  {% for row in answers %}
+    {% if row.shown_photos %}{% set state.has_photos = True %}{% endif %}
   {% endfor %}
   {% if state.has_photos %}
     <button class="hbtn" type="button" data-findings-toggle aria-expanded="false"
@@ -342,7 +353,7 @@
     <section class="ov-card ov-card--wide" data-information data-findings{% if can_proof %} data-proofread data-proofread-data='{{ proof_data|tojson }}'{% endif %}>
       <div class="ov-card__head">
         <div class="ov-card__title">{{ t('card.info.title') }}</div>
-        {% if can_proof %}{{ photos_toggle(information, photos) }}{% endif %}
+        {{ photos_toggle(information, photos, info) }}
         <div class="ov-card__count">{{ info|length + information|length + recommendations|length }}</div>
       </div>
       {% if info and not info_titles_found %}
@@ -355,6 +366,20 @@
             <span class="info-row__code">{{ item_label(row.code) }}{% if info_titles_found and not row.question %} · {{ t('card.info.no_question') }}{% endif %}</span>
           </div>
           <div class="info-row__answer">{{ day(row.answer) if row.answer else '—' }}</div>
+          {% if not row.photos_known %}
+            <div class="muted">{{ t('card.findings.photos_unknown') }}</div>
+          {% endif %}
+          {% if row.shown_photos %}
+            <details class="find-row find-row--photos" data-info-photos="{{ row.code }}">
+              <summary class="find-row__summary">
+                {{ t('card.info.photos', n=row.shown_photos|length) }}
+                {% if row.missing_photos %}<span class="find-row__lost">{{ t('card.findings.photos_lost', n=row.missing_photos) }}</span>{% endif %}
+              </summary>
+              {{ photo_gallery(head.id, row.shown_photos, row.answer, row.question or item_label(row.code)) }}
+            </details>
+          {% elif row.missing_photos %}
+            <div class="find-row__lost">{{ t('card.findings.photos_lost', n=row.missing_photos) }}</div>
+          {% endif %}
         </div>
       {% endfor %}
       {% if information %}
@@ -393,6 +418,8 @@
   {% elif not moves_known and may_retract %}
     <div class="note mt-gap"><div><div class="note__text">{{ t('move.history.unknown') }}</div></div></div>
   {% endif %}
+
+  {% include "inspections/_split_history.html" %}
 
   {# Версия чек-листа (до #969 «Сборка») — свёрнутой справкой внизу (D218), и названа она ДАТОЙ:
      номер сборки человеку ничего не говорит. Номер остаётся подсказкой к дате —

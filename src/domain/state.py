@@ -45,6 +45,7 @@ from .errors import (
 from .kinds import kind_title
 from .models import SOURCES, TEXT_LANGS, Finding, InfoAnswer, Inspection, Suggestion
 from .tenants import HQ_TENANT, canonical_tenant
+from .timing import duration_seconds, parse_timestamp, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -561,6 +562,9 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
         ],
         info=read_info(raw),
         run_id=str(block.get("run_id") or ""),
+        started_at=parse_timestamp(block.get("started_at")),
+        finished_at=parse_timestamp(block.get("finished_at")),
+        finding_history=list(block.get("finding_history") or []),
     )
 
 
@@ -672,6 +676,7 @@ def start_inspection(
         "run_id": uuid.uuid4().hex,
     }
     run_audit(args, chat_id=chat_id, settings=init_settings, create=True)
+    block["started_at"] = utc_now().isoformat()
     patch_domain_block(state_file(chat_id, settings), block)
     started = read_state(chat_id, settings)
     if started is None:
@@ -679,6 +684,30 @@ def start_inspection(
             f"Движок отчитался об успехе, но состояния нет: {state_file(chat_id, settings)}"
         )
     return started
+
+
+def finish_inspection(chat_id: int, run_id: str, finished_at: datetime) -> Inspection:
+    """Commit the first successful finish, rejecting a replaced inspection.
+
+    The caller captures its candidate before report construction, but commits
+    only after delivery succeeds. Historical states keep both timestamps unknown.
+    """
+    path = state_file(chat_id, check_environment())
+    with state_lock(path):
+        raw = _read_raw(path)
+        block = dict(raw.get(DOMAIN_KEY) or {})
+        if block.get("run_id", "") != run_id:
+            raise DomainError("Сменился запуск проверки во время завершения")
+        started_at = parse_timestamp(block.get("started_at"))
+        if started_at is not None and block.get("finished_at") is None:
+            end = parse_timestamp(finished_at)
+            if end is None:
+                raise ValidationError("Не задано время завершения")
+            duration_seconds(started_at, end)
+            block["finished_at"] = end.isoformat()
+            raw[DOMAIN_KEY] = block
+            _write_atomic(path, raw)
+        return _inspection(chat_id, raw, path)
 
 
 def set_report_lang(chat_id: int, lang: str) -> Inspection:

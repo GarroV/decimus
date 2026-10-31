@@ -380,3 +380,14 @@ def test_тестер_из_круга_обход_видит(domain_env: Path, mo
 def test_кривой_круг_тестеров_отказ_на_старте(значение: str) -> None:
     with pytest.raises(ValueError, match="WALK_USERS"):
         load_walk_settings({"TELEGRAM_BOT_TOKEN": ТОКЕН, "WALK_USERS": значение})
+
+
+def test_same_day_runs_have_distinct_storage_identity(domain_env: Path) -> None:
+    start_inspection(1, unit="Белград-1", kind="planned", report_lang="ru", date="2026-09-01")
+    first = get_state(1)
+    start_inspection(1, unit="Белград-1", kind="planned", report_lang="ru", date="2026-09-01")
+    second = get_state(1)
+    assert first and second
+    assert first.run_id != second.run_id
+    assert walk.mark_key(first) != walk.mark_key(second)
+    assert walk.mark_key(second) == walk.mark_key(get_state(1))

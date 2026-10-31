@@ -341,6 +341,7 @@ tr.z0 td { background:#FCEFEF; }
 .zh { margin:4.5mm 0 1mm 0; font-weight:bold; color:#3F2A63; font-size:11pt; page-break-after:avoid; page-break-inside:avoid; }
 .note { color:#6F6880; font-size:8.8pt; margin-top:3mm; line-height:1.35; }
 .info p { margin:1.2mm 0; }
+.info p.info-photo-heading { break-after:avoid; page-break-after:avoid; }
 .info .k { color:#6F6880; }
 """
 
@@ -502,7 +503,11 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
     # здесь не дублируются — ни при вставленном блоке, ни при несовпавшем языке.
     fed = {r["id"] for r in load_checklist() if r.get("letter_role")}
     info = {k: v for k, v in (res.get("info") or {}).items() if k not in fed}
-    if notes or info:
+    # Feedback text is already above. Its photos still belong in the appendix,
+    # including photo-only answers and reports in another language.
+    feedback_photos = {k: info_field(v)["photos"] for k, v in (res.get("info") or {}).items()
+                       if k in fed and info_field(v)["photos"]}
+    if notes or info or feedback_photos:
         h.append(f'<h2 class="sec-findings">{esc(t["appendix"])}</h2>')
         h.append(f'<div class="note">{esc(t["appendix_note"])}</div>')
         if info:
@@ -529,6 +534,12 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
                     h.append('<div class="shots">'
                              + "".join(src.html(x, t) for x in поле["photos"]) + "</div>")
             h.append("</div>")
+        for k, shots in feedback_photos.items():
+            q = (cl.get(k, {}).get(qk) or cl.get(k, {}).get("question_ru")
+                 or item_label(k, cl.get(k), lang))
+            h.append('<div class="info"><p class="info-photo-heading"><span class="k">'
+                     + esc(clean_q(q)) + ':</span></p><div class="shots">'
+                     + "".join(src.html(ref, t) for ref in shots) + '</div></div>')
         for f in sorted(notes, key=lambda x: x["n"]):
             if True:
                 h.append('<div class="f">')

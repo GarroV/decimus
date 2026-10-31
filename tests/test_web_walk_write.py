@@ -91,7 +91,14 @@ def клиент(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> Клие�
 
 
 def _нарушение(ref: str, **сверх: Any) -> dict[str, Any]:
-    тело = {"op": "add", "zone": "hot_kitchen", "code": "CLN05", "level": "D1", "photos": [ref]}
+    тело = {
+        "op": "add",
+        "zone": "hot_kitchen",
+        "code": "CLN05",
+        "level": "D1",
+        "photos": [ref],
+        "text": "Synthetic observed condition",
+    }
     return тело | сверх
 
 
@@ -115,28 +122,32 @@ def test_нарушение_с_кадром_и_рекомендацией_лож
     assert горячий["recorded"][0]["photos"] == [{"ref": ref, "own": True}]
 
 
-def test_без_своих_слов_формулировка_пункта_без_классов(клиент: Клиент) -> None:
-    клиент.запись(**_нарушение(клиент.ссылка()))
+@pytest.mark.parametrize("level", ["D1", "D2", "D3"])
+@pytest.mark.parametrize("blank", [None, "", "   "])
+def test_new_violation_requires_explicit_factual_description(
+    клиент: Клиент, level: str, blank: str | None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        walk_write,
+        "_default_text",
+        lambda *_: pytest.fail("blank factual text reached checklist fallback"),
+    )
+    body = _нарушение(клиент.ссылка(), level=level)
+    if blank is None:
+        body.pop("text")
+    else:
+        body["text"] = blank
+    response = клиент.запись(**body)
+    assert response.status_code == 422
+    assert get_state(АУДИТОР).findings == []
 
-    текст = get_state(АУДИТОР).findings[0].text  # type: ignore[union-attr]
 
-    assert текст and not текст.startswith("("), "служебный префикс класса ушёл бы партнёру"
-
-
-@pytest.mark.parametrize(
-    "фото",
-    [
-        pytest.param([], id="без-кадра"),
-        pytest.param(["walk:" + "0" * 32], id="кадр-не-загружен"),
-        pytest.param(["AgACAgIAAxkBAAI"], id="кадр-телеграма"),
-        pytest.param(["walk:../../inspection"], id="путь-вместо-ссылки"),
-    ],
-)
-def test_запись_без_настоящего_кадра_не_заводится(клиент: Клиент, фото: list[str]) -> None:
-    ответ = клиент.запись(op="add", zone="hot_kitchen", code="CLN05", level="D1", photos=фото)
-
-    assert ответ.status_code == 422
-    assert get_state(АУДИТОР).findings == [], "D078: записи без фотофиксации быть не может"  # type: ignore[union-attr]
+def test_information_entry_keeps_existing_default_description(клиент: Клиент) -> None:
+    response = клиент.запись(
+        op="add", zone="fridge", code="INF10", level="D0", photos=[клиент.ссылка()]
+    )
+    assert response.status_code == 200
+    assert get_state(АУДИТОР).findings[0].text
 
 
 def test_отказ_движка_приходит_общим_текстом(клиент: Клиент) -> None:
@@ -445,3 +456,48 @@ def test_проверка_чужого_пространства_не_читае�
     assert (экран.status_code, запись.status_code, сведение.status_code) == (403, 403, 403)
     assert запись.get_json() == {"error": "forbidden"}, "отказ с подробностями"
     assert get_state(ЧУЖОЙ) == до
+
+
+def test_info_photo_packet_is_append_only_and_keeps_telegram_refs(клиент: Клиент) -> None:
+    from src.domain import set_info
+
+    set_info(АУДИТОР, "INF08", "Saved caption", photos=["AgACexisting"])
+    first = клиент.ссылка()
+    second = клиент.ссылка(ДРУГОЙ_JPEG)
+    response = клиент.сведение(code="INF08", value="New caption", photos=[first, second, first])
+    assert response.status_code == 200, response.get_json()
+    answer = get_state(АУДИТОР).info["INF08"]
+    assert answer.photos == ["AgACexisting", first, second]
+    assert answer.text == "New caption"
+    field = next(field for field in response.get_json()["info"] if field["code"] == "INF08")
+    assert field["photos"] == [
+        {"ref": "AgACexisting", "own": False},
+        {"ref": first, "own": True},
+        {"ref": second, "own": True},
+    ]
+    assert клиент.сведение(code="INF08", value="Text edit only").status_code == 200
+    assert get_state(АУДИТОР).info["INF08"].photos == ["AgACexisting", first, second]
+
+
+def test_info_photo_only_text_answer_and_empty_without_evidence(клиент: Клиент) -> None:
+    ref = клиент.ссылка()
+    response = клиент.сведение(code="INF08", value="", photos=[ref])
+    assert response.status_code == 200, response.get_json()
+    assert get_state(АУДИТОР).info["INF08"].text == ""
+    assert get_state(АУДИТОР).info["INF08"].photos == [ref]
+    assert клиент.сведение(code="INF01", value="", photos=[]).status_code == 422
+
+
+@pytest.mark.parametrize("code", ["INF03", "INF05", "INF07"])
+def test_info_photos_do_not_invent_date_or_boolean(клиент: Клиент, code: str) -> None:
+    ref = клиент.ссылка()
+    assert клиент.сведение(code=code, value="", photos=[ref]).status_code == 422
+    assert code not in get_state(АУДИТОР).info
+
+
+def test_info_rejects_another_chat_upload_without_writing_partial_answer(клиент: Клиент) -> None:
+    start_inspection(777, unit="Other synthetic", kind="planned", report_lang="ru")
+    stranger = Клиент(клиент.c, 777)
+    ref = stranger.ссылка()
+    assert клиент.сведение(code="INF08", value="Synthetic caption", photos=[ref]).status_code == 422
+    assert "INF08" not in get_state(АУДИТОР).info

@@ -43,6 +43,8 @@ from src import db, domain
 from src.domain.errors import ChecklistVersionMismatch, DomainError
 from src.domain.handover import HandedOverError
 from src.domain.log_ids import log_id
+from src.domain.state import finish_inspection
+from src.domain.timing import utc_now
 from src.domain.translation import untranslated
 from src.report import PhotoMissing, ReportError, build_letter_notes, build_pdf
 
@@ -426,6 +428,7 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
     # Печать ДО сборки (#546): с этой секунды мини-апп и бот запись не принимают,
     # и в отчёт ложится ровно то, что попадёт в историю. Отчёт не соберётся —
     # печать снимается ниже. Проверка перечитывается уже запечатанной.
+    finish_candidate = utc_now()
     sealed = _seal(chat_id, inspection)
     inspection = read_inspection(chat_id) or inspection
     if sealed:
@@ -436,37 +439,44 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
         # Кадры живут только на время сборки: своего хранилища фотографий у
         # продукта нет (`docs/06-mvp-bot.md`, технические требования), хватает
         # идентификатора телеграма.
-        found = await download_all(bot, refs, Path(tmp))
         try:
-            pdf = await asyncio.to_thread(
-                build_pdf,
-                chat_id,
-                fetch_photo=found.get,
-                allow_missing_photos=allow_missing,
-            )
-        except PhotoMissing as exc:
-            # Решение «собрать без кадра» принимает аудитор, а не код: отчёт без
-            # доказательства партнёр справедливо оспорит.
-            await stops.refuse(
-                message,
-                lang,
-                step="finish.build",
-                key="finish.photos_missing",
-                reply_markup=without_photos_keyboard(lang),
-                reason=exc,
-            )
-            _unseal(chat_id, sealed)
-            return
-        except ReportError:
-            # Текст движка — для того, кто чинит стенд: в нём внутренности
-            # рендерера, пути во временный каталог и совет поставить системные
-            # библиотеки (T151). Аудитору на точке нужен не он.
-            logger.exception("отчёт чата %s не собрался", log_id(chat_id))
-            await stops.refuse(message, lang, step="finish.build", key="finish.pdf_failed")
-            _unseal(chat_id, sealed)
-            return
+            found = await download_all(bot, refs, Path(tmp))
+            try:
+                pdf = await asyncio.to_thread(
+                    build_pdf,
+                    chat_id,
+                    fetch_photo=found.get,
+                    allow_missing_photos=allow_missing,
+                )
+            except PhotoMissing as exc:
+                # Решение «собрать без кадра» принимает аудитор, а не код: отчёт без
+                # доказательства партнёр справедливо оспорит.
+                await stops.refuse(
+                    message,
+                    lang,
+                    step="finish.build",
+                    key="finish.photos_missing",
+                    reply_markup=without_photos_keyboard(lang),
+                    reason=exc,
+                )
+                _unseal(chat_id, sealed)
+                return
+            except ReportError:
+                # Текст движка — для того, кто чинит стенд: в нём внутренности
+                # рендерера, пути во временный каталог и совет поставить системные
+                # библиотеки (T151). Аудитору на точке нужен не он.
+                logger.exception("отчёт чата %s не собрался", log_id(chat_id))
+                await stops.refuse(message, lang, step="finish.build", key="finish.pdf_failed")
+                _unseal(chat_id, sealed)
+                return
 
-        await message.answer_document(FSInputFile(pdf))
+            await message.answer_document(FSInputFile(pdf))
+            inspection = await asyncio.to_thread(
+                finish_inspection, chat_id, inspection.run_id, finish_candidate
+            )
+        except BaseException:
+            _unseal(chat_id, sealed)
+            raise
         # Сразу под документом, а не до сборки: предупреждение говорит о том,
         # что в этом самом файле напечатано, и читается вместе с ним.
         await warn_untranslated(message, inspection, lang)

@@ -34,7 +34,7 @@
     });
     var info = {};
     SEED.payload.info.forEach(function (f) { info[f.code] = f.value || ""; });
-    return { findings: findings, info: info, pics: {} };
+    return { findings: findings, info: info, info_photos: {}, pics: {} };
   }
 
   function load() {
@@ -85,7 +85,12 @@
         });
       });
     });
-    p.info.forEach(function (f) { f.value = S.info[f.code] || ""; });
+    p.info.forEach(function (f) {
+      f.value = S.info[f.code] || "";
+      f.photos = ((S.info_photos || {})[f.code] || []).map(function (ref) {
+        return {ref: ref, own: true};
+      });
+    });
     // Приложение (D373): язык человека и подключение Claude (D448 — каждому).
     p.lang = S.lang || "ru";
     if (p.lang === "en") p.texts = SEED.texts_en;
@@ -96,6 +101,12 @@
   /* ── приложение: настройки и подключение Claude (D373, D448) ─────── */
 
   function appOp(data) {
+    if (["finish_review", "finish_submit", "finish_status"].indexOf(data.op) !== -1) {
+      // The standalone mock has no engine/server: never invent a score or delivery.
+      throw new Refused(S.lang === "en"
+        ? "Reports are not generated in this mock. Complete the inspection in the working application."
+        : "В макете отчёт не формируется. Завершение доступно в рабочем приложении.", 422);
+    }
     if (data.op === "lang") {
       if (["ru", "en"].indexOf(data.lang) === -1) throw new Refused(said("walk.app.err.lang"), 422);
       S.lang = data.lang;
@@ -303,7 +314,16 @@
       } else if (path === "/mock/info") {
         var field = SEED.payload.info.filter(function (f) { return f.code === data.code; })[0];
         if (!field) throw new Refused(said("walk.err.bad_request"), 400);
-        S.info[data.code] = infoValue(field.kind, data.value);
+        var incoming = data.photos && data.photos.length ? refs(data.photos) : [];
+        var known = (S.info_photos || {})[data.code] || [];
+        var infoPhotos = known.concat(incoming).filter(function (ref, index, all) {
+          return all.indexOf(ref) === index;
+        });
+        var answer = field.kind === "text" && infoPhotos.length && typeof data.value === "string" && !data.value.trim()
+          ? "" : infoValue(field.kind, data.value);
+        S.info[data.code] = answer;
+        if (!S.info_photos) S.info_photos = {};
+        S.info_photos[data.code] = infoPhotos;
       } else {
         return Promise.resolve(json({ error: "not_found" }, 404));
       }

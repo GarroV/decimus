@@ -220,3 +220,43 @@ def test_изоляция_партнёров_охватом_своего_тен�
     """`tenants=(t,)` — только свои проверки: проверка УК той же страны не видна."""
     свои = _ids(Reach(tenant="GE", tenants=("GE",), countries=None))
     assert свои == {сеть["партнёр_батуми"]}
+
+
+def test_info_owned_previews_keep_country_scope_and_separate_finding_owners(
+    сеть: dict[str, str], pg_dsn: str
+) -> None:
+    ident = сеть["уК_ереван"]
+    with psycopg.connect(pg_dsn) as conn:
+        answer = conn.execute(
+            "insert into inspection_info (inspection_id,position,code,text) "
+            "values (%s,1,'SYN_INFO','Synthetic answer') returning id",
+            (ident,),
+        ).fetchone()[0]
+        shown = conn.execute(
+            "insert into photos (inspection_id,info_id,telegram_file_id,preview_path) "
+            "values (%s,%s,'synthetic-info','s3://b/info.jpg') returning id",
+            (ident, answer),
+        ).fetchone()[0]
+        conn.execute(
+            "insert into photos (inspection_id,info_id,telegram_file_id) "
+            "values (%s,%s,'synthetic-missing')",
+            (ident, answer),
+        )
+    assert previews.info_previews(ident, reach=reach_of("HQ")) == {
+        "SYN_INFO": previews.FindingShots((str(shown),), 1)
+    }
+    assert previews.info_previews(ident, reach=reach_of("GE")) == {}
+    from src.db.reach import own_reach
+
+    assert previews.info_previews(ident, reach=own_reach("not-owner")) == {}
+    assert previews.finding_previews(ident, reach=reach_of("HQ")) == {}
+
+    class Reader:
+        def get(self, key: str) -> bytes:
+            assert key == "info.jpg"
+            return b"synthetic-info-preview"
+
+    assert previews.preview_bytes(ident, str(shown), reach=reach_of("HQ"), storage=Reader()) == (
+        b"synthetic-info-preview"
+    )
+    assert previews.preview_bytes(ident, str(shown), reach=reach_of("GE"), storage=Reader()) is None

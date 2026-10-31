@@ -1,0 +1,46 @@
+{% if head.finding_history %}
+<details class="mx-more">
+  <summary>{{ t('walk.edit.history') if (head.finding_history|selectattr('kind', 'equalto', 'edit')|list or head.finding_history|selectattr('kind', 'equalto', 'clarification')|list) else t('walk.split.history') }}</summary>
+  {% for event in head.finding_history %}
+  {% if event.kind == 'clarification' %}
+  <section class="section">
+    <h3>{{ t('walk.edit.clarification') }} #{{ event.n }}</h3>
+    <div class="meta"><time datetime="{{ event.at }}">{{ event.at }}</time></div>
+    {% for fact in event.clarifications %}
+    <p><strong>{{ t('walk.edit.question') }}:</strong> {{ fact.question }}</p>
+    <p><strong>{{ t('walk.edit.answer') }}:</strong> {{ fact.answer }}</p>
+    {% endfor %}
+  </section>
+  {% else %}
+  {% set original = event.before %}
+  <section class="section">
+    <h3>{{ t('walk.edit.before') if event.kind == 'edit' else t('walk.split.source') }} #{{ original.n }}</h3>
+    <div class="meta"><time datetime="{{ event.at }}">{{ event.at }}</time></div>
+    <p>{{ original.code }} · {{ original.level }} · {{ original.zone }}</p>
+    <p>{{ original.text }}</p>
+    {% if original.repeat %}<p>{{ t('walk.rec.repeat') }}</p>{% endif %}
+    {% if original.reading_c is defined and original.reading_c is not none %}<p>{{ original.reading_c }} °C</p>{% endif %}
+    {% if original.comment %}<p>{{ original.comment }}</p>{% endif %}
+    <p>{{ t('walk.edit.photo_refs' if event.kind == 'edit' else 'walk.split.photo_count', n=original.photos|length) }}</p>
+    {% for part in event.after %}
+    <div class="card"><div class="card__body">
+      <h4>{{ t('walk.edit.after') if event.kind == 'edit' else t('walk.split.part', n=loop.index) }} · #{{ part.n }}</h4>
+      <p>{{ part.code }} · {{ part.level }} · {{ part.zone }}</p>
+      <p>{{ part.text }}</p>
+      {% if part.repeat %}<p>{{ t('walk.rec.repeat') }}</p>{% endif %}
+      {% if part.reading_c is defined and part.reading_c is not none %}<p>{{ part.reading_c }} °C</p>{% endif %}
+      {% if part.comment %}<p>{{ part.comment }}</p>{% endif %}
+      {% if event.kind == 'edit' %}
+      <p>{{ t('walk.edit.photo_refs', n=part.photos|length) }}</p>
+      {% else %}
+      {% for ref in part.photos %}
+      <span class="meta">{{ t('walk.split.photo', n=loop.index if event.kind == 'edit' else original.photos.index(ref) + 1) }}</span>
+      {% endfor %}
+      {% endif %}
+    </div></div>
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% endfor %}
+</details>
+{% endif %}

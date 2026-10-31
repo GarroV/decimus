@@ -404,6 +404,15 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0105_dodois_metrics.sql": (
         "sql1:cdf25476ee516f5fa7b24796aacebb02894bbc27a8a693b7dbafcef3e1318527"
     ),
+    "0106_inspection_timing.sql": (
+        "sql1:161419b558e2d7c1ad051abfc861d2c6942a6a6ab1b55108926d9ff24b0000a0"
+    ),
+    "0107_inspection_info_photo_answers.sql": (
+        "sql1:99f5e802243cc7cf6f7ff3aef97b89e30b4da6a346776833752eccbf588c34ab"
+    ),
+    "0108_finding_split_history.sql": (
+        "sql1:fae2c3f06273b3dc9ff227c62a12decef0eea32430c36769465d7bc91489e012"
+    ),
 }
 
 

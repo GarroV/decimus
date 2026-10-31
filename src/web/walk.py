@@ -40,6 +40,7 @@ from src.db.errors import DbError
 from src.db.models import PreviousFindings
 from src.db.space import enter_space, leave_space
 from src.domain import (
+    finding_revision,
     get_item,
     get_state,
     handed_over,
@@ -53,12 +54,15 @@ from src.domain.info_fields import FIELDS
 from src.domain.log_ids import log_id
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.timing import duration_seconds, utc_now
 from src.domain.walk_users import walk_open_to
 
 from . import (
     walk_access,
     walk_finish,
+    walk_level,
     walk_rate,
+    walk_search_tags,
     walk_settings,
     walk_start,
     walk_suggest,
@@ -81,6 +85,7 @@ from .walk_auth import (
     chat_of,
     load_walk_settings,
 )
+from .walk_model_session import ModelSession
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +113,12 @@ class PreviousOutcome:
     unavailable: bool = False
 
 
+def legacy_mark_key(inspection: Inspection) -> str:
+    """Старый ключ: только адрес восстановления, без автоматического переноса."""
+    raw = f"{inspection.tenant}|{inspection.unit}|{inspection.date}|{inspection.kind}"
+    return "walk_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+
+
 def mark_key(inspection: Inspection) -> str:
     """Ключ личных пометок обхода в облачном хранилище Telegram.
 
@@ -115,7 +126,10 @@ def mark_key(inspection: Inspection) -> str:
     листа, а не с прошлых галочек. Хранилище принимает только `[A-Za-z0-9_-]`
     до 128 знаков — поэтому отпечаток, а не название точки.
     """
-    raw = f"{inspection.tenant}|{inspection.unit}|{inspection.date}|{inspection.kind}"
+    raw = (
+        f"{inspection.tenant}|{inspection.unit}|{inspection.date}|"
+        f"{inspection.kind}|{inspection.run_id}"
+    )
     return "walk_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
@@ -192,7 +206,9 @@ def build_walk(
         slot(finding.zone)["recorded"].append(
             {
                 "n": finding.n,
+                "revision": finding_revision(finding),
                 "code": finding.code,
+                "zone": finding.zone,
                 "level": finding.level,
                 "text": finding.text,
                 "comment": finding.comment,
@@ -223,6 +239,16 @@ def build_walk(
         "unit": inspection.unit,
         "date": str(inspection.date),
         "key": mark_key(inspection),
+        "run_id": inspection.run_id,
+        "checklist_version": inspection.checklist_version,
+        "timing": {
+            "started_at": inspection.started_at.isoformat() if inspection.started_at else None,
+            "finished_at": inspection.finished_at.isoformat() if inspection.finished_at else None,
+            "duration_seconds": duration_seconds(inspection.started_at, inspection.finished_at),
+            "server_now": utc_now().isoformat(),
+        },
+        "legacy_key": legacy_mark_key(inspection),
+        "finding_history": inspection.finding_history,
         "sealed": sealed,
         "previous": (
             {"date": found.date.isoformat(), "count": len(found.findings)} if found else None
@@ -281,6 +307,7 @@ def info_fields(inspection: Inspection, lang: str) -> list[dict[str, Any]]:
                 "kind": field.kind,
                 "q": _question_text(asked),
                 "value": answer.text if answer else "",
+                "photos": [_photo(ref) for ref in answer.photos] if answer else [],
             }
         )
     return out
@@ -317,6 +344,7 @@ def walk_payload(
         info=info_fields(inspection, lang),
         sealed=handed_over(chat_id),
     )
+    payload["item_search_tags"] = walk_search_tags.search_tags(items, chat_id=chat_id)
     app = walk_settings.app_block(chat_id, lang)
     out = {**payload, "texts": texts_for(lang), "app": app}
     if app["finish_mode"] == finish_modes.REPORT:
@@ -486,7 +514,9 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
 
     walk_write.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
     walk_settings.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
-    walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
+    model_session = ModelSession()
+    walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify, session=model_session)
+    walk_level.install(app, conf=conf, ui_lang=ui_lang, identify=identify, session=model_session)
     walk_translate.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_voice.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_start.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond, bot=bot)

@@ -754,3 +754,9 @@ dot_word
 tiles
 # D679: высоту столбца читает _inspection_timeline.html.
 count_height
+# Request-local timing JSON keys (TypedDict; consumed as mapping keys in journal/logs).
+model_ms
+timings_ms
+# InfoLine photo fields read by inspections/_card_body.html, outside Python AST.
+shown_photos
+missing_photos

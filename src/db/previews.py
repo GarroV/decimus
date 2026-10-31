@@ -88,6 +88,18 @@ where p.inspection_id = %(id)s and p.finding_id is not null
 order by p.created_at, p.id
 """
 
+_INFO_PREVIEWS_OF_INSPECTION_SQL = """
+select answer.code, p.id, (p.preview_path is not null and p.purged_at is null) as shown
+from photos p
+join inspection_info answer on answer.id = p.info_id and answer.inspection_id = p.inspection_id
+join inspections i on i.id = p.inspection_id
+join units u on u.id = i.unit_id
+where p.inspection_id = %(id)s
+  and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+order by p.created_at, p.id
+"""
+
 _PREVIEW_PATH_SQL = """
 select p.preview_path
 from photos p
@@ -160,12 +172,25 @@ def report_photos(inspection_id: str, *, reach: Reach) -> tuple[ReportPhoto, ...
 def finding_previews(inspection_id: str, *, reach: Reach) -> dict[str, FindingShots]:
     """Кадры по записям: идентификатор записи → показываемые кадры по порядку и
     число кадров без копии. Запись без единого кадра в словарь не попадает."""
+    return _group_previews(
+        _read(_PREVIEWS_OF_INSPECTION_SQL, {"id": inspection_id, **require_reach(reach).params()})
+    )
+
+
+def info_previews(inspection_id: str, *, reach: Reach) -> dict[str, FindingShots]:
+    """Все кадры информационных ответов одной видимой проверки, по коду ответа."""
+    return _group_previews(
+        _read(
+            _INFO_PREVIEWS_OF_INSPECTION_SQL, {"id": inspection_id, **require_reach(reach).params()}
+        )
+    )
+
+
+def _group_previews(rows: list[tuple[Any, ...]]) -> dict[str, FindingShots]:
     показать: dict[str, list[str]] = {}
     нечем: dict[str, int] = {}
-    for finding_id, photo_id, shown in _read(
-        _PREVIEWS_OF_INSPECTION_SQL, {"id": inspection_id, **require_reach(reach).params()}
-    ):
-        запись = str(finding_id)
+    for owner, photo_id, shown in rows:
+        запись = str(owner)
         показать.setdefault(запись, [])
         if shown:
             показать[запись].append(str(photo_id))

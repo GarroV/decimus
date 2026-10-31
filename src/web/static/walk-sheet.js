@@ -13,8 +13,8 @@
  * Результат — одна строка «пункт · зона», зона в ней — пилюля с меню.
  * Одним кадром бывает видно два нарушения (сломанный дозатор и в нём нет мыла):
  * у невыбранной карточки есть «Тоже записать» (D593) — отмеченные пункты
- * сохраняются отдельными записями с теми же кадрами и словами, следом за
- * основной; зона — своя у пункта, а не вывелась — та же, что у основной.
+ * сохраняются отдельными записями с подтверждёнными кадрами, следом за
+ * основной; дополнительная запись требует своей явно выведенной зоны.
  * Рекомендация (D201, класс R) и общая заметка (D314, код NOTE) — без вычета,
  * текст обязателен. Замер (D0) — со стоянки «Печь и холодильники» (D315).
  *
@@ -46,7 +46,80 @@
 
   /* ── данные формы ─────────────────────────────────────────────────── */
 
-  function draftKey() { return W.state.data.key + "_draft"; }
+  function draftKey() { return f.draftKey; }
+
+  function contextZone(opts) {
+    var zone = opts.mode === "measure" && opts.contextZone === opts.zone && zoneOf(opts.contextZone);
+    return zone && !zone.equipment ? zone.code : null;
+  }
+
+  function openingDraftKey(opts) {
+    var data = W.state.data;
+    var globalKey = data.key + "_draft";
+    var zone = contextZone(opts);
+    if (!zone) return globalKey;
+    var key = data.key + "_draft_measure_" + zone;
+    var scoped = W.local.get(key);
+    if (scoped && scoped.run_id === data.run_id) return key;
+    var old = W.local.get(globalKey);
+    // Resume a matching global draft in place; never move its receipt IDs.
+    if (old && old.run_id === data.run_id && old.mode === "measure" && old.zone === zone) return globalKey;
+    return key;
+  }
+
+  function loadDraft() {
+    var data = W.state.data;
+    var draft = W.local.get(draftKey());
+    if (draft && data.run_id && draft.run_id === data.run_id) return draft;
+    if (f.contextZone) return null; // Context entry never imports another location implicitly.
+    var legacy = W.local.get(data.legacy_key + "_draft");
+    if (legacy && data.run_id && legacy.run_id === data.run_id) {
+      W.local.set(draftKey(), legacy);
+      return legacy;
+    }
+    return null; // Unknown legacy drafts stay untouched for recovery.
+  }
+
+  function recoveryPanel(body) {
+    var data = W.state.data;
+    var oldKey = data.legacy_key + "_draft";
+    var old = W.local.get(oldKey);
+    var current = f;
+    var panel = el("details", "walk-form__note walk-form__note--info");
+    var summary = el("summary", "", tx("walk.draft.recovery"));
+    panel.appendChild(summary);
+    function show(entries) {
+      if (!f || f !== current || (!old && !entries.length)) return;
+      panel.appendChild(el("p", "", tx("walk.draft.unknown")));
+      if (old) panel.appendChild(el("pre", "", [old.code, old.words, old.text, old.comment].filter(Boolean).join("\n")));
+      ((old && old.photos) || []).forEach(function (ref) {
+        panel.appendChild(W.photo.thumb({ref: ref, own: true}));
+      });
+      entries.forEach(function (entry) {
+        var url = URL.createObjectURL(entry.blob);
+        var img = el("img", "walk-thumb__img");
+        img.alt = tx("walk.draft.recovery"); img.src = url;
+        img.onload = function () { URL.revokeObjectURL(url); };
+        panel.appendChild(img);
+      });
+      var button = W.button("walk-btn", tx("walk.draft.copy"), function () {
+        if (!window.confirm(tx("walk.draft.confirm"))) return;
+        button.disabled = true;
+        var copied = Object.assign({}, old || {mode: current.mode}, {run_id: current.run_id});
+        W.local.set(current.draftKey, copied);
+        // Copy bytes, keeping all original keys and frames as a recovery source.
+        Promise.all(entries.map(function (entry) {
+          return W.offline.put(current.draftKey, entry.mode, entry.blob, current.run_id);
+        })).then(function () {
+          if (f !== current) return;
+          open({mode: copied.mode || current.mode});
+        }, function () { button.disabled = false; W.toast(tx("walk.offline.nostore"), "warn"); });
+      });
+      panel.appendChild(button);
+      body.insertBefore(panel, body.firstChild);
+    }
+    W.offline.recovery(oldKey).then(show);
+  }
 
   function zoneOf(code) {
     return W.state.data.zones.filter(function (z) { return z.code === code; })[0] || null;
@@ -94,9 +167,11 @@
 
   function hasNoViolation() { return f.noViolation !== null && f.noViolation !== undefined; }
 
-  function setReading(value) {
+  function setReading(value, source, confirmed) {
     f.reading = value === null || value === undefined ? null : String(value);
     f.readingBase = value === null || value === undefined ? null : value;
+    f.readingSource = source || "human";
+    f.readingConfirmed = confirmed === true || (!!f.n && confirmed === undefined);
     f.noViolation = null;
   }
 
@@ -139,7 +214,13 @@
     var list = W.state.data.items.filter(function (i) {
       if (i.measure !== isMeasure()) return false;
       if (q) return (i.q + " " + i.code + " " + i.process).toLowerCase().indexOf(q) !== -1;
-      return !f.zone || !i.zones.length || i.zones.indexOf(f.zone) !== -1;
+      return true;
+    });
+    var hint = f.zone || f.hint;
+    list.sort(function (a, b) {
+      var aHere = !hint || !a.zones.length || a.zones.indexOf(hint) !== -1;
+      var bHere = !hint || !b.zones.length || b.zones.indexOf(hint) !== -1;
+      return Number(bHere) - Number(aHere);
     });
     var before = list.filter(function (i) { return previousHere(i.code); });
     return before.concat(list.filter(function (i) { return !previousHere(i.code); }));
@@ -174,12 +255,19 @@
     if (uploading()) return "walk.sheet.need_upload";
     // Кадр, ждущий связи, нельзя бросить за порогом записи: она ушла бы без него.
     if (waitingPhotos().length) return "walk.sheet.need_online";
+    if (f.photos.some(function (p) { return p.state === "failed" && !p.entryId; })) return "walk.offline.nostore";
     // Число после «нарушения нет» поправлено: «Пересчитать» доступно без пункта.
     if (f.noViolation !== null && readingChanged() && !readingInvalid()) return null;
     if (!f.zone) return recognizing() && f.code ? "walk.sheet.need_where" : "walk.sheet.need_zone";
     if (!f.code) return "walk.sheet.need_item";
     if (readingInvalid()) return "walk.err.reading";
+    if (assignmentEnabled() && (!assignmentReady(primaryPhotoCandidate()) ||
+        extras().some(function (c) { return !assignmentReady(c); }))) return "walk.sheet.photo_assignment.need";
     if (isAdvice()) return f.text.trim() ? null : "walk.sheet.need_advice";
+    if (!f.n && !taken() && ["D1", "D2", "D3"].indexOf(f.level) !== -1 && !f.text.trim()) return "walk.sheet.need_factual_text";
+    if (extras().some(function (cand) {return ["D1", "D2", "D3"].indexOf(extraLevel(cand)) !== -1 && !extraText(cand).trim();})) return "walk.sheet.need_factual_text";
+    var classWhy = classBlocker();
+    if (classWhy) return classWhy;
     if (!taken() && !f.level) return "walk.sheet.need_level";
     return null;
   }
@@ -195,15 +283,20 @@
   }
 
   function saveDraft() {
-    if (f.n) return;
-    W.local.set(draftKey(), {
-      mode: f.mode, zone: f.zone, code: f.code, level: f.level, text: f.text,
+    if (f.n) { if (W.editDraft) W.editDraft.save(f); return; }
+    W.local.set(draftKey(), Object.assign({}, W.local.get(draftKey()) || {}, {
+      run_id: f.run_id, mode: f.mode, zone: f.zone, code: f.code,
+      level: f.level || f.legacyLevel || null, text: f.text,
       comment: f.comment, repeat: f.repeat, words: f.words, reading: f.reading,
+      reading_source: f.readingSource || "model", reading_confirmed: !!f.readingConfirmed,
+      class_facts: classFactDrafts(),
       photos: readyPhotos().map(function (p) { return p.ref; }),
-    });
+      reconcile: !!f.reconcile, submitted_ops: f.submitted_ops || [],
+    }));
   }
 
   function changed() {
+    syncClassSelections();
     saveDraft();
     if (W.tg && W.supports("6.2")) {
       if (dirty()) W.tg.enableClosingConfirmation(); else W.tg.disableClosingConfirmation();
@@ -214,10 +307,10 @@
 
   function addFiles(files) {
     // Кадр новой записи при обрыве связи переживёт закрытие формы: он привязан к черновику.
-    var key = f.n ? null : draftKey();
+    var key = !f.n || hasEditDraft() ? draftKey() : null;
     var mode = f.mode;
     files.forEach(function (file) {
-      var p = { id: ++seq, state: "uploading", fresh: true, own: true, url: URL.createObjectURL(file), draftKey: key, mode: mode };
+      var p = { id: ++seq, state: "uploading", fresh: true, own: true, url: URL.createObjectURL(file), draftKey: key, run_id: f.run_id, mode: mode };
       f.photos.push(p);
       send(p, file);
     });
@@ -226,11 +319,31 @@
 
   function send(p, file) {
     p.state = "uploading";
+    if (p.draftKey) {
+      var stored = p.entryId && W.offline.retry ? W.offline.retry(p.entryId, p.draftKey, p.run_id) :
+        (p.blob ? Promise.resolve(p.blob) : W.photo.compress(file)).then(function (blob) {
+          p.blob = blob;
+          if (!W.offline.available()) throw new Error("storage");
+          return W.offline.put(p.draftKey, p.mode, blob, p.run_id).then(function (entry) {
+            p.entryId = entry.id; p.receiptIds = [entry.id];
+          });
+        });
+      stored.then(function () {
+        p.state = "waiting";
+        if (f && f.photos.indexOf(p) !== -1) redraw("photos", "item", "footer");
+        W.offline.kick(); W.offline.watch();
+      }, function () {
+        p.state = "failed"; p.file = file;
+        W.toast(tx("walk.offline.nostore"), "warn");
+        if (f && f.photos.indexOf(p) !== -1) redraw("photos", "item", "footer");
+      });
+      return;
+    }
     var blob = p.blob ? Promise.resolve(p.blob) : W.photo.compress(file);
     blob.then(function (b) {
       p.blob = b;
       if (navigator.onLine === false) throw W.photo.offline();
-      return W.photo.upload(b);
+      return W.photo.upload(b, p.run_id);
     }).then(function (ref) {
       if (!f || f.photos.indexOf(p) === -1) return;
       p.ref = ref;
@@ -239,7 +352,7 @@
       changed();
       redraw("photos", "item", "footer");
     }, function (err) {
-      if (err && err.retryable && p.blob) { park(p, file); return; }
+      if (err && (err.retryable || err.code === "run_changed" || err.status === 409) && p.blob) { park(p, file); return; }
       if (!f || f.photos.indexOf(p) === -1) return;
       p.state = "failed";
       p.error = err && err.message;
@@ -268,7 +381,7 @@
       W.offline.watch();
       return;
     }
-    W.offline.put(p.draftKey, p.mode, p.blob).then(function (entry) {
+    W.offline.put(p.draftKey, p.mode, p.blob, p.run_id).then(function (entry) {
       p.entryId = entry.id;
       if (shown()) {
         p.state = "waiting";
@@ -281,19 +394,34 @@
 
   /** Фон отправил кадр из хранилища. Форма на том же черновике открыта — кадр становится готовым в ней. */
   function adopt(entry, ref) {
-    if (!f || f.n || draftKey() !== entry.key) return false;
+    if (!f || (f.n && !hasEditDraft()) || f.run_id !== entry.run_id || draftKey() !== entry.key) return false;
     if (f.gone.indexOf(entry.id) !== -1) return true;
-    var p = f.photos.filter(function (x) { return x.entryId === entry.id; })[0];
+    var exact = f.photos.filter(function (x) { return x.entryId === entry.id; })[0];
+    var existing = f.photos.filter(function (x) { return x.ref === ref; })[0];
+    if (exact && existing && exact !== existing) {
+      f.photos = f.photos.filter(function (x) { return x !== exact; });
+      if (exact.url) URL.revokeObjectURL(exact.url);
+    }
+    var p = existing || exact;
     if (!p) {
-      p = { id: ++seq, fresh: true, own: true, draftKey: entry.key, mode: entry.mode, url: URL.createObjectURL(entry.blob) };
+      p = { id: ++seq, fresh: true, own: true, draftKey: entry.key, run_id: entry.run_id, mode: entry.mode, url: URL.createObjectURL(entry.blob) };
       f.photos.push(p);
     }
     p.ref = ref;
     p.state = "done";
-    p.entryId = null;
+    p.entryId = entry.id;
+    p.receiptIds = (p.receiptIds || []).concat(exact && exact.receiptIds || [], [entry.id]).filter(function (id, at, all) { return all.indexOf(id) === at; });
+    if (!p.url) p.url = URL.createObjectURL(entry.blob);
     W.photo.remember(ref, p.url);
     changed();
     redraw("photos", "item", "footer");
+    return true;
+  }
+
+  function uploadFailed(entry) {
+    if (!f || (f.n && !hasEditDraft()) || f.run_id !== entry.run_id || draftKey() !== entry.key) return false;
+    var p = f.photos.filter(function (p) { return p.entryId === entry.id; })[0];
+    if (p) { p.state = "failed"; redraw("photos", "item", "footer"); }
     return true;
   }
 
@@ -307,16 +435,17 @@
 
   /** Форма открылась: кадры этого черновика, дожидавшиеся связи, возвращаются в неё. */
   function restoreWaiting() {
-    if (f.n || !W.offline.available()) return;
+    if ((f.n && !hasEditDraft()) || !W.offline.available()) return;
     var mine = f;
     W.offline.list(draftKey()).then(function (entries) {
       if (f !== mine) return;
       var added = false;
       entries.forEach(function (e) {
         if (e.mode !== f.mode || f.gone.indexOf(e.id) !== -1) return;
+        if (e.uploaded_ref) { adopt(e, e.uploaded_ref); return; }
         if (f.photos.some(function (x) { return x.entryId === e.id; })) return;
         f.photos.push({
-          id: ++seq, state: "waiting", fresh: true, own: true, entryId: e.id, draftKey: e.key,
+          id: ++seq, state: e.upload_error ? "failed" : "waiting", fresh: true, own: true, entryId: e.id, receiptIds: [e.id], draftKey: e.key, run_id: e.run_id,
           mode: e.mode, blob: e.blob, url: URL.createObjectURL(e.blob),
         });
         added = true;
@@ -335,7 +464,7 @@
       return;
     }
     if (!p.fresh && p.ref) f.removed.push(p.ref);
-    if (p.entryId) { f.gone.push(p.entryId); W.offline.remove(p.entryId); }
+    (p.receiptIds || (p.entryId ? [p.entryId] : [])).forEach(function (id) { f.gone.push(id); W.offline.remove(id); });
     f.photos = left;
     changed();
     redraw("photos", "item", "footer");
@@ -395,16 +524,24 @@
   }
 
   function setZone(code, source) {
+    if (f.contextZone && !f.n && code !== f.contextZone) {
+      if (f.saving) { W.toast(tx("walk.sheet.saving"), "warn"); return; }
+      if (f.photos.some(function (p) { return !p.ref && !p.entryId; })) { W.toast(tx("walk.sheet.need_upload"), "warn"); return; }
+      saveDraft();
+      open({mode: "measure", zone: code, contextZone: code});
+      return;
+    }
     f.zone = code;
     f.zoneSource = source;
     W.haptic();
     changed();
     redraw.apply(null, ORDER.concat(["footer"]));
+    if (recognizing() && f.code) requestClass(primaryClassCandidate());
   }
 
   function fullZoneMenu() {
     W.menu.open({
-      title: tx("walk.sheet.zone"),
+      title: tx(f.contextZone && !f.n ? "walk.sheet.context_other_zone" : "walk.sheet.zone"),
       options: realZones().map(function (z) { return { label: z.title, value: z.code, on: z.code === f.zone }; }),
       onPick: function (code) { setZone(code, "pick"); },
     });
@@ -444,9 +581,18 @@
       title: isMeasure() ? tx("walk.sheet.item_measure") : isAdvice() ? tx("walk.sheet.item_advice") : tx("walk.sheet.item"),
       placeholder: isMeasure() ? tx("walk.sheet.search_measure") : tx("walk.sheet.search"),
       lead: lead,
-      list: function (q) {
-        return choices(q).map(function (i) {
-          return { code: i.label, label: i.q, value: i.code, on: i.code === f.code, badge: previousHere(i.code) ? tx("walk.sheet.was_here") : null };
+      semanticTags: isMeasure() || isAdvice() ? [] : (W.state.data.item_search_tags || []).map(function (tag) {
+        return {id:tag.id, label:tx("walk.sheet.search_tag." + tag.id), codes:tag.codes};
+      }),
+      tags: choices("").map(function (i) { return i.process; }).filter(function (p, at, all) { return p && all.indexOf(p) === at; }),
+      list: function (q, filters) {
+        filters = filters || {};
+        var selectedTag = (W.state.data.item_search_tags || []).filter(function (tag) {return tag.id === filters.semantic;})[0];
+        return choices(q).filter(function (i) {
+          return (!filters.process || i.process === filters.process) &&
+            (!selectedTag || selectedTag.codes.indexOf(i.code) !== -1);
+        }).map(function (i) {
+          return { code: i.label, kind: isAdvice() ? "advice" : i.measure ? "info" : "violation", label: i.q, value: i.code, on: i.code === f.code, badge: previousHere(i.code) ? tx("walk.sheet.was_here") : null };
         });
       },
       onPick: function (code) { pick(code, null); },
@@ -458,7 +604,14 @@
    * несёт готовый вывод сервера; ручной выбор повторяет его без слов: одна зона
    * пункта — она, иначе зона с экрана, если она у пункта есть, иначе спросить.
    */
-  function applyResolution(i, cand) {
+  function applyResolution(i, cand, keepPhysical) {
+    var physical = zoneOf(f.zone);
+    if (keepPhysical && f.zoneSource === "pick" && physical && !physical.equipment) {
+      // A human location belongs to this selection, never to every candidate
+      // sharing its item code. Keep the raw model zone untouched.
+      if (cand) cand.resolution = Object.assign({}, cand.resolution || {}, { zone: f.zone, source: "pick" });
+      return;
+    }
     var r = cand && cand.resolution;
     if (!r) {
       var own = itemZones(i.code);
@@ -477,30 +630,61 @@
   function pick(code, cand) {
     var i = item(code);
     if (!i) return;
+    var keepPhysical = !cand || !f.picked || cand === f.picked;
+    if (recognizing() && f.code) {
+      f.savedClassFacts = classFactDrafts();
+      var old = classState(primaryClassCandidate());
+      old.reading = f.reading == null ? "" : f.reading;
+      old.readingSource = f.readingSource || "human";
+      old.readingConfirmed = !!f.readingConfirmed;
+    }
+    // Явный выбор зоны сохраняется у кандидата, когда человек переходит к
+    // другому варианту. Исходная model zone (cand.zone) остаётся нетронутой.
+    if (f.picked && f.zone && f.zoneSource === "pick") {
+      var previous = f.picked.resolution || {};
+      previous.zone = f.zone;
+      previous.source = "pick";
+      f.picked.resolution = previous;
+    }
     f.code = code;
     f.picked = cand ? cand : null;
-    // Ставший основным пункт из «тоже» уходит: одна запись на пункт.
-    f.also = f.also.filter(function (c) { return c.code !== code; });
-    if (recognizing()) applyResolution(i, cand);
-    if (i.measure) f.level = "D0";
-    else if (isAdvice() || i.note) f.level = ADVICE_LEVEL;
-    else if (cand && i.levels.indexOf(cand.level) !== -1) f.level = cand.level;
-    else if (i.levels.length === 1) f.level = i.levels[0];
-    else if (i.levels.indexOf(f.level) === -1) f.level = null;
-    var before = previousHere(code);
-    if (before && !isAdvice() && !f.level && i.levels.indexOf(before.level) !== -1) f.level = before.level;
+    if (recognizing()) applyResolution(i, cand, keepPhysical);
+    // Основной стала одна пара «пункт + зона»; другие зоны остаются в «тоже».
+    f.also = f.also.filter(function (c) { return !isPrimary(c); });
+    if (recognizing() && !i.measure && !i.note) {
+      var review = classState(primaryClassCandidate());
+      review.key = null;
+      review.manualMode = false;
+      f.level = null;
+      f.legacyLevel = null;
+    } else {
+      if (i.measure) f.level = "D0";
+      else if (isAdvice() || i.note) f.level = ADVICE_LEVEL;
+      else if (cand && i.levels.indexOf(cand.level) !== -1) f.level = cand.level;
+      else if (i.levels.length === 1) f.level = i.levels[0];
+      else if (i.levels.indexOf(f.level) === -1) f.level = null;
+      var before = previousHere(code);
+      if (before && !isAdvice() && !f.level && i.levels.indexOf(before.level) !== -1) f.level = before.level;
+    }
     if (cand && cand.wording && (!f.text.trim() || f.textAuto)) { f.text = cand.wording; f.textAuto = true; }
-    if (cand && cand.reading_c !== null && cand.reading_c !== undefined) setReading(cand.reading_c);
-    else if (cand && !f.n) setReading(null);
+    if (recognizing()) {
+      var ownReading = classState(primaryClassCandidate());
+      setReading(ownReading.reading === "" ? null : ownReading.reading,
+        ownReading.readingSource, ownReading.readingConfirmed);
+    } else if (cand && cand.reading_c != null) setReading(cand.reading_c);
     W.haptic();
     changed();
     redraw.apply(null, ORDER.concat(["footer"]));
+    if (recognizing()) requestClass(primaryClassCandidate());
   }
 
   /* ── система ищет пункт (D330) ─────────────────────────────────────── */
 
   function find(reading) {
     if (findBlocker() || f.finding) return;
+    if (recognizing() && f.code) f.savedClassFacts = classFactDrafts();
+    var form = f;
+    var runId = f.run_id;
     f.finding = true;
     f.findError = null;
     // Простой поиск (без исправленного числа) начинает разговор заново.
@@ -520,7 +704,7 @@
     f.pending = asked;
     if (fixed === null && asked.words) preview(mine, asked, body.zone_hint);
     W.post(W.urls.suggest, body).then(function (res) {
-      if (!f || f.findId !== mine) return;
+      if (f !== form || W.state.data.run_id !== runId || f.findId !== mine) return;
       if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
       f.finding = false;
       f.preview = null;
@@ -531,7 +715,17 @@
       f.answered = null;
       f.via = (res.body && res.body.via) || "model";
       f.asked = JSON.stringify(asked);
-      if (f.found.length) {
+      if (recognizing()) {
+        // A location picked before the first item belongs to this search;
+        // an existing candidate's override must not spread to a new snapshot.
+        var physical = zoneOf(f.zone);
+        var physicalPick = !f.picked && f.zoneSource === "pick" && physical && !physical.equipment ? f.zone : null;
+        f.code = null; f.zone = physicalPick; f.zoneSource = physicalPick ? "pick" : "ask";
+        f.level = null; f.picked = null;
+        f.legacyLevel = null;
+        f.question = ""; f.answers = [];
+        redraw.apply(null, ORDER.concat(["footer"]));
+      } else if (f.found.length) {
         if (fixed !== null) {
           // Предложение посчитано заново: формулировка и класс — новые, число — аудитора.
           f.textAuto = true;
@@ -547,7 +741,7 @@
         redraw.apply(null, ORDER.concat(["footer"]));
       } else { redraw("item", "footer"); }
     }).catch(function (err) {
-      if (!f || f.findId !== mine) return;
+      if (f !== form || W.state.data.run_id !== runId || f.findId !== mine) return;
       f.finding = false;
       f.findError = err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network");
       redraw("item", "reading", "footer");
@@ -560,8 +754,10 @@
    * экран ждёт модель как раньше.
    */
   function preview(mine, asked, zone) {
+    var form = f;
+    var runId = f.run_id;
     W.post(W.urls.hint, { zone_hint: zone, words: asked.words, frames: asked.photos.length }).then(function (res) {
-      if (!f || !f.finding || f.findId !== mine || !res.ok) return;
+      if (f !== form || W.state.data.run_id !== runId || !f.finding || f.findId !== mine || !res.ok) return;
       var cards = (res.body && res.body.candidates) || [];
       if (!cards.length) return;
       f.preview = cards;
@@ -597,10 +793,12 @@
 
   function proposal(cand, onPick) {
     var i = item(cand.code) || { q: cand.code };
-    var on = f.code === cand.code && (!f.picked || f.picked === cand);
+    var on = f.picked ? f.picked === cand : isPrimary(cand);
     var top = el("span", "walk-found__top");
-    top.appendChild(el("span", "walk-option__code", cand.code));
-    if (cand.level && cand.level !== ADVICE_LEVEL) top.appendChild(W.level(cand.level));
+    var kind = cand.level === ADVICE_LEVEL ? "advice" : cand.level === "D0" || i.measure ? "info" : /^D[1-3]$/.test(cand.level || "") ? "violation" : null;
+    top.appendChild(el("span", "walk-option__code" + (kind ? " walk-item-code--" + kind : ""), i.label || cand.code));
+    if (kind) top.appendChild(el("span", "walk-item-kind walk-item-kind--" + kind, tx("walk.item.kind." + kind)));
+    if (!recognizing() && cand.level && cand.level !== ADVICE_LEVEL) top.appendChild(W.level(cand.level));
     if (on) {
       // Выбранная карточка — результат «пункт · зона» (D445): зона — пилюля с
       // меню. Не вывелась — пилюли нет, под карточкой строка «Где?».
@@ -618,49 +816,181 @@
         line.appendChild(pill);
       }
       card.appendChild(line);
+      var assigned = photoAssignmentControl(f.picked || primaryPhotoCandidate());
+      if (assigned) card.appendChild(assigned);
       return card;
     }
     var b = W.button("walk-found__card", null, function () { if (onPick) onPick(cand); else pick(cand.code, cand); });
     b.setAttribute("aria-pressed", "false");
     b.appendChild(top);
-    b.appendChild(el("span", "walk-found__q", i.q));
+    var resolved = zoneOf(extraZone(cand));
+    b.appendChild(el("span", "walk-found__q", i.q + " · " + (resolved ? resolved.title : tx("walk.sheet.where"))));
     if (!recognizing() || !f.code || !item(cand.code)) return b;
     // «Тоже записать» (D593) — рядом с карточкой, а не в ней: кнопка в кнопке недопустима.
     var row = el("div", "walk-found__row");
     var also = isAlso(cand);
     var t = W.button("walk-found__also" + (also ? " is-on" : ""), tx(also ? "walk.sheet.also_on" : "walk.sheet.also"), function () { toggleAlso(cand); });
     t.setAttribute("aria-pressed", String(also));
+    t.disabled = !also && (!extraZone(cand) || isPrimary(cand) || (assignmentEnabled() && !assignmentReady(cand)));
+    if (!extraZone(cand)) t.title = tx("walk.sheet.need_zone");
     row.appendChild(b);
     row.appendChild(t);
-    return row;
+    var assigned = photoAssignmentControl(cand);
+    var extraClass = also ? classReviewBox(cand) : null;
+    if (!assigned && !extraClass) return row;
+    var group = el("div", "walk-form__part");
+    group.appendChild(row);
+    if (assigned) group.appendChild(assigned);
+    if (extraClass) group.appendChild(extraClass);
+    return group;
   }
 
-  function isAlso(cand) { return f.also.some(function (c) { return c.code === cand.code; }); }
+  /** Модель предлагает кадры; выбранная человеком привязка хранится отдельно. */
+  function assignmentEnabled() { return recognizing() && f.found && f.found.length > 1; }
+
+  function primaryPhotoCandidate() {
+    if (f.picked) return f.picked;
+    if (!f.manualPhotoCandidate || f.manualPhotoCandidate.code !== f.code) {
+      f.manualPhotoCandidate = { code: f.code, frame_indices: null, frame_count: 0 };
+    }
+    return f.manualPhotoCandidate;
+  }
+
+  function validFrameIndices(value, count) {
+    if (!Array.isArray(value)) return null;
+    var seen = [];
+    for (var i = 0; i < value.length; i++) {
+      var n = value[i];
+      if (typeof n !== "number" || Math.floor(n) !== n || n < 0 || n >= count || seen.indexOf(n) !== -1) return null;
+      seen.push(n);
+    }
+    return seen;
+  }
+
+  function frameAssignment(cand) {
+    var refs = readyPhotos().map(function (p) { return p.ref; });
+    var snapshot = JSON.stringify({ words: f.words.trim(), photos: refs });
+    var key = String(f.findId || 0) + ":" + snapshot;
+    if (cand.photoAssignment && cand.photoAssignment.key === key) return cand.photoAssignment;
+    var source = refs.filter(function (ref, i) { return refs.indexOf(ref) === i; });
+    var modelRefs = Array.isArray(cand.frame_refs) ? cand.frame_refs.slice() : [];
+    var count = cand.frame_count;
+    if (typeof count !== "number" || Math.floor(count) !== count || count < 0 || count !== modelRefs.length) {
+      count = 0; modelRefs = [];
+    }
+    var raw = validFrameIndices(cand.frame_indices, count);
+    var proposed = raw ? raw.map(function (i) { return source.indexOf(modelRefs[i]); }) : [];
+    if (proposed.some(function (i) { return i < 0; })) proposed = [];
+    cand.photoAssignment = {
+      key: key, source_photos: source, model_source_photos: modelRefs,
+      model_frame_indices: raw,
+      assigned_frame_indices: snapshot === f.asked ? proposed : [], confirmed: false,
+    };
+    return cand.photoAssignment;
+  }
+
+  function assignmentReady(cand) {
+    var state = frameAssignment(cand);
+    return state.confirmed && state.assigned_frame_indices.length > 0;
+  }
+
+  function assignmentPayload(cand) {
+    var state = frameAssignment(cand);
+    return {
+      source_photos: state.source_photos.slice(), model_source_photos: state.model_source_photos.slice(),
+      model_frame_indices: state.model_frame_indices ? state.model_frame_indices.slice() : null,
+      assigned_frame_indices: state.assigned_frame_indices.slice(), confirmed: state.confirmed,
+    };
+  }
+
+  function assignedPhotos(cand) {
+    var state = frameAssignment(cand);
+    return state.assigned_frame_indices.map(function (i) { return state.source_photos[i]; });
+  }
+
+  function photoAssignmentControl(cand) {
+    if (!assignmentEnabled()) return null;
+    var state = frameAssignment(cand);
+    var box = section(tx("walk.sheet.photo_assignment.title"), tx("walk.sheet.photo_assignment.hint"));
+    box.setAttribute("data-photo-assignment", cand.code);
+    state.source_photos.forEach(function (ref, index) {
+      var label = el("label", "walk-option");
+      var input = document.createElement("input");
+      input.type = "checkbox";
+      input.setAttribute("data-frame-index", String(index));
+      input.checked = state.assigned_frame_indices.indexOf(index) !== -1;
+      input.addEventListener("change", function () {
+        state.assigned_frame_indices = state.assigned_frame_indices.filter(function (i) { return i !== index; });
+        if (input.checked) state.assigned_frame_indices.push(index);
+        state.assigned_frame_indices.sort(function (a, b) { return a - b; });
+        state.confirmed = false;
+        classSelectionChanged();
+        redraw("item", "level", "footer");
+      });
+      label.appendChild(input);
+      var photo = readyPhotos().filter(function (p) { return p.ref === ref; })[0];
+      if (photo && W.photo.thumb) label.appendChild(W.photo.thumb(photo));
+      label.appendChild(el("span", null, tx("walk.sheet.photo_assignment.frame", { n: index + 1 })));
+      box.appendChild(label);
+    });
+    var label = el("label", "walk-option");
+    var confirm = document.createElement("input");
+    confirm.type = "checkbox";
+    confirm.setAttribute("data-photo-confirm", "");
+    confirm.checked = state.confirmed;
+    confirm.disabled = !state.assigned_frame_indices.length;
+    confirm.addEventListener("change", function () {
+      state.confirmed = confirm.checked;
+      classSelectionChanged();
+      if (confirm.checked && classSelected(cand)) requestClass(cand);
+      redraw("item", "level", "footer");
+    });
+    label.appendChild(confirm);
+    label.appendChild(el("span", null, tx("walk.sheet.photo_assignment.confirm")));
+    box.appendChild(label);
+    return box;
+  }
+
+  /** Равенство кандидатов: известная пара «пункт + зона», либо тот же объект. */
+  function sameCandidate(a, b) {
+    if (a === b) return true;
+    var zone = extraZone(a);
+    return !!zone && a.code === b.code && zone === extraZone(b);
+  }
+
+  function isPrimary(cand) {
+    return cand === f.picked || (!!f.zone && cand.code === f.code && extraZone(cand) === f.zone);
+  }
+
+  function isAlso(cand) { return f.also.some(function (c) { return sameCandidate(c, cand); }); }
 
   function toggleAlso(cand) {
-    f.also = isAlso(cand) ? f.also.filter(function (c) { return c.code !== cand.code; }) : f.also.concat([cand]);
+    if (!isAlso(cand) && (!extraZone(cand) || isPrimary(cand) || (assignmentEnabled() && !assignmentReady(cand)))) return;
+    f.also = isAlso(cand) ? f.also.filter(function (c) { return !sameCandidate(c, cand); }) : f.also.concat([cand]);
     W.haptic();
-    redraw("item", "footer");
+    changed();
+    if (isAlso(cand)) requestClass(cand);
+    redraw("item", "level", "footer");
   }
 
   /** Отмеченные «тоже» — только у свежего поиска нового нарушения. */
   function extras() {
     if (!recognizing() || !f.found || stale()) return [];
-    return f.also.filter(function (c) { return item(c.code) && c.code !== f.code; });
+    return f.also.filter(function (c) { return item(c.code) && !isPrimary(c) && !!extraZone(c); });
   }
 
-  /** Зона «тоже»-записи: своя у пункта, иначе — та же, что у основной (D593). */
+  /** Неопределённая зона дополнительного кандидата требует выбора человека. */
   function extraZone(cand) {
-    var r = cand.resolution;
-    var own = itemZones(cand.code);
-    var z = r && r.zone && zoneOf(r.zone) && !zoneOf(r.zone).equipment ? r.zone
-      : own.length === 1 ? own[0].code : null;
-    return z || f.zone;
+    var r = cand && cand.resolution;
+    var z = r && r.zone && zoneOf(r.zone);
+    return z && !z.equipment ? z.code : null;
   }
 
   function extraLevel(cand) {
     var i = item(cand.code);
     if (i.note) return ADVICE_LEVEL;
+    if (i.measure) return "D0";
+    if (recognizing()) return classState(cand).level;
     if (i.levels.indexOf(cand.level) !== -1) return cand.level;
     return i.levels.length === 1 ? i.levels[0] : cand.level;
   }
@@ -714,6 +1044,395 @@
 
   /* ── секции ───────────────────────────────────────────────────────── */
 
+  /* ── пункт выбран человеком → класс по его фактам и этому изданию ───── */
+  function classState(cand) {
+    if (!cand.classReview) {
+      cand.classReview = W.classReview.fresh();
+      cand.classReview.answer = "";
+      cand.classReview.clarifications = [];
+      cand.classReview.answerQuestion = "";
+      cand.classReview.additionalWords = "";
+      cand.classReview.humanText = cand.wording || "";
+      cand.classReview.textEdited = false;
+      cand.classReview.reading = cand.reading_c == null ? "" : String(cand.reading_c);
+      cand.classReview.readingConfirmed = false;
+      cand.classReview.readingSource = "model";
+    }
+    restoreClassFacts(cand, cand.classReview);
+    return cand.classReview;
+  }
+
+  function classPhotoRefs(cand) {
+    if (assignmentEnabled()) return assignmentReady(cand) ? assignedPhotos(cand) : null;
+    return readyPhotos().map(function (p) { return p.ref; }).filter(function (ref, i, all) { return all.indexOf(ref) === i; });
+  }
+  function restoreClassFacts(cand, state) {
+    if (state.factsEdited || state.restoredEntry) return;
+    var primary = cand === f.picked || cand === f.manualPhotoCandidate;
+    var zone = primary ? f.zone : extraZone(cand);
+    var refs = classPhotoRefs(cand);
+    if (!zone || refs === null) return;
+    var words = primary ? f.words.trim() : "";
+    var saved = (f.savedClassFacts || []).filter(function (entry) {
+      return entry.code === cand.code && entry.zone === zone && entry.words === words &&
+        entry.checklist_version === W.state.data.checklist_version &&
+        JSON.stringify(entry.photos) === JSON.stringify(refs);
+    });
+    if (saved.length !== 1) return;
+    state.restoredEntry = saved[0];
+    state.answer = typeof saved[0].answer === "string" ? saved[0].answer : "";
+    state.clarifications = Array.isArray(saved[0].clarifications) ? saved[0].clarifications.filter(function (pair) {
+      return pair && typeof pair.question === "string" && typeof pair.answer === "string";
+    }) : [];
+    state.answerQuestion = saved[0].answer_question || "";
+    state.additionalWords = saved[0].additional_words || "";
+    if (typeof saved[0].human_text === "string") {state.humanText = saved[0].human_text; state.textEdited = true;}
+    state.clarificationScope = saved[0].clarification_scope || null;
+    if (!state.readingEdited && saved[0].reading != null) {
+      state.reading = String(saved[0].reading);
+      state.readingSource = saved[0].reading_source === "human" ? "human" : "model";
+      state.readingConfirmed = saved[0].reading_confirmed === true;
+      if (primary) {
+        f.reading = state.reading;
+        f.readingSource = state.readingSource;
+        f.readingConfirmed = state.readingConfirmed;
+      }
+    }
+  }
+  function classFactDrafts() {
+    var facts = (f.savedClassFacts || []).slice();
+    if (!recognizing() || !f.code) return facts;
+    var candidates = (f.found || []).filter(function (cand) { return !!cand.classReview; });
+    if (f.code && candidates.indexOf(primaryClassCandidate()) === -1) candidates.push(primaryClassCandidate());
+    candidates.forEach(function (cand) {
+      var state = classState(cand);
+      var primary = classIsPrimary(cand);
+      var zone = primary ? f.zone : extraZone(cand);
+      var reading = primary ? f.reading : state.reading;
+      if (!state.textEdited && !state.answer && !state.additionalWords && !state.clarifications.length && (reading == null || !String(reading).trim())) return;
+      var entry = { code:cand.code, zone:zone || null, checklist_version:W.state.data.checklist_version, answer:state.answer, reading:reading,
+        words:primary ? f.words.trim() : "", photos:classPhotoRefs(cand),
+        human_text:state.textEdited ? state.humanText : null, additional_words:state.additionalWords, clarifications:state.clarifications, answer_question:state.answerQuestion, clarification_scope:state.clarificationScope,
+        reading_source:primary ? f.readingSource : state.readingSource,
+        reading_confirmed:primary ? !!f.readingConfirmed : !!state.readingConfirmed };
+      // Preserve ambiguous/unmatched facts instead of moving them to another item.
+      if (state.restoredEntry) facts = facts.filter(function (old) { return old !== state.restoredEntry; });
+      var same = facts.some(function (old) { return JSON.stringify(old) === JSON.stringify(entry); });
+      if (!same) facts.push(entry);
+    });
+    return facts;
+  }
+  function primaryClassCandidate() { return primaryPhotoCandidate(); }
+  function classIsPrimary(cand) { return cand === primaryClassCandidate(); }
+  function selectedClassCandidates() {
+    if (!recognizing() || !f.code) return [];
+    return [primaryClassCandidate()].concat(extras());
+  }
+  function classReading(cand) {
+    var state = classState(cand);
+    var primary = classIsPrimary(cand);
+    var raw = primary ? f.reading : state.reading;
+    var value = raw == null || !String(raw).trim() ? null : parseReading(raw);
+    return { raw: raw, value: value, confirmed: primary ? !!f.readingConfirmed : state.readingConfirmed,
+      source: primary ? f.readingSource || "human" : state.readingSource };
+  }
+  function classContext(cand) {
+    var state = classState(cand);
+    var primary = classIsPrimary(cand);
+    var zone = primary ? f.zone : extraZone(cand);
+    var reading = classReading(cand);
+    var words = [primary ? f.words.trim() : "", state.additionalWords, state.answerQuestion ? "" : state.answer.trim()].filter(Boolean).join("\n");
+    var chain = state.clarifications.slice();
+    if (state.answerQuestion && state.answer.trim()) chain.push({question:state.answerQuestion, answer:state.answer.trim()});
+    var confirmed = !assignmentEnabled() || assignmentReady(cand);
+    var photos = assignmentEnabled() ? (confirmed ? assignedPhotos(cand) : [])
+      : readyPhotos().map(function (p) { return p.ref; }).filter(function (ref, i, all) { return all.indexOf(ref) === i; });
+    var body = { run_id: f.run_id, checklist_version: W.state.data.checklist_version,
+      code: cand.code, zone: zone || null, words: words, photos: photos, clarifications:chain,
+      reading_c: reading.confirmed ? reading.value : null,
+      reading_confirmed: reading.value !== null && reading.confirmed };
+    if (body.reading_c !== null) body.reading_source = reading.source;
+    var scope = JSON.stringify({run:f.run_id, edition:body.checklist_version, code:cand.code, zone:zone || null,
+      words:words, photos:photos, reading:reading, assigned:confirmed});
+    var total = words.length + chain.reduce(function (n, pair) {return n + pair.question.length + pair.answer.length;}, 0);
+    var blocked = "";
+    if ((chain.length || state.answerQuestion) && state.clarificationScope && state.clarificationScope !== scope) blocked = tx("walk.sheet.class_review.review_changed");
+    else if (f.run_id !== W.state.data.run_id) blocked = tx("walk.sheet.class_review.context_changed");
+    else if (!zone) blocked = tx("walk.sheet.need_zone");
+    else if (!confirmed || uploading() || waitingPhotos().length) blocked = tx("walk.sheet.photo_assignment.need");
+    else if (reading.raw != null && String(reading.raw).trim() && reading.value === null) blocked = tx("walk.err.reading");
+    else if (reading.value !== null && !reading.confirmed) blocked = tx("walk.sheet.class_review.confirm_reading");
+    else if (total > 1000 || chain.length > 6 || chain.some(function (pair) {return pair.question.length > 500 || pair.answer.length > 1000;})) blocked = tx("walk.sheet.class_review.facts_limit");
+    else if (photos.length > 10) blocked = tx("walk.sheet.class_review.photos_limit");
+    return { body: body, scope:scope, total:total, levels: (item(cand.code) || {levels: []}).levels,
+      key: JSON.stringify({body: body, reading: reading, assigned: confirmed, search: f.findId || 0,
+        currentRun: W.state.data.run_id, blocked: blocked}), blocked: blocked };
+  }
+  function classSaveContext(cand) {
+    var body = classContext(cand).body;
+    if (!body.clarifications.length) return null;
+    return {clarifications:body.clarifications, run_id:body.run_id, checklist_version:body.checklist_version,
+      code:body.code, zone:body.zone, photo_refs:body.photos};
+  }
+  function classSaveWords(cand) {
+    var body = classContext(cand).body;
+    return [body.words].concat(body.clarifications.map(function (pair) {return pair.answer;})).filter(Boolean).join("\n");
+  }
+  function syncClassSelections() {
+    if (!f || !recognizing() || !f.code) return;
+    selectedClassCandidates().forEach(function (cand) {
+      W.classReview.sync(classState(cand), classContext(cand));
+    });
+    var primary = item(f.code);
+    f.level = primary && primary.measure ? "D0" : classState(primaryClassCandidate()).level;
+  }
+  function classSelectionChanged() {
+    if (!f || !recognizing()) return;
+    syncClassSelections();
+    updateClassPanels();
+    saveDraft();
+  }
+  function classSelected(cand) {
+    return !!f && recognizing() && !!f.code &&
+      (cand === primaryClassCandidate() || extras().indexOf(cand) !== -1);
+  }
+  function requestClass(cand) {
+    if (!classSelected(cand) || (item(cand.code) || {}).measure || (classIsPrimary(cand) && taken())) return;
+    var form = f;
+    var context = classContext(cand);
+    var requestedState = classState(cand);
+    W.classReview.request(requestedState, context, function (key) {
+      return f === form && classSelected(cand) && f.run_id === W.state.data.run_id && classContext(cand).key === key;
+    }, function () {
+      if (f !== form || !classSelected(cand)) return;
+      if (["ready", "needs_fact", "not_established"].indexOf(requestedState.status) !== -1 && requestedState.answer.trim()) {
+        if (requestedState.answerQuestion) requestedState.clarifications = context.body.clarifications;
+        else requestedState.additionalWords = [requestedState.additionalWords, requestedState.answer.trim()].filter(Boolean).join("\n");
+        requestedState.answer = "";
+        requestedState.answerQuestion = "";
+        requestedState.clarificationScope = context.scope;
+        if (node) node.querySelectorAll("[data-class-review]").forEach(function (panel) {
+          if (panel._candidate === cand) panel.querySelector(".walk-class-review__facts").value = "";
+        });
+      }
+      syncClassSelections();
+      updateClassPanels();
+      changed();
+      redraw("repeat", "footer");
+    });
+  }
+  function classBlocker() {
+    if (!recognizing() || !f.code) return null;
+    if (f.run_id !== W.state.data.run_id) return "walk.sheet.class_review.context_changed";
+    syncClassSelections();
+    var candidates = selectedClassCandidates();
+    for (var i = 0; i < candidates.length; i++) {
+      var cand = candidates[i];
+      var reading = classReading(cand);
+      if (reading.raw != null && String(reading.raw).trim() && reading.value === null) return "walk.err.reading";
+      if (classContext(cand).total > 1000 || classContext(cand).body.clarifications.length > 6) return "walk.sheet.class_review.facts_limit";
+      if (classContext(cand).blocked === tx("walk.sheet.class_review.review_changed")) return "walk.sheet.class_review.review_changed";
+      if (reading.value !== null && !reading.confirmed) return "walk.sheet.class_review.confirm_reading";
+      if ((item(cand.code) || {}).measure || (classIsPrimary(cand) && taken())) continue;
+      if (!classState(cand).level) return "walk.sheet.class_review.need_class";
+    }
+    return null;
+  }
+  function updateClassPanels() {
+    if (!node) return;
+    node.querySelectorAll("[data-class-review]").forEach(function (panel) {
+      var cand = panel._candidate;
+      if (!classSelected(cand)) return;
+      renderClassFeedback(panel, cand);
+    });
+  }
+  function renderClassFeedback(panel, cand) {
+    var state = classState(cand);
+    var feedback = panel.querySelector("[data-class-feedback]");
+    feedback.textContent = "";
+    var text = state.status === "pending" ? tx("walk.sheet.class_review.pending")
+      : state.status === "manual" ? tx("walk.sheet.class_review.manual_active")
+      : state.status === "ready" ? tx("walk.sheet.class_review.proposed", {level:state.level})
+      : state.status === "needs_fact" ? state.needFact
+      : state.status === "not_established" ? tx("walk.sheet.class_review.not_established")
+      : state.message || classContext(cand).blocked || tx("walk.sheet.class_review.check_hint");
+    feedback.appendChild(el("p", "walk-form__hint", text));
+    if (state.status === "needs_fact" && state.provisional) {
+      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.provisional", {level:state.provisional})));
+    }
+    if (state.clarifications.length) {
+      var chainReview = el("details");
+      chainReview.appendChild(el("summary", null, tx("walk.sheet.class_review.history")));
+      state.clarifications.forEach(function (pair) { chainReview.appendChild(el("p", null, pair.question)); chainReview.appendChild(el("p", null, pair.answer)); });
+      feedback.appendChild(chainReview);
+    }
+    if (classContext(cand).blocked === tx("walk.sheet.class_review.review_changed")) {
+      feedback.appendChild(W.button("walk-link", tx("walk.sheet.class_review.reaffirm"), function () {
+        state.clarificationScope = classContext(cand).scope;
+        state.factsEdited = true;
+        classSelectionChanged();
+        redraw("item", "level", "footer");
+      }));
+    }
+    if (state.answerQuestion) feedback.appendChild(el("p", "walk-form__hint", state.answerQuestion));
+    if (state.reason) feedback.appendChild(el("p", "walk-form__hint", state.reason));
+    var zone = classIsPrimary(cand) ? f.zone : extraZone(cand);
+    var unmatched = (f.savedClassFacts || []).filter(function (entry) {
+      return entry.code === cand.code && entry.zone === zone && entry !== state.restoredEntry &&
+        (typeof entry.human_text === "string" || entry.answer || entry.additional_words || (entry.clarifications || []).length || entry.reading != null);
+    });
+    if (unmatched.length && !state.answer) {
+      var recovery = el("details", "walk-form__hint");
+      recovery.appendChild(el("summary", null, tx("walk.sheet.class_review.saved_facts")));
+      unmatched.forEach(function (entry) {
+        recovery.appendChild(el("pre", null, [entry.human_text, entry.additional_words, entry.answer].concat((entry.clarifications || []).map(function (pair) {return pair.question + "\n" + pair.answer;}), [entry.reading]).filter(function (v) { return v != null && v !== ""; }).join("\n")));
+        if (typeof entry.human_text === "string" || entry.answer || entry.additional_words || (entry.clarifications || []).length) recovery.appendChild(W.button("walk-link", tx("walk.sheet.class_review.use_saved_facts"), function () {
+          if (typeof entry.human_text === "string") {state.humanText = entry.human_text; state.textEdited = true;}
+          state.answer = entry.answer || "";
+          state.additionalWords = entry.additional_words || "";
+          state.answerQuestion = entry.answer_question || "";
+          state.clarifications = entry.clarifications || [];
+          state.clarificationScope = classContext(cand).scope;
+          state.factsEdited = true;
+          classSelectionChanged();
+          redraw("item", "level", "footer");
+        }));
+      });
+      feedback.appendChild(recovery);
+    }
+    if (classIsPrimary(cand) && f.legacyLevel && !state.level) {
+      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.draft_level", {level:f.legacyLevel})));
+    }
+    var check = panel.querySelector("[data-class-check]");
+    check.disabled = state.status === "pending" || !!classContext(cand).blocked;
+    panel.querySelectorAll("[data-manual-class]").forEach(function (button) {
+      var on = state.manualMode && state.level === button.dataset.manualClass;
+      button.setAttribute("aria-pressed", String(on));
+      button.classList.toggle("is-on", on);
+    });
+  }
+  function addExtraReadingControls(box, cand) {
+    var state = classState(cand);
+      var numberLabel = el("label", "walk-form__hint", tx("walk.sheet.reading"));
+      var number = el("input", "walk-input");
+      number.inputMode = "decimal";
+      number.value = state.reading;
+      number.setAttribute("data-extra-reading", "");
+      number.addEventListener("input", function () {
+        state.reading = number.value;
+        state.readingSource = "human";
+        state.readingEdited = true;
+        state.readingConfirmed = false;
+        var confirm = box.querySelector("[data-extra-reading-confirm]");
+        confirm.checked = false;
+        confirm.disabled = parseReading(number.value) === null;
+        classSelectionChanged();
+        redraw("footer");
+      });
+      numberLabel.appendChild(number);
+      box.appendChild(numberLabel);
+      var readingLabel = el("label", "walk-option");
+      var readingConfirm = document.createElement("input");
+      readingConfirm.type = "checkbox";
+      readingConfirm.checked = state.readingConfirmed;
+      readingConfirm.disabled = parseReading(state.reading) === null;
+      readingConfirm.setAttribute("data-extra-reading-confirm", "");
+      readingConfirm.addEventListener("change", function () {
+        state.readingConfirmed = readingConfirm.checked;
+        classSelectionChanged();
+        if (readingConfirm.checked) requestClass(cand);
+        redraw("footer");
+      });
+      readingLabel.appendChild(readingConfirm);
+      readingLabel.appendChild(el("span", null, tx("walk.sheet.class_review.reading_checked")));
+      box.appendChild(readingLabel);
+  }
+  function extraText(cand) { return classState(cand).humanText; }
+  function extraTextEditor(cand) {
+    var state = classState(cand);
+    var label = el("label", "walk-form__hint", tx("walk.sheet.extra_text"));
+    var area = el("textarea", "walk-area");
+    area.rows = 4;
+    area.maxLength = 1000;
+    area.value = state.humanText;
+    area.setAttribute("data-extra-text", cand.code);
+    area.addEventListener("input", function () {
+      state.humanText = area.value;
+      state.textEdited = true;
+      changed();
+      redraw("footer");
+    });
+    label.appendChild(area);
+    label.appendChild(el("p", "walk-form__hint", tx("walk.sheet.text_model_review")));
+    return label;
+  }
+  function classReviewBox(cand) {
+    if ((item(cand.code) || {}).measure) {
+      var info = section(tx("walk.sheet.level"));
+      info.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", {level:"D0"})));
+      if (!classIsPrimary(cand)) {addExtraReadingControls(info, cand); info.appendChild(extraTextEditor(cand));}
+      return info;
+    }
+    var state = classState(cand);
+    W.classReview.sync(state, classContext(cand));
+    var box = section(tx("walk.sheet.level"));
+    box.setAttribute("data-class-review", cand.code);
+    box._candidate = cand;
+    var feedback = el("div");
+    feedback.setAttribute("data-class-feedback", "");
+    feedback.setAttribute("role", "status");
+    box.appendChild(feedback);
+    if (!classIsPrimary(cand)) {addExtraReadingControls(box, cand); box.appendChild(extraTextEditor(cand));}
+    var label = el("label", "walk-form__hint", tx("walk.sheet.class_review.facts"));
+    var facts = el("textarea", "walk-area walk-class-review__facts");
+    facts.rows = 2;
+    facts.maxLength = 1000;
+    facts.value = state.answer;
+    facts.addEventListener("input", function () {
+      if (!state.answerQuestion && state.needFact) {
+        state.answerQuestion = state.needFact.trim();
+        state.clarificationScope = classContext(cand).scope;
+      }
+      state.answer = facts.value;
+      state.factsEdited = true;
+      classSelectionChanged();
+      redraw("repeat", "footer");
+    });
+    label.appendChild(facts);
+    box.appendChild(label);
+    var check = W.button("walk-link", tx("walk.sheet.class_review.check"), function () {
+      state.manualMode = false;
+      requestClass(cand);
+      redraw("item", "level", "footer");
+    });
+    check.setAttribute("data-class-check", "");
+    box.appendChild(check);
+    if (!state.manualMode) {
+      box.appendChild(W.button("walk-link", tx("walk.sheet.class_review.manual"), function () {
+        W.classReview.enterManual(state, classContext(cand));
+        syncClassSelections();
+        changed();
+        redraw("item", "level", "footer");
+      }));
+    } else {
+      var seg = el("div", "walk-seg");
+      (item(cand.code) || {levels:[]}).levels.forEach(function (level) {
+        var button = W.button("walk-seg__opt walk-seg__opt--" + level.toLowerCase(), level, function () {
+          W.classReview.chooseManual(state, classContext(cand), level);
+          syncClassSelections();
+          changed();
+          updateClassPanels();
+          redraw("repeat", "footer");
+        });
+        button.dataset.manualClass = level;
+        seg.appendChild(button);
+      });
+      box.appendChild(seg);
+    }
+    renderClassFeedback(box, cand);
+    return box;
+  }
+
   var draw = {
     context: function () {
       var row = el("div", "walk-ctx");
@@ -726,12 +1445,13 @@
       if (!recognizing()) {
         var z = zoneOf(f.zone);
         var zb = W.hinted(W.button("walk-ctx__pill walk-ctx__pill--zone" + (z ? "" : " is-empty"),
-          (z ? z.title : tx("walk.sheet.pick_zone")), zoneMenu), "zonepill");
-        zb.setAttribute("aria-label", tx("walk.sheet.zone") + ": " + (z ? z.title : tx("walk.sheet.pick_zone")));
+          (f.contextZone && !f.n ? tx("walk.sheet.context_other_zone") : z ? z.title : tx("walk.sheet.pick_zone")), zoneMenu), "zonepill");
+        zb.setAttribute("aria-label", f.contextZone && !f.n ? tx("walk.sheet.context_other_zone") : tx("walk.sheet.zone") + ": " + (z ? z.title : tx("walk.sheet.pick_zone")));
         row.appendChild(zb);
       }
       var box = el("div", "walk-ctx__box");
       box.appendChild(row);
+      if (f.contextZone && !f.n) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.context_kept", {zone: z ? z.title : f.contextZone})));
       if (isMeasure() && !f.n) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.measure_hint")));
       if (isAdvice() && !f.n) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.advice_hint")));
       if (unusual()) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.unusual")));
@@ -764,7 +1484,8 @@
         var was = stale();
         f.words = area.value;
         changed();
-        if (was !== stale()) redraw("item", "footer");
+        classSelectionChanged();
+        if (was !== stale() || assignmentEnabled()) redraw("item", "level", "footer");
       });
       box.appendChild(area);
       // Голос (D652): рассказ в пустое поле сразу запускает поиск пункта — то же, что «Найти пункт».
@@ -785,7 +1506,9 @@
       }
       var card = el("div", "walk-choice");
       var line = el("div", "walk-choice__line");
-      if (!chosen.note) line.appendChild(el("span", "walk-choice__code", chosen.code));
+      var kind = isAdvice() ? "advice" : chosen.measure ? "info" : "violation";
+      if (!chosen.note) line.appendChild(el("span", "walk-choice__code walk-item-code--" + kind, chosen.label || chosen.code));
+      line.appendChild(el("span", "walk-item-kind walk-item-kind--" + kind, tx("walk.item.kind." + kind)));
       line.appendChild(el("span", "walk-choice__text", chosen.q));
       card.appendChild(line);
       if (chosen.note) card.appendChild(el("p", "walk-form__hint", tx("walk.note.hint")));
@@ -800,6 +1523,17 @@
 
     reading: function () {
       var none = f.noViolation !== null && f.noViolation !== undefined;
+      if (!hasReading() && recognizing() && f.code) {
+        var empty = section(tx("walk.sheet.reading"));
+        empty.appendChild(W.button("walk-link", tx("walk.sheet.class_review.add_reading"), function () {
+          setReading("", "human", false);
+          changed();
+          redraw("reading", "level", "footer");
+          var field = node.querySelector(".walk-input--reading");
+          if (field) field.focus({preventScroll:true});
+        }));
+        return empty;
+      }
       if (!hasReading() || (!f.code && !none)) return null;
       var box = section(tx("walk.sheet.reading"), tx("walk.sheet.reading_hint"));
       if (none) {
@@ -816,10 +1550,43 @@
       input.addEventListener("input", function () {
         var was = readingChanged() || readingInvalid();
         f.reading = input.value;
-        changed();
-        if (was !== (readingChanged() || readingInvalid())) redraw("footer");
+        if (recognizing()) {
+          f.readingSource = "human";
+          var own = classState(primaryClassCandidate());
+          own.readingEdited = true;
+          own.reading = input.value;
+          own.readingSource = "human";
+          own.readingConfirmed = false;
+          f.readingConfirmed = false;
+          readingConfirm.checked = false;
+          readingConfirm.disabled = parseReading(input.value) === null;
+          classSelectionChanged();
+          redraw("repeat", "footer");
+        } else {
+          changed();
+          if (was !== (readingChanged() || readingInvalid())) redraw("footer");
+        }
       });
       box.appendChild(input);
+      var readingConfirm;
+      if (recognizing()) {
+        var checkedLabel = el("label", "walk-option");
+        readingConfirm = document.createElement("input");
+        readingConfirm.type = "checkbox";
+        readingConfirm.checked = !!f.readingConfirmed;
+        readingConfirm.disabled = parseReading(f.reading) === null;
+        readingConfirm.setAttribute("data-reading-confirm", "");
+        readingConfirm.addEventListener("change", function () {
+          f.readingConfirmed = readingConfirm.checked;
+          classState(primaryClassCandidate()).readingConfirmed = readingConfirm.checked;
+          classSelectionChanged();
+          if (readingConfirm.checked) requestClass(primaryClassCandidate());
+          redraw("repeat", "footer");
+        });
+        checkedLabel.appendChild(readingConfirm);
+        checkedLabel.appendChild(el("span", null, tx("walk.sheet.class_review.reading_checked")));
+        box.appendChild(checkedLabel);
+      }
       if (none && recognizing()) {
         box.appendChild(W.button("walk-link", tx("walk.sheet.reading_reset"), function () {
           setReading(null);
@@ -832,6 +1599,7 @@
     level: function () {
       var it = item(f.code);
       if (!it || isMeasure() || isAdvice() || taken()) return null;
+      if (recognizing()) return classReviewBox(primaryClassCandidate());
       var box = section(tx("walk.sheet.level"));
       if (it.levels.length === 1) {
         box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", { level: it.levels[0] })));
@@ -862,15 +1630,17 @@
       area.maxLength = 1000;
       area.placeholder = tx(label + "_hint");
       area.value = f.text;
+      area.setAttribute("data-finding-text", "");
       area.addEventListener("input", function () {
         var was = !!f.text.trim();
         f.text = area.value;
         f.textAuto = false;
         changed();
         // У рекомендации текст обязателен: кнопка оживает с первым словом.
-        if (isAdvice() && was !== !!f.text.trim()) redraw("footer");
+        if ((isAdvice() || !f.n) && was !== !!f.text.trim()) redraw("footer");
       });
       box.appendChild(area);
+      if (!f.n && !isAdvice() && !isMeasure()) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.text_model_review")));
       var voice = W.voiceBar(area);
       if (voice) box.appendChild(voice);
       // Модель вписала рассуждение вместо находки (#970): пока текст её, а не
@@ -904,6 +1674,7 @@
       area.setAttribute("aria-label", tx("walk.sheet.comment"));
       area.addEventListener("input", function () { f.comment = area.value; changed(); });
       box.appendChild(area);
+      if (!f.n && !isAdvice() && !isMeasure()) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.text_model_review")));
       var voice = W.voiceBar(area);
       if (voice) box.appendChild(voice);
       var bar = W.translateBar(area);
@@ -936,6 +1707,13 @@
     danger: function () {
       if (!f.n) return null;
       var box = section(null);
+      if (W.split) {
+        var split = W.button("walk-link", tx("walk.split.open"), function () {
+          if (dirty()) { W.toast(tx("walk.split.save_first"), "warn"); return; }
+          var source = f.source_record; close(true); W.split.open(source);
+        });
+        box.appendChild(split);
+      }
       if (!f.confirmDelete) {
         box.appendChild(W.button("walk-link walk-link--danger", tx("walk.sheet.delete"), function () {
           f.confirmDelete = true;
@@ -963,7 +1741,8 @@
         var row = el("div", "walk-row");
         row.appendChild(W.button("walk-btn walk-btn--danger", tx("walk.sheet.discard_yes"), function () {
           if (!f.n) W.local.drop(draftKey());
-          waitingPhotos().forEach(function (p) { if (p.entryId) W.offline.remove(p.entryId); });
+          else if (W.editDraft) W.editDraft.clear(f);
+          f.photos.forEach(function (p) { (p.receiptIds || (p.entryId ? [p.entryId] : [])).forEach(function (id) { W.offline.remove(id); }); });
           close(true);
         }));
         row.appendChild(W.button("walk-btn", tx("walk.sheet.cancel"), function () {
@@ -983,7 +1762,7 @@
         return box;
       }
       var why = blocker();
-      var recheck = readingChanged() && !readingInvalid();
+      var recheck = !f.n && !recognizing() && readingChanged() && !readingInvalid();
       var label = f.saving ? tx("walk.sheet.saving")
         : f.finding ? tx("walk.sheet.rechecking")
         : recheck ? tx("walk.sheet.recheck")
@@ -1014,12 +1793,13 @@
     var list = el("div", "walk-found");
     (f.found || []).forEach(function (cand) { list.appendChild(proposal(cand)); });
     var manual = item(f.code);
-    var fromList = (f.found || []).some(function (c) { return c.code === f.code; });
-    if (manual && !fromList) list.appendChild(proposal({ code: f.code, level: f.level, zone: f.zone }));
+    var fromList = (f.found || []).some(function (c) { return f.picked ? c === f.picked : isPrimary(c); });
+    if (manual && !fromList) list.appendChild(proposal({ code: f.code, level: f.level, zone: f.zone, resolution: { zone: f.zone } }));
     if (list.childNodes.length) box.appendChild(list);
+    if (f.found && f.found.length && !f.code) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.choose_item")));
     if (f.code && !f.zone && item(f.code) && !isAdvice() && !isMeasure()) box.appendChild(whereRow());
     if (f.found && !f.found.length && !hasNoViolation()) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.found_none")));
-    if (f.question) box.appendChild(questionBox());
+    if (f.question && !recognizing()) box.appendChild(questionBox());
     if (stale()) {
       var again = el("p", "walk-form__note walk-form__note--info");
       again.appendChild(document.createTextNode(tx("walk.sheet.found_stale") + " "));
@@ -1066,29 +1846,42 @@
     return parseReading(f.reading);
   }
 
-  /** «Тоже»-записи (D593): те же кадры и слова, синоним по ним не учится — слова про основной пункт. */
+  /** «Тоже»-записи (D593): свои подтверждённые кадры; слова не учат синоним второго пункта. */
   function extraOps() {
-    var photos = readyPhotos().map(function (p) { return p.ref; });
     return extras().map(function (c) {
       return {
-        op: "add", zone: extraZone(c), code: c.code, level: extraLevel(c), text: (c.wording || "").trim(),
-        comment: "", repeat: false, photos: photos, words: f.words.trim(), also: true,
+        op: "add", zone: extraZone(c), code: c.code, level: extraLevel(c), text: extraText(c).trim(),
+        comment: "", repeat: false, photos: assignedPhotos(c), words: classSaveWords(c), also: true,
+        photo_assignment: assignmentPayload(c),
+        class_context: classSaveContext(c) || undefined,
         suggested: { code: c.code, level: c.level, zone: c.zone, confidence: c.confidence, via: f.via },
-        reading_c: c.reading_c === undefined ? null : c.reading_c,
+        reading_c: classReading(c).confirmed ? classReading(c).value : null,
       };
     });
   }
 
   function ops() {
-    var refs = readyPhotos().filter(function (p) { return p.fresh; }).map(function (p) { return p.ref; });
+    var assigned = assignmentEnabled() ? primaryPhotoCandidate() : null;
+    var photos = assigned ? assignedPhotos(assigned) : readyPhotos().map(function (p) { return p.ref; });
+    var refs = readyPhotos().filter(function (p) { return p.fresh && photos.indexOf(p.ref) !== -1; }).map(function (p) { return p.ref; });
     var t = taken();
-    if (t) return refs.map(function (ref) { return { op: "attach", n: t.n, ref: ref }; }).concat(extraOps());
+    if (t) return refs.map(function (ref) {
+      var body = { op: "attach", n: t.n, ref: ref };
+      if (assigned) {
+        body.photo_assignment = assignmentPayload(assigned);
+        body.photo_assignment.assigned_frame_indices = [body.photo_assignment.source_photos.indexOf(ref)];
+      }
+      return body;
+    }).concat(extraOps());
     if (!f.n) {
       return [{
         op: "add", zone: f.zone, code: f.code, level: isAdvice() ? ADVICE_LEVEL : f.level, text: f.text.trim(),
         comment: f.comment.trim(), repeat: !!f.repeat && repeatOffered(),
-        photos: readyPhotos().map(function (p) { return p.ref; }),
-        words: f.words.trim(), suggested: suggested(), reading_c: readingValue(),
+        photos: photos,
+        photo_assignment: assigned ? assignmentPayload(assigned) : null,
+        words: recognizing() ? classSaveWords(primaryClassCandidate()) : f.words.trim(),
+        class_context: recognizing() ? classSaveContext(primaryClassCandidate()) || undefined : undefined,
+        suggested: suggested(), reading_c: readingValue(),
         hint_codes: f.hintCodes || [],
       }].concat(extraOps());
     }
@@ -1102,22 +1895,25 @@
     if (f.comment.trim() !== o.comment) { edit.comment = f.comment.trim(); any = true; }
     if (!!f.repeat !== !!o.repeat) { edit.repeat = !!f.repeat; any = true; }
     if (hasReading() && readingValue() !== o.reading) { edit.reading_c = readingValue(); any = true; }
-    var list = refs.map(function (ref) { return { op: "attach", n: f.n, ref: ref }; });
-    if (any) list.unshift(edit);
-    // Снимать — после того, как новые кадры легли: запись ни на миг без фото.
-    return list.concat(f.removed.map(function (ref) { return { op: "detach", n: f.n, ref: ref }; }));
+    if (refs.length || f.removed.length) {
+      edit.new_refs = refs;
+      edit.remove_photos = f.removed.slice();
+      any = true;
+    }
+    if (!any) return [];
+    return [W.editDraft ? W.editDraft.body(f, edit) : edit];
   }
 
   function save_() {
     if (blocker()) return;
-    if (readingChanged()) {
+    if (!f.n && !recognizing() && readingChanged()) {
       // Число поправлено — это не запись, а пересчёт предложения (#836): новое
       // предложение ждёт «Сохранить». Стёртое поле — «замера нет», пересчитывать нечего.
       var fixed = readingValue();
       if (fixed !== null) { find(fixed); return; }
     }
     var list = ops();
-    if (!list.length) { close(true); return; }
+    if (!list.length) { if (f.n && W.editDraft) W.editDraft.clear(f); close(true); return; }
     submit(list);
   }
 
@@ -1131,33 +1927,139 @@
   }
 
   function submit(list) {
+    var form = f;
+    var runId = form.run_id;
     f.saving = true;
     f.error = null;
     redraw("footer");
     var last = null;
+    var confirmed = [];
     var at = f.zone;
+    var beginning = Promise.resolve();
+    if (form.reconcile) beginning = W.post(W.urls.data, {}).then(function (res) {
+      if (!res.ok || f !== form || W.state.data.run_id !== runId || !res.body || res.body.run_id !== runId) throw new Error(tx("walk.err.run_changed"));
+      last = res.body;
+      (form.submitted_ops || []).forEach(function (attempt) {
+        var matches = matching(last, attempt.body, attempt);
+        if (attempt.confirmed_n && !matches.some(function (record) { return record.n === attempt.confirmed_n; })) throw new Error(tx("walk.sheet.save_conflict"));
+        if (/^D[1-3]$/.test(attempt.body.level) && records(last, attempt.body).length && !matches.length) throw new Error(tx("walk.sheet.save_conflict"));
+        if (!/^D[1-3]$/.test(attempt.body.level) && !matches.length && records(last, attempt.body).some(function (record) { return (attempt.before_ids || []).indexOf(record.n) === -1; })) throw new Error(tx("walk.sheet.save_conflict"));
+      });
+      W.apply(last, true);
+    });
     var chain = list.reduce(function (p, body) {
       return p.then(function () {
-        return W.post(W.urls.finding, body).then(function (res) {
+        if (f !== form || W.state.data.run_id !== runId) throw new Error(tx("walk.err.run_changed"));
+        if (body.op === "add") {
+          form.submitted_ops = form.submitted_ops || [];
+          if (!form.submitted_ops.some(function (attempt) { return JSON.stringify(attempt.body) === JSON.stringify(body); })) {
+            form.submitted_ops.push({body: body, before_ids: records(last || W.state.data, body).map(function (record) { return record.n; })});
+          }
+          saveDraft();
+        }
+        return writeOperation(body).then(function (res) {
+          if (!res) return;
           if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
-          last = res.body;
+          var refs = body.op === "add" ? body.photos || [] : body.op === "attach" ? [body.ref] : body.op === "edit" ? body.new_refs || [] : [];
+          if (!res.body || res.body.run_id !== runId || f !== form || W.state.data.run_id !== runId) throw new Error(tx("walk.err.run_changed"));
+          if (body.op === "add") {
+            var recorded = matching(res.body, body, attemptFor(body))[0];
+            form.submitted_ops.forEach(function (attempt) { if (JSON.stringify(attempt.body) === JSON.stringify(body) && recorded) attempt.confirmed_n = recorded.n; });
+            saveDraft();
+          }
+          return accept(res, refs, body);
         });
       });
-    }, Promise.resolve());
+    }, beginning);
     chain.then(function () {
-      if (!f.n) W.local.drop(draftKey());
+      if (f !== form || W.state.data.run_id !== runId) return;
+      if (!f.n) {
+        var remaining = f.photos.filter(function (p) { return !p.ref || confirmed.indexOf(p.ref) === -1; });
+        if (!remaining.length) W.local.drop(draftKey());
+        else W.local.set(draftKey(), Object.assign({}, W.local.get(draftKey()) || {}, {
+          run_id: runId, mode: f.mode, zone: null, code: null, level: null, text: "", comment: "", repeat: false,
+          reading: null, words: f.words, photos: remaining.filter(function (p) { return p.ref; }).map(function (p) { return p.ref; }),
+          queued: remaining.filter(function (p) { return p.ref; }).map(function (p) { return p.ref; }),
+          reconcile: false, submitted_ops: [],
+        }));
+      } else if (W.editDraft) W.editDraft.clear(form);
       W.haptic("success");
-      savedToast(at);
+      if (remaining && remaining.length) W.toast(tx("walk.sheet.remaining_material", { n: remaining.length }), "warn");
+      else savedToast(at);
       close(true);
       if (last) W.apply(last);
     }, function (err) {
+      if (f !== form || W.state.data.run_id !== runId) return;
       W.haptic("error");
       f.saving = false;
+      f.reconcile = true; saveDraft();
       f.error = err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network");
       // Часть шагов могла пройти — данные экрана подтягиваются заново.
       if (last) W.apply(last, true);
       redraw("footer");
     });
+
+    function accept(res, refs, body) {
+      if (f !== form || W.state.data.run_id !== runId || !res.body || res.body.run_id !== runId) return Promise.reject(new Error(tx("walk.err.run_changed")));
+      var targets = body && body.op === "add" ? matching(res.body, body, attemptFor(body)) :
+        (res.body.zones || []).reduce(function (all, zone) { return all.concat(zone.recorded); }, []).filter(function (record) { return body && record.n === body.n; });
+      if (refs.length && !targets.some(function (record) { return refs.every(function (ref) { return record.photos.some(function (p) { return p.ref === ref; }); }); })) return Promise.reject(new Error(tx("walk.sheet.save_conflict")));
+      last = res.body;
+      refs.forEach(function (ref) { if (confirmed.indexOf(ref) === -1) confirmed.push(ref); });
+      if (!form.draftKey || !refs.length || !W.offline.ack) return Promise.resolve();
+      return W.offline.list(form.draftKey).then(function (rows) {
+        return W.offline.ack(form.draftKey, runId, rows.filter(function (r) { return refs.indexOf(r.uploaded_ref) !== -1; }).map(function (r) { return r.id; }));
+      }).then(function () {
+        if (form.n && W.editDraft) return W.editDraft.ack(form, refs);
+      });
+    }
+
+    function attemptFor(body) {
+      return (form.submitted_ops || []).filter(function (attempt) { return JSON.stringify(attempt.body) === JSON.stringify(body); })[0];
+    }
+
+    function matching(data, body, attempt) {
+      return records(data, body).filter(function (record) {
+        return sameFacts(record, body) && (/^D[1-3]$/.test(body.level) || !attempt || (attempt.before_ids || []).indexOf(record.n) === -1);
+      });
+    }
+
+    function writeOperation(body) {
+      // A prior step can have succeeded before a later request failed. Use
+      // the existing same-point attach path instead of adding it again.
+      if (body.op === "add") {
+        var candidates = records(last || W.state.data, body);
+        var exists = matching(last || W.state.data, body, attemptFor(body))[0];
+        if (candidates.length && /^D[1-3]$/.test(body.level) && !exists) return Promise.reject(new Error(tx("walk.sheet.save_conflict")));
+        if (!form.reconcile && !/^D[1-3]$/.test(body.level)) exists = null;
+        if (exists) {
+          return Promise.resolve({ok: true, body: last || W.state.data});
+        }
+      }
+      return W.api.write(W.urls.finding, body, runId);
+    }
+  }
+
+  function records(data, body) {
+    return (data.zones || []).reduce(function (all, zone) {
+      return all.concat(zone.recorded.filter(function (record) { return (record.zone || zone.code) === body.zone && record.code === body.code &&
+        (/^D[1-3]$/.test(body.level) ? /^D[1-3]$/.test(record.level) : record.level === body.level); }));
+    }, []);
+  }
+
+  function hasEditDraft() {
+    var prefix = f.run_key + "_edit_" + f.n + "_";
+    return f.draftKey.indexOf(prefix) === 0 && /^[a-f0-9]{64}$/.test(f.draftKey.slice(prefix.length));
+  }
+
+  function sameFacts(record, body) {
+    var known = item(body.code);
+    var expectedText = body.text || (known && known.q) || "";
+    function refs(values) { return values.filter(function (ref, at, all) { return all.indexOf(ref) === at; }).sort().join("|"); }
+    return record.level === body.level && record.text === expectedText && (record.comment || "") === (body.comment || "") &&
+      (record.words || "") === (body.words || "") && !!record.repeat === !!body.repeat &&
+      (record.reading_c == null ? null : record.reading_c) === (body.reading_c == null ? null : body.reading_c) &&
+      refs((record.photos || []).map(function (p) { return p.ref; })) === refs(body.photos || []);
   }
 
   /* ── открыть и закрыть ────────────────────────────────────────────── */
@@ -1169,6 +2071,8 @@
       redraw("footer");
       return;
     }
+    if (f.n && W.editDraft) W.editDraft.release(f);
+    if (f.unregisterDraft) f.unregisterDraft();
     f = null;
     if (W.voice) W.voice.cancelAll(); // идущая запись голоса выбрасывается, микрофон отпускается
     if (W.menu) W.menu.close();
@@ -1203,9 +2107,15 @@
     if (f) close(true);
     var rec = opts.record;
     f = {
+      source_record: rec || null,
+      run_id: W.state.data.run_id,
+      run_key: W.state.data.key,
+      draftKey: openingDraftKey(opts),
+      contextZone: contextZone(opts),
       mode: opts.mode || "violation",
       n: rec ? rec.n : null,
       zone: opts.zone || null,
+      zoneSource: opts.zone && zoneOf(opts.zone) && !zoneOf(opts.zone).equipment ? "pick" : null,
       // Зона на экране — мягкая подсказка поиску, а не зона записи (D445).
       hint: opts.hint || null,
       code: opts.code || null,
@@ -1236,9 +2146,10 @@
       f.words = rec.words || "";
       if (rec.reading_c !== null && rec.reading_c !== undefined) setReading(rec.reading_c);
       f.original = { code: rec.code, level: rec.level, zone: opts.zone, text: rec.text, comment: rec.comment || "", repeat: !!rec.repeat, reading: rec.reading_c === undefined ? null : rec.reading_c };
+      if (W.editDraft) W.editDraft.init(f, rec);
     } else {
-      var draft = W.local.get(draftKey());
-      if (draft && !opts.code && draft.mode === f.mode && (draft.code || draft.words || (draft.photos || []).length)) {
+      var draft = loadDraft();
+      if (draft && !opts.code && draft.mode === f.mode && (draft.code || draft.words || draft.text || draft.comment || (draft.photos || []).length)) {
         f.zone = draft.zone || f.zone;
         f.code = draft.code;
         f.level = draft.level;
@@ -1246,8 +2157,12 @@
         f.comment = draft.comment || "";
         f.words = draft.words || "";
         if (draft.reading !== null && draft.reading !== undefined) { f.reading = String(draft.reading); f.readingBase = parseReading(draft.reading); }
+        f.savedClassFacts = Array.isArray(draft.class_facts) ? draft.class_facts : [];
+        f.readingSource = draft.reading_source === "human" ? "human" : "model";
+        f.readingConfirmed = draft.reading_confirmed === true;
         f.commentOpen = !!draft.comment;
         f.repeat = !!draft.repeat;
+        f.reconcile = !!draft.reconcile; f.submitted_ops = draft.submitted_ops || [];
         f.photos = (draft.photos || []).map(function (ref) { return { id: ++seq, ref: ref, own: true, state: "done", fresh: true }; });
         f.restored = true;
       } else if (draft && draft.mode === f.mode && (draft.queued || []).length) {
@@ -1256,8 +2171,19 @@
         f.restored = true;
       }
     }
+    if (!rec && f.mode === "violation" && f.code) {
+      f.legacyLevel = f.level;
+      f.level = null;
+    }
+    if (f.contextZone && f.draftKey !== W.state.data.key + "_draft" && W.offline.register) {
+      f.unregisterDraft = W.offline.register(f.draftKey, {uploaded: adopt, failed: uploadFailed});
+    }
     build();
     restoreWaiting();
+    if (f.n && W.editDraft) {
+      var editForm = f;
+      W.editDraft.activate(editForm, function () { changed(); redraw("photos", "footer"); }, function () {return f === editForm;});
+    }
   }
 
   function build() {
@@ -1292,6 +2218,11 @@
     parts.footer = el("div");
     node.appendChild(parts.footer);
     redraw.apply(null, ORDER.concat(["footer"]));
+    recoveryPanel(body);
+    if (f.n && W.editDraft) {
+      var editRecovery = W.editDraft.panel(f, function () { changed(); redraw.apply(null, ORDER.concat(["footer"])); });
+      if (editRecovery) body.appendChild(editRecovery);
+    }
     document.body.appendChild(node);
     document.documentElement.classList.add("has-sheet");
     if (W.tg && W.supports("6.1")) {
@@ -1302,6 +2233,7 @@
   }
 
   W.offline.onUploaded = adopt;
+  W.offline.onFailed = uploadFailed;
   W.offline.onTick = retryInMemory;
 
   W.sheet = { open: open, close: close, isOpen: function () { return !!f; } };
