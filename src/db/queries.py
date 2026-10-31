@@ -82,7 +82,8 @@ select
     (select count(*) from findings f where f.inspection_id = i.id) as findings_count,
     -- Город: записанный в проверке, а пустой — город пиццерии из справочника
     -- кодом (#460): мастер бота города больше не спрашивает (D233).
-    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
+    i.pushed_at, i.started_at, i.finished_at, i.auditor,
+    coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
     -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
     i.checklist_code,
@@ -115,7 +116,8 @@ select
     (select count(*) from findings f where f.inspection_id = i.id) as findings_count,
     -- Город: записанный в проверке, а пустой — город пиццерии из справочника
     -- кодом (#460): мастер бота города больше не спрашивает (D233).
-    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
+    i.pushed_at, i.started_at, i.finished_at, i.auditor,
+    coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
     -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
     i.checklist_code,
@@ -158,7 +160,8 @@ select
     (select count(*) from findings f where f.inspection_id = i.id) as findings_count,
     -- Город: записанный в проверке, а пустой — город пиццерии из справочника
     -- кодом (#460): мастер бота города больше не спрашивает (D233).
-    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
+    i.pushed_at, i.started_at, i.finished_at, i.auditor,
+    coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
     -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
     i.checklist_code,
@@ -296,6 +299,8 @@ def _row_to_inspection(row: Mapping[str, Any]) -> InspectionRow:
         grade=str(row["grade"]),
         findings_count=int(row["findings_count"]),
         pushed_at=row["pushed_at"].isoformat(),
+        started_at=row["started_at"].isoformat() if row.get("started_at") else None,
+        finished_at=row["finished_at"].isoformat() if row.get("finished_at") else None,
         # Шапка письма (T176). Колонки объявлены `not null default ''`, но
         # `or ""` здесь не украшение: историю за прошлые годы зальют программно
         # из чужой выгрузки (D035), и `None` в подписи письма партнёру

@@ -225,6 +225,8 @@ class Inspection:
     #: другой процесс, до памяти бота ему не дотянуться. Пусто — проверка
     #: начата до D392.
     run_id: str = ""
+    started_at: datetime.datetime | None = None
+    finished_at: datetime.datetime | None = None
 
     def visit_date(self) -> datetime.date | None:
         """Дата обхода датой; нечитаемая строка — `None` (сравнивать не с чем)."""

@@ -120,6 +120,14 @@ class InspectionRow:
     #: которые идут в письмо партнёру (D663). Заполнен только у карточки
     #: (`get_inspection`); пустой — «не читали», а не «язык неизвестен».
     speech_lang: str = ""
+    started_at: str | None = None
+    finished_at: str | None = None
+
+    @property
+    def duration_seconds(self) -> float | None:
+        from src.domain.timing import duration_seconds, parse_timestamp
+
+        return duration_seconds(parse_timestamp(self.started_at), parse_timestamp(self.finished_at))
 
     @property
     def is_legacy(self) -> bool:

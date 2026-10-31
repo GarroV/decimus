@@ -53,6 +53,7 @@ from src.domain.info_fields import FIELDS
 from src.domain.log_ids import log_id
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.timing import duration_seconds, utc_now
 from src.domain.walk_users import walk_open_to
 
 from . import (
@@ -121,7 +122,10 @@ def mark_key(inspection: Inspection) -> str:
     листа, а не с прошлых галочек. Хранилище принимает только `[A-Za-z0-9_-]`
     до 128 знаков — поэтому отпечаток, а не название точки.
     """
-    raw = f"{inspection.tenant}|{inspection.unit}|{inspection.date}|{inspection.kind}|{inspection.run_id}"
+    raw = (
+        f"{inspection.tenant}|{inspection.unit}|{inspection.date}|"
+        f"{inspection.kind}|{inspection.run_id}"
+    )
     return "walk_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
@@ -230,6 +234,12 @@ def build_walk(
         "date": str(inspection.date),
         "key": mark_key(inspection),
         "run_id": inspection.run_id,
+        "timing": {
+            "started_at": inspection.started_at.isoformat() if inspection.started_at else None,
+            "finished_at": inspection.finished_at.isoformat() if inspection.finished_at else None,
+            "duration_seconds": duration_seconds(inspection.started_at, inspection.finished_at),
+            "server_now": utc_now().isoformat(),
+        },
         "legacy_key": legacy_mark_key(inspection),
         "sealed": sealed,
         "previous": (
