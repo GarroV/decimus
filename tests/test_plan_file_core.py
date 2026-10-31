@@ -256,12 +256,7 @@ def правка(data: bytes, ячейки: dict[str, Any]) -> bytes:
     книга = load_workbook(io.BytesIO(data))
     лист = книга.worksheets[0]
     for адрес, значение in ячейки.items():
-        if isinstance(значение, str) and any(ord(c) < 32 and c not in "\n\t\r" for c in значение):
-            # Библиотека такие знаки не пишет; в чужом файле они могут быть — кладём в обход.
-            лист[адрес] = "x"
-            лист[адрес]._value = значение
-        else:
-            лист[адрес] = значение
+        лист[адрес] = значение
     out = io.BytesIO()
     книга.save(out)
     return out.getvalue()
@@ -462,9 +457,25 @@ def test_управляющие_знаки_в_значении_вычищают�
 def test_книга_с_управляющим_знаком_в_xml_не_разбирается_а_не_падает() -> None:
     данные = выгрузка()
     первая = первая_строка_данных(данные)
+    marker = b"SYNTHETIC_CONTROL_CHARACTER"
+    valid = правка(данные, {f"F{первая}": marker.decode()})
+    corrupted = io.BytesIO()
+    replaced = 0
+    # Build a valid ZIP first, then corrupt the XML itself. Both lxml and the
+    # stdlib writer may refuse invalid characters before the parser is reached.
+    with zipfile.ZipFile(io.BytesIO(valid)) as source, zipfile.ZipFile(corrupted, "w") as target:
+        for entry in source.infolist():
+            content = source.read(entry.filename)
+            if entry.filename == "xl/worksheets/sheet1.xml":
+                replaced += content.count(marker)
+                content = content.replace(marker, "Меры\x07 тут".encode())
+            target.writestr(entry, content)
+    assert replaced == 1
+    with zipfile.ZipFile(io.BytesIO(corrupted.getvalue())) as archive:
+        assert archive.testzip() is None
 
     with pytest.raises(SheetError) as exc:
-        plan_sheet.parse(правка(данные, {f"F{первая}": "Меры\x07 тут"}))
+        plan_sheet.parse(corrupted.getvalue())
 
     assert exc.value.code == plan_sheet.ERR_NOT_XLSX
 

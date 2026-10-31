@@ -260,11 +260,13 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
 | `src/web/texts_demo.py` | Тексты открытого демо и лендинга (D524): выбор роли, плашка, посадочная страница |
 | `src/web/texts_dodois.py` | Тексты входов в Dodo IS по странам (D640, #951): блок «Dodo IS» на «Подключениях» и публичная страница входа по ссылке |
+| `src/web/texts_edit.py` | Manual edit history and recoverable, revision-bound edit drafts |
 | `src/web/texts_grade.py` | Тексты «почему такая буква» и «расшифровка оценки» на карточке проверки (D490) |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры |
 | `src/web/texts_inspection_timeline.py` | Подписи общей истории проверок: страна и раздел рейтингов |
 | `src/web/texts_journal.py` | Тексты журналов входов и действий (D462): подписи действий и экран «Журнал» |
+| `src/web/texts_level.py` | A selected item's severity is a read-only criterion check, never a fallback guess |
 | `src/web/texts_mailings.py` | Тексты вкладки «Письма и уведомления» раздела «Администрирование» (D608, #1130) |
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
 | `src/web/texts_notifications.py` | Тексты уведомлений в приложении (#1129, D604, D614): колокольчик и фразы событий |
@@ -305,9 +307,12 @@ Claude входом через сайт (OAuth).
 | `src/web/walk_auth.py` | Кто открыл мини-апп обхода — по подписи Telegram, а не по куке админки (#418) |
 | `src/web/walk_finish.py` | Общая сборка отчёта для miniapp и запасного завершения через чат |
 | `src/web/walk_finish_review.py` | Read-only miniapp review of the current run; the engine owns every score |
+| `src/web/walk_level.py` | Classify only the selected item, using its complete pinned criterion and fresh facts |
 | `src/web/walk_main.py` | Точка входа сервиса мини-аппа обхода: `python -m src.web.walk_main` |
+| `src/web/walk_model_session.py` | The search and selected-item check share one bounded auditor model session |
 | `src/web/walk_proxy.py` | Адреса мини-аппа обхода в админке — передача сервису обхода, без своей логики |
 | `src/web/walk_rate.py` | Предел частоты запросов мини-аппа обхода по чату (#529, #710) |
+| `src/web/walk_search_tags.py` | Semantic search shortcuts: edition data selects codes; no class or model decisions |
 | `src/web/walk_settings.py` | Мини-апп как приложение аудитора (D373): настройки и завершение проверки |
 | `src/web/walk_start.py` | Начало проверки из мини-аппа (D392): те же шаги, что у мастера бота, — полями на одном экране |
 | `src/web/walk_suggest.py` | Мини-апп обхода: поиск пункта по кадру и словам (D330) — `POST /tg/walk/suggest` |
@@ -315,6 +320,7 @@ Claude входом через сайт (OAuth).
 | `src/web/walk_unseen.py` | Мини-апп обхода: «Ещё не смотрели» — пункты зоны, по которым записи пока нет (#837, D492) |
 | `src/web/walk_voice.py` | Мини-апп обхода: голос → текст в поле (D652) — `POST /tg/walk/transcribe` |
 | `src/web/walk_write.py` | Запись из мини-аппа обхода (D312): кадр, нарушение, замер, рекомендация, сведения о визите |
+| `src/web/walk_write_timing.py` | Numeric-only, request-local HTTP write timing, including early/raised refusals |
 | `src/web/walk_zone.py` | Мини-апп обхода: зона записи после того, как пункт найден (D445) |
 <!-- map:end -->
 
@@ -352,7 +358,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 69 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+61) |
+| `src/web/static/` | 72 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+64) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -888,8 +894,10 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/bot_checklists.py` | Чек-листы, по которым аудитор может начать проверку в боте (волна 3, D221) |
 | `src/domain/checklist.py` | Чтение методики: пункты чек-листа, зоны, допустимые классы, версия набора |
 | `src/domain/checklist_store.py` | Раскладка хранилища методик — та её часть, которую читает бот (#455) |
+| `src/domain/clarifications.py` | Bounded human answers paired with untrusted clarification questions |
 | `src/domain/client_ip.py` | Чей это адрес у сервера MCP: клиент за общим прокси (D462, журнал действий) |
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
+| `src/domain/criteria.py` | One criteria extractor, with a consistent active-inspection edition snapshot |
 | `src/domain/dates.py` | Разбор даты из живой фразы аудитора (задача #220) |
 | `src/domain/demo.py` | Открытое демо: учётки ролей и переключатели — контракт между посевом и входом |
 | `src/domain/dodois.py` | Входы в Dodo IS по странам (D640, #951): правила без базы и сети |
@@ -918,6 +926,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/quality.py` | Расчёты страницы «Качество» (docs/21-quality.md): среднее КР, карт и агрегаторов, доли заказов |
 | `src/domain/repeat_rule.py` | Правило «пункт уже был нарушением в прошлой проверке» (D191, D255) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
+| `src/domain/revisions.py` | Stable record identity shared by manual edits and human splits |
 | `src/domain/route.py` | Маршрут обхода: в каком порядке аудитор идёт по зонам и по пунктам внутри них |
 | `src/domain/scoring.py` | Оценка проверки |
 | `src/domain/second_factor.py` | Вторая ступень входа (D463): правила без базы и без веба |
@@ -970,6 +979,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/revise.py` | Правка записи ответом словами (#454, решения D294, D295) |
 | `src/recognize/rules_check.py` | T032: страховка после модели — код-уровневая проверка формулировки |
 | `src/recognize/schema.py` | T031: схема ответа модели |
+| `src/recognize/selected_level.py` | Selected-item criterion request and a result bound to the exact factual context |
 | `src/recognize/shortlist.py` | T030: перечень кандидатов, который уходит в запрос к модели |
 | `src/recognize/timing.py` | #1253: monotonic request-local timing; never captures input or model output |
 | `src/recognize/transcribe.py` | T033: голосовое сообщение аудитора → текст |

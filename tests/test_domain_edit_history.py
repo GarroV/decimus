@@ -20,6 +20,7 @@ def source():
 
 def test_complete_edit_replay_stale_and_restart(domain_env: Path):
     from src.domain.findings import EditConflict
+
     before = source()
     kwargs = dict(
         text="After",
