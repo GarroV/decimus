@@ -42,7 +42,8 @@ def load_sheet(page, cards):
         zones:[{code:'zone_a',title:'Zone A',recorded:[],previous:[]},
                {code:'zone_b',title:'Zone B',recorded:[],previous:[]}]
       };
-      const draft = {run_id:'synthetic-run',mode:'violation', words:'Synthetic observation',photos:['synthetic-ref']};
+      const draft = {run_id:'synthetic-run',mode:'violation',
+        words:'Synthetic observation',photos:['synthetic-ref']};
       W.local = {get:()=>draft,set:()=>{},drop:()=>{}};
       W.photo = {block:()=>W.el('div'),closeCamera:()=>false};
       W.offline = {available:()=>false,recovery:async()=>[]};
