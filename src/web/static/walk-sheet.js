@@ -577,7 +577,14 @@
    * несёт готовый вывод сервера; ручной выбор повторяет его без слов: одна зона
    * пункта — она, иначе зона с экрана, если она у пункта есть, иначе спросить.
    */
-  function applyResolution(i, cand) {
+  function applyResolution(i, cand, keepPhysical) {
+    var physical = zoneOf(f.zone);
+    if (keepPhysical && f.zoneSource === "pick" && physical && !physical.equipment) {
+      // A human location belongs to this selection, never to every candidate
+      // sharing its item code. Keep the raw model zone untouched.
+      if (cand) cand.resolution = Object.assign({}, cand.resolution || {}, { zone: f.zone, source: "pick" });
+      return;
+    }
     var r = cand && cand.resolution;
     if (!r) {
       var own = itemZones(i.code);
@@ -596,6 +603,7 @@
   function pick(code, cand) {
     var i = item(code);
     if (!i) return;
+    var keepPhysical = !cand || !f.picked || cand === f.picked;
     if (recognizing() && f.code) {
       f.savedClassFacts = classFactDrafts();
       var old = classState(primaryClassCandidate());
@@ -613,7 +621,7 @@
     }
     f.code = code;
     f.picked = cand ? cand : null;
-    if (recognizing()) applyResolution(i, cand);
+    if (recognizing()) applyResolution(i, cand, keepPhysical);
     // Основной стала одна пара «пункт + зона»; другие зоны остаются в «тоже».
     f.also = f.also.filter(function (c) { return !isPrimary(c); });
     if (recognizing() && !i.measure && !i.note) {
@@ -681,7 +689,12 @@
       f.via = (res.body && res.body.via) || "model";
       f.asked = JSON.stringify(asked);
       if (recognizing()) {
-        f.code = null; f.zone = null; f.level = null; f.picked = null;
+        // A location picked before the first item belongs to this search;
+        // an existing candidate's override must not spread to a new snapshot.
+        var physical = zoneOf(f.zone);
+        var physicalPick = !f.picked && f.zoneSource === "pick" && physical && !physical.equipment ? f.zone : null;
+        f.code = null; f.zone = physicalPick; f.zoneSource = physicalPick ? "pick" : "ask";
+        f.level = null; f.picked = null;
         f.legacyLevel = null;
         f.question = ""; f.answers = [];
         redraw.apply(null, ORDER.concat(["footer"]));
@@ -1812,7 +1825,7 @@
         op: "add", zone: extraZone(c), code: c.code, level: extraLevel(c), text: extraText(c).trim(),
         comment: "", repeat: false, photos: assignedPhotos(c), words: classSaveWords(c), also: true,
         photo_assignment: assignmentPayload(c),
-        class_context: classSaveContext(c),
+        class_context: classSaveContext(c) || undefined,
         suggested: { code: c.code, level: c.level, zone: c.zone, confidence: c.confidence, via: f.via },
         reading_c: classReading(c).confirmed ? classReading(c).value : null,
       };
@@ -1839,7 +1852,7 @@
         photos: photos,
         photo_assignment: assigned ? assignmentPayload(assigned) : null,
         words: recognizing() ? classSaveWords(primaryClassCandidate()) : f.words.trim(),
-        class_context: recognizing() ? classSaveContext(primaryClassCandidate()) : null,
+        class_context: recognizing() ? classSaveContext(primaryClassCandidate()) || undefined : undefined,
         suggested: suggested(), reading_c: readingValue(),
         hint_codes: f.hintCodes || [],
       }].concat(extraOps());
@@ -2072,6 +2085,7 @@
       mode: opts.mode || "violation",
       n: rec ? rec.n : null,
       zone: opts.zone || null,
+      zoneSource: opts.zone && zoneOf(opts.zone) && !zoneOf(opts.zone).equipment ? "pick" : null,
       // Зона на экране — мягкая подсказка поиску, а не зона записи (D445).
       hint: opts.hint || null,
       code: opts.code || null,

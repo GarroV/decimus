@@ -355,3 +355,18 @@ def test_lost_recommendation_reply_does_not_merge_an_identical_preexisting_recor
     page.wait_for_function("()=>!DecimusWalk.sheet.isOpen()")
     assert len(requests) == before
     assert len(get_state(АУДИТОР).findings) == 2
+
+
+def test_actual_manual_save_omits_absent_clarification_context(page, клиент: Клиент):  # noqa: F811
+    requests = bridge(page, клиент)
+    bootstrap(page, sheet=True)
+    page.locator(".walk-pick--gallery input").set_input_files(picture(1))
+    page.evaluate("online=true;DecimusWalk.offline.kick()")
+    page.wait_for_function("()=>DecimusWalk.testSubmit.form().photos.some(p=>p.state==='done')")
+    authorize_manual_classes(page)
+    page.locator("[data-finding-text]").fill("Synthetic human-entered description")
+    label = page.evaluate("DecimusWalk.tx('walk.sheet.save')")
+    page.get_by_role("button", name=label, exact=True).click()
+    page.wait_for_function("()=>!DecimusWalk.sheet.isOpen()")
+    assert len(requests) == 1 and "class_context" not in requests[0]
+    assert len(get_state(АУДИТОР).findings) == 1

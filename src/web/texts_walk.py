@@ -99,6 +99,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.tile.done": {"ru": "осмотрено", "en": "checked"},
     "walk.tile.todo": {"ru": "не были", "en": "not yet"},
     "walk.tile.started": {"ru": "в работе", "en": "in progress"},
+    "walk.zone.measure_here": {"ru": "Измерения в этой зоне", "en": "Measurements in this zone"},
     "walk.zone.measure_add": {"ru": "внести", "en": "add"},
     "walk.zone.need_prev": {
         "ru": "Сначала отметьте прошлое замечание: исправлено или нет.",
