@@ -320,3 +320,18 @@ def test_строка_шапки_у_сборов_называет_самый_р�
     assert rf.section_line(строки, "agg", "en") == "arrived 25.10 07:30"
     assert rf.section_line(строки, "risk", "ru") is None  # у этих разделов своей даты нет
     assert rf.section_line((fresh.Row("rs", fresh.Status.STALE),), "rs", "ru") == "оценок ещё нет"
+
+
+@pytest.mark.parametrize("lang", ["ru", "en"])
+@pytest.mark.parametrize("key", РАЗДЕЛЫ)
+def test_work_sections_have_no_business_settings(
+    monkeypatch: pytest.MonkeyPatch, lang: str, key: str
+) -> None:
+    подготовить(monkeypatch)
+    response = получить(monkeypatch, f"/ratings/{key}?lang={lang}")
+    main = re.search(r"<main\b[^>]*>(.*?)</main>", response, flags=re.S)
+    assert main is not None
+    assert screen.t("ratings.manage", lang) not in main.group(1)
+    assert not re.search(
+        r'<a\b[^>]*href="[^"]*/administration|<form\b[^>]*method="post"', main.group(1)
+    )

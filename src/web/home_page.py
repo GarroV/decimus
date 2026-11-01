@@ -87,7 +87,7 @@ def _board_href(kind: str) -> str:
         home_board.PLANS_REVIEW: f"{действия}?tab=plans",
         home_board.PLANS_DUE: f"{действия}?tab=plans",
         home_board.ORDERS_DUE: f"{действия}?tab=prescriptions",
-        home_board.RATINGS_STALE: f"{section('administration').path}?tab=ratings",
+        home_board.RATINGS_STALE: section("ratings").path,
         home_board.MCP_RELINK: f"{section('settings').path}?tile=claude",
         home_board.BOT_CONNECT: f"{section('settings').path}?tile=bot",
         home_board.CLAUDE_CONNECT: f"{section('settings').path}?tile=claude",

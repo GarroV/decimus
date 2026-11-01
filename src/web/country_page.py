@@ -45,7 +45,6 @@ from src.domain.tenants import HQ_TENANT
 
 from . import (
     action_plans,
-    administration,
     auth,
     country_filter,
     country_settings,
@@ -64,7 +63,6 @@ from .geo_names import city_title, country_title
 from .sections import section
 from .texts import t
 from .unit_add import can_add_here
-from .users_view import TAB_COUNTRIES
 
 log = logging.getLogger(__name__)
 
@@ -522,12 +520,11 @@ def _one_country(
                 request.args.get("saved", ""),
                 units=units,
                 # Правка и договор — во вкладке «Администрирование → Страны» (D640);
-                # здесь карточка для чтения и ссылка туда, если вкладка у вошедшего есть.
+                # здесь только карточка для чтения, без ссылок на настройки.
                 can_edit=False,
                 show_email=auth.current_tenant() == HQ_TENANT,
                 can_contract=False,
                 inspections=data.inspections,
-                edit_url=_edit_url(вид.code),
             )
             if settings_open
             else None
@@ -555,13 +552,6 @@ def _one_country(
         "truncated": data.truncated,
         "country_name": country_title(вид.code, lang),
     }
-
-
-def _edit_url(code: str) -> str:
-    """Адрес настроек страны во вкладке «Страны» — если она открыта вошедшему, иначе пусто."""
-    if not any(tab.key == TAB_COUNTRIES for tab in administration.tabs_for(auth.current_account())):
-        return ""
-    return administration.url(TAB_COUNTRIES, country=code)
 
 
 def index_redirect(lang_in_url: bool, lang: str) -> Response | None:
