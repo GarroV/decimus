@@ -242,13 +242,13 @@ def test_задан_в_базе_перечень_показан_отмеченн
     assert 'name="reset"' in страница
 
 
-def test_страница_страны_без_форм_и_со_ссылкой_изменить(
+def test_страница_страны_без_форм_и_ссылок_на_настройки(
     админ: FlaskClient, монкей: pytest.MonkeyPatch, записи: dict[str, list[Any]]
 ) -> None:
     страница = открыть(админ, монкей, данные(), "/country/GE?settings=1")
     assert "Карточка страны" in страница, "карточка не открылась — проверять нечего"
     assert "/country/GE/settings/" not in страница and "ccard__contract" not in страница
-    assert 'href="/administration?tab=countries&amp;country=GE"' in страница
+    assert 'href="/administration?tab=countries&amp;country=GE"' not in страница
 
 
 def test_у_роли_без_вкладки_ссылки_изменить_нет(
