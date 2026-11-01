@@ -436,7 +436,6 @@ def render_section(
         ),
         previous_title=_period_title(previous, found, lang),
         may_manage=may_manage(),
-        admin_ratings_url=admin_url(),
         unit_url=unit_rating_url,
         country_name=country_name,
         ratings_path=root,
@@ -453,6 +452,7 @@ BLOCK_ISSUES = "issues"
 BLOCK_DEVELOPERS = "developers"
 BLOCK_RULES = "rules"
 BLOCK_SETTINGS = "settings"
+BLOCK_AGGREGATORS = "aggregators"
 BLOCKS = (
     BLOCK_SHEET,
     BLOCK_UPLOAD,
@@ -461,6 +461,7 @@ BLOCKS = (
     BLOCK_DEVELOPERS,
     BLOCK_RULES,
     BLOCK_SETTINGS,
+    BLOCK_AGGREGATORS,
 )
 
 
@@ -502,6 +503,7 @@ def _block_states(
         if key in settings
     ]
     return {
+        BLOCK_AGGREGATORS: (t("ratings.admin.aggregators.state", lang), False),
         BLOCK_SHEET: sheet_line,
         BLOCK_UPLOAD: (
             t("ratings.admin.upload.last", lang, at=at(last.at))
@@ -555,7 +557,7 @@ def render_imports(
         block=block,
         split_open=bool(block),
         split_back=admin_url(),
-        split_wide=block in (BLOCK_SHEET, BLOCK_JOURNAL, BLOCK_ISSUES),
+        split_wide=block in (BLOCK_SHEET, BLOCK_JOURNAL, BLOCK_ISSUES, BLOCK_AGGREGATORS),
         link=admin_url,
         blocks=[(key, *states[key]) for key in BLOCKS],
         notice=notice,
@@ -568,6 +570,18 @@ def render_imports(
         sheet=sheet,
         sheet_every_h=sheet_sync.SYNC_EVERY_SEC // 3600,
         sheet_notice=ratings_sheet.NOTICES.get(request.args.get(ratings_sheet.ARG, "")),
+        agg=(
+            ratings_platforms.build_agg(
+                tuple(c.code for c in countries), until=date.today(), today=date.today()
+            )
+            if block == BLOCK_AGGREGATORS
+            else None
+        ),
+        agg_names=_agg_names(lang),
+        agg_pending=_agg_pending() if block == BLOCK_AGGREGATORS else None,
+        agg_update_notice=_AGG_UPDATE_NOTICES.get(request.args.get("agg", "")),
+        link_platforms=LINK_PLACEHOLDERS,
+        open_country="",
         max_mb=UPLOAD_MAX_BYTES // _MB,
         ratings_path=section("ratings").path,
         country_name=lambda code: names.get(code) or country_title(code, lang),
@@ -604,8 +618,8 @@ def _link_point(conf: Settings) -> tuple[str, int]:
     lang = _lang(conf)
     aggregator = (request.form.get("aggregator") or "glovo").strip()
     if aggregator not in _LINKERS:
-        return render_section(
-            conf, ratings_nav.AGG, failure=t("ratings.coverage.link.failed", lang)
+        return render_imports(
+            conf, block=BLOCK_AGGREGATORS, failure=t("ratings.coverage.link.failed", lang)
         ), 400
     linker, bad_url = _LINKERS[aggregator]
     unit_id = (request.form.get("dodo_id") or "").strip().lower()
@@ -619,16 +633,16 @@ def _link_point(conf: Settings) -> tuple[str, int]:
             agg_store.save([point], [rating] if rating else [])
     except RatingsError:
         logger.warning("рейтинги: привязка %s не легла", aggregator, exc_info=True)
-        return render_section(
-            conf, ratings_nav.AGG, failure=t("ratings.coverage.db_down", lang)
+        return render_imports(
+            conf, block=BLOCK_AGGREGATORS, failure=t("ratings.coverage.db_down", lang)
         ), 503
     platform = _agg_names(lang).get(aggregator, aggregator)
     if result.code == glovo_link.OK and unit is not None:
         notice = t("ratings.coverage.link.ok", lang, platform=platform, name=unit.name)
-        return render_section(conf, ratings_nav.AGG, notice=notice), 200
+        return render_imports(conf, block=BLOCK_AGGREGATORS, notice=notice), 200
     code = bad_url if result.code == glovo_link.BAD_URL else result.code
     reason = _coded("ratings.coverage.link", code, {}, lang, "ratings.coverage.link.failed")
-    return render_section(conf, ratings_nav.AGG, failure=reason), 400
+    return render_imports(conf, block=BLOCK_AGGREGATORS, failure=reason), 400
 
 
 def _loaded_notice(итог: ImportReport, lang: str) -> str:
@@ -802,7 +816,7 @@ def install(app: Flask, conf: Settings) -> None:
     @guard.action("ratings.manage")
     def ratings_agg_update() -> Response | tuple[str, int]:
         """Кнопка «Обновить сейчас» (D420): та же заявка, что у Claude; собирает бот.
-        Назад — на ту же сводку (период и срез из адреса), с пометкой исхода."""
+        Назад — в административный блок площадок с пометкой исхода."""
         if not may_manage():
             return _forbidden()
         refuse_foreign_origin()
@@ -812,11 +826,7 @@ def install(app: Flask, conf: Settings) -> None:
         except RatingsError:
             logger.warning("рейтинги: заявка на обновление агрегаторов не легла", exc_info=True)
             outcome = "db_down"
-        # Исход виден в разделе «Агрегаторы»: возвращаем человека туда, с тем же отбором.
-        args = {**request.args.to_dict(), "agg": outcome}
-        return redirect(
-            f"{request.script_root}{путь}/{ratings_nav.AGG}?{urlencode(args)}", code=303
-        )
+        return redirect(admin_url(BLOCK_AGGREGATORS, agg=outcome), code=303)
 
     @app.post(f"{путь}/sheet-sync")
     @guard.action("ratings.manage")

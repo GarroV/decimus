@@ -199,11 +199,11 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "ratings.admin.sub": {
         "ru": (
             "Загрузка данных, справочники и пороги рейтингов. "
-            "Охват площадок и привязка Glovo — в разделе «Рейтинги»."
+            "Привязка площадок и запрос обновления — в блоке «Агрегаторы»."
         ),
         "en": (
             "Rating data uploads, reference lists and thresholds. "
-            "Platform coverage and the Glovo link live in the Ratings section."
+            "Platform links and refresh requests are in the Aggregators block."
         ),
     },
     "ratings.admin.count": {"ru": "Блоков: {n}", "en": "Blocks: {n}"},
@@ -219,6 +219,11 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "ratings.admin.block.issues": {"ru": "Несопоставленное", "en": "Unmatched rows"},
     "ratings.admin.block.developers": {"ru": "Девелоперы стран", "en": "Country developers"},
     "ratings.admin.block.rules": {"ru": "Хард-правила", "en": "Hard rules"},
+    "ratings.admin.block.aggregators": {"ru": "Агрегаторы", "en": "Aggregators"},
+    "ratings.admin.aggregators.state": {
+        "ru": "Привязка площадок и обновление данных",
+        "en": "Platform links and data refresh",
+    },
     "ratings.admin.block.settings": {"ru": "Пороги", "en": "Thresholds"},
     "ratings.admin.sheet.off": {"ru": "Самозабор выключен", "en": "Auto-pull is off"},
     "ratings.admin.sheet.failed": {

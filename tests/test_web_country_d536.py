@@ -355,7 +355,7 @@ def test_почта_партнёра_в_карточке_только_для_у�
         assert панель.partners[0].email == ждём, (уК, панель.partners)
 
 
-def test_панель_настроек_на_экране_страны_только_чтение_со_ссылкой_изменить(
+def test_карточка_страны_только_чтение_без_ссылки_на_настройки(
     админ: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.db.spaces import SpaceRow
@@ -367,10 +367,10 @@ def test_панель_настроек_на_экране_страны_тольк
     )
     страница = открыть(админ, monkeypatch, данные(), "/country/GE?settings=1")
     assert "data-drawer" in страница and "sdrawer--wide" in страница
-    # D640: правка — только во вкладке «Страны»; здесь ни одной формы, зато ссылка туда.
+    # D689: правка и ссылки на настройки — только в администрировании.
     assert "/country/GE/settings/" not in страница
-    assert 'href="/administration?tab=countries&amp;country=GE"' in страница
-    assert "Изменить в «Администрировании»" in страница
+    assert 'href="/administration?tab=countries&amp;country=GE"' not in страница
+    assert "Изменить в «Администрировании»" not in страница
     # Список проверок и плитки остаются на месте: экран тот же.
     assert "pk-tiles" in страница
 

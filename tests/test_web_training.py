@@ -143,10 +143,10 @@ def test_пустое_состояние_без_загрузки(monkeypatch: py
         assert "Ключи ставит главный администратор" in page
 
 
-def test_пустое_состояние_зовёт_главного_админа_к_ключам(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_пустое_состояние_не_дублирует_настройки_ключей(monkeypatch: pytest.MonkeyPatch) -> None:
     for client in _войти(monkeypatch, role="superadmin", loaded=False):
         page = client.get("/training").get_data(as_text=True)
-        assert 'href="/administration?tab=keys' in page
+        assert 'href="/administration?tab=keys' not in page
 
 
 def test_сбой_чтения_говорит_словами_а_не_500(monkeypatch: pytest.MonkeyPatch) -> None:
