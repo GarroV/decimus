@@ -122,6 +122,17 @@ def run_engine(
     return Run(p.returncode, p.stdout, p.stderr)
 
 
+@pytest.fixture(autouse=True)
+def _exercise_existing_action_plan_capabilities(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep testing the retained workflow; pause tests explicitly unset this opt-in.
+
+    Production defaults to paused. This suite also protects the archived implementation
+    from regressions while it is paused; no database records or old tests are discarded.
+    """
+    if "ACTION_PLANS_ENABLED" not in os.environ:
+        monkeypatch.setenv("ACTION_PLANS_ENABLED", "1")
+
+
 CHECKLIST_DIR_VAR = "CHECKLIST_DIR"
 
 

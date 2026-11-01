@@ -35,6 +35,7 @@ from typing import Any, Protocol
 import psycopg
 
 from src.domain.action_plan_rule import needs_action_plan as _needs_action_plan
+from src.domain.features import action_plans_enabled
 from src.domain.plan_due import plan_due_on
 from src.domain.tenants import HQ_TENANT
 
@@ -627,6 +628,8 @@ def open_auto_request(
 
     Вместе с запросом заводятся строки плана — по записи D1–D3 (#1168).
     """
+    if not action_plans_enabled():
+        return None
     cur.execute(_INSPECTION_FOR_REQUEST_SQL, (inspection_id,))
     row = cur.fetchone()
     if row is None:
@@ -696,6 +699,8 @@ def _create_request(
 
 
 def _actor(actor: str) -> str:
+    if not action_plans_enabled():
+        raise ActionPlanError("Electronic action plans are paused")
     value = (actor or "").strip()
     if not value:
         raise ActionPlanError("Не назван, кто действует: в истории каждое действие подписано")
@@ -729,6 +734,8 @@ def request_plan(
     дату сама (и тогда она обязана быть не в прошлом). `terms` — дни и формулировки записей
     от движка (`plan_rows.TermsProvider`): без них строк нет, и план файловый.
     """
+    if not action_plans_enabled():
+        raise ActionPlanError("Electronic action plans are paused")
     who = _actor(actor)
     ident = _uuid_or_none(inspection_id)
     if ident is None:

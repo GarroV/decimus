@@ -760,3 +760,6 @@ timings_ms
 # InfoLine photo fields read by inspections/_card_body.html, outside Python AST.
 shown_photos
 missing_photos
+# Flask before_request and pytest autouse callbacks are registered by decorators.
+paused_plan_routes
+_exercise_existing_action_plan_capabilities

@@ -26,6 +26,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
+from .features import action_plans_enabled
 from .tenants import HQ_TENANT, canonical_tenant
 
 #: Сторона, которой принадлежит пространство: УК или партнёр.
@@ -129,6 +130,7 @@ ACTIONS: tuple[Action, ...] = (
     # проверкам, предписаниям и экшн-планам. Только админ и главный админ — ОСБ,
     # девелопер и контроль не правят (спека ОСБ, «Шаблоны и списки рассылок»).
     Action("mailing.manage", "people", hq_only=True),
+    Action("plan.archive", "plan", hq_only=True, writes=False),
     Action("unit.create", "unit", hq_only=True),
     Action("api.manage", "api", hq_only=True),
     # Ключи внешних сервисов на экране «Подключения» (D576): отдельный код, чтобы доступ к
@@ -220,6 +222,7 @@ _HQ_ADMIN = (
         "people.role",
         "space.manage",
         "contract.manage",
+        "plan.archive",
         "mailing.manage",  # D608: списки копий и шаблоны писем УК
         "refusals.read",
         "view.osb",  # D599: админ видит страницу «ОСБ» без действий
@@ -358,7 +361,10 @@ def grants_of(role: str | None, tenant: str) -> frozenset[str]:
     """Действия роли в её пространстве. Незнакомая роль — ничего."""
     if not role:
         return frozenset()
-    return MATRIX.get((side_of(tenant), role), frozenset())
+    grants = MATRIX.get((side_of(tenant), role), frozenset())
+    if not action_plans_enabled():
+        grants = grants - {"plan.manage", "plan.submit"}
+    return grants
 
 
 def can(actor: Actor, action: str, object_tenant: str | None = None) -> Decision:

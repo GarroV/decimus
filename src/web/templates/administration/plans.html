@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "administration/_nav.html" import admin_nav with context %}
+{% block title %}{{ t('administration.tab.plans') }}{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">{% endblock %}
+{% block body %}
+<header class="shead"><h1 class="shead__title">{{ t('administration.tab.plans') }}</h1></header>
+<div class="sadmin">
+  {{ admin_nav() }}
+  <div class="sadmin__main">
+    <h2>{{ t('plans.paused.title') }}</h2>
+    <p>{{ t('plans.paused.note') }}</p>
+    {% if failed %}<p role="alert">{{ t('actions.panel.failed.text') }}</p>{% endif %}
+    <ul>{% for row in rows %}<li><a href="{{ admin_url('plans', id=row.id) }}">{{ row.unit_name }} · {{ day(row.inspection_date) }}</a></li>{% endfor %}</ul>
+    {% if selected %}
+      <section aria-labelledby="archived-plan-title">
+        <h2 id="archived-plan-title">{{ selected.unit_name }} · {{ day(selected.inspection_date) }}</h2>
+        <p>{{ selected.grade }} {{ selected.pct }}%</p>
+        <ol>{% for row in selected.rows %}<li>{{ row.level }} · {{ row.title(lang) }}{% if row.measure %} — {{ row.measure }}{% endif %}</li>{% endfor %}</ol>
+      </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
