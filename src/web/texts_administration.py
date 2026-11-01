@@ -6,6 +6,18 @@
 from __future__ import annotations
 
 ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
+    "administration.tab.plans": {"ru": "Экшн-планы", "en": "Action plans"},
+    "plans.paused.title": {"ru": "Экшн-планы отключены", "en": "Action plans are paused"},
+    "plans.paused.note": {
+        "ru": (
+            "Новые запросы и уведомления не создаются. "
+            "Сохранённые планы доступны здесь только для чтения."
+        ),
+        "en": (
+            "New requests and notifications are disabled. "
+            "Stored plans remain here for read-only review."
+        ),
+    },
     "section.administration.title": {"ru": "Администрирование", "en": "Administration"},
     "administration.tabs": {"ru": "Разделы администрирования", "en": "Administration tabs"},
     "administration.tab.people": {"ru": "Люди и доступ", "en": "People & access"},

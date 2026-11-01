@@ -30,7 +30,7 @@
 {% block pick_work %}
   {% if tab != 'osb' %}
     <nav class="stabs" aria-label="{{ t('section.actions.title') }}">
-      <a class="stabs__item{% if tab == 'plans' %} is-current{% endif %}" href="{{ tab_links['plans'] }}"{% if tab == 'plans' %} aria-current="page"{% endif %}>{{ t('actions.tab.plans') }}</a>
+      {% if action_plans_enabled() %}      <a class="stabs__item{% if tab == 'plans' %} is-current{% endif %}" href="{{ tab_links['plans'] }}"{% if tab == 'plans' %} aria-current="page"{% endif %}>{{ t('actions.tab.plans') }}</a>{% endif %}
       <a class="stabs__item{% if tab == 'prescriptions' %} is-current{% endif %}" href="{{ tab_links['prescriptions'] }}"{% if tab == 'prescriptions' %} aria-current="page"{% endif %}>{{ t('actions.tab.prescriptions') }}</a>
     </nav>
   {% endif %}

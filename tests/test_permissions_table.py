@@ -66,6 +66,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "contract.manage",
         # Списки копий и шаблоны писем УК (D608): админ УК и главный админ.
         "mailing.manage",
+        "plan.archive",
     }
 )
 СОТРУДНИК_ПАРТНЁРА = ВИДЫ_ПАРТНЁРА | {

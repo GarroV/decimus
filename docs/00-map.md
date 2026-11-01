@@ -118,7 +118,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -154,6 +154,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/methodology_view.py` | Экран чек-листа (D197): отбор, группировка и соседи пункта |
 | `src/web/osb.py` | Страница «ОСБ»: очереди предписаний сети (D599, D606; шаг 1 спеки 2026-10-21-osb-prescriptions) |
 | `src/web/overview.py` | Экран «Обзор сети»: что показать и чем это взято |
+| `src/web/plan_archive.py` | Read-only administration archive for the paused electronic action-plan workflow |
 | `src/web/plan_roundtrip.py` | Файл «туда и обратно» электронного плана на экране (#1168, шаг 3) |
 | `src/web/plan_rows.py` | Строки электронного плана в вебе: запись партнёра и вердикты УК (#1168, D613, D617, D618, D621) |
 | `src/web/plan_sheet.py` | Электронный план исправлений — `.xlsx` туда и обратно (шаг 3 эпика #1168) |
@@ -905,6 +906,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/edition.py` | Издание методики, на котором идёт проверка, и его снимок рядом с состоянием |
 | `src/domain/engine.py` | Вызов движка подпроцессом — единственный способ, которым блок его трогает |
 | `src/domain/errors.py` | Отказы блока `domain` |
+| `src/domain/features.py` | Operational feature switches; a paused workflow preserves its stored history |
 | `src/domain/findings.py` | Операции над записями проверки: фиксация, правка, удаление, фотографии |
 | `src/domain/geo.py` | Страны и города сети: названия для людей, страна города, местные написания |
 | `src/domain/handover.py` | Сдана ли проверка: признак, который ставит бот, а читают и бот, и мини-апп (D080, D312) |

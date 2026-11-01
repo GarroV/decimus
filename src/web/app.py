@@ -54,6 +54,7 @@ from src.db.models import InspectionRow
 from src.db.pool import shared_connections
 from src.db.reports import ReportRef
 from src.domain.errors import ValidationError
+from src.domain.features import action_plans_enabled
 from src.domain.kinds import kind_title
 from src.domain.permissions import is_read_only
 from src.domain.second_factor import passkey_auto_enroll
@@ -308,6 +309,7 @@ def _register_context(app: Flask, conf: Settings) -> None:
         return {
             "lang": lang,
             "langs": UI_LANGS,
+            "action_plans_enabled": action_plans_enabled,
             "t": lambda key, **params: t(key, lang, **params),
             # Страна и город в справочнике — коды; на экран они идут словом.
             "city_title": lambda code: city_title(code, lang),

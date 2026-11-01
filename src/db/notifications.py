@@ -29,6 +29,8 @@ from typing import Any
 
 import psycopg
 
+from src.domain.features import action_plans_enabled
+
 from .config import check_environment
 from .errors import AccessError
 from .pool import connection
@@ -58,11 +60,15 @@ select id, kind, link, params, created_at, read_at
   from notifications
  where user_id = %(user)s::uuid
    and (not %(unread_only)s or read_at is null)
+   and (%(show_plans)s or left(kind, 5) <> 'plan_')
  order by created_at desc, id desc
  limit %(limit)s
 """
 
-_COUNT_SQL = "select count(*) from notifications where user_id = %s::uuid and read_at is null"
+_COUNT_SQL = (
+    "select count(*) from notifications where user_id = %s::uuid and read_at is null "
+    "and (%s or left(kind, 5) <> 'plan_')"
+)
 
 _MARK_SQL = """
 update notifications set read_at = now()
@@ -130,6 +136,8 @@ def notify(
     то, из чего экран соберёт текст на своём языке. Возвращает число записанных
     строк. Отказ базы идёт вверх как есть: вызывающий откатывает свою транзакцию.
     """
+    if kind.startswith("plan_") and not action_plans_enabled():
+        return 0
     получатели = list(dict.fromkeys(str(u) for u in users))
     if not получатели:
         return 0
@@ -162,7 +170,15 @@ def list_for(user: str, limit: int = MAX_LIST, *, unread_only: bool = False) -> 
         return []
     предел = max(1, min(int(limit), MAX_LIST))
     with _connected("прочитать уведомления") as conn, conn.cursor() as cur:
-        cur.execute(_LIST_SQL, {"user": ключ, "unread_only": unread_only, "limit": предел})
+        cur.execute(
+            _LIST_SQL,
+            {
+                "user": ключ,
+                "unread_only": unread_only,
+                "limit": предел,
+                "show_plans": action_plans_enabled(),
+            },
+        )
         return [
             Notification(
                 id=int(row[0]),
@@ -182,7 +198,7 @@ def unread_count(user: str) -> int:
     if ключ is None:
         return 0
     with _connected("посчитать уведомления") as conn, conn.cursor() as cur:
-        cur.execute(_COUNT_SQL, (ключ,))
+        cur.execute(_COUNT_SQL, (ключ, action_plans_enabled()))
         row = cur.fetchone()
     return 0 if row is None else int(row[0])
 
