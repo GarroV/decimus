@@ -119,6 +119,19 @@ def test_failed_class_check_can_retry_directly_from_save_area(browser_page):
     assert page.get_by_role("button", name="Save", exact=True).is_enabled()
 
 
+# Один вариант в ответе: без выбора кадров, проверка класса стартует сразу после выбора.
+PENDING_SEARCH = """() => {
+  const W=DecimusWalk, post=W.post;
+  W.post=(url,body,...args)=>{
+    if (url==='hint') return Promise.resolve({ok:true,body:{candidates:cards.slice(0,1).map(c=>({...c}))}});
+    if (url==='suggest') return new Promise(resolve=>{
+      window.finishSearch=()=>resolve({ok:true,body:{candidates:cards.slice(0,1).map(c=>({...c}))}});
+    });
+    return post(url,body,...args);
+  };
+}"""
+
+
 def preview_during_search(page):
     load(page)
     page.evaluate("""() => {
@@ -174,18 +187,49 @@ def test_finishing_search_only_checks_current_preview_selection(browser_page):
     assert page.evaluate("levelCalls[0].code") == "SYN02"
 
 
-@pytest.mark.parametrize("change", ["facts", "close"])
-def test_waiting_class_request_is_discarded_after_changed_facts_or_closed_form(
-    browser_page, change
-):
+def test_waiting_class_request_is_discarded_after_closed_form(browser_page):
     page = browser_page
     preview_during_search(page)
-    if change == "facts":
-        page.locator(".walk-area--words").fill("Different current observation")
-    else:
-        page.evaluate("DecimusWalk.sheet.close(true)")
+    page.evaluate("DecimusWalk.sheet.close(true)")
     page.evaluate("async()=>{finishSearch();await new Promise(resolve=>setTimeout(resolve,0))}")
     assert page.evaluate("levelCalls.length") == 0
+
+
+@pytest.mark.parametrize("earlier", [None, "ready", "not_established"])
+def test_class_waiting_for_search_is_rechecked_on_changed_words(browser_page, earlier):
+    """#1430: слова поправили, пока выбранная карточка ждала конца поиска."""
+    page = browser_page
+    if earlier:
+        load(page, same_code=True)
+        choose(page, 0)
+        page.wait_for_function("levelCalls.length === 1")
+        if earlier == "ready":
+            resolve(page, level="D1")
+        else:
+            resolve(page, status="not_established", level=None, need_fact=None)
+        page.locator(".walk-area--words").fill("Second observation")
+        page.evaluate(PENDING_SEARCH)
+        page.get_by_role("button", name="walk.sheet.find_again", exact=True).click()
+        page.wait_for_function("!!window.finishSearch")
+        page.wait_for_function("document.querySelectorAll('.walk-found__card').length === 1")
+        page.locator(".walk-found__card").nth(0).click()
+        base = 1
+    else:
+        load(page, same_code=True)
+        page.evaluate(PENDING_SEARCH)
+        page.locator(".walk-mark--find").click()
+        page.wait_for_function("document.querySelectorAll('.walk-found__card').length === 1")
+        page.locator(".walk-found__card").nth(0).click()
+        base = 0
+    assert page.evaluate("levelCalls.length") == base
+    page.locator(".walk-area--words").fill("Different current observation")
+    page.evaluate("finishSearch()")
+    page.wait_for_function(f"levelCalls.length === {base + 1}")
+    assert page.evaluate(f"levelCalls[{base}].words") == "Different current observation"
+    assert page.locator(".walk-sheet__why").inner_text() == "walk.sheet.class_review.pending"
+    resolve(page, base, level="D1")
+    assert page.locator("[data-manual-class]").count() == 0
+    assert page.get_by_role("button", name="Save", exact=True).is_enabled()
 
 
 def test_needs_fact_never_applies_provisional_class_and_answer_is_scoped(browser_page):
@@ -736,3 +780,32 @@ def test_extra_reply_while_deselected_does_not_leave_a_stuck_pending_check(brows
     assert page.get_by_role("button", name="Save 2", exact=True).is_disabled()
     resolve(page, 2, level="D1")
     assert page.get_by_role("button", name="Save 2", exact=True).is_enabled()
+
+
+@pytest.mark.parametrize("first_status", ["ready", "not_established"])
+@pytest.mark.parametrize("same_code", [True, False])
+def test_class_is_rechecked_after_words_change_and_repeat_search(
+    browser_page, first_status, same_code
+):
+    page = browser_page
+    load(page, same_code=True)
+    choose(page, 0)
+    page.wait_for_function("levelCalls.length === 1")
+    if first_status == "ready":
+        resolve(page, level="D1")
+    else:
+        resolve(page, status="not_established", level=None, need_fact=None)
+    page.locator(".walk-area--words").fill("Edited observation")
+    # Повторный поиск вернёт тот же код (и второй вариант).
+    page.evaluate(
+        "(same) => { cards = cards.map(c => Object.assign({}, c, same ? {code:'SYN01'} : {})); }",
+        same_code,
+    )
+    page.get_by_role("button", name="walk.sheet.find_again", exact=True).click()
+    page.wait_for_function("!document.querySelector('.walk-found__card.is-on')")
+    choose(page, 0)
+    page.wait_for_function("levelCalls.length === 2")
+    assert page.evaluate("levelCalls[1].words") == "Edited observation"
+    resolve(page, 1, level="D1")
+    assert page.locator("[data-manual-class]").count() == 0
+    assert page.get_by_role("button", name="Save", exact=True).is_enabled()
