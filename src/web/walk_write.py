@@ -68,6 +68,7 @@ from src.domain.errors import DomainError, EngineError, ValidationError
 from src.domain.findings import EditConflict
 from src.domain.info_fields import FIELDS, KIND_DATE, KIND_TEXT, KIND_YES_NO
 from src.domain.log_ids import log_id
+from src.domain.measurement_sets import MeasurementSetConflict
 from src.domain.models import READING_MAX_C, READING_MIN_C, Inspection, Suggestion
 from src.domain.uploads import MAX_UPLOAD_BYTES, UploadQuotaError, own_upload
 from src.recognize.models import UNKNOWN_ZONE
@@ -422,6 +423,11 @@ def _edit(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         kwargs["photos"] = list(
             dict.fromkeys([ref for ref in current.photos if ref not in removed] + added)
         )
+    if "class_context" in body:
+        if not isinstance(body["class_context"], dict):
+            raise WalkRefused("walk.err.bad_request")
+        kwargs["class_context"] = body["class_context"]
+        kwargs["context_words"] = _text(body, "words") if "words" in body else current.words
     edit_finding(
         chat_id,
         n,
@@ -477,7 +483,19 @@ def _split_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> Non
 
 def _finding_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     op = body.get("op")
-    if op == "split":
+    if op == "measurement_set":
+        from src.domain.measurement_sets import delete_set, save_set
+
+        value = body.get("measurement_set")
+        if not isinstance(value, dict) or not isinstance(body.get("run_id"), str):
+            raise WalkRefused("walk.err.bad_request")
+        if body.get("delete") is True:
+            delete_set(
+                chat_id, value.get("id"), revision=value.get("revision"), run_id=body["run_id"]
+            )
+        else:
+            save_set(chat_id, value, run_id=body["run_id"])
+    elif op == "split":
         _split_op(chat_id, inspection, body)
     elif op == "add":
         _add(chat_id, inspection, body)
@@ -590,9 +608,9 @@ def install(
             lang = inspection.ui_lang
             # Решающая проверка сдачи — под замком заметок вместе с записью:
             # ранняя выше могла пройти за миг до того, как бот отдал отчёт.
-            if op is _finding_op and body.get("op") == "split":
-                # Public split owns notes + state locks, including the run check.
-                # Taking notes twice would deadlock its independent domain API.
+            if op is _finding_op and body.get("op") in ("split", "measurement_set"):
+                # These domain operations own notes + state locks and the run check.
+                # Taking notes twice would deadlock their independent domain API.
                 with measure("mutation"):
                     op(who, inspection, body)
             else:
@@ -609,6 +627,10 @@ def install(
         except HandedOverError:
             logger.info("Обход: чат %s сдал проверку во время записи — отказ", log_id(who))
             return refused(said("walk.sealed", lang), 409)
+        except MeasurementSetConflict:
+            return jsonify(
+                {"error": "measurement_set_changed", "message": said("walk.level.changed", lang)}
+            ), 409
         except EditConflict:
             return jsonify(
                 {"error": "edit_conflict", "message": said("walk.edit.conflict", lang)}

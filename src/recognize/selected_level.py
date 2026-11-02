@@ -13,6 +13,9 @@ from src.domain.clarifications import MAX_LEVEL_WORDS, clarification_chain
 from src.domain.criteria import ItemCriteria, item_criteria
 from src.domain.errors import ValidationError
 from src.domain.findings import check_reading
+from src.domain.measurement_sets import bound_scope, scope_for
+from src.domain.models import Inspection
+from src.domain.state import get_state
 
 from .classify import AskArgs
 from .client import ModelAnswer
@@ -55,6 +58,8 @@ def prepare_selected_level(
     reading_source: str | None = None,
     settings: RecognizeSettings | None = None,
     clarifications: Any = None,
+    measurement_set_id: str | None = None,
+    measurement_set_revision: str | None = None,
 ) -> PreparedLevel:
     if (
         not isinstance(selection_revision, str)
@@ -70,12 +75,30 @@ def prepare_selected_level(
         check_reading(reading_c)
         if reading_confirmed is not True or reading_source not in ("human", "model"):
             raise UnconfirmedReading("Показание должен явно подтвердить человек")
-    if not words.strip() and not photos and reading_c is None and not chain:
+    if (
+        not words.strip()
+        and not photos
+        and reading_c is None
+        and not chain
+        and not measurement_set_id
+    ):
         raise MissingFacts("Нет фактов для выбранного пункта")
     item = item_criteria(chat_id, code)
     if zone is not None and zone not in {z.code for z in list_zones(chat_id=chat_id)}:
         raise ValidationError("Выбранной зоны нет в издании проверки")
-    facts = {
+    measurement = None
+    if measurement_set_id is not None or measurement_set_revision is not None:
+        inspection = get_state(chat_id)
+        if inspection is None or not measurement_set_id or not measurement_set_revision:
+            raise ValidationError("Нужен сохранённый набор замеров и его ревизия")
+        measurement = scope_for(
+            inspection,
+            code=code,
+            zone=zone,
+            set_id=measurement_set_id,
+            set_revision=measurement_set_revision,
+        )
+    facts: dict[str, Any] = {
         "words": words.strip(),
         "clarifications": chain,
         "photo_refs": list(photo_refs),
@@ -83,6 +106,8 @@ def prepare_selected_level(
         "reading_confirmed": reading_c is not None,
         "reading_source": reading_source if reading_c is not None else None,
     }
+    if measurement is not None:
+        facts["measurement_scope"] = measurement.data
     facts_key = hashlib.sha256(
         json.dumps(facts, sort_keys=True, ensure_ascii=False).encode()
     ).hexdigest()
@@ -101,6 +126,8 @@ def prepare_selected_level(
             "photos": len(photos),
         },
     }
+    if measurement is not None:
+        context["measurement_context"] = measurement.context
     binding = {
         key: context[key]
         for key in ("run_id", "checklist_version", "code", "zone", "photo_refs", "criteria_hash")
@@ -115,6 +142,15 @@ def prepare_selected_level(
         note += f"\nПодтверждённое человеком показание термометра: {reading_c:g} °C."
     if zone is not None:
         note += f"\nЯвно выбранная зона: {zone}."
+    if measurement is not None:
+        note += (
+            "\nПодтверждённые человеком продукты и замеры отдельных линий одной зоны. "
+            "Не складывай продукты разных линий. Один product id — один продукт, "
+            "несколько его измерений не являются несколькими продуктами. "
+            "Измерения получены сервером из сохранённых источников. "
+            "Категорию и время не угадывай, при нехватке фактов задай уточнение.\n"
+            + json.dumps(measurement.data, ensure_ascii=False)
+        )
     ask = level_request(
         note,
         code=item.code,
@@ -151,3 +187,9 @@ def finish_selected_level(prepared: PreparedLevel, answer: ModelAnswer) -> dict[
 
 def evaluate_selected_level(prepared: PreparedLevel) -> dict[str, Any]:
     return finish_selected_level(prepared, prepared.ask.call())
+
+
+def recheck_measurement_scope(prepared: PreparedLevel, inspection: Inspection) -> None:
+    context = prepared.context.get("measurement_context")
+    if context is not None:
+        bound_scope(inspection, context, code=prepared.item.code, zone=prepared.context["zone"])

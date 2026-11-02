@@ -44,14 +44,18 @@ def bound_class_context(
     photos: list[str],
     words: str,
 ) -> list[dict[str, str]]:
-    if not isinstance(value, dict) or set(value) != {
+    required = {
         "clarifications",
         "run_id",
         "checklist_version",
         "code",
         "zone",
         "photo_refs",
-    }:
+    }
+    if not isinstance(value, dict) or set(value) not in (
+        required,
+        required | {"measurement_context"},
+    ):
         raise ValidationError("Недопустимый контекст уточнений")
     expected = {
         "run_id": run_id,
@@ -63,6 +67,8 @@ def bound_class_context(
     if any(value.get(key) != expected[key] for key in expected):
         raise ValidationError("Контекст уточнений относится к другой записи")
     chain = clarification_chain(value["clarifications"], words=words, answers_in_words=True)
-    if not chain or any(pair["answer"] not in words for pair in chain):
+    if (not chain and "measurement_context" not in value) or any(
+        pair["answer"] not in words for pair in chain
+    ):
         raise ValidationError("Человеческие ответы должны сохраняться в исходных словах")
     return chain

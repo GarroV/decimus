@@ -538,3 +538,87 @@ def test_extra_finding_exposes_full_independent_editable_description(browser_pag
         "MODEL WORDING MUST NOT BECOME FACTS",
         "Human fact for second item only",
     ]
+
+
+@pytest.mark.parametrize("status", ["ready", "needs_fact", "not_established"])
+def test_reselect_same_item_and_zone_reuses_result_until_explicit_check(browser_page, status):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    page.locator(".walk-found__card").nth(0).click()
+    assert page.evaluate("levelCalls.length") == 1  # Pending selection is deduplicated.
+    result = {"status": status}
+    if status != "ready":
+        result.update(
+            level=None,
+            provisional_level=None,
+            need_fact="Synthetic missing fact?" if status == "needs_fact" else None,
+        )
+    resolve(page, **result)
+    page.locator(".walk-found__card").nth(0).click()
+    page.get_by_role("button", name="walk.sheet.zone: Zone A", exact=True).first.click()
+    page.evaluate("menu.onPick('zone_a')")
+    assert page.evaluate("levelCalls.length") == 1
+    assert page.get_by_role("button", name="Save", exact=True).is_enabled() == (status == "ready")
+    page.locator("[data-class-check]").click()
+    page.wait_for_function("levelCalls.length === 2")
+    assert page.get_by_role("button", name="Save", exact=True).is_disabled()
+
+
+def test_repeated_extra_toggle_preserves_ready_result_without_new_request(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, level="D1")
+    confirm_assignment(page, 1)
+    extra_toggle = (
+        page.locator(".walk-found__row")
+        .filter(has_text="Synthetic second item")
+        .locator(".walk-found__also")
+    )
+    extra_toggle.click()
+    page.wait_for_function("levelCalls.length === 2")
+    resolve(page, 1, level="D2")
+    extra_toggle.click()
+    extra_toggle.click()
+    assert page.evaluate("levelCalls.length") == 2
+    assert page.get_by_role("button", name="Save 2", exact=True).is_enabled()
+    page.get_by_role("button", name="Save 2", exact=True).click()
+    page.wait_for_function("ops.length === 2")
+    assert [op["level"] for op in page.evaluate("ops")] == ["D1", "D2"]
+
+
+def test_reselect_does_not_discard_explicit_manual_class(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    page.get_by_role("button", name="walk.sheet.class_review.manual", exact=True).click()
+    page.locator('[data-manual-class="D2"]').click()
+    page.locator(".walk-found__card").nth(0).click()
+    resolve(page, level="D1")
+    assert page.evaluate("levelCalls.length") == 1
+    page.get_by_role("button", name="Save", exact=True).click()
+    page.wait_for_function("ops.length === 1")
+    assert page.evaluate("ops[0].level") == "D2"
+
+
+def test_extra_reply_while_deselected_does_not_leave_a_stuck_pending_check(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, level="D1")
+    confirm_assignment(page, 1)
+    toggle = (
+        page.locator(".walk-found__row")
+        .filter(has_text="Synthetic second item")
+        .locator(".walk-found__also")
+    )
+    toggle.click()
+    page.wait_for_function("levelCalls.length === 2")
+    toggle.click()
+    resolve(page, 1, level="D2")
+    toggle.click()
+    page.wait_for_function("levelCalls.length === 3")
+    assert page.get_by_role("button", name="Save 2", exact=True).is_disabled()
+    resolve(page, 2, level="D1")
+    assert page.get_by_role("button", name="Save 2", exact=True).is_enabled()

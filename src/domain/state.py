@@ -43,6 +43,7 @@ from .errors import (
     ValidationError,
 )
 from .kinds import kind_title
+from .measurement_sets import read_sets
 from .models import SOURCES, TEXT_LANGS, Finding, InfoAnswer, Inspection, Suggestion
 from .tenants import HQ_TENANT, canonical_tenant
 from .timing import duration_seconds, parse_timestamp, utc_now
@@ -565,6 +566,7 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
         started_at=parse_timestamp(block.get("started_at")),
         finished_at=parse_timestamp(block.get("finished_at")),
         finding_history=list(block.get("finding_history") or []),
+        measurement_sets=read_sets(block.get("measurement_sets")),
     )
 
 

@@ -880,3 +880,148 @@ WALK_TEXTS.update(SPLIT_TEXTS)
 WALK_TEXTS.update(LEVEL_TEXTS)
 
 WALK_TEXTS.update(EDIT_TEXTS)
+
+
+# Human-confirmed product measurement sets.
+WALK_TEXTS.update(
+    {
+        "walk.measurement.title": {
+            "ru": "Продукты и линии: наборы замеров",
+            "en": "Products and lines: measurement sets",
+        },
+        "walk.measurement.explain": {
+            "ru": "Сначала сохраните нейтральные замеры D0. Явно назовите "
+            "линию и каждый продукт; повторный замер добавляйте тому же "
+            "продукту. Кадры и строки замеров не определяют число "
+            "продуктов. Критерий проверяется по всем подтверждённым "
+            "линиям этого пункта и зоны, отдельно по каждой линии.",
+            "en": "Save neutral D0 readings first. Explicitly name the line "
+            "and each product; add repeat readings to the same product. "
+            "Photos and reading rows do not determine product counts. "
+            "The full criterion reviews every confirmed line for this "
+            "item and zone, each line separately.",
+        },
+        "walk.measurement.select": {
+            "ru": "Набор для проверки класса",
+            "en": "Set for class review",
+        },
+        "walk.measurement.none": {"ru": "Без набора замеров", "en": "No measurement set"},
+        "walk.measurement.stale_short": {
+            "ru": "нужно обновить источники",
+            "en": "sources need review",
+        },
+        "walk.measurement.stale": {
+            "ru": "Набор или исходные замеры изменились. Обновите данные, "
+            "проверьте источники и подтвердите состав заново; введённый "
+            "текст сохранён.",
+            "en": "The set or source readings changed. Refresh data, review "
+            "sources and confirm the composition again; your text is "
+            "retained.",
+        },
+        "walk.measurement.unsaved": {
+            "ru": "Изменения выбранного набора ещё не сохранены. Сохраните "
+            "набор или отмените правку перед проверкой класса.",
+            "en": "Changes to the selected set are not saved. Save the set or "
+            "cancel editing before reviewing the class.",
+        },
+        "walk.measurement.edit": {"ru": "Изменить набор", "en": "Edit set"},
+        "walk.measurement.create": {"ru": "Новая линия / набор", "en": "New line / set"},
+        "walk.measurement.no_sources": {
+            "ru": "В этой зоне ещё нет сохранённых D0 с числом. Сохраните "
+            "замер через «Замер» и вернитесь к набору. Воздух и "
+            "оборудование не подтверждайте как продукт.",
+            "en": "This zone has no saved numeric D0 readings yet. Save a "
+            "reading using Measurement, then return to the set. Do "
+            "not confirm air or equipment as a product.",
+        },
+        "walk.measurement.line": {"ru": "Линия (укажите явно)", "en": "Line (name explicitly)"},
+        "walk.measurement.product": {
+            "ru": "Отдельный продукт / единица продукта",
+            "en": "Individual product / product unit",
+        },
+        "walk.measurement.product_number": {"ru": "Продукт {n}", "en": "Product {n}"},
+        "walk.measurement.facts": {
+            "ru": "Факты о продукте: категория, время и другие условия критерия",
+            "en": "Product facts: category, time and other criterion conditions",
+        },
+        "walk.measurement.confirm_product": {
+            "ru": "Подтверждаю: это замеры отдельного продукта, не воздуха и не оборудования",
+            "en": "I confirm these are readings of an individual product, not air or equipment",
+        },
+        "walk.measurement.confirm_set": {
+            "ru": "Подтверждаю состав и полноту набора этой линии; "
+            "продукты и повторные замеры разделены верно",
+            "en": "I confirm this line’s composition and completeness; "
+            "individual products and repeat readings are grouped "
+            "correctly",
+        },
+        "walk.measurement.remove_product": {
+            "ru": "Убрать продукт из набора",
+            "en": "Remove product from set",
+        },
+        "walk.measurement.add_product": {
+            "ru": "Добавить отдельный продукт",
+            "en": "Add individual product",
+        },
+        "walk.measurement.save": {"ru": "Сохранить набор замеров", "en": "Save measurement set"},
+        "walk.measurement.delete": {"ru": "Удалить этот набор", "en": "Delete this set"},
+        "walk.measurement.cancel": {"ru": "Отменить правку набора", "en": "Cancel set editing"},
+        "walk.measurement.rebind": {
+            "ru": "Подтвердить актуальные версии источников, сохранив ввод",
+            "en": "Use current source versions and retain input",
+        },
+        "walk.measurement.refresh": {
+            "ru": "Обновить данные, сохранив ввод",
+            "en": "Refresh data and retain input",
+        },
+        "walk.measurement.confirm": {
+            "ru": "Назовите линию и каждый продукт, выберите замеры и явно "
+            "подтвердите продукт и состав набора.",
+            "en": "Name the line and each product, choose readings and "
+            "explicitly confirm each product and the set composition.",
+        },
+        "walk.measurement.duplicate": {
+            "ru": "Один замер нельзя отнести к разным продуктам. Повторные "
+            "замеры добавляйте к тому же продукту.",
+            "en": "One reading cannot belong to different products. Add "
+            "repeat readings to the same product.",
+        },
+        "walk.measurement.limit": {
+            "ru": "В наборе слишком много продуктов или замеров. Проверьте состав.",
+            "en": "The set has too many products or readings. Review its composition.",
+        },
+        "walk.measurement.source": {
+            "ru": "Замер №{n}: {reading} °C",
+            "en": "Reading #{n}: {reading} °C",
+        },
+        "walk.measurement.source_stale": {
+            "ru": "Источник №{n} изменён или удалён: проверьте привязку",
+            "en": "Source #{n} changed or was deleted: review the reference",
+        },
+        "walk.measurement.unconfirmed": {
+            "ru": "Сервер не подтвердил сохранённый набор. Обновите данные "
+            "перед повтором; ввод сохранён.",
+            "en": "The server did not confirm the saved set. Refresh data "
+            "before retrying; your input is retained.",
+        },
+        "walk.measurement.need_check": {
+            "ru": "Проверьте класс по сохранённому набору замеров.",
+            "en": "Review the class against the saved measurement set.",
+        },
+        "walk.measurement.open_existing": {
+            "ru": "Открыть существующую запись и проверить класс",
+            "en": "Open existing finding and review its class",
+        },
+    }
+)
+
+WALK_TEXTS["walk.measurement.target_changed"] = {
+    "ru": (
+        "Запись изменена или удалена. Откройте её заново; "
+        "введённые уточнения сохранены в черновике."
+    ),
+    "en": (
+        "The finding changed or was deleted. Reopen it; "
+        "your clarifications are retained in the draft."
+    ),
+}

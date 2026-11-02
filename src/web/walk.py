@@ -344,6 +344,9 @@ def walk_payload(
         info=info_fields(inspection, lang),
         sealed=handed_over(chat_id),
     )
+    from src.domain.measurement_sets import public_sets
+
+    payload["measurement_sets"] = public_sets(inspection)
     payload["item_search_tags"] = walk_search_tags.search_tags(items, chat_id=chat_id)
     app = walk_settings.app_block(chat_id, lang)
     out = {**payload, "texts": texts_for(lang), "app": app}

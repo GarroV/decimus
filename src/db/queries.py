@@ -166,7 +166,7 @@ select
     -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
     i.checklist_code,
     i.status, i.accepted_at, i.accepted_by,
-    i.origin, i.speech_lang, i.finding_history,
+    i.origin, i.speech_lang, i.finding_history, i.measurement_sets,
     i.deductions, i.counts, i.by_zone, i.by_process,
     i.reported_status, i.legacy_method
 from inspections i
@@ -302,6 +302,7 @@ def _row_to_inspection(row: Mapping[str, Any]) -> InspectionRow:
         started_at=row["started_at"].isoformat() if row.get("started_at") else None,
         finished_at=row["finished_at"].isoformat() if row.get("finished_at") else None,
         finding_history=row.get("finding_history"),
+        measurement_sets=row.get("measurement_sets"),
         # Шапка письма (T176). Колонки объявлены `not null default ''`, но
         # `or ""` здесь не украшение: историю за прошлые годы зальют программно
         # из чужой выгрузки (D035), и `None` в подписи письма партнёру

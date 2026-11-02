@@ -1,0 +1,8 @@
+.walk-measurements { border-block: 1px solid var(--line); padding-block: 12px; }
+.walk-measurements > summary { cursor: pointer; font-weight: 600; }
+.walk-measurements__field { display: grid; gap: 6px; margin-block: 12px; }
+.walk-measurements__editor, .walk-measurements__product { min-inline-size: 0; border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-block: 12px; }
+.walk-measurements__line { padding-block: 10px; border-block-end: 1px solid var(--line); overflow-wrap: anywhere; }
+.walk-measurements__source { align-items: start; margin-block: 8px; overflow-wrap: anywhere; }
+.walk-measurements .walk-link { margin-inline-end: 12px; margin-block: 8px; }
+.walk-measurements select { max-inline-size: 100%; }
