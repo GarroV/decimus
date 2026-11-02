@@ -281,6 +281,9 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # Языки отчёта страны (`0096`, D640): приложение только читает, пишет вкладка
     # «Страны» под администратором.
     "country_report_langs": {"SELECT"},
+    "mailing_cc": {"SELECT"},
+    "mailing_templates": {"SELECT"},
+    "service_settings": {"SELECT"},
     # Сведения о пиццерии из свода (`0046`): загрузка перезаписывает строку
     # целиком и убирает пропавшие из свода, поэтому полный набор прав.
     "unit_profiles": {"SELECT", "INSERT", "UPDATE", "DELETE"},
@@ -433,6 +436,9 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     # Языки отчёта страны (`0096`, D640): вкладка «Страны» задаёт, правит и
     # сбрасывает к умолчанию (удаление строки).
     "country_report_langs": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+    "mailing_cc": {"SELECT", "INSERT", "DELETE"},
+    "mailing_templates": {"SELECT", "INSERT"},
+    "service_settings": {"SELECT", "INSERT", "UPDATE"},
 }
 
 #: А пишет администратор ровно три колонки, и это главный заслон снятия
