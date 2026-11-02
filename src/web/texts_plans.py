@@ -73,6 +73,11 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "ru": "План вернули. Комментарий УК:",
         "en": "The plan was returned. Comment from the management company:",
     },
+    "plans.returns.label": {"ru": "Возвратов УК", "en": "Returns by the management company"},
+    "plans.returns.hint": {
+        "ru": "Срок плана при возврате не продлевается: просрочка считается до принятия плана УК.",
+        "en": "A return does not extend the plan due date: overdue counts until the plan is accepted.",  # noqa: E501
+    },
     "plans.upload_title": {"ru": "Файл плана", "en": "Plan file"},
     # Шаблон плана и объяснение запроса (#976, ступень 1).
     "plans.ask.title": {"ru": "Что ждём", "en": "What we expect"},

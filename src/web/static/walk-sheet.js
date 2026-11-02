@@ -1959,7 +1959,7 @@
 
   // Имя пометки — из `src/recognize/rules_check.py` (`SERVICE_ASIDE`).
   var ASIDE_FLAG = "служебная-оговорка";
-  var ORDER = ["context", "photos", "words", "item", "reading", "measurements", "level", "text", "comment", "repeat", "danger"];
+  var ORDER = ["context", "photos", "words", "item", "text", "comment", "reading", "measurements", "level", "repeat", "danger"];
 
   function redraw() {
     var names = Array.prototype.slice.call(arguments);
