@@ -7,43 +7,6 @@
 from __future__ import annotations
 
 COUNTRY_TEXTS: dict[str, dict[str, str]] = {
-    "country.contacts.mailing": {
-        "ru": ("Дополнительно: адресаты предписаний и экшн-планов"),
-        "en": ("Advanced: prescription and plan recipients"),
-    },
-    "country.contacts.mailing_hint": {
-        "ru": (
-            "Обычно используется общий список рассылки страны выше. Здесь можно "
-            "задать особый список для предписаний и планов. Пустой особый список "
-            "оставляет «Кому» пустым, без прежних адресов."
-        ),
-        "en": (
-            "The main country mailing list above is used by default. Set a separate"
-            " list for prescriptions and plans only if needed. An empty override "
-            "leaves To blank without fallback."
-        ),
-    },
-    "country.contacts.to": {
-        "ru": "Кому: почты через запятую или с новой строки",
-        "en": "To: emails separated by commas or new lines",
-    },
-    "country.contacts.use": {"ru": "Использовать заданный список", "en": "Use this list"},
-    "country.contacts.reset": {
-        "ru": ("Использовать общий список страны"),
-        "en": ("Use the main country list"),
-    },
-    "country.contacts.empty": {"ru": "Заданный список пуст", "en": "The configured list is empty"},
-    "country.contacts.custom": {
-        "ru": "Используется заданный список, в том числе если он пуст.",
-        "en": "Using the configured list, including when empty.",
-    },
-    "country.contacts.legacy": {
-        "ru": (
-            "По умолчанию — общий список рассылки страны; если он пуст — прежние "
-            "адресаты предписаний."
-        ),
-        "en": ("Using the main country mailing list; if empty, legacy prescription recipients."),
-    },
     "country.contacts.units": {
         "ru": "Пиццерии: адреса и контакты партнёров",
         "en": "Pizzerias: addresses and partner contacts",

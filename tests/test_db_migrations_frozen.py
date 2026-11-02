@@ -434,6 +434,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0115_prescription_findings.sql": (
         "sql1:4f46b9430c9dea057f9760feab3ed2997596ed55640e09eb4bbb8eff93fdc7ea"
     ),
+    "0116_drop_country_mailing_recipients.sql": (
+        "sql1:cfb870117c2fd66754d182a5cdb052a54ec5577b05c343fe900ba1ebdcad8bdf"
+    ),
 }
 
 

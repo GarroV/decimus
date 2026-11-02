@@ -640,12 +640,12 @@ def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
 
 def _default_recipients(country: str) -> str:
     """«Кому» пустой формы: контакты по ДКК страны (D603); нет их — запомненные (D275)."""
-    from src.db import country_mailing_recipients
+    from src.db import country_contacts
 
     try:
-        configured = country_mailing_recipients.effective(country)
+        configured = country_contacts.mailing_to(country)
     except (DbError, ConfigError):
-        # Do not expose old recipients if explicit configuration could not be read.
+        # Do not expose old recipients if the mailing list could not be read.
         logger.warning("Country mailing defaults could not be read")
         return ""
     if configured is not None:

@@ -69,7 +69,6 @@ OAUTH_TEXTS: dict[str, dict[str, str]] = {
         "en": "Sign in to decimus and start the connection again.",
     },
     # --- блок «Подключить Claude» в «Настройках» -----------------------------
-    "users.claude.title": {"ru": "Подключить Claude", "en": "Connect Claude"},
     "users.claude.address": {
         "ru": "Адрес decimus для Claude:",
         "en": "The decimus address for Claude:",

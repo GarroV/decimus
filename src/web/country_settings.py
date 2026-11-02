@@ -26,12 +26,11 @@ from werkzeug.wrappers import Response
 from src.db import (
     agg_store,
     country_contacts,
-    country_mailing_recipients,
     country_report_langs,
     ratings_read,
 )
 from src.db import country_contracts as contracts_db
-from src.db.errors import CountryContractError, DbError, PrescriptionError
+from src.db.errors import CountryContractError, DbError
 from src.db.models import InspectionRow
 from src.domain.errors import ConfigError
 from src.domain.models import TEXT_LANGS
@@ -143,9 +142,6 @@ class Panel:
     contracts: tuple[contracts_db.Contract, ...] = ()
     #: Договор не прочитался — блок об этом говорит, а не рисует «договора нет».
     contracts_failed: bool = False
-    mailing_recipients: str | None = None
-    recipients_failed: bool = False
-    can_recipients: bool = False
     can_units: bool = False
     contacts: tuple[country_contacts.Contact, ...] = ()
     contacts_known: bool = True
@@ -243,17 +239,12 @@ def load(
         "can_langs": can_edit and settings_only,
     }
     if settings_only and show_email:
-        сведения["can_recipients"] = can_edit and guard.may("mailing.manage")
         сведения["can_units"] = can_edit and guard.may("unit.create")
         try:
             сведения["contacts"] = country_contacts.for_country(code)
         except DbError:
             сведения["contacts_known"] = False
             log.warning("Country contact directory is unavailable")
-        try:
-            сведения["mailing_recipients"] = country_mailing_recipients.read(code)
-        except DbError:
-            сведения["recipients_failed"] = True
     сведения["report_langs"], сведения["langs_custom"] = _report_langs(code)
     if not settings_only:
         сведения["aggregators"], сведения["aggregators_failed"] = _aggregators(code)
@@ -348,25 +339,6 @@ def install(app: Flask) -> None:
             log.warning("Языки отчёта страны %s не сохранены", страна, exc_info=True)
             return _back(страна, FAILED)
         return _back(страна, SAVED)
-
-    @app.post(base + "/recipients", endpoint="country_set_recipients")
-    @guard.action("mailing.manage")
-    def set_recipients(code: str) -> Response:
-        country = _checked(code)
-        refuse_foreign_origin()
-        account = auth.current_account()
-        try:
-            country_mailing_recipients.save(
-                country,
-                request.form.get("recipients") or "",
-                actor=account.login if account else "",
-                reset=request.form.get("reset") == "1",
-            )
-        except (PrescriptionError, ValueError):
-            return _back(country, "contacts_invalid")
-        except DbError:
-            return _back(country, FAILED)
-        return _back(country, SAVED)
 
     contract_base = base + "/contract"
 

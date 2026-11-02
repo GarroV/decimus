@@ -16,7 +16,7 @@ from web_harness import СВОЙ, войти, подменить_двери, с�
 
 from src.db import (
     action_plans,
-    country_mailing_recipients,
+    country_contacts,
     prescriptions,
 )
 from src.db import (
@@ -182,7 +182,7 @@ def test_plan_real_preview_and_eml_use_selected_plan_and_configured_recipients(
     monkeypatch.setattr(
         action_plans, "get_request", lambda ident, **_: item if ident == item.id else None
     )
-    monkeypatch.setattr(country_mailing_recipients, "effective", lambda _: "country@example.com")
+    monkeypatch.setattr(country_contacts, "mailing_to", lambda _: "country@example.com")
     path = f"/actions/requests/{item.id}/letter?lang=en"
     result = admin.get(path)
     assert result.status_code == 200 and "Selected plan Batumi-1" in result.get_data(as_text=True)
