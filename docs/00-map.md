@@ -118,7 +118,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -127,11 +127,12 @@ Flask-приложение управляющей компании и партн
 | `src/web/calendar_screen.py` | Раздел «Календарь» (D497): сетка месяца с проверками и поездками (D505, D506) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
 | `src/web/connect_reminder.py` | Напоминание на «Главной»: привяжите бота и подключите Claude (27.10.2026) |
-| `src/web/countries_screen.py` | Вкладка «Страны» раздела «Администрирование» (D640, #1251) |
+| `src/web/countries_screen.py` | Вкладка «Страны» раздела «Администрирование» (D640, D690) |
 | `src/web/country.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
+| `src/web/country_contacts_actions.py` | Validated country-contact writes; HQ administration only, without outbound mail |
 | `src/web/country_filter.py` | Постоянный отбор стран экрана «Страны» (D536): «мне нужен только Кавказ» |
 | `src/web/country_page.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
-| `src/web/country_settings.py` | «Карточка страны» на экране «Страны» (D539, прежде «Настройки страны», D536) и вкладка «Администрирование → Страны» (D640, #1251) |
+| `src/web/country_settings.py` | Карточка страны для чтения и административные формы (D539, D640, D690) |
 | `src/web/country_summary.py` | Сводка экрана «Страны» (D467): цифры периода и девелоперы стран |
 | `src/web/country_units.py` | Строки пиццерий экрана «Страны» (D467): одна строка на пиццерию |
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
@@ -259,6 +260,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
+| `src/web/texts_country_contacts.py` | Country contact directory and read-only references (D690) |
 | `src/web/texts_demo.py` | Тексты открытого демо и лендинга (D524): выбор роли, плашка, посадочная страница |
 | `src/web/texts_dodois.py` | Тексты входов в Dodo IS по странам (D640, #951): блок «Dodo IS» на «Подключениях» и публичная страница входа по ссылке |
 | `src/web/texts_edit.py` | Manual edit history and recoverable, revision-bound edit drafts |
@@ -338,7 +340,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
 | `src/web/templates/administration/` | 10 | _health.html, _nav.html, _ratings_aggregators.html, connections.html, countries.html, dodois.html, keys.html, mailings.html, … (+2) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
-| `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
+| `src/web/templates/country/` | 8 | _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
 | `src/web/templates/dodois/` | 1 | connect.html |
 | `src/web/templates/inspections/` | 11 | _card_body.html, _card_parts.html, _letter_form.html, _panel.html, _panel_fragment.html, _row.html, _split_history.html, card.html, … (+3) |
@@ -438,13 +440,14 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
 | `src/db/agg_store.py` | Оценки в агрегаторах доставки в базе (схема `agg`, миграция 0050) |
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
+| `src/db/country_contacts.py` | Country partner contacts and inspection mail recipients; HQ-only personal data |
 | `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
 | `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
 | `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
@@ -603,6 +606,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0107_inspection_info_photo_answers.sql` | Info and photo metadata are inserted in the same push transaction, so this invariant is checked at commit rather than before the photo INSERT exists |
 | `0108_finding_split_history.sql` | Existing rows and legacy remain NULL; no accepted inspection is rewritten |
 | `0109_service_settings.sql` | (нет описания) |
+| `0110_country_contacts.sql` | Country partner contacts and inspection mailing recipients, private to HQ |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

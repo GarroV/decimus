@@ -1,5 +1,5 @@
 -- D690: contact people and inspection recipients are separate from access spaces.
--- 0109 is reserved for the persisted electronic action-plan switch.
+-- Country partner contacts and inspection mailing recipients, private to HQ.
 -- No historical backfill and no changes to country ownership or DKK contacts.
 create table country_contacts (
     id uuid primary key default gen_random_uuid(),
