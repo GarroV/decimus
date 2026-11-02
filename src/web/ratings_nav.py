@@ -76,11 +76,12 @@ def items(
     lang: str,
     rows: tuple[fresh.Row, ...],
     inspections: bool = False,
+    clients_status: str | None = None,
 ) -> tuple[Item, ...]:
     """Подменю для вошедшего: пункты, адреса с текущим отбором, точки свежести."""
     result = []
     for key in visible(is_hq, inspections=inspections):
-        status = ratings_freshness.section_status(rows, key)
+        status = clients_status if key == CLIENTS else ratings_freshness.section_status(rows, key)
         result.append(
             Item(
                 key=key,

@@ -160,7 +160,12 @@ def replace_rating_periods(
     start: date, stop: date, units: Sequence[str], rows: Sequence[RatingPeriod]
 ) -> int:
     """Заменить оценки РКО и РС у `units` за периоды, начавшиеся между `start` и `stop`."""
-    data = [(r.dodo_id, r.kind, r.period_from, r.period_to, r.rate, r.publish_status) for r in rows]
+    covered = {unit_id(unit) for unit in units}
+    data = [
+        (r.dodo_id, r.kind, r.period_from, r.period_to, r.rate, r.publish_status)
+        for r in rows
+        if unit_id(r.dodo_id) in covered
+    ]
     return _replace_range(_DEL_RATING, _INS_RATING, start, stop, units, data)
 
 
@@ -168,9 +173,11 @@ def replace_checkup_periods(
     start: date, stop: date, units: Sequence[str], rows: Sequence[CheckupPeriod]
 ) -> int:
     """Заменить счёт проверок у `units` за периоды, начавшиеся между `start` и `stop`."""
+    covered = {unit_id(unit) for unit in units}
     data = [
         (r.dodo_id, r.kind, r.period_from, r.period_to, r.checkups, Jsonb(r.by_status))
         for r in rows
+        if unit_id(r.dodo_id) in covered
     ]
     return _replace_range(_DEL_CHECKUP, _INS_CHECKUP, start, stop, units, data)
 

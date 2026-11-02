@@ -275,6 +275,9 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "prescription_replies": {"SELECT", "INSERT"},
     "prescription_events": {"SELECT"},
     "country_recipients": {"SELECT"},
+    # Явные адресаты рассылки страны (`0112`): приложение только читает;
+    # видимость контактов ограничена политикой пространства УК.
+    "country_mailing_recipients": {"SELECT"},
     # Договор страны (`0088`, D603): приложение читает, и то лишь из пространства УК
     # (политика) — почты контактов партнёру не видны. Пишет только администратор.
     "country_contracts": {"SELECT"},
@@ -432,6 +435,8 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "prescription_replies": {"SELECT"},
     "prescription_events": {"SELECT"},
     "country_recipients": {"SELECT"},
+    # УК задаёт адресатов, сохраняет явный пустой список и сбрасывает к наследованию.
+    "country_mailing_recipients": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     # Договор страны (`0088`, D603): строки заводит и снимает УК, правка — по колонкам.
     "country_contracts": {"SELECT", "INSERT", "DELETE"},
     "country_contacts": {"SELECT", "INSERT", "DELETE"},

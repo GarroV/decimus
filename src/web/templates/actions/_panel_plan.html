@@ -45,6 +45,7 @@
       <div class="spanel__score">{{ state_tag(r, today) }}</div>
     </header>
 
+    {% if hq and may('plan.manage') %}<p><a class="sbtn" href="{{ url_for('plan_letter_preview', ident=r.id, lang=lang) }}">{{ t('mailings.content.plan_open') }}</a></p>{% endif %}
     {% if notice %}<div class="note note--ok" role="status"><div class="note__text">{{ notice }}</div></div>{% endif %}
     {% if failure %}<div class="note note--error" role="alert"><div class="note__text">{{ failure }}</div></div>{% endif %}
     {% if returned_note %}

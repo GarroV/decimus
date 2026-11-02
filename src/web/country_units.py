@@ -68,6 +68,7 @@ class UnitRow:
     seats: int | None = None
     #: Почта партнёра из свода: показывается только УК (D375).
     partner_email: str = ""
+    profile_key: str = ""
     #: Последняя проверка ЗА ПЕРИОД экрана; `None` — за период не проверяли.
     last: PointRow | None = None
     #: Дата последней проверки ВООБЩЕ, не за период; `None` — не проверяли ни разу.
@@ -130,6 +131,7 @@ def _from_profile(profile: unit_profiles.Profile) -> dict[str, Any]:
         "area": float(profile.total_area) if profile.total_area is not None else None,
         "seats": profile.seats,
         "partner_email": profile.partner_email or "",
+        "profile_key": profile.name_normalized,
     }
 
 
@@ -273,3 +275,10 @@ def history(
     except DbError:
         log.warning("История проверок пиццерии не прочиталась", exc_info=True)
         return fallback
+
+
+def settings_rows(*, reach: Reach, code: str) -> UnitsData:
+    """Directory and profiles for editing; no ratings, maps or inspection queries."""
+    units = directory.list_units(reach=reach, country=code)
+    profiles = unit_profiles.by_country(code)
+    return UnitsData(rows=build_rows(units, profiles, {}, {}, {}))

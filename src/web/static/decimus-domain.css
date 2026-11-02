@@ -1,4 +1,4 @@
-/* forma dodo/decimus/domain.css sha256:9505608ccc99c1336811bbe343fe722bc8676e7caddd1c16998ab85115fdc350 — не править здесь, правка идёт в GarroV/forma */
+/* forma dodo/decimus/domain.css sha256:1c31fedcbb304a135a950d3a847c46c6e3b1b78b702a0003f67d43b09675d2f8 — не править здесь, правка идёт в GarroV/forma */
 /* ═══════════════════════════════════════════════════════════════════════════
    DECIMUS — слой продукта поверх ядра (слой 3).
    Подключается ПОСЛЕ dodo-ds.css.
@@ -82,3 +82,23 @@
    Переключение между представлениями должно быть явным, поэтому
    партнёрский режим помечает корень, а не отдельные блоки. */
 [data-view="partner"] .internal-only { display: none !important; }
+
+/* Оболочка остаётся на одной координате при смене разделов. Размер формы
+   ограничивается самой формой, а не разной шириной всей страницы. */
+.shell__nav ~ main.shell__main { width: auto; max-width: none; margin: 0; padding: var(--space-9); }
+.sidenav__list { scrollbar-gutter: stable; }
+.sidenav__branch { min-width: 0; }
+.sidenav__branch-toggle { justify-content: flex-start; }
+.sidenav__branch-arrow { display: inline-flex; margin-left: auto; }
+.sidenav__branch-arrow svg { width: 14px; height: 14px; transition: transform var(--t-state) var(--ease); }
+.sidenav__branch-clip { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--t-state) var(--ease); }
+.sidenav__branch-clip > div { min-height: 0; overflow: hidden; }
+html[data-nav-ratings-open="false"] .sidenav__branch-clip,
+html[data-nav-collapsed="true"] .sidenav__branch-clip { grid-template-rows: 0fr; }
+html[data-nav-ratings-open="true"] .sidenav__branch-arrow svg { transform: rotate(90deg); }
+html[data-nav-collapsed="true"] :is(.sidenav__branch-arrow, .sidenav__chev) { display: none; }
+html[data-nav-collapsed="true"] .sidenav__me { justify-content: center; }
+html[data-nav-collapsed="false"] .sidenav__me { justify-content: flex-start; }
+html[data-nav-collapsed="false"] .sidenav__chev { display: inline-flex; }
+@media (max-width: 719px) { .shell__nav ~ main.shell__main { padding: var(--space-7); } }
+@media (prefers-reduced-motion: reduce) { .sidenav__branch-clip, .sidenav__branch-arrow svg { transition: none; } }

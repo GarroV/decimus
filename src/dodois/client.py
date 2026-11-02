@@ -106,15 +106,21 @@ def _open(request: urllib.request.Request) -> Response:
     """Единственный выход в сеть. Ответ любого кода — ответ; сеть упала — `DodoisError`."""
     try:
         with _opener.open(request, timeout=TIMEOUT_SEC) as raw:
-            status, headers, data = raw.status, dict(raw.headers), raw.read(RESPONSE_LIMIT_BYTES)
+            status, headers, data = (
+                raw.status,
+                dict(raw.headers),
+                raw.read(RESPONSE_LIMIT_BYTES + 1),
+            )
     except urllib.error.HTTPError as exc:
         status, headers = exc.code, dict(exc.headers or {})
         try:
-            data = exc.read(RESPONSE_LIMIT_BYTES)
+            data = exc.read(RESPONSE_LIMIT_BYTES + 1)
         except OSError:
             data = b""
     except (urllib.error.URLError, TimeoutError, OSError):
         raise DodoisError(NETWORK) from None
+    if len(data) > RESPONSE_LIMIT_BYTES:
+        raise DodoisError("response_too_large")
     try:
         body = json.loads(data) if data else None
     except ValueError:

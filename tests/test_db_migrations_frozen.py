@@ -422,6 +422,15 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0111_measurement_sets.sql": (
         "sql1:a226e654b55f0087ea05900198beedf45967775b184f06aeccd0bcf1ab4488f7"
     ),
+    "0112_country_mailing_recipients.sql": (
+        "sql1:0d8c010f7d726aa8bbfd8342464f2a2196c54d7d7b5ba67364156077f3d96af0"
+    ),
+    "0113_mailing_content_templates.sql": (
+        "sql1:adb5ddce7680d4ca5768024926a9a7d38af8efa69ba16b1c0936b6940a62586d"
+    ),
+    "0114_service_key_health_lock.sql": (
+        "sql1:53ddbbbda989ae8b3b974d500618b4f3a110961d4341217566ee092b94ed7c29"
+    ),
 }
 
 

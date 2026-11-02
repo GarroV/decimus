@@ -49,6 +49,7 @@ class ProbeRow:
     light: str
     reason: str
     checked_at: datetime
+    _key_fingerprint: bytes | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
