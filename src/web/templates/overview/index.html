@@ -4,8 +4,8 @@
   внутри): «Требует внимания» (доска + «куда смотреть»), итог периода, «Рейтинги»
   (РС, РКО, карты и агрегаторы: колонки по срезу — кластеры, страны кластера, пиццерии страны), «Топ нарушений», потери по процессам (блокам методики, D507).
   Ниже — таблица «Пиццерии» (она и есть список проверок: блока «Последние проверки»
-  нет) и справа от неё панель фильтров: период, кластер, страна, порядок. Фильтры
-  действуют на весь экран, верхний ряд тоже.
+  нет); географические фильтры — слева от рейтингов. Порядок строк относится только к
+  таблице пиццерий. Личные задания показываются по полному охвату вошедшего.
   «Где нужно проверить» живёт в «Проверках», таблицы «Страны» нет.
   Сборка данных — `src/web/home_page.py`;
   в шаблоне ни одного вычисления: проценты и буквы записал движок, средние
@@ -106,7 +106,7 @@
 
   {# ── Верх (D557): фильтры слева, справа — большой блок кластеров: РС, РКО, карты, агрегаторы. #}
   <div class="hm-top">
-    {# ── Фильтры (D557): слева вверху, действуют на весь экран, включая блоки ниже. На телефоне —
+    {# ── Фильтры (D557): слева вверху, сужают данные по географии, личные задания остаются. На телефоне —
           свёрнутым блоком «Фильтры» (флажок без JS). #}
     <aside class="hm-filters" aria-label="{{ t('home.filters.title') }}">
       <input class="hm-filters__flag" type="checkbox" id="hm-filters-flag">
@@ -131,10 +131,6 @@
             {{ pick(country_pick) }}
           </div>
         {% endif %}
-        <div class="hm-field">
-          <span class="hm-field__label">{{ t('overview.sort') }}</span>
-          {{ pick(sort_pick) }}
-        </div>
         {# Вход на экран страны — только у УК и только при выбранной стране. #}
         {% if only_country and country_url %}<a class="hm-more hm-filters__open" href="{{ country_url(only_country) }}">{{ t('home.countries.open', country=country_title(only_country)) }} →</a>{% endif %}
         <p class="hm-filters__note">{{ t('home.filters.note') }}</p>
@@ -298,6 +294,10 @@
       <header class="hm-card__head">
         <h2 class="hm-label">{{ t('home.units.title') }}</h2>
         <span class="hm-meta">{{ data.points|length }}</span>
+        <div class="hm-card__tools hm-field">
+          <span class="hm-field__label">{{ t('home.units.sort') }}</span>
+          {{ pick(sort_pick) }}
+        </div>
         {% if ratings_failed %}<span class="hm-meta">{{ t('home.ratings.failed') }}</span>{% endif %}
       </header>
       {% if data.points %}

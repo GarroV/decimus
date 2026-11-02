@@ -1031,3 +1031,60 @@ def test_девелопер_у_ук_сужает_выборку_до_своих_
     # Assert
     assert t_ru("home.filters.developer") in страница
     assert set(охваты[0] or ()) == {"RS", "TR"}
+
+
+@pytest.mark.parametrize("lang", ["ru", "en"])
+def test_home_sort_belongs_to_inspection_table_not_geography_or_ratings(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, lang: str
+) -> None:
+    calls: dict[str, object] = {}
+
+    def load(**kwargs: object) -> ov.Overview:
+        calls["selection"] = kwargs["selection"]
+        return снимок()
+
+    def ratings(**kwargs: object) -> home_ratings_block.Block:
+        calls["ratings_sort"] = kwargs.get("sort", "score")
+        return home_ratings_block.Block()
+
+    monkeypatch.setattr(overview_data, "load", load)
+    monkeypatch.setattr(home_ratings_block, "load", ratings)
+    response = стенд.get(f"/overview?sort=date&lang={lang}")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    filters = page.split('<aside class="hm-filters"', 1)[1].split("</aside>", 1)[0]
+    units = page.split('<section class="hm-card hm-units">', 1)[1]
+    assert "sort=" not in filters
+    assert _t("home.units.sort", lang) in units
+    assert _t("home.units.sort.date", lang) in units
+    assert calls["selection"].sort == "date"  # type: ignore[union-attr]
+    assert calls["ratings_sort"] == "score"
+    assert _t("overview.sort.score", lang) not in page
+
+
+@pytest.mark.parametrize("lang", ["ru", "en"])
+def test_home_geography_keeps_personal_tasks_in_full_reach(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, lang: str
+) -> None:
+    _справочник_стран(monkeypatch)
+    calls: dict[str, object] = {}
+
+    def load(**kwargs: object) -> ov.Overview:
+        calls["data_reach"] = kwargs["reach"]
+        return снимок()
+
+    def counts(reach: object, *args: object, **kwargs: object) -> home_board.Counts:
+        calls["board_reach"] = reach
+        return home_board.Counts(review=3)
+
+    monkeypatch.setattr(overview_data, "load", load)
+    monkeypatch.setattr(home_board, "load_counts", counts)
+    response = стенд.get(f"/overview?cluster=CEE&country=RS&lang={lang}")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert set(calls["data_reach"].countries or ()) == {"RS", "GE"}  # type: ignore[union-attr]
+    assert calls["board_reach"].countries is None  # type: ignore[union-attr]
+    assert _t("home.board.review.title", lang, count=3) in page
+    assert _t("home.filters.note", lang) in page
+    expected = "Личные задания" if lang == "ru" else "Personal tasks"
+    assert expected in page
