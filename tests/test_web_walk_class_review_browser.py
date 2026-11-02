@@ -123,7 +123,8 @@ def test_failed_class_check_can_retry_directly_from_save_area(browser_page):
 PENDING_SEARCH = """() => {
   const W=DecimusWalk, post=W.post;
   W.post=(url,body,...args)=>{
-    if (url==='hint') return Promise.resolve({ok:true,body:{candidates:cards.slice(0,1).map(c=>({...c}))}});
+    if (url==='hint') return Promise.resolve(
+      {ok:true,body:{candidates:cards.slice(0,1).map(c=>({...c}))}});
     if (url==='suggest') return new Promise(resolve=>{
       window.finishSearch=()=>resolve({ok:true,body:{candidates:cards.slice(0,1).map(c=>({...c}))}});
     });
