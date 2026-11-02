@@ -660,6 +660,21 @@
     toggleForm(pending, buttonFor(pending), true);
   }, true);
 
+  // Enter confirms the current record through its normal submit/validation path.
+  // Shift+Enter keeps a newline; IME completion and item/photo controls stay native.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey ||
+        e.isComposing || e.keyCode === 229) return;
+    var field = e.target;
+    if (!field.matches || !field.matches('textarea[name="text"], input[name="reading_c"]')) return;
+    var form = field.closest("form[data-proofread-form]");
+    if (!form) return;
+    e.preventDefault();
+    var submit = form.querySelector('button[type="submit"]');
+    if (e.repeat || !submit || submit.disabled) return;
+    form.requestSubmit(submit);
+  });
+
   // ── Отправка и возврат формы после отказа ──────────────────────────────────
   document.addEventListener("submit", function (e) {
     var form = e.target;
