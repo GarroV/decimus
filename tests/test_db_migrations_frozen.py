@@ -413,6 +413,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0108_finding_split_history.sql": (
         "sql1:fae2c3f06273b3dc9ff227c62a12decef0eea32430c36769465d7bc91489e012"
     ),
+    "0109_service_settings.sql": (
+        "sql1:d17b20f0be54e2d3229ffedabbced9c347c2fec4454c334bdad061e495a80667"
+    ),
 }
 
 
