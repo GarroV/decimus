@@ -21,6 +21,8 @@
   // Скрипты экрана, уже выполненные на этой странице. Список, а не поиск
   // тега: тег уходит вместе со старым `<main>`, а скрипт остаётся в памяти.
   var loaded = {};
+  // A slower response must not undo the section selected more recently.
+  var navigation = 0;
   function remember() { root.dataset.navPath = location.pathname; }
   function storeRailScroll() {
     var rail = document.querySelector(".sidenav__list");
@@ -113,22 +115,36 @@
   }
 
   function go(url, push) {
+    var current = ++navigation;
     return fetch(url, { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
       .then(function (r) {
         if (!r.ok || r.redirected) throw new Error("status " + r.status);
         return r.text();
       })
       .then(function (html) {
+        if (current !== navigation) return null;
         var doc = new DOMParser().parseFromString(html, "text/html");
         if (hasPageHeadScripts(doc)) throw new Error("head scripts");
         return ensureStyles(doc).then(function () { return doc; });
       })
       .then(function (doc) {
-        var swap = function () { if (!apply(doc, url, push)) throw new Error("layout"); };
-        if (document.startViewTransition) document.startViewTransition(swap);
-        else swap();
+        if (!doc || current !== navigation) return;
+        var swap = function () {
+          if (current !== navigation) return;
+          if (!apply(doc, url, push)) throw new Error("layout");
+        };
+        if (document.startViewTransition) {
+          var transition = document.startViewTransition(swap);
+          // Skipping an animation is harmless; a failed DOM update still falls back.
+          transition.ready.catch(function () {});
+          transition.finished.catch(function () {});
+          return transition.updateCallbackDone;
+        }
+        swap();
       })
-      .catch(function () { window.location.assign(url); });
+      .catch(function () {
+        if (current === navigation) window.location.assign(url);
+      });
   }
 
   document.addEventListener("click", function (event) {
@@ -146,6 +162,7 @@
   // Назад и вперёд между разделами. Шаги внутри одного экрана (панель
   // «Методики» меняет только параметры адреса) — дело самого экрана.
   window.addEventListener("popstate", function () {
+    ++navigation;
     if (location.pathname === root.dataset.navPath) return;
     go(location.href, false);
   });
