@@ -236,6 +236,23 @@
   /** Новое нарушение без выбранного пункта: пункт ищет система (D330). */
   function recognizing() { return !f.n && f.mode === "violation"; }
 
+  // Existing records opt into the full criterion protocol only by selecting a group.
+  function reviewing() {
+    return recognizing() || !!(f && f.n && f.mode === "violation" && W.measurementSets &&
+      W.measurementSets.context(f, f.code, f.zone).enabled);
+  }
+
+  function syncMeasurementEditMode() {
+    if (!f || !f.n) return;
+    if (reviewing() && !f.measurementReviewActive) {
+      f.manualLevelBeforeMeasurement = f.level;
+      f.measurementReviewActive = true;
+    } else if (!reviewing() && f.measurementReviewActive) {
+      f.level = f.manualLevelBeforeMeasurement || f.original.level;
+      f.measurementReviewActive = false;
+    }
+  }
+
   /** Что мешает спросить систему: без кадра нарушение не разбирается (D078). */
   function findBlocker() {
     if (!readyPhotos().length) return missingPhoto();
@@ -283,7 +300,11 @@
   }
 
   function saveDraft() {
-    if (f.n) { if (W.editDraft) W.editDraft.save(f); return; }
+    if (f.n) {
+      if (reviewing()) f.editClassFacts = classFactDrafts();
+      if (W.editDraft) W.editDraft.save(f);
+      return;
+    }
     W.local.set(draftKey(), Object.assign({}, W.local.get(draftKey()) || {}, {
       run_id: f.run_id, mode: f.mode, zone: f.zone, code: f.code,
       level: f.level || f.legacyLevel || null, text: f.text,
@@ -296,6 +317,7 @@
   }
 
   function changed() {
+    syncMeasurementEditMode();
     syncClassSelections();
     saveDraft();
     if (W.tg && W.supports("6.2")) {
@@ -652,9 +674,6 @@
     // Основной стала одна пара «пункт + зона»; другие зоны остаются в «тоже».
     f.also = f.also.filter(function (c) { return !isPrimary(c); });
     if (recognizing() && !i.measure && !i.note) {
-      var review = classState(primaryClassCandidate());
-      review.key = null;
-      review.manualMode = false;
       f.level = null;
       f.legacyLevel = null;
     } else {
@@ -1066,6 +1085,15 @@
     if (assignmentEnabled()) return assignmentReady(cand) ? assignedPhotos(cand) : null;
     return readyPhotos().map(function (p) { return p.ref; }).filter(function (ref, i, all) { return all.indexOf(ref) === i; });
   }
+  function classFactsBinding(cand) {
+    var primary = classIsPrimary(cand);
+    var zone = primary ? f.zone : extraZone(cand);
+    var measurement = W.measurementSets && W.measurementSets.context(f, cand.code, zone);
+    return {run_id:f.run_id, source_revision:f.n ? f.editRevision || f.source_record.revision : null,
+      code:cand.code, zone:zone || null, checklist_version:W.state.data.checklist_version,
+      words:primary ? f.words.trim() : "", photos:classPhotoRefs(cand),
+      measurement_scope:measurement && measurement.enabled ? measurement.key : null};
+  }
   function restoreClassFacts(cand, state) {
     if (state.factsEdited || state.restoredEntry) return;
     var primary = cand === f.picked || cand === f.manualPhotoCandidate;
@@ -1073,13 +1101,18 @@
     var refs = classPhotoRefs(cand);
     if (!zone || refs === null) return;
     var words = primary ? f.words.trim() : "";
+    var binding = classFactsBinding(cand);
     var saved = (f.savedClassFacts || []).filter(function (entry) {
-      return entry.code === cand.code && entry.zone === zone && entry.words === words &&
+      var bound = entry.run_id === binding.run_id && entry.source_revision === binding.source_revision &&
+        entry.measurement_scope === binding.measurement_scope;
+      var legacy = !f.n && !binding.measurement_scope && !entry.measurement_scope && entry.run_id === undefined;
+      return (bound || legacy) && entry.code === cand.code && entry.zone === zone && entry.words === words &&
         entry.checklist_version === W.state.data.checklist_version &&
         JSON.stringify(entry.photos) === JSON.stringify(refs);
     });
     if (saved.length !== 1) return;
     state.restoredEntry = saved[0];
+    state.factDraftBinding = binding;
     state.answer = typeof saved[0].answer === "string" ? saved[0].answer : "";
     state.clarifications = Array.isArray(saved[0].clarifications) ? saved[0].clarifications.filter(function (pair) {
       return pair && typeof pair.question === "string" && typeof pair.answer === "string";
@@ -1101,20 +1134,22 @@
   }
   function classFactDrafts() {
     var facts = (f.savedClassFacts || []).slice();
-    if (!recognizing() || !f.code) return facts;
+    if (!reviewing() || !f.code) return facts;
     var candidates = (f.found || []).filter(function (cand) { return !!cand.classReview; });
     if (f.code && candidates.indexOf(primaryClassCandidate()) === -1) candidates.push(primaryClassCandidate());
     candidates.forEach(function (cand) {
       var state = classState(cand);
       var primary = classIsPrimary(cand);
-      var zone = primary ? f.zone : extraZone(cand);
       var reading = primary ? f.reading : state.reading;
-      if (!state.textEdited && !state.answer && !state.additionalWords && !state.clarifications.length && (reading == null || !String(reading).trim())) return;
-      var entry = { code:cand.code, zone:zone || null, checklist_version:W.state.data.checklist_version, answer:state.answer, reading:reading,
-        words:primary ? f.words.trim() : "", photos:classPhotoRefs(cand),
+      if (!state.textEdited && !state.answer && !state.additionalWords && !state.clarifications.length && (reading == null || !String(reading).trim())) {
+        if (state.restoredEntry) facts = facts.filter(function (old) {return old !== state.restoredEntry;});
+        return;
+      }
+      if (!state.factDraftBinding) state.factDraftBinding = classFactsBinding(cand);
+      var entry = Object.assign({}, state.factDraftBinding, {answer:state.answer, reading:reading,
         human_text:state.textEdited ? state.humanText : null, additional_words:state.additionalWords, clarifications:state.clarifications, answer_question:state.answerQuestion, clarification_scope:state.clarificationScope,
         reading_source:primary ? f.readingSource : state.readingSource,
-        reading_confirmed:primary ? !!f.readingConfirmed : !!state.readingConfirmed };
+        reading_confirmed:primary ? !!f.readingConfirmed : !!state.readingConfirmed });
       // Preserve ambiguous/unmatched facts instead of moving them to another item.
       if (state.restoredEntry) facts = facts.filter(function (old) { return old !== state.restoredEntry; });
       var same = facts.some(function (old) { return JSON.stringify(old) === JSON.stringify(entry); });
@@ -1125,7 +1160,7 @@
   function primaryClassCandidate() { return primaryPhotoCandidate(); }
   function classIsPrimary(cand) { return cand === primaryClassCandidate(); }
   function selectedClassCandidates() {
-    if (!recognizing() || !f.code) return [];
+    if (!reviewing() || !f.code) return [];
     return [primaryClassCandidate()].concat(extras());
   }
   function classReading(cand) {
@@ -1152,12 +1187,24 @@
       reading_c: reading.confirmed ? reading.value : null,
       reading_confirmed: reading.value !== null && reading.confirmed };
     if (body.reading_c !== null) body.reading_source = reading.source;
+    var measurement = W.measurementSets ? W.measurementSets.context(f, cand.code, zone) : null;
+    var currentTarget = f.n ? (W.state.data.zones || []).reduce(function (all, z) {return all.concat(z.recorded || []);}, [])
+      .find(function (record) {return record.n === f.n;}) : null;
+    var editSource = f.n ? {n:f.n, expected:f.editRevision || f.source_record.revision,
+      current:currentTarget && currentTarget.revision || null} : null;
+    if (measurement && measurement.selected) {
+      body.measurement_set_id = measurement.selected.id;
+      body.measurement_set_revision = measurement.selected.revision;
+    }
     var scope = JSON.stringify({run:f.run_id, edition:body.checklist_version, code:cand.code, zone:zone || null,
-      words:words, photos:photos, reading:reading, assigned:confirmed});
+      words:words, photos:photos, reading:reading, assigned:confirmed,
+      measurement:measurement && measurement.enabled ? measurement.key : null, editSource:editSource});
     var total = words.length + chain.reduce(function (n, pair) {return n + pair.question.length + pair.answer.length;}, 0);
     var blocked = "";
-    if ((chain.length || state.answerQuestion) && state.clarificationScope && state.clarificationScope !== scope) blocked = tx("walk.sheet.class_review.review_changed");
+    if (editSource && editSource.expected !== editSource.current) blocked = tx("walk.measurement.target_changed");
+    else if ((chain.length || state.answerQuestion) && state.clarificationScope && state.clarificationScope !== scope) blocked = tx("walk.sheet.class_review.review_changed");
     else if (f.run_id !== W.state.data.run_id) blocked = tx("walk.sheet.class_review.context_changed");
+    else if (measurement && measurement.blocked) blocked = tx(measurement.blocked);
     else if (!zone) blocked = tx("walk.sheet.need_zone");
     else if (!confirmed || uploading() || waitingPhotos().length) blocked = tx("walk.sheet.photo_assignment.need");
     else if (reading.raw != null && String(reading.raw).trim() && reading.value === null) blocked = tx("walk.err.reading");
@@ -1166,20 +1213,24 @@
     else if (photos.length > 10) blocked = tx("walk.sheet.class_review.photos_limit");
     return { body: body, scope:scope, total:total, levels: (item(cand.code) || {levels: []}).levels,
       key: JSON.stringify({body: body, reading: reading, assigned: confirmed, search: f.findId || 0,
-        currentRun: W.state.data.run_id, blocked: blocked}), blocked: blocked };
+        currentRun: W.state.data.run_id, measurement:measurement && measurement.enabled ? measurement.key : null,
+        editSource:editSource, blocked: blocked}), blocked: blocked };
   }
   function classSaveContext(cand) {
     var body = classContext(cand).body;
-    if (!body.clarifications.length) return null;
-    return {clarifications:body.clarifications, run_id:body.run_id, checklist_version:body.checklist_version,
+    var measurement = classState(cand).measurementContext;
+    if (!body.clarifications.length && !measurement) return null;
+    var result = {clarifications:body.clarifications, run_id:body.run_id, checklist_version:body.checklist_version,
       code:body.code, zone:body.zone, photo_refs:body.photos};
+    if (measurement) result.measurement_context = measurement;
+    return result;
   }
   function classSaveWords(cand) {
     var body = classContext(cand).body;
     return [body.words].concat(body.clarifications.map(function (pair) {return pair.answer;})).filter(Boolean).join("\n");
   }
   function syncClassSelections() {
-    if (!f || !recognizing() || !f.code) return;
+    if (!f || !reviewing() || !f.code) return;
     selectedClassCandidates().forEach(function (cand) {
       W.classReview.sync(classState(cand), classContext(cand));
     });
@@ -1187,16 +1238,16 @@
     f.level = primary && primary.measure ? "D0" : classState(primaryClassCandidate()).level;
   }
   function classSelectionChanged() {
-    if (!f || !recognizing()) return;
+    if (!f || !reviewing()) return;
     syncClassSelections();
     updateClassPanels();
     saveDraft();
   }
   function classSelected(cand) {
-    return !!f && recognizing() && !!f.code &&
+    return !!f && reviewing() && !!f.code &&
       (cand === primaryClassCandidate() || extras().indexOf(cand) !== -1);
   }
-  function requestClass(cand) {
+  function requestClass(cand, force) {
     if (!classSelected(cand) || (item(cand.code) || {}).measure || (classIsPrimary(cand) && taken())) return;
     var form = f;
     var context = classContext(cand);
@@ -1219,10 +1270,10 @@
       updateClassPanels();
       changed();
       redraw("repeat", "footer");
-    });
+    }, force);
   }
   function classBlocker() {
-    if (!recognizing() || !f.code) return null;
+    if (!reviewing() || !f.code) return null;
     if (f.run_id !== W.state.data.run_id) return "walk.sheet.class_review.context_changed";
     syncClassSelections();
     var candidates = selectedClassCandidates();
@@ -1232,7 +1283,11 @@
       if (reading.raw != null && String(reading.raw).trim() && reading.value === null) return "walk.err.reading";
       if (classContext(cand).total > 1000 || classContext(cand).body.clarifications.length > 6) return "walk.sheet.class_review.facts_limit";
       if (classContext(cand).blocked === tx("walk.sheet.class_review.review_changed")) return "walk.sheet.class_review.review_changed";
+      if (classContext(cand).blocked === tx("walk.measurement.target_changed")) return "walk.measurement.target_changed";
       if (reading.value !== null && !reading.confirmed) return "walk.sheet.class_review.confirm_reading";
+      var measurement = W.measurementSets && W.measurementSets.context(f, cand.code, classIsPrimary(cand) ? f.zone : extraZone(cand));
+      if (measurement && measurement.enabled && measurement.blocked) return measurement.blocked;
+      if (measurement && measurement.enabled && !classState(cand).measurementContext) return "walk.measurement.need_check";
       if ((item(cand.code) || {}).measure || (classIsPrimary(cand) && taken())) continue;
       if (!classState(cand).level) return "walk.sheet.class_review.need_class";
     }
@@ -1269,6 +1324,7 @@
     if (classContext(cand).blocked === tx("walk.sheet.class_review.review_changed")) {
       feedback.appendChild(W.button("walk-link", tx("walk.sheet.class_review.reaffirm"), function () {
         state.clarificationScope = classContext(cand).scope;
+        state.factDraftBinding = null;
         state.factsEdited = true;
         classSelectionChanged();
         redraw("item", "level", "footer");
@@ -1293,6 +1349,7 @@
           state.answerQuestion = entry.answer_question || "";
           state.clarifications = entry.clarifications || [];
           state.clarificationScope = classContext(cand).scope;
+          state.factDraftBinding = null;
           state.factsEdited = true;
           classSelectionChanged();
           redraw("item", "level", "footer");
@@ -1366,6 +1423,21 @@
     label.appendChild(el("p", "walk-form__hint", tx("walk.sheet.text_model_review")));
     return label;
   }
+  function measurementPanel(cand) {
+    if (!W.measurementSets) return null;
+    var code = cand.code, zone = classIsPrimary(cand) ? f.zone : extraZone(cand);
+    var known = item(code);
+    if (!zone || !known || !known.levels.some(function (lv) {return /^D[1-3]$/.test(lv);})) return null;
+    var form = f;
+    return W.measurementSets.panel({form:form, code:code, zone:zone,
+      current:function () {return f === form && W.state.data.run_id === form.run_id;},
+      changed:function (render) {
+        if (f !== form) return;
+        changed(); updateClassPanels();
+        if (render) redraw("measurements", "level", "item", "repeat", "footer");
+        else redraw("footer");
+      }});
+  }
   function classReviewBox(cand) {
     if ((item(cand.code) || {}).measure) {
       var info = section(tx("walk.sheet.level"));
@@ -1382,7 +1454,10 @@
     feedback.setAttribute("data-class-feedback", "");
     feedback.setAttribute("role", "status");
     box.appendChild(feedback);
-    if (!classIsPrimary(cand)) {addExtraReadingControls(box, cand); box.appendChild(extraTextEditor(cand));}
+    if (!classIsPrimary(cand)) {
+      addExtraReadingControls(box, cand); box.appendChild(extraTextEditor(cand));
+      var manager = measurementPanel(cand); if (manager) box.appendChild(manager);
+    }
     var label = el("label", "walk-form__hint", tx("walk.sheet.class_review.facts"));
     var facts = el("textarea", "walk-area walk-class-review__facts");
     facts.rows = 2;
@@ -1394,6 +1469,7 @@
         state.clarificationScope = classContext(cand).scope;
       }
       state.answer = facts.value;
+      state.factDraftBinding = null;
       state.factsEdited = true;
       classSelectionChanged();
       redraw("repeat", "footer");
@@ -1402,7 +1478,7 @@
     box.appendChild(label);
     var check = W.button("walk-link", tx("walk.sheet.class_review.check"), function () {
       state.manualMode = false;
-      requestClass(cand);
+      requestClass(cand, true);
       redraw("item", "level", "footer");
     });
     check.setAttribute("data-class-check", "");
@@ -1515,7 +1591,12 @@
       card.appendChild(W.button("walk-link", tx("walk.sheet.change"), itemMenu));
       box.appendChild(card);
       var t = taken();
-      if (t) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.taken", { n: t.n })));
+      if (t) {
+        box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.taken", { n: t.n })));
+        box.appendChild(W.button("walk-link", tx("walk.measurement.open_existing"), function () {
+          saveDraft(); open({record:t, zone:f.zone});
+        }));
+      }
       var v = isAdvice() && !f.n ? violationHere() : null;
       if (v) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.advice_has_violation", { n: v.n })));
       return box;
@@ -1596,10 +1677,15 @@
       return box;
     },
 
+    measurements: function () {
+      if (!f.code || isMeasure() || isAdvice()) return null;
+      return measurementPanel(primaryClassCandidate());
+    },
+
     level: function () {
       var it = item(f.code);
       if (!it || isMeasure() || isAdvice() || taken()) return null;
-      if (recognizing()) return classReviewBox(primaryClassCandidate());
+      if (reviewing()) return classReviewBox(primaryClassCandidate());
       var box = section(tx("walk.sheet.level"));
       if (it.levels.length === 1) {
         box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", { level: it.levels[0] })));
@@ -1808,13 +1894,18 @@
     }
     box.appendChild(W.button("walk-link", tx("walk.sheet.pick_manual"), itemMenu));
     var t = taken();
-    if (t) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.taken", { n: t.n })));
+    if (t) {
+      box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.taken", { n: t.n })));
+      box.appendChild(W.button("walk-link", tx("walk.measurement.open_existing"), function () {
+        saveDraft(); open({record:t, zone:f.zone});
+      }));
+    }
     return box;
   }
 
   // Имя пометки — из `src/recognize/rules_check.py` (`SERVICE_ASIDE`).
   var ASIDE_FLAG = "служебная-оговорка";
-  var ORDER = ["context", "photos", "words", "item", "text", "comment", "reading", "level", "repeat", "danger"];
+  var ORDER = ["context", "photos", "words", "item", "text", "comment", "reading", "measurements", "level", "repeat", "danger"];
 
   function redraw() {
     var names = Array.prototype.slice.call(arguments);
@@ -1898,6 +1989,12 @@
     if (refs.length || f.removed.length) {
       edit.new_refs = refs;
       edit.remove_photos = f.removed.slice();
+      any = true;
+    }
+    if (reviewing()) {
+      edit.level = f.level;
+      edit.words = classSaveWords(primaryClassCandidate());
+      edit.class_context = classSaveContext(primaryClassCandidate()) || undefined;
       any = true;
     }
     if (!any) return [];
@@ -2178,6 +2275,7 @@
     if (f.contextZone && f.draftKey !== W.state.data.key + "_draft" && W.offline.register) {
       f.unregisterDraft = W.offline.register(f.draftKey, {uploaded: adopt, failed: uploadFailed});
     }
+    syncMeasurementEditMode();
     build();
     restoreWaiting();
     if (f.n && W.editDraft) {

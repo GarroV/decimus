@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var W = window.DecimusWalk;
-  var fields = ["mode", "zone", "code", "level", "text", "comment", "repeat", "reading", "readingSource", "readingConfirmed"];
+  var fields = ["mode", "zone", "code", "level", "text", "comment", "repeat", "reading", "readingSource", "readingConfirmed", "words"];
   function id() {
     var bytes = new Uint8Array(16); window.crypto.getRandomValues(bytes);
     return Array.from(bytes).map(function (n) { return n.toString(16).padStart(2, "0"); }).join("");
@@ -19,6 +19,7 @@
   }
   function apply(form, draft) {
     fields.forEach(function (key) { if (Object.prototype.hasOwnProperty.call(draft.values, key)) form[key] = draft.values[key]; });
+    form.savedClassFacts = Array.isArray(draft.class_facts) ? draft.class_facts : [];
     form.commentOpen = !!form.comment;
     var refs = form.source_record.photos.map(function (p) {return p.ref;});
     form.removed = (draft.removed || []).filter(function (ref) {return refs.indexOf(ref) !== -1;});
@@ -63,10 +64,16 @@
   function save(form) {
     if (!form.editRevision) return;
     var values = {};
-    fields.forEach(function (key) {if (form[key] !== undefined) values[key] = form[key];});
+    fields.forEach(function (key) {
+      if (key === "level" && form.measurementReviewActive) {
+        // A model proposal is never a restored manual choice or a saved result.
+        values.level = form.manualLevelBeforeMeasurement || form.original.level;
+      } else if (form[key] !== undefined) values[key] = form[key];
+    });
     var old = W.local.get(form.draftKey) || {};
     W.local.set(form.draftKey, Object.assign({}, old, {
       run_id:form.run_id, n:form.n, source_revision:form.editRevision, values:values,
+      class_facts:form.editClassFacts || form.savedClassFacts || [],
       removed:form.removed.slice(), photos:form.photos.filter(function (p) {return p.fresh && p.ref;}).map(function (p) {return p.ref;}),
       pending:form.photos.filter(function (p) {return p.fresh;}).map(function (p) {return {id:p.entryId || null, ref:p.ref || null, receiptIds:p.receiptIds || []};}),
       request_id:form.editRequestId || null, request_signature:form.editSignature || null, recovery_keys:form.editRecoveryKeys || [],
@@ -157,6 +164,14 @@
       item.appendChild(W.el("summary", "", (v.code || "")+" · "+(v.level || "")+" · "+(v.zone || "")));
       item.appendChild(W.el("p", "", v.text || ""));
       if (v.comment) item.appendChild(W.el("p", "", v.comment));
+      if (Array.isArray(d.class_facts) && d.class_facts.length) {
+        item.appendChild(W.el("p", "", W.tx("walk.sheet.class_review.saved_facts")));
+        d.class_facts.forEach(function (fact) {
+          item.appendChild(W.el("pre", "", [fact.additional_words, fact.answer_question, fact.answer]
+            .concat((fact.clarifications || []).map(function (pair) {return pair.question + "\n" + pair.answer;}))
+            .filter(Boolean).join("\n")));
+        });
+      }
       if (v.reading !== null && v.reading !== undefined) item.appendChild(W.el("p", "", String(v.reading)+" °C"));
       item.appendChild(W.el("p", "", W.tx("walk.edit.removed", {n:(d.removed || []).length})));
       item.appendChild(W.el("p", "", W.tx("walk.edit.pending", {n:(d.pending || []).length})));

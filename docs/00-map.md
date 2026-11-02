@@ -361,7 +361,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 72 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+64) |
+| `src/web/static/` | 74 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+66) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -607,6 +607,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0108_finding_split_history.sql` | Existing rows and legacy remain NULL; no accepted inspection is rewritten |
 | `0109_service_settings.sql` | (нет описания) |
 | `0110_country_contacts.sql` | Country partner contacts and inspection mailing recipients, private to HQ |
+| `0111_measurement_sets.sql` | Existing inspection RLS and finalized-row protection apply to this column |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -925,6 +926,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/kinds.py` | Вид проверки: код — сущность, слово — перевод (T152, задача #123) |
 | `src/domain/letter_template.py` | Шаблон письма партнёру: слоты, подстановки-блоки и проверка текста (D550, D608, #977, #1130) |
 | `src/domain/log_ids.py` | Идентификаторы людей и пространств в журнале — меткой, а не как есть (F-015) |
+| `src/domain/measurement_sets.py` | Human-confirmed product measurements grouped by explicit line and physical zone |
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
 | `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |

@@ -13,6 +13,7 @@ from src.domain.config import check_environment
 from src.domain.criteria import CriteriaUnavailable, item_criteria
 from src.domain.errors import DomainError, ValidationError
 from src.domain.handover import HandedOverError
+from src.domain.measurement_sets import MeasurementSetConflict
 from src.domain.model_usage import KIND_SUGGEST, usage_scope
 from src.recognize.errors import RecognizeError
 from src.recognize.selected_level import (
@@ -21,6 +22,7 @@ from src.recognize.selected_level import (
     UnconfirmedReading,
     evaluate_selected_level,
     prepare_selected_level,
+    recheck_measurement_scope,
 )
 from src.recognize.timing import collect, measure
 
@@ -137,6 +139,8 @@ def install(
                     reading_c=reading_of(body),
                     reading_confirmed=body.get("reading_confirmed") is True,
                     reading_source=body.get("reading_source"),
+                    measurement_set_id=body.get("measurement_set_id"),
+                    measurement_set_revision=body.get("measurement_set_revision"),
                 )
             if prepared.item.run_id != body["run_id"]:
                 return refused("run_changed", "walk.err.run_changed", lang, 409)
@@ -158,9 +162,12 @@ def install(
                 if state.checklist_version != prepared.item.checklist_version:
                     return refused("context_changed", "walk.level.changed", lang, 409)
                 current = item_criteria(who, code)
+                recheck_measurement_scope(prepared, state)
             if current != prepared.item:
                 return refused("context_changed", "walk.level.changed", lang, 409)
             return jsonify(result), 200
+        except MeasurementSetConflict:
+            return refused("measurement_set_changed", "walk.level.changed", lang, 409)
         except MissingFacts:
             return refused("missing_facts", "walk.level.missing_facts", lang)
         except UnconfirmedReading:

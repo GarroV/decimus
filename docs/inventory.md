@@ -595,6 +595,7 @@
 | `0108_finding_split_history.sql` | — |
 | `0109_service_settings.sql` | `service_settings` |
 | `0110_country_contacts.sql` | `country_contacts` |
+| `0111_measurement_sets.sql` | — |
 <!-- map:end -->
 
 ## Makefile

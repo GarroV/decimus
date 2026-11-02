@@ -71,3 +71,20 @@ test('lost successful edit reload uses server request history, preserving later 
   const old=W.local.get(first.draftKey);old.values.text='Additional unsaved edit';W.local.set(first.draftKey,old);
   fresh=form(updated);W.editDraft.init(fresh,updated);assert.equal(fresh.editCompleted.length,0);assert.equal(fresh.editRecovery.length,1);
 });
+test('edit draft keeps only scoped human class facts and source words, never a restored model class',()=>{
+  const {W,record,form,storage}=fixture();let f=form();W.editDraft.init(f,record);
+  const human={run_id:'run-a',source_revision:record.revision,code:'CLN05',zone:'hot_kitchen',
+    words:'Original human observation',photos:['old'],measurement_scope:'synthetic-full-scope',
+    answer:'Unsent human answer',answer_question:'Synthetic question?',
+    clarifications:[{question:'Earlier question?',answer:'Earlier human answer'}],
+    additional_words:'Additional human fact',clarification_scope:'synthetic-clarification-scope'};
+  f.words='Original human observation';f.editClassFacts=[human];f.measurementReviewActive=true;
+  f.original={level:'D1'};f.manualLevelBeforeMeasurement='D1';f.level='D2';
+  W.editDraft.save(f);const saved=JSON.parse(storage.get(f.draftKey));
+  assert.equal(saved.values.level,'D1');assert.equal(saved.values.words,'Original human observation');
+  assert.deepEqual(saved.class_facts,[human]);assert.equal(saved.measurement_context,undefined);
+  f=form();W.editDraft.init(f,record);assert.equal(f.level,'D1');assert.equal(f.words,'Original human observation');
+  assert.deepEqual(f.savedClassFacts,[human]);assert.equal(f.classReview,undefined);
+  const changed={...record,revision:'b'.repeat(64)};const g=form(changed);W.editDraft.init(g,changed);
+  assert.equal(g.savedClassFacts,undefined);assert.equal(g.editRecovery[0].draft.class_facts[0].answer,human.answer);
+});

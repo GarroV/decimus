@@ -17,11 +17,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from .clarifications import bound_class_context
+from .clarifications import MAX_LEVEL_WORDS, bound_class_context
 from .config import Settings
 from .engine import DOMAIN_KEY, option, run_audit, state_file
 from .errors import EngineError, ValidationError
 from .handover import guard_writable
+from .measurement_sets import bound_scope
 from .models import READING_MAX_C, READING_MIN_C, SOURCES, Finding, Suggestion
 from .revisions import digest, finding_revision
 from .state import (
@@ -232,6 +233,11 @@ def add_finding(
             photos=frames,
             words=words,
         )
+        measurement = (
+            bound_scope(inspection, class_context["measurement_context"], code=code, zone=zone)
+            if "measurement_context" in class_context
+            else None
+        )
         with tempfile.TemporaryDirectory(prefix=".clarification-", dir=path.parent) as temp:
             staged = replace(settings, state_dir=Path(temp))
             staged_path = state_file(chat_id, staged)
@@ -248,6 +254,9 @@ def add_finding(
                 "clarifications": chain,
                 "after": [asdict(after)],
             }
+            if measurement is not None:
+                event["measurement_context"] = measurement.data
+                event["measurement_scope_hash"] = measurement.context["scope_hash"]
             block["finding_history"] = [*inspection.finding_history, event]
             result[DOMAIN_KEY] = block
             _write_atomic(path, result)
@@ -275,6 +284,8 @@ def edit_finding(
     photos: Sequence[str] | None = None,
     source_revision: str | None = None,
     request_id: str | None = None,
+    class_context: dict[str, Any] | None = None,
+    context_words: str | None = None,
     **fields: str,
 ) -> Finding:
     """Поправить запись: `code`, `level`, `zone`, `text`, `comment`, `repeat`.
@@ -318,6 +329,19 @@ def edit_finding(
             "zone_by_person": zone_by_person,
         }
     )
+    if context_words is not None and (
+        class_context is None
+        or not isinstance(context_words, str)
+        or len(context_words) > MAX_LEVEL_WORDS
+        or any(
+            (ord(char) < 32 and char not in "\n\t") or ord(char) == 127 for char in context_words
+        )
+    ):
+        raise ValidationError("Слова для оценки отсутствуют, некорректны или превышают предел")
+    if class_context is not None:
+        signature = digest(
+            {"base": signature, "class_context": class_context, "context_words": context_words}
+        )
     path = state_file(chat_id, settings)
     with state_lock(path):
         raw = _read_raw(path)
@@ -340,6 +364,31 @@ def edit_finding(
             raise ValidationError(f"Записи #{n} в проверке нет")
         if source_revision is not None and finding_revision(source) != source_revision:
             raise EditConflict("Исходная запись изменилась; перечитайте её")
+        chain = None
+        measurement = None
+        if class_context is not None:
+            code = fields.get("code", source.code)
+            zone = fields.get("zone", source.zone)
+            chain = bound_class_context(
+                class_context,
+                run_id=inspection.run_id,
+                checklist_version=inspection.checklist_version,
+                code=code,
+                zone=zone,
+                photos=final_photos if final_photos is not None else source.photos,
+                words=source.words if context_words is None else context_words,
+            )
+            if "measurement_context" in class_context:
+                measurement = bound_scope(
+                    inspection, class_context["measurement_context"], code=code, zone=zone
+                )
+                if any(
+                    ref["n"] == n
+                    for line in measurement.data["lines"]
+                    for product in line["products"]
+                    for ref in product["sources"]
+                ):
+                    raise ValidationError("Целевая запись не может быть источником совокупности")
         with tempfile.TemporaryDirectory(prefix=".edit-", dir=path.parent) as temp:
             staged = replace(settings, state_dir=Path(temp))
             staged_path = state_file(chat_id, staged)
@@ -389,6 +438,13 @@ def edit_finding(
                 "before": asdict(source),
                 "after": [asdict(after)],
             }
+            if chain is not None:
+                event["clarifications"] = chain
+                if context_words is not None:
+                    event["classification_words"] = context_words
+            if measurement is not None:
+                event["measurement_context"] = measurement.data
+                event["measurement_scope_hash"] = measurement.context["scope_hash"]
             if request_id is not None:
                 event.update(request_id=request_id, signature=signature)
             block["finding_history"] = [*inspection.finding_history, event]
