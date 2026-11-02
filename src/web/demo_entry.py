@@ -91,7 +91,6 @@ LOCKED_ENDPOINTS = frozenset(
         "mailing_cc_remove",
         "mailing_template_save",
         "mailing_content_save",
-        "country_set_recipients",
         "bot_unlink",
         # Выход наружу — настоящие сервисы под настоящими ключами: ключи API на
         # данные, Google (вход, почта, таблица), сайты агрегаторов.

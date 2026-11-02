@@ -103,6 +103,16 @@ def for_country(country: str) -> tuple[Contact, ...]:
     return tuple(Contact(str(r[0]), r[1], r[2], r[3], r[4], r[5]) for r in rows)
 
 
+def mailing_to(country: str) -> str | None:
+    """Адреса списка рассылки страны для «Кому»; None — список пуст (человек отправляет сам)."""
+    emails = tuple(
+        dict.fromkeys(
+            row.email for row in for_country(country) if row.kind == MAILING and row.email
+        )
+    )
+    return ", ".join(emails) if emails else None
+
+
 def partner_names() -> dict[str, tuple[str, ...]]:
     """Country list labels in one query; access-space names are not contact names."""
     with reading("country partner names") as conn:

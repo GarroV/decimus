@@ -450,7 +450,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,country_mailing_recipients,customer_ratings,source_units}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -459,7 +459,6 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
 | `src/db/country_contacts.py` | Country partner contacts and inspection mail recipients; HQ-only personal data |
 | `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
-| `src/db/country_mailing_recipients.py` | Explicit country To: override |
 | `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
 | `src/db/customer_ratings.py` | Месячные оценки клиентов и журнал их сбора для выбранного среза рейтингов |
 | `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
@@ -626,6 +625,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0113_mailing_content_templates.sql` | (нет описания) |
 | `0114_service_key_health_lock.sql` | The real probe timestamp is preserved; admin cannot fabricate a fresh probe |
 | `0115_prescription_findings.sql` | Сборка предписания из проверки (шаг 3 спеки 2026-10-21-osb-prescriptions-design, D601, D602, D606): вид предписания и нарушения из проверки-основания |
+| `0116_drop_country_mailing_recipients.sql` | Особый список «Кому» страны (`0112`) снят: адресаты предписаний и экшн-планов берутся из общего списка рассылки страны (`country_contacts`, вид `mailing`), который… |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

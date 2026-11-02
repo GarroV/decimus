@@ -5,7 +5,7 @@ from __future__ import annotations
 from flask import Flask, abort, render_template, request, url_for
 from flask import Response as FlaskResponse
 
-from src.db import action_plans, country_mailing_recipients, mailing_templates, prescriptions
+from src.db import action_plans, country_contacts, mailing_templates, prescriptions
 from src.db.models import InspectionDetail
 from src.domain import mailing_content
 from src.domain.features import action_plans_enabled
@@ -107,7 +107,7 @@ def install(app: Flask, conf_lang: str) -> None:
             "plan_url": url_for("actions", tab="plans", id=plan.id, _external=True),
         }
         subject, body = mailings_content.render("plan", lang, values)
-        to = country_mailing_recipients.effective(plan.country) if plan.country else None
+        to = country_contacts.mailing_to(plan.country) if plan.country else None
         if request.args.get("download") == "eml":
             message = letter_message(
                 to=to or "", cc=cc_for("plan"), subject=subject, body=from_plain(body)

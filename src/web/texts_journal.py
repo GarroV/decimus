@@ -13,10 +13,6 @@ from __future__ import annotations
 _WEB: dict[str, tuple[str, str]] = {
     "country_contact_save": ("Контакт страны сохранён", "Country contact saved"),
     "country_contact_delete": ("Контакт страны удалён", "Country contact deleted"),
-    "country_set_recipients": (
-        "Адресаты рассылки страны изменены",
-        "Country mailing recipients changed",
-    ),
     "unit_profile_save": ("Контакты пиццерии изменены", "Pizzeria contacts changed"),
     "action_plan_setting": ("Настройка экшн-планов изменена", "Action-plan setting changed"),
     "actions_due": ("Срок по запросу экшн-плана", "Action plan request due date"),
