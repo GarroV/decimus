@@ -10,7 +10,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.db import country_contacts, country_contracts, unit_profiles
+from src.db import country_contacts, unit_profiles
 from src.db.errors import DbError
 from src.db.reach import Reach
 from src.web import auth, country_units, prescriptions, unit_profile_edit
@@ -141,7 +141,7 @@ def test_foreign_origin_never_writes(admin: FlaskClient, calls: Any) -> None:
     assert calls == {"units": []}
 
 
-def test_mailing_list_fills_to_and_skips_contract_fallback(
+def test_mailing_list_fills_to(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -154,24 +154,19 @@ def test_mailing_list_fills_to_and_skips_contract_fallback(
             SimpleNamespace(kind="partner", email="partner@example.com"),
         ),
     )
-    monkeypatch.setattr(
-        country_contracts,
-        "dkk_recipients",
-        lambda _: pytest.fail("must not read contract fallback"),
-    )
     assert country_contacts.mailing_to("RS") == "shared@example.com, second@example.com"
     assert prescriptions._default_recipients("RS") == "shared@example.com, second@example.com"
 
 
-def test_empty_mailing_list_keeps_legacy_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_empty_mailing_list_falls_back_to_remembered(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         country_contacts,
         "for_country",
         lambda _: (SimpleNamespace(kind="partner", email="p@x.io"),),
     )
-    monkeypatch.setattr(country_contracts, "dkk_recipients", lambda _: "contract@example.com")
+    monkeypatch.setattr(prescriptions.rx, "remembered_recipients", lambda _: "old@example.com")
     assert country_contacts.mailing_to("RS") is None
-    assert prescriptions._default_recipients("RS") == "contract@example.com"
+    assert prescriptions._default_recipients("RS") == "old@example.com"
 
 
 def test_unread_mailing_list_does_not_expose_old_addresses(
@@ -200,7 +195,7 @@ def test_new_pizzeria_email_is_validated_and_carried_into_profile() -> None:
         unit_add.parse_extras({"partner_email": "a@example.com\r\nBcc: bad@example.com"})
 
 
-def test_administration_exposes_primary_contacts_and_keeps_contract_additional(
+def test_administration_exposes_primary_contacts(
     admin: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from src.web import country as country_data
@@ -214,7 +209,7 @@ def test_administration_exposes_primary_contacts_and_keeps_contract_additional(
     assert html.count("Mailing recipients") == 1
     assert 'name="unit_key" value="unit-1"' in html
     assert 'name="address"' in html and 'name="partner_email"' in html
-    assert "Additional: contract</summary>" in html
+    assert "contract" not in html.lower().replace("contacts", ""), "договора страны нет (D702)"
 
 
 def test_profile_read_failure_never_becomes_empty_overwrite(

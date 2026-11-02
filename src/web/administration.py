@@ -68,7 +68,7 @@ def _sees_spaces(account: object) -> bool:
 
 
 def _sees_countries(account: object) -> bool:
-    """Главный, админ УК и ОСБ — те, у кого есть `space.manage` или `contract.manage` (D640)."""
+    """Главный и админ УК — те, у кого есть `space.manage` (D640)."""
     from . import countries_screen  # countries_screen сам берёт адреса отсюда
 
     return countries_screen.may_see(

@@ -171,8 +171,6 @@ OPEN_ENDPOINTS = frozenset(
         "trip_step_delete",
         "country_set_developer",
         "country_set_space",
-        "country_save_contract",
-        "country_delete_contract",
         "unit_create",
         "unit_profile_save",
         "do_accept",

@@ -62,17 +62,33 @@
 .cblock .sfold > summary { margin-top: 0; }
 .cblock__form { margin-top: var(--space-3); max-width: 32rem; }
 .cblock__form textarea { resize: vertical; }
+/* Контакты страны («Партнёр», «Почты для рассылки»): компактный список, действия справа, форма по «+ Добавить». */
+.cblock__head.info-row { padding: 0; border-bottom: 0; }
+.cblock summary { list-style: none; }
+.cblock summary::-webkit-details-marker { display: none; }
+.clist { margin: 0; padding: 0; list-style: none; }
+.clist__row { position: relative; border-top: 1px solid var(--line); }
+.clist__row:first-child { border-top: 0; }
+.clist__line { display: flex; align-items: center; gap: var(--space-5); min-height: 40px; padding: var(--space-3) 0; }
+.clist__edit > .clist__line { padding-right: 5.5rem; cursor: pointer; }
+.clist__text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-body); }
+.clist__text span { color: var(--ink-2); }
+.cblock .clist__btn { height: 26px; padding: 0 var(--space-5); font-size: var(--fs-meta); }
+.clist__del { position: absolute; top: 7px; right: 0; margin: 0; }
+.cblock .cadd > summary { display: inline-flex; margin-top: var(--space-3); cursor: pointer; }
+.cform { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto; align-items: end; gap: var(--space-5); margin: var(--space-3) 0 var(--space-5); }
+.cform label { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.cform__actions { display: flex; gap: var(--space-3); }
 .cblock__item { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--r-md, 8px); background: var(--surface-2); }
-.cblock__facts { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr); gap: var(--space-2) var(--space-5); margin: 0; font-size: var(--fs-body); }
-.cblock__facts dt { color: var(--ink-2); font-size: var(--fs-dense); }
-.cblock__facts dd { margin: 0; overflow-wrap: anywhere; }
 
 @media (max-width: 719px) {
   .cblocks { grid-template-columns: minmax(0, 1fr); }
-  .cblock__facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
-  .cblock__facts dd { margin-bottom: var(--space-3); }
   .cblock .sbtn { min-height: 44px; }
-  }
+  .cform { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .cblock .clist__btn { height: auto; min-height: 36px; width: 5.5rem; }
+  .clist__edit > .clist__line { align-items: flex-start; min-height: 88px; padding-right: 0; }
+  .clist__del { top: 48px; }
+}
 
 /* Вкладка «Dodo IS» (D651): сжатая панель ключей приложения и список стран и панель выбранной (D653). */
 .sdodois__app { margin: 0 0 var(--space-5); }

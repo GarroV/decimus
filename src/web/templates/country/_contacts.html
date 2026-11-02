@@ -1,4 +1,8 @@
-{# Names and recipients, not access-space ownership. All writes remain in Administration. #}
+{# Names and recipients, not access-space ownership. All writes remain in Administration.
+   Блок — заголовок с «?» (пояснение под ним), список строк «имя — почта» с действиями справа,
+   «+ Добавить» раскрывает компактную форму. Поля и адреса POST прежние. #}
+{% from "_info_tip.html" import info_tip %}
+
 {% macro fields(kind, name='', email='') %}
   <input type="hidden" name="kind" value="{{ kind }}">
   <label><span class="sform__label">{{ t('contacts.name') }}</span><input class="sinput" type="text" name="name" value="{{ name }}" maxlength="200" autocomplete="off"></label>
@@ -6,37 +10,55 @@
 {% endmacro %}
 
 {% macro contact_block(s, kind) %}
-<section class="cblock" aria-labelledby="contacts-{{ kind }}">
-  <h3 class="cblock__title" id="contacts-{{ kind }}">{{ t('contacts.' ~ kind) }}</h3>
-  <p class="cblock__note">{{ t('contacts.' ~ kind ~ '_note') }}</p>
+{% set cancel_url = url('/administration') ~ '?tab=countries&country=' ~ s.code ~ '&lang=' ~ lang %}
+<section class="cblock cblock--wide" aria-labelledby="contacts-{{ kind }}">
+  <div class="info-row cblock__head">
+    <h3 class="cblock__title" id="contacts-{{ kind }}">{{ t('contacts.' ~ kind) }}</h3>
+    {{ info_tip(t('tip.hint'), '', [t('contacts.' ~ kind ~ '_note')], 'contacts-' ~ kind) }}
+  </div>
   {% if not s.contacts_known %}<p role="status">{{ t('contacts.unavailable') }}</p>
   {% else %}
     {% set rows = s.contacts|selectattr('kind', 'equalto', kind)|list %}
-    {% if not rows %}<p class="is-muted">{{ t('contacts.empty') }}</p>{% endif %}
-    {% for row in rows %}
-      <div class="country-contact">
-        <p>{% if row.name %}<b>{{ row.name }}</b>{% endif %}{% if row.email %}<span>{{ row.email }}</span>{% endif %}</p>
-        {% if s.can_edit %}
-          {% set rejected = contact_error and contact_ident == row.id %}
-          <details class="sfold"{% if rejected %} open{% endif %}>
-            <summary class="sbtn">{{ t('contacts.edit') }}</summary>
-            <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contacts') }}?lang={{ lang }}">
-              <input type="hidden" name="id" value="{{ row.id }}">
-              {{ fields(kind, contact_draft.name if rejected else row.name, contact_draft.email if rejected else row.email) }}
-              <button class="sbtn sbtn--primary" type="submit">{{ t('contacts.save') }}</button>
-            </form>
-          </details>
-          <form method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contacts/' ~ row.id ~ '/delete') }}?lang={{ lang }}"><button class="sbtn" type="submit">{{ t('contacts.delete') }}</button></form>
-        {% endif %}
-      </div>
-    {% endfor %}
+    {% if not rows %}<p class="cblock__note is-muted">{{ t('contacts.empty') }}</p>
+    {% else %}
+      <ul class="clist">
+        {% for row in rows %}
+          {% set text %}{% if row.name %}<b>{{ row.name }}</b>{% endif %}{% if row.name and row.email %} — {% endif %}{% if row.email %}<span>{{ row.email }}</span>{% endif %}{% endset %}
+          <li class="clist__row">
+            {% if s.can_edit %}
+              {% set rejected = contact_error and contact_ident == row.id %}
+              <details class="clist__edit"{% if rejected %} open{% endif %}>
+                <summary class="clist__line"><span class="clist__text">{{ text }}</span><span class="sbtn clist__btn">{{ t('contacts.edit') }}</span></summary>
+                <form class="cform" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contacts') }}?lang={{ lang }}">
+                  <input type="hidden" name="id" value="{{ row.id }}">
+                  {{ fields(kind, contact_draft.name if rejected else row.name, contact_draft.email if rejected else row.email) }}
+                  <div class="cform__actions">
+                    <button class="sbtn sbtn--primary" type="submit">{{ t('contacts.save') }}</button>
+                    <a class="sbtn" href="{{ cancel_url }}">{{ t('contacts.cancel') }}</a>
+                  </div>
+                </form>
+              </details>
+              <form class="clist__del" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contacts/' ~ row.id ~ '/delete') }}?lang={{ lang }}"><button class="sbtn clist__btn" type="submit">{{ t('contacts.delete') }}</button></form>
+            {% else %}
+              <div class="clist__line"><span class="clist__text">{{ text }}</span></div>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
     {% if s.can_edit %}
       {% set rejected = contact_error and contact_draft and contact_draft.kind == kind and (not contact_ident or not (rows|selectattr('id', 'equalto', contact_ident)|list)) %}
-      <form class="sform cblock__form country-contact-add" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contacts') }}?lang={{ lang }}">
-        {% if rejected and contact_ident %}<input type="hidden" name="id" value="{{ contact_ident }}">{% endif %}
-        {{ fields(kind, contact_draft.name if rejected else '', contact_draft.email if rejected else '') }}
-        <button class="sbtn sbtn--primary" type="submit">{{ t('contacts.add') }}</button>
-      </form>
+      <details class="cadd"{% if rejected %} open{% endif %}>
+        <summary class="sbtn clist__btn">{{ t('contacts.add') }}</summary>
+        <form class="cform" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contacts') }}?lang={{ lang }}">
+          {% if rejected and contact_ident %}<input type="hidden" name="id" value="{{ contact_ident }}">{% endif %}
+          {{ fields(kind, contact_draft.name if rejected else '', contact_draft.email if rejected else '') }}
+          <div class="cform__actions">
+            <button class="sbtn sbtn--primary" type="submit">{{ t('contacts.save') }}</button>
+            <a class="sbtn" href="{{ cancel_url }}">{{ t('contacts.cancel') }}</a>
+          </div>
+        </form>
+      </details>
     {% endif %}
   {% endif %}
 </section>

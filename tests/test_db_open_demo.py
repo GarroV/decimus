@@ -122,7 +122,6 @@ def test_посев_открытого_демо(
         без_кода = conn.execute(
             "select count(*) from units where tenant_code = 'HQ' and code is null"
         ).fetchone()
-        договоров = conn.execute("select count(*) from country_contracts").fetchone()
         люди = conn.execute(
             "select count(*), count(email), count(distinct role) from web_users"
         ).fetchone()
@@ -161,7 +160,6 @@ def test_посев_открытого_демо(
     assert карты == (8, 2) and связанных_карт == (8,), (карты, связанных_карт)
     assert партнёров == (3, 8), "у каждой пиццерии демо — партнёр, в каждой стране"
     assert без_кода == (0,), "у пиццерий нет кода Dodo: оценки площадок не найдут точку"
-    assert договоров == (3,)
     assert люди is not None and люди[0] >= 10 and люди[1] == люди[0], "люди демо без почты"
     assert люди[2] >= 5, "в «Людях» не показаны роли УК"
     assert люди_партнёра is not None and люди_партнёра[0] >= 3, "у партнёра один человек"
