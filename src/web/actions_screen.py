@@ -25,6 +25,8 @@ from flask import Flask, current_app, render_template, request, url_for
 from flask import redirect as flask_redirect
 from werkzeug.wrappers import Response
 
+from src.domain.features import action_plans_enabled
+
 from . import guard, ui_lang
 from .config import Settings
 from .sections import section
@@ -85,6 +87,8 @@ def _lang(conf: Settings) -> str:
 
 def tab_of(raw: str | None) -> str:
     """Вкладка из адреса; незнакомое значение — первая вкладка, а не отказ."""
+    if not action_plans_enabled():
+        return TAB_RX
     return raw if raw in TABS else TAB_PLANS
 
 

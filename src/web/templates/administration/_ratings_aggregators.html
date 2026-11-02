@@ -1,0 +1,27 @@
+{# Управление площадками — только в административном блоке. #}
+{% if agg_update_notice %}<div class="rt-note" role="status">{{ t(agg_update_notice) }}</div>{% endif %}
+  <div class="rt-note">
+    {% if agg_pending %}{{ t('ratings.agg.update.pending', at=agg_pending.requested_at.strftime(at_format), by=agg_pending.requested_by) }}
+    {% else %}<form method="post" action="{{ url(ratings_path) }}/aggregators/update?{{ request.query_string.decode() }}" class="rt-form">
+      <button class="btn btn--sm" type="submit">{{ t('ratings.agg.update') }}</button> <span class="rt-maps__n">{{ t('ratings.agg.update.hint') }}</span></form>{% endif %}</div>
+{% if agg is none %}<p>{{ t('ratings.coverage.db_down') }}</p>
+{% elif not agg.gaps %}<p>{{ t('ratings.agg.gaps.none') }}</p>
+{% else %}
+<ul class="rt-reasons">
+{% for g in agg.gaps %}<li><b>{{ g.unit.name }}</b> · {{ country_name(g.unit.country) }}
+<ul>{% for r in g.reasons %}<li>
+{% if r.code == 'stale' %}{{ t('ratings.agg.reason.stale', platform=agg_names.get(r.platform, r.platform), date=r.on_date.strftime('%d.%m.%Y')) }}
+{% else %}{{ t('ratings.agg.reason.' ~ r.code, platform=agg_names.get(r.platform, r.platform)) }}{% endif %}
+          {%- if r.code == 'unlinked' and r.platform in link_platforms %}
+          <details class="rt-link"><summary>{{ t('ratings.coverage.link.summary') }}</summary>
+            <form method="post" action="{{ url(ratings_path) }}/coverage/link?{{ request.query_string.decode() }}">
+              <input type="hidden" name="dodo_id" value="{{ g.unit.dodo_id }}">
+              <input type="hidden" name="country" value="{{ open_country }}">
+              <input type="hidden" name="aggregator" value="{{ r.platform }}">
+              <label class="rt-field__label" for="rt-link-{{ r.platform }}-{{ g.unit.dodo_id }}">{{ t('ratings.coverage.link.label.' ~ r.platform) }}</label>
+              <input class="input input--sm" id="rt-link-{{ r.platform }}-{{ g.unit.dodo_id }}" type="url" name="url" required placeholder="{{ link_platforms[r.platform] }}">
+              <button class="btn btn--sm" type="submit">{{ t('ratings.coverage.link.submit') }}</button>
+            </form></details>
+          {%- endif %}
+</li>{% endfor %}</ul></li>{% endfor %}
+</ul>{% endif %}

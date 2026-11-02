@@ -120,12 +120,20 @@ def test_чего_не_хватает_причина_словами_у_кажд�
     assert "Бухарест-1" in блок and "Варшава-1" in блок
 
 
-def test_привязка_по_ссылке_видна_управляющему_там_же(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_привязка_по_ссылке_только_в_администрировании(monkeypatch: pytest.MonkeyPatch) -> None:
     html = _агрегаторы(monkeypatch)
 
-    assert 'action="/ratings/coverage/link?' in html
-    assert 'name="aggregator" value="glovo"' in html  # у Бухарест-1 нет Glovo — форма есть
-    assert html.count('name="dodo_id"') == 1  # там, где не хватает точки, а не у каждой строки
+    assert 'action="/ratings/coverage/link?' not in html
+    from test_web_administration import _рейтинги_без_базы
+
+    _рейтинги_без_базы(monkeypatch)
+    for c in клиент(monkeypatch):
+        response = c.get("/administration?tab=ratings&block=aggregators")
+        assert response.status_code == 200
+        admin = response.get_data(as_text=True)
+    assert 'action="/ratings/coverage/link?' in admin
+    assert 'name="aggregator" value="glovo"' in admin
+    assert admin.count('name="dodo_id"') == 1
 
 
 def test_без_права_формы_привязки_нет(monkeypatch: pytest.MonkeyPatch) -> None:

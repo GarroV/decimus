@@ -49,9 +49,8 @@
         <p class="note note--warn" role="status">{{ t('training.failed') }}</p>
       {% else %}
         <p>{{ t('training.empty.text') }}</p>
-        {% if keys_path %}
+        {% if may_configure %}
           <p>{{ t('training.empty.keys') }}.</p>
-          <p><a class="btn btn--sm btn--primary" href="{{ url(keys_path) }}">{{ t('training.empty.keys_open') }}</a></p>
         {% else %}
           <p>{{ t('training.empty.ask') }}</p>
         {% endif %}

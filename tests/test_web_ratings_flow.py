@@ -54,20 +54,17 @@ def test_контроль_грузит_партнёр_видит(
         )
         assert ответ.status_code == 200
         сводка = client.get("/ratings?group=developer&value=Dev+One&period=2026-Q3")
-        assert "/administration?tab=ratings" in сводка.get_data(as_text=True)
-        # Пустой квартал: проверок не было — каждый блок, включая хард-нарушения,
-        # пишет «нет данных», а не «чисто»; зону риска не судили — «мало периодов»
-        # (P16, P37). Проверяется вся страница, а не её начало.
-        пусто = client.get("/ratings?group=developer&value=Dev+One&period=2026-Q1")
-        текст = пусто.get_data(as_text=True)
-        # Хард РС и РКО — одна секция с таблицей (D423).
-        хард = текст.split("Хард-нарушения РС и РКО")[1].split("</section>")[0]
-        assert "За период нет данных РС и РКО." in хард
-        assert "Нарушений не найдено." not in текст
-        assert "В зоне риска никого." not in текст
-        assert "Недостаточно периодов для оценки: РС, РКО." in текст
-        # Пустой кластер не обёрнут в карточку — «нет данных» стоит на месте секции.
-        assert "rt-viol__cluster" not in текст
+        assert "/administration?tab=ratings" not in сводка.get_data(as_text=True)
+        # Пустые периоды проверяем в отдельных разделах D660: отсутствие данных
+        # не превращается в утверждение об отсутствии нарушений.
+        for kind, label in (("rs", "РС"), ("rko", "РКО")):
+            empty = client.get(f"/ratings/{kind}?group=developer&value=Dev+One&period=2026-Q1")
+            assert empty.status_code == 200
+            text = empty.get_data(as_text=True)
+            assert f"За период нет данных {label}." in text
+            assert "Нарушений не найдено." not in text
+        risk = client.get("/ratings/risk?group=developer&value=Dev+One&period=2026-Q1")
+        assert "Недостаточно периодов для оценки: РС, РКО." in risk.get_data(as_text=True)
         # Дельта к периоду РС подписана его названием, а не ключом `rs:<id>` (P39):
         # догружаем прошлый период РС с оценкой — в первом снимке он пустой.
         прошлый = snapshot(history=[{"score": 90, "status": "1", "period": ПРОШЛЫЙ_РС}], remarks=[])
@@ -84,18 +81,16 @@ def test_контроль_грузит_партнёр_видит(
         период_текст = период.get_data(as_text=True)
         assert "Сентябрь 2 часть 2026" in период_текст.split("rt-cal__title")[1][:80]
         assert "Δ к Сентябрь 1 часть 2026" in период_текст and "Δ к rs:" not in период_текст
-        # Вторая страна застройщика без замечаний РС: её карточка пишет «нет данных»,
-        # а не «нарушений не найдено» — при данных в кластере.
+        # Вторая страна того же девелопера участвует в самостоятельном сравнении.
         ответ = client.post(
             "/ratings/countries", data={"code": "BY", "developer": "Dev One"}, headers=ORIGIN
         )
         assert ответ.status_code == 200
-        две = client.get(f"/ratings?group=developer&value=Dev+One&{СЕНТЯБРЬ_2}")
-        замечания_рс = две.get_data(as_text=True).split("rt-viol__cluster")[1]
-        assert "За период нет данных РС." in замечания_рс
-        # Сравнение девелоперов и стран (D551) — у УК: Dev One со своими странами.
-        сравнение = две.get_data(as_text=True).split('id="rt-tp-compare"')[1].split("</article>")[0]
-        assert "Dev One" in сравнение and "rt-cmp__v is-" in сравнение
+        # Сравнение теперь самостоятельный раздел D660; данные девелопера сохранены.
+        comparison = client.get(f"/ratings/compare?group=developer&value=Dev+One&{СЕНТЯБРЬ_2}")
+        assert comparison.status_code == 200
+        text = comparison.get_data(as_text=True)
+        assert "Dev One" in text and "rt-cmp__v is-" in text
 
     подменить_двери(monkeypatch, tenant="GE", role="admin")
     with собрать(tenant="GE").test_client() as client:
@@ -106,7 +101,7 @@ def test_контроль_грузит_партнёр_видит(
         текст = страница.get_data(as_text=True)
         assert "97.5" in текст
         assert "/administration?tab=ratings" not in текст
-        assert 'id="rt-tp-compare"' not in текст  # D551: сравнение — только УК
+        assert client.get("/ratings/compare").status_code == 404  # D551: сравнение — только УК
         assert (
             client.post(
                 "/ratings/import", data={"file": (io.BytesIO(b"x"), "x.csv")}, headers=ORIGIN

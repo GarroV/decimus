@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 211 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 212 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -92,6 +92,7 @@
 | `/administration/mailings/<kind>/cc/remove` | POST | `mailing_cc_remove` | `src/web/mailings_screen.py` |
 | `/administration/mailings/<kind>/content` | POST | `mailing_content_save` | `src/web/mailings_content.py` |
 | `/administration/mailings/inspection/template` | POST | `mailing_template_save` | `src/web/mailings_screen.py` |
+| `/administration/plans/settings` | POST | `action_plan_setting` | `src/web/plan_archive.py` |
 | `/api/v1/aggregators/ratings` | GET | `swarm_api_aggregators` | `src/web/swarm_api.py` |
 | `/api/v1/inspections` | GET | `swarm_api_inspections` | `src/web/swarm_api.py` |
 | `/api/v1/inspections/<inspection_id>` | GET | `swarm_api_inspection` | `src/web/swarm_api.py` |
@@ -369,6 +370,7 @@
 <!-- map:begin env -->
 | Переменная | Где читается | В `.env.example` |
 |---|---|---|
+| `ACTION_PLANS_ENABLED` | `src/domain/features.py` | да |
 | `ADMIN_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/oauth_smoke.py` | да |
 | `API_TOKEN_BY` | `tools/api_token.py` | да |
 | `ATTACHMENT_MAX_MB` | `src/db/config.py` | да |
@@ -387,7 +389,7 @@
 | `DATABASE_APP_PASSWORD` | `src/db/migrate.py` | да |
 | `DATABASE_RETRACTION_PASSWORD` | `src/db/migrate.py` | да |
 | `DATABASE_RETRACTION_URL` | `src/db/config.py`, `tools/seed_web_demo.py` | да |
-| `DATABASE_URL` | `src/db/config.py`, `src/mcp/config.py` | да |
+| `DATABASE_URL` | `src/db/config.py`, `src/mcp/config.py`, `src/settings_read.py` | да |
 | `DB_BATCH_STATEMENT_TIMEOUT_S` | `src/db/timeouts.py` | да |
 | `DB_LOCK_TIMEOUT_S` | `src/db/timeouts.py` | да |
 | `DB_POOL_MAX` | `src/db/pool.py` | да |
@@ -594,8 +596,10 @@
 | `0106_inspection_timing.sql` | — |
 | `0107_inspection_info_photo_answers.sql` | — |
 | `0108_finding_split_history.sql` | — |
+| `0109_service_settings.sql` | `service_settings` |
 | `0110_country_mailing_recipients.sql` | `country_mailing_recipients` |
 | `0111_mailing_content_templates.sql` | — |
+| `0112_service_key_health_lock.sql` | — |
 <!-- map:end -->
 
 ## Makefile

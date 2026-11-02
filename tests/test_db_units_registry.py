@@ -201,7 +201,8 @@ def test_привязка_glovo_по_ссылке_только_управляю�
     подменить_двери(monkeypatch, tenant="HQ", role="control")
     with собрать(tenant="HQ").test_client() as client:
         assert войти(client).status_code == 302
-        assert "привязать" in _страница(client)  # у «Новой» нет Glovo — форма есть
+        assert "привязать" not in _страница(client)
+        assert "привязать" in _страница(client, "/administration?tab=ratings&block=aggregators")
         чужая = client.post(
             "/ratings/coverage/link", data=форма, headers={"Origin": "http://evil.example"}
         )
@@ -263,7 +264,7 @@ def test_привязка_migros_по_ссылке_с_экрана(db_env: str, 
     подменить_двери(monkeypatch, tenant="HQ", role="control")
     with собрать(tenant="HQ").test_client() as client:
         assert войти(client).status_code == 302
-        экран = _страница(client, "/ratings/agg?country=TR")
+        экран = _страница(client, "/administration?tab=ratings&block=aggregators")
         плохая = client.post(
             "/ratings/coverage/link",
             data={**форма, "url": "https://glovoapp.com/x"},

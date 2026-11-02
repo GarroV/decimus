@@ -248,3 +248,19 @@ def test_роль_приложения_не_переписывает_суть_у
         conn.rollback()
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute("delete from notifications")
+
+
+@requires_db
+def test_paused_plan_notifications_are_hidden_but_not_deleted(
+    люди: dict[str, str], pg_dsn: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rxw.create_draft(_черновик(), actor=АВТОР, submit=True)
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        assert store.notify(cur, [люди[ОСБ]], "plan_requested", "/actions?tab=plans") == 1
+    assert store.unread_count(люди[ОСБ]) == 2
+    monkeypatch.setenv("ACTION_PLANS_ENABLED", "0")
+    assert store.unread_count(люди[ОСБ]) == 1
+    assert not any(n.kind.startswith("plan_") for n in store.list_for(люди[ОСБ]))
+    monkeypatch.setenv("ACTION_PLANS_ENABLED", "1")
+    assert store.unread_count(люди[ОСБ]) == 2
+    assert any(n.kind == "plan_requested" for n in store.list_for(люди[ОСБ]))

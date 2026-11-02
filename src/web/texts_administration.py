@@ -8,6 +8,56 @@ from __future__ import annotations
 from .texts_aggregators_admin import AGGREGATORS_ADMIN_TEXTS
 
 ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
+    "plans.setting.title": {"ru": "Настройки экшн-планов", "en": "Action-plan settings"},
+    "plans.setting.label": {"ru": "Электронные экшн-планы", "en": "Electronic action plans"},
+    "plans.setting.on": {"ru": "Включены", "en": "Enabled"},
+    "plans.setting.off": {"ru": "Выключены", "en": "Disabled"},
+    "plans.setting.save": {"ru": "Сохранить", "en": "Save"},
+    "plans.setting.saved": {"ru": "Настройка сохранена", "en": "Setting saved"},
+    "plans.setting.failed": {
+        "ru": "Настройка не сохранена. Повторите попытку.",
+        "en": "The setting was not saved. Please retry.",
+    },
+    "plans.setting.archive": {"ru": "Сохранённые планы", "en": "Stored plans"},
+    "plans.setting.open": {"ru": "Открыть работу с планами", "en": "Open action-plan workflow"},
+    "plans.setting.changed": {"ru": "Изменил: {actor} · {at}", "en": "Changed by: {actor} · {at}"},
+    "plans.setting.unavailable": {
+        "ru": "Настройку не удалось прочитать. Экшн-планы временно недоступны.",
+        "en": "The setting could not be read. Action plans are temporarily unavailable.",
+    },
+    "plans.setting.note": {
+        "ru": (
+            "Новые запросы, заполнение, согласование и подтверждение исправлений "
+            "доступны по правам пользователя."
+        ),
+        "en": (
+            "New requests, submissions, reviews and confirmation of corrections "
+            "are available according to user permissions."
+        ),
+    },
+    "plans.setting.activation_note": {
+        "ru": (
+            "Включение не создаёт планы по старым проверкам и не отправляет письма "
+            "или сообщения в Telegram. Старые непрочитанные уведомления не появляются заново."
+        ),
+        "en": (
+            "Enabling does not create plans for past inspections "
+            "or send email or Telegram messages. "
+            "Old unread notifications do not reappear."
+        ),
+    },
+    "administration.tab.plans": {"ru": "Экшн-планы", "en": "Action plans"},
+    "plans.paused.title": {"ru": "Экшн-планы отключены", "en": "Action plans are paused"},
+    "plans.paused.note": {
+        "ru": (
+            "Новые запросы и уведомления не создаются. "
+            "Сохранённые планы доступны здесь только для чтения."
+        ),
+        "en": (
+            "New requests and notifications are disabled. "
+            "Stored plans remain here for read-only review."
+        ),
+    },
     "section.administration.title": {"ru": "Администрирование", "en": "Administration"},
     "administration.tabs": {"ru": "Разделы администрирования", "en": "Administration tabs"},
     "administration.tab.people": {"ru": "Люди и доступ", "en": "People & access"},
@@ -189,11 +239,11 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "ratings.admin.sub": {
         "ru": (
             "Загрузка данных, справочники и пороги рейтингов. "
-            "Охват площадок и привязка Glovo — в разделе «Рейтинги»."
+            "Привязка площадок и запрос обновления — в блоке «Агрегаторы»."
         ),
         "en": (
             "Rating data uploads, reference lists and thresholds. "
-            "Platform coverage and the Glovo link live in the Ratings section."
+            "Platform links and refresh requests are in the Aggregators block."
         ),
     },
     "ratings.admin.count": {"ru": "Блоков: {n}", "en": "Blocks: {n}"},
@@ -209,6 +259,11 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "ratings.admin.block.issues": {"ru": "Несопоставленное", "en": "Unmatched rows"},
     "ratings.admin.block.developers": {"ru": "Девелоперы стран", "en": "Country developers"},
     "ratings.admin.block.rules": {"ru": "Хард-правила", "en": "Hard rules"},
+    "ratings.admin.block.aggregators": {"ru": "Агрегаторы", "en": "Aggregators"},
+    "ratings.admin.aggregators.state": {
+        "ru": "Привязка площадок и обновление данных",
+        "en": "Platform links and data refresh",
+    },
     "ratings.admin.block.settings": {"ru": "Пороги", "en": "Thresholds"},
     "ratings.admin.sheet.off": {"ru": "Самозабор выключен", "en": "Auto-pull is off"},
     "ratings.admin.sheet.failed": {

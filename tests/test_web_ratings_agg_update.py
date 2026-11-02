@@ -34,6 +34,14 @@ def страница(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     """Настоящий раздел «Агрегаторы» над пустым охватом; состояние заявки — в словаре."""
     состояние: dict[str, Any] = {"открытая": None, "заявки": []}
     подготовить(monkeypatch)
+    for name in ("countries", "imports", "open_issues", "hard_rules"):
+        monkeypatch.setattr(screen.read, name, lambda: ())
+    monkeypatch.setattr(screen.read, "settings", dict)
+    monkeypatch.setattr(
+        screen.ratings_sheet,
+        "build",
+        lambda _lang: screen.ratings_sheet.Block(False, (), None, 0, None),
+    )
     monkeypatch.setattr(agg_store, "load_states", lambda: ())
     monkeypatch.setattr(agg_store, "open_request", lambda: состояние["открытая"])
     # `подготовить` подменила `_agg_pending` пустышкой — здесь нужна настоящая очередь.
@@ -64,7 +72,7 @@ def test_кнопка_есть_у_контроля_и_админа_уК(
     monkeypatch: pytest.MonkeyPatch, страница: Any, tenant: str, role: str
 ) -> None:
     for client in _клиенты(monkeypatch, tenant, role):
-        текст = client.get("/ratings/agg").get_data(as_text=True)
+        текст = client.get("/administration?tab=ratings&block=aggregators").get_data(as_text=True)
         assert КНОПКА in текст and 'action="/ratings/aggregators/update' in текст
 
 
@@ -76,6 +84,7 @@ def test_у_остальных_кнопки_нет_и_адрес_закрыт(
 ) -> None:
     for client in _клиенты(monkeypatch, tenant, role):
         assert КНОПКА not in client.get("/ratings/agg").get_data(as_text=True)
+        assert client.get("/administration?tab=ratings&block=aggregators").status_code == 404
         ответ = client.post("/ratings/aggregators/update", headers=ORIGIN)
         assert ответ.status_code == 403
     assert страница["заявки"] == []
@@ -90,8 +99,10 @@ def test_нажатие_ставит_заявку_от_имени_учётки_�
         )
         assert ответ.status_code == 303
         куда = ответ.headers["Location"]
-        assert куда.startswith("/ratings/agg?") and "agg=queued" in куда
-        assert "group=country" in куда and "period=2026-09" in куда  # срез не потерян
+        assert (
+            куда.startswith("/administration?tab=ratings&block=aggregators")
+            and "agg=queued" in куда
+        )
         после = client.get(куда).get_data(as_text=True)
     ((имена, кто),) = страница["заявки"]
     assert имена == () and кто  # все агрегаторы, автор — логин учётки
@@ -135,7 +146,7 @@ def test_чужой_origin_отказ(monkeypatch: pytest.MonkeyPatch, стра�
 
 def test_кнопка_на_английском(monkeypatch: pytest.MonkeyPatch, страница: Any) -> None:
     for client in _клиенты(monkeypatch, "HQ", "control", ui_lang="en"):
-        текст = client.get("/ratings/agg").get_data(as_text=True)
+        текст = client.get("/administration?tab=ratings&block=aggregators").get_data(as_text=True)
         assert КНОПКА_EN in текст and КНОПКА not in текст
 
 

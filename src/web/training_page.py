@@ -153,14 +153,14 @@ def _course_rows(
 def _empty(*, failed: bool) -> str:
     """Загрузки ещё не было (или база не ответила): честное пустое состояние.
 
-    Ключи iSpring ставит главный админ на экране «Подключения» (D576): ему даём ссылку.
+    Ключи iSpring задаются только в администрировании (D689), без ссылки на рабочем экране.
     """
     return render_template(
         "training/index.html",
         view=None,
         failed=failed,
         rail=(),
-        keys_path=f"{section('administration').path}?tab=keys" if guard.may("keys.manage") else "",
+        may_configure=guard.may("keys.manage"),
     )
 
 

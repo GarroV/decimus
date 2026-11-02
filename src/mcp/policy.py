@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from src.domain.features import action_plans_enabled
 from src.domain.permissions import claude_may, require_action
 
 from .catalogue import (
@@ -93,6 +94,11 @@ TOOL_ACTIONS: Mapping[str, str] = {
 
 def action_of(spec: ToolSpec) -> str:
     """Действие матрицы, которое открывает инструмент. Незнакомый вид — ошибка кода."""
+    if spec.kind == KIND_PLAN and not action_plans_enabled():
+        from .plans import READ_TOOLS
+
+        if spec.name in READ_TOOLS:
+            return "plan.archive"
     if spec.name in TOOL_ACTIONS:
         return require_action(TOOL_ACTIONS[spec.name]).code
     if spec.kind == KIND_CHECKLIST and spec.writes:

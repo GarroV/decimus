@@ -290,3 +290,19 @@ def test_отклонённую_ждущую_не_подтверждают(се�
         )
     # Отклонённую роль приложения не видит (политики снятия) — читает владелец.
     assert _статус(pg_dsn, ident)[0] == "draft"
+
+
+def test_paused_module_accepts_a_real_d1_without_creating_plan_or_notifications(
+    сеть: None, admin_env: str, db_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ident = _ждущая()
+    monkeypatch.setenv("ACTION_PLANS_ENABLED", "0")
+    accept_inspection(ident, tenant="HQ", actor="owner-paused-workflow")
+    assert _статус(db_env, ident)[0] == "finalized"
+    with psycopg.connect(db_env) as conn:
+        assert conn.execute(
+            "select count(*) from action_plan_requests where inspection_id = %s", (ident,)
+        ).fetchone() == (0,)
+        assert conn.execute(
+            "select count(*) from notifications where kind like 'plan_%'"
+        ).fetchone() == (0,)

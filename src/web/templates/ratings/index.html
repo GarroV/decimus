@@ -39,7 +39,6 @@
         {% if section_line %}<span class="rt-fresh-line">{% if section_dot %}<i class="rt-fdot rt-fdot--{{ section_dot }}" aria-hidden="true"></i> {% endif %}{{ section_line }}</span>{% endif %}
       </div>
     </div>
-    {% if may_manage %}<a class="btn btn--sm" href="{{ admin_ratings_url }}">{{ t('ratings.manage') }}</a>{% endif %}
   </header>
 
   <form class="rt-bar" id="rt-bar-form" data-rt-auto method="get" action="{{ url(ratings_path) }}/{{ section_key }}" aria-label="{{ t('ratings.group') }}">

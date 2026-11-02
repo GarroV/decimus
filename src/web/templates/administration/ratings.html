@@ -7,8 +7,7 @@
   таблица контроля, загрузка файла, журнал загрузок, несопоставленное,
   девелоперы стран, хард-правила, пороги. Формы шлют POST на прежние адреса `/ratings/…`; ответ
   — эта же вкладка с открытым блоком и исходом. Компоновки страницы больше нет (D660):
-  порядок разделов «Рейтингов» задаёт код. Охват площадок и привязка Glovo — в разделе
-  «Агрегаторы» (`/ratings/agg`): это правка там, где виден пробел. Примечания журнала и
+  порядок разделов «Рейтингов» задаёт код. Привязка площадок и запрос обновления — в блоке «Агрегаторы» этой вкладки. Примечания журнала и
   причины строк пишет импортёр по-русски, поэтому в другой язык они не идут (P15). Стили списка
   и панели — `static/decimus-rt.css` и каркас `decimus-split.css`.
 #}{% extends "_split_page.html" %}
@@ -50,7 +49,7 @@
 
 {% block split_list %}
   <p class="ssec__note">{{ t('ratings.admin.purpose') }} <a href="{{ url(ratings_path) }}?lang={{ lang }}">{{ t('ratings.admin.openRatings') }}</a></p>
-  {% for group, keys in [('sources', ['sheet', 'upload', 'journal', 'issues']), ('directory', ['developers']), ('calculation', ['rules', 'settings'])] %}
+  {% for group, keys in [('sources', ['sheet', 'upload', 'journal', 'issues', 'aggregators']), ('directory', ['developers']), ('calculation', ['rules', 'settings'])] %}
   <section class="ssec">
     <h2 class="ssec__title">{{ t('ratings.admin.group.' ~ group) }}</h2>
     <div class="sbox slist slist--ratings rt-admin-blocks"><ul class="slist__rows">
@@ -74,7 +73,9 @@
   <div class="rt rt--panel">
   {{ outcome() }}
 
-  {% if block == 'sheet' %}
+  {% if block == 'aggregators' %}
+    {% include 'administration/_ratings_aggregators.html' %}
+  {% elif block == 'sheet' %}
     {#- Таблица контроля (D464): забор самим decimus; сбой — строкой, а не тишиной. -#}
     {{ hint(t('ratings.sheet.hint', h=sheet_every_h), 'rt-sheet') }}
     {% if sheet_notice %}<div class="note note--ok"><div><div class="note__title">{{ t(sheet_notice) }}</div></div></div>{% endif %}

@@ -29,6 +29,8 @@ from typing import Any
 
 import psycopg
 
+from src.domain.features import action_plan_state, action_plans_enabled
+
 from .config import check_environment
 from .errors import AccessError
 from .pool import connection
@@ -58,11 +60,18 @@ select id, kind, link, params, created_at, read_at
   from notifications
  where user_id = %(user)s::uuid
    and (not %(unread_only)s or read_at is null)
+   and (left(kind, 5) <> 'plan_' or (%(show_plans)s and
+        (%(plans_after)s::timestamptz is null or read_at is not null
+         or created_at >= %(plans_after)s::timestamptz)))
  order by created_at desc, id desc
  limit %(limit)s
 """
 
-_COUNT_SQL = "select count(*) from notifications where user_id = %s::uuid and read_at is null"
+_COUNT_SQL = (
+    "select count(*) from notifications where user_id = %s::uuid and read_at is null "
+    "and (left(kind, 5) <> 'plan_' or (%s and "
+    "(%s::timestamptz is null or created_at >= %s::timestamptz)))"
+)
 
 _MARK_SQL = """
 update notifications set read_at = now()
@@ -130,6 +139,8 @@ def notify(
     то, из чего экран соберёт текст на своём языке. Возвращает число записанных
     строк. Отказ базы идёт вверх как есть: вызывающий откатывает свою транзакцию.
     """
+    if kind.startswith("plan_") and not action_plans_enabled():
+        return 0
     получатели = list(dict.fromkeys(str(u) for u in users))
     if not получатели:
         return 0
@@ -161,8 +172,18 @@ def list_for(user: str, limit: int = MAX_LIST, *, unread_only: bool = False) -> 
     if ключ is None:
         return []
     предел = max(1, min(int(limit), MAX_LIST))
+    feature = action_plan_state()
     with _connected("прочитать уведомления") as conn, conn.cursor() as cur:
-        cur.execute(_LIST_SQL, {"user": ключ, "unread_only": unread_only, "limit": предел})
+        cur.execute(
+            _LIST_SQL,
+            {
+                "user": ключ,
+                "unread_only": unread_only,
+                "limit": предел,
+                "show_plans": feature.enabled,
+                "plans_after": feature.notifications_after,
+            },
+        )
         return [
             Notification(
                 id=int(row[0]),
@@ -181,8 +202,12 @@ def unread_count(user: str) -> int:
     ключ = _uuid_or_none(user)
     if ключ is None:
         return 0
+    feature = action_plan_state()
     with _connected("посчитать уведомления") as conn, conn.cursor() as cur:
-        cur.execute(_COUNT_SQL, (ключ,))
+        cur.execute(
+            _COUNT_SQL,
+            (ключ, feature.enabled, feature.notifications_after, feature.notifications_after),
+        )
         row = cur.fetchone()
     return 0 if row is None else int(row[0])
 

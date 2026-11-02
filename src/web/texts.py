@@ -97,6 +97,10 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "ratings.admin.group.directory": {"ru": "Страны и ответственные", "en": "Countries and owners"},
     "ratings.admin.group.calculation": {"ru": "Правила расчёта", "en": "Calculation rules"},
+    "ratings.admin.explain.aggregators": {
+        "ru": "Сбор данных площадок и сопоставление их с пиццериями.",
+        "en": "Platform collection and matching to pizzerias.",
+    },
     "ratings.admin.explain.sheet": {
         "ru": "Автоматическая загрузка из таблицы контроля.",
         "en": "Automatic collection from the control spreadsheet.",

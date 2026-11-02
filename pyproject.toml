@@ -351,6 +351,7 @@ layers = [
     # и не импортируется другими блоками этого яруса.
     "src.recognize : src.report : src.db",
     "src.domain",
+    "src.settings_read",
 ]
 
 [[tool.importlinter.contracts]]

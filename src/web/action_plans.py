@@ -38,6 +38,7 @@ from src.db.errors import (
 )
 from src.domain import list_zones
 from src.domain.errors import DomainError
+from src.domain.features import action_plans_enabled
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import (
@@ -90,6 +91,8 @@ def today() -> date:
 
 def card_plan(inspection_id: str) -> tuple[plans.PlanRequest | None, bool]:
     """Запрос по проверке для карточки и известно ли это (отказ базы карточку не роняет)."""
+    if not action_plans_enabled():
+        return None, True
     try:
         return plans.request_of_inspection(inspection_id, reach=auth.current_reach()), True
     except DbError as exc:
@@ -99,7 +102,7 @@ def card_plan(inspection_id: str) -> tuple[plans.PlanRequest | None, bool]:
 
 def needs_plan(counts: Mapping[str, Any]) -> bool:
     """Любой D1/D2/D3 в счётчиках движка — то же правило, что у автозапроса."""
-    return plans.needs_action_plan(counts or {})
+    return action_plans_enabled() and plans.needs_action_plan(counts or {})
 
 
 def unit_without_country(inspection_id: str) -> bool:
@@ -122,6 +125,8 @@ def country_plans(code: str) -> tuple[plans.PlanList, plans.PlanList, bool]:
     Принятые читаются отдельно: итог плана экран страны показывает (критерий
     спеки), а в очередь они не попадают.
     """
+    if not action_plans_enabled():
+        return EMPTY, EMPTY, True
     if not code:
         return EMPTY, EMPTY, True
     охват = auth.current_reach()
@@ -143,6 +148,32 @@ def _parse_date(raw: str) -> date | None:
 
 def install(app: Flask, conf: Settings) -> None:
     """Повесить маршруты вкладки. Настройки читаются на сборке: мусор — отказ сразу."""
+
+    @app.before_request
+    def paused_plan_routes() -> Response | None:
+        path = request.path
+        if not action_plans_enabled() and path == "/actions" and request.args.get("tab") == "plans":
+            if guard.may("plan.archive"):
+                return redirect(
+                    url_for(
+                        "administration",
+                        tab="plans",
+                        id=request.args.get("id", ""),
+                        lang=_lang(conf),
+                    ),
+                    code=303,
+                )
+            return redirect(url_for("actions", tab="prescriptions", lang=_lang(conf)), code=303)
+        if action_plans_enabled() or not (
+            path.startswith("/actions/requests/")
+            or path.startswith("/actions/plan-files/")
+            or path.startswith("/plans/")
+        ):
+            return None
+        if request.method == "GET" and guard.may("plan.archive"):
+            return None
+        abort(404)
+
     max_bytes = load_action_plan_settings().max_bytes
     actions_screen.register(
         app,

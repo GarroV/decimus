@@ -153,7 +153,6 @@ class Panel:
     #: Панель во вкладке «Страны»: без пиццерий, аудиторов и оценок площадок — это чтение.
     settings_only: bool = False
     #: Адрес вкладки «Страны» для ссылки «Изменить» на экране страны; пусто — вкладки нет.
-    edit_url: str = ""
     #: Блок «Договор» (D603, D609): виден и правится только у `contract.manage`.
     show_contract: bool = False
     can_contract: bool = False
@@ -237,7 +236,6 @@ def load(
     can_contract: bool = False,
     inspections: Sequence[InspectionRow] = (),
     settings_only: bool = False,
-    edit_url: str = "",
 ) -> Panel:
     """Карточка страны `code`: партнёр и девелопер, партнёры свода, пиццерии, договор.
 
@@ -257,7 +255,6 @@ def load(
         "auditors": _auditors(inspections),
         "settings_only": settings_only,
         "can_langs": can_edit and settings_only,
-        "edit_url": edit_url,
     }
     if show_email:
         сведения["can_recipients"] = settings_only and guard.may("mailing.manage")
