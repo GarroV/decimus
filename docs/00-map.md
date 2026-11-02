@@ -96,7 +96,7 @@ Flask-приложение управляющей компании и партн
 `app.py` собирает приложение и ещё держит часть экранов; остальные экраны
 подключаются своими `install(app, conf)`.
 
-<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,server_limits,view,webauthn_rp,aggregators_admin,mailing_documents,mailings_content,navigation,ratings_clients,unit_profile_edit}.py -->
+<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,server_limits,view,webauthn_rp,aggregators_admin,mailing_documents,mailings_content,prescription_notice,navigation,ratings_clients,unit_profile_edit}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/__main__.py` | Точка входа веб-админки: `python -m src.web` |
@@ -111,6 +111,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/mailing_documents.py` | Actual plan letter and prescription document consumers; no sending |
 | `src/web/mailings_content.py` | Message template editor/preview; no outbound communication |
 | `src/web/navigation.py` | Постоянное подменю оболочки: доступные разделы рейтингов без запроса данных |
+| `src/web/prescription_notice.py` | Сборка предписания из проверки в вебе: отбор нарушений, форма, документ PDF (шаг 3, D602, D606) |
 | `src/web/ratings_clients.py` | Клиентские оценки из существующих месячных агрегатов Dodo IS |
 | `src/web/sections.py` | Разделы веб-админки и признак «построен / не построен» (D138) |
 | `src/web/server_limits.py` | Явные пределы сервера `waitress` и предел одновременных медленных запросов |
@@ -449,7 +450,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,country_mailing_recipients,customer_ratings,source_units}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,country_mailing_recipients,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -481,6 +482,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/plan_flow.py` | Ход электронного плана исправлений: заполнение, согласование, выполнение (#1168) |
 | `src/db/plan_notify.py` | Уведомления электронного плана исправлений — только внутри приложения (#1168, D604, D614) |
 | `src/db/plan_rows.py` | Строки электронного плана исправлений: модель, чтение, заведение (шаг 2 эпика #1168) |
+| `src/db/prescription_notice.py` | Чтение для сборки предписания: английские формулировки записей проверки (шаг 3) |
 | `src/db/prescriptions.py` | Предписания: черновик, согласование ОСБ, отправка через Gmail, ответ партнёра, закрытие |
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, согласование, отправка, закрытие (УК), ответ партнёра |
 | `src/db/quality_read.py` | Чтения для экрана «Качество» (docs/21-quality.md): РКО, РС и проверки по месяцам |
@@ -623,6 +625,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0112_country_mailing_recipients.sql` | an empty configured list suppresses fallback |
 | `0113_mailing_content_templates.sql` | (нет описания) |
 | `0114_service_key_health_lock.sql` | The real probe timestamp is preserved; admin cannot fabricate a fresh probe |
+| `0115_prescription_findings.sql` | Сборка предписания из проверки (шаг 3 спеки 2026-10-21-osb-prescriptions-design, D601, D602, D606): вид предписания и нарушения из проверки-основания |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -1032,6 +1035,8 @@ Telegram, ни HTTP, ни SQL.
 | `src/report/info_titles.py` | Подписи полей информационной части — формулировки вопросов по кодам |
 | `src/report/letter_markup.py` | Разметка письма партнёру: белый список из четырёх элементов (T353, D169, #332) |
 | `src/report/letters.py` | Письмо партнёру по уже записанной проверке — пересборка, а не пересчёт |
+| `src/report/notice.py` | Отбор нарушений для предписания по проверке (D602, D606, шаг 3 спеки 2026-10-21) |
+| `src/report/notice_pdf.py` | PDF предписания по проверке: текст шаблона, таблица нарушений, приложение с фото (шаг 3) |
 | `src/report/photos.py` | Где взять кадр, приложенный к записи или к информационному полю, и что считать его пропажей |
 | `src/report/plan_terms.py` | Сроки и формулировки строк экшн-плана — только из ответа движка (#1168, CLAUDE.md) |
 | `src/report/rescore.py` | Пересчёт записанной проверки движком — для правки на приёмке (D200) |
