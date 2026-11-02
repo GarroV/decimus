@@ -617,9 +617,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0107_inspection_info_photo_answers.sql` | Info and photo metadata are inserted in the same push transaction, so this invariant is checked at commit rather than before the photo INSERT exists |
 | `0108_finding_split_history.sql` | Existing rows and legacy remain NULL; no accepted inspection is rewritten |
 | `0109_service_settings.sql` | (нет описания) |
-| `0110_country_mailing_recipients.sql` | an empty configured list suppresses fallback |
-| `0111_mailing_content_templates.sql` | (нет описания) |
-| `0112_service_key_health_lock.sql` | The real probe timestamp is preserved; admin cannot fabricate a fresh probe |
+| `0111_country_mailing_recipients.sql` | an empty configured list suppresses fallback |
+| `0112_mailing_content_templates.sql` | (нет описания) |
+| `0113_service_key_health_lock.sql` | The real probe timestamp is preserved; admin cannot fabricate a fresh probe |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

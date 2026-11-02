@@ -25,5 +25,6 @@
 </dl><p class="ssec__note">{{ t('aggadmin.global') }}</p>
 {% if p.gaps %}<h3>{{ t('aggadmin.gaps') }}</h3><ul>{% for unit, state, at in p.gaps %}<li>{{ unit }} — {{ t('aggadmin.gap.' ~ state) }}{% if at %} ({{ at.strftime('%d.%m.%Y') }}){% endif %}</li>{% endfor %}</ul>{% endif %}
 </section>{% endfor %}
+<p><a class="sbtn sbtn--primary" href="{{ settings_link }}">{{ t('aggadmin.settings') }}</a></p>
 <a class="sbtn" href="{{ request.script_root }}/ratings/agg?group=country&amp;value={{ selected.code }}&amp;lang={{ lang }}">{{ t('aggadmin.openRatings') }}</a>
 {% endif %}{% endblock %}

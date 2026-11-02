@@ -597,9 +597,9 @@
 | `0107_inspection_info_photo_answers.sql` | — |
 | `0108_finding_split_history.sql` | — |
 | `0109_service_settings.sql` | `service_settings` |
-| `0110_country_mailing_recipients.sql` | `country_mailing_recipients` |
-| `0111_mailing_content_templates.sql` | — |
-| `0112_service_key_health_lock.sql` | — |
+| `0111_country_mailing_recipients.sql` | `country_mailing_recipients` |
+| `0112_mailing_content_templates.sql` | — |
+| `0113_service_key_health_lock.sql` | — |
 <!-- map:end -->
 
 ## Makefile

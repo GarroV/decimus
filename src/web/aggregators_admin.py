@@ -169,6 +169,7 @@ def show() -> Response:
             split_open=selected is not None,
             split_back=administration.url("aggregators"),
             link=lambda code: administration.url("aggregators", country=code),
+            settings_link=administration.url("ratings", block="aggregators"),
             **administration.nav("aggregators"),
         )
     )

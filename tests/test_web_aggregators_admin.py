@@ -135,6 +135,8 @@ def test_hq_managers_see_actual_gaps_and_global_status(
     assert "missing — нет привязки" in html
     assert "подробности в закрытом журнале" in html and "всему сборщику" in html
     assert "/ratings/agg?group=country&amp;value=BG" in html
+    assert "/administration?tab=ratings&amp;block=aggregators" in html
+    assert "Настройки площадок и привязки" in html
     assert "shealth__dot--red" in html
     assert all(n == 1 for n in calls.values()), calls
     assert response.headers["Cache-Control"] == "private, no-store"

@@ -1,6 +1,10 @@
 """Тексты административного охвата агрегаторов (#1391)."""
 
 AGGREGATORS_ADMIN_TEXTS: dict[str, dict[str, str]] = {
+    "aggadmin.settings": {
+        "ru": "Настройки площадок и привязки",
+        "en": "Platform settings and links",
+    },
     "aggadmin.partial": {"ru": "Собрано частично", "en": "Partially collected"},
     "aggadmin.errorDetails": {
         "ru": "Ошибка сбора; подробности в закрытом журнале",
