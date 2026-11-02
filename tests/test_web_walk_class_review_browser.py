@@ -117,6 +117,75 @@ def test_failed_class_check_can_retry_directly_from_save_area(browser_page):
     assert page.get_by_role("button", name="Save", exact=True).is_enabled()
 
 
+def preview_during_search(page):
+    load(page)
+    page.evaluate("""() => {
+      const W=DecimusWalk, post=W.post;
+      W.post=(url,body,...args)=>{
+        if (url==='hint') return Promise.resolve({ok:true,body:{candidates:cards}});
+        if (url==='suggest') return new Promise(resolve=>{
+          window.finishSearch=()=>resolve({ok:true,body:{candidates:[cards[1]]}});
+        });
+        return post(url,body,...args);
+      };
+    }""")
+    page.locator(".walk-mark--find").click()
+    page.wait_for_selector(".walk-found__card")
+    choose(page, 0)
+
+
+def test_preview_waits_for_search_before_checking_class_without_racing_model_lock(browser_page):
+    page = browser_page
+    preview_during_search(page)
+    assert page.evaluate("levelCalls.length") == 0
+    assert page.locator(".walk-sheet__why").inner_text() == (
+        "walk.sheet.class_review.waiting_search"
+    )
+    page.evaluate("finishSearch()")
+    page.wait_for_function("levelCalls.length===1")
+    assert page.evaluate("levelCalls[0].code") == "SYN01"
+    resolve(page, level="D1")
+    page.get_by_role("button", name="Save", exact=True).click()
+    page.wait_for_function("ops.length===1")
+    assert page.evaluate("[ops[0].code,ops[0].level]") == ["SYN01", "D1"]
+
+
+def test_finishing_search_does_not_override_manual_class(browser_page):
+    page = browser_page
+    preview_during_search(page)
+    page.get_by_role("button", name="walk.sheet.class_review.manual", exact=True).click()
+    page.locator('[data-manual-class="D2"]').click()
+    page.evaluate("finishSearch()")
+    page.get_by_role("button", name="Save", exact=True).click()
+    page.wait_for_function("ops.length===1")
+    assert page.evaluate("levelCalls.length") == 0
+    assert page.evaluate("ops[0].level") == "D2"
+
+
+def test_finishing_search_only_checks_current_preview_selection(browser_page):
+    page = browser_page
+    preview_during_search(page)
+    choose(page, 1)
+    assert page.evaluate("levelCalls.length") == 0
+    page.evaluate("finishSearch()")
+    page.wait_for_function("levelCalls.length===1")
+    assert page.evaluate("levelCalls[0].code") == "SYN02"
+
+
+@pytest.mark.parametrize("change", ["facts", "close"])
+def test_waiting_class_request_is_discarded_after_changed_facts_or_closed_form(
+    browser_page, change
+):
+    page = browser_page
+    preview_during_search(page)
+    if change == "facts":
+        page.locator(".walk-area--words").fill("Different current observation")
+    else:
+        page.evaluate("DecimusWalk.sheet.close(true)")
+    page.evaluate("async()=>{finishSearch();await new Promise(resolve=>setTimeout(resolve,0))}")
+    assert page.evaluate("levelCalls.length") == 0
+
+
 def test_needs_fact_never_applies_provisional_class_and_answer_is_scoped(browser_page):
     page = browser_page
     load(page)

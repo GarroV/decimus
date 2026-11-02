@@ -597,6 +597,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Check the facts, then determine the class for the selected item.",
     },
     "walk.sheet.class_review.pending": {"ru": "Определяем класс…", "en": "Checking the class…"},
+    "walk.sheet.class_review.waiting_search": {
+        "ru": "Ждём завершения поиска, затем определим класс…",
+        "en": "Waiting for the search to finish, then checking the class…",
+    },
     "walk.sheet.class_review.proposed": {
         "ru": "Предложенный класс: {level}",
         "en": "Proposed class: {level}",

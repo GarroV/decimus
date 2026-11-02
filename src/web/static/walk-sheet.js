@@ -722,6 +722,7 @@
     f.hintCodes = null;
     f.pending = asked;
     if (fixed === null && asked.words) preview(mine, asked, body.zone_hint);
+    form.searchesInFlight = (form.searchesInFlight || 0) + 1;
     W.post(W.urls.suggest, body).then(function (res) {
       if (f !== form || W.state.data.run_id !== runId || f.findId !== mine) return;
       if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
@@ -764,6 +765,17 @@
       f.finding = false;
       f.findError = err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network");
       redraw("item", "reading", "footer");
+    }).finally(function () {
+      form.searchesInFlight -= 1;
+      if (f !== form || form.searchesInFlight || !reviewing() || !f.code) return;
+      selectedClassCandidates().forEach(function (cand) {
+        var state = classState(cand);
+        var queued = state.waitingSearch;
+        state.waitingSearch = null;
+        if (state.status !== "waiting_search" || !queued) return;
+        if (classContext(cand).key === queued.key) requestClass(cand, queued.force);
+        else classSelectionChanged();
+      });
     });
   }
 
@@ -1252,6 +1264,20 @@
     var form = f;
     var context = classContext(cand);
     var requestedState = classState(cand);
+    // A preview can be selected while the coarse request still owns the
+    // auditor's model lock. Wait for that request; never race it into HTTP429.
+    if (form.searchesInFlight && !context.blocked) {
+      W.classReview.sync(requestedState, context);
+      if (!force && ["ready", "needs_fact", "not_established", "manual"].indexOf(requestedState.status) !== -1) return;
+      requestedState.status = "waiting_search";
+      requestedState.manualMode = false;
+      requestedState.level = null;
+      requestedState.waitingSearch = {key:context.key, force:!!force};
+      syncClassSelections();
+      updateClassPanels();
+      redraw("footer");
+      return;
+    }
     W.classReview.request(requestedState, context, function (key) {
       return f === form && classSelected(cand) && f.run_id === W.state.data.run_id && classContext(cand).key === key;
     }, function () {
@@ -1305,7 +1331,8 @@
     var state = classState(cand);
     var feedback = panel.querySelector("[data-class-feedback]");
     feedback.textContent = "";
-    var text = state.status === "pending" ? tx("walk.sheet.class_review.pending")
+    var text = state.status === "waiting_search" ? tx("walk.sheet.class_review.waiting_search")
+      : state.status === "pending" ? tx("walk.sheet.class_review.pending")
       : state.status === "manual" ? tx("walk.sheet.class_review.manual_active")
       : state.status === "ready" ? tx("walk.sheet.class_review.proposed", {level:state.level})
       : state.status === "needs_fact" ? state.needFact
@@ -1361,7 +1388,7 @@
       feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.draft_level", {level:f.legacyLevel})));
     }
     var check = panel.querySelector("[data-class-check]");
-    check.disabled = state.status === "pending" || !!classContext(cand).blocked;
+    check.disabled = state.status === "pending" || state.status === "waiting_search" || !!classContext(cand).blocked;
     panel.querySelectorAll("[data-manual-class]").forEach(function (button) {
       var on = state.manualMode && state.level === button.dataset.manualClass;
       button.setAttribute("aria-pressed", String(on));
@@ -1863,7 +1890,8 @@
         });
         if (missingClass) {
           var state = classState(missingClass);
-          var status = state.status === "pending" ? tx("walk.sheet.class_review.pending")
+          var status = state.status === "waiting_search" ? tx("walk.sheet.class_review.waiting_search")
+            : state.status === "pending" ? tx("walk.sheet.class_review.pending")
             : state.status === "needs_fact" ? state.needFact
             : state.status === "not_established" ? tx("walk.sheet.class_review.not_established")
             : state.message || tx(state.manualMode ? "walk.sheet.class_review.manual_active" : "walk.sheet.class_review.check_hint");
