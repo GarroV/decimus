@@ -66,6 +66,7 @@
           <dd{% if r.overdue(today) %} class="srow__err"{% endif %}>{{ day(r.due_on) }}</dd></div>
         {% if r.electronic %}<div><dt>{{ t('plans.count_from.shown') }}</dt><dd>{{ day(r.count_from) }}</dd></div>{% endif %}
         <div><dt>{{ t('actions.col.state') }}</dt><dd>{{ state_tag(r, today) }}</dd></div>
+        {% if r.returns_count %}<div><dt>{{ t('plans.returns.label') }}</dt><dd title="{{ t('plans.returns.hint') }}">{{ r.returns_count }}</dd></div>{% endif %}
         <div><dt>{{ t('actions.panel.origin') }}</dt><dd>{{ t('plans.origin.' ~ r.origin) }}</dd></div>
       </dl>
     </section>
