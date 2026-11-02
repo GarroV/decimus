@@ -27,6 +27,16 @@ AGGREGATORS_ADMIN_TEXTS: dict[str, dict[str, str]] = {
     },
     "aggadmin.tone.green": {"ru": "Полно и актуально", "en": "Complete and fresh"},
     "aggadmin.tone.yellow": {"ru": "Неполно или устарело", "en": "Incomplete or stale"},
+    "aggadmin.info": {"ru": "К сведению", "en": "For information"},
+    "aggadmin.info.note": {
+        "ru": (
+            "Привязаны к площадке, но оценки пока нет (мало отзывов) — "
+            "это норма, делать ничего не надо."
+        ),
+        "en": (
+            "Linked to the platform but not rated yet (too few reviews): normal, nothing to do."
+        ),
+    },
     "aggadmin.tone.red": {"ru": "Сбой общего сборщика", "en": "Global collection failed"},
     "aggadmin.tone.grey": {"ru": "Нет ожидаемого охвата", "en": "No expected coverage"},
     "aggadmin.working": {"ru": "Работающих пиццерий: {n}", "en": "Working pizzerias: {n}"},
