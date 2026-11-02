@@ -1,41 +1,34 @@
-{#
-  «Страны» (D640, #1251): вкладка раздела «Администрирование». Слева столбцом страны охвата,
-  у каждой видно, что настроено (партнёр, девелопер, языки отчёта, договор): строка — тот же
-  `pick_item`, что в «Странах», «Проверках» и «Методике» (D655); справа в панели выбранной страны четыре блока-плитки: партнёр, девелопер,
-  языки отчёта, договор, форма каждого раскрывается внутри блока (`country/_settings.html`,
-  режим `settings_only`; без него тот же макрос — карточка страны для чтения). Выбор живёт в адресе (`?country=<код>`).
-  Открыта тем, у кого есть `space.manage` или `contract.manage`; ОСБ видит договор и не
-  видит форм девелопера, партнёра и языков.
-#}{% extends "_split_page.html" %}
+{# D690: страны охвата и inline-карточка выбранной страны. Партнёр и адресаты —
+   реальные контакты name/email, отдельно от пространств доступа. Первая страна
+   выбрана по умолчанию; drawer не используется. Правка — по матрице доступа. #}{% extends "base.html" %}
 {% from "_info_tip.html" import info_tip %}
+
 {% from "_pick_ui.html" import pick_item %}
 {% from "administration/_nav.html" import admin_nav with context %}
 {% from "country/_settings.html" import settings_panel with context %}
 {% block title %}{{ t('administration.tab.countries') }} · {{ t('section.administration.title') }}{% endblock %}
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endblock %}
-
-{# Столбец вкладок слева, вся страница вкладки — справа (D639). #}
-{% block body %}
-  <div class="sadmin">
-    {{ admin_nav() }}
-    <div class="sadmin__main">{{ super() }}</div>
-  </div>
-{% endblock %}
-
-{% block split_top %}
-  <header class="shead">
-    <div class="shead__main">
+{% block page_heading %}<header class="page-heading">
+<div class="shead__main">
       <div class="info-row">
         <h1 class="shead__title">{{ t('administration.tab.countries') }}</h1>
         {{ info_tip(t('tip.hint'), '', [t('countries.sub')], 'countries') }}
       </div>
     </div>
-  </header>
-{% endblock %}
+</header>{% endblock %}
 
-{% block split_list %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-pick.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">
+{% endblock %}
+{% block body %}
+<div class="sadmin">
+{{ admin_nav() }}
+<div class="sadmin__main countryadmininline">
+<section class="countryadmininline__list">
+
   <div class="sbox">
     <div class="sbar"><span class="sbar__count">{{ t('countries.count', count=lines|length) }}</span></div>
     {% if partial_failed %}<p class="ssec__note">{{ t('countries.partial_failed') }}</p>{% endif %}
@@ -51,14 +44,15 @@
             {% set langs = (c.langs|map('upper')|join(' · ')) if c.langs else ('—' if c.langs is none else t('countries.langs.default')) %}
             {% set contract = ('—' if c.has_contract is none else (t('countries.contract.yes') if c.has_contract else t('countries.contract.no'))) %}
             {% set meta = (c.space or unset) ~ ' · ' ~ (c.developer or unset) ~ ' · ' ~ langs ~ ((' · ' ~ t('countries.col.contract') ~ ': ' ~ contract) if show_contract else '') %}
-            {{ pick_item(country_url(c.code), c.name, meta, on=(split_open and picked == c.code), code=c.code, drawer=true) }}
+            {{ pick_item(country_url(c.code), c.name, meta, on=(split_open and picked == c.code), code=c.code, drawer=false) }}
           {% endfor %}
         </div>
       </div>
     {% endif %}
   </div>
-{% endblock %}
-
-{% block split_title %}{{ t('country.settings.title') }} · {{ lines|selectattr('code', 'equalto', picked)|map(attribute='name')|first }}{% endblock %}
-
-{% block split_detail %}{% if panel %}{{ settings_panel(panel) }}{% endif %}{% endblock %}
+</section>
+<section class="countryadmininline__detail">
+<h2 class="sdetail__title">{{ t('country.settings.title') }} · {{ lines|selectattr('code', 'equalto', picked)|map(attribute='name')|first }}</h2>
+{% if contact_error %}<p role="alert">{{ t('contacts.error.' ~ contact_error) }}</p>{% endif %}
+{% if panel %}{{ settings_panel(panel) }}{% else %}<p>{{ t('contacts.choose_country') }}</p>{% endif %}
+</section></div></div>{% endblock %}

@@ -295,6 +295,51 @@ def test_callback_sends_current_pdf_in_gmail_mime(
     assert attachment.get_payload(decode=True) == PDF
 
 
+@pytest.mark.parametrize("prefix", ["Тема", "Subject"])
+def test_saved_subject_goes_only_into_gmail_header(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]],
+    monkeypatch: pytest.MonkeyPatch,
+    prefix: str,
+) -> None:
+    from src.web import google_mail
+
+    включить_почту(monkeypatch)
+    client, traces = клиент
+    raw = f"<b>{prefix}: Human-edited inspection result</b>\n\nHello!\n<b>87.0%</b>\nFull comment."
+    saved = SavedLetter(
+        id="l-saved", body=raw, lang="ru", saved_by="tester", created_at=datetime.now()
+    )
+    monkeypatch.setattr(data, "saved_letter", lambda _id, *, lang=None: saved)
+    messages: list[Any] = []
+
+    def create(token: str, **fields: Any) -> str:
+        encoded = google_mail.mime_message(**fields)
+        message = BytesParser(policy=email.policy.default).parsebytes(
+            base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
+        )
+        messages.append(message)
+        return "draft-test"
+
+    monkeypatch.setattr(letter_draft, "create_draft", create)
+    response = увести(client, raw)
+    state = urllib.parse.parse_qs(urllib.parse.urlparse(response.location).query)["state"][0]
+    result = client.get("/auth/google/mail", query_string={"state": state, "code": "code"})
+    assert "gmail=ok" in result.headers["Location"]
+    assert len(messages) == 1
+    message = messages[0]
+    assert str(message["Subject"]) == "Human-edited inspection result"
+    plain = message.get_body(preferencelist=("plain",)).get_content().strip()
+    rich = message.get_body(preferencelist=("html",)).get_content()
+    assert plain == "Hello!\n87.0%\nFull comment."
+    assert "Human-edited inspection result" not in rich
+    assert "<b>87.0%</b>" in rich
+    assert saved.body == raw
+    assert len(traces["remember"]) == 1
+    assert traces["remember"][0][1] == raw
+    (attachment,) = message.iter_attachments()
+    assert attachment.get_payload(decode=True) == PDF
+
+
 def test_черновик_в_чужой_аккаунт_google_не_ложится(
     клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -543,3 +588,51 @@ def test_у_ждущей_приёмки_письмо_не_сохраняется
     assert ответ.status_code == 303
     assert "saved=on_review" in ответ.headers["Location"]
     assert not следы["remember"]
+
+
+@pytest.mark.parametrize("manual", ["manual@example.com", ""])
+def test_country_recipient_fallback_respects_manual_address(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch, manual: str
+) -> None:
+    включить_почту(monkeypatch)
+    client, traces = клиент
+    detail = карточка()
+    detail = replace(detail, inspection=replace(detail.inspection, contact=manual))
+    monkeypatch.setattr(data, "load_card", lambda _id, *, reach: detail)
+    resolved: list[Any] = []
+    monkeypatch.setattr(
+        letter_draft.country_contacts,
+        "recipients_for_inspection",
+        lambda ident, *, reach: resolved.append((ident, reach)) or "country@example.com",
+    )
+    response = увести(client)
+    state = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(response.location).query))["state"]
+    response = client.get(f"/auth/google/mail?state={state}&code=synthetic")
+    assert response.status_code in (302, 303)
+    assert traces["draft"][0][1] == (manual or "country@example.com")
+    assert bool(resolved) is (not bool(manual))
+    if resolved:
+        assert resolved[0][0] == ПРОВЕРКА
+
+
+def test_unreadable_country_recipients_prevents_draft(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    включить_почту(monkeypatch)
+    client, traces = клиент
+    detail = карточка()
+    monkeypatch.setattr(
+        data,
+        "load_card",
+        lambda _id, *, reach: replace(detail, inspection=replace(detail.inspection, contact="")),
+    )
+
+    def unavailable(*args: Any, **kwargs: Any) -> str:
+        raise DbError("unavailable")
+
+    monkeypatch.setattr(letter_draft.country_contacts, "recipients_for_inspection", unavailable)
+    response = увести(client)
+    state = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(response.location).query))["state"]
+    response = client.get(f"/auth/google/mail?state={state}&code=synthetic")
+    assert "gmail=failed" in response.location
+    assert traces["draft"] == []

@@ -12,12 +12,16 @@
   вот этот», а не право.
 #}{% extends "base.html" %}
 {% block title %}{{ t('checklists.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<h1 class="ov-head__title">{{ t('checklists.title') }}</h1>
+</header>{% endblock %}
+
 
 {% block body %}
   <div class="ov-head">
     <div class="ov-head__main">
       <div class="ov-head__kicker">{{ t('section.admin.title') }}</div>
-      <h1 class="ov-head__title">{{ t('checklists.title') }}</h1>
+
     </div>
   </div>
 

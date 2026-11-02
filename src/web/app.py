@@ -70,6 +70,7 @@ from . import (
     assets,
     auth,
     calendar_screen,
+    country_contacts_actions,
     country_filter,
     country_page,
     country_settings,
@@ -239,6 +240,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     unit_add.install(app, conf)
     country_filter.install(app)
     country_settings.install(app)
+    country_contacts_actions.install(app, conf.ui_lang)
     mailings_screen.install(app, conf.ui_lang)
     _register_registry(app, conf)
     calendar_screen.install(app, conf)

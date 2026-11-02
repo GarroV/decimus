@@ -7,11 +7,15 @@
   Переменные названы поимённо: искать их в коде человеку не должно быть нужно.
 #}{% extends "base.html" %}
 {% block title %}{{ t('section.admin.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<h1 class="section__title">{{ t('section.admin.title') }}</h1>
+</header>{% endblock %}
+
 
 {% block body %}
   <div class="section">
     <div class="section__head">
-      <h1 class="section__title">{{ t('section.admin.title') }}</h1>
+
     </div>
     <p class="section__lead">{{ t('methodology.lead') }}</p>
   </div>

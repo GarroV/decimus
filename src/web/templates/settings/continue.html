@@ -5,18 +5,20 @@
   на GET мог бы вызвать чужой сайт, пока намерение заряжено.
 #}{% extends "base.html" %}
 {% block title %}{{ t('settings.continue.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<div class="shead__main">
+      <h1 class="shead__title">{{ t('settings.continue.title') }}</h1>
+      <p class="shead__sub">{{ account.login }}</p>
+    </div>
+</header>{% endblock %}
+
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
 {% endblock %}
 {% block page_class %} page--settings{% endblock %}
 {% block body %}
-  <header class="shead">
-    <div class="shead__main">
-      <h1 class="shead__title">{{ t('settings.continue.title') }}</h1>
-      <p class="shead__sub">{{ account.login }}</p>
-    </div>
-  </header>
+
   <article class="sdetail ssettings">
     <section class="ssec" id="continue">
       <p class="ssec__text">{{ t('settings.continue.why', action=t('settings.continue.' ~ action)) }}</p>

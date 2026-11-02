@@ -23,12 +23,29 @@
   (D404; `registry_period.py`).
 #}{% extends "_split_page.html" %}
 {% from "_info_tip.html" import info_tip %}
+
 {% from "_pick.html" import pick %}
 {% from "_pick_ui.html" import pick_item %}
 {% from "_period.html" import period_picker with context %}
 {% from "inspections/_panel.html" import inspection_panel with context %}
 {% from "inspections/_row.html" import inspection_row with context %}
 {% block title %}{{ t('section.registry.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<div class="shead__main">
+      {#- Период в шапке не повторяем — он в переключателе ниже; служебные числа — под «?» (D632). -#}
+      {% set tip_rows = [] %}
+      {% if filters.unchecked %}
+        {% set _ = tip_rows.append(t('registry.unchecked.label') ~ ' (' ~ period_title ~ ')' ~ (': ' ~ to_check.total if to_check.shown and not to_check.failed else '')) %}
+      {% elif registry.retracted_count %}
+        {% set _ = tip_rows.append(t('registry.retracted_count', count=registry.retracted_count)) %}
+      {% endif %}
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('section.registry.title') }}</h1>
+        {% if tip_rows %}{{ info_tip(t('tip.counts'), '', tip_rows, 'registry') }}{% endif %}
+      </div>
+    </div>
+</header>{% endblock %}
+
 {% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}"><script src="{{ url_for('static', filename='proofread.js') }}" defer></script><script src="{{ url_for('static', filename='letter.js') }}" defer></script>{% endblock %}
 
 {% macro row_link(row, review=false) %}
@@ -47,21 +64,7 @@
 {% endmacro %}
 
 {% block split_top %}
-  <header class="shead">
-    <div class="shead__main">
-      {#- Период в шапке не повторяем — он в переключателе ниже; служебные числа — под «?» (D632). -#}
-      {% set tip_rows = [] %}
-      {% if filters.unchecked %}
-        {% set _ = tip_rows.append(t('registry.unchecked.label') ~ ' (' ~ period_title ~ ')' ~ (': ' ~ to_check.total if to_check.shown and not to_check.failed else '')) %}
-      {% elif registry.retracted_count %}
-        {% set _ = tip_rows.append(t('registry.retracted_count', count=registry.retracted_count)) %}
-      {% endif %}
-      <div class="info-row">
-        <h1 class="shead__title">{{ t('section.registry.title') }}</h1>
-        {% if tip_rows %}{{ info_tip(t('tip.counts'), '', tip_rows, 'registry') }}{% endif %}
-      </div>
-    </div>
-  </header>
+
 {% endblock %}
 
 {% block body %}

@@ -107,7 +107,7 @@ def _шапка_экрана(monkeypatch: pytest.MonkeyPatch, rows: tuple[fresh.
     monkeypatch.setattr(screen.ratings_freshness, "read_rows", lambda now: rows)
     for client in _клиент(monkeypatch):
         страница = client.get("/ratings?lang=ru").get_data(as_text=True)
-        начало = страница.index('<header class="rt-head">')
+        начало = страница.index('<header class="page-heading">')
         шапка = страница[начало : страница.index("</header>", начало)]
         # Строка «данные за … · пришли …» у заголовка раздела (D660) — не таблица под «?».
         return re.sub(r'<span class="rt-fresh-line">.*?</span>', "", шапка, flags=re.S)

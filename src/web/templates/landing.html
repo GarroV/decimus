@@ -10,6 +10,7 @@
   файлу на язык; их делает `make landing-shots`, размеры лежат в `sizes.json`.
   Шапка своя: общая шапка до входа здесь не нужна.
 #}{% extends "base.html" %}
+{% block page_heading %}{% endblock %}
 {% block title %}{{ t('landing.title') }}{% endblock %}
 {% block page_class %} page--landing{% endblock %}
 {% block head %}

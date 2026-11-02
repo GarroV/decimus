@@ -1,4 +1,29 @@
 {# Общий блок; работает без JavaScript, таблица доступна с телефона и клавиатуры. #}
+{% macro score_plot(width) %}
+      <svg viewBox="0 0 {{ width }} 300" width="100%" role="group" aria-label="{{ t('history.results') }}">
+        <title>{{ t('history.results') }}</title>
+        {% for value in (0, 25, 50, 75, 100) %}{% set y = 248 - value * 2 %}
+          <line class="ih-grid" x1="48" x2="{{ width - 24 }}" y1="{{ y }}" y2="{{ y }}"/>
+          <text class="ih-axis" x="32" y="{{ y + 5 }}" text-anchor="end">{{ value }}</text>
+        {% endfor %}
+        {% for tick in timeline.ticks %}{% if width > 600 or loop.first or loop.last or loop.index0 == 2 %}
+          <line class="ih-grid ih-grid--vertical" x1="{{ 48 + tick.x * (width - 72) }}" x2="{{ 48 + tick.x * (width - 72) }}" y1="48" y2="248"/>
+          <text class="ih-axis" x="{{ 48 + tick.x * (width - 72) }}" y="278" text-anchor="{{ 'start' if loop.first else ('end' if loop.last else 'middle') }}">{{ tick.day.strftime('%d.%m.%y') }}</text>
+        {% endif %}{% endfor %}
+        {% if timeline.points|length > 1 %}
+          <polygon class="ih-area" points="48,248 {% for p in timeline.points %}{{ 48 + p.x * (width - 72) }},{{ p.y }} {% endfor %}{{ width - 24 }},248"/>
+          <polyline class="ih-line" points="{% for p in timeline.points %}{{ 48 + p.x * (width - 72) }},{{ p.y }} {% endfor %}"/>
+        {% endif %}
+        {% for p in timeline.points %}
+          <g class="ih-point" tabindex="0" role="img" aria-label="{{ p.day.strftime('%d.%m.%Y') }} · {{ p.average }}% · {{ t('history.count') }}: {{ p.count }}">
+            <title>{{ p.day.strftime('%d.%m.%Y') }} · {{ p.average }}% · {{ t('history.count') }}: {{ p.count }}</title>
+            <circle class="ih-point__hit" cx="{{ 48 + p.x * (width - 72) }}" cy="{{ p.y }}" r="12"/>
+            <circle class="ih-point__dot" cx="{{ 48 + p.x * (width - 72) }}" cy="{{ p.y }}" r="5"/>
+          </g>
+          {% if loop.first or loop.last %}<text class="ih-value" x="{{ 48 + p.x * (width - 72) + (8 if loop.first else -8) }}" y="{{ p.y - 14 }}" text-anchor="{{ 'start' if loop.first else 'end' }}">{{ '%.1f'|format(p.average) }}</text>{% endif %}
+        {% endfor %}
+      </svg>
+{% endmacro %}
 {% if timeline %}
 {% from "_pick_ui.html" import pick_block with context %}
 {% call pick_block(t('history.title'), '', '' if timeline.failed else timeline.count) %}
@@ -20,29 +45,31 @@
       <button class="btn btn--sm" type="submit">{{ t('history.show') }}</button>
     </form>
     <p class="pk-empty pk-empty--pad">{{ t('history.count') }}: <strong>{{ timeline.count }}</strong> · {{ t('history.average') }}: <strong>{{ '%.1f'|format(timeline.average) if timeline.average is not none else '—' }}</strong></p>
-    <div class="ih-plot"><svg viewBox="0 0 640 265" width="100%" role="img" aria-label="{{ t('history.title') }}">
-      <text x="12" y="15" fill="currentColor" font-size="12">{{ t('history.count') }}</text>
-      <text x="12" y="140" fill="currentColor" font-size="12">{{ t('history.average') }} (0–100)</text>
-      <line x1="25" x2="620" y1="105" y2="105" stroke="currentColor" opacity=".2"/>
-      {% for y, label in ((150, 100), (190, 50), (230, 0)) %}
-        <line x1="25" x2="620" y1="{{ y }}" y2="{{ y }}" stroke="currentColor" opacity=".15"/>
-        <text x="22" y="{{ y + 4 }}" text-anchor="end" fill="currentColor" font-size="10">{{ label }}</text>
-      {% endfor %}
-      {% for b in timeline.buckets %}
-        <rect x="{{ b.x - 7 }}" y="{{ 105 - b.count_height }}" width="14" height="{{ b.count_height }}" fill="currentColor" opacity=".5"><title>{{ b.label }} · {{ t('history.count') }}: {{ b.count }}</title></rect>
-        {% if b.score_y is not none %}
-          {% if not loop.first %}{% set prev = timeline.buckets[loop.index0 - 1] %}{% if prev.score_y is not none %}<line x1="{{ prev.x }}" y1="{{ prev.score_y }}" x2="{{ b.x }}" y2="{{ b.score_y }}" stroke="currentColor" stroke-width="2"/>{% endif %}{% endif %}
-          <text x="{{ b.x + 8 }}" y="{{ b.score_y + 3 }}" text-anchor="start" fill="currentColor" font-size="10">{{ b.average }}</text>
-          <circle cx="{{ b.x }}" cy="{{ b.score_y }}" r="4" fill="currentColor"><title>{{ b.label }} · {{ b.average }}%</title></circle>
-        {% endif %}
-        <text x="{{ b.x }}" y="122" text-anchor="middle" fill="currentColor" font-size="11">{{ b.count }}</text>
-        <text x="{{ b.x }}" y="253" text-anchor="middle" fill="currentColor" font-size="11">{{ b.label }}</text>
-      {% endfor %}
-    </svg></div>
+    <section class="ih-chart" aria-label="{{ t('history.results') }}">
+      <div class="ih-chart__head"><h3>{{ t('history.results') }}</h3><span>{{ t('history.scale') }}</span></div>
+      {% if timeline.points %}
+      <div class="ih-plot ih-plot--wide">{{ score_plot(960) }}</div>
+      <div class="ih-plot ih-plot--narrow">{{ score_plot(360) }}</div>
+      <p class="ih-chart__note">{{ t('history.daily') }}{% if timeline.points|length == 1 %} {{ t('history.single') }}{% endif %}</p>
+      {% else %}<p class="ih-chart__note">{{ t('history.empty_period') }}</p>{% endif %}
+    </section>
+    <section class="ih-chart ih-chart--counts" aria-label="{{ t('history.volume') }}">
+      <div class="ih-chart__head"><h3>{{ t('history.volume') }}</h3><span>{{ t('history.months') if timeline.grain == 'month' else t('history.years') }}</span></div>
+      <div class="ih-counts">
+        {% for b in timeline.buckets %}<div class="ih-count" title="{{ b.label }} · {{ t('history.count') }}: {{ b.count }}">
+          <span class="ih-count__value">{{ b.count }}</span>
+          <div class="ih-count__track"><i style="height: {{ b.count_height }}px"></i></div>
+          <span class="ih-count__label">{{ b.label }}</span>
+        </div>{% endfor %}
+      </div>
+    </section>
     <details class="ih-data"><summary>{{ t('history.table') }}</summary>
       <table class="table"><thead><tr><th>{{ t('history.period') }}</th><th>{{ t('history.count') }}</th><th>{{ t('history.average') }}</th></tr></thead><tbody>
         {% for b in timeline.buckets %}<tr><th>{{ b.label }}{% if timeline.grain == 'month' %}.{{ timeline.year }}{% endif %}</th><td>{{ b.count }}</td><td>{{ '%.1f'|format(b.average) if b.average is not none else '—' }}</td></tr>{% endfor %}
       </tbody></table>
+      {% if timeline.points %}<table class="table"><thead><tr><th>{{ t('history.date') }}</th><th>{{ t('history.count') }}</th><th>{{ t('history.average') }}</th></tr></thead><tbody>
+        {% for p in timeline.points %}<tr><th>{{ p.day.strftime('%d.%m.%Y') }}</th><td>{{ p.count }}</td><td>{{ '%.1f'|format(p.average) }}</td></tr>{% endfor %}
+      </tbody></table>{% endif %}
     </details>
   {% endif %}
 {% endcall %}

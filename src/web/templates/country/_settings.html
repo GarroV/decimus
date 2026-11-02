@@ -87,34 +87,12 @@
 
 {# Панель вкладки «Страны» (D640): четыре блока-плитки, у каждого заголовок, значение, пояснение
    и кнопка, форма раскрывается внутри блока. Адреса и поля форм те же, что были. #}
+{% from "country/_contacts.html" import contact_block with context %}
+
 {% macro _blocks(s) %}
   <div class="cblocks">
-    <section class="cblock" aria-labelledby="cb-partner">
-      <h3 class="cblock__title" id="cb-partner">{{ t('country.block.partner') }}</h3>
-      {% if s.failed %}
-        <p class="cblock__value cblock__value--none">—</p>
-        <p class="cblock__note">{{ t('country.settings.partner_failed') }}</p>
-      {% elif s.owner %}
-        <p class="cblock__value">{{ s.owner_name }} <small class="mono">{{ s.owner }}</small></p>
-        <p class="cblock__note">{{ t('country.block.partner_locked') }}</p>
-      {% else %}
-        <p class="cblock__value cblock__value--none">{{ t('country.card.unset') }}</p>
-        <p class="cblock__note">{{ t('country.block.partner_note') }}</p>
-        {% if s.can_edit and s.spaces %}
-          <details class="sfold">
-            <summary class="sbtn sbtn--primary">{{ t('country.block.assign') }}</summary>
-            <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/space') }}?lang={{ lang }}">
-              <label><span class="sform__label">{{ t('country.settings.partner_pick') }}</span>
-                <select class="sinput" name="space" required>
-                  {% for sp in s.spaces %}<option value="{{ sp.code }}">{{ sp.name }}</option>{% endfor %}
-                </select></label>
-              <p class="cblock__note">{{ t('country.settings.partner_hint') }}</p>
-              <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.partner_assign') }}</button>
-            </form>
-          </details>
-        {% endif %}
-      {% endif %}
-    </section>
+    {{ contact_block(s, 'partner') }}
+    {{ contact_block(s, 'mailing') }}
 
     <section class="cblock" aria-labelledby="cb-developer">
       <h3 class="cblock__title" id="cb-developer">{{ t('country.block.developer') }}</h3>

@@ -240,7 +240,7 @@ def render(
     стикеры, доска_отказ = _board(full_reach)
     # Блок «Рейтинги» (D418): среднее группы считают «Рейтинги», здесь — только показ.
     # Колонки разворачиваются по срезу (D583, D584): кластер — по странам, страна — по
-    # пиццериям в порядке «Сортировки»; пиццерия ведёт в «Страны» по id её проверок.
+    # пиццериям в штатном порядке РС; пиццерия ведёт в «Страны» по id её проверок.
     коды = snapshot.unit_codes
     проверена = {коды[p.unit]: p.when for p in snapshot.points if p.unit in коды}
     ид_по_коду = {коды[имя]: ид for имя, ид in snapshot.unit_ids.items() if имя in коды}
@@ -250,7 +250,6 @@ def render(
         cluster=кластер,
         period=period,
         today=today,
-        sort=selection.sort,
         inspected=проверена,
     )
 
@@ -298,11 +297,11 @@ def render(
     )
     порядок = pick(
         label="",
-        empty_title=t("overview.sort.score", lang),
+        empty_title=t("home.units.sort.score", lang),
         current="" if selection.sort == "score" else selection.sort,
         values=tuple((код, None) for код in overview_data.ПОРЯДКИ if код != "score"),
         href=lambda значение: select(sort=значение or "score"),
-        title=lambda код: t("overview.sort." + код, lang),
+        title=lambda код: t("home.units.sort." + код, lang),
     )
     return render_template(
         "overview/index.html",

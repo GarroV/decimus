@@ -5,6 +5,7 @@
   auth.dodois.com; результат страница узнаёт, опрашивая свой сервер (`dodois-connect.js`).
   Сторонних ресурсов нет. Тексты — `texts_dodois.py`.
 #}{% extends "base.html" %}
+{% block page_heading %}{% endblock %}
 {% block title %}{{ t('dodois.page.title') }}{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endblock %}
 {% block body %}

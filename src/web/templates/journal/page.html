@@ -11,20 +11,12 @@
   сам — у обычного человека в ответе просто нет чужого.
 #}{% extends "base.html" %}
 {% from "_info_tip.html" import info_tip %}
+
 {% from "_period.html" import period_picker with context %}
 {% from "administration/_nav.html" import admin_nav with context %}
 {% block title %}{{ t('journal.own.title') if own else t(admin_heading) ~ ' · ' ~ t('section.administration.title') }}{% endblock %}
-{% block head %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-journal.css') }}">
-  {% if not own %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endif %}
-{% endblock %}
-{% block page_class %} page--split{% endblock %}
-{% block body %}
-  {% if not own %}<div class="sadmin">{{ admin_nav() }}<div class="sadmin__main">{% endif %}
-  <header class="shead">
-    <div class="shead__main">
+{% block page_heading %}<header class="page-heading">
+<div class="shead__main">
       {% set tip_rows = [t('journal.own.sub' if own else 'journal.sub')] %}
       {% if view == 'actions' %}
         {% set _ = tip_rows.extend([t('journal.retention.actions'), t('journal.retention.secrets')]) %}
@@ -36,6 +28,19 @@
         {{ info_tip(t('tip.hint'), '', tip_rows, 'journal') }}
       </div>
     </div>
+</header>{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-journal.css') }}">
+  {% if not own %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endif %}
+{% endblock %}
+{% block page_class %} page--split{% endblock %}
+{% block body %}
+  {% if not own %}<div class="sadmin">{{ admin_nav() }}<div class="sadmin__main">{% endif %}
+  <header class="shead">
+
     {% if own %}<a class="sbtn" href="{{ settings_url }}?lang={{ lang }}">{{ t('journal.own.back') }}</a>{% endif %}
   </header>
 

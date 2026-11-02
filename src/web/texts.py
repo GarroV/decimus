@@ -25,6 +25,7 @@ from .errors import WebTextError
 from .texts_administration import ADMINISTRATION_TEXTS
 from .texts_connections import CONNECTIONS_TEXTS
 from .texts_country import COUNTRY_TEXTS
+from .texts_country_contacts import CONTACT_TEXTS
 from .texts_demo import DEMO_TEXTS
 from .texts_dodois import DODOIS_TEXTS
 from .texts_grade import GRADE_TEXTS
@@ -1958,3 +1959,5 @@ def lang_or_default(lang: str | None, *, fallback: str) -> str:
 # Общая история проверок на стране и в рейтингах.
 
 TEXTS.update(TIMELINE_TEXTS)
+
+TEXTS.update(CONTACT_TEXTS)

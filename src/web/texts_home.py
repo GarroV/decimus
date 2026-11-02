@@ -19,9 +19,26 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.filters.developer": {"ru": "Бизнес-девелопер", "en": "Business developer"},
     "home.filters.country": {"ru": "Страна", "en": "Country"},
     "home.filters.note": {
-        "ru": "Фильтры действуют на весь экран, включая верхние блоки.",
-        "en": "Filters apply to the whole screen, including the top blocks.",
+        "ru": "Данные показаны по выбранной географии. Личные задания — по всему вашему доступу.",
+        "en": "Data follows the selected geography. Personal tasks cover your full access.",
     },
+    "home.units.sort": {
+        "ru": "Порядок пиццерий по проверкам",
+        "en": "Pizzeria order by inspections",
+    },
+    "home.units.sort.score": {
+        "ru": "Балл проверки: сначала низкий",
+        "en": "Inspection score: lowest first",
+    },
+    "home.units.sort.delta": {
+        "ru": "Изменение балла: сначала снижение",
+        "en": "Score change: declines first",
+    },
+    "home.units.sort.date": {
+        "ru": "Дата проверки: сначала новые",
+        "en": "Inspection date: newest first",
+    },
+    "home.units.sort.unit": {"ru": "Название: А–Я", "en": "Name: A–Z"},
     "home.more.registry": {"ru": "Проверки", "en": "Inspections"},
     # ── «Требует внимания»: задания по живым счётчикам (D217) и пиццерии (D398) ─────────────
     "home.board.failed": {

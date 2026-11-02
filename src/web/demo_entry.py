@@ -33,6 +33,8 @@ from .walk_auth import PAGE_PATH as WALK_PAGE_PATH
 #: Claude, ни ключи API — демо показывает продукт, а не выдаёт к нему доступ.
 LOCKED_ENDPOINTS = frozenset(
     {
+        "country_contact_save",
+        "country_contact_delete",
         "freeze_user",
         "unfreeze_user",
         "user_role",
