@@ -14,6 +14,28 @@ from src.settings_read import BooleanSetting, SettingsUnavailable
 PATH = "/administration/plans/settings"
 
 
+def test_demo_cannot_change_service_setting(monkeypatch, store):
+    from test_web_demo_entry import _app
+    from web_harness import Учётка
+
+    from src.web import auth, demo_entry
+
+    подменить_двери(monkeypatch, tenant="HQ", role="admin")
+    monkeypatch.setattr(
+        demo_entry, "find_by_login", lambda login: Учётка(login=login, tenant="HQ", role="admin")
+    )
+    monkeypatch.setattr(
+        demo_entry, "open_session", lambda account, **kw: auth.open_session(account)
+    )
+    with _app(demo=True).test_client() as client:
+        assert client.post("/demo/admin", headers={"Origin": СВОЙ}).status_code == 302
+        page = client.get("/administration?tab=plans&lang=en")
+        assert page.status_code == 200
+        assert 'name="enabled" disabled' in page.get_data(as_text=True)
+        assert client.post(PATH, data={"enabled": "1"}, headers={"Origin": СВОЙ}).status_code == 403
+    assert store["writes"] == []
+
+
 @pytest.fixture
 def store(monkeypatch):
     values = {"saved": None, "writes": [], "reads": 0}
