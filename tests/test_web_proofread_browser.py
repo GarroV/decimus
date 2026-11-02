@@ -88,15 +88,16 @@ def test_item_review_and_unsaved_accept(стенд, monkeypatch, browser_page, a
     assert form.locator("textarea[name=text]").input_value() == old_text
     assert form.locator("[data-code-review]").is_visible()
     assert not form.evaluate("(f) => f.checkValidity()")
+    form.locator("textarea[name=text]").press("Enter")
+    assert page.evaluate("calls") == 0
     form.locator("[name=code_text_reviewed]").check()
     assert form.locator("[name=code_text_reviewed]").evaluate("(el) => el.validity.valid")
-    # Both normal Enter and Shift+Enter still insert newlines; IME is untouched.
+    # Shift+Enter inserts a newline; IME never triggers a save.
     text = form.locator("textarea[name=text]")
     text.fill("Факт")
     text.press("End")
-    text.press("Enter")
     text.press("Shift+Enter")
-    assert text.input_value() == "Факт\n\n"
+    assert text.input_value() == "Факт\n"
     assert text.evaluate(
         '(el) => el.dispatchEvent(new KeyboardEvent("keydown", {key:"Enter", isComposing:true, '
         "bubbles:true, cancelable:true}))"
@@ -186,4 +187,156 @@ def test_preserves_other_drafts_and_files_during_save(
     page.locator("[data-accept-guard]").evaluate(
         '(f) => f.dispatchEvent(new SubmitEvent("submit", {bubbles:true, cancelable:true}))'
     )
+    assert page.evaluate("calls") == 1
+
+
+@админ
+@pytest.mark.parametrize("address", ["/inspections/x", "/inspections?inspection=x"])
+@pytest.mark.parametrize("field", ["text", "reading_c"])
+def test_enter_submits_only_current_edit_and_keeps_photos(
+    стенд, monkeypatch, browser_page, address, field
+):
+    from dataclasses import replace
+
+    from test_web_acceptance import ТЕНАНТ
+    from test_web_app import карточка, шапка
+
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+    detail = карточка(шапка(on_review=True, tenant_code=ТЕНАНТ))
+    finding = replace(detail.findings[0], reading_c=4)
+    monkeypatch.setattr(
+        inspections, "load_card", lambda *args, **kw: replace(detail, findings=(finding,))
+    )
+    monkeypatch.setattr(
+        inspections,
+        "load_previews",
+        lambda *args, **kw: {finding.id: FindingShots(shown=("synthetic-existing",), missing=0)},
+    )
+    page = browser_page
+    load(page, стенд.get(address).get_data(as_text=True))
+    page.evaluate("""() => {
+      window.payloads = [];
+      window.fetch = (url, opts) => {
+        payloads.push({url, text:opts.body.get('text'), reading:opts.body.get('reading_c'),
+          files:opts.body.getAll('photo').map(f=>f.name),
+          removed:opts.body.getAll('remove_photo')});
+        calls++;
+        return new Promise(()=>{});
+      };
+    }""")
+    page.locator("[data-proofread-edit]").first.click()
+    form = page.locator('form[data-proofread-form="edit"]').first
+    form.evaluate(
+        "(f) => f.action = new URL(f.getAttribute('action'), 'https://proofread.test').href"
+    )
+    form.locator("[name=text]").fill("Current edited comment")
+    form.locator("[name=reading_c]").fill("5")
+    form.locator("[data-pshots-input]").set_input_files(
+        {"name": "new.png", "mimeType": "image/png", "buffer": b"synthetic"}
+    )
+    form.locator("[data-pshot-remove]").check()
+    form.locator("[name=" + field + "]").press("Enter")
+    assert page.evaluate("calls") == 1
+    (payload,) = page.evaluate("payloads")
+    assert f"/findings/{finding.id}/revise" in payload["url"]
+    assert payload["text"] == "Current edited comment"
+    assert payload["reading"] == "5"
+    assert payload["files"] == ["new.png"]
+    assert payload["removed"] == ["synthetic-existing"]
+
+
+@админ
+@pytest.mark.parametrize("address", ["/inspections/x", "/inspections?inspection=x"])
+def test_enter_reaches_flask_revision_without_http_server(
+    стенд, monkeypatch, browser_page, address
+):
+    import mimetypes
+    from urllib.parse import urlsplit
+
+    from web_harness import войти
+
+    from src.web import revision
+
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+    saved = []
+    monkeypatch.setattr(
+        revision, "revise_card", lambda ident, finding, **kw: saved.append((ident, finding, kw))
+    )
+    client = стенд.application.test_client()
+    assert войти(client).status_code == 302
+    page = browser_page
+
+    def route(r):
+        parsed = urlsplit(r.request.url)
+        if parsed.path.startswith("/static/"):
+            file = ROOT / "src/web/static" / parsed.path.removeprefix("/static/")
+            if file.is_file():
+                r.fulfill(
+                    body=file.read_bytes(),
+                    content_type=mimetypes.guess_type(str(file))[0] or "application/octet-stream",
+                )
+            else:
+                r.fulfill(status=404, body="")
+            return
+        headers = {"Origin": "http://localhost"}
+        for key in ("content-type", "x-panel"):
+            if key in r.request.headers:
+                headers[key] = r.request.headers[key]
+        response = client.open(
+            parsed.path + ("?" + parsed.query if parsed.query else ""),
+            method=r.request.method,
+            data=r.request.post_data_buffer,
+            headers=headers,
+        )
+        r.fulfill(
+            status=response.status_code, headers=dict(response.headers), body=response.get_data()
+        )
+
+    page.route("https://proofread.test/**", route)
+    page.goto("https://proofread.test" + address)
+    page.locator("[data-proofread-edit]").first.click()
+    text = page.locator('form[data-proofread-form="edit"] textarea[name=text]').first
+    text.fill("Explicit comment saved by Enter")
+    text.press("Enter")
+    page.wait_for_function("() => !document.querySelector('[data-proofread-busy]')")
+    assert len(saved) == 1
+    from test_web_app import шапка
+
+    assert saved[0][0] == шапка().id
+    assert saved[0][1] == "f1"
+    assert saved[0][2]["text"] == "Explicit comment saved by Enter"
+
+
+@админ
+def test_enter_composer_and_ime_modifiers(стенд, monkeypatch, browser_page):
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+    page = browser_page
+    load(page, стенд.get("/inspections/x").get_data(as_text=True))
+    page.locator("[data-proofread-add]").click()
+    form = page.locator('form[data-proofread-form="add"]')
+    form.locator(".ipick__opt").first.click()
+    form.locator("[data-lvls] input:not(:disabled)").first.check()
+    text = form.locator("textarea[name=text]")
+    text.fill("New comment")
+    for extra in (
+        {"isComposing": True},
+        {"keyCode": 229},
+        {"repeat": True},
+        {"ctrlKey": True},
+        {"altKey": True},
+        {"metaKey": True},
+    ):
+        text.evaluate(
+            "(el, extra) => el.dispatchEvent(new KeyboardEvent('keydown', "
+            "{...extra, key:'Enter', bubbles:true, cancelable:true}))",
+            extra,
+        )
+    assert page.evaluate("calls") == 0
+    text.press("Shift+Enter")
+    assert text.input_value() == "New comment\n"
+    assert page.evaluate("calls") == 0
+    text.press("Enter")
     assert page.evaluate("calls") == 1
