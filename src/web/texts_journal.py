@@ -13,6 +13,11 @@ from __future__ import annotations
 _WEB: dict[str, tuple[str, str]] = {
     "country_contact_save": ("Контакт страны сохранён", "Country contact saved"),
     "country_contact_delete": ("Контакт страны удалён", "Country contact deleted"),
+    "country_set_recipients": (
+        "Адресаты рассылки страны изменены",
+        "Country mailing recipients changed",
+    ),
+    "unit_profile_save": ("Контакты пиццерии изменены", "Pizzeria contacts changed"),
     "action_plan_setting": ("Настройка экшн-планов изменена", "Action-plan setting changed"),
     "actions_due": ("Срок по запросу экшн-плана", "Action plan request due date"),
     "actions_new": ("Запрос экшн-плана", "Action plan requested"),
@@ -136,6 +141,10 @@ _WEB: dict[str, tuple[str, str]] = {
     "mailing_cc_add": ("Добавлен адрес в копию писем УК", "Address added to HQ letter Cc"),
     "mailing_cc_remove": ("Убран адрес из копии писем УК", "Address removed from HQ letter Cc"),
     "mailing_template_save": ("Сохранён шаблон письма УК", "HQ letter template saved"),
+    "mailing_content_save": (
+        "Сохранён текст письма или документа",
+        "Letter or document text saved",
+    ),
     "country_save_contract": ("Сохранён договор страны", "Country agreement saved"),
     "country_delete_contract": ("Снята строка договора страны", "Country agreement row removed"),
     "ratings_rule_add": ("Добавлено жёсткое правило", "Hard rule added"),

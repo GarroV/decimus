@@ -13,6 +13,9 @@ PUBLIC = {
     "demo/app.html",
     "demo/pick.html",
     "dodois/connect.html",
+    # Самостоятельные печатные страницы без оболочки: белый A4, заголовок — часть документа.
+    "mailings/document.html",
+    "mailings/plan_letter.html",
 }
 TEMPLATES = Path(__file__).resolve().parents[1] / "src/web/templates"
 
