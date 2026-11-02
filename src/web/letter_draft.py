@@ -30,8 +30,10 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response
 
-from src.db import mailing_cc
+from src.db import country_contacts, mailing_cc
 from src.db.errors import DbError
+from src.db.models import InspectionDetail
+from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.letter_markup import subject_and_body
 from src.report.letters import LetterError
@@ -119,6 +121,13 @@ def _копия_ук(tenant_code: str) -> tuple[str, ...]:
     if canonical_tenant(tenant_code) != HQ_TENANT:
         return ()
     return cc_for(mailing_cc.KIND_INSPECTION)
+
+
+def _inspection_to(detail: InspectionDetail, *, reach: Reach) -> str:
+    manual = detail.inspection.contact
+    if manual.strip():
+        return manual
+    return country_contacts.recipients_for_inspection(detail.inspection.id, reach=reach)
 
 
 def install(app: Flask, conf: Settings) -> None:
@@ -371,12 +380,15 @@ def install(app: Flask, conf: Settings) -> None:
             )
             create_draft(
                 токен,
-                to=detail.inspection.contact,
+                to=_inspection_to(detail, reach=auth.current_reach()),
                 cc=_копия_ук(detail.inspection.tenant_code),
                 subject=subject,
                 body=body,
                 attachments=((data.report_name(detail.inspection), файл, "application/pdf"),),
             )
+        except DbError:
+            logger.warning("Country recipients could not be loaded for inspection draft")
+            return к_письму(inspection_id, lang=письмо_на, исход="failed")
         except MailAccountMismatchError as сбой:
             logger.warning("черновик письма не создан: %s", сбой)
             return к_письму(inspection_id, lang=письмо_на, исход=OUTCOME_WRONG_ACCOUNT)

@@ -40,6 +40,8 @@ from typing import Any
 from flask import abort, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
+from src.db import country_contacts
+from src.db.errors import DbError
 from src.db.models import InspectionRow
 from src.domain.tenants import HQ_TENANT
 
@@ -490,6 +492,20 @@ def _one_country(
     # Карточку страны видит каждый, кому видна страна (D539); правка — `space.manage`.
     can_settings = bool(вид.code)
     settings_open = can_settings and request.args.get("settings") == "1"
+    reference = request.args.get("reference", "")
+    if reference and reference not in country_contacts.KINDS:
+        abort(404)
+    if reference == country_contacts.MAILING and auth.current_tenant() != HQ_TENANT:
+        abort(404)
+    reference_rows: tuple[country_contacts.Contact, ...] = ()
+    reference_known = True
+    if reference and auth.current_tenant() == HQ_TENANT:
+        try:
+            reference_rows = tuple(
+                row for row in country_contacts.for_country(вид.code) if row.kind == reference
+            )
+        except DbError:
+            reference_known = False
     card_open = bool(card is not None and card.explicit)
     return {
         "view": вид,
@@ -504,13 +520,22 @@ def _one_country(
         "rail_open": tuple(r for r in in_rail if not r.is_closed),
         "rail_closed": tuple(r for r in in_rail if r.is_closed),
         "rail_reach": _reach(units.rows),
-        "pick_open": settings_open or card_open,
-        "pick_back": select(inspection="", settings="", saved=""),
+        "pick_open": bool(reference) or settings_open or card_open,
+        "pick_back": select(inspection="", settings="", saved="", reference=""),
         "pick_title": (
-            f"{t('country.settings.title', lang)} · {country_title(вид.code, lang)}"
-            if settings_open
-            else t("registry.drawer.title", lang)
+            t("contacts." + reference, lang)
+            if reference
+            else (
+                f"{t('country.settings.title', lang)} · {country_title(вид.code, lang)}"
+                if settings_open
+                else t("registry.drawer.title", lang)
+            )
         ),
+        "reference": reference,
+        "reference_contacts": reference_rows,
+        "reference_known": reference_known,
+        "partner_reference_url": select(reference="partner", settings="", inspection=""),
+        "mailing_reference_url": select(reference="mailing", settings="", inspection=""),
         "settings_open": settings_open,
         "pick_wide": settings_open,
         "panel_settings": (

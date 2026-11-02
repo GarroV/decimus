@@ -1,37 +1,15 @@
-"""«Карточка страны» на экране «Страны» (D539, прежде «Настройки страны», D536) и
-вкладка «Администрирование → Страны» (D640, #1251).
+"""Карточка страны для чтения и административные формы (D539, D640, D690).
 
-Широкая панель справа на том же экране (D527): всё, что известно про страну, —
-партнёр и девелопер, юридические партнёры из свода, пиццерии с адресами, датами
-открытия и другими написаниями названия (D538). Видит каждый, кому видна страна;
-почта партнёра — только УК (D375). На экране страны панель — только чтение со ссылкой
-«Изменить»: настройки (девелопер, партнёр, языки отчёта, договор) меняются во вкладке
-«Страны» «Администрирования» (D640), той же панелью с формами (`settings_only`).
+В администрировании карточка открывается inline: контакты партнёра и адресаты проверок
+из country_contacts, девелопер, языки отчёта и договор. Контакты правит space.manage
+через country_contacts_actions. Пространства доступа не являются контактами; прежний API
+привязки страны к пространству сохранён, управление им находится в «Пространствах».
 
-Строки пиццерий — те же `UnitRow`, что уже прочитал экран (`country_units`): второго
-чтения базы ради панели нет. Правка — дверь веба в то, что уже есть:
-
-- девелопер — справочник рейтингов (`ratings.countries.developer`), тот же
-  `ratings_read.set_developer`, что у экрана «Рейтинги → Загрузки» (`ratings.py`);
-- партнёр — пространство, за которым закреплена страна (`space_countries`), тот же
-  `partner_spaces.add_countries`, что у «Пользователи → Пространства». Страна — один
-  партнёр: занятую другим пространством страну отсюда не перенести, как и там;
-  привязка добавляется, снять её можно только руками (`docs/18-access-map.md`).
-
-Кто вправе — по матрице: маршруты девелопера, партнёра и языков объявлены действием
-`space.manage` (главный админ и админ УК, D364). Кнопка на экране показывается по тому же
-коду, остальным адреса отвечают отказом заслона. После действия — возврат во вкладку
-«Страны» (`administration.url`), а не на страницу страны.
-
-Языки отчёта (D640): перечень страны из базы (`db/country_report_langs.py`) перекрывает
-`report_langs.json`; выбор — из языков методики, не меньше одного; «Как по умолчанию»
-снимает переопределение. Перечень задаёт и язык отчёта в боте, и язык письма по умолчанию.
-
-Блок «Договор» (D603) — юрлицо партнёра, договор одной строкой, контакты по ДКК: список
-строк на страну (`db/country_contracts.py`). Видит только УК (почты — персональные
-данные, как `partner_email`, D375), правят ОСБ, админ и главный админ — отдельное
-действие `contract.manage`, чтобы ОСБ не получила девелопера и партнёра страны
-(`space.manage`). Два маршрута: сохранить строку (новую или правку) и снять её.
+На экране страны карточка settings=1 сохранена для чтения без ссылки редактирования.
+Отдельные справки «Партнёр» и «Почты для рассылки» собирает country_page. Частные почты
+доступны только УК; партнёру показываются юридические имена из справочника пиццерий.
+Договор и контакты по ДКК остаются отдельными данными и управляются contract.manage.
+Строки пиццерий уже прочитаны country_units; математика проверок здесь не меняется.
 """
 
 from __future__ import annotations
@@ -45,7 +23,7 @@ from typing import Any
 from flask import Flask, abort, redirect, request
 from werkzeug.wrappers import Response
 
-from src.db import agg_store, country_report_langs, ratings_read
+from src.db import agg_store, country_contacts, country_report_langs, ratings_read
 from src.db import country_contracts as contracts_db
 from src.db.errors import CountryContractError, DbError
 from src.db.models import InspectionRow
@@ -159,6 +137,8 @@ class Panel:
     contracts: tuple[contracts_db.Contract, ...] = ()
     #: Договор не прочитался — блок об этом говорит, а не рисует «договора нет».
     contracts_failed: bool = False
+    contacts: tuple[country_contacts.Contact, ...] = ()
+    contacts_known: bool = True
 
 
 def _ordered(rows: Sequence[UnitRow]) -> tuple[UnitRow, ...]:
@@ -252,6 +232,12 @@ def load(
         "settings_only": settings_only,
         "can_langs": can_edit and settings_only,
     }
+    if settings_only and show_email:
+        try:
+            сведения["contacts"] = country_contacts.for_country(code)
+        except DbError:
+            сведения["contacts_known"] = False
+            log.warning("Country contact directory is unavailable")
     сведения["report_langs"], сведения["langs_custom"] = _report_langs(code)
     if not settings_only:
         сведения["aggregators"], сведения["aggregators_failed"] = _aggregators(code)

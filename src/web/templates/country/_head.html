@@ -44,7 +44,8 @@
            title="{{ t('country.rx.act') if rx_act_hq else t('country.rx.mine') }}">
           {{ t('country.rx.title') }}<span class="cn-count{% if rx_count %} is-on{% endif %}">{{ '—' if rx_count is none else rx_count }}</span></a>
         {% if can_settings %}
-          <a class="btn btn--sm" href="{{ settings_url }}" data-drawer-open>{{ t('country.settings.open') }}</a>
+          <a class="btn btn--sm" href="{{ partner_reference_url }}" data-drawer-open>{{ t('contacts.partner') }}</a>
+          {% if is_hq %}<a class="btn btn--sm" href="{{ mailing_reference_url }}" data-drawer-open>{{ t('contacts.mailing') }}</a>{% endif %}
         {% endif %}
       </div>
     </div>

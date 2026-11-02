@@ -1,17 +1,13 @@
-"""Вкладка «Страны» раздела «Администрирование» (D640, #1251).
+"""Вкладка «Страны» раздела «Администрирование» (D640, D690).
 
-Слева столбцом страны охвата вошедшего — у каждой что настроено: партнёр (пространство),
-девелопер, языки отчёта и, у кого есть `contract.manage`, договор («есть» / «нет»); языки и
-договоры дочитываются по одному запросу на все страны, а не по запросу на страну. Справа
-в панели настройки выбранной (`?tab=countries&country=<код>`): четыре блока — партнёр,
-девелопер, языки отчёта и договор. Панель — макрос карточки страны (`country_settings.load`,
-`country/_settings.html`, режим `settings_only`): на экране страны та же карточка остаётся
-чтением со ссылкой сюда.
+Страны охвата — слева, выбранная карточка — в свободной области справа, без drawer;
+без явного выбора открывается первая страна. На узком экране блоки идут друг за другом.
+Партнёр — имена/почты контактов, отдельно от пространств доступа. Контакты и адресаты
+проверок читаются из country_contacts; владение пространствами остаётся в «Пространствах».
 
-Вкладка открыта тем, у кого в матрице есть `space.manage` или `contract.manage` (главный,
-админ УК, ОСБ) — права не менялись. Что именно можно править, решают те же коды: ОСБ видит
-договор и не видит форм девелопера, партнёра и языков. Страна вне охвата или без пиццерий в
-справочнике — 404, как у несуществующей. Маршруты действий — `country_settings.py`.
+Вкладка доступна по space.manage или contract.manage. Контакты, девелопера и языки
+правит только space.manage; ОСБ ведёт договор. Страна вне охвата — 404. Контактные POST
+объявлены в country_contacts_actions; прочие действия — в country_settings.
 """
 
 from __future__ import annotations
@@ -19,10 +15,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from flask import Response as FlaskResponse
 from flask import abort, render_template, request
 
-from src.db import country_contracts, country_report_langs
+from src.db import country_contacts, country_contracts, country_report_langs
 from src.db.errors import DbError
 from src.domain.errors import ConfigError
 from src.domain.permissions import role_may
@@ -34,7 +29,6 @@ from . import (
     country_settings,
     country_summary,
     guard,
-    partner_spaces,
     ui_lang,
 )
 from . import country as country_data
@@ -70,16 +64,6 @@ class CountryLine:
     has_contract: bool | None = False
 
 
-def _owners() -> tuple[dict[str, str], bool]:
-    """`{код страны: название пространства}`; не прочиталось — пусто и отметка."""
-    try:
-        spaces = partner_spaces.overview()
-    except DbError:
-        log.warning("Пространства партнёров для вкладки «Страны» не прочитались", exc_info=True)
-        return {}, True
-    return {c: (s.name or s.code) for s in spaces for c in s.countries}, False
-
-
 def _langs_by_country() -> dict[str, tuple[str, ...]] | None:
     """Языки отчёта, заданные для стран, одним запросом; не прочиталось — `None`."""
     try:
@@ -98,14 +82,25 @@ def _contract_countries() -> frozenset[str] | None:
         return None
 
 
-def show(conf_lang: str) -> FlaskResponse | tuple[str, int]:
+def show(
+    conf_lang: str,
+    *,
+    selected: str = "",
+    contact_error: str = "",
+    contact_draft: country_contacts.Fields | None = None,
+    contact_ident: str = "",
+) -> tuple[str, int]:
     """Страница вкладки: столбец стран и, если выбрана страна, её панель."""
     lang = ui_lang.request_lang(conf_lang)
     reach = auth.current_reach()
     known = country_data.countries(reach=reach)
     codes = tuple(code for code, _n in known)
     _by_dev, dev_of, dev_failed = country_summary.developers_of(codes)
-    owners, owners_failed = _owners()
+    try:
+        names = country_contacts.partner_names()
+        owners, owners_failed = {c: ", ".join(v) for c, v in names.items()}, False
+    except DbError:
+        owners, owners_failed = {}, True
     show_contract = auth.current_tenant() == HQ_TENANT and guard.may("contract.manage")
     langs = _langs_by_country()
     with_contract = _contract_countries() if show_contract else frozenset()
@@ -120,10 +115,12 @@ def show(conf_lang: str) -> FlaskResponse | tuple[str, int]:
         )
         for code in sorted(codes, key=lambda c: country_title(c, lang).casefold())
     )
-    raw = request.args.get("country", "").strip()
+    raw = selected or request.args.get("country", "").strip()
     picked = country_data.normalize_code(raw) if raw else ""
     if raw and picked not in codes:
         abort(404)
+    if not picked and lines:
+        picked = lines[0].code
     panel = (
         country_settings.load(
             picked,
@@ -141,6 +138,9 @@ def show(conf_lang: str) -> FlaskResponse | tuple[str, int]:
     return (
         render_template(
             "administration/countries.html",
+            contact_error=contact_error,
+            contact_draft=contact_draft,
+            contact_ident=contact_ident,
             lines=lines,
             picked=picked,
             panel=panel,

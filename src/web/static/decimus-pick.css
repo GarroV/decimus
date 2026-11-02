@@ -162,3 +162,14 @@
   .ih-plot--wide { display: none; }
   .ih-plot--narrow { display: block; }
 }
+
+/* D690: country administration uses the available page area, without a drawer. */
+.countryadmininline { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.countryadmininline__list, .countryadmininline__detail { min-width: 0; }
+.countryadmininline__detail .cblocks { margin-top: 16px; }
+.countryadmininline .country-contact { padding-block: 12px; border-bottom: 1px solid var(--line); }
+.countryadmininline .country-contact p { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+@media (max-width: 1000px) {
+  .countryadmininline { grid-template-columns: minmax(0, 1fr); }
+  .countryadmininline__list { max-height: 32vh; overflow-y: auto; }
+}

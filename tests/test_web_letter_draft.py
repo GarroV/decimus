@@ -588,3 +588,51 @@ def test_у_ждущей_приёмки_письмо_не_сохраняется
     assert ответ.status_code == 303
     assert "saved=on_review" in ответ.headers["Location"]
     assert not следы["remember"]
+
+
+@pytest.mark.parametrize("manual", ["manual@example.com", ""])
+def test_country_recipient_fallback_respects_manual_address(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch, manual: str
+) -> None:
+    включить_почту(monkeypatch)
+    client, traces = клиент
+    detail = карточка()
+    detail = replace(detail, inspection=replace(detail.inspection, contact=manual))
+    monkeypatch.setattr(data, "load_card", lambda _id, *, reach: detail)
+    resolved: list[Any] = []
+    monkeypatch.setattr(
+        letter_draft.country_contacts,
+        "recipients_for_inspection",
+        lambda ident, *, reach: resolved.append((ident, reach)) or "country@example.com",
+    )
+    response = увести(client)
+    state = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(response.location).query))["state"]
+    response = client.get(f"/auth/google/mail?state={state}&code=synthetic")
+    assert response.status_code in (302, 303)
+    assert traces["draft"][0][1] == (manual or "country@example.com")
+    assert bool(resolved) is (not bool(manual))
+    if resolved:
+        assert resolved[0][0] == ПРОВЕРКА
+
+
+def test_unreadable_country_recipients_prevents_draft(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    включить_почту(monkeypatch)
+    client, traces = клиент
+    detail = карточка()
+    monkeypatch.setattr(
+        data,
+        "load_card",
+        lambda _id, *, reach: replace(detail, inspection=replace(detail.inspection, contact="")),
+    )
+
+    def unavailable(*args: Any, **kwargs: Any) -> str:
+        raise DbError("unavailable")
+
+    monkeypatch.setattr(letter_draft.country_contacts, "recipients_for_inspection", unavailable)
+    response = увести(client)
+    state = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(response.location).query))["state"]
+    response = client.get(f"/auth/google/mail?state={state}&code=synthetic")
+    assert "gmail=failed" in response.location
+    assert traces["draft"] == []

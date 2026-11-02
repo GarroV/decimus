@@ -16,6 +16,7 @@ from flask.testing import FlaskClient
 from test_web_country import данные, открыть
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
+from src.db import country_contacts
 from src.db import country_contracts as cc
 from src.db import country_report_langs as crl
 from src.db.errors import DbError
@@ -33,6 +34,8 @@ from src.web import country_summary, country_units, partner_spaces
 def записи(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     """Что писали в языки отчёта; чтение базы подменено."""
     журнал: dict[str, list[Any]] = {"save": [], "reset": []}
+    monkeypatch.setattr(country_contacts, "partner_names", lambda: {"AM": ("Контакт партнёра",)})
+    monkeypatch.setattr(country_contacts, "for_country", lambda code: ())
     monkeypatch.setattr(crl, "read", lambda _c: None)
     monkeypatch.setattr(
         crl, "save", lambda c, langs, *, actor: журнал["save"].append((c, langs, actor))
@@ -99,7 +102,8 @@ def test_список_стран_столбцом_с_партнёром_и_де�
     assert список.count('<a class="pk-item') == 2, "каждая страна — строка колонки `pick_item`"
     # Армения закреплена за пространством Лотос, девелопер — Иван; у Грузии ни того ни другого.
     строка_am = список[список.index("country=AM") :]
-    assert "Лотос" in строка_am and "Иван" in строка_am
+    assert "Контакт партнёра" in строка_am and "Иван" in строка_am
+    assert "Лотос" not in строка_am
     строка_ge = список[список.index("country=GE") : список.index("country=AM")]
     assert "Лотос" not in строка_ge and "Иван" not in строка_ge
 
@@ -110,7 +114,7 @@ def test_список_показывает_что_настроено_у_кажд
     строка_ge = список[список.index("country=GE") :]
     assert "EN · RU" in строка_am and "есть" in строка_am
     assert "по умолчанию" in строка_ge and "нет" in строка_ge and "не задан" in строка_ge
-    assert список.count("data-drawer-open") == 2, "строка открывает панель справа, не страницу"
+    assert "data-drawer-open" not in список, "выбор страны меняет inline-карточку"
 
 
 def test_язык_и_договор_читаются_одним_запросом_на_все_страны(
@@ -126,14 +130,16 @@ def test_язык_и_договор_читаются_одним_запросом
 def test_панель_страны_четыре_блока_у_каждого_своя_кнопка(главный: FlaskClient) -> None:
     страница = _страница(главный, "&country=GE")
     панель = страница[страница.index('class="cblocks"') :]
-    assert панель.count('<section class="cblock') == 4, "блоков должно быть четыре"
+    assert панель.count('<section class="cblock') == 5
     блоки = панель.split('<section class="cblock')[1:]
-    assert len(блоки) == 4
+    assert len(блоки) == 5
     for блок, заголовок in zip(
-        блоки, ("Партнёр", "Девелопер", "Языки отчёта", "Договор"), strict=True
+        блоки,
+        ("Партнёр", "Почты для рассылки", "Девелопер", "Языки отчёта", "Договор"),
+        strict=True,
     ):
         assert f">{заголовок}</h3>" in блок, заголовок
-        assert 'class="sbtn' in блок.split("</section>")[0] and "<summary" in блок, заголовок
+        assert 'class="sbtn' in блок.split("</section>")[0], заголовок
 
 
 def test_без_выбора_панель_закрыта(главный: FlaskClient) -> None:
@@ -142,11 +148,12 @@ def test_без_выбора_панель_закрыта(главный: FlaskCl
 
 def test_админ_видит_формы_девелопера_партнёра_и_языков(админ: FlaskClient) -> None:
     страница = _страница(админ, "&country=GE")
-    for форма in ("/settings/developer", "/settings/space", "/settings/report-langs"):
+    for форма in ("/settings/developer", "/settings/contacts", "/settings/report-langs"):
         assert f"/country/GE{форма}" in страница, форма
     assert 'name="langs" value="ru"' in страница and 'name="langs" value="en"' in страница
     # Список стран и панель — на одном экране.
-    assert "pk-rail--col" in страница and "sdrawer__panel" in страница
+    assert "pk-rail--col" in страница and "countryadmininline__detail" in страница
+    assert "sdrawer__panel" not in страница
 
 
 def test_осб_видит_договор_и_не_видит_форм_девелопера_партнёра_и_языков(
@@ -154,7 +161,7 @@ def test_осб_видит_договор_и_не_видит_форм_девел
 ) -> None:
     страница = _страница(осб, "&country=GE")
     assert "/country/GE/settings/contract" in страница
-    for форма in ("/settings/developer", "/settings/space", "/settings/report-langs"):
+    for форма in ("/settings/developer", "/settings/contacts", "/settings/report-langs"):
         assert форма not in страница, форма
 
 

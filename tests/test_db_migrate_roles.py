@@ -278,6 +278,7 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # Договор страны (`0088`, D603): приложение читает, и то лишь из пространства УК
     # (политика) — почты контактов партнёру не видны. Пишет только администратор.
     "country_contracts": {"SELECT"},
+    "country_contacts": {"SELECT"},
     # Языки отчёта страны (`0096`, D640): приложение только читает, пишет вкладка
     # «Страны» под администратором.
     "country_report_langs": {"SELECT"},
@@ -433,6 +434,7 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "country_recipients": {"SELECT"},
     # Договор страны (`0088`, D603): строки заводит и снимает УК, правка — по колонкам.
     "country_contracts": {"SELECT", "INSERT", "DELETE"},
+    "country_contacts": {"SELECT", "INSERT", "DELETE"},
     # Языки отчёта страны (`0096`, D640): вкладка «Страны» задаёт, правит и
     # сбрасывает к умолчанию (удаление строки).
     "country_report_langs": {"SELECT", "INSERT", "UPDATE", "DELETE"},
@@ -445,6 +447,7 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
 #: (`0010`): политика «менять разрешено только пометку» не выражается вовсе,
 #: потому что `with check` не видит старой строки.
 ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
+    "country_contacts": {"UPDATE": {"name", "email", "updated_by", "updated_at"}},
     # Договор страны (`0088`, D603): всё содержимое, кроме страны и id — строка
     # не переезжает в другую страну.
     "country_contracts": {

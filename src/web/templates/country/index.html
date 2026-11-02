@@ -191,7 +191,8 @@
 
 {# Панель справа: проверка из списка (как в «Проверках») или «Карточка страны» (широкая, D539). #}
 {% block pick_panel %}
-  {% if settings_open %}{{ settings_panel(panel_settings) }}
+  {% if reference %}{% include "country/_reference.html" %}
+  {% elif settings_open %}{{ settings_panel(panel_settings) }}
   {% elif card %}{{ inspection_panel(card) }}
   {% elif card_failed %}
     <div class="sdetail sdetail--hint">
