@@ -23,6 +23,7 @@ from src.domain.dodois_metrics import (
     KrRow,
     RatingPeriod,
     SalesRow,
+    unit_id,
 )
 
 from .config import check_environment
@@ -55,9 +56,26 @@ def _failed(what: str, exc: psycopg.Error) -> RatingsError:
     return RatingsError(f"{what}: база отказала ({exc.__class__.__name__})")
 
 
+def _canonical_data(
+    units: Sequence[str], rows: list[tuple[Any, ...]]
+) -> tuple[list[str], list[tuple[Any, ...]]]:
+    covered = {unit_id(unit) for unit in units}
+    if None in covered:
+        raise RatingsError("Некорректный код пиццерии в покрытии Dodo IS")
+    canonical = sorted(unit for unit in covered if unit is not None)
+    data = []
+    for row in rows:
+        unit = unit_id(row[0])
+        if unit is None or unit not in covered:
+            raise RatingsError("Строка Dodo IS вне покрытия ответа")
+        data.append((unit, *row[1:]))
+    return canonical, data
+
+
 def _replace(
     delete: str, insert: str, month: date, units: Sequence[str], rows: list[tuple[Any, ...]]
 ) -> int:
+    units, rows = _canonical_data(units, rows)
     try:
         with connection(check_environment().dsn) as conn, conn.transaction():
             conn.execute(delete, (month, list(units)))
@@ -101,13 +119,21 @@ _DEL_CHECKUP = (
     "delete from dodois.unit_checkup_period "
     "where period_from between %s and %s and dodo_id = any(%s)"
 )
+# API может вернуть неделю, начавшуюся до DELETE-окна. Обновляем только её точный
+# возвращённый ключ; соседние исторические периоды за окном не удаляем.
 _INS_RATING = (
     "insert into dodois.unit_rating_period "
-    "(dodo_id, kind, period_from, period_to, rate, publish_status) values (%s, %s, %s, %s, %s, %s)"
+    "(dodo_id, kind, period_from, period_to, rate, publish_status) values (%s, %s, %s, %s, %s, %s) "
+    "on conflict (dodo_id, kind, period_from) do update set "
+    "period_to = excluded.period_to, rate = excluded.rate, "
+    "publish_status = excluded.publish_status, loaded_at = now()"
 )
 _INS_CHECKUP = (
     "insert into dodois.unit_checkup_period "
-    "(dodo_id, kind, period_from, period_to, checkups, by_status) values (%s, %s, %s, %s, %s, %s)"
+    "(dodo_id, kind, period_from, period_to, checkups, by_status) values (%s, %s, %s, %s, %s, %s) "
+    "on conflict (dodo_id, kind, period_from) do update set "
+    "period_to = excluded.period_to, checkups = excluded.checkups, "
+    "by_status = excluded.by_status, loaded_at = now()"
 )
 
 
@@ -119,6 +145,7 @@ def _replace_range(
     units: Sequence[str],
     rows: list[tuple[Any, ...]],
 ) -> int:
+    units, rows = _canonical_data(units, rows)
     try:
         with connection(check_environment().dsn) as conn, conn.transaction():
             conn.execute(delete, (start, stop, list(units)))

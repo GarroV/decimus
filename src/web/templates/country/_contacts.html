@@ -1,0 +1,43 @@
+{# Names and recipients, not access-space ownership. All writes remain in Administration. #}
+{% macro fields(kind, name='', email='') %}
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <label><span class="sform__label">{{ t('contacts.name') }}</span><input class="sinput" type="text" name="name" value="{{ name }}" maxlength="200" autocomplete="off"></label>
+  <label><span class="sform__label">{{ t('contacts.email') }}</span><input class="sinput" type="email" name="email" value="{{ email }}" maxlength="254" autocomplete="off"{% if kind == 'mailing' %} required{% endif %}></label>
+{% endmacro %}
+
+{% macro contact_block(s, kind) %}
+<section class="cblock" aria-labelledby="contacts-{{ kind }}">
+  <h3 class="cblock__title" id="contacts-{{ kind }}">{{ t('contacts.' ~ kind) }}</h3>
+  <p class="cblock__note">{{ t('contacts.' ~ kind ~ '_note') }}</p>
+  {% if not s.contacts_known %}<p role="status">{{ t('contacts.unavailable') }}</p>
+  {% else %}
+    {% set rows = s.contacts|selectattr('kind', 'equalto', kind)|list %}
+    {% if not rows %}<p class="is-muted">{{ t('contacts.empty') }}</p>{% endif %}
+    {% for row in rows %}
+      <div class="country-contact">
+        <p>{% if row.name %}<b>{{ row.name }}</b>{% endif %}{% if row.email %}<span>{{ row.email }}</span>{% endif %}</p>
+        {% if s.can_edit %}
+          {% set rejected = contact_error and contact_ident == row.id %}
+          <details class="sfold"{% if rejected %} open{% endif %}>
+            <summary class="sbtn">{{ t('contacts.edit') }}</summary>
+            <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contacts') }}?lang={{ lang }}">
+              <input type="hidden" name="id" value="{{ row.id }}">
+              {{ fields(kind, contact_draft.name if rejected else row.name, contact_draft.email if rejected else row.email) }}
+              <button class="sbtn sbtn--primary" type="submit">{{ t('contacts.save') }}</button>
+            </form>
+          </details>
+          <form method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contacts/' ~ row.id ~ '/delete') }}?lang={{ lang }}"><button class="sbtn" type="submit">{{ t('contacts.delete') }}</button></form>
+        {% endif %}
+      </div>
+    {% endfor %}
+    {% if s.can_edit %}
+      {% set rejected = contact_error and contact_draft and contact_draft.kind == kind and (not contact_ident or not (rows|selectattr('id', 'equalto', contact_ident)|list)) %}
+      <form class="sform cblock__form country-contact-add" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contacts') }}?lang={{ lang }}">
+        {% if rejected and contact_ident %}<input type="hidden" name="id" value="{{ contact_ident }}">{% endif %}
+        {{ fields(kind, contact_draft.name if rejected else '', contact_draft.email if rejected else '') }}
+        <button class="sbtn sbtn--primary" type="submit">{{ t('contacts.add') }}</button>
+      </form>
+    {% endif %}
+  {% endif %}
+</section>
+{% endmacro %}

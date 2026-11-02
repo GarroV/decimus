@@ -11,11 +11,15 @@
   форме не верится, верится только тому, что сервер проверил сам.
 #}{% extends "base.html" %}
 {% block title %}{{ t('oauth.consent.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<h1 class="section__title">{{ t('oauth.consent.title') }}</h1>
+</header>{% endblock %}
+
 
 {% block body %}
   <div class="section">
     <div class="section__head">
-      <h1 class="section__title">{{ t('oauth.consent.title') }}</h1>
+
     </div>
   </div>
 

@@ -24,6 +24,10 @@
 {% from "_pick.html" import pick %}
 {% from "_pick_ui.html" import pick_item %}
 {% block title %}{{ t('section.admin.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<h1 class="section__title">{{ t('section.admin.title') }}</h1>
+</header>{% endblock %}
+
 {% block page_class %} page--wide{% endblock %}
 
 {% set editable = composition.is_latest and can_edit_checklist %}
@@ -221,7 +225,7 @@
   <div class="mx-top" data-mx-top>
   <div class="mx-bar">
     <div class="mx-bar__title">
-      <h1 class="section__title">{{ t('section.admin.title') }}<span class="mx-bar__dot" aria-hidden="true">·</span></h1>
+
       {% set here = checklists | selectattr('code', 'equalto', checklist_code) | first %}
       <details class="pick mx-switch" name="pick">
         <summary class="mx-switch__btn" aria-label="{{ t('methodology.bar.switch') }}">

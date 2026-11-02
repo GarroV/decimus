@@ -7,6 +7,7 @@
   «оценка» стоит у каждой суммы. Без скриптов: период — обычные ссылки и форма.
 #}{% extends "base.html" %}
 {% from "_info_tip.html" import info_tip %}
+
 {% from "_period.html" import period_picker with context %}
 {% from "administration/_nav.html" import admin_nav with context %}
 {% macro cost_cell(s) %}{{ money(s.cost) }}{% if s.cost is not none and s.cost_partial %}*{% endif %}{% endmacro %}
@@ -15,6 +16,15 @@
   {% else %}<span class="stat__delta">{{ t('usage.stat.vs', value=percent(value)) }}</span>{% endif %}
 {% endmacro %}
 {% block title %}{{ t(admin_heading) }} · {{ t('section.administration.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<div class="shead__main">
+      <div class="info-row">
+        <h1 class="shead__title">{{ t(admin_heading) }}</h1>
+        {{ info_tip(t('tip.hint'), '', [t('usage.sub')], 'usage') }}
+      </div>
+    </div>
+</header>{% endblock %}
+
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
@@ -25,14 +35,7 @@
 {% block page_class %} page--split{% endblock %}
 {% block body %}
   <div class="sadmin">{{ admin_nav() }}<div class="sadmin__main">
-  <header class="shead">
-    <div class="shead__main">
-      <div class="info-row">
-        <h1 class="shead__title">{{ t(admin_heading) }}</h1>
-        {{ info_tip(t('tip.hint'), '', [t('usage.sub')], 'usage') }}
-      </div>
-    </div>
-  </header>
+
 
   <div class="sbox ubox">
     <div class="sbar sbar--registry jbar">

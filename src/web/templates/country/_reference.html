@@ -1,0 +1,13 @@
+<article class="sdetail spanel">
+  <p class="ssec__note">{{ t('contacts.reference_note') }}</p>
+  {% if not reference_known %}<p role="alert">{{ t('contacts.unavailable') }}</p>
+  {% elif reference_contacts %}
+    <ul class="country-reference">
+      {% for contact in reference_contacts %}<li>{% if contact.name %}<b>{{ contact.name }}</b>{% endif %}{% if contact.email %}<span>{{ contact.email }}</span>{% endif %}</li>{% endfor %}
+    </ul>
+  {% elif reference == 'partner' and partners %}
+    <p class="ssec__note">{{ t('contacts.imported') }}</p>
+    <ul>{% for name in partners %}<li>{{ name }}</li>{% endfor %}</ul>
+  {% else %}<p>{{ t('contacts.empty') }}</p>{% endif %}
+  {% if reference == 'mailing' %}<p class="ssec__note">{{ t('contacts.mailing_note') }}</p>{% endif %}
+</article>

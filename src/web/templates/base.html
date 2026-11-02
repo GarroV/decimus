@@ -206,6 +206,9 @@
     {% endif %}
 
     <main class="page{% block page_class %}{% endblock %} shell__main">
+      {% if account %}
+        {% block page_heading %}<header class="page-heading"><h1>{{ self.title() }}</h1></header>{% endblock %}
+      {% endif %}
       {% if passkey_here %}
         {# После входа паролем или Google (D485): браузер без метки «ключ тут есть» сам просит у
            устройства Touch ID и сохраняет ключ. Эта строка скрыта и показывается, только если

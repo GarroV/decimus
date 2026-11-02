@@ -768,3 +768,6 @@ missing_photos
 # Flask before_request and pytest autouse callbacks are registered by decorators.
 paused_plan_routes
 _exercise_existing_action_plan_capabilities
+
+# Country contact read-state field is consumed in country/_contacts.html.
+contacts_known

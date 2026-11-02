@@ -214,3 +214,84 @@ def test_рс_уходит_в_месяц_большинства_дней_а_рк
         ("rs", date(2026, 9, 14), Decimal("88.00")),
     ]
     assert август == [("rko", date(2026, 8, 31))]
+
+
+def test_overlapping_period_upserts_exact_returned_snapshot_only(пиццерии: str) -> None:
+    start, stop = date(2026, 9, 28), date(2026, 10, 4)
+    old = date(2026, 8, 3)
+    store.replace_rating_periods(
+        СЕНТЯБРЬ,
+        stop,
+        [А],
+        [
+            RatingPeriod(А, "rs", start, stop, Decimal(80), "Draft"),
+            RatingPeriod(А, "rs", old, old, Decimal(70), None),
+        ],
+    )
+    store.replace_checkup_periods(
+        СЕНТЯБРЬ, stop, [А], [CheckupPeriod(А, "rs", start, stop, 1, {"Started": 1})]
+    )
+    for _ in range(2):
+        store.replace_rating_periods(
+            ОКТЯБРЬ, stop, [А], [RatingPeriod(А, "rs", start, stop, Decimal(92), "Published")]
+        )
+        store.replace_checkup_periods(
+            ОКТЯБРЬ, stop, [А], [CheckupPeriod(А, "rs", start, stop, 2, {"Completed": 2})]
+        )
+    assert read.unit_rating_periods("BG", ОКТЯБРЬ) == [
+        read.UnitRatingPeriod(А, "rs", start, stop, Decimal("92.00"), "Published", 2)
+    ]
+    assert [
+        (row.period_from, row.rate) for row in read.unit_rating_periods("BG", date(2026, 8, 1))
+    ] == [(old, Decimal("70.00"))]
+    with psycopg.connect(пиццерии) as conn:
+        assert conn.execute(
+            "select checkups, by_status from dodois.unit_checkup_period where dodo_id=%s", (А,)
+        ).fetchall() == [(2, {"Completed": 2})]
+
+
+def test_uuid_alias_coverage_replaces_all_monthly_tables_idempotently(пиццерии: str) -> None:
+    from uuid import UUID
+
+    alias = str(UUID(А)).upper()
+    for _ in range(2):
+        store.replace_sales(
+            СЕНТЯБРЬ, [alias, А], [SalesRow(А, "Website", "Delivery", 2, Decimal(20), None)]
+        )
+        store.replace_aggregators(СЕНТЯБРЬ, [alias], [AggregatorMonth(А, "Glovo", 2)])
+        store.replace_kr(СЕНТЯБРЬ, [alias], [KrRow(А, Decimal(5), 2, None, 0)])
+    store.replace_sales(СЕНТЯБРЬ, [alias], [SalesRow(А, "Kiosk", "Dine-in", 1, Decimal(10), None)])
+    store.replace_aggregators(СЕНТЯБРЬ, [alias], [])
+    store.replace_kr(СЕНТЯБРЬ, [alias], [])
+    assert [(r.order_source, r.orders) for r in read.unit_sales("BG", СЕНТЯБРЬ)] == [("Kiosk", 1)]
+    assert read.unit_aggregator_orders("BG", СЕНТЯБРЬ) == []
+    assert read.unit_kr("BG", СЕНТЯБРЬ) == []
+
+
+def test_row_outside_coverage_rejected_before_delete(пиццерии: str) -> None:
+    from src.db.errors import RatingsError
+
+    original = SalesRow(А, "Website", "Delivery", 2, Decimal(20), None)
+    store.replace_sales(СЕНТЯБРЬ, [А], [original])
+    with pytest.raises(RatingsError, match="вне покрытия"):
+        store.replace_sales(СЕНТЯБРЬ, [А], [SalesRow(Б, "Kiosk", "Dine-in", 1, Decimal(10), None)])
+    assert [(r.dodo_id, r.orders) for r in read.unit_sales("BG", СЕНТЯБРЬ)] == [(А, 2)]
+
+
+def test_null_response_keeps_real_month_data(
+    пиццерии: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.dodois import metrics
+    from src.dodois.client import Response
+    from src.domain import dodois_metrics as parse
+
+    store.replace_aggregators(ОКТЯБРЬ, [А], [AggregatorMonth(А, "Glovo", 7)])
+    monkeypatch.setattr(metrics.client, "api_get", lambda *args: Response(200, {}, None))
+    with pytest.raises(parse.ShapeError):
+        covered, rows = metrics._aggregators_month(
+            "BG", "intl", "synthetic", [А], ОКТЯБРЬ, date(2026, 10, 28), lambda _: None
+        )
+        store.replace_aggregators(ОКТЯБРЬ, covered, rows)
+    assert [(row.aggregator, row.orders) for row in read.unit_aggregator_orders("BG", ОКТЯБРЬ)] == [
+        ("Glovo", 7)
+    ]

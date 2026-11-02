@@ -6,6 +6,7 @@
   Отказ один на все причины: «нет такого логина» и «пароль не тот» выглядят
   одинаково, иначе форма сама рассказывает перебором, кто здесь заведён.
 #}{% extends "login_base.html" %}
+{% block page_heading %}{% endblock %}
 {% block title %}{{ t('auth.title') }}{% endblock %}
 
 {% block body %}
