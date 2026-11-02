@@ -141,8 +141,6 @@ _WEB: dict[str, tuple[str, str]] = {
         "Сохранён текст письма или документа",
         "Letter or document text saved",
     ),
-    "country_save_contract": ("Сохранён договор страны", "Country agreement saved"),
-    "country_delete_contract": ("Снята строка договора страны", "Country agreement row removed"),
     "ratings_rule_add": ("Добавлено жёсткое правило", "Hard rule added"),
     "ratings_rule_remove": ("Удалено жёсткое правило", "Hard rule removed"),
     "ratings_settings": ("Изменены настройки рейтингов", "Ratings settings changed"),

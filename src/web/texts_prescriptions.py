@@ -73,9 +73,9 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     "rx.form.due": {"ru": "Срок устранения", "en": "Deadline"},
     "rx.form.recipients": {"ru": "Кому", "en": "To"},
     "rx.form.recipients_hint": {
-        "ru": "Адреса через запятую. Подставлены контакты по ДКК из карточки страны; если их "
-        "там нет, — адреса прошлой отправки. Система запомнит эти для страны.",
-        "en": "Addresses separated by commas. Filled in from the agreement contacts in the "
+        "ru": "Адреса через запятую. Подставлены «Почты для рассылки» из карточки страны; если "
+        "их там нет, — адреса прошлой отправки. Система запомнит эти для страны.",
+        "en": "Addresses separated by commas. Filled in from the mailing recipients in the "
         "country card; if there are none, from the last notice sent. They are remembered "
         "for the country.",
     },

@@ -11,7 +11,7 @@ Migration 0112 once stored a free-text override in country_mailing_recipients; m
 Routes:
 
 - POST /country/<code>/unit-profile: contact-only update, space.manage plus country reach.
-- Existing developer, partner, report-language and contract routes remain compatible.
+- Existing developer, partner and report-language routes remain compatible. The country agreement block was removed (D702).
 
 Regression coverage: tests/test_web_country_contacts.py and tests/test_db_country_contacts.py, plus existing unit creation/country/contract tests. The database tests use temporary databases on the documented remote test PostgreSQL instance, never production.
 

@@ -1,7 +1,7 @@
 """Вкладка «Администрирование → Страны» (D640, #1251): кто видит, что правит, языки отчёта.
 
-Права не менялись: вкладка открыта тем, у кого есть `space.manage` или `contract.manage`;
-ОСБ видит договор и не видит форм девелопера, партнёра и языков. Языки отчёта — запись
+Права не менялись: вкладка открыта тем, у кого есть `space.manage`;
+ОСБ вкладки не видит (договора страны нет, D702). Языки отчёта — запись
 в базу только из языков методики и не меньше одного. Двери базы подменены: что держит
 сама таблица, проверяет `tests/test_db_country_report_langs.py`.
 """
@@ -17,7 +17,6 @@ from test_web_country import данные, открыть
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
 from src.db import country_contacts
-from src.db import country_contracts as cc
 from src.db import country_report_langs as crl
 from src.db.errors import DbError
 from src.db.reach import Reach
@@ -41,9 +40,7 @@ def записи(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         crl, "save", lambda c, langs, *, actor: журнал["save"].append((c, langs, actor))
     )
     monkeypatch.setattr(crl, "reset", lambda c: журнал["reset"].append(c))
-    monkeypatch.setattr(cc, "read", lambda _c: ())
     monkeypatch.setattr(crl, "read_all", lambda: {"AM": ("en", "ru")})
-    monkeypatch.setattr(cc, "countries_with_contract", lambda: frozenset({"AM"}))
     monkeypatch.setattr(
         partner_spaces,
         "overview",
@@ -83,8 +80,8 @@ def _страница(client: FlaskClient, query: str = "") -> str:
     return ответ.get_data(as_text=True)
 
 
-@pytest.mark.parametrize("кто", ["главный", "админ", "осб"])
-def test_вкладку_видят_те_у_кого_есть_управление_страной_или_договором(
+@pytest.mark.parametrize("кто", ["главный", "админ"])
+def test_вкладку_видят_те_у_кого_есть_управление_страной(
     кто: str, request: pytest.FixtureRequest
 ) -> None:
     клиент: FlaskClient = request.getfixturevalue(кто)
@@ -92,47 +89,31 @@ def test_вкладку_видят_те_у_кого_есть_управлени�
     assert "tab=countries" in страница and ">Страны</span>" in страница
 
 
-def test_девелопер_вкладки_не_видит_и_адрес_закрыт(девелопер: FlaskClient) -> None:
-    assert девелопер.get(ВКЛАДКА).status_code == 404
+@pytest.mark.parametrize("кто", ["девелопер", "осб"])
+def test_без_управления_страной_вкладки_нет_и_адрес_закрыт(
+    кто: str, request: pytest.FixtureRequest
+) -> None:
+    клиент: FlaskClient = request.getfixturevalue(кто)
+    assert клиент.get(ВКЛАДКА).status_code == 404
 
 
-def test_список_стран_столбцом_с_партнёром_и_девелопером(главный: FlaskClient) -> None:
+def test_список_стран_одна_рамка_строки_без_сведений_о_настройке(главный: FlaskClient) -> None:
     страница = _страница(главный)
-    список = страница.split("pk-rail--col")[1]
+    список = страница.split('countryrail">')[1].split("countryadmininline__detail")[0]
+    assert "sbox" not in список
     assert список.count('<a class="pk-item') == 2, "каждая страна — строка колонки `pick_item`"
-    # Армения закреплена за пространством Лотос, девелопер — Иван; у Грузии ни того ни другого.
-    строка_am = список[список.index("country=AM") :]
-    assert "Контакт партнёра" in строка_am and "Иван" in строка_am
-    assert "Лотос" not in строка_am
-    строка_ge = список[список.index("country=GE") : список.index("country=AM")]
-    assert "Лотос" not in строка_ge and "Иван" not in строка_ge
-
-
-def test_список_показывает_что_настроено_у_каждой_страны(главный: FlaskClient) -> None:
-    список = _страница(главный).split("pk-rail--col")[1]
-    строка_am = список[список.index("country=AM") : список.index("country=GE")]
-    строка_ge = список[список.index("country=GE") :]
-    assert "EN · RU" in строка_am and "есть" in строка_am
-    assert "по умолчанию" in строка_ge and "нет" in строка_ge and "не задан" in строка_ge
+    assert "pk-item__meta" not in список, "партнёр, девелопер, языки — в панели справа"
+    for лишнее in ("Иван", "Контакт партнёра", "EN · RU", "Договор", "не задан"):
+        assert лишнее not in список, лишнее
     assert "data-drawer-open" not in список, "выбор страны меняет inline-карточку"
 
 
-def test_язык_и_договор_читаются_одним_запросом_на_все_страны(
-    главный: FlaskClient, монкей: pytest.MonkeyPatch
-) -> None:
-    вызовы: list[str] = []
-    монкей.setattr(crl, "read_all", lambda: вызовы.append("langs") or {})
-    монкей.setattr(cc, "countries_with_contract", lambda: вызовы.append("contract") or frozenset())
-    _страница(главный)
-    assert sorted(вызовы) == ["contract", "langs"]
-
-
-def test_панель_страны_шесть_блоков_у_каждого_своя_кнопка(главный: FlaskClient) -> None:
+def test_панель_страны_пять_блоков_у_каждого_своя_кнопка(главный: FlaskClient) -> None:
     страница = _страница(главный, "&country=GE")
     панель = страница[страница.index('class="cblocks"') :]
-    assert панель.count('<section class="cblock') == 6
+    assert панель.count('<section class="cblock') == 5
     блоки = панель.split('<section class="cblock')[1:]
-    assert len(блоки) == 6
+    assert len(блоки) == 5
     for блок, заголовок in zip(
         блоки,
         (
@@ -141,7 +122,6 @@ def test_панель_страны_шесть_блоков_у_каждого_с�
             "Девелопер",
             "Языки отчёта",
             "Пиццерии: адреса и контакты партнёров",
-            "Договор",
         ),
         strict=True,
     ):
@@ -159,17 +139,8 @@ def test_админ_видит_формы_девелопера_партнёра_
         assert f"/country/GE{форма}" in страница, форма
     assert 'name="langs" value="ru"' in страница and 'name="langs" value="en"' in страница
     # Список стран и панель — на одном экране.
-    assert "pk-rail--col" in страница and "countryadmininline__detail" in страница
+    assert "countryrail" in страница and "countryadmininline__detail" in страница
     assert "sdrawer__panel" not in страница
-
-
-def test_осб_видит_договор_и_не_видит_форм_девелопера_партнёра_и_языков(
-    осб: FlaskClient,
-) -> None:
-    страница = _страница(осб, "&country=GE")
-    assert "/country/GE/settings/contract" in страница
-    for форма in ("/settings/developer", "/settings/contacts", "/settings/report-langs"):
-        assert форма not in страница, форма
 
 
 def test_чужая_или_неизвестная_страна_во_вкладке_404(главный: FlaskClient) -> None:
@@ -261,7 +232,7 @@ def test_страница_страны_без_форм_и_ссылок_на_на
 ) -> None:
     страница = открыть(админ, монкей, данные(), "/country/GE?settings=1")
     assert "Карточка страны" in страница, "карточка не открылась — проверять нечего"
-    assert "/country/GE/settings/" not in страница and "ccard__contract" not in страница
+    assert "/country/GE/settings/" not in страница
     assert 'href="/administration?tab=countries&amp;country=GE"' not in страница
 
 

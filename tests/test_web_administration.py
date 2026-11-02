@@ -180,7 +180,7 @@ def test_старый_адрес_вкладки_перенаправляет(г�
     ("GE", "admin"): ["people", "spaces"],
     ("HQ", "developer"): [],
     ("HQ", "guest"): [],
-    ("HQ", "osb"): ["countries"],
+    ("HQ", "osb"): [],
     ("GE", "auditor"): [],
 }
 
