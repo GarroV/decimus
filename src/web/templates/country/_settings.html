@@ -44,7 +44,7 @@
     {{ contact_block(s, 'partner') }}
     {{ contact_block(s, 'mailing') }}
 
-    <section class="cblock" aria-labelledby="cb-developer">
+    <section class="cblock cblock--wide" aria-labelledby="cb-developer">
       <h3 class="cblock__title" id="cb-developer">{{ t('country.block.developer') }}</h3>
       {% if s.developer %}<p class="cblock__value">{{ s.developer }}</p>
       {% else %}<p class="cblock__value cblock__value--none">{{ t('country.card.unset') }}</p>{% endif %}
