@@ -123,9 +123,42 @@
 .ih-controls label { display: flex; flex-direction: column; gap: var(--space-2);
   font-size: var(--fs-meta); color: var(--ink-2); }
 .ih-plot { overflow-x: auto; padding: var(--space-4); }
-.ih-plot svg { display: block; min-width: 640px; color: var(--accent); }
+.ih-plot svg { display: block; color: var(--accent); }
+.ih-plot--narrow { display: none; }
 .ih-data { padding: var(--space-4) var(--space-5); font-size: var(--fs-meta); }
 .ih-data summary { cursor: pointer; }
 .ih-data table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .ih-data th, .ih-data td { padding: var(--space-2); text-align: right; border-bottom: 1px solid var(--line); }
 .ih-data th:first-child { text-align: left; }
+
+.ih-chart { margin: var(--space-4) var(--space-5); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.ih-chart__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-4) 0; }
+.ih-chart__head h3 { margin: 0; font-size: var(--fs-body); font-weight: 600; }
+.ih-chart__head span, .ih-chart__note { color: var(--ink-2); font-size: var(--fs-meta); }
+.ih-chart__note { margin: 0; padding: 0 var(--space-4) var(--space-4); }
+.ih-grid { stroke: var(--line); stroke-width: 1; }
+.ih-grid--vertical { stroke-dasharray: 3 5; opacity: .6; }
+.ih-axis { fill: var(--ink-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+.ih-line { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.ih-area { fill: var(--accent); opacity: .07; }
+.ih-point__dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.ih-point__hit { fill: transparent; }
+.ih-point { outline: none; }
+.ih-point:hover .ih-point__dot, .ih-point:focus .ih-point__dot { stroke: var(--accent); stroke-width: 4; }
+.ih-counts { display: flex; gap: var(--space-3); overflow-x: auto; padding: var(--space-4); }
+.ih-count { display: flex; flex: 1 0 34px; max-width: 120px; flex-direction: column; align-items: center; font-variant-numeric: tabular-nums; font-size: var(--fs-meta); }
+.ih-count__value { color: var(--ink-2); }
+.ih-count__track { height: 80px; width: 100%; display: flex; align-items: end; justify-content: center; border-bottom: 1px solid var(--line); }
+.ih-count__track i { display: block; width: 28px; max-width: 70%; background: var(--accent); opacity: .35; border-radius: 4px 4px 0 0; }
+.ih-count__label { padding-top: var(--space-2); }
+@media (max-width: 600px) {
+  .ih-chart { margin-left: var(--space-3); margin-right: var(--space-3); }
+  .ih-chart__head { flex-wrap: wrap; }
+}
+
+.ih-value { fill: var(--ink); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 600px) {
+  .ih-plot--wide { display: none; }
+  .ih-plot--narrow { display: block; }
+}

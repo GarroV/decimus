@@ -5,7 +5,7 @@ from datetime import date
 import psycopg
 from conftest import requires_db
 
-from src.db.inspection_timeline import months
+from src.db.inspection_timeline import days, months
 from src.db.reach import Reach
 
 pytestmark = requires_db
@@ -25,6 +25,7 @@ def test_history_is_complete_and_scoped(pg_dsn: str, db_env: str) -> None:
                status, origin, reported_pct, retracted_at, retraction_reason)
             select 'HQ', u.id, 0, 'planned',
                    case when u.country = 'AZ' and g = 3 then '2099-01-01'::date
+                        when u.country = 'AZ' and g in (4,5,6) then '2024-01-07'::date + g
                         else '2024-01-10'::date end, 'ru', 'ru', 'ru', 'v1',
                    93.5, 'B', u.country || '-' || g,
                    case when u.country = 'AZ' and g = 1 then 'draft' else 'finalized' end,
@@ -45,3 +46,11 @@ def test_history_is_complete_and_scoped(pg_dsn: str, db_env: str) -> None:
     assert months(reach=Reach("HQ", None, ("AZ",)), countries=("RS",), today=today) == ()
     assert months(reach=hq, countries=(), today=today) == ()
     assert months(reach=Reach("HQ", (), None), countries=None, today=today) == ()
+
+    daily = days(reach=hq, countries=("AZ",), today=today)
+    assert [d.start for d in daily] == [date(2024, 1, n) for n in (10, 11, 12, 13)]
+    assert [d.count for d in daily] == [995, 1, 1, 1]
+    assert sum(d.total for d in daily) == 998 * 93.5
+    assert days(reach=Reach("HQ", None, ("AZ",)), countries=("RS",), today=today) == ()
+    assert days(reach=hq, countries=(), today=today) == ()
+    assert days(reach=Reach("HQ", (), None), countries=None, today=today) == ()

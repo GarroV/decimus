@@ -22,7 +22,7 @@ def test_years_weight_by_inspections_and_keep_empty_year() -> None:
     assert [(b.count, b.average) for b in view.buckets] == [(4, 95.0), (0, None), (1, 93.5)]
     assert view.count == 5
     assert view.average == 94.7
-    assert view.buckets[1].score_y is None
+    assert view.buckets[1].average is None
 
 
 def test_months_keep_gaps_and_never_average_monthly_averages() -> None:
@@ -68,11 +68,11 @@ def test_ratings_history_uses_selected_countries_and_ignores_page_period(
     calls = подготовить(monkeypatch)
     countries = []
 
-    def months(**kwargs: object) -> tuple[Month, ...]:
+    def days(**kwargs: object) -> tuple[Month, ...]:
         countries.append(kwargs["countries"])
         return ROWS
 
-    monkeypatch.setattr(timeline.store, "months", months)
+    monkeypatch.setattr(timeline.store, "days", days)
     for client in клиент(monkeypatch):
         response = client.get("/ratings/inspections?group=country&value=RS&period=2026-09")
         assert response.status_code == 200
@@ -82,3 +82,37 @@ def test_ratings_history_uses_selected_countries_and_ignores_page_period(
         assert 'name="history_grain"' in html
     assert countries == [("RS",)]
     assert not calls["build"]
+
+
+def test_exact_dates_survive_year_aggregation() -> None:
+    from src.db.inspection_timeline import Day
+
+    rows = (
+        Day(date(2026, 1, 5), 1, 81.0),
+        Day(date(2026, 6, 1), 1, 90.0),
+        Day(date(2026, 10, 1), 1, 96.0),
+    )
+    view = timeline.build(rows, {}, today=TODAY)
+    assert len(view.buckets) == 1
+    assert [p.day for p in view.points] == [r.start for r in rows]
+    assert [p.average for p in view.points] == [81.0, 90.0, 96.0]
+    assert view.points[0].x < view.points[1].x < view.points[2].x
+    assert view.points[0].y > view.points[1].y > view.points[2].y
+
+
+def test_same_day_is_weighted_and_single_date_is_centered() -> None:
+    from src.db.inspection_timeline import Day
+
+    view = timeline.build(
+        (Day(date(2026, 9, 1), 1, 80.0), Day(date(2026, 9, 1), 3, 300.0)), {}, today=TODAY
+    )
+    assert len(view.points) == 1
+    assert view.points[0].count == 4
+    assert view.points[0].average == 95.0
+    assert view.points[0].x == 0.5
+
+
+def test_month_view_filters_primary_dates_to_selected_year() -> None:
+    view = timeline.build(ROWS, {"history_grain": "month", "history_year": "2024"}, today=TODAY)
+    assert all(p.day.year == 2024 for p in view.points)
+    assert len(view.points) == 2
