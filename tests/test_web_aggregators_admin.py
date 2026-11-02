@@ -92,6 +92,18 @@ def test_green_requires_complete_fresh_scores_and_successful_recent_collector(
     assert row.tone == tone
 
 
+def test_linked_but_unrated_is_green_while_missing_and_stale_stay_yellow() -> None:
+    def tone(units: list[agg_store.UnitRow], rows: list[agg_store.CoverageRow]) -> str:
+        return screen.build(COUNTRIES[:1], units, rows, {"wolt": {"BG"}}, (load(),), (), TODAY)[
+            0
+        ].tone
+
+    ok = [unit("a"), unit("u")]
+    assert tone(ok, [linked("a", 0), linked("u", None)]) == "green"
+    assert tone([*ok, unit("m")], [linked("a", 0), linked("u", None)]) == "yellow"
+    assert tone(ok, [linked("a", 8), linked("u", None)]) == "yellow"
+
+
 def doors(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
     calls: dict[str, int] = {}
 
