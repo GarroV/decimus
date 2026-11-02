@@ -8,6 +8,20 @@
   открытый раздел, а не сбрасывает его.
 #}{% extends "base.html" %}
 {% block title %}{{ section_title }} · {{ t('section.ratings.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<div class="rt-head__main">
+      <div class="rt-head__kicker">{{ t('section.ratings.title') }}</div>
+      {#- Свежесть всех источников — под «?», таблицей (D659); у раздела — одна строка о его данных. -#}
+      <div class="info-row">
+        <h1 class="rt-head__title">{{ section_title }}</h1>
+        {{ fresh_tip(t('ratings.loaded.hint'), t('ratings.fresh.title'), freshness, 'loaded',
+                     [t('ratings.fresh.col.source'), t('ratings.fresh.col.scope'), t('ratings.fresh.col.at'), t('ratings.fresh.col.status')],
+                     t('ratings.fresh.foot'), t('ratings.loaded.none')) }}
+        {% if section_line %}<span class="rt-fresh-line">{% if section_dot %}<i class="rt-fdot rt-fdot--{{ section_dot }}" aria-hidden="true"></i> {% endif %}{{ section_line }}</span>{% endif %}
+      </div>
+    </div>
+</header>{% endblock %}
+
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">
 <script src="{{ url_for('static', filename='decimus-rt.js') }}" defer></script>{% endblock %}
 
@@ -27,19 +41,7 @@
       {% for i in subnav %}<option value="{{ i.href }}"{% if i.current %} selected{% endif %}>{{ i.title }}</option>{% endfor %}
     </select>
   </div>
-  <header class="rt-head">
-    <div class="rt-head__main">
-      <div class="rt-head__kicker">{{ t('section.ratings.title') }}</div>
-      {#- Свежесть всех источников — под «?», таблицей (D659); у раздела — одна строка о его данных. -#}
-      <div class="info-row">
-        <h1 class="rt-head__title">{{ section_title }}</h1>
-        {{ fresh_tip(t('ratings.loaded.hint'), t('ratings.fresh.title'), freshness, 'loaded',
-                     [t('ratings.fresh.col.source'), t('ratings.fresh.col.scope'), t('ratings.fresh.col.at'), t('ratings.fresh.col.status')],
-                     t('ratings.fresh.foot'), t('ratings.loaded.none')) }}
-        {% if section_line %}<span class="rt-fresh-line">{% if section_dot %}<i class="rt-fdot rt-fdot--{{ section_dot }}" aria-hidden="true"></i> {% endif %}{{ section_line }}</span>{% endif %}
-      </div>
-    </div>
-  </header>
+
 
   <form class="rt-bar" id="rt-bar-form" data-rt-auto method="get" action="{{ url(ratings_path) }}/{{ section_key }}" aria-label="{{ t('ratings.group') }}">
     <input type="hidden" name="group" value="{{ selection.group }}">

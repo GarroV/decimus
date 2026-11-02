@@ -96,10 +96,11 @@ Flask-приложение управляющей компании и партн
 `app.py` собирает приложение и ещё держит часть экранов; остальные экраны
 подключаются своими `install(app, conf)`.
 
-<!-- map:begin files src/web/{__main__,navigation,app,assets,config,dates,db_refusal,errors,icons,sections,server_limits,view,webauthn_rp}.py -->
+<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,server_limits,view,webauthn_rp,aggregators_admin,mailing_documents,mailings_content,navigation,ratings_clients,unit_profile_edit}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/__main__.py` | Точка входа веб-админки: `python -m src.web` |
+| `src/web/aggregators_admin.py` | Административный охват агрегаторов: существующие ячейки и недельная свежесть (#1391) |
 | `src/web/app.py` | Веб-админка управляющей компании: маршруты и сборка приложения |
 | `src/web/assets.py` | Статика админки: отпечаток в адресе и долгий кеш |
 | `src/web/config.py` | Окружение веб-админки: адрес, порт, тенант, язык интерфейса, ключ подписи |
@@ -107,9 +108,13 @@ Flask-приложение управляющей компании и партн
 | `src/web/db_refusal.py` | Отказ базы словами для вошедшего — без устройства стенда (#515, F-012 аудита 12.10) |
 | `src/web/errors.py` | Отказы блока `web` |
 | `src/web/icons.py` | Иконки админки — набор линейки из дизайн-системы (`static/icons.json`) |
+| `src/web/mailing_documents.py` | Actual plan letter and prescription document consumers; no sending |
+| `src/web/mailings_content.py` | Message template editor/preview; no outbound communication |
 | `src/web/navigation.py` | Постоянное подменю оболочки: доступные разделы рейтингов без запроса данных |
+| `src/web/ratings_clients.py` | Клиентские оценки из существующих месячных агрегатов Dodo IS |
 | `src/web/sections.py` | Разделы веб-админки и признак «построен / не построен» (D138) |
 | `src/web/server_limits.py` | Явные пределы сервера `waitress` и предел одновременных медленных запросов |
+| `src/web/unit_profile_edit.py` | Edit existing pizzeria contact fields from the country card |
 | `src/web/view.py` | Подготовка того, что уже посчитано, к показу |
 | `src/web/webauthn_rp.py` | Ключи доступа (WebAuthn): тонкая обёртка над `webauthn` (duo-labs/py_webauthn, D463) |
 <!-- map:end -->
@@ -119,21 +124,21 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{plan_archive,unit_profile_edit,texts_clients,texts_aggregators_admin,ratings_clients,mailings_content,mailing_documents,aggregators_admin,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
 | `src/web/actions_columns.py` | «Столбец стран слева, блоки по состоянию справа» — «ОСБ» и «Действия» (D611) |
 | `src/web/actions_screen.py` | Раздел «Действия»: экшн-планы и предписания — один экран у УК и партнёра (D526, D527) |
-| `src/web/aggregators_admin.py` | Административный охват агрегаторов: существующие ячейки и недельная свежесть (#1391) |
 | `src/web/calendar_screen.py` | Раздел «Календарь» (D497): сетка месяца с проверками и поездками (D505, D506) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
 | `src/web/connect_reminder.py` | Напоминание на «Главной»: привяжите бота и подключите Claude (27.10.2026) |
-| `src/web/countries_screen.py` | Вкладка «Страны» раздела «Администрирование» (D640, #1251) |
+| `src/web/countries_screen.py` | Вкладка «Страны» раздела «Администрирование» (D640, D690) |
 | `src/web/country.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
+| `src/web/country_contacts_actions.py` | Validated country-contact writes; HQ administration only, without outbound mail |
 | `src/web/country_filter.py` | Постоянный отбор стран экрана «Страны» (D536): «мне нужен только Кавказ» |
 | `src/web/country_page.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
-| `src/web/country_settings.py` | «Карточка страны» на экране «Страны» (D539, прежде «Настройки страны», D536) и вкладка «Администрирование → Страны» (D640, #1251) |
+| `src/web/country_settings.py` | Карточка страны для чтения и административные формы (D539, D640, D690) |
 | `src/web/country_summary.py` | Сводка экрана «Страны» (D467): цифры периода и девелоперы стран |
 | `src/web/country_units.py` | Строки пиццерий экрана «Страны» (D467): одна строка на пиццерию |
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
@@ -144,14 +149,12 @@ Flask-приложение управляющей компании и партн
 | `src/web/home_page.py` | Экран «Главная» (D378): по образцу новой главной Swarm Brain |
 | `src/web/home_ratings.py` | Блоки «Стандарты · РС» и «Клиентский опыт · РКО» на «Главной» (D378) |
 | `src/web/home_ratings_block.py` | Блок «Рейтинги» на «Главной» (D418): РС, РКО, карты и агрегаторы (D557) — по кластерам (D502) |
-| `src/web/inspection_timeline.py` | Общая история проверок для страны и рейтингов: годы либо месяцы одного года |
+| `src/web/inspection_timeline.py` | Динамика проверок по датам; количество отдельно по годам или месяцам |
 | `src/web/inspection_titles.py` | Формулировки пунктов методики по коду — для деталей проверки в API Swarm (D391) |
 | `src/web/inspections.py` | Раздел «Проверки»: что показать и чем это взято |
 | `src/web/item_labels.py` | Пункт чек-листа для человека на экранах веба: «Порядок 13», а не `CLN13` (20.10.2026) |
 | `src/web/letter_draft.py` | Письмо уходит в черновики почты вошедшего (T352, D174, D176, D185, #332) |
 | `src/web/mailing_copy.py` | Список копий УК для «Копии» черновика письма (D608, #1130): одна дверь на все виды |
-| `src/web/mailing_documents.py` | Actual plan letter and prescription document consumers; no sending |
-| `src/web/mailings_content.py` | Message template editor/preview; no outbound communication |
 | `src/web/mailings_screen.py` | Вкладка «Письма и уведомления» раздела «Администрирование» (D608, #1130, #977) |
 | `src/web/mailings_template.py` | Шаблон письма партнёру по проверке во вкладке «Письма и уведомления» (D550, D608, #977, #1130) |
 | `src/web/methodology.py` | Раздел «Методика»: правка состава чек-листа той же дверью, что MCP и CLI |
@@ -170,7 +173,6 @@ Flask-приложение управляющей компании и партн
 | `src/web/quality_page.py` | Экран «Качество»: рабочая страница здоровья по странам и пиццериям за месяц |
 | `src/web/ratings.py` | Раздел «Рейтинги» (спека 2026-10-08) и подраздел «Загрузки» |
 | `src/web/ratings_calendar.py` | Период раздела «Рейтинги»: «‹ 2026 Q3 ›», по щелчку — календарь «с — по» |
-| `src/web/ratings_clients.py` | Клиентские оценки из существующих месячных агрегатов Dodo IS |
 | `src/web/ratings_freshness.py` | Таблица свежести под значком «?» у заголовка «Рейтингов» (D659) |
 | `src/web/ratings_line.py` | График средних раздела «Рейтинги» (D396): линия по периодам рейтинга |
 | `src/web/ratings_nav.py` | Разделы «Рейтингов» и подменю в общей навигации (D660) |
@@ -181,13 +183,10 @@ Flask-приложение управляющей компании и партн
 | `src/web/registry_view.py` | Реестр проверок: отбор строк и подписи периода — без прав и без оценок |
 | `src/web/review.py` | Чек-лист той версии, по которой считали проверку, — для правки записей на вычитке (D535) |
 | `src/web/revision.py` | Правка записи на приёмке с пересчётом отчёта (D200) |
-| `src/web/texts_aggregators_admin.py` | Тексты административного охвата агрегаторов (#1391) |
-| `src/web/texts_clients.py` | Клиентские оценки: язык интерфейса не меняет источник и вес данных |
 | `src/web/to_inspect.py` | «Где не проведено» на «Проверках» (D399; D418, D466, D497 — переезды; D501 — вернулся сюда) |
 | `src/web/training_page.py` | Экран «Обучение»: обученность пиццерий по данным iSpring (D574, D575, D578, #906) |
 | `src/web/unit_add.py` | Новая пиццерия из веб-админки: экран страны → «Добавить пиццерию» (#437, D240) |
 | `src/web/unit_card.py` | Карточка точки: где пиццерия сейчас, куда движется и что у неё не чинится |
-| `src/web/unit_profile_edit.py` | Edit existing pizzeria contact fields from the country card |
 <!-- map:end -->
 
 ### Вход, пользователи и доступ
@@ -269,6 +268,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_clients.py` | Клиентские оценки: язык интерфейса не меняет источник и вес данных |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
+| `src/web/texts_country_contacts.py` | Country contact directory and read-only references (D690) |
 | `src/web/texts_demo.py` | Тексты открытого демо и лендинга (D524): выбор роли, плашка, посадочная страница |
 | `src/web/texts_dodois.py` | Тексты входов в Dodo IS по странам (D640, #951): блок «Dodo IS» на «Подключениях» и публичная страница входа по ссылке |
 | `src/web/texts_edit.py` | Manual edit history and recoverable, revision-bound edit drafts |
@@ -346,9 +346,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 26 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _inspection_timeline.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, … (+18) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
-| `src/web/templates/administration/` | 15 | _content_editor.html, _health.html, _nav.html, _ratings_aggregators.html, aggregators.html, connections.html, content_editor.html, countries.html, … (+7) |
+| `src/web/templates/administration/` | 13 | _content_editor.html, _health.html, _nav.html, _ratings_aggregators.html, aggregators.html, connections.html, content_editor.html, countries.html, … (+5) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
-| `src/web/templates/country/` | 6 | _head.html, _mine.html, _parts.html, _settings.html, _summary.html, index.html |
+| `src/web/templates/country/` | 8 | _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
 | `src/web/templates/dodois/` | 1 | connect.html |
 | `src/web/templates/inspections/` | 11 | _card_body.html, _card_parts.html, _letter_form.html, _panel.html, _panel_fragment.html, _row.html, _split_history.html, card.html, … (+3) |
@@ -449,13 +449,14 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,source_units,customer_ratings,country_mailing_recipients,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,country_mailing_recipients,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
 | `src/db/agg_store.py` | Оценки в агрегаторах доставки в базе (схема `agg`, миграция 0050) |
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
+| `src/db/country_contacts.py` | Country partner contacts and inspection mail recipients; HQ-only personal data |
 | `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
 | `src/db/country_mailing_recipients.py` | Explicit country To: override |
 | `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
@@ -464,7 +465,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/dodois_metrics.py` | Чтение данных Dodo IS для страницы «Качество» (D671, миграция `0105`): продажи, агрегаторы, КР |
 | `src/db/dodois_metrics_store.py` | Запись данных Dodo IS для «Качества» (D671, миграция `0105`): замена месяца и журнал загрузки |
 | `src/db/health_store.py` | Двери базы для вкладки «Подключения» (D638): исходы проб и последние заходы сборов |
-| `src/db/inspection_timeline.py` | Месячная история принятых проверок: вся история охвата без лимита реестра |
+| `src/db/inspection_timeline.py` | История принятых проверок по датам и месяцам, без лимита реестра |
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
 | `src/db/learning_store.py` | Обучение в базе (схема `learning`, миграция 0085): запись снимка дня и журнал загрузок |
@@ -617,6 +618,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0107_inspection_info_photo_answers.sql` | Info and photo metadata are inserted in the same push transaction, so this invariant is checked at commit rather than before the photo INSERT exists |
 | `0108_finding_split_history.sql` | Existing rows and legacy remain NULL; no accepted inspection is rewritten |
 | `0109_service_settings.sql` | (нет описания) |
+| `0110_country_contacts.sql` | Country partner contacts and inspection mailing recipients, private to HQ |
 | `0111_country_mailing_recipients.sql` | an empty configured list suppresses fallback |
 | `0112_mailing_content_templates.sql` | (нет описания) |
 | `0113_service_key_health_lock.sql` | The real probe timestamp is preserved; admin cannot fabricate a fresh probe |

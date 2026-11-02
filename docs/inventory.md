@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 212 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 214 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -111,6 +111,8 @@
 | `/calendar/trips/<trip_id>/steps/<step_id>/delete` | POST | `trip_step_delete` | `src/web/calendar_screen.py` |
 | `/country` | GET | `country_index` | `src/web/app.py` |
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
+| `/country/<code>/settings/contacts` | POST | `country_contact_save` | `src/web/country_contacts_actions.py` |
+| `/country/<code>/settings/contacts/<ident>/delete` | POST | `country_contact_delete` | `src/web/country_contacts_actions.py` |
 | `/country/<code>/settings/contract` | POST | `country_save_contract` | `src/web/country_settings.py` |
 | `/country/<code>/settings/contract/<contract_id>/delete` | POST | `country_delete_contract` | `src/web/country_settings.py` |
 | `/country/<code>/settings/developer` | POST | `country_set_developer` | `src/web/country_settings.py` |
@@ -597,6 +599,7 @@
 | `0107_inspection_info_photo_answers.sql` | — |
 | `0108_finding_split_history.sql` | — |
 | `0109_service_settings.sql` | `service_settings` |
+| `0110_country_contacts.sql` | `country_contacts` |
 | `0111_country_mailing_recipients.sql` | `country_mailing_recipients` |
 | `0112_mailing_content_templates.sql` | — |
 | `0113_service_key_health_lock.sql` | — |

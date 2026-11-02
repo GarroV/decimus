@@ -4,13 +4,17 @@
   подставленные адресаты. Текст письма сотрудник вставляет сам.
 #}{% extends "base.html" %}
 {% block title %}{{ t('section.actions.title') }} · {{ t('rx.form.title_edit') if current else (t('rx.form.title_new') if is_manager else t('rx.form.title_by_inspection')) }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<h1 class="ov-head__title">{{ t('rx.form.title_edit') if current else (t('rx.form.title_new') if is_manager else t('rx.form.title_by_inspection')) }}</h1>
+</header>{% endblock %}
+
 
 {% block body %}
   <a class="cn-back" href="{{ back_url }}">‹ {{ t('actions.tab.prescriptions') }}</a>
   <div class="ov-head">
     <div class="ov-head__main">
       <div class="ov-head__kicker">{{ (country_title(country) or country) if country else t('rx.form.kicker') }}</div>
-      <h1 class="ov-head__title">{{ t('rx.form.title_edit') if current else (t('rx.form.title_new') if is_manager else t('rx.form.title_by_inspection')) }}</h1>
+
     </div>
   </div>
 

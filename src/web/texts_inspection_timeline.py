@@ -15,6 +15,28 @@ TIMELINE_TEXTS = {
             "a gap means no inspections."
         ),
     },
+    "history.results": {"ru": "Динамика результатов", "en": "Score history"},
+    "history.scale": {"ru": "Результат, % · шкала 0–100", "en": "Score, % · 0–100 scale"},
+    "history.volume": {"ru": "Количество проверок", "en": "Inspection count"},
+    "history.date": {"ru": "Дата проверки", "en": "Inspection date"},
+    "history.daily": {
+        "ru": (
+            "Точки — даты обхода; несколько проверок за день объединены в среднюю. "
+            "Линия связывает только даты с проверками."
+        ),
+        "en": (
+            "Points mark inspection dates; multiple inspections on one day share an average. "
+            "The line connects observed dates only."
+        ),
+    },
+    "history.single": {
+        "ru": "Пока есть только одна дата — изменение результата ещё не видно.",
+        "en": "There is only one date so far; a change in score is not yet available.",
+    },
+    "history.empty_period": {
+        "ru": "За выбранный год проверок нет.",
+        "en": "No inspections in the selected year.",
+    },
     "history.years": {"ru": "По годам", "en": "By year"},
     "history.months": {"ru": "По месяцам", "en": "By month"},
     "history.year": {"ru": "Год для месяцев", "en": "Year for months"},

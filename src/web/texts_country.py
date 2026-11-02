@@ -8,8 +8,8 @@ from __future__ import annotations
 
 COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     "country.contacts.mailing": {
-        "ru": "Адреса рассылки страны",
-        "en": "Country mailing recipients",
+        "ru": "Дополнительно: адресаты предписаний и экшн-планов",
+        "en": "Advanced: prescription and plan recipients",
     },
     "country.contacts.mailing_hint": {
         "ru": (
@@ -36,11 +36,9 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     },
     "country.contacts.legacy": {
         "ru": (
-            "Используются прежние адреса: контакты договора, иначе адресаты последнего предписания."
+            "По умолчанию — список рассылки страны; если он пуст — прежние адресаты предписаний."
         ),
-        "en": (
-            "Using legacy defaults: contract contacts, otherwise the last prescription recipients."
-        ),
+        "en": ("Using the country mailing list, otherwise legacy prescription recipients."),
     },
     "country.contacts.units": {
         "ru": "Пиццерии: адреса и контакты партнёров",

@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -100,12 +100,19 @@ def _each_batch(
             queue[:0] = [batch[:middle], batch[middle:]]
 
 
+def _require_requested(batch: list[str], returned: Iterable[str]) -> None:
+    if not set(returned).issubset(batch):
+        raise parse.ShapeError("ответ содержит незапрошенную пиццерию")
+
+
 def _sales_month(
     country: str, contour: str, token: str, units: list[str], month: date, today: date, sleep: Sleep
 ) -> tuple[list[str], list[parse.SalesRow]]:
     end = parse.month_end(month, today)
     rows: list[parse.SalesRow] = []
-    covered: list[str] = []
+    if end < month:
+        return [], []
+    covered = set(units)
     for start, stop in parse.windows(month, end, parse.SALES_WINDOW_DAYS):
 
         def get(batch: list[str], start: date = start, stop: date = stop) -> Response:
@@ -119,10 +126,12 @@ def _sales_month(
 
         window_covered: list[str] = []
         for batch, body in _each_batch(units, SALES_UNITS_PER_CALL, get):
-            rows.extend(parse.sales_rows(body))
+            parsed = parse.sales_rows(body)
+            _require_requested(batch, (row.dodo_id for row in parsed))
+            rows.extend(parsed)
             window_covered.extend(batch)
-        covered = window_covered
-    return covered, parse.merge_sales(rows)
+        covered.intersection_update(window_covered)
+    return sorted(covered), parse.merge_sales([row for row in rows if row.dodo_id in covered])
 
 
 def _paged(
@@ -176,7 +185,9 @@ def _aggregators_month(
         )
 
     for batch, body in _each_batch(units, SALES_UNITS_PER_CALL, get):
-        orders.extend(parse.aggregator_orders(body))
+        parsed = parse.aggregator_orders(body)
+        _require_requested(batch, (row.dodo_id for row in parsed))
+        orders.extend(parsed)
         covered.extend(batch)
     return covered, parse.sum_aggregators(orders)
 
@@ -196,7 +207,9 @@ def _kr_month(
         return client.api_get(contour, KR_PATH, query, token)
 
     for batch, body in _each_batch(units, KR_UNITS_PER_CALL, get):
-        rows.extend(parse.kr_rows(body))
+        parsed = parse.kr_rows(body)
+        _require_requested(batch, (row.dodo_id for row in parsed))
+        rows.extend(parsed)
         covered.extend(batch)
     return covered, rows
 
@@ -231,13 +244,18 @@ def _ratings_range(
             for batch, items in _each_batch(units, KR_UNITS_PER_CALL, get):
                 answered.update(batch)
                 if kind:
-                    ratings.extend(parse.rating_periods(items, kind))
+                    parsed = parse.rating_periods(items, kind)
+                    _require_requested(batch, (row.dodo_id for row in parsed))
+                    ratings.extend(parsed)
                 else:
+                    _require_requested(batch, (row.dodo_id for row in parse.checkup_periods(items)))
                     checkups.extend(items)
             covered = answered if covered is None else covered & answered
     done = sorted(covered or ())
-    total = store.replace_rating_periods(start, stop, done, parse.merge_rating_periods(ratings))
-    return total + store.replace_checkup_periods(start, stop, done, parse.checkup_periods(checkups))
+    rating_rows = [row for row in parse.merge_rating_periods(ratings) if row.dodo_id in done]
+    checkup_rows = [row for row in parse.checkup_periods(checkups) if row.dodo_id in done]
+    total = store.replace_rating_periods(start, stop, done, rating_rows)
+    return total + store.replace_checkup_periods(start, stop, done, checkup_rows)
 
 
 def _collect_kind(

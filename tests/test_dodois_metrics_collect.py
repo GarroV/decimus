@@ -392,3 +392,144 @@ def test_all_metric_kinds_receive_same_canonical_uuid_set(
     monkeypatch.setattr(metrics, "_collect_kind", collect)
     assert metrics.collect_country(_вход(), [kind], today=СЕГОДНЯ, sleep=_без_сна)[0].ok
     assert seen == [sorted([А, Б])]
+
+
+def test_uuid_aliases_are_canonical_before_batching(
+    мир: Мир, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from uuid import UUID
+
+    monkeypatch.setattr(client, "working_pizzerias", lambda country: [str(UUID(А)).upper(), А])
+    мир.удачных[parse.KIND_KR] = True
+    мир.ответ = lambda path, query: _ок({"customerRatings": []})
+    metrics.collect_country(_вход(), [parse.KIND_KR], today=СЕГОДНЯ, sleep=_без_сна)
+    assert {query["units"] for _, query in мир.запросы} == {А}
+    assert all(units == [А] for _, units, _ in мир.оценки)
+
+
+def test_sales_requires_coverage_in_every_window(мир: Мир) -> None:
+    def answer(path: str, query: dict[str, str]) -> Response:
+        if query["from"].startswith("2026-10-01") and Б in query["units"]:
+            return _нет_доступа()
+        return _ок(
+            {
+                "result": [
+                    {
+                        "unitId": unit,
+                        "orderSource": "Website",
+                        "salesChannel": "Delivery",
+                        "ordersCount": 1,
+                        "sales": 10,
+                    }
+                    for unit in query["units"].split(",")
+                ]
+            }
+        )
+
+    мир.ответ = answer
+    units, rows = metrics._sales_month(
+        "BG", "intl", ДОСТУП, [А, Б], date(2026, 10, 1), СЕГОДНЯ, _без_сна
+    )
+    assert units == [А]
+    assert {row.dodo_id for row in rows} == {А}
+
+
+@pytest.mark.parametrize("null_page", [0, 1])
+def test_null_aggregator_page_is_failure_without_replacement(мир: Мир, null_page: int) -> None:
+    мир.удачных[parse.KIND_AGGREGATORS] = True
+
+    def answer(path: str, query: dict[str, str]) -> Response:
+        if int(query["skip"]) == null_page * metrics.ACCOUNTING_PAGE_SIZE:
+            return _ок(None)
+        return _ок(
+            {"sales": [{"unitId": А, "aggregatorName": "Glovo"}], "isEndOfListReached": False}
+        )
+
+    мир.ответ = answer
+    (outcome,) = metrics.collect_country(
+        _вход(), [parse.KIND_AGGREGATORS], today=СЕГОДНЯ, sleep=_без_сна
+    )
+    assert not outcome.ok
+    assert outcome.error and outcome.error.startswith("unknown_shape")
+    assert мир.агрегаторы == []
+    assert мир.журнал[-1][1] is False
+
+
+def test_unrequested_unit_fails_before_month_write(мир: Мир) -> None:
+    мир.ответ = lambda path, query: _ок(
+        {
+            "customerRatings": [
+                {
+                    "unitId": "c" * 32,
+                    "avgDineInOrderRate": 5,
+                    "dineInRateCount": 1,
+                    "avgDeliveryOrderRate": None,
+                    "deliveryRateCount": 0,
+                }
+            ]
+        }
+    )
+    (outcome,) = metrics.collect_country(_вход(), [parse.KIND_KR], today=СЕГОДНЯ, sleep=_без_сна)
+    assert not outcome.ok
+    assert мир.оценки == []
+
+
+def test_ratings_partial_coverage_filters_all_rows(
+    мир: Мир, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[tuple[list[str], list[Any]]] = []
+
+    def replace(start: date, stop: date, units: list[str], rows: list[Any]) -> int:
+        captured.append((units, rows))
+        return len(rows)
+
+    monkeypatch.setattr(store, "replace_rating_periods", replace)
+    monkeypatch.setattr(store, "replace_checkup_periods", replace)
+
+    def answer(path: str, query: dict[str, str]) -> Response:
+        if path == parse.CHECKUPS_PATH:
+            if Б in query["units"]:
+                return _нет_доступа()
+            return _ок([])
+        return _ок(
+            [
+                {"unitId": unit, "periodFrom": "2026-09-28", "periodTo": "2026-10-04", "rate": 90}
+                for unit in query["units"].split(",")
+            ]
+        )
+
+    мир.ответ = answer
+    metrics._ratings_range("intl", ДОСТУП, [А, Б], [date(2026, 10, 1)], СЕГОДНЯ, _без_сна)
+    assert all(units == [А] for units, _ in captured)
+    assert {row.dodo_id for _, rows in captured for row in rows} == {А}
+
+
+def test_empty_aggregator_response_is_successful_empty_month(мир: Мир) -> None:
+    мир.удачных[parse.KIND_AGGREGATORS] = True
+    мир.ответ = lambda path, query: _ок([])
+    (outcome,) = metrics.collect_country(
+        _вход(), [parse.KIND_AGGREGATORS], today=СЕГОДНЯ, sleep=_без_сна
+    )
+    assert outcome.ok
+    assert len(мир.агрегаторы) == 2
+    assert all(units == [А, Б] and rows == [] for _, units, rows in мир.агрегаторы)
+
+
+def test_invalid_checkup_does_not_write_valid_ratings_first(
+    мир: Мир, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    writes: list[str] = []
+    monkeypatch.setattr(store, "replace_rating_periods", lambda *args: writes.append("ratings"))
+    monkeypatch.setattr(store, "replace_checkup_periods", lambda *args: writes.append("checkups"))
+
+    def answer(path: str, query: dict[str, str]) -> Response:
+        if path == parse.CHECKUPS_PATH:
+            return _ок([{"unitId": А, "id": "synthetic", "unexpected": True}])
+        return _ок(
+            [{"unitId": А, "periodFrom": "2026-09-28", "periodTo": "2026-10-04", "rate": 90}]
+        )
+
+    мир.ответ = answer
+    with pytest.raises(parse.ShapeError):
+        metrics._ratings_range("intl", ДОСТУП, [А], [date(2026, 10, 1)], СЕГОДНЯ, _без_сна)
+    assert writes == []

@@ -10,22 +10,25 @@
   поездка открывается панелью справа (`calendar/_trip.html`).
 #}{% extends "_split_page.html" %}
 {% from "_info_tip.html" import info_tip %}
+
 {% from "_period.html" import period_picker with context %}
 {% from "calendar/_trip.html" import trip_panel with context %}
 {% block title %}{{ t('section.calendar.title') }}{% endblock %}
-{% block page_class %} page--wide{% endblock %}
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">{% endblock %}
-
-{% block split_top %}
-  <header class="shead">
-    <div class="shead__main">
+{% block page_heading %}<header class="page-heading">
+<div class="shead__main">
       {#- Период — в переключателе ниже, второй раз его не пишем; числа — под «?» (D632). -#}
       <div class="info-row">
         <h1 class="shead__title">{{ t('section.calendar.title') }}</h1>
         {{ info_tip(t('tip.counts'), '', [t('calendar.count', count=total), t('trip.count', count=trips_total)], 'calendar') }}
       </div>
     </div>
-  </header>
+</header>{% endblock %}
+
+{% block page_class %} page--wide{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">{% endblock %}
+
+{% block split_top %}
+
 {% endblock %}
 
 {% block split_list %}

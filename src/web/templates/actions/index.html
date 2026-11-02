@@ -11,6 +11,7 @@
   держит панель открытой, ссылкой можно поделиться.
 #}{% extends "_pick_page.html" %}
 {% from "_info_tip.html" import info_tip %}
+
 {% from "actions/_columns.html" import country_rail, country_select, state_blocks with context %}
 {% from "actions/_list_plans.html" import plans_list with context %}
 {% from "actions/_list_rx.html" import rx_list with context %}
@@ -21,6 +22,13 @@
 {% set pick_norail = not rail %}
 {% set pick_title = t('actions.drawer.plan' if tab == 'plans' else 'actions.drawer.rx') %}
 {% block title %}{{ t(title_key|default('section.actions.title')) }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<div class="info-row">
+        <h1 class="pk-title">{{ t(title_key|default('section.actions.title')) }}</h1>
+        {% if total %}{{ info_tip(t('tip.counts'), '', [t('actions.count', n=total)], 'actions') }}{% endif %}
+      </div>
+</header>{% endblock %}
+
 {% block pick_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-actions.css') }}"><script src="{{ url_for('static', filename='actions.js') }}" defer></script>{% endblock %}
 {% block pick_label %}{{ t('actions.country') }}{% endblock %}
 {% block pick_rail_mod %} pk-rail--select{% endblock %}
@@ -37,10 +45,7 @@
   <header class="pk-head">
     <div class="pk-head__main">
       <div class="pk-kicker">{{ country_title(country) or country if country else t('actions.all_countries') }}</div>
-      <div class="info-row">
-        <h1 class="pk-title">{{ t(title_key|default('section.actions.title')) }}</h1>
-        {% if total %}{{ info_tip(t('tip.counts'), '', [t('actions.count', n=total)], 'actions') }}{% endif %}
-      </div>
+
     </div>
     {#- «Новое предписание» без проверки — только у ОСБ и главного админа; админ смотрит без кнопок. -#}
     {% if tab == 'osb' and may('prescription.manage') %}

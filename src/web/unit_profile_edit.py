@@ -32,7 +32,7 @@ def contacts(form: Mapping[str, str]) -> tuple[str, str, str]:
 
 def install(app: Flask, conf: Settings) -> None:
     @app.post("/country/<code>/unit-profile", endpoint="unit_profile_save")
-    @guard.action("unit.create")
+    @guard.action("space.manage")
     def save(code: str) -> Response:
         country = unit_add._gate(code)
         refuse_foreign_origin()

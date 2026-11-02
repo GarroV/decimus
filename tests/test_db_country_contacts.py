@@ -1,144 +1,197 @@
-"""Country recipient PII and non-destructive profile edits against PostgreSQL."""
+"""Contacts persist independently of access spaces and never leak to partners."""
 
-from __future__ import annotations
-
-from dataclasses import replace
 from datetime import date
-from decimal import Decimal
-from pathlib import Path
 
+import psycopg
 import pytest
 from conftest import requires_db
 from db_harness import set_retraction_env
 
-psycopg = pytest.importorskip("psycopg")
-from src.db import country_mailing_recipients as recipients  # noqa: E402
-from src.db import unit_profiles  # noqa: E402
-from src.db.errors import PrescriptionError  # noqa: E402
+from src.db import country_contacts as contacts
+from src.db.reach import Reach
+from src.db.space import acting_space
 
 pytestmark = requires_db
 
 
 @pytest.fixture
-def database(pg_dsn: str, db_env: str, domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+def admin_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
     return set_retraction_env(db_env, monkeypatch)
 
 
-def test_explicit_empty_reset_and_remembered_addresses_independent(
-    database: str, pg_dsn: str
+def test_contacts_persist_and_are_hq_only(db_env: str, admin_env: str) -> None:
+    with acting_space("HQ"):
+        ident = contacts.save(
+            "GE", contacts.Fields("partner", "Owner", "owner@example.com"), actor="admin"
+        )
+        contacts.save(
+            "GE", contacts.Fields("mailing", "Audits", "audit@example.com"), actor="admin"
+        )
+        contacts.save("GE", contacts.Fields("partner", "Second owner"), actor="admin")
+        assert contacts.partner_names() == {"GE": ("Owner", "Second owner")}
+        rows = contacts.for_country("GE")
+        assert len(rows) == 3
+        contacts.save(
+            "GE",
+            contacts.Fields("partner", "Updated", "owner@example.com"),
+            actor="admin",
+            ident=ident,
+        )
+        assert next(r for r in contacts.for_country("GE") if r.id == ident).name == "Updated"
+        with pytest.raises(contacts.ContactError, match="missing"):
+            contacts.delete("RS", ident, actor="admin")
+        with pytest.raises(contacts.ContactError, match="missing"):
+            contacts.save(
+                "RS", contacts.Fields("partner", "Wrong country"), actor="admin", ident=ident
+            )
+        with pytest.raises(contacts.ContactError, match="duplicate"):
+            contacts.save(
+                "GE", contacts.Fields("partner", "Duplicate", "OWNER@example.com"), actor="admin"
+            )
+    with acting_space("GE"):
+        assert contacts.for_country("GE") == ()
+        assert contacts.partner_names() == {}
+        with pytest.raises(contacts.ContactError, match="forbidden"):
+            contacts.save("GE", contacts.Fields("partner", "Unexpected"), actor="partner")
+    with acting_space("HQ"):
+        contacts.delete("GE", ident, actor="admin")
+        assert len(contacts.for_country("GE")) == 2
+
+
+def test_app_cannot_write_and_database_checks_email(db_env: str, admin_env: str) -> None:
+    sql = (
+        "insert into country_contacts(country,kind,name,email,updated_by) "
+        "values ('GE','mailing','Audit',%s,'admin')"
+    )
+    with psycopg.connect(db_env) as conn:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute(sql, ("audit@example.com",))
+    for invalid in ("bad", "a@example.com, b@example.com", "a@example.com\r\nBcc:x@example.com"):
+        with psycopg.connect(admin_env) as conn:
+            with pytest.raises(psycopg.errors.CheckViolation):
+                conn.execute(sql, (invalid,))
+
+
+def test_inspection_recipients_follow_unit_id_and_required_reach(
+    pg_dsn: str, db_env: str, admin_env: str
 ) -> None:
-    assert recipients.read("RS") is None
-    recipients.save("RS", "A@EXAMPLE.COM; b@example.com", actor="admin")
-    assert recipients.read("RS") == "a@example.com, b@example.com"
-    assert recipients.read("GE") is None
+    ids = []
     with psycopg.connect(pg_dsn) as conn:
-        conn.execute(
-            "insert into country_recipients(country,recipients,updated_by) "
-            "values ('RS','legacy@example.com','admin')"
+        for code, name in (("GE", "Unit One"), ("RS", "Unit Two")):
+            unit = conn.execute(
+                "insert into units(tenant_code,name,name_normalized,country) "
+                "values ('HQ',%s,%s,%s) returning id",
+                (name, name.lower(), code),
+            ).fetchone()[0]
+            ident = conn.execute(
+                "insert into inspections(tenant_code,unit_id,chat_id,kind,"
+                "inspection_date,report_lang,"
+                "ui_lang,speech_lang,checklist_version,pct,grade,source_fingerprint,"
+                "status,origin,reported_pct) "
+                "values ('HQ',%s,0,'planned',%s,'ru','ru','ru','v1',95,'B',%s,"
+                "'finalized','legacy',95) returning id",
+                (unit, date(2026, 1, 1), code),
+            ).fetchone()[0]
+            ids.append(str(ident))
+    with acting_space("HQ"):
+        contacts.save("GE", contacts.Fields("partner", "Owner", "owner@example.com"), actor="admin")
+        contacts.save(
+            "GE", contacts.Fields("mailing", "Audits", "audit@example.com"), actor="admin"
         )
-    assert recipients.read("RS") == "a@example.com, b@example.com"
-    recipients.save("RS", "", actor="admin")
-    assert recipients.read("RS") == ""
-    recipients.save("RS", "bad unsaved input", actor="admin", reset=True)
-    assert recipients.read("RS") is None
-
-
-def test_invalid_recipients_keep_previous_value(database: str) -> None:
-    recipients.save("RS", "a@example.com", actor="admin")
-    with pytest.raises(PrescriptionError):
-        recipients.save("RS", "a@example.com\r\nBcc: bad@example.com", actor="admin")
-    assert recipients.read("RS") == "a@example.com"
-
-
-def test_contact_edit_preserves_entire_imported_profile_and_clears_fields(database: str) -> None:
-    original = unit_profiles.Profile(
-        country_code="RS",
-        name="Belgrade-1",
-        name_normalized="belgrade1",
-        dodo_id="a" * 32,
-        stage="closed",
-        status="closed by partner",
-        city="Belgrade",
-        address="old",
-        partner="old partner",
-        partner_email="old@example.com",
-        restaurant_on=date(2020, 1, 1),
-        delivery_on=date(2020, 2, 1),
-        revenue_on=date(2020, 3, 1),
-        closed_on=date(2026, 1, 1),
-        total_area=Decimal("123"),
-        seats=17,
-        extra={"preserve": "source"},
-    )
-    unit_profiles.save(
-        (
-            original,
-            replace(
-                original,
-                country_code="GE",
-                name="Batumi-1",
-                name_normalized="batumi1",
-                dodo_id="b" * 32,
-            ),
+        contacts.save(
+            "RS", contacts.Fields("mailing", "Audits", "serbia@example.com"), actor="admin"
         )
-    )
-    unit_profiles.update_contacts(
-        "RS",
-        "belgrade1",
-        name="ignored name",
-        dodo_id="a" * 32,
-        address="new",
-        partner="new partner",
-        partner_email="new@example.com",
-    )
-    assert unit_profiles.by_country("RS")[0] == replace(
-        original, address="new", partner="new partner", partner_email="new@example.com"
-    )
-    assert unit_profiles.by_country("GE")[0].address == "old"
-    unit_profiles.update_contacts(
-        "RS",
-        "belgrade1",
-        name="ignored",
-        dodo_id="a" * 32,
-        address="",
-        partner="",
-        partner_email="",
-    )
-    assert unit_profiles.by_country("RS")[0] == replace(
-        original, address="", partner="", partner_email=""
-    )
+        hq = Reach("HQ", None, None)
+        assert contacts.recipients_for_inspection(ids[0], reach=hq) == "audit@example.com"
+        assert contacts.recipients_for_inspection(ids[1], reach=hq) == "serbia@example.com"
+        assert contacts.recipients_for_inspection(ids[0], reach=Reach("HQ", None, ("RS",))) == ""
+    with acting_space("GE"):
+        assert contacts.recipients_for_inspection(ids[0], reach=Reach("GE", None, ("GE",))) == ""
 
 
-def test_application_cannot_write_country_recipients(database: str, db_env: str) -> None:
-    with psycopg.connect(db_env) as conn, pytest.raises(psycopg.errors.InsufficientPrivilege):
-        conn.execute(
-            "insert into country_mailing_recipients(country,recipients,updated_by) "
-            "values('RS','a@example.com','bot')"
+def test_admin_cannot_change_contact_country_kind_or_id(db_env: str, admin_env: str) -> None:
+    with acting_space("HQ"):
+        ident = contacts.save("GE", contacts.Fields("partner", "Owner"), actor="admin")
+    for field, value in (
+        ("country", "RS"),
+        ("kind", "mailing"),
+        ("id", "11111111-1111-1111-1111-111111111111"),
+    ):
+        with psycopg.connect(admin_env) as conn:
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                conn.execute(
+                    psycopg.sql.SQL("update country_contacts set {}=%s where id=%s").format(
+                        psycopg.sql.Identifier(field)
+                    ),
+                    (value, ident),
+                )
+
+
+def test_real_web_save_reference_recipient_update_delete(
+    pg_dsn: str, db_env: str, admin_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from web_harness import СВОЙ, войти, подменить_двери, собрать
+
+    from src.web import inspections, letter_draft
+
+    with psycopg.connect(pg_dsn) as conn:
+        unit = conn.execute(
+            "insert into units(tenant_code,name,name_normalized,country,city) "
+            "values ('HQ','Contact Flow Unit','contact flow unit','GE','Tbilisi') returning id"
+        ).fetchone()[0]
+        inspection = str(
+            conn.execute(
+                "insert into inspections(tenant_code,unit_id,chat_id,kind,inspection_date,"
+                "report_lang,ui_lang,speech_lang,checklist_version,pct,grade,source_fingerprint,"
+                "status,origin,reported_pct) values ('HQ',%s,0,'planned',%s,'ru','ru','ru','v1',"
+                "95,'B','contact-flow','finalized','legacy',95) returning id",
+                (unit, date(2026, 1, 1)),
+            ).fetchone()[0]
         )
-
-
-def test_country_recipient_pii_is_hq_only(database: str, db_env: str) -> None:
-    recipients.save("RS", "a@example.com", actor="admin")
-    for space, expected in (("HQ", 1), ("*", 1), ("RS", 0)):
-        with psycopg.connect(db_env) as conn:
-            conn.execute("select set_config('decimus.space', %s, false)", (space,))
-            row = conn.execute("select count(*) from country_mailing_recipients").fetchone()
-            assert row is not None and row[0] == expected
-
-
-@pytest.mark.parametrize(
-    "value",
-    [
-        "bad",
-        "a@example.com\r\nBcc: bad@example.com",
-        "a@example.com,b@example.com",
-        "A@EXAMPLE.COM",
-    ],
-)
-def test_database_itself_refuses_invalid_country_headers(database: str, value: str) -> None:
-    with psycopg.connect(database) as conn, pytest.raises(psycopg.errors.CheckViolation):
-        conn.execute(
-            "insert into country_mailing_recipients (country, recipients, updated_by) "
-            "values ('RS', %s, 'admin')",
-            (value,),
+    traces = подменить_двери(monkeypatch, tenant="HQ", role="superadmin")
+    with собрать(tenant="HQ").test_client() as client:
+        assert войти(client).status_code == 302
+        base = "/country/GE/settings/contacts"
+        response = client.post(
+            base,
+            data={"kind": "mailing", "name": "Flow Contact", "email": "flow@example.com"},
+            headers={"Origin": СВОЙ},
         )
+        assert response.status_code == 303
+        admin = client.get(response.location)
+        assert admin.status_code == 200 and "flow@example.com" in admin.get_data(as_text=True)
+        reference = client.get("/country/GE?reference=mailing")
+        assert reference.status_code == 200
+        assert "flow@example.com" in reference.get_data(as_text=True)
+        assert 'name="email"' not in reference.get_data(as_text=True)
+        with acting_space("HQ"):
+            (row,) = contacts.for_country("GE")
+            detail = inspections.load_card(inspection, reach=Reach("HQ", None, None))
+            assert detail is not None
+            assert (
+                letter_draft._inspection_to(detail, reach=Reach("HQ", None, None))
+                == "flow@example.com"
+            )
+        response = client.post(
+            base,
+            data={
+                "id": row.id,
+                "kind": "mailing",
+                "name": "Updated Contact",
+                "email": "updated@example.com",
+            },
+            headers={"Origin": СВОЙ},
+        )
+        assert response.status_code == 303
+        assert "updated@example.com" in client.get("/country/GE?reference=mailing").get_data(
+            as_text=True
+        )
+        response = client.post(base + "/" + row.id + "/delete", headers={"Origin": СВОЙ})
+        assert response.status_code == 303
+        with acting_space("HQ"):
+            assert contacts.for_country("GE") == ()
+            assert letter_draft._inspection_to(detail, reach=Reach("HQ", None, None)) == ""
+    assert all(
+        "flow@example.com" not in trace["target"] and "updated@example.com" not in trace["target"]
+        for trace in traces["action_journal"]
+    )

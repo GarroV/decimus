@@ -11,6 +11,8 @@ from __future__ import annotations
 
 #: Код действия → (русская подпись, английская). Маршруты веба.
 _WEB: dict[str, tuple[str, str]] = {
+    "country_contact_save": ("Контакт страны сохранён", "Country contact saved"),
+    "country_contact_delete": ("Контакт страны удалён", "Country contact deleted"),
     "action_plan_setting": ("Настройка экшн-планов изменена", "Action-plan setting changed"),
     "actions_due": ("Срок по запросу экшн-плана", "Action plan request due date"),
     "actions_new": ("Запрос экшн-плана", "Action plan requested"),

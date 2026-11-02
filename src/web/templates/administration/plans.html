@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {% from "administration/_nav.html" import admin_nav with context %}
 {% block title %}{{ t('administration.tab.plans') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<h1 class="shead__title">{{ t('administration.tab.plans') }}</h1>
+</header>{% endblock %}
+
 {% block head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">{% endblock %}
 {% block body %}
-<header class="shead"><h1 class="shead__title">{{ t('administration.tab.plans') }}</h1></header>
+
 <div class="sadmin">
   {{ admin_nav() }}
   <div class="sadmin__main">

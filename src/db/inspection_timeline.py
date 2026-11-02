@@ -1,4 +1,4 @@
-"""Месячная история принятых проверок: вся история охвата без лимита реестра.
+"""История принятых проверок по датам и месяцам, без лимита реестра.
 
 Проценты читаются сохранёнными, включая legacy; оценки не пересчитываются.
 Снятые проверки скрывает RLS, черновики исключаются явно.
@@ -47,3 +47,39 @@ def months(*, reach: Reach, countries: tuple[str, ...] | None, today: date) -> t
             },
         )
         return tuple(Month(row[0], int(row[1]), float(row[2])) for row in cur.fetchall())
+
+
+@dataclass(frozen=True)
+class Day:
+    """Дата обхода, число проверок и сумма сохранённых процентов за эту дату."""
+
+    start: date
+    count: int
+    total: float
+
+
+_DAYS_SQL = """
+select i.inspection_date, count(*), sum(i.pct)
+from inspections i join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(selected)s::text[] is null or u.country = any(%(selected)s))
+  and i.status = 'finalized'
+  and i.inspection_date <= %(today)s
+group by 1 order by 1
+"""
+
+
+def days(*, reach: Reach, countries: tuple[str, ...] | None, today: date) -> tuple[Day, ...]:
+    """Точные даты всех принятых проверок; несколько в один день — одна средняя точка."""
+    scope = require_reach(reach)
+    with reading("динамика проверок") as conn, conn.cursor() as cur:
+        cur.execute(
+            _DAYS_SQL,
+            {
+                **scope.params(),
+                "selected": None if countries is None else list(countries),
+                "today": today,
+            },
+        )
+        return tuple(Day(row[0], int(row[1]), float(row[2])) for row in cur.fetchall())

@@ -560,8 +560,8 @@ def _default_recipients(country: str) -> str:
     from src.db import country_mailing_recipients
 
     try:
-        configured = country_mailing_recipients.read(country)
-    except DbError:
+        configured = country_mailing_recipients.effective(country)
+    except (DbError, ConfigError):
         # Do not expose old recipients if explicit configuration could not be read.
         logger.warning("Country mailing defaults could not be read")
         return ""

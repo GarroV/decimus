@@ -414,3 +414,59 @@ def to_email_html(markup: str) -> str:
         '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
         f"<body><div>{тело}</div></body></html>"
     )
+
+
+class _SubjectTags(HTMLParser):
+    """Track inline formatting crossing the removed subject line."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.active: list[tuple[str, str]] = []
+        self.text: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.active.append((tag, self.get_starttag_text() or f"<{tag}>"))
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.active and self.active[-1][0] == tag:
+            self.active.pop()
+
+    def handle_data(self, data: str) -> None:
+        self.text.append(data)
+
+
+def _subject_line(markup: str) -> str:
+    parser = _SubjectTags()
+    parser.feed(markup)
+    return "".join(parser.text).strip()
+
+
+def subject_and_body(markup: str, *, fallback: str) -> tuple[str, str]:
+    """Move a leading RU/EN subject line into the mail header, preserving the body.
+
+    Saved versions are untouched. A subject-like line later in the letter stays
+    part of the body. Inline formatting spanning the header remains active.
+    """
+    canonical = sanitize(markup)
+    lines = canonical.splitlines(keepends=True)
+    offset = 0
+    for index, line in enumerate(lines):
+        plain = _subject_line(line)
+        offset += len(line)
+        if not plain:
+            continue
+        match = re.fullmatch(r"(?:Тема|Subject)\s*:\s*(.+)", plain, flags=re.IGNORECASE)
+        if match is None:
+            return fallback, markup
+        subject = match.group(1).strip()
+        if not subject:
+            return fallback, markup
+        for blank in lines[index + 1 :]:
+            if _subject_line(blank):
+                break
+            offset += len(blank)
+        tags = _SubjectTags()
+        tags.feed(canonical[:offset])
+        prefix = "".join(opening for _, opening in tags.active)
+        return subject, sanitize(prefix + canonical[offset:])
+    return fallback, markup

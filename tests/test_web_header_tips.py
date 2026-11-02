@@ -110,7 +110,7 @@ def test_расход_пояснение_под_знаком_вопроса_а_�
 
     страница = client.get("/administration?tab=usage").get_data(as_text=True)  # type: ignore[attr-defined]
 
-    вся, без_столбика = шапка_без_подсказки(страница, '<header class="shead">')
+    вся, без_столбика = шапка_без_подсказки(страница, '<header class="page-heading">')
     assert "Сколько токенов и денег уходит на нейросеть" in вся
     assert "Сколько токенов и денег уходит на нейросеть" not in без_столбика
     assert "info-tip__mark" in без_столбика
@@ -132,7 +132,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
 def test_календарь_числа_под_знаком_вопроса_период_не_повторён(стенд: FlaskClient) -> None:
     страница = стенд.get("/calendar?from=2026-09-01&to=2026-09-30").get_data(as_text=True)
 
-    вся, без_столбика = шапка_без_подсказки(страница, '<header class="shead">')
+    вся, без_столбика = шапка_без_подсказки(страница, '<header class="page-heading">')
     assert "<li>проверок: 1</li>" in вся and "<li>поездок: " in вся
     assert "проверок:" not in без_столбика and "поездок:" not in без_столбика
     assert "сентябр" not in без_столбика.lower() and "2026" not in без_столбика
@@ -141,7 +141,7 @@ def test_календарь_числа_под_знаком_вопроса_пер
 def test_настройки_пояснение_столбиком_по_фактам(стенд: FlaskClient) -> None:
     страница = стенд.get("/settings?lang=ru").get_data(as_text=True)
 
-    вся, без_столбика = шапка_без_подсказки(страница, '<header class="shead">')
+    вся, без_столбика = шапка_без_подсказки(страница, '<header class="page-heading">')
     assert вся.count("<li>") == 3
     assert "Ваш профиль: подключения и вход." in вся
     assert "Ваш профиль" not in без_столбика and "ssec__note" not in без_столбика

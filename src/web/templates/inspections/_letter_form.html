@@ -42,7 +42,7 @@
     <form class="lt{{ ' lt--panel' if in_panel }}" method="post"{% if in_panel %} data-panel-form{% endif %}{% if own %} action="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}"{% endif %}>
       <div class="lt__head">
         <div class="lt__title">
-          <{{ 'h2' if in_panel else 'h1' }} class="lt__name">{{ t('letter.title') }}</{{ 'h2' if in_panel else 'h1' }}>
+          {% if in_panel %}<h2 class="lt__name">{{ t('letter.title') }}</h2>{% endif %}
           <div class="lt__meta">
             <span>{{ head.unit_name }} · {{ day(head.inspection_date) }}</span>
             <span class="lt__score" title="{{ t('letter.meta.score') }}">{{ head.pct }}{{ t('card.score.unit') }} · {{ head.grade }}</span>

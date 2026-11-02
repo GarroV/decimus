@@ -22,7 +22,7 @@
       if (text) text.textContent = label;
     });
     document.querySelectorAll("[data-nav-ratings-toggle]").forEach(function (button) {
-      button.setAttribute("aria-expanded", root.dataset.navRatingsOpen);
+      button.setAttribute("aria-expanded", String(!collapsed && root.dataset.navRatingsOpen === "true"));
     });
     var panel = document.getElementById("ratings-navigation");
     if (panel) panel.inert = collapsed || root.dataset.navRatingsOpen !== "true";

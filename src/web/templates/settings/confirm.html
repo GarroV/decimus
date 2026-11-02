@@ -6,18 +6,20 @@
   (D450), иначе паролем. Введённый пароль обратно в разметку не возвращается.
 #}{% extends "base.html" %}
 {% block title %}{{ t('settings.confirm.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<div class="shead__main">
+      <h1 class="shead__title">{{ t('settings.confirm.title') }}</h1>
+      <p class="shead__sub">{{ account.login }}</p>
+    </div>
+</header>{% endblock %}
+
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
 {% endblock %}
 {% block page_class %} page--settings{% endblock %}
 {% block body %}
-  <header class="shead">
-    <div class="shead__main">
-      <h1 class="shead__title">{{ t('settings.confirm.title') }}</h1>
-      <p class="shead__sub">{{ account.login }}</p>
-    </div>
-  </header>
+
   <article class="sdetail ssettings">
     <section class="ssec" id="confirm">
       <p class="ssec__text">{{ t('settings.confirm.why') }}</p>

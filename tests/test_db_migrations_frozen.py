@@ -416,6 +416,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0109_service_settings.sql": (
         "sql1:d17b20f0be54e2d3229ffedabbced9c347c2fec4454c334bdad061e495a80667"
     ),
+    "0110_country_contacts.sql": (
+        "sql1:18188a20e60fdfdfb1897d8164101d50f2e8c6b7cedc73385be8b45b54284a28"
+    ),
 }
 
 

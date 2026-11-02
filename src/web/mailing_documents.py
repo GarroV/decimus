@@ -8,6 +8,7 @@ from flask import Response as FlaskResponse
 from src.db import action_plans, country_mailing_recipients, mailing_templates, prescriptions
 from src.db.models import InspectionDetail
 from src.domain import mailing_content
+from src.domain.features import action_plans_enabled
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.letter_markup import from_plain, to_plain
 
@@ -92,6 +93,8 @@ def install(app: Flask, conf_lang: str) -> None:
     @app.get("/actions/requests/<ident>/letter", endpoint="plan_letter_preview")
     @guard.action("plan.manage")
     def plan_letter(ident: str) -> str | FlaskResponse:
+        if not action_plans_enabled():
+            abort(404)
         lang = ui_lang.request_lang(conf_lang)
         plan = action_plans.get_request(ident, reach=auth.current_reach())
         if plan is None:
@@ -104,7 +107,7 @@ def install(app: Flask, conf_lang: str) -> None:
             "plan_url": url_for("actions", tab="plans", id=plan.id, _external=True),
         }
         subject, body = mailings_content.render("plan", lang, values)
-        to = country_mailing_recipients.read(plan.country) if plan.country else None
+        to = country_mailing_recipients.effective(plan.country) if plan.country else None
         if request.args.get("download") == "eml":
             message = letter_message(
                 to=to or "", cc=cc_for("plan"), subject=subject, body=from_plain(body)

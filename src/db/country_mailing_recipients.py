@@ -46,3 +46,20 @@ def save(country: str, raw: str, *, actor: str, reset: bool = False) -> None:
                 )
     except psycopg.Error as exc:
         raise DbError("Country mailing recipients were not changed") from exc
+
+
+def effective(country: str) -> str | None:
+    """Explicit RX/plan override, otherwise main country mailing directory, then legacy."""
+    from . import country_contacts
+
+    configured = read(country)
+    if configured is not None:
+        return configured
+    emails = tuple(
+        dict.fromkeys(
+            row.email
+            for row in country_contacts.for_country(country)
+            if row.kind == country_contacts.MAILING and row.email
+        )
+    )
+    return ", ".join(emails) if emails else None
