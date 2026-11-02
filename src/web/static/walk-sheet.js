@@ -772,9 +772,18 @@
         var state = classState(cand);
         var queued = state.waitingSearch;
         state.waitingSearch = null;
-        if (state.status !== "waiting_search" || !queued) return;
-        if (classContext(cand).key === queued.key) requestClass(cand, queued.force);
-        else classSelectionChanged();
+        if (!queued) return;
+        if (state.status === "waiting_search" && classContext(cand).key === queued.key) {
+          requestClass(cand, queued.force);
+          return;
+        }
+        // Факты поменялись, пока проверка ждала поиск (#1430): ключ сменился, состояние
+        // уже сброшено в «не проверялось». Проверка выбранного пункта всё равно была
+        // запрошена — запускаем её по актуальным фактам, как в первый раз. Ручной
+        // выбор класса и уже идущая проверка отложенную не заменяют.
+        classSelectionChanged();
+        if (state.status === "idle" && !state.manualMode) requestClass(cand, queued.force);
+        else redraw("footer");
       });
     });
   }
