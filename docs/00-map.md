@@ -96,10 +96,11 @@ Flask-приложение управляющей компании и партн
 `app.py` собирает приложение и ещё держит часть экранов; остальные экраны
 подключаются своими `install(app, conf)`.
 
-<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,server_limits,view,webauthn_rp}.py -->
+<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,server_limits,view,webauthn_rp,aggregators_admin,mailing_documents,mailings_content,navigation,ratings_clients,unit_profile_edit}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/__main__.py` | Точка входа веб-админки: `python -m src.web` |
+| `src/web/aggregators_admin.py` | Административный охват агрегаторов: существующие ячейки и недельная свежесть (#1391) |
 | `src/web/app.py` | Веб-админка управляющей компании: маршруты и сборка приложения |
 | `src/web/assets.py` | Статика админки: отпечаток в адресе и долгий кеш |
 | `src/web/config.py` | Окружение веб-админки: адрес, порт, тенант, язык интерфейса, ключ подписи |
@@ -107,8 +108,13 @@ Flask-приложение управляющей компании и партн
 | `src/web/db_refusal.py` | Отказ базы словами для вошедшего — без устройства стенда (#515, F-012 аудита 12.10) |
 | `src/web/errors.py` | Отказы блока `web` |
 | `src/web/icons.py` | Иконки админки — набор линейки из дизайн-системы (`static/icons.json`) |
+| `src/web/mailing_documents.py` | Actual plan letter and prescription document consumers; no sending |
+| `src/web/mailings_content.py` | Message template editor/preview; no outbound communication |
+| `src/web/navigation.py` | Постоянное подменю оболочки: доступные разделы рейтингов без запроса данных |
+| `src/web/ratings_clients.py` | Клиентские оценки из существующих месячных агрегатов Dodo IS |
 | `src/web/sections.py` | Разделы веб-админки и признак «построен / не построен» (D138) |
 | `src/web/server_limits.py` | Явные пределы сервера `waitress` и предел одновременных медленных запросов |
+| `src/web/unit_profile_edit.py` | Edit existing pizzeria contact fields from the country card |
 | `src/web/view.py` | Подготовка того, что уже посчитано, к показу |
 | `src/web/webauthn_rp.py` | Ключи доступа (WebAuthn): тонкая обёртка над `webauthn` (duo-labs/py_webauthn, D463) |
 <!-- map:end -->
@@ -443,7 +449,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,country_mailing_recipients,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -452,7 +458,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
 | `src/db/country_contacts.py` | Country partner contacts and inspection mail recipients; HQ-only personal data |
 | `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
+| `src/db/country_mailing_recipients.py` | Explicit country To: override |
 | `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
+| `src/db/customer_ratings.py` | Месячные оценки клиентов и журнал их сбора для выбранного среза рейтингов |
 | `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
 | `src/db/dodois_metrics.py` | Чтение данных Dodo IS для страницы «Качество» (D671, миграция `0105`): продажи, агрегаторы, КР |
 | `src/db/dodois_metrics_store.py` | Запись данных Dodo IS для «Качества» (D671, миграция `0105`): замена месяца и журнал загрузки |
@@ -483,6 +491,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/second_factor.py` | Вторая ступень входа (D463, `0068`): хранение и одноразовые переходы |
 | `src/db/secret_crypto.py` | Шифрование секретов, которые лежат в базе (D491): AES-256-GCM, ключ — вне базы |
 | `src/db/service_keys.py` | Ключи внешних сервисов из базы (D576, обобщение ключа модели D491) |
+| `src/db/source_units.py` | Официальный реестр для чтения метрик: первичен справочник рейтингов (#1391) |
 | `src/db/training_names.py` | Столбцы счётчиков обучения (миграция 0085) — общие для записи и чтения |
 | `src/db/training_read.py` | Чтение обучения для экрана «Обучение» (схема `learning`, миграция 0085; D574, D578) |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
