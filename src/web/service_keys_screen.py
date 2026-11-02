@@ -105,16 +105,12 @@ def _state(fields: tuple[FieldRow, ...]) -> str:
 
 
 def _field(
-    service: registry.Service, field: registry.KeyField, found: dict[str, service_keys.KeyStatus]
+    field: registry.KeyField,
+    found: dict[str, service_keys.KeyStatus],
+    identifier: str | None = None,
 ) -> FieldRow:
     raw_env = (os.environ.get(field.env_var) or "").strip()
     status = found.get(field.vault_name)
-    identifier = None
-    if field.code == "client_id":
-        try:
-            identifier = service_keys.resolve(service.code, field.code)
-        except DbError:
-            identifier = None
     return FieldRow(
         field.code,
         registry.form_name(field.code),
@@ -150,7 +146,22 @@ def _row(
     found: dict[str, service_keys.KeyStatus],
     probes: dict[str, health.ProbeRow] | None,
 ) -> ServiceRow:
-    fields = tuple(_field(service, f, found) for f in service.fields)
+    metadata = dict(found)
+    identifier = None
+    if service.field("client_id") is not None:
+        try:
+            snapshot = service_keys.probe_snapshot(service.code)
+            identifier = snapshot.values.get("client_id") or None
+            if snapshot._statuses is not None:
+                for key_field in service.fields:
+                    metadata.pop(key_field.vault_name, None)
+                metadata.update(snapshot._statuses)
+        except DbError:
+            # Never show a cached full identifier alongside fresh configuration metadata.
+            identifier = None
+    fields = tuple(
+        _field(f, metadata, identifier if f.code == "client_id" else None) for f in service.fields
+    )
     return ServiceRow(service.code, fields, _state(fields), _last_probe(service, fields, probes))
 
 

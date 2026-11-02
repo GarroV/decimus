@@ -5,7 +5,8 @@
 {% macro name(row) %}{{ row.name_en if lang == 'en' else row.name_ru }}{% endmacro %}
 {% macro stamp(at) %}{{ utc_stamp(at) }}{% endmacro %}
 {% block body %}<div class="sadmin">{{ admin_nav() }}<div class="sadmin__main">{{ super() }}</div></div>{% endblock %}
-{% block split_top %}<header class="shead"><div class="shead__main"><h1 class="shead__title">{{ t('administration.tab.aggregators') }}</h1><p class="ssec__note">{{ t('aggadmin.sub') }}</p></div></header>{% endblock %}
+{% block page_heading %}<header class="page-heading"><div class="shead__main"><h1 class="shead__title">{{ t('administration.tab.aggregators') }}</h1></div></header>{% endblock %}
+{% block split_top %}<p class="ssec__note">{{ t('aggadmin.sub') }}</p>{% endblock %}
 {% block split_list %}<div class="sbox">
 {% if not known %}<div class="note note--error"><div>{{ t('aggadmin.failed') }}</div></div>
 {% else %}<ul class="sdtiles">{% for row in rows %}<li><a class="shealth__tile sdtile{% if selected and selected.code == row.code %} is-on{% endif %}" href="{{ link(row.code) }}" data-drawer-open{% if selected and selected.code == row.code %} aria-current="true"{% endif %}>

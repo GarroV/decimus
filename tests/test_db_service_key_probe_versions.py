@@ -163,3 +163,29 @@ def test_env_version_change_is_unknown_in_both_shared_and_key_display_status(
     assert shared.checked_at == checked
     assert old.fingerprint.hex() not in repr(shared)
     assert "fake-env-before-restart" not in repr(shared)
+
+
+def test_client_id_display_bypasses_resolver_cache_after_another_process_update(vault: str) -> None:
+    from src.domain import service_keys as registry
+    from src.web.service_keys_screen import _row
+
+    name = "ispring.client_id"
+    old, new = "fake-old-client-AAAA", "fake-new-client-BBBB"
+    service_keys.save_many(
+        {name: old, "ispring.client_secret": "fake-secret"}, provider="ispring", by="qa"
+    )
+    assert service_keys.resolve("ispring", "client_id") == old
+    # Separate connection models an update performed by another process, which
+    # cannot clear this process's existing resolver cache.
+    with psycopg.connect(vault) as conn:
+        conn.execute(
+            "update vault.secrets set ciphertext=%s,last4=%s,set_at=now() where name=%s",
+            (secret_crypto.encrypt(name, new), new[-4:], name),
+        )
+    assert service_keys.resolve("ispring", "client_id") == old
+    service = registry.service("ispring")
+    assert service is not None
+    displayed = _row(service, service_keys.statuses(), {})
+    field = next(f for f in displayed.fields if f.code == "client_id")
+    assert field.identifier == new
+    assert field.status is not None and field.status.last4 == new[-4:]

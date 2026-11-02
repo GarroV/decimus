@@ -10,7 +10,7 @@ The prescription card links to an actual printable document using its heading, c
 
 The action-plan card provides Prepare email. Preview and downloadable .eml use facts from the selected in-reach plan, its actual card URL, the configured country To list (blank if absent) and plan-specific HQ CC. Existing in-app plan notifications are unchanged. Downloading a message never sends it or changes plan status.
 
-Migration 0110 extends mailing_templates with a subject and the message slot for inspection/prescription/plan/document, keeping existing body slots and immutable history. Application reads remain HQ/service-only; administrator writes and mailing.manage web guards are retained. Configuration mutations remain blocked in the public demo. Demo pizzeria profile edits follow the existing demo unit-creation policy.
+Migration 0112 extends mailing_templates with a subject and the message slot for inspection/prescription/plan/document, keeping existing body slots and immutable history. Application reads remain HQ/service-only; administrator writes and mailing.manage web guards are retained. Configuration mutations remain blocked in the public demo. Demo pizzeria profile edits follow the existing demo unit-creation policy.
 
 Routes:
 
@@ -19,3 +19,5 @@ Routes:
 - GET /actions/requests/<id>/letter: actual plan email preview; download=eml prepares a file, plan.manage plus plan reach.
 
 Tests cover whitelist/header injection, safe markup, explicit reset/version history, old inspection slots, editor permissions, foreign origin, real prescription document/cover consumption, actual plan EML and handled template failures before outbound calls.
+
+Action-plan pause and manual service settings remain authoritative: template editing never changes the feature switch. The plan letter/EML consumer is denied while paused, including direct URLs, before loading plan data.

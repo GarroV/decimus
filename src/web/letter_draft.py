@@ -389,13 +389,13 @@ def install(app: Flask, conf: Settings) -> None:
                 body=body,
                 attachments=((data.report_name(detail.inspection), файл, "application/pdf"),),
             )
-        except DbError:
-            logger.warning("Country recipients could not be loaded for inspection draft")
+        except (DbError, ConfigError, ValueError):
+            logger.warning("Country recipients or mail template could not be prepared")
             return к_письму(inspection_id, lang=письмо_на, исход="failed")
         except MailAccountMismatchError as сбой:
             logger.warning("черновик письма не создан: %s", сбой)
             return к_письму(inspection_id, lang=письмо_на, исход=OUTCOME_WRONG_ACCOUNT)
-        except (GoogleMailError, DbError, ConfigError, ValueError) as сбой:
+        except GoogleMailError as сбой:
             # Без записи кнопка «не работала» молча: человек видел «не вышло»,
             # а в журнале не было ничего (11.10.2026).
             logger.warning("черновик письма в Gmail не создан: %s", сбой)

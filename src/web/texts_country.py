@@ -8,19 +8,19 @@ from __future__ import annotations
 
 COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     "country.contacts.mailing": {
-        "ru": "Дополнительно: адресаты предписаний и экшн-планов",
-        "en": "Advanced: prescription and plan recipients",
+        "ru": ("Дополнительно: адресаты предписаний и экшн-планов"),
+        "en": ("Advanced: prescription and plan recipients"),
     },
     "country.contacts.mailing_hint": {
         "ru": (
-            "Отдельный список «Кому» для новых предписаний. Он не меняет почты "
-            "партнёров, контакты договора или общую копию УК. Пустой заданный список "
-            "оставляет «Кому» пустым, без старых адресов."
+            "Обычно используется общий список рассылки страны выше. Здесь можно "
+            "задать особый список для предписаний и планов. Пустой особый список "
+            "оставляет «Кому» пустым, без прежних адресов."
         ),
         "en": (
-            "Separate To defaults for new prescriptions. Does not change partner "
-            "emails, contract contacts or global HQ CC. An empty configured list "
-            "leaves To blank without old addresses."
+            "The main country mailing list above is used by default. Set a separate"
+            " list for prescriptions and plans only if needed. An empty override "
+            "leaves To blank without fallback."
         ),
     },
     "country.contacts.to": {
@@ -28,7 +28,10 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
         "en": "To: emails separated by commas or new lines",
     },
     "country.contacts.use": {"ru": "Использовать заданный список", "en": "Use this list"},
-    "country.contacts.reset": {"ru": "Использовать прежние адреса", "en": "Use legacy defaults"},
+    "country.contacts.reset": {
+        "ru": ("Использовать общий список страны"),
+        "en": ("Use the main country list"),
+    },
     "country.contacts.empty": {"ru": "Заданный список пуст", "en": "The configured list is empty"},
     "country.contacts.custom": {
         "ru": "Используется заданный список, в том числе если он пуст.",
@@ -36,9 +39,10 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     },
     "country.contacts.legacy": {
         "ru": (
-            "По умолчанию — список рассылки страны; если он пуст — прежние адресаты предписаний."
+            "По умолчанию — общий список рассылки страны; если он пуст — прежние "
+            "адресаты предписаний."
         ),
-        "en": ("Using the country mailing list, otherwise legacy prescription recipients."),
+        "en": ("Using the main country mailing list; if empty, legacy prescription recipients."),
     },
     "country.contacts.units": {
         "ru": "Пиццерии: адреса и контакты партнёров",

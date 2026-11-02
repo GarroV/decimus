@@ -82,6 +82,7 @@ class ProbeSnapshot:
 
     values: dict[str, str] = field(repr=False)
     fingerprint: bytes = field(repr=False)
+    _statuses: dict[str, KeyStatus] | None = field(default=None, repr=False)
 
 
 def _service_lock(conn: Any, code: str) -> None:
@@ -124,7 +125,9 @@ def probe_snapshot(code: str, *, conn: Any = None) -> ProbeSnapshot:
         _service_lock(conn, code)
         names = [f.vault_name for f in found.fields]
         rows = conn.execute(
-            "select name, ciphertext, set_at from vault.secrets where name = any(%s)", (names,)
+            "select name, ciphertext, set_at, provider, last4, set_by from vault.secrets "
+            "where name = any(%s)",
+            (names,),
         ).fetchall()
         stored_rows = {row[0]: (bytes(row[1]), row[2]) for row in rows}
         values: dict[str, str] = {}
@@ -150,7 +153,10 @@ def probe_snapshot(code: str, *, conn: Any = None) -> ProbeSnapshot:
                 )
             )
         fingerprint = hashlib.sha256(json.dumps(versions, ensure_ascii=True).encode()).digest()
-        return ProbeSnapshot(values, fingerprint)
+        statuses = {
+            str(row[0]): KeyStatus(str(row[3]), str(row[4]), str(row[5]), row[2]) for row in rows
+        }
+        return ProbeSnapshot(values, fingerprint, statuses)
     except psycopg.Error as exc:
         raise AccessError(
             "Не удалось прочитать версию ключей (" + type(exc).__name__ + ")"

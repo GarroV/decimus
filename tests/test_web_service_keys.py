@@ -826,3 +826,37 @@ def test_internal_probe_snapshot_repr_contains_no_key_or_fingerprint() -> None:
     snapshot = service_keys.ProbeSnapshot({"api_key": "must-not-leak"}, b"internal-version")
     assert "must-not-leak" not in repr(snapshot)
     assert "internal-version" not in repr(snapshot)
+
+
+def test_client_identifier_and_metadata_come_from_one_fresh_snapshot(
+    главный: FlaskClient,
+    склад: Склад,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = "cached-old-client-AAAA"
+    new = "fresh-current-client-BBBB"
+    moment = datetime.now(UTC)
+    old_status = service_keys.KeyStatus("ispring", "AAAA", "old-admin", moment)
+    new_status = service_keys.KeyStatus("ispring", "BBBB", "new-admin", moment)
+    склад.записи["ispring.client_id"] = old_status
+    monkeypatch.setattr(service_keys, "resolve", lambda *_args: old)
+    monkeypatch.setattr(
+        service_keys,
+        "probe_snapshot",
+        lambda _code, **_kwargs: service_keys.ProbeSnapshot(
+            {"client_id": new, "client_secret": "never-render-this-secret"},
+            b"internal-current-version",
+            {"ispring.client_id": new_status},
+        ),
+    )
+    html = главный.get(f"{ВКЛАДКА}&key=ispring").get_data(as_text=True)
+    assert new in html and old not in html
+    assert "never-render-this-secret" not in html
+    assert b"internal-current-version".hex() not in html
+    from src.web.service_keys_screen import _row
+
+    service = registry.service("ispring")
+    assert service is not None
+    displayed = _row(service, {"ispring.client_id": old_status}, {})
+    field = next(f for f in displayed.fields if f.code == "client_id")
+    assert field.identifier == new and field.status == new_status

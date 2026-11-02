@@ -9,7 +9,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.db import country_contracts, country_mailing_recipients, unit_profiles
+from src.db import country_contacts, country_contracts, country_mailing_recipients, unit_profiles
 from src.db.errors import DbError
 from src.db.reach import Reach
 from src.web import auth, country_units, prescriptions, unit_profile_edit
@@ -27,6 +27,7 @@ ROW = country_units.UnitRow(
 
 @pytest.fixture
 def calls(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
+    monkeypatch.setattr(country_contacts, "for_country", lambda _: ())
     out: dict[str, list[Any]] = {"units": [], "recipients": []}
     monkeypatch.setattr(
         country_units, "settings_rows", lambda **_: country_units.UnitsData(rows=(ROW,))
@@ -166,6 +167,7 @@ def test_explicit_country_defaults_even_empty_do_not_fall_back(
 
 def test_absent_country_override_keeps_legacy_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(country_mailing_recipients, "read", lambda _: None)
+    monkeypatch.setattr(country_contacts, "for_country", lambda _: ())
     monkeypatch.setattr(country_contracts, "dkk_recipients", lambda _: "contract@example.com")
     assert prescriptions._default_recipients("RS") == "contract@example.com"
 
@@ -244,3 +246,35 @@ def test_reader_sees_explicit_empty_as_empty_not_legacy(
     assert "The configured list is empty" in html
     assert "Using the configured list, including when empty." in html
     assert "Using legacy defaults:" not in html
+
+
+def test_default_rx_plan_recipients_inherit_main_directory_without_duplicate_storage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(country_mailing_recipients, "read", lambda _: None)
+    monkeypatch.setattr(
+        country_contacts,
+        "for_country",
+        lambda _: (
+            SimpleNamespace(kind="mailing", email="shared@example.com"),
+            SimpleNamespace(kind="partner", email="partner@example.com"),
+        ),
+    )
+    assert country_mailing_recipients.effective("RS") == "shared@example.com"
+    assert prescriptions._default_recipients("RS") == "shared@example.com"
+    monkeypatch.setattr(country_mailing_recipients, "read", lambda _: "")
+    assert country_mailing_recipients.effective("RS") == ""
+
+
+def test_developer_cannot_edit_administrative_pizzeria_contacts(
+    monkeypatch: pytest.MonkeyPatch, calls: Any
+) -> None:
+    подменить_двери(monkeypatch, tenant="HQ", role="developer")
+    with собрать(tenant="HQ").test_client() as client:
+        assert войти(client).status_code == 302
+        assert client.post(
+            "/country/RS/unit-profile", headers=ORIGIN, data={"unit_key": ROW.key}
+        ).status_code in (403, 404)
+    assert calls["units"] == []

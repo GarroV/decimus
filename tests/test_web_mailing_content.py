@@ -23,6 +23,7 @@ from src.db import (
     mailing_templates as store,
 )
 from src.db.errors import ConfigError, DbError
+from src.domain import features
 from src.domain import mailing_content as mc
 from src.web import country_units, mailing_documents
 
@@ -172,6 +173,8 @@ def test_rx_actual_email_uses_saved_template(versions: Any) -> None:
 def test_plan_real_preview_and_eml_use_selected_plan_and_configured_recipients(
     admin: FlaskClient, versions: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv("ACTION_PLANS_ENABLED", "1")
+    monkeypatch.setattr(features, "read_boolean", lambda _: None)
     item = запрос()
     versions[("plan", "en")] = store.Version(
         1, "Selected plan {unit} {due} {plan_url}", "admin", datetime.now(UTC), "Plan {unit}"
@@ -179,7 +182,7 @@ def test_plan_real_preview_and_eml_use_selected_plan_and_configured_recipients(
     monkeypatch.setattr(
         action_plans, "get_request", lambda ident, **_: item if ident == item.id else None
     )
-    monkeypatch.setattr(country_mailing_recipients, "read", lambda _: "country@example.com")
+    monkeypatch.setattr(country_mailing_recipients, "effective", lambda _: "country@example.com")
     path = f"/actions/requests/{item.id}/letter?lang=en"
     result = admin.get(path)
     assert result.status_code == 200 and "Selected plan Batumi-1" in result.get_data(as_text=True)
@@ -229,3 +232,27 @@ def test_rx_template_failure_is_handled_before_any_gmail_draft(
         )
     assert response.status_code == 303 and "gmail=failed" in response.location
     assert outbound == [] and issued == []
+
+
+def test_paused_plan_letter_never_loads_plan_or_eml_and_template_save_does_not_enable_it(
+    admin: FlaskClient, versions: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ACTION_PLANS_ENABLED", "0")
+    monkeypatch.setattr(features, "read_boolean", lambda _: None)
+    monkeypatch.setattr(
+        action_plans,
+        "get_request",
+        lambda *a, **kw: pytest.fail("paused consumer must not read plan"),
+    )
+    for suffix in ("", "?download=eml"):
+        assert admin.get(
+            "/actions/requests/11111111-1111-1111-1111-111111111111/letter" + suffix
+        ).status_code in (403, 404)
+    subject, body = mc.defaults("plan", "en")
+    response = admin.post(
+        "/administration/mailings/plan/content",
+        headers=ORIGIN,
+        data={"tlang": "en", "subject": subject, "body": body},
+    )
+    assert response.status_code == 303
+    assert not features.action_plans_enabled()
