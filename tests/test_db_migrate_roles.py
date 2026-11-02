@@ -272,6 +272,7 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "prescriptions": {"SELECT"},
     "prescription_units": {"SELECT"},
     "prescription_inspections": {"SELECT"},
+    "prescription_findings": {"SELECT"},
     "prescription_replies": {"SELECT", "INSERT"},
     "prescription_events": {"SELECT"},
     "country_recipients": {"SELECT"},
@@ -432,6 +433,7 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "prescriptions": {"SELECT", "INSERT"},
     "prescription_units": {"SELECT", "INSERT", "DELETE"},
     "prescription_inspections": {"SELECT", "INSERT", "DELETE"},
+    "prescription_findings": {"SELECT", "INSERT", "DELETE"},
     "prescription_replies": {"SELECT"},
     "prescription_events": {"SELECT"},
     "country_recipients": {"SELECT"},
@@ -542,6 +544,8 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # Предписания (`0037`): содержимое черновика, отправка и закрытие. Страна,
     # авторство и отметки времени не правятся никем; что правится на каком
     # шаге (отправленное — никак), держит триггер `prescriptions_guarded`.
+    # Строка нарушений предписания (`0115`): отметка «включено» и срок; остальное — снимок.
+    "prescription_findings": {"UPDATE": {"included", "due_on"}},
     "prescriptions": {
         "UPDATE": {
             "subject",

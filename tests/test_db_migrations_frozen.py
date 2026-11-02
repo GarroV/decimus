@@ -431,6 +431,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0114_service_key_health_lock.sql": (
         "sql1:53ddbbbda989ae8b3b974d500618b4f3a110961d4341217566ee092b94ed7c29"
     ),
+    "0115_prescription_findings.sql": (
+        "sql1:4f46b9430c9dea057f9760feab3ed2997596ed55640e09eb4bbb8eff93fdc7ea"
+    ),
 }
 
 
