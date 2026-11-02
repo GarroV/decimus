@@ -15,11 +15,11 @@
     {% if outcome == 'ok' %}<p role="status">{{ t('plans.setting.saved') }}</p>{% endif %}
     <form method="post" action="{{ request.script_root }}/administration/plans/settings?lang={{ lang }}">
       <label for="action-plans-enabled">{{ t('plans.setting.label') }}</label>
-      <select id="action-plans-enabled" name="enabled">
+      <select id="action-plans-enabled" name="enabled"{% if demo_mode %} disabled{% endif %}>
         <option value="0"{% if not feature.enabled %} selected{% endif %}>{{ t('plans.setting.off') }}</option>
         <option value="1"{% if feature.enabled %} selected{% endif %}>{{ t('plans.setting.on') }}</option>
       </select>
-      <button class="btn" type="submit">{{ t('plans.setting.save') }}</button>
+      <button class="btn" type="submit"{% if demo_mode %} disabled{% endif %}>{{ t('plans.setting.save') }}</button>
     </form>
     <p>{{ t('plans.setting.activation_note') }}</p>
     {% if feature.enabled %}<p><a href="{{ request.script_root }}/actions?tab=plans&amp;lang={{ lang }}">{{ t('plans.setting.open') }}</a></p>{% endif %}
