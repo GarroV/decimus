@@ -360,7 +360,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/prescriptions/` | 1 | not_found.html |
 | `src/web/templates/quality/` | 1 | index.html |
 | `src/web/templates/ratings/` | 10 | _macros.html, _period.html, _s_agg.html, _s_clients.html, _s_compare.html, _s_maps.html, _s_risk.html, _s_source.html, … (+2) |
-| `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
+| `src/web/templates/settings/` | 5 | _ai.html, confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/usage/` | 1 | page.html |
