@@ -2,14 +2,22 @@
 
 Вопрос экрана: на каких картах и агрегаторах есть каждая пиццерия и свежие ли
 там данные. Строка — работающая пиццерия из реестра `agg.units`, колонка —
-площадка, ячейка — одно из четырёх:
+площадка, ячейка — одно из пяти:
 
 - **оценка** — точка привязана и оценка есть; `stale` — последняя оценка старше
   `STALE_DAYS`, новые не приходят (не авария: помечается значком, не строкой);
 - **без оценки** — точка привязана, но оценок у неё ещё нет;
-- **нет на площадке** — площадка в стране пиццерии работает, а привязанной точки
-  нет (не нашлась или её ещё не привязали);
+- **не привязана** (`MISSING`) — площадка в стране пиццерии работает, привязанной
+  точки нет, и это дело для рук: рядом (до `NEAR_M`) есть непривязанная точка
+  площадки или площадки без поиска у координат, а «нет на площадке» никто не отметил;
+- **нет на площадке** (`NOT_LISTED`) — не пробел, а сведение (D700). У площадки с
+  поиском у координат (`searched`) это значит «искали у координат пиццерии и
+  ничего не нашли»; у площадки по известной точке — отметка человека. Ни в
+  «ожидается», ни в «не хватает» не считается;
 - **нет в стране** — площадки в этой стране нет, ячейка пустая.
+
+Ожидаемые страны площадки — те, где у неё есть хоть одна точка Додо (D700), не
+список стран сборщика: сбор идёт везде, и появившаяся точка подхватится сама.
 
 Расчётов оценки здесь нет — берётся то, что собрано, в родной шкале площадки.
 """
@@ -17,10 +25,11 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
-from src.db.agg_store import CoverageRow, UnitRow
+from src.db.agg_store import CoverageRow, OpenPoint, UnitRow
+from src.ratings.maps_link import distance_m
 
 STALE_DAYS = 7
 NEW_DAYS = 30
@@ -30,6 +39,12 @@ SCORE = "score"
 UNRATED = "unrated"
 MISSING = "missing"
 ABSENT = "absent"
+NOT_LISTED = "not_listed"
+
+#: Непривязанная точка площадки не дальше этого — кандидат на ручную привязку (D700).
+NEAR_M = 3000
+#: Сколько кандидатов показывать у одной пиццерии.
+MAX_CANDIDATES = 3
 
 KIND_MAP = "map"
 KIND_AGG = "agg"
@@ -45,12 +60,24 @@ class Platform:
 
 
 @dataclass(frozen=True)
+class Candidate:
+    """Непривязанная точка площадки рядом с пиццерией."""
+
+    point_key: str
+    name: str | None
+    url: str | None
+    metres: int
+
+
+@dataclass(frozen=True)
 class Cell:
     state: str
     score: float | None = None
     scale: int | None = None
     on_date: date | None = None
     stale: bool = False
+    candidates: tuple[Candidate, ...] = ()  # у `MISSING`: что привязать руками
+    marked: bool = False  # у `NOT_LISTED`: отметил человек, а не поиск
 
 
 @dataclass(frozen=True)
@@ -82,16 +109,59 @@ def _scored(score: float, scale: int, on_date: date, today: date) -> Cell:
     return Cell(SCORE, score, scale, on_date, is_stale(on_date, today))
 
 
+Near = Mapping[tuple[str, str], tuple[Candidate, ...]]
+
+
+@dataclass(frozen=True)
+class Hints:
+    """Что охвату нужно сверх реестра и привязок (D700): `searched` — агрегаторы с
+    поиском у координат (без привязки и кандидата пиццерия там «нет на площадке»),
+    `absent` — отметки человека (агрегатор, пиццерия), `near` — кандидаты от `nearby`."""
+
+    searched: frozenset[str] = frozenset()
+    absent: frozenset[tuple[str, str]] = frozenset()
+    near: Near = field(default_factory=dict)
+
+
+NO_HINTS = Hints()
+
+
+def nearby(
+    units: Sequence[UnitRow], points: Iterable[OpenPoint]
+) -> dict[tuple[str, str], tuple[Candidate, ...]]:
+    """(агрегатор, пиццерия) → ближайшие непривязанные точки той же страны не дальше `NEAR_M`."""
+    found: dict[tuple[str, str], list[Candidate]] = {}
+    pool = list(points)
+    for unit in units:
+        for point in pool:
+            if point.country_code != unit.country:
+                continue
+            metres = distance_m(unit.lat, unit.lng, point.lat, point.lng)
+            if metres <= NEAR_M:
+                found.setdefault((point.aggregator, unit.dodo_id), []).append(
+                    Candidate(point.point_key, point.name, point.url, round(metres))
+                )
+    return {k: tuple(sorted(v, key=lambda c: c.metres)[:MAX_CANDIDATES]) for k, v in found.items()}
+
+
 def _agg_cell(
     key: str,
     unit: UnitRow,
     linked: Mapping[tuple[str, str], CoverageRow],
     expected: Collection[str],
     today: date,
+    hints: Hints,
 ) -> Cell:
     row = linked.get((key, unit.dodo_id))
     if row is None:
-        return Cell(MISSING if unit.country in expected else ABSENT)
+        if unit.country not in expected:
+            return Cell(ABSENT)
+        if (key, unit.dodo_id) in hints.absent:
+            return Cell(NOT_LISTED, marked=True)
+        candidates = hints.near.get((key, unit.dodo_id), ())
+        if candidates or key not in hints.searched:
+            return Cell(MISSING, candidates=candidates)
+        return Cell(NOT_LISTED)
     if row.score is None or row.scale is None or row.on_date is None:
         return Cell(UNRATED)
     return _scored(row.score, row.scale, row.on_date, today)
@@ -116,11 +186,12 @@ def build(
     today: date,
     *,
     country: str | None = None,
+    hints: Hints = NO_HINTS,
 ) -> Coverage:
     """Охват по работающим пиццериям (одной страны, если задана).
 
     `maps` — пары (ключ карты, оценка пиццерий на ней); `agg_countries` — страны,
-    где агрегатор ожидается (его сборщик или его точки в справочнике). Колонка
+    где агрегатор ожидается (где в справочнике есть его точки). Колонка
     агрегатора есть, если он ожидается хотя бы в одной показанной стране."""
     shown = [u for u in units if u.working and (country is None or u.country == country)]
     by_point = {(r.aggregator, r.dodo_id): r for r in linked}
@@ -132,7 +203,9 @@ def build(
     rows = []
     for unit in shown:
         cells = {k: _map_cell(latest, unit, today) for k, latest in maps}
-        cells.update({k: _agg_cell(k, unit, by_point, agg_countries[k], today) for k in aggs})
+        cells.update(
+            {k: _agg_cell(k, unit, by_point, agg_countries[k], today, hints) for k in aggs}
+        )
         rows.append(Row(unit, is_new(unit, today), cells))
     return Coverage(
         platforms,

@@ -70,11 +70,11 @@ def test_counts_partition_working_units_and_separate_excluded() -> None:
     )
     assert (p.unmatched, p.excluded) == (2, 3)
     assert p.latest == TODAY - timedelta(days=7)
-    assert p.gaps == (
+    assert [(g.unit, g.state, g.on_date) for g in p.gaps] == [
         ("stale", "stale", TODAY - timedelta(days=8)),
         ("unrated", "unrated", None),
         ("missing", "missing", None),
-    )
+    ]
     assert bg.tone == "yellow"
     assert rs.tone == "grey" and not rs.platforms and rs.working == 0
 
@@ -117,6 +117,9 @@ def doors(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
     monkeypatch.setattr(ratings_read, "countries", counted("countries", COUNTRIES))
     monkeypatch.setattr(agg_store, "units", counted("units", [unit("missing")]))
     monkeypatch.setattr(agg_store, "coverage", counted("coverage", ()))
+    monkeypatch.setattr(agg_store, "unit_absent", counted("absent", frozenset()))
+    monkeypatch.setattr(agg_store, "open_points", counted("open", ()))
+    monkeypatch.setattr(agg_store, "point_links", counted("links", ()))
     monkeypatch.setattr(agg_store, "load_states", counted("loads", (load("failed"),)))
     monkeypatch.setattr(
         agg_store,
@@ -145,7 +148,8 @@ def test_hq_managers_see_actual_gaps_and_global_status(
     html = response.get_data(as_text=True)
     assert response.status_code == 200
     assert html.index('<header class="page-heading">') < html.index('class="sadmin"')
-    assert "missing — нет привязки" in html
+    # Wolt ищется у координат: «нет точки» там — «нет на площадке», сведение, не пробел (D700).
+    assert "missing — нет на площадке" in html and "missing — нет привязки" not in html
     assert "подробности в закрытом журнале" in html and "всему сборщику" in html
     assert "/ratings/agg?group=country&amp;value=BG" in html
     assert "/administration?tab=ratings&amp;block=aggregators" in html

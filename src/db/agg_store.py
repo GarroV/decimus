@@ -11,7 +11,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+import re
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -501,8 +502,19 @@ def save_units(units: Sequence[UnitIn], today: date) -> int:
     return len(unique)
 
 
+#: Тестовая пиццерия в публичном API Dodo (`TEST-1`): рабочей не считается.
+_TEST_UNIT = re.compile(r"TEST-\d+", re.IGNORECASE)
+
+
+def is_test_unit(name: str) -> bool:
+    """Имя тестовой пиццерии: `TEST-<число>` целиком, без учёта регистра."""
+    return _TEST_UNIT.fullmatch(name.strip()) is not None
+
+
 def units(countries: Sequence[str] | None = None) -> tuple[UnitRow, ...]:
-    """Реестр пиццерий — все или по странам, по стране и имени."""
+    """Реестр пиццерий — все или по странам, по стране и имени. Тестовые
+    пиццерии (`is_test_unit`) не отдаются: это единственная точка чтения реестра
+    для охвата, экрана «Качество» и счётчиков, поэтому отсев живёт здесь (D700)."""
     sql = """
         select dodo_id, country_code, name, lat, lng, working, first_seen, last_seen
         from agg.units where (%s::text[] is null or country_code = any(%s))
@@ -517,6 +529,7 @@ def units(countries: Sequence[str] | None = None) -> tuple[UnitRow, ...]:
     return tuple(
         UnitRow(str(r[0]), str(r[1]), str(r[2]), float(r[3]), float(r[4]), bool(r[5]), r[6], r[7])
         for r in rows
+        if not is_test_unit(str(r[2]))
     )
 
 
@@ -627,3 +640,166 @@ def unmatched_counts() -> tuple[UnmatchedCount, ...]:
     except psycopg.Error as exc:
         raise _fail("Непривязанные точки агрегаторов не прочитались", exc) from exc
     return tuple(UnmatchedCount(str(c), str(a), int(n), int(x)) for c, a, n, x in rows)
+
+
+@dataclass(frozen=True)
+class OpenPoint:
+    """Точка агрегатора, не привязанная к пиццерии, — кандидат на ручную привязку."""
+
+    aggregator: str
+    point_key: str
+    country_code: str
+    name: str | None
+    url: str | None
+    lat: float
+    lng: float
+
+
+def open_points() -> tuple[OpenPoint, ...]:
+    """Непривязанные точки с координатами; исключённые вручную («не пиццерия») не отдаются."""
+    sql = """
+        select aggregator, point_key, country_code, name, url, lat, lng
+        from agg.points
+        where dodo_id is null and excluded_reason is null and lat is not null and lng is not null
+        order by aggregator, point_key
+    """
+    try:
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute(sql).fetchall()
+    except psycopg.Error as exc:
+        raise _fail("Непривязанные точки не прочитались", exc) from exc
+    return tuple(
+        OpenPoint(str(r[0]), str(r[1]), str(r[2]), r[3], r[4], float(r[5]), float(r[6]))
+        for r in rows
+    )
+
+
+def unit_absent() -> frozenset[tuple[str, str]]:
+    """Пары (агрегатор, пиццерия), отмеченные руками «нет на площадке» (D700)."""
+    try:
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute("select aggregator, dodo_id from agg.unit_absent").fetchall()
+    except psycopg.Error as exc:
+        raise _fail("Отметки «нет на площадке» не прочитались", exc) from exc
+    return frozenset((str(a), str(d)) for a, d in rows)
+
+
+def mark_absent(aggregator: str, dodo_id: str, *, by: str) -> None:
+    """Отметить «пиццерии нет на площадке». Повтор — не ошибка, автор не меняется."""
+    try:
+        with connection(check_environment().dsn) as conn, conn.transaction():
+            conn.execute(
+                "insert into agg.unit_absent (aggregator, dodo_id, marked_by) values (%s, %s, %s)"
+                " on conflict do nothing",
+                (aggregator, dodo_id, by),
+            )
+    except psycopg.Error as exc:
+        raise _fail("Отметка «нет на площадке» не легла", exc) from exc
+
+
+def unmark_absent(aggregator: str, dodo_id: str) -> None:
+    """Снять отметку «нет на площадке». Не было отметки — ничего не меняется."""
+    try:
+        with connection(check_environment().dsn) as conn, conn.transaction():
+            conn.execute(
+                "delete from agg.unit_absent where aggregator = %s and dodo_id = %s",
+                (aggregator, dodo_id),
+            )
+    except psycopg.Error as exc:
+        raise _fail("Отметка «нет на площадке» не снялась", exc) from exc
+
+
+@dataclass(frozen=True)
+class PointLink:
+    """Закреплённая вручную пара: точка агрегатора — пиццерия."""
+
+    aggregator: str
+    point_key: str
+    dodo_id: str
+
+
+def point_links(aggregator: str | None = None) -> tuple[PointLink, ...]:
+    """Закреплённые привязки — все или одного агрегатора."""
+    sql = "select aggregator, point_key, dodo_id from agg.point_links"
+    sql += " where aggregator = %s order by point_key" if aggregator else " order by 1, 2"
+    try:
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute(sql, (aggregator,) if aggregator else ()).fetchall()
+    except psycopg.Error as exc:
+        raise _fail("Закреплённые привязки не прочитались", exc) from exc
+    return tuple(PointLink(str(a), str(k), str(d)) for a, k, d in rows)
+
+
+def pin_link(
+    aggregator: str,
+    point_key: str,
+    dodo_id: str,
+    dodo_name: str,
+    distance_m: int,
+    *,
+    by: str,
+) -> bool:
+    """Закрепить точку за пиццерией и сразу записать привязку в `agg.points`.
+
+    Прежнее закрепление этой точки или этой пиццерии заменяется; точка, что была
+    привязана к пиццерии раньше без закрепления, отвязывается — иначе на экране
+    у пиццерии были бы две точки. Отметка «нет на площадке» снимается. `False` —
+    такой точки нет в справочнике, ничего не записано."""
+    try:
+        with connection(check_environment().dsn) as conn, conn.transaction():
+            known = conn.execute(
+                "select 1 from agg.points where aggregator = %s and point_key = %s",
+                (aggregator, point_key),
+            ).fetchone()
+            if known is None:
+                return False
+            conn.execute(
+                "delete from agg.point_links where aggregator = %s"
+                " and (point_key = %s or dodo_id = %s)",
+                (aggregator, point_key, dodo_id),
+            )
+            conn.execute(
+                "update agg.points set dodo_id = null, dodo_name = null, link_distance_m = null"
+                " where aggregator = %s and dodo_id = %s and point_key <> %s",
+                (aggregator, dodo_id, point_key),
+            )
+            conn.execute(
+                "update agg.points set dodo_id = %s, dodo_name = %s, link_distance_m = %s"
+                " where aggregator = %s and point_key = %s",
+                (dodo_id, dodo_name, distance_m, aggregator, point_key),
+            )
+            conn.execute(
+                "insert into agg.point_links (aggregator, point_key, dodo_id, linked_by)"
+                " values (%s, %s, %s, %s)",
+                (aggregator, point_key, dodo_id, by),
+            )
+            conn.execute(
+                "delete from agg.unit_absent where aggregator = %s and dodo_id = %s",
+                (aggregator, dodo_id),
+            )
+    except psycopg.Error as exc:
+        raise _fail("Закреплённая привязка не легла", exc) from exc
+    return True
+
+
+def unpin_link(aggregator: str, point_key: str) -> None:
+    """Снять закрепление и отвязать точку: ближайшая пиццерия подберётся при следующем сборе."""
+    try:
+        with connection(check_environment().dsn) as conn, conn.transaction():
+            gone = conn.execute(
+                "delete from agg.point_links where aggregator = %s and point_key = %s returning 1",
+                (aggregator, point_key),
+            ).fetchone()
+            if gone is not None:
+                conn.execute(
+                    "update agg.points set dodo_id = null, dodo_name = null,"
+                    " link_distance_m = null where aggregator = %s and point_key = %s",
+                    (aggregator, point_key),
+                )
+    except psycopg.Error as exc:
+        raise _fail("Закреплённая привязка не снялась", exc) from exc
+
+
+def pins(aggregator: str) -> Mapping[str, str]:
+    """Закреплённые пары агрегатора для сборщика: ключ точки → пиццерия."""
+    return {link.point_key: link.dodo_id for link in point_links(aggregator)}

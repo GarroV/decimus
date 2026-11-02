@@ -507,6 +507,11 @@ on_report_lang
 # библиотека; `_без_базы_реестра` — автофикстура pytest.
 ratings_coverage
 ratings_coverage_link
+# Ручные решения по охвату агрегаторов (D700, `src/web/aggregators_actions.py`): маршруты Flask.
+aggregators_absent
+aggregators_present
+aggregators_pin
+aggregators_unpin
 redirect_request
 _без_базы_реестра
 # Заслон происхождения на всю админку (#709): крюк `@app.before_request`.

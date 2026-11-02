@@ -440,6 +440,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0117_drop_country_contracts.sql": (
         "sql1:197243a8eb6e91066460d104bbe7dd59ffb819a1b8bf20b56c6d517d997b0273"
     ),
+    "0118_agg_unit_absent_point_links.sql": (
+        "sql1:22a43c5c1ccc7c42d66fcec2932a622fbf7b5e76c172600d9d1c509118f3b1b2"
+    ),
 }
 
 

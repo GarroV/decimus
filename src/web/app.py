@@ -67,6 +67,7 @@ from src.report.letters import LetterError
 from . import (
     action_plans,
     actions_screen,
+    aggregators_actions,
     assets,
     auth,
     calendar_screen,
@@ -255,6 +256,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     prescriptions.install(app, conf)
     osb.install(app, conf)
     ratings.install(app, conf)
+    aggregators_actions.install(app, conf)
     quality_page.install(app, conf)
     training_page.install(app, conf)
     # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.
