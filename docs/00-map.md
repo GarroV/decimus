@@ -95,10 +95,11 @@ Flask-приложение управляющей компании и партн
 `app.py` собирает приложение и ещё держит часть экранов; остальные экраны
 подключаются своими `install(app, conf)`.
 
-<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,server_limits,view,webauthn_rp,aggregators_admin,mailing_documents,mailings_content,prescription_notice,navigation,ratings_clients,unit_profile_edit}.py -->
+<!-- map:begin files src/web/{__main__,app,assets,config,dates,db_refusal,errors,icons,sections,server_limits,view,webauthn_rp,aggregators_admin,aggregators_actions,mailing_documents,mailings_content,prescription_notice,navigation,ratings_clients,unit_profile_edit}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/__main__.py` | Точка входа веб-админки: `python -m src.web` |
+| `src/web/aggregators_actions.py` | Ручные решения по охвату агрегаторов (D700): «нет на площадке» и закреплённая привязка |
 | `src/web/aggregators_admin.py` | Административный охват агрегаторов: существующие ячейки и недельная свежесть (#1391) |
 | `src/web/app.py` | Веб-админка управляющей компании: маршруты и сборка приложения |
 | `src/web/assets.py` | Статика админки: отпечаток в адресе и долгий кеш |
