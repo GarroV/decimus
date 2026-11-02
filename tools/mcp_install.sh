@@ -31,7 +31,7 @@ set -eu
 # Прежние имена DODO_MCP_* — запасные: так называлась строка бота до переименования.
 TOKEN="${DECIMUS_MCP_TOKEN:-${DODO_MCP_TOKEN:-}}"
 URL="${DECIMUS_MCP_URL:-${DODO_MCP_URL:-}}"
-: "${TOKEN:?не задан DECIMUS_MCP_TOKEN — возьмите команду в вебе: «Настройки» → «Claude (MCP)»}"
+: "${TOKEN:?не задан DECIMUS_MCP_TOKEN — возьмите команду в вебе: «Настройки» → «Нейросети» → Claude}"
 : "${URL:?не задан DECIMUS_MCP_URL — возьмите команду в вебе целиком}"
 NAME="decimus"
 OLD_NAME="dodo-audit"

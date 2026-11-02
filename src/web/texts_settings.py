@@ -77,7 +77,7 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Что в них доступно, решает ваша роль.",
         "en": "What you can do there depends on your role.",
     },
-    "settings.claude.title": {"ru": "Claude (MCP)", "en": "Claude (MCP)"},
+    "settings.claude.title": {"ru": "Нейросети", "en": "AI assistants"},
     # Пояснение к объявлению D629 (текст утверждён владельцем 23.10.2026, путь — уже внутри плитки).
     "settings.claude.relink": {
         "ru": "Обновили подключение Claude (MCP): теперь фото к проверке можно загружать прямо "
@@ -111,11 +111,116 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Paste it into a terminal on your Mac and restart Claude (⌘Q). The command is "
         "shown once; the token is personal.",
     },
-    "settings.claude.address": {
-        "ru": "Для claude.ai в браузере и телефона — коннектор, адрес (фото из папки так "
-        "недоступны):",
-        "en": "For claude.ai in a browser and for the phone — a connector, the address (photos "
-        "from a folder are not available this way):",
+    # --- плитка «Нейросети» (D695): ChatGPT, Claude, GLM, Kimi --------------------
+    "settings.ai.name.chatgpt": {"ru": "ChatGPT", "en": "ChatGPT"},
+    "settings.ai.name.claude": {"ru": "Claude", "en": "Claude"},
+    "settings.ai.name.glm": {"ru": "GLM (Z.ai)", "en": "GLM (Z.ai)"},
+    "settings.ai.name.kimi": {"ru": "Kimi (Moonshot)", "en": "Kimi (Moonshot)"},
+    "settings.ai.pick": {"ru": "Нейросеть", "en": "AI assistant"},
+    "settings.ai.lead": {
+        "ru": "Подключите нейросеть к decimus: она работает с проверками от вашего имени, в "
+        "пределах вашей роли.",
+        "en": "Connect an AI assistant to decimus: it works with inspections on your behalf, "
+        "within your role.",
+    },
+    "settings.ai.address": {"ru": "Адрес MCP decimus:", "en": "The decimus MCP address:"},
+    "settings.ai.off": {
+        "ru": "Подключение входом через сайт на этом стенде не включено.",
+        "en": "Connecting by signing in through the site is not enabled on this stand.",
+    },
+    "settings.ai.tip.title": {"ru": "К чему это", "en": "Good to know"},
+    "settings.ai.tip.chatgpt": {
+        "ru": "Работает, если политика вашего рабочего пространства ChatGPT разрешает свои "
+        "MCP-серверы; иначе обратитесь к его администратору.",
+        "en": "Works if your ChatGPT workspace policy allows custom MCP servers; otherwise ask "
+        "its administrator.",
+    },
+    "settings.ai.tip.claude": {
+        "ru": "Коннектор claude.ai, телефон и Claude Code входят через сайт; Claude Desktop с "
+        "фото из папки — личным токеном.",
+        "en": "The claude.ai connector, the phone and Claude Code sign in through the site; "
+        "Claude Desktop with photos from a folder uses a personal token.",
+    },
+    "settings.ai.tip.glm": {
+        "ru": "В веб-чате chat.z.ai своего MCP нет: подключайте через ZCode или Claude Code.",
+        "en": "The chat.z.ai web chat has no MCP of its own: connect through ZCode or Claude Code.",
+    },
+    "settings.ai.tip.kimi": {
+        "ru": "В kimi.com своего MCP нет: подключайте через Kimi Code CLI.",
+        "en": "kimi.com has no MCP of its own: connect through Kimi Code CLI.",
+    },
+    "settings.ai.chatgpt.web_title": {"ru": "ChatGPT в браузере", "en": "ChatGPT in a browser"},
+    "settings.ai.chatgpt.web": {
+        "ru": "Plugins → Add custom MCP server → вставьте адрес выше, способ входа — OAuth. "
+        "Войдите в decimus и нажмите «Разрешить».",
+        "en": "Plugins → Add custom MCP server → paste the address above, sign-in method — "
+        "OAuth. Sign in to decimus and press “Allow”.",
+    },
+    "settings.ai.chatgpt.app_title": {
+        "ru": "Приложение на компьютере (Codex)",
+        "en": "The desktop app (Codex)",
+    },
+    "settings.ai.chatgpt.app": {
+        "ru": "Settings → MCP servers → Add server → Streamable HTTP → вставьте адрес → "
+        "Authenticate.",
+        "en": "Settings → MCP servers → Add server → Streamable HTTP → paste the address → "
+        "Authenticate.",
+    },
+    "settings.ai.chatgpt.cli": {
+        "ru": "Или двумя командами в терминале:",
+        "en": "Or with two commands in a terminal:",
+    },
+    "settings.ai.glm.chat": {
+        "ru": "В веб-чате chat.z.ai своего MCP нет. Подключить decimus к GLM можно так:",
+        "en": "The chat.z.ai web chat has no MCP of its own. You can connect decimus to GLM "
+        "this way:",
+    },
+    "settings.ai.glm.zcode_title": {"ru": "ZCode от Z.ai", "en": "ZCode by Z.ai"},
+    "settings.ai.glm.zcode": {
+        "ru": "Добавьте удалённый MCP-сервер с входом OAuth по адресу выше, войдите в decimus и "
+        "нажмите «Разрешить».",
+        "en": "Add a remote MCP server with OAuth sign-in at the address above, sign in to "
+        "decimus and press “Allow”.",
+    },
+    "settings.ai.glm.cc_title": {
+        "ru": "Claude Code с ключом GLM Coding Plan",
+        "en": "Claude Code with a GLM Coding Plan key",
+    },
+    "settings.ai.glm.cc": {
+        "ru": "Настройте Claude Code на ключ GLM Coding Plan и добавьте decimus командой:",
+        "en": "Point Claude Code at your GLM Coding Plan key and add decimus with:",
+    },
+    "settings.ai.kimi.chat": {
+        "ru": "В kimi.com своего MCP нет. Подключить decimus к Kimi можно так:",
+        "en": "kimi.com has no MCP of its own. You can connect decimus to Kimi this way:",
+    },
+    "settings.ai.kimi.cli_title": {"ru": "Kimi Code CLI", "en": "Kimi Code CLI"},
+    "settings.ai.kimi.cli": {
+        "ru": "Добавьте decimus как удалённый MCP-сервер по адресу выше, затем войдите — в "
+        "Kimi Code выполните:",
+        "en": "Add decimus as a remote MCP server at the address above, then sign in — in "
+        "Kimi Code run:",
+    },
+    "settings.ai.claude.web_title": {
+        "ru": "claude.ai в браузере и телефон",
+        "en": "claude.ai in a browser and the phone",
+    },
+    "settings.ai.claude.web": {
+        "ru": "Настройки → Коннекторы → Добавить свой коннектор → вставьте адрес выше. Claude "
+        "откроет вход decimus: войдите и нажмите «Разрешить». Фото из папки так недоступны.",
+        "en": "Settings → Connectors → Add custom connector → paste the address above. Claude "
+        "opens the decimus sign-in: sign in and press “Allow”. Photos from a folder are not "
+        "available this way.",
+    },
+    "settings.ai.claude.cc": {
+        "ru": "Claude Code — команда в терминале:",
+        "en": "Claude Code — run in a terminal:",
+    },
+    "settings.ai.claude.desktop_title": {"ru": "Claude Desktop", "en": "Claude Desktop"},
+    "settings.ai.connected": {"ru": "Подключено", "en": "Connected"},
+    "settings.ai.row": {
+        "ru": "называет себя «{client}» · подключено {created} · {used}",
+        "en": "calls itself “{client}” · connected {created} · {used}",
     },
     "settings.claude.copy": {"ru": "Скопировать команду", "en": "Copy the command"},
     "settings.claude.copy_again": {"ru": "Скопировать ещё раз", "en": "Copy again"},

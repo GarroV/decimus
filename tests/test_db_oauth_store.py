@@ -225,6 +225,29 @@ def test_последний_вызов_отмечается(клиент: Client
     assert list_connections(учётка)[0].last_used_at is not None
 
 
+@pytest.mark.parametrize(
+    ("возврат", "вид"),
+    [
+        (ВОЗВРАТ, "claude"),
+        ("https://chatgpt.com/connector/oauth/abc", "chatgpt"),
+        ("http://localhost:1455/oauth/callback", "local"),
+    ],
+)
+def test_подключение_знает_вид_клиента_по_адресу(
+    база: str, учётка: str, возврат: str, вид: str
+) -> None:
+    """Вид — по адресам возврата клиента, а не по имени: имя здесь у всех «Claude»."""
+    клиент = register_client("Claude", [возврат], address=АДРЕС, limits=ПРЕДЕЛЫ)
+    код = issue_code(
+        клиент, user_id=учётка, redirect_uri=возврат, code_challenge=CHALLENGE, resource=РЕСУРС
+    )
+    exchange_code(код, client_id=клиент.client_id, redirect_uri=возврат, verifier=VERIFIER)
+
+    (подключение,) = list_connections(учётка)
+
+    assert подключение.kind == вид
+
+
 def test_отзыв_своего_подключения(клиент: Client, учётка: str) -> None:
     пара = _обмен(_код(клиент, учётка), клиент)
     (подключение,) = list_connections(учётка)

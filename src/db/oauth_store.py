@@ -27,7 +27,7 @@ import hmac
 import re
 import secrets
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -68,18 +68,34 @@ SCOPE = OAUTH_SCOPE
 #: Длина отпечатка SHA-256 шестнадцатеричной записью (схема `0054` требует её же).
 FINGERPRINT_LENGTH = 64
 
-#: Адреса возврата Claude (спека D417, «Безопасность»): веб и Desktop/телефон
-#: через claude.ai или claude.com, Claude Code — петля с любым портом. Всё
-#: остальное — отказ, и отказ без редиректа: увести код на чужой адрес нельзя.
+#: Адреса возврата нейросетей (D417, D695). Всё остальное — отказ, и отказ без
+#: редиректа: увести код на чужой адрес нельзя. Сверка — только `fullmatch`:
+#: у `match` знак `$` пропускает `\n` в конце строки; а полное совпадение
+#: заодно не пускает userinfo, фрагмент, query и пробелы — их в шаблонах нет.
+#:
+#: Claude: веб, Desktop и телефон — через claude.ai или claude.com.
 _CLAUDE_CALLBACKS = frozenset(
     {
         "https://claude.ai/api/mcp/auth_callback",
         "https://claude.com/api/mcp/auth_callback",
     }
 )
-#: Сверка — только `fullmatch`: у `match` знак `$` пропускает `\n` в конце строки.
-_LOOPBACK_CALLBACK = re.compile(r"http://(localhost|127\.0\.0\.1):([0-9]{1,5})/callback")
+#: ChatGPT: два пути своего хоста; номер подключения во втором — любой годный.
+_CHATGPT_CALLBACK = re.compile(
+    r"https://chatgpt\.com/(connector_platform_oauth_redirect|connector/oauth/[A-Za-z0-9_-]{1,128})"
+)
+#: Программы на компьютере (Claude Code, Codex, Kimi Code CLI, ZCode): петля с
+#: любым портом и одним из путей возврата; имя в последнем — как у MCP-клиентов.
+_LOOPBACK_CALLBACK = re.compile(
+    r"http://(localhost|127\.0\.0\.1|\[::1\]):([1-9][0-9]{0,4})"
+    r"/(callback|oauth/callback|oauth/callback/mcp/(?!\.{1,2}$)[A-Za-z0-9._-]{1,64})"
+)
 _MAX_PORT = 65535
+
+#: Вид клиента (D695): откуда он возвращает человека.
+KIND_CLAUDE = "claude"
+KIND_CHATGPT = "chatgpt"
+KIND_LOCAL = "local"
 
 #: `code_challenge` метода S256: base64url без выравнивания от 32 байт.
 _CHALLENGE = re.compile(r"[A-Za-z0-9_-]{43}")
@@ -99,18 +115,37 @@ MAX_ADDRESS = 100
 
 
 def redirect_uri_allowed(uri: object) -> bool:
-    """Адрес возврата — один из адресов Claude. Порт петли — любой годный."""
+    """Адрес возврата — один из адресов Claude или ChatGPT либо петля. Порт петли — любой годный."""
     if not isinstance(uri, str):
         return False
-    if uri in _CLAUDE_CALLBACKS:
+    if uri in _CLAUDE_CALLBACKS or _CHATGPT_CALLBACK.fullmatch(uri) is not None:
         return True
     петля = _LOOPBACK_CALLBACK.fullmatch(uri)
     return петля is not None and 0 < int(петля.group(2)) <= _MAX_PORT
 
 
 def is_loopback(uri: str) -> bool:
-    """Возврат на машину человека (Claude Code): странице согласия — предупреждение."""
+    """Возврат на машину человека (Claude Code, Codex, Kimi Code, ZCode): нужно предупреждение."""
     return _LOOPBACK_CALLBACK.fullmatch(uri) is not None
+
+
+def client_kind(redirect_uris: Iterable[str]) -> str:
+    """Вид клиента по адресам возврата: `claude`, `chatgpt` или `local`.
+
+    Только по адресу: имя клиент пишет о себе сам и годится лишь подписью. Если
+    адреса разных видов (регистрация допускает до десяти), вид — `local`:
+    осторожный, с предупреждением про программу на этом компьютере.
+    """
+    виды = {_kind_of(uri) for uri in redirect_uris}
+    return виды.pop() if len(виды) == 1 else KIND_LOCAL
+
+
+def _kind_of(uri: str) -> str:
+    if uri in _CLAUDE_CALLBACKS:
+        return KIND_CLAUDE
+    if _CHATGPT_CALLBACK.fullmatch(uri) is not None:
+        return KIND_CHATGPT
+    return KIND_LOCAL
 
 
 def challenge_valid(challenge: object) -> bool:
@@ -199,6 +234,8 @@ class Connection:
     client_name: str
     created_at: datetime
     last_used_at: datetime | None
+    #: Вид клиента из адресов возврата (`client_kind`), а не из имени (D695).
+    kind: str = KIND_LOCAL
 
 
 # --- запросы ----------------------------------------------------------------
@@ -304,7 +341,7 @@ _TOUCH_GRANT_SQL = "update oauth_grants set last_used_at = now() where id = %s"
 
 #: Живые подключения человека: не отозваны и есть неиспользованный живой refresh.
 _LIST_CONNECTIONS_SQL = """
-select g.id, c.client_name, g.created_at, g.last_used_at
+select g.id, c.client_name, g.created_at, g.last_used_at, c.redirect_uris
   from oauth_grants g
   join oauth_clients c on c.id = g.client_id
  where g.user_id = %s
@@ -667,12 +704,18 @@ def resolve_access_token(token: str, *, resource: str) -> OAuthOwner | None:
 
 
 def list_connections(user_id: str) -> tuple[Connection, ...]:
-    """Живые подключения Claude этой учётки — для её карточки."""
+    """Живые подключения нейросетей этой учётки — для её карточки."""
     with _connected("прочитать подключения Claude") as conn, conn.cursor() as cur:
         cur.execute(_LIST_CONNECTIONS_SQL, (user_id,))
         rows = cur.fetchall()
     return tuple(
-        Connection(id=str(r[0]), client_name=str(r[1]), created_at=r[2], last_used_at=r[3])
+        Connection(
+            id=str(r[0]),
+            client_name=str(r[1]),
+            created_at=r[2],
+            last_used_at=r[3],
+            kind=client_kind(r[4] or ()),
+        )
         for r in rows
     )
 

@@ -1,4 +1,4 @@
-"""Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках».
+"""Тексты подключения нейросетей входом через сайт (D417, D695): согласие, отказ, плитка.
 
 Отдельным модулем, как тексты экрана людей: `texts.py` длиннее предела файла.
 Сливаются в общий каталог (`texts.TEXTS`).
@@ -8,14 +8,22 @@ from __future__ import annotations
 
 OAUTH_TEXTS: dict[str, dict[str, str]] = {
     # --- страница согласия -------------------------------------------------
-    "oauth.consent.title": {"ru": "Подключить Claude", "en": "Connect Claude"},
+    "oauth.consent.title": {"ru": "Подключить нейросеть", "en": "Connect an AI assistant"},
+    # Вид клиента — по адресу возврата, а не по имени, которое клиент пишет о себе сам.
+    "oauth.kind.claude": {"ru": "Claude", "en": "Claude"},
+    "oauth.kind.chatgpt": {"ru": "ChatGPT", "en": "ChatGPT"},
+    "oauth.kind.local": {
+        "ru": "Программа на этом компьютере (Claude Code, Codex, Kimi Code, ZCode)",
+        "en": "A program on this computer (Claude Code, Codex, Kimi Code, ZCode)",
+    },
     "oauth.consent.lead": {
-        "ru": "«{client}» просит доступ к decimus от имени вашей учётки {login}.",
-        "en": "“{client}” asks for access to decimus on behalf of your account {login}.",
+        "ru": "{kind} просит доступ к decimus от имени вашей учётки {login}.",
+        "en": "{kind} asks for access to decimus on behalf of your account {login}.",
     },
     "oauth.consent.unverified": {
-        "ru": "Имя «{client}» клиент назвал сам, его никто не проверял.",
-        "en": "The name “{client}” was chosen by the client itself; nobody has verified it.",
+        "ru": "Клиент называет себя «{client}» — это имя он выбрал сам, его никто не проверял.",
+        "en": "The client calls itself “{client}” — it chose that name itself; nobody has "
+        "verified it.",
     },
     "oauth.consent.only_you": {
         "ru": "Разрешайте, только если подключение начали вы сами и только что. Если вы "
@@ -25,10 +33,10 @@ OAUTH_TEXTS: dict[str, dict[str, str]] = {
     },
     "oauth.consent.role": {"ru": "Ваша роль: {role}.", "en": "Your role: {role}."},
     "oauth.consent.rights": {
-        "ru": "Claude получит права вашей роли — не больше. Отключить подключение можно в "
+        "ru": "Нейросеть получит права вашей роли — не больше. Отключить подключение можно в "
         "любой момент в разделе «Настройки».",
-        "en": "Claude gets the rights of your role, no more. You can disconnect it at any "
-        "time under “Settings”.",
+        "en": "The assistant gets the rights of your role, no more. You can disconnect it at "
+        "any time under “Settings”.",
     },
     "oauth.consent.host": {
         "ru": "После решения вы вернётесь на {host}.",
@@ -36,23 +44,25 @@ OAUTH_TEXTS: dict[str, dict[str, str]] = {
     },
     "oauth.consent.loopback": {
         "ru": "Доступ получит программа на этом компьютере ({host}). Разрешайте, только если "
-        "вы сами только что начали подключение в Claude Code.",
+        "вы сами только что начали подключение в Claude Code, Codex, Kimi Code или ZCode.",
         "en": "Access goes to a program on this computer ({host}). Allow only if you have just "
-        "started the connection in Claude Code yourself.",
+        "started the connection in Claude Code, Codex, Kimi Code or ZCode yourself.",
     },
     "oauth.consent.allow": {"ru": "Разрешить", "en": "Allow"},
     "oauth.consent.deny": {"ru": "Отказать", "en": "Deny"},
     # --- отказ без редиректа -----------------------------------------------
     "oauth.refused.title": {"ru": "Подключение не начато", "en": "Connection not started"},
     "oauth.refused.unknown_client": {
-        "ru": "Этот клиент Claude здесь не зарегистрирован или ссылка устарела. Начните "
-        "подключение в Claude заново.",
-        "en": "This Claude client is not registered here or the link is out of date. Start "
-        "the connection in Claude again.",
+        "ru": "Этот клиент здесь не зарегистрирован или ссылка устарела. Начните "
+        "подключение в нейросети заново.",
+        "en": "This client is not registered here or the link is out of date. Start "
+        "the connection in the assistant again.",
     },
     "oauth.refused.bad_redirect": {
-        "ru": "Адрес возврата не из разрешённых: подключить через сайт можно только Claude.",
-        "en": "The return address is not allowed: only Claude can be connected through the site.",
+        "ru": "Адрес возврата не из разрешённых: через сайт подключаются Claude, ChatGPT и "
+        "программы на компьютере.",
+        "en": "The return address is not allowed: Claude, ChatGPT and programs on a computer "
+        "can be connected through the site.",
     },
     "oauth.refused.no_account": {
         "ru": "Войдите в decimus и начните подключение заново.",
@@ -96,8 +106,8 @@ OAUTH_TEXTS: dict[str, dict[str, str]] = {
     "users.claude.unused": {"ru": "вызовов ещё не было", "en": "no calls yet"},
     "users.claude.revoke": {"ru": "Отключить", "en": "Disconnect"},
     "users.claude.revoked": {
-        "ru": "Подключение отключено: Claude потеряет доступ на следующем же вызове.",
-        "en": "Disconnected: Claude loses access on its very next call.",
+        "ru": "Подключение отключено: нейросеть потеряет доступ на следующем же вызове.",
+        "en": "Disconnected: the assistant loses access on its very next call.",
     },
     "users.claude.revoke_missing": {
         "ru": "Такого подключения у вас нет — возможно, оно уже отключено.",

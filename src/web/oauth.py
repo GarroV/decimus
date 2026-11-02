@@ -1,7 +1,8 @@
-"""Сервер авторизации OAuth для подключения Claude к MCP (D417).
+"""Сервер авторизации OAuth для подключения нейросетей к MCP (D417, D695).
 
-claude.ai в браузере, Desktop и телефон подключаются к MCP только через OAuth:
-человек вставляет адрес MCP в Claude, тот находит здесь вход, человек входит
+claude.ai в браузере, Desktop и телефон, ChatGPT и программы на компьютере
+(Claude Code, Codex, Kimi Code, ZCode) подключаются к MCP через OAuth:
+человек вставляет адрес MCP в нейросеть, та находит здесь вход, человек входит
 своей учёткой decimus и разрешает доступ. Права в MCP после этого решает роль
 учётки (`src/mcp/policy.py`).
 
@@ -238,7 +239,7 @@ def install(app: Flask, conf: Settings) -> None:
 
     @app.post(REGISTER_PATH, endpoint="oauth_register")
     def oauth_register() -> Response:
-        """DCR: адреса возврата — только Claude. Способ входа клиента всегда `none`.
+        """DCR: адреса возврата — Claude, ChatGPT и петля (D695). Вход клиента всегда `none`.
 
         Запрошенные `token_endpoint_auth_method`, `grant_types` и
         `response_types` не отвергаются, а заменяются своими (RFC 7591 §3.2.1
@@ -253,7 +254,7 @@ def install(app: Flask, conf: Settings) -> None:
                 адрес,
                 400,
                 "invalid_redirect_uri",
-                "redirect_uris must be Claude callback addresses",
+                "redirect_uris must be supported AI assistant callback addresses",
             )
         имя = тело.get("client_name") if isinstance(тело, dict) else None
         try:
@@ -314,6 +315,7 @@ def install(app: Flask, conf: Settings) -> None:
                 ask=запрос,
                 host=urlsplit(запрос.redirect_uri).netloc,
                 loopback=oauth_store.is_loopback(запрос.redirect_uri),
+                kind=oauth_store.client_kind([запрос.redirect_uri]),
                 login=account.login,
             )
         if request.form.get("decision") != "allow":
