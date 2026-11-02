@@ -6,6 +6,44 @@
 from __future__ import annotations
 
 ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
+    "plans.setting.title": {"ru": "Настройки экшн-планов", "en": "Action-plan settings"},
+    "plans.setting.label": {"ru": "Электронные экшн-планы", "en": "Electronic action plans"},
+    "plans.setting.on": {"ru": "Включены", "en": "Enabled"},
+    "plans.setting.off": {"ru": "Выключены", "en": "Disabled"},
+    "plans.setting.save": {"ru": "Сохранить", "en": "Save"},
+    "plans.setting.saved": {"ru": "Настройка сохранена", "en": "Setting saved"},
+    "plans.setting.failed": {
+        "ru": "Настройка не сохранена. Повторите попытку.",
+        "en": "The setting was not saved. Please retry.",
+    },
+    "plans.setting.archive": {"ru": "Сохранённые планы", "en": "Stored plans"},
+    "plans.setting.open": {"ru": "Открыть работу с планами", "en": "Open action-plan workflow"},
+    "plans.setting.changed": {"ru": "Изменил: {actor} · {at}", "en": "Changed by: {actor} · {at}"},
+    "plans.setting.unavailable": {
+        "ru": "Настройку не удалось прочитать. Экшн-планы временно недоступны.",
+        "en": "The setting could not be read. Action plans are temporarily unavailable.",
+    },
+    "plans.setting.note": {
+        "ru": (
+            "Новые запросы, заполнение, согласование и подтверждение исправлений "
+            "доступны по правам пользователя."
+        ),
+        "en": (
+            "New requests, submissions, reviews and confirmation of corrections "
+            "are available according to user permissions."
+        ),
+    },
+    "plans.setting.activation_note": {
+        "ru": (
+            "Включение не создаёт планы по старым проверкам и не отправляет письма "
+            "или сообщения в Telegram. Старые непрочитанные уведомления не появляются заново."
+        ),
+        "en": (
+            "Enabling does not create plans for past inspections "
+            "or send email or Telegram messages. "
+            "Old unread notifications do not reappear."
+        ),
+    },
     "administration.tab.plans": {"ru": "Экшн-планы", "en": "Action plans"},
     "plans.paused.title": {"ru": "Экшн-планы отключены", "en": "Action plans are paused"},
     "plans.paused.note": {
