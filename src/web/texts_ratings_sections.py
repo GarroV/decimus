@@ -67,6 +67,10 @@ SECTION_TEXTS: dict[str, dict[str, str]] = {
         "ru": "{platform}: не привязана — точка рядом с пиццерией не нашлась",
         "en": "{platform}: not linked — no listing found near the pizzeria",
     },
+    "ratings.agg.reason.candidate": {
+        "ru": "{platform}: рядом есть непривязанная точка — привязать вручную",
+        "en": "{platform}: an unlinked listing is nearby — link it by hand",
+    },
     "ratings.agg.reason.paused": {
         "ru": "{platform}: площадка на паузе, точки не ищем",
         "en": "{platform}: the platform is paused, listings are not searched",

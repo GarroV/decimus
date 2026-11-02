@@ -29,8 +29,9 @@
     </select>
   </div>{% endif %}
 {% endmacro %}
-{#- Ячейка охвата: оценка в родной шкале (△ — новые не приходят), «—» — нет точки или оценок. -#}
+{#- Ячейка охвата: оценка в родной шкале (△ — новые не приходят), «—» — нет точки, оценок или самой пиццерии на площадке. -#}
 {% macro cov_cell(c) %}{%- if c.state == 'score' -%}<b>{{ agg_score(c.score, c.scale) }}</b>{% if c.stale %} <span class="rt-stale" role="img" title="{{ t('ratings.coverage.stale', date=c.on_date.strftime('%d.%m.%Y')) }}" aria-label="{{ t('ratings.coverage.stale', date=c.on_date.strftime('%d.%m.%Y')) }}">△</span>{% endif %}
   {%- elif c.state == 'unrated' -%}<span class="is-empty" title="{{ t('ratings.coverage.unrated') }}">—</span>
   {%- elif c.state == 'missing' -%}<span class="is-empty" title="{{ t('ratings.coverage.missing') }}">—</span>
+  {%- elif c.state == 'not_listed' -%}<span class="is-empty" title="{{ t('ratings.coverage.notListed') }}">—</span>
   {%- else -%}<span class="rt-cov__off" aria-hidden="true">·</span>{%- endif -%}{% endmacro %}

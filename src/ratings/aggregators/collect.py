@@ -6,7 +6,12 @@
 берётся из справочника `agg.points`, оценка снимается по её id.
 
 **Привязка** точки к пиццерии — ближайшая не дальше `MAX_LINK_M`, одна точка —
-одной пиццерии и наоборот: пары разбираются от самой близкой. Точка Додо без
+одной пиццерии и наоборот: пары разбираются от самой близкой. Закреплённые
+вручную пары (`agg.point_links`, D700) берутся первыми и из расчёта по расстоянию
+выпадают: площадка, плохо геокодирующая адрес, ставит точку дальше `MAX_LINK_M`,
+и без закрепления ночной сбор отменял бы ручную привязку. Две точки одной пиццерии
+в пределах `DUPLICATE_M` (дубль карточки) делят привязку так: с оценкой вместо без
+оценки, затем с большим числом оценок. Точка Додо без
 пиццерии рядом тоже записывается (без кода пиццерии) — так видно, что на
 витрине есть то, чего нет в публичном API, — но в оценки не входит.
 
@@ -70,6 +75,8 @@ SEARCHERS, PAUSED = searchers(bool(yandex_eda.relay_base()))
 #: Migros Yemek — через ретранслятор на домашнем сервере (D434, `migros.py`).
 KNOWN: tuple[ModuleType, ...] = (glovo, chowdeck, migros)
 MAX_LINK_M = 400
+#: Точки в пределах этого радиуса от пиццерии — возможные дубли одной карточки (D700).
+DUPLICATE_M = 50
 
 
 @dataclass(frozen=True)
@@ -83,17 +90,44 @@ class Outcome:
 
 def assign(
     candidates: Sequence[tuple[str, str, float]],
+    pins: Mapping[str, str] | None = None,
+    quality: Mapping[str, tuple[bool, int]] | None = None,
 ) -> dict[str, tuple[str, int]]:
     """(точка, пиццерия, метры) → точка: (пиццерия, метры). Ближайшие пары
-    первыми; точка и пиццерия берутся по разу; дальше `MAX_LINK_M` — не пара."""
+    первыми; точка и пиццерия берутся по разу; дальше `MAX_LINK_M` — не пара.
+
+    `pins` — закреплённые руками пары (точка → пиццерия): берутся первыми, любое
+    расстояние, и точка с пиццерией из расчёта выпадают. Закрепление, чья пара не
+    в `candidates` (пиццерия не работает, точка не попалась), пропускается.
+    `quality` — точка → (есть оценка, число оценок): среди точек в `DUPLICATE_M`
+    от пиццерии первой идёт точка с оценкой, затем с большим числом оценок."""
     taken_points: dict[str, tuple[str, int]] = {}
     taken_units: set[str] = set()
-    for point, unit, metres in sorted(candidates, key=lambda c: c[2]):
+    pinned = dict(pins or {})
+    for point, unit, metres in candidates:
+        if pinned.get(point) == unit and point not in taken_points and unit not in taken_units:
+            taken_points[point] = (unit, round(metres))
+            taken_units.add(unit)
+    rated = quality or {}
+
+    def order(pair: tuple[str, str, float]) -> tuple[int, bool, int, float]:
+        point, _, metres = pair
+        if metres > DUPLICATE_M:
+            return (1, False, 0, metres)
+        has_rating, votes = rated.get(point, (False, 0))
+        return (0, not has_rating, -votes, metres)
+
+    for point, unit, metres in sorted(candidates, key=order):
         if metres > MAX_LINK_M or point in taken_points or unit in taken_units:
             continue
         taken_points[point] = (unit, round(metres))
         taken_units.add(unit)
     return taken_points
+
+
+def _quality(seen: Mapping[str, tuple[Found, str]]) -> dict[str, tuple[bool, int]]:
+    """Точка → (есть ли оценка, число оценок): чем разбирать дубли карточки в `assign`."""
+    return {key: (found.score is not None, found.votes or 0) for key, (found, _) in seen.items()}
 
 
 def _candidates(
@@ -140,7 +174,10 @@ def _rating(aggregator: str, found: Found, today: date) -> RatingRow | None:
 
 
 def _search_one(
-    module: ModuleType, units: Sequence[DodoUnit], today: date
+    module: ModuleType,
+    units: Sequence[DodoUnit],
+    today: date,
+    pins: Mapping[str, str] | None = None,
 ) -> tuple[list[PointRow], list[RatingRow], int, int, str | None]:
     """Обойти пиццерии агрегатора: точки, оценки, ошибок, попыток, первая ошибка."""
     http = base.Http(module.GAP_SEC, getattr(module, "HEADERS", None))
@@ -158,7 +195,7 @@ def _search_one(
             continue
         for point in found:
             seen.setdefault(point.point_key, (point, unit.country))
-    links = assign(_candidates(seen, mine))
+    links = assign(_candidates(seen, mine), pins, _quality(seen))
     names = {u.dodo_id: u.name for u in mine}
     points, ratings = [], []
     for key, (point, country) in seen.items():
@@ -253,7 +290,8 @@ def run_one(module: ModuleType, units: Sequence[DodoUnit], today: date) -> Outco
         if module in KNOWN:
             points, ratings, errors, attempts, first = _known_one(module, units, today)
         else:
-            points, ratings, errors, attempts, first = _search_one(module, units, today)
+            pins = agg_store.pins(module.KEY)
+            points, ratings, errors, attempts, first = _search_one(module, units, today, pins)
         failure = verdict(len(points), errors, attempts, agg_store.last_ok_points(module.KEY))
         if failure:
             outcome = Outcome(

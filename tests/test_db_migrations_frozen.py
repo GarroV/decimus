@@ -437,6 +437,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0116_drop_country_mailing_recipients.sql": (
         "sql1:cfb870117c2fd66754d182a5cdb052a54ec5577b05c343fe900ba1ebdcad8bdf"
     ),
+    "0118_agg_unit_absent_point_links.sql": (
+        "sql1:22a43c5c1ccc7c42d66fcec2932a622fbf7b5e76c172600d9d1c509118f3b1b2"
+    ),
 }
 
 

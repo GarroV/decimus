@@ -97,4 +97,35 @@ AGGREGATORS_ADMIN_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Пиццерии и привязки на площадках",
         "en": "Pizzerias and platform links",
     },
+    "aggadmin.gap.candidate": {
+        "ru": "кандидат рядом не привязан",
+        "en": "unlinked candidate nearby",
+    },
+    "aggadmin.gap.not_listed": {"ru": "нет на площадке", "en": "not on the platform"},
+    "aggadmin.candidate.at": {"ru": "{m} м", "en": "{m} m"},
+    "aggadmin.candidate.unnamed": {"ru": "без названия", "en": "unnamed"},
+    "aggadmin.action.pin": {"ru": "Привязать", "en": "Link"},
+    "aggadmin.action.unpin": {"ru": "Отвязать", "en": "Unlink"},
+    "aggadmin.action.absent": {"ru": "Нет на площадке", "en": "Not on the platform"},
+    "aggadmin.action.present": {"ru": "Снять отметку", "en": "Clear the mark"},
+    "aggadmin.action.failed": {
+        "ru": "Не получилось: данные не записались. Обновите страницу и повторите.",
+        "en": "Could not save. Reload the page and try again.",
+    },
+    "aggadmin.info.notListed": {
+        "ru": (
+            "Нет на площадке: у пиццерии искали по её координатам и ничего не нашли, "
+            "либо это отмечено вручную. Делать ничего не надо."
+        ),
+        "en": (
+            "Not on the platform: searched at the pizzeria's coordinates and nothing "
+            "was found, or marked by hand. Nothing to do."
+        ),
+    },
+    "aggadmin.info.marked": {"ru": "отмечено вручную", "en": "marked by hand"},
+    "aggadmin.pinned": {"ru": "Закреплённые привязки", "en": "Pinned links"},
+    "aggadmin.pinned.note": {
+        "ru": "Ночной сбор их не отменяет, даже если точка далеко от пиццерии.",
+        "en": "The nightly run does not undo them, even if the listing is far from the pizzeria.",
+    },
 }
