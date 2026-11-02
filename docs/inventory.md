@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 214 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 215 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -32,6 +32,7 @@
 | `/actions/prescriptions/<prescription_id>` | GET | `rx_view` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/approve` | POST | `rx_approve` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/close` | POST | `rx_close` | `src/web/prescriptions.py` |
+| `/actions/prescriptions/<prescription_id>/document.pdf` | GET | `rx_document` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/edit` | GET | `rx_edit` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/edit` | POST | `rx_update` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/reply` | POST | `order_reply` | `src/web/prescriptions.py` |
@@ -604,6 +605,7 @@
 | `0112_country_mailing_recipients.sql` | `country_mailing_recipients` |
 | `0113_mailing_content_templates.sql` | — |
 | `0114_service_key_health_lock.sql` | — |
+| `0115_prescription_findings.sql` | `prescription_findings` |
 <!-- map:end -->
 
 ## Makefile

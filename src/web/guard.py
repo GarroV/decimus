@@ -102,6 +102,7 @@ ENDPOINT_VIEWS: Mapping[str, str] = {"unit": "view.registry"}
 READ_BY_ACTION: Mapping[str, tuple[str, ...]] = {
     "rx_new": ("prescription.request",),
     "rx_edit": ("prescription.request",),
+    "rx_document": ("prescription.request",),
     # Файл ответа партнёра лежит под `/actions`, а читают его и ОСБ со своей
     # страницы «ОСБ», где раздела «Действия» нет (#1151): хватает любого из кодов.
     # Охват и принадлежность файла проверяет сам маршрут.
@@ -127,6 +128,7 @@ WITHOUT_SECTION_VIEW = frozenset(
         "plan_count_from",
         "rx_new",
         "rx_edit",
+        "rx_document",
         "rx_create",
         "rx_update",
         "rx_request",

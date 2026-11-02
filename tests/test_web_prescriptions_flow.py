@@ -133,6 +133,22 @@ def _проверка_уК() -> str:
     return ident
 
 
+def _отбор(основание: str) -> dict[str, list[str]]:
+    """Поля формы шага 3: отмечена единственная запись проверки (её добавил ОСБ сам)."""
+    import psycopg
+
+    from src.db.config import load_retraction_settings
+
+    with psycopg.connect(load_retraction_settings().dsn) as conn:
+        записи = [
+            str(r[0])
+            for r in conn.execute(
+                "select id from findings where inspection_id = %s", (основание,)
+            ).fetchall()
+        ]
+    return {"finding_shown": записи, "finding": записи}
+
+
 def test_путь_предписания(как: Вход, почта: list[dict[str, Any]]) -> None:
     # Arrange
     основание = _проверка_уК()
@@ -147,6 +163,7 @@ def test_путь_предписания(как: Вход, почта: list[dict
             "country": "GE",
             "unit": [],
             "inspection": [основание],
+            **_отбор(основание),
             "due": СРОК,
             "recipients": "ops@ge.example.com",
             "subject": "Предписание · Грузия",
@@ -242,6 +259,7 @@ def test_путь_предписания(как: Вход, почта: list[dict
 
 
 def test_черновик_партнёр_не_видит_нигде(как: Вход) -> None:
+    основание = _проверка_уК()
     уК = как("HQ")
     ответ = уК.post(
         "/actions/prescriptions?lang=ru",
@@ -251,7 +269,8 @@ def test_черновик_партнёр_не_видит_нигде(как: Вх
             "recipients": "ops@ge.example.com",
             "subject": "Черновая тема",
             "body": "текст",
-            "inspection": [_проверка_уК()],
+            "inspection": [основание],
+            **_отбор(основание),
             "then": "save",
         },
         headers=ORIGIN,
@@ -273,6 +292,7 @@ def _составить(клиент: FlaskClient, основание: str, *, t
         data={
             "country": "GE",
             "inspection": [основание],
+            **_отбор(основание),
             "due": СРОК,
             "recipients": "ops@ge.example.com",
             "subject": "Предписание от девелопера",

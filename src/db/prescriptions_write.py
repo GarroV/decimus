@@ -58,10 +58,21 @@ MAX_REPLY = 4_000
 MAX_COMMENT = 2_000
 
 _INSERT_SQL = """
-insert into prescriptions (country, due_on, recipients, subject, body, created_by)
-values (%(country)s, %(due_on)s, %(recipients)s, %(subject)s, %(body)s, %(actor)s)
+insert into prescriptions (country, due_on, recipients, subject, body, created_by, kind)
+values (%(country)s, %(due_on)s, %(recipients)s, %(subject)s, %(body)s, %(actor)s, %(kind)s)
 returning id
 """
+_INSERT_FINDING_SQL = """
+insert into prescription_findings
+    (prescription_id, inspection_id, finding_id, position, object_kind, object_name, level,
+     clause, description, description_translated, due_on, engine_due_on, suggested, included)
+values
+    (%(prescription_id)s, %(inspection_id)s, %(finding_id)s, %(position)s, %(object_kind)s,
+     %(object_name)s, %(level)s, %(clause)s, %(description)s, %(description_translated)s,
+     %(due_on)s, %(engine_due_on)s, %(suggested)s, %(included)s)
+"""
+_DELETE_FINDINGS_SQL = "delete from prescription_findings where prescription_id = %s"
+_HAS_FINDINGS_SQL = "select exists (select 1 from prescription_findings where prescription_id = %s)"
 
 _INSERT_UNIT_SQL = "insert into prescription_units (prescription_id, unit_id) values (%s, %s)"
 _INSERT_BASE_SQL = (
@@ -193,6 +204,27 @@ def _links(cur: psycopg.Cursor[Any], ident: str, draft: Draft) -> None:
         cur.execute(_INSERT_UNIT_SQL, (ident, unit_id))
     for inspection_id in draft.inspection_ids:
         cur.execute(_INSERT_BASE_SQL, (ident, inspection_id))
+    # Нарушения — после оснований: составной внешний ключ смотрит на них.
+    for pick in draft.findings:
+        cur.execute(
+            _INSERT_FINDING_SQL,
+            {
+                "prescription_id": ident,
+                "inspection_id": pick.inspection_id,
+                "finding_id": pick.finding_id,
+                "position": pick.position,
+                "object_kind": pick.object_kind,
+                "object_name": pick.object_name,
+                "level": pick.level,
+                "clause": pick.clause,
+                "description": pick.description,
+                "description_translated": pick.description_translated,
+                "due_on": pick.due_on,
+                "engine_due_on": pick.engine_due_on,
+                "suggested": pick.suggested,
+                "included": pick.included,
+            },
+        )
 
 
 def create_draft(draft: Draft, *, actor: str, submit: bool = False) -> str:
@@ -214,6 +246,7 @@ def create_draft(draft: Draft, *, actor: str, submit: bool = False) -> str:
                     "subject": чистый.subject,
                     "body": чистый.body,
                     "actor": who,
+                    "kind": "inspection" if чистый.findings else "other",
                 },
             )
             row = cur.fetchone()
@@ -295,6 +328,17 @@ def update_draft(
                     "body": чистый.body,
                 },
             )
+            cur.execute(_HAS_FINDINGS_SQL, (ident,))
+            с_нарушениями = bool((cur.fetchone() or (False,))[0])
+            if с_нарушениями and not чистый.findings:
+                raise PrescriptionError(
+                    "В предписании по проверке должно быть хотя бы одно нарушение"
+                )
+            if not с_нарушениями and чистый.findings:
+                raise PrescriptionError(
+                    "Предписание заведено с текстом руками: нарушения в него не добавляются"
+                )
+            cur.execute(_DELETE_FINDINGS_SQL, (ident,))
             cur.execute(_DELETE_UNITS_SQL, (ident,))
             cur.execute(_DELETE_BASES_SQL, (ident,))
             _links(cur, ident, чистый)
