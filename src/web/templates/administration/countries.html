@@ -29,24 +29,15 @@
 <div class="sadmin__main countryadmininline">
 <section class="countryadmininline__list">
 
-  <div class="sbox">
-    <div class="sbar"><span class="sbar__count">{{ t('countries.count', count=lines|length) }}</span></div>
-    {% if partial_failed %}<p class="ssec__note">{{ t('countries.partial_failed') }}</p>{% endif %}
+  <div class="pk-rail pk-rail--inline countryrail">
+    <p class="countryrail__count">{{ t('countries.count', count=lines|length) }}</p>
     {% if not lines %}
-      <div class="sempty">
-        <p class="sempty__title">{{ t('countries.none') }}</p>
-      </div>
+      <p class="is-muted">{{ t('countries.none') }}</p>
     {% else %}
-      <div class="pk-rail pk-rail--inline pk-rail--col">
-        <div class="pk-rail__list">
-          {% for c in lines %}
-            {% set unset = t('countries.unset') %}
-            {% set langs = (c.langs|map('upper')|join(' · ')) if c.langs else ('—' if c.langs is none else t('countries.langs.default')) %}
-            {% set contract = ('—' if c.has_contract is none else (t('countries.contract.yes') if c.has_contract else t('countries.contract.no'))) %}
-            {% set meta = (c.space or unset) ~ ' · ' ~ (c.developer or unset) ~ ' · ' ~ langs ~ ((' · ' ~ t('countries.col.contract') ~ ': ' ~ contract) if show_contract else '') %}
-            {{ pick_item(country_url(c.code), c.name, meta, on=(split_open and picked == c.code), code=c.code, drawer=false) }}
-          {% endfor %}
-        </div>
+      <div class="pk-rail__list">
+        {% for c in lines %}
+          {{ pick_item(country_url(c.code), c.name, on=(split_open and picked == c.code), code=c.code, drawer=false) }}
+        {% endfor %}
       </div>
     {% endif %}
   </div>

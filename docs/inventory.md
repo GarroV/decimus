@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 214 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 212 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -114,8 +114,6 @@
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
 | `/country/<code>/settings/contacts` | POST | `country_contact_save` | `src/web/country_contacts_actions.py` |
 | `/country/<code>/settings/contacts/<ident>/delete` | POST | `country_contact_delete` | `src/web/country_contacts_actions.py` |
-| `/country/<code>/settings/contract` | POST | `country_save_contract` | `src/web/country_settings.py` |
-| `/country/<code>/settings/contract/<contract_id>/delete` | POST | `country_delete_contract` | `src/web/country_settings.py` |
 | `/country/<code>/settings/developer` | POST | `country_set_developer` | `src/web/country_settings.py` |
 | `/country/<code>/settings/report-langs` | POST | `country_set_report_langs` | `src/web/country_settings.py` |
 | `/country/<code>/settings/space` | POST | `country_set_space` | `src/web/country_settings.py` |
@@ -606,6 +604,7 @@
 | `0114_service_key_health_lock.sql` | — |
 | `0115_prescription_findings.sql` | `prescription_findings` |
 | `0116_drop_country_mailing_recipients.sql` | — |
+| `0117_drop_country_contracts.sql` | — |
 <!-- map:end -->
 
 ## Makefile

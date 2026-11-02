@@ -19,10 +19,8 @@ from flask.testing import FlaskClient
 from web_harness import войти, подменить_двери, собрать
 
 from src.db import country_contacts
-from src.db import country_contracts as contracts_db
 from src.db import prescriptions as rx
 from src.db import prescriptions_write as rxw
-from src.db.errors import CountryContractError
 from src.web import prescriptions as web_rx
 from src.web.google_mail import MailGrant
 
@@ -94,7 +92,7 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]
     monkeypatch.setattr(rx, "file_for_download", записать("file", None))
     monkeypatch.setattr(rx, "choices", lambda *_a, **_k: ((), ()))
     monkeypatch.setattr(rx, "remembered_recipients", lambda _c: "ops@ge.example.com")
-    monkeypatch.setattr(contracts_db, "dkk_recipients", lambda _c: "")
+    monkeypatch.setattr(country_contacts, "mailing_to", lambda _c: None)
     monkeypatch.setattr(rxw, "create_draft", записать("create", ИД))
     monkeypatch.setattr(rxw, "update_draft", записать("update"))
     monkeypatch.setattr(rxw, "close", записать("close"))
@@ -322,24 +320,21 @@ def test_форма_подставляет_адресатов_страны(уК:
     assert 'value="ops@ge.example.com"' in страница
 
 
-def test_форма_подставляет_контакты_по_дкк_а_не_запомненных(
+def test_форма_подставляет_почты_для_рассылки_а_не_запомненных(
     уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        contracts_db, "dkk_recipients", lambda c: "dkk@ge.example.com, law@ge.example.com"
+        country_contacts, "mailing_to", lambda c: "mail@ge.example.com, law@ge.example.com"
     )
     страница = уК.get("/actions/prescriptions/new?country=GE&lang=ru").get_data(as_text=True)
-    assert 'value="dkk@ge.example.com, law@ge.example.com"' in страница
+    assert 'value="mail@ge.example.com, law@ge.example.com"' in страница
     assert "ops@ge.example.com" not in страница
 
 
-def test_контакты_по_дкк_не_прочитались_форма_берёт_запомненных(
+def test_список_рассылки_пуст_форма_берёт_запомненных(
     уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def сбой(_c: str) -> str:
-        raise CountryContractError("база не на связи")
-
-    monkeypatch.setattr(contracts_db, "dkk_recipients", сбой)
+    monkeypatch.setattr(country_contacts, "mailing_to", lambda _c: None)
     страница = уК.get("/actions/prescriptions/new?country=GE&lang=ru").get_data(as_text=True)
     assert 'value="ops@ge.example.com"' in страница
 

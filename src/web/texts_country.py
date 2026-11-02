@@ -25,10 +25,6 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
             "details stay unchanged."
         ),
     },
-    "country.contacts.contract_extra": {
-        "ru": "Дополнительно: договор",
-        "en": "Additional: contract",
-    },
     "country.contacts.invalid": {
         "ru": "Проверьте адрес и почты. Изменения не сохранены.",
         "en": "Check the address and emails. Changes were not saved.",
@@ -311,11 +307,6 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Бот предлагает их при сборке отчёта; они же язык письма по умолчанию.",
         "en": "The bot offers them when building a report; also the default letter language.",
     },
-    "country.block.contract": {"ru": "Договор", "en": "Agreement"},
-    "country.block.contract_note": {
-        "ru": "Юрлицо партнёра, договор и контакты по ДКК.",
-        "en": "Partner legal entity, agreement and agreement contacts.",
-    },
     "country.block.assign": {"ru": "Назначить", "en": "Assign"},
     "country.block.fill": {"ru": "Заполнить", "en": "Fill in"},
     "country.settings.people": {
@@ -327,47 +318,5 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     "country.settings.edit_in_admin": {
         "ru": "Изменить в «Администрировании»",
         "en": "Change in Administration",
-    },
-    "country.contract.title": {"ru": "Договор", "en": "Agreement"},
-    "country.contract.legal_name": {"ru": "Юрлицо партнёра", "en": "Partner legal entity"},
-    "country.contract.registration_country": {
-        "ru": "Страна регистрации",
-        "en": "Country of registration",
-    },
-    "country.contract.company_number": {"ru": "Номер компании", "en": "Company number"},
-    "country.contract.address": {"ru": "Адрес", "en": "Address"},
-    "country.contract.agreement": {
-        "ru": "Договор (название и дата)",
-        "en": "Agreement (title and date)",
-    },
-    "country.contract.dkk_emails": {"ru": "Контакты по ДКК", "en": "Agreement contacts"},
-    "country.contract.dkk_hint": {
-        "ru": "Почты через запятую или с новой строки. Их форма предписания подставляет в "
-        "«Кому». Договор здесь только записан текстом, его условия система не знает.",
-        "en": "Email addresses separated by commas or new lines. The notice form fills them "
-        'into "To". The agreement is only recorded as text; the system does not know its terms.',
-    },
-    "country.contract.none": {
-        "ru": "Договор страны не заполнен. Пока контактов по ДКК нет, форма предписания "
-        "подставляет адресатов прошлой отправки.",
-        "en": "No agreement recorded for this country. Until there are agreement contacts, "
-        "the notice form fills in the recipients of the last notice sent.",
-    },
-    "country.contract.read_failed": {
-        "ru": "Договор не прочитался. Обновите страницу позже.",
-        "en": "The agreement could not be read. Reload the page later.",
-    },
-    "country.contract.updated": {
-        "ru": "Правил: {who} · {when}",
-        "en": "Edited by {who} · {when}",
-    },
-    "country.contract.add": {"ru": "Добавить строку договора", "en": "Add an agreement row"},
-    "country.contract.add_first": {"ru": "Заполнить договор", "en": "Fill in the agreement"},
-    "country.contract.delete": {"ru": "Удалить строку", "en": "Delete this row"},
-    "country.contract.invalid": {
-        "ru": "Не сохранилось: проверьте почты (каждая должна быть адресом вида a@b.com) "
-        "и заполните хотя бы одно поле. Строки не длиннее 300 знаков.",
-        "en": "Not saved: check the emails (each must look like a@b.com) and fill in at "
-        "least one field. Lines are at most 300 characters.",
     },
 }

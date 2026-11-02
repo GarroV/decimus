@@ -216,21 +216,11 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     },
     # ── Вкладка «Страны» (D640) ──
     "countries.sub": {
-        "ru": "Партнёр, девелопер, языки отчёта и договор страны. Выберите страну в списке.",
-        "en": "Partner, developer, report languages and agreement of a country. "
-        "Pick a country in the list.",
+        "ru": "Партнёр, девелопер и языки отчёта страны. Выберите страну в списке.",
+        "en": "Partner, developer and report languages of a country. Pick a country in the list.",
     },
     "countries.count": {"ru": "Стран: {count}", "en": "Countries: {count}"},
     "countries.none": {"ru": "Стран в справочнике нет.", "en": "No countries in the directory."},
-    "countries.col.country": {"ru": "Страна", "en": "Country"},
-    "countries.col.space": {"ru": "Партнёр", "en": "Partner"},
-    "countries.col.developer": {"ru": "Девелопер", "en": "Developer"},
-    "countries.col.langs": {"ru": "Языки отчёта", "en": "Report languages"},
-    "countries.col.contract": {"ru": "Договор", "en": "Agreement"},
-    "countries.unset": {"ru": "не задан", "en": "not set"},
-    "countries.langs.default": {"ru": "по умолчанию", "en": "default"},
-    "countries.contract.yes": {"ru": "есть", "en": "on file"},
-    "countries.contract.no": {"ru": "нет", "en": "none"},
     "countries.open": {
         "ru": "Настроить страну: {country}",
         "en": "Configure the country: {country}",
@@ -282,10 +272,6 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
         "en": "Set for {set} of {total} countries",
     },
     "ratings.admin.rules.state": {"ru": "Правил: {n}", "en": "Rules: {n}"},
-    "countries.partial_failed": {
-        "ru": "Партнёры или девелоперы сейчас не прочитались: в столбцах могут быть пропуски.",
-        "en": "Partners or developers could not be read: some cells may be empty.",
-    },
 }
 
 ADMINISTRATION_TEXTS.update(AGGREGATORS_ADMIN_TEXTS)
