@@ -80,6 +80,53 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.more": {"ru": "Ещё", "en": "More"},
     "split.back": {"ru": "Назад", "en": "Back"},
     "split.close": {"ru": "Закрыть", "en": "Close"},
+    "ratings.admin.purpose": {
+        "ru": (
+            "Настройки источников и расчёта рейтингов. "
+            "Данные и сравнения открываются в основном меню «Рейтинги»."
+        ),
+        "en": (
+            "Configure rating sources and calculations. "
+            "Results and comparisons are in the main Ratings menu."
+        ),
+    },
+    "ratings.admin.openRatings": {"ru": "Открыть рейтинги", "en": "Open ratings"},
+    "ratings.admin.group.sources": {
+        "ru": "Загрузка и проверка данных",
+        "en": "Load and validate data",
+    },
+    "ratings.admin.group.directory": {"ru": "Страны и ответственные", "en": "Countries and owners"},
+    "ratings.admin.group.calculation": {"ru": "Правила расчёта", "en": "Calculation rules"},
+    "ratings.admin.explain.sheet": {
+        "ru": "Автоматическая загрузка из таблицы контроля.",
+        "en": "Automatic collection from the control spreadsheet.",
+    },
+    "ratings.admin.explain.upload": {
+        "ru": "Ручная загрузка файла с рейтингами.",
+        "en": "Upload a rating file manually.",
+    },
+    "ratings.admin.explain.journal": {
+        "ru": "Результаты загрузок: время, строки и ошибки.",
+        "en": "Collection history: time, rows and errors.",
+    },
+    "ratings.admin.explain.issues": {
+        "ru": "Строки, которые пока не удалось связать с пиццерией.",
+        "en": "Rows that have not yet been matched to a pizzeria.",
+    },
+    "ratings.admin.explain.developers": {
+        "ru": "Кто отвечает за страну; также задаётся в карточке страны.",
+        "en": "Country owners; also editable in the country card.",
+    },
+    "ratings.admin.explain.rules": {
+        "ru": "Условия, влияющие на результат рейтинга.",
+        "en": "Conditions that affect rating results.",
+    },
+    "ratings.admin.explain.settings": {
+        "ru": "Пороги Top/Bottom и зоны риска.",
+        "en": "Thresholds for Top/Bottom and risk zones.",
+    },
+    "nav.collapse": {"ru": "Свернуть меню", "en": "Collapse menu"},
+    "nav.expand": {"ru": "Развернуть меню", "en": "Expand menu"},
     "nav.search": {"ru": "Поиск пиццерии", "en": "Find a pizzeria"},
     "nav.theme": {"ru": "Тема", "en": "Theme"},
     "nav.theme.system": {"ru": "Как в системе", "en": "System"},

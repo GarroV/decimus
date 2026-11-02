@@ -534,11 +534,14 @@ def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
         return _back_from_gmail(ident, lang, "failed")
 
     def положить(предписание: rx.Prescription) -> None:
+        from .mailing_documents import prescription_message
+
+        subject, body = prescription_message(предписание, lang)
         create_draft(
             доступ,
             to=предписание.recipients,
-            subject=предписание.subject,
-            body=from_plain(предписание.body),
+            subject=subject,
+            body=from_plain(body),
             cc=cc_for(mailing_cc.KIND_PRESCRIPTION),
         )
 
@@ -546,7 +549,7 @@ def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
         rxw.issue(ident, actor=_actor(), put_draft=положить)
     except IssuedDraftLostError:
         return _back_from_gmail(ident, lang, "lost")
-    except (PrescriptionError, GoogleMailError) as exc:
+    except (DbError, ConfigError, GoogleMailError, ValueError) as exc:
         logger.warning("предписание %s не отправлено: %s", ident, exc)
         return _back_from_gmail(ident, lang, "failed")
     return _back_from_gmail(ident, lang, "ok")
@@ -554,6 +557,16 @@ def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
 
 def _default_recipients(country: str) -> str:
     """«Кому» пустой формы: контакты по ДКК страны (D603); нет их — запомненные (D275)."""
+    from src.db import country_mailing_recipients
+
+    try:
+        configured = country_mailing_recipients.read(country)
+    except DbError:
+        # Do not expose old recipients if explicit configuration could not be read.
+        logger.warning("Country mailing defaults could not be read")
+        return ""
+    if configured is not None:
+        return configured
     try:
         контакты = contracts_db.dkk_recipients(country)
     except (DbError, ConfigError) as exc:

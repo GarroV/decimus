@@ -32,9 +32,9 @@
           <span class="stile__icon">{{ icon(key_icon[svc.code]) }}</span>
           <span class="stile__main">
             <b>{{ t('keys.service.' ~ svc.code) }}</b>
-            <small>{{ t('keys.tile.' ~ svc.state) }}{% if last %} · <span class="mono">{{ last }}</span>{% endif %}</small>
+            <small>{{ t('keys.configured' if svc.configured else 'keys.not_configured') }}{% if last %} · <span class="mono">{{ last }}</span>{% endif %}</small>
           </span>
-          <span class="sdot{{ ' sdot--ok' if svc.state in ('db', 'env') else '' }}" aria-hidden="true"></span>
+          <span class="shealth__dot shealth__dot--{{ svc.health.light if svc.health else 'grey' }}" aria-hidden="true"></span>
         </a>
       {% endfor %}
     </nav>

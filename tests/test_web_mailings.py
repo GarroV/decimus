@@ -17,7 +17,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.db import mailing_cc
+from src.db import mailing_cc, mailing_templates
 from src.db.errors import ConfigError, MailingCcError
 from src.web import google_mail, letter_draft
 
@@ -38,6 +38,7 @@ from src.web import google_mail, letter_draft
 @pytest.fixture
 def список(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     """Список копий в памяти и журнал обращений к нему."""
+    monkeypatch.setattr(mailing_templates, "current", lambda kind="inspection": {})
     хранилище: dict[str, list[str]] = {k: [] for k in mailing_cc.KINDS}
     журнал: dict[str, Any] = {"add": [], "remove": [], "store": хранилище}
 
@@ -196,7 +197,9 @@ def test_черновик_предписания_несёт_копию_пред�
     monkeypatch: pytest.MonkeyPatch, список: dict[str, Any]
 ) -> None:
     """Копия предписаний подставляется в черновик, а список писем по проверкам — нет."""
-    from types import SimpleNamespace
+    from dataclasses import replace
+
+    from test_web_prescriptions import предписание as rx_fixture
 
     from src.web import prescriptions as web_rx
 
@@ -206,7 +209,7 @@ def test_черновик_предписания_несёт_копию_пред�
     monkeypatch.setattr(
         web_rx, "create_draft", lambda token, **поля: черновики.append(поля) or "id"
     )
-    предписание = SimpleNamespace(recipients="p@x.io", subject="Тема", body="Текст")
+    предписание = replace(rx_fixture(), recipients="p@x.io", subject="Тема", body="Текст")
     monkeypatch.setattr(
         web_rx.rxw, "issue", lambda _id, *, actor, put_draft: put_draft(предписание)
     )

@@ -146,3 +146,67 @@ SERVICE_KEYS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Too many attempts in a row. Try again in {minutes} min.",
     },
 }
+
+
+SERVICE_KEYS_TEXTS.update(
+    {
+        "keys.configured": {"ru": "Задан", "en": "Configured"},
+        "keys.not_configured": {"ru": "Не задан", "en": "Not configured"},
+        "keys.last_check": {"ru": "Последняя проверка подключения", "en": "Last connection check"},
+        "keys.check_current": {
+            "ru": "Проверить текущее подключение",
+            "en": "Check current connection",
+        },
+        "keys.health.unknown": {
+            "ru": "Не удалось прочитать результат проверки",
+            "en": "Could not read the check result",
+        },
+        "keys.health.changed": {
+            "ru": "Ключ заменён после этой проверки: текущее значение ещё не проверено",
+            "en": "The key changed after this check; the current value has not been checked yet",
+        },
+        "keys.health.app_pair": {
+            "ru": (
+                "Пара приложения не проверялась. Состояние входов стран показано отдельно"
+                " и не подтверждает эту пару."
+            ),
+            "en": (
+                "The app pair has not been checked. Country login health is separate and "
+                "does not verify this pair."
+            ),
+        },
+        "keys.err.current_unavailable": {
+            "ru": (
+                "Это подключение нельзя проверить без отдельного запроса к провайдеру. "
+                "Ключи не изменены."
+            ),
+            "en": (
+                "This connection needs a separate provider request to verify. Keys were "
+                "not changed."
+            ),
+        },
+        "keys.ok.current_checked": {
+            "ru": (
+                "Проверка текущего подключения завершена. Результат и время показаны "
+                "выше. Ключи не изменены."
+            ),
+            "en": (
+                "The current connection check finished. Its result and time are shown "
+                "above. Keys were not changed."
+            ),
+        },
+        "keys.err.health_db": {
+            "ru": (
+                "Не удалось записать результат проверки. Ключи не изменены; повторите "
+                "проверку позже."
+            ),
+            "en": "Could not save the check result. Keys were not changed; try again later.",
+        },
+    }
+)
+
+
+SERVICE_KEYS_TEXTS["health.reason.credentials_recheck"] = {
+    "ru": "Нужна повторная проверка текущего подключения",
+    "en": "The current connection needs to be checked again",
+}

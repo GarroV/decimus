@@ -13,12 +13,17 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
         "ru": (
             "Страна подключается по ссылке: откройте страну в списке, сгенерируйте ссылку и "
             "передайте коллеге. Он подтвердит вход на сайте Dodo IS, и здесь появится, кто "
-            "подключил страну и в каком состоянии вход."
+            "подключил страну и в каком состоянии вход. Собираем продажи и каналы заказов, "
+            "заказы агрегаторов, оценки клиентов, РС и РКО. Стопы используются только для "
+            "проверки доступа; статистика стопов, доставки и производства не собирается."
         ),
         "en": (
             "A country is connected through a link: open the country in the list, generate a "
             "link and pass it to a colleague. They confirm the login on the Dodo IS site, and "
-            "this tab then shows who connected the country and the state of the login."
+            "this tab then shows who connected the country and the state of the login. "
+            "We collect sales, order channels, aggregator orders, customer ratings, RS and RKO. "
+            "Stop sales only verify access; stop, delivery and production statistics "
+            "are not collected."
         ),
     },
     "dodois.keys.title": {"ru": "Ключи приложения", "en": "App keys"},
@@ -185,11 +190,13 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
     "dodois.page.lead": {
         "ru": (
             "Decimus просит доступ на чтение данных Dodo IS по стране {country}: "
-            "продажи, стопы, доставка."
+            "разрешения на продажи, стопы, доставку и производство. Это разрешения входа, "
+            "а не перечень собираемых показателей."
         ),
         "en": (
             "Decimus asks for read access to Dodo IS data for {country}: "
-            "sales, stop lists, delivery."
+            "permissions for sales, stop sales, delivery and production. These are login "
+            "permissions, not a list of collected metrics."
         ),
     },
     "dodois.page.safe": {

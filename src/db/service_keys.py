@@ -22,18 +22,20 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from threading import Lock
 from typing import Any
 
 import psycopg
 
-from src.domain.service_keys import LAST_CHARS, VAULT_NAMES, field_of
+from src.domain.service_keys import LAST_CHARS, SERVICES, VAULT_NAMES, field_of, service
 
 from . import secret_crypto
 from .config import check_environment
@@ -72,6 +74,87 @@ class KeyStatus:
     @property
     def masked(self) -> str:
         return "••••" + self.last4
+
+
+@dataclass(frozen=True)
+class ProbeSnapshot:
+    """Internal-only effective credentials and version. Never serialize or log these fields."""
+
+    values: dict[str, str] = field(repr=False)
+    fingerprint: bytes = field(repr=False)
+
+
+def _service_lock(conn: Any, code: str) -> None:
+    # PostgreSQL hash + fixed namespace: stable across processes and connections.
+    conn.execute(
+        "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+        ("decimus:service-key-health:" + code,),
+    )
+
+
+def _named_locks(conn: Any, names: Any) -> tuple[str, ...]:
+    codes = tuple(sorted(s.code for s in SERVICES if any(f.vault_name in names for f in s.fields)))
+    for code in codes:
+        _service_lock(conn, code)
+    return codes
+
+
+def _invalidate_health(conn: Any, codes: tuple[str, ...]) -> None:
+    for code in codes:
+        conn.execute(
+            "update health.checks set light = 'grey', "
+            "reason = 'health.reason.credentials_recheck' where code = %s",
+            (code,),
+        )
+
+
+def probe_snapshot(code: str, *, conn: Any = None) -> ProbeSnapshot:
+    """Fresh DB→ENV snapshot under a short per-service lock, without resolver cache.
+
+    With an existing connection the caller retains that transaction and lock. HTTP
+    must happen only after the standalone snapshot transaction has closed.
+    """
+    found = service(code)
+    if found is None:
+        raise AccessError("Сервис не из реестра")
+    try:
+        if conn is None:
+            with connection(check_environment().dsn) as opened:
+                return probe_snapshot(code, conn=opened)
+        _service_lock(conn, code)
+        names = [f.vault_name for f in found.fields]
+        rows = conn.execute(
+            "select name, ciphertext, set_at from vault.secrets where name = any(%s)", (names,)
+        ).fetchall()
+        stored_rows = {row[0]: (bytes(row[1]), row[2]) for row in rows}
+        values: dict[str, str] = {}
+        versions = []
+        for key_field in found.fields:
+            item = stored_rows.get(key_field.vault_name)
+            value = None
+            if item is not None:
+                try:
+                    value = secret_crypto.decrypt(key_field.vault_name, item[0]).strip() or None
+                except DbError as exc:
+                    logger.warning("Версия ключа: расшифровка недоступна (%s)", type(exc).__name__)
+            source = "db" if value else "env"
+            if not value:
+                value = (os.environ.get(key_field.env_var) or "").strip()
+            values[key_field.code] = value
+            versions.append(
+                (
+                    key_field.vault_name,
+                    source,
+                    value,
+                    (item[0].hex(), item[1].isoformat()) if item else None,
+                )
+            )
+        fingerprint = hashlib.sha256(json.dumps(versions, ensure_ascii=True).encode()).digest()
+        return ProbeSnapshot(values, fingerprint)
+    except psycopg.Error as exc:
+        raise AccessError(
+            "Не удалось прочитать версию ключей (" + type(exc).__name__ + ")"
+        ) from exc
 
 
 _lock = Lock()
@@ -189,8 +272,10 @@ def save_many(values: Mapping[str, str], *, provider: str, by: str) -> dict[str,
         blobs[_known(name)] = (secret_crypto.encrypt(name, value), value[-LAST_CHARS:])
     try:
         with _managing() as conn, conn.cursor() as cur:
+            codes = _named_locks(conn, blobs)
             for name, (blob, last4) in blobs.items():
                 cur.execute(_UPSERT_SQL, (name, provider, blob, last4, by))
+            _invalidate_health(conn, codes)
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось поменять ключ сервиса ({type(exc).__name__})") from exc
     for name in blobs:
@@ -204,10 +289,13 @@ def clear_many(names: tuple[str, ...]) -> bool:
         _known(name)
     try:
         with _managing() as conn, conn.cursor() as cur:
+            codes = _named_locks(conn, names)
             removed = 0
             for name in names:
                 cur.execute(_DELETE_SQL, (name,))
                 removed += cur.rowcount
+            if removed:
+                _invalidate_health(conn, codes)
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось убрать ключ сервиса ({type(exc).__name__})") from exc
     for name in names:

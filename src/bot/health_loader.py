@@ -16,13 +16,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, datetime
 
-from src.db import health_store
 from src.db.errors import DbError
 from src.db.space import SYSTEM_SPACE, acting_space
 from src.health import alerts
-from src.health.checks import PROBE_EVERY, SCHEDULED_CODES, run_probe
+from src.health.checks import PROBE_EVERY, SCHEDULED_CODES, probe_and_record
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +29,11 @@ def probe_all() -> None:
     """Один заход: пробовать всё и записать исходы."""
     for code in SCHEDULED_CODES:
         try:
-            outcome = run_probe(code)
-        except Exception:
-            logger.exception("Проверка подключений: проба %s упала", code)
-            continue
-        if outcome is None:
-            continue
-        light, reason = outcome
-        try:
-            health_store.record(code, light, reason, datetime.now(UTC))
+            probe_and_record(code)
         except DbError:
             logger.warning("Проверка подключений: исход %s не записался", code, exc_info=True)
+        except Exception:
+            logger.exception("Проверка подключений: проба %s упала", code)
 
 
 async def check_forever() -> None:

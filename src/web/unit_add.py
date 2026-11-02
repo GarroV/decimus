@@ -36,7 +36,8 @@ from flask import Flask, abort, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
 from src.db import directory, unit_profiles
-from src.db.errors import DbError, UnitExistsError
+from src.db.errors import DbError, MailingCcError, UnitExistsError
+from src.db.mailing_cc import clean_email
 from src.db.reach import Reach
 from src.domain.geo import COUNTRIES
 from src.domain.log_ids import log_id
@@ -76,13 +77,21 @@ class Extras:
 
     address: str = ""
     partner: str = ""
+    partner_email: str = ""
     dodo_id: str = ""
     stage: str = ""
     opened: date | None = None
 
     @property
     def is_empty(self) -> bool:
-        return not (self.address or self.partner or self.dodo_id or self.stage or self.opened)
+        return not (
+            self.address
+            or self.partner
+            or self.partner_email
+            or self.dodo_id
+            or self.stage
+            or self.opened
+        )
 
 
 def parse_extras(form: Any) -> Extras:
@@ -98,7 +107,12 @@ def parse_extras(form: Any) -> Extras:
         opened = date.fromisoformat(raw_date) if raw_date else None
     except ValueError as exc:
         raise ExtrasRefused("opened") from exc
+    try:
+        email = clean_email(form.get("partner_email") or "") if form.get("partner_email") else ""
+    except MailingCcError as exc:
+        raise ExtrasRefused("partner_email") from exc
     return Extras(
+        partner_email=email,
         address=" ".join((form.get("address") or "").split())[:_ADDRESS_MAX],
         partner=" ".join((form.get("partner") or "").split())[:_PARTNER_MAX],
         dodo_id=dodo_id,
@@ -145,7 +159,7 @@ def merged_profile(
         city=base.city if base else None,
         address=extras.address or (base.address if base else None),
         partner=extras.partner or (base.partner if base else None),
-        partner_email=base.partner_email if base else None,
+        partner_email=extras.partner_email or (base.partner_email if base else None),
         restaurant_on=extras.opened or (base.restaurant_on if base else None),
         delivery_on=base.delivery_on if base else None,
         revenue_on=base.revenue_on if base else None,
@@ -245,6 +259,7 @@ def _prefill(code: str, typed: str) -> dict[str, str]:
         "name": base.name,
         "address": base.address or "",
         "partner": base.partner or "",
+        "partner_email": base.partner_email or "",
         "dodo_id": base.dodo_id or "",
         "stage": base.stage if base.stage in STAGES else "",
         "opened": str(base.restaurant_on or base.delivery_on or ""),
@@ -281,6 +296,9 @@ def _card_url_in_reach(exc: UnitExistsError, lang: str) -> str | None:
 
 def install(app: Flask, conf: Settings) -> None:
     """Маршруты заведения пиццерии: форма и её отправка."""
+    from . import unit_profile_edit
+
+    unit_profile_edit.install(app, conf)
     путь = section("country").path + "/<code>/units/new"
 
     # Объявлено действием, а не только чтением раздела: «Страна» открыта и
@@ -304,7 +322,7 @@ def install(app: Flask, conf: Settings) -> None:
         написано = (request.form.get("name") or "")[:200]
         поля = {
             k: (request.form.get(k) or "")
-            for k in ("address", "partner", "dodo_id", "stage", "opened")
+            for k in ("address", "partner", "partner_email", "dodo_id", "stage", "opened")
         }
         try:
             plan = plan_new_unit(написано, country=страна, refs=_refs(страна))
@@ -319,7 +337,12 @@ def install(app: Flask, conf: Settings) -> None:
                 lang,
                 typed=написано,
                 values=поля,
-                failure=t(f"unitnew.refused.{exc.args[0]}", lang),
+                failure=t(
+                    "country.contacts.invalid"
+                    if exc.args[0] == "partner_email"
+                    else f"unitnew.refused.{exc.args[0]}",
+                    lang,
+                ),
             ), 400
         if not plan.known_city and request.form.get("confirm") != plan.name:
             # Незнакомый город (D240) заводится, но не молча: район или адрес

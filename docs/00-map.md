@@ -255,7 +255,9 @@ Claude входом через сайт (OAuth).
 |---|---|
 | `src/web/texts.py` | Тексты веб-админки: каталог по ключам, язык — параметр |
 | `src/web/texts_administration.py` | Тексты раздела «Администрирование» (D639), вкладок «Подключения» (D638) и «Ключи и API» (D650) |
+| `src/web/texts_aggregators_admin.py` | Тексты административного охвата агрегаторов (#1391) |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
+| `src/web/texts_clients.py` | Клиентские оценки: язык интерфейса не меняет источник и вес данных |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
 | `src/web/texts_demo.py` | Тексты открытого демо и лендинга (D524): выбор роли, плашка, посадочная страница |
@@ -600,6 +602,8 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0106_inspection_timing.sql` | Historical rows deliberately stay NULL; no inference or backfill |
 | `0107_inspection_info_photo_answers.sql` | Info and photo metadata are inserted in the same push transaction, so this invariant is checked at commit rather than before the photo INSERT exists |
 | `0108_finding_split_history.sql` | Existing rows and legacy remain NULL; no accepted inspection is rewritten |
+| `0110_country_mailing_recipients.sql` | an empty configured list suppresses fallback |
+| `0111_mailing_content_templates.sql` | (нет описания) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -827,6 +831,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | Файл | Что делает |
 |---|---|
 | `src/ratings/base.py` | Листы общей таблицы контроля «база рейтингов» (D464) |
+| `src/ratings/clients.py` | Сводка клиентских оценок: только целые месячные агрегаты, вес — число оценок |
 | `src/ratings/compare.py` | Сравнение девелоперов и стран рядом (D551, #972) — только для УК |
 | `src/ratings/countries.py` | Страны выгрузок рейтинга → код ISO |
 | `src/ratings/coverage.py` | Охват пиццерий на площадках — картах и агрегаторах (D424) |
@@ -917,6 +922,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/kinds.py` | Вид проверки: код — сущность, слово — перевод (T152, задача #123) |
 | `src/domain/letter_template.py` | Шаблон письма партнёру: слоты, подстановки-блоки и проверка текста (D550, D608, #977, #1130) |
 | `src/domain/log_ids.py` | Идентификаторы людей и пространств в журнале — меткой, а не как есть (F-015) |
+| `src/domain/mailing_content.py` | Plain-text message/document templates |
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
 | `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |

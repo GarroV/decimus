@@ -10,7 +10,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import os
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -19,7 +21,8 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.db import secret_crypto, service_keys
+from src.db import health_store, secret_crypto, service_keys
+from src.domain import health
 from src.domain import service_keys as registry
 from src.health import probes as service_probes
 from src.health.probes import KeyRejected, KeyUnverified
@@ -87,9 +90,37 @@ class Склад:
 @pytest.fixture
 def склад(monkeypatch: pytest.MonkeyPatch) -> Склад:
     склад = Склад()
+    monkeypatch.setattr(health_store, "probes", lambda: {})
+    monkeypatch.setattr(
+        service_keys,
+        "resolve",
+        lambda code, field: os.environ.get(registry.field_of(code, field).env_var),
+    )
+    for service in registry.SERVICES:
+        for field in service.fields:
+            monkeypatch.delenv(field.env_var, raising=False)
     monkeypatch.setattr(service_keys, "statuses", склад.statuses)
     monkeypatch.setattr(service_keys, "save_many", склад.save_many)
     monkeypatch.setattr(service_keys, "clear_many", склад.clear_many)
+
+    def snapshot(code: str, **_kwargs: Any) -> service_keys.ProbeSnapshot:
+        service = registry.service(code)
+        assert service is not None
+        values = {f.code: service_keys.resolve(code, f.code) or "" for f in service.fields}
+        versions = [(f.vault_name, склад.записи.get(f.vault_name)) for f in service.fields]
+        fingerprint = hashlib.sha256(repr((values, versions)).encode()).digest()
+        return service_keys.ProbeSnapshot(values, fingerprint)
+
+    def record_current(
+        code: str, fingerprint: bytes, light: str, reason: str, moment: datetime
+    ) -> bool:
+        if service_keys.probe_snapshot(code).fingerprint != fingerprint:
+            return False
+        health_store.record(code, light, reason, moment)
+        return True
+
+    monkeypatch.setattr(service_keys, "probe_snapshot", snapshot)
+    monkeypatch.setattr(health_store, "record_key_if_current", record_current)
     for код in СЕРВИСЫ:
         monkeypatch.setitem(service_probes.PROBES, код, склад.probe)
     from src.db import api_access
@@ -244,15 +275,16 @@ def test_запись_видна_как_последние_четыре_и_кт�
         "pointer", "wxyz", "director", datetime.now(UTC)
     )
     html = главный.get(f"{ВКЛАДКА}&key=pointer").get_data(as_text=True)
-    assert "••••wxyz" in html and "director" in html and "Задан в админке" in html
+    assert "••••wxyz" in html and "director" in html and "Задан" in html
 
 
-def test_окружение_называется_окружением(
+def test_окружение_показывает_маску_вместо_значения(
     главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("POINTER_API_KEY", "из-окружения-1234567")
     html = главный.get(f"{ВКЛАДКА}&key=pointer").get_data(as_text=True)
-    assert "Из окружения сервера" in html and "из-окружения-1234567" not in html
+    assert "••••4567" in html and "из-окружения-1234567" not in html
+    assert "Проверить текущее подключение" in html
 
 
 @pytest.mark.parametrize(("tenant", "role"), РОЛИ)
@@ -591,3 +623,206 @@ def test_адрес_возврата_только_из_известных_вкл
 
     with собрать(tenant="HQ").test_request_context("/", method="POST", data={"back": пришло}):
         assert connections_screen.return_tab() == вкладка
+
+
+# Current-connection checks are separate from replacement validation. Provider probes,
+# credential resolution and the existing route gates are reused, without key writes.
+
+
+def test_configured_is_not_a_successful_health_check(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("POINTER_API_KEY", "fake-current-pointer-3456")
+    html = главный.get(f"{ВКЛАДКА}&key=pointer").get_data(as_text=True)
+    assert "Задан" in html and "••••3456" in html
+    assert "Последняя проверка подключения" in html
+    assert "shealth__dot--grey" in html and "shealth__dot--green" not in html
+    assert "fake-current-pointer-3456" not in html
+
+
+def test_client_id_is_an_identifier_but_client_secret_stays_masked(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ISPRING_CLIENT_ID", "public-client-identifier-1234")
+    monkeypatch.setenv("ISPRING_CLIENT_SECRET", "never-show-env-secret-6789")
+    html = главный.get(f"{ВКЛАДКА}&key=ispring").get_data(as_text=True)
+    assert "public-client-identifier-1234" in html and "••••6789" in html
+    assert "never-show-env-secret-6789" not in html
+    assert 'value="never-show' not in html
+
+
+def test_replaced_db_key_cannot_inherit_an_older_green_probe(
+    главный: FlaskClient, склад: Склад, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    now = datetime.now(UTC)
+    склад.записи["pointer.api_key"] = service_keys.KeyStatus("pointer", "new4", "owner", now)
+    monkeypatch.setattr(
+        health_store,
+        "probes",
+        lambda: {
+            "pointer": health.ProbeRow(health.GREEN, "health.reason.ok", now - timedelta(minutes=2))
+        },
+    )
+    html = главный.get(f"{ВКЛАДКА}&key=pointer").get_data(as_text=True)
+    assert "Ключ заменён после этой проверки" in html
+    assert "shealth__dot--yellow" in html
+    assert "shealth__dot--green" not in html
+    assert (now - timedelta(minutes=2)).strftime("%d.%m.%Y %H:%M UTC") in html
+
+
+def test_current_check_uses_effective_values_records_health_and_never_writes_keys(
+    главный: FlaskClient, склад: Склад, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    current = "fake-db-override-not-the-form-value"
+    monkeypatch.setenv("POINTER_API_KEY", "different-env-fallback")
+    monkeypatch.setattr(service_keys, "resolve", lambda _service, _field: current)
+    recorded: list[tuple[Any, ...]] = []
+    monkeypatch.setattr(health_store, "record", lambda *args: recorded.append(args))
+    answer = главный.post(
+        _адрес("pointer", "check"),
+        data={"current_connection": "1", "secret_api_key": "wrong-form-input"},
+        headers=ЗАГОЛОВКИ,
+    )
+    assert answer.status_code == 200
+    assert ("verify", {"api_key": current}) in склад.зовы
+    assert склад.записывающие() == []
+    assert recorded[0][:3] == ("pointer", health.GREEN, "health.reason.ok")
+    assert isinstance(recorded[0][3], datetime)
+    html = answer.get_data(as_text=True)
+    assert current not in html and "wrong-form-input" not in html
+
+
+@pytest.mark.parametrize(
+    "refusal, light, reason",
+    [
+        (KeyRejected(401), health.RED, "health.reason.rejected"),
+        (KeyUnverified(429), health.YELLOW, "health.reason.unverified"),
+    ],
+)
+def test_current_check_reports_failure_without_replacing_keys(
+    главный: FlaskClient,
+    склад: Склад,
+    monkeypatch: pytest.MonkeyPatch,
+    refusal: Exception,
+    light: str,
+    reason: str,
+) -> None:
+    monkeypatch.setenv("POINTER_API_KEY", "fake-current-provider-key")
+    склад.проверка = refusal
+    recorded: list[tuple[Any, ...]] = []
+    monkeypatch.setattr(health_store, "record", lambda *args: recorded.append(args))
+    answer = главный.post(
+        _адрес("pointer", "check"), data={"current_connection": "1"}, headers=ЗАГОЛОВКИ
+    )
+    assert answer.status_code == 422
+    assert recorded[0][:3] == ("pointer", light, reason)
+    assert склад.записывающие() == []
+    assert "fake-current-provider-key" not in answer.get_data(as_text=True)
+
+
+def test_current_check_keeps_step_up_and_origin_gates(
+    главный: FlaskClient, склад: Склад, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    answer = главный.post(
+        _адрес("pointer", "check"),
+        data={"current_connection": "1"},
+        headers={"Origin": "https://foreign.example"},
+    )
+    assert answer.status_code == 403 and склад.зовы == []
+    _сессия_с(monkeypatch, has_second_factor=False)
+    answer = главный.post(
+        _адрес("pointer", "check"), data={"current_connection": "1"}, headers=ЗАГОЛОВКИ
+    )
+    assert answer.status_code == 403 and склад.зовы == []
+
+
+def test_dodois_current_check_does_not_start_live_device_authorization(
+    главный: FlaskClient, склад: Склад
+) -> None:
+    html = главный.get(ВКЛАДКА_DODOIS).get_data(as_text=True)
+    assert "Пара приложения не проверялась" in html
+    assert 'name="current_connection"' not in html
+    answer = главный.post(
+        _адрес("dodois", "check"),
+        data={"current_connection": "1", "back": "dodois"},
+        headers=ЗАГОЛОВКИ,
+    )
+    assert answer.status_code == 409 and склад.зовы == []
+
+
+@pytest.mark.parametrize("action", ["save", "delete"])
+def test_key_mutation_invalidates_old_success_without_fabricating_probe_time(
+    главный: FlaskClient,
+    склад: Склад,
+    monkeypatch: pytest.MonkeyPatch,
+    action: str,
+) -> None:
+    checked = datetime.now(UTC) - timedelta(minutes=5)
+    склад.записи["pointer.api_key"] = service_keys.KeyStatus(
+        "pointer", "old4", "owner", checked - timedelta(days=1)
+    )
+    recorded: list[tuple[Any, ...]] = []
+    monkeypatch.setattr(
+        health_store,
+        "probes",
+        lambda: {"pointer": health.ProbeRow(health.GREEN, "health.reason.ok", checked)},
+    )
+    monkeypatch.setattr(health_store, "record", lambda *args: recorded.append(args))
+    response = _отправить(главный, "pointer", action)
+    assert response.status_code == 200
+    assert recorded == [("pointer", health.GREY, "health.reason.credentials_recheck", checked)]
+
+
+def test_health_invalidation_failure_refuses_key_mutation_before_write(
+    главный: FlaskClient,
+    склад: Склад,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.db.errors import DbError
+
+    monkeypatch.setattr(
+        health_store,
+        "probes",
+        lambda: {"pointer": health.ProbeRow(health.GREEN, "health.reason.ok", datetime.now(UTC))},
+    )
+
+    def unavailable(*_args: Any) -> None:
+        raise DbError("health store unavailable")
+
+    monkeypatch.setattr(health_store, "record", unavailable)
+    response = _отправить(главный, "pointer", "save")
+    assert response.status_code == 503
+    assert склад.записывающие() == []
+
+
+def test_old_inflight_probe_cannot_report_success_after_configuration_changes(
+    главный: FlaskClient,
+    monkeypatch: pytest.MonkeyPatch,
+    склад: Склад,
+) -> None:
+    old = "fake-old-provider-key"
+    replacement = "fake-replacement-provider-key"
+    monkeypatch.setenv("POINTER_API_KEY", old)
+    used: list[str] = []
+    recorded: list[tuple[Any, ...]] = []
+
+    def change_during_probe(values: dict[str, str]) -> None:
+        used.append(values["api_key"])
+        monkeypatch.setenv("POINTER_API_KEY", replacement)
+
+    monkeypatch.setitem(service_probes.PROBES, "pointer", change_during_probe)
+    monkeypatch.setattr(health_store, "record", lambda *args: recorded.append(args))
+    response = главный.post(
+        _адрес("pointer", "check"), data={"current_connection": "1"}, headers=ЗАГОЛОВКИ
+    )
+    assert response.status_code == 422
+    assert used == [old] and recorded == []
+    assert склад.записывающие() == []
+    assert old not in response.get_data(as_text=True)
+    assert replacement not in response.get_data(as_text=True)
+
+
+def test_internal_probe_snapshot_repr_contains_no_key_or_fingerprint() -> None:
+    snapshot = service_keys.ProbeSnapshot({"api_key": "must-not-leak"}, b"internal-version")
+    assert "must-not-leak" not in repr(snapshot)
+    assert "internal-version" not in repr(snapshot)

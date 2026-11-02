@@ -86,6 +86,8 @@ LOCKED_ENDPOINTS = frozenset(
         "mailing_cc_add",
         "mailing_cc_remove",
         "mailing_template_save",
+        "mailing_content_save",
+        "country_set_recipients",
         "bot_unlink",
         # Выход наружу — настоящие сервисы под настоящими ключами: ключи API на
         # данные, Google (вход, почта, таблица), сайты агрегаторов.
@@ -169,6 +171,7 @@ OPEN_ENDPOINTS = frozenset(
         "country_save_contract",
         "country_delete_contract",
         "unit_create",
+        "unit_profile_save",
         "do_accept",
         "do_add_finding",
         "do_add_photo",

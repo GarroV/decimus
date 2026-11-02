@@ -129,7 +129,7 @@
                     <small>{{ р.email or t('users.no_email') }}</small>
                   </span>
                   <span class="srow__cell mono" data-label="{{ t('users.col.space') }}">{{ р.tenant }}</span>
-                  <span class="srow__cell"><span class="sbadge{% if р.role in ('superadmin', 'admin') %} sbadge--accent{% endif %}">{{ t(role_key(р.role, р.tenant)) }}</span></span>
+                  <span class="srow__cell srow__role"><span class="sbadge{% if р.role in ('superadmin', 'admin') %} sbadge--accent{% endif %}">{{ t(role_key(р.role, р.tenant)) }}</span></span>
                   {% if show_bindings %}
                     <span class="srow__cell srow__bot">{% if bindings.get(р.id) %}<span class="sdot sdot--ok"></span>{{ t('users.bot.yes') }}{% else %}<span class="srow__none">{{ t('users.bot.no') }}</span>{% endif %}</span>
                   {% endif %}

@@ -31,7 +31,7 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response
 
 from src.db import mailing_cc
-from src.db.errors import DbError
+from src.db.errors import ConfigError, DbError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.letters import LetterError
 
@@ -360,22 +360,30 @@ def install(app: Flask, conf: Settings) -> None:
             return к_письму(inspection_id, lang=письмо_на, исход="pdf_failed")
 
         try:
-            create_draft(
-                токен,
-                to=detail.inspection.contact,
-                cc=_копия_ук(detail.inspection.tenant_code),
-                subject=draft_subject(
+            from .mailing_documents import inspection_message
+
+            subject, body = inspection_message(
+                detail,
+                письмо_на,
+                draft_subject(
                     city=detail.inspection.city,
                     date=str(detail.inspection.inspection_date),
                     lang=письмо_на,
                 ),
-                body=записанное.body,
+                записанное.body,
+            )
+            create_draft(
+                токен,
+                to=detail.inspection.contact,
+                cc=_копия_ук(detail.inspection.tenant_code),
+                subject=subject,
+                body=body,
                 attachments=((data.report_name(detail.inspection), файл, "application/pdf"),),
             )
         except MailAccountMismatchError as сбой:
             logger.warning("черновик письма не создан: %s", сбой)
             return к_письму(inspection_id, lang=письмо_на, исход=OUTCOME_WRONG_ACCOUNT)
-        except GoogleMailError as сбой:
+        except (GoogleMailError, DbError, ConfigError, ValueError) as сбой:
             # Без записи кнопка «не работала» молча: человек видел «не вышло»,
             # а в журнале не было ничего (11.10.2026).
             logger.warning("черновик письма в Gmail не создан: %s", сбой)

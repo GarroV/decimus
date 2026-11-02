@@ -233,7 +233,8 @@ def test_клиенты_честная_пустая_плашка(monkeypatch: py
     подготовить(monkeypatch)
     html = получить(monkeypatch, "/ratings/clients")
 
-    assert "Оценки клиентов из приложения появятся после подключения отзывов Dodo IS" in html
+    assert "За выбранные полные месяцы клиентских оценок нет" in html
+    assert "появятся после подключения" not in html
 
 
 def test_общий_список_риска_называет_источники_словами(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -275,10 +276,16 @@ def test_точка_свежести_в_подменю_и_строка_в_шап
     assert "данные за 16–31.10 · пришли 27.10 11:17" in html
 
 
-def test_подменю_не_попадает_на_чужие_страницы(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_подменю_постоянно_но_скрипт_рейтингов_не_включён_на_других_страницах(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     подготовить(monkeypatch)
     for c in клиент(monkeypatch):
-        assert "sidenav__sub" not in c.get("/inspections").get_data(as_text=True)
+        html = c.get("/inspections").get_data(as_text=True)
+        assert "sidenav__sub" in html
+        assert "data-nav-ratings-toggle" in html
+        assert "data-rt-subnav" not in html
+        assert "data-rt-nav" not in html
 
 
 def test_видимость_разделов_по_пространству() -> None:

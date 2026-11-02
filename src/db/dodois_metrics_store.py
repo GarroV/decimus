@@ -103,11 +103,17 @@ _DEL_CHECKUP = (
 )
 _INS_RATING = (
     "insert into dodois.unit_rating_period "
-    "(dodo_id, kind, period_from, period_to, rate, publish_status) values (%s, %s, %s, %s, %s, %s)"
+    "(dodo_id, kind, period_from, period_to, rate, publish_status) values (%s, %s, %s, %s, %s, %s) "
+    "on conflict (dodo_id, kind, period_from) do update set "
+    "period_to=excluded.period_to, rate=excluded.rate, publish_status=excluded.publish_status, "
+    "loaded_at=now()"
 )
 _INS_CHECKUP = (
     "insert into dodois.unit_checkup_period "
-    "(dodo_id, kind, period_from, period_to, checkups, by_status) values (%s, %s, %s, %s, %s, %s)"
+    "(dodo_id, kind, period_from, period_to, checkups, by_status) values (%s, %s, %s, %s, %s, %s) "
+    "on conflict (dodo_id, kind, period_from) do update set "
+    "period_to=excluded.period_to, checkups=excluded.checkups, by_status=excluded.by_status, "
+    "loaded_at=now()"
 )
 
 
@@ -133,7 +139,12 @@ def replace_rating_periods(
     start: date, stop: date, units: Sequence[str], rows: Sequence[RatingPeriod]
 ) -> int:
     """Заменить оценки РКО и РС у `units` за периоды, начавшиеся между `start` и `stop`."""
-    data = [(r.dodo_id, r.kind, r.period_from, r.period_to, r.rate, r.publish_status) for r in rows]
+    covered = set(units)
+    data = [
+        (r.dodo_id, r.kind, r.period_from, r.period_to, r.rate, r.publish_status)
+        for r in rows
+        if r.dodo_id in covered
+    ]
     return _replace_range(_DEL_RATING, _INS_RATING, start, stop, units, data)
 
 
@@ -141,9 +152,11 @@ def replace_checkup_periods(
     start: date, stop: date, units: Sequence[str], rows: Sequence[CheckupPeriod]
 ) -> int:
     """Заменить счёт проверок у `units` за периоды, начавшиеся между `start` и `stop`."""
+    covered = set(units)
     data = [
         (r.dodo_id, r.kind, r.period_from, r.period_to, r.checkups, Jsonb(r.by_status))
         for r in rows
+        if r.dodo_id in covered
     ]
     return _replace_range(_DEL_CHECKUP, _INS_CHECKUP, start, stop, units, data)
 

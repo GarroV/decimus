@@ -87,6 +87,49 @@
 
 {# Панель вкладки «Страны» (D640): четыре блока-плитки, у каждого заголовок, значение, пояснение
    и кнопка, форма раскрывается внутри блока. Адреса и поля форм те же, что были. #}
+
+{% macro _contacts(s) %}
+  <section class="cblock cblock--wide" aria-labelledby="cb-recipients">
+    <h3 class="cblock__title" id="cb-recipients">{{ t('country.contacts.mailing') }}</h3>
+    <p class="cblock__note">{{ t('country.contacts.mailing_hint') }}</p>
+    {% if s.recipients_failed %}<p role="alert">{{ t('country.settings.failed') }}</p>
+    {% elif s.can_recipients %}
+      <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/recipients') }}?lang={{ lang }}">
+        <label><span class="sform__label">{{ t('country.contacts.to') }}</span>
+          <textarea class="sinput" name="recipients" rows="3" maxlength="2000">{{ s.mailing_recipients if s.mailing_recipients is not none else '' }}</textarea></label>
+        <p class="cblock__note">{{ t('country.contacts.custom') if s.mailing_recipients is not none else t('country.contacts.legacy') }}</p>
+        <div class="sactions">
+          <button class="sbtn sbtn--primary" type="submit">{{ t('country.contacts.use') }}</button>
+          {% if s.mailing_recipients is not none %}<button class="sbtn" type="submit" name="reset" value="1">{{ t('country.contacts.reset') }}</button>{% endif %}
+        </div>
+      </form>
+    {% elif s.mailing_recipients is not none %}<p>{{ s.mailing_recipients or t('country.contacts.empty') }}</p><p>{{ t('country.contacts.custom') }}</p>
+    {% else %}<p>{{ t('country.contacts.legacy') }}</p>{% endif %}
+  </section>
+  <section class="cblock cblock--wide" aria-labelledby="cb-unit-contacts">
+    <h3 class="cblock__title" id="cb-unit-contacts">{{ t('country.contacts.units') }}</h3>
+    {% if s.can_units %}<p><a class="sbtn sbtn--primary" href="{{ url('/country/' ~ s.code ~ '/units/new') }}?lang={{ lang }}">{{ t('unitnew.open') }}</a></p>{% endif %}
+    {% if s.profiles_failed %}<p role="alert">{{ t('country.card.profiles_failed') }}</p>
+    {% else %}
+      {% for u in s.rows %}
+        <details class="sfold cblock__item">
+          <summary>{{ u.name }} · {{ u.address or '—' }}</summary>
+          {% if s.can_units %}
+            <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/unit-profile') }}?lang={{ lang }}">
+              <input type="hidden" name="unit_key" value="{{ u.key }}">
+              <p class="cblock__note">{{ t('country.contacts.identity_hint') }}</p>
+              <label><span class="sform__label">{{ t('country.card.col.address') }}</span><input class="sinput" name="address" value="{{ u.address }}" maxlength="200"></label>
+              <label><span class="sform__label">{{ t('country.block.partner') }}</span><input class="sinput" name="partner" value="{{ u.partner }}" maxlength="120"></label>
+              <label><span class="sform__label">{{ t('country.contacts.partner_email') }}</span><input class="sinput" type="email" name="partner_email" value="{{ u.partner_email }}" maxlength="200"></label>
+              <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.save') }}</button>
+            </form>
+          {% else %}<p>{{ u.partner }} · {{ u.partner_email }}</p>{% endif %}
+        </details>
+      {% else %}<p class="cblock__note">{{ t('country.card.no_units') }}</p>{% endfor %}
+    {% endif %}
+  </section>
+{% endmacro %}
+
 {% macro _blocks(s) %}
   <div class="cblocks">
     <section class="cblock" aria-labelledby="cb-partner">
@@ -163,7 +206,8 @@
       {% endif %}
     </section>
 
-    {% if s.show_contract %}{{ _contract_block(s) }}{% endif %}
+    {{ _contacts(s) }}
+    {% if s.show_contract %}<details class="sfold cblock--wide"><summary>{{ t('country.contacts.contract_extra') }}</summary>{{ _contract_block(s) }}</details>{% endif %}
   </div>
 {% endmacro %}
 
@@ -173,6 +217,8 @@
       <div class="note note--ok" role="status"><div class="note__text">{{ t('country.settings.saved') }}</div></div>
     {% elif s.saved == 'failed' %}
       <div class="note note--error" role="alert"><div class="note__text">{{ t('country.settings.failed') }}</div></div>
+    {% elif s.saved == 'contacts_invalid' %}
+      <div class="note note--error" role="alert"><div class="note__text">{{ t('country.contacts.invalid') }}</div></div>
     {% elif s.saved == 'langs_invalid' %}
       <div class="note note--error" role="alert"><div class="note__text">{{ t('country.langs.invalid') }}</div></div>
     {% endif %}

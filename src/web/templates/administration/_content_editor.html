@@ -1,0 +1,19 @@
+{% macro content_form(ed) %}
+<section class="ssec" id="message-content">
+  <h2 class="ssec__title">{{ t('mailings.content.title.' ~ ed.kind) }}</h2>
+  <p>{{ t('mailings.content.no_send') }}</p>
+  <p class="sactions">{% for code in ('ru','en') %}<a class="sbtn" href="{{ url('/administration') }}?tab=mailings&amp;kind={{ 'prescription' if ed.kind == 'document' else ed.kind }}&amp;content={{ ed.kind }}&amp;clang={{ code }}">{{ code|upper }}</a>{% endfor %}
+  {% if ed.kind in ('prescription','document') %}<a class="sbtn" href="{{ url('/administration') }}?tab=mailings&amp;kind=prescription&amp;content={{ 'document' if ed.kind == 'prescription' else 'prescription' }}&amp;clang={{ ed.lang }}">{{ t('mailings.content.title.' ~ ('document' if ed.kind == 'prescription' else 'prescription')) }}</a>{% endif %}</p>
+  {% if ed.error %}<p class="note note--error" role="alert">{{ ed.error }}</p>{% endif %}
+  <p>{{ t('mailings.tpl.state.version', n=ed.version.version, who=ed.version.saved_by, at=ed.version.saved_at.strftime('%Y-%m-%d')) if ed.version and ed.version.body is not none else t('mailings.tpl.state.builtin') }} · {{ ed.lang|upper }}</p>
+  <form class="sform" method="post" action="{{ url('/administration/mailings/' ~ ed.kind ~ '/content') }}?lang={{ lang }}">
+    <input type="hidden" name="tlang" value="{{ ed.lang }}">
+    <label><span class="sform__label">{{ t('mailings.content.subject') }}</span><input class="sinput" name="subject" value="{{ ed.subject }}" required maxlength="300"></label>
+    <label><span class="sform__label">{{ t('mailings.tpl.body') }}</span><textarea class="sinput" name="body" rows="12" maxlength="6000" required>{{ ed.body }}</textarea></label>
+    <p>{{ t('mailings.content.variables') }} {% for field in ed.fields %}<code>{{ '{' ~ field ~ '}' }}</code> {% endfor %}</p>
+    <div class="sactions"><button class="sbtn sbtn--primary" name="action" value="save">{{ t('mailings.tpl.save') }}</button><button class="sbtn" name="action" value="preview">{{ t('mailings.content.preview') }}</button><button class="sbtn" name="action" value="reset" formnovalidate>{{ t('mailings.tpl.reset') }}</button></div>
+  </form>
+  {% if ed.preview_subject %}<article class="ssec"><h3>{{ ed.preview_subject }}</h3><pre>{{ ed.preview_body }}</pre></article>{% endif %}
+  <details class="sfold"><summary>{{ t('mailings.tpl.history') }}</summary>{% for v in ed.history %}<p>{{ t('mailings.tpl.history.row', n=v.version, who=v.saved_by, at=v.saved_at.strftime('%Y-%m-%d %H:%M')) }}{% if v.body is none %} · {{ t('mailings.tpl.state.builtin') }}{% endif %}</p>{% else %}<p>{{ t('mailings.tpl.history.none') }}</p>{% endfor %}</details>
+</section>
+{% endmacro %}

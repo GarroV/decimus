@@ -45,9 +45,9 @@ from typing import Any
 from flask import Flask, abort, redirect, request
 from werkzeug.wrappers import Response
 
-from src.db import agg_store, country_report_langs, ratings_read
+from src.db import agg_store, country_mailing_recipients, country_report_langs, ratings_read
 from src.db import country_contracts as contracts_db
-from src.db.errors import CountryContractError, DbError
+from src.db.errors import CountryContractError, DbError, PrescriptionError
 from src.db.models import InspectionRow
 from src.domain.errors import ConfigError
 from src.domain.models import TEXT_LANGS
@@ -69,7 +69,7 @@ FAILED = "failed"
 INVALID = "invalid"
 #: Языки отчёта: пусто или язык не из методики — отказ, ничего не записано.
 LANGS_INVALID = "langs_invalid"
-_OUTCOMES = frozenset({SAVED, FAILED, INVALID, LANGS_INVALID})
+_OUTCOMES = frozenset({SAVED, FAILED, INVALID, LANGS_INVALID, "contacts_invalid"})
 
 #: Длина имени девелопера — как у поля справочника (`country_page.DEVELOPER_MAX`).
 DEVELOPER_MAX = 120
@@ -160,6 +160,10 @@ class Panel:
     contracts: tuple[contracts_db.Contract, ...] = ()
     #: Договор не прочитался — блок об этом говорит, а не рисует «договора нет».
     contracts_failed: bool = False
+    mailing_recipients: str | None = None
+    recipients_failed: bool = False
+    can_recipients: bool = False
+    can_units: bool = False
 
 
 def _ordered(rows: Sequence[UnitRow]) -> tuple[UnitRow, ...]:
@@ -238,8 +242,8 @@ def load(
     """Карточка страны `code`: партнёр и девелопер, партнёры свода, пиццерии, договор.
 
     Договор читается и показывается только там, где видны почты (`show_email`, УК, D375).
-    `settings_only` — панель вкладки «Страны» (D640): пиццерий и оценок площадок в ней нет,
-    поэтому их чтение пропускается; форма языков отчёта рисуется вместе с `can_edit`.
+    `settings_only` — панель вкладки «Страны»: контактные строки пиццерий передаёт
+    вызывающий, без чтения оценок; формы контактов имеют собственные права.
     """
     сведения: dict[str, Any] = {
         "code": code,
@@ -255,6 +259,13 @@ def load(
         "can_langs": can_edit and settings_only,
         "edit_url": edit_url,
     }
+    if show_email:
+        сведения["can_recipients"] = settings_only and guard.may("mailing.manage")
+        сведения["can_units"] = settings_only and guard.may("unit.create")
+        try:
+            сведения["mailing_recipients"] = country_mailing_recipients.read(code)
+        except DbError:
+            сведения["recipients_failed"] = True
     сведения["report_langs"], сведения["langs_custom"] = _report_langs(code)
     if not settings_only:
         сведения["aggregators"], сведения["aggregators_failed"] = _aggregators(code)
@@ -349,6 +360,25 @@ def install(app: Flask) -> None:
             log.warning("Языки отчёта страны %s не сохранены", страна, exc_info=True)
             return _back(страна, FAILED)
         return _back(страна, SAVED)
+
+    @app.post(base + "/recipients", endpoint="country_set_recipients")
+    @guard.action("mailing.manage")
+    def set_recipients(code: str) -> Response:
+        country = _checked(code)
+        refuse_foreign_origin()
+        account = auth.current_account()
+        try:
+            country_mailing_recipients.save(
+                country,
+                request.form.get("recipients") or "",
+                actor=account.login if account else "",
+                reset=request.form.get("reset") == "1",
+            )
+        except (PrescriptionError, ValueError):
+            return _back(country, "contacts_invalid")
+        except DbError:
+            return _back(country, FAILED)
+        return _back(country, SAVED)
 
     contract_base = base + "/contract"
 

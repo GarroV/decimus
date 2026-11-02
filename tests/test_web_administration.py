@@ -17,7 +17,15 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.db import api_access, dodois_logins, health_store, mailing_cc, model_key, ratings_sync
+from src.db import (
+    api_access,
+    dodois_logins,
+    health_store,
+    mailing_cc,
+    model_key,
+    ratings_sync,
+    service_keys,
+)
 from src.domain.health import LoadFacts, ProbeRow
 from src.domain.permissions import MATRIX, SIDE_HQ, role_may
 from src.health import checks
@@ -37,15 +45,31 @@ from src.web import ratings as ratings_screen
 
 
 def _стенд(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str) -> Iterator[FlaskClient]:
+    from src.web import aggregators_admin
+
+    monkeypatch.setattr(aggregators_admin.agg_store, "units", lambda: ())
+    monkeypatch.setattr(aggregators_admin.agg_store, "coverage", lambda: ())
+    monkeypatch.setattr(aggregators_admin.agg_store, "load_states", lambda: ())
+    monkeypatch.setattr(aggregators_admin.agg_store, "unmatched_counts", lambda: ())
+    monkeypatch.setattr(aggregators_admin.ratings_platforms, "agg_countries", lambda: {})
     monkeypatch.setattr(api_access, "list_tokens", lambda: ())
     monkeypatch.setattr(model_key, "status", lambda: None)
+    monkeypatch.setattr(
+        service_keys,
+        "probe_snapshot",
+        lambda code: service_keys.ProbeSnapshot({"api_key": "fake-fixture"}, b"fixture-version"),
+    )
     записано: list[tuple[str, str, str]] = []
     monkeypatch.setattr(
         health_store,
         "probes",
         lambda: {
-            "openai": ProbeRow("green", "health.reason.ok", СЕЙЧАС - timedelta(minutes=5)),
-            "pointer": ProbeRow("red", "health.reason.rejected", СЕЙЧАС - timedelta(minutes=5)),
+            "openai": ProbeRow(
+                "green", "health.reason.ok", СЕЙЧАС - timedelta(minutes=5), b"fixture-version"
+            ),
+            "pointer": ProbeRow(
+                "red", "health.reason.rejected", СЕЙЧАС - timedelta(minutes=5), b"fixture-version"
+            ),
         },
     )
     monkeypatch.setattr(
@@ -133,6 +157,7 @@ def test_старый_адрес_вкладки_перенаправляет(г�
         "spaces",
         "countries",
         "ratings",
+        "aggregators",
         "mailings",
         "journal",
         "usage",
@@ -140,8 +165,16 @@ def test_старый_адрес_вкладки_перенаправляет(г�
         "keys",
         "dodois",
     ],
-    ("HQ", "admin"): ["people", "spaces", "countries", "ratings", "mailings", "usage"],
-    ("HQ", "control"): ["people", "ratings"],
+    ("HQ", "admin"): [
+        "people",
+        "spaces",
+        "countries",
+        "ratings",
+        "aggregators",
+        "mailings",
+        "usage",
+    ],
+    ("HQ", "control"): ["people", "ratings", "aggregators"],
     ("GE", "admin"): ["people", "spaces"],
     ("HQ", "developer"): [],
     ("HQ", "guest"): [],
@@ -290,10 +323,19 @@ def test_расход_чужой_роли_404(monkeypatch: pytest.MonkeyPatch, t
 def test_проверить_сейчас_пробует_и_пишет(
     главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(checks, "run_probe", lambda code: ("green", "health.reason.ok"))
+    called: list[str] = []
+
+    def guarded_probe(code: str) -> tuple[str, str]:
+        called.append(code)
+        return "green", "health.reason.ok"
+
+    monkeypatch.setattr(checks, "probe_and_record", guarded_probe)
     ответ = главный.post(f"{РАЗДЕЛ}/connections/health/openai/check", headers={"Origin": СВОЙ})
     assert ответ.status_code == 200
-    assert главный.записано == [("openai", "green", "health.reason.ok")]  # type: ignore[attr-defined]
+    assert called == ["openai"]
+    # Storage is owned by the guarded facade, tested with real PostgreSQL separately.
+    # The web adapter must not append an unguarded second write after it.
+    assert главный.записано == []  # type: ignore[attr-defined]
     assert "Проверено: OpenAI" in ответ.get_data(as_text=True)
 
 

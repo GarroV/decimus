@@ -1,4 +1,4 @@
-/* forma dodo/core/dodo-ds.css sha256:d6e48d6505a2e35e6263a95bf8185c93c421d2093a37c0ced67a8a9b878d27c1 — не править здесь, правка идёт в GarroV/forma */
+/* forma dodo/core/dodo-ds.css sha256:a2ab38b2eac60f379d94fc6904d754f9faff7ec93923781e5e788c54a3d5674e — не править здесь, правка идёт в GarroV/forma */
 /* ═══════════════════════════════════════════════════════════════════════════
    DODO — ЕДИНАЯ ДИЗАЙН-СИСТЕМА ТРЁХ ПРОДУКТОВ
    Собрана 17.09.2026 из двух источников:
@@ -1261,3 +1261,38 @@ a.prow:hover, button.prow:hover, label.prow:hover { background: var(--surface-2)
    Чего нельзя: переопределять токены ядра под свой вкус и писать хексы
    в компонентах. Разошлись значения — правится ядро, для всех трёх сразу.
    ═══════════════════════════════════════════════════════════════════════ */
+
+/* Ручной выбор ширины рейки — та же геометрия 216/56, что у адаптивной.
+   Флаг ставится оболочкой до CSS, поэтому переходы не вспыхивают широкой панелью. */
+.sidenav { transition: width var(--t-state) var(--ease); }
+.sidenav__toggle { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-4); margin: var(--space-3) var(--space-4) 0; padding: 0 var(--space-5); min-height: 28px; border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink-3); font: inherit; font-size: var(--fs-micro); cursor: pointer; }
+.sidenav__toggle:hover { color: var(--ink); background: var(--surface-3); }
+.sidenav__toggle:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
+.sidenav__toggle svg { flex: none; width: 16px; height: 16px; }
+html[data-nav-collapsed="true"] .sidenav { width: 56px; }
+html[data-nav-collapsed="true"] .sidenav__brand { justify-content: center; padding-left: 0; padding-right: 0; }
+html[data-nav-collapsed="true"] :is(.sidenav__name, .sidenav__label, .sidenav__group, .sidenav__who, .sidenav__theme-label, .sidenav__field .kbd) { display: none; }
+html[data-nav-collapsed="true"] .sidenav__search { position: relative; }
+html[data-nav-collapsed="true"] .sidenav__field { justify-content: center; padding: 0; }
+html[data-nav-collapsed="true"] .sidenav__field input { flex: 0 0 0; width: 0; padding: 0; }
+html[data-nav-collapsed="true"] .sidenav__field:focus-within { position: absolute; left: var(--space-4); z-index: 50; width: min(260px, 85vw); justify-content: flex-start; padding: 0 var(--space-5); box-shadow: var(--sh-pop); }
+html[data-nav-collapsed="true"] .sidenav__field:focus-within input { flex: 1; width: auto; }
+html[data-nav-collapsed="true"] :is(.sidenav__item, .sidenav__current, .sidenav__toggle) { justify-content: center; padding: 0; }
+html[data-nav-collapsed="true"] .sidenav__count { position: absolute; top: 2px; right: 4px; font-size: 9.5px; }
+html[data-nav-collapsed="true"] :is(.sidenav__theme, .sidenav__prefs, .sidenav__lang, .sidenav__lang .langpill) { flex-direction: column; }
+html[data-nav-collapsed="true"] :is(.sidenav__prefs, .sidenav__lang) { padding: 0; }
+html[data-nav-collapsed="true"] .sidenav__lang-label { display: none; }
+html[data-nav-collapsed="true"] .sidenav__user { justify-content: center; padding-left: 0; padding-right: 0; }
+html[data-nav-collapsed="true"] .sidenav__toggle svg { transform: rotate(180deg); }
+/* На планшете человек тоже может развернуть меню. Адаптивное значение — лишь начальное. */
+html[data-nav-collapsed="false"] .sidenav { width: 216px; }
+html[data-nav-collapsed="false"] .sidenav__brand { justify-content: flex-start; padding: 14px var(--space-7); }
+html[data-nav-collapsed="false"] :is(.sidenav__name, .sidenav__who) { display: flex; }
+html[data-nav-collapsed="false"] :is(.sidenav__label, .sidenav__theme-label, .sidenav__field .kbd) { display: inline; }
+html[data-nav-collapsed="false"] .sidenav__group { display: block; }
+html[data-nav-collapsed="false"] .sidenav__field { justify-content: flex-start; padding: 0 var(--space-5); }
+html[data-nav-collapsed="false"] .sidenav__field input { flex: 1; width: auto; }
+html[data-nav-collapsed="false"] :is(.sidenav__item, .sidenav__current) { justify-content: flex-start; padding: 0 var(--space-5); }
+html[data-nav-collapsed="false"] :is(.sidenav__prefs, .sidenav__theme, .sidenav__lang, .sidenav__lang .langpill) { flex-direction: row; }
+html[data-nav-collapsed="false"] .sidenav__user { justify-content: flex-start; padding: var(--space-5) var(--space-6); }
+@media (prefers-reduced-motion: reduce) { .sidenav { transition: none; } }

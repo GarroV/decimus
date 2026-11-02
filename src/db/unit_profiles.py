@@ -170,6 +170,7 @@ on conflict (country_code, name_normalized) do update set
     city = coalesce(excluded.city, unit_profiles.city),
     address = coalesce(excluded.address, unit_profiles.address),
     partner = coalesce(excluded.partner, unit_profiles.partner),
+    partner_email = coalesce(excluded.partner_email, unit_profiles.partner_email),
     restaurant_on = coalesce(excluded.restaurant_on, unit_profiles.restaurant_on),
     delivery_on = coalesce(excluded.delivery_on, unit_profiles.delivery_on),
     loaded_at = now()
@@ -197,3 +198,36 @@ def upsert(profile: Profile) -> None:
         raise RatingsError(
             f"Сведения о пиццерии не легли в справочник ({exc.__class__.__name__})"
         ) from exc
+
+
+def update_contacts(
+    country: str,
+    name_key: str,
+    *,
+    name: str,
+    dodo_id: str | None,
+    address: str,
+    partner: str,
+    partner_email: str,
+) -> None:
+    """Update contact fields only; imported identity, status and other fields stay intact."""
+    try:
+        with connection(check_environment().dsn) as conn, conn.transaction():
+            current = conn.execute(
+                "select dodo_id from unit_profiles where country_code = %s "
+                "and name_normalized = %s for update",
+                (country, name_key),
+            ).fetchone()
+            if current and current[0] and dodo_id and current[0] != dodo_id:
+                raise RatingsError("Profile identity changed; reload before editing")
+            conn.execute(
+                "insert into unit_profiles (country_code, name_normalized, name, dodo_id, "
+                "stage, status, address, partner, partner_email) "
+                "values (%s, %s, %s, %s, 'open', '', %s, %s, %s) "
+                "on conflict (country_code, name_normalized) do update set "
+                "address = excluded.address, partner = excluded.partner, "
+                "partner_email = excluded.partner_email, loaded_at = now()",
+                (country, name_key, name, dodo_id, address, partner, partner_email),
+            )
+    except psycopg.Error as exc:
+        raise RatingsError("Unit contact details were not changed") from exc

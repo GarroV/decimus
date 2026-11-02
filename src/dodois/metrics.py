@@ -56,6 +56,8 @@ SALES_UNITS_PER_CALL = 30
 KR_UNITS_PER_CALL = 100
 #: Строк на страницу заказов и предохранитель от бесконечной выдачи.
 PAGE_SIZE = 1000
+# Заказ содержит products: 1000 заказов могут превысить лимит ответа клиента.
+ACCOUNTING_PAGE_SIZE = 100
 MAX_PAGES = 500
 #: Пауза между запросами, чтобы не упереться в лимит Dodo IS.
 PAUSE_SEC = 0.25
@@ -133,7 +135,9 @@ def _paged(
 ) -> Response:
     """Все страницы выдачи одним ответом: 200 с общим списком строк; отказ по доступу — как есть."""
     collected: list[Any] = []
-    for page in range(MAX_PAGES):
+    # Меньшая страница заказов не уменьшает прежний предел числа строк.
+    max_pages = MAX_PAGES * max(1, PAGE_SIZE // page_size)
+    for page in range(max_pages):
         sleep(PAUSE_SEC)
         query = {**base, "skip": str(page * page_size), "take": str(page_size)}
         response = client.api_get(contour, path, query, token)
@@ -162,7 +166,14 @@ def _aggregators_month(
             "units": ",".join(batch),
             "orderSource": ORDER_SOURCE_AGGREGATOR,
         }
-        return _paged(contour, ACCOUNTING_PATH.format(cc=country.lower()), base, token, sleep)
+        return _paged(
+            contour,
+            ACCOUNTING_PATH.format(cc=country.lower()),
+            base,
+            token,
+            sleep,
+            ACCOUNTING_PAGE_SIZE,
+        )
 
     for batch, body in _each_batch(units, SALES_UNITS_PER_CALL, get):
         orders.extend(parse.aggregator_orders(body))
@@ -282,7 +293,9 @@ def collect_country(
         units = sorted(set(client.working_pizzerias(country)) | set(store.country_units(country)))
     except (DodoisError, DbError) as exc:
         return [Outcome(country, kind, False, 0, _error_text(exc)) for kind in kinds]
-    units = [u for u in units if parse.unit_id(u)]
+    # Public API UUIDs can use capitals/hyphens; all stored and parsed IDs are canonical.
+    # Retaining the raw aliases makes DELETE miss existing monthly rows on retry.
+    units = sorted({normal for unit in units if (normal := parse.unit_id(unit)) is not None})
     outcomes: list[Outcome] = []
     for kind in kinds:
         load_id = store.start_load(country, kind)

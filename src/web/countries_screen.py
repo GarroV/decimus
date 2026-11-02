@@ -3,8 +3,9 @@
 Слева столбцом страны охвата вошедшего — у каждой что настроено: партнёр (пространство),
 девелопер, языки отчёта и, у кого есть `contract.manage`, договор («есть» / «нет»); языки и
 договоры дочитываются по одному запросу на все страны, а не по запросу на страну. Справа
-в панели настройки выбранной (`?tab=countries&country=<код>`): четыре блока — партнёр,
-девелопер, языки отчёта и договор. Панель — макрос карточки страны (`country_settings.load`,
+в панели настройки выбранной (`?tab=countries&country=<код>`): девелопер, партнёр, языки отчёта,
+пиццерии с контактами и независимые адресаты страны; договор — дополнительный блок.
+Панель — макрос карточки страны (`country_settings.load`,
 `country/_settings.html`, режим `settings_only`): на экране страны та же карточка остаётся
 чтением со ссылкой сюда.
 
@@ -24,6 +25,7 @@ from flask import abort, render_template, request
 
 from src.db import country_contracts, country_report_langs
 from src.db.errors import DbError
+from src.db.reach import Reach
 from src.domain.errors import ConfigError
 from src.domain.permissions import role_may
 from src.domain.tenants import HQ_TENANT
@@ -33,6 +35,7 @@ from . import (
     auth,
     country_settings,
     country_summary,
+    country_units,
     guard,
     partner_spaces,
     ui_lang,
@@ -98,6 +101,14 @@ def _contract_countries() -> frozenset[str] | None:
         return None
 
 
+def _units(code: str, reach: Reach) -> UnitsData:
+    try:
+        return country_units.settings_rows(reach=reach, code=code)
+    except DbError:
+        log.warning("Country unit contacts could not be read")
+        return UnitsData(profiles_failed=True)
+
+
 def show(conf_lang: str) -> FlaskResponse | tuple[str, int]:
     """Страница вкладки: столбец стран и, если выбрана страна, её панель."""
     lang = ui_lang.request_lang(conf_lang)
@@ -129,7 +140,7 @@ def show(conf_lang: str) -> FlaskResponse | tuple[str, int]:
             picked,
             dev_of.get(picked, ""),
             request.args.get("saved", ""),
-            units=UnitsData(),
+            units=_units(picked, reach),
             can_edit=guard.may("space.manage"),
             show_email=auth.current_tenant() == HQ_TENANT,
             can_contract=guard.may("contract.manage"),

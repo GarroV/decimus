@@ -105,7 +105,7 @@
   {% if notice %}<div class="note note--ok"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
   {% if failure %}<div class="note note--error"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
 
-  {% if no_countries and section_key != 'clients' %}
+  {% if no_countries %}
     <div class="rt-empty">{{ t('ratings.empty.countries') }}</div>
   {% elif section_key in ('rs', 'rko') %}{% include "ratings/_s_source.html" %}
   {% elif section_key == 'inspections' %}{% include '_inspection_timeline.html' %}

@@ -324,3 +324,71 @@ def test_оценки_контроля_и_проверки_идут_без_пр�
     assert заменены == [А]  # пиццерия без доступа не стирается
     assert {r.kind for r in рейтинги} == {"rko", "rs"}
     assert [c.checkups for c in записано["проверки"]] == [1]  # из двух окон — одна проверка
+
+
+def test_accounting_uses_smaller_pages_for_product_payload(мир: Мир) -> None:
+    sizes = []
+
+    def reply(path, query):
+        sizes.append(int(query["take"]))
+        return _ок({"sales": [], "isEndOfListReached": True})
+
+    мир.ответ = reply
+    metrics._aggregators_month("BG", "intl", ДОСТУП, [А], date(2026, 10, 1), СЕГОДНЯ, _без_сна)
+    assert sizes == [100]
+    assert sizes[0] < metrics.PAGE_SIZE
+
+
+def test_public_uuid_aliases_are_canonicalized_before_requests_and_month_replacement(
+    мир: Мир, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from uuid import UUID
+
+    monkeypatch.setattr(
+        client, "working_pizzerias", lambda country: [str(UUID(А)).upper(), Б.upper()]
+    )
+    monkeypatch.setattr(store, "country_units", lambda country: [А, А.upper(), "invalid"])
+    мир.удачных[parse.KIND_KR] = True
+    мир.ответ = lambda path, query: Response(
+        200,
+        {},
+        {
+            "customerRatings": [
+                {
+                    "unitId": key,
+                    "dineInRateCount": 2,
+                    "avgDineInOrderRate": 4.5,
+                    "deliveryRateCount": 0,
+                }
+                for key in query["units"].split(",")
+            ]
+        },
+    )
+    outcomes = metrics.collect_country(_вход(), [parse.KIND_KR], today=СЕГОДНЯ, sleep=_без_сна)
+    assert outcomes[0].ok
+    assert all(query["units"].split(",") == sorted([А, Б]) for _, query in мир.запросы)
+    assert len(мир.оценки) == 2
+    for _, covered, rows in мир.оценки:
+        assert covered == sorted([А, Б])
+        assert {row.dodo_id for row in rows} == set(covered)
+
+
+@pytest.mark.parametrize("kind", parse.KINDS)
+def test_all_metric_kinds_receive_same_canonical_uuid_set(
+    мир: Мир, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    from uuid import UUID
+
+    monkeypatch.setattr(
+        client, "working_pizzerias", lambda country: [str(UUID(А)).upper(), Б.upper()]
+    )
+    monkeypatch.setattr(store, "country_units", lambda country: [А, А.upper()])
+    seen = []
+
+    def collect(kind, country, login, token, units, months, today, sleep):
+        seen.append(units)
+        return 0
+
+    monkeypatch.setattr(metrics, "_collect_kind", collect)
+    assert metrics.collect_country(_вход(), [kind], today=СЕГОДНЯ, sleep=_без_сна)[0].ok
+    assert seen == [sorted([А, Б])]

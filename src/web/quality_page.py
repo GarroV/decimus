@@ -359,6 +359,11 @@ def render(lang: str) -> str:
         }
         for c in sorted(now.values(), key=lambda c: country_title(c.code, lang).casefold())
     )
+    try:
+        latest_data = dodois_metrics.latest_available_month((code,) if code else scope)
+    except (DbError, RatingsError):
+        log.warning("Качество: последний месяц данных не прочитался")
+        latest_data = None
     options = tuple(
         {"href": link(code, m), "title": month_label(m, lang, today), "on": m == month}
         for m in months
@@ -393,6 +398,8 @@ def render(lang: str) -> str:
         kicker=t("quality.kicker.country" if code else "quality.kicker.network", lang),
         network_href=link(None),
         month_options=options,
+        latest_data_href=link(code, latest_data) if latest_data and latest_data < month else None,
+        latest_data_title=month_title(latest_data, lang) if latest_data else None,
         month_title=month_label(month, lang, today),
         prev_href=link(code, prev_month),
         next_href=link(code, next_month) if next_month <= today.replace(day=1) else None,

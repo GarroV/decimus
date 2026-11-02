@@ -1,3 +1,31 @@
-{#- Оценки клиентов (D658): то, что клиент ставит заказу в приложении; источник — только
-    Dodo IS (`customer-feedback`, #1303), пока не подключён — честная пустая плашка. -#}
-<div class="rt-sec"><div class="rt-empty">{{ t('ratings.clients.empty') }}</div></div>
+{% from "ratings/_macros.html" import stat with context %}
+{% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.2f'|format(x) }}{% endif %}{% endmacro %}
+{% if clients.failed %}<div class="note note--error"><div>{{ t('ratings.clients.failed') }}</div></div>{% endif %}
+{% if clients.incomplete %}<div class="note"><div>{{ t('ratings.clients.incomplete') }}</div></div>{% endif %}
+{% if clients.loaded %}<p class="rt-head__meta">{{ t('ratings.clients.loaded', at=clients.loaded.strftime(at_format)) }}</p>{% endif %}
+{% if clients.partial_period %}<p class="rt-head__meta">{{ t('ratings.clients.monthsOnly') }}</p>{% endif %}
+{% if not clients.units %}
+  <div class="rt-empty">{{ t('ratings.clients.noData') }}
+  {% if clients.latest %}<a href="{{ href(selection.group, selection.value, clients.latest.strftime('%Y-%m')) }}">{{ t('ratings.clients.latest', month=clients.latest.strftime('%Y-%m')) }}</a>{% endif %}
+  </div>
+{% else %}
+<div class="rt-section">
+  <p class="rt-head__meta">{{ t('ratings.clients.coverage', begin=clients.begin.strftime('%d.%m.%Y'), end=clients.end.strftime('%d.%m.%Y')) }}</p>
+  <p class="rt-head__meta">{{ t('ratings.clients.months') }} {% for month in clients.months %}{{ month.strftime('%Y-%m') }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+  <div class="pk-tiles" style="--pk-cols: 3">
+    {% call stat(t('ratings.clients.total'), t('ratings.clients.count', n=clients.total.total.count)) %}{{ num(clients.total.total.average) }}{% endcall %}
+    {% call stat(t('ratings.clients.dine'), t('ratings.clients.count', n=clients.total.dine.count)) %}{{ num(clients.total.dine.average) }}{% endcall %}
+    {% call stat(t('ratings.clients.delivery'), t('ratings.clients.count', n=clients.total.delivery.count)) %}{{ num(clients.total.delivery.average) }}{% endcall %}
+  </div>
+  <section class="pk-block">
+    <header class="pk-block__head"><h2 class="pk-block__title">{{ t('ratings.clients.units') }}</h2><span class="pk-block__hint">{{ t('ratings.clients.weighted') }}</span></header>
+    <div class="rt-scroll"><table class="rt-maps rt-src">
+      <thead><tr><th scope="col">{{ t('ratings.src.col.country') }}</th><th scope="col">{{ t('ratings.clients.unit') }}</th>
+      <th scope="col" class="num">{{ t('ratings.clients.total') }}</th><th scope="col" class="num">{{ t('ratings.clients.dine') }}</th><th scope="col" class="num">{{ t('ratings.clients.delivery') }}</th></tr></thead>
+      <tbody>{% for row in clients.units %}<tr><th scope="row">{{ country_name(row.country) }}</th><td>{{ row.name }}</td>
+      {% for score in (row.total,row.dine,row.delivery) %}<td class="num">{{ num(score.average) }} <small>({{ score.count }})</small></td>{% endfor %}
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+</div>
+{% endif %}

@@ -22,6 +22,11 @@
   // тега: тег уходит вместе со старым `<main>`, а скрипт остаётся в памяти.
   var loaded = {};
   function remember() { root.dataset.navPath = location.pathname; }
+  function storeRailScroll() {
+    var rail = document.querySelector(".sidenav__list");
+    try { if (rail) sessionStorage.setItem("decimus-nav-scroll", String(rail.scrollTop)); } catch (_) {}
+  }
+  window.addEventListener("pagehide", storeRailScroll);
 
   function sameAll(doc, selector) {
     var fresh = doc.querySelectorAll(selector);
@@ -89,7 +94,11 @@
     if (!fresh || !here) return false;
     var known = loadScripts(fresh);
     here.replaceWith(fresh);
+    var oldList = document.querySelector(".sidenav__list");
+    var menuScroll = oldList ? oldList.scrollTop : 0;
     sameAll(doc, ".sidenav__list");
+    var newList = document.querySelector(".sidenav__list");
+    if (newList) newList.scrollTop = menuScroll;
     sameAll(doc, ".tabbar");
     sameAll(doc, ".sidenav__search");
     sameAll(doc, "[data-bell]");
@@ -98,6 +107,7 @@
     if (push) history.pushState({ nav: true }, "", url);
     window.scrollTo(0, 0);
     remember();
+    document.dispatchEvent(new Event("decimus:navigation"));
     if (known) document.dispatchEvent(new Event("decimus:page"));
     return true;
   }
@@ -160,6 +170,11 @@
     document.querySelectorAll("main.shell__main script[src]").forEach(function (s) {
       loaded[s.getAttribute("src")] = true;
     });
+    try {
+      var rail = document.querySelector(".sidenav__list");
+      var scroll = Number(sessionStorage.getItem("decimus-nav-scroll"));
+      if (rail && Number.isFinite(scroll)) rail.scrollTop = scroll;
+    } catch (_) {}
     remember();
   });
 })();

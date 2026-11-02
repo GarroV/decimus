@@ -22,13 +22,17 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from flask import request
 
-from src.db import secret_crypto, service_keys
+from src.db import health_store, secret_crypto, service_keys
 from src.db.errors import DbError
+from src.domain import health
 from src.domain import service_keys as registry
+from src.health import checks
+from src.health import rows as health_rows
 from src.health.probes import PROBES, KeyRejected, KeyUnverified
 
 from .db_refusal import note_target_mismatch
@@ -62,6 +66,8 @@ class FieldRow:
     form_name: str
     status: service_keys.KeyStatus | None
     in_env: bool
+    env_masked: str | None = None
+    identifier: str | None = None
 
 
 @dataclass(frozen=True)
@@ -71,6 +77,17 @@ class ServiceRow:
     code: str
     fields: tuple[FieldRow, ...]
     state: str
+    health: health.Status | None = None
+
+    @property
+    def configured(self) -> bool:
+        return all(f.status or f.in_env for f in self.fields)
+
+    @property
+    def current_check_available(self) -> bool:
+        # App credentials require an OAuth device request, not a read-only probe.
+        # Country connection health is separate evidence, never proof of this pair.
+        return self.code != APP_SERVICE
 
 
 @dataclass(frozen=True)
@@ -87,17 +104,58 @@ def _state(fields: tuple[FieldRow, ...]) -> str:
     return sources.pop() if len(sources) == 1 else "partial"
 
 
-def _row(service: registry.Service, found: dict[str, service_keys.KeyStatus]) -> ServiceRow:
-    fields = tuple(
-        FieldRow(
-            f.code,
-            registry.form_name(f.code),
-            found.get(f.vault_name),
-            bool((os.environ.get(f.env_var) or "").strip()),
-        )
-        for f in service.fields
+def _field(
+    service: registry.Service, field: registry.KeyField, found: dict[str, service_keys.KeyStatus]
+) -> FieldRow:
+    raw_env = (os.environ.get(field.env_var) or "").strip()
+    status = found.get(field.vault_name)
+    identifier = None
+    if field.code == "client_id":
+        try:
+            identifier = service_keys.resolve(service.code, field.code)
+        except DbError:
+            identifier = None
+    return FieldRow(
+        field.code,
+        registry.form_name(field.code),
+        status,
+        bool(raw_env),
+        "••••" + raw_env[-registry.LAST_CHARS :] if raw_env else None,
+        identifier,
     )
-    return ServiceRow(service.code, fields, _state(fields))
+
+
+def _last_probe(
+    service: registry.Service,
+    fields: tuple[FieldRow, ...],
+    probes: dict[str, health.ProbeRow] | None,
+) -> health.Status | None:
+    if service.code == APP_SERVICE:
+        return health.Status(health.GREY, "keys.health.app_pair")
+    if probes is None:
+        return None
+    row = probes.get(service.code)
+    if not all(f.status or f.in_env for f in fields):
+        return health.Status(health.GREY, "health.reason.no_key", row.checked_at if row else None)
+    changed_at = max((f.status.set_at for f in fields if f.status), default=None)
+    if row is not None and changed_at is not None and changed_at > row.checked_at:
+        return health.Status(health.YELLOW, "keys.health.changed", row.checked_at)
+    connection = checks.connection(service.code)
+    every = checks.PROBE_EVERY if connection and connection.scheduled else None
+    return health_rows.probe_status(service.code, row, datetime.now(UTC), every=every)
+
+
+def _row(
+    service: registry.Service,
+    found: dict[str, service_keys.KeyStatus],
+    probes: dict[str, health.ProbeRow] | None,
+) -> ServiceRow:
+    fields = tuple(_field(service, f, found) for f in service.fields)
+    return ServiceRow(service.code, fields, _state(fields), _last_probe(service, fields, probes))
+
+
+def _stamp(moment: datetime) -> str:
+    return moment.astimezone(UTC).strftime("%d.%m.%Y %H:%M UTC")
 
 
 def view(flash: KeyFlash | None = None, *, app: bool = False) -> KeysView:
@@ -108,7 +166,15 @@ def view(flash: KeyFlash | None = None, *, app: bool = False) -> KeysView:
         note_target_mismatch(exc)
         _log.warning("service_keys: записи не прочитаны (%s)", type(exc).__name__)
         return KeysView((), False, flash)
-    shown = tuple(_row(s, found) for s in registry.SERVICES if (s.code == APP_SERVICE) is app)
+    try:
+        probes = health_store.probes()
+    except DbError as exc:
+        note_target_mismatch(exc)
+        _log.warning("service_keys: состояние подключения не прочитано (%s)", type(exc).__name__)
+        probes = None
+    shown = tuple(
+        _row(s, found, probes) for s in registry.SERVICES if (s.code == APP_SERVICE) is app
+    )
     return KeysView(shown, True, flash)
 
 
@@ -142,6 +208,8 @@ def _verify(service: registry.Service, values: dict[str, str]) -> KeyFlash | Non
 
 def check(service: registry.Service) -> tuple[KeyFlash, int]:
     """Проверить введённое у провайдера; ничего не записывать."""
+    if request.form.get("current_connection") == "1":
+        return check_current(service)
     values, refusal = _typed(service)
     if values is None:
         return KeyFlash(service.code, refusal or "keys.err.empty", False), 400
@@ -149,6 +217,45 @@ def check(service: registry.Service) -> tuple[KeyFlash, int]:
     if refused is not None:
         return refused, 422
     return KeyFlash(service.code, "keys.ok.checked", True), 200
+
+
+def check_current(service: registry.Service) -> tuple[KeyFlash, int]:
+    """Probe effective DB→ENV credentials; never save or return credential values."""
+    if service.code == APP_SERVICE:
+        return KeyFlash(service.code, "keys.err.current_unavailable", False), 409
+    try:
+        outcome = checks.probe_and_record(service.code)
+    except DbError as exc:
+        note_target_mismatch(exc)
+        _log.warning("service_keys: исход проверки не записан (%s)", type(exc).__name__)
+        return KeyFlash(service.code, "keys.err.health_db", False), 503
+    if outcome is None:
+        return KeyFlash(service.code, "keys.err.current_unavailable", False), 409
+    light, _reason = outcome
+    return KeyFlash(service.code, "keys.ok.current_checked", light == health.GREEN), (
+        200 if light == health.GREEN else 422
+    )
+
+
+def _require_recheck(service: registry.Service) -> KeyFlash | None:
+    """Do not keep a successful result for credentials about to be replaced/removed.
+
+    Keep the actual probe time; invalidation is not a new provider check.
+    If invalidation cannot be stored, refuse the key mutation before it happens.
+    """
+    if service.code == APP_SERVICE:
+        return None
+    try:
+        previous = health_store.probes().get(service.code)
+        if previous is not None:
+            health_store.record(
+                service.code, health.GREY, "health.reason.credentials_recheck", previous.checked_at
+            )
+    except DbError as exc:
+        note_target_mismatch(exc)
+        _log.warning("service_keys: прежний исход проверки не сброшен (%s)", type(exc).__name__)
+        return KeyFlash(service.code, "keys.err.health_db", False)
+    return None
 
 
 def save(service: registry.Service, by: str) -> tuple[KeyFlash, int, str]:
@@ -162,6 +269,9 @@ def save(service: registry.Service, by: str) -> tuple[KeyFlash, int, str]:
     refused = _verify(service, values)
     if refused is not None:
         return refused, 422, ""
+    stale = _require_recheck(service)
+    if stale is not None:
+        return stale, 503, ""
     by_name = {f.vault_name: values[f.code] for f in service.fields}
     try:
         saved = service_keys.save_many(by_name, provider=service.code, by=by)
@@ -179,6 +289,9 @@ def save(service: registry.Service, by: str) -> tuple[KeyFlash, int, str]:
 
 def remove(service: registry.Service) -> tuple[KeyFlash, int]:
     """Убрать записи сервиса из базы: дальше работает окружение."""
+    stale = _require_recheck(service)
+    if stale is not None:
+        return stale, 503
     try:
         removed = service_keys.clear_many(tuple(f.vault_name for f in service.fields))
     except DbError as exc:
@@ -209,7 +322,12 @@ def app_context(flash: KeyFlash | None = None) -> dict[str, Any]:
     """Переменные шаблона вкладки «Dodo IS»: ключи приложения и готовность пары."""
     shown = view(flash, app=True)
     row = shown.services[0] if shown.services else None
-    return {"keys": shown, "keys_max": registry.MAX_LENGTH, "app_keys_ready": is_ready(row)}
+    return {
+        "keys": shown,
+        "keys_max": registry.MAX_LENGTH,
+        "app_keys_ready": is_ready(row),
+        "keys_stamp": _stamp,
+    }
 
 
 def context(flash: KeyFlash | None = None) -> dict[str, Any]:
@@ -218,5 +336,6 @@ def context(flash: KeyFlash | None = None) -> dict[str, Any]:
     return {
         "keys": shown,
         "keys_max": registry.MAX_LENGTH,
+        "keys_stamp": _stamp,
         "keys_selected": selected(shown.services, flash),
     }

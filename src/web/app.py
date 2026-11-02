@@ -81,6 +81,7 @@ from . import (
     journal,
     letter_draft,
     mailings_screen,
+    navigation,
     notifications,
     oauth,
     osb,
@@ -330,6 +331,7 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # ссылка, ведущая в отказ, выглядит как поломка продукта, а
             # проверка внутри шаблона расходится с заслоном на экране молча.
             "sections": visible_sections(account),
+            "ratings_menu": navigation.ratings_menu(account, lang, request.script_root),
             "tabbar_max": TABBAR_MAX,
             # Текущий раздел — по началу адреса, а не по точному совпадению:
             # карточка проверки `/inspections/<id>` живёт в «Проверках», и

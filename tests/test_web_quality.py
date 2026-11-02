@@ -262,3 +262,21 @@ def test_quality_renders_on_demo_stand_without_dodois_data(
             response = client.get(url)
             assert response.status_code == 200, url
             assert "не прочитались" not in response.get_data(as_text=True), url
+
+
+def test_empty_later_month_links_to_saved_data_without_changing_default(
+    ук: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = []
+
+    def latest(countries):
+        calls.append(tuple(countries))
+        return MONTH
+
+    monkeypatch.setattr(dodois_metrics, "latest_available_month", latest)
+    response = ук.get("/quality?country=PL&month=2026-10&lang=ru")
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Последний месяц с сохранёнными данными Dodo IS" in html
+    assert "month=2026-09" in html
+    assert calls == [("PL",)]

@@ -7,6 +7,67 @@
 from __future__ import annotations
 
 COUNTRY_TEXTS: dict[str, dict[str, str]] = {
+    "country.contacts.mailing": {
+        "ru": "Адреса рассылки страны",
+        "en": "Country mailing recipients",
+    },
+    "country.contacts.mailing_hint": {
+        "ru": (
+            "Отдельный список «Кому» для новых предписаний. Он не меняет почты "
+            "партнёров, контакты договора или общую копию УК. Пустой заданный список "
+            "оставляет «Кому» пустым, без старых адресов."
+        ),
+        "en": (
+            "Separate To defaults for new prescriptions. Does not change partner "
+            "emails, contract contacts or global HQ CC. An empty configured list "
+            "leaves To blank without old addresses."
+        ),
+    },
+    "country.contacts.to": {
+        "ru": "Кому: почты через запятую или с новой строки",
+        "en": "To: emails separated by commas or new lines",
+    },
+    "country.contacts.use": {"ru": "Использовать заданный список", "en": "Use this list"},
+    "country.contacts.reset": {"ru": "Использовать прежние адреса", "en": "Use legacy defaults"},
+    "country.contacts.empty": {"ru": "Заданный список пуст", "en": "The configured list is empty"},
+    "country.contacts.custom": {
+        "ru": "Используется заданный список, в том числе если он пуст.",
+        "en": "Using the configured list, including when empty.",
+    },
+    "country.contacts.legacy": {
+        "ru": (
+            "Используются прежние адреса: контакты договора, иначе адресаты последнего предписания."
+        ),
+        "en": (
+            "Using legacy defaults: contract contacts, otherwise the last prescription recipients."
+        ),
+    },
+    "country.contacts.units": {
+        "ru": "Пиццерии: адреса и контакты партнёров",
+        "en": "Pizzerias: addresses and partner contacts",
+    },
+    "country.contacts.partner_email": {
+        "ru": "Почта партнёра пиццерии",
+        "en": "Pizzeria partner email",
+    },
+    "country.contacts.identity_hint": {
+        "ru": (
+            "Правятся только адрес, партнёр и его почта. Название, код Dodo и "
+            "остальные сведения сохраняются."
+        ),
+        "en": (
+            "Only address, partner and email change. Name, Dodo ID and all other "
+            "details stay unchanged."
+        ),
+    },
+    "country.contacts.contract_extra": {
+        "ru": "Дополнительно: договор",
+        "en": "Additional: contract",
+    },
+    "country.contacts.invalid": {
+        "ru": "Проверьте адрес и почты. Изменения не сохранены.",
+        "en": "Check the address and emails. Changes were not saved.",
+    },
     "country.search": {"ru": "Поиск страны или пиццерии", "en": "Search country or pizzeria"},
     "country.rail.average": {"ru": "средняя {avg}", "en": "average {avg}"},
     "country.rail.no_inspections": {

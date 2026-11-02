@@ -15,6 +15,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import войти, подменить_двери, собрать
 
+from src.db import customer_ratings
 from src.db.ratings_read import CountryRow
 from src.ratings import compare as rcompare
 from src.ratings import report
@@ -67,6 +68,9 @@ def подготовить(
     monkeypatch: pytest.MonkeyPatch, данные: report.Summary | None = None
 ) -> dict[str, list[Any]]:
     """Подменить чтение базы; вернуть журнал вызовов (`build`, `compare`, `agg`, `maps`)."""
+    monkeypatch.setattr(customer_ratings, "monthly", lambda *_args: [])
+    monkeypatch.setattr(customer_ratings, "loads", lambda *_args: [])
+    monkeypatch.setattr(customer_ratings, "latest_month", lambda *_args: None)
     итог = данные or сводка()
     вызовы: dict[str, list[Any]] = {"build": [], "compare": [], "agg": [], "maps": []}
     страна = CountryRow("RS", "Сербия", "Serbia", None, True, "CEE")

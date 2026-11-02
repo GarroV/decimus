@@ -16,10 +16,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from typing import cast
 
 import psycopg
 
 from src.domain import letter_template as lt
+from src.domain import mailing_content
 
 from .config import check_environment, load_retraction_settings
 from .errors import MailingTemplateError, MailingTemplateInputError
@@ -42,15 +44,25 @@ class Version:
     body: str | None
     saved_by: str
     saved_at: datetime
+    subject: str | None = None
 
 
 def _slot(kind: str, slot: str, lang: str) -> None:
-    if kind != KIND_INSPECTION or slot not in lt.SLOTS or lang not in lt.LANGS:
+    allowed = slot == "message" and kind in mailing_content.KINDS
+    if not allowed and (kind != KIND_INSPECTION or slot not in lt.SLOTS):
+        raise MailingTemplateInputError("Такого шаблона нет")
+    if lang not in lt.LANGS:
         raise MailingTemplateInputError("Такого шаблона нет")
 
 
 def _row(r: tuple[object, ...]) -> Version:
-    return Version(int(str(r[0])), None if r[1] is None else str(r[1]), str(r[2]), r[3])  # type: ignore[arg-type]
+    return Version(
+        int(str(r[0])),
+        None if r[1] is None else str(r[1]),
+        str(r[2]),
+        cast(datetime, r[3]),
+        None if len(r) < 5 or r[4] is None else str(r[4]),
+    )
 
 
 def current(kind: str = KIND_INSPECTION) -> dict[tuple[str, str], Version]:
@@ -61,7 +73,8 @@ def current(kind: str = KIND_INSPECTION) -> dict[tuple[str, str], Version]:
     try:
         with connection(check_environment().dsn) as conn:
             rows = conn.execute(
-                "select distinct on (slot, lang) slot, lang, version, body, saved_by, saved_at "
+                "select distinct on (slot, lang) slot, lang, version, body, saved_by, "
+                "saved_at, subject "
                 "from mailing_templates where kind = %s "
                 "order by slot, lang, version desc",
                 (kind,),
@@ -81,7 +94,7 @@ def bodies(kind: str = KIND_INSPECTION) -> dict[str, dict[str, str]]:
     """
     итог: dict[str, dict[str, str]] = {}
     for (slot, lang), v in current(kind).items():
-        if v.body is not None:
+        if slot in lt.SLOTS and v.body is not None:
             итог.setdefault(lang, {})[slot] = v.body
     return итог
 
@@ -94,7 +107,7 @@ def history(
     try:
         with connection(check_environment().dsn) as conn:
             rows = conn.execute(
-                "select version, body, saved_by, saved_at from mailing_templates "
+                "select version, body, saved_by, saved_at, subject from mailing_templates "
                 "where kind = %s and slot = %s and lang = %s order by version desc limit %s",
                 (kind, slot, lang, limit),
             ).fetchall()
@@ -105,7 +118,15 @@ def history(
     return tuple(_row(r) for r in rows)
 
 
-def save(slot: str, lang: str, body: str | None, *, actor: str, kind: str = KIND_INSPECTION) -> int:
+def save(
+    slot: str,
+    lang: str,
+    body: str | None,
+    *,
+    actor: str,
+    kind: str = KIND_INSPECTION,
+    subject: str | None = None,
+) -> int:
     """Сохранить слот новой версией; `body=None` — вернуть встроенный текст. Отдаёт номер версии.
 
     Текст проверяется до базы: пустой, длинный, с неизвестной подстановкой — отказ с причиной.
@@ -118,17 +139,31 @@ def save(slot: str, lang: str, body: str | None, *, actor: str, kind: str = KIND
         raise MailingTemplateInputError("Не назван, кто правит шаблон: запись подписывается")
     if body is not None:
         body = body.replace("\r\n", "\n").strip("\n")
-        why = lt.problem(body)
+        if slot == "message":
+            try:
+                mailing_content.check(kind, subject or "", body)
+            except ValueError as exc:
+                raise MailingTemplateInputError(str(exc)) from exc
+        why = lt.problem(body) if slot != "message" else ""
         if why:
             raise MailingTemplateInputError(why)
     try:
         with psycopg.connect(load_retraction_settings().dsn) as conn:
             row = conn.execute(
-                "insert into mailing_templates (kind, slot, lang, version, body, saved_by) "
-                "select %(k)s, %(s)s, %(l)s, coalesce(max(version), 0) + 1, %(b)s, %(w)s "
+                "insert into mailing_templates (kind, slot, lang, version, body, "
+                "saved_by, subject) "
+                "select %(k)s, %(s)s, %(l)s, coalesce(max(version), 0) + 1, %(b)s, "
+                "%(w)s, %(subject)s "
                 "from mailing_templates where kind = %(k)s and slot = %(s)s and lang = %(l)s "
                 "returning version",
-                {"k": kind, "s": slot, "l": lang, "b": body, "w": who},
+                {
+                    "k": kind,
+                    "s": slot,
+                    "l": lang,
+                    "b": body,
+                    "w": who,
+                    "subject": subject if body is not None else None,
+                },
             ).fetchone()
     except psycopg.errors.UniqueViolation as exc:
         raise MailingTemplateError("Шаблон правили одновременно: повторите сохранение") from exc

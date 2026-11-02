@@ -214,3 +214,108 @@ def test_рс_уходит_в_месяц_большинства_дней_а_рк
         ("rs", date(2026, 9, 14), Decimal("88.00")),
     ]
     assert август == [("rko", date(2026, 8, 31))]
+
+
+def test_retry_boundary_periods_before_requested_range_is_idempotent(пиццерии: str) -> None:
+    start, stop = date(2026, 10, 1), date(2026, 11, 2)
+    boundary = date(2026, 9, 14)
+    for score in (Decimal(80), Decimal(90)):
+        store.replace_rating_periods(
+            start, stop, [А], [RatingPeriod(А, "rs", boundary, date(2026, 10, 4), score, None)]
+        )
+        store.replace_checkup_periods(
+            start,
+            stop,
+            [А],
+            [CheckupPeriod(А, "rs", boundary, date(2026, 10, 4), 2, {"Completed": 2})],
+        )
+    rows = read.unit_rating_periods("BG", СЕНТЯБРЬ)
+    assert len(rows) == 1
+    assert rows[0].rate == Decimal(90)
+    assert rows[0].checkups == 2
+
+
+def test_partial_access_does_not_write_rows_of_uncovered_units(пиццерии: str) -> None:
+    start, stop = date(2026, 10, 1), date(2026, 11, 2)
+    rows = [
+        RatingPeriod(А, "rs", start, date(2026, 10, 14), Decimal(80), None),
+        RatingPeriod(Б, "rs", start, date(2026, 10, 14), Decimal(40), None),
+    ]
+    assert store.replace_rating_periods(start, stop, [А], rows) == 1
+    assert {r.dodo_id for r in read.unit_rating_periods("BG", ОКТЯБРЬ)} == {А}
+
+
+def test_customer_section_reads_only_selected_months_countries_and_kr_health(пиццерии: str) -> None:
+    from src.db import customer_ratings
+
+    store.replace_kr(
+        СЕНТЯБРЬ, [А, В], [KrRow(А, Decimal(5), 1, None, 0), KrRow(В, Decimal(1), 99, None, 0)]
+    )
+    store.replace_kr(ОКТЯБРЬ, [А], [KrRow(А, Decimal(1), 9, None, 0)])
+    rows = customer_ratings.monthly(("BG",), СЕНТЯБРЬ, ОКТЯБРЬ)
+    assert [(r.country, r.unit, r.month, r.dine_count) for r in rows] == [
+        ("BG", А, СЕНТЯБРЬ, 1),
+        ("BG", А, ОКТЯБРЬ, 9),
+    ]
+    assert customer_ratings.latest_month(("BG",)) == ОКТЯБРЬ
+    assert read.latest_available_month(("RS",)) == СЕНТЯБРЬ
+    store.finish_load(store.start_load("BG", "kr"), ok=True, rows=1)
+    store.finish_load(store.start_load("BG", "ratings"), ok=False, error="synthetic")
+    assert not customer_ratings.loads(("BG",))[0].failed
+    store.finish_load(store.start_load("BG", "kr"), ok=False, error="synthetic")
+    assert customer_ratings.loads(("BG",))[0].failed
+    assert customer_ratings.loads(("BG",))[0].last_ok is not None
+
+
+def test_latest_month_uses_rating_month_for_cross_month_rs(пиццерии: str) -> None:
+    store.replace_rating_periods(
+        date(2026, 8, 1),
+        date(2026, 9, 30),
+        [А],
+        [RatingPeriod(А, "rs", date(2026, 8, 31), date(2026, 9, 13), Decimal(80), None)],
+    )
+    assert read.latest_available_month(("BG",)) == СЕНТЯБРЬ
+    assert read.months_with_data("BG") == [СЕНТЯБРЬ]
+
+
+def test_official_registry_fallback_keeps_primary_identity_and_country_scope(пиццерии: str) -> None:
+    from src.db import customer_ratings
+
+    new = "d" * 32
+    with psycopg.connect(пиццерии) as conn:
+        # A contradictory public row must not move the primary BG identity into RS.
+        for ident, code, name in (
+            (А, "RS", "Public conflicting name"),
+            (new, "RS", "Official new unit"),
+        ):
+            conn.execute(
+                "insert into agg.units(dodo_id,country_code,name,lat,lng,working,last_seen) "
+                "values(%s,%s,%s,0,0,true,current_date)",
+                (ident, code, name),
+            )
+    store.replace_kr(
+        СЕНТЯБРЬ, [А, new], [KrRow(А, Decimal(4), 2, None, 0), KrRow(new, Decimal(5), 3, None, 0)]
+    )
+    store.replace_sales(
+        СЕНТЯБРЬ, [new], [SalesRow(new, "MobileApp", "Delivery", 1, Decimal(10), None)]
+    )
+    store.replace_aggregators(СЕНТЯБРЬ, [new], [AggregatorMonth(new, "Wolt", 1, None)])
+    store.replace_rating_periods(
+        СЕНТЯБРЬ,
+        date(2026, 9, 30),
+        [new],
+        [RatingPeriod(new, "rs", СЕНТЯБРЬ, date(2026, 9, 14), Decimal(90), None)],
+    )
+    assert [r.dodo_id for r in read.unit_kr("RS", СЕНТЯБРЬ)] == [new]
+    assert [r.dodo_id for r in read.unit_kr("BG", СЕНТЯБРЬ)] == [А]
+    assert [r.dodo_id for r in read.unit_sales("RS", СЕНТЯБРЬ)] == [new]
+    assert [r.dodo_id for r in read.unit_aggregator_orders("RS", СЕНТЯБРЬ)] == [new]
+    assert [r.dodo_id for r in read.unit_rating_periods("RS", СЕНТЯБРЬ)] == [new]
+    assert read.latest_available_month(("RS",)) == СЕНТЯБРЬ
+    assert customer_ratings.latest_month(("RS",)) == СЕНТЯБРЬ
+    rows = customer_ratings.monthly(("RS",), СЕНТЯБРЬ, ОКТЯБРЬ)
+    assert [(r.unit, r.name, r.country) for r in rows] == [(new, "Official new unit", "RS")]
+    all_rows = customer_ratings.monthly(("BG", "RS"), СЕНТЯБРЬ, ОКТЯБРЬ)
+    assert len(all_rows) == 2
+    assert next(r.name for r in all_rows if r.unit == А) == А[:3]
+    assert customer_ratings.monthly(("HR",), СЕНТЯБРЬ, ОКТЯБРЬ) == []

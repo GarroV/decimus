@@ -54,6 +54,10 @@
           {% if partners %}<datalist id="un-partners">{% for n in partners %}<option value="{{ n }}">{% endfor %}</datalist>{% endif %}
         </label>
         <label>
+          <span class="field-label">{{ t('country.contacts.partner_email') }}</span>
+          <input class="input" type="email" name="partner_email" value="{{ values.get('partner_email', '') }}" maxlength="200" autocomplete="off">
+        </label>
+        <label>
           <span class="field-label">{{ t('unitnew.stage') }}</span>
           <select class="input" name="stage">
             {% for st in stages %}<option value="{{ st }}"{% if values.get('stage', 'open') == st %} selected{% endif %}>{{ t('unit.stage.' ~ st) }}</option>{% endfor %}

@@ -283,3 +283,23 @@ def test_значения_не_светятся_в_отладочном_виде
         вид = repr(объект) + str(объект)
         for значение in (ДОСТУП, ПРОДЛЕНИЕ, КОД_УСТРОЙСТВА, КЛЮЧИ.client_secret):
             assert значение not in вид
+
+
+def test_oversize_response_is_explicit_failure_not_unknown_json(monkeypatch):
+    from io import BytesIO
+
+    class Raw(BytesIO):
+        status = 200
+
+        def __init__(self, value):
+            super().__init__(value)
+            self.headers = {"Content-Type": "application/json"}
+
+    class Opener:
+        def open(self, *args, **kwargs):
+            return Raw(b'{"sales":[' + b"x" * 64)
+
+    monkeypatch.setattr(client, "RESPONSE_LIMIT_BYTES", 32)
+    monkeypatch.setattr(client, "_opener", Opener())
+    with pytest.raises(DodoisError, match="response_too_large"):
+        client._open(urllib.request.Request("https://api.test/example"))

@@ -56,6 +56,7 @@ from . import (
     guard,
     inspection_timeline,
     ratings_calendar,
+    ratings_clients,
     ratings_freshness,
     ratings_nav,
     ratings_platforms,
@@ -313,6 +314,13 @@ def _section_data(
             "unit_maps": _unit_maps(frame.until),
             "no_countries": not summary.countries,
         }
+    if key == ratings_nav.CLIENTS:
+        return {
+            "no_countries": not codes,
+            "clients": ratings_clients.load(
+                codes, sel.period.begin, frame.until, today=date.today()
+            ),
+        }
     if key == ratings_nav.RISK:
         summary = report.build(sel, kinds=(), with_risk=True)
         agg_names = _agg_names(lang)
@@ -375,7 +383,7 @@ def _section_data(
             "open_country": (request.values.get("country") or "").strip().upper(),
             "link_platforms": LINK_PLACEHOLDERS,
         }
-    return {"no_countries": not codes}  # «Оценки клиентов»: источника ещё нет
+    return {"no_countries": not codes}
 
 
 def render_section(
@@ -405,6 +413,8 @@ def render_section(
     agg_failures = _agg_failures() if key == ratings_nav.AGG else ()
     data = _section_data(key, frame, agg_failures=agg_failures)
     agg_names = _agg_names(lang)
+    clients_view = data.get("clients")
+    clients_status = clients_view.status if isinstance(clients_view, ratings_clients.View) else None
     return render_template(
         "ratings/index.html",
         section_key=key,
@@ -416,10 +426,13 @@ def render_section(
             lang=lang,
             rows=rows,
             inspections=inspections,
+            clients_status=clients_status,
         ),
         section_title=t(f"ratings.sec.{key}", lang),
         section_line=ratings_freshness.section_line(rows, key, lang),
-        section_dot=ratings_freshness.section_status(rows, key),
+        section_dot=clients_status
+        if key == ratings_nav.CLIENTS
+        else ratings_freshness.section_status(rows, key),
         freshness=ratings_freshness.lines_of(rows, lang, agg_names),
         notice=notice,
         failure=failure,

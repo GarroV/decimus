@@ -13,18 +13,34 @@
     {% set own_flash = ks.flash and ks.flash.service == svc.code %}
     <div class="sconn__panel{{ ' sconn__panel--compact' if compact else '' }}" id="service-key-{{ svc.code }}">
       <h3 class="sconn__panel__title">{{ icon(key_icon[svc.code]) }}<span>{{ title or t('keys.service.' ~ svc.code) }}</span>
-        <small><span class="sdot{{ ' sdot--ok' if svc.state in ('db', 'env') else '' }}"></span>{{ t('keys.status.' ~ svc.state) }}</small></h3>
+        <small>{{ t('keys.configured' if svc.configured else 'keys.not_configured') }}</small></h3>
       {% if not compact %}<p class="ssec__note">{{ t('keys.purpose.' ~ svc.code) }}</p>{% endif %}
       {% if own_flash %}
         <div class="note {{ 'note--ok' if ks.flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ refusal_text(ks.flash.key, ks.flash.params) }}</div></div>
       {% endif %}
+      <dl class="sprops">
+        <div><dt>{{ t('keys.last_check') }}</dt><dd>
+          {% if svc.health is none %}{{ t('keys.health.unknown') }}{% else %}
+            <span class="shealth__dot shealth__dot--{{ svc.health.light }}" aria-hidden="true"></span>
+            {{ t(svc.health.reason, **svc.health.params) }}
+            {% if svc.health.checked_at %} · {{ keys_stamp(svc.health.checked_at) }}{% endif %}
+          {% endif %}
+        </dd></div>
+      </dl>
       <dl class="sprops skeys__facts{{ ' skeys__facts--inline' if compact else '' }}">
         {% for f in svc.fields %}
           <div><dt>{{ t('keys.field.' ~ f.code) }}</dt>
-            <dd class="mono">{% if f.status %}{{ f.status.masked }} · {{ t('connections.card.issued_by', by=f.status.set_by, date=day(f.status.set_at)) }}{% elif f.in_env %}{{ t('keys.status.env') }}{% else %}—{% endif %}</dd></div>
+            <dd class="mono">{% if f.identifier %}{{ f.identifier }}{% elif f.status %}{{ f.status.masked }} · {{ t('connections.card.issued_by', by=f.status.set_by, date=day(f.status.set_at)) }}{% elif f.env_masked %}{{ f.env_masked }}{% else %}—{% endif %}</dd></div>
         {% endfor %}
       </dl>
       <div class="skeys__actions">
+        {% if svc.current_check_available %}
+          <form method="post" action="{{ users_url }}/connections/keys/{{ svc.code }}/check?lang={{ lang }}">
+            <input type="hidden" name="current_connection" value="1">
+            {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
+            <button class="sbtn" type="submit">{{ t('keys.check_current') }}</button>
+          </form>
+        {% endif %}
         <details class="sfold"{% if own_flash and not ks.flash.ok %} open{% endif %}>
           <summary class="sbtn sbtn--primary">{{ t('keys.save') }}</summary>
           <form method="post" action="{{ users_url }}/connections/keys/{{ svc.code }}/save?lang={{ lang }}" class="sform skeys__form" autocomplete="off">

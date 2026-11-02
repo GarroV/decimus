@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -21,6 +22,7 @@ from src.domain.dodois_metrics import KINDS, rating_month
 from .config import check_environment
 from .errors import RatingsError
 from .pool import connection
+from .source_units import with_registry
 
 
 @dataclass(frozen=True)
@@ -78,11 +80,15 @@ def _rows(sql: str, params: tuple[Any, ...]) -> list[tuple[Any, ...]]:
         ) from exc
 
 
+def _unit_rows(sql: str, params: tuple[Any, ...]) -> list[tuple[Any, ...]]:
+    return _rows(with_registry(sql), params)
+
+
 def unit_sales(country_code: str, month: date) -> list[UnitSales]:
     """Продажи пиццерий страны за месяц по источнику заказа и каналу."""
-    rows = _rows(
+    rows = _unit_rows(
         "select s.dodo_id, s.order_source, s.sales_channel, s.orders, s.revenue, s.currency "
-        "from dodois.unit_sales_month s join ratings.units u on u.dodo_id = s.dodo_id "
+        "from dodois.unit_sales_month s join source_units u on u.dodo_id = s.dodo_id "
         "where u.country_code = %s and s.month = %s "
         "order by s.dodo_id, s.order_source, s.sales_channel",
         (country_code, month),
@@ -92,9 +98,9 @@ def unit_sales(country_code: str, month: date) -> list[UnitSales]:
 
 def unit_aggregator_orders(country_code: str, month: date) -> list[UnitAggregatorOrders]:
     """Заказы пиццерий страны из агрегаторов за месяц."""
-    rows = _rows(
+    rows = _unit_rows(
         "select a.dodo_id, a.aggregator, a.orders, a.revenue "
-        "from dodois.unit_aggregator_month a join ratings.units u on u.dodo_id = a.dodo_id "
+        "from dodois.unit_aggregator_month a join source_units u on u.dodo_id = a.dodo_id "
         "where u.country_code = %s and a.month = %s order by a.dodo_id, a.aggregator",
         (country_code, month),
     )
@@ -103,9 +109,9 @@ def unit_aggregator_orders(country_code: str, month: date) -> list[UnitAggregato
 
 def unit_kr(country_code: str, month: date) -> list[UnitKr]:
     """Оценки клиентов пиццерий страны за месяц (шкала 0–5, зал и доставка)."""
-    rows = _rows(
+    rows = _unit_rows(
         "select k.dodo_id, k.dine_in_avg, k.dine_in_count, k.delivery_avg, k.delivery_count "
-        "from dodois.unit_kr_month k join ratings.units u on u.dodo_id = k.dodo_id "
+        "from dodois.unit_kr_month k join source_units u on u.dodo_id = k.dodo_id "
         "where u.country_code = %s and k.month = %s order by k.dodo_id",
         (country_code, month),
     )
@@ -119,10 +125,10 @@ def unit_rating_periods(country_code: str, month: date) -> list[UnitRatingPeriod
     (`rating_month`: границы РС не календарные). `kind` — `rko` или `rs`; `checkups` — `None`,
     если счёта проверок за период нет.
     """
-    rows = _rows(
+    rows = _unit_rows(
         "select r.dodo_id, r.kind, r.period_from, r.period_to, r.rate, r.publish_status, "
         "c.checkups from dodois.unit_rating_period r "
-        "join ratings.units u on u.dodo_id = r.dodo_id "
+        "join source_units u on u.dodo_id = r.dodo_id "
         "left join dodois.unit_checkup_period c on c.dodo_id = r.dodo_id and c.kind = r.kind "
         "and c.period_from = r.period_from "
         "where u.country_code = %s "
@@ -136,21 +142,8 @@ def unit_rating_periods(country_code: str, month: date) -> list[UnitRatingPeriod
 
 
 def months_with_data(country_code: str) -> list[date]:
-    """Месяцы, за которые у страны есть хоть какие-то данные; свежие первыми."""
-    rows = _rows(
-        "select month from ("
-        " select s.month from dodois.unit_sales_month s"
-        "  join ratings.units u on u.dodo_id = s.dodo_id where u.country_code = %s"
-        " union select a.month from dodois.unit_aggregator_month a"
-        "  join ratings.units u on u.dodo_id = a.dodo_id where u.country_code = %s"
-        " union select k.month from dodois.unit_kr_month k"
-        "  join ratings.units u on u.dodo_id = k.dodo_id where u.country_code = %s"
-        " union select date_trunc('month', p.period_from)::date from dodois.unit_rating_period p"
-        "  join ratings.units u on u.dodo_id = p.dodo_id where u.country_code = %s"
-        ") m order by month desc",
-        (country_code, country_code, country_code, country_code),
-    )
-    return [r[0] for r in rows]
+    """Месяцы источника, с каноническим отнесением переходящих периодов РС."""
+    return _available_months((country_code,))
 
 
 def load_states() -> list[LoadState]:
@@ -179,3 +172,29 @@ def load_states() -> list[LoadState]:
         errors = [kinds[k][1] or "failed" for k in KINDS if k in kinds and not kinds[k][0]]
         states.append(LoadState(country, last_ok, errors[0] if errors else None))
     return states
+
+
+def _available_months(countries: Sequence[str]) -> list[date]:
+    """Один запрос для всех выбранных стран, без клиентских данных."""
+    if not countries:
+        return []
+    rows = _unit_rows(
+        "with periods as ("
+        "select dodo_id,NULL::text kind,month period_from,month period_to "
+        "from dodois.unit_sales_month union all "
+        "select dodo_id,NULL::text,month,month from dodois.unit_aggregator_month union all "
+        "select dodo_id,NULL::text,month,month from dodois.unit_kr_month union all "
+        "select dodo_id,kind,period_from,period_to from dodois.unit_rating_period) "
+        "select distinct m.kind,m.period_from,m.period_to from periods m "
+        "join source_units u on u.dodo_id=m.dodo_id where u.country_code=any(%s)",
+        (list(countries),),
+    )
+    return sorted(
+        {rating_month(kind, begin, end) if kind else begin for kind, begin, end in rows},
+        reverse=True,
+    )
+
+
+def latest_available_month(countries: Sequence[str]) -> date | None:
+    months = _available_months(countries)
+    return months[0] if months else None

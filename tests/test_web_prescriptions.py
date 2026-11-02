@@ -19,6 +19,7 @@ from flask.testing import FlaskClient
 from web_harness import войти, подменить_двери, собрать
 
 from src.db import country_contracts as contracts_db
+from src.db import country_mailing_recipients
 from src.db import prescriptions as rx
 from src.db import prescriptions_write as rxw
 from src.db.errors import CountryContractError
@@ -58,6 +59,7 @@ def предписание(*, status: str = "issued") -> rx.Prescription:
 @pytest.fixture
 def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]:
     """Двери блока `db` предписаний, подменённые и пишущие, кого звали."""
+    monkeypatch.setattr(country_mailing_recipients, "read", lambda _: None)
     журнал: dict[str, list[dict[str, Any]]] = {
         имя: []
         for имя in (

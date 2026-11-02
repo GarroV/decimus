@@ -17,11 +17,11 @@ import logging
 import os
 import urllib.error
 import urllib.request
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
-from src.db import service_keys
+from src.db import health_store, service_keys
 from src.db.config import load_storage_settings
 from src.db.errors import DbError
 from src.db.storage import S3PhotoStorage
@@ -111,10 +111,14 @@ def _key(service_code: str) -> Outcome:
     except DbError:
         logger.warning("Проверка подключений: ключ %s не прочитался", service_code, exc_info=True)
         return YELLOW, "health.reason.unverified"
+    return _key_values(service_code, values)
+
+
+def _key_values(service_code: str, values: Mapping[str, str | None]) -> Outcome:
     if not all(values.values()):
         return GREY, "health.reason.no_key"
     try:
-        PROBES[service.code]({k: v for k, v in values.items() if v})
+        PROBES[service_code]({k: v for k, v in values.items() if v})
     except KeyRejected:
         return RED, "health.reason.rejected"
     except KeyUnverified:
@@ -167,3 +171,20 @@ def run_probe(code: str) -> Outcome | None:
     """Пробовать подключение сейчас. `None` — здесь пробовать нечем."""
     runner = _RUNNERS.get(code)
     return None if runner is None else runner()
+
+
+def probe_and_record(code: str) -> Outcome | None:
+    """One guarded writer for web and background probes; network never holds SQL locks."""
+    key_service = registry.service(code)
+    if key_service is not None:
+        snapshot = service_keys.probe_snapshot(code)
+        # probe_snapshot has released its standalone SQL transaction before HTTP.
+        key_outcome = _key_values(code, snapshot.values)
+        applied = health_store.record_key_if_current(
+            code, snapshot.fingerprint, *key_outcome, datetime.now(UTC)
+        )
+        return key_outcome if applied else (GREY, "health.reason.credentials_recheck")
+    outcome = run_probe(code)
+    if outcome is not None:
+        health_store.record(code, *outcome, datetime.now(UTC))
+    return outcome

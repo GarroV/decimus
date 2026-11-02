@@ -760,3 +760,19 @@ timings_ms
 # InfoLine photo fields read by inspections/_card_body.html, outside Python AST.
 shown_photos
 missing_photos
+
+# Карточка страны, шаблоны и состояние подключений: поля читаются Jinja,
+# обработчики set_recipients/plan_letter вызываются маршрутизатором Flask.
+# Каждый путь покрыт целевыми веб-тестами; не шаблонная маска имён.
+mailing_recipients
+recipients_failed
+can_recipients
+can_units
+set_recipients
+plan_letter
+preview_subject
+preview_body
+incomplete
+partial_period
+env_masked
+current_check_available

@@ -27,7 +27,8 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.db.errors import DbError, StorageError
+from src.db import mailing_templates
+from src.db.errors import ConfigError, DbError, StorageError
 from src.db.letters import SavedLetter
 from src.db.models import InspectionDetail, InspectionRow
 from src.db.reports import ReportRef
@@ -72,6 +73,7 @@ def карточка() -> InspectionDetail:
 
 @pytest.fixture
 def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[FlaskClient, dict[str, list[Any]]]]:
+    monkeypatch.setattr(mailing_templates, "current", lambda kind="inspection": {})
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, email=ПОЧТА)
     следы: dict[str, list[Any]] = {
         "remember": [],
@@ -543,3 +545,30 @@ def test_у_ждущей_приёмки_письмо_не_сохраняется
     assert ответ.status_code == 303
     assert "saved=on_review" in ответ.headers["Location"]
     assert not следы["remember"]
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        DbError("template unavailable"),
+        ConfigError("configuration unavailable"),
+        ValueError("invalid rendered subject"),
+    ],
+)
+def test_inspection_template_failure_stays_handled_before_outbound(
+    клиент: Any, monkeypatch: pytest.MonkeyPatch, failure: Exception
+) -> None:
+    from src.web import mailing_documents
+
+    client, traces = клиент
+
+    def bad(*args: Any, **kwargs: Any) -> tuple[str, str]:
+        raise failure
+
+    monkeypatch.setattr(mailing_documents, "inspection_message", bad)
+    включить_почту(monkeypatch)
+    response = увести(client)
+    state = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(response.location).query))["state"]
+    failed = client.get(f"/auth/google/mail?state={state}&code=code")
+    assert failed.status_code == 303 and "failed" in failed.location
+    assert traces["draft"] == []

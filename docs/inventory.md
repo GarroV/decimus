@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 206 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 211 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -28,6 +28,7 @@
 | `/actions/prescription-files/<reply_id>` | GET | `order_file` | `src/web/prescriptions.py` |
 | `/actions/prescriptions` | GET | `rx_list` | `src/web/prescriptions.py` |
 | `/actions/prescriptions` | POST | `rx_create` | `src/web/prescriptions.py` |
+| `/actions/prescriptions/<ident>/document` | GET | `prescription_document` | `src/web/mailing_documents.py` |
 | `/actions/prescriptions/<prescription_id>` | GET | `rx_view` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/approve` | POST | `rx_approve` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/<prescription_id>/close` | POST | `rx_close` | `src/web/prescriptions.py` |
@@ -39,6 +40,7 @@
 | `/actions/prescriptions/<prescription_id>/send` | POST | `rx_send` | `src/web/prescriptions.py` |
 | `/actions/prescriptions/new` | GET | `rx_new` | `src/web/prescriptions.py` |
 | `/actions/request` | POST | `actions_new` | `src/web/action_plans.py` |
+| `/actions/requests/<ident>/letter` | GET | `plan_letter_preview` | `src/web/mailing_documents.py` |
 | `/actions/requests/<request_id>` | GET | `actions_request` | `src/web/action_plans.py` |
 | `/actions/requests/<request_id>/accept` | POST | `plan_accept` | `src/web/plan_rows.py` |
 | `/actions/requests/<request_id>/count-from` | POST | `plan_count_from` | `src/web/plan_rows.py` |
@@ -88,6 +90,7 @@
 | `/administration/dodois/invite/<int:invite_id>/revoke` | POST | `dodois_invite_revoke` | `src/web/dodois_screen.py` |
 | `/administration/mailings/<kind>/cc/add` | POST | `mailing_cc_add` | `src/web/mailings_screen.py` |
 | `/administration/mailings/<kind>/cc/remove` | POST | `mailing_cc_remove` | `src/web/mailings_screen.py` |
+| `/administration/mailings/<kind>/content` | POST | `mailing_content_save` | `src/web/mailings_content.py` |
 | `/administration/mailings/inspection/template` | POST | `mailing_template_save` | `src/web/mailings_screen.py` |
 | `/api/v1/aggregators/ratings` | GET | `swarm_api_aggregators` | `src/web/swarm_api.py` |
 | `/api/v1/inspections` | GET | `swarm_api_inspections` | `src/web/swarm_api.py` |
@@ -110,8 +113,10 @@
 | `/country/<code>/settings/contract` | POST | `country_save_contract` | `src/web/country_settings.py` |
 | `/country/<code>/settings/contract/<contract_id>/delete` | POST | `country_delete_contract` | `src/web/country_settings.py` |
 | `/country/<code>/settings/developer` | POST | `country_set_developer` | `src/web/country_settings.py` |
+| `/country/<code>/settings/recipients` | POST | `country_set_recipients` | `src/web/country_settings.py` |
 | `/country/<code>/settings/report-langs` | POST | `country_set_report_langs` | `src/web/country_settings.py` |
 | `/country/<code>/settings/space` | POST | `country_set_space` | `src/web/country_settings.py` |
+| `/country/<code>/unit-profile` | POST | `unit_profile_save` | `src/web/unit_profile_edit.py` |
 | `/country/<code>/units/new` | GET | `unit_new` | `src/web/unit_add.py` |
 | `/country/<code>/units/new` | POST | `unit_create` | `src/web/unit_add.py` |
 | `/country/filter` | POST | `country_filter` | `src/web/country_filter.py` |
@@ -589,6 +594,8 @@
 | `0106_inspection_timing.sql` | — |
 | `0107_inspection_info_photo_answers.sql` | — |
 | `0108_finding_split_history.sql` | — |
+| `0110_country_mailing_recipients.sql` | `country_mailing_recipients` |
+| `0111_mailing_content_templates.sql` | — |
 <!-- map:end -->
 
 ## Makefile
