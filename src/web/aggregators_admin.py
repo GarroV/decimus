@@ -111,6 +111,7 @@ def build(
             )
         tone = "grey"
         if platforms and rows:
+            # Привязана, но без оценки (мало отзывов) — норма (D700), не пробел.
             tone = "green"
             for p in platforms:
                 if p.load and p.load.outcome != "ok":
@@ -119,7 +120,7 @@ def build(
                 if (
                     (p.load is not None and bool(p.load.error))
                     or not p.expected
-                    or p.fresh != p.expected
+                    or p.fresh + p.unrated != p.expected
                     or p.unmatched
                     or p.load is None
                     or p.load.last_ok is None
