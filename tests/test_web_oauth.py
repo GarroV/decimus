@@ -123,6 +123,9 @@ def test_метаданные_называют_внешние_адреса(кл�
     assert данные["registration_endpoint"] == f"{АДМИНКА}{oauth.REGISTER_PATH}"
     assert данные["code_challenge_methods_supported"] == ["S256"]
     assert данные["token_endpoint_auth_methods_supported"] == ["none"]
+    # RFC 9207: клиент вправе требовать `iss` в ответе авторизации
+    assert данные["authorization_response_iss_parameter_supported"] is True
+    assert данные["scopes_supported"] == ["mcp"]
 
 
 # --- регистрация: только адреса Claude ---------------------------------------
@@ -135,9 +138,14 @@ def test_метаданные_называют_внешние_адреса(кл�
         "https://claude.com/api/mcp/auth_callback",
         "http://localhost:51234/callback",
         "http://127.0.0.1:8080/callback",
+        "https://chatgpt.com/connector_platform_oauth_redirect",
+        "https://chatgpt.com/connector/oauth/abc_123-X",
+        "http://[::1]:8080/callback",
+        "http://localhost:1455/oauth/callback",
+        "http://localhost:8080/oauth/callback/mcp/decimus",
     ],
 )
-def test_регистрация_адреса_claude(клиент: FlaskClient, адрес: str) -> None:
+def test_регистрация_адреса_нейросети(клиент: FlaskClient, адрес: str) -> None:
     ответ = _регистрация(клиент, адрес)
 
     assert ответ.status_code == 201
@@ -145,7 +153,15 @@ def test_регистрация_адреса_claude(клиент: FlaskClient, �
 
 
 @pytest.mark.parametrize(
-    "адрес", ["https://evil.com/cb", "http://localhost.evil.com/callback", "javascript:alert(1)"]
+    "адрес",
+    [
+        "https://evil.com/cb",
+        "http://localhost.evil.com/callback",
+        "javascript:alert(1)",
+        "https://chatgpt.com.evil.com/connector_platform_oauth_redirect",
+        "https://chatgpt.com/connector/oauth/a/b",
+        "http://localhost:8080/oauth/callback?x=1",
+    ],
 )
 def test_регистрация_чужого_адреса_отвергается(
     клиент: FlaskClient, память: ПамятьOAuth, адрес: str
@@ -302,7 +318,10 @@ def test_согласие_показывает_клиента_и_хост(кли
     страница = ответ.get_data(as_text=True)
     assert ответ.status_code == 200
     assert "Claude" in страница and "claude.ai" in страница
-    assert "https://claude.ai" in ответ.headers["Content-Security-Policy"]
+    политика = ответ.headers["Content-Security-Policy"]
+    # `form-action` проверяется и на редиректе формы: хост каждого вида возврата назван
+    for источник in ("https://claude.ai", "https://chatgpt.com", "http://[::1]:*"):
+        assert источник in политика
 
 
 @pytest.mark.parametrize(
@@ -347,7 +366,43 @@ def test_согласие_для_петли_предупреждает(клие�
         oauth.AUTHORIZE_PATH, query_string=_параметры(client_id, redirect_uri=петля)
     ).get_data(as_text=True)
 
-    assert "Claude Code" in страница
+    assert "Claude Code" in страница and "Codex" in страница and "Kimi Code" in страница
+
+
+def _страница_согласия(клиент: FlaskClient, адрес: str, имя: str) -> str:
+    client_id = клиент.post(
+        oauth.REGISTER_PATH, json={"client_name": имя, "redirect_uris": [адрес]}
+    ).get_json()["client_id"]
+    войти(клиент)
+    return клиент.get(
+        oauth.AUTHORIZE_PATH, query_string=_параметры(client_id, redirect_uri=адрес)
+    ).get_data(as_text=True)
+
+
+def test_согласие_называет_вид_по_адресу_а_не_по_имени(клиент: FlaskClient) -> None:
+    """Имя клиент пишет сам: «Claude» с петлёй — всё равно программа на этом компьютере."""
+    страница = _страница_согласия(клиент, "http://localhost:4000/callback", "Claude")
+
+    assert "программа на этом компьютере" in страница
+    assert "называет себя" in страница and "Claude" in страница
+
+
+def test_согласие_chatgpt_называет_chatgpt(клиент: FlaskClient) -> None:
+    страница = _страница_согласия(
+        клиент, "https://chatgpt.com/connector_platform_oauth_redirect", "что-угодно"
+    )
+
+    assert "ChatGPT просит доступ" in страница
+    assert "программа на этом компьютере" not in страница
+    assert "chatgpt.com" in страница
+
+
+def test_согласие_claude_без_предупреждения_про_компьютер(клиент: FlaskClient) -> None:
+    страница = _страница_согласия(клиент, ВОЗВРАТ, "ChatGPT")
+
+    assert "Claude просит доступ" in страница
+    assert "ChatGPT просит доступ" not in страница
+    assert "программа на этом компьютере" not in страница
 
 
 def test_незнакомый_клиент_отказ_без_редиректа(клиент: FlaskClient) -> None:
@@ -395,6 +450,7 @@ def test_кривой_запрос_возвращается_ошибкой(
     assert запрос["error"] == [ошибка]
     assert запрос["state"] == ["состояние-клиента"]
     assert "code" not in запрос
+    assert запрос["iss"] == [АДМИНКА]
 
 
 def test_разрешение_без_origin_отвергается(клиент: FlaskClient, память: ПамятьOAuth) -> None:
@@ -417,7 +473,9 @@ def test_отказ_человека_возвращает_access_denied(клие
         headers={"Origin": СВОЙ},
     )
 
-    assert _запрос_возврата(ответ)["error"] == ["access_denied"]
+    запрос = _запрос_возврата(ответ)
+    assert запрос["error"] == ["access_denied"]
+    assert запрос["iss"] == [АДМИНКА]
 
 
 # --- обмен кода --------------------------------------------------------------

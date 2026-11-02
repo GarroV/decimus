@@ -52,10 +52,13 @@ CONTENT_SECURITY_POLICY = "; ".join(
 )
 
 #: Согласие OAuth (D417): после «Разрешить» форма уходит редиректом на адрес
-#: возврата Claude, а `form-action` браузер проверяет и на редиректах формы.
-#: Поэтому на ответах согласия к своим источникам добавлены ровно адреса
-#: возврата Claude (`oauth_store.redirect_uri_allowed`), и только там.
-OAUTH_FORM_ACTION = "https://claude.ai https://claude.com http://localhost:* http://127.0.0.1:*"
+#: возврата нейросети, а `form-action` браузер проверяет и на редиректах формы.
+#: Поэтому на ответах согласия к своим источникам добавлены ровно хосты адресов
+#: возврата (`oauth_store.redirect_uri_allowed`: Claude, ChatGPT, петля), и только там.
+OAUTH_FORM_ACTION = (
+    "https://claude.ai https://claude.com https://chatgpt.com "
+    "http://localhost:* http://127.0.0.1:* http://[::1]:*"
+)
 
 OAUTH_CONTENT_SECURITY_POLICY = CONTENT_SECURITY_POLICY.replace(
     "form-action 'self' https://accounts.google.com https://*.google.com",
