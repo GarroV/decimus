@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 214 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 216 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -114,8 +114,6 @@
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
 | `/country/<code>/settings/contacts` | POST | `country_contact_save` | `src/web/country_contacts_actions.py` |
 | `/country/<code>/settings/contacts/<ident>/delete` | POST | `country_contact_delete` | `src/web/country_contacts_actions.py` |
-| `/country/<code>/settings/contract` | POST | `country_save_contract` | `src/web/country_settings.py` |
-| `/country/<code>/settings/contract/<contract_id>/delete` | POST | `country_delete_contract` | `src/web/country_settings.py` |
 | `/country/<code>/settings/developer` | POST | `country_set_developer` | `src/web/country_settings.py` |
 | `/country/<code>/settings/report-langs` | POST | `country_set_report_langs` | `src/web/country_settings.py` |
 | `/country/<code>/settings/space` | POST | `country_set_space` | `src/web/country_settings.py` |
@@ -165,6 +163,10 @@
 | `/quality` | GET | `quality` | `src/web/quality_page.py` |
 | `/ratings` | GET | `ratings` | `src/web/ratings.py` |
 | `/ratings/<any(rs,rko,clients,maps,agg,risk,compare,inspections):key>` | GET | `ratings_section` | `src/web/ratings.py` |
+| `/ratings/aggregators/absent` | POST | `aggregators_absent` | `src/web/aggregators_actions.py` |
+| `/ratings/aggregators/pin` | POST | `aggregators_pin` | `src/web/aggregators_actions.py` |
+| `/ratings/aggregators/present` | POST | `aggregators_present` | `src/web/aggregators_actions.py` |
+| `/ratings/aggregators/unpin` | POST | `aggregators_unpin` | `src/web/aggregators_actions.py` |
 | `/ratings/aggregators/update` | POST | `ratings_agg_update` | `src/web/ratings.py` |
 | `/ratings/countries` | POST | `ratings_developer` | `src/web/ratings.py` |
 | `/ratings/coverage` | GET | `ratings_coverage` | `src/web/ratings.py` |
@@ -606,6 +608,8 @@
 | `0114_service_key_health_lock.sql` | — |
 | `0115_prescription_findings.sql` | `prescription_findings` |
 | `0116_drop_country_mailing_recipients.sql` | — |
+| `0117_drop_country_contracts.sql` | — |
+| `0118_agg_unit_absent_point_links.sql` | `agg.unit_absent`, `agg.point_links` |
 <!-- map:end -->
 
 ## Makefile

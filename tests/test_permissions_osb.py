@@ -41,15 +41,13 @@ def test_страницу_осб_видят_осб_админ_и_главный_
 def test_осб_не_пишет_в_проверки_и_вообще_ничего_кроме_предписаний() -> None:
     пишущие = {a.code for a in ACTIONS if a.writes}
     разрешено = {c for c in пишущие if _can("osb", c)}
-    # Плюс блок «Договор» карточки страны (D603) — и только он.
-    assert разрешено == {"prescription.request", "prescription.manage", "contract.manage"}
+    assert разрешено == {"prescription.request", "prescription.manage"}
 
 
 def test_осб_читает_как_гость() -> None:
     читает_гость = {a.code for a in ACTIONS if not a.writes and _can("guest", a.code)}
     читает_осб = {a.code for a in ACTIONS if not a.writes and _can("osb", a.code)}
-    # Вид «Администрирования» — вкладка «Страны» с договором (D640); других лишних видов нет.
-    assert читает_осб == читает_гость | {"view.osb", "view.administration"}
+    assert читает_осб == читает_гость | {"view.osb"}
 
 
 def test_партнёру_ничего_из_предписаний_ведения_не_открыто() -> None:
@@ -64,22 +62,8 @@ def test_роль_осб_бывает_только_в_ук() -> None:
     assert not perm.grants_of("osb", "GE")
 
 
-def test_договор_страны_правят_осб_админ_и_главный_админ() -> None:
-    assert _роли_с("contract.manage") == {"osb", "admin", "superadmin"}
-
-
-def test_договор_страны_партнёру_не_открыт_даже_админу_пространства() -> None:
-    for роль in ("admin", "auditor"):
-        assert not _can(роль, "contract.manage", tenant="GE"), роль
-
-
-def test_осб_правит_договор_но_не_остальную_карточку_страны() -> None:
-    # Девелопер и партнёр страны — `space.manage`; у ОСБ его нет и не появилось.
+def test_осб_не_правит_карточку_страны() -> None:
+    # Девелопер и партнёр страны — `space.manage`; у ОСБ его нет (договора страны нет, D702).
     assert not _can("osb", "space.manage")
     assert not _can("osb", "ratings.manage")
     assert _can("admin", "space.manage")
-
-
-def test_договор_страны_только_для_ук_и_пишущее() -> None:
-    действие = next(a for a in ACTIONS if a.code == "contract.manage")
-    assert действие.hq_only and действие.writes

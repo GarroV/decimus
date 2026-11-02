@@ -544,11 +544,10 @@ def _one_country(
                 developer,
                 request.args.get("saved", ""),
                 units=units,
-                # Правка и договор — во вкладке «Администрирование → Страны» (D640);
+                # Правка — во вкладке «Администрирование → Страны» (D640);
                 # здесь только карточка для чтения, без ссылок на настройки.
                 can_edit=False,
                 show_email=auth.current_tenant() == HQ_TENANT,
-                can_contract=False,
                 inspections=data.inspections,
             )
             if settings_open

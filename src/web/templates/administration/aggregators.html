@@ -13,6 +13,7 @@
 <span class="shealth__dot shealth__dot--{{ row.tone }} sdtile__dot" aria-hidden="true"></span><b class="sdtile__code mono">{{ row.code }}</b><small class="sdtile__name">{{ name(row) }}</small><small class="sdtile__note">{{ t('aggadmin.tone.' ~ row.tone) }}</small></a></li>{% endfor %}</ul>{% endif %}</div>{% endblock %}
 {% block split_title %}{% if selected %}{{ name(selected) }} · {{ t('administration.tab.aggregators') }}{% endif %}{% endblock %}
 {% block split_detail %}{% if selected %}
+{% if result == 'failed' %}<div class="note note--error"><div>{{ t('aggadmin.action.failed') }}</div></div>{% endif %}
 <p>{{ t('aggadmin.working', n=selected.working) }}</p>
 {% if not selected.working %}<p class="ssec__note">{{ t('aggadmin.noUnits') }}</p>{% endif %}
 {% if not selected.platforms %}<p class="ssec__note">{{ t('aggadmin.noPlatforms') }}</p>{% endif %}
@@ -24,9 +25,13 @@
 <div><dt>{{ t('aggadmin.lastAttempt') }}</dt><dd>{{ stamp(p.load.at) if p.load else '—' }}</dd></div>
 <div><dt>{{ t('aggadmin.collection') }}</dt><dd>{% if not p.load %}{{ t('aggadmin.never') }}{% elif p.load.outcome == 'ok' and not p.load.error %}{{ t('aggadmin.ok') }}{% else %}{{ t('aggadmin.partial' if p.load.outcome == 'ok' else 'aggadmin.error') }}{% if p.error_code %}: {{ t('aggadmin.errorDetails') if p.error_code == 'collection_error' else p.error_code }}{% endif %}{% endif %}</dd></div>
 </dl><p class="ssec__note">{{ t('aggadmin.global') }}</p>
-{% set todo = p.gaps|rejectattr(1, 'equalto', 'unrated')|list %}{% set info = p.gaps|selectattr(1, 'equalto', 'unrated')|list %}
-{% if todo %}<h3>{{ t('aggadmin.gaps') }}</h3><ul>{% for unit, state, at in todo %}<li>{{ unit }} — {{ t('aggadmin.gap.' ~ state) }}{% if at %} ({{ at.strftime('%d.%m.%Y') }}){% endif %}</li>{% endfor %}</ul>{% endif %}
-{% if info %}<h3>{{ t('aggadmin.info') }}</h3><p class="ssec__note">{{ t('aggadmin.info.note') }}</p><ul>{% for unit, state, at in info %}<li>{{ unit }} — {{ t('aggadmin.gap.unrated') }}</li>{% endfor %}</ul>{% endif %}
+{% set todo = p.gaps|rejectattr('state', 'in', ('unrated', 'not_listed'))|list %}{% set info = p.gaps|selectattr('state', 'in', ('unrated', 'not_listed'))|list %}
+{% macro act(path, p, label, unit_id=none, point_key=none) %}<form method="post" action="{{ request.script_root }}/ratings/aggregators/{{ path }}" style="display:inline"><input type="hidden" name="aggregator" value="{{ p.key }}"><input type="hidden" name="country" value="{{ selected.code }}">{% if unit_id %}<input type="hidden" name="dodo_id" value="{{ unit_id }}">{% endif %}{% if point_key %}<input type="hidden" name="point_key" value="{{ point_key }}">{% endif %}<button type="submit" class="sbtn sbtn--ghost">{{ label }}</button></form>{% endmacro %}
+{% if todo %}<h3>{{ t('aggadmin.gaps') }}</h3><ul>{% for g in todo %}<li>{{ g.unit }} — {{ t('aggadmin.gap.' ~ g.state) }}{% if g.on_date %} ({{ g.on_date.strftime('%d.%m.%Y') }}){% endif %}
+{% for c in g.candidates %}<div class="ssec__note">{{ c.name or t('aggadmin.candidate.unnamed') }} · {{ t('aggadmin.candidate.at', m=c.metres) }}{% if c.url %} · <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.url }}</a>{% endif %} {{ act('pin', p, t('aggadmin.action.pin'), g.unit_id, c.point_key) }}</div>{% endfor %}
+{% if not p.searched and g.state == 'missing' %} {{ act('absent', p, t('aggadmin.action.absent'), g.unit_id) }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+{% if info %}<h3>{{ t('aggadmin.info') }}</h3><p class="ssec__note">{{ t('aggadmin.info.note') }} {{ t('aggadmin.info.notListed') }}</p><ul>{% for g in info %}<li>{{ g.unit }} — {{ t('aggadmin.gap.' ~ g.state) }}{% if g.marked %} ({{ t('aggadmin.info.marked') }}) {{ act('present', p, t('aggadmin.action.present'), g.unit_id) }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+{% if p.pinned %}<h3>{{ t('aggadmin.pinned') }}</h3><p class="ssec__note">{{ t('aggadmin.pinned.note') }}</p><ul>{% for pin in p.pinned %}<li>{{ pin.unit }} — <span class="mono">{{ pin.point_key }}</span> {{ act('unpin', p, t('aggadmin.action.unpin'), none, pin.point_key) }}</li>{% endfor %}</ul>{% endif %}
 </section>{% endfor %}
 <p><a class="sbtn sbtn--primary" href="{{ settings_link }}">{{ t('aggadmin.settings') }}</a></p>
 <a class="sbtn" href="{{ request.script_root }}/ratings/agg?group=country&amp;value={{ selected.code }}&amp;lang={{ lang }}">{{ t('aggadmin.openRatings') }}</a>

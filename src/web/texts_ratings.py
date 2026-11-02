@@ -451,7 +451,11 @@ _IMPORTS: dict[str, dict[str, str]] = {
         "ru": "Данные от {date}, новые не приходят",
         "en": "Data from {date}, no newer data is arriving",
     },
-    "ratings.coverage.missing": {"ru": "Нет на площадке", "en": "Not on the platform"},
+    "ratings.coverage.missing": {"ru": "Точка не привязана", "en": "Listing not linked"},
+    "ratings.coverage.notListed": {
+        "ru": "Нет на площадке: искали у координат пиццерии, не нашли",
+        "en": "Not on the platform: searched at the pizzeria's coordinates, nothing found",
+    },
     "ratings.coverage.unrated": {"ru": "Оценок пока нет", "en": "No ratings yet"},
     "ratings.coverage.empty": {
         "ru": "Реестр пиццерий пока пуст: он наполнится при ближайшем ежедневном сборе.",

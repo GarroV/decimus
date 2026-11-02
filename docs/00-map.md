@@ -49,7 +49,6 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Legacy-проверка | Историческая проверка, загруженная из старого отчёта (`origin = 'legacy'`): оценка переносится как есть и нигде не пересчитывается | `src/db/imports_legacy.py`, `src/mcp/imports.py`, `docs/14-history-import.md` |
 | План действий (экшн-план) | Ответ партнёра на запрос УК по проверке с D2/D3: файл с версиями, приём и возврат | `src/db/action_plans.py`, `src/web/action_plans.py`, `docs/12-web-admin.md` |
 | Предписание | Письмо УК партнёру с требованием: черновик, отправка через почту сотрудника, ответ партнёра, закрытие | `src/db/prescriptions.py`, `src/web/prescriptions.py` |
-| Договор страны, контакты по ДКК | Блок «Договор» в карточке страны: юрлицо партнёра, договор одной строкой (ДКК не моделируется, D603), почты, которые форма предписания подставляет в «Кому»; видит только УК, правят ОСБ, админ, главный админ (`contract.manage`) | `src/db/country_contracts.py`, `src/web/country_settings.py` |
 | РС, РКО | Рейтинг стандартов и рейтинг клиентского опыта: средние оценки по пиццериям из выгрузок Dodo IS; раздел «Рейтинги» | `docs/15-ratings.md`, `src/ratings/` |
 | Агрегатор | Площадка доставки с оценками пиццерий (Wolt, Glovo, Bolt Food, Yemeksepeti и др.); оценки собираются раз в сутки | `docs/17-aggregators.md`, `src/ratings/aggregators/` |
 | Качество, здоровье сети | Раздел «Качество»: рабочая страница здоровья — РКО, РС, КР, карты, агрегаторы, доли заказов, выручка, наша проверка по странам и пиццериям за месяц, с движением к прошлому месяцу (D677) | `docs/21-quality.md`, `src/domain/quality.py`, `src/web/quality_page.py` |
@@ -450,7 +449,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_contracts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -458,7 +457,6 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
 | `src/db/country_contacts.py` | Country partner contacts and inspection mail recipients; HQ-only personal data |
-| `src/db/country_contracts.py` | Договор страны: юрлицо партнёра, договор одной строкой, контакты по ДКК (0088, D603) |
 | `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
 | `src/db/customer_ratings.py` | Месячные оценки клиентов и журнал их сбора для выбранного среза рейтингов |
 | `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
@@ -626,6 +624,8 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0114_service_key_health_lock.sql` | The real probe timestamp is preserved; admin cannot fabricate a fresh probe |
 | `0115_prescription_findings.sql` | Сборка предписания из проверки (шаг 3 спеки 2026-10-21-osb-prescriptions-design, D601, D602, D606): вид предписания и нарушения из проверки-основания |
 | `0116_drop_country_mailing_recipients.sql` | Особый список «Кому» страны (`0112`) снят: адресаты предписаний и экшн-планов берутся из общего списка рассылки страны (`country_contacts`, вид `mailing`), который… |
+| `0117_drop_country_contracts.sql` | Блок «Договор» карточки страны (`0088`, D603) снят: договоров страны в decimus нет, их здесь не контролируют (D702) |
+| `0118_agg_unit_absent_point_links.sql` | Ручные решения по охвату агрегаторов (D700): отметка «пиццерии нет на площадке» и закреплённая привязка точки к пиццерии (docs/17-aggregators.md) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -1086,7 +1086,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/methodology_leak.py` | Проверка: методика управляющей компании не цитируется в репозитории (#138, #854) |
 | `tools/oauth_smoke.py` | Сквозной прогон подключения Claude входом через сайт (D417) против живого стенда |
 | `tools/open_demo_notices.py` | Предписания открытого демо: страница «ОСБ» и «Compliance notices» стран — не пустые |
-| `tools/open_demo_people.py` | Люди и партнёры открытого демо: учётки с почтой и ролями, партнёры стран, договоры |
+| `tools/open_demo_people.py` | Люди и партнёры открытого демо: учётки с почтой и ролями, партнёры стран |
 | `tools/open_demo_ratings.py` | Рейтинги открытого демо (D524): РС и РКО пиццерий демо-сети — тем же импортёром, что у продукта |
 | `tools/open_demo_reviews.py` | Оценки площадок открытого демо: агрегаторы доставки и карты — теми же дверями, что у сборщиков |
 | `tools/open_demo_training.py` | Обучение открытого демо (D524): тем же загрузчиком, что у продукта, из выдуманного iSpring |

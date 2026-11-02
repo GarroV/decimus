@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 #: Причины, по которым у пиццерии нет точки или оценки на площадке.
 UNLINKED = "unlinked"
+CANDIDATE = "candidate"
 PAUSED = "paused"
 UNRATED = "unrated"
 STALE = "stale"
@@ -68,14 +69,27 @@ class AggView:
 
 
 def agg_countries() -> dict[str, frozenset[str]]:
-    """Где агрегатор ожидается: поисковый — в странах сборщика, известной точки
-    (Glovo, Chowdeck) — там, где у него есть точки; на паузе — только где точки
-    остались (D397)."""
-    expected = {m.KEY: frozenset(m.COUNTRIES) for m in collect.SEARCHERS}
-    for module in collect.KNOWN + collect.PAUSED:
+    """Где агрегатор ожидается: в странах, где у него есть хоть одна точка Додо
+    (D700). Поисковые площадки ищут везде, но ожидаются только там, где что-то
+    нашли: страна без точек (Wolt в Сербии) пробелом не считается, а появившаяся
+    точка подхватится следующим сбором. Площадка на паузе — только где точки
+    остались и она вообще работает (D397)."""
+    expected: dict[str, frozenset[str]] = {}
+    for module in collect.SEARCHERS + collect.KNOWN + collect.PAUSED:
         has = agg_store.point_countries(module.KEY)
-        expected[module.KEY] = has if module in collect.KNOWN else has & frozenset(module.COUNTRIES)
+        expected[module.KEY] = (
+            has & frozenset(module.COUNTRIES) if module in collect.PAUSED else has
+        )
     return expected
+
+
+def hints(units: Sequence[agg_store.UnitRow]) -> coverage.Hints:
+    """Поисковые площадки, отметки «нет на площадке» и кандидаты рядом (D700)."""
+    return coverage.Hints(
+        frozenset(m.KEY for m in collect.SEARCHERS),
+        agg_store.unit_absent(),
+        coverage.nearby(units, agg_store.open_points()),
+    )
 
 
 def _gaps(rows: Sequence[coverage.Row], platforms: Sequence[str]) -> tuple[Gap, ...]:
@@ -86,7 +100,8 @@ def _gaps(rows: Sequence[coverage.Row], platforms: Sequence[str]) -> tuple[Gap, 
         for key in platforms:
             cell = row.cells[key]
             if cell.state == coverage.MISSING:
-                reasons.append(Reason(key, PAUSED if key in paused else UNLINKED))
+                code = CANDIDATE if cell.candidates else PAUSED if key in paused else UNLINKED
+                reasons.append(Reason(key, code))
             elif cell.state == coverage.UNRATED:
                 reasons.append(Reason(key, UNRATED))
             elif cell.state == coverage.SCORE and cell.stale:
@@ -102,7 +117,7 @@ def _tile(key: str, rows: Sequence[coverage.Row], overall: ragg.GroupAggs) -> Ti
         key,
         overall.scores.get(key),
         sum(s in (coverage.SCORE, coverage.UNRATED) for s in states),
-        sum(s != coverage.ABSENT for s in states),
+        sum(s not in (coverage.ABSENT, coverage.NOT_LISTED) for s in states),
     )
 
 
@@ -110,7 +125,14 @@ def build_agg(codes: Sequence[str], *, until: date, today: date) -> AggView | No
     """Раздел «Агрегаторы» по странам выбранного среза; `None` — база не ответила."""
     try:
         units = agg_store.units(tuple(codes))
-        cov = coverage.build(units, (), agg_store.coverage(), agg_countries(), today)
+        cov = coverage.build(
+            units,
+            (),
+            agg_store.coverage(),
+            agg_countries(),
+            today,
+            hints=hints(units),
+        )
         groups = [(c, (c,)) for c in codes] + [("", tuple(codes))]
         _, found, later = ragg.for_groups(groups, until=until, today=today)
     except RatingsError:
