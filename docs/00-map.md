@@ -373,7 +373,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
+<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
@@ -389,6 +389,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/recipe_audit.py` | T203 (#170): можно ли снять прежний рецепт отпечатка на ЭТОЙ базе |
 | `src/db/reports.py` | T336 (#317): готовый отчёт проверки уезжает в хранилище |
 | `src/db/request_memo.py` | Память одного HTTP-запроса для чтений, которые страница просит из разных блоков |
+| `src/db/service_settings.py` | Manual service settings; no backlog processing or notifications on toggle |
 | `src/db/space.py` | Пространство, от имени которого идёт обращение к базе (аудит 12.10, F-037, F-005) |
 | `src/db/space_guard.py` | Пространство записи обязано быть заведено — опечатка в коде это отказ (#481) |
 | `src/db/stamp.py` | Видимый штамп на кадре проверки: когда, где, кто снял и откуда кадр (D619, D621, D625) |
@@ -601,6 +602,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0106_inspection_timing.sql` | Historical rows deliberately stay NULL; no inference or backfill |
 | `0107_inspection_info_photo_answers.sql` | Info and photo metadata are inserted in the same push transaction, so this invariant is checked at commit rather than before the photo INSERT exists |
 | `0108_finding_split_history.sql` | Existing rows and legacy remain NULL; no accepted inspection is rewritten |
+| `0109_service_settings.sql` | (нет описания) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -1156,3 +1158,9 @@ Telegram, ни HTTP, ни SQL.
 | Мини-апп обхода: экран, форма записи | Отдельный сервис `walk` (`src/web/walk_main.py`, свой образ — пересобирать вместе с `web`); экран — `src/web/static/walk.js`, форма — `walk-sheet.js`, «Ещё не смотрели» — `walk-unseen.js`, старт — `walk-app.js` + `src/web/walk_start.py`; запись — `walk_write.py`, поиск пункта — `walk_suggest.py`; тексты — `texts_walk.py`, `texts_app.py`; описание — `docs/13-walk-mini-app.md` |
 | Посадочная страница | `src/web/landing.py`, `templates/landing.html`, `static/decimus-landing.css`, `static/landing.js`; снимки — `make landing-shots`; `docs/12-web-admin.md`, раздел о посадочной |
 | Написать тест | Блоки без базы — `tests/test_<блок>_*.py` с общей оснасткой `tests/*_harness.py`; с базой — `tests/test_db_*.py` (`tests/db_harness.py`), на CI пропускаются; методика тестов — `tests/methodology/` |
+
+<!-- map:begin files src/settings_read.py -->
+| Файл | Что делает |
+|---|---|
+| `src/settings_read.py` | Read-only infrastructure adapter below domain; no product-layer imports |
+<!-- map:end -->

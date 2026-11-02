@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 206 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 207 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -89,6 +89,7 @@
 | `/administration/mailings/<kind>/cc/add` | POST | `mailing_cc_add` | `src/web/mailings_screen.py` |
 | `/administration/mailings/<kind>/cc/remove` | POST | `mailing_cc_remove` | `src/web/mailings_screen.py` |
 | `/administration/mailings/inspection/template` | POST | `mailing_template_save` | `src/web/mailings_screen.py` |
+| `/administration/plans/settings` | POST | `action_plan_setting` | `src/web/plan_archive.py` |
 | `/api/v1/aggregators/ratings` | GET | `swarm_api_aggregators` | `src/web/swarm_api.py` |
 | `/api/v1/inspections` | GET | `swarm_api_inspections` | `src/web/swarm_api.py` |
 | `/api/v1/inspections/<inspection_id>` | GET | `swarm_api_inspection` | `src/web/swarm_api.py` |
@@ -383,7 +384,7 @@
 | `DATABASE_APP_PASSWORD` | `src/db/migrate.py` | да |
 | `DATABASE_RETRACTION_PASSWORD` | `src/db/migrate.py` | да |
 | `DATABASE_RETRACTION_URL` | `src/db/config.py`, `tools/seed_web_demo.py` | да |
-| `DATABASE_URL` | `src/db/config.py`, `src/mcp/config.py` | да |
+| `DATABASE_URL` | `src/db/config.py`, `src/mcp/config.py`, `src/settings_read.py` | да |
 | `DB_BATCH_STATEMENT_TIMEOUT_S` | `src/db/timeouts.py` | да |
 | `DB_LOCK_TIMEOUT_S` | `src/db/timeouts.py` | да |
 | `DB_POOL_MAX` | `src/db/pool.py` | да |
@@ -590,6 +591,7 @@
 | `0106_inspection_timing.sql` | — |
 | `0107_inspection_info_photo_answers.sql` | — |
 | `0108_finding_split_history.sql` | — |
+| `0109_service_settings.sql` | `service_settings` |
 <!-- map:end -->
 
 ## Makefile

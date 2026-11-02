@@ -190,6 +190,8 @@ def install(app: Flask, conf: Settings) -> None:
     def people() -> FlaskResponse | tuple[str, int]:
         return users_page.render(users_page.Show(tab=TAB_PEOPLE))
 
+    plan_archive.install(app, conf.ui_lang)
+
     def spaces() -> FlaskResponse | tuple[str, int]:
         return users_page.render(users_page.Show(tab=TAB_SPACES))
 
