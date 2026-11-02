@@ -295,6 +295,51 @@ def test_callback_sends_current_pdf_in_gmail_mime(
     assert attachment.get_payload(decode=True) == PDF
 
 
+@pytest.mark.parametrize("prefix", ["Тема", "Subject"])
+def test_saved_subject_goes_only_into_gmail_header(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]],
+    monkeypatch: pytest.MonkeyPatch,
+    prefix: str,
+) -> None:
+    from src.web import google_mail
+
+    включить_почту(monkeypatch)
+    client, traces = клиент
+    raw = f"<b>{prefix}: Human-edited inspection result</b>\n\nHello!\n<b>87.0%</b>\nFull comment."
+    saved = SavedLetter(
+        id="l-saved", body=raw, lang="ru", saved_by="tester", created_at=datetime.now()
+    )
+    monkeypatch.setattr(data, "saved_letter", lambda _id, *, lang=None: saved)
+    messages: list[Any] = []
+
+    def create(token: str, **fields: Any) -> str:
+        encoded = google_mail.mime_message(**fields)
+        message = BytesParser(policy=email.policy.default).parsebytes(
+            base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
+        )
+        messages.append(message)
+        return "draft-test"
+
+    monkeypatch.setattr(letter_draft, "create_draft", create)
+    response = увести(client, raw)
+    state = urllib.parse.parse_qs(urllib.parse.urlparse(response.location).query)["state"][0]
+    result = client.get("/auth/google/mail", query_string={"state": state, "code": "code"})
+    assert "gmail=ok" in result.headers["Location"]
+    assert len(messages) == 1
+    message = messages[0]
+    assert str(message["Subject"]) == "Human-edited inspection result"
+    plain = message.get_body(preferencelist=("plain",)).get_content().strip()
+    rich = message.get_body(preferencelist=("html",)).get_content()
+    assert plain == "Hello!\n87.0%\nFull comment."
+    assert "Human-edited inspection result" not in rich
+    assert "<b>87.0%</b>" in rich
+    assert saved.body == raw
+    assert len(traces["remember"]) == 1
+    assert traces["remember"][0][1] == raw
+    (attachment,) = message.iter_attachments()
+    assert attachment.get_payload(decode=True) == PDF
+
+
 def test_черновик_в_чужой_аккаунт_google_не_ложится(
     клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
 ) -> None:

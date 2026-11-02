@@ -33,6 +33,7 @@ from werkzeug.wrappers import Response
 from src.db import mailing_cc
 from src.db.errors import DbError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.report.letter_markup import subject_and_body
 from src.report.letters import LetterError
 
 from . import auth, guard
@@ -360,16 +361,20 @@ def install(app: Flask, conf: Settings) -> None:
             return к_письму(inspection_id, lang=письмо_на, исход="pdf_failed")
 
         try:
-            create_draft(
-                токен,
-                to=detail.inspection.contact,
-                cc=_копия_ук(detail.inspection.tenant_code),
-                subject=draft_subject(
+            subject, body = subject_and_body(
+                записанное.body,
+                fallback=draft_subject(
                     city=detail.inspection.city,
                     date=str(detail.inspection.inspection_date),
                     lang=письмо_на,
                 ),
-                body=записанное.body,
+            )
+            create_draft(
+                токен,
+                to=detail.inspection.contact,
+                cc=_копия_ук(detail.inspection.tenant_code),
+                subject=subject,
+                body=body,
                 attachments=((data.report_name(detail.inspection), файл, "application/pdf"),),
             )
         except MailAccountMismatchError as сбой:
