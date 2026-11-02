@@ -16,6 +16,7 @@
       <div class="spanel__score">{{ rx_tag(p, today) }}{{ rx_replied(p) }}</div>
     </header>
 
+    <p><a class="sbtn" href="{{ url_for('prescription_document', ident=p.id, lang=lang) }}" target="_blank" rel="noopener">{{ t('mailings.content.document_open') }}</a></p>
     {% if gmail %}
       <div class="note {{ 'note--ok' if gmail == 'ok' else ('note--warn' if gmail in ('denied', 'unavailable', 'wrong_account') else 'note--error') }}" role="status"><div class="note__text">{{ t('rx.gmail.' ~ gmail) }}</div></div>
     {% endif %}

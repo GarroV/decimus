@@ -313,7 +313,9 @@ def collect_country(
         units = sorted(set(client.working_pizzerias(country)) | set(store.country_units(country)))
     except (DodoisError, DbError) as exc:
         return [Outcome(country, kind, False, 0, _error_text(exc)) for kind in kinds]
-    units = sorted({canonical for unit in units if (canonical := parse.unit_id(unit)) is not None})
+    # Public API UUIDs can use capitals/hyphens; all stored and parsed IDs are canonical.
+    # Retaining the raw aliases makes DELETE miss existing monthly rows on retry.
+    units = sorted({normal for unit in units if (normal := parse.unit_id(unit)) is not None})
     outcomes: list[Outcome] = []
     for kind in kinds:
         load_id = store.start_load(country, kind)

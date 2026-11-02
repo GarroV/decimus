@@ -31,7 +31,7 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response
 
 from src.db import country_contacts, mailing_cc
-from src.db.errors import DbError
+from src.db.errors import ConfigError, DbError
 from src.db.models import InspectionDetail
 from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT, canonical_tenant
@@ -370,6 +370,8 @@ def install(app: Flask, conf: Settings) -> None:
             return к_письму(inspection_id, lang=письмо_на, исход="pdf_failed")
 
         try:
+            from .mailing_documents import inspection_message
+
             subject, body = subject_and_body(
                 записанное.body,
                 fallback=draft_subject(
@@ -378,6 +380,7 @@ def install(app: Flask, conf: Settings) -> None:
                     lang=письмо_на,
                 ),
             )
+            subject, body = inspection_message(detail, письмо_на, subject, body)
             create_draft(
                 токен,
                 to=_inspection_to(detail, reach=auth.current_reach()),
@@ -386,8 +389,8 @@ def install(app: Flask, conf: Settings) -> None:
                 body=body,
                 attachments=((data.report_name(detail.inspection), файл, "application/pdf"),),
             )
-        except DbError:
-            logger.warning("Country recipients could not be loaded for inspection draft")
+        except (DbError, ConfigError, ValueError):
+            logger.warning("Country recipients or mail template could not be prepared")
             return к_письму(inspection_id, lang=письмо_на, исход="failed")
         except MailAccountMismatchError as сбой:
             logger.warning("черновик письма не создан: %s", сбой)

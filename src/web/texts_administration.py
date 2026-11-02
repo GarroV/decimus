@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from .texts_aggregators_admin import AGGREGATORS_ADMIN_TEXTS
+
 ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "plans.setting.title": {"ru": "Настройки экшн-планов", "en": "Action-plan settings"},
     "plans.setting.label": {"ru": "Электронные экшн-планы", "en": "Electronic action plans"},
@@ -285,3 +287,5 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
         "en": "Partners or developers could not be read: some cells may be empty.",
     },
 }
+
+ADMINISTRATION_TEXTS.update(AGGREGATORS_ADMIN_TEXTS)

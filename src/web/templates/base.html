@@ -74,6 +74,7 @@
     скриптом его не держим: политика источников (#489) такие не исполняет.
   #}
   <script data-shell src="{{ url_for('static', filename='theme.js') }}"></script>
+  <script data-shell src="{{ url_for('static', filename='nav-state.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='dodo-ds.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-domain.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-web.css') }}">
@@ -146,6 +147,7 @@
           Поиск ведёт в реестр проверок по названию пиццерии. Обычная форма:
           без скрипта работает так же, скрипт добавляет только ⌘K и Esc.
         #}
+        <button class="sidenav__toggle" type="button" data-nav-collapse data-collapse-label="{{ t('nav.collapse') }}" data-expand-label="{{ t('nav.expand') }}" aria-expanded="true" aria-label="{{ t('nav.collapse') }}">{{ icon('cleft') }}<span class="sidenav__label">{{ t('nav.collapse') }}</span></button>
         <form class="sidenav__search" method="get" action="{{ url('/inspections') }}" role="search">
           <input type="hidden" name="lang" value="{{ lang }}">
           {# Пиццерию ищут по всей истории, а не в текущем месяце — реестр без
@@ -165,7 +167,9 @@
             {% set title = t('section.' ~ item.key ~ '.title') %}
             {# Граница групп меню (D499): проверки · статистика · администрирование. #}
             {% if not loop.first and item.group != loop.previtem.group %}<span class="sidenav__sep" aria-hidden="true"></span>{% endif %}
-            {% if item.path == current_path %}
+            {% if item.key == 'ratings' %}
+              {% include '_ratings_branch.html' %}
+            {% elif item.path == current_path %}
               <span class="sidenav__current" aria-current="page" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</span>
             {% elif item.key == current_key %}
               {# Вложенная страница раздела: пункт подсвечен и ведёт на раздел. #}
@@ -176,7 +180,7 @@
                  title="{{ title }}{% if not item.built %} · {{ t('nav.wip') }}{% endif %}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</a>
             {% endif %}
             {#- Подменю раздела (D660): раскрыто, пока открыт сам раздел; его собирает экран. -#}
-            {% if item.key == current_key and subnav is defined and subnav %}{% include "ratings/_subnav.html" %}{% endif %}
+
           {% endfor %}
         </div>
 

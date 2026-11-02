@@ -123,6 +123,7 @@ TABS: tuple[Tab, ...] = (
     Tab(TAB_COUNTRIES, _sees_countries),
     # Настройки рейтингов: те же роли, что вели «Загрузки» (D654).
     Tab(TAB_RATINGS, _sees_ratings),
+    Tab("aggregators", _sees_ratings),
     # Списки копий и шаблоны писем УК (D608, #1130): админ УК и главный админ.
     Tab(TAB_MAILINGS, _sees_mailings),
     Tab(
@@ -176,6 +177,7 @@ def nav(current: str) -> dict[str, object]:
 def install(app: Flask, conf: Settings) -> None:
     """Страница раздела. Вкладки ставят свои маршруты действий сами."""
     from . import (
+        aggregators_admin,
         connections_screen,
         countries_screen,
         dodois_screen,
@@ -200,6 +202,7 @@ def install(app: Flask, conf: Settings) -> None:
         TAB_SPACES: spaces,
         TAB_COUNTRIES: lambda: countries_screen.show(conf.ui_lang),
         TAB_RATINGS: lambda: ratings.show_admin(conf),
+        "aggregators": aggregators_admin.show,
         TAB_MAILINGS: lambda: mailings_screen.show(conf.ui_lang),
         "plans": lambda: plan_archive.show(conf.ui_lang),
         TAB_JOURNAL: lambda: journal_screen.show_users(conf),

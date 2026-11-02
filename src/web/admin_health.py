@@ -91,13 +91,12 @@ def _stamp(moment: datetime | None) -> str:
 
 def check_now(code: str) -> Flash:
     """Пробовать подключение сейчас и записать исход."""
-    outcome = checks.run_probe(code)
-    if outcome is None:
-        return Flash("health.err.unavailable", False, {})
-    light, reason = outcome
     try:
-        health_store.record(code, light, reason, datetime.now(UTC))
+        outcome = checks.probe_and_record(code)
     except DbError:
         _log.warning("Подключения: исход проверки %s не записался", code, exc_info=True)
         return Flash("health.err.db", False, {})
+    if outcome is None:
+        return Flash("health.err.unavailable", False, {})
+    light, _reason = outcome
     return Flash("health.ok.checked", light == GREEN, {"code": code})

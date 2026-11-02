@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+from .texts_clients import CLIENT_TEXTS
 from .texts_ratings_sections import SECTION_TEXTS
 
 _SCREEN: dict[str, dict[str, str]] = {
@@ -630,4 +631,5 @@ RATINGS_TEXTS: dict[str, dict[str, str]] = {
     **_ERRORS,
     **_REFUSALS,
     **SECTION_TEXTS,
+    **CLIENT_TEXTS,
 }

@@ -257,7 +257,9 @@ Claude входом через сайт (OAuth).
 |---|---|
 | `src/web/texts.py` | Тексты веб-админки: каталог по ключам, язык — параметр |
 | `src/web/texts_administration.py` | Тексты раздела «Администрирование» (D639), вкладок «Подключения» (D638) и «Ключи и API» (D650) |
+| `src/web/texts_aggregators_admin.py` | Тексты административного охвата агрегаторов (#1391) |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
+| `src/web/texts_clients.py` | Клиентские оценки: язык интерфейса не меняет источник и вес данных |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
 | `src/web/texts_country_contacts.py` | Country contact directory and read-only references (D690) |
@@ -336,15 +338,16 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 25 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _inspection_timeline.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, … (+17) |
+| `src/web/templates/` | 26 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _inspection_timeline.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, … (+18) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
-| `src/web/templates/administration/` | 10 | _health.html, _nav.html, _ratings_aggregators.html, connections.html, countries.html, dodois.html, keys.html, mailings.html, … (+2) |
+| `src/web/templates/administration/` | 13 | _content_editor.html, _health.html, _nav.html, _ratings_aggregators.html, aggregators.html, connections.html, content_editor.html, countries.html, … (+5) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 8 | _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
 | `src/web/templates/dodois/` | 1 | connect.html |
 | `src/web/templates/inspections/` | 11 | _card_body.html, _card_parts.html, _letter_form.html, _panel.html, _panel_fragment.html, _row.html, _split_history.html, card.html, … (+3) |
 | `src/web/templates/journal/` | 1 | page.html |
+| `src/web/templates/mailings/` | 2 | document.html, plan_letter.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
@@ -361,7 +364,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 74 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+66) |
+| `src/web/static/` | 77 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+69) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -608,6 +611,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0109_service_settings.sql` | (нет описания) |
 | `0110_country_contacts.sql` | Country partner contacts and inspection mailing recipients, private to HQ |
 | `0111_measurement_sets.sql` | Existing inspection RLS and finalized-row protection apply to this column |
+| `0112_country_mailing_recipients.sql` | an empty configured list suppresses fallback |
+| `0113_mailing_content_templates.sql` | (нет описания) |
+| `0114_service_key_health_lock.sql` | The real probe timestamp is preserved; admin cannot fabricate a fresh probe |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -835,6 +841,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | Файл | Что делает |
 |---|---|
 | `src/ratings/base.py` | Листы общей таблицы контроля «база рейтингов» (D464) |
+| `src/ratings/clients.py` | Сводка клиентских оценок: только целые месячные агрегаты, вес — число оценок |
 | `src/ratings/compare.py` | Сравнение девелоперов и стран рядом (D551, #972) — только для УК |
 | `src/ratings/countries.py` | Страны выгрузок рейтинга → код ISO |
 | `src/ratings/coverage.py` | Охват пиццерий на площадках — картах и агрегаторах (D424) |
@@ -926,6 +933,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/kinds.py` | Вид проверки: код — сущность, слово — перевод (T152, задача #123) |
 | `src/domain/letter_template.py` | Шаблон письма партнёру: слоты, подстановки-блоки и проверка текста (D550, D608, #977, #1130) |
 | `src/domain/log_ids.py` | Идентификаторы людей и пространств в журнале — меткой, а не как есть (F-015) |
+| `src/domain/mailing_content.py` | Plain-text message/document templates |
 | `src/domain/measurement_sets.py` | Human-confirmed product measurements grouped by explicit line and physical zone |
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |

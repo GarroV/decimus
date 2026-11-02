@@ -398,3 +398,6 @@
 .rt-bycountry tbody { border-bottom: 1px solid var(--line); }
 .rt-bycountry tbody:last-child { border-bottom: 0; }
 .rt-reasons { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--fs-dense); color: var(--ink-2); }
+
+/* Назначение настроек читается целиком, а не пропадает в многоточии. */
+.rt-admin-blocks .srow__main small, .rt-admin-blocks .srow__cell { white-space: normal; overflow: visible; }

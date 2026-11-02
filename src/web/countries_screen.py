@@ -19,6 +19,7 @@ from flask import abort, render_template, request
 
 from src.db import country_contacts, country_contracts, country_report_langs
 from src.db.errors import DbError
+from src.db.reach import Reach
 from src.domain.errors import ConfigError
 from src.domain.permissions import role_may
 from src.domain.tenants import HQ_TENANT
@@ -28,6 +29,7 @@ from . import (
     auth,
     country_settings,
     country_summary,
+    country_units,
     guard,
     ui_lang,
 )
@@ -82,6 +84,14 @@ def _contract_countries() -> frozenset[str] | None:
         return None
 
 
+def _units(code: str, reach: Reach) -> UnitsData:
+    try:
+        return country_units.settings_rows(reach=reach, code=code)
+    except DbError:
+        log.warning("Country unit contacts could not be read")
+        return UnitsData(profiles_failed=True)
+
+
 def show(
     conf_lang: str,
     *,
@@ -126,7 +136,7 @@ def show(
             picked,
             dev_of.get(picked, ""),
             request.args.get("saved", ""),
-            units=UnitsData(),
+            units=_units(picked, reach),
             can_edit=guard.may("space.manage"),
             show_email=auth.current_tenant() == HQ_TENANT,
             can_contract=guard.may("contract.manage"),

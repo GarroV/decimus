@@ -55,6 +55,11 @@
     </div>
   {% endcall %}
 
+  {% if latest_data_href %}
+    <p class="note qa-note">{{ t('quality.latest_data', month=latest_data_title) }}
+      <a href="{{ latest_data_href }}">{{ t('quality.latest_open') }}</a>
+    </p>
+  {% endif %}
   {% if not view %}
     {% call pick_block(t('quality.block.network'), '', network|length) %}
       {% if network %}

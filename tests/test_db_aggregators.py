@@ -87,6 +87,8 @@ def test_заявка_одна_открытая_и_закрывается_исх
 def test_блок_агрегаторов_на_странице_и_сбой_строкой(
     db_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from types import SimpleNamespace
+
     import psycopg
 
     from src.db import agg_store
@@ -99,6 +101,14 @@ def test_блок_агрегаторов_на_странице_и_сбой_ст�
             RatingRow("glovo", "306069", date.today(), 98.3, 100, 591, True, True),
         ],
     )
+    agg_store.save_units(
+        [
+            SimpleNamespace(
+                dodo_id=ДОДО, country="RS", name="Beograd-1", lat=44.8, lng=20.46, working=True
+            )
+        ],
+        date.today(),
+    )
     agg_store.log_load("glovo", ok=False, points=0, ratings=0, error="HTTP 503")
     # Страна охвата появляется в рейтингах с первой загрузкой — здесь как импорт.
     with psycopg.connect(db_env) as conn:
@@ -110,13 +120,31 @@ def test_блок_агрегаторов_на_странице_и_сбой_ст�
     подменить_двери(monkeypatch, tenant="HQ", role="control")
     with собрать(tenant="HQ").test_client() as client:
         assert войти(client).status_code == 302
-        ответ = client.get("/ratings?group=country&value=RS")
-        прошлый = client.get("/ratings?group=country&value=RS&period=2026-01")
+        ответ = client.get("/ratings/agg?group=country&value=RS")
+        прошлый = client.get("/ratings/agg?group=country&value=RS&period=2026-01")
     assert ответ.status_code == 200
-    блок = ответ.get_data(as_text=True).split('id="rt-tp-aggregators"')[1].split("</article>")[0]
+    блок = ответ.get_data(as_text=True)
     assert '9.2<span class="rt-src__scale">/10</span>' in блок and "98.3%" in блок
     assert "Не собралось: Glovo." in блок and "HTTP 503" in блок
     assert "за выбранный период оценок нет" not in блок
     # Истории до первого сбора нет: на прошлый период — последние данные с датой.
-    блок = прошлый.get_data(as_text=True).split('id="rt-tp-aggregators"')[1].split("</article>")[0]
+    блок = прошлый.get_data(as_text=True)
     assert "98.3%" in блок and "за выбранный период оценок нет" in блок
+
+
+def test_unmatched_batch_counts_exclude_manual_non_pizzerias(db_env: str) -> None:
+    import psycopg
+
+    from src.db import agg_store
+
+    agg_store.save(
+        [
+            _точка("wolt", "unlinked", None),
+            _точка("wolt", "excluded", None),
+            _точка("wolt", "linked"),
+        ],
+        [],
+    )
+    with psycopg.connect(db_env) as conn:
+        conn.execute("update agg.points set excluded_reason='not_dodo' where point_key='excluded'")
+    assert agg_store.unmatched_counts() == (agg_store.UnmatchedCount("RS", "wolt", 1, 1),)

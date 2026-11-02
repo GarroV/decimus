@@ -34,7 +34,7 @@ from src.db.errors import (
 )
 from src.domain import letter_template
 
-from . import administration, auth, guard, mailings_template, ui_lang
+from . import administration, auth, guard, mailings_content, mailings_template, ui_lang
 from .origin import refuse_foreign_origin
 from .sections import section
 from .users_view import TAB_MAILINGS
@@ -112,11 +112,31 @@ def _page(
     template = None
     if picked == templates_db.KIND_INSPECTION:
         template = mailings_template.load(
-            selected or mailings_template.picked_slot(), form_body=form_body, error=error
+            selected
+            or mailings_template.picked_slot()
+            or ("plan", "en" if ui_lang.request_lang(conf_lang) == "en" else "ru"),
+            form_body=form_body,
+            error=error,
         )
+    content_editor = None
+    content_failed = False
+    if picked:
+        content_kind = request.args.get("content", picked)
+        if content_kind not in (picked, "document" if picked == "prescription" else picked):
+            abort(404)
+        content_lang = request.args.get(
+            "clang", "en" if ui_lang.request_lang(conf_lang) == "en" else "ru"
+        )
+        try:
+            content_editor = mailings_content.editor(content_kind, content_lang)
+        except DbError:
+            content_failed = True
+            log.warning("Message template editor could not be read")
     return (
         render_template(
             "administration/mailings.html",
+            content_editor=content_editor,
+            content_failed=content_failed,
             lines=lines,
             picked=picked,
             tpl=template,
@@ -143,6 +163,7 @@ def _page(
 
 def install(app: Flask, conf_lang: str) -> None:
     """Маршруты списка копий и шаблона письма (`mailing.manage`)."""
+    mailings_content.install(app, conf_lang)
     base = section("administration").path + "/mailings/<kind>/cc"
 
     def _checked(kind: str) -> str:

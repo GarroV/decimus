@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from src.db import dodois_logins, health_store
+from src.db import dodois_logins, health_store, service_keys
 from src.db.errors import DbError
 from src.domain import dodois as dodois_rules
 from src.domain import health
+from src.domain import service_keys as key_registry
 from src.domain.dodois import Login
 from src.domain.health import GREY, Status
 
@@ -59,6 +60,26 @@ def _dodois_rows(conn: checks.Connection, logins: tuple[Login, ...], moment: dat
     ]
 
 
+def probe_status(
+    code: str, row: health.ProbeRow | None, moment: datetime, *, every: timedelta | None = None
+) -> Status:
+    """Only this configuration can inherit a key probe, including ENV after restart.
+
+    Private fingerprints never enter the returned display Status. Legacy rows and
+    unavailable configuration are unknown, not a green cache for another key.
+    """
+    if row is not None and key_registry.service(code) is not None:
+        if row._key_fingerprint is None:
+            return Status(GREY, "health.reason.credentials_recheck", row.checked_at)
+        try:
+            current = service_keys.probe_snapshot(code)
+        except DbError:
+            return Status(GREY, "health.reason.credentials_recheck", row.checked_at)
+        if current.fingerprint != row._key_fingerprint:
+            return Status(GREY, "health.reason.credentials_recheck", row.checked_at)
+    return health.of_probe(row, moment, every=every)
+
+
 def build(now: datetime | None = None, *, google: Status | None = None) -> tuple[Row, ...] | None:
     """Строки по реестру; `None` — база не ответила.
 
@@ -77,7 +98,7 @@ def build(now: datetime | None = None, *, google: Status | None = None) -> tuple
     for conn in checks.CONNECTIONS:
         if conn.kind == PROBE:
             every = PROBE_EVERY if conn.scheduled else None
-            status = health.of_probe(probes.get(conn.code), moment, every=every)
+            status = probe_status(conn.code, probes.get(conn.code), moment, every=every)
         elif conn.kind == LOAD and conn.fresh_for is not None:
             status = health.of_loads(loads.get(conn.code), moment, fresh_for=conn.fresh_for)
         elif conn.kind == DODOIS:

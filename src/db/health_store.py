@@ -38,11 +38,40 @@ def record(code: str, light: str, reason: str, checked_at: datetime) -> None:
                 "insert into health.checks (code, light, reason, checked_at) "
                 "values (%s, %s, %s, %s) on conflict (code) do update set "
                 "light = excluded.light, reason = excluded.reason, "
-                "checked_at = excluded.checked_at",
+                "checked_at = excluded.checked_at, key_fingerprint = null",
                 (code, light, reason, checked_at),
             )
     except psycopg.Error as exc:
         raise _fail("Исход проверки подключения не записался", exc) from exc
+
+
+def record_key_if_current(
+    code: str, fingerprint: bytes, light: str, reason: str, checked_at: datetime
+) -> bool:
+    """Atomically compare fresh effective configuration and store its probe result.
+
+    Same service lock as vault mutations; no HTTP or nested connection under it.
+    A result for a changed configuration can never restore an old successful color.
+    """
+    from . import service_keys
+
+    try:
+        with connection(check_environment().dsn) as conn:
+            current = service_keys.probe_snapshot(code, conn=conn)
+            if current.fingerprint != fingerprint:
+                # A newer valid probe may already exist. Ignore this stale outcome;
+                # never overwrite a successful result for the new configuration.
+                return False
+            conn.execute(
+                "insert into health.checks (code, light, reason, checked_at, key_fingerprint) "
+                "values (%s,%s,%s,%s,%s) "
+                "on conflict(code) do update set light=excluded.light,reason=excluded.reason,"
+                "checked_at=excluded.checked_at,key_fingerprint=excluded.key_fingerprint",
+                (code, light, reason, checked_at, fingerprint),
+            )
+    except psycopg.Error as exc:
+        raise _fail("Исход проверки текущих ключей не записался", exc) from exc
+    return True
 
 
 def probes() -> dict[str, ProbeRow]:
@@ -50,11 +79,19 @@ def probes() -> dict[str, ProbeRow]:
     try:
         with connection(check_environment().dsn) as conn:
             rows = conn.execute(
-                "select code, light, reason, checked_at from health.checks"
+                "select code, light, reason, checked_at, key_fingerprint from health.checks"
             ).fetchall()
     except psycopg.Error as exc:
         raise _fail("Исходы проверок подключений не прочитались", exc) from exc
-    return {r[0]: ProbeRow(light=r[1], reason=r[2], checked_at=r[3]) for r in rows}
+    return {
+        r[0]: ProbeRow(
+            light=r[1],
+            reason=r[2],
+            checked_at=r[3],
+            _key_fingerprint=bytes(r[4]) if r[4] is not None else None,
+        )
+        for r in rows
+    }
 
 
 def alert_levels() -> dict[str, str]:

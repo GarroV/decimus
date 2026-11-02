@@ -1,0 +1,15 @@
+<div class="sidenav__branch">
+  <button class="{% if item.key == current_key %}sidenav__current{% else %}sidenav__item{% endif %} sidenav__branch-toggle" type="button" data-nav-ratings-toggle aria-expanded="{{ 'true' if current_key == 'ratings' else 'false' }}" aria-controls="ratings-navigation" title="{{ title }}">
+    {{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span><span class="sidenav__branch-arrow" aria-hidden="true">{{ icon('cright') }}</span>
+  </button>
+  <div class="sidenav__branch-clip" id="ratings-navigation"><div>
+    {% set menu_items = subnav if subnav is defined and subnav else ratings_menu %}
+    <nav class="sidenav__sub" aria-label="{{ t('ratings.sec.nav') }}"{% if current_key == 'ratings' %} data-rt-subnav{% endif %}>
+      {% for i in menu_items %}
+      <a class="sidenav__subitem{% if i.current %} is-on{% endif %}" href="{{ i.href }}"{% if current_key == 'ratings' %} data-rt-nav{% endif %}{% if i.current %} aria-current="page"{% endif %}>
+        <span>{{ i.title }}</span>{% if i.dot %}<i class="rt-fdot rt-fdot--{{ i.dot }}" title="{{ i.dot_word }}" role="img" aria-label="{{ i.dot_word }}"></i>{% endif %}
+      </a>
+      {% endfor %}
+    </nav>
+  </div></div>
+</div>

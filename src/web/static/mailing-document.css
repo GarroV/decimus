@@ -1,0 +1,21 @@
+.mailing-document {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: var(--space-6);
+  overflow-wrap: anywhere;
+}
+.mailing-document h1 {
+  line-height: 1.2;
+  margin-bottom: var(--space-6);
+}
+.mailing-document__body {
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+@page { size: A4; margin: 20mm; }
+@media print {
+  html, body { background: white; color: black; }
+  .mailing-document { max-width: none; padding: 0; }
+  .mailing-document h1 { break-after: avoid; }
+  [data-content-controls] { display: none; }
+}

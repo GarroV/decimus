@@ -222,7 +222,8 @@ async def test_frames_are_attached_to_the_record(
     started()
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen", "Печь в нагаре")))
     bot, _ = make_bot()
-    dp = build_dispatcher(SETTINGS, album_window=0.01)
+    # Здесь альбом закрывает следующее событие, а не таймер.
+    dp = build_dispatcher(SETTINGS, album_window=5.0)
 
     await feed(dp, bot, photo_message("album-1", media_group_id="a1", caption="печь грязная"))
     await feed(dp, bot, photo_message("album-2", media_group_id="a1"))

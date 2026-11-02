@@ -7,6 +7,11 @@
 from __future__ import annotations
 
 QUALITY_TEXTS: dict[str, dict[str, str]] = {
+    "quality.latest_data": {
+        "ru": "Последний месяц с сохранёнными данными Dodo IS: {month}.",
+        "en": "Latest month with saved Dodo IS data: {month}.",
+    },
+    "quality.latest_open": {"ru": "Открыть этот месяц", "en": "Open this month"},
     "section.quality.title": {"ru": "Качество", "en": "Quality"},
     "quality.title": {"ru": "Качество", "en": "Quality"},
     "quality.kicker.network": {"ru": "Качество · сеть", "en": "Quality · network"},

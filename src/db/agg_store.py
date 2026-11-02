@@ -601,3 +601,29 @@ def point_countries(aggregator: str) -> frozenset[str]:
     except psycopg.Error as exc:
         raise _fail("Страны агрегатора не прочитались", exc) from exc
     return frozenset(str(r[0]) for r in rows)
+
+
+@dataclass(frozen=True)
+class UnmatchedCount:
+    """Непривязанные точки и явно исключённые: отдельные счётчики, без адресов."""
+
+    country: str
+    aggregator: str
+    unmatched: int
+    excluded: int
+
+
+def unmatched_counts() -> tuple[UnmatchedCount, ...]:
+    """Один групповой запрос по всем странам; исключённые не считаются пропущенными."""
+    try:
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute(
+                "select country_code,aggregator,"
+                "count(*) filter(where dodo_id is null and excluded_reason is null),"
+                "count(*) filter(where excluded_reason is not null) "
+                "from agg.points group by country_code,aggregator "
+                "order by country_code,aggregator"
+            ).fetchall()
+    except psycopg.Error as exc:
+        raise _fail("Непривязанные точки агрегаторов не прочитались", exc) from exc
+    return tuple(UnmatchedCount(str(c), str(a), int(n), int(x)) for c, a, n, x in rows)

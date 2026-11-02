@@ -725,15 +725,13 @@ a.ov-table__row:focus-visible, a.ov-row:focus-visible, a.ins-row:focus-visible, 
   .mbar .sidenav__theme { flex-direction: row; margin: 0; padding: 0; }
 }
 
-/* Переход между разделами без белой вспышки. Каждый раздел — отдельная
-   страница с сервера, и без этого браузер на миг показывал пустой холст между
-   старой и новой. Панель названа отдельно: она одинакова на всех страницах и
-   остаётся на месте, плавно сменяется только содержимое. */
-@view-transition { navigation: auto; }
+/* Анимацию подмены DOM запускает nav.js. Межстраничный opt-in не нужен:
+   отмена перехода с полной загрузкой иногда даёт необработанный InvalidState.
+   Панель названа отдельно, чтобы оставаться на месте при подмене раздела. */
 .shell__nav { view-transition-name: sidenav; }
 ::view-transition-group(root) { animation-duration: .12s; }
 @media (prefers-reduced-motion: reduce) {
-  @view-transition { navigation: none; }
+  ::view-transition-group(root), ::view-transition-group(sidenav) { animation-duration: 0s; }
 }
 
 /* Шапки после входа нет, но имя осталось: на него опираются липкие колонки

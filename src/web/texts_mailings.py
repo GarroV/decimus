@@ -7,6 +7,38 @@
 from __future__ import annotations
 
 MAILINGS_TEXTS: dict[str, dict[str, str]] = {
+    "mailings.content.title.inspection": {
+        "ru": ("Тема и оформление письма по проверке"),
+        "en": ("Inspection email subject and wrapping"),
+    },
+    "mailings.content.title.prescription": {
+        "ru": ("Сопроводительное письмо предписания"),
+        "en": ("Prescription email"),
+    },
+    "mailings.content.title.plan": {"ru": "Письмо по экшн-плану", "en": "Action plan email"},
+    "mailings.content.title.document": {
+        "ru": ("Документ предписания"),
+        "en": ("Prescription document"),
+    },
+    "mailings.content.subject": {"ru": "Тема / заголовок", "en": "Subject / heading"},
+    "mailings.content.variables": {"ru": "Доступные подстановки:", "en": "Available variables:"},
+    "mailings.content.preview": {"ru": "Предпросмотр на примере", "en": "Preview with sample data"},
+    "mailings.content.no_send": {
+        "ru": ("Редактор и предпросмотр ничего не отправляют. Получатели настраиваются отдельно."),
+        "en": ("Editing and previewing send nothing. Recipients are configured separately."),
+    },
+    "mailings.content.inspection_blocks": {
+        "ru": ("Текст письма по проверке: блоки движка"),
+        "en": ("Inspection body: engine blocks"),
+    },
+    "mailings.content.print": {"ru": "Печать / сохранить PDF", "en": "Print / save PDF"},
+    "mailings.content.document_open": {
+        "ru": ("Документ: просмотр и печать"),
+        "en": ("Document: preview and print"),
+    },
+    "mailings.content.plan_open": {"ru": "Подготовить письмо", "en": "Prepare email"},
+    "mailings.content.to": {"ru": "Кому:", "en": "To:"},
+    "mailings.content.download": {"ru": "Скачать письмо .eml", "en": "Download email .eml"},
     "mailings.sub": {
         "ru": (
             "Кому из сотрудников УК уходит копия письма и каким текстом письмо пишется. "
@@ -56,31 +88,17 @@ MAILINGS_TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "mailings.cc.hint.prescription": {
-        "ru": (
-            "Почты сотрудников УК. Подставляются в «Копию» черновика письма предписания, "
-            "когда ОСБ кладёт его в почту; письмо отправляет она сама. Шаблон документа "
-            "предписания и сопроводительное письмо появятся здесь после сборки предписания "
-            "(#1128)."
-        ),
-        "en": (
-            "HQ staff emails. They are filled into the Cc of the prescription letter draft "
-            "when the OSB puts it into the mailbox; the OSB sends the letter. The prescription "
-            "document template and the cover letter will appear here once prescription "
-            "assembly is built (#1128)."
-        ),
+        "ru": ("Копия УК в черновике письма предписания. Тема и текст задаются редактором выше."),
+        "en": ("HQ Cc for prescription drafts. Subject and body are edited above."),
     },
     "mailings.cc.hint.plan": {
         "ru": (
-            "Почты сотрудников УК для «Копии» письма о запросе плана действий. Сейчас запрос "
-            "плана идёт уведомлением внутри сервиса, письма партнёру о нём нет, поэтому "
-            "список пока только хранится: он подставится в черновик, когда такое письмо "
-            "появится. Ничего не отправляется."
+            "Копия УК в скачиваемом письме экшн-плана. Письмо готовится из карточки "
+            "плана и не отправляется автоматически."
         ),
         "en": (
-            "HQ staff emails for the Cc of an action plan request letter. Today a plan request "
-            "goes as an in-app notification and there is no letter to the partner, so the list "
-            "is only stored for now: it will be filled into the draft once such a letter "
-            "exists. Nothing is sent."
+            "HQ Cc in downloaded plan emails. Prepare the email from its plan card; "
+            "it is never sent automatically."
         ),
     },
     "mailings.cc.empty": {
