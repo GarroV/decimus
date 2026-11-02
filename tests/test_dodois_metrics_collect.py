@@ -371,7 +371,7 @@ def test_null_aggregator_page_is_failure_without_replacement(мир: Мир, nul
     мир.удачных[parse.KIND_AGGREGATORS] = True
 
     def answer(path: str, query: dict[str, str]) -> Response:
-        if int(query["skip"]) == null_page * metrics.PAGE_SIZE:
+        if int(query["skip"]) == null_page * int(query["take"]):
             return _ок(None)
         return _ок(
             {"sales": [{"unitId": А, "aggregatorName": "Glovo"}], "isEndOfListReached": False}
@@ -465,3 +465,75 @@ def test_invalid_checkup_does_not_write_valid_ratings_first(
     with pytest.raises(parse.ShapeError):
         metrics._ratings_range("intl", ДОСТУП, [А], [date(2026, 10, 1)], СЕГОДНЯ, _без_сна)
     assert writes == []
+
+
+def test_accounting_large_order_pages_are_read_in_smaller_complete_chunks(мир: Мир) -> None:
+    calls: list[tuple[int, int]] = []
+
+    def answer(path: str, query: dict[str, str]) -> Response:
+        take, skip = int(query["take"]), int(query["skip"])
+        calls.append((take, skip))
+        # A real 1000-order response exceeds the client's 4 MiB JSON limit.
+        if take > 100:
+            return _ок(None)
+        return _ок(
+            {
+                "sales": [{"unitId": А, "aggregatorName": "Glovo"}] * (100 if skip == 0 else 37),
+                "isEndOfListReached": skip != 0,
+            }
+        )
+
+    мир.ответ = answer
+    covered, rows = metrics._aggregators_month(
+        "BG", "intl", ДОСТУП, [А], date(2026, 10, 1), СЕГОДНЯ, _без_сна
+    )
+    assert covered == [А]
+    assert calls == [(100, 0), (100, 100)]
+    assert [(row.aggregator, row.orders) for row in rows] == [("Glovo", 137)]
+
+
+def test_smaller_accounting_pages_preserve_the_previous_total_row_budget(
+    мир: Мир, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(metrics, "MAX_PAGES", 1)
+    calls: list[int] = []
+
+    def answer(path: str, query: dict[str, str]) -> Response:
+        skip = int(query["skip"])
+        calls.append(skip)
+        return _ок(
+            {
+                "sales": [{"unitId": А, "aggregatorName": "Glovo"}],
+                "isEndOfListReached": len(calls) == 3,
+            }
+        )
+
+    мир.ответ = answer
+    _covered, rows = metrics._aggregators_month(
+        "BG", "intl", ДОСТУП, [А], date(2026, 10, 1), СЕГОДНЯ, _без_сна
+    )
+    assert calls == [0, 100, 200]
+    assert rows[0].orders == 3
+
+
+def test_accounting_page_budget_failure_never_replaces_a_partial_month(
+    мир: Мир, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(metrics, "MAX_PAGES", 1)
+    мир.удачных[parse.KIND_AGGREGATORS] = True
+
+    def answer(path: str, query: dict[str, str]) -> Response:
+        return _ок(
+            {
+                "sales": [{"unitId": А, "aggregatorName": "Glovo"}],
+                "isEndOfListReached": False,
+            }
+        )
+
+    мир.ответ = answer
+    (outcome,) = metrics.collect_country(
+        _вход(), [parse.KIND_AGGREGATORS], today=СЕГОДНЯ, sleep=_без_сна
+    )
+    assert not outcome.ok
+    assert outcome.error and outcome.error.startswith("unknown_shape")
+    assert мир.агрегаторы == []

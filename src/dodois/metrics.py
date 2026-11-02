@@ -57,6 +57,9 @@ KR_UNITS_PER_CALL = 100
 #: Строк на страницу заказов и предохранитель от бесконечной выдачи.
 PAGE_SIZE = 1000
 MAX_PAGES = 500
+# Accounting orders include large detail objects: 1000 orders can exceed the
+# client's 4 MiB response limit. Keep other endpoints and the total row cap intact.
+ACCOUNTING_PAGE_SIZE = 100
 #: Пауза между запросами, чтобы не упереться в лимит Dodo IS.
 PAUSE_SEC = 0.25
 #: Сколько вид данных считается свежим: суточный сбор, с запасом на сдвиг часов.
@@ -139,10 +142,12 @@ def _paged(
     token: str,
     sleep: Sleep,
     page_size: int = PAGE_SIZE,
+    *,
+    max_pages: int | None = None,
 ) -> Response:
     """Все страницы выдачи одним ответом: 200 с общим списком строк; отказ по доступу — как есть."""
     collected: list[Any] = []
-    for page in range(MAX_PAGES):
+    for page in range(MAX_PAGES if max_pages is None else max_pages):
         sleep(PAUSE_SEC)
         query = {**base, "skip": str(page * page_size), "take": str(page_size)}
         response = client.api_get(contour, path, query, token)
@@ -171,7 +176,15 @@ def _aggregators_month(
             "units": ",".join(batch),
             "orderSource": ORDER_SOURCE_AGGREGATOR,
         }
-        return _paged(contour, ACCOUNTING_PATH.format(cc=country.lower()), base, token, sleep)
+        return _paged(
+            contour,
+            ACCOUNTING_PATH.format(cc=country.lower()),
+            base,
+            token,
+            sleep,
+            ACCOUNTING_PAGE_SIZE,
+            max_pages=MAX_PAGES * PAGE_SIZE // ACCOUNTING_PAGE_SIZE,
+        )
 
     for batch, body in _each_batch(units, SALES_UNITS_PER_CALL, get):
         parsed = parse.aggregator_orders(body)
