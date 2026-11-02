@@ -131,6 +131,7 @@ ACTIONS: tuple[Action, ...] = (
     # девелопер и контроль не правят (спека ОСБ, «Шаблоны и списки рассылок»).
     Action("mailing.manage", "people", hq_only=True),
     Action("plan.archive", "plan", hq_only=True, writes=False),
+    Action("service.settings", "people", hq_only=True),
     Action("unit.create", "unit", hq_only=True),
     Action("api.manage", "api", hq_only=True),
     # Ключи внешних сервисов на экране «Подключения» (D576): отдельный код, чтобы доступ к
@@ -223,6 +224,7 @@ _HQ_ADMIN = (
         "space.manage",
         "contract.manage",
         "plan.archive",
+        "service.settings",
         "mailing.manage",  # D608: списки копий и шаблоны писем УК
         "refusals.read",
         "view.osb",  # D599: админ видит страницу «ОСБ» без действий

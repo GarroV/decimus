@@ -54,7 +54,7 @@ from src.db.models import InspectionRow
 from src.db.pool import shared_connections
 from src.db.reports import ReportRef
 from src.domain.errors import ValidationError
-from src.domain.features import action_plans_enabled
+from src.domain.features import action_plans_enabled, begin_feature_scope, end_feature_scope
 from src.domain.kinds import kind_title
 from src.domain.permissions import is_read_only
 from src.domain.second_factor import passkey_auto_enroll
@@ -177,6 +177,7 @@ _SHARED_DB_ENVIRON_KEY = "decimus.db_shared"
 
 
 def _open_memo() -> None:
+    request.environ["decimus_feature_scope"] = begin_feature_scope()
     # Метка есть у любого запроса: на POST память явно выключена, а не «не тронута».
     читает = request.method in ("GET", "HEAD")
     request.environ[_MEMO_ENVIRON_KEY] = request_memo.begin(enabled=читает)
@@ -189,6 +190,9 @@ def _open_memo() -> None:
 
 
 def _close_memo(_exc: BaseException | None) -> None:
+    feature_token = request.environ.pop("decimus_feature_scope", None)
+    if feature_token is not None:
+        end_feature_scope(feature_token)
     token = request.environ.pop(_MEMO_ENVIRON_KEY, None)
     if token is not None:
         request_memo.end(token)
