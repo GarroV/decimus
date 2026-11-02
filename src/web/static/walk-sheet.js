@@ -1857,7 +1857,33 @@
       var save = W.hinted(W.button("walk-mark", label, save_), "save");
       save.disabled = !!why || f.saving || !!f.finding;
       box.appendChild(save);
-      if (why && !f.saving) box.appendChild(el("p", "walk-sheet__why", tx(why)));
+      if (why && !f.saving) {
+        var missingClass = why === "walk.sheet.class_review.need_class" && selectedClassCandidates().find(function (cand) {
+          return !classState(cand).level;
+        });
+        if (missingClass) {
+          var state = classState(missingClass);
+          var status = state.status === "pending" ? tx("walk.sheet.class_review.pending")
+            : state.status === "needs_fact" ? state.needFact
+            : state.status === "not_established" ? tx("walk.sheet.class_review.not_established")
+            : state.message || tx(state.manualMode ? "walk.sheet.class_review.manual_active" : "walk.sheet.class_review.check_hint");
+          box.appendChild(el("p", "walk-sheet__why", status));
+          var retry = !state.manualMode && ["idle", "error"].indexOf(state.status) !== -1;
+          var action = W.button("walk-link", tx(retry ? "walk.sheet.class_review.check" : "walk.sheet.class_review.open"), function () {
+            if (retry) requestClass(missingClass, true);
+            node.querySelectorAll("[data-class-review]").forEach(function (panel) {
+              if (panel._candidate !== missingClass) return;
+              panel.scrollIntoView({block:"start"});
+              var target = state.status === "needs_fact" || state.status === "not_established"
+                ? panel.querySelector(".walk-class-review__facts")
+                : panel.querySelector(state.manualMode ? "[data-manual-class]" : "[data-class-check]");
+              if (target && !target.disabled) target.focus({preventScroll:true});
+            });
+          });
+          action.setAttribute("data-class-save-action", "");
+          box.appendChild(action);
+        } else box.appendChild(el("p", "walk-sheet__why", tx(why)));
+      }
       return box;
     },
   };
@@ -1905,7 +1931,7 @@
 
   // Имя пометки — из `src/recognize/rules_check.py` (`SERVICE_ASIDE`).
   var ASIDE_FLAG = "служебная-оговорка";
-  var ORDER = ["context", "photos", "words", "item", "text", "comment", "reading", "measurements", "level", "repeat", "danger"];
+  var ORDER = ["context", "photos", "words", "item", "reading", "measurements", "level", "text", "comment", "repeat", "danger"];
 
   function redraw() {
     var names = Array.prototype.slice.call(arguments);

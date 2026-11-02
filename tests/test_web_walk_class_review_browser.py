@@ -74,6 +74,49 @@ def test_search_requires_deliberate_item_choice_before_any_class_request(browser
     assert page.get_by_role("button", name="Save", exact=True).is_disabled()
 
 
+def test_mobile_ready_class_saves_without_manual_reselection(browser_page):
+    page = browser_page
+    page.set_viewport_size({"width": 360, "height": 640})
+    load(page)
+    choose(page, 0)
+    page.wait_for_function("levelCalls.length === 1")
+    assert page.locator(".walk-sheet__why").inner_text() == "walk.sheet.class_review.pending"
+    assert page.locator("[data-class-review]").evaluate(
+        "el => !!(el.compareDocumentPosition(document.querySelector('[data-finding-text]'))"
+        " & Node.DOCUMENT_POSITION_FOLLOWING)"
+    )
+    resolve(page, level="D1")
+    assert page.locator("[data-manual-class]").count() == 0
+    assert page.get_by_role("button", name="Save", exact=True).is_enabled()
+    page.get_by_role("button", name="Save", exact=True).click()
+    page.wait_for_function("ops.length === 1")
+    assert page.evaluate("ops[0].level") == "D1"
+
+
+def test_missing_fact_is_shown_at_save_and_action_focuses_the_answer(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, status="needs_fact", level=None, need_fact="Is the handle damaged?")
+    assert page.locator(".walk-sheet__why").inner_text() == "Is the handle damaged?"
+    page.locator("[data-class-save-action]").click()
+    assert page.locator(".walk-class-review__facts").evaluate("el => el === document.activeElement")
+    assert page.evaluate("levelCalls.length") == 1
+    assert page.get_by_role("button", name="Save", exact=True).is_disabled()
+
+
+def test_failed_class_check_can_retry_directly_from_save_area(browser_page):
+    page = browser_page
+    load(page)
+    choose(page, 0)
+    resolve(page, code="wrong-item")
+    assert page.locator(".walk-sheet__why").inner_text() == "walk.sheet.class_review.unavailable"
+    page.locator("[data-class-save-action]").click()
+    page.wait_for_function("levelCalls.length === 2")
+    resolve(page, 1, level="D1")
+    assert page.get_by_role("button", name="Save", exact=True).is_enabled()
+
+
 def test_needs_fact_never_applies_provisional_class_and_answer_is_scoped(browser_page):
     page = browser_page
     load(page)

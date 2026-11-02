@@ -617,6 +617,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Определить класс по фактам",
         "en": "Check class against the facts",
     },
+    "walk.sheet.class_review.open": {
+        "ru": "Перейти к проверке класса",
+        "en": "Go to the class check",
+    },
     "walk.sheet.class_review.facts": {
         "ru": "Уточнение фактов для этого пункта",
         "en": "Facts for this item",
