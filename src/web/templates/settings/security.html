@@ -10,7 +10,17 @@
   Секреты: QR и ключ приложения — пока приложение не подтверждено; резервные коды — один
   раз, ответом на выпуск. В адрес они не попадают.
 #}{% extends "base.html" %}
+{% from "_info_tip.html" import info_tip %}
 {% block title %}{{ t('sf.sec.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<div class="shead__main">
+      <div class="info-row">
+        <h1 class="shead__title">{{ t('sf.sec.title') }}</h1>
+        {{ info_tip(t('tip.hint'), '', [t('sf.sec.sub'), t('sf.sec.sub.fallback')], 'security') }}
+      </div>
+    </div>
+</header>{% endblock %}
+
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
@@ -18,16 +28,9 @@
 {% endblock %}
 {% block page_class %} page--settings{% endblock %}
 {% block body %}
-  {% from "_info_tip.html" import info_tip %}
+
 {% from "_split_ui.html" import confirm %}
-  <header class="shead">
-    <div class="shead__main">
-      <div class="info-row">
-        <h1 class="shead__title">{{ t('sf.sec.title') }}</h1>
-        {{ info_tip(t('tip.hint'), '', [t('sf.sec.sub'), t('sf.sec.sub.fallback')], 'security') }}
-      </div>
-    </div>
-  </header>
+
   <article class="ssettings">
   {% if db_down %}
     <div class="note note--warn"><div class="note__text">{{ t('sf.sec.db') }}</div></div>

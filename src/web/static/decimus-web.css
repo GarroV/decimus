@@ -2205,3 +2205,7 @@ a[data-zoom] { cursor: zoom-in; }
 .info-tip:hover .info-tip__pop, .info-tip:focus-within .info-tip__pop { display: block; }
 .info-tip__list { margin: 0; padding: var(--space-3) var(--space-5) 0; list-style: none; font-size: var(--fs-dense); color: var(--ink-2); }
 .info-tip__list li { padding: var(--space-1) 0; }
+/* Page title precedes every workspace, rail and filter. */
+.page-heading { width: 100%; min-width: 0; grid-column: 1 / -1; margin: 0 0 var(--space-6); }
+.page-heading h1 { margin: 0; font-size: 28px; line-height: 1.25; font-weight: 600; letter-spacing: -.02em; }
+@media (max-width: 600px) { .page-heading h1 { font-size: 24px; } }

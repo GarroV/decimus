@@ -15,10 +15,17 @@
   Пустой вспомогательный блок не показывается: «всё сделано» экрану ни о чём не
   говорит. Отказ данных — наоборот, строка с ошибкой, а не тишина.
 #}{% extends "base.html" %}
-{% from "_pick.html" import pick %}
 {% from "_info_tip.html" import info_tip %}
+{% from "_pick.html" import pick %}
+
 {% from "_period.html" import period_picker with context %}
 {% block title %}{{ t('section.overview.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<div class="shead__main">
+      <h1 class="shead__title">{{ t('section.overview.title') }}</h1>
+    </div>
+</header>{% endblock %}
+
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
@@ -43,11 +50,7 @@
 {%- endmacro %}
 
 {% block body %}
-  <header class="shead hm-head">
-    <div class="shead__main">
-      <h1 class="shead__title">{{ t('section.overview.title') }}</h1>
-    </div>
-  </header>
+
 
   {# Период — наверху и на весь экран (interface-logic п. 3, 7): в блоке «Фильтры»
         справа его не находили. #}

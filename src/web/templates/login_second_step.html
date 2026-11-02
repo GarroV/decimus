@@ -17,6 +17,7 @@
   (`login__methods--code-first`), кнопка ключа остаётся запасной. Отказ или закрытие окна
   молча оставляют кнопку; сообщение об ошибке — только после нажатия.
 #}{% extends "login_base.html" %}
+{% block page_heading %}{% endblock %}
 {% block title %}{{ t('sf.step.title') }}{% endblock %}
 {% block head %}
   {{ super() }}

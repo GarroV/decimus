@@ -26,7 +26,7 @@
     <div class="cn-head__row">
       <div class="cn-head__title">
         <div class="pk-kicker">{{ t('country.kicker') }}</div>
-        <h1 class="pk-title">{{ country_name or '—' }}</h1>
+        <h2 class="pk-title">{{ country_name or '—' }}</h2>
       </div>
       <div class="cn-head__period">
         {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), period_hidden) }}
@@ -74,7 +74,7 @@
     <div class="cn-head__row">
       <div class="cn-head__title">
         <a class="pk-kicker cn-back" href="{{ back_url }}">‹ {{ country_name or t('country.back') }}</a>
-        <h1 class="pk-title">{{ row.name }}</h1>
+        <h2 class="pk-title">{{ row.name }}</h2>
       </div>
       <div class="cn-head__period">{{ badge(t('unit.stage.' ~ row.stage), {'open': 'ok', 'pipeline': 'warn', 'paused': 'warn', 'closed': 'err'}.get(row.stage, '')) }}</div>
     </div>
