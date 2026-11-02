@@ -10,7 +10,16 @@
 .page--settings .ssec__sub:first-child { margin-top: 0; }
 .page--settings .ssecret { max-width: 100%; }
 .page--settings .ssecret code { overflow-wrap: anywhere; word-break: break-all; }
-.page--settings #claude-connect { margin-top: var(--space-7); }
+.page--settings #claude-connect { margin-top: var(--space-5); }
+/* «Нейросети» (D695): список выбора со «?», инструкция и «Подключено» — блоками ограниченной ширины. */
+.page--settings .aipick { padding: 0; border-bottom: 0; margin: var(--space-6) 0 var(--space-5); gap: var(--space-4); max-width: 360px; }
+.page--settings .aipick .pickbox { flex: 1; min-width: 0; }
+.page--settings .aipanel, .page--settings .aiconn { max-width: 640px; }
+.page--settings .aiconn { margin-top: var(--space-7); padding-top: var(--space-6); border-top: 1px solid var(--line); }
+.page--settings .aiconn__row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-5); margin-top: var(--space-4); }
+.page--settings .aiconn__row .ssec__text, .page--settings .aiconn__row .ssec__note { margin-bottom: 0; overflow-wrap: anywhere; }
+.page--settings .aiconn__row .sbtn { flex: none; }
+@media (max-width: 40rem) { .page--settings .aiconn__row { flex-direction: column; } }
 /* Инструкции для проекта Claude: блок с прокруткой, текст как есть (D476). */
 .sinstr__text { max-height: 160px; margin: var(--space-4) 0; padding: var(--space-5); overflow: auto; border: 1px solid var(--line); border-radius: var(--r-control);
   background: var(--surface); color: var(--ink-2); font-family: var(--font-mono); font-size: 12px; line-height: 17px; white-space: pre-wrap; overflow-wrap: anywhere; }

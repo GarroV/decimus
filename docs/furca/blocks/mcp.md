@@ -122,7 +122,7 @@ submit_action_plan(request_id)   start_plan_row(request_id, row_id)   finish_pla
 
 **Право загрузки (D305, D335).** `MCP_IMPORT_TENANTS=HQ` — единственное допустимое значение: любое другое пространство (после `canonical_tenant`) — отказ на старте (`config._parse_import`), партнёрам загрузка задним числом не открывается. Пусто — загрузка закрыта (выключатель). Требует `MCP_CHECKLIST_STORE` и `AUDIT_DATA_DIR` (режим `current` берёт оттуда действующую версию эталона), иначе отказ на старте. Без права вызов отказывает до обработчика (`rpc.IMPORT_CLOSED`). Подтверждению нужна `DATABASE_RETRACTION_URL` (роль администратора истории), кадрам — `S3_*`; без них соответствующий инструмент отвечает отказом, остальные работают. Режимы и разбор их аргументов — `src/mcp/import_modes.py`. Пределы (строка base64 кадра, записи и кадры черновика, число черновиков, длины полей) — именованные константы в `src/mcp/imports.py`, `src/db/imports.py` и `src/mcp/import_modes.py`.
 
-**Вход через сайт (OAuth, D417, D420).** Третья дверь — access-токен, который
+**Вход через сайт (OAuth, D417, D420, D695).** Третья дверь — access-токен, который
 выдаёт админка после входа учёткой decimus (`src/web/oauth.py`); сверка —
 `src/db/oauth_store.py:resolve_access_token` на каждый вызов, вместе с учёткой
 (`disabled_at is null`), подключением (не отозвано) и СВЕЖЕЙ ролью. Годен
@@ -130,11 +130,34 @@ submit_action_plan(request_id)   start_plan_row(request_id, row_id)   finish_pla
 хранится в токене, сверяется при обмене кода и refresh и здесь). Дверь
 открыта только при заданных `ADMIN_PUBLIC_URL` и `MCP_PUBLIC_URL`; тогда отказ 401
 несёт `resource_metadata`, а `GET /.well-known/oauth-protected-resource` (и с
-суффиксом пути) называет админку сервером авторизации (RFC 9728). Доступ через
+суффиксом пути) называет админку сервером авторизации (RFC 9728) и
+перечисляет `scopes_supported`. Метаданные сервера авторизации объявляют
+`authorization_response_iss_parameter_supported` (RFC 9207), и параметр `iss`
+(издатель) стоит в КАЖДОМ редиректе ответа авторизации — и с кодом, и с ошибкой
+(`src/web/oauth.py`: `назад`, отказ человека, выдача кода). Доступ через
 сайт: `Access(tenant=пространство учётки, may_retract=False, actor="web:<логин>",
 role=роль)`. При заданной роли и список (`tools/list`), и вызов решает одна
 матрица `src/mcp/policy.py` («роль × вид»; прежние заслоны настройки действуют
 поверх неё):
+
+Подключаются ChatGPT, Claude, GLM (Z.ai) и Kimi (Moonshot) (D695): клиенты
+регистрируются сами (DCR), а адрес возврата проверяет
+`oauth_store.redirect_uri_allowed` — строго `fullmatch`, без userinfo, query,
+фрагмента и пробелов; всё остальное отказ без редиректа. Вид клиента
+(`oauth_store.client_kind`) берётся из адресов возврата, а не из `client_name`,
+который клиент пишет о себе сам: экран согласия и список «Подключено» называют
+вид словами, имя — подписью «называет себя …».
+
+| Вид | Кто | Адреса возврата |
+|---|---|---|
+| `claude` | claude.ai в браузере, Desktop, телефон | `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback` |
+| `chatgpt` | ChatGPT в браузере | `https://chatgpt.com/connector_platform_oauth_redirect`, `https://chatgpt.com/connector/oauth/<id>` (`id` — `[A-Za-z0-9_-]{1,128}`) |
+| `local` | программа на компьютере: Claude Code, Codex/ChatGPT desktop, Kimi Code CLI, ZCode (Z.ai) | `http://localhost`, `http://127.0.0.1` или `http://[::1]` с портом 1–65535 без ведущего нуля и путём `/callback`, `/oauth/callback` или `/oauth/callback/mcp/<имя>` (`имя` — `[A-Za-z0-9._-]{1,64}`, не `.` и не `..`); без query |
+
+Клиент с адресами разных видов получает вид `local` (осторожный: с
+предупреждением про программу на этом компьютере). PKCE S256 обязателен, ресурс
+(`resource`) привязан к токену. Экран согласия отвечает под `form-action`,
+расширенным хостами этих адресов (`web.security_headers.OAUTH_FORM_ACTION`).
 
 | Роль | inspections | checklist_source | checklist | import | ratings_read | ratings | retraction |
 |---|---|---|---|---|---|---|---|

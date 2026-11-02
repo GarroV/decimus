@@ -219,6 +219,25 @@ def _tile_hints(account: Any, lang: str, google_login: bool) -> dict[str, str]:
     }
 
 
+def _assistant_picker(base: str, lang: str, selected: str) -> dict[str, Any]:
+    """Список выбора нейросети для макроса `_pick.html`: готовые адреса, шаблон их не клеит."""
+    опции = [
+        {
+            "href": f"{base}?lang={lang}&tile=claude&ai={ключ}#connections",
+            "title": t(f"settings.ai.name.{ключ}", lang),
+            "selected": ключ == selected,
+            "count": None,
+        }
+        for ключ in users_claude.ASSISTANTS
+    ]
+    return {
+        "label": t("settings.ai.pick", lang),
+        "current": True,
+        "current_title": t(f"settings.ai.name.{selected}", lang),
+        "options": опции,
+    }
+
+
 def _needs_relink(user_id: str | None) -> bool:
     """Пояснение объявления D629 в плитке Claude; ключ не прочитался — без пояснения."""
     if user_id is None:
@@ -254,6 +273,8 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
         own_binding_known=известна,
         has_google=has_google_login,
     )
+    base = f"{request.script_root}{section('settings').path}"
+    ai = users_claude.selected_assistant(request.args.get("ai"))
     return (
         render_template(
             "settings/index.html",
@@ -263,7 +284,7 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             tile_hint=_tile_hints(вошедший, lang, has_google_login),
             tile_groups=TILE_GROUPS,
             me=вошедший,
-            base=f"{request.script_root}{section('settings').path}",
+            base=base,
             own_binding=привязка,
             own_binding_known=известна,
             bot_username=current_app.config.get(BOT_USERNAME_KEY),
@@ -271,6 +292,11 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             mcp=статус_токена,
             mcp_relink=_needs_relink(user_id),
             claude=подключение,
+            ai=ai,
+            ai_pick=_assistant_picker(base, lang, ai),
+            codex_add=users_claude.codex_add_command(подключение.mcp_url),
+            codex_login=users_claude.CODEX_LOGIN_COMMAND,
+            code_add=подключение.command,
             min_password=accounts.MIN_PASSWORD_LENGTH,
             max_password=accounts.MAX_PASSWORD_LENGTH,
             hq_account=вошедший is not None and canonical_tenant(вошедший.tenant) == HQ_TENANT,
