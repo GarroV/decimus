@@ -97,13 +97,13 @@ TEXTS: dict[str, dict[str, str]] = {
     "access.role_closed": {
         "ru": (
             "Ваша роль в decimus не проводит проверок, поэтому бот и мини-апп обхода "
-            "вам закрыты. Рейтинги — в админке на сайте; Claude подключается там же, "
-            "кнопкой «Подключить Claude»."
+            "вам закрыты. Рейтинги — в админке на сайте. Подключить нейросеть — в вебе: "
+            "«Настройки» → «Нейросети»."
         ),
         "en": (
             "Your decimus role does not run inspections, so the bot and the walk mini-app "
-            "are closed to you. Ratings are in the web admin; Claude is connected there "
-            "too, with the “Connect Claude” button."
+            "are closed to you. Ratings are in the web admin. To connect an AI assistant, "
+            "open Settings → AI assistants on the web."
         ),
     },
     "access.foreign_space": {
