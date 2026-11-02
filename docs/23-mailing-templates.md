@@ -21,3 +21,5 @@ Routes:
 Tests cover whitelist/header injection, safe markup, explicit reset/version history, old inspection slots, editor permissions, foreign origin, real prescription document/cover consumption, actual plan EML and handled template failures before outbound calls.
 
 Action-plan pause and manual service settings remain authoritative: template editing never changes the feature switch. The plan letter/EML consumer is denied while paused, including direct URLs, before loading plan data.
+
+The body editor keeps a usable minimum height on both the settings page and validation/preview responses. Printable prescription documents preserve line breaks, wrap long text, and use white paper with A4 margins. The print controls are excluded from the document.
