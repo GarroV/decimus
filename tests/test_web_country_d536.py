@@ -17,7 +17,7 @@ from test_web_country import (
 from test_web_country import стенд as база_стенд  # noqa: F401
 from web_harness import СВОЙ, ТОКЕН, Учётка, войти, подменить_двери, собрать
 
-from src.db import ratings_read, web_own_profile
+from src.db import country_contacts, ratings_read, web_own_profile
 from src.web import auth, country_filter, country_settings, partner_spaces
 from src.web import country as cn
 
@@ -305,7 +305,17 @@ def test_карточку_страны_открывает_каждый_кому_
     девелопер: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _пиццерии(monkeypatch)
-    assert "Карточка страны" in открыть(девелопер, monkeypatch, данные(), "/country/GE")
+    monkeypatch.setattr(country_contacts, "for_country", lambda code: ())
+    главная = открыть(девелопер, monkeypatch, данные(), "/country/GE")
+    assert "reference=partner" in главная and "reference=mailing" in главная
+    assert "Партнёр" in главная and "Почты для рассылки" in главная
+    действия = главная.split('class="cn-head__actions"', 1)[1].split("</div>", 1)[0]
+    assert "settings=1" not in действия
+    for справка in ("partner", "mailing"):
+        чтение = открыть(девелопер, monkeypatch, данные(), f"/country/GE?reference={справка}")
+        assert "Только справка" in чтение
+        assert "/settings/contacts" not in чтение and 'name="email"' not in чтение
+    # Старый адрес карточки остаётся доступным для чтения без ссылки редактирования.
     страница = открыть(девелопер, monkeypatch, данные(), "/country/GE?settings=1")
     assert "sdrawer--wide" in страница and "Rustaveli 1" in страница and "Батуми-1" in страница
     # Сведения — текстом, без форм правки: правит только администратор.
@@ -385,11 +395,17 @@ def test_панель_настроек_во_вкладке_стран_с_фор�
         "overview",
         lambda: (SpaceRow("HQ", "УК", (), 3), SpaceRow("LOTOS", "Лотос", (), 1)),
     )
+    monkeypatch.setattr(country_contacts, "for_country", lambda code: ())
     ответ = админ.get("/administration?tab=countries&country=GE")
     assert ответ.status_code == 200
     страница = ответ.get_data(as_text=True)
     assert "/country/GE/settings/developer" in страница
-    assert "/country/GE/settings/space" in страница and "Лотос" in страница
+    assert "/country/GE/settings/contacts?lang=ru" in страница
+    assert 'method="post"' in страница
+    assert 'name="kind" value="partner"' in страница
+    assert 'name="kind" value="mailing"' in страница
+    assert 'name="name" value=""' in страница and 'name="email" value=""' in страница
+    assert "/country/GE/settings/space" not in страница and 'name="space"' not in страница
     assert "/country/GE/settings/report-langs" in страница
 
 
