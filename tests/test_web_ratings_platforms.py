@@ -106,7 +106,7 @@ def test_страна_раскрывается_сервером_по_адрес�
     assert 'class="rt-group is-open" data-country="RO"' in открыта
     assert 'class="rt-group" data-country="PL"' in открыта  # раскрыта одна, остальные нет
     # Меню оболочки тоже несёт aria-expanded, поэтому смотрим только на ссылки стран.
-    assert 'data-rt-country' in открыта
+    assert "data-rt-country" in открыта
     assert 'aria-expanded="true"><span class="rt-group__caret"' in открыта
     assert 'aria-expanded="true"><span class="rt-group__caret"' not in закрыта
     # открытая страна едет в ссылки фильтров: пересчёт не сворачивает её
