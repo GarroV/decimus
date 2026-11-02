@@ -1,6 +1,7 @@
 {#
-  Согласие на подключение Claude (D417). Человек уже вошёл; здесь он видит,
-  КТО просит доступ (имя клиента из регистрации), КУДА уйдёт код (хост
+  Согласие на подключение нейросети (D417, D695). Человек уже вошёл; здесь он видит,
+  КТО просит доступ (вид клиента — по адресу возврата, а не по имени: имя клиент
+  пишет о себе сам и стоит лишь подписью «называет себя»), КУДА уйдёт код (хост
   возврата) и с какими правами (его роль), — и решает сам. Имя клиента любой
   может назвать «Claude» при регистрации, поэтому рядом сказано, что его никто
   не проверял, а предупреждение «только если начали сами и только что» стоит
@@ -24,7 +25,7 @@
   </div>
 
   <div class="empty">
-    <p class="empty__text">{{ t('oauth.consent.lead', client=ask.client.client_name, login=login) }}</p>
+    <p class="empty__text">{{ t('oauth.consent.lead', kind=t('oauth.kind.' ~ kind), login=login) }}</p>
     <p class="empty__text"><small>{{ t('oauth.consent.unverified', client=ask.client.client_name) }}</small></p>
     <p class="empty__text">{{ t('oauth.consent.role', role=t(role_key(account.role, account.tenant))) }}</p>
     <p class="empty__text">{{ t('oauth.consent.rights') }}</p>

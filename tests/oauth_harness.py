@@ -243,6 +243,7 @@ class ПамятьOAuth:
                 client_name=п.client.client_name,
                 created_at=п.created_at,
                 last_used_at=п.last_used_at,
+                kind=oauth_store.client_kind(п.client.redirect_uris),
             )
             for номер, п in self.grants.items()
             if п.user_id == user_id and not п.revoked

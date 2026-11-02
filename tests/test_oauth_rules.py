@@ -19,6 +19,7 @@ from src.db.oauth_store import (
     RefreshState,
     challenge_valid,
     clean_client_name,
+    client_kind,
     fingerprint,
     is_loopback,
     judge_code,
@@ -44,9 +45,19 @@ def _challenge(verifier: str) -> str:
         "http://localhost:1/callback",
         "http://localhost:33418/callback",
         "http://127.0.0.1:65535/callback",
+        # ChatGPT в браузере (D695)
+        "https://chatgpt.com/connector_platform_oauth_redirect",
+        "https://chatgpt.com/connector/oauth/abc123",
+        "https://chatgpt.com/connector/oauth/Ab_c-9" + "x" * 121,
+        # Программы на компьютере: Codex, Kimi Code CLI, ZCode, Claude Code
+        "http://[::1]:8080/callback",
+        "http://localhost:1455/oauth/callback",
+        "http://127.0.0.1:51234/oauth/callback",
+        "http://localhost:8080/oauth/callback/mcp/decimus",
+        "http://[::1]:65535/oauth/callback/mcp/my.server_1-a",
     ],
 )
-def test_адрес_claude_принимается(адрес: str) -> None:
+def test_адрес_нейросети_принимается(адрес: str) -> None:
     assert redirect_uri_allowed(адрес) is True
 
 
@@ -68,10 +79,49 @@ def test_адрес_claude_принимается(адрес: str) -> None:
         "http://localhost:65536/callback",
         "http://localhost:8080/callback/evil",
         "http://localhost:8080/other",
-        "http://[::1]:8080/callback",
         "",
         None,
         42,
+        # ChatGPT: только свой хост и свои два пути (D695)
+        "https://chatgpt.com.evil.com/connector_platform_oauth_redirect",
+        "https://evil.com/connector_platform_oauth_redirect",
+        "http://chatgpt.com/connector_platform_oauth_redirect",
+        "https://chatgpt.com/connector_platform_oauth_redirect?x=1",
+        "https://chatgpt.com/connector_platform_oauth_redirect#x",
+        "https://chatgpt.com/connector_platform_oauth_redirect/",
+        "https://chatgpt.com@evil.com/connector_platform_oauth_redirect",
+        "https://user:pw@chatgpt.com/connector_platform_oauth_redirect",
+        "https://chatgpt.com:444/connector_platform_oauth_redirect",
+        "https://chatgpt.com/connector/oauth/",
+        "https://chatgpt.com/connector/oauth/a/b",
+        "https://chatgpt.com/connector/oauth/a b",
+        "https://chatgpt.com/connector/oauth/a?x=1",
+        "https://chatgpt.com/connector/oauth/a#x",
+        "https://chatgpt.com/connector/oauth/" + "x" * 129,
+        "https://chatgpt.com/connector/oauth/..",
+        "https://chatgpt.com/other",
+        # петля: чужие пути, query, фрагмент, userinfo, пробелы, нулевой порт
+        "http://localhost:8080/oauth/callback/mcp/",
+        "http://localhost:8080/oauth/callback/mcp/a/b",
+        "http://localhost:8080/oauth/callback/mcp/a b",
+        "http://localhost:8080/oauth/callback/mcp/..",
+        "http://localhost:8080/oauth/callback/mcp/" + "n" * 65,
+        "http://localhost:8080/oauth/callback/other",
+        "http://localhost:8080/callback?x=1",
+        "http://localhost:8080/oauth/callback?code=1",
+        "http://localhost:8080/callback#x",
+        "http://user@localhost:8080/callback",
+        "http://localhost:8080@evil.com/callback",
+        "http://localhost:8080/ callback",
+        "http://localhost:8080/callback ",
+        "http://[::1]:0/callback",
+        "http://localhost:08080/callback",
+        "http://[::1]/callback",
+        "http://[::2]:8080/callback",
+        "http://[::1]:70000/callback",
+        "http://0.0.0.0:8080/callback",
+        "https://127.0.0.1:8080/callback",
+        "http://localhost:8080/callback\r\n",
     ],
 )
 def test_чужой_адрес_отвергается(адрес: object) -> None:
@@ -278,3 +328,32 @@ def test_refresh_с_чужим_ресурсом_отвергается_как_in
 
     assert решение.refusal is not None and решение.error == "invalid_target"
     assert judge_refresh(_refresh(), client_id=КЛИЕНТ, resource=РЕСУРС).refusal is None
+
+
+# --- вид клиента (D695) -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("адреса", "вид"),
+    [
+        (["https://claude.ai/api/mcp/auth_callback"], "claude"),
+        (
+            ["https://claude.com/api/mcp/auth_callback", "https://claude.ai/api/mcp/auth_callback"],
+            "claude",
+        ),
+        (["https://chatgpt.com/connector_platform_oauth_redirect"], "chatgpt"),
+        (["https://chatgpt.com/connector/oauth/abc"], "chatgpt"),
+        (["http://localhost:1455/oauth/callback"], "local"),
+        (["http://[::1]:8080/callback"], "local"),
+        # смесь видов — осторожный вид: предупреждение про свою машину остаётся
+        (["https://claude.ai/api/mcp/auth_callback", "http://localhost:8080/callback"], "local"),
+        ([], "local"),
+    ],
+)
+def test_вид_клиента_по_адресу_возврата(адреса: list[str], вид: str) -> None:
+    assert client_kind(адреса) == вид
+
+
+def test_вид_клиента_не_берётся_из_имени() -> None:
+    """Имя клиент пишет о себе сам; вид зависит только от адреса возврата."""
+    assert client_kind(["http://localhost:8080/callback"]) == "local"
