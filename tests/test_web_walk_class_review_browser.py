@@ -81,9 +81,11 @@ def test_mobile_ready_class_saves_without_manual_reselection(browser_page):
     choose(page, 0)
     page.wait_for_function("levelCalls.length === 1")
     assert page.locator(".walk-sheet__why").inner_text() == "walk.sheet.class_review.pending"
+    # П. 6 фидбека: формулировка и рекомендация стоят выше показаний и класса;
+    # состояние проверки класса видно у кнопки сохранения, а не за счёт порядка.
     assert page.locator("[data-class-review]").evaluate(
         "el => !!(el.compareDocumentPosition(document.querySelector('[data-finding-text]'))"
-        " & Node.DOCUMENT_POSITION_FOLLOWING)"
+        " & Node.DOCUMENT_POSITION_PRECEDING)"
     )
     resolve(page, level="D1")
     assert page.locator("[data-manual-class]").count() == 0
