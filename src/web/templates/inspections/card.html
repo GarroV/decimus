@@ -20,8 +20,9 @@
   <div class="row row--tight row--between">
     <a class="back" href="{{ url('/inspections') }}?lang={{ lang }}">‹ {{ t('card.back') }}</a>
   </div>
-  {% if not report and not failure %}
-    <div class="note mt-gap"><div><div class="note__text">{{ t('card.report.none.' ~ head.origin if head.origin != 'field' else 'card.report.none') if report_known else t('card.report.unknown') }}</div></div></div>
+  {#- Без сохранённого PDF молчим: кроме исторической, выдача соберёт его сама (#1437). -#}
+  {% if not report and not failure and head.is_legacy %}
+    <div class="note mt-gap"><div><div class="note__text">{{ t('card.report.none.legacy') if report_known else t('card.report.unknown') }}</div></div></div>
   {% endif %}
 
   {% if notice %}
