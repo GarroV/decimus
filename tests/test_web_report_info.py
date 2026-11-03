@@ -2,8 +2,9 @@
 
 Замечание владельца 28.09: «не ясно что да? что нет? какие вопросы то были?»
 и «не вижу возможности скачать пдф с проверкой». Здесь проверяется то, что
-видит человек: вопрос стоит рядом с ответом, кнопка есть только при
-сохранённом отчёте, и файл отдаётся тем, что лежит в хранилище.
+видит человек: вопрос стоит рядом с ответом, кнопка есть у любой проверки,
+кроме исторической без сохранённого отчёта (#1437: у проверок из Claude PDF
+собирается при скачивании), и файл отдаётся тем, что лежит в хранилище.
 """
 
 from __future__ import annotations
@@ -36,9 +37,13 @@ from src.web import inspections as data
 ВОПРОСЫ = {"INF03": "Is the team stable?"}
 
 
-def _стенд(monkeypatch: pytest.MonkeyPatch, *, report: ReportRef | None) -> Iterator[FlaskClient]:
+def _стенд(
+    monkeypatch: pytest.MonkeyPatch, *, report: ReportRef | None, origin: str = "field"
+) -> Iterator[FlaskClient]:
     monkeypatch.setattr(data, "retraction_available", lambda: False)
-    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка(), info=ПОЛЯ))
+    monkeypatch.setattr(
+        data, "load_card", lambda *_a, **_k: карточка(шапка(origin=origin), info=ПОЛЯ)
+    )
     monkeypatch.setattr(data, "load_moves", lambda *_a, **_k: ())
     monkeypatch.setattr(data, "load_report", lambda *_a, **_k: report)
     monkeypatch.setattr(
@@ -63,6 +68,11 @@ def с_отчётом(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
 @pytest.fixture
 def без_отчёта(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     yield from _стенд(monkeypatch, report=None)
+
+
+@pytest.fixture
+def историческая_без_отчёта(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
+    yield from _стенд(monkeypatch, report=None, origin="legacy")
 
 
 def test_вопрос_стоит_рядом_с_ответом(с_отчётом: FlaskClient) -> None:
@@ -94,10 +104,26 @@ def test_кнопка_pdf_есть_при_сохранённом_отчёте(с
     assert "M10 3.5v9M6.5 9l3.5 3.5L13.5 9M4 16.5h12" in кнопка
 
 
-def test_кнопки_pdf_нет_без_отчёта_и_сказано_почему(без_отчёта: FlaskClient) -> None:
-    html = без_отчёта.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
+@pytest.fixture(params=["field", "import"])
+def несохранённый(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> Iterator[FlaskClient]:
+    yield from _стенд(monkeypatch, report=None, origin=request.param)
+
+
+def test_кнопка_pdf_есть_и_без_сохранённого_отчёта(несохранённый: FlaskClient) -> None:
+    # #1437: у проверки из Claude PDF не сохранён, а выдача собирает его сама.
+    html = несохранённый.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
+    assert f"/inspections/{ПРОВЕРКА}/report" in html
+    assert "PDF is not stored" not in html
+
+
+def test_кнопки_pdf_нет_у_исторической_без_отчёта_и_сказано_почему(
+    историческая_без_отчёта: FlaskClient,
+) -> None:
+    html = историческая_без_отчёта.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
     assert f"/inspections/{ПРОВЕРКА}/report" not in html
-    assert "PDF is not stored" in html
+    assert "historical inspection has no PDF" in html
 
 
 def test_отчёт_отдаётся_файлом_тем_самым(с_отчётом: FlaskClient) -> None:

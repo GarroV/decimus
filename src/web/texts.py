@@ -903,16 +903,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "report storage, or the report did not reach the storage."
         ),
     },
-    "card.report.none.import": {
-        "ru": (
-            "PDF собирается при приёмке через Claude. Если его нет — попросите Claude "
-            "собрать отчёт заново (inspection_letter / приёмка)."
-        ),
-        "en": (
-            "The PDF is built when the inspection is accepted via Claude. If it is "
-            "missing, ask Claude to build the report again (inspection_letter / acceptance)."
-        ),
-    },
     "card.report.none.legacy": {
         "ru": "Для исторической проверки PDF нет.",
         "en": "A historical inspection has no PDF.",
