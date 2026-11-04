@@ -2,53 +2,38 @@
 
 CLIENT_TEXTS: dict[str, dict[str, str]] = {
     "ratings.clients.failed": {
-        "ru": (
-            "Не удалось обновить или прочитать клиентские оценки. Сохранённые данные, если "
-            "доступны, показаны ниже."
-        ),
-        "en": (
-            "Customer ratings could not be refreshed or read. Saved data, when available, "
-            "is shown below."
-        ),
+        "ru": "Оценки клиентов сейчас не прочитались. Показано то, что сохранено.",
+        "en": "Customer ratings could not be read right now. Showing what is saved.",
     },
     "ratings.clients.incomplete": {
-        "ru": (
-            "Для части стран нет успешной загрузки клиентских оценок. Сводка может быть неполной."
-        ),
-        "en": (
-            "Some countries have no successful customer-rating collection. The summary may "
-            "be incomplete."
-        ),
+        "ru": "Для части стран нет загрузки оценок клиентов.",
+        "en": "Some countries have no customer ratings loaded.",
     },
-    "ratings.clients.loaded": {
-        "ru": "Последняя успешная загрузка выбранных стран: {at} UTC",
-        "en": "Last successful collection for the selected countries: {at} UTC",
-    },
+    "ratings.clients.loaded": {"ru": "Загружено: {at}", "en": "Loaded: {at}"},
     "ratings.clients.monthsOnly": {
         "ru": (
-            "Источник хранит месячные агрегаты. Неполные месяцы на границах отбора "
-            "исключены; текущий месяц доступен с первого числа по сегодня. Оценки не "
-            "делятся пропорционально дням."
+            "Оценки приходят по месяцам целиком. Если период захватывает месяц не "
+            "полностью, этот месяц не учитывается. Текущий месяц — с 1-го числа по "
+            "сегодня."
         ),
         "en": (
-            "The source stores monthly aggregates. Partial boundary months are excluded; "
-            "the current month is available from its first day through today. Ratings are "
-            "not prorated by day."
+            "Ratings come in whole months. If the period only partly covers a month, "
+            "that month is left out. The current month runs from the 1st through "
+            "today."
         ),
     },
     "ratings.clients.noData": {
-        "ru": "За выбранные полные месяцы клиентских оценок нет.",
-        "en": "No customer ratings are available for the selected complete months.",
+        "ru": "За выбранный период нет полных месяцев с оценками клиентов.",
+        "en": "There are no complete months with customer ratings in the selected period.",
     },
     "ratings.clients.latest": {
         "ru": "Открыть последний месяц с данными: {month}",
         "en": "Open the latest month with data: {month}",
     },
     "ratings.clients.coverage": {
-        "ru": "Месячные агрегаты за {begin} — {end}.",
-        "en": "Monthly aggregates for {begin} — {end}.",
+        "ru": "Учтены оценки за {months} (по {end}).",
+        "en": "Ratings included: {months} (through {end}).",
     },
-    "ratings.clients.months": {"ru": "Месяцы с оценками:", "en": "Months with ratings:"},
     "ratings.clients.total": {"ru": "Все оценки · из 5", "en": "All ratings · out of 5"},
     "ratings.clients.dine": {"ru": "Зал · из 5", "en": "Dine-in · out of 5"},
     "ratings.clients.delivery": {"ru": "Доставка · из 5", "en": "Delivery · out of 5"},
@@ -56,7 +41,13 @@ CLIENT_TEXTS: dict[str, dict[str, str]] = {
     "ratings.clients.units": {"ru": "Оценки по пиццериям", "en": "Ratings by pizzeria"},
     "ratings.clients.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
     "ratings.clients.weighted": {
-        "ru": "Средние взвешены числом оценок; в скобках — число оценок.",
-        "en": "Averages are weighted by rating count; counts are in parentheses.",
+        "ru": (
+            "Средняя считается с учётом числа оценок: месяц с большим числом оценок "
+            "влияет сильнее. В скобках — сколько было оценок."
+        ),
+        "en": (
+            "The average accounts for how many ratings there were: a month with more "
+            "ratings counts for more. In parentheses: the number of ratings."
+        ),
     },
 }

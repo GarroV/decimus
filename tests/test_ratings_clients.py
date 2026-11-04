@@ -106,7 +106,7 @@ def test_real_page_renders_existing_month_and_weights_not_placeholder(monkeypatc
     html = получить(monkeypatch, "/ratings/clients?group=country&value=RS&period=2026-Q4")
     assert "1.40" in html and "Оценок: 10" in html
     assert "Pizzeria a" in html and "Pizzeria b" in html
-    assert "Месяцы с оценками" in html
+    assert "Учтены оценки за" in html
     assert "появятся после подключения" not in html
 
 
@@ -116,7 +116,7 @@ def test_empty_current_period_links_to_existing_month(monkeypatch):
     подготовить(monkeypatch)
     source(monkeypatch, [], [], date(2026, 10, 1))
     html = получить(monkeypatch, "/ratings/clients?group=country&value=RS&period=2026-11")
-    assert "Открыть последний месяц с данными: 2026-10" in html
+    assert "Открыть последний месяц с данными: октябрь 2026" in html
     assert "period=2026-10" in html
 
 

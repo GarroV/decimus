@@ -113,14 +113,16 @@ def test_страна_раскрывается_сервером_по_адрес�
     assert "&amp;country=RO" in открыта.split('id="rt-bar-form"')[1].split("</form>")[0]
 
 
-def test_чего_не_хватает_причина_словами_у_каждой_пиццерии(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_чего_не_хватает_на_экране_нет_пиццерия_без_оценки_просто_прочерк(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     html = _агрегаторы(monkeypatch)
 
-    блок = html.split('<h2 class="pk-block__title">Чего не хватает</h2>')[1]
-    assert "Glovo: не привязана — точка рядом с пиццерией не нашлась" in блок
-    assert "Wolt: точка привязана, оценок у неё ещё нет" in блок
-    assert "Glovo: оценка не обновляется с 10.10.2026" in блок
-    assert "Бухарест-1" in блок and "Варшава-1" in блок
+    # О неполных данных сообщаем владельцу, а не читателю: блока и причин на экране нет.
+    assert "Чего не хватает" not in html
+    assert "не привязана — точка рядом" not in html
+    assert "оценок у неё ещё нет" not in html
+    assert "Бухарест-1" in html and "Варшава-1" in html  # сами пиццерии — в раскрытии стран
 
 
 def test_привязка_по_ссылке_только_в_администрировании(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -144,7 +146,7 @@ def test_без_права_формы_привязки_нет(monkeypatch: pytes
     monkeypatch.setattr(screen.ratings_platforms, "build_agg", lambda *_a, **_k: _охват())
     for c in клиент(monkeypatch, tenant="GE"):
         html = c.get("/ratings/agg").get_data(as_text=True)
-    assert "Чего не хватает" in html and "coverage/link" not in html
+    assert "Чего не хватает" not in html and "coverage/link" not in html
 
 
 def test_база_не_ответила_агрегаторы_говорят_об_этом(monkeypatch: pytest.MonkeyPatch) -> None:

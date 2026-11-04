@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from src.db import customer_ratings as read
 from src.db.errors import RatingsError
 from src.domain.dodois_metrics import next_month
 from src.ratings import clients, freshness
+
+from . import ratings_words
+from .texts import t
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +58,7 @@ def load(codes: tuple[str, ...], begin: date, end: date, *, today: date) -> View
     complete = all(c in states and states[c].last_ok is not None for c in codes)
     loaded = min(s.last_ok for s in states.values() if s.last_ok is not None) if complete else None
     if loaded is not None:
-        loaded = loaded.astimezone(UTC)
+        loaded = loaded.astimezone(freshness.local_zone())
     failed = metadata_failed or any(s.failed for s in states.values())
     status = None
     if failed:
@@ -81,3 +84,24 @@ def load(codes: tuple[str, ...], begin: date, end: date, *, today: date) -> View
         incomplete=not complete,
         partial_period=start != begin or end_of_coverage != min(end, today),
     )
+
+
+_AT = "%d.%m.%Y %H:%M"
+
+
+def help_rows(view: View, lang: str) -> tuple[str, ...]:
+    """Строки под «?» у раздела: за какие месяцы учтено, как считаются месяцы, когда загружено."""
+    rows: list[str] = []
+    if view.months:
+        rows.append(
+            t(
+                "ratings.clients.coverage",
+                lang,
+                months=ratings_words.months_phrase(view.months, lang),
+                end=view.end.strftime("%d.%m.%Y"),
+            )
+        )
+    rows.append(t("ratings.clients.monthsOnly", lang))
+    if view.loaded:
+        rows.append(t("ratings.clients.loaded", lang, at=view.loaded.strftime(_AT)))
+    return tuple(rows)

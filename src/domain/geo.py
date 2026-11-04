@@ -40,6 +40,20 @@ COUNTRIES: dict[str, dict[str, str]] = {
     "UZ": {"ru": "Узбекистан", "en": "Uzbekistan"},
 }
 
+#: Страны, которых нет в сети Decimus, но которые встречаются в данных рейтингов: названия
+#: нужны, чтобы показать их словом, а не кодом. Заводить пиццерии в них нельзя — `COUNTRIES`
+#: этих стран не содержит.
+EXTRA_COUNTRIES: dict[str, dict[str, str]] = {
+    "KZ": {"ru": "Казахстан", "en": "Kazakhstan"},
+    "MX": {"ru": "Мексика", "en": "Mexico"},
+    "RU": {"ru": "Россия", "en": "Russia"},
+}
+
+#: Единый справочник названий стран для показа: сеть и страны из данных рейтингов. Новая
+#: страна заводится здесь (в `COUNTRIES`, если в ней можно вести пиццерии, иначе в
+#: `EXTRA_COUNTRIES`); `src/web/geo_names.py` и `src/ratings/countries.py` берут названия отсюда.
+COUNTRY_NAMES: dict[str, dict[str, str]] = {**COUNTRIES, **EXTRA_COUNTRIES}
+
 CITIES: dict[str, dict[str, str]] = {
     "abuja": {"ru": "Абуджа", "en": "Abuja"},
     "adana": {"ru": "Адана", "en": "Adana"},

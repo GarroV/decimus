@@ -62,6 +62,7 @@ from . import (
     ratings_platforms,
     ratings_risk,
     ratings_sheet,
+    ratings_words,
     ui_lang,
 )
 from . import ratings_line as rl_chart
@@ -128,7 +129,32 @@ def _period_title(period: ReportPeriod | None, found: report.Choices, lang: str)
                 return p.title_ru if lang == "ru" else p.title_en
     if period.kind == KIND_RANGE:
         return f"{period.begin:%d.%m.%Y} — {period.end:%d.%m.%Y}"
-    return period.key
+    return ratings_words.period_title(period, lang) or period.key
+
+
+def _grouped(number: int) -> str:
+    """Число с разделителем тысяч: 37812 → «37 812» (неразрывный пробел)."""
+    return f"{number:,}".replace(",", "\u00a0")
+
+
+def _section_help(
+    key: str, lang: str, data: Mapping[str, object], fresh_line: str | None
+) -> tuple[str, ...]:
+    """Строки под «?» у заголовка раздела: что это, как считается, за какие даты и когда пришло."""
+    rows: list[str] = []
+    if key == ratings_nav.CLIENTS:
+        view = data.get("clients")
+        if isinstance(view, ratings_clients.View):
+            rows.extend(ratings_clients.help_rows(view, lang))
+    elif key == ratings_nav.RISK:
+        hint = data.get("risk_hint")
+        if isinstance(hint, tuple):
+            rows.extend(str(row) for row in hint)
+    elif f"ratings.help.{key}" in TEXTS:
+        rows.append(t(f"ratings.help.{key}", lang))
+    if fresh_line:
+        rows.append(fresh_line)
+    return tuple(rows)
 
 
 def _maps(
@@ -335,16 +361,27 @@ def _section_data(
             "no_countries": not summary.countries,
             "risk": risk,
             "risk_short": summary.risk_short,
-            "risk_hint": t(
-                "ratings.risk.hint",
-                lang,
-                n=int(summary.thresholds["risk_periods"]),
-                x=f"{summary.thresholds['risk_threshold']:.1f}",
-                agg=rsrc.AGG_WINDOW,
-                insp=rsrc.INSPECTION_WINDOW,
-                wolt=f"{rsrc.AGG_THRESHOLDS['wolt']:.1f}",
-                glovo=f"{rsrc.AGG_THRESHOLDS['glovo']:.0f}",
-                share=round(rsrc.AGG_OTHER_SHARE * 100),
+            "risk_hint": (
+                t(
+                    "ratings.risk.hint.rs",
+                    lang,
+                    n=int(summary.thresholds["risk_periods"]),
+                    x=f"{summary.thresholds['risk_threshold']:.1f}",
+                ),
+                t(
+                    "ratings.risk.hint.agg",
+                    lang,
+                    agg=rsrc.AGG_WINDOW,
+                    wolt=f"{rsrc.AGG_THRESHOLDS['wolt']:.1f}",
+                    glovo=f"{rsrc.AGG_THRESHOLDS['glovo']:.0f}",
+                    share=round(rsrc.AGG_OTHER_SHARE * 100),
+                ),
+                t(
+                    "ratings.risk.hint.insp",
+                    lang,
+                    insp=rsrc.INSPECTION_WINDOW,
+                    x=f"{summary.thresholds['risk_threshold']:.1f}",
+                ),
             ),
             "risk_unread": ", ".join(t(f"ratings.risk.unread.{k}", lang) for k in risk.unread),
             "risk_sources": ratings_risk.source_names(agg_names, lang),
@@ -429,7 +466,19 @@ def render_section(
             clients_status=clients_status,
         ),
         section_title=t(f"ratings.sec.{key}", lang),
-        section_line=ratings_freshness.section_line(rows, key, lang),
+        section_help=_section_help(
+            key,
+            lang,
+            data,
+            ratings_freshness.section_line(rows, key, lang),
+        ),
+        delta_note=(
+            t("ratings.delta.note", lang, prev=_period_title(previous, found, lang))
+            if previous
+            else None
+        ),
+        month_title=lambda month: ratings_words.month_title(month, lang),
+        grouped=_grouped,
         section_dot=clients_status
         if key == ratings_nav.CLIENTS
         else ratings_freshness.section_status(rows, key),

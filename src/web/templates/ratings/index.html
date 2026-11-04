@@ -9,17 +9,13 @@
 #}{% extends "base.html" %}
 {% block title %}{{ section_title }} · {{ t('section.ratings.title') }}{% endblock %}
 {% block page_heading %}<header class="page-heading">
-<div class="rt-head__main">
-      <div class="rt-head__kicker">{{ t('section.ratings.title') }}</div>
-      {#- Свежесть всех источников — под «?», таблицей (D659); у раздела — одна строка о его данных. -#}
-      <div class="info-row">
+      {#- В шапке — заголовок и «?» (D632): пояснение раздела и свежесть данных лежат под значком. -#}
+      <div class="info-row rt-head__row">
         <h1 class="rt-head__title">{{ section_title }}</h1>
         {{ fresh_tip(t('ratings.loaded.hint'), t('ratings.fresh.title'), freshness, 'loaded',
                      [t('ratings.fresh.col.source'), t('ratings.fresh.col.scope'), t('ratings.fresh.col.at'), t('ratings.fresh.col.status')],
-                     t('ratings.fresh.foot'), t('ratings.loaded.none')) }}
-        {% if section_line %}<span class="rt-fresh-line">{% if section_dot %}<i class="rt-fdot rt-fdot--{{ section_dot }}" aria-hidden="true"></i> {% endif %}{{ section_line }}</span>{% endif %}
+                     t('ratings.fresh.foot'), t('ratings.loaded.none'), section_help) }}
       </div>
-    </div>
 </header>{% endblock %}
 
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">

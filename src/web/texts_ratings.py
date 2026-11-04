@@ -64,9 +64,9 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.fresh.name.maps": {"ru": "Карты (Google, Яндекс)", "en": "Maps (Google, Yandex)"},
     "ratings.fresh.scope.rs": {"ru": "за {span}", "en": "for {span}"},
     "ratings.fresh.scope.rko": {"ru": "неделя {span}", "en": "week {span}"},
-    "ratings.fresh.scope.sheet": {"ru": "проверка бота", "en": "bot check"},
-    "ratings.fresh.scope.maps": {"ru": "сбор", "en": "collection"},
-    "ratings.fresh.scope.agg": {"ru": "сбор", "en": "collection"},
+    "ratings.fresh.scope.sheet": {"ru": "проверка таблицы", "en": "spreadsheet check"},
+    "ratings.fresh.scope.maps": {"ru": "загрузка", "en": "loading"},
+    "ratings.fresh.scope.agg": {"ru": "загрузка", "en": "loading"},
     "ratings.fresh.none": {"ru": "нет оценок", "en": "no scores"},
     "ratings.fresh.never": {"ru": "ни разу", "en": "never"},
     "ratings.fresh.foot": {
@@ -86,7 +86,7 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.cluster.OTHER": {"ru": "Остальные страны", "en": "Other countries"},
     "ratings.countries.n": {"ru": "стран: {n}", "en": "countries: {n}"},
     "ratings.col.country": {"ru": "Страна", "en": "Country"},
-    "ratings.col.delta": {"ru": "Δ к {prev}", "en": "Δ vs {prev}"},
+    "ratings.col.delta": {"ru": "Изменение", "en": "Change"},
     "ratings.total": {"ru": "Итого", "en": "Total"},
     "ratings.cluster": {"ru": "Топ-5", "en": "Top 5"},
     "ratings.top": {"ru": "Выше {x}", "en": "Above {x}"},
@@ -95,8 +95,8 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.compare.countries": {"ru": "Страна", "en": "Country"},
     "ratings.compare.units": {"ru": "Пиццерий", "en": "Pizzerias"},
     "ratings.hard.source": {
-        "ru": "Формулировки — дословно из Dodo IS. РКО — фото-проверка заказа.",
-        "en": "Wording is verbatim from Dodo IS. RKO is a photo check of an order.",
+        "ru": "Формулировки — как в Dodo IS. В РКО нарушения находят по фото заказа.",
+        "en": "Wording is as in Dodo IS. In CX, violations are found from the order photo.",
     },
     "ratings.empty.rs_rko": {
         "ru": "За период нет данных РС и РКО.",
@@ -114,41 +114,41 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.layout.aggregators": {"ru": "Оценки в агрегаторах", "en": "Delivery app ratings"},
     "ratings.more": {"ru": "Показать ещё ({n})", "en": "Show more ({n})"},
     "ratings.maps.hint": {
-        "ru": "Средняя по всем отзывам и оценкам пиццерий группы",
-        "en": "Average over all reviews and ratings of the group's pizzerias",
+        "ru": "Средняя по всем отзывам на картах у пиццерий группы.",
+        "en": "Average over all map reviews of the group's pizzerias.",
     },
-    "ratings.maps.reviews": {"ru": "{n} отз.", "en": "{n} reviews"},
+    "ratings.maps.reviews": {"ru": "отзывов: {n}", "en": "reviews: {n}"},
     "ratings.agg.points": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
-    "ratings.maps.branches_n": {"ru": "филиалов: {n}", "en": "branches: {n}"},
+    "ratings.maps.branches_n": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
     "ratings.agg.later": {
-        "ru": (
-            "Агрегаторы собираются с 11.10.2026, раз в сутки: за выбранный период "
-            "оценок нет, показаны данные на {date}."
-        ),
-        "en": (
-            "Delivery apps are collected daily since 11.10.2026: no ratings for the "
-            "selected period, showing data as of {date}."
-        ),
+        "ru": "За выбранный период оценок нет — показаны данные на {date}.",
+        "en": "No ratings for the selected period; showing data as of {date}.",
     },
     "ratings.risk.tile": {
         "ru": "Пиццерии, стабильно низкие по любому источнику",
         "en": "Pizzerias consistently low by any source",
     },
-    "ratings.risk.hint": {
+    "ratings.col.sources": {"ru": "Где ниже порога", "en": "Below the threshold in"},
+    "ratings.risk.hint.rs": {
+        "ru": "РС и РКО: средняя ниже {x} (последних периодов: {n}).",
+        "en": "Standards and customer experience: average below {x} (last periods: {n}).",
+    },
+    "ratings.risk.hint.agg": {
         "ru": (
-            "РС и РКО: средняя за {n} последних периода ниже {x} · площадки доставки: "
-            "{agg} последних снимка подряд ниже порога площадки (Wolt — {wolt} из 10, "
-            "Glovo — {glovo} %, остальные — {share} % шкалы) · наши проверки: "
-            "{insp} последние принятые ниже {x}"
+            "Площадки доставки: оценка ниже порога площадки в каждом из последних "
+            "снимков (их {agg}). Порог: Wolt — {wolt} из 10, Glovo — {glovo} %, "
+            "остальные — {share} % шкалы."
         ),
         "en": (
-            "Standards and customer experience: average of the last {n} periods below {x} · "
-            "delivery apps: the last {agg} snapshots all below the app's threshold "
-            "(Wolt {wolt} of 10, Glovo {glovo}%, others {share}% of the scale) · "
-            "our inspections: the last {insp} accepted ones below {x}"
+            "Delivery apps: rating below the app's threshold in each of the last "
+            "{agg} snapshots. Threshold: Wolt {wolt} of 10, Glovo {glovo}%, others "
+            "{share}% of the scale."
         ),
     },
-    "ratings.col.sources": {"ru": "Где ниже порога", "en": "Below the threshold in"},
+    "ratings.risk.hint.insp": {
+        "ru": "Наши проверки: оценка ниже {x} в каждой из последних принятых проверок (их {insp}).",
+        "en": "Our inspections: score below {x} in each of the last {insp} accepted inspections.",
+    },
     "ratings.risk.src.inspections": {"ru": "Наши проверки", "en": "Our inspections"},
     "ratings.risk.unread": {
         "ru": "Не прочитались, в списке их нет: {names}.",
@@ -185,7 +185,10 @@ _SCREEN: dict[str, dict[str, str]] = {
         "ru": "Нет пиццерий на пороге и ниже.",
         "en": "No pizzerias at or below the threshold.",
     },
-    "ratings.empty.risk": {"ru": "В зоне риска никого.", "en": "Nobody is at risk."},
+    "ratings.empty.risk": {
+        "ru": "Пиццерий стабильно ниже порога нет.",
+        "en": "No pizzerias are consistently below the threshold.",
+    },
     "ratings.risk.short": {
         "ru": "Недостаточно периодов для оценки: {types}.",
         "en": "Not enough periods to assess: {types}.",
@@ -444,8 +447,8 @@ _IMPORTS: dict[str, dict[str, str]] = {
     },
     "ratings.coverage.new": {"ru": "новая", "en": "new"},
     "ratings.coverage.new_title": {
-        "ru": "Появилась в публичном API Dodo за последние {days} дней",
-        "en": "Appeared in the Dodo public API in the last {days} days",
+        "ru": "Появилась в Dodo IS за последние {days} дней",
+        "en": "Appeared in Dodo IS in the last {days} days",
     },
     "ratings.coverage.stale": {
         "ru": "Данные от {date}, новые не приходят",
