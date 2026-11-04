@@ -1,28 +1,18 @@
 """Страны выгрузок рейтинга → код ISO. Охват — IMF без РФ, КЗ и УЗ (D318).
 
 Выгрузки пишут страну то по-русски («Беларусь»), то по-английски («Turkey»).
-Карта — справочник сети (`src.domain.geo.COUNTRIES`) плюс страны, которых в
-справочнике Decimus нет, и встреченные написания.
+Названия — единый справочник `src.domain.geo.COUNTRY_NAMES`, здесь — встреченные написания.
 """
 
 from __future__ import annotations
 
 import unicodedata
 
-from src.domain.geo import COUNTRIES
+from src.domain.geo import COUNTRY_NAMES
 
 #: Не IMF (D318): строки с ними отбрасываются по стране, а не по «Конвейеру» —
 #: у части стран IMF конвейер в выгрузке пустой.
 EXCLUDED = frozenset({"RU", "KZ", "UZ"})
-
-_EXTRA: dict[str, dict[str, str]] = {
-    "BY": {"ru": "Беларусь", "en": "Belarus"},
-    "RU": {"ru": "Россия", "en": "Russia"},
-    "KZ": {"ru": "Казахстан", "en": "Kazakhstan"},
-    "UZ": {"ru": "Узбекистан", "en": "Uzbekistan"},
-    # Есть в листе РКО «Качество по пиццериям», в справочнике Decimus нет.
-    "MX": {"ru": "Мексика", "en": "Mexico"},
-}
 
 #: Написания из выгрузок сверх русского и английского названий справочника.
 _ALIASES = {
@@ -33,7 +23,8 @@ _ALIASES = {
     "united arab emirates": "AE",
 }
 
-NAMES: dict[str, dict[str, str]] = {**COUNTRIES, **_EXTRA}
+#: Названия стран — единый справочник `src.domain.geo.COUNTRY_NAMES`; здесь только написания.
+NAMES = COUNTRY_NAMES
 
 
 #: Флаг 🇳🇬 — пара символов категории `So`; эмодзи — `So` с селектором

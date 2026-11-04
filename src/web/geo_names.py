@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from ..domain.geo import CITIES, COUNTRIES
+from ..domain.geo import CITIES, COUNTRY_NAMES
 
 
 def _title(table: dict[str, dict[str, str]], code: str, lang: str) -> str | None:
@@ -25,7 +25,7 @@ def country_title(code: str | None, lang: str) -> str:
     """Страна словом; незнакомый код — кодом, пустой — пустой строкой."""
     if not code:
         return ""
-    return _title(COUNTRIES, code.upper(), lang) or code.upper()
+    return _title(COUNTRY_NAMES, code.upper(), lang) or code.upper()
 
 
 def city_title(code: str | None, lang: str) -> str:

@@ -1,7 +1,7 @@
 // Разделы «Рейтингов» (D660). Что делает скрипт:
 //  1. Переходы без перезагрузки: щелчок по пункту подменю, по срезу, стрелкам и выбору
 //     периода, отправка календаря «с — по» — `fetch` того же адреса, замена содержимого
-//     раздела и подсветки подменю, `history.pushState`, `popstate`. Содержимое плавно
+//     раздела, заголовка страницы и подсветки подменю, `history.pushState`, `popstate`. Содержимое плавно
 //     тускнеет на время запроса, страница не мигает целиком. Не получилось — обычный
 //     переход по ссылке. БЕЗ СКРИПТА всё это — обычные ссылки и форма.
 //  2. Отбор раздела применяется сразу (D357): сменил девелопера или страну — пересчёт
@@ -110,6 +110,11 @@
     var next = doc.querySelector(".rt[data-rt-section]");
     var current = page();
     if (!next || !current) return false;
+    // Заголовок страницы стоит вне `.rt`: без его замены название раздела оставалось от
+    // первого открытого («Рейтинг стандартов» над «Картами»).
+    var heading = doc.querySelector(".page-heading");
+    var headingHere = document.querySelector(".page-heading");
+    if (heading && headingHere) headingHere.replaceWith(heading);
     var sub = doc.querySelector("[data-rt-subnav]");
     var here = document.querySelector("[data-rt-subnav]");
     if (sub && here) here.replaceWith(sub);

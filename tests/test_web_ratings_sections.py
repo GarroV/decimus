@@ -42,14 +42,14 @@ def test_подменю_в_заданном_порядке_и_голый_адр�
     html = получить(monkeypatch)
 
     assert _подменю(html) == [(k, k == "rs") for k in РАЗДЕЛЫ]
-    assert _заголовок(html) == "Рейтинг стандарт (РС)"
+    assert _заголовок(html) == "Рейтинг стандартов (РС)"
 
 
 @pytest.mark.parametrize(
     ("раздел", "название"),
     [
-        ("rs", "Рейтинг стандарт (РС)"),
-        ("rko", "РКО"),
+        ("rs", "Рейтинг стандартов (РС)"),
+        ("rko", "Рейтинг клиентского опыта (РКО)"),
         ("clients", "Оценки клиентов"),
         ("maps", "Карты"),
         ("agg", "Агрегаторы"),
@@ -86,7 +86,7 @@ def test_незнакомый_раздел_и_старый_open_не_ломаю�
         assert c.get("/ratings/zzz").status_code == 404
         # `?open=` из закладок молча игнорируется: открывается РС, как голый адрес
         html = c.get("/ratings?open=risk").get_data(as_text=True)
-        assert _заголовок(html) == "Рейтинг стандарт (РС)"
+        assert _заголовок(html) == "Рейтинг стандартов (РС)"
 
 
 def test_срез_и_период_едут_в_подменю_и_в_фильтры_того_же_раздела(
@@ -233,7 +233,7 @@ def test_клиенты_честная_пустая_плашка(monkeypatch: py
     подготовить(monkeypatch)
     html = получить(monkeypatch, "/ratings/clients")
 
-    assert "За выбранные полные месяцы клиентских оценок нет" in html
+    assert "За выбранный период нет полных месяцев с оценками клиентов" in html
     assert "появятся после подключения" not in html
 
 
@@ -273,7 +273,7 @@ def test_точка_свежести_в_подменю_и_строка_в_шап
     assert re.search(r'РС\)</span><i class="rt-fdot rt-fdot--fresh"', блок.group(0))
     assert re.search(r'Карты</span><i class="rt-fdot rt-fdot--lag"', блок.group(0))
     assert "Оценки клиентов</span><i" not in блок.group(0)  # у клиентов источника нет — точки нет
-    assert "данные за 16–31.10 · пришли 27.10 11:17" in html
+    assert "Данные за 16–31.10, пришли 27.10 11:17" in html
 
 
 def test_подменю_постоянно_но_скрипт_рейтингов_не_включён_на_других_страницах(
@@ -323,10 +323,10 @@ def test_строка_шапки_у_сборов_называет_самый_р�
         ),
     )
 
-    assert rf.section_line(строки, "agg", "ru") == "пришли 25.10 07:30"
-    assert rf.section_line(строки, "agg", "en") == "arrived 25.10 07:30"
+    assert rf.section_line(строки, "agg", "ru") == "Загружено 25.10 07:30"
+    assert rf.section_line(строки, "agg", "en") == "Loaded 25.10 07:30"
     assert rf.section_line(строки, "risk", "ru") is None  # у этих разделов своей даты нет
-    assert rf.section_line((fresh.Row("rs", fresh.Status.STALE),), "rs", "ru") == "оценок ещё нет"
+    assert rf.section_line((fresh.Row("rs", fresh.Status.STALE),), "rs", "ru") == "Оценок ещё нет"
 
 
 @pytest.mark.parametrize("lang", ["ru", "en"])

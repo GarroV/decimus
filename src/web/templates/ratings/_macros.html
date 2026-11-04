@@ -2,6 +2,15 @@
   Макросы разделов «Рейтингов» (D660). Подключаются `with context`: им нужны `t`,
   `unit_url` и `country_name` из окружения страницы. Ни одного вычисления.
 #}
+{% from "_info_tip.html" import info_tip %}
+{#- Число с разделителем тысяч: «37 812». -#}
+{% macro grp(n) %}{{ grouped(n) }}{% endmacro %}
+{#- Заголовок блока: название, «?» с пояснением (D632) и, если нужно, число справа. Пояснения
+    блока — только под значком, строкой над таблицей их нет. -#}
+{% macro block_head(title, rows=(), key='block', count=none) %}<header class="pk-block__head info-row">
+    <h2 class="pk-block__title">{{ title }}</h2>
+    {% if rows %}{{ info_tip(t('ratings.tip.label'), '', rows, key) }}{% endif %}
+    {% if count is not none %}<span class="pk-block__count">{{ count }}</span>{% endif %}</header>{% endmacro %}
 {% macro thr(x) %}{{ '%.1f'|format(x) }}{% endmacro %}
 {% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
 {#- Знак и цвет — по уже округлённой дельте: −0.04 показывается и красится как +0.0 (P17). -#}

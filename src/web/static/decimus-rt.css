@@ -401,3 +401,24 @@
 
 /* Назначение настроек читается целиком, а не пропадает в многоточии. */
 .rt-admin-blocks .srow__main small, .rt-admin-blocks .srow__cell { white-space: normal; overflow: visible; }
+
+/* ── Шапка раздела — одна строка: заголовок и «?» (D632) ──────────────────────── */
+.rt-head__row { padding: 0; border-bottom: 0; }
+/* Заголовок блока со значком «?»: подсказка раскрывается от края блока. */
+.pk-block__head.info-row { padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: center; }
+
+/* ── Раскладка не прыгает при переключении разделов, стран и площадок ──────────────
+   Полоса прокрутки то появляется, то исчезает (страницы разной высоты) и сдвигает всё
+   на её ширину; колонки таблицы «страна × площадка» пересчитывались, когда строка страны
+   раскрывалась длинными названиями пиццерий. */
+html { scrollbar-gutter: stable; }
+.rt-bycountry { table-layout: fixed; min-width: 32rem; }
+.rt-bycountry th:first-child { width: 34%; }
+.rt-bycountry tbody th { white-space: normal; overflow-wrap: anywhere; }
+/* На телефоне заголовок самого длинного раздела («Рейтинг клиентского опыта (РКО)») не
+   помещается в строку: место под две строки держим у всех разделов, иначе отбор под
+   заголовком сдвигается при переходе между ними. */
+@media (max-width: 600px) {
+  .page-heading .rt-head__title { font-size: 20px; line-height: 26px; }
+  .page-heading .rt-head__row { min-height: 52px; }
+}
