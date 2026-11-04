@@ -59,3 +59,9 @@ def test_карты_без_второго_отбора_по_странам(monke
 
     assert "rt-filter" not in html and "pk-block__count" not in html
     assert "Δ к" not in html and "отз." not in html
+
+
+@pytest.mark.parametrize("code", ["IQ", "MD", "GB", "CN", "VN", "US", "DE", "AE", "QA"])
+def test_страны_из_данных_называются_словом(code: str) -> None:
+    assert code in COUNTRY_NAMES
+    assert country_title(code, "ru") != code and country_title(code, "en") != code

@@ -44,6 +44,13 @@ COUNTRIES: dict[str, dict[str, str]] = {
 #: нужны, чтобы показать их словом, а не кодом. Заводить пиццерии в них нельзя — `COUNTRIES`
 #: этих стран не содержит.
 EXTRA_COUNTRIES: dict[str, dict[str, str]] = {
+    "CN": {"ru": "Китай", "en": "China"},
+    "DE": {"ru": "Германия", "en": "Germany"},
+    "GB": {"ru": "Великобритания", "en": "United Kingdom"},
+    "IQ": {"ru": "Ирак", "en": "Iraq"},
+    "MD": {"ru": "Молдова", "en": "Moldova"},
+    "US": {"ru": "США", "en": "United States"},
+    "VN": {"ru": "Вьетнам", "en": "Vietnam"},
     "KZ": {"ru": "Казахстан", "en": "Kazakhstan"},
     "MX": {"ru": "Мексика", "en": "Mexico"},
     "RU": {"ru": "Россия", "en": "Russia"},
