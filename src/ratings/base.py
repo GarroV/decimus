@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date, timedelta
 from typing import TypeVar
 
@@ -26,7 +26,7 @@ from src.domain.unit_name import fold_unit_name, unit_name_skeleton
 from .countries import is_excluded
 from .csvio import read_table
 from .formats import _bad, _BadRow, _country, _rows
-from .links import parse_rating_link
+from .links import hex_id, parse_rating_link
 from .model import (
     CATEGORY_REMARK,
     FORMAT_BASE_COLLECTION,
@@ -327,6 +327,28 @@ def parse_directory(data: bytes) -> dict[str, str]:
         }
         ids.setdefault(key, set()).update(found)
     return shared_ids_ambiguous({key: one_id(found) for key, found in ids.items() if found})
+
+
+def with_own_units(
+    directory: Mapping[str, str], own: Iterable[tuple[str, str | None]]
+) -> dict[str, str]:
+    """Справочник ссылок, дополненный пиццериями нашего справочника точек (`units`).
+
+    Пиццерия, которой нет в листах-справочниках таблицы контроля (новая точка: Podgorica-2,
+    Dushanbe-9), иначе уходит в «не сопоставлено», хотя её имя и код Dodo у нас есть.
+    Лист главнее: имя, уже стоящее в нём (в том числе `AMBIGUOUS`), не трогается, а код,
+    за которым в листе уже стоит другое имя, не берётся: ошибиться пиццерией хуже.
+    """
+    merged = dict(directory)
+    taken = {value.casefold() for value in merged.values()}
+    for name, code in own:
+        dodo_id = hex_id(code)
+        key = fold_unit_name(name)
+        if dodo_id is None or not key or key in merged or dodo_id in taken:
+            continue
+        merged[key] = dodo_id
+        taken.add(dodo_id)
+    return merged
 
 
 def directory_id(directory: Mapping[str, str], name: str) -> str | None:
