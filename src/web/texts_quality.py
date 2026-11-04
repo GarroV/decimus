@@ -19,6 +19,7 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.network": {"ru": "Все страны", "en": "All countries"},
     "quality.filter.title": {"ru": "Страны", "en": "Countries"},
     "quality.rail.line": {"ru": "РКО {rko} · РС {rs}", "en": "RKO {rko} · RS {rs}"},
+    "quality.rail.units": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
     "quality.rail.none": {"ru": "нет данных", "en": "no data"},
     "quality.month.label": {"ru": "Месяц", "en": "Month"},
     "quality.month.prev": {"ru": "Предыдущий месяц", "en": "Previous month"},
@@ -75,12 +76,12 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
         "ru": (
             "Цвет ячейки: РКО и РС — как в «Рейтингах» (ниже 80 красный, ниже 90 жёлтый); "
             "остальные показатели — жёлтым, если стали хуже прошлого месяца. Доли заказов "
-            "не подсвечиваются."
+            "не подсвечиваются; выручка в идущем месяце — тоже, и движения у неё нет."
         ),
         "en": (
             "Cell colour: RKO and RS as in Ratings (below 80 red, below 90 amber); other "
             "figures turn amber when worse than the previous month. Order shares are not "
-            "coloured."
+            "coloured; revenue in a month still in progress is not, and shows no change."
         ),
     },
     "quality.tip.audit": {
@@ -123,15 +124,23 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.total": {"ru": "Вся страна", "en": "Whole country"},
     "quality.col.rko": {"ru": "РКО", "en": "RKO"},
     "quality.col.rs": {"ru": "РС", "en": "RS"},
-    "quality.col.checks": {"ru": "Пров./нед.", "en": "Checks/wk"},
+    "quality.col.checks": {"ru": "Проверок в нед.", "en": "Checks/wk"},
     "quality.col.kr": {"ru": "КР", "en": "CR"},
     "quality.col.maps": {"ru": "Карты", "en": "Maps"},
-    "quality.col.aggs": {"ru": "Агрег.", "en": "Aggr."},
-    "quality.col.share_agg": {"ru": "Агрегаторы, %", "en": "Aggregators, %"},
-    "quality.col.share_app": {"ru": "Прилож. и сайт, %", "en": "App and site, %"},
-    "quality.col.share_other": {"ru": "Прочее, %", "en": "Other, %"},
-    "quality.col.rev_dine": {"ru": "Выручка: зал", "en": "Revenue: dine-in"},
-    "quality.col.rev_delivery": {"ru": "Выручка: доставка", "en": "Revenue: delivery"},
+    "quality.col.aggs": {"ru": "Агрегаторы", "en": "Aggregators"},
+    "quality.col.share_agg": {"ru": "Агрегаторы", "en": "Aggregators"},
+    "quality.col.share_app": {"ru": "Приложение и сайт", "en": "App and site"},
+    "quality.col.share_other": {"ru": "Прочее", "en": "Other"},
+    "quality.col.rev_dine": {"ru": "Зал", "en": "Dine-in"},
+    "quality.col.rev_delivery": {"ru": "Доставка", "en": "Delivery"},
+    "quality.group.ratings": {"ru": "Рейтинги", "en": "Ratings"},
+    "quality.group.guest": {"ru": "Оценки гостей, из 5", "en": "Guest ratings, of 5"},
+    "quality.group.shares": {"ru": "Доли заказов", "en": "Order shares"},
+    "quality.group.revenue": {"ru": "Выручка", "en": "Revenue"},
+    "quality.no_data": {
+        "ru": "Нет данных за {month} ({n}): ",
+        "en": "No data for {month} ({n}): ",
+    },
     "quality.col.audit": {"ru": "Проверка", "en": "Inspection"},
     # --- страна
     "quality.col.score": {"ru": "Оценка", "en": "Score"},

@@ -4,12 +4,14 @@
 `quality_data` (`values` пиццерии или страны). Подсветка по D677: РКО и РС — по порогам
 «Рейтингов» (ниже 80 красный, ниже 90 жёлтый, D552), остальные показатели — только если стали
 хуже прошлого месяца; доли заказов направления «лучше/хуже» не имеют и не подсвечиваются.
+Пока месяц идёт, выручка без движения и без подсветки: неполный месяц против полного прошлого
+всегда «падение» (D707).
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 
 from .ratings_line import tone as score_tone
@@ -35,22 +37,34 @@ class Column:
     #: РКО и РС красятся по порогам рейтингов, остальные — по ухудшению.
     threshold: bool = False
     audit: bool = False
+    #: Группа верхнего этажа шапки (`ratings`, `guest`, `shares`, `revenue`); пусто — без группы.
+    group: str = ""
 
 
 COLUMNS = (
-    Column("rko", "score", 1, threshold=True),
-    Column("rs", "score", 1, threshold=True),
-    Column("checks", "score", 1),
-    Column("kr", "score", 2),
-    Column("maps", "score", 2),
-    Column("aggs", "score", 2),
-    Column("share_agg", "share"),
-    Column("share_app", "share"),
-    Column("share_other", "share"),
-    Column("rev_dine", "money"),
-    Column("rev_delivery", "money"),
+    Column("rko", "score", 1, threshold=True, group="ratings"),
+    Column("rs", "score", 1, threshold=True, group="ratings"),
+    Column("checks", "score", 1, group="ratings"),
+    Column("kr", "score", 2, group="guest"),
+    Column("maps", "score", 2, group="guest"),
+    Column("aggs", "score", 2, group="guest"),
+    Column("share_agg", "share", group="shares"),
+    Column("share_app", "share", group="shares"),
+    Column("share_other", "share", group="shares"),
+    Column("rev_dine", "money", group="revenue"),
+    Column("rev_delivery", "money", group="revenue"),
     Column("audit", "score", 1, audit=True),
 )
+
+
+def shown(show_audit: bool) -> tuple[Column, ...]:
+    """Столбцы, которые видит читатель: проверка — только тому, кому она открыта."""
+    return tuple(c for c in COLUMNS if show_audit or not c.audit)
+
+
+def group_starts(columns: tuple[Column, ...]) -> tuple[bool, ...]:
+    """Для каждого столбца: он первый в своей группе (слева от него — тонкая линия)."""
+    return tuple(i == 0 or c.group != columns[i - 1].group for i, c in enumerate(columns))
 
 
 @dataclass(frozen=True)
@@ -59,6 +73,8 @@ class Cell:
     delta: Delta
     #: Подсветка: пусто, `bad`, `mid` (пороги рейтингов) или `worse` (хуже прошлого месяца).
     tone: str
+    #: Первый столбец группы шапки: слева от ячейки тонкая линия.
+    edge: bool = False
 
 
 def num(value: Decimal | None, places: int = 2) -> str:
@@ -107,14 +123,21 @@ def _tone(column: Column, now: Decimal | None, move: Delta) -> str:
     return ""
 
 
-def cell(column: Column, now: Decimal | None, before: Decimal | None, currency: str | None) -> Cell:
-    """Ячейка столбца: значение, движение и подсветка."""
+def cell(
+    column: Column,
+    now: Decimal | None,
+    before: Decimal | None,
+    currency: str | None,
+    *,
+    in_progress: bool = False,
+) -> Cell:
+    """Ячейка столбца: значение, движение и подсветка. Идущий месяц выручку не сравнивает."""
     if column.kind == "share":
         scaled = None if now is None else now * 100
         prior = None if before is None else before * 100
         return Cell(pct(now), delta(scaled, prior, 0), "")
     if column.kind == "money":
-        move = delta_percent(now, before)
+        move = Delta("", "") if in_progress else delta_percent(now, before)
         return Cell(money(now, currency), move, _tone(column, now, move))
     move = delta(now, before, column.places)
     return Cell(num(now, column.places), move, _tone(column, now, move))
@@ -126,10 +149,20 @@ def cells(
     currency: str | None,
     *,
     show_audit: bool,
+    in_progress: bool = False,
 ) -> tuple[Cell, ...]:
     """Ячейки строки по `COLUMNS`; столбец проверки — только тому, кто её видит."""
+    columns = shown(show_audit)
     return tuple(
-        cell(c, now.get(c.key), None if before is None else before.get(c.key), currency)
-        for c in COLUMNS
-        if show_audit or not c.audit
+        replace(
+            cell(
+                c,
+                now.get(c.key),
+                None if before is None else before.get(c.key),
+                currency,
+                in_progress=in_progress,
+            ),
+            edge=edge,
+        )
+        for c, edge in zip(columns, group_starts(columns), strict=True)
     )

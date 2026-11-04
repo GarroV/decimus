@@ -264,6 +264,10 @@ def _unit(
     n_orders = by_group["aggregators"] or sum(a.orders for a in lines.values())
     orders = q.Orders(n_orders, by_group["app_site"], by_group["other"])
     aggs5 = q.aggregator_score([(line.score5, line.orders) for line in lines.values()])
+    if not lines:
+        # Заказов агрегаторов нет (Dodo IS не собран или не подключён): веса взять неоткуда,
+        # оценки площадок усредняются поровну, чтобы собранные оценки не пропадали.
+        aggs5 = _mean(q.five_point(score, scale) for score, scale in agg_scores.values())
     values = _unit_values(
         rko=rko,
         checks=checks,
@@ -500,7 +504,13 @@ def _load_country(
     rated = dodois_metrics.unit_rating_periods(code, month)
     in_country = {u for u, (_, c) in names.items() if c == code}
     ids = (
-        in_country & (set(scores) | set(audits))
+        in_country
+        & (
+            set(scores)
+            | set(audits)
+            | set(agg_scores)
+            | {u for m in maps_by_provider.values() for u in m}
+        )
         | {s.dodo_id for s in sales}
         | {a.dodo_id for a in agg_orders}
         | set(krs)

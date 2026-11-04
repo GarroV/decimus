@@ -25,12 +25,23 @@
 {% endblock %}
 
 {% macro delta(d) %}{% if d.kind %}<span class="qa-delta qa-delta--{{ d.kind }}">{{ d.text }}</span>{% endif %}{% endmacro %}
+{% macro sort_link(c, label) %}<a class="qa-sort" href="{{ c.href }}">{{ label }}{% if c.on %} {{ '▼' if c.desc else '▲' }}{% endif %}</a>{% endmacro %}
+{# Двухэтажная шапка: группы сверху, подписи столбцов (по ним сортировка) снизу; первый столбец и «Проверка» — на оба этажа. #}
 {% macro th_row(columns, first) %}
   <tr>
-  {% for c in columns %}<th class="{{ '' if loop.first else 'qa-num' }}"{% if c.on %} aria-sort="{{ 'descending' if c.desc else 'ascending' }}"{% endif %}><a class="qa-sort" href="{{ c.href }}">{{ first if loop.first else c.label }}{% if c.on %} {{ '▼' if c.desc else '▲' }}{% endif %}</a></th>{% endfor %}
+  {% for c in columns %}
+    {%- if c.key == 'name' or not c.group -%}
+      <th rowspan="2" class="{{ '' if c.key == 'name' else 'qa-num' }}{{ ' qa-edge' if c.edge else '' }}"{% if c.on %} aria-sort="{{ 'descending' if c.desc else 'ascending' }}"{% endif %}>{{ sort_link(c, first if c.key == 'name' else c.label) }}</th>
+    {%- elif c.group_label -%}
+      <th colspan="{{ c.group_span }}" class="qa-group qa-edge">{{ c.group_label }}</th>
+    {%- endif -%}
+  {% endfor %}
+  </tr>
+  <tr>
+  {% for c in columns if c.group %}<th class="qa-num{{ ' qa-edge' if c.edge else '' }}"{% if c.on %} aria-sort="{{ 'descending' if c.desc else 'ascending' }}"{% endif %}>{{ sort_link(c, c.label) }}</th>{% endfor %}
   </tr>
 {% endmacro %}
-{% macro tds(row_cells) %}{% for c in row_cells %}<td class="qa-num{% if c.tone %} qa-tone--{{ c.tone }}{% endif %}">{{ c.text }}{{ delta(c.delta) }}</td>{% endfor %}{% endmacro %}
+{% macro tds(row_cells) %}{% for c in row_cells %}<td class="qa-num{% if c.tone %} qa-tone--{{ c.tone }}{% endif %}{% if c.edge %} qa-edge{% endif %}">{{ c.text }}{{ delta(c.delta) }}</td>{% endfor %}{% endmacro %}
 
 {% block pick_work %}
 {% if failed %}
@@ -67,10 +78,13 @@
         <thead>{{ th_row(columns, t('quality.col.country')) }}</thead>
         <tbody>
         {% for r in network %}
-          <tr><td><a href="{{ r.href }}">{{ r.title }}</a> <span class="qa-dim">· {{ r.units }}</span></td>{{ tds(r.cells) }}</tr>
+          <tr><td class="qa-name"><a href="{{ r.href }}">{{ r.title }}</a> <span class="qa-dim">· {{ r.units }}</span></td>{{ tds(r.cells) }}</tr>
         {% endfor %}
         </tbody>
       </table></div>
+      {% if no_data %}
+        <p class="note qa-note qa-nodata">{{ t('quality.no_data', month=no_data_title, n=no_data|length) }}{% for r in no_data %}<a href="{{ r.href }}">{{ r.title }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>
+      {% endif %}
       {% else %}
         {% call pick_empty() %}{{ t('quality.empty.scope') }}{% endcall %}
       {% endif %}
