@@ -260,3 +260,19 @@ def test_с_адресом_яндекс_в_сборе() -> None:
     искать, пауза = collect.searchers(True)
     assert искать[-1] is yandex_eda and пауза == ()
     assert искать[:-1] == collect._ALWAYS
+
+
+def test_карточка_без_заведения_сбой_а_не_пропуск(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 200 без заведения раньше молча клалось в кэш как «нет точки» — сбор терял точки без ошибки.
+    class Заглушка:
+        def post(self, url: str, body: object, headers: object = None) -> object:
+            return ВЫДАЧА
+
+        def get(self, url: str, headers: object = None) -> object:
+            return {"payload": {}}
+
+    кэш: dict[str, object] = {}
+    monkeypatch.delenv("MIGROS_RELAY_URL", raising=False)
+    with pytest.raises(AggregatorError):
+        yandex_eda.search(Заглушка(), 53.9, 27.5667, "BY", кэш)  # type: ignore[arg-type]
+    assert not кэш

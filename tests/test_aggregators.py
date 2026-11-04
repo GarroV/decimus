@@ -273,7 +273,10 @@ def test_привязка_ближайшая_и_одна_к_одной() -> None
     assert пары == {"a": ("u1", 10), "b": ("u2", 60)}
 
 
-def test_точка_у_пиццерии_привязывается_даже_если_её_принёс_каталог_другой_пиццерии() -> None:
+def test_точка_у_пиццерии_привязывается_даже_если_её_принёс_каталог_другой_пиццерии(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(collect, "RETRY_PAUSE_SEC", 0)
     # #1344: Wolt-точка `dodo-pizza` стоит в ~10 м от Ljubljana-1, но каталог Wolt у координат
     # Ljubljana-1 её не отдал (запрос упал), а каталог у соседней пиццерии отдал. Расстояние до
     # справочной точки — факт; привязка не должна зависеть от того, чей запрос принёс точку.
@@ -297,6 +300,39 @@ def test_точка_у_пиццерии_привязывается_даже_ес
     (строка,) = points
     assert строка.dodo_id == "1" * 32 and строка.dodo_name == "Ljubljana-1"
     assert строка.link_distance_m is not None and строка.link_distance_m <= 15
+
+
+def test_запрос_с_429_повторяется_вторым_проходом(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Wolt каждую ночь терял одну-три пиццерии на 429: повтор через паузу их возвращает.
+    monkeypatch.setattr(collect, "RETRY_PAUSE_SEC", 0)
+    пиццерия = collect.DodoUnit("1" * 32, "Tbilisi-1", 41.72299, 44.77335, "GE")
+    точка = base.Found(
+        "dodo-pizza-pekini", "Dodo Pizza Pekini", "https://wolt.com/x", 41.72299, 44.77335,
+        None, 10, None, True, True, {},
+    )  # fmt: skip
+    вызовы: list[int] = []
+
+    def поиск(http: object, lat: float, lng: float, country: str, cache: object) -> list:
+        вызовы.append(1)
+        if len(вызовы) == 1:
+            raise AggregatorError("HTTP 429")
+        return [точка]
+
+    модуль = SimpleNamespace(KEY="wolt", GAP_SEC=0, COUNTRIES={"GE": "geo"}, search=поиск)
+
+    points, _, errors, attempts, _ = collect._search_one(модуль, [пиццерия], ДЕНЬ)
+
+    assert (errors, attempts, len(вызовы)) == (0, 1, 2)
+    assert [p.dodo_id for p in points] == ["1" * 32]
+
+
+def test_страж_неполного_ответа() -> None:
+    # Яндекс Еда 01.11.2026: 21 точка вместо 41 без единой ошибки — снимок не пишем.
+    неполный = collect.verdict(points=21, errors=0, attempts=56, last_ok_points=41)
+    assert неполный is not None and "21" in неполный and "41" in неполный
+    assert collect.verdict(points=30, errors=0, attempts=56, last_ok_points=41) is None
+    # у малой выборки скачки естественны
+    assert collect.verdict(points=2, errors=0, attempts=4, last_ok_points=5) is None
 
 
 def test_страж_пустого_ответа() -> None:

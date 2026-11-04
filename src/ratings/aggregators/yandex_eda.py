@@ -113,7 +113,12 @@ def _search(
                 if relay
                 else CARD.format(slug=slug, lat=lat, lng=lng)
             )
-            cache[key] = card(http.get(card_url, HEADERS), slug, is_open)
+            fresh = card(http.get(card_url, HEADERS), slug, is_open)
+            if fresh is None:
+                # Ответ 200 без заведения — площадка или ретранслятор отдал не то: это
+                # сбой, а не «точки нет». В кэш не кладём, повтор спросит заново.
+                raise AggregatorError(f"Яндекс Еда: у карточки {slug} нет заведения в ответе")
+            cache[key] = fresh
         point = cache[key]
         if isinstance(point, Found):
             found.append(point)
