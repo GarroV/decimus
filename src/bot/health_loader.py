@@ -9,6 +9,10 @@
 оповещённым состоянием и при смене пишет владельцу в канал FURCA (D641, его «да» на текст и
 адресата). Тот же заход зовёт и загрузчик входов Dodo IS (`dodois_loader.py`).
 
+**Покрытие данных рейтингов.** Тем же кругом, раз в сутки после утреннего часа, идёт проверка
+«страна × источник» (`src/health/coverage_check.py`, D704, D706): пустые и неполные источники
+приходят владельцу в тот же канал.
+
 Упавшая проба не роняет цикл: исход других подключений важнее одного сбоя.
 """
 
@@ -19,7 +23,7 @@ import logging
 
 from src.db.errors import DbError
 from src.db.space import SYSTEM_SPACE, acting_space
-from src.health import alerts
+from src.health import alerts, coverage_check
 from src.health.checks import PROBE_EVERY, SCHEDULED_CODES, probe_and_record
 
 logger = logging.getLogger(__name__)
@@ -43,6 +47,7 @@ async def check_forever() -> None:
             try:
                 await asyncio.to_thread(probe_all)
                 await asyncio.to_thread(alerts.run_pass_safely)
+                await asyncio.to_thread(coverage_check.run_daily_safely)
             except Exception:
                 # Упавшая задача asyncio молчит — поэтому ловим всё и живём дальше.
                 logger.exception("Проверка подключений: непредвиденный сбой")

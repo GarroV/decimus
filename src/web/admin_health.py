@@ -17,11 +17,12 @@ from flask import current_app
 
 from src.db import health_store
 from src.db.errors import DbError
-from src.domain import health
+from src.domain import coverage_rules, health
 from src.domain.health import GREEN, GREY, RED, YELLOW, Status
-from src.health import alerts, checks
+from src.health import alerts, checks, coverage_check
 from src.health import rows as health_rows
 from src.health.checks import PENDING
+from src.health.coverage_texts import aggregator_name
 from src.health.rows import Row
 
 from . import auth
@@ -82,6 +83,9 @@ def context(flash: Flash | None = None) -> dict[str, Any]:
         "health_flash": flash,
         "health_stamp": _stamp,
         "health_pending": PENDING,
+        "coverage": coverage_check.read_matrix(),
+        "coverage_min_percent": round(coverage_rules.MIN_SHARE * 100),
+        "coverage_aggregator": aggregator_name,
     }
 
 

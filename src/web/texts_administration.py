@@ -135,6 +135,46 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
     "health.group.ratings": {"ru": "Рейтинги и оценки", "en": "Ratings and reviews"},
     "health.group.learning": {"ru": "Обучение", "en": "Training"},
     "health.group.dodo_is": {"ru": "Dodo IS по странам", "en": "Dodo IS by country"},
+    # ── Данные рейтингов по странам и источникам (D704, D706) ──
+    "coverage.title": {"ru": "Данные рейтингов по странам", "en": "Ratings data by country"},
+    "coverage.sub": {
+        "ru": "У скольких пиццерий страны есть данные источника и когда они обновлялись. "
+        "Если источник пуст или заполнен меньше {min}% пиццерий, данные старше срока "
+        "или нет месяца, владельцу раз в сутки приходит оповещение. Пустая клетка — "
+        "источник для страны не ждём.",
+        "en": "How many of a country's pizzerias have data from a source and when it was "
+        "last updated. If a source is empty or covers under {min}% of pizzerias, the data "
+        "is out of date or a month is missing, the owner is notified once a day. "
+        "An empty cell means the source is not expected for that country.",
+    },
+    "coverage.err": {
+        "ru": "Не удалось прочитать данные рейтингов: база не ответила.",
+        "en": "Could not read the ratings data: the database did not respond.",
+    },
+    "coverage.country": {"ru": "Страна", "en": "Country"},
+    "coverage.src.rs": {"ru": "Рейтинг стандартов", "en": "Standards rating"},
+    "coverage.src.rko": {"ru": "Рейтинг контроля", "en": "Control rating"},
+    "coverage.src.kr": {"ru": "Клиентские оценки", "en": "Customer ratings"},
+    "coverage.src.maps_google": {"ru": "Google Карты", "en": "Google Maps"},
+    "coverage.src.maps_yandex": {"ru": "Яндекс Карты", "en": "Yandex Maps"},
+    "coverage.reason.empty": {"ru": "данных нет совсем", "en": "no data at all"},
+    "coverage.reason.not_connected": {
+        "ru": "не подключён вход Dodo IS",
+        "en": "Dodo IS login is not connected",
+    },
+    "coverage.reason.stale": {"ru": "данные устарели", "en": "data is out of date"},
+    "coverage.reason.missing_current": {
+        "ru": "нет данных за текущий месяц",
+        "en": "no data for the current month",
+    },
+    "coverage.reason.missing_previous": {
+        "ru": "нет данных за прошлый месяц",
+        "en": "no data for the previous month",
+    },
+    "coverage.reason.low": {
+        "ru": "заполнено меньше {min}% пиццерий",
+        "en": "fewer than {min}% of pizzerias filled",
+    },
     # ── Подключения ──
     "health.conn.openai": {"ru": "OpenAI — распознавание", "en": "OpenAI — recognition"},
     "health.conn.telegram": {"ru": "Бот в Telegram", "en": "Telegram bot"},
