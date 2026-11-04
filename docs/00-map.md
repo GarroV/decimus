@@ -451,7 +451,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,model_key,model_usage,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -460,6 +460,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/busy_lock.py` | Замок «уже выполняется» между процессами (F-110): дедуп дорогих операций |
 | `src/db/country_contacts.py` | Country partner contacts and inspection mail recipients; HQ-only personal data |
 | `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
+| `src/db/coverage_store.py` | Что лежит в базе по каждой паре «страна × источник» данных рейтингов (D704, D706, #1444) |
 | `src/db/customer_ratings.py` | Месячные оценки клиентов и журнал их сбора для выбранного среза рейтингов |
 | `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
 | `src/db/dodois_metrics.py` | Чтение данных Dodo IS для страницы «Качество» (D671, миграция `0105`): продажи, агрегаторы, КР |
@@ -806,6 +807,9 @@ JSON-RPC поверх одного POST на локальной петле, ли
 `src/domain/health.py`, их сборка в строки (общая для плиток и оповещений) — `rows.py`.
 Оповещения владельцу о смене состояния (D641) — `alerts.py` (правила — `src/domain/health_alerts.py`,
 последнее оповещённое — `health.alerts`).
+Покрытие данных рейтингов «страна × источник» (D704, D706) — `coverage_check.py` (правила —
+`src/domain/coverage_rules.py`, счётчики — `src/db/coverage_store.py`): раз в сутки владельцу
+уходит одно сообщение о пустых и неполных источниках, таблица — на вкладке «Подключения».
 
 <!-- map:begin files src/health/*.py -->
 | Файл | Что делает |
@@ -813,6 +817,8 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/health/alert_texts.py` | Тексты оповещений о подключениях (D641): ru — для владельца, en — запасной |
 | `src/health/alerts.py` | Оповещения владельцу о смене состояния подключений (D641) |
 | `src/health/checks.py` | Реестр подключений вкладки «Подключения» (D638) и пробы тех, что пробуются |
+| `src/health/coverage_check.py` | Постоянная проверка покрытия данных рейтингов «страна × источник» (D704, D706, #1444) |
+| `src/health/coverage_texts.py` | Тексты оповещений о дырах в данных рейтингов (D704, D706): ru — для владельца, en — запасной |
 | `src/health/probes.py` | Проверка ключа у провайдера до записи (D576): один дешёвый вызов с введённым значением |
 | `src/health/rows.py` | Строки состояния подключений: реестр + факты из базы → цвет каждой (D638, D641) |
 <!-- map:end -->
@@ -926,6 +932,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/clarifications.py` | Bounded human answers paired with untrusted clarification questions |
 | `src/domain/client_ip.py` | Чей это адрес у сервера MCP: клиент за общим прокси (D462, журнал действий) |
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
+| `src/domain/coverage_rules.py` | Когда пара «страна × источник» данных рейтингов считается дырой (D704, D706, #1444) |
 | `src/domain/criteria.py` | One criteria extractor, with a consistent active-inspection edition snapshot |
 | `src/domain/dates.py` | Разбор даты из живой фразы аудитора (задача #220) |
 | `src/domain/demo.py` | Открытое демо: учётки ролей и переключатели — контракт между посевом и входом |

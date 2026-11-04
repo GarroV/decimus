@@ -27,6 +27,14 @@
 .shealth__dot--red { background: var(--err); }
 .shealth__dot--grey { background: var(--line-strong); }
 
+.scover { margin: var(--space-6) 0; }
+.scover__wrap { overflow-x: auto; }
+.scover__table { border-collapse: collapse; font-size: var(--fs-dense); }
+.scover__table th, .scover__table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; white-space: nowrap; }
+.scover__table th { color: var(--ink-3); font-weight: var(--w-semibold); font-size: var(--fs-meta); }
+.scover__cell { display: flex; align-items: center; gap: var(--space-2); }
+.scover__cell small, .scover__table td > small { color: var(--ink-3); font-size: var(--fs-meta); }
+
 @media (max-width: 899px) {
   .sadmin { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
   .sadmin__nav { position: static; }

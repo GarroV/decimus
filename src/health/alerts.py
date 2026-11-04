@@ -63,6 +63,8 @@ CHANNEL_CODE = "alerts_channel"
 OWNER_LANG = "ru"
 DODOIS_TAB_PATH = "/administration?tab=dodois"
 DODOIS_PREFIX = "dodo_is:"
+#: Префикс состояний проверки покрытия данных (`src/domain/coverage_rules.py`).
+COVERAGE_PREFIX = "cov_"
 
 #: Сборы, у которых уже есть своя тревога о сборе «с ошибкой» (агрегаторы — D438, обучение —
 #: `learning_loader`): здесь они оповещают только о «не пришёл в срок» и «остановился», а
@@ -262,6 +264,13 @@ def process(
     return sent
 
 
+def connection_levels(levels: Mapping[str, str]) -> dict[str, str]:
+    """Оповещённые состояния подключений без состояний проверки покрытия (`cov_*`, D704): они
+    живут в той же таблице, но первый заход оповещений о подключениях определяется только
+    по своим кодам."""
+    return {k: v for k, v in levels.items() if not k.startswith(COVERAGE_PREFIX)}
+
+
 def channel_state(env: Mapping[str, str]) -> tuple[tuple[str, str] | None, Status]:
     """Канал, если оповещения включены, и строка о нём для вкладки «Подключения»."""
     if is_demo(env):
@@ -320,7 +329,7 @@ def run_pass(
             return 0
         return process(
             signals(found),
-            health_store.alert_levels(),
+            connection_levels(health_store.alert_levels()),
             target=target,
             send=send,
             country_names=_country_names(),

@@ -1,0 +1,47 @@
+{#
+  Данные рейтингов по странам и источникам (D704, D706): строка — страна, колонка — источник,
+  в клетке цвет, доля пиццерий с данными и дата самых новых данных. Цвета и причины — те же
+  правила, что у оповещения владельцу (`src/domain/coverage_rules.py`). Пустая клетка — источник
+  для страны не ждём. Пользовательские экраны рейтингов пробелов не показывают (D704).
+#}
+<section class="scard shealth scover" id="coverage" aria-labelledby="coverage-title">
+  <header class="shealth__head">
+    <h2 class="shealth__title" id="coverage-title">{{ t('coverage.title') }}</h2>
+    {{ info_tip(t('tip.hint'), '', [t('coverage.sub', min=coverage_min_percent)], 'coverage') }}
+  </header>
+  {% if coverage is none %}
+    <div class="note note--warn"><div class="note__text">{{ t('coverage.err') }}</div></div>
+  {% else %}
+    <div class="scover__wrap">
+      <table class="scover__table">
+        <thead>
+          <tr>
+            <th scope="col">{{ t('coverage.country') }}</th>
+            {% for source in coverage.sources %}
+              <th scope="col">{% if source.startswith('agg_') %}{{ coverage_aggregators.get(source[4:], source[4:]) }}{% else %}{{ t('coverage.src.' ~ source) }}{% endif %}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for country, cells in coverage.rows %}
+            <tr>
+              <th scope="row">{{ country_title(country) }}</th>
+              {% for cell in cells %}
+                <td>
+                  {% if cell %}
+                    <span class="scover__cell">
+                      <span class="shealth__dot shealth__dot--{{ cell.light }}" role="img" aria-label="{{ t('health.light.' ~ cell.light) }}"></span>
+                      {{ cell.percent }}%
+                      {% if cell.on %}<small>{{ cell.on.strftime('%d.%m') }}</small>{% endif %}
+                    </span>
+                    {% if cell.reason %}<small>{{ t('coverage.reason.' ~ cell.reason, min=coverage_min_percent) }}</small>{% endif %}
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
