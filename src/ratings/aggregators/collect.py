@@ -83,7 +83,7 @@ DUPLICATE_M = 50
 #: Пауза перед повторным проходом по пиццериям, чей запрос не удался: 429 площадки
 #: проходит за полминуты, а повтор сразу упирается в тот же лимит (Wolt, 04.11.2026:
 #: каждый ночной сбор терял одну-три пиццерии на 429).
-RETRY_PAUSE_SEC = 30.0
+AGG_RETRY_PAUSE_SEC = 30.0
 #: Сбор, давший меньше этой доли точек прошлого удачного, — неполный (см. `verdict`).
 PARTIAL_SHARE = 0.6
 #: Ниже такого числа точек в прошлом сборе долю не сверяем: у малой выборки скачки естественны.
@@ -211,7 +211,7 @@ def _search_one(
         for point in found:
             seen.setdefault(point.point_key, (point, unit.country))
     if failed:
-        time.sleep(RETRY_PAUSE_SEC)
+        time.sleep(AGG_RETRY_PAUSE_SEC)
     for unit in failed:
         try:
             found = module.search(http, unit.lat, unit.lng, unit.country, cache)

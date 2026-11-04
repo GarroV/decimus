@@ -276,7 +276,7 @@ def test_привязка_ближайшая_и_одна_к_одной() -> None
 def test_точка_у_пиццерии_привязывается_даже_если_её_принёс_каталог_другой_пиццерии(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(collect, "RETRY_PAUSE_SEC", 0)
+    monkeypatch.setattr(collect, "AGG_RETRY_PAUSE_SEC", 0)
     # #1344: Wolt-точка `dodo-pizza` стоит в ~10 м от Ljubljana-1, но каталог Wolt у координат
     # Ljubljana-1 её не отдал (запрос упал), а каталог у соседней пиццерии отдал. Расстояние до
     # справочной точки — факт; привязка не должна зависеть от того, чей запрос принёс точку.
@@ -304,7 +304,7 @@ def test_точка_у_пиццерии_привязывается_даже_ес
 
 def test_запрос_с_429_повторяется_вторым_проходом(monkeypatch: pytest.MonkeyPatch) -> None:
     # Wolt каждую ночь терял одну-три пиццерии на 429: повтор через паузу их возвращает.
-    monkeypatch.setattr(collect, "RETRY_PAUSE_SEC", 0)
+    monkeypatch.setattr(collect, "AGG_RETRY_PAUSE_SEC", 0)
     пиццерия = collect.DodoUnit("1" * 32, "Tbilisi-1", 41.72299, 44.77335, "GE")
     точка = base.Found(
         "dodo-pizza-pekini", "Dodo Pizza Pekini", "https://wolt.com/x", 41.72299, 44.77335,
