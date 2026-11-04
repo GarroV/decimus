@@ -19,7 +19,8 @@
 .qa-num { text-align: right !important; font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .qa-table--wide .qa-edge { border-left: 1px solid var(--line-strong); }
 .qa-name { white-space: nowrap; }
-.qa-nodata { margin-top: var(--space-3); max-width: none; padding: 0 8px; }
+.qa-note.qa-nodata { margin: 0; max-width: none; padding: 12px 16px; border-top: 1px solid var(--line-2); color: var(--ink-3); }
+.qa-nodata a { margin-left: 2px; }
 .qa-sort { color: inherit !important; text-decoration: none; }
 .qa-sort:hover { text-decoration: underline; }
 .qa-tone--bad { background: var(--err-soft); }
