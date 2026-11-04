@@ -33,6 +33,7 @@ from src.db import ratings_read as ratings
 from src.db.coverage_store import Counts, Raw
 from src.db.errors import DbError
 from src.db.job_lock import HEALTH_ALERTS_LOCK_KEY, job_lock
+from src.domain import coverage_exempt
 from src.domain import coverage_rules as rules
 from src.domain import health_alerts as decisions
 from src.domain.coverage_rules import Fact, Finding
@@ -116,19 +117,33 @@ def _agg_fact(aggregator: str, country: str, raw: Raw, today: date) -> Fact:
     )  # fmt: skip
 
 
-def build_facts(raw: Raw, today: date, enrolled: Collection[tuple[str, str]]) -> list[Fact]:
+def build_facts(
+    raw: Raw,
+    today: date,
+    enrolled: Collection[tuple[str, str]],
+    not_served: Collection[tuple[str, str]] | None = None,
+) -> list[Fact]:
     """Факт на каждую пару «страна × источник». `enrolled` — пары (агрегатор, страна), для
     которых агрегатор заведён по списку стран сборщика; к ним добавляются страны, где у
     агрегатора уже есть точки в справочнике (сборщики «известной точки» без списка стран).
-    Агрегатор, не заведённый для страны, фактов не даёт — это не дыра."""
-    pairs = set(enrolled) | set(raw.agg_points)
+    Агрегатор, не заведённый для страны, фактов не даёт — это не дыра. Так же — пары
+    «источник × страна» из `not_served` (по умолчанию `coverage_exempt.country_pairs()`: площадка
+    или карты там не обслуживают, D706); пиццерии, не обслуживаемые поштучно, вычитает база."""
+    if not_served is None:
+        not_served = coverage_exempt.country_pairs()
+    pairs = {
+        (a, c)
+        for a, c in set(enrolled) | set(raw.agg_points)
+        if (rules.agg_source(a), c) not in not_served
+    }
     out: list[Fact] = []
     for country in sorted(raw.base):
         out.append(_period_fact("rs", country, raw, today, freshness.RS_GREEN_DAYS))
         out.append(_period_fact("rko", country, raw, today, freshness.RKO_GREEN_DAYS))
         out.append(_kr_fact(country, raw, today))
         out.append(_maps_fact(rules.SRC_GOOGLE, pointer.GOOGLE, country, raw, today))
-        out.append(_maps_fact(rules.SRC_YANDEX, pointer.YANDEX, country, raw, today))
+        if (rules.SRC_YANDEX, country) not in not_served:
+            out.append(_maps_fact(rules.SRC_YANDEX, pointer.YANDEX, country, raw, today))
         out.extend(_agg_fact(a, country, raw, today) for a, c in sorted(pairs) if c == country)
     return out
 
@@ -216,7 +231,7 @@ def _entry(finding: Finding, names: Mapping[str, str], lang: str) -> str:
     if finding.reason == rules.LOW:
         return texts.text("cov.detail.share", lang, name=name, percent=round(finding.share * 100))
     if finding.reason == rules.STALE and finding.age_days is not None:
-        return texts.text("cov.detail.age", lang, name=name, days=finding.age_days)
+        return texts.text("cov.detail.age", lang, name=name, age=texts.days(finding.age_days, lang))
     return name
 
 
@@ -376,6 +391,10 @@ def read_raw(today: date) -> Raw:
         months=[current, previous],
         since=today - timedelta(days=rules.FRESH_DAYS),
         providers=[pointer.GOOGLE, pointer.YANDEX],
+        unit_exempt=[
+            (source.removeprefix(rules.AGG_PREFIX), name)
+            for source, name in coverage_exempt.unit_pairs()
+        ],
     )
 
 

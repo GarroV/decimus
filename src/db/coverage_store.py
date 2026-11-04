@@ -4,7 +4,8 @@
 пороги и страны приходят параметрами.
 
 **База страны** — работающие пиццерии реестра `agg.units`, у которых в `unit_profiles` стадия
-`open` или `paused` либо профиля нет вовсе, без тестовых (`TEST%`) и без исключённых стран.
+`open` или `paused` либо профиля нет вовсе, без тестовых (то же правило, что
+`agg_store.is_test_unit`) и без исключённых стран.
 Поверх неё по каждому источнику считается: у скольких пиццерий данные есть (`ever`), у скольких
 свежие или входят в последний период (`covered`), и дата самых новых данных.
 
@@ -12,7 +13,8 @@
 период с оценками; клиентские оценки — `dodois.unit_kr_month` за два месяца (с ненулевым
 числом оценок), подключение страны — `dodois.logins`; карты — `maps.ratings` по привязке
 `maps.companies.dodo_id` (не исключённые); агрегаторы — `agg.points` с `dodo_id` (не
-исключённые) ⋈ `agg.ratings`, без пиццерий, отмеченных в `agg.unit_absent`.
+исключённые) ⋈ `agg.ratings`, без пиццерий, отмеченных в `agg.unit_absent` или перечисленных
+в `src/domain/coverage_exempt.py`.
 """
 
 from __future__ import annotations
@@ -23,19 +25,34 @@ from datetime import date
 
 import psycopg
 
+from . import agg_store
 from .config import check_environment
 from .errors import DbError
 from .pool import connection
 
 #: База страны: пиццерии, у которых вообще ждём данные.
 _BASE = """
-    select u.dodo_id, u.country_code
+    select u.dodo_id, u.country_code, u.name
     from agg.units u
     left join unit_profiles p on p.dodo_id = u.dodo_id
     where u.working
-      and u.name not ilike 'TEST%%'
+      and u.name !~* ('^\\s*(' || %(test_pattern)s || ')\\s*$')
       and (p.dodo_id is null or p.stage in ('open', 'paused'))
       and u.country_code <> all(%(excluded)s)
+"""
+
+#: Пиццерии, которых на площадке агрегатора нет: отметки людей (`agg.unit_absent`) и список
+#: «не обслуживается» (`src/domain/coverage_exempt.py`, пары приходят параметрами). Из базы
+#: страны для этого агрегатора они вычитаются и в долю не входят.
+_GONE = """
+    gone as (
+        select a.aggregator, a.dodo_id from agg.unit_absent a
+        union
+        select x.src, b.dodo_id
+        from base b
+        join unnest(%(ex_src)s::text[], %(ex_name)s::text[]) as x(src, nm)
+          on btrim(b.name) = x.nm
+    )
 """
 
 
@@ -102,7 +119,7 @@ _MAPS = f"""
 """  # noqa: S608
 
 _AGGS = f"""
-    with base as ({_BASE})
+    with base as ({_BASE}), {_GONE}
     select p.aggregator, b.country_code,
            count(distinct b.dodo_id) as ever,
            count(distinct b.dodo_id) filter (where r.on_date >= %(since)s) as fresh,
@@ -111,15 +128,15 @@ _AGGS = f"""
     join agg.points p on p.dodo_id = b.dodo_id and p.excluded_reason is null
     join agg.ratings r on r.aggregator = p.aggregator and r.point_key = p.point_key
     where not exists (
-        select 1 from agg.unit_absent a where a.aggregator = p.aggregator and a.dodo_id = b.dodo_id
+        select 1 from gone g where g.aggregator = p.aggregator and g.dodo_id = b.dodo_id
     )
     group by 1, 2
 """  # noqa: S608
 
 _ABSENT = f"""
-    with base as ({_BASE})
-    select a.aggregator, b.country_code, count(*)
-    from agg.unit_absent a join base b on b.dodo_id = a.dodo_id
+    with base as ({_BASE}), {_GONE}
+    select g.aggregator, b.country_code, count(distinct b.dodo_id)
+    from gone g join base b on b.dodo_id = g.dodo_id
     group by 1, 2
 """  # noqa: S608
 
@@ -130,15 +147,20 @@ def read(
     months: Sequence[date],
     since: date,
     providers: Sequence[int],
+    unit_exempt: Sequence[tuple[str, str]] = (),
 ) -> Raw:
     """Счётчики по всем источникам. `months` — месяцы клиентских оценок (первые числа),
     `since` — самая ранняя дата, ещё считающаяся свежей у карт и агрегаторов,
-    `providers` — коды карт Pointer. Отказ базы — `DbError`."""
+    `providers` — коды карт Pointer, `unit_exempt` — пары (агрегатор, имя пиццерии), которых на
+    площадке нет. Отказ базы — `DbError`."""
     params = {
         "excluded": list(excluded),
         "months": list(months),
         "since": since,
         "providers": list(providers),
+        "test_pattern": agg_store.TEST_UNIT_PATTERN,
+        "ex_src": [src for src, _ in unit_exempt],
+        "ex_name": [name for _, name in unit_exempt],
     }
     try:
         with connection(check_environment().dsn) as conn:

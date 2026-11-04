@@ -503,7 +503,8 @@ def save_units(units: Sequence[UnitIn], today: date) -> int:
 
 
 #: Тестовая пиццерия в публичном API Dodo (`TEST-1`): рабочей не считается.
-_TEST_UNIT = re.compile(r"TEST-\d+", re.IGNORECASE)
+TEST_UNIT_PATTERN = r"TEST-\d+"
+_TEST_UNIT = re.compile(TEST_UNIT_PATTERN, re.IGNORECASE)
 
 
 def is_test_unit(name: str) -> bool:

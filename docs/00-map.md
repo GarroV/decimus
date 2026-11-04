@@ -348,7 +348,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 26 | _account_menu.html, _account_menu_connections.html, _info_tip.html, _inspection_timeline.html, _langpick.html, _login_lang.html, _notifications_menu.html, _period.html, … (+18) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
-| `src/web/templates/administration/` | 13 | _content_editor.html, _health.html, _nav.html, _ratings_aggregators.html, aggregators.html, connections.html, content_editor.html, countries.html, … (+5) |
+| `src/web/templates/administration/` | 14 | _content_editor.html, _coverage.html, _health.html, _nav.html, _ratings_aggregators.html, aggregators.html, connections.html, content_editor.html, … (+6) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 8 | _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
@@ -932,6 +932,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/clarifications.py` | Bounded human answers paired with untrusted clarification questions |
 | `src/domain/client_ip.py` | Чей это адрес у сервера MCP: клиент за общим прокси (D462, журнал действий) |
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
+| `src/domain/coverage_exempt.py` | Где источник данных рейтингов Додо не обслуживает — и потому его пустота не дыра (D704, D706) |
 | `src/domain/coverage_rules.py` | Когда пара «страна × источник» данных рейтингов считается дырой (D704, D706, #1444) |
 | `src/domain/criteria.py` | One criteria extractor, with a consistent active-inspection edition snapshot |
 | `src/domain/dates.py` | Разбор даты из живой фразы аудитора (задача #220) |

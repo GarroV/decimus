@@ -22,7 +22,7 @@ from src.domain.health import GREEN, GREY, RED, YELLOW, Status
 from src.health import alerts, checks, coverage_check
 from src.health import rows as health_rows
 from src.health.checks import PENDING
-from src.health.coverage_texts import AGGREGATOR_NAMES
+from src.health.coverage_texts import aggregator_name
 from src.health.rows import Row
 
 from . import auth
@@ -85,7 +85,7 @@ def context(flash: Flash | None = None) -> dict[str, Any]:
         "health_pending": PENDING,
         "coverage": coverage_check.read_matrix(),
         "coverage_min_percent": round(coverage_rules.MIN_SHARE * 100),
-        "coverage_aggregators": AGGREGATOR_NAMES,
+        "coverage_aggregator": aggregator_name,
     }
 
 

@@ -18,7 +18,7 @@
           <tr>
             <th scope="col">{{ t('coverage.country') }}</th>
             {% for source in coverage.sources %}
-              <th scope="col">{% if source.startswith('agg_') %}{{ coverage_aggregators.get(source[4:], source[4:]) }}{% else %}{{ t('coverage.src.' ~ source) }}{% endif %}</th>
+              <th scope="col">{% if source.startswith('agg_') %}{{ coverage_aggregator(source[4:], lang) }}{% else %}{{ t('coverage.src.' ~ source) }}{% endif %}</th>
             {% endfor %}
           </tr>
         </thead>
