@@ -502,3 +502,22 @@ def test_справочник_два_русских_имени_с_одним_н�
     двойной = {"новополоцк-1": U1, "новополотск-1": ДРУГОЙ}
     assert base.directory_id(двойной, "Novopolotsk-1") == base.AMBIGUOUS
     assert base.directory_id(directory, "novopolotsk-1") == ДРУГОЙ
+
+
+def test_справочник_ссылок_дополняется_нашим_справочником_точек() -> None:
+    sheet = {"podgorica-1": "a" * 32, "spornaya-1": base.AMBIGUOUS}
+    own = [
+        ("Podgorica-2", "B" * 32),  # новой точки нет в листе — берётся, id строчными
+        ("Podgorica-1", "c" * 32),  # имя уже в листе — лист главнее
+        ("Spornaya-1", "d" * 32),  # спорное имя листа не перебивается
+        ("Dublikat-1", "a" * 32),  # id уже стоит за другим именем листа
+        ("Bezkoda-1", None),
+        ("Bad-1", "не id"),
+    ]
+
+    merged = base.with_own_units(sheet, own)
+
+    assert merged["podgorica-2"] == "b" * 32
+    assert merged["podgorica-1"] == "a" * 32
+    assert merged["spornaya-1"] == base.AMBIGUOUS
+    assert set(merged) == {"podgorica-1", "podgorica-2", "spornaya-1"}
