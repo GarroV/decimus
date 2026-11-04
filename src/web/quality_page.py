@@ -33,7 +33,7 @@ from src.ratings.countries import country_names
 from . import auth, guard, quality_data, ratings_freshness, ui_lang
 from .config import Settings
 from .geo_names import country_title as geo_title
-from .quality_cells import COLUMNS, DASH, cells, money, num, pct
+from .quality_cells import COLUMNS, DASH, cells, group_starts, money, num, pct, shown
 from .quality_data import CountryHealth
 from .sections import section
 from .texts import t
@@ -178,7 +178,12 @@ def _period_rows(c: CountryHealth, lang: str) -> list[dict[str, Any]]:
 
 
 def _unit_rows(
-    c: CountryHealth, before: CountryHealth | None, show_audit: bool, key: str, desc: bool
+    c: CountryHealth,
+    before: CountryHealth | None,
+    show_audit: bool,
+    key: str,
+    desc: bool,
+    in_progress: bool,
 ) -> list[dict[str, Any]]:
     prior = {u.dodo_id: u for u in before.units} if before else {}
     ordered = sorted_by(list(c.units), key, desc, lambda u: u.name.casefold(), lambda u: u.values)
@@ -190,6 +195,7 @@ def _unit_rows(
                 prior[u.dodo_id].values if u.dodo_id in prior else None,
                 c.currency,
                 show_audit=show_audit,
+                in_progress=in_progress,
             ),
         }
         for u in ordered
@@ -211,6 +217,7 @@ def _country_view(
     show_audit: bool,
     key: str,
     desc: bool,
+    in_progress: bool,
 ) -> dict[str, Any]:
     channels = [
         (ch, t(f"quality.channel.{ch}", lang)) for ch in (*quality_data.SALES_CHANNELS, "other")
@@ -218,9 +225,13 @@ def _country_view(
     by_source = sorted(c.revenue_by_source, key=lambda s: -c.revenue_by_source[s])
     return {
         "total": cells(
-            c.values, before.values if before else None, c.currency, show_audit=show_audit
+            c.values,
+            before.values if before else None,
+            c.currency,
+            show_audit=show_audit,
+            in_progress=in_progress,
         ),
-        "units": _unit_rows(c, before, show_audit, key, desc),
+        "units": _unit_rows(c, before, show_audit, key, desc, in_progress),
         "units_total": len(c.units),
         "dodois_note": _dodois_note(c.dodois, lang),
         "aggs": _agg_rows(c),
@@ -244,9 +255,15 @@ def _country_view(
 
 def _rail_line(c: CountryHealth, lang: str) -> str:
     rko, rs = c.values.get("rko"), c.values.get("rs")
-    if rko is None and rs is None:
-        return t("quality.rail.none", lang)
-    return t("quality.rail.line", lang, rko=num(rko, 1), rs=num(rs, 1))
+    if rko is not None or rs is not None:
+        return t("quality.rail.line", lang, rko=num(rko, 1), rs=num(rs, 1))
+    if c.units:
+        return t("quality.rail.units", lang, n=len(c.units))
+    return t("quality.rail.none", lang)
+
+
+def _has_values(c: CountryHealth) -> bool:
+    return any(v is not None for v in c.values.values())
 
 
 def _network_rows(
@@ -257,9 +274,10 @@ def _network_rows(
     href: Callable[[str], str],
     key: str,
     desc: bool,
+    in_progress: bool,
 ) -> list[dict[str, Any]]:
     ordered = sorted_by(
-        list(now.values()),
+        [c for c in now.values() if _has_values(c)],
         key,
         desc,
         lambda c: country_title(c.code, lang).casefold(),
@@ -275,10 +293,20 @@ def _network_rows(
                 before[c.code].values if c.code in before else None,
                 c.currency,
                 show_audit=show_audit,
+                in_progress=in_progress,
             ),
         }
         for c in ordered
     ]
+
+
+def _no_data_links(
+    now: dict[str, CountryHealth], lang: str, href: Callable[[str], str]
+) -> list[dict[str, str]]:
+    """Страны без единого значения за месяц — одной строкой под таблицей."""
+    empty = [c for c in now.values() if not _has_values(c)]
+    empty.sort(key=lambda c: country_title(c.code, lang).casefold())
+    return [{"title": country_title(c.code, lang), "href": href(c.code)} for c in empty]
 
 
 def _freshness_rows(lang: str, show_audit: bool, source: str = "") -> tuple[str, ...]:
@@ -369,28 +397,46 @@ def render(lang: str) -> str:
         for m in months
     )
     prev_month, next_month = shift(month, -1), shift(month, 1)
-    columns = tuple(
-        {
+    visible = shown(show_audit)
+    firsts = group_starts(visible)
+    group_sizes = {g: sum(1 for c in visible if c.group == g) for g in {c.group for c in visible}}
+
+    def column(key: str, group: str = "", first: bool = False) -> dict[str, Any]:
+        return {
             "key": key,
             "label": t("quality.col.unit" if key == "name" else f"quality.col.{key}", lang),
             "href": link(code, order=(key, not (sort_key == key and desc))),
             "on": sort_key == key,
             "desc": sort_key == key and desc,
+            "group": group,
+            "group_label": t(f"quality.group.{group}", lang) if group and first else "",
+            "group_span": group_sizes.get(group, 1),
+            "edge": first,
         }
-        for key in ("name", *(c.key for c in COLUMNS if show_audit or not c.audit))
+
+    columns = (
+        column("name"),
+        *(column(c.key, c.group, f) for c, f in zip(visible, firsts, strict=True)),
     )
+    in_progress = month >= today.replace(day=1)
     view: dict[str, Any] | None = None
     view_source = now[code].rating_source if code else ""
     network: list[dict[str, Any]] = []
     if code:
-        view = _country_view(now[code], before.get(code), lang, show_audit, sort_key, desc)
+        view = _country_view(
+            now[code], before.get(code), lang, show_audit, sort_key, desc, in_progress
+        )
     else:
-        network = _network_rows(now, before, lang, show_audit, link, sort_key, desc)
+        network = _network_rows(now, before, lang, show_audit, link, sort_key, desc, in_progress)
     return render_template(
         "quality/index.html",
         failed=False,
         view=view,
         network=network,
+        no_data=_no_data_links(now, lang, link) if not code else [],
+        no_data_title=month_title(month, lang).lower()
+        if lang == "ru"
+        else month_title(month, lang),
         columns=columns,
         rail=rail,
         code=code,

@@ -55,3 +55,25 @@ def test_audit_column_only_for_those_who_may_see_it() -> None:
 
     assert len(qc.cells(values, None, None, show_audit=True)) == len(qc.COLUMNS)
     assert len(qc.cells(values, None, None, show_audit=False)) == len(qc.COLUMNS) - 1
+
+
+def test_revenue_in_a_month_in_progress_has_no_movement_and_no_tint() -> None:
+    open_month = qc.cell(MONEY, D("40000"), D("100000"), "EUR", in_progress=True)
+
+    assert open_month.text == "40 000 EUR"
+    assert open_month.delta.kind == "" and open_month.tone == ""
+    # Остальные показатели идущего месяца сравниваются как обычно.
+    assert qc.cell(KR, D("4.50"), D("4.70"), None, in_progress=True).tone == "worse"
+
+
+def test_groups_mark_first_column_of_each_group() -> None:
+    values = {c.key: D(1) for c in qc.COLUMNS}
+    edges = [c.edge for c in qc.cells(values, None, None, show_audit=True)]
+
+    assert [k for k, e in zip((c.key for c in qc.COLUMNS), edges, strict=True) if e] == [
+        "rko",
+        "kr",
+        "share_agg",
+        "rev_dine",
+        "audit",
+    ]

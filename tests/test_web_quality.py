@@ -130,7 +130,19 @@ def test_network_table_has_one_row_per_country_and_skips_non_imf(ук: FlaskClie
     assert "Россия" not in html
     assert "Все страны" in html and "country=PL" in html
     # Столбцы здоровья; сводной оценки и мест нет (D677).
-    for column in ("РКО", "РС", "Пров./нед.", "КР", "Карты", "Агрег.", "Выручка: зал", "Проверка"):
+    for column in (
+        "РКО",
+        "РС",
+        "Проверок в нед.",
+        "КР",
+        "Карты",
+        "Агрегаторы",
+        "Рейтинги",
+        "Оценки гостей, из 5",
+        "Доли заказов",
+        "Зал",
+        "Проверка",
+    ):
         assert column in html, column
 
 
@@ -280,3 +292,79 @@ def test_empty_later_month_links_to_saved_data_without_changing_default(
     assert "Последний месяц с сохранёнными данными Dodo IS" in html
     assert "month=2026-09" in html
     assert calls == [("PL",)]
+
+
+BG2, BG3 = "d" * 32, "e" * 32
+
+
+def _registry_only_units(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Пиццерии BG2 и BG3 есть только в реестре; за месяц у них лишь оценки агрегатора и карт."""
+    monkeypatch.setattr(
+        agg_store,
+        "units",
+        lambda countries=None: (
+            agg_store.UnitRow(BG2, "BG", "Plovdiv-1", 0.0, 0.0, True, MONTH, MONTH),
+            agg_store.UnitRow(BG3, "BG", "Varna-1", 0.0, 0.0, True, MONTH, MONTH),
+        ),
+    )
+    monkeypatch.setattr(
+        agg_store,
+        "latest",
+        lambda countries, until=None: (
+            agg_store.LatestRating("BG", "glovo", BG2, 9.0, 10, 20, date(2026, 9, 25)),
+        ),
+    )
+    monkeypatch.setattr(
+        maps_store,
+        "unit_scores_dated",
+        lambda provider, until: {BG3: (4.2, 40, date(2026, 9, 20))} if provider == 2 else {},
+    )
+
+
+def test_unit_with_only_aggregator_or_map_rating_is_not_lost(
+    monkeypatch: pytest.MonkeyPatch, чтения: None
+) -> None:
+    from src.web import quality_data
+
+    _registry_only_units(monkeypatch)
+    found = quality_data.load_month(Reach("HQ", None, ("BG",)), ("BG",), MONTH)["BG"]
+    by_name = {u.name: u for u in found.units}
+
+    assert {"Sofia-1", "Plovdiv-1", "Varna-1"} <= set(by_name)
+    assert by_name["Plovdiv-1"].values["aggs"] == D("4.5")  # 9 из 10 → 4.5 из 5
+    assert by_name["Varna-1"].values["maps"] == D("4.2")
+    assert found.values["maps"] == D("4.2") and found.values["aggs"] == D("4.5")
+
+
+def test_network_moves_countries_without_values_under_the_table(
+    monkeypatch: pytest.MonkeyPatch, ук: FlaskClient
+) -> None:
+    monkeypatch.setattr(
+        read,
+        "countries",
+        lambda: (*_countries(), read.CountryRow("SK", "Словакия", "Slovakia", None, True)),
+    )
+    html = ук.get("/quality?month=2026-09").get_data(as_text=True)
+    table = html[html.index("<tbody>") : html.index("</tbody>")]
+
+    assert "Польша" in table and "Болгария" in table  # есть РКО и РС
+    assert "Словакия" not in table
+    assert "Нет данных за сентябрь 2026 (1): " in html
+    assert "qa-nodata" in html and "country=SK" in html.split("qa-nodata")[1]
+
+
+def test_rail_says_pizzerias_count_when_country_has_units_but_no_rko_rs(
+    monkeypatch: pytest.MonkeyPatch, чтения: None
+) -> None:
+    _registry_only_units(monkeypatch)
+    monkeypatch.setattr(quality_read, "period_scores", lambda countries, month: ())
+    html = next(_client(monkeypatch)).get("/quality?month=2026-09").get_data(as_text=True)
+
+    assert "пиццерий: 2" in html  # BG: две пиццерии с одними оценками, РКО и РС нет
+
+
+def test_header_has_two_floors_with_groups(ук: FlaskClient) -> None:
+    html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
+
+    assert 'colspan="3"' in html and 'rowspan="2"' in html
+    assert "qa-edge" in html
