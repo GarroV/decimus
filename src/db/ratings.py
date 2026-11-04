@@ -168,6 +168,16 @@ def live_units(since: date) -> list[tuple[str, str, str]]:
     return [(str(r[0]), str(r[1]), str(r[2])) for r in rows]
 
 
+def own_unit_codes() -> list[tuple[str, str | None]]:
+    """Имя и код Dodo пиццерий нашего справочника точек (`units`): запасной справочник ссылок."""
+    try:
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute("select name, code from units where code is not null").fetchall()
+    except psycopg.Error as exc:
+        raise RatingsError(f"Справочник точек недоступен ({type(exc).__name__}): {exc}") from exc
+    return [(str(r[0]), str(r[1])) for r in rows]
+
+
 def known_units(conn: psycopg.Connection) -> list[tuple[str, str, str | None]]:
     return [
         (r[0], r[1], r[2])

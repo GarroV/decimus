@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import contextvars
 import logging
+import time
 from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -77,6 +78,16 @@ KNOWN: tuple[ModuleType, ...] = (glovo, chowdeck, migros)
 MAX_LINK_M = 400
 #: Точки в пределах этого радиуса от пиццерии — возможные дубли одной карточки (D700).
 DUPLICATE_M = 50
+
+
+#: Пауза перед повторным проходом по пиццериям, чей запрос не удался: 429 площадки
+#: проходит за полминуты, а повтор сразу упирается в тот же лимит (Wolt, 04.11.2026:
+#: каждый ночной сбор терял одну-три пиццерии на 429).
+RETRY_PAUSE_SEC = 30.0
+#: Сбор, давший меньше этой доли точек прошлого удачного, — неполный (см. `verdict`).
+PARTIAL_SHARE = 0.6
+#: Ниже такого числа точек в прошлом сборе долю не сверяем: у малой выборки скачки естественны.
+PARTIAL_MIN_POINTS = 10
 
 
 @dataclass(frozen=True)
@@ -155,6 +166,10 @@ def verdict(points: int, errors: int, attempts: int, last_ok_points: int) -> str
         return f"не ответил ни на один из {attempts} запросов"
     if points == 0 and last_ok_points > 0:
         return f"пустой ответ: ни одной точки Додо, в прошлый раз было {last_ok_points}"
+    if last_ok_points >= PARTIAL_MIN_POINTS and points < last_ok_points * PARTIAL_SHARE:
+        # Яндекс Еда через ретранслятор отдавал 21 точку вместо 41 без единой ошибки
+        # (01.11.2026): запись такого снимка стирала бы со страницы половину оценок.
+        return f"неполный ответ: точек {points}, в прошлый раз было {last_ok_points}"
     return None
 
 
@@ -185,7 +200,19 @@ def _search_one(
     mine = [u for u in units if u.working and u.country in module.COUNTRIES]
     seen: dict[str, tuple[Found, str]] = {}
     errors, first_error = 0, None
+    failed: list[DodoUnit] = []
     for unit in mine:
+        try:
+            found = module.search(http, unit.lat, unit.lng, unit.country, cache)
+        except AggregatorError as exc:
+            logger.warning("%s: %s не прочиталась (%s), повторим", module.KEY, unit.name, exc)
+            failed.append(unit)
+            continue
+        for point in found:
+            seen.setdefault(point.point_key, (point, unit.country))
+    if failed:
+        time.sleep(RETRY_PAUSE_SEC)
+    for unit in failed:
         try:
             found = module.search(http, unit.lat, unit.lng, unit.country, cache)
         except AggregatorError as exc:

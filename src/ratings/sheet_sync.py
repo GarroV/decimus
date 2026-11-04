@@ -15,8 +15,9 @@
 
 Справочник ссылок («Справочник», «Реестр_ссылок») не журналируется: он нужен, чтобы
 найти id пиццерии, чьё имя не сопоставилось с известными. Имя с разными id в разных
-ссылках или строках помечено `base.AMBIGUOUS` — загрузка пишет его в журнал. Не скачался — листы
-идут без него, пиццерия без id попадает в «не сопоставлено».
+ссылках или строках помечено `base.AMBIGUOUS` — загрузка пишет его в журнал.
+Нет в листах — id берётся из нашего справочника точек (`units`, `base.with_own_units`).
+Не скачался — листы идут без него, пиццерия без id попадает в «не сопоставлено».
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ from src.db import ratings as store
 from src.db import ratings_sync as state
 from src.db.errors import RatingsError
 
-from .base import one_id, parse_directory, shared_ids_ambiguous
+from .base import one_id, parse_directory, shared_ids_ambiguous, with_own_units
 from .importer import CHANNEL_SYNC, OUTCOME_DUPLICATE, ImportReport, import_file
 from .model import (
     FORMAT_BASE_COLLECTION,
@@ -152,7 +153,13 @@ def _directory(sheet: str, fetch: Fetcher) -> dict[str, str]:
             continue
         for key, dodo_id in part.items():
             merged.setdefault(key, set()).add(dodo_id)
-    return shared_ids_ambiguous({key: one_id(ids) for key, ids in merged.items()})
+    sheet_ids = shared_ids_ambiguous({key: one_id(ids) for key, ids in merged.items()})
+    try:
+        own = store.own_unit_codes()
+    except RatingsError as exc:
+        logger.warning("рейтинги: запасной справочник точек не взят: %s", exc)
+        return sheet_ids
+    return with_own_units(sheet_ids, own)
 
 
 def _failed(tab: str, note: str, *, sha: str | None) -> TabResult:
