@@ -854,7 +854,7 @@ def better_rule_if(fired, cfg):
     return None
 
 
-def breakdown(items, per_zone, cfg, pct):
+def breakdown(items, per_zone, cfg, pct, processes=None):
     """Расшифровка оценки: от стартовых 100 % до итога, строка за строкой.
 
     Числа берутся из тех же `items` и `per_zone`, что дали вычеты, — своей
@@ -870,6 +870,9 @@ def breakdown(items, per_zone, cfg, pct):
         lvl = i["level"]
         if lvl in (ADVICE, "D3") or lvl not in ("D1", "D2"):
             continue
+        if i.get("collapsed_into"):
+            # D714: повтор того же пункта в другой зоне — то же нарушение, не пропуск.
+            continue
         if not i["counted"]:
             skipped[lvl] = skipped.get(lvl, 0) + 1
             continue
@@ -881,15 +884,150 @@ def breakdown(items, per_zone, cfg, pct):
     lines = []
     for _, row in sorted(levels.items()):
         lines.append({**row, "loss": round(row["loss"], 4)})
+    for code, p in (processes or {}).items():
+        if p.get("zeroed"):
+            lines.append({"kind": "d3_process", "process": code, "name_ru": p["name_ru"],
+                          "name_en": p["name_en"], "count": p["D3"], "loss": p["loss"]})
     for code, z in per_zone.items():
         if z["zeroed"]:
             lines.append({"kind": "d3_zone", "zone": code, "name_ru": z["name_ru"],
                           "name_en": z["name_en"], "count": z["D3"], "loss": z["loss"]})
     lost = sum(row["loss"] for row in lines)
-    exact = (cfg["d3"].get("mode") == "zero_zone_share" and not cfg.get("cap_zone_loss_at_share")
+    mode = cfg["d3"].get("mode")
+    exact = ((mode == PROCESS_MODE or (mode == "zero_zone_share" and not cfg.get("cap_zone_loss_at_share")))
              and round(max(cfg["start_pct"] - lost, cfg.get("floor_pct", 0.0)) + 1e-9, 2) == pct)
     return {"start": cfg["start_pct"], "lines": lines,
             "skipped": dict(sorted(skipped.items())), "total": pct, "exact": exact}
+
+
+#: D714 (прототип): режим «итоги по процессам». Включается только изданием
+#: методики — `d3.mode` в `scoring.json`; без него движок считает по зонам, как раньше.
+PROCESS_MODE = "once_per_process"
+VIOLATION_RANK = {"D1": 1, "D2": 2, "D3": 3}
+
+
+def scored_process_keys(cl_rows):
+    """Процессы, где методика вообще предусматривает нарушение (есть класс D1–D3).
+
+    Оценивается ли процесс — свойство МЕТОДИКИ, а не находок этой проверки.
+    Без этого «нарушений нет» и «нечему быть нарушением» (информационная
+    часть, одни D0) слились бы в одну строку, и чистый процесс читался бы
+    как непроверенный.
+    """
+    scored = set()
+    for r in cl_rows:
+        levels = r.get("levels") or []
+        if isinstance(levels, str):
+            levels = re.split(r"[;,]", levels)
+        if {str(x).strip().upper() for x in levels} & set(VIOLATION_RANK):
+            scored.add((r.get("process_code") or r.get("process_ru") or "").strip())
+    return scored
+
+
+def _process_key(i):
+    return i["process_code"] or i["process_ru"] or "—"
+
+
+def _lead(records):
+    """Запись, которая представляет свёрнутое нарушение: старший класс, повтор — первым, потом по номеру."""
+    top = max(VIOLATION_RANK[r["level"]] for r in records)
+    at_top = [r for r in records if VIOLATION_RANK[r["level"]] == top]
+    return sorted(at_top, key=lambda r: (not r.get("repeat"), r["n"]))[0]
+
+
+def _unit_cost(lead, cfg):
+    cost = float(cfg["penalty"].get(lead["level"], 0))
+    if lead.get("repeat"):
+        cost *= float(cfg.get("repeat_multiplier", 1.0))
+    return cost
+
+
+def _process_units(items, by_item):
+    """Нарушения по процессам: процесс → пункт (или пара «пункт + зона») → записи по порядку."""
+    groups = {}
+    for i in items:
+        if i["level"] not in VIOLATION_RANK:
+            continue
+        unit = i["qid"] if by_item else (i["qid"], i["zone"])
+        groups.setdefault(_process_key(i), {}).setdefault(unit, []).append(i)
+    return groups
+
+
+def compute_by_process(st, cl_rows, cfg, items, per_zone, record_counts):
+    """D714: итог по процессам. Обход по зонам, вычет — по процессам.
+
+    * один пункт, записанный в нескольких зонах, — одно нарушение по старшему
+      классу (`collapse: "item"`); зоны остаются адресами находки;
+    * D3 стоит `d3.process_loss` п.п. один раз на процесс («единый D3 за
+      процесс»), а D1/D2 этого процесса уже не вычитаются;
+    * разные пункты процесса без D3 вычитаются каждый, повтор — по множителю;
+    * буква считается по свёрнутым нарушениям (`counts`); записи — в `record_counts`.
+
+    Зона здесь ничего не теряет и не обнуляется: её доля в этом режиме не вес.
+    """
+    d3_loss = float(cfg["d3"].get("process_loss", 10.0))
+    by_item = cfg.get("collapse", "item") == "item"
+    scored = scored_process_keys(cl_rows)
+    groups = _process_units(items, by_item)
+    counts = {**record_counts, "D1": 0, "D2": 0, "D3": 0}
+    patched = {}
+    by_process = {}
+    for key, units in groups.items():
+        first = next(iter(units.values()))[0]
+        zeroed = any(r["level"] == "D3" for recs in units.values() for r in recs)
+        proc = {"code": first["process_code"], "name_ru": first["process_ru"],
+                "name_en": first["process_en"], "scored": key in scored, "model": "process",
+                "zeroed": zeroed, "D1": 0, "D2": 0, "D3": 0,
+                "loss": d3_loss if zeroed else 0.0, "items": []}
+        if zeroed:
+            counts["D3"] += 1
+        for recs in units.values():
+            lead = _lead(recs)
+            lvl = lead["level"]
+            proc[lvl] += 1
+            counted = lvl == "D3" or not zeroed
+            cost = _unit_cost(lead, cfg) if counted and lvl != "D3" else 0.0
+            if counted and lvl != "D3":
+                counts[lvl] += 1
+                proc["loss"] += cost
+            for r in recs:
+                mine = r is lead
+                patched[r["n"]] = {"counted": counted if mine else False,
+                                   "cost": cost if mine else 0.0,
+                                   **({} if mine else {"collapsed_into": lead["n"]})}
+            zones = []
+            for r in recs:
+                if r["zone"] not in zones:
+                    zones.append(r["zone"])
+            proc["items"].append({"qid": lead["qid"], "level": lvl, "repeat": bool(lead.get("repeat")),
+                                  "zones": zones, "findings": [r["n"] for r in recs],
+                                  "lead": lead["n"], "counted": counted, "cost": round(cost, 4)})
+        proc["loss"] = round(proc["loss"], 4)
+        by_process[key] = proc
+
+    for r in cl_rows:
+        code = (r.get("process_code") or r.get("process_ru") or "").strip()
+        if code and code not in by_process:
+            by_process[code] = {"code": r.get("process_code", ""), "name_ru": r.get("process_ru", ""),
+                                "name_en": r.get("process_en", ""), "scored": code in scored,
+                                "model": "process", "zeroed": False,
+                                "D1": 0, "D2": 0, "D3": 0, "loss": 0.0, "items": []}
+
+    items = [{**i, **patched.get(i["n"], {})} if i["level"] in VIOLATION_RANK else i for i in items]
+    zones = {code: {**z, "loss": 0.0, "score": z["share"], "zeroed": False}
+             for code, z in per_zone.items()}
+    deductions = sum(p["loss"] for p in by_process.values())
+    pct = round(max(cfg["start_pct"] - deductions, cfg.get("floor_pct", 0.0)) + 1e-9, 2)
+    rule_index, grade = grade_rule(pct, counts, cfg)
+    return {"meta": st["meta"], "pct": pct, "grade": grade["grade"], "model": "process",
+            "grade_rule": {"index": rule_index, "if": dict(grade.get("if") or {}),
+                           "better_if": better_rule_if(grade, cfg)},
+            "breakdown": breakdown(items, zones, cfg, pct, by_process),
+            "grade_label_ru": grade.get("label_ru", ""), "grade_label_en": grade.get("label_en", ""),
+            "counts": counts, "record_counts": dict(record_counts),
+            "deductions": round(deductions, 2),
+            "zones": zones, "by_process": by_process, "findings": items,
+            "info": {k: info_field(v) for k, v in (st.get("info") or {}).items()}}
 
 
 def compute(st, cl_rows, zones, cfg):
@@ -899,6 +1037,7 @@ def compute(st, cl_rows, zones, cfg):
     pen = cfg["penalty"]
     d3cfg = cfg["d3"]
     d3_zones = {f["zone"] for f in st["findings"] if f["level"] == "D3"}
+    process_mode = d3cfg.get("mode") == PROCESS_MODE
     counts = {"D1": 0, "D2": 0, "D3": 0}
     per_zone = {z["code"]: {"name_ru": z["name_ru"], "name_en": z["name_en"],
                             "share": z["share_pct"], "D1": 0, "D2": 0, "D3": 0,
@@ -921,9 +1060,11 @@ def compute(st, cl_rows, zones, cfg):
         if advice:
             pass
         elif lvl == "D3":
-            z["zeroed"] = True
+            # D714: в режиме процессов зона — только адрес находки, ничего не обнуляет.
+            z["zeroed"] = not process_mode
         else:
-            if d3cfg.get("skip_other_violations_in_d3_zone", True) and f["zone"] in d3_zones:
+            if (not process_mode and d3cfg.get("skip_other_violations_in_d3_zone", True)
+                    and f["zone"] in d3_zones):
                 counted = False
             else:
                 cost = float(pen.get(lvl, 0))
@@ -942,6 +1083,9 @@ def compute(st, cl_rows, zones, cfg):
                       "zone_name_ru": zmap.get(f["zone"], {}).get("name_ru", f["zone"]),
                       "zone_name_en": zmap.get(f["zone"], {}).get("name_en", f["zone"]),
                       "days": days, "due": due, "counted": counted, "cost": cost})
+
+    if process_mode:
+        return compute_by_process(st, cl_rows, cfg, items, per_zone, counts)
 
     deductions = 0.0
     for code, z in per_zone.items():
@@ -977,14 +1121,7 @@ def compute(st, cl_rows, zones, cfg):
     # Без этого «нарушений нет» и «нечему быть нарушением» (информационная
     # часть, одни D0) слились бы в одну строку, и чистый процесс читался бы
     # как непроверенный.
-    VIOLATION_LEVELS = {"D1", "D2", "D3"}
-    scored_processes = set()
-    for r in cl_rows:
-        levels = r.get("levels") or []
-        if isinstance(levels, str):
-            levels = re.split(r"[;,]", levels)
-        if {str(x).strip().upper() for x in levels} & VIOLATION_LEVELS:
-            scored_processes.add((r.get("process_code") or r.get("process_ru") or "").strip())
+    scored_processes = scored_process_keys(cl_rows)
 
     def _process(i):
         key = i["process_code"] or i["process_ru"] or "—"
