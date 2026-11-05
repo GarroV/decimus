@@ -26,6 +26,8 @@ class ItemCriteria:
     run_id: str
     checklist_version: str
     lang: str
+    #: Формулировка требования пункта: по ней модель судит, подпадает ли объект под пункт.
+    title: str = ""
 
 
 def criteria_section(directory: Path, code: str) -> str:
@@ -63,4 +65,5 @@ def item_criteria(chat_id: int, code: str) -> ItemCriteria:
             run_id=state.run_id,
             checklist_version=state.checklist_version,
             lang=state.ui_lang,
+            title=item.question(state.ui_lang),
         )
