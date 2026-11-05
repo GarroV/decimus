@@ -227,3 +227,19 @@ def test_адрес_не_https_и_не_эта_машина_не_запрашив
     assert файл.read_bytes() == было
     assert "адрес не https" in прогон.stderr
     assert сервер.paths == []
+
+
+def test_мост_настольного_chatgpt_обновляется_так_же(
+    сервер: _Сервер, установленный: tuple[Path, Path]
+) -> None:
+    """Копия в `~/.decimus/chatgpt` (D695) самообновляется, как и в `~/.decimus/bin`."""
+    дом, _ = установленный
+    файл = дом / ".decimus" / "chatgpt" / "mcp_bridge.sh"
+    файл.parent.mkdir(parents=True)
+    shutil.copy(BRIDGE, файл)
+    файл.chmod(0o700)
+
+    прогон = _запустить(дом, файл, сервер.url)
+
+    assert файл.read_text(encoding="utf-8") == НОВЫЙ_МОСТ
+    assert ПРИВЕТ in прогон.stdout

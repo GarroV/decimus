@@ -1091,6 +1091,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/mcp_bridge.sh` | Мост stdio ↔ HTTP для MCP-сервера проверок (T095) |
 | `tools/mcp_healthcheck.py` | Проба здоровья MCP-сервера — изнутри его контейнера (задача T255, #210) |
 | `tools/mcp_install.sh` | Установщик подключения к MCP-серверу проверок (#244, решение D112) |
+| `tools/mcp_install_chatgpt.sh` | Установщик decimus для настольного ChatGPT на Mac (D695, #1439) |
 | `tools/mcp_outside.py` | Смоук доступа к MCP-серверу С ЧУЖОЙ МАШИНЫ (задача T256, #211) |
 | `tools/mcp_watch.py` | Сторож доступности продукта снаружи: MCP (#243) и вход в админку (F-111) |
 | `tools/methodology_leak.py` | Проверка: методика управляющей компании не цитируется в репозитории (#138, #854) |

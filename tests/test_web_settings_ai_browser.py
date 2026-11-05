@@ -102,14 +102,16 @@ def test_плитка_нейросети_не_шире_окна_и_выбор_р
 
     assert page.locator("select[data-pick-nav]").count() == 1
     assert page.locator("#claude-mcp-url").is_visible()
-    assert page.locator("#ai-codex-add").is_visible()
+    assert page.locator("#chatgpt-token").is_visible()
+    assert page.get_by_text("Настольный ChatGPT на Mac").is_visible()
+    assert page.get_by_text("Обычные чаты и ChatGPT в браузере").is_visible()
     assert без_горизонтальной_прокрутки()
     _снимок(page, f"ai-chatgpt-{ширина}")
 
     page.select_option("select[data-pick-nav]", label="GLM (Z.ai)")
     page.wait_for_url("**ai=glm**")
     assert page.get_by_text("ZCode от Z.ai").is_visible()
-    assert page.locator("#ai-codex-add").count() == 0
+    assert page.locator("#chatgpt-token").count() == 0
     assert без_горизонтальной_прокрутки()
     _снимок(page, f"ai-glm-{ширина}")
 

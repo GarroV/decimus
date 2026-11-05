@@ -40,15 +40,6 @@ def claude_code_command(mcp_url: str) -> str:
     return f"claude mcp add --transport http decimus {mcp_url}"
 
 
-def codex_add_command(mcp_url: str) -> str:
-    """Строка для Codex (приложение ChatGPT на компьютере): добавить decimus удалённым MCP."""
-    return f"codex mcp add decimus --url {mcp_url}"
-
-
-#: Вторая строка для Codex: войти (OAuth) — адрес не нужен.
-CODEX_LOGIN_COMMAND = "codex mcp login decimus"
-
-
 @dataclass(frozen=True)
 class ClaudeConnect:
     """Что показать в блоке: включено ли, адрес, команда, подключения."""

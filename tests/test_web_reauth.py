@@ -33,6 +33,7 @@ from src.web.google_auth import GoogleIdentity, GoogleSettings
 #: (путь, данные, якорь возврата, дверь, которую НЕ должны позвать)
 ДЕЙСТВИЯ = [
     ("/settings/claude-token", {}, "?tile=claude", "issue"),
+    ("/settings/chatgpt-token", {}, "?tile=claude&ai=chatgpt", "issue"),
     ("/settings/bot-link", {}, "?tile=bot", "link"),
     ("/settings/google-link", {}, "?tile=google", "begin"),
 ]

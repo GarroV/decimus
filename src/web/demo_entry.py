@@ -56,6 +56,7 @@ LOCKED_ENDPOINTS = frozenset(
         "settings_bot_link",
         "settings_bot_unlink",
         "settings_claude_token",
+        "settings_chatgpt_token",
         "settings_claude_token_revoke",
         "settings_sign_out_everywhere",
         "service_key_save",

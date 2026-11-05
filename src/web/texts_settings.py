@@ -101,8 +101,10 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Reissue the install command",
     },
     "settings.claude.reissue_confirm": {
-        "ru": "Прежний токен перестанет работать — переустановите Claude по новой команде.",
-        "en": "The previous token stops working — reinstall Claude with the new command.",
+        "ru": "Прежний токен перестанет работать — переустановите Claude (и ChatGPT, если он "
+        "подключён) по новой команде.",
+        "en": "The previous token stops working — reinstall Claude (and ChatGPT, if connected) "
+        "with the new command.",
     },
     "settings.claude.reissue_yes": {"ru": "Да, перевыпустить", "en": "Yes, reissue"},
     "settings.claude.run": {
@@ -130,10 +132,10 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     },
     "settings.ai.tip.title": {"ru": "К чему это", "en": "Good to know"},
     "settings.ai.tip.chatgpt": {
-        "ru": "Работает, если политика вашего рабочего пространства ChatGPT разрешает свои "
-        "MCP-серверы; иначе обратитесь к его администратору.",
-        "en": "Works if your ChatGPT workspace policy allows custom MCP servers; otherwise ask "
-        "its administrator.",
+        "ru": "К обычным чатам подключает только администратор рабочего пространства ChatGPT; "
+        "настольное приложение подключается командой выше, без администратора.",
+        "en": "Only the ChatGPT workspace administrator can connect regular chats; the desktop "
+        "app connects with the command above, no administrator needed.",
     },
     "settings.ai.tip.claude": {
         "ru": "Коннектор claude.ai, телефон и Claude Code входят через сайт; Claude Desktop с "
@@ -149,26 +151,48 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "ru": "В kimi.com своего MCP нет: подключайте через Kimi Code CLI.",
         "en": "kimi.com has no MCP of its own: connect through Kimi Code CLI.",
     },
-    "settings.ai.chatgpt.web_title": {"ru": "ChatGPT в браузере", "en": "ChatGPT in a browser"},
-    "settings.ai.chatgpt.web": {
-        "ru": "Plugins → Add custom MCP server → вставьте адрес выше, способ входа — OAuth. "
-        "Войдите в decimus и нажмите «Разрешить».",
-        "en": "Plugins → Add custom MCP server → paste the address above, sign-in method — "
-        "OAuth. Sign in to decimus and press “Allow”.",
-    },
     "settings.ai.chatgpt.app_title": {
-        "ru": "Приложение на компьютере (Codex)",
-        "en": "The desktop app (Codex)",
+        "ru": "Настольный ChatGPT на Mac",
+        "en": "The ChatGPT desktop app on a Mac",
     },
     "settings.ai.chatgpt.app": {
-        "ru": "Settings → MCP servers → Add server → Streamable HTTP → вставьте адрес → "
-        "Authenticate.",
-        "en": "Settings → MCP servers → Add server → Streamable HTTP → paste the address → "
-        "Authenticate.",
+        "ru": "Одна команда в терминале подключает decimus к приложению. Сервер виден во "
+        "вкладке Work (переключатель Chat | Work вверху нового чата); во вкладке Chat его нет.",
+        "en": "One command in a terminal connects decimus to the app. The server shows in the "
+        "Work tab (the Chat | Work switch at the top of a new chat); it is not in the Chat tab.",
     },
-    "settings.ai.chatgpt.cli": {
-        "ru": "Или двумя командами в терминале:",
-        "en": "Or with two commands in a terminal:",
+    "settings.ai.chatgpt.get": {"ru": "Получить команду", "en": "Get the command"},
+    "settings.ai.chatgpt.run": {
+        "ru": "Вставьте в терминал на Mac. Команда видна один раз, токен личный. Потом "
+        "полностью закройте ChatGPT (⌘Q), откройте снова и проверьте просьбой «кто я в "
+        "decimus».",
+        "en": "Paste it into a terminal on your Mac. The command is shown once; the token is "
+        "personal. Then quit ChatGPT completely (⌘Q), reopen it and check by asking “who am I "
+        "in decimus”.",
+    },
+    "settings.ai.chatgpt.shared": {
+        "ru": "Токен один на Claude Desktop и ChatGPT: новая команда отключает прежнюю установку.",
+        "en": "One token serves Claude Desktop and ChatGPT: a new command switches off the "
+        "previous install.",
+    },
+    "settings.ai.chatgpt.reissue": {"ru": "Получить новую команду", "en": "Get a new command"},
+    "settings.ai.chatgpt.reissue_confirm": {
+        "ru": "Прежний токен перестанет работать — Claude Desktop, если он у вас стоит, "
+        "придётся поставить заново.",
+        "en": "The previous token stops working — Claude Desktop, if you have it, will need "
+        "reinstalling.",
+    },
+    "settings.ai.chatgpt.web_title": {
+        "ru": "Обычные чаты и ChatGPT в браузере",
+        "en": "Regular chats and ChatGPT in a browser",
+    },
+    "settings.ai.chatgpt.web": {
+        "ru": "В корпоративном ChatGPT это подключает администратор рабочего пространства: "
+        "он добавляет MCP-сервер по адресу выше с входом OAuth. Потом каждый сотрудник один "
+        "раз входит своей учёткой decimus.",
+        "en": "In a corporate ChatGPT the workspace administrator connects it: they add an MCP "
+        "server at the address above with OAuth sign-in. After that each employee signs in "
+        "once with their own decimus account.",
     },
     "settings.ai.glm.chat": {
         "ru": "В веб-чате chat.z.ai своего MCP нет. Подключить decimus к GLM можно так:",
@@ -400,6 +424,10 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     "settings.continue.claude-token": {
         "ru": "выпустить токен Claude",
         "en": "issue a Claude token",
+    },
+    "settings.continue.chatgpt-token": {
+        "ru": "получить команду для настольного ChatGPT",
+        "en": "get the command for the ChatGPT desktop app",
     },
     "settings.continue.bot-link": {
         "ru": "выпустить ссылку привязки бота",

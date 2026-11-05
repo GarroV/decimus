@@ -17,7 +17,12 @@ from __future__ import annotations
 import hashlib
 import shlex
 
-from src.mcp.install import install_script
+from src.mcp.install import (
+    CHATGPT_INSTALL_PATH,
+    INSTALL_PATH,
+    chatgpt_install_script,
+    install_script,
+)
 
 #: Адрес сервера MCP, каким его видит человек со своей машины (`BOT_MCP_URL`).
 MCP_URL_VAR = "BOT_MCP_URL"
@@ -42,6 +47,10 @@ def _проверить(значение: str, что: str) -> str:
     return значение
 
 
+def _sha256(текст: str) -> str:
+    return hashlib.sha256(текст.encode("utf-8")).hexdigest()
+
+
 def installer_sha256() -> str:
     """SHA-256 установщика ровно в том виде, в каком его отдаёт сервер (F-103).
 
@@ -51,7 +60,31 @@ def installer_sha256() -> str:
     Считается от `install_script()` — той же сборки, что отдаёт сервер, а не от
     файла на диске: в файле стоит маркер моста, а отдаётся уже слитое.
     """
-    return hashlib.sha256(install_script().encode("utf-8")).hexdigest()
+    return _sha256(install_script())
+
+
+def chatgpt_installer_sha256() -> str:
+    """То же для установщика настольного ChatGPT (`/setup/chatgpt`, D695)."""
+    return _sha256(chatgpt_install_script())
+
+
+def _command(*, url: str, token: str, path: str, sha256: str) -> str:
+    адрес = _проверить(url, "адрес MCP-сервера")
+    секрет = _проверить(token, "токен доступа")
+    установщик = f"{адрес.rstrip('/')}{path}"
+    return (
+        f'f=$(mktemp) && curl -fsSL {shlex.quote(установщик)} -o "$f" && '
+        f'echo "{sha256}  $f" | shasum -a 256 -c - && '
+        f'DECIMUS_MCP_URL={shlex.quote(адрес)} DECIMUS_MCP_TOKEN={shlex.quote(секрет)} bash "$f"; '
+        'rm -f "$f"'
+    )
+
+
+def chatgpt_setup_command(*, url: str, token: str) -> str:
+    """Та же строка для настольного ChatGPT на Mac: установщик за `/setup/chatgpt` (D695)."""
+    return _command(
+        url=url, token=token, path=CHATGPT_INSTALL_PATH, sha256=chatgpt_installer_sha256()
+    )
 
 
 def setup_command(*, url: str, token: str) -> str:
@@ -72,13 +105,4 @@ def setup_command(*, url: str, token: str) -> str:
     на 4096 знаках и уезжает в терминал с потерями. Теперь скрипт лежит за
     адресом (`src/mcp/install.py`), а в переписке — только строка запуска.
     """
-    адрес = _проверить(url, "адрес MCP-сервера")
-    секрет = _проверить(token, "токен доступа")
-    установщик = f"{адрес.rstrip('/')}/setup"
-    отпечаток = installer_sha256()
-    return (
-        f'f=$(mktemp) && curl -fsSL {shlex.quote(установщик)} -o "$f" && '
-        f'echo "{отпечаток}  $f" | shasum -a 256 -c - && '
-        f'DECIMUS_MCP_URL={shlex.quote(адрес)} DECIMUS_MCP_TOKEN={shlex.quote(секрет)} bash "$f"; '
-        'rm -f "$f"'
-    )
+    return _command(url=url, token=token, path=INSTALL_PATH, sha256=installer_sha256())

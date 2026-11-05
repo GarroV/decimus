@@ -182,11 +182,14 @@ def test_плитка_называется_нейросети_и_список_и
         (
             "chatgpt",
             [
-                "Add custom MCP server",
-                "codex mcp add decimus --url " + MCP,
-                "codex mcp login decimus",
+                "Настольный ChatGPT на Mac",
+                "вкладке Work",
+                "Получить команду",
+                "Обычные чаты и ChatGPT в браузере",
+                "администратор рабочего пространства",
+                "claude-mcp-url",
             ],
-            ["claude mcp add"],
+            ["claude mcp add", "codex mcp", "Add custom MCP server", "Add server"],
         ),
         (
             "claude",
@@ -212,14 +215,14 @@ def test_инструкция_выбранной_нейросети(
         assert страница.count("<option") == 4
 
 
-def test_chatgpt_оговорка_про_политику_пространства_под_значком(
+def test_chatgpt_оговорка_про_администратора_пространства_под_значком(
     monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth
 ) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
         страница = client.get("/settings?tile=claude&ai=chatgpt").get_data(as_text=True)
 
-        assert "политика вашего рабочего пространства ChatGPT" in страница
-        assert страница.index("info-tip__pop") < страница.index("политика вашего рабочего")
+        assert "только администратор рабочего пространства ChatGPT" in страница
+        assert страница.index("info-tip__pop") < страница.index("только администратор рабочего")
 
 
 def test_без_oauth_адреса_и_команд_нет_а_токен_desktop_есть(
@@ -231,6 +234,7 @@ def test_без_oauth_адреса_и_команд_нет_а_токен_desktop_
         клод = client.get("/settings?tile=claude").get_data(as_text=True)
 
         assert "codex mcp" not in чат and "не включено" in чат
+        assert "Получить команду" in чат, "настольному ChatGPT OAuth стенда не нужен"
         assert "Получить команду установки" in клод and "claude mcp add" not in клод
 
 

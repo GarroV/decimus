@@ -34,7 +34,7 @@
 # (локальные инструменты для фото, D583) доезжают только в свежие установки. Поэтому
 # мост на старте сверяет `BRIDGE_VERSION` с сервером и, если там новее, заменяет себя
 # (self_update ниже). Работает только для моста, установленного в
-# ~/.decimus/bin/mcp_bridge.sh: запуск из рабочей копии репозитория свой файл не трогает.
+# ~/.decimus/bin/mcp_bridge.sh (и ~/.decimus/chatgpt/mcp_bridge.sh у ChatGPT): запуск из рабочей копии репозитория свой файл не трогает.
 # DECIMUS_MCP_NO_UPDATE=1 выключает проверку.
 BRIDGE_VERSION=1
 set -u
@@ -73,8 +73,13 @@ update_note() { printf 'mcp_bridge: обновление моста пропущ
 self_update() {
   [ "${DECIMUS_MCP_NO_UPDATE:-}" = "1" ] && return 0
   [ -z "${DECIMUS_BRIDGE_UPDATED:-}" ] || return 0
-  local self="$HOME/.decimus/bin/mcp_bridge.sh" base meta code remote_ver remote_sha tmp got
-  [ "$0" = "$self" ] && [ -f "$self" ] && [ ! -L "$self" ] || return 0
+  local self="$0" base meta code remote_ver remote_sha tmp got
+  # Только установленные копии: для Claude и для настольного ChatGPT (D695).
+  case "$self" in
+    "$HOME/.decimus/bin/mcp_bridge.sh"|"$HOME/.decimus/chatgpt/mcp_bridge.sh") ;;
+    *) return 0 ;;
+  esac
+  [ -f "$self" ] && [ ! -L "$self" ] || return 0
   base="$(printf '%s' "$URL" | sed -E 's#^(https?://[^/?#]+).*#\1#')"
   case "$base" in
     *@*) update_note "адрес с логином"; return 0 ;;
