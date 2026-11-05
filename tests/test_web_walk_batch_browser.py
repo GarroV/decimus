@@ -350,3 +350,59 @@ def test_already_recorded_same_issue_attaches_the_photos_to_the_record(page):
     page.locator("[data-batch-same-yes]").click()
     page.wait_for_function("written.length === 1")
     assert [(w["op"], w["n"]) for w in written(page)] == [("attach", 7)]
+
+
+LONG_WORD = "Unbroken" + "wordwithoutspaces" * 8 + "_0123456789"
+
+
+def test_five_cards_with_long_words_do_not_widen_the_sheet_at_360px(page):
+    """A long unbroken word (wording, earlier comment, item name) wraps instead of widening the sheet."""
+    page.set_viewport_size({"width": 360, "height": 740})
+    replies = [
+        found("c1", "ITM2", "zone_a", "screen", READY_D2),
+        found("c2", "ITM1", "zone_a", "screen", READY_D2),
+        found("c3", "ITM1", "zone_b", "words", NOT_ESTABLISHED),
+        photo_only(found("c4", "ITM1", "zone_a", "screen", READY_D2)),
+        found("c5", "ITM2", "zone_b", "screen", verdict("needs_fact")),
+    ]
+    replies[4]["class"]["need_fact"] = f"Which {LONG_WORD} was it?"
+    replies[3]["wording"] = LONG_WORD
+    start(page, replies, recorded=[{**RECORDED, "words": LONG_WORD, "text": LONG_WORD}])
+    page.evaluate(
+        """w=>{const D=DecimusWalk.state.data;
+        D.items.forEach(i=>{i.q=w; i.label=w;});
+        D.zones[0].previous[0].text=w; D.zones[1].title=w;}""",
+        LONG_WORD,
+    )
+    add_photos(page, 5)
+    for i in range(5):
+        page.locator("[data-batch-words]").nth(i).fill(LONG_WORD + " " + LONG_WORD)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-save]")
+
+    got = page.evaluate(
+        """()=>{const body=document.querySelector('.walk-batch .walk-sheet__body');
+        const vw=innerWidth;
+        const wide=[...document.querySelectorAll('.walk-batch *')].filter(e=>{
+          const r=e.getBoundingClientRect(); return r.width && (r.right>vw+0.5||r.left<-0.5)})
+          .map(e=>e.tagName+'.'+e.className);
+        const doc=Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+        return {doc, vw, body:[body.scrollWidth, body.clientWidth], wide}}"""
+    )
+    assert got["doc"] <= got["vw"], got
+    assert got["body"][0] <= got["body"][1], got
+    assert got["wide"] == [], got
+
+
+def test_after_the_search_the_list_starts_at_the_first_card(page):
+    start(page, [found(f"c{i}", "ITM1", "zone_a", "screen", READY_D2) for i in range(1, 6)])
+    add_photos(page, 5)
+    page.evaluate("document.querySelector('.walk-sheet__body').scrollTop = 1e6")
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-save]")
+
+    top = page.evaluate(
+        """()=>document.querySelector('[data-batch-card]').getBoundingClientRect().top
+        - document.querySelector('.walk-sheet__body').getBoundingClientRect().top"""
+    )
+    assert 0 <= top <= 16, "the first card is at the top of the list, not scrolled away"

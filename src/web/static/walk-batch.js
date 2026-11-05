@@ -231,7 +231,15 @@
       list.forEach(function (c) { c.finding = false; });
       b.busy = false;
       draw();
+      if (list.length > 1) toFirstCard();
     });
+  }
+
+  /** Результаты по всей пачке выросли над и под экраном: показываем с первой карточки, а не с середины списка. */
+  function toFirstCard() {
+    var scroller = node && node.querySelector(".walk-sheet__body");
+    var first = scroller && scroller.querySelector("[data-batch-card]");
+    if (first) scroller.scrollTop += first.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8;
   }
 
   /** Карточек без комментария среди ещё не подобранных: по ним система смотрит только фото. */
