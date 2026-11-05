@@ -25,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from src.bot import journal
 from src.bot.propose import propose
@@ -43,6 +44,7 @@ from src.recognize.selected_level import (
     prepare_selected_level,
 )
 
+from .server_limits import SlowGate
 from .texts_walk import WALK_TEXTS
 from .walk_auth import BATCH_ENDPOINT, BATCH_PATH, WalkSettings
 from .walk_level import _images
@@ -56,6 +58,10 @@ logger = logging.getLogger(__name__)
 
 #: Карточек в одном вызове. Каждая — до двух платных вызовов модели.
 MAX_CARDS = 12
+#: Предел тела: карточка — до 1000 знаков слов (до 4 байт на знак) и до 20 ссылок на кадры
+#: (по ~80 байт) — около 6 КБ; на 12 карточек с запасом.
+MAX_BATCH_BODY_BYTES = 96 * 1024
+BUSY = "busy"
 #: Параллельных карточек внутри вызова (как у `mcp.import_match.WORKERS`).
 WORKERS = 8
 #: Предложений пункта на карточку: первое — выбор системы, остальные — запасные.
@@ -162,7 +168,11 @@ def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None
     card = _text(raw, "id")
     out: dict[str, Any] = {"id": card, "status": UNAVAILABLE, "candidates": []}
     words = _text(raw, "words")
-    refs = _refs(raw.get("photos"), who, inspection)[:MAX_SUGGEST_PHOTOS]
+    photos = raw.get("photos")
+    # Предел — до разбора ссылок: лишние кадры не читаются с диска и не уходят в модель.
+    refs = _refs(
+        photos[:MAX_SUGGEST_PHOTOS] if isinstance(photos, list) else photos, who, inspection
+    )
     pinned = _code(raw, "code") if raw.get("code") else None
     human_zone = _code(raw, "zone") if raw.get("zone") else None
     candidates: list[dict[str, Any]] = []
@@ -206,9 +216,18 @@ def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None
 
 
 def _guarded(
-    who: int, inspection: Inspection, raw: Any, hint: str | None, lang: str
+    who: int, inspection: Inspection, raw: Any, hint: str | None, lang: str, gate: SlowGate
 ) -> dict[str, Any]:
     ident = raw.get("id") if isinstance(raw, dict) else None
+    card_id = ident if isinstance(ident, str) else ""
+    # Каждая карточка — свой слот общего предела вызовов модели, без ожидания.
+    if not gate.try_enter():
+        return {
+            "id": card_id,
+            "status": BUSY,
+            "candidates": [],
+            "message": _said("walk.batch.model_busy", lang),
+        }
     try:
         if not isinstance(raw, dict):
             raise WalkRefused("walk.err.bad_request")
@@ -219,8 +238,10 @@ def _guarded(
         # Только тип: слова аудитора и текст модели в журнал не идут.
         logger.warning("Обход: карточка пакета не подобрана: %s", type(exc).__name__)
         text = _said("walk.err.recognize", lang)
+    finally:
+        gate.leave()
     return {
-        "id": ident if isinstance(ident, str) else "",
+        "id": card_id,
         "status": UNAVAILABLE,
         "candidates": [],
         "message": text,
@@ -233,12 +254,12 @@ def _said(key: str, lang: str) -> str:
 
 
 def _in_parallel(
-    who: int, inspection: Inspection, cards: list[Any], hint: str | None, lang: str
+    who: int, inspection: Inspection, cards: list[Any], hint: str | None, lang: str, gate: SlowGate
 ) -> list[dict[str, Any]]:
     contexts = [contextvars.copy_context() for _ in cards]
     with ThreadPoolExecutor(max_workers=min(WORKERS, len(cards))) as pool:
         futures = [
-            pool.submit(ctx.run, _guarded, who, inspection, raw, hint, lang)
+            pool.submit(ctx.run, _guarded, who, inspection, raw, hint, lang, gate)
             for ctx, raw in zip(contexts, cards, strict=True)
         ]
     return [f.result() for f in futures]
@@ -264,7 +285,11 @@ def install(
         who = identify(conf, ui_lang, header_only=True)
         if not isinstance(who, int):
             return who
-        body = request.get_json(silent=True)
+        request.max_content_length = MAX_BATCH_BODY_BYTES
+        try:
+            body = request.get_json(silent=True)
+        except RequestEntityTooLarge:
+            return refused("walk.level.too_large", ui_lang, 413)
         if not isinstance(body, dict):
             return refused("walk.err.bad_request", ui_lang, 400)
         inspection = get_state(who)
@@ -287,19 +312,13 @@ def install(
             with guard:
                 busy.discard(who)
             return refused("walk.err.suggest_busy", lang, 429)
-        if not gate.try_enter():
-            hold.release()
-            with guard:
-                busy.discard(who)
-            return refused("walk.err.overloaded", lang, 503)
         try:
             try:
                 hint = _code(body, "zone_hint") if body.get("zone_hint") else None
             except WalkRefused as exc:
                 return refused(str(exc), lang, 400)
-            results = _in_parallel(who, inspection, cards, hint, lang)
+            results = _in_parallel(who, inspection, cards, hint, lang, gate)
         finally:
-            gate.leave()
             hold.release()
             with guard:
                 busy.discard(who)

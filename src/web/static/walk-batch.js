@@ -457,8 +457,8 @@
     }
     var tail = function (key) { box.appendChild(note(tx(key), "walk-form__hint--warn")); };
     if (r.status === "no_item") tail("walk.batch.no_item");
-    else if (r.status === "unavailable") box.appendChild(note(r.message || tx("walk.batch.unavailable"), "walk-form__hint--warn"));
-    if (r.status === "no_item" || r.status === "unavailable") {
+    else if (r.status === "unavailable" || r.status === "busy") box.appendChild(note(r.message || tx("walk.batch.unavailable"), "walk-form__hint--warn"));
+    if (r.status === "no_item" || r.status === "unavailable" || r.status === "busy") {
       box.appendChild(W.button("walk-btn walk-btn--small", tx("walk.batch.retry"), function () { find([card]); }));
       box.appendChild(W.button("walk-btn walk-btn--small", tx("walk.sheet.class_review.other_item"), function () { pickItem(card); }));
       return box;

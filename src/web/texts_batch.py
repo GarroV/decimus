@@ -78,6 +78,10 @@ BATCH_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Не получилось подобрать. Найдите заново.",
         "en": "Could not match this one. Search again.",
     },
+    "walk.batch.model_busy": {
+        "ru": "Система занята, повторите: нажмите «Найти заново».",
+        "en": "The system is busy, try again: press “Search again”.",
+    },
     "walk.batch.level_pick": {"ru": "Класс", "en": "Class"},
     "walk.batch.prev": {"ru": "Прошлый раз, {date}: {text}", "en": "Last time, {date}: {text}"},
     "walk.batch.prev_ask": {"ru": "Это то же самое?", "en": "Is it the same thing?"},

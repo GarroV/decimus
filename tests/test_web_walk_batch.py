@@ -19,6 +19,7 @@ from src.domain import get_state
 from src.recognize.fastpath import FastPath
 from src.recognize.models import Candidate, Suggestion
 from src.web import walk_auth, walk_batch
+from src.web.server_limits import walk_model_gate
 
 МОДЕЛЬ = Candidate(code="PRD05", level="D2", zone="fridge", wording="Нагар.", confidence=0.8)
 КЛАСС = {
@@ -145,3 +146,37 @@ def test_чужая_проверка_отклоняется(клиент: Кли
     карточка = {"id": "a", "words": "x", "photos": [клиент.ссылка()]}
 
     assert _пакет(клиент, карточка, run_id="not-this-run").status_code == 409
+
+
+def test_при_занятом_пределе_модели_карточки_получают_занято_а_не_уходят_в_модель(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    звали: list[str] = []
+    monkeypatch.setattr(ядро, "classify", lambda *a, **k: звали.append("model"))
+    gate = walk_model_gate()
+    занято = 0
+    while gate.try_enter():
+        занято += 1
+    try:
+        ответ = _пакет(
+            клиент,
+            {"id": "a", "words": "нагар", "photos": [клиент.ссылка()]},
+            {"id": "b", "words": "нагар", "photos": [клиент.ссылка()]},
+        )
+    finally:
+        for _ in range(занято):
+            gate.leave()
+
+    assert ответ.status_code == 200, ответ.get_json()
+    карточки = ответ.get_json()["cards"]
+    assert [c["status"] for c in карточки] == ["busy", "busy"]
+    assert all(c["message"] for c in карточки), "отказ сказан словами, не молчанием"
+    assert звали == [] and подмена == [], "карточка без слота в модель не идёт"
+
+
+def test_слишком_большое_тело_отклоняется_до_разбора(клиент: Клиент) -> None:  # noqa: F811
+    карточка = {"id": "a", "words": "x" * 200_000, "photos": []}
+
+    assert _пакет(клиент, карточка).status_code == 413
