@@ -303,6 +303,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_usage.py` | Тексты экрана «Расход модели» (D537): вкладка «Администрирования», расход токенов |
 | `src/web/texts_users.py` | Тексты экрана «Пользователи» вместе с карточкой человека (#585, переделка экрана) |
 | `src/web/texts_walk.py` | Тексты мини-аппа обхода (#418) — сливаются в общий каталог `texts.TEXTS` |
+| `src/web/texts_walk_log.py` | Тексты блока «Журнал обхода» на карточке проверки (D710) |
 <!-- map:end -->
 
 ### Мини-апп обхода
@@ -321,6 +322,7 @@ Claude входом через сайт (OAuth).
 | `src/web/walk_finish.py` | Общая сборка отчёта для miniapp и запасного завершения через чат |
 | `src/web/walk_finish_review.py` | Read-only miniapp review of the current run; the engine owns every score |
 | `src/web/walk_level.py` | Classify only the selected item, using its complete pinned criterion and fresh facts |
+| `src/web/walk_log_view.py` | Журнал обхода на карточке проверки (D710): шаги человеческими словами |
 | `src/web/walk_main.py` | Точка входа сервиса мини-аппа обхода: `python -m src.web.walk_main` |
 | `src/web/walk_model_session.py` | The search and selected-item check share one bounded auditor model session |
 | `src/web/walk_proxy.py` | Адреса мини-аппа обхода в админке — передача сервису обхода, без своей логики |
@@ -328,6 +330,7 @@ Claude входом через сайт (OAuth).
 | `src/web/walk_search_tags.py` | Semantic search shortcuts: edition data selects codes; no class or model decisions |
 | `src/web/walk_settings.py` | Мини-апп как приложение аудитора (D373): настройки и завершение проверки |
 | `src/web/walk_start.py` | Начало проверки из мини-аппа (D392): те же шаги, что у мастера бота, — полями на одном экране |
+| `src/web/walk_steps.py` | Журнал шагов обхода (D710): запись шага из обработчиков мини-аппа |
 | `src/web/walk_suggest.py` | Мини-апп обхода: поиск пункта по кадру и словам (D330) — `POST /tg/walk/suggest` |
 | `src/web/walk_translate.py` | Мини-апп обхода: перевод свободного текста на другой язык (D394) — `POST /tg/walk/translate` |
 | `src/web/walk_unseen.py` | Мини-апп обхода: «Ещё не смотрели» — пункты зоны, по которым записи пока нет (#837, D492) |
@@ -353,7 +356,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/country/` | 8 | _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, index.html |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
 | `src/web/templates/dodois/` | 1 | connect.html |
-| `src/web/templates/inspections/` | 11 | _card_body.html, _card_parts.html, _letter_form.html, _panel.html, _panel_fragment.html, _row.html, _split_history.html, card.html, … (+3) |
+| `src/web/templates/inspections/` | 12 | _card_body.html, _card_parts.html, _letter_form.html, _panel.html, _panel_fragment.html, _row.html, _split_history.html, _walk_log.html, … (+4) |
 | `src/web/templates/journal/` | 1 | page.html |
 | `src/web/templates/mailings/` | 2 | document.html, plan_letter.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
@@ -629,6 +632,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0116_drop_country_mailing_recipients.sql` | Особый список «Кому» страны (`0112`) снят: адресаты предписаний и экшн-планов берутся из общего списка рассылки страны (`country_contacts`, вид `mailing`), который… |
 | `0117_drop_country_contracts.sql` | Блок «Договор» карточки страны (`0088`, D603) снят: договоров страны в decimus нет, их здесь не контролируют (D702) |
 | `0118_agg_unit_absent_point_links.sql` | Ручные решения по охвату агрегаторов (D700): отметка «пиццерии нет на площадке» и закреплённая привязка точки к пиццерии (docs/17-aggregators.md) |
+| `0119_walk_log.sql` | Журнал шагов обхода (D710): что аудитор ввёл и что ответила система на каждом шаге записи нарушения в мини-аппе — подбор пункта, определение класса, уточнение фактов… |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
