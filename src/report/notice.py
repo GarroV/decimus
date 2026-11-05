@@ -60,12 +60,36 @@ def zeroed_zones(score: Mapping[str, Any]) -> frozenset[str]:
     )
 
 
+def zeroed_processes(score: Mapping[str, Any]) -> frozenset[str]:
+    """Процессы, которые движок отдаёт обнулёнными в режиме процессов (D714, прототип).
+
+    Флаг `zeroed` у процесса ставит только движок в режиме «единый D3 за процесс»;
+    в зонном режиме его нет, и множество пусто.
+    """
+    processes = score.get("by_process") or {}
+    return frozenset(key for key, proc in processes.items() if proc.get("zeroed"))
+
+
+def _process_key(item: Mapping[str, Any]) -> str:
+    """Ключ процесса записи — тот же, каким движок раскладывает `by_process`."""
+    return str(item.get("process_code") or item.get("process_ru") or "—")
+
+
 def suggest(score: Mapping[str, Any]) -> frozenset[int]:
     """Номера записей, которые предписание берёт по умолчанию (D602, D606).
 
     Все записи D3 и все нарушения зон, обнулённых целиком — D3 или набором D1
     (`zeroed_zones`). Правило расширяемое (D610): новые основания — новые зоны здесь.
+    В режиме процессов (D714) основание — обнулённый ПРОЦЕСС: берутся все его
+    нарушения, в какой бы зоне их ни нашли; зоны там ничего не обнуляют.
     """
+    if score.get("model") == "process":
+        processes = zeroed_processes(score)
+        return frozenset(
+            int(item["n"])
+            for item in score.get("findings") or []
+            if item.get("level") in VIOLATION_LEVELS and _process_key(item) in processes
+        )
     zeroed = zeroed_zones(score)
     return frozenset(
         int(item["n"])
