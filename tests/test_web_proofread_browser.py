@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 import pytest
+from conftest import chromium_executable
 from playwright.sync_api import sync_playwright
 from test_web_acceptance import _приёмка, админ, стенд  # noqa: F401
 
@@ -28,18 +29,14 @@ def _лист(monkeypatch):
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CFT = Path.home() / (
-    ".cache/chrome-for-testing/chrome/mac_arm-154.0.8037.57/"
-    "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
-)
 
 
 @pytest.fixture
 def browser_page():
-    if not CFT.is_file():
-        pytest.skip("Chrome for Testing is not installed at the documented location")
     with sync_playwright() as p:
-        browser = p.chromium.launch(executable_path=str(CFT), headless=True)
+        browser = p.chromium.launch(
+            executable_path=chromium_executable(p.chromium.executable_path), headless=True
+        )
         page = browser.new_page()
         page.route("**/*", lambda route: route.abort())
         yield page
