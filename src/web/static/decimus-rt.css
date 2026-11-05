@@ -222,6 +222,16 @@
 }
 .rt-cal__title::after { content: "▾"; font-size: .7em; color: var(--ink-3); }
 .rt-cal__pick[open] > .rt-cal__title { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+/* Периоды рейтинга внутри месяца или квартала: строка «‹ целиком · даты… ›» под отбором. */
+.rt-steps { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-4); }
+.rt-steps > .rt-field__label { margin-right: var(--space-2); }
+.rt-step {
+  display: inline-flex; align-items: center; height: 1.75rem; padding: 0 var(--space-3);
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  font-size: var(--fs-dense); font-variant-numeric: tabular-nums; color: var(--ink-2); text-decoration: none; white-space: nowrap;
+}
+.rt-step:hover { color: var(--accent); border-color: var(--accent-line); text-decoration: none; }
+.rt-step.is-on { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); font-weight: var(--w-semibold); }
 .rt-cal__pop {
   position: absolute; z-index: 20; top: calc(100% + var(--space-2)); left: 50%; transform: translateX(-50%);
   width: min(22rem, calc(100vw - 2rem));

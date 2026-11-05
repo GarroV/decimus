@@ -13,6 +13,13 @@
 
 Стрелка листает на длину выбранного периода и ведёт только туда, где есть
 данные. Ни одного вычисления оценок — только ключи периодов (`periods`).
+
+Периоды рейтинга внутри месяца или квартала (контролинг 05.11.2026): под отбором —
+строка «целиком» и периоды рейтинга раздела (у РС — его периоды по имени, у РКО —
+недели датами), задевшие выбранный месяц или квартал. Пункт открывает один период рейтинга,
+а месяц или квартал едет в адресе (`within=`), чтобы строка и стрелки в ней остались
+и было куда вернуться. Периоды — по тому же правилу, что данные (D396): задевшие
+отрезок хотя бы днём.
 """
 
 from __future__ import annotations
@@ -35,6 +42,19 @@ class Option:
 
 
 @dataclass(frozen=True)
+class Inside:
+    """Периоды рейтинга внутри месяца или квартала: ключ и имя «целиком», пункты
+    (старые первыми) и соседи выбранного для стрелок строки."""
+
+    parent_key: str
+    parent_title: str
+    whole_on: bool
+    items: tuple[Option, ...]
+    prev: str | None
+    next: str | None
+
+
+@dataclass(frozen=True)
 class Calendar:
     title: str
     prev: str | None
@@ -43,6 +63,7 @@ class Calendar:
     end: date
     rs_options: tuple[Option, ...] = ()
     rko_options: tuple[Option, ...] = ()
+    inside: Inside | None = None
 
 
 def _rs_title(p: rp.RatingPeriod, lang: str) -> str:
@@ -93,12 +114,75 @@ def _rko_options(selected: rp.ReportPeriod, rko: tuple[rp.RatingPeriod, ...]) ->
     ordered = sorted(rko, key=lambda p: p.begin_on, reverse=True)
     return tuple(
         Option(
-            f"{p.begin_on.isoformat()}..{p.end_on.isoformat()}",
+            _rko_key(p),
             week_title(p.begin_on, p.end_on),
             _same_span(p, selected),
         )
         for p in ordered
     )
+
+
+def span_title(begin: date, end: date) -> str:
+    """Неделя РКО датами в строке «внутри месяца»: «05.10 — 11.10»."""
+    return f"{begin:%d.%m} — {end:%d.%m}"
+
+
+def _rko_key(p: rp.RatingPeriod) -> str:
+    return f"{p.begin_on.isoformat()}..{p.end_on.isoformat()}"
+
+
+def _inside(
+    selected: rp.ReportPeriod,
+    within: rp.ReportPeriod | None,
+    kind: str | None,
+    rs: tuple[rp.RatingPeriod, ...],
+    rko: tuple[rp.RatingPeriod, ...],
+    lang: str,
+) -> Inside | None:
+    """Строка периодов рейтинга раздела `kind` («rs» / «rko») внутри месяца или квартала.
+
+    Выбран месяц или квартал — он и есть «целиком». Выбран один период рейтинга и в
+    адресе месяц или квартал (`within`), в который этот период входит, — строка
+    остаётся. Иначе строки нет: произвольный отрезок и разделы без периодов рейтинга
+    (карты, агрегаторы…) её не получают.
+    """
+    whole = (rp.KIND_MONTH, rp.KIND_QUARTER)
+    if kind not in ("rs", "rko"):
+        return None
+    parent = selected if selected.kind in whole else within
+    if parent is None or parent.kind not in whole:
+        return None
+    source = rs if kind == "rs" else rko
+    touching = sorted(
+        (p for p in source if p.end_on >= parent.begin and p.begin_on <= parent.end),
+        key=lambda p: p.begin_on,
+    )
+    if not touching:
+        return None
+    # У РС — имя периода («Октябрь 1»), а не даты: даты периода РС мы пока выводим
+    # из подписи листа контроля (1–15 и 16–конец), а настоящие в Dodo IS другие
+    # (05.10–18.10, 19.10–02.11). Пока даты не берутся из Dodo IS, неверных не показываем.
+    # У РКО подпись листа — сами даты недели, им верить можно.
+    items = tuple(
+        Option(
+            f"rs:{p.id}" if kind == "rs" else _rko_key(p),
+            _rs_title(p, lang) if kind == "rs" else span_title(p.begin_on, p.end_on),
+            _same_span(p, selected),
+        )
+        for p in touching
+    )
+    whole_on = selected.key == parent.key
+    on = next((i for i, o in enumerate(items) if o.on), None)
+    if not whole_on and on is None:
+        return None  # в адресе чужой месяц: выбранный период в него не входит
+    prev: str | None
+    nxt: str | None
+    if on is None:
+        prev, nxt = None, items[0].key
+    else:
+        prev = items[on - 1].key if on > 0 else None
+        nxt = items[on + 1].key if on + 1 < len(items) else None
+    return Inside(parent.key, _title(parent, rs, rko, lang), whole_on, items, prev, nxt)
 
 
 def build(
@@ -107,6 +191,9 @@ def build(
     rs_periods: tuple[rp.RatingPeriod, ...],
     lang: str,
     rko_periods: tuple[rp.RatingPeriod, ...] = (),
+    *,
+    kind: str | None = None,
+    within: rp.ReportPeriod | None = None,
 ) -> Calendar:
     first = min(data_months, default=None)
     last = max(data_months, default=None)
@@ -127,4 +214,5 @@ def build(
         end=selected.end,
         rs_options=_rs_options(selected, rs_periods, lang),
         rko_options=_rko_options(selected, rko_periods),
+        inside=_inside(selected, within, kind, rs_periods, rko_periods, lang),
     )

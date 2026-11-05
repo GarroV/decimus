@@ -152,7 +152,15 @@ def _selected(
 
 def _group_name(line: report.GroupLine, selection: report.Selection, found: report.Choices) -> str:
     names = {row.code: row.name_ru for row in found.countries}
-    clusters = {"CEE": "CEE", "TR": "Турция", "CAUCASUS": "Кавказ", "OTHER": "Остальные страны"}
+    clusters = {
+        "CEE": "Европа",
+        "TR": "Турция",
+        "ASIA": "Азия",
+        "CAUCASUS": "Кавказ",
+        "NG": "Нигерия",
+        "MX": "Мексика",
+        "OTHER": "Остальные страны",
+    }
     if line.level == report.LEVEL_COUNTRY and line.key:
         return names.get(line.key, line.key)
     if line.key is not None:

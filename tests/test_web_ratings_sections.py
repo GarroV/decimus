@@ -204,6 +204,24 @@ def test_рс_плитки_страны_топ_и_боттом_из_сводки
     assert "Пиццерия-Верх" in html and "Пиццерия-Низ" in html
 
 
+def test_проверено_пиццерии_с_баллом_без_всего_реестра(monkeypatch: pytest.MonkeyPatch) -> None:
+    """«Проверено» — пиццерии с баллом за период; всех работающих в знаменателе нет:
+    у кого балла нет, та и не должна была проверяться (контролинг 05.11.2026)."""
+    from types import SimpleNamespace
+
+    подготовить(monkeypatch, сводка())
+    # В реестре 10 работающих пиццерий, балл у 4: показываем 4, а не «4 из 10».
+    реестр = [SimpleNamespace(working=True) for _ in range(10)]
+    monkeypatch.setattr(screen.agg_store, "units", lambda *_a, **_k: реестр)
+    html = получить(monkeypatch)
+
+    плитка = re.search(r'pk-tile__label">Проверено</div>(.*?)</div>\s*</div>', html, re.S)
+    assert плитка
+    текст = re.sub(r"<[^>]+>", " ", плитка.group(1))
+    assert " 4 " in f" {текст} " and "пиццерий с баллом за период" in текст
+    assert " из " not in текст and "10" not in текст and "работающих" not in html
+
+
 def test_рко_берёт_свои_числа_а_не_рс(monkeypatch: pytest.MonkeyPatch) -> None:
     подготовить(monkeypatch)
     html = получить(monkeypatch, "/ratings/rko")

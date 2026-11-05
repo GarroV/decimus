@@ -12,7 +12,10 @@
     {% call stat(t('ratings.src.avg'), t('ratings.src.avg.sub', n=src.units) if src.units else none) %}{{ num(src.avg) }} {{ dlt(src.avg_delta) }}{% endcall %}
     {% call stat(t('ratings.src.viol'), t('ratings.src.viol.sub', x='%.2f'|format(v.per_checkup)) if v.per_checkup is not none else none) %}{% if v.has_data %}{{ v.total }}{% else %}<span class="is-empty">—</span>{% endif %}{% endcall %}
     {% call stat(t('ratings.src.hard'), t('ratings.src.hard.sub', n=src.hard_units) if src.hard else none) %}{% if v.has_data %}{{ src.hard|length }}{% else %}<span class="is-empty">—</span>{% endif %}{% endcall %}
-    {% call stat(t('ratings.src.checked'), t('ratings.src.checked.sub') if src.registry else none) %}{% if src.registry %}{{ t('ratings.src.checked.of', n=src.units, m=src.registry) }}{% else %}{{ src.units }}{% endif %}{% endcall %}
+    {#- «Проверено» — пиццерии с баллом за период, без знаменателя всего реестра: проверяют
+        100% пиццерий, и у кого балла нет, та и не должна была проверяться (контролинг
+        05.11.2026). -#}
+    {% call stat(t('ratings.src.checked'), t('ratings.src.checked.sub')) %}{{ src.units }}{% endcall %}
   </div>
 
   <section class="pk-block">
