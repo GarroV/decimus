@@ -543,6 +543,7 @@ settings_own_password
 settings_bot_link
 settings_bot_unlink
 settings_claude_token
+settings_chatgpt_token
 settings_claude_token_revoke
 settings_claude_revoke
 settings_sign_out_everywhere

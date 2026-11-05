@@ -26,6 +26,10 @@ from pathlib import Path
 #: строку, которую человек вставляет в терминал с телефона в руке.
 INSTALL_PATH = "/setup"
 
+#: Установщик для настольного ChatGPT на Mac (D695): тот же мост, но свой каталог
+#: (`~/.decimus/chatgpt`), свой файл токена и регистрация через встроенный Codex.
+CHATGPT_INSTALL_PATH = "/setup/chatgpt"
+
 #: Самообновление моста (D626): мост при старте спрашивает здесь версию и отпечаток
 #: (`BRIDGE_META_PATH`, JSON) и, если версия на сервере новее своей, скачивает файл
 #: (`BRIDGE_SCRIPT_PATH`). В отличие от `/setup` обе двери требуют токен:
@@ -41,6 +45,7 @@ INSTALL_CONTENT_TYPE = "text/plain; charset=utf-8"
 
 _ROOT = Path(__file__).resolve().parents[2]
 _INSTALLER = _ROOT / "tools" / "mcp_install.sh"
+_CHATGPT_INSTALLER = _ROOT / "tools" / "mcp_install_chatgpt.sh"
 _BRIDGE = _ROOT / "tools" / "mcp_bridge.sh"
 
 #: Место, куда подставляется тело моста. Оно не пишется в установщике строкой:
@@ -57,24 +62,34 @@ class InstallScriptError(RuntimeError):
     """Установщик собрать не из чего — отдавать нечего."""
 
 
-def install_script() -> str:
-    """Готовый текст установщика с подставленным телом моста.
+def _assemble(installer: Path) -> str:
+    """Установщик с подставленным телом моста. Отказ, а не пустая строка.
 
-    Отказ, а не пустая строка: скрипт без моста прошёл бы до конца и оставил
-    человека с настройкой, которая не работает, — молчаливый промах ровно того
-    сорта, из-за которого задача и заведена.
+    Скрипт без моста прошёл бы до конца и оставил человека с настройкой, которая
+    не работает, — молчаливый промах ровно того сорта, из-за которого задача и
+    заведена.
     """
-    for файл in (_INSTALLER, _BRIDGE):
+    for файл in (installer, _BRIDGE):
         if not файл.exists():
             raise InstallScriptError(f"нет файла {файл} — установщик собрать не из чего")
-    шаблон = _INSTALLER.read_text(encoding="utf-8")
+    шаблон = installer.read_text(encoding="utf-8")
     if _BRIDGE_MARK not in шаблон:
-        raise InstallScriptError(f"в {_INSTALLER} нет места для моста ({_BRIDGE_MARK!r})")
+        raise InstallScriptError(f"в {installer} нет места для моста ({_BRIDGE_MARK!r})")
     мост = _BRIDGE.read_text(encoding="utf-8")
     собран = шаблон.replace(_BRIDGE_MARK, "\n" + мост.rstrip("\n") + "\n", 1)
     if _BRIDGE_MARK in собран:
         raise InstallScriptError("место для моста осталось незаполненным: маркеров больше одного")
     return собран
+
+
+def install_script() -> str:
+    """Готовый текст установщика Claude с подставленным телом моста."""
+    return _assemble(_INSTALLER)
+
+
+def chatgpt_install_script() -> str:
+    """Готовый текст установщика для настольного ChatGPT (D695), мост тот же."""
+    return _assemble(_CHATGPT_INSTALLER)
 
 
 #: Строка версии в шапке моста: целое число, растёт на каждую правку, которую надо

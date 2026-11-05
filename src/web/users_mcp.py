@@ -9,8 +9,8 @@
 Блок стоит только в «Настройках», и учётка берётся из сессии, а не из
 формы: выпустить или отозвать чужой токен отсюда нечем.
 
-Команду собирает `src/bot/mcp_setup.py`:
-одна строка в терминале кладёт мост и запись Claude Desktop.
+Команду собирает `src/bot/mcp_setup.py`: одна строка в терминале кладёт мост и запись
+Claude Desktop либо регистрирует мост в настольном ChatGPT (D695).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from src.bot.mcp_setup import MCP_URL_VAR, setup_command
+from src.bot.mcp_setup import MCP_URL_VAR, chatgpt_setup_command, setup_command
 from src.db import mcp_access
 from src.db.errors import DbError
 
@@ -28,6 +28,11 @@ from .db_refusal import note_target_mismatch
 #: Заглушка адреса, когда стенд его не назвал, — как у бота: видна в команде
 #: ровно там, где стоял бы адрес, а не подменяется догадкой.
 URL_PLACEHOLDER = "SERVER_ADDRESS"
+
+
+TARGET_CLAUDE = "claude"
+TARGET_CHATGPT = "chatgpt"
+TARGETS = (TARGET_CLAUDE, TARGET_CHATGPT)
 
 
 @dataclass(frozen=True)
@@ -48,6 +53,9 @@ class Issued:
     command: str = field(repr=False)
     expires_at: datetime | None = None
     replaced: bool = False
+    #: Для какой программы команда: `claude` (Claude Desktop) или `chatgpt` (D695).
+    #: Токен один и тот же, различается только установщик за строкой.
+    target: str = TARGET_CLAUDE
 
 
 def own_status(user_id: str | None) -> TokenStatus:
@@ -61,12 +69,20 @@ def own_status(user_id: str | None) -> TokenStatus:
         return TokenStatus(known=False)
 
 
-def issue_own(user_id: str) -> Issued:
-    """Выпустить вошедшему токен и собрать команду настройки. Отказ базы — наверх."""
+def issue_own(user_id: str, target: str = TARGET_CLAUDE) -> Issued:
+    """Выпустить вошедшему токен и собрать команду настройки. Отказ базы — наверх.
+
+    Токен у учётки один (миграция `0059`): выпуск для ChatGPT гасит и тот, что стоит у
+    Claude Desktop, и наоборот. Установщик за строкой — по `target`.
+    """
+    if target not in TARGETS:
+        raise ValueError(f"неизвестная программа для токена: {target}")
     выпущен = mcp_access.issue_for_account(user_id)
     url = (os.environ.get(MCP_URL_VAR) or "").strip() or URL_PLACEHOLDER
+    build = chatgpt_setup_command if target == TARGET_CHATGPT else setup_command
     return Issued(
-        command=setup_command(url=url, token=выпущен.value),
+        command=build(url=url, token=выпущен.value),
         expires_at=выпущен.expires_at,
         replaced=выпущен.replaced_previous,
+        target=target,
     )

@@ -165,3 +165,34 @@ def test_база_молчит_отказ_словами(
 
     assert ответ.status_code == 503
     assert "curl" not in ответ.get_data(as_text=True), "без токена ушла полкоманды"
+
+
+def test_chatgpt_получает_свою_строку_с_тем_же_токеном(
+    админ_уК: FlaskClient, токены: dict[str, Any]
+) -> None:
+    """Настольный ChatGPT (D695): установщик `/setup/chatgpt`, а не Claude-овский `/setup`."""
+    ответ = админ_уК.post("/settings/chatgpt-token", headers=ЗАГОЛОВКИ)
+
+    assert ответ.status_code == 200 and токены["issued"] == [МОЙ_ID]
+    страница = ответ.get_data(as_text=True)
+    assert 'id="chatgpt-token-command"' in страница, "команда показана не в панели ChatGPT"
+    assert "/setup/chatgpt" in страница and "tok-SECRET-1" in страница
+    assert 'id="claude-token-command"' not in страница
+    assert "no-store" in ответ.headers.get("Cache-Control", "")
+
+
+def test_команда_claude_по_прежнему_со_своим_установщиком(
+    админ_уК: FlaskClient, токены: dict[str, Any]
+) -> None:
+    ответ = админ_уК.post("/settings/claude-token", headers=ЗАГОЛОВКИ)
+
+    страница = ответ.get_data(as_text=True)
+    assert 'id="claude-token-command"' in страница and "/setup/chatgpt" not in страница
+
+
+def test_chatgpt_токен_для_чужой_учётки_из_формы_не_берётся(
+    админ_уК: FlaskClient, токены: dict[str, Any]
+) -> None:
+    админ_уК.post("/settings/chatgpt-token", data={"user_id": "id-petr"}, headers=ЗАГОЛОВКИ)
+
+    assert токены["issued"] == [МОЙ_ID]

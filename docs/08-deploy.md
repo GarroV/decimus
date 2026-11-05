@@ -1846,9 +1846,14 @@ D391) — так же: миграций нет, право — уже выдан
    `select revoked_reason, count(*) from oauth_grants group by 1` — отзыв `user`.
 5. **Последний шаг — руками:** claude.ai → Настройки → Коннекторы → Добавить
    свой коннектор → адрес из плитки «Нейросети»; `claude mcp add --transport http
-   decimus <MCP_PUBLIC_URL>` в Claude Code; ChatGPT → Plugins → Add custom MCP
-   server → тот же адрес, OAuth (D695; зависит от политики рабочего пространства
-   ChatGPT). Адреса возврата и их проверка — `docs/furca/blocks/mcp.md`.
+   decimus <MCP_PUBLIC_URL>` в Claude Code. ChatGPT (D695, #1439): обычные чаты и
+   браузер подключает администратор рабочего пространства — добавляет MCP-сервер
+   по тому же адресу с входом OAuth, потом каждый входит своей учёткой decimus;
+   настольное приложение на Mac — командой из плитки «Нейросети» → ChatGPT
+   (личный токен, мост в `~/.decimus/chatgpt`, регистрация штатным `codex mcp
+   add` из ChatGPT.app; сервер виден только во вкладке Work). Ручное «Plugins →
+   Add MCP server» вход OAuth не запускает — не использовать. Адреса возврата и их
+   проверка — `docs/furca/blocks/mcp.md`.
 6. **Отключить всё сразу** — опустошить обе переменные и перезапустить `web` и
    `mcp`: маршрутов OAuth нет, токены через сайт не принимаются. Токены бота и
    `.env` работают как прежде.

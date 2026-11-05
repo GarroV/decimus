@@ -177,6 +177,10 @@ _WEB: dict[str, tuple[str, str]] = {
         "Own Claude connection removed",
     ),
     "settings_claude_token": ("Выпущен личный токен Claude", "Personal Claude token issued"),
+    "settings_chatgpt_token": (
+        "Выпущен личный токен для настольного ChatGPT",
+        "Personal token for the ChatGPT desktop app issued",
+    ),
     "settings_claude_token_revoke": (
         "Отозван личный токен Claude",
         "Personal Claude token revoked",

@@ -36,18 +36,29 @@
 
   <div class="aipanel" id="ai-{{ ai }}">
     {% if ai == 'chatgpt' %}
+      {# Настольное приложение — мост с личным токеном: OAuth стенда ему не нужен (как Claude Desktop). #}
+      <p class="ssec__text"><b>{{ t('settings.ai.chatgpt.app_title') }}</b><br>{{ t('settings.ai.chatgpt.app') }}</p>
+      <div id="chatgpt-token">
+        {% if show.token and show.token.target == 'chatgpt' %}
+          <p class="ssecret"><code id="chatgpt-token-command">{{ show.token.command }}</code></p>
+          <div class="sform">
+            <button class="sbtn sbtn--primary" type="button" data-copy="#chatgpt-token-command" data-copied="{{ copied }}" hidden>{{ t('settings.claude.copy') }}</button>
+          </div>
+          <p class="ssec__note">{{ t('settings.ai.chatgpt.run') }}</p>
+        {% elif not mcp.known %}
+          <p class="ssec__note">{{ t('users.mcp.unknown') }}</p>
+        {% elif mcp.expires_at %}
+          <p class="ssec__note"><span class="sdot sdot--ok"></span>{{ t('users.mcp.live', date=mcp.expires_at.strftime('%Y-%m-%d')) }} {{ t('settings.ai.chatgpt.shared') }}</p>
+          {{ confirm('chatgpt-reissue-confirm', t('settings.ai.chatgpt.reissue'), t('settings.ai.chatgpt.reissue_confirm'), t('settings.claude.reissue_yes'),
+                     base ~ '/chatgpt-token?lang=' ~ lang, []) }}
+        {% else %}
+          <form method="post" action="{{ base }}/chatgpt-token?lang={{ lang }}" class="sform">
+            <button class="sbtn sbtn--primary" type="submit">{{ t('settings.ai.chatgpt.get') }}</button>
+          </form>
+        {% endif %}
+      </div>
       {% if claude.enabled %}
         <p class="ssec__text"><b>{{ t('settings.ai.chatgpt.web_title') }}</b><br>{{ t('settings.ai.chatgpt.web') }}</p>
-        <p class="ssec__text"><b>{{ t('settings.ai.chatgpt.app_title') }}</b><br>{{ t('settings.ai.chatgpt.app') }}</p>
-        <p class="ssec__note">{{ t('settings.ai.chatgpt.cli') }}</p>
-        <div class="ssecret">
-          <code id="ai-codex-add">{{ codex_add }}</code>
-          <button class="sbtn" type="button" data-copy="#ai-codex-add" data-copied="{{ copied }}" hidden>{{ t('users.claude.copy') }}</button>
-        </div>
-        <div class="ssecret">
-          <code id="ai-codex-login">{{ codex_login }}</code>
-          <button class="sbtn" type="button" data-copy="#ai-codex-login" data-copied="{{ copied }}" hidden>{{ t('users.claude.copy') }}</button>
-        </div>
       {% else %}
         <p class="ssec__note">{{ t('settings.ai.off') }}</p>
       {% endif %}
@@ -89,7 +100,7 @@
 
       <p class="ssec__text"><b>{{ t('settings.ai.claude.desktop_title') }}</b><br>{{ t('settings.claude.lead') }}</p>
       <div id="claude-token">
-        {% if show.token %}
+        {% if show.token and show.token.target == 'claude' %}
           <p class="ssecret"><code id="claude-token-command">{{ show.token.command }}</code></p>
           <div class="sform">
             <button class="sbtn sbtn--primary" type="button" data-copy="#claude-token-command" data-copied="{{ copied }}" hidden>{{ t('settings.claude.copy') }}</button>

@@ -58,6 +58,7 @@ EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "logout": "выход закрывает свою сессию",
     "settings_own_password": "свой пароль — у себя, без доступа к остальному (D447)",
     "settings_claude_token": "личный токен Claude себе выпускает любая роль (D448)",
+    "settings_chatgpt_token": "личный токен для ChatGPT себе выпускает любая роль (D695)",
     "settings_claude_token_revoke": "свой токен Claude гасит сам (D448)",
     "settings_claude_revoke": "своё подключение Claude отзывает сам (D417)",
     "settings_sign_out_everywhere": "свои входы и подключения закрывает сам (D462)",

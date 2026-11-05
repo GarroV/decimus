@@ -275,6 +275,8 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
     )
     base = f"{request.script_root}{section('settings').path}"
     ai = users_claude.selected_assistant(request.args.get("ai"))
+    if show.token is not None and show.token.target == users_mcp.TARGET_CHATGPT:
+        ai = "chatgpt"  # ответ на «Получить команду» — в той же панели, откуда её просили
     return (
         render_template(
             "settings/index.html",
@@ -294,8 +296,6 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             claude=подключение,
             ai=ai,
             ai_pick=_assistant_picker(base, lang, ai),
-            codex_add=users_claude.codex_add_command(подключение.mcp_url),
-            codex_login=users_claude.CODEX_LOGIN_COMMAND,
             code_add=подключение.command,
             min_password=accounts.MIN_PASSWORD_LENGTH,
             max_password=accounts.MAX_PASSWORD_LENGTH,
@@ -485,11 +485,11 @@ def _start_google_link(conf: Settings, base: str) -> Response:
     return auth.begin_google_link()
 
 
-def _issue_claude_token(conf: Settings, base: str) -> tuple[str, int]:
-    """Выпустить себе токен Claude: кнопка и выполнение после подтверждения."""
+def _issue_token(conf: Settings, base: str, target: str) -> tuple[str, int]:
+    """Выпустить себе токен и команду для `target` (Claude Desktop или ChatGPT)."""
     чей = _current_id()
     try:
-        выпуск = users_mcp.issue_own(чей)
+        выпуск = users_mcp.issue_own(чей, target)
     except DbError as exc:
         note_target_mismatch(exc)
         return render(Show(flash=_flash("users.mcp.failed", ok=False)), 503)
@@ -508,11 +508,22 @@ def _issue_claude_token(conf: Settings, base: str) -> tuple[str, int]:
     return render(Show(token=выпуск))
 
 
+def _issue_claude_token(conf: Settings, base: str) -> tuple[str, int]:
+    """Выпустить себе токен Claude: кнопка и выполнение после подтверждения."""
+    return _issue_token(conf, base, users_mcp.TARGET_CLAUDE)
+
+
+def _issue_chatgpt_token(conf: Settings, base: str) -> tuple[str, int]:
+    """То же для настольного ChatGPT (D695): другая строка, тот же токен."""
+    return _issue_token(conf, base, users_mcp.TARGET_CHATGPT)
+
+
 #: Что выполняется само после подтверждения входа (`reauth.INTENT_ACTIONS`).
 _RUN_INTENT = {
     "bot-link": _issue_bot_link,
     "google-link": _start_google_link,
     "claude-token": _issue_claude_token,
+    "chatgpt-token": _issue_chatgpt_token,
 }
 
 
@@ -638,6 +649,16 @@ def _install_claude_token(app: Flask, base: str, conf: Settings) -> None:
         if (переспрос := reauth.require_fresh(f"{base}?tile=claude", "claude-token")) is not None:
             return переспрос
         return _issue_claude_token(conf, base)
+
+    @app.post(f"{base}/chatgpt-token")
+    def settings_chatgpt_token() -> Response | FlaskResponse | tuple[str, int]:
+        """То же для настольного ChatGPT: команда показывается этим ответом один раз."""
+        refuse_foreign_origin()
+        if (
+            переспрос := reauth.require_fresh(f"{base}?tile=claude&ai=chatgpt", "chatgpt-token")
+        ) is not None:
+            return переспрос
+        return _issue_chatgpt_token(conf, base)
 
     @app.post(f"{base}/claude-token-revoke")
     def settings_claude_token_revoke() -> FlaskResponse | tuple[str, int]:

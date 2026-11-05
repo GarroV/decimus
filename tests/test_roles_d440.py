@@ -370,6 +370,7 @@ def test_вкладка_рейтинги_во_вкладках_админист�
     "/oauth/authorize",
     "/settings/claude-revoke",
     "/settings/claude-token",
+    "/settings/chatgpt-token",
     "/settings/claude-token-revoke",
     "/settings/sign-out-everywhere",
     # Свой профиль (D447): своя почта Google и свой язык сайта.

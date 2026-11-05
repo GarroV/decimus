@@ -38,11 +38,13 @@ from .errors import AuthError
 from .install import (
     BRIDGE_META_PATH,
     BRIDGE_SCRIPT_PATH,
+    CHATGPT_INSTALL_PATH,
     INSTALL_CONTENT_TYPE,
     INSTALL_PATH,
     InstallScriptError,
     bridge_meta,
     bridge_script,
+    chatgpt_install_script,
     install_script,
 )
 from .ratelimit import CODE_RATE_LIMITED, RATE_LIMITED, McpRate, token_key
@@ -232,7 +234,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _serve_install(self) -> None:
+    def _serve_install(self, build: Callable[[], str] = install_script) -> None:
         """Отдать скрипт установки — публично, без токена.
 
         Секретов в нём нет: адрес и токен человек подставляет сам, запуская
@@ -244,7 +246,7 @@ class _Handler(BaseHTTPRequestHandler):
         и решит, что подключился.
         """
         try:
-            текст = install_script()
+            текст = build()
         except InstallScriptError as отказ:
             print(f"[mcp] установщик не собран: {отказ}", file=sys.stderr)
             self._send(
@@ -297,6 +299,9 @@ class _Handler(BaseHTTPRequestHandler):
         путь = self.path.split("?", 1)[0].rstrip("/") or "/"
         if путь == INSTALL_PATH:
             self._guarded(self._serve_install)
+            return
+        if путь == CHATGPT_INSTALL_PATH:
+            self._guarded(lambda: self._serve_install(chatgpt_install_script))
             return
         if путь in (BRIDGE_META_PATH, BRIDGE_SCRIPT_PATH):
             self._guarded(lambda: self._serve_bridge(путь == BRIDGE_SCRIPT_PATH))
