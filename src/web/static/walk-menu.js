@@ -23,7 +23,7 @@
   var el = W.el;
   var node = null;
 
-  /** Слова без регистра и без ё/е: «Прилегающая» и «прилег» — одно и то же. */
+  /** Слова без регистра и без ё/е: «Прилежащий» и «прилеж» — одно и то же. */
   var BREAKS = "\\s.,;:!?…\"'«»‹›()\\[\\]{}\\/\\\\*–—-";
   var SPLIT = new RegExp("[" + BREAKS + "]+");
   function norm(text) { return String(text == null ? "" : text).toLowerCase().replace(/ё/g, "е"); }
