@@ -59,6 +59,7 @@ from src.domain.walk_users import walk_open_to
 
 from . import (
     walk_access,
+    walk_aliases,
     walk_finish,
     walk_level,
     walk_rate,
@@ -348,6 +349,9 @@ def walk_payload(
 
     payload["measurement_sets"] = public_sets(inspection)
     payload["item_search_tags"] = walk_search_tags.search_tags(items, chat_id=chat_id)
+    payload["item_aliases"] = walk_aliases.item_aliases(
+        inspection, (item["code"] for item in payload["items"])
+    )
     app = walk_settings.app_block(chat_id, lang)
     out = {**payload, "texts": texts_for(lang), "app": app}
     if app["finish_mode"] == finish_modes.REPORT:

@@ -483,6 +483,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.find_again": {"ru": "Найти заново", "en": "Search again"},
     "walk.sheet.pick_manual": {"ru": "Выбрать пункт вручную", "en": "Pick the item yourself"},
     "walk.sheet.pick_item": {"ru": "Выбрать пункт", "en": "Choose item"},
+    "walk.sheet.search_via": {"ru": "по формулировке «{phrase}»", "en": "matched “{phrase}”"},
     "walk.sheet.photos": {"ru": "Фото", "en": "Photos"},
     "walk.photo.uploading": {"ru": "Загружаю…", "en": "Uploading…"},
     "walk.photo.failed": {"ru": "Не загрузилось — повторить", "en": "Failed — retry"},
@@ -569,13 +570,21 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.class_review.not_established": {
         "ru": (
             "Нарушение по этим фактам не установлено. "
-            "Проверьте пункт и факты или явно выберите класс вручную."
+            "Запишите как отклонение сами или выберите другой пункт."
         ),
         "en": (
             "These facts do not establish a violation. "
-            "Review the item and facts, or explicitly select a class manually."
+            "Record it as a deviation yourself, or choose another item."
         ),
     },
+    "walk.sheet.class_review.record_deviation": {
+        "ru": "Записать как отклонение",
+        "en": "Record as a deviation",
+    },
+    "walk.sheet.class_review.other_item": {"ru": "Другой пункт", "en": "Another item"},
+    "walk.sheet.class_review.level.D1": {"ru": "отклонение", "en": "deviation"},
+    "walk.sheet.class_review.level.D2": {"ru": "значительное", "en": "significant"},
+    "walk.sheet.class_review.level.D3": {"ru": "критическое", "en": "critical"},
     "walk.sheet.class_review.history": {
         "ru": "Вопросы и ответы по этому пункту",
         "en": "Questions and answers for this item",

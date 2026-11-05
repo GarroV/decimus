@@ -209,21 +209,44 @@
     return !!(it && f.zone && it.zones.length && it.zones.indexOf(f.zone) === -1);
   }
 
+  /**
+   * Поиск пункта по словам: запрос режется на слова, каждое — начало какого-то
+   * слова формулировки, метки, процесса или кода (все сразу, регистр и ё/е не
+   * важны). Не нашлось по самому пункту — ищем по выученным формулировкам
+   * (`item_aliases`), найденное так несёт `via`. Выше: пункты, чья формулировка
+   * начинается с первого слова; затем «было в прошлый раз» и зона записи.
+   */
   function choices(query) {
-    var q = (query || "").trim().toLowerCase();
-    var list = W.state.data.items.filter(function (i) {
-      if (i.measure !== isMeasure()) return false;
-      if (q) return (i.q + " " + i.code + " " + i.process).toLowerCase().indexOf(q) !== -1;
-      return true;
-    });
+    var terms = W.find.words(query);
     var hint = f.zone || f.hint;
-    list.sort(function (a, b) {
-      var aHere = !hint || !a.zones.length || a.zones.indexOf(hint) !== -1;
-      var bHere = !hint || !b.zones.length || b.zones.indexOf(hint) !== -1;
-      return Number(bHere) - Number(aHere);
+    var aliases = W.state.data.item_aliases || {};
+    var found = [];
+    W.state.data.items.forEach(function (i) {
+      if (i.measure !== isMeasure()) return;
+      var via = null;
+      if (terms.length) {
+        var own = W.find.words(i.q + " " + (i.label || "") + " " + i.code + " " + i.process);
+        if (!W.find.allPrefix(terms, own)) {
+          via = (aliases[i.code] || []).filter(function (phrase) {
+            return W.find.allPrefix(terms, W.find.words(phrase));
+          })[0] || null;
+          if (via === null) return;
+        }
+      }
+      var here = !hint || !i.zones.length || i.zones.indexOf(hint) !== -1;
+      var rank = [
+        terms.length && W.find.norm(i.q).indexOf(terms[0]) === 0 ? 0 : 1,
+        via === null ? 0 : 1,
+        previousHere(i.code) ? 0 : 1,
+        here ? 0 : 1,
+      ];
+      found.push({ item: Object.assign({}, i, { via: via, terms: terms }), rank: rank, at: found.length });
     });
-    var before = list.filter(function (i) { return previousHere(i.code); });
-    return before.concat(list.filter(function (i) { return !previousHere(i.code); }));
+    found.sort(function (a, b) {
+      for (var k = 0; k < a.rank.length; k++) if (a.rank[k] !== b.rank[k]) return a.rank[k] - b.rank[k];
+      return a.at - b.at;
+    });
+    return found.map(function (entry) { return entry.item; });
   }
 
   function uploading() { return f.photos.some(function (p) { return p.state === "uploading"; }); }
@@ -614,7 +637,7 @@
           return (!filters.process || i.process === filters.process) &&
             (!selectedTag || selectedTag.codes.indexOf(i.code) !== -1);
         }).map(function (i) {
-          return { code: i.label, kind: isAdvice() ? "advice" : i.measure ? "info" : "violation", label: i.q, value: i.code, on: i.code === f.code, badge: previousHere(i.code) ? tx("walk.sheet.was_here") : null };
+          return { code: i.label, kind: isAdvice() ? "advice" : i.measure ? "info" : "violation", label: i.q, value: i.code, on: i.code === f.code, badge: previousHere(i.code) ? tx("walk.sheet.was_here") : null, terms: i.terms, via: i.via };
         });
       },
       onPick: function (code) { pick(code, null); },
@@ -1336,6 +1359,33 @@
       renderClassFeedback(panel, cand);
     });
   }
+  /**
+   * Класс не установлен: два явных выхода вместо мелких ссылок. «Записать как
+   * отклонение» — человек сам фиксирует класс (у пункта с одним допустимым
+   * классом — сразу его, иначе открывается выбор класса); «Другой пункт» —
+   * поиск пункта. «Определить класс по фактам» остаётся вторичной ссылкой.
+   */
+  function deadEnd(cand) {
+    var state = classState(cand);
+    var box = el("div", "walk-deadend");
+    box.setAttribute("data-class-deadend", "");
+    var record = W.button("walk-btn walk-btn--primary", tx("walk.sheet.class_review.record_deviation"), function () {
+      var context = classContext(cand);
+      var levels = (item(cand.code) || { levels: [] }).levels;
+      if (levels.length === 1) W.classReview.chooseManual(state, context, levels[0]);
+      else W.classReview.enterManual(state, context);
+      syncClassSelections();
+      changed();
+      redraw("item", "level", "footer");
+    });
+    record.setAttribute("data-class-record", "");
+    box.appendChild(record);
+    var other = W.button("walk-btn", tx("walk.sheet.class_review.other_item"), itemMenu);
+    other.setAttribute("data-class-other-item", "");
+    box.appendChild(other);
+    return box;
+  }
+
   function renderClassFeedback(panel, cand) {
     var state = classState(cand);
     var feedback = panel.querySelector("[data-class-feedback]");
@@ -1396,6 +1446,12 @@
     if (classIsPrimary(cand) && f.legacyLevel && !state.level) {
       feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.draft_level", {level:f.legacyLevel})));
     }
+    var dead = state.status === "not_established" && !state.manualMode;
+    var exits = panel.querySelector("[data-class-exits]");
+    exits.textContent = "";
+    if (dead) exits.appendChild(deadEnd(cand));
+    var manualLink = panel.querySelector("[data-class-manual]");
+    if (manualLink) manualLink.hidden = dead;
     var check = panel.querySelector("[data-class-check]");
     check.disabled = state.status === "pending" || state.status === "waiting_search" || !!classContext(cand).blocked;
     panel.querySelectorAll("[data-manual-class]").forEach(function (button) {
@@ -1490,6 +1546,9 @@
     feedback.setAttribute("data-class-feedback", "");
     feedback.setAttribute("role", "status");
     box.appendChild(feedback);
+    var exits = el("div");
+    exits.setAttribute("data-class-exits", "");
+    box.appendChild(exits);
     if (!classIsPrimary(cand)) {
       addExtraReadingControls(box, cand); box.appendChild(extraTextEditor(cand));
       var manager = measurementPanel(cand); if (manager) box.appendChild(manager);
@@ -1520,16 +1579,19 @@
     check.setAttribute("data-class-check", "");
     box.appendChild(check);
     if (!state.manualMode) {
-      box.appendChild(W.button("walk-link", tx("walk.sheet.class_review.manual"), function () {
+      var manualLink = W.button("walk-link", tx("walk.sheet.class_review.manual"), function () {
         W.classReview.enterManual(state, classContext(cand));
         syncClassSelections();
         changed();
         redraw("item", "level", "footer");
-      }));
+      });
+      manualLink.setAttribute("data-class-manual", "");
+      box.appendChild(manualLink);
     } else {
       var seg = el("div", "walk-seg");
       (item(cand.code) || {levels:[]}).levels.forEach(function (level) {
-        var button = W.button("walk-seg__opt walk-seg__opt--" + level.toLowerCase(), level, function () {
+        var word = tx("walk.sheet.class_review.level." + level);
+        var button = W.button("walk-seg__opt walk-seg__opt--" + level.toLowerCase(), word === "walk.sheet.class_review.level." + level ? level : level + " · " + word, function () {
           W.classReview.chooseManual(state, classContext(cand), level);
           syncClassSelections();
           changed();
@@ -1911,7 +1973,9 @@
             node.querySelectorAll("[data-class-review]").forEach(function (panel) {
               if (panel._candidate !== missingClass) return;
               panel.scrollIntoView({block:"start"});
-              var target = state.status === "needs_fact" || state.status === "not_established"
+              var target = state.status === "not_established" && !state.manualMode
+                ? panel.querySelector("[data-class-record]")
+                : state.status === "needs_fact" || state.status === "not_established"
                 ? panel.querySelector(".walk-class-review__facts")
                 : panel.querySelector(state.manualMode ? "[data-manual-class]" : "[data-class-check]");
               if (target && !target.disabled) target.focus({preventScroll:true});

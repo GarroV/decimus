@@ -504,6 +504,13 @@
 .walk-option--note { background: var(--accent-soft); }
 .walk-option--note .walk-option__text { font-weight: 600; color: var(--accent); }
 .walk-option__hint { display: block; font-size: 13px; line-height: 18px; color: var(--ink-2); }
+.walk-option__via { display: block; font-size: 12px; line-height: 16px; color: var(--ink-2); }
+.walk-option__mark { background: var(--accent-soft); color: inherit; font-weight: 600; border-radius: 2px; }
+
+/* класс не установлен: два явных выхода вместо мелких ссылок */
+.walk-deadend { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.walk-deadend .walk-btn { flex: none; width: 100%; min-height: 44px; }
+.walk-deadend .walk-btn--primary { border-color: var(--accent); background: var(--accent); color: var(--ink-inverse); font-weight: 600; }
 
 .walk-options .walk-link { margin: 6px 12px 10px; }
 

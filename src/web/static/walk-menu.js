@@ -10,6 +10,10 @@
  * `list(query, filters)` отдаёт варианты так же, как `options`; `lead` — варианты,
  * которые стоят первыми без запроса (общая заметка у рекомендации).
  * filters хранит process/semantic отдельно от текста: ярлык не выбирает пункт.
+ *
+ * Вариант может нести `terms` (слова запроса: совпавшие начала слов в подписи
+ * подсвечиваются `<mark>`, текст всегда узлами, не разметкой) и `via` (по какой
+ * выученной формулировке найден пункт — мелкой строкой под подписью).
  */
 (function () {
   "use strict";
@@ -18,6 +22,42 @@
   var tx = W.tx;
   var el = W.el;
   var node = null;
+
+  /** Слова без регистра и без ё/е: «Прилегающая» и «прилег» — одно и то же. */
+  var BREAKS = "\\s.,;:!?…\"'«»‹›()\\[\\]{}\\/\\\\*–—-";
+  var SPLIT = new RegExp("[" + BREAKS + "]+");
+  function norm(text) { return String(text == null ? "" : text).toLowerCase().replace(/ё/g, "е"); }
+  function words(text) { return norm(text).split(SPLIT).filter(Boolean); }
+
+  /** Все слова запроса — начала каких-то слов текста (AND). */
+  function allPrefix(terms, textWords) {
+    return terms.every(function (term) {
+      return textWords.some(function (w) { return w.indexOf(term) === 0; });
+    });
+  }
+
+  /** Подпись с подсвеченными началами слов: только текстовые узлы и `<mark>`. */
+  function highlight(parent, text, terms) {
+    var rx = new RegExp("[^" + BREAKS + "]+", "g");
+    var at = 0;
+    var m;
+    function plain(to) { if (to > at) parent.appendChild(document.createTextNode(text.slice(at, to))); }
+    while ((m = rx.exec(text)) !== null) {
+      var token = m[0];
+      var low = norm(token);
+      var len = 0;
+      terms.forEach(function (term) { if (low.indexOf(term) === 0 && term.length > len) len = term.length; });
+      if (!len) continue;
+      if (low.length !== token.length) len = token.length;
+      plain(m.index);
+      var mark = document.createElement("mark");
+      mark.className = "walk-option__mark";
+      mark.textContent = token.slice(0, len);
+      parent.appendChild(mark);
+      at = m.index + len;
+    }
+    plain(text.length);
+  }
 
   function close() {
     if (!node) return;
@@ -66,7 +106,10 @@
         if (o.badge) top.appendChild(el("span", "walk-option__was", o.badge));
         b.appendChild(top);
       }
-      b.appendChild(el("span", "walk-option__text", o.label));
+      var label = el("span", "walk-option__text");
+      if (o.terms && o.terms.length) highlight(label, String(o.label), o.terms); else label.textContent = o.label;
+      b.appendChild(label);
+      if (o.via) b.appendChild(el("span", "walk-option__via", tx("walk.sheet.search_via", { phrase: o.via })));
       if (o.hint) b.appendChild(el("span", "walk-option__hint", o.hint));
       if (o.on) b.setAttribute("aria-current", "true");
       li.appendChild(b);
@@ -134,5 +177,6 @@
     input.focus();
   }
 
+  W.find = { norm: norm, words: words, allPrefix: allPrefix };
   W.menu = { open: open, search: search, close: close, isOpen: function () { return !!node; } };
 })();
