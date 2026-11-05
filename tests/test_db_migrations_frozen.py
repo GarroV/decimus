@@ -443,6 +443,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0118_agg_unit_absent_point_links.sql": (
         "sql1:22a43c5c1ccc7c42d66fcec2932a622fbf7b5e76c172600d9d1c509118f3b1b2"
     ),
+    "0119_ratings_clusters_six.sql": (
+        "sql1:727be0cc0bf3ef697e07d06d1624f93a9e132a012363acfe2abfdf4d9ab047c4"
+    ),
 }
 
 

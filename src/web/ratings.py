@@ -45,6 +45,7 @@ from src.ratings.periods import (
     KIND_RATING,
     RatingPeriod,
     ReportPeriod,
+    parse_period,
     previous_period,
 )
 from src.ratings.pointer import GOOGLE
@@ -254,20 +255,9 @@ class SourceView:
     violations: ViolationBlock
     hard: tuple[ViolationFact, ...]
     hard_units: int
-    registry: int | None
     countries: tuple[SourceCountry, ...]
     top: tuple[UnitScore, ...]
     bottom: tuple[UnitScore, ...]
-
-
-def _registry_units(codes: tuple[str, ...]) -> int | None:
-    """Работающих пиццерий в реестре этих стран — знаменатель плитки «Проверено».
-    Реестр не прочитался — `None`, плитка покажет одно число."""
-    try:
-        return sum(1 for u in agg_store.units(codes) if u.working)
-    except RatingsError:
-        logger.warning("Реестр пиццерий для плитки «Проверено» не прочитался", exc_info=True)
-        return None
 
 
 def _source(summary: report.Summary, kind: str) -> SourceView:
@@ -299,7 +289,6 @@ def _source(summary: report.Summary, kind: str) -> SourceView:
         violations=block,
         hard=hard,
         hard_units=len({f.unit for f in hard}),
-        registry=_registry_units(summary.countries),
         countries=tuple(rows),
         top=summary.rs_top if is_rs else summary.rko_top,
         bottom=summary.rs_bottom if is_rs else summary.rko_bottom,
@@ -495,6 +484,8 @@ def render_section(
             found.rs_periods,
             lang,
             tuple(RatingPeriod(*p) for p in read.rko_periods()),
+            kind=key if key in (ratings_nav.RS, ratings_nav.RKO) else None,
+            within=parse_period(request.args.get("within", ""), rs_periods=found.rs_periods),
         ),
         previous_title=_period_title(previous, found, lang),
         may_manage=may_manage(),

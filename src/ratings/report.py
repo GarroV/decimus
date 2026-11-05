@@ -47,9 +47,11 @@ GROUP_DEVELOPER = "developer"
 GROUP_COUNTRY = "country"
 GROUP_CLUSTER = "cluster"
 GROUPS = (GROUP_IMF, GROUP_CLUSTER, GROUP_DEVELOPER, GROUP_COUNTRY)
-#: Кластеры IMF (D502, вместо двух D384): CEE — Европа, TR — Турция, CAUCASUS —
-#: Кавказ, OTHER — остальные страны. Порядок — порядок колонок и выбора.
-CLUSTERS = ("CEE", "TR", "CAUCASUS", "OTHER")
+#: Кластеры IMF (миграция 0119, вместо четырёх D502): CEE — Европа, TR — Турция,
+#: ASIA — Азия, CAUCASUS — Кавказ, NG — Нигерия, MX — Мексика; OTHER — запасной для
+#: новой страны, пока её не перенесут (пустой не показывается). Порядок — порядок
+#: колонок и выбора.
+CLUSTERS = ("CEE", "TR", "ASIA", "CAUCASUS", "NG", "MX", "OTHER")
 LEVEL_CLUSTER = "cluster"
 LEVEL_SLICE = "slice"
 LEVEL_COUNTRY = "country"
@@ -237,8 +239,8 @@ def group_lines(
             )
             for key in CLUSTERS
         ]
-        # Кластер без стран в охвате строкой не идёт: четыре кластера (D502) у
-        # партнёра одной страны дали бы три пустые строки.
+        # Кластер без стран в охвате строкой не идёт: шесть кластеров (0119) у
+        # партнёра одной страны дали бы пять пустых строк.
         parts = [part for part in parts if part[2]]
     else:
         parts = [(LEVEL_SLICE, None, tuple(codes))]

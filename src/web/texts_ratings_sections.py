@@ -37,8 +37,10 @@ SECTION_TEXTS: dict[str, dict[str, str]] = {
     "ratings.src.hard": {"ru": "Хард", "en": "Hard"},
     "ratings.src.hard.sub": {"ru": "пиццерий с хардом: {n}", "en": "pizzerias with hard: {n}"},
     "ratings.src.checked": {"ru": "Проверено", "en": "Checked"},
-    "ratings.src.checked.of": {"ru": "{n} из {m}", "en": "{n} of {m}"},
-    "ratings.src.checked.sub": {"ru": "работающих пиццерий", "en": "working pizzerias"},
+    "ratings.src.checked.sub": {
+        "ru": "пиццерий с баллом за период",
+        "en": "pizzerias scored in the period",
+    },
     "ratings.src.countries": {"ru": "По странам", "en": "By country"},
     "ratings.src.col.country": {"ru": "Страна", "en": "Country"},
     "ratings.src.col.violations": {"ru": "Нарушений", "en": "Violations"},

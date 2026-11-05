@@ -311,6 +311,39 @@ def test_кластер_IMF_делит_страны_по_справочнику(
     assert isinstance(one[0], GroupLine)
 
 
+def test_шесть_кластеров_в_порядке_контролинга() -> None:
+    """Европа, Турция, Азия, Кавказ, Нигерия, Мексика (0119); запасной OTHER — последним."""
+    from datetime import date
+
+    from src.db.ratings_read import CountryRow
+    from src.ratings.periods import ReportPeriod
+    from src.ratings.report import CLUSTERS, Choices, Selection, group_lines
+    from src.ratings.summary import Fact
+
+    assert CLUSTERS == ("CEE", "TR", "ASIA", "CAUCASUS", "NG", "MX", "OTHER")
+    страны = (
+        CountryRow("MX", "Мексика", "Mexico", None, True, "MX"),
+        CountryRow("NG", "Нигерия", "Nigeria", None, True, "NG"),
+        CountryRow("GE", "Грузия", "Georgia", None, True, "CAUCASUS"),
+        CountryRow("MN", "Монголия", "Mongolia", None, True, "ASIA"),
+        CountryRow("ID", "Индонезия", "Indonesia", None, True, "ASIA"),
+        CountryRow("TR", "Турция", "Turkey", None, True, "TR"),
+        CountryRow("RS", "Сербия", "Serbia", None, True, "CEE"),
+    )
+    коды = tuple(c.code for c in страны)
+    период = ReportPeriod("month", "2026-09", date(2026, 9, 1), date(2026, 9, 30))
+    факты = [Fact(c.code, c.code, c.code, "rs", 1, date(2026, 9, 2), 80.0) for c in страны]
+    imf = group_lines(Selection("imf", None, период), Choices((), страны, ()), коды, (факты, []))
+    assert [(g.key, tuple(sorted(g.countries))) for g in imf] == [
+        ("CEE", ("RS",)),
+        ("TR", ("TR",)),
+        ("ASIA", ("ID", "MN")),
+        ("CAUCASUS", ("GE",)),
+        ("NG", ("NG",)),
+        ("MX", ("MX",)),
+    ]
+
+
 def test_девелопер_общая_строка_и_по_стране() -> None:
     """D385: срез девелопера — общая строка по всем его странам и строка на страну."""
     from datetime import date

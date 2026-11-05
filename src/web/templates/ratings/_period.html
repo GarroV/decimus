@@ -22,3 +22,24 @@
     </noscript>
   {% endfor %}
 {% endmacro %}
+
+{#
+  Периоды рейтинга внутри месяца или квартала (контролинг 05.11.2026): строка под отбором —
+  «‹ · целиком · периоды датами · ›». Средние месяца или квартала — на «целиком»; пункт
+  открывает один период рейтинга, месяц или квартал едет в адресе (`within`), чтобы
+  строка осталась. Пункты, выбранный и соседи считает `ratings_calendar._inside`.
+#}
+{% macro period_steps(inside, href, group, value, kind) %}
+  {% if inside %}
+  <nav class="rt-steps" aria-label="{{ t('ratings.inside.' ~ kind) }}">
+    <span class="rt-field__label">{{ t('ratings.inside.' ~ kind) }}</span>
+    {% if inside.prev %}<a class="rt-cal__arrow" href="{{ href(group, value, inside.prev, inside.parent_key) }}" aria-label="{{ t('ratings.inside.prev') }}">‹</a>
+    {% else %}<span class="rt-cal__arrow" aria-disabled="true">‹</span>{% endif %}
+    <a class="rt-step{% if inside.whole_on %} is-on{% endif %}" href="{{ href(group, value, inside.parent_key) }}"{% if inside.whole_on %} aria-current="true"{% endif %}>{{ t('ratings.inside.whole', title=inside.parent_title) }}</a>
+    {% for o in inside.items %}<a class="rt-step{% if o.on %} is-on{% endif %}" href="{{ href(group, value, o.key, inside.parent_key) }}"{% if o.on %} aria-current="true"{% endif %}>{{ o.title }}</a>
+    {% endfor %}
+    {% if inside.next %}<a class="rt-cal__arrow" href="{{ href(group, value, inside.next, inside.parent_key) }}" aria-label="{{ t('ratings.inside.next') }}">›</a>
+    {% else %}<span class="rt-cal__arrow" aria-disabled="true">›</span>{% endif %}
+  </nav>
+  {% endif %}
+{% endmacro %}

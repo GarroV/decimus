@@ -98,7 +98,6 @@ def подготовить(
     monkeypatch.setattr(screen.read, "rko_periods", lambda: ())
     monkeypatch.setattr(screen, "_maps", lambda *_a: None)
     monkeypatch.setattr(screen, "_unit_maps", lambda _u: {})
-    monkeypatch.setattr(screen, "_registry_units", lambda _c: None)
     monkeypatch.setattr(screen, "_agg_failures", lambda: ())
     monkeypatch.setattr(screen, "_agg_pending", lambda: None)
     monkeypatch.setattr(screen.ratings_risk, "build", lambda *_a, **_k: CombinedRisk((), ()))

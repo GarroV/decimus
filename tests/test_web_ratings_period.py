@@ -144,3 +144,82 @@ def test_шапка_без_источников_говорит_это_одной
     html = _шапка_экрана(monkeypatch, ())
 
     assert "<table" not in html and "Загрузок ещё не было." in html
+
+
+# --- Периоды рейтинга внутри месяца или квартала (контролинг 05.11.2026) ---------------
+
+РКО_ОКТЯБРЬ = (
+    rp.RatingPeriod(20, date(2026, 9, 28), date(2026, 10, 4), "Неделя 40", "Week 40"),
+    *РКО,
+    rp.RatingPeriod(23, date(2026, 11, 2), date(2026, 11, 8), "Неделя 45", "Week 45"),
+)
+
+
+def _внутри(key: str, kind: str, within: str = "") -> cal.Inside | None:
+    период = rp.parse_period(key, rs_periods=РС)
+    assert период is not None
+    родитель = rp.parse_period(within, rs_periods=РС) if within else None
+    return cal.build(период, МЕСЯЦЫ, РС, "ru", РКО_ОКТЯБРЬ, kind=kind, within=родитель).inside
+
+
+def test_месяц_показывает_свои_периоды_рс_по_имени() -> None:
+    """Имя, а не даты: даты РС пока выведены из подписи листа и с Dodo IS не совпадают."""
+    строка = _внутри("2026-09", "rs")
+    assert строка is not None
+    assert строка.parent_key == "2026-09" and строка.whole_on
+    assert [(o.key, o.title, o.on) for o in строка.items] == [
+        ("rs:11", "Сентябрь 1", False),
+        ("rs:12", "Сентябрь 2", False),
+    ]
+    # С «целиком» стрелка ведёт в первый период рейтинга, назад — некуда.
+    assert (строка.prev, строка.next) == (None, "rs:11")
+
+
+def test_недели_рко_задевшие_месяц_по_правилу_данных() -> None:
+    """Неделя 28.09–04.10 задевает октябрь — и в данных октября она есть (D396)."""
+    строка = _внутри("2026-10", "rko")
+    assert строка is not None
+    assert [o.title for o in строка.items] == ["28.09 — 04.10", "05.10 — 11.10", "12.10 — 18.10"]
+
+
+def test_выбранный_период_внутри_месяца_держит_строку_и_соседей() -> None:
+    строка = _внутри("rs:12", "rs", within="2026-09")
+    assert строка is not None
+    assert not строка.whole_on
+    assert [o.on for o in строка.items] == [False, True]
+    assert (строка.prev, строка.next) == ("rs:11", None)
+    неделя = _внутри("2026-10-05..2026-10-11", "rko", within="2026-10")
+    assert неделя is not None
+    assert (неделя.prev, неделя.next) == ("2026-09-28..2026-10-04", "2026-10-12..2026-10-18")
+
+
+def test_строки_нет_без_месяца_и_вне_рс_и_рко() -> None:
+    assert _внутри("rs:12", "rs") is None  # один период без месяца в адресе
+    assert _внутри("rs:13", "rs", within="2026-09") is None  # чужой месяц
+    assert _внутри("2026-09", "maps") is None  # у карт периодов рейтинга нет
+    assert _внутри("2026-09-03..2026-09-20", "rs") is None  # произвольный отрезок
+
+
+_ХОСТ_СТРОКИ = (
+    '{% from "ratings/_period.html" import period_steps with context %}'
+    "{% macro href(g, v, k, w=none) %}/r?period={{ k }}{% if w %}&within={{ w }}{% endif %}"
+    "{% endmacro %}"
+    "{{ period_steps(c.inside, href, 'imf', none, 'rs') }}"
+)
+
+
+def test_строка_периодов_ссылками_с_месяцем_в_адресе() -> None:
+    app = собрать(tenant="HQ")
+    период = rp.parse_period("rs:11", rs_periods=РС)
+    месяц = rp.parse_period("2026-09", rs_periods=РС)
+    assert период is not None and месяц is not None
+    c = cal.build(период, МЕСЯЦЫ, РС, "ru", РКО, kind="rs", within=месяц)
+    with app.test_request_context("/?lang=ru"):
+        html = render_template_string(_ХОСТ_СТРОКИ, c=c)
+    assert "Периоды РС" in html
+    assert '<a class="rt-step" href="/r?period=2026-09">Сен 2026 целиком</a>' in html
+    assert (
+        '<a class="rt-step is-on" href="/r?period=rs:11&within=2026-09" aria-current="true">'
+        "Сентябрь 1</a>" in html
+    )
+    assert 'href="/r?period=rs:12&within=2026-09" aria-label="Следующий период рейтинга"' in html

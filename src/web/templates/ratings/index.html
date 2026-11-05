@@ -22,10 +22,10 @@
 <script src="{{ url_for('static', filename='decimus-rt.js') }}" defer></script>{% endblock %}
 
 {% from "_info_tip.html" import fresh_tip %}
-{% from "ratings/_period.html" import period_lists with context %}
+{% from "ratings/_period.html" import period_lists, period_steps with context %}
 {#- Адрес этого раздела с другим срезом или периодом; открытая страна «Агрегаторов» едет дальше. -#}
-{% macro href(group, value=none, period=selection.period.key) -%}
-  {{ url(ratings_path) }}/{{ section_key }}?group={{ group }}{% if value %}&amp;value={{ value|urlencode }}{% endif %}&amp;period={{ period|urlencode }}&amp;lang={{ lang }}{% if open_country %}&amp;country={{ open_country|urlencode }}{% endif %}
+{% macro href(group, value=none, period=selection.period.key, within=none) -%}
+  {{ url(ratings_path) }}/{{ section_key }}?group={{ group }}{% if value %}&amp;value={{ value|urlencode }}{% endif %}&amp;period={{ period|urlencode }}{% if within %}&amp;within={{ within|urlencode }}{% endif %}&amp;lang={{ lang }}{% if open_country %}&amp;country={{ open_country|urlencode }}{% endif %}
 {%- endmacro %}
 
 {% block body %}
@@ -98,6 +98,7 @@
     {% else %}<input type="hidden" name="period" value="{{ selection.period.key }}">{% endif %}
     <noscript><button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.show') }}</button></noscript>
   </form>
+  {{ period_steps(calendar.inside, href, selection.group, selection.value, section_key) }}
 
   {% if notice %}<div class="note note--ok"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
   {% if failure %}<div class="note note--error"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
