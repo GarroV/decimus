@@ -1752,7 +1752,7 @@ D391) — так же: миграций нет, право — уже выдан
    учётки):
 
    ```bash
-   dc exec web python tools/api_token.py issue swarm --scope ratings:scores,ratings:checkups,ratings:violations,maps:ratings,aggregators:ratings,inspections:list,inspections:detail,inspections:violations
+   dc exec web python tools/api_token.py issue swarm --scope ratings:scores,ratings:checkups,ratings:violations,maps:ratings,aggregators:ratings,inspections:list,inspections:detail,inspections:violations,sales:month
    ```
 
    Токен печатается ОДИН раз — сразу в секреты Swarm (п.3), никуда больше.

@@ -2930,10 +2930,12 @@ Google, заморозка и роли учёток, новые учётки и 
   | `inspections:list` | `/api/v1/inspections` |
   | `inspections:detail` | `/api/v1/inspections/<uuid>` |
   | `inspections:violations` | `/api/v1/inspections/violations` |
+  | `sales:month` | `/api/v1/sales` |
 
   Прежние крупные права миграция `0052` разложила по методам без перерыва
   (`ratings:read` → четыре первых, `inspections:read` → список и подробности);
-  токен Swarm сверх того получил `aggregators:ratings` и `inspections:violations` (D426).
+  токен Swarm сверх того получил `aggregators:ratings` и `inspections:violations` (D426),
+  а миграция `0121` добавила `sales:month` (D713) и выдала его токену Swarm.
 - **Страны токена.** `api.tokens.countries` — страны, которые токен видит;
   пусто — вся сеть (так у Swarm). Запрос чужой страны — 403 `forbidden_country`
   (не молча урезанный ответ); без `countries` в запросе — страны токена;
@@ -3187,6 +3189,36 @@ Swarm (`DECIMUS_API_URL`): за Worker'ом сервер своего внешн
                          "findings": 12, "inspections": 9 }] },
   "countries": [{ "cc": "RS", "inspections": 7, "top": [ … ] }] }
 ```
+
+### `GET /api/v1/sales?countries=&month=YYYY-MM` (D713)
+
+Продажи пиццерий за месяц из Dodo IS, право `sales:month`. Данные собирает бот раз в
+сутки (`docs/21-quality.md`) в `dodois.unit_sales_month`; метод их только читает.
+`month` — `YYYY-MM`, по умолчанию текущий месяц (UTC); кривой — 400 `bad_month`. Без
+`countries` — страны IMF (или страны токена). По пиццерии одна строка: выручка и заказы
+**суммой по всем источникам заказа и каналам продажи**. Пиццерия без продаж за месяц в
+выдачу не попадает.
+
+**Валюта — по стране, а не по сумме и не из строки.** Колонка `currency` у загруженных
+строк пуста, поэтому валюту даёт справочник `src/domain/country_currency.py` (Сербия —
+`RSD`, евро — Болгария, Хорватия, Черногория, Словения, Кипр, Эстония, Испания, Литва).
+Страна вне справочника: у её пиццерий `currency` и `revenue` равны `null` (сумма без
+валюты ничего не значит), `orders` остаётся. Новая страна сети — строка в справочнике.
+
+```json
+{ "month": "2026-11",
+  "units": [{ "id": "<32 hex>", "name": "Belgrade-1", "cc": "RS",
+              "revenue": 330737.0, "orders": 164, "currency": "RSD" }],
+  "loaded": { "RS": "2026-11-05T09:53:32Z" } }
+```
+
+`id`, `name`, `cc` — те же, что `units[]` в `ratings/scores` (`id` — код пиццерии
+Dodo, 32 hex в нижнем регистре): по нему Swarm сопоставляет строки. `loaded` — когда по
+стране последний раз удалась загрузка продаж (`dodois.metric_loads`, вид `sales`);
+страны без удачной загрузки в нём нет. Месяц может быть неполным: в идущем месяце сумма
+— по сегодняшний сбор, а не за весь месяц. Чтение — `src/db/swarm_read.py: unit_sales`,
+`sales_loaded` (пиццерия и страна — через реестр метрик `source_units`, как на странице
+«Качество»), раскладка — `src/web/api_feed.py: sales_units`.
 
 ## Стек и почему такой
 

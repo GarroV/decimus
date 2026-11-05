@@ -443,11 +443,12 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0118_agg_unit_absent_point_links.sql": (
         "sql1:22a43c5c1ccc7c42d66fcec2932a622fbf7b5e76c172600d9d1c509118f3b1b2"
     ),
-    "0119_walk_log.sql": (
-        "sql1:8f676694c2cdfa6e8b8d291932a4086a2405e858fd4ad3c4e21d4ff607b7f26f"
-    ),
+    "0119_walk_log.sql": ("sql1:8f676694c2cdfa6e8b8d291932a4086a2405e858fd4ad3c4e21d4ff607b7f26f"),
     "0120_walk_log_retention_30d.sql": (
         "sql1:6450da72fa6374d2931de3d8674186f77aaaebc21658072c5996184c57f99162"
+    ),
+    "0121_api_sales_scope.sql": (
+        "sql1:ab25c8457fc6bf0b205b21fd8be0d5d77addb9d0a2768e82c3a57a1905a5cd11"
     ),
 }
 

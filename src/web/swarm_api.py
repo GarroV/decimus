@@ -1,5 +1,5 @@
-"""API чтения для сервисов, v1 (#567, D387, D390, D426): рейтинги, нарушения,
-проверки, карты, агрегаторы. Первый потребитель — Swarm.
+"""API чтения для сервисов, v1 (#567, D387, D390, D426, D713): рейтинги, нарушения,
+проверки, карты, агрегаторы, продажи пиццерий. Первый потребитель — Swarm.
 
 Децимус — единственный источник этих данных; Swarm их не хранит и не грузит у
 себя, а забирает отсюда с сервера (Edge Function), не из браузера. Контракт —
@@ -74,6 +74,7 @@ INSPECTION_PATH = f"{PREFIX}/inspections/<inspection_id>"
 MAPS_PATH = f"{PREFIX}/maps/ratings"
 AGGREGATORS_PATH = f"{PREFIX}/aggregators/ratings"
 INSPECTION_VIOLATIONS_PATH = f"{PREFIX}/inspections/violations"
+SALES_PATH = f"{PREFIX}/sales"
 
 SCORES_ENDPOINT = "swarm_api_scores"
 CHECKUPS_ENDPOINT = "swarm_api_checkups"
@@ -83,6 +84,7 @@ INSPECTION_ENDPOINT = "swarm_api_inspection"
 MAPS_ENDPOINT = "swarm_api_maps"
 AGGREGATORS_ENDPOINT = "swarm_api_aggregators"
 INSPECTION_VIOLATIONS_ENDPOINT = "swarm_api_inspection_violations"
+SALES_ENDPOINT = "swarm_api_sales"
 #: Открыты заслону входа (`auth.OPEN_ENDPOINTS`): опознаёт токен, а не кука.
 ENDPOINTS = frozenset(
     {
@@ -94,6 +96,7 @@ ENDPOINTS = frozenset(
         MAPS_ENDPOINT,
         AGGREGATORS_ENDPOINT,
         INSPECTION_VIOLATIONS_ENDPOINT,
+        SALES_ENDPOINT,
     }
 )
 
@@ -118,6 +121,7 @@ RATE_WINDOW = timedelta(minutes=1)
 _UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 _COUNTRY = re.compile(r"[A-Z]{2}")
 _DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+_MONTH = re.compile(r"(\d{4})-(0[1-9]|1[0-2])")
 
 
 class ApiRefusal(Exception):
@@ -495,6 +499,36 @@ def _inspection_violations(_: Settings) -> dict[str, Any]:
     }
 
 
+def _month() -> date:
+    """Месяц запроса `YYYY-MM` → первое число; без параметра — текущий месяц (UTC)."""
+    raw = (request.args.get("month") or "").strip()
+    if not raw:
+        today = datetime.now(UTC).date()
+        return today.replace(day=1)
+    found = _MONTH.fullmatch(raw)
+    if not found:
+        raise ApiRefusal(400, "bad_month", "month: expected YYYY-MM")
+    return date(int(found.group(1)), int(found.group(2)), 1)
+
+
+def _sales(_: Settings) -> dict[str, Any]:
+    """Продажи пиццерий за месяц из Dodo IS (D713): сумма по источникам и каналам.
+
+    Валюта — по стране (`domain.country_currency`), не по сумме; страна без известной
+    валюты отдаётся с `revenue` и `currency` равными `null`. `loaded` — когда по стране
+    последний раз удалась загрузка продаж; страны без удачной загрузки в нём нет.
+    """
+    countries = _countries_or_imf(_countries())
+    month = _month()
+    rows = swarm_read.unit_sales(countries=countries, month=month)
+    loaded = swarm_read.sales_loaded(countries)
+    return {
+        "month": month.strftime("%Y-%m"),
+        "units": api_feed.sales_units(rows),
+        "loaded": {cc: feed.iso_utc(at) for cc, at in sorted(loaded.items())},
+    }
+
+
 def _respond(
     conf: Settings, scope: str, build: Callable[[Settings], dict[str, Any]]
 ) -> tuple[Response, int, int | None]:
@@ -565,6 +599,7 @@ def routes() -> tuple[tuple[str, str, str, Callable[[Settings], dict[str, Any]]]
             _inspection_violations,
         ),
         (INSPECTION_PATH, INSPECTION_ENDPOINT, api_access.SCOPE_INSPECTION_DETAIL, _inspection),
+        (SALES_PATH, SALES_ENDPOINT, api_access.SCOPE_SALES, _sales),
     )
 
 

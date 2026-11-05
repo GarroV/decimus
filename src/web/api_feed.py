@@ -1,4 +1,4 @@
-"""Ответы API для сервисов (D426): оценки агрегаторов и топ нарушений по проверкам.
+"""Ответы API для сервисов (D426, D713): агрегаторы, топ нарушений проверок, продажи пиццерий.
 
 Чистая раскладка над прочитанными строками — ни одного похода в базу. Средние
 агрегаторов считает та же функция, что блок «Оценки на картах и в агрегаторах»
@@ -12,7 +12,8 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from src.db.agg_store import LatestRating
-from src.db.swarm_read import CountryInspections, FindingCount
+from src.db.swarm_read import CountryInspections, FindingCount, UnitSalesRow
+from src.domain.country_currency import currency_of
 from src.ratings.aggregators import summary as ragg
 
 Titles = Mapping[str, tuple[str | None, str | None]]
@@ -120,3 +121,26 @@ def inspection_violations(
             for t in sorted(totals, key=lambda t: t.country)
         ],
     }
+
+
+def sales_units(rows: Sequence[UnitSalesRow]) -> list[dict[str, Any]]:
+    """Продажи пиццерий за месяц, валюта — по стране (`country_currency`).
+
+    Ключ `id` — код пиццерии, тот же, что `units[].id` в `ratings/scores`. Страна вне
+    справочника валют: `currency` и `revenue` — `null` (сумма без валюты ничего не значит,
+    а угадывать её нельзя); число заказов остаётся.
+    """
+    units: list[dict[str, Any]] = []
+    for row in rows:
+        currency = currency_of(row.country)
+        units.append(
+            {
+                "id": row.dodo_id,
+                "name": row.name,
+                "cc": row.country,
+                "revenue": float(row.revenue) if currency else None,
+                "orders": row.orders,
+                "currency": currency,
+            }
+        )
+    return units
