@@ -133,19 +133,23 @@ def test_учётка_аудитора_подставляется_по_прив�
     assert строка.login == "dev"
 
 
-def test_срок_хранения_сто_восемьдесят_дней(токены: dict[str, str], pg_dsn: str) -> None:
+def test_срок_хранения_тридцать_дней(токены: dict[str, str], pg_dsn: str) -> None:
     ident = _проверка()
     _шаг(words="свежий")
+    _шаг(words="почти месяц")
     _шаг(words="старый")
     with psycopg.connect(pg_dsn) as conn:
         conn.execute(
-            "update walk_log set occurred_at = now() - interval '181 days' where words = 'старый'"
+            "update walk_log set occurred_at = now() - interval '29 days' where words = 'почти месяц'"
+        )
+        conn.execute(
+            "update walk_log set occurred_at = now() - interval '31 days' where words = 'старый'"
         )
 
     убрано = walk_log.purge()
 
     assert убрано == 1
-    assert [r.words for r in walk_log.read(токены["super"], ident)] == ["свежий"]
+    assert [r.words for r in walk_log.read(токены["super"], ident)] == ["почти месяц", "свежий"]
 
 
 def test_слишком_длинные_слова_усекаются_а_не_роняют_запись(токены: dict[str, str]) -> None:
