@@ -2060,7 +2060,6 @@
       edit.level = f.level;
       edit.words = classSaveWords(primaryClassCandidate());
       edit.class_context = classSaveContext(primaryClassCandidate()) || undefined;
-      edit.class_status = classState(primaryClassCandidate()).status;
       any = true;
     }
     if (!any) return [];

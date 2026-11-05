@@ -538,7 +538,7 @@ Swarm; своих цветов слой не вводит.
 | `class` | `POST /tg/walk/level` без уточнений (`walk_level.py`) | пункт, зона, вердикт (`ready` / `needs_fact` / `not_established`), класс, причина, вопрос о факте |
 | `class_facts` | то же, с ответами аудитора на вопросы | то же + число уточнений |
 | `class_manual` | `POST /tg/walk/finding`, `op=add` с `class_status=manual` | выбранный руками класс; отдельного запроса у выбора нет — он виден серверу только вместе с сохранением, экран шлёт `class_status` |
-| `save` / `edit` / `remove` | `POST /tg/walk/finding`, `op=add` / `edit` / `drop` (`walk_write.py`) | пункт, зона, класс, текст записи, `class_status`; остальные операции (`attach`, `detach`, `split`, замер) — шаг `other` с именем в `detail.op` |
+| `save` / `edit` / `remove` | `POST /tg/walk/finding`, `op=add` / `edit` / `drop` (`walk_write.py`) | пункт, зона, класс, текст записи, у `add` — `class_status` (как был выбран класс); остальные операции (`attach`, `detach`, `split`, замер) — шаг `other` с именем в `detail.op` |
 
 Пример строки: шаг `class`, исход `ok`, слова «повреждённая мусорка на улице», 1 кадр, пункт
 `TEH14`, зона `outside`, вердикт `not_established`, причина — текст классификатора, 2310 мс.
