@@ -385,12 +385,21 @@ def test_отклонённое_основание_не_даёт_отправи�
 
 
 def test_перенос_основания_в_другую_страну_не_даёт_отправить(
-    сеть: dict[str, str],
+    сеть: dict[str, str], pg_dsn: str
 ) -> None:
-    # D1: принятая с D2/D3 сама заводит экшн-план (D272), а проверку с планом
-    # в другую страну не переносят вовсе — до предписания дело бы не дошло.
+    # Перенос проверки с экшн-планом в другую страну запрещён самим переносом
+    # (`move_inspection`), поэтому до предписания дело доходит только для проверки
+    # без плана (запрос плана снят). Состояние готовим напрямую: защита предписания
+    # «основание уже не в стране» держится независимо от запрета переноса.
     основание = _принятая(finding=("CLN05", "D1", "hot_kitchen"))
     ident = _согласованное(inspection_ids=(основание,))
+    with psycopg.connect(pg_dsn, autocommit=True) as conn:
+        conn.execute(
+            "delete from action_plan_events where request_id in "
+            "(select id from action_plan_requests where inspection_id = %s)",
+            (основание,),
+        )
+        conn.execute("delete from action_plan_requests where inspection_id = %s", (основание,))
     move_inspection(
         основание,
         tenant="HQ",
