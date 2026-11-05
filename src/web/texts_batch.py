@@ -1,7 +1,11 @@
 """Тексты пакетного ввода нарушений в обходе (прототип): несколько кадров со словами."""
 
 BATCH_TEXTS: dict[str, dict[str, str]] = {
-    "walk.batch.open": {"ru": "Несколько с фото", "en": "Several with photos"},
+    "walk.batch.open": {"ru": "Несколько", "en": "Several"},
+    "walk.batch.open_aria": {
+        "ru": "Несколько нарушений с фото",
+        "en": "Several issues with photos",
+    },
     "walk.batch.title": {"ru": "Несколько нарушений", "en": "Several issues"},
     "walk.batch.close": {"ru": "Закрыть", "en": "Close"},
     "walk.batch.intro": {
@@ -81,6 +85,23 @@ BATCH_TEXTS: dict[str, dict[str, str]] = {
     "walk.batch.model_busy": {
         "ru": "Система занята, повторите: нажмите «Найти заново».",
         "en": "The system is busy, try again: press “Search again”.",
+    },
+    "walk.batch.photo_warn": {
+        "ru": (
+            "Без комментария система смотрит только фото — это дольше и менее точно. "
+            "Карточек без комментария: {n}."
+        ),
+        "en": (
+            "Without a comment the system looks at the photo only — slower and less accurate. "
+            "Cards without a comment: {n}."
+        ),
+    },
+    "walk.batch.seen": {"ru": "Система видит:", "en": "The system sees:"},
+    "walk.batch.seen_ok": {"ru": "Верно", "en": "Correct"},
+    "walk.batch.seen_ok_set": {"ru": "Подтверждено", "en": "Confirmed"},
+    "walk.batch.photo_none": {
+        "ru": "Система не нашла нарушение на фото. Опишите словами и найдите заново.",
+        "en": "The system found no issue in the photo. Describe it in words and search again.",
     },
     "walk.batch.level_pick": {"ru": "Класс", "en": "Class"},
     "walk.batch.prev": {"ru": "Прошлый раз, {date}: {text}", "en": "Last time, {date}: {text}"},

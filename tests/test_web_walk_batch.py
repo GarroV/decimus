@@ -176,6 +176,33 @@ def test_при_занятом_пределе_модели_карточки_по
     assert звали == [] and подмена == [], "карточка без слота в модель не идёт"
 
 
+def test_карточка_без_слов_идёт_путём_кадра_и_помечена(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    видела: list[Any] = []
+
+    def модель(note: str, photo: bytes | None, zone: str | None, **kw: Any) -> Suggestion:
+        видела.append((note, photo, kw["photos"]))
+        return Suggestion(candidates=(МОДЕЛЬ,), needs_human=False)
+
+    monkeypatch.setattr(ядро, "classify", модель)
+    ответ = _пакет(
+        клиент,
+        {"id": "a", "words": "", "photos": [клиент.ссылка()]},
+        {"id": "b", "words": "нагар", "photos": [клиент.ссылка()]},
+        zone_hint="dough",
+    )
+
+    без_слов, со_словами = ответ.get_json()["cards"]
+    assert без_слов["photo_only"] is True and со_словами["photo_only"] is False
+    assert без_слов["status"] == "found" and без_слов["wording"], "модель описала кадр"
+    assert без_слов["zone"] == "dough", "зона для карточки без слов — зона экрана"
+    assert ("", True) in [(n, p is not None) for n, p, _ in видела], "кадр ушёл в модель без слов"
+    assert get_state(АУДИТОР).findings == []  # type: ignore[union-attr]
+
+
 def test_слишком_большое_тело_отклоняется_до_разбора(клиент: Клиент) -> None:  # noqa: F811
     карточка = {"id": "a", "words": "x" * 200_000, "photos": []}
 

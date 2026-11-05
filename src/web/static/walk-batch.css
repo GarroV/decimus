@@ -1,6 +1,40 @@
 /* Пакетный ввод нарушений в обходе (прототип): карточки в листе поверх экрана зоны. */
 
-.walk-dock__batch { display: block; margin: 0 auto 6px; min-height: 32px; }
+/* Сплит-кнопка дока: «+ Нарушение» слева, «Несколько» справа за тонким разделителем. */
+.walk-dock__row .walk-dock__split {
+  flex: 1.9;
+  display: flex;
+  width: auto;
+  min-width: 0;
+  overflow: hidden;
+  cursor: default;
+}
+.walk-dock__split .walk-dock__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.walk-dock__split .walk-dock__add:active { background: var(--accent-press); }
+.walk-dock__split .walk-dock__add--main { flex: 1 1 auto; min-width: 0; padding: 0 5px; font-size: 14px; }
+.walk-dock__split .walk-dock__add--several {
+  flex: none;
+  gap: 4px;
+  padding: 0 7px 0 6px;
+  border-left: 1px solid rgb(255 255 255 / .45);
+  font-size: 12px;
+}
+.walk-dock__add--several .walk-icon { width: 16px; height: 16px; }
+.walk-dock__split .walk-dock__add:focus-visible { outline: 2px solid var(--ink-inverse); outline-offset: -4px; }
 
 .walk-batch { z-index: 10; }
 .walk-batch__pick { position: relative; display: flex; align-items: center; justify-content: center; margin: 10px 0 14px; min-height: 48px; }
@@ -28,3 +62,6 @@
 .walk-batch .walk-deadend .walk-btn { width: 100%; min-height: 44px; }
 .walk-batch__second { margin-top: 8px; }
 .walk-batch .walk-sheet__foot .walk-mark + .walk-mark { margin-top: 8px; }
+
+/* Узкий экран (360 px): камеру перед «+ Нарушение» убираем, подпись важнее. */
+@media (max-width: 374px) { .walk-dock__split .walk-dock__add--main .walk-icon { display: none; } }

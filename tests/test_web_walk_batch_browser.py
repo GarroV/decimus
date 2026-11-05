@@ -13,6 +13,7 @@ from test_web_walk_ux_browser import STATIC, page  # noqa: F401
 TEXTS = {
     "walk.batch.save_ready": "Save all ready ({n})",
     "walk.batch.zone": "Zone: {zone}",
+    "walk.batch.photo_warn": "Cards without a comment: {n}.",
     "walk.batch.zone_words": "named in the comment",
     "walk.batch.zone_screen": "zone not named - the current one",
     "walk.batch.prev": "Last time, {date}: {text}",
@@ -217,3 +218,58 @@ def test_cards_without_a_decision_are_never_saved(page, status):
 
     assert page.locator("[data-batch-save]").is_disabled()
     assert written(page) == []
+
+
+def photo_only(reply):
+    return {**reply, "photo_only": True, "wording": "Synthetic seen wording"}
+
+
+def test_photo_only_cards_warn_with_the_count_and_need_confirmation(page):
+    start(
+        page,
+        [
+            photo_only(found("c1", "ITM1", "zone_a", "screen", READY_D2)),
+            found("c2", "ITM1", "zone_b", "screen", READY_D2),
+        ],
+    )
+    add_photos(page, 2)
+    page.locator("[data-batch-words]").nth(1).fill("has a comment")
+
+    assert "1" in page.locator("[data-batch-photo-warn]").inner_text()
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-seen]")
+
+    seen = page.locator("[data-batch-seen]")
+    assert seen.input_value() == "Synthetic seen wording"
+    assert page.locator("[data-batch-save]").inner_text() == "Save all ready (1)"
+    assert written(page) == []
+
+    seen.fill("Synthetic corrected wording")  # editing the text confirms it
+    page.locator("[data-batch-save]").click()
+    page.wait_for_function("written.length === 2")
+    assert written(page)[0]["text"] == "Synthetic corrected wording"
+    assert written(page)[0]["words"] == ""
+
+
+def test_photo_only_card_is_confirmed_with_the_correct_button(page):
+    start(page, [photo_only(found("c1", "ITM1", "zone_a", "screen", READY_D2))])
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-seen-ok]")
+    assert page.locator("[data-batch-save]").is_disabled()
+
+    page.locator("[data-batch-seen-ok]").click()
+    page.locator("[data-batch-save]").click()
+    page.wait_for_function("written.length === 1")
+    assert written(page)[0]["text"] == "Synthetic seen wording"
+
+
+def test_photo_only_card_without_an_issue_asks_for_words(page):
+    reply = {"id": "c1", "status": "no_item", "candidates": [], "photo_only": True}
+    start(page, [reply])
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-card].is-doubt")
+
+    assert "walk.batch.photo_none" in page.locator("[data-batch-card]").inner_text()
+    assert page.locator("[data-batch-save]").is_disabled()

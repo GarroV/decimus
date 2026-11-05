@@ -53,7 +53,7 @@
 
   function newCard() {
     return { id: "c" + (++seq), photos: [], words: "", result: null, finding: false, dirty: false,
-      saved: null, humanZone: null, humanCode: null, manualMode: false, manualLevel: null, repeat: null, error: "" };
+      saved: null, seen: "", seenOk: false, humanZone: null, humanCode: null, manualMode: false, manualLevel: null, repeat: null, error: "" };
   }
 
   function refs(card) { return card.photos.filter(function (p) { return p.state === "done"; }).map(function (p) { return p.ref; }); }
@@ -93,6 +93,7 @@
     if (card.dirty) return "dirty";
     if (photosPending(card)) return "photos";
     if (r.status !== "found") return r.status;
+    if (r.photo_only && !card.seenOk) return "confirm";
     if (!levelOf(card)) return "class";
     if (repeatAsked(card) && card.repeat === null) return "repeat";
     if (recordedFor(code(card), zone(card))) return "recorded";
@@ -219,6 +220,8 @@
         c.manualMode = false;
         c.manualLevel = null;
         if (before[c.id] !== code(c) + "/" + zone(c)) c.repeat = null;
+        c.seen = r.wording || (itemOf(r.code) || {}).q || "";
+        c.seenOk = false;
         if (r.status === "unavailable" && r.message) c.error = r.message;
       });
     }).catch(function (err) {
@@ -231,6 +234,11 @@
     });
   }
 
+  /** Карточек без комментария среди ещё не подобранных: по ним система смотрит только фото. */
+  function bareCount() {
+    return unsearched().filter(function (c) { return !c.words.trim(); }).length;
+  }
+
   function unsearched() { return b.cards.filter(function (c) { return c.saved === null && !c.result && !c.finding; }); }
 
   /* ── запись ────────────────────────────────────────────────────────── */
@@ -238,7 +246,7 @@
   function textOf(card) {
     var r = card.result;
     var item = itemOf(r.code);
-    return card.words.trim() || r.wording || (item && item.q) || r.code;
+    return card.words.trim() || (r.photo_only && card.seen.trim()) || r.wording || (item && item.q) || r.code;
   }
 
   function addBody(card) {
@@ -448,6 +456,32 @@
     box.appendChild(ask);
   }
 
+  /** Только фото: что система увидела. Без «Верно» или правки текста карточка не сохраняется. */
+  function seenPart(card, box) {
+    var wrap = el("div", "walk-batch__seen");
+    wrap.appendChild(el("p", "walk-form__hint", tx("walk.batch.seen")));
+    var area = el("textarea", "walk-area walk-area--words");
+    area.rows = 2;
+    area.maxLength = WORDS_MAX;
+    area.value = card.seen;
+    area.setAttribute("data-batch-seen", card.id);
+    area.addEventListener("input", function () {
+      var was = card.seenOk;
+      card.seen = area.value;
+      card.seenOk = area.value.trim() !== "";
+      if (was !== card.seenOk) draw();
+    });
+    wrap.appendChild(area);
+    var ok = W.button("walk-btn walk-btn--small" + (card.seenOk ? " is-on" : ""), card.seenOk ? tx("walk.batch.seen_ok_set") : tx("walk.batch.seen_ok"), function () {
+      card.seenOk = card.seen.trim() !== "";
+      draw();
+    });
+    ok.setAttribute("data-batch-seen-ok", "");
+    ok.setAttribute("aria-pressed", String(card.seenOk));
+    wrap.appendChild(ok);
+    box.appendChild(wrap);
+  }
+
   function resultPart(card) {
     var r = card.result;
     var box = el("div", "walk-batch__result");
@@ -456,7 +490,7 @@
       return box;
     }
     var tail = function (key) { box.appendChild(note(tx(key), "walk-form__hint--warn")); };
-    if (r.status === "no_item") tail("walk.batch.no_item");
+    if (r.status === "no_item") tail(r.photo_only ? "walk.batch.photo_none" : "walk.batch.no_item");
     else if (r.status === "unavailable" || r.status === "busy") box.appendChild(note(r.message || tx("walk.batch.unavailable"), "walk-form__hint--warn"));
     if (r.status === "no_item" || r.status === "unavailable" || r.status === "busy") {
       box.appendChild(W.button("walk-btn walk-btn--small", tx("walk.batch.retry"), function () { find([card]); }));
@@ -468,6 +502,7 @@
     head.appendChild(el("strong", null, (item && item.label || r.code)));
     head.appendChild(document.createTextNode(" " + (item ? item.q : r.wording || "")));
     box.appendChild(head);
+    if (r.photo_only && r.status !== "measure") seenPart(card, box);
     var where = el("p", "walk-batch__zone");
     where.setAttribute("data-batch-zone", r.zone || "");
     where.appendChild(document.createTextNode(r.zone ? tx("walk.batch.zone", { zone: zoneTitle(r.zone) }) + " — " + zoneSource(r) : zoneSource(r)));
@@ -546,7 +581,7 @@
       var was = card.dirty;
       card.words = area.value;
       if (card.result) card.dirty = true;
-      if (was !== card.dirty) draw();
+      if (was !== card.dirty || (b.bare !== undefined && b.bare !== bareCount())) draw();
     };
     area.addEventListener("input", sync);
     li.appendChild(area);
@@ -594,6 +629,13 @@
     var searched = b.cards.some(function (c) { return c.result; });
     if (searched && left > 0 && good.length) foot.appendChild(note(tx("walk.batch.waiting_n", { n: left })));
     if (pending.length) {
+      var bare = bareCount();
+      b.bare = bare;
+      if (bare) {
+        var warn = note(tx("walk.batch.photo_warn", { n: bare }), "walk-form__hint--warn");
+        warn.setAttribute("data-batch-photo-warn", "");
+        foot.appendChild(warn);
+      }
       var blocked = pending.some(photosPending);
       var go = W.button("walk-mark", b.busy ? tx("walk.batch.finding") : tx("walk.batch.find"), function () { find(unsearched()); });
       go.setAttribute("data-batch-find", "");
@@ -614,7 +656,8 @@
   function draw() {
     if (!b || !node) return;
     var active = document.activeElement;
-    var focusId = active && active.getAttribute && active.getAttribute("data-batch-words");
+    var focusAttr = active && active.getAttribute && (active.getAttribute("data-batch-words") ? "data-batch-words" : active.getAttribute("data-batch-seen") ? "data-batch-seen" : null);
+    var focusId = focusAttr && active.getAttribute(focusAttr);
     var from = active && active.selectionStart;
     var scroller = node.querySelector(".walk-sheet__body");
     var top = scroller ? scroller.scrollTop : 0;
@@ -635,7 +678,7 @@
     node.appendChild(footer());
     body.scrollTop = top;
     if (focusId) {
-      var again = node.querySelector('[data-batch-words="' + focusId + '"]');
+      var again = node.querySelector('[' + focusAttr + '="' + focusId + '"]');
       if (again) { again.focus(); if (from != null) again.setSelectionRange(from, from); }
     }
   }

@@ -173,6 +173,8 @@ def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None
     refs = _refs(
         photos[:MAX_SUGGEST_PHOTOS] if isinstance(photos, list) else photos, who, inspection
     )
+    # Без слов система смотрит только кадр (`propose` умеет и это); клиент просит подтверждения.
+    out["photo_only"] = not words
     pinned = _code(raw, "code") if raw.get("code") else None
     human_zone = _code(raw, "zone") if raw.get("zone") else None
     candidates: list[dict[str, Any]] = []
