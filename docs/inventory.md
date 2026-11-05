@@ -614,6 +614,7 @@
 | `0117_drop_country_contracts.sql` | — |
 | `0118_agg_unit_absent_point_links.sql` | `agg.unit_absent`, `agg.point_links` |
 | `0119_walk_log.sql` | `walk_log` |
+| `0120_walk_log_retention_30d.sql` | — |
 <!-- map:end -->
 
 ## Makefile

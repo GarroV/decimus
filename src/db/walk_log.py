@@ -200,7 +200,7 @@ def read(session_token: str, inspection_id: str) -> tuple[StepRow, ...]:
 
 
 def purge() -> int:
-    """Убрать записи старше 180 дней. Число убранных."""
+    """Убрать записи старше 30 дней. Число убранных."""
     with _connected("убрать старые шаги обхода") as conn, conn.cursor() as cur:
         cur.execute(_PURGE_SQL)
         row = cur.fetchone()
