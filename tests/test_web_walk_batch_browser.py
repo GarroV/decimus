@@ -356,7 +356,7 @@ LONG_WORD = "Unbroken" + "wordwithoutspaces" * 8 + "_0123456789"
 
 
 def test_five_cards_with_long_words_do_not_widen_the_sheet_at_360px(page):
-    """A long unbroken word (wording, earlier comment, item name) wraps instead of widening the sheet."""
+    """A long unbroken word (wording, comment, item name) wraps, not widens."""
     page.set_viewport_size({"width": 360, "height": 740})
     replies = [
         found("c1", "ITM2", "zone_a", "screen", READY_D2),
