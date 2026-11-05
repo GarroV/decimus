@@ -5,11 +5,11 @@ Set WALK_CHROME_BIN to run with Chrome for Testing installed outside Playwright.
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from conftest import chromium_executable
 
 playwright = pytest.importorskip("playwright.sync_api")
 STATIC = Path(__file__).resolve().parents[1] / "src/web/static"
@@ -18,9 +18,7 @@ STATIC = Path(__file__).resolve().parents[1] / "src/web/static"
 @pytest.fixture
 def page() -> Iterator:
     with playwright.sync_playwright() as pw:
-        executable = os.environ.get("WALK_CHROME_BIN") or pw.chromium.executable_path
-        if not Path(executable).exists():
-            pytest.skip("Chromium unavailable; set WALK_CHROME_BIN")
+        executable = chromium_executable(pw.chromium.executable_path)
         browser = pw.chromium.launch(executable_path=executable, headless=True)
         page = browser.new_page(viewport={"width": 390, "height": 844}, has_touch=True)
         errors = []

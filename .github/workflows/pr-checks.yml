@@ -1,7 +1,8 @@
 # Проверки каждого PR в main (решение владельца 12.10.2026: в репозиторий
 # приходит второй разработчик, а `main` раскатывается на прод).
 #
-# Гоняет то, что не требует базы: формат, линт, типы и тесты без базы. Тесты,
+# Гоняет то, что не требует базы: формат, линт, типы и тесты без базы (в том числе
+# браузерные: Chromium ставится здесь же). Тесты,
 # которым нужна база, здесь пропускаются — они идут на тестовой базе
 # MUSPELHEIM (`make test`), и зелёный прогон здесь НЕ означает, что они
 # прошли. Поэтому шаг тестов печатает число пропущенных в итог прогона.
@@ -57,6 +58,24 @@ jobs:
         run: |
           pip install --require-hashes -r requirements-dev.txt -r requirements-build.txt
           pip install --no-deps --no-build-isolation -e .
+
+      # Браузерные тесты (Playwright) без Chromium падают, а не пропускаются
+      # (#1409): без этого шага они в CI не шли вовсе. Ключ кэша — lockfile,
+      # версия Playwright в нём; системные пакеты браузера ставит `--with-deps`.
+      - name: Chromium для браузерных тестов
+        id: playwright-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements-dev.txt') }}
+
+      - name: Установить Chromium
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            playwright install-deps chromium
+          else
+            playwright install --with-deps chromium
+          fi
 
       - name: Формат
         run: ruff format --check .

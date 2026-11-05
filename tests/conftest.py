@@ -537,6 +537,36 @@ def db_env(pg_dsn: str, monkeypatch: pytest.MonkeyPatch) -> str:
     return dsn
 
 
+#: Явный отказ от браузерных тестов на машине без Chromium. Без него отсутствие
+#: браузера — падение, а не пропуск (#1409): тихий пропуск откатил п. 6 фидбека,
+#: и зелёный прогон этого не показал, потому что в CI браузера не было вовсе.
+NO_BROWSER_VAR = "AUDIT_NO_BROWSER"
+_CFT = Path.home() / (
+    ".cache/chrome-for-testing/chrome/mac_arm-154.0.8037.57/"
+    "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+)
+
+
+def chromium_executable(playwright_chromium_path: str | None = None) -> str:
+    """Путь к Chromium для браузерного теста; нет браузера — тест ПАДАЕТ.
+
+    Порядок: `WALK_CHROME_BIN`, затем Chromium Playwright (`playwright install
+    chromium`), затем Chrome for Testing по документированному пути. Пропуск
+    возможен только по явному `AUDIT_NO_BROWSER=1` — и он слышен в причине.
+    """
+    candidates = [os.environ.get("WALK_CHROME_BIN"), playwright_chromium_path, str(_CFT)]
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file():
+            return candidate
+    message = (
+        "Chromium не найден: браузерные тесты не проверили ничего. Поставьте "
+        "`playwright install chromium` или задайте WALK_CHROME_BIN"
+    )
+    if os.environ.get(NO_BROWSER_VAR):
+        pytest.skip(f"{message} ({NO_BROWSER_VAR} задана — прогон неполный)")
+    pytest.fail(message, pytrace=False)
+
+
 #: Переменная, которой прогон объявляется ПОЛНЫМ. В таком прогоне пропуск из-за
 #: отсутствия данных — не «нечего проверять», а неполная проверка, выданная за
 #: полную, и набор обязан об этом сказать кодом возврата.
