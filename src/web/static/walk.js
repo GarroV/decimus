@@ -646,6 +646,14 @@
 
   function renderDock(zone) {
     var dock = el("div", "walk-dock");
+    if (W.batch) {
+      // Пакетный ввод (прототип): несколько кадров со словами; зона — из комментария, на экране — подсказка.
+      var batch = W.button("walk-link walk-dock__batch", "+ " + tx("walk.batch.open"), function () {
+        W.batch.open(zone.equipment ? null : zone.code);
+      });
+      batch.setAttribute("data-batch-open", "");
+      dock.appendChild(batch);
+    }
     var row = el("div", "walk-dock__row");
     var add = W.hinted(W.button("walk-mark walk-dock__add", null, function () {
       // Нарушение не привязано к зоне на экране (D445): зона — мягкая подсказка,

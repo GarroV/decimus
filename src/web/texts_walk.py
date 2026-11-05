@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from .texts_app import APP_TEXTS
+from .texts_batch import BATCH_TEXTS
 from .texts_edit import EDIT_TEXTS
 from .texts_hints import HINT_TEXTS
 from .texts_level import LEVEL_TEXTS
@@ -895,6 +896,7 @@ WALK_TEXTS.update(HINT_TEXTS)
 WALK_TEXTS.update(SPLIT_TEXTS)
 
 WALK_TEXTS.update(LEVEL_TEXTS)
+WALK_TEXTS.update(BATCH_TEXTS)
 
 WALK_TEXTS.update(EDIT_TEXTS)
 

@@ -1,0 +1,30 @@
+/* Пакетный ввод нарушений в обходе (прототип): карточки в листе поверх экрана зоны. */
+
+.walk-dock__batch { display: block; margin: 0 auto 6px; min-height: 32px; }
+
+.walk-batch { z-index: 10; }
+.walk-batch__pick { position: relative; display: flex; align-items: center; justify-content: center; margin: 10px 0 14px; min-height: 48px; }
+.walk-batch .walk-btn--primary { border-color: var(--accent); background: var(--accent); color: var(--ink-inverse); font-weight: 600; }
+.walk-batch__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+
+.walk-batch__card { padding: 12px; border: 1px solid var(--line-control); border-radius: 14px; background: var(--surface); }
+.walk-batch__card.is-ready { border-color: var(--ok-line); }
+.walk-batch__card.is-doubt { border-color: var(--warn); background: var(--warn-soft); }
+.walk-batch__card.is-saved { opacity: .75; }
+.walk-batch__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.walk-batch__n { font-weight: 600; font-size: 14px; }
+.walk-batch__badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--ink-2); }
+.walk-batch__badge.is-ready, .walk-batch__badge.is-saved { color: var(--ok); }
+.walk-batch__badge.is-doubt { color: var(--warn); }
+.walk-batch__drop { margin-left: auto; width: 32px; height: 32px; border: 0; border-radius: 16px; background: var(--surface-2); color: var(--ink-2); font: inherit; cursor: pointer; }
+
+.walk-batch__result { margin-top: 8px; display: grid; gap: 6px; }
+.walk-batch__item, .walk-batch__zone, .walk-batch__class, .walk-batch__ask { margin: 0; font-size: 14px; line-height: 20px; }
+.walk-batch__zone { color: var(--ink-2); }
+.walk-batch__row, .walk-batch__levels { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.walk-batch__repeat { padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.walk-batch .walk-btn { flex: none; }
+.walk-batch .walk-btn.is-on { border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.walk-batch .walk-deadend .walk-btn { width: 100%; min-height: 44px; }
+.walk-batch__second { margin-top: 8px; }
+.walk-batch .walk-sheet__foot .walk-mark + .walk-mark { margin-top: 8px; }

@@ -30,6 +30,7 @@
     suggest: root.getAttribute("data-suggest"),
     hint: root.getAttribute("data-hint"),
     level: root.getAttribute("data-level"),
+    batch: root.getAttribute("data-batch"),
     translate: root.getAttribute("data-translate"),
     voice: root.getAttribute("data-voice"),
     app: root.getAttribute("data-app"),
