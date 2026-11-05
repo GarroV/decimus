@@ -97,8 +97,8 @@ BATCH_TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "walk.batch.seen": {"ru": "Система видит:", "en": "The system sees:"},
-    "walk.batch.seen_ok": {"ru": "Верно", "en": "Correct"},
-    "walk.batch.seen_ok_set": {"ru": "Подтверждено", "en": "Confirmed"},
+    "walk.batch.item_ok": {"ru": "Пункт верный", "en": "The item is correct"},
+    "walk.batch.item_ok_set": {"ru": "Пункт подтверждён", "en": "Item confirmed"},
     "walk.batch.photo_none": {
         "ru": "Система не нашла нарушение на фото. Опишите словами и найдите заново.",
         "en": "The system found no issue in the photo. Describe it in words and search again.",

@@ -244,24 +244,30 @@ def test_photo_only_cards_warn_with_the_count_and_need_confirmation(page):
     assert page.locator("[data-batch-save]").inner_text() == "Save all ready (1)"
     assert written(page) == []
 
-    seen.fill("Synthetic corrected wording")  # editing the text confirms it
+    # Editing the explanation does not make the card ready: the item must be approved.
+    seen.fill("Synthetic corrected wording")
+    assert page.locator("[data-batch-save]").inner_text() == "Save all ready (1)"
+    page.locator("[data-batch-item-ok]").click()
+    assert page.locator("[data-batch-save]").inner_text() == "Save all ready (2)"
     page.locator("[data-batch-save]").click()
     page.wait_for_function("written.length === 2")
     assert written(page)[0]["text"] == "Synthetic corrected wording"
     assert written(page)[0]["words"] == ""
 
 
-def test_photo_only_card_is_confirmed_with_the_correct_button(page):
+def test_photo_only_card_is_saved_only_after_the_item_is_approved(page):
     start(page, [photo_only(found("c1", "ITM1", "zone_a", "screen", READY_D2))])
     add_photos(page, 1)
     page.locator("[data-batch-find]").click()
-    page.wait_for_selector("[data-batch-seen-ok]")
+    page.wait_for_selector("[data-batch-item-ok]")
     assert page.locator("[data-batch-save]").is_disabled()
+    page.locator("[data-batch-seen]").fill("Synthetic edited text")
+    assert page.locator("[data-batch-save]").is_disabled(), "text edit is not an approval"
 
-    page.locator("[data-batch-seen-ok]").click()
+    page.locator("[data-batch-item-ok]").click()
     page.locator("[data-batch-save]").click()
     page.wait_for_function("written.length === 1")
-    assert written(page)[0]["text"] == "Synthetic seen wording"
+    assert written(page)[0]["text"] == "Synthetic edited text"
 
 
 def test_photo_only_card_without_an_issue_asks_for_words(page):

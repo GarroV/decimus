@@ -53,7 +53,7 @@
 
   function newCard() {
     return { id: "c" + (++seq), photos: [], words: "", result: null, finding: false, dirty: false,
-      saved: null, seen: "", seenOk: false, humanZone: null, humanCode: null, manualMode: false, manualLevel: null, repeat: null, error: "" };
+      saved: null, seen: "", itemOk: false, humanZone: null, humanCode: null, manualMode: false, manualLevel: null, repeat: null, error: "" };
   }
 
   function refs(card) { return card.photos.filter(function (p) { return p.state === "done"; }).map(function (p) { return p.ref; }); }
@@ -93,7 +93,7 @@
     if (card.dirty) return "dirty";
     if (photosPending(card)) return "photos";
     if (r.status !== "found") return r.status;
-    if (r.photo_only && !card.seenOk) return "confirm";
+    if (r.photo_only && !card.itemOk) return "confirm";
     if (!levelOf(card)) return "class";
     if (repeatAsked(card) && card.repeat === null) return "repeat";
     if (recordedFor(code(card), zone(card))) return "recorded";
@@ -221,7 +221,7 @@
         c.manualLevel = null;
         if (before[c.id] !== code(c) + "/" + zone(c)) c.repeat = null;
         c.seen = r.wording || (itemOf(r.code) || {}).q || "";
-        c.seenOk = false;
+        c.itemOk = !!c.humanCode; // пункт, выбранный руками, подтверждён самим выбором
         if (r.status === "unavailable" && r.message) c.error = r.message;
       });
     }).catch(function (err) {
@@ -456,7 +456,7 @@
     box.appendChild(ask);
   }
 
-  /** Только фото: что система увидела. Без «Верно» или правки текста карточка не сохраняется. */
+  /** Только фото: что система увидела — пояснение, править необязательно («Найти заново» ищет по этим словам). */
   function seenPart(card, box) {
     var wrap = el("div", "walk-batch__seen");
     wrap.appendChild(el("p", "walk-form__hint", tx("walk.batch.seen")));
@@ -465,21 +465,29 @@
     area.maxLength = WORDS_MAX;
     area.value = card.seen;
     area.setAttribute("data-batch-seen", card.id);
-    area.addEventListener("input", function () {
-      var was = card.seenOk;
-      card.seen = area.value;
-      card.seenOk = area.value.trim() !== "";
-      if (was !== card.seenOk) draw();
-    });
+    area.addEventListener("input", function () { card.seen = area.value; });
     wrap.appendChild(area);
-    var ok = W.button("walk-btn walk-btn--small" + (card.seenOk ? " is-on" : ""), card.seenOk ? tx("walk.batch.seen_ok_set") : tx("walk.batch.seen_ok"), function () {
-      card.seenOk = card.seen.trim() !== "";
+    var again = W.button("walk-btn walk-btn--small", tx("walk.batch.retry"), function () {
+      if (!card.seen.trim()) return;
+      card.words = card.seen.trim();
+      find([card]);
+    });
+    again.setAttribute("data-batch-seen-again", "");
+    wrap.appendChild(again);
+    box.appendChild(wrap);
+  }
+
+  /** Только фото: пункт предложила система — без «Пункт верный» карточка не сохраняется. */
+  function itemConfirm(card, box) {
+    var row = el("div", "walk-batch__row");
+    var ok = W.button("walk-btn walk-btn--small" + (card.itemOk ? " is-on" : ""), card.itemOk ? tx("walk.batch.item_ok_set") : tx("walk.batch.item_ok"), function () {
+      card.itemOk = true;
       draw();
     });
-    ok.setAttribute("data-batch-seen-ok", "");
-    ok.setAttribute("aria-pressed", String(card.seenOk));
-    wrap.appendChild(ok);
-    box.appendChild(wrap);
+    ok.setAttribute("data-batch-item-ok", "");
+    ok.setAttribute("aria-pressed", String(card.itemOk));
+    row.appendChild(ok);
+    box.appendChild(row);
   }
 
   function resultPart(card) {
@@ -503,6 +511,7 @@
     head.appendChild(document.createTextNode(" " + (item ? item.q : r.wording || "")));
     box.appendChild(head);
     if (r.photo_only && r.status !== "measure") seenPart(card, box);
+    if (r.photo_only && (r.status === "found" || r.status === "need_zone")) itemConfirm(card, box);
     var where = el("p", "walk-batch__zone");
     where.setAttribute("data-batch-zone", r.zone || "");
     where.appendChild(document.createTextNode(r.zone ? tx("walk.batch.zone", { zone: zoneTitle(r.zone) }) + " — " + zoneSource(r) : zoneSource(r)));
