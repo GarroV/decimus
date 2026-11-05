@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import contextvars
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -44,6 +45,7 @@ from src.recognize.selected_level import (
     prepare_selected_level,
 )
 
+from . import walk_steps
 from .server_limits import SlowGate
 from .texts_walk import WALK_TEXTS
 from .walk_auth import BATCH_ENDPOINT, BATCH_PATH, WalkSettings
@@ -56,10 +58,10 @@ from .walk_zone import resolve_item_zone
 
 logger = logging.getLogger(__name__)
 
-#: Карточек в одном вызове. Каждая — до двух платных вызовов модели.
-MAX_CARDS = 12
+#: Карточек в одном вызове (D712: «лимит до 5 фоток»). Каждая — до двух платных вызовов модели.
+MAX_CARDS = 5
 #: Предел тела: карточка — до 1000 знаков слов (до 4 байт на знак) и до 20 ссылок на кадры
-#: (по ~80 байт) — около 6 КБ; на 12 карточек с запасом.
+#: (по ~80 байт) — около 6 КБ; на 5 карточек с большим запасом.
 MAX_BATCH_BODY_BYTES = 96 * 1024
 BUSY = "busy"
 #: Параллельных карточек внутри вызова (как у `mcp.import_match.WORKERS`).
@@ -220,6 +222,7 @@ def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None
 def _guarded(
     who: int, inspection: Inspection, raw: Any, hint: str | None, lang: str, gate: SlowGate
 ) -> dict[str, Any]:
+    started = time.monotonic()
     ident = raw.get("id") if isinstance(raw, dict) else None
     card_id = ident if isinstance(ident, str) else ""
     # Каждая карточка — свой слот общего предела вызовов модели, без ожидания.
@@ -229,17 +232,20 @@ def _guarded(
             "status": BUSY,
             "candidates": [],
             "message": _said("walk.batch.model_busy", lang),
+            "error_code": BUSY,
         }
     try:
         if not isinstance(raw, dict):
             raise WalkRefused("walk.err.bad_request")
-        return _one(who, inspection, raw, hint)
+        card = _one(who, inspection, raw, hint)
+        card["ms"] = _since(started)
+        return card
     except WalkRefused as exc:
-        text = _said(str(exc), lang)
+        text, code = _said(str(exc), lang), str(exc)
     except (RecognizeError, DomainError, CriteriaUnavailable, ValidationError, OSError) as exc:
         # Только тип: слова аудитора и текст модели в журнал не идут.
         logger.warning("Обход: карточка пакета не подобрана: %s", type(exc).__name__)
-        text = _said("walk.err.recognize", lang)
+        text, code = _said("walk.err.recognize", lang), type(exc).__name__
     finally:
         gate.leave()
     return {
@@ -247,7 +253,14 @@ def _guarded(
         "status": UNAVAILABLE,
         "candidates": [],
         "message": text,
+        # Для журнала шагов: код отказа или тип исключения, без текста.
+        "error_code": code,
+        "ms": _since(started),
     }
+
+
+def _since(started: float) -> int:
+    return int((time.monotonic() - started) * 1000)
 
 
 def _said(key: str, lang: str) -> str:
@@ -279,10 +292,13 @@ def install(
     resources = session or ModelSession()
     busy, guard, gate = resources.busy, resources.guard, resources.gate
 
-    def refused(key: str, lang: str, status: int = 422) -> tuple[Response, int]:
-        return jsonify({"error": "refused", "message": _said(key, lang)}), status
+    def refused(key: str, lang: str, status: int = 422, **params: Any) -> tuple[Response, int]:
+        walk_steps.note_reason(key)
+        message = _said(key, lang)
+        return jsonify({"error": "refused", "message": message.format(**params)}), status
 
     @app.post(BATCH_PATH, endpoint=BATCH_ENDPOINT)
+    @walk_steps.logged(walk_steps.KIND_BATCH)
     def walk_batch() -> tuple[Response, int]:
         who = identify(conf, ui_lang, header_only=True)
         if not isinstance(who, int):
@@ -297,13 +313,16 @@ def install(
         inspection = get_state(who)
         if inspection is None:
             return refused("walk.none.title", ui_lang, 409)
+        walk_steps.note_run(who, inspection)
         lang = inspection.ui_lang
         if handed_over(who):
             return refused("walk.sealed", lang, 409)
         if "run_id" in body and body["run_id"] != inspection.run_id:
             return refused("walk.err.run_changed", lang, 409)
         cards = body.get("cards")
-        if not isinstance(cards, list) or not cards or len(cards) > MAX_CARDS:
+        if isinstance(cards, list) and len(cards) > MAX_CARDS:
+            return refused("walk.batch.too_many", lang, 400, n=MAX_CARDS)
+        if not isinstance(cards, list) or not cards:
             return refused("walk.err.bad_request", lang, 400)
         with guard:
             if who in busy:

@@ -18,7 +18,7 @@
   var el = W.el;
   var tx = function (key, params) { return W.tx(key, params); };
 
-  var MAX_CARDS = 12;
+  var MAX_CARDS = 5;
   var WORDS_MAX = 1000;
   var LEVELS_REPEAT = ["D1", "D2"];
 
@@ -53,7 +53,7 @@
 
   function newCard() {
     return { id: "c" + (++seq), photos: [], words: "", result: null, finding: false, dirty: false,
-      saved: null, seen: "", itemOk: false, humanZone: null, humanCode: null, manualMode: false, manualLevel: null, repeat: null, error: "" };
+      saved: null, seen: "", itemOk: false, humanZone: null, humanCode: null, manualMode: false, manualLevel: null, repeat: null, distinct: false, error: "" };
   }
 
   function refs(card) { return card.photos.filter(function (p) { return p.state === "done"; }).map(function (p) { return p.ref; }); }
@@ -96,7 +96,7 @@
     if (r.photo_only && !card.itemOk) return "confirm";
     if (!levelOf(card)) return "class";
     if (repeatAsked(card) && card.repeat === null) return "repeat";
-    if (recordedFor(code(card), zone(card))) return "recorded";
+    if (recordedFor(code(card), zone(card)) && !card.distinct) return "recorded";
     if (duplicatedInBatch(card)) return "batch_dup";
     return null;
   }
@@ -219,7 +219,7 @@
         c.dirty = false;
         c.manualMode = false;
         c.manualLevel = null;
-        if (before[c.id] !== code(c) + "/" + zone(c)) c.repeat = null;
+        if (before[c.id] !== code(c) + "/" + zone(c)) { c.repeat = null; c.distinct = false; }
         c.seen = r.wording || (itemOf(r.code) || {}).q || "";
         c.itemOk = !!c.humanCode; // пункт, выбранный руками, подтверждён самим выбором
         if (r.status === "unavailable" && r.message) c.error = r.message;
@@ -434,6 +434,35 @@
     }
   }
 
+  /** Пункт уже записан в этой зоне: показать прежний кадр и слова, спросить «то же или другое». */
+  function sameOrOther(card, box, record) {
+    var ask = el("div", "walk-batch__same");
+    ask.setAttribute("data-batch-same", "");
+    ask.appendChild(note(tx("walk.batch.dup_recorded", { n: record.n }), "walk-form__hint--warn"));
+    var shown = el("div", "walk-batch__row");
+    var shot = (record.photos || [])[0];
+    if (shot) shown.appendChild(W.photo.thumb(shot));
+    var said = (record.words || record.text || "").trim();
+    if (said) shown.appendChild(el("span", "walk-form__hint", said));
+    if (shot || said) ask.appendChild(shown);
+    ask.appendChild(el("p", "walk-batch__ask", tx("walk.batch.dup_ask")));
+    var row = el("div", "walk-batch__row");
+    if (refs(card).length) {
+      var same = W.button("walk-btn walk-btn--small", tx("walk.batch.dup_attach"), function () { attachTo(card, record); });
+      same.setAttribute("data-batch-same-yes", "");
+      row.appendChild(same);
+    }
+    var other = W.button("walk-btn walk-btn--small" + (card.distinct ? " is-on" : ""), tx("walk.batch.dup_other"), function () {
+      card.distinct = true;
+      draw();
+    });
+    other.setAttribute("data-batch-same-no", "");
+    other.setAttribute("aria-pressed", String(!!card.distinct));
+    row.appendChild(other);
+    ask.appendChild(row);
+    box.appendChild(ask);
+  }
+
   function repeatPart(card, box) {
     var prev = previousFor(code(card), zone(card));
     var date = W.state.data.previous ? W.day(W.state.data.previous.date) : "";
@@ -527,8 +556,7 @@
     if (levelOf(card) && repeatAsked(card)) repeatPart(card, box);
     var record = levelOf(card) && recordedFor(r.code, r.zone);
     if (record) {
-      box.appendChild(note(tx("walk.batch.dup_recorded", { n: record.n }), "walk-form__hint--warn"));
-      if (refs(card).length) box.appendChild(W.button("walk-btn walk-btn--small", tx("walk.batch.dup_attach"), function () { attachTo(card, record); }));
+      sameOrOther(card, box, record);
     } else if (levelOf(card) && duplicatedInBatch(card)) {
       tail("walk.batch.dup_batch");
     }
@@ -603,6 +631,11 @@
   }
 
   function pickInput() {
+    if (b.cards.length >= MAX_CARDS) {
+      var full = note(tx("walk.batch.full", { n: MAX_CARDS }));
+      full.setAttribute("data-batch-full", "");
+      return full;
+    }
     var label = el("label", "walk-btn walk-btn--primary walk-batch__pick");
     var input = document.createElement("input");
     input.type = "file";

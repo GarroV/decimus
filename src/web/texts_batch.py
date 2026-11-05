@@ -21,8 +21,16 @@ BATCH_TEXTS: dict[str, dict[str, str]] = {
     "walk.batch.pick": {"ru": "Выбрать фото из галереи", "en": "Pick photos from the gallery"},
     "walk.batch.pick_more": {"ru": "Добавить ещё фото", "en": "Add more photos"},
     "walk.batch.limit": {
-        "ru": "Не больше {n} карточек за раз. Остальные фото не добавлены.",
-        "en": "No more than {n} cards at a time. The remaining photos were not added.",
+        "ru": "Не больше {n} фото за раз. Остальные не добавлены.",
+        "en": "No more than {n} photos at a time. The rest were not added.",
+    },
+    "walk.batch.full": {
+        "ru": "В одной пачке не больше {n} фото. Запишите эти, затем добавьте следующие.",
+        "en": "No more than {n} photos in one batch. Save these, then add the next ones.",
+    },
+    "walk.batch.too_many": {
+        "ru": "В одной пачке не больше {n} фото.",
+        "en": "No more than {n} photos in one batch.",
     },
     "walk.batch.card": {"ru": "Нарушение {n}", "en": "Issue {n}"},
     "walk.batch.words_hint": {
@@ -114,7 +122,18 @@ BATCH_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Это нарушение уже записано в этой зоне (запись №{n}).",
         "en": "This issue is already recorded in this zone (record #{n}).",
     },
-    "walk.batch.dup_attach": {"ru": "Добавить фото к записи", "en": "Add photos to the record"},
+    "walk.batch.dup_ask": {
+        "ru": "Это то же нарушение или другое?",
+        "en": "Is it the same issue or a different one?",
+    },
+    "walk.batch.dup_attach": {
+        "ru": "То же: добавить фото к записи",
+        "en": "The same: add photos to the record",
+    },
+    "walk.batch.dup_other": {
+        "ru": "Другое: записать отдельно",
+        "en": "Different: record separately",
+    },
     "walk.batch.dup_batch": {
         "ru": "Такое же нарушение в этой зоне есть в другой карточке списка.",
         "en": "The same issue in this zone is in another card of this list.",

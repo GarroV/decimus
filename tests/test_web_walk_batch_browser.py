@@ -20,6 +20,28 @@ TEXTS = {
     "walk.batch.prev_yes": "Yes, a repeat",
     "walk.batch.prev_no": "No, a different one",
     "walk.sheet.class_review.record_deviation": "Record as a deviation",
+    "walk.batch.full": "No more than {n} photos in one batch.",
+    "walk.batch.limit": "No more than {n} photos at a time.",
+    "walk.batch.pick": "Pick photos",
+    "walk.batch.pick_more": "Add more photos",
+    "walk.batch.dup_recorded": "Already recorded (record #{n}).",
+    "walk.batch.dup_ask": "Is it the same issue or a different one?",
+    "walk.batch.dup_attach": "The same: add photos",
+    "walk.batch.dup_other": "Different: record separately",
+}
+
+PIXEL = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+)
+RECORDED = {
+    "n": 7,
+    "code": "ITM1",
+    "zone": "zone_a",
+    "level": "D2",
+    "text": "Earlier wording",
+    "words": "dirty shelf earlier",
+    "photos": [{"ref": "walk:earlier", "own": True, "url": PIXEL}],
 }
 
 
@@ -73,15 +95,17 @@ def png() -> bytes:
     return out.getvalue()
 
 
-def start(page, replies):
-    """Open the sheet on `zone_a` with `replies` as the server's answer to «Find items»."""
+def start(page, replies, recorded=None):
+    """Open the sheet on `zone_a` with `replies` as the server's answer to «Find items».
+
+    `recorded` — findings already recorded in `zone_a` (what the screen data carries)."""
     page.set_default_timeout(4000)
     page.evaluate(
-        """({texts, items, replies})=>{
+        """({texts, items, replies, recorded})=>{
       const W=DecimusWalk;
       W.state.data={state:'active',run_id:'r',key:'k',texts,items,
         previous:{date:'2026-09-16',count:1},
-        zones:[{code:'zone_a',title:'Cold prep',recorded:[],
+        zones:[{code:'zone_a',title:'Cold prep',recorded,
                 previous:[{code:'ITM2',level:'D1',text:'Old wording',again:false}]},
                {code:'zone_b',title:'Dining',recorded:[],previous:[]}]};
       W.tx=(key,params)=>{let s=texts[key]||key;
@@ -95,7 +119,7 @@ def start(page, replies):
         return {ok:true,status:200,body:{run_id:'r'}};};
       W.urls.batch='/batch'; W.urls.finding='/finding';
     }""",
-        {"texts": TEXTS, "items": ITEMS, "replies": replies},
+        {"texts": TEXTS, "items": ITEMS, "replies": replies, "recorded": recorded or []},
     )
     page.add_style_tag(path=str(STATIC / "walk-batch.css"))
     page.add_script_tag(path=str(STATIC / "walk-menu.js"))
@@ -279,3 +303,50 @@ def test_photo_only_card_without_an_issue_asks_for_words(page):
 
     assert "walk.batch.photo_none" in page.locator("[data-batch-card]").inner_text()
     assert page.locator("[data-batch-save]").is_disabled()
+
+
+def test_a_sixth_photo_cannot_be_added_and_the_limit_is_said(page):
+    start(page, [])
+    add_photos(page, 5)
+
+    assert page.locator("[data-batch-card]").count() == 5
+    assert page.locator("[data-batch-input]").count() == 0, "no way to add a sixth"
+    assert "No more than 5" in page.locator("[data-batch-full]").inner_text()
+
+
+def test_six_files_at_once_add_only_five_cards(page):
+    start(page, [])
+    files = [{"name": f"p{i}.png", "mimeType": "image/png", "buffer": png()} for i in range(6)]
+    page.set_input_files("[data-batch-input]", files)
+    page.wait_for_function("document.querySelectorAll('[data-batch-card]').length === 5")
+
+    assert page.locator("[data-batch-card]").count() == 5
+
+
+def test_already_recorded_asks_same_or_different_and_shows_the_earlier_photo(page):
+    start(page, [found("c1", "ITM1", "zone_a", "screen", READY_D2)], recorded=[RECORDED])
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-same]")
+
+    asked = page.locator("[data-batch-same]")
+    assert asked.locator("img.walk-thumb__img").count() == 1, "the earlier photo is shown"
+    assert "dirty shelf earlier" in asked.inner_text(), "and its words"
+    assert "same issue or a different" in asked.inner_text()
+    assert page.locator("[data-batch-save]").is_disabled(), "not saved until the person answers"
+
+    page.locator("[data-batch-same-no]").click()
+    page.locator("[data-batch-save]").click()
+    page.wait_for_function("written.length === 1")
+    assert [(w["op"], w["code"], w["zone"]) for w in written(page)] == [("add", "ITM1", "zone_a")]
+
+
+def test_already_recorded_same_issue_attaches_the_photos_to_the_record(page):
+    start(page, [found("c1", "ITM1", "zone_a", "screen", READY_D2)], recorded=[RECORDED])
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-same-yes]")
+
+    page.locator("[data-batch-same-yes]").click()
+    page.wait_for_function("written.length === 1")
+    assert [(w["op"], w["n"]) for w in written(page)] == [("attach", 7)]

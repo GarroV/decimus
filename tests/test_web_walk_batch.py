@@ -142,6 +142,60 @@ def test_пустой_и_слишком_большой_пакет_отклоня
     assert _пакет(клиент, *лишние).status_code == 400
 
 
+def test_предел_пачки_пять_карточек_и_отказ_называет_число(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+) -> None:
+    assert walk_batch.MAX_CARDS == 5
+    карточки = [{"id": str(n), "words": "нагар", "photos": [клиент.ссылка()]} for n in range(6)]
+
+    отказ = _пакет(клиент, *карточки)
+    принято = _пакет(клиент, *карточки[:5])
+
+    assert отказ.status_code == 400 and "5" in отказ.get_json()["message"]
+    assert "{n}" not in отказ.get_json()["message"]
+    assert принято.status_code == 200 and len(принято.get_json()["cards"]) == 5
+
+
+def test_журнал_пишет_строку_на_карточку_с_путём_пакет(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    walk_log_steps: list[Any],
+) -> None:
+    _пакет(
+        клиент,
+        {"id": "bad", "words": "нагар", "photos": ["walk:" + "0" * 64]},
+        {"id": "ok", "words": "нагар", "photos": [клиент.ссылка(), клиент.ссылка()]},
+        zone_hint="hot_kitchen",
+    )
+
+    плохая, хорошая = walk_log_steps
+    assert (хорошая.step, хорошая.via, хорошая.outcome, хорошая.verdict) == (
+        "suggest",
+        "batch",
+        "ok",
+        "found",
+    )
+    assert (хорошая.words, хорошая.photos, хорошая.item_code) == ("нагар", 2, "PRD05")
+    assert хорошая.level == "D2" and хорошая.zone and хорошая.duration_ms is not None
+    assert (плохая.outcome, плохая.verdict, плохая.via) == ("error", "unavailable", "batch")
+    assert плохая.error, "сбой записан кодом, не молчанием"
+    assert "walk:" not in repr(хорошая.detail) and "нагар" not in repr(плохая.error)
+
+
+def test_журнал_пишет_отказ_всего_пакета_одной_строкой(
+    клиент: Клиент,  # noqa: F811
+    walk_log_steps: list[Any],
+) -> None:
+    лишние = [{"id": str(n), "words": "x", "photos": []} for n in range(walk_batch.MAX_CARDS + 1)]
+
+    _пакет(клиент, *лишние)
+
+    (строка,) = walk_log_steps
+    assert (строка.via, строка.outcome, строка.item_code) == ("batch", "refused", None)
+    assert строка.detail["reason_code"] == "walk.batch.too_many"
+
+
 def test_чужая_проверка_отклоняется(клиент: Клиент) -> None:  # noqa: F811
     карточка = {"id": "a", "words": "x", "photos": [клиент.ссылка()]}
 
