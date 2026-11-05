@@ -610,6 +610,19 @@ def model_usage_calls(monkeypatch: pytest.MonkeyPatch) -> list[object]:
     return calls
 
 
+@pytest.fixture(autouse=True)
+def walk_log_steps(monkeypatch: pytest.MonkeyPatch) -> list[object]:
+    """Журнал шагов обхода (D710) не ходит в базу: шаги собираются в список.
+
+    Тест, которому важен журнал, берёт список параметром; тест самой записи
+    (`tests/test_walk_log.py`) вызывает настоящие `record` и `submit` — он держит их
+    копии, снятые при импорте, до этой подмены.
+    """
+    steps: list[object] = []
+    monkeypatch.setattr("src.db.walk_log.submit", steps.append)
+    return steps
+
+
 _UNTRUSTED_BLOCK = re.compile(
     r'\A<untrusted_data id="([0-9a-f]{32})" source="[A-Za-z0-9_-]*">\n'
     r'(.*)\n</untrusted_data id="\1">\Z',

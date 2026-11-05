@@ -53,6 +53,7 @@ from .texts_units import UNIT_TEXTS
 from .texts_usage import USAGE_TEXTS
 from .texts_users import USERS_TEXTS
 from .texts_walk import WALK_TEXTS
+from .texts_walk_log import WALK_LOG_TEXTS
 
 #: Языки интерфейса. Третий добавляется строками в каталоге, не кодом.
 UI_LANGS = ("ru", "en")
@@ -1903,6 +1904,7 @@ _ЧАСТИ = (
     USAGE_TEXTS,
     USERS_TEXTS,
     WALK_TEXTS,
+    WALK_LOG_TEXTS,
     ADMINISTRATION_TEXTS,
     MAILINGS_TEXTS,
 )
@@ -1943,6 +1945,7 @@ TEXTS = {
     **USAGE_TEXTS,
     **USERS_TEXTS,
     **WALK_TEXTS,
+    **WALK_LOG_TEXTS,
     **ADMINISTRATION_TEXTS,
     **MAILINGS_TEXTS,
 }

@@ -2008,6 +2008,7 @@
         comment: "", repeat: false, photos: assignedPhotos(c), words: classSaveWords(c), also: true,
         photo_assignment: assignmentPayload(c),
         class_context: classSaveContext(c) || undefined,
+        class_status: classState(c).status,
         suggested: { code: c.code, level: c.level, zone: c.zone, confidence: c.confidence, via: f.via },
         reading_c: classReading(c).confirmed ? classReading(c).value : null,
       };
@@ -2035,6 +2036,7 @@
         photo_assignment: assigned ? assignmentPayload(assigned) : null,
         words: recognizing() ? classSaveWords(primaryClassCandidate()) : f.words.trim(),
         class_context: recognizing() ? classSaveContext(primaryClassCandidate()) || undefined : undefined,
+        class_status: recognizing() ? classState(primaryClassCandidate()).status : undefined,
         suggested: suggested(), reading_c: readingValue(),
         hint_codes: f.hintCodes || [],
       }].concat(extraOps());
@@ -2058,6 +2060,7 @@
       edit.level = f.level;
       edit.words = classSaveWords(primaryClassCandidate());
       edit.class_context = classSaveContext(primaryClassCandidate()) || undefined;
+      edit.class_status = classState(primaryClassCandidate()).status;
       any = true;
     }
     if (!any) return [];

@@ -110,6 +110,7 @@ from . import (
     users_view,
     view,
     walk_auth,
+    walk_log_view,
     walk_proxy,
 )
 from . import inspections as data
@@ -1779,6 +1780,13 @@ def _card_context(
     except DbError:
         кадры_известны = False
     zone_lines = view.zone_lines(detail.by_zone, lang)
+    # Журнал обхода (D710): шаги аудитора в мини-аппе — главному админу и админу УК.
+    журнал_обхода = walk_log_view.card_block(
+        inspection_id,
+        lang=lang,
+        full=метка_с_текстом,
+        zone_names={z.code: z.name for z in zone_lines},
+    )
     план, план_известен = action_plans.card_plan(inspection_id)
     # План нужен (D1/D2/D3 у принятой проверки УК), а запроса нет: либо его можно
     # запросить, либо у точки нет страны — тогда только видимая отметка.
@@ -1795,6 +1803,7 @@ def _card_context(
     )
     без_страны = план_нужен and action_plans.unit_without_country(inspection_id)
     return dict(
+        **журнал_обхода,
         plan=план,
         plan_known=план_известен,
         # Запрос открывается панелью «Действий» (D527) — у УК и у партнёра тем же адресом.
