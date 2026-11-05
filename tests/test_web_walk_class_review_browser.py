@@ -582,7 +582,7 @@ def test_not_established_does_not_create_d0_or_coarse_fallback(browser_page):
         in page.locator("[data-class-feedback]").inner_text()
     )
     assert page.get_by_role("button", name="Save", exact=True).is_disabled()
-    page.get_by_role("button", name="walk.sheet.class_review.manual", exact=True).click()
+    page.get_by_role("button", name="walk.sheet.class_review.record_deviation", exact=True).click()
     page.locator('[data-manual-class="D1"]').click()
     page.get_by_role("button", name="Save", exact=True).click()
     page.wait_for_function("ops.length === 1")
