@@ -26,6 +26,7 @@ from src.recognize.selected_level import (
 )
 from src.recognize.timing import collect, measure
 
+from . import walk_steps
 from .texts_walk import WALK_TEXTS
 from .walk_auth import LEVEL_ENDPOINT, LEVEL_PATH, WalkSettings
 from .walk_model_session import ModelSession
@@ -63,6 +64,7 @@ def install(
     busy, guard, gate = resources.busy, resources.guard, resources.gate
 
     def refused(error: str, key: str, lang: str, status: int = 422) -> tuple[Response, int]:
+        walk_steps.note_reason(key)
         entry = WALK_TEXTS[key]
         return jsonify(
             {
@@ -80,6 +82,7 @@ def install(
         inspection = get_state(who)
         if inspection is None:
             return refused("run_changed", "walk.none.title", ui_lang, 409)
+        walk_steps.note_run(who, inspection)
         lang = inspection.ui_lang
         request.max_content_length = MAX_LEVEL_BODY_BYTES
         try:
@@ -180,10 +183,11 @@ def install(
             return refused("invalid_request", str(exc), lang)
         except ValidationError:
             return refused("invalid_selection", "walk.err.rejected", lang)
-        except (RecognizeError, DomainError, OSError):
+        except (RecognizeError, DomainError, OSError) as exc:
             # Numerical timing only: criteria, raw facts and model output are
             # deliberately absent from logs, including failure paths.
             logger.warning("Обход: критерии выбранного пункта не проверены")
+            walk_steps.note_error(type(exc).__name__)
             return refused("unavailable", "walk.err.recognize", lang, 503)
         finally:
             gate.leave()
@@ -192,6 +196,7 @@ def install(
                 busy.discard(who)
 
     @app.post(LEVEL_PATH, endpoint=LEVEL_ENDPOINT)
+    @walk_steps.logged(walk_steps.KIND_LEVEL)
     def walk_level() -> tuple[Response, int]:
         with collect() as timing:
             status = 500

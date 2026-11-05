@@ -16,7 +16,7 @@ import asyncio
 import logging
 
 from src import db
-from src.db import journals, second_factor
+from src.db import journals, second_factor, walk_log
 from src.db.photos import walk_photo_refs
 from src.domain import check_environment
 from src.domain.second_factor import PASSKEY_IDLE_LIMIT
@@ -65,6 +65,12 @@ async def _purge_journals() -> None:
             logger.info("убрано старых записей журналов входов и действий: %s", убрано)
     except Exception:
         logger.exception("уборка журналов входов и действий не прошла")
+    try:
+        убрано = await asyncio.to_thread(walk_log.purge)
+        if убрано:
+            logger.info("убрано старых шагов журнала обхода: %s", убрано)
+    except Exception:
+        logger.exception("уборка журнала обхода не прошла")
 
 
 #: Запись в журнал действий (`action_journal.action`) о снятых за простой ключах (D485).

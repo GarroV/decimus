@@ -75,7 +75,7 @@ from src.recognize.models import UNKNOWN_ZONE
 from src.recognize.provenance import frame_indices
 from src.recognize.timing import measure
 
-from . import walk_rate
+from . import walk_rate, walk_steps
 from .texts_walk import WALK_TEXTS
 from .walk_auth import (
     FINDING_ENDPOINT,
@@ -587,9 +587,12 @@ def install(
             inspection = get_state(chat_id)
         if inspection is None:
             return refused(said("walk.none.title", ui_lang), 409)
+        walk_steps.note_run(chat_id, inspection)
         if not run_matches(inspection, identity):
+            walk_steps.note_reason("walk.err.run_changed")
             return changed(inspection.ui_lang)
         if handed_over(chat_id):
+            walk_steps.note_reason("walk.sealed")
             return refused(said("walk.sealed", inspection.ui_lang), 409)
         return inspection
 
@@ -626,22 +629,28 @@ def install(
                         op(who, inspection, body)
         except HandedOverError:
             logger.info("Обход: чат %s сдал проверку во время записи — отказ", log_id(who))
+            walk_steps.note_reason("walk.sealed")
             return refused(said("walk.sealed", lang), 409)
         except MeasurementSetConflict:
+            walk_steps.note_reason("walk.level.changed")
             return jsonify(
                 {"error": "measurement_set_changed", "message": said("walk.level.changed", lang)}
             ), 409
         except EditConflict:
+            walk_steps.note_reason("walk.edit.conflict")
             return jsonify(
                 {"error": "edit_conflict", "message": said("walk.edit.conflict", lang)}
             ), 409
         except SplitConflict:
+            walk_steps.note_reason("walk.split.conflict")
             return jsonify(
                 {"error": "split_conflict", "message": said("walk.split.conflict", lang)}
             ), 409
         except WalkRefused as exc:
+            walk_steps.note_reason(str(exc))
             return refused(said(str(exc), lang))
         except (ValidationError, EngineError) as exc:
+            walk_steps.note_error(type(exc).__name__)
             # Текст отказа движка или домена аудитору не уходит (F-114): он
             # пишется оператору и может нести пути и подробности. Аудитор
             # получает общий текст, подробности — в журнал сервера.
@@ -652,7 +661,8 @@ def install(
                 exc,
             )
             return refused(said("walk.err.rejected", lang))
-        except DomainError:
+        except DomainError as exc:
+            walk_steps.note_error(type(exc).__name__)
             # Прочее (битые заметки, занятый замок) — внутренности сервера:
             # пути и подробности в журнал, аудитору — общее «не вышло».
             logger.exception("Обход: запись чата %s не удалась", log_id(who))
@@ -719,6 +729,7 @@ def install(
 
     @app.post(FINDING_PATH, endpoint=FINDING_ENDPOINT)
     @timed_write(FINDING)
+    @walk_steps.logged(walk_steps.KIND_FINDING)
     def walk_finding() -> tuple[Response, int]:
         return write(_finding_op)
 

@@ -41,6 +41,7 @@ from src.recognize.models import Candidate
 from src.recognize.provenance import frame_indices
 from src.recognize.timing import collect, measure, report
 
+from . import walk_steps
 from .texts_walk import WALK_TEXTS
 from .walk_auth import HINT_ENDPOINT, HINT_PATH, SUGGEST_ENDPOINT, SUGGEST_PATH, WalkSettings
 from .walk_model_session import ModelSession
@@ -209,10 +210,12 @@ def install(
     busy, guard, gate = resources.busy, resources.guard, resources.gate
 
     def refused(key: str, lang: str, status: int = 422) -> tuple[Response, int]:
+        walk_steps.note_reason(key)
         entry = WALK_TEXTS[key]
         return jsonify({"error": "refused", "message": entry.get(lang) or entry[ui_lang]}), status
 
     @app.post(SUGGEST_PATH, endpoint=SUGGEST_ENDPOINT)
+    @walk_steps.logged(walk_steps.KIND_SUGGEST)
     @_timed_search
     def walk_suggest() -> tuple[Response, int]:
         who = identify(conf, ui_lang, header_only=True)
@@ -224,6 +227,7 @@ def install(
         inspection = get_state(who)
         if inspection is None:
             return refused("walk.none.title", ui_lang, 409)
+        walk_steps.note_run(who, inspection)
         lang = inspection.ui_lang
         if handed_over(who):
             return refused("walk.sealed", lang, 409)
@@ -274,9 +278,12 @@ def install(
             # Модель недоступна — обход не встаёт: аудитор выбирает пункт
             # вручную, как в боте. Сырой текст исключения — в журнал.
             logger.warning("Обход: модель недоступна для чата %s: %s", log_id(who), exc)
+            walk_steps.note_via(walk_steps.VIA_FALLBACK)
+            walk_steps.note_error(type(exc).__name__)
             return refused("walk.err.recognize", lang, 503)
         except (RecognizeError, DomainError) as exc:
             logger.warning("Обход: поиск пункта для чата %s не удался: %s", log_id(who), exc)
+            walk_steps.note_error(type(exc).__name__)
             return refused("walk.err.recognize", lang, 503)
         finally:
             gate.leave()
