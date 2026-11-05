@@ -161,6 +161,7 @@ def prepare_selected_level(
         photos=photos,
         allow_no_violation=True,
         clarifications=chain,
+        title=item.title,
     )
     return PreparedLevel(ask, item, item.levels, context)
 

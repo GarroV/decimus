@@ -289,6 +289,7 @@ def match_texts(
             criteria=criteria["criteria"],
             lang=_remark_lang(job.text),
             settings=cfg,
+            title=str(criteria.get("question_ru") or ""),
         )
         refining.append((job, levels))
         calls.append(ask.call)
