@@ -55,6 +55,27 @@ CASES: tuple[tuple[str, str, str, str], ...] = (
         "                if False:\n",
         T + "test_engine_repeat_doubles.py",
     ),
+    # D714 (режим процессов): D3 стоит за каждую запись, а не один раз за процесс.
+    (
+        "engine/audit.py",
+        '                "loss": d3_loss if zeroed else 0.0, "items": []}\n',
+        '                "loss": d3_loss * len(units) if zeroed else 0.0, "items": []}\n',
+        T + "test_engine_process_mode.py",
+    ),
+    # D714: один пункт в нескольких зонах больше не сворачивается в одно нарушение.
+    (
+        "engine/audit.py",
+        '    by_item = cfg.get("collapse", "item") == "item"\n',
+        "    by_item = False\n",
+        T + "test_engine_process_mode.py",
+    ),
+    # D714: D1/D2 процесса с D3 снова вычитаются.
+    (
+        "engine/audit.py",
+        '            counted = lvl == "D3" or not zeroed\n',
+        "            counted = True\n",
+        T + "test_engine_process_mode.py",
+    ),
     # Правило формулировки 2: масштаб за кадром больше не помечается.
     (
         "src/recognize/rules_check.py",

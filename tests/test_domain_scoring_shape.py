@@ -257,3 +257,20 @@ def test_отпечаток_одинаков_у_двух_копий_одной_�
     shutil.copytree(data_copy, вторая)
 
     assert scoring_shape(вторая) == scoring_shape(data_copy)
+
+
+def test_итог_по_процессам_рвёт_ряд(data_copy: Path) -> None:
+    """D714: та же проверка по зонам и по процессам — разные шкалы (70 % против 90 %).
+
+    Ряд, где смешаны обе, усреднил бы несравнимое молча, поэтому режим процессов
+    входит в отпечаток, хотя прочие правила движка в него не входят.
+    """
+    было = scoring_shape(data_copy)
+
+    def правка(тело: dict[str, object]) -> None:
+        тело["d3"] = {"mode": "once_per_process", "process_loss": 10.0}
+        тело["collapse"] = "item"
+
+    _правка_json(data_copy, правка)
+
+    assert scoring_shape(data_copy) != было
