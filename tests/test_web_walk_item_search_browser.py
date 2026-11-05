@@ -10,7 +10,7 @@ from test_web_walk_class_review_browser import ITEMS, choose, load, resolve
 from test_web_walk_ux_browser import STATIC, page  # noqa: F401
 
 CATALOGUE = [
-    ("CLN01", "Прилегающая территория загрязнена", "Порядок"),
+    ("CLN01", "Прилежащий газон, территория замусорены", "Порядок"),
     ("CLN02", "Фасад здания поврежден", "Здание"),
     ("CLN03", "Территория склада не убрана", "Порядок"),
     ("CLN04", "Мойка загрязнена", "Порядок"),
@@ -51,10 +51,10 @@ def codes(page):
 
 def test_words_match_word_starts_in_any_case(page):
     open_search(page)
-    page.locator(".walk-search").fill("прилег тер")
-    assert codes(page) == ["Прилегающая территория загрязнена"]
-    page.locator(".walk-search").fill("ПРИЛЕГ ТЕР")
-    assert codes(page) == ["Прилегающая территория загрязнена"]
+    page.locator(".walk-search").fill("прилеж газ")
+    assert codes(page) == ["Прилежащий газон, территория замусорены"]
+    page.locator(".walk-search").fill("ПРИЛЕЖ ГАЗ")
+    assert codes(page) == ["Прилежащий газон, территория замусорены"]
     page.locator(".walk-search").fill("фасад поврежд")
     assert codes(page) == ["Фасад здания поврежден"]
 
@@ -76,13 +76,13 @@ def test_every_word_is_required_and_mid_word_is_not_a_match(page):
 def test_item_starting_with_the_first_word_ranks_first(page):
     open_search(page)
     page.locator(".walk-search").fill("тер")
-    assert codes(page) == ["Территория склада не убрана", "Прилегающая территория загрязнена"]
+    assert codes(page) == ["Территория склада не убрана", "Прилежащий газон, территория замусорены"]
 
 
 def test_matched_word_starts_are_highlighted(page):
     open_search(page)
-    page.locator(".walk-search").fill("прилег тер")
-    assert page.locator(".walk-option__text mark").all_text_contents() == ["Прилег", "тер"]
+    page.locator(".walk-search").fill("прилеж газ")
+    assert page.locator(".walk-option__text mark").all_text_contents() == ["Прилеж", "газ"]
 
 
 def test_label_is_text_never_markup(page):
