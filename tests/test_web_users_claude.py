@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -128,6 +129,25 @@ def test_своё_подключение_отключается(
         assert ответ.status_code == 200, (tenant, role)
         assert память.grants["мое-подключение"].revoked is True
         assert "мое-подключение" not in ответ.get_data(as_text=True)
+
+
+def test_адреса_смоука_подключения_живые(
+    monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth
+) -> None:
+    """`tools/oauth_smoke.py` ходит на те же адреса, что и человек (#1259)."""
+    from tools.oauth_smoke import CONNECTIONS_PATH, REVOKE_PATH
+
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
+        страница = client.get(CONNECTIONS_PATH)
+        номера = re.findall(
+            r'name="connection_id" value="([^"]+)"', страница.get_data(as_text=True)
+        )
+        assert страница.status_code == 200 and номера, "смоук не найдёт подключение для отзыва"
+        ответ = client.post(
+            REVOKE_PATH, data={"connection_id": номера[0]}, headers={"Origin": СВОЙ}
+        )
+        assert ответ.status_code == 200
+        assert память.grants[номера[0]].revoked is True
 
 
 def test_чужое_подключение_не_отключается(
