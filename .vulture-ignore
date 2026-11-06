@@ -728,7 +728,6 @@ checkable
 # `after_request` — их зовёт Flask, по имени не зовёт никто; `SOURCE_IMPORT` берёт только
 # `tools/dodois_import.py`, а `tools` vulture не сканирует.
 dodois_invite_issue
-dodois_invite_options
 dodois_invite_revoke
 dodois_check
 dodois_connect

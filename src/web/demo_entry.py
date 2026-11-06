@@ -69,7 +69,6 @@ LOCKED_ENDPOINTS = frozenset(
         # Входы в Dodo IS по странам (D640): выдача и погашение ссылок, проверка настоящим
         # входом; публичная страница по ссылке тоже закрыта — демо ничего не подтверждает.
         "dodois_invite_issue",
-        "dodois_invite_options",
         "dodois_invite_revoke",
         "dodois_check",
         "dodois_connect",
