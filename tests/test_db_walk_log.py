@@ -140,7 +140,8 @@ def test_срок_хранения_тридцать_дней(токены: dict[
     _шаг(words="старый")
     with psycopg.connect(pg_dsn) as conn:
         conn.execute(
-            "update walk_log set occurred_at = now() - interval '29 days' where words = 'почти месяц'"
+            "update walk_log set occurred_at = now() - interval '29 days'"
+            " where words = 'почти месяц'"
         )
         conn.execute(
             "update walk_log set occurred_at = now() - interval '31 days' where words = 'старый'"
