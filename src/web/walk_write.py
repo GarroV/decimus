@@ -562,9 +562,21 @@ def _owns(inspection: Inspection, ref: str) -> bool:
     return any(ref in answer.photos for answer in inspection.info.values())
 
 
+#: Строка журнала процесса, по которой решают, можно ли снять совместимость без run_id.
+LEGACY_RUN_LOG = "Обход: запись без run_id (экран старше 31.10.2026, #1407)"
+
+
 def run_matches(inspection: Inspection, body: dict[str, Any]) -> bool:
-    """Old clients omit identity; new clients must match the current server run."""
-    return "run_id" not in body or body["run_id"] == inspection.run_id
+    """Old clients omit identity; new clients must match the current server run.
+
+    Запись без `run_id` принимается (#1407): экран с кодом до 31.10.2026 (#17), открытый в
+    Telegram с тех пор, её так и шлёт, а отказ потерял бы его запись. Каждый такой случай
+    пишется в журнал процесса строкой `LEGACY_RUN_LOG`: когда за 14 дней её нет в журнале
+    прода, совместимость снимается (`docs/12-web-admin.md`, «Обход: run_id»)."""
+    if "run_id" not in body:
+        logger.warning(LEGACY_RUN_LOG)
+        return True
+    return body["run_id"] == inspection.run_id
 
 
 def install(
