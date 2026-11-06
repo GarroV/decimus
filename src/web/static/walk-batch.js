@@ -475,7 +475,7 @@
   function zoneSource(r) {
     if (r.zone_source === "words") return tx("walk.batch.zone_words");
     if (r.zone_source === "human") return tx("walk.batch.zone_human");
-    if (r.zone_source === "screen") return tx("walk.batch.zone_screen");
+    if (r.zone_source === "hint" || r.zone_source === "screen") return tx("walk.batch.zone_screen");
     if (r.zone_source === "ask") return tx("walk.batch.zone_ask");
     return tx("walk.batch.zone_item");
   }
