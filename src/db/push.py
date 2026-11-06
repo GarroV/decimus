@@ -24,7 +24,7 @@ from psycopg.types.json import Json
 from src.domain import get_state
 from src.domain import score as domain_score
 from src.domain.errors import ChecklistVersionMismatch, DomainError
-from src.domain.models import Finding, Inspection, Score
+from src.domain.models import Finding, Inspection, ProcessScore, Score
 from src.domain.tenants import HQ_TENANT
 
 from .config import check_environment
@@ -145,7 +145,18 @@ def _by_zone_payload(score: Score) -> dict[str, object]:
 
 def _by_process_payload(score: Score) -> dict[str, object]:
     """Разбивка по процессам, как её вернул движок (D507): переносится, не считается."""
-    return {key: asdict(process) for key, process in score.by_process.items()}
+    return {key: _process_payload(process) for key, process in score.by_process.items()}
+
+
+#: Поля режима процессов (D714): у зонного итога их в базе нет, как не было и раньше.
+_PROCESS_MODE_FIELDS = ("model", "zeroed", "items")
+
+
+def _process_payload(process: ProcessScore) -> dict[str, object]:
+    raw = asdict(process)
+    if not process.model:
+        return {k: v for k, v in raw.items() if k not in _PROCESS_MODE_FIELDS}
+    return {**raw, "items": [dict(item) for item in process.items]}
 
 
 def _tenant_code(inspection: Inspection) -> str:

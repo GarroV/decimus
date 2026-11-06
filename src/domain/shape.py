@@ -115,6 +115,29 @@ def _зоны(каталог: Path) -> list[list[Any]]:
     return sorted(собранные, key=lambda зона: str(зона[0]))
 
 
+#: Режим D3, при котором итог сводится к процессам (D714, прототип). Значение то же,
+#: что у движка (`engine/audit.py`, `PROCESS_MODE`); движок отсюда не импортируется.
+PROCESS_MODE = "once_per_process"
+
+
+def _модель_итога(ставки: dict[str, Any]) -> dict[str, Any] | None:
+    """Модель итога, если она не зонная, — иначе `None`, и отпечаток прежний.
+
+    Исключение из «правила движка в отпечаток не входят»: итог по процессам —
+    не новая механика поверх тех же весов, а другая шкала. Одна и та же
+    проверка даёт 70 % по зонам и 90 % по процессам, и средняя по ряду, где
+    смешаны обе, — та самая правдоподобная неправда, ради которой отпечаток
+    заведён. Зонные издания ключа не получают: их отпечатки не меняются.
+    """
+    d3 = ставки.get("d3") or {}
+    if d3.get("mode") != PROCESS_MODE:
+        return None
+    return {
+        "d3": _без_подписей(d3),
+        "collapse": ставки.get("collapse", "item"),
+    }
+
+
 def scoring_shape(data_dir: Path) -> str | None:
     """Отпечаток цены этого каталога методики или `None`, если его не собрать.
 
@@ -131,6 +154,9 @@ def scoring_shape(data_dir: Path) -> str | None:
             "items": _пункты(data_dir),
             "zones": _зоны(data_dir),
         }
+        модель = _модель_итога(ставки)
+        if модель is not None:
+            форма["model"] = модель
     except (OSError, ValueError, KeyError):
         return None
     слепок = json.dumps(форма, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

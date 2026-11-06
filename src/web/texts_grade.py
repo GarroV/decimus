@@ -69,6 +69,50 @@ GRADE_TEXTS: dict[str, dict[str, str]] = {
         "en": "Did not lower the score (the zone is already zeroed by D3): {what}",
     },
     "explain.total": {"ru": "Итог — {pct}%", "en": "Total — {pct}%"},
+    # --- режим итогов по процессам (D714, прототип) --------------------------
+    "explain.d3_process": {
+        "ru": "D3 в процессе «{process}» — процесс обнулён, −{loss}%",
+        "en": "D3 in “{process}” — the process is zeroed, −{loss}%",
+    },
+    "explain.d3_process_many": {
+        "ru": "D3 × {n} в процессе «{process}» — процесс обнулён один раз, −{loss}%",
+        "en": "D3 × {n} in “{process}” — the process is zeroed once, −{loss}%",
+    },
+    "explain.skipped_process": {
+        "ru": "Не снижали балл (процесс уже обнулён D3): {what}",
+        "en": "Did not lower the score (the process is already zeroed by D3): {what}",
+    },
+    "card.proc.title": {"ru": "Итог по процессам", "en": "Result by process"},
+    "card.proc.total": {"ru": "вычтено {loss} п.п.", "en": "deducted {loss} pp"},
+    "card.proc.ok": {"ru": "OK", "en": "OK"},
+    "card.proc.zeroed": {"ru": "процесс обнулён", "en": "process zeroed"},
+    "card.proc.found": {"ru": "найдено: {zones}", "en": "found in: {zones}"},
+    "card.proc.absorbed": {
+        "ru": "не вычитается — процесс обнулён",
+        "en": "not deducted — the process is zeroed",
+    },
+    "card.proc.repeat": {"ru": "повтор", "en": "repeat"},
+    "card.proc.records": {"ru": "записей: {n}", "en": "records: {n}"},
+    "card.proc.clean": {"ru": "нарушений нет", "en": "no violations"},
+    "card.proc.tip.label": {"ru": "Как считается итог", "en": "How the result is counted"},
+    "card.proc.tip.walk": {
+        "ru": "Обход идёт по зонам, итог сводится к процессам",
+        "en": "The walk goes by zone, the result is summed up by process",
+    },
+    "card.proc.tip.once": {
+        "ru": "Одно нарушение в нескольких зонах считается один раз, по старшему классу",
+        "en": "One violation found in several zones counts once, at its highest class",
+    },
+    "card.proc.tip.d3": {
+        "ru": "D3 обнуляет процесс один раз; прочие нарушения этого процесса уже не вычитаются",
+        "en": "A D3 zeroes the process once; its other violations are no longer deducted",
+    },
+    "card.zones.addr.title": {"ru": "Зоны обхода", "en": "Walk zones"},
+    "card.zones.addr.note": {
+        "ru": "Зона — адрес находки. Потерь у зоны нет: итог считается по процессам",
+        "en": "A zone is where a finding was made. Zones lose nothing: the result is by process",
+    },
+    "card.findings.by_zone": {"ru": "Записи по зонам", "en": "Records by zone"},
     "explain.zones_only": {
         "ru": "Разбивка по классам недоступна. Вычтено по зонам:",
         "en": "The per-class split is unavailable. Deducted by zone:",

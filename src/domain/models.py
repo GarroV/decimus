@@ -277,6 +277,14 @@ class ProcessScore:
     d2: int
     d3: int
     loss: float
+    #: Режим итогов по процессам (D714, прототип): `"process"` — иначе пусто, и
+    #: три поля ниже в базу не пишутся (`db.push._by_process_payload`).
+    model: str = ""
+    #: Процесс обнулён единым D3 (только в режиме процессов).
+    zeroed: bool = False
+    #: Свёрнутые нарушения процесса, как их отдал движок: пункт, класс, зоны-адреса,
+    #: номера записей. Переносятся без пересчёта.
+    items: tuple[dict[str, Any], ...] = ()
 
     def name(self, lang: str) -> str:
         return pick_text(self.name_ru, self.name_en, lang)

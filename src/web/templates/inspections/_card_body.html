@@ -9,6 +9,7 @@
   Формулировки — на языке РЕЧИ той проверки, подписи — на языке интерфейса.
 #}
 {% from "inspections/_card_parts.html" import loss_zone_list, level_chips with context %}
+{% from "_info_tip.html" import info_tip %}
 
 {#
   Правка прямо в записях на вычитке (D535). Отдельного режима «Исправить» нет:
@@ -247,6 +248,83 @@
   {% endif %}
 {% endmacro %}
 
+{# ── Итог по процессам (D714, прототип) ─────────────────────────────────
+   Главный итог проверки в режиме процессов: процесс — статус и потеря, под ним
+   нарушения, свёрнутые по пункту, с зонами-адресами («найдено: Кухня, Склад»).
+   Числа — записанные движком, ни одно не пересчитано. Записи под пунктом —
+   только на чтение (правят их в «Записях по зонам» ниже: там свои формы). #}
+{% macro process_card(c) %}
+  <section class="ov-card ov-card--wide proc-card" data-processes>
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('card.proc.title') }}</div>
+      {{ info_tip(t('card.proc.tip.label'), '', [t('card.proc.tip.walk'), t('card.proc.tip.once'), t('card.proc.tip.d3')], 'proc-' ~ c.head.id) }}
+      <div class="ov-card__count">{{ t('card.proc.total', loss=c.detail.deductions) }}</div>
+    </div>
+    <ul class="proc">
+      {% for p in c.processes %}
+        <li class="proc__row{% if p.zeroed %} is-zeroed{% elif p.has_loss %} is-loss{% else %} is-ok{% endif %}">
+          <div class="proc__head">
+            <span class="proc__name">{{ p.name }}</span>
+            <span class="proc__counts">
+              {%- if p.counts %}{% for lvl, n, tone in p.counts %}{{ lvl }} × {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}{{ t('card.proc.clean') }}{% endif -%}
+            </span>
+            <span class="proc__status">
+              {% if p.zeroed %}<span class="tag tag--err">{{ t('card.proc.zeroed') }} · D3</span>
+              {% elif not p.has_loss %}<span class="tag tag--ok">{{ t('card.proc.ok') }}</span>{% endif %}
+              {% if p.has_loss %}<span class="mono proc__loss">−{{ p.loss }}</span>{% endif %}
+            </span>
+          </div>
+          {% if p.items %}
+            <ul class="proc__items">
+              {% for it in p.items %}
+                <li class="proc-item{% if not it.counted %} is-absorbed{% endif %}">
+                  <details class="proc-item__box">
+                    <summary class="proc-item__sum">
+                      <span class="tag {{ it.tone }} find-row__level">{{ it.level }}</span>
+                      <span class="proc-item__main">
+                        <span class="proc-item__title">{{ c.item_full(it.code) }}</span>
+                        <span class="proc-item__meta">
+                          <span class="proc-item__where">{{ t('card.proc.found', zones=it.zones|join(', ')) }}</span>
+                          {%- if it.repeat %} · {{ t('card.proc.repeat') }}{% endif %}
+                          {%- if not it.counted %} · {{ t('card.proc.absorbed') }}{% endif %}
+                          {%- if it.findings|length > 1 %} · {{ t('card.proc.records', n=it.findings|length) }}{% endif %}
+                        </span>
+                      </span>
+                      {% if it.counted and it.level != 'D3' %}<span class="mono proc-item__cost">−{{ it.cost }}</span>{% endif %}
+                    </summary>
+                    <div class="proc-item__records">
+                      {% for finding in it.findings %}{{ finding_card(c, finding, False) }}{% endfor %}
+                    </div>
+                  </details>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  {# Зоны — только адреса: сколько записей каких классов найдено, без потерь. #}
+  {% if c.zone_counts %}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('card.zones.addr.title') }}</div>
+      <div class="ov-card__count">{{ c.zone_counts|length }}</div>
+    </div>
+    <div class="ov-card__body">
+      <p class="zaddr__note">{{ t('card.zones.addr.note') }}</p>
+      <ul class="zaddr">
+        {% for z in c.zone_counts %}
+          <li><span class="zaddr__name">{{ z.name }}</span>
+            <span class="zaddr__counts">{% for lvl, n, tone in z.counts %}<span class="tag tag--micro {{ tone }}">{{ lvl }}<span class="tag__note">{{ n }}</span></span>{% endfor %}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+{% endmacro %}
+
 {% macro card_body(c, panel=False) %}
   {% set head = c.head %}
   {% set detail = c.detail %}
@@ -277,7 +355,9 @@
      D401): строки с нулями растягивали блок ни о чём. Числа — записанные, ни
      одно не пересчитано. У исторической разбивки по зонам нет (D332) —
      блока тоже нет, а не «потеряно 0». #}
-  {% if not head.is_legacy %}
+  {% if c.process_mode and not head.is_legacy %}
+  {{ process_card(c) }}
+  {% elif not head.is_legacy %}
   <section class="ov-card ov-card--wide">
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('card.zones.title') }}</div>
@@ -315,7 +395,7 @@
   {% endif %}
   <section class="ov-card ov-card--wide" data-violations data-findings{% if can_proof %} data-proofread data-proofread-data='{{ proof_data|tojson }}'{% endif %}>
     <div class="ov-card__head">
-      <div class="ov-card__title">{{ t('card.findings.title') }}</div>
+      <div class="ov-card__title">{{ t('card.findings.by_zone') if c.process_mode else t('card.findings.title') }}</div>
       {{ level_chips(c) }}
       {% if can_proof %}{{ photos_toggle(violations, photos) }}{% endif %}
       {% if can_proof %}
@@ -336,9 +416,26 @@
       {% if not photos_known %}
         <div class="ov-card__empty">{{ t('card.findings.photos_unknown') }}</div>
       {% endif %}
+      {% if c.process_mode %}
+        {#- Режим процессов (D714): записи листаются по зонам обхода — зона здесь адрес. -#}
+        {% set known = zones|map(attribute='code')|list %}
+        {% for zone in zones %}
+          {% set here = violations|selectattr('zone', 'equalto', zone.code)|list %}
+          {% if here %}
+            <div class="find-zone"><span>{{ zone.name }}</span><span class="find-zone__n">{{ here|length }}</span></div>
+            {% for finding in by_severity(here) %}{{ finding_card(c, finding, can_proof, panel) }}{% endfor %}
+          {% endif %}
+        {% endfor %}
+        {% set rest = violations|rejectattr('zone', 'in', known)|list %}
+        {% if rest %}
+          <div class="find-zone"><span>{{ t('card.findings.no_zone') }}</span><span class="find-zone__n">{{ rest|length }}</span></div>
+          {% for finding in by_severity(rest) %}{{ finding_card(c, finding, can_proof, panel) }}{% endfor %}
+        {% endif %}
+      {% else %}
       {% for finding in by_severity(violations) %}
         {{ finding_card(c, finding, can_proof, panel) }}
       {% endfor %}
+      {% endif %}
     {% else %}
       <div class="ov-card__empty">{{ t('card.findings.empty') }}</div>
     {% endif %}

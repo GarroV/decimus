@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -25,7 +26,9 @@ from src.report.letters import _run
 ДАТА = "2026-10-01"
 
 
-def _оценка(tmp_path: Path, находки: list[tuple[str, str, str]]) -> dict[str, Any]:
+def _оценка(
+    tmp_path: Path, находки: list[tuple[str, str, str]], data_dir: Path = TEST_DATA
+) -> dict[str, Any]:
     """Ответ `score --json` движка по состоянию из (код пункта, класс, зона)."""
     состояние = tmp_path / "inspection.json"
     состояние.write_text(
@@ -49,7 +52,7 @@ def _оценка(tmp_path: Path, находки: list[tuple[str, str, str]]) ->
         encoding="utf-8",
     )
     код, вывод, ошибки = _run(
-        AUDIT_SCRIPT, ["score", "--json"], data_dir=TEST_DATA, state=состояние
+        AUDIT_SCRIPT, ["score", "--json"], data_dir=data_dir, state=состояние
     )
     assert код == 0, ошибки
     return json.loads(вывод)  # type: ignore[no-any-return]
@@ -169,3 +172,23 @@ def test_pdf_собирается_по_английски_и_несёт_кадр
     данные = notice_pdf.build_pdf(_документ())
     assert данные.startswith(b"%PDF-") and len(данные) > notice_pdf.PDF_MIN_BYTES
     assert данные.count(b"/Subtype /Image") >= 2
+
+
+def test_в_режиме_процессов_берутся_нарушения_обнулённого_процесса(tmp_path: Path) -> None:
+    """D714: основание предписания — обнулённый процесс, а не зона."""
+    методика = tmp_path / "process-edition"
+    shutil.copytree(TEST_DATA, методика)
+    ставки = json.loads((методика / "scoring.json").read_text(encoding="utf-8"))
+    ставки["d3"] = {"mode": "once_per_process", "process_loss": 10.0}
+    (методика / "scoring.json").write_text(json.dumps(ставки), encoding="utf-8")
+    оценка = _оценка(
+        tmp_path,
+        [
+            ("PRD10", "D3", "fridge"),  # 1: D3 процесса заготовок — берём
+            ("PRD01", "D1", "hot_kitchen"),  # 2: тот же процесс, другая зона — берём
+            ("CLN01", "D1", "hot_kitchen"),  # 3: другой процесс — нет
+        ],
+        data_dir=методика,
+    )
+    assert оценка["model"] == "process"
+    assert notice.suggest(оценка) == frozenset({1, 2})

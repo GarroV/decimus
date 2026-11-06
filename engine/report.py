@@ -57,6 +57,17 @@ T = {
                         "стоит вдвое дороже. Буква: A — от 95% без D2 и D3; B — от 90% без D3 "
                         "и не более одного D2; C — два и более D2 либо результат ниже 90%; "
                         "D — хотя бы одно нарушение D3."),
+        "proc_zeroed": "обнулён (D3)", "proc_ok": "OK", "status": "Статус",
+        "found_in": "найдено", "absorbed": "учтено в обнулении процесса",
+        "same_as": "то же нарушение, что запись №{n}",
+        "zones_addr": "Зоны обхода", "zones_addr_note": "Зона — адрес находки; итог считается по процессам.",
+        "method_text_process": ("Старт — 100%. Обход идёт по зонам, итог сводится к процессам. "
+                                "Одно нарушение, найденное в нескольких зонах, считается один раз, "
+                                "по старшему классу. Каждое нарушение D1 снижает результат на {d1} п.п., "
+                                "каждое D2 — на {d2} п.п.; повтор записи предыдущей проверки стоит вдвое "
+                                "дороже. Нарушение D3 обнуляет процесс один раз — {d3} п.п., — и прочие "
+                                "нарушения этого процесса уже не вычитаются. Буква считается по "
+                                "нарушениям процессов, а не по записям."),
         "photo_app": "Фотоприложение",
         "photo_missing": "Фотография не приложена",
         "no_photo": "Без фотофиксации",
@@ -89,6 +100,16 @@ T = {
                         "Grade: A — 95% or above with no D2 and no D3; B — 90% or above with no D3 "
                         "and at most one D2; C — two or more D2, or a result below 90%; "
                         "D — at least one D3 violation."),
+        "proc_zeroed": "zeroed (D3)", "proc_ok": "OK", "status": "Status",
+        "found_in": "found in", "absorbed": "covered by the process reset",
+        "same_as": "same violation as record #{n}",
+        "zones_addr": "Walk zones", "zones_addr_note": "A zone is where a finding was made; the result is by process.",
+        "method_text_process": ("Starting score is 100%. The walk goes by zone, the result is summed up by "
+                                "process. One violation found in several zones counts once, at its highest "
+                                "class. Each D1 deducts {d1} pp, each D2 deducts {d2} pp; a repeat of the "
+                                "previous audit's record costs twice as much. A D3 zeroes its process once — "
+                                "{d3} pp — and the other violations of that process are no longer deducted. "
+                                "The grade counts process violations, not records."),
         "photo_app": "Photo appendix",
         "photo_missing": "Photo not attached",
         "no_photo": "No photo taken",
@@ -353,6 +374,80 @@ def deadline_text(f, t):
     return fmt_date(f.get("due")) or t["immediately"]
 
 
+def method_text(t, cfg, proc_mode):
+    """Абзац «Методика расчёта»: ставки — из `scoring.json` этой проверки."""
+    if proc_mode:
+        return t["method_text_process"].format(
+            d1=cfg["penalty"]["D1"], d2=cfg["penalty"]["D2"],
+            d3=f'{float(cfg["d3"].get("process_loss", 10.0)):g}')
+    return t["method_text"].format(d1=cfg["penalty"]["D1"], d2=cfg["penalty"]["D2"])
+
+
+def zone_mode_tables_html(res, t, nk):
+    """Итог по процессам и разбивка по зонам — зонный режим, как было до D714."""
+    h = []
+    h.append(f'<table class="d"><tr><th>{esc(t["process"])}</th>'
+             f'<th>D1</th><th>D2</th><th>D3</th><th>{esc(t["lost"])}</th></tr>')
+    procs = sorted(res["by_process"].items(), key=lambda kv: (-kv[1]["loss"], kv[1][nk]))
+    for _code, pr in procs:
+        # Прочерк — только у процесса, которому нечему быть нарушением
+        # (информационная часть, одни D0). Процесс, который оценивается и чист,
+        # обязан показать 0%: прочерк на его месте читался бы как «не смотрели».
+        lost = f'{pr["loss"]:g}%' if pr.get("scored", True) else "—"
+        h.append(f'<tr><td>{esc(pr[nk])}</td>'
+                 f'<td class="n">{pr["D1"] or ""}</td><td class="n">{pr["D2"] or ""}</td>'
+                 f'<td class="n">{pr["D3"] or ""}</td><td class="n">{lost}</td></tr>')
+    h.append("</table>")
+
+    h.append(f"<h2>{esc(t['zones'])}</h2>")
+    h.append(f'<table class="d"><tr><th>{esc(t["zone"])}</th>'
+             f'<th>D1</th><th>D2</th><th>D3</th><th>{esc(t["lost"])}</th><th>{esc(t["left"])}</th></tr>')
+    for code, z in res["zones"].items():
+        cls = ' class="z0"' if z["zeroed"] else ""
+        h.append(f'<tr{cls}><td>{esc(z[nk])}</td>'
+                 f'<td class="n">{z["D1"] or ""}</td><td class="n">{z["D2"] or ""}</td>'
+                 f'<td class="n">{z["D3"] or ""}</td><td class="n">{z["loss"]:g}%</td>'
+                 f'<td class="n">{z.get("score", 0):g}%</td></tr>')
+    h.append("</table>")
+    return h
+
+
+def process_table_html(res, t, nk, qk):
+    """D714 (прототип): процессы — главный итог; зоны — адреса находок без своей потери.
+
+    Под строкой процесса — его нарушения, свёрнутые по пункту, с зонами, где их
+    нашли. Числа — из ответа движка, своей арифметики здесь нет.
+    """
+    zone_name = {code: z[nk] for code, z in res["zones"].items()}
+    by_n = {f["n"]: f for f in res["findings"]}
+    h = [f'<table class="d"><tr><th>{esc(t["process"])}</th><th>{esc(t["status"])}</th>'
+         f'<th>D1</th><th>D2</th><th>D3</th><th>{esc(t["lost"])}</th></tr>']
+    procs = sorted(((k, p) for k, p in res["by_process"].items() if p.get("scored", True)),
+                   key=lambda kv: (not kv[1].get("zeroed"), -kv[1]["loss"], kv[1][nk]))
+    for _code, pr in procs:
+        status = t["proc_zeroed"] if pr.get("zeroed") else (t["proc_ok"] if not pr["loss"] else "")
+        cls = ' class="z0"' if pr.get("zeroed") else ""
+        h.append(f'<tr{cls}><td>{esc(pr[nk])}</td><td>{esc(status)}</td>'
+                 f'<td class="n">{pr["D1"] or ""}</td><td class="n">{pr["D2"] or ""}</td>'
+                 f'<td class="n">{pr["D3"] or ""}</td><td class="n">{pr["loss"]:g}%</td></tr>')
+        for it in pr.get("items") or ():
+            lead = by_n.get(it["lead"], {})
+            where = ", ".join(zone_name.get(z, z) for z in it["zones"])
+            extra = "" if it["counted"] else f' · {t["absorbed"]}'
+            h.append(f'<tr><td colspan="6" class="pi"><span class="badge {it["level"]}">{it["level"]}</span> '
+                     f'{esc(item_title(lead, qk) if lead else it["qid"])} — '
+                     f'{esc(t["found_in"])}: {esc(where)}{esc(extra)}</td></tr>')
+    h.append("</table>")
+    h.append(f"<h2>{esc(t['zones_addr'])}</h2><p class=\"m\">{esc(t['zones_addr_note'])}</p>")
+    h.append(f'<table class="d"><tr><th>{esc(t["zone"])}</th><th>D1</th><th>D2</th><th>D3</th></tr>')
+    for _code, z in res["zones"].items():
+        if z["D1"] or z["D2"] or z["D3"]:
+            h.append(f'<tr><td>{esc(z[nk])}</td><td class="n">{z["D1"] or ""}</td>'
+                     f'<td class="n">{z["D2"] or ""}</td><td class="n">{z["D3"] or ""}</td></tr>')
+    h.append("</table>")
+    return h
+
+
 def build_html(res, lang, photos, src=None, speech_lang=None):
     t = T[lang]
     src = Photos() if src is None else src
@@ -410,8 +505,12 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
     cfg = load_cfg()
     h.append(f"<h2>{esc(t['summary'])}</h2>")
     h.append(f'<table class="d"><tr><th>{esc(t["crit"])}</th><th>{esc(t["count"])}</th><th>{esc(t["cost"])}</th></tr>')
+    proc_mode = res.get("model") == "process"
     for lv in ("D1", "D2", "D3"):
-        if lv == "D3":
+        if lv == "D3" and proc_mode:
+            cost = "-" if not c["D3"] else ", ".join(
+                f"{p[nk]} −{p['loss']:g}%" for p in res["by_process"].values() if p.get("zeroed"))
+        elif lv == "D3":
             cost = "-" if not c["D3"] else ", ".join(
                 f"{z[nk]} → 0" for z in res["zones"].values() if z["zeroed"])
         else:
@@ -424,29 +523,10 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
     # чинить, процесс — что именно разъехалось в работе. Потеря здесь в той же
     # шкале, что и у зон, и сумма по столбцу равна общему вычету.
     h.append(f"<h2>{esc(t['processes'])}</h2>")
-    h.append(f'<table class="d"><tr><th>{esc(t["process"])}</th>'
-             f'<th>D1</th><th>D2</th><th>D3</th><th>{esc(t["lost"])}</th></tr>')
-    procs = sorted(res["by_process"].items(), key=lambda kv: (-kv[1]["loss"], kv[1][nk]))
-    for _code, pr in procs:
-        # Прочерк — только у процесса, которому нечему быть нарушением
-        # (информационная часть, одни D0). Процесс, который оценивается и чист,
-        # обязан показать 0%: прочерк на его месте читался бы как «не смотрели».
-        lost = f'{pr["loss"]:g}%' if pr.get("scored", True) else "—"
-        h.append(f'<tr><td>{esc(pr[nk])}</td>'
-                 f'<td class="n">{pr["D1"] or ""}</td><td class="n">{pr["D2"] or ""}</td>'
-                 f'<td class="n">{pr["D3"] or ""}</td><td class="n">{lost}</td></tr>')
-    h.append("</table>")
-
-    h.append(f"<h2>{esc(t['zones'])}</h2>")
-    h.append(f'<table class="d"><tr><th>{esc(t["zone"])}</th>'
-             f'<th>D1</th><th>D2</th><th>D3</th><th>{esc(t["lost"])}</th><th>{esc(t["left"])}</th></tr>')
-    for code, z in res["zones"].items():
-        cls = ' class="z0"' if z["zeroed"] else ""
-        h.append(f'<tr{cls}><td>{esc(z[nk])}</td>'
-                 f'<td class="n">{z["D1"] or ""}</td><td class="n">{z["D2"] or ""}</td>'
-                 f'<td class="n">{z["D3"] or ""}</td><td class="n">{z["loss"]:g}%</td>'
-                 f'<td class="n">{z.get("score", 0):g}%</td></tr>')
-    h.append("</table>")
+    if proc_mode:
+        h.extend(process_table_html(res, t, nk, qk))
+    else:
+        h.extend(zone_mode_tables_html(res, t, nk))
 
     h.append(f"<h2 class=\"sec-findings\">{esc(t['findings'])}</h2>")
     VIOL = ("D1", "D2", "D3")
@@ -464,7 +544,7 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
     for f in fs + advice:
         by_zone.setdefault(f[zk], []).append(f)
     for zname, lst in by_zone.items():
-        zeroed = any(x["level"] == "D3" for x in lst)
+        zeroed = not proc_mode and any(x["level"] == "D3" for x in lst)
         suffix = f" — {t['zeroed']}" if zeroed else ""
         h.append(f'<div class="zh">{esc(zname)}{esc(suffix)}</div>')
         for f in sorted(lst, key=lambda x: (order.get(x["level"], 9), x["n"])):
@@ -472,6 +552,10 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
                 h.extend(advice_html(f, t, qk, src))
                 continue
             nc = "" if f["counted"] or f["level"] == "D3" else f' · {t["not_counted"]}'
+            if proc_mode and f.get("collapsed_into"):
+                nc = f' · {t["same_as"].format(n=f["collapsed_into"])}'
+            elif proc_mode and nc:
+                nc = f' · {t["absorbed"]}'
             # Повтор назван у самой записи, а не только в разделе методики:
             # партнёр сверяет цену по строке, и вычет, выросший вдвое без
             # объяснения рядом, читается как ошибка расчёта (#359). У записи,
@@ -564,7 +648,7 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
             h.append("</div>")
 
     h.append(f'<div class="note"><b>{esc(t["method"])}.</b> '
-             + esc(t["method_text"].format(d1=cfg["penalty"]["D1"], d2=cfg["penalty"]["D2"])) + "</div>")
+             + esc(method_text(t, cfg, proc_mode)) + "</div>")
     return "<html><head><meta charset='utf-8'/></head><body>" + "".join(h) + "</body></html>"
 
 
@@ -792,6 +876,9 @@ def summary_lines(res, lang, clean):
                  else f"— критических D3: {c['D3']}, значительных D2: {c['D2']}, "
                       f"незначительных D1: {c['D1']}."]
         shown = ("D1", "D2", "D3")
+    if res.get("model") == "process":
+        lines.extend(process_letter_lines(res, lang, shown, qk))
+        return "\n".join(lines)
     by_zone = {}
     for f in res["findings"]:
         if f["level"] in shown:
@@ -800,6 +887,25 @@ def summary_lines(res, lang, clean):
         lines.extend(("", f"— {z}:"))
         lines.extend(f"• {letter_text(x, qk, lang)}" for x in lst)
     return "\n".join(lines)
+
+
+def process_letter_lines(res, lang, shown, qk):
+    """D714 (прототип): нарушения письма — по процессам, одно на пункт, с зонами-адресами."""
+    nk = "name_en" if lang == "en" else "name_ru"
+    zone_name = {code: z[nk] for code, z in res["zones"].items()}
+    by_n = {f["n"]: f for f in res["findings"]}
+    zeroed_word = "process zeroed" if lang == "en" else "процесс обнулён"
+    lines = []
+    for pr in res["by_process"].values():
+        items = [it for it in pr.get("items") or () if it["level"] in shown]
+        if not items:
+            continue
+        head = f"— {pr[nk]}" + (f" ({zeroed_word}, D3)" if pr.get("zeroed") else "") + ":"
+        lines.extend(("", head))
+        for it in items:
+            where = ", ".join(zone_name.get(z, z) for z in it["zones"])
+            lines.append(f"• {letter_text(by_n[it['lead']], qk, lang)} [{where}]")
+    return lines
 
 
 def plan_due_date(res):
