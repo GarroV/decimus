@@ -80,7 +80,8 @@ def _text(value: object) -> str:
 def _counts(raw: Mapping[str, Any]) -> tuple[tuple[str, int, str], ...]:
     out = []
     for level in ("D3", "D2", "D1"):
-        n = int(raw.get(level) or 0)
+        # В базе процесс лежит полями `ProcessScore` (`d1`…), у движка и у зоны — `D1`…
+        n = int(raw.get(level) or raw.get(level.lower()) or 0)
         if n:
             out.append((level, n, level_tone(level)))
     return tuple(out)

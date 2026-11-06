@@ -83,7 +83,7 @@ GRADE_TEXTS: dict[str, dict[str, str]] = {
         "en": "Did not lower the score (the process is already zeroed by D3): {what}",
     },
     "card.proc.title": {"ru": "Итог по процессам", "en": "Result by process"},
-    "card.proc.total": {"ru": "вычтено {loss} п.п.", "en": "deducted {loss} pp"},
+    "card.proc.total": {"ru": "вычтено {loss}%", "en": "deducted {loss}%"},
     "card.proc.ok": {"ru": "OK", "en": "OK"},
     "card.proc.zeroed": {"ru": "процесс обнулён", "en": "process zeroed"},
     "card.proc.found": {"ru": "найдено: {zones}", "en": "found in: {zones}"},

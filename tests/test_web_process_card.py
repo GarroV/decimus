@@ -59,9 +59,9 @@ def _процессы() -> dict[str, Any]:
             "scored": True,
             "model": "process",
             "zeroed": True,
-            "D1": 1,
-            "D2": 0,
-            "D3": 1,
+            "d1": 1,
+            "d2": 0,
+            "d3": 1,
             "loss": 10.0,
             "items": [
                 {
@@ -133,6 +133,7 @@ def test_процессы_главный_итог_зоны_адреса(
     assert t("card.proc.found", "ru", zones="Кухня, Склад, Зал") in страница
     assert t("card.proc.absorbed", "ru") in страница
     assert t("card.proc.ok", "ru") in страница
+    assert "D3 × 1 · D1 × 1" in страница, "счётчики процесса — из записанных полей d1/d3"
     assert t("card.zones.addr.title", "ru") in страница
     assert t("card.findings.by_zone", "ru") in страница
 
