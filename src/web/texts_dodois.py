@@ -112,6 +112,15 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
     "dodois.col.status": {"ru": "Статус", "en": "Status"},
     "dodois.col.via": {"ru": "Через кого подключено", "en": "Connected via"},
     "dodois.generate": {"ru": "Сгенерировать ссылку", "en": "Generate link"},
+    "dodois.err.passkey": {
+        "ru": "Ключ доступа не подтвердил выдачу. Попробуйте ещё раз.",
+        "en": "The passkey did not confirm. Try again.",
+    },
+    "dodois.add_passkey": {"ru": "Подключить ключ", "en": "Add a passkey"},
+    "dodois.err.no_passkey": {
+        "ru": "Чтобы выдавать ссылки, подключите ключ доступа в «Вход и защита».",
+        "en": "To issue links, add a passkey in “Sign-in and security”.",
+    },
     "dodois.issue_hint": {
         "ru": (
             "Ссылка одноразовая, живёт 24 часа и откроет вход только этой страны. "

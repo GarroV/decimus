@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 217 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 218 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -89,6 +89,7 @@
 | `/administration/dodois/<country>/check` | POST | `dodois_check` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite` | POST | `dodois_invite_issue` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite/<int:invite_id>/revoke` | POST | `dodois_invite_revoke` | `src/web/dodois_screen.py` |
+| `/administration/dodois/invite/options` | POST | `dodois_invite_options` | `src/web/dodois_screen.py` |
 | `/administration/mailings/<kind>/cc/add` | POST | `mailing_cc_add` | `src/web/mailings_screen.py` |
 | `/administration/mailings/<kind>/cc/remove` | POST | `mailing_cc_remove` | `src/web/mailings_screen.py` |
 | `/administration/mailings/<kind>/content` | POST | `mailing_content_save` | `src/web/mailings_content.py` |
