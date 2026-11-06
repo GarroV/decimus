@@ -422,3 +422,62 @@ def test_один_кадр_ложится_в_несколько_записей_�
     )
     записи = get_state(АУДИТОР).findings  # type: ignore[union-attr]
     assert [(f.code, f.photos) for f in записи] == [("CLN05", [ссылка]), ("PRD05", [ссылка])]
+
+
+def test_параллельных_вызовов_модели_не_больше_слотов_предела_а_строк_в_вызове_не_больше_общего(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import threading
+    import time
+
+    gate = walk_model_gate()
+    слотов = 2
+    занято = 0
+    while gate.try_enter():
+        занято += 1
+    for _ in range(занято):
+        gate.leave()
+    assert занято >= 1
+    # Оставляем предел в `слотов` свободных: остальные заняты на время теста.
+    держим = max(занято - слотов, 0)
+    for _ in range(держим):
+        gate.try_enter()
+    lock, сейчас, пик, звали = threading.Lock(), [0], [0], [0]
+
+    def модель(note: str, *a: Any, **kw: Any) -> Suggestion:
+        with lock:
+            сейчас[0] += 1
+            звали[0] += 1
+            пик[0] = max(пик[0], сейчас[0])
+        time.sleep(0.05)
+        with lock:
+            сейчас[0] -= 1
+        return Suggestion(candidates=(МОДЕЛЬ,), needs_human=False)
+
+    monkeypatch.setattr(ядро, "classify", модель)
+    monkeypatch.setattr(
+        walk_batch,
+        "split_violations",
+        lambda words, max_parts=8, **kw: tuple(f"дефект{n}" for n in range(max_parts)),
+    )
+    try:
+        ответ = _пакет(
+            клиент,
+            *[
+                {"id": str(n), "words": "раз два три четыре", "photos": [клиент.ссылка()]}
+                for n in range(5)
+            ],
+        )
+    finally:
+        for _ in range(держим):
+            gate.leave()
+
+    карточки = ответ.get_json()["cards"]
+    принятых = [c for c in карточки if c["status"] == "ok"]
+    assert пик[0] <= min(занято, слотов), "строки не должны обходить предел модели"
+    assert len(принятых) <= слотов and len(карточки) == 5
+    assert all(c["status"] == "busy" and c["message"] for c in карточки if c not in принятых)
+    assert sum(len(c["lines"]) for c in принятых) <= walk_batch.MAX_LINES_TOTAL
+    assert звали[0] <= walk_batch.MAX_LINES_TOTAL

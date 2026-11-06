@@ -77,8 +77,11 @@ MAX_CANDIDATES = 3
 #: Строк (нарушений), которые система находит на одной карточке сама (D713): «сколько угодно»
 #: упирается в платный класс на каждую; остальное аудитор добавляет строкой руками.
 MAX_LINES = 8
-#: Параллельных строк внутри одной карточки.
-LINE_WORKERS = 4
+#: Строк (нарушений) на весь вызов: платный путь на каждую. Делится поровну между карточками,
+#: но не меньше двух на карточку. Строки карточки идут ПО ОДНОЙ в её слоте предела модели:
+#: параллелизм вызова ограничен числом слотов, а не числом строк.
+MAX_LINES_TOTAL = 12
+MIN_LINES_PER_CARD = 2
 
 #: Статус самой карточки: `ok` — строки подобраны; `busy` и `unavailable` — карточка не прошла.
 OK = "ok"
@@ -253,27 +256,29 @@ def _line(
     return out
 
 
-def _lines_in_parallel(calls: list[Callable[[], dict[str, Any]]]) -> list[dict[str, Any]]:
-    """Строки одной карточки — параллельно, в слоте самой карточки (предел модели считает её)."""
-    if len(calls) == 1:
-        return [calls[0]()]
-    contexts = [contextvars.copy_context() for _ in calls]
-    with ThreadPoolExecutor(max_workers=min(LINE_WORKERS, len(calls))) as pool:
-        futures = [pool.submit(ctx.run, call) for ctx, call in zip(contexts, calls, strict=True)]
-    return [f.result() for f in futures]
+def _lines_in_turn(calls: list[Callable[[], dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Строки одной карточки — одна за другой, в слоте самой карточки (предел модели считает её)."""
+    return [call() for call in calls]
 
 
-def _split(words: str, lang: str) -> tuple[list[str], bool]:
+def _cap_of(cards: int) -> int:
+    """Сколько строк модель находит на одной карточке: общий предел вызова поровну."""
+    return min(MAX_LINES, max(MIN_LINES_PER_CARD, MAX_LINES_TOTAL // max(cards, 1)))
+
+
+def _split(words: str, cap: int) -> tuple[list[str], bool]:
     """Нарушения комментария и «деление не удалось». Сбой деления — комментарий одной строкой."""
     try:
-        parts = split_violations(words)
+        parts = split_violations(words, max_parts=cap)
     except (RecognizeError, OSError) as exc:
         logger.warning("Обход: комментарий пачки не поделен: %s", type(exc).__name__)
         return [words], True
     return list(parts), False
 
 
-def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None) -> dict[str, Any]:
+def _one(
+    who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None, cap: int
+) -> dict[str, Any]:
     """Одна карточка: кадры и слова → строки (по нарушению на строку), у каждой пункт, зона, класс.
 
     Слова с несколькими РАЗНЫМИ дефектами делятся на строки (`split_violations`); слов нет —
@@ -308,7 +313,7 @@ def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None
         ]
         return out
     if words:
-        parts, out["split_failed"] = _split(words, inspection.report_lang)
+        parts, out["split_failed"] = _split(words, cap)
         calls = [
             partial(
                 _line,
@@ -321,10 +326,10 @@ def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None
             )
             for n, part in enumerate(parts, 1)
         ]
-        out["lines"] = _lines_in_parallel(calls)
+        out["lines"] = _lines_in_turn(calls)
         return out
     # Кадр без слов: всё, что видит модель, — каждое отдельной строкой.
-    seen, via = _candidates_of(who, inspection, words="", refs=refs, hint=hint, limit=MAX_LINES)
+    seen, via = _candidates_of(who, inspection, words="", refs=refs, hint=hint, limit=cap)
     if not seen:
         out["lines"] = [
             {
@@ -337,7 +342,7 @@ def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None
             }
         ]
         return out
-    out["lines"] = _lines_in_parallel(
+    out["lines"] = _lines_in_turn(
         [
             partial(
                 _line,
@@ -351,7 +356,7 @@ def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None
                 via=via,
                 photo_only=True,
             )
-            for n, found in enumerate(_distinct(seen), 1)
+            for n, found in enumerate(_distinct(seen)[:cap], 1)
         ]
     )
     return out
@@ -370,7 +375,13 @@ def _distinct(found: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _guarded(
-    who: int, inspection: Inspection, raw: Any, hint: str | None, lang: str, gate: SlowGate
+    who: int,
+    inspection: Inspection,
+    raw: Any,
+    hint: str | None,
+    lang: str,
+    gate: SlowGate,
+    cap: int,
 ) -> dict[str, Any]:
     started = time.monotonic()
     ident = raw.get("id") if isinstance(raw, dict) else None
@@ -387,7 +398,7 @@ def _guarded(
     try:
         if not isinstance(raw, dict):
             raise WalkRefused("walk.err.bad_request")
-        card = _one(who, inspection, raw, hint)
+        card = _one(who, inspection, raw, hint, cap)
         card["ms"] = _since(started)
         return card
     except WalkRefused as exc:
@@ -421,10 +432,11 @@ def _said(key: str, lang: str) -> str:
 def _in_parallel(
     who: int, inspection: Inspection, cards: list[Any], hint: str | None, lang: str, gate: SlowGate
 ) -> list[dict[str, Any]]:
+    cap = _cap_of(len(cards))
     contexts = [contextvars.copy_context() for _ in cards]
     with ThreadPoolExecutor(max_workers=min(WORKERS, len(cards))) as pool:
         futures = [
-            pool.submit(ctx.run, _guarded, who, inspection, raw, hint, lang, gate)
+            pool.submit(ctx.run, _guarded, who, inspection, raw, hint, lang, gate, cap)
             for ctx, raw in zip(contexts, cards, strict=True)
         ]
     return [f.result() for f in futures]
