@@ -18,6 +18,7 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db.bot_links import (  # noqa: E402
     LINK_PREFIX,
+    bind_by_login,
     binding_of,
     issue_link,
     live_bindings,
@@ -96,6 +97,17 @@ def test_второй_telegram_гасит_прежнюю_привязку(учё
     assert resolve(501) is None
     второй = resolve(502)
     assert второй is not None and второй.login == "ge-auditor"
+
+
+def test_привязка_по_логину_берёт_только_учётку_без_привязки(учётки: dict[str, str]) -> None:
+    """#1300: список юзернеймов — дорога для непривязанных, подключённого по ней не сменить."""
+    первая = bind_by_login("ge-auditor", telegram_id=501)
+    assert первая is not None and первая.tenant == "GE"
+
+    assert bind_by_login("ge-auditor", telegram_id=666) is None
+    assert resolve(666) is None, "чужой Telegram не должен занять уже подключённую учётку"
+    хозяин = resolve(501)
+    assert хозяин is not None and хозяин.login == "ge-auditor", "прежняя привязка цела"
 
 
 def test_telegram_чужой_учётки_не_перепривязывается(учётки: dict[str, str]) -> None:
