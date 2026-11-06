@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from datetime import date
 from decimal import Decimal as D
@@ -129,21 +130,30 @@ def test_network_table_has_one_row_per_country_and_skips_non_imf(ук: FlaskClie
     assert "Poland" not in html and "Польша" in html and "Болгария" in html
     assert "Россия" not in html
     assert "Все страны" in html and "country=PL" in html
-    # Столбцы здоровья; сводной оценки и мест нет (D677).
-    for column in (
-        "РКО",
-        "РС",
+    # Сеть — как прототип аналитика (D722): оценка рядом с весом, без РС, выручки и проверки.
+    head = html[html.index("<thead>") : html.index("</thead>")]
+    top, bottom = head.split("</tr>")[:2]
+    pick = r"<a class=\"qa-sort\"[^>]*>([^<]+?)(?: [▲▼])?</a>"
+    assert re.findall(pick, top) == ["Страна", "Рейтинг, из 5"]  # на оба этажа
+    assert re.findall(pick, bottom) == [
+        "РКО, из 100",
+        "РКО adj, из 5",
         "Проверок в нед.",
-        "КР",
-        "Карты",
+        "Вес",
+        "Оценка",
+        "Вес",
+        "Оценка (G/Y)",
+        "Вес (20%)",
+        "Оценка",
+        "Вес",
         "Агрегаторы",
-        "Рейтинги",
-        "Оценки гостей, из 5",
-        "Доли заказов",
-        "Зал",
-        "Проверка",
-    ):
-        assert column in html, column
+        "Приложение и сайт",
+        "Прочее",
+    ]
+    for group in ("РКО", "КР", "Карты", "Агрегаторы", "Доли заказов"):
+        assert f'class="qa-group qa-edge">{group}<' in head, group
+    for gone in ("РС", "Зал", "Доставка", "Проверка", "Выручка"):
+        assert gone not in head, gone
 
 
 def test_country_page_shows_all_blocks_and_core_numbers(ук: FlaskClient) -> None:
@@ -189,7 +199,8 @@ def test_no_composite_score_or_ranking_anywhere(ук: FlaskClient) -> None:
 def test_country_page_shows_total_weights_and_how_it_is_computed(ук: FlaskClient) -> None:
     html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
 
-    assert "Рейтинг, из 5" in html and ">Итог<" in html and ">Веса<" in html
+    assert "Рейтинг, из 5" in html and "Вес (20%)" in html and ">Веса<" not in html
+    assert "по её строке" in html  # итог страны — по строке страны (D722)
     assert "Как считается итог" in html
     # Пороги веса РКО и вес карт — из констант, словами.
     assert "нет проверок — 0%" in html and "меньше 2 — 10%" in html
@@ -199,6 +210,7 @@ def test_country_page_shows_total_weights_and_how_it_is_computed(ук: FlaskClie
     assert "20%" in html and "Итог " in html  # колонка стран слева: «Итог … · РКО … · РС …»
     en = ук.get("/quality?country=PL&month=2026-09&lang=en").get_data(as_text=True)
     assert "How the total is computed" in en and "Rating, of 5" in en
+    assert "from its own row" in en and "Weight (20%)" in en
 
 
 def test_total_column_sorts(ук: FlaskClient) -> None:
@@ -386,5 +398,5 @@ def test_rail_says_pizzerias_count_when_country_has_units_but_no_rko_rs(
 def test_header_has_two_floors_with_groups(ук: FlaskClient) -> None:
     html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
 
-    assert 'colspan="3"' in html and 'rowspan="2"' in html
+    assert 'colspan="4"' in html and 'colspan="2"' in html and 'rowspan="2"' in html
     assert "qa-edge" in html
