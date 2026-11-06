@@ -4,6 +4,8 @@
 отдаёт заведения, что доставляют на эту точку, ВКЛЮЧАЯ закрытые сейчас
 (`available: false`). Своя точка пиццерии в своей зоне доставки всегда — если
 её нет в выдаче, её нет на Яндекс Еде (сверено на Бресте 11.10.2026).
+Хост зависит от страны (#1429): Армению `.by` не знает (отвечает пустой выдачей),
+её Додо находится на `.uz`; Беларусь — `.by`. Таблица `HOSTS`, сверено 06.11.2026.
 Карточка `GET /api/v2/catalog/{slug}?latitude&longitude` — оценка из 5,
 число оценок и координаты точки. Нужен заголовок `x-platform: desktop_web`.
 
@@ -25,9 +27,11 @@ KEY = "yandex_eda"
 # 1,5 с на проде 11.10.2026 — 12 отказов 429 на 76 пиццерий; 4 с — с запасом.
 GAP_SEC = 4.0
 SCALE = 5
-HOST = "https://eda.yandex.by"
-SEARCH = HOST + "/eats/v1/full-text-search/v1/search"
-CARD = HOST + "/api/v2/catalog/{slug}?latitude={lat}&longitude={lng}"
+#: Зона Яндекс Еды по стране; по умолчанию `.by`. Эти же зоны разрешает ретранслятор.
+DEFAULT_ZONE = "by"
+HOSTS = {"BY": "by", "AM": "uz", "KG": "by"}
+SEARCH = "/eats/v1/full-text-search/v1/search"
+CARD = "/api/v2/catalog/{slug}?latitude={lat}&longitude={lng}"
 HEADERS = {"x-platform": "desktop_web"}
 #: Страны IMF, где Яндекс Еда работает и где искать Додо (сверено 11.10.2026).
 COUNTRIES = frozenset({"BY", "AM", "KG"})
@@ -66,7 +70,13 @@ def places(payload: object) -> dict[str, bool | None]:
     return found
 
 
-def card(payload: object, slug: str, is_open: bool | None) -> Found | None:
+def zone_of(country: str) -> str:
+    return HOSTS.get(country, DEFAULT_ZONE)
+
+
+def card(
+    payload: object, slug: str, is_open: bool | None, zone: str = DEFAULT_ZONE
+) -> Found | None:
     place = dig(payload, "payload", "foundPlace", "place")
     if not isinstance(place, dict):
         return None
@@ -75,7 +85,7 @@ def card(payload: object, slug: str, is_open: bool | None) -> Found | None:
     return Found(
         point_key=slug,
         name=str(place.get("name") or ""),
-        url=f"{HOST}/r/{brand}?placeSlug={slug}",
+        url=f"https://eda.yandex.{zone}/r/{brand}?placeSlug={slug}",
         lat=number(dig(place, "address", "location", "latitude")),
         lng=number(dig(place, "address", "location", "longitude")),
         score=number(place.get("rating")),
@@ -92,7 +102,7 @@ def search(
 ) -> list[Found]:
     relay = relay_base()
     try:
-        return _search(http, lat, lng, cache, relay)
+        return _search(http, lat, lng, cache, relay, zone_of(country))
     except AggregatorError as exc:
         if not relay:
             raise
@@ -100,20 +110,26 @@ def search(
 
 
 def _search(
-    http: Http, lat: float, lng: float, cache: MutableMapping[str, object], relay: str
+    http: Http, lat: float, lng: float, cache: MutableMapping[str, object], relay: str, zone: str
 ) -> list[Found]:
-    search_url = f"{relay}/yandex/search" if relay else SEARCH
+    # Зону ретранслятору говорим, только когда она не по умолчанию: старый
+    # ретранслятор параметра не знает и отвечал бы 404 даже Беларуси.
+    host_arg = f"&host={zone}" if zone != DEFAULT_ZONE else ""
+    origin = f"https://eda.yandex.{zone}"
+    search_url = (
+        f"{relay}/yandex/search{host_arg.replace('&', '?', 1)}" if relay else origin + SEARCH
+    )
     found = []
     body = {"text": "Додо", "location": {"latitude": lat, "longitude": lng}}
     for slug, is_open in places(http.post(search_url, body, HEADERS)).items():
         key = f"{KEY}:{slug}"
         if key not in cache:
             card_url = (
-                f"{relay}/yandex/catalog/{slug}?latitude={lat}&longitude={lng}"
+                f"{relay}/yandex/catalog/{slug}?latitude={lat}&longitude={lng}{host_arg}"
                 if relay
-                else CARD.format(slug=slug, lat=lat, lng=lng)
+                else origin + CARD.format(slug=slug, lat=lat, lng=lng)
             )
-            fresh = card(http.get(card_url, HEADERS), slug, is_open)
+            fresh = card(http.get(card_url, HEADERS), slug, is_open, zone)
             if fresh is None:
                 # Ответ 200 без заведения — площадка или ретранслятор отдал не то: это
                 # сбой, а не «точки нет». В кэш не кладём, повтор спросит заново.

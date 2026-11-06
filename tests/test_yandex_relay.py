@@ -124,7 +124,7 @@ def ретранслятор(
         зовы.append((url, body))
         if ответ["raise"]:
             raise ответ["raise"]
-        данные = ответ["search"] if url == migros_relay.YANDEX_SEARCH else ответ["card"]
+        данные = ответ["search"] if url.endswith(migros_relay.YANDEX_SEARCH) else ответ["card"]
         return ответ["status"], _тело(данные)
 
     monkeypatch.setattr(migros_relay, "fetch", яндекс)
@@ -162,10 +162,70 @@ def test_ретранслятор_отдаёт_поиск_и_карточку(
         ("dodo_kwls7", 4.6, 870, True)
     ]
     assert _адреса(зовы) == [
-        migros_relay.YANDEX_SEARCH,
+        "https://eda.yandex.by" + migros_relay.YANDEX_SEARCH,
         "https://eda.yandex.by/api/v2/catalog/dodo_kwls7?latitude=53.9&longitude=27.5667",
     ]
     assert json.loads(зовы[0][1] or b"") == ТЕЛО
+
+
+def test_армения_идёт_на_хост_uz_через_ретранслятор(
+    monkeypatch: pytest.MonkeyPatch, ретранслятор: tuple[str, list[Any], dict[str, Any]]
+) -> None:
+    адрес, зовы, _ = ретранслятор
+    найдено = yandex_eda.search(_http(monkeypatch, адрес), 40.18, 44.51, "AM", {})
+    assert [p.point_key for p in найдено] == ["dodo_kwls7"]
+    assert найдено[0].url.startswith("https://eda.yandex.uz/")
+    assert _адреса(зовы) == [
+        "https://eda.yandex.uz" + migros_relay.YANDEX_SEARCH,
+        "https://eda.yandex.uz/api/v2/catalog/dodo_kwls7?latitude=40.18&longitude=44.51",
+    ]
+
+
+def test_беларусь_не_шлёт_параметр_хоста_старому_ретранслятору(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(migros.RELAY_VAR, "https://relay.example")
+    адреса: list[str] = []
+
+    class Заглушка:
+        def post(self, url: str, body: object, headers: object = None) -> object:
+            адреса.append(url)
+            return ВЫДАЧА
+
+        def get(self, url: str, headers: object = None) -> object:
+            адреса.append(url)
+            return КАРТОЧКА
+
+    yandex_eda.search(Заглушка(), 53.9, 27.5, "BY", {})  # type: ignore[arg-type]
+    assert all("host=" not in url for url in адреса)
+    адреса.clear()
+    yandex_eda.search(Заглушка(), 40.18, 44.51, "AM", {})  # type: ignore[arg-type]
+    assert all("host=uz" in url for url in адреса) and len(адреса) == 2
+
+
+@pytest.mark.parametrize(
+    ("путь", "ожидание"),
+    [
+        ("/yandex/search", "https://eda.yandex.by/eats/v1/full-text-search/v1/search"),
+        ("/yandex/search?host=by", "https://eda.yandex.by/eats/v1/full-text-search/v1/search"),
+        ("/yandex/search?host=uz", "https://eda.yandex.uz/eats/v1/full-text-search/v1/search"),
+        ("/yandex/search?host=ru", None),
+        ("/yandex/search?host=evil.com", None),
+        ("/yandex/search?host=uz&x=1", None),
+    ],
+)
+def test_хост_поиска_только_из_списка(путь: str, ожидание: str | None) -> None:
+    assert migros_relay.yandex_search_target(путь) == ожидание
+
+
+def test_хост_карточки_только_из_списка() -> None:
+    база = "/yandex/catalog/dodo_x?latitude=40.1&longitude=44.5"
+    assert (migros_relay.yandex_card_target(база) or "").startswith("https://eda.yandex.by/")
+    assert (migros_relay.yandex_card_target(база + "&host=uz") or "").startswith(
+        "https://eda.yandex.uz/"
+    )
+    assert migros_relay.yandex_card_target(база + "&host=ru") is None
+    assert migros_relay.yandex_card_target(база + "&host=uz/../x") is None
 
 
 def _адреса(зовы: list[tuple[str, bytes | None]]) -> list[str]:
@@ -234,7 +294,7 @@ def test_без_адреса_ходит_напрямую(monkeypatch: pytest.Mon
             return {}
 
     assert yandex_eda.search(Заглушка(), 1.0, 2.0, "BY", {}) == []  # type: ignore[arg-type]
-    assert адреса == [yandex_eda.SEARCH]
+    assert адреса == ["https://eda.yandex.by" + yandex_eda.SEARCH]
 
 
 def test_без_адреса_сбой_без_переписанной_причины(monkeypatch: pytest.MonkeyPatch) -> None:
