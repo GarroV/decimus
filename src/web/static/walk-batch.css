@@ -55,6 +55,18 @@
 .walk-batch__badge.is-doubt { color: var(--warn); }
 .walk-batch__drop { margin-left: auto; width: 32px; height: 32px; border: 0; border-radius: 16px; background: var(--surface-2); color: var(--ink-2); font: inherit; cursor: pointer; }
 
+/* Строки карточки (D713): по нарушению на строку, у каждой свой пункт, зона, класс. */
+.walk-batch__lines { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.walk-batch__line { min-width: 0; padding: 8px 10px; border: 1px solid var(--line-control); border-radius: 10px; background: var(--surface); }
+.walk-batch__line.is-ready { border-color: var(--ok-line); }
+.walk-batch__line.is-doubt { border-color: var(--warn); }
+.walk-batch__line.is-saved { opacity: .75; }
+.walk-batch__linehead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.walk-batch__linen { font-weight: 600; font-size: 13px; }
+.walk-batch__linehead .walk-batch__drop { width: 28px; height: 28px; }
+.walk-batch__said { margin: 0 0 6px; font-size: 14px; line-height: 20px; color: var(--ink-2); overflow-wrap: anywhere; }
+.walk-batch__more { margin-top: 8px; }
+
 .walk-batch__result { margin-top: 8px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .walk-batch__item, .walk-batch__zone, .walk-batch__class, .walk-batch__ask { margin: 0; font-size: 14px; line-height: 20px; }
 .walk-batch__zone { color: var(--ink-2); }

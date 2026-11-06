@@ -28,6 +28,11 @@ TEXTS = {
     "walk.batch.dup_ask": "Is it the same issue or a different one?",
     "walk.batch.dup_attach": "The same: add photos",
     "walk.batch.dup_other": "Different: record separately",
+    "walk.batch.line": "Issue {n}",
+    "walk.batch.add_line": "+ another issue on this photo",
+    "walk.batch.line_find": "Find the item",
+    "walk.batch.saved": "Saved",
+    "walk.batch.item_ok": "The item is correct",
 }
 
 PIXEL = (
@@ -113,8 +118,15 @@ def start(page, replies, recorded=None):
       W.offline={available:()=>false,register:()=>()=>{},remove(){},kick(){},watch(){}};
       W.voiceBar=null; W.haptic=()=>{}; W.toast=()=>{}; W.apply=()=>{};
       window.written=[]; window.asked=[];
+      // A reply is either one server line (wrapped into a card) or a whole card with `lines`.
+      const card=(c,r)=>{
+        if(r.lines) return {id:c.id,status:'ok',...r};
+        if(r.status==='unavailable'||r.status==='busy')
+          return {id:c.id,status:r.status,message:r.message,lines:[]};
+        return {id:c.id,status:'ok',lines:[{...r,id:c.line||c.id+'-1',words:c.words}]};};
       W.post=async(url,body)=>{asked.push(body);
-        return {ok:true,status:200,body:{run_id:'r',cards:body.cards.map((c,i)=>replies[i])}};};
+        const cards=body.cards.map((c,i)=>card(c,replies[i]));
+        return {ok:true,status:200,body:{run_id:'r',cards}};};
       W.api.write=async(url,body)=>{written.push(body);
         return {ok:true,status:200,body:{run_id:'r'}};};
       W.urls.batch='/batch'; W.urls.finding='/finding';
@@ -406,3 +418,250 @@ def test_after_the_search_the_list_starts_at_the_first_card(page):
         - document.querySelector('.walk-sheet__body').getBoundingClientRect().top"""
     )
     assert 0 <= top <= 16, "the first card is at the top of the list, not scrolled away"
+
+
+# ── several issues on one photo (D713) ───────────────────────────────────────
+
+
+def line(line_id, code, zone, class_, words, **extra):
+    """One server line of a card (what `walk_batch._line` answers)."""
+    return {**found(line_id, code, zone, "screen", class_), "words": words, **extra}
+
+
+def card_with(*lines):
+    return {"lines": list(lines)}
+
+
+def test_split_comment_gives_a_line_per_defect_each_saved_as_its_own_record(page):
+    start(
+        page,
+        [
+            card_with(
+                line("c1-1", "ITM1", "zone_a", READY_D2, "floor is dirty"),
+                line("c1-2", "ITM2", "zone_b", verdict("ready", "D1"), "door does not close"),
+            )
+        ],
+    )
+    add_photos(page, 1)
+    page.locator("[data-batch-words]").fill("floor is dirty, door does not close")
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-line]")
+
+    assert page.locator("[data-batch-line]").count() == 2
+    assert page.locator("[data-batch-card]").count() == 1, "one photo, one card"
+    # The limit of 5 counts photos: two issues on one photo leave room for four more.
+    assert page.locator("[data-batch-input]").count() == 1
+    assert page.locator("[data-batch-save]").inner_text() == "Save all ready (2)"
+
+    page.locator("[data-batch-save]").click()
+    page.wait_for_function("written.length === 2")
+    first, second = written(page)
+    assert (first["code"], first["words"], second["code"], second["words"]) == (
+        "ITM1",
+        "floor is dirty",
+        "ITM2",
+        "door does not close",
+    )
+    assert first["photos"] == second["photos"] and len(first["photos"]) == 1, (
+        "the same photo goes to every record of the card"
+    )
+    assert page.locator("[data-batch-save]").is_disabled(), "nothing is saved twice"
+
+
+def test_photo_only_card_lists_every_violation_and_each_needs_its_approval(page):
+    lines = [
+        line(f"c1-{n}", code, "zone_a", READY_D2, "", photo_only=True, wording=f"Seen {n}")
+        for n, code in ((1, "ITM1"), (2, "ITM2"), (3, "ITM1"))
+    ]
+    lines[1]["zone"] = lines[2]["zone"] = "zone_b"  # zone_a has a repeat question for ITM2
+    start(page, [card_with(*lines)])
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-line]")
+
+    assert page.locator("[data-batch-line]").count() == 3
+    assert page.locator("[data-batch-seen]").count() == 3
+    assert page.locator("[data-batch-save]").is_disabled(), "no line is approved yet"
+
+    page.locator("[data-batch-item-ok]").nth(0).click()
+    page.locator("[data-batch-item-ok]").nth(1).click()
+    assert page.locator("[data-batch-save]").inner_text() == "Save all ready (2)"
+    page.locator("[data-batch-save]").click()
+    page.wait_for_function("written.length === 2")
+    assert [w["text"] for w in written(page)] == ["Seen 1", "Seen 2"]
+    assert all(w["words"] == "" for w in written(page))
+    assert page.locator("[data-batch-line]:not(.is-saved)").count() == 1
+    assert page.locator("[data-batch-save]").is_disabled(), "the unapproved line stays unsaved"
+
+
+def test_text_lines_need_no_approval_button(page):
+    start(page, [card_with(line("c1-1", "ITM1", "zone_a", READY_D2, "dirty shelf"))])
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-line]")
+
+    assert page.locator("[data-batch-item-ok]").count() == 0
+    assert page.locator("[data-batch-save]").is_enabled(), "a text card behaves as before"
+
+
+def test_a_line_can_be_removed_and_is_then_not_saved(page):
+    start(
+        page,
+        [
+            card_with(
+                line("c1-1", "ITM1", "zone_a", READY_D2, "one thing"),
+                line("c1-2", "ITM2", "zone_b", verdict("ready", "D1"), "other thing"),
+            )
+        ],
+    )
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-line]")
+
+    page.locator("[data-batch-line-drop]").nth(0).click()
+    page.locator("[data-batch-save]").click()
+    page.wait_for_function("written.length === 1")
+    assert [w["code"] for w in written(page)] == ["ITM2"]
+
+
+def test_another_issue_on_this_photo_adds_a_manual_line_searched_by_its_own_words(page):
+    start(page, [line("c1-1", "ITM1", "zone_a", READY_D2, "dirty shelf")])
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-add-line]")
+
+    page.locator("[data-batch-add-line]").click()
+    assert page.locator("[data-batch-line-find]").is_disabled(), "no words, nothing to search"
+    page.evaluate(
+        """()=>{const first=asked[0].cards[0];
+        DecimusWalk.post=async(url,body)=>{asked.push(body);
+          const c=body.cards[0];
+          return {ok:true,status:200,body:{run_id:'r',cards:[{id:c.id,status:'ok',lines:[
+            {id:c.line,status:'found',code:'ITM2',zone:'zone_b',zone_source:'words',
+             zone_options:['zone_b'],words:c.words,candidates:[{code:'ITM2'}],
+             suggested:{code:'ITM2',level:'D1',zone:'zone_b',confidence:.7},
+             class:{status:'ready',level:'D1',provisional_level:null,need_fact:'',reason:''}}]}]}};}}"""
+    )
+    page.locator("[data-batch-line-words]").fill("cracked lid")
+    page.locator("[data-batch-line-find]").click()
+    page.wait_for_function("document.querySelectorAll('[data-batch-line].is-ready').length === 2")
+
+    sent = page.evaluate("asked[asked.length-1].cards[0]")
+    assert sent["words"] == "cracked lid" and sent["line"], "only this line is searched"
+    assert len(sent["photos"]) == 1, "the photo goes with it"
+    page.locator("[data-batch-save]").click()
+    page.wait_for_function("written.length === 2")
+    assert [w["code"] for w in written(page)] == ["ITM1", "ITM2"]
+    assert written(page)[0]["photos"] == written(page)[1]["photos"]
+
+
+def test_repeat_question_is_asked_for_each_line_separately(page):
+    start(
+        page,
+        [
+            card_with(
+                line("c1-1", "ITM2", "zone_a", verdict("ready", "D1"), "first"),
+                line("c1-2", "ITM1", "zone_a", verdict("ready", "D1"), "second"),
+            )
+        ],
+    )
+    page.evaluate(
+        """()=>DecimusWalk.state.data.zones[0].previous.push(
+          {code:'ITM1',level:'D1',text:'Old two',again:false})"""
+    )
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-repeat]")
+
+    assert page.locator("[data-batch-repeat]").count() == 2
+    assert page.locator("[data-batch-save]").is_disabled(), "neither question is answered"
+    page.locator("[data-batch-repeat-yes]").nth(0).click()
+    assert page.locator("[data-batch-save]").inner_text() == "Save all ready (1)"
+    page.locator("[data-batch-repeat-no]").nth(1).click()
+    page.locator("[data-batch-save]").click()
+    page.wait_for_function("written.length === 2")
+    assert [(w["code"], w["repeat"]) for w in written(page)] == [("ITM2", True), ("ITM1", False)]
+
+
+def test_already_recorded_question_is_asked_per_line_with_the_earlier_photo(page):
+    start(
+        page,
+        [
+            card_with(
+                line("c1-1", "ITM1", "zone_a", READY_D2, "dirty shelf"),
+                line("c1-2", "ITM2", "zone_b", verdict("ready", "D1"), "other"),
+            )
+        ],
+        recorded=[RECORDED],
+    )
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-same]")
+
+    assert page.locator("[data-batch-same]").count() == 1, "only the line that matches asks"
+    assert page.locator("[data-batch-same] img.walk-thumb__img").count() == 1
+    assert page.locator("[data-batch-save]").inner_text() == "Save all ready (1)"
+
+
+def test_a_card_with_several_lines_does_not_widen_the_sheet_at_360px(page):
+    page.set_viewport_size({"width": 360, "height": 740})
+    lines = [
+        line(
+            f"c1-{n}",
+            code,
+            "zone_a",
+            READY_D2,
+            LONG_WORD,
+            photo_only=n == 3,
+            wording=LONG_WORD,
+        )
+        for n, code in ((1, "ITM1"), (2, "ITM2"), (3, "ITM1"))
+    ]
+    start(page, [card_with(*lines)], recorded=[{**RECORDED, "words": LONG_WORD}])
+    page.evaluate(
+        """w=>{const D=DecimusWalk.state.data;
+        D.items.forEach(i=>{i.q=w; i.label=w;}); D.zones[1].title=w;}""",
+        LONG_WORD,
+    )
+    add_photos(page, 1)
+    page.locator("[data-batch-words]").fill(LONG_WORD + " " + LONG_WORD)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-line]")
+    page.locator("[data-batch-add-line]").click()
+
+    got = page.evaluate(
+        """()=>{const body=document.querySelector('.walk-batch .walk-sheet__body');
+        const vw=innerWidth;
+        const wide=[...document.querySelectorAll('.walk-batch *')].filter(e=>{
+          const r=e.getBoundingClientRect(); return r.width && (r.right>vw+0.5||r.left<-0.5)})
+          .map(e=>e.tagName+'.'+e.className);
+        const doc=Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+        return {doc, vw, body:[body.scrollWidth, body.clientWidth], wide}}"""
+    )
+    assert got["doc"] <= got["vw"], got
+    assert got["body"][0] <= got["body"][1], got
+    assert got["wide"] == [], got
+
+
+def test_single_form_opens_with_the_photos_of_the_record_just_saved(page):
+    """«Another item from this photo»: a new record opens with the same photos attached."""
+    page.evaluate(
+        """()=>{
+      const W=DecimusWalk;
+      W.state.data={run_id:'r',checklist_version:'v',key:'k',texts:{},item_aliases:{},
+        items:[],zones:[{code:'zone_a',title:'A',recorded:[],previous:[]}]};
+      window.shown=[];
+      W.photo={block:(photos)=>{shown.push(photos.map(p=>[p.ref,p.state]));return W.el('div');},
+        closeCamera:()=>false};
+      W.offline={available:()=>false,recovery:async()=>[]};
+      W.voiceBar=W.translateBar=()=>null; W.local.drop=()=>{};
+      W.post=()=>Promise.resolve({ok:true,body:{candidates:[]}});
+    }"""
+    )
+    for name in ("walk-menu.js", "walk-class-review.js", "walk-sheet.js"):
+        page.add_script_tag(path=str(STATIC / name))
+    page.evaluate(
+        "DecimusWalk.sheet.open({mode:'violation',hint:'zone_a',photos:['walk:aaa','walk:bbb']})"
+    )
+
+    assert page.evaluate("shown[shown.length-1]") == [["walk:aaa", "done"], ["walk:bbb", "done"]]

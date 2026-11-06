@@ -1030,6 +1030,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/schema.py` | T031: схема ответа модели |
 | `src/recognize/selected_level.py` | Selected-item criterion request and a result bound to the exact factual context |
 | `src/recognize/shortlist.py` | T030: перечень кандидатов, который уходит в запрос к модели |
+| `src/recognize/split.py` | Разделить комментарий аудитора на отдельные нарушения (D713) |
 | `src/recognize/timing.py` | #1253: monotonic request-local timing; never captures input or model output |
 | `src/recognize/transcribe.py` | T033: голосовое сообщение аудитора → текст |
 | `src/recognize/translate.py` | Перевод свободного текста аудитора на язык отчёта (D394, #542) |

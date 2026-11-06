@@ -2144,12 +2144,19 @@
   }
 
   /** «Записано: <зона>»; зона не та, что на экране, — со ссылкой «Перейти» (D445). */
-  function savedToast(zoneCode) {
+  function savedToast(zoneCode, more) {
     var z = zoneOf(zoneCode);
-    if (!z) { W.toast(tx("walk.sheet.saved"), "ok"); return; }
+    var actions = more ? [more] : [];
+    if (!z) { W.toast(tx("walk.sheet.saved"), "ok", actions); return; }
     var text = tx("walk.sheet.saved_in", { zone: z.title });
-    if (zoneCode === W.state.open || !W.goZone) { W.toast(text, "ok"); return; }
-    W.toast(text, "ok", { label: tx("walk.sheet.saved_go"), run: function () { W.goZone(zoneCode); } });
+    if (zoneCode !== W.state.open && W.goZone) actions.unshift({ label: tx("walk.sheet.saved_go"), run: function () { W.goZone(zoneCode); } });
+    W.toast(text, "ok", actions);
+  }
+
+  /** «Ещё пункт с этим фото» (D713): новая запись с теми же кадрами уже приложенными. */
+  function photoAgain(form, refs) {
+    if (form.n || form.mode !== "violation" || !refs.length) return null;
+    return { label: tx("walk.sheet.photo_again"), run: function () { open({ mode: "violation", hint: form.hint, photos: refs.slice() }); } };
   }
 
   function submit(list) {
@@ -2211,7 +2218,7 @@
       } else if (W.editDraft) W.editDraft.clear(form);
       W.haptic("success");
       if (remaining && remaining.length) W.toast(tx("walk.sheet.remaining_material", { n: remaining.length }), "warn");
-      else savedToast(at);
+      else savedToast(at, photoAgain(form, confirmed));
       close(true);
       if (last) W.apply(last);
     }, function (err) {
@@ -2373,6 +2380,9 @@
       if (rec.reading_c !== null && rec.reading_c !== undefined) setReading(rec.reading_c);
       f.original = { code: rec.code, level: rec.level, zone: opts.zone, text: rec.text, comment: rec.comment || "", repeat: !!rec.repeat, reading: rec.reading_c === undefined ? null : rec.reading_c };
       if (W.editDraft) W.editDraft.init(f, rec);
+    } else if (opts.photos && opts.photos.length) {
+      // Кадры уже записанного нарушения — к новому пункту (D713); черновик не поднимается.
+      f.photos = opts.photos.map(function (ref) { return { id: ++seq, ref: ref, own: true, state: "done", fresh: true }; });
     } else {
       var draft = loadDraft();
       if (draft && !opts.code && draft.mode === f.mode && (draft.code || draft.words || draft.text || draft.comment || (draft.photos || []).length)) {

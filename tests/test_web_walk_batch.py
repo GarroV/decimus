@@ -48,6 +48,8 @@ def подмена(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
         return dict(КЛАСС)
 
     monkeypatch.setattr(walk_batch, "_level", класс)
+    # Деление комментария — отдельный платный шаг: по умолчанию комментарий одно нарушение.
+    monkeypatch.setattr(walk_batch, "split_violations", lambda words, **kw: (words,))
     return спросили
 
 
@@ -72,7 +74,7 @@ def test_зона_называется_в_комментарии_и_берётс
     )
 
     assert ответ.status_code == 200, ответ.get_json()
-    названа, не_названа = ответ.get_json()["cards"]
+    названа, не_названа = (c["lines"][0] for c in ответ.get_json()["cards"])
     assert (названа["zone"], названа["zone_source"]) == ("hot_kitchen", "words")
     # Зона не названа — зона экрана, и источник об этом говорит (карточка подпишет «текущая»).
     assert не_названа["zone"] == "dough"
@@ -90,7 +92,7 @@ def test_подбор_ничего_не_пишет_и_повтор_сам_не_�
         клиент, {"id": "a", "words": "нагар", "photos": [клиент.ссылка()]}, zone_hint="hot_kitchen"
     )
 
-    карточка = ответ.get_json()["cards"][0]
+    карточка = ответ.get_json()["cards"][0]["lines"][0]
     assert карточка["status"] == "found" and карточка["class"]["level"] == "D2"
     assert "repeat" not in карточка, "повтор решает человек, подбор его не предлагает как факт"
     assert get_state(АУДИТОР).findings == []  # type: ignore[union-attr]
@@ -111,7 +113,7 @@ def test_зона_и_пункт_человека_сильнее_подбора(
         },
     )
 
-    карточка = ответ.get_json()["cards"][0]
+    карточка = ответ.get_json()["cards"][0]["lines"][0]
     assert (карточка["code"], карточка["zone"], карточка["zone_source"]) == (
         "CLN05",
         "dough",
@@ -132,8 +134,8 @@ def test_сбой_одной_карточки_не_роняет_остальны
     )
 
     плохая, хорошая = ответ.get_json()["cards"]
-    assert плохая["status"] == "unavailable" and плохая["message"]
-    assert хорошая["status"] == "found"
+    assert плохая["status"] == "unavailable" and плохая["message"] and плохая["lines"] == []
+    assert хорошая["lines"][0]["status"] == "found"
 
 
 def test_пустой_и_слишком_большой_пакет_отклоняются(клиент: Клиент) -> None:  # noqa: F811
@@ -249,7 +251,7 @@ def test_карточка_без_слов_идёт_путём_кадра_и_по
         zone_hint="dough",
     )
 
-    без_слов, со_словами = ответ.get_json()["cards"]
+    без_слов, со_словами = (c["lines"][0] for c in ответ.get_json()["cards"])
     assert без_слов["photo_only"] is True and со_словами["photo_only"] is False
     assert без_слов["status"] == "found" and без_слов["wording"], "модель описала кадр"
     assert без_слов["zone"] == "dough", "зона для карточки без слов — зона экрана"
@@ -261,3 +263,162 @@ def test_слишком_большое_тело_отклоняется_до_ра
     карточка = {"id": "a", "words": "x" * 200_000, "photos": []}
 
     assert _пакет(клиент, карточка).status_code == 413
+
+
+ПОЛ = Candidate(code="CLN05", level="D2", zone="fridge", wording="Пол грязный.", confidence=0.9)
+ДВЕРЬ = Candidate(code="PRD05", level="D1", zone="fridge", wording="Дверь.", confidence=0.9)
+
+
+def test_комментарий_с_разными_дефектами_делится_и_у_каждой_строки_свой_пункт(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    искали: list[str] = []
+
+    def модель(note: str, *a: Any, **kw: Any) -> Suggestion:
+        искали.append(note)
+        return Suggestion(candidates=(ПОЛ if "пол" in note else ДВЕРЬ,), needs_human=False)
+
+    monkeypatch.setattr(ядро, "classify", модель)
+    monkeypatch.setattr(
+        walk_batch,
+        "split_violations",
+        lambda words, **kw: ("пол грязный", "дверь не закрывается"),
+    )
+
+    ответ = _пакет(
+        клиент,
+        {"id": "a", "words": "пол грязный, дверь не закрывается", "photos": [клиент.ссылка()]},
+        zone_hint="fridge",
+    )
+
+    (карточка,) = ответ.get_json()["cards"]
+    пол, дверь = карточка["lines"]
+    assert (пол["code"], пол["words"]) == ("CLN05", "пол грязный")
+    assert (дверь["code"], дверь["words"]) == ("PRD05", "дверь не закрывается")
+    assert пол["id"] != дверь["id"]
+    assert sorted(искали) == ["дверь не закрывается", "пол грязный"], "каждая строка ищет сама"
+    assert len(подмена) == 2, "класс считается на каждую строку"
+
+
+def test_один_дефект_с_местом_остаётся_одной_строкой(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+) -> None:
+    ответ = _пакет(
+        клиент,
+        {"id": "a", "words": "грязный пол у двери", "photos": [клиент.ссылка()]},
+        zone_hint="fridge",
+    )
+
+    (карточка,) = ответ.get_json()["cards"]
+    assert [x["words"] for x in карточка["lines"]] == ["грязный пол у двери"]
+
+
+def test_сбой_деления_оставляет_комментарий_одной_строкой_и_говорит_об_этом(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.recognize.errors import ModelUnavailable
+
+    def упало(words: str, **kw: Any) -> tuple[str, ...]:
+        raise ModelUnavailable("нет связи")
+
+    monkeypatch.setattr(walk_batch, "split_violations", упало)
+
+    ответ = _пакет(
+        клиент,
+        {"id": "a", "words": "пол грязный, дверь не закрывается", "photos": [клиент.ссылка()]},
+        zone_hint="fridge",
+    )
+
+    (карточка,) = ответ.get_json()["cards"]
+    assert [x["words"] for x in карточка["lines"]] == ["пол грязный, дверь не закрывается"]
+    assert карточка["split_failed"] is True
+
+
+def test_кадр_без_слов_даёт_строку_на_каждое_увиденное_нарушение(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        ядро,
+        "classify",
+        lambda *a, **k: Suggestion(candidates=(ПОЛ, ДВЕРЬ, ПОЛ), needs_human=False),
+    )
+
+    ответ = _пакет(
+        клиент, {"id": "a", "words": "", "photos": [клиент.ссылка()]}, zone_hint="fridge"
+    )
+
+    (карточка,) = ответ.get_json()["cards"]
+    строки = карточка["lines"]
+    assert [x["code"] for x in строки] == ["CLN05", "PRD05"], "повтор модели строку не множит"
+    assert all(x["photo_only"] and x["status"] == "found" for x in строки)
+    assert len({x["id"] for x in строки}) == 2
+
+
+def test_повтор_строки_по_выбору_человека_возвращает_одну_строку_с_тем_же_id(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    делили: list[str] = []
+    monkeypatch.setattr(
+        walk_batch, "split_violations", lambda words, **kw: делили.append(words) or (words,)
+    )
+
+    ответ = _пакет(
+        клиент,
+        {
+            "id": "a",
+            "line": "a-2",
+            "words": "пол грязный, дверь не закрывается",
+            "code": "CLN05",
+            "photos": [клиент.ссылка()],
+        },
+        zone_hint="fridge",
+    )
+
+    (карточка,) = ответ.get_json()["cards"]
+    assert [x["id"] for x in карточка["lines"]] == ["a-2"]
+    assert делили == [], "строка уже выбрана, комментарий заново не режется"
+
+
+def test_журнал_пишет_строку_на_нарушение(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    walk_log_steps: list[Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(walk_batch, "split_violations", lambda words, **kw: ("пол", "дверь"))
+
+    _пакет(
+        клиент,
+        {"id": "a", "words": "пол грязный, дверь не закрывается", "photos": [клиент.ссылка()]},
+        zone_hint="fridge",
+    )
+
+    первая, вторая = walk_log_steps
+    assert (первая.words, вторая.words) == ("пол", "дверь")
+    assert (первая.detail["line"], вторая.detail["line"], первая.detail["lines"]) == (1, 2, 2)
+
+
+def test_один_кадр_ложится_в_несколько_записей_ссылкой_а_не_копией(
+    клиент: Клиент,  # noqa: F811
+) -> None:
+    ссылка = клиент.ссылка()
+    тело = {"op": "add", "zone": "hot_kitchen", "level": "D1", "photos": [ссылка]}
+
+    первая = клиент.запись(**тело, code="CLN05", text="Пол грязный")
+    вторая = клиент.запись(**тело, code="PRD05", text="Дверь не закрывается")
+
+    assert первая.status_code == 200 and вторая.status_code == 200, (
+        первая.get_json(),
+        вторая.get_json(),
+    )
+    записи = get_state(АУДИТОР).findings  # type: ignore[union-attr]
+    assert [(f.code, f.photos) for f in записи] == [("CLN05", [ссылка]), ("PRD05", [ссылка])]

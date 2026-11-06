@@ -10,12 +10,14 @@ BATCH_TEXTS: dict[str, dict[str, str]] = {
     "walk.batch.close": {"ru": "Закрыть", "en": "Close"},
     "walk.batch.intro": {
         "ru": (
-            "Каждое фото — отдельное нарушение. Напишите или надиктуйте, что не так; "
-            "зону можно назвать в комментарии: «Холодный цех: нет маркировки на соусе»."
+            "Одно фото — одно или несколько нарушений. Напишите или надиктуйте, что не так: "
+            "разные дефекты в комментарии система разделит на отдельные пункты. "
+            "Зону можно назвать в начале комментария — запись встанет в неё."
         ),
         "en": (
-            "Each photo is a separate issue. Type or dictate what is wrong; you can name "
-            "the zone in the comment: “Cold prep: no label on the sauce”."
+            "One photo can hold one or several issues. Type or dictate what is wrong: different "
+            "defects in the comment are split into separate items. You can name the zone at "
+            "the start of the comment — the record goes into it."
         ),
     },
     "walk.batch.pick": {"ru": "Выбрать фото из галереи", "en": "Pick photos from the gallery"},
@@ -32,7 +34,24 @@ BATCH_TEXTS: dict[str, dict[str, str]] = {
         "ru": "В одной пачке не больше {n} фото.",
         "en": "No more than {n} photos in one batch.",
     },
-    "walk.batch.card": {"ru": "Нарушение {n}", "en": "Issue {n}"},
+    "walk.batch.card": {"ru": "Фото {n}", "en": "Photo {n}"},
+    "walk.batch.line": {"ru": "Нарушение {n}", "en": "Issue {n}"},
+    "walk.batch.line_drop": {"ru": "Убрать нарушение", "en": "Remove the issue"},
+    "walk.batch.add_line": {
+        "ru": "+ ещё нарушение на этом фото",
+        "en": "+ another issue on this photo",
+    },
+    "walk.batch.line_find": {"ru": "Найти пункт", "en": "Find the item"},
+    "walk.batch.split_failed": {
+        "ru": (
+            "Не удалось разделить комментарий на нарушения — он взят одним. "
+            "Если там несколько, добавьте остальные кнопкой «+ ещё нарушение на этом фото»."
+        ),
+        "en": (
+            "Could not split the comment into issues — it was taken as one. If there are "
+            "several, add the rest with “+ another issue on this photo”."
+        ),
+    },
     "walk.batch.words_hint": {
         "ru": "Что не так (можно с зоной в начале)",
         "en": "What is wrong (you can start with the zone)",

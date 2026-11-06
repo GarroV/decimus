@@ -1,17 +1,20 @@
 """Мини-апп обхода: пакетный подбор нарушений — `POST /tg/walk/batch` (прототип).
 
-Аудитор вкидывает несколько кадров, к каждому пишет слова; система по каждой
-карточке параллельно проходит тот же путь, что одиночный ввод: пункт по кадрам и
-словам (`walk_suggest`: быстрый путь → выученная фраза → модель), зона из слов,
-класс по полным критериям выбранного пункта (`walk_level`). Ничего не пишет: ответ
-— по карточке на карточку, а запись остаётся обычным `POST /tg/walk/finding`
-(модель предлагает, фиксирует человек), поэтому журнал шагов и пополнение словаря
-работают как у одиночной записи.
+Аудитор вкидывает до 5 кадров (карточек), к каждому пишет слова. С одного кадра — несколько
+нарушений (D713): карточка отвечает СПИСКОМ строк, по строке на нарушение. Слова с разными
+дефектами делит модель (`recognize.split`: «пол грязный, дверь не закрывается» — две строки,
+«грязный пол у двери» — одна); слов нет — по строке на каждое нарушение, которое модель видит
+на кадре. Каждая строка проходит тот же путь, что одиночный ввод: пункт по кадрам и словам
+(`walk_suggest`: быстрый путь → выученная фраза → модель), зона из слов, класс по полным
+критериям выбранного пункта (`walk_level`). Ничего не пишет: запись остаётся обычным
+`POST /tg/walk/finding` на каждую строку (модель предлагает, фиксирует человек), поэтому журнал
+шагов и пополнение словаря работают как у одиночной записи.
 
-Карточка может нести решения человека: `code` — пункт выбран руками («Другой
-пункт»; поиск по кадрам пропускается, класс считается заново) и `zone` — зона
-выбрана руками. Сбой одной карточки не роняет остальные: она возвращается со
-своим статусом и текстом.
+Строка может нести решения человека: `code` — пункт выбран руками («Другой пункт»; поиск по
+кадрам пропускается, класс считается заново) и `zone` — зона выбрана руками; вместе с `line`
+такой запрос повторяет одну строку и не делит слова заново. Карточка занимает один слот общего
+предела вызовов модели (строки внутри идут параллельно); сбой карточки не роняет остальные: она
+возвращается со своим статусом и текстом.
 
 Повтор здесь не решается: что было в прошлый раз, клиент берёт из данных экрана
 (`zones[].previous`), а «то же самое?» спрашивает человека.
@@ -22,7 +25,9 @@ from __future__ import annotations
 import contextvars
 import logging
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
@@ -44,6 +49,7 @@ from src.recognize.selected_level import (
     evaluate_selected_level,
     prepare_selected_level,
 )
+from src.recognize.split import split_violations
 
 from . import walk_steps
 from .server_limits import SlowGate
@@ -68,8 +74,15 @@ BUSY = "busy"
 WORKERS = 8
 #: Предложений пункта на карточку: первое — выбор системы, остальные — запасные.
 MAX_CANDIDATES = 3
+#: Строк (нарушений), которые система находит на одной карточке сама (D713): «сколько угодно»
+#: упирается в платный класс на каждую; остальное аудитор добавляет строкой руками.
+MAX_LINES = 8
+#: Параллельных строк внутри одной карточки.
+LINE_WORKERS = 4
 
-#: Статусы карточки: `found` — пункт и класс есть, остальное — решает человек.
+#: Статус самой карточки: `ok` — строки подобраны; `busy` и `unavailable` — карточка не прошла.
+OK = "ok"
+#: Статусы строки: `found` — пункт и класс есть, остальное — решает человек.
 FOUND = "found"
 NO_ITEM = "no_item"
 NEED_ZONE = "need_zone"
@@ -131,7 +144,13 @@ def _level(
 
 
 def _candidates_of(
-    who: int, inspection: Inspection, *, words: str, refs: list[str], hint: str | None
+    who: int,
+    inspection: Inspection,
+    *,
+    words: str,
+    refs: list[str],
+    hint: str | None,
+    limit: int = MAX_CANDIDATES,
 ) -> tuple[list[dict[str, Any]], str]:
     """Пункты по кадрам и словам — тем же путём, что одиночный подбор; и чем найдены."""
     frames = _frames(refs)
@@ -162,38 +181,53 @@ def _candidates_of(
         frames=len(frames),
         candidates=journal.candidates(offer.candidates),
     )
-    return list(reply["candidates"])[:MAX_CANDIDATES], offer.via
+    return list(reply["candidates"])[:limit], offer.via
 
 
-def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None) -> dict[str, Any]:
-    """Одна карточка: пункт → зона → класс. Отказ карточки — её статус, а не отказ вызова."""
-    card = _text(raw, "id")
-    out: dict[str, Any] = {"id": card, "status": UNAVAILABLE, "candidates": []}
-    words = _text(raw, "words")
-    photos = raw.get("photos")
-    # Предел — до разбора ссылок: лишние кадры не читаются с диска и не уходят в модель.
-    refs = _refs(
-        photos[:MAX_SUGGEST_PHOTOS] if isinstance(photos, list) else photos, who, inspection
-    )
-    # Без слов система смотрит только кадр (`propose` умеет и это); клиент просит подтверждения.
-    out["photo_only"] = not words
-    pinned = _code(raw, "code") if raw.get("code") else None
-    human_zone = _code(raw, "zone") if raw.get("zone") else None
-    candidates: list[dict[str, Any]] = []
-    if pinned is None:
+def _line(
+    who: int,
+    inspection: Inspection,
+    *,
+    line_id: str,
+    words: str,
+    refs: list[str],
+    hint: str | None,
+    pinned: str | None = None,
+    human_zone: str | None = None,
+    found: list[dict[str, Any]] | None = None,
+    via: str | None = None,
+    photo_only: bool = False,
+) -> dict[str, Any]:
+    """Одна строка карточки: пункт → зона → класс. Отказ строки — её статус, не отказ карточки.
+
+    `found` — пункты, уже найденные по кадру (строка «увидено»): поиск не идёт, первый — выбор
+    системы. `pinned` — пункт назван человеком.
+    """
+    out: dict[str, Any] = {
+        "id": line_id,
+        "status": UNAVAILABLE,
+        "candidates": [],
+        "words": words,
+        # Без слов система смотрит только кадр: клиент просит подтверждения пункта.
+        "photo_only": photo_only,
+    }
+    candidates = found or []
+    if via:
+        out["via"] = via
+    if pinned is None and not candidates:
         candidates, out["via"] = _candidates_of(who, inspection, words=words, refs=refs, hint=hint)
-        out["candidates"] = candidates
-        if not candidates:
-            out["status"] = NO_ITEM
-            return out
+    out["candidates"] = candidates
+    if pinned is None and not candidates:
+        out["status"] = NO_ITEM
+        return out
     code = pinned or candidates[0]["code"]
     levels = get_item(code, chat_id=who).levels
     out["code"] = code
     out["item_levels"] = list(levels)
-    out["wording"] = candidates[0]["wording"] if candidates else None
+    out["wording"] = candidates[0]["wording"] if candidates and not pinned else None
     out["suggested"] = (
         {k: candidates[0][k] for k in ("code", "level", "zone", "confidence")}
-        if candidates
+        if candidates and not pinned
         else None
     )
     zone, source, options = _zone_of(
@@ -207,7 +241,7 @@ def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None
         out["status"] = NEED_ZONE
         return out
     try:
-        result = _level(who, inspection, code=code, zone=zone, words=words, refs=refs, card=card)
+        result = _level(who, inspection, code=code, zone=zone, words=words, refs=refs, card=line_id)
     except MissingFacts:
         out["status"] = NO_FACTS
         return out
@@ -216,6 +250,122 @@ def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None
         key: result.get(key)
         for key in ("status", "level", "provisional_level", "need_fact", "reason")
     }
+    return out
+
+
+def _lines_in_parallel(calls: list[Callable[[], dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Строки одной карточки — параллельно, в слоте самой карточки (предел модели считает её)."""
+    if len(calls) == 1:
+        return [calls[0]()]
+    contexts = [contextvars.copy_context() for _ in calls]
+    with ThreadPoolExecutor(max_workers=min(LINE_WORKERS, len(calls))) as pool:
+        futures = [pool.submit(ctx.run, call) for ctx, call in zip(contexts, calls, strict=True)]
+    return [f.result() for f in futures]
+
+
+def _split(words: str, lang: str) -> tuple[list[str], bool]:
+    """Нарушения комментария и «деление не удалось». Сбой деления — комментарий одной строкой."""
+    try:
+        parts = split_violations(words)
+    except (RecognizeError, OSError) as exc:
+        logger.warning("Обход: комментарий пачки не поделен: %s", type(exc).__name__)
+        return [words], True
+    return list(parts), False
+
+
+def _one(who: int, inspection: Inspection, raw: dict[str, Any], hint: str | None) -> dict[str, Any]:
+    """Одна карточка: кадры и слова → строки (по нарушению на строку), у каждой пункт, зона, класс.
+
+    Слова с несколькими РАЗНЫМИ дефектами делятся на строки (`split_violations`); слов нет —
+    строки по тому, что модель видит на кадре. `line`, `code` или `zone` в запросе — повтор
+    одной строки (человек выбрал пункт или зону, дописал слово): деления нет, ответ — одна
+    строка с тем же id.
+    """
+    card = _text(raw, "id")
+    out: dict[str, Any] = {"id": card, "status": OK, "lines": []}
+    words = _text(raw, "words")
+    photos = raw.get("photos")
+    # Предел — до разбора ссылок: лишние кадры не читаются с диска и не уходят в модель.
+    refs = _refs(
+        photos[:MAX_SUGGEST_PHOTOS] if isinstance(photos, list) else photos, who, inspection
+    )
+    pinned = _code(raw, "code") if raw.get("code") else None
+    human_zone = _code(raw, "zone") if raw.get("zone") else None
+    line_id = _text(raw, "line")
+    if line_id or pinned or human_zone:
+        out["lines"] = [
+            _line(
+                who,
+                inspection,
+                line_id=line_id or f"{card}-1",
+                words=words,
+                refs=refs,
+                hint=hint,
+                pinned=pinned,
+                human_zone=human_zone,
+                photo_only=raw.get("photo_only") is True,
+            )
+        ]
+        return out
+    if words:
+        parts, out["split_failed"] = _split(words, inspection.report_lang)
+        calls = [
+            partial(
+                _line,
+                who,
+                inspection,
+                line_id=f"{card}-{n}",
+                words=part,
+                refs=refs,
+                hint=hint,
+            )
+            for n, part in enumerate(parts, 1)
+        ]
+        out["lines"] = _lines_in_parallel(calls)
+        return out
+    # Кадр без слов: всё, что видит модель, — каждое отдельной строкой.
+    seen, via = _candidates_of(who, inspection, words="", refs=refs, hint=hint, limit=MAX_LINES)
+    if not seen:
+        out["lines"] = [
+            {
+                "id": f"{card}-1",
+                "status": NO_ITEM,
+                "candidates": [],
+                "words": "",
+                "photo_only": True,
+                "via": via,
+            }
+        ]
+        return out
+    out["lines"] = _lines_in_parallel(
+        [
+            partial(
+                _line,
+                who,
+                inspection,
+                line_id=f"{card}-{n}",
+                words="",
+                refs=refs,
+                hint=hint,
+                found=[found],
+                via=via,
+                photo_only=True,
+            )
+            for n, found in enumerate(_distinct(seen), 1)
+        ]
+    )
+    return out
+
+
+def _distinct(found: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Один пункт в одной зоне — одно нарушение: повторы модели строк не множат."""
+    seen: set[tuple[str, str | None]] = set()
+    out: list[dict[str, Any]] = []
+    for item in found:
+        key = (item["code"], item.get("zone"))
+        if key not in seen:
+            seen.add(key)
+            out.append(item)
     return out
 
 
@@ -230,7 +380,7 @@ def _guarded(
         return {
             "id": card_id,
             "status": BUSY,
-            "candidates": [],
+            "lines": [],
             "message": _said("walk.batch.model_busy", lang),
             "error_code": BUSY,
         }
@@ -251,7 +401,7 @@ def _guarded(
     return {
         "id": card_id,
         "status": UNAVAILABLE,
-        "candidates": [],
+        "lines": [],
         "message": text,
         # Для журнала шагов: код отказа или тип исключения, без текста.
         "error_code": code,
@@ -344,9 +494,9 @@ def install(
             with guard:
                 busy.discard(who)
         logger.info(
-            "Обход: чат %s — пакетный подбор, карточек %s, найдено %s",
+            "Обход: чат %s — пакетный подбор, карточек %s, найдено строк %s",
             log_id(who),
             len(results),
-            sum(1 for r in results if r["status"] == FOUND),
+            sum(1 for r in results for line in r["lines"] if line["status"] == FOUND),
         )
         return jsonify({"run_id": inspection.run_id, "cards": results}), 200

@@ -207,15 +207,17 @@
       document.body.appendChild(node);
     }
     node.textContent = text;
-    if (action) {
+    // `action` — одно действие или список (после записи: «Перейти» и «Ещё пункт с этим фото»).
+    var actions = !action ? [] : Array.isArray(action) ? action : [action];
+    actions.forEach(function (one) {
       node.appendChild(document.createTextNode(" "));
-      node.appendChild(W.button("walk-toast__action", action.label, function () {
+      node.appendChild(W.button("walk-toast__action", one.label, function () {
         node.className = "walk-toast";
-        action.run();
+        one.run();
       }));
-    }
-    node.className = "walk-toast is-shown" + (tone ? " walk-toast--" + tone : "") + (action ? " has-action" : "");
+    });
+    node.className = "walk-toast is-shown" + (tone ? " walk-toast--" + tone : "") + (actions.length ? " has-action" : "");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { node.className = "walk-toast"; }, action ? 6000 : 2600);
+    toastTimer = setTimeout(function () { node.className = "walk-toast"; }, actions.length ? 8000 : 2600);
   };
 })();

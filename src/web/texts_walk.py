@@ -718,6 +718,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.saved": {"ru": "Записано", "en": "Recorded"},
     "walk.sheet.saved_in": {"ru": "Записано: {zone}", "en": "Recorded: {zone}"},
     "walk.sheet.saved_go": {"ru": "Перейти", "en": "Go there"},
+    "walk.sheet.photo_again": {"ru": "Ещё пункт с этим фото", "en": "Another item from this photo"},
     "walk.sheet.where": {"ru": "Где?", "en": "Where?"},
     "walk.sheet.zone_other": {"ru": "Другая зона…", "en": "Another zone…"},
     "walk.sheet.need_where": {
