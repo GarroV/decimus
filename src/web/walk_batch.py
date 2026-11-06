@@ -292,7 +292,8 @@ def _one(
     Слова с несколькими РАЗНЫМИ дефектами делятся на строки (`split_violations`); слов нет —
     строки по тому, что модель видит на кадре. `line`, `code` или `zone` в запросе — повтор
     одной строки (человек выбрал пункт или зону, дописал слово): деления нет, ответ — одна
-    строка с тем же id.
+    строка с тем же id. `card_zone` — зона, выбранная человеком на карточке раньше: ею
+    подбираются все строки карточки.
     """
     card = _text(raw, "id")
     out: dict[str, Any] = {"id": card, "status": OK, "lines": []}
@@ -303,9 +304,14 @@ def _one(
         photos[:MAX_SUGGEST_PHOTOS] if isinstance(photos, list) else photos, who, inspection
     )
     pinned = _code(raw, "code") if raw.get("code") else None
-    human_zone = _code(raw, "zone") if raw.get("zone") else None
+    # Зона, которую человек уже выбрал на этой карточке: держится и после того, как карточку
+    # подобрали заново (дописал слова, сохранил соседние) — иначе снова встаёт зона экрана
+    # (06.11.2026, Брашов-1: горячий цех → «Фасад» после каждой правки текста).
+    card_zone = _code(raw, "card_zone") if raw.get("card_zone") else None
+    line_zone = _code(raw, "zone") if raw.get("zone") else None
+    human_zone = line_zone or card_zone
     line_id = _text(raw, "line")
-    if line_id or pinned or human_zone:
+    if line_id or pinned or line_zone:
         out["lines"] = [
             _line(
                 who,
@@ -331,6 +337,7 @@ def _one(
                 words=part,
                 refs=refs,
                 hint=hint,
+                human_zone=card_zone,
             )
             for n, part in enumerate(parts, 1)
         ]
@@ -360,6 +367,7 @@ def _one(
                 words="",
                 refs=refs,
                 hint=hint,
+                human_zone=card_zone,
                 found=[found],
                 via=via,
                 photo_only=True,

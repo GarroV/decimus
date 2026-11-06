@@ -530,3 +530,40 @@ def test_пункт_строки_решают_её_слова_а_увиденн�
     assert дверь["status"] == "no_item" and "code" not in дверь, (
         "строка про дверь не получает пункт про пол"
     )
+
+
+def test_зона_выбранная_на_карточке_держится_при_новом_подборе_и_деление_остаётся(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Человек сменил зону, потом дописал слова — карточку подбирают заново. Его зона остаётся,
+    зона экрана её не перебивает (Брашов-1, 06.11.2026: мойка → «Фасад» после правки текста)."""
+    monkeypatch.setattr(
+        ядро,
+        "classify",
+        lambda note, *a, **kw: Suggestion(
+            candidates=(ПОЛ if "пол" in note else ДВЕРЬ,), needs_human=False
+        ),
+    )
+    monkeypatch.setattr(
+        walk_batch,
+        "split_violations",
+        lambda words, **kw: ("пол грязный", "дверь не закрывается"),
+    )
+
+    ответ = _пакет(
+        клиент,
+        {
+            "id": "a",
+            "words": "пол грязный, дверь не закрывается",
+            "photos": [клиент.ссылка()],
+            "card_zone": "dishwashing",
+        },
+        zone_hint="facade",
+    )
+
+    (карточка,) = ответ.get_json()["cards"]
+    assert len(карточка["lines"]) == 2, "зона карточки не выключает деление на нарушения"
+    for строка in карточка["lines"]:
+        assert (строка["zone"], строка["zone_source"]) == ("dishwashing", "human")
