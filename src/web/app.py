@@ -266,7 +266,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     oauth.install(app, conf)
     # Кадры к черновику загрузки по подписанной ссылке из Claude: токен в адресе, не кука.
     photo_upload.install(app, conf)
-    # Вход в Dodo IS по ссылке-приглашению: токен в адресе, входа в decimus нет (D640).
+    # Вход в Dodo IS по ссылке-приглашению: токен в адресе, входа в decimus нет (D640b).
     dodois_connect.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)

@@ -49,7 +49,7 @@ PROBE = "probe"
 LOAD = "load"
 CONFIG = "config"
 PENDING = "pending"
-#: Входы в Dodo IS по странам (D640): строка на страну, цвет — из состояния входа.
+#: Входы в Dodo IS по странам (D640b): строка на страну, цвет — из состояния входа.
 DODOIS = "dodois"
 
 #: Группы плиток на экране, по порядку (ключ текста `health.group.<код>`).
@@ -89,7 +89,7 @@ CONNECTIONS: tuple[Connection, ...] = (
     Connection("sheet", LOAD, RATINGS, SHEET_FRESH),
     Connection("ispring", PROBE, LEARNING),
     Connection("learning", LOAD, LEARNING, DAILY_FRESH),
-    # Dodo IS по странам (D640, #951): строка на каждый вход; цвет — из `dodois.logins`,
+    # Dodo IS по странам (D640b, #951): строка на каждый вход; цвет — из `dodois.logins`,
     # которые продлевает и проверяет бот (`src/bot/dodois_loader.py`).
     Connection("dodo_is", DODOIS, DODO_IS),
 )
