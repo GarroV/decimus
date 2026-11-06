@@ -43,13 +43,14 @@ from src import db, domain
 from src.domain.errors import ChecklistVersionMismatch, DomainError
 from src.domain.handover import HandedOverError
 from src.domain.log_ids import log_id
+from src.domain.revision import revision
 from src.domain.state import finish_inspection
 from src.domain.timing import utc_now
 from src.domain.translation import untranslated
 from src.report import PhotoMissing, ReportError, build_letter_notes, build_pdf
 
 from .. import item_labels, sealed, sidecar, stops, view
-from ..errors import BotNotesError
+from ..errors import BotNotesError, ChangedSinceReviewError
 from ..finish_translate import translate_comments
 from ..inspection import read_inspection
 from ..keyboards import (
@@ -375,14 +376,25 @@ async def warn_untranslated(message: Message, inspection: domain.Inspection, lan
     )
 
 
-def _seal(chat_id: int, inspection: domain.Inspection) -> bool:
+def _seal(
+    chat_id: int, inspection: domain.Inspection, *, expected_revision: str | None = None
+) -> bool:
     """Поставить признак сдачи (T153, #546). Не легла заметка — `False` и журнал.
 
     Отказ не роняет сдачу: отчёт важнее заметки. Цена названа: `/start` снова
     назовёт проверку незавершённой, а окно #546 на этот раз останется открытым.
     """
+
+    def unchanged() -> bool:
+        current = read_inspection(chat_id)
+        return current is not None and revision(current) == expected_revision
+
     try:
-        sidecar.mark_handed_over(chat_id, len(inspection.findings))
+        sidecar.mark_handed_over(
+            chat_id,
+            len(inspection.findings),
+            still_current=None if expected_revision is None else unchanged,
+        )
     except BotNotesError:
         logger.exception("отметка о сдаче проверки чата %s не записалась", log_id(chat_id))
         return False
@@ -399,12 +411,22 @@ def _unseal(chat_id: int, sealed: bool) -> None:
         logger.exception("печать проверки чата %s не снялась", log_id(chat_id))
 
 
-async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: bool) -> None:
+async def deliver(
+    message: Message,
+    chat_id: int,
+    lang: str,
+    *,
+    allow_missing: bool,
+    expected_revision: str | None = None,
+) -> None:
     """Собрать отчёт и письмо, отдать их в чат и записать проверку в историю.
 
     Кадры скачиваются заранее и отдаются `report` готовой картой: `build_pdf`
     синхронный и выполняется в рабочем потоке, а качать из него нельзя — там нет
     цикла событий. Карта же держит правило «где лежит кадр» в одном месте.
+
+    `expected_revision` — отпечаток проверки, который аудитор видел в итоге
+    (мини-апп): сверяется под замком заметок, прямо перед печатью (#1407).
 
     Временная папка с кадрами живёт до конца работы, а не до отдачи PDF: та же
     карта нужна выгрузке кадров в хранилище (T123). Скачивать их второй раз
@@ -429,7 +451,11 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
     # и в отчёт ложится ровно то, что попадёт в историю. Отчёт не соберётся —
     # печать снимается ниже. Проверка перечитывается уже запечатанной.
     finish_candidate = utc_now()
-    sealed = _seal(chat_id, inspection)
+    try:
+        sealed = _seal(chat_id, inspection, expected_revision=expected_revision)
+    except ChangedSinceReviewError:
+        await stops.refuse(message, lang, step="finish.seal", key="finish.changed_since_review")
+        return
     inspection = read_inspection(chat_id) or inspection
     if sealed:
         _seal(chat_id, inspection)  # число записей — уже по запечатанной
