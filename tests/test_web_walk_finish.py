@@ -48,7 +48,7 @@ def отчёты(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, int]]:
     """Подмена фоновой сборки отчёта: запуск записывается, чат остаётся занятым."""
     запущено: list[tuple[str, int]] = []
     monkeypatch.setattr(
-        walk_finish, "_run_report", lambda token, chat: запущено.append((token, chat))
+        walk_finish, "_run_report", lambda token, chat, _rev=None: запущено.append((token, chat))
     )
     walk_finish._building.clear()
     walk_finish._holds.clear()
@@ -376,8 +376,15 @@ def test_отчёт_собирает_функция_чата_для_чата_ч�
     _начать()
     вызовы: list[tuple[int, int, bool]] = []
 
-    async def собрать(message: Any, chat_id: int, _lang: str, *, allow_missing: bool) -> None:
-        вызовы.append((message.chat.id, chat_id, allow_missing))
+    async def собрать(
+        message: Any,
+        chat_id: int,
+        _lang: str,
+        *,
+        allow_missing: bool,
+        expected_revision: str | None,
+    ) -> None:
+        вызовы.append((message.chat.id, chat_id, allow_missing, expected_revision))
 
     class ПодменаБота:
         def __init__(self, token: str) -> None:
@@ -390,9 +397,9 @@ def test_отчёт_собирает_функция_чата_для_чата_ч�
     monkeypatch.setattr("aiogram.types.Message.as_", lambda self, _bot: self)
     walk_finish._building.add(АУДИТОР)
 
-    walk_finish._run_report(ТОКЕН, АУДИТОР)
+    walk_finish._run_report(ТОКЕН, АУДИТОР, "rev-1")
 
-    assert вызовы == [(АУДИТОР, АУДИТОР, False)]
+    assert вызовы == [(АУДИТОР, АУДИТОР, False, "rev-1")]
     assert АУДИТОР not in walk_finish._building, "после сборки чат освобождается"
 
 
@@ -421,7 +428,7 @@ def test_сборка_отпускает_замок_базы_вместе_с_ч�
     """Замок берётся в запросе, а отпускается в фоновом потоке сборки."""
     from src.db.busy_lock import Hold
 
-    async def собрать(token: str, chat_id: int) -> None:
+    async def собрать(token: str, chat_id: int, expected_revision: str | None = None) -> None:
         return None
 
     отпущено: list[int] = []

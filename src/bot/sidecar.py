@@ -58,7 +58,7 @@ from src.domain.handover import HANDED_OVER_KEY, NEVER_HANDED_OVER, NOTES_FILE_N
 from src.domain.state import state_lock
 
 from . import journal
-from .errors import BotNotesError
+from .errors import BotNotesError, ChangedSinceReviewError
 
 #: Четвёртое издание формата: добавлен `origins` — карта «сообщение АУДИТОРА →
 #: запись» (T205). Третье добавляло `records` — карту «сообщение бота → запись»
@@ -507,14 +507,26 @@ def origin_of(chat_id: int, message_id: int) -> int | None:
     return _last_for(read(chat_id).origins, message_id)
 
 
-def mark_handed_over(chat_id: int, findings: int) -> None:
+def mark_handed_over(
+    chat_id: int, findings: int, *, still_current: Callable[[], bool] | None = None
+) -> None:
     """Запомнить, что отчёт по этой проверке отдан аудитору (T153).
+
+    `still_current` вызывается под замком заметок, прямо перед печатью: запись
+    из мини-аппа идёт под тем же замком, значит, между сверкой и печатью она не
+    вклинится. `False` — `ChangedSinceReviewError`, печать не ставится.
 
     Зовётся ДО сборки отчёта (#546): иначе запись из мини-аппа, пришедшая между
     сборкой PDF и отметкой, ушла бы в историю мимо отданного файла. Отчёт не
     собрался — признак снимается (`unmark_handed_over`), и проверка снова в работе.
     """
-    _change(chat_id, lambda notes: replace(notes, handed_over_findings=findings))
+
+    def seal(notes: Notes) -> Notes:
+        if still_current is not None and not still_current():
+            raise ChangedSinceReviewError(f"проверка чата {chat_id} изменилась до печати")
+        return replace(notes, handed_over_findings=findings)
+
+    _change(chat_id, seal)
 
 
 def unmark_handed_over(chat_id: int) -> None:

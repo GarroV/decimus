@@ -182,9 +182,10 @@ def _native_finish(
     """Review is read-only; report delivery requires explicit run-bound confirmation."""
     from src.bot.keyboards import LANG_LABELS
     from src.domain import get_state
+    from src.domain.revision import revision
 
     from .walk import walk_payload
-    from .walk_finish_review import review, revision
+    from .walk_finish_review import review
 
     def payload() -> dict[str, Any]:
         return walk_payload(who, fallback_lang=lang, bot=bot_settings())
