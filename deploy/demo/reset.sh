@@ -6,6 +6,9 @@
 # приходит снаружи, чтобы этим скриптом нечем было снести прод.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+# shellcheck source=deploy/demo/guard.sh
+source deploy/demo/guard.sh
+require_demo_tree
 
 project=decimus-demo
 compose=(docker compose -p "$project" -f docker-compose.yml -f docker-compose.prod.yml
