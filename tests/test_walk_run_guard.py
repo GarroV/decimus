@@ -75,11 +75,17 @@ def test_run_is_reread_inside_notes_lock(
     assert current.unit == "replacement" and current.info == {}
 
 
-def test_matching_run_and_legacy_without_run_still_write(клиент: Клиент) -> None:  # noqa: F811
+def test_matching_run_and_legacy_without_run_still_write(
+    клиент: Клиент,  # noqa: F811
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     run_id = get_state(АУДИТОР).run_id
     assert клиент.запись(**_совет(text="matching run", run_id=run_id)).status_code == 200
+    assert walk_write.LEGACY_RUN_LOG not in caplog.text  # новый экран не шумит
     assert клиент.запись(**_совет(text="legacy client")).status_code == 200
     assert len(get_state(АУДИТОР).findings) == 2
+    # Старый экран принят, но виден в журнале: по нему решают, когда снимать совместимость.
+    assert walk_write.LEGACY_RUN_LOG in caplog.text
 
 
 def test_stale_run_precedes_new_run_seal_and_keeps_upload_retryable(

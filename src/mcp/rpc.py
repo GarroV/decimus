@@ -26,6 +26,7 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from src.db.space import acting_space
+from src.domain.features import feature_scope
 from src.domain.permissions import SIDE_HQ, claude_may, side_of
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
@@ -610,6 +611,35 @@ def _call_tool(
 
 
 def handle(
+    message: object,
+    *,
+    tenant: str,
+    checklist: Store | None = None,
+    source: Store | None = None,
+    may_retract: bool = False,
+    imports: Store | None = None,
+    actor: str = "",
+    role: str | None = None,
+) -> dict[str, Any] | None:
+    """Разобранное сообщение JSON-RPC → ответ; весь разбор под одним снимком переключателей.
+
+    Права читают переключатель экшн-планов (`features.action_plans_enabled`), а вне веба
+    снимка не было: каждая проверка права — своё чтение из базы, и `tools/list` читал её по
+    разу на инструмент (#1407). Теперь одно чтение на сообщение, как на запрос веба."""
+    with feature_scope():
+        return _handle(
+            message,
+            tenant=tenant,
+            checklist=checklist,
+            source=source,
+            may_retract=may_retract,
+            imports=imports,
+            actor=actor,
+            role=role,
+        )
+
+
+def _handle(
     message: object,
     *,
     tenant: str,

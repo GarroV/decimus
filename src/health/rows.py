@@ -36,7 +36,7 @@ class Row:
     status: Status
     #: Группа плиток (`checks.GROUPS`).
     group: str = ""
-    #: Код страны у строки входа Dodo IS (D640); у остальных пусто.
+    #: Код страны у строки входа Dodo IS (D640b); у остальных пусто.
     country: str = ""
 
     @property

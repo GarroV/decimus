@@ -158,6 +158,17 @@ class Proposal:
     origin: int | None = None
 
 
+def _same_material(a: Proposal, b: Proposal) -> bool:
+    """Два предложения выросли из одних и тех же кадров — это не «позапрошлый кадр».
+
+    Из одного материала бывает два разговора разом: кандидаты по словам аудитора
+    и «на кадрах видно ещё» (D208, свой слот). Вытесни второй первый — и
+    «Записать №1» под словами аудитора отвечало бы «предложение неактуально».
+    Без кадров (правка записи, T204) сравнивать нечего — там по-прежнему вытесняет.
+    """
+    return bool(a.file_ids) and a.file_ids == b.file_ids
+
+
 @dataclass
 class ChatPending:
     """Ожидания одного чата."""
@@ -227,7 +238,8 @@ class PendingStore:
 
         Одиночное предложение вытесняет предыдущее одиночное: кнопки под ним уже
         не отвечают ничему живому, и держать их означало бы дать аудитору
-        зафиксировать разбор позапрошлого кадра.
+        зафиксировать разбор позапрошлого кадра. Предложения по тем же кадрам
+        (`_same_material`) — один материал, они друг друга не вытесняют.
 
         Предложения ПАЧКИ (T206) не вытесняют ничего и не вытесняются: список
         нарушений на то и список, что аудитор разбирает его не по порядку и не
@@ -241,7 +253,11 @@ class PendingStore:
         chat = self._chat(chat_id)
         if proposal.batch is None:
             for slot, живое in list(chat.live.items()):
-                if slot != proposal.slot and живое.batch is None:
+                if (
+                    slot != proposal.slot
+                    and живое.batch is None
+                    and not _same_material(живое, proposal)
+                ):
                     self._drop(chat, slot)
         chat.live[proposal.slot] = proposal
         chat.current = proposal.slot
