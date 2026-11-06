@@ -660,7 +660,7 @@ def test_без_номера_аккаунта_google_не_пускает(
     assert сверка.звали == [], "учётку сверяли без номера аккаунта"
 
 
-# --- отпечаток при каждом входе developer / admin / superadmin (D717) -------------------
+# --- отпечаток при каждом входе developer / admin / superadmin (D720) -------------------
 
 ШАГ = "/login/second-step"
 РОЛИ_С_ОТПЕЧАТКОМ = ["developer", "admin", "superadmin"]

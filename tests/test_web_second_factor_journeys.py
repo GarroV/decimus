@@ -107,7 +107,7 @@ def стенд(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -> Ite
     monkeypatch.setenv("DATABASE_ADMIN_URL", pg_dsn)
     завести_пространства(pg_dsn, "HQ")
     # Почти весь файл описывает ступень у человека, которого сперва заводят без способов, и ждёт,
-    # что такой входит паролем сразу. Отпечаток на входе (D717) включают тесты ниже, где он нужен.
+    # что такой входит паролем сразу. Отпечаток на входе (D720) включают тесты ниже, где он нужен.
     monkeypatch.setattr(second_step, "REQUIRE_KEY_AT_LOGIN", False)
     app = собрать(
         tenant="HQ",
@@ -986,7 +986,7 @@ def test_сессия_подключившая_первый_способ_про�
     assert стенд.sql("select 1 from web_backup_codes")
 
 
-# --- отпечаток на каждом входе developer / admin / superadmin (D717) ------------------------
+# --- отпечаток на каждом входе developer / admin / superadmin (D720) ------------------------
 
 
 def _сохранить_на_входе(клиент: FlaskClient, ключ: VirtualAuthenticator) -> tuple[int, str]:
