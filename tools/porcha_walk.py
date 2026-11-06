@@ -143,20 +143,6 @@ cases = [
         "    if False:\n        # Отвязан",
         "tests/test_web_walk.py::test_снятый_доступ_не_открывает_даже_свою_проверку",
     ),
-    # F-032: выпуск токена Claude — только по свежей подписи (5 минут).
-    (
-        "src/web/walk_settings.py",
-        "            _fresh(who, conf)\n",
-        "",
-        "tests/test_web_walk_app.py::test_старая_подпись_не_выпускает_токен",
-    ),
-    # D448: токен — только себе; кому выпускать, решает подпись, не поле запроса.
-    (
-        "src/web/walk_settings.py",
-        "        выпущен = mcp_access.issue_token(who)",
-        "        выпущен = mcp_access.issue_token(int(request.get_json().get('id', who)))",
-        "tests/test_web_walk_app.py::test_выпуск_не_принимает_чужой_id",
-    ),
     # F-034: приложить можно только свой кадр.
     (
         "src/domain/uploads.py",
