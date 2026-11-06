@@ -1,7 +1,8 @@
 """Экран «Качество»: рабочая страница здоровья по странам и пиццериям за месяц.
 
 Вопрос экрана: «как работают пиццерии сети — рейтинги, оценки клиентов, агрегаторы, каналы,
-выручка, наша проверка — и что за месяц стало хуже». Сводной оценки и мест нет (D677).
+выручка, наша проверка — и что за месяц стало хуже». Есть итоговый рейтинг и веса компонентов
+по методике аналитика (D719), мест нет (D677).
 Каркас — общий шаблон «выбор слева — рабочая область справа» (`_pick_page.html`, D474, D655),
 как у «Стран»: слева страны, справа таблица стран или страна целиком — строки пиццерий и блоки.
 
@@ -202,6 +203,50 @@ def _unit_rows(
     ]
 
 
+def _pct_whole(value: Decimal) -> str:
+    return f"{value * 100:.0f}%"
+
+
+def _rko_tiers(lang: str) -> str:
+    """Пороги веса РКО словами, из `q.RKO_TIERS` (от меньшего порога к большему)."""
+    tiers = sorted(q.RKO_TIERS)
+    parts = [t("quality.overall.tier.zero", lang, w=_pct_whole(q.ZERO))]
+    for i, (floor, weight) in enumerate(tiers):
+        if i + 1 < len(tiers):
+            parts.append(
+                t(
+                    "quality.overall.tier.below",
+                    lang,
+                    n=f"{tiers[i + 1][0]:.0f}",
+                    w=_pct_whole(weight),
+                )
+            )
+        else:
+            parts.append(
+                t("quality.overall.tier.from", lang, n=f"{floor:.0f}", w=_pct_whole(weight))
+            )
+    return "; ".join(parts)
+
+
+def _overall_rows(c: CountryHealth, lang: str) -> list[str]:
+    """Блок «Как считается итог»: словами, числа порогов — из констант `quality`."""
+    rows = [
+        t("quality.overall.rko", lang, divisor=f"{q.RKO_DIVISOR:.0f}"),
+        t("quality.overall.rko_weight", lang, tiers=_rko_tiers(lang)),
+        t("quality.overall.maps", lang, w=_pct_whole(q.MAPS_WEIGHT)),
+        t("quality.overall.rest", lang),
+        t("quality.overall.sum", lang),
+        t("quality.overall.missing", lang),
+    ]
+    if c.with_total:
+        inc = t("quality.overall.incomplete", lang, k=c.incomplete) if c.incomplete else ""
+        rows.append(t("quality.overall.country", lang, n=c.with_total, inc=inc))
+    else:
+        rows.append(t("quality.overall.country_none", lang))
+    rows.append(t("quality.overall.table", lang))
+    return rows
+
+
 def _dodois_note(state: str, lang: str) -> str:
     if state == quality_data.DODOIS_NOT_CONNECTED:
         return t("quality.dodois.not_connected", lang)
@@ -233,6 +278,7 @@ def _country_view(
         ),
         "units": _unit_rows(c, before, show_audit, key, desc, in_progress),
         "units_total": len(c.units),
+        "overall": _overall_rows(c, lang),
         "dodois_note": _dodois_note(c.dodois, lang),
         "aggs": _agg_rows(c),
         "revenue": _revenue_rows(c.revenue, channels, c.currency),
@@ -255,8 +301,10 @@ def _country_view(
 
 def _rail_line(c: CountryHealth, lang: str) -> str:
     rko, rs = c.values.get("rko"), c.values.get("rs")
+    total = c.values.get("total")
     if rko is not None or rs is not None:
-        return t("quality.rail.line", lang, rko=num(rko, 1), rs=num(rs, 1))
+        line = t("quality.rail.line", lang, rko=num(rko, 1), rs=num(rs, 1))
+        return t("quality.rail.total", lang, total=num(total, 2), line=line) if total else line
     if c.units:
         return t("quality.rail.units", lang, n=len(c.units))
     return t("quality.rail.none", lang)
@@ -326,6 +374,7 @@ def _freshness_rows(lang: str, show_audit: bool, source: str = "") -> tuple[str,
     return (
         t("quality.tip.unit", lang),
         t("quality.tip.scores", lang),
+        t("quality.tip.overall", lang),
         t("quality.tip.tone", lang),
         *((t("quality.tip.audit", lang),) if show_audit else ()),
         t("quality.tip.fresh", lang),

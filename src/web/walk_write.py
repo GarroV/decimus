@@ -576,7 +576,7 @@ def run_matches(inspection: Inspection, body: dict[str, Any]) -> bool:
     if "run_id" not in body:
         logger.warning(LEGACY_RUN_LOG)
         return True
-    return body["run_id"] == inspection.run_id
+    return bool(body["run_id"] == inspection.run_id)
 
 
 def install(

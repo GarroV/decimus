@@ -60,6 +60,7 @@ from src.domain.walk_users import walk_open_to
 from . import (
     walk_access,
     walk_aliases,
+    walk_batch,
     walk_finish,
     walk_level,
     walk_rate,
@@ -524,6 +525,7 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
     model_session = ModelSession()
     walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify, session=model_session)
     walk_level.install(app, conf=conf, ui_lang=ui_lang, identify=identify, session=model_session)
+    walk_batch.install(app, conf=conf, ui_lang=ui_lang, identify=identify, session=model_session)
     walk_translate.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_voice.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_start.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond, bot=bot)
