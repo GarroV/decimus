@@ -15,7 +15,7 @@ import pytest
 from web_harness import ТОКЕН, Учётка, войти, подменить_двери, собрать
 
 from src.domain.tenants import HQ_TENANT
-from src.web import auth
+from src.web import auth, second_step
 
 ТЕНАНТ = HQ_TENANT
 МАРКЕР = "data-passkey-here"
@@ -34,6 +34,9 @@ def _страница(
     коды: tuple[int, ...] = (200,),
 ) -> str:
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
+    # Здесь проверяется страница ПОСЛЕ входа (автосохранение), а не вход: отпечаток на входе (D717)
+    # выключен, иначе роли с ним уходили бы на «Подтвердите вход» и в базу.
+    monkeypatch.setattr(second_step, "REQUIRE_KEY_AT_LOGIN", False)
     monkeypatch.setattr(
         auth,
         "resolve_session",
@@ -107,8 +110,8 @@ def test_скрипт_запускает_ключ_сам_только_по_ме�
 
     assert 'var HERE_KEY = "decimus.passkey.here"' in js
     assert re.search(
-        r"if \(storageGet\(HERE_KEY\)\) \{\s*"
-        r"if \(root\.hasAttribute\(\"data-passkey-autostart\"\)\) run\(true\);",
+        r"if \(useExisting \|\| createUrl\) \{\s*"
+        r"if \(root\.hasAttribute\(\"data-passkey-autostart\"\)\) go\(true\);",
         js,
     ), "автозапуск ключа не стоит за меткой браузера"
     # Метка ставится после входа ключом, после автосохранения и если ключ уже есть на устройстве.
@@ -137,11 +140,18 @@ def test_на_форме_входа_нет_ключа_доступа(monkeypatch
     assert "passkey.js" not in страница
 
 
-def test_вторая_ступень_стоит_у_пароля_и_не_стоит_у_google() -> None:
-    from src.domain.journal import METHOD_GOOGLE, METHOD_PASSWORD
-    from src.web import second_step
+def test_вторая_ступень_стоит_у_пароля_и_у_google_только_ролям_с_отпечатком() -> None:
+    from types import SimpleNamespace
 
-    assert second_step.step_required(METHOD_PASSWORD)
-    assert not second_step.step_required(METHOD_GOOGLE)
-    assert second_step.first_step_suffices(METHOD_GOOGLE)
-    assert not second_step.first_step_suffices(METHOD_PASSWORD)
+    from src.domain.journal import METHOD_GOOGLE, METHOD_PASSWORD
+
+    студия = SimpleNamespace(role="auditor")
+    for роль in ("developer", "admin", "superadmin"):
+        учётка = SimpleNamespace(role=роль)
+        assert second_step.step_required(METHOD_GOOGLE, учётка)
+        assert not second_step.first_step_suffices(METHOD_GOOGLE, учётка)
+    for роль in ("auditor", "control", "guest"):
+        assert not second_step.step_required(METHOD_GOOGLE, SimpleNamespace(role=роль))
+    assert second_step.first_step_suffices(METHOD_GOOGLE, студия)
+    assert second_step.step_required(METHOD_PASSWORD, студия)
+    assert not second_step.first_step_suffices(METHOD_PASSWORD, студия)

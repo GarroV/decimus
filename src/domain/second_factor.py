@@ -29,6 +29,11 @@ import pyotp
 #: Роли, которым вторая ступень обязательна: угнанная учётка админа — вся система.
 REQUIRED_ROLES = frozenset({"admin", "superadmin"})
 
+#: Кому отпечаток нужен при КАЖДОМ входе (D717), в том числе после Google: админам и главному
+#: админу (угнанная учётка — вся система) и бизнес-девелоперам. Нет способа — ключ сохраняется
+#: прямо на входе; остальные роли входят через Google без ступени (D485).
+STEP_EVERY_LOGIN_ROLES = frozenset({"developer", "admin", "superadmin"})
+
 #: Полупройденный вход живёт не дольше (D463): время на ввод кода, не на раздумья.
 PENDING_TTL = timedelta(minutes=5)
 
@@ -58,6 +63,9 @@ BACKUP_CODE_COUNT = 10
 #: Имя ключа доступа: ограничение схемы (`0068`) и формы.
 MAX_PASSKEY_NAME = 60
 
+#: Сколько ключей доступа у человека не больше (запас на устройства, а не на перебор).
+MAX_PASSKEYS = 10
+
 #: Приложение-аутентификатор: параметры RFC 6238, которые понимает любое приложение.
 TOTP_DIGITS = 6
 TOTP_INTERVAL_SECONDS = 30
@@ -76,6 +84,11 @@ _CODE_DIGITS = re.compile(r"[0-9]{%d}" % TOTP_DIGITS)
 def passkey_auto_enroll(role: str) -> bool:
     """Предлагать ли этой роли сохранить Touch ID в браузере после входа."""
     return role in PASSKEY_AUTO_ROLES
+
+
+def needs_step_every_login(role: str) -> bool:
+    """Роль, которой отпечаток нужен при каждом входе (D717)."""
+    return role in STEP_EVERY_LOGIN_ROLES
 
 
 def is_required(role: str) -> bool:

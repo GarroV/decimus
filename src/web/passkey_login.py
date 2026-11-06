@@ -35,7 +35,7 @@ from src.domain.journal import (
 from src.domain.second_factor import PASSKEY_LOGIN_TTL
 
 from . import journal as web_journal
-from . import webauthn_rp
+from . import login_alert, webauthn_rp
 from .config import Settings
 from .origin import over_https, refuse_foreign_origin
 from .remote import client_address
@@ -141,6 +141,7 @@ def install(
             session_id=session.session_id,
         )
         note_success(tenant=stand, login=ключ_счётчика)
+        login_alert.notify_login(account, method=METHOD_PASSKEY, ip=откуда, user_agent=браузер)
         from .auth import after_login
 
         ведёт = after_login(request.args.get("next"))

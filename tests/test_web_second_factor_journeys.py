@@ -106,6 +106,9 @@ class Стенд:
 def стенд(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -> Iterator[Стенд]:
     monkeypatch.setenv("DATABASE_ADMIN_URL", pg_dsn)
     завести_пространства(pg_dsn, "HQ")
+    # Почти весь файл описывает ступень у человека, которого сперва заводят без способов, и ждёт,
+    # что такой входит паролем сразу. Отпечаток на входе (D717) включают тесты ниже, где он нужен.
+    monkeypatch.setattr(second_step, "REQUIRE_KEY_AT_LOGIN", False)
     app = собрать(
         tenant="HQ",
         admin_public_url=ORIGIN,
@@ -981,3 +984,63 @@ def test_сессия_подключившая_первый_способ_про�
 
     assert коды.status_code == 200
     assert стенд.sql("select 1 from web_backup_codes")
+
+
+# --- отпечаток на каждом входе developer / admin / superadmin (D717) ------------------------
+
+
+def _сохранить_на_входе(клиент: FlaskClient, ключ: VirtualAuthenticator) -> tuple[int, str]:
+    опции = клиент.post(f"{STEP}/passkey/create-options", headers=HDR)
+    assert опции.status_code == 200, опции.get_data(as_text=True)
+    ответ = клиент.post(
+        f"{STEP}/passkey/create",
+        json={
+            "credential": json.loads(ключ.create(опции.get_data(as_text=True), origin=ORIGIN)),
+            "name": "Chrome \u00b7 Mac",
+        },
+        headers=HDR,
+    )
+    return ответ.status_code, ответ.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("логин", ["dev", "anna", "sofia"])
+def test_без_способа_отпечаток_сохраняется_на_входе_и_открывает_сессию(
+    стенд: Стенд, monkeypatch: pytest.MonkeyPatch, логин: str
+) -> None:
+    monkeypatch.setattr(second_step, "REQUIRE_KEY_AT_LOGIN", True)
+
+    стенд.вход_паролем(логин)
+    assert not _сессия(стенд.client), "сессия открыта до отпечатка"
+    код, тело = _сохранить_на_входе(стенд.client, VirtualAuthenticator())
+
+    assert код == 200, тело
+    assert _сессия(стенд.client) and _доказана(стенд, стенд.client)
+    assert стенд.sql("select count(*) from web_passkeys")[0][0] == 1
+
+
+def test_в_новом_браузере_отпечаток_сохраняется_даже_при_ключе_в_другом(
+    стенд: Стенд, с_ключом: VirtualAuthenticator, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(second_step, "REQUIRE_KEY_AT_LOGIN", True)
+    чистый = стенд.новый_браузер()
+    войти(чистый, login="dev", password=ПАРОЛЬ)
+
+    код, тело = _сохранить_на_входе(чистый, VirtualAuthenticator())
+
+    assert код == 200, тело
+    assert _сессия(чистый) and _доказана(стенд, чистый)
+    assert стенд.sql("select count(*) from web_passkeys")[0][0] == 2
+
+
+def test_ключ_на_входе_обновляет_последний_вход(
+    стенд: Стенд, с_ключом: VirtualAuthenticator, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ключ, использованный второй ступенью, не доживёт до снятия «30 дней без входа»."""
+    monkeypatch.setattr(second_step, "REQUIRE_KEY_AT_LOGIN", True)
+    стенд.sql("update web_passkeys set last_used_at = null")
+
+    стенд.вход_паролем("dev")
+    код, _ = _вход_ключом(стенд.client, с_ключом)
+
+    assert код == 200
+    assert стенд.sql("select last_used_at is not null from web_passkeys")[0][0]

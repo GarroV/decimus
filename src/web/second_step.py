@@ -1,9 +1,14 @@
 """Вторая ступень входа: «Подтвердите вход» после Google или пароля (D463).
 
-**С 14.10.2026 (D485) ступень стоит только при входе ЛОГИНОМ И ПАРОЛЕМ (`STEP_AT_PASSWORD`);
-вход через Google её не проходит (`STEP_AT_GOOGLE = False`).** Ключ доступа — самостоятельный
-способ входа (`passkey_login.py`). Всё ниже описывает ступень как она работает там, где
-она включена.
+**С 14.10.2026 (D485) ступень стоит при входе ЛОГИНОМ И ПАРОЛЕМ (`STEP_AT_PASSWORD`);
+вход через Google её не проходит, КРОМЕ `developer`, `admin` и `superadmin` (D717: им отпечаток
+нужен при каждом входе, и после Google тоже; остальные роли входят как раньше).** У этих ролей
+без единого способа (или в браузере без метки «ключ тут есть») страница ступени сразу
+СОХРАНЯЕТ отпечаток (`/login/second-step/passkey/create*`) и открывает сессию, прошедшую ступень;
+запасной путь — код приложения или резервный (если есть), иначе подсказка про другой браузер и
+главного админа. Ключ доступа —
+самостоятельный способ входа (`passkey_login.py`). Всё ниже описывает ступень как она работает
+там, где она включена.
 
 **Сессия выдаётся только после обеих ступеней.** Первая (Google или пароль) у человека
 со вторым способом открывает не сессию, а «полупройденный вход» (`web_second_steps`):
@@ -32,6 +37,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote
@@ -63,15 +69,18 @@ from src.domain.journal import (
     RESULT_RATE_LIMITED,
 )
 from src.domain.second_factor import (
+    MAX_PASSKEY_NAME,
+    MAX_PASSKEYS,
     PENDING_TTL,
     backup_code_hash,
     is_required,
     match_totp_step,
+    needs_step_every_login,
     normalize_totp_code,
 )
 
 from . import journal as web_journal
-from . import prove_return, webauthn_rp
+from . import login_alert, prove_return, webauthn_rp
 from .config import Settings
 from .origin import over_https, refuse_foreign_origin
 from .remote import client_address
@@ -90,6 +99,8 @@ ENDPOINTS = frozenset(
         "second_step_code",
         "second_step_passkey_options",
         "second_step_passkey_verify",
+        "second_step_passkey_create_options",
+        "second_step_passkey_create",
     }
 )
 
@@ -124,21 +135,26 @@ THROTTLE_PREFIX = "2fa:"
 #: заперла владельца посреди встречи; подключение остаётся рекомендацией на экране.
 ENFORCE_ENROLL = False
 
-#: Спрашивать ли вторую ступень при входе (D485). Пароль — да: ключ доступа (Touch ID), а в
+#: Спрашивать ли вторую ступень при входе. Пароль — да (D485): ключ доступа (Touch ID), а в
 #: браузере без ключа — приложение-аутентификатор как резерв; у учётки без способов вход
-#: как раньше. Google — нет: почту Google и так защищает сам Google, студии входят через неё.
-#: Код ступени и маршруты целы в обоих случаях; флаг лишь решает, открывает ли первая ступень
-#: сессию.
+#: как раньше. Google — только `developer`, `admin`, `superadmin` (D717, уточняет D485): студии
+#: входят через Google без ступени, а этим ролям почта Google одна не открывает сессию. Код
+#: ступени и маршруты целы везде; здесь решается, открывает ли первая ступень сессию.
 STEP_AT_PASSWORD = True
-STEP_AT_GOOGLE = False
+
+#: Этим ролям ступень нужна и без единого способа: отпечаток сохраняется прямо на входе (D717).
+#: Выключено — как до D717: учётка без способов входит сразу (так заводят учётки в тестах).
+REQUIRE_KEY_AT_LOGIN = True
 
 
-def step_required(method: str) -> bool:
-    """Нужна ли вторая ступень после первой ступени этим способом (`METHOD_*`)."""
-    return STEP_AT_GOOGLE if method == METHOD_GOOGLE else STEP_AT_PASSWORD
+def step_required(method: str, account: Any) -> bool:
+    """Нужна ли вторая ступень этой учётке после первой ступени этим способом (`METHOD_*`)."""
+    if method == METHOD_GOOGLE:
+        return needs_step_every_login(str(account.role))
+    return STEP_AT_PASSWORD
 
 
-def first_step_suffices(method: str) -> bool:
+def first_step_suffices(method: str, account: Any) -> bool:
     """Достаточно ли первой ступени (пароль, Google) для полной сессии этим способом.
 
     Если ступень этому способу не нужна — достаточно, и `open_session` выдаёт такую сессию
@@ -146,7 +162,7 @@ def first_step_suffices(method: str) -> bool:
     ступень: снять или заменить способы ей можно только после настоящего доказательства —
     входа ключом или кода приложения в этой же сессии (`security_prove_code`, форма входа ключом).
     """
-    return not step_required(method)
+    return not step_required(method, account)
 
 
 def must_enroll(account: Any) -> bool:
@@ -154,6 +170,12 @@ def must_enroll(account: Any) -> bool:
     if not ENFORCE_ENROLL:
         return False
     return is_required(str(account.role)) and not bool(getattr(account, "has_second_factor", True))
+
+
+def _device_name(raw: Any) -> str:
+    """Имя ключа из браузера: строка, без лишних пробелов, усечённая; пусто — «Key»."""
+    имя = " ".join("".join(c for c in str(raw or "") if c.isprintable()).split())[:MAX_PASSKEY_NAME]
+    return имя or "Key"
 
 
 def throttle_key(login: str) -> str:
@@ -218,7 +240,14 @@ def install(
             return None
 
     def _begin(account: Account, method: str, next_path: str | None) -> Response | None:
-        if not step_required(method) or not store.has_any(account.id):
+        if not step_required(method, account):
+            return None
+        # Нет способа: роли с отпечатком на каждом входе всё равно ведут на страницу ступени, где
+        # он сохраняется (D717). Ключи на площадке выключены — сохранять нечем, вход как раньше.
+        must_create = (
+            REQUIRE_KEY_AT_LOGIN and party is not None and needs_step_every_login(str(account.role))
+        )
+        if not must_create and not store.has_any(account.id):
             return None
         token = store.open_pending(account.id, method=method, next_path=next_path)
         откуда, браузер = web_journal.login_origin(conf)
@@ -258,15 +287,21 @@ def install(
         locked_minutes: int | None = None,
         code: int = 200,
     ) -> Response:
+        # Ключ можно сохранить прямо здесь: роли с отпечатком на каждом входе (D717).
+        can_create = (
+            REQUIRE_KEY_AT_LOGIN and party is not None and needs_step_every_login(str(account.role))
+        )
         ответ = make_response(
             render_template(
                 "login_second_step.html",
                 failed=failed,
                 locked_minutes=locked_minutes,
+                can_create=can_create,
+                no_method=not token_status.has_factor,
                 has_passkeys=bool(token_status.passkeys) and party is not None,
                 # Ключ запускается сам при открытии страницы; после осечки (код не
                 # подошёл, замок) — нет, иначе окно ключа выскакивало бы по кругу.
-                passkey_autostart=bool(token_status.passkeys)
+                passkey_autostart=(bool(token_status.passkeys) or can_create)
                 and party is not None
                 and not failed
                 and not locked_minutes,
@@ -308,6 +343,7 @@ def install(
             session_id=session.session_id,
         )
         note_success(tenant=stand, login=throttle_key(account.login))
+        login_alert.notify_login(account, method=pending.method, ip=откуда, user_agent=браузер)
         return remember(_drop_cookie(_after(pending.next_path)), session)
 
     def _after(next_path: str | None) -> Response:
@@ -462,6 +498,90 @@ def install(
             token, purpose=store.PURPOSE_AUTHENTICATE, user_id=account.id, challenge=вызов
         )
         ответ = current_app.response_class(параметры, mimetype="application/json")
+        ответ.headers["Cache-Control"] = "no-store"
+        return ответ
+
+    @app.post(f"{STEP_PATH}/passkey/create-options", endpoint="second_step_passkey_create_options")
+    def second_step_passkey_create_options() -> Response | tuple[Response, int]:
+        """Параметры сохранения отпечатка прямо на входе (D717): браузер без метки «ключ тут есть».
+
+        Сохраняется платформенный ключ для ЭТОГО человека (первая ступень уже пройдена), только
+        ролям с отпечатком на каждом входе. Ключи в других браузерах не мешают: окно открывается
+        само, без QR.
+        """
+        refuse_foreign_origin()
+        вход = _live()
+        if вход is None or party is None:
+            return jsonify(error="expired", login=url_for("login", second_step="expired")), 401
+        token, _pending, account = вход
+        if not REQUIRE_KEY_AT_LOGIN or not needs_step_every_login(str(account.role)):
+            return jsonify(error="forbidden"), 403
+        ключи = store.status_of(account.id).passkeys
+        if len(ключи) >= MAX_PASSKEYS:
+            return jsonify(error="limit"), 409
+        параметры, вызов = webauthn_rp.registration_options(
+            party,
+            user_id=account.id,
+            login=account.login,
+            existing=tuple(k.credential_id for k in ключи),
+        )
+        store.store_challenge(
+            token, purpose=store.PURPOSE_REGISTER, user_id=account.id, challenge=вызов
+        )
+        ответ = current_app.response_class(параметры, mimetype="application/json")
+        ответ.headers["Cache-Control"] = "no-store"
+        return ответ
+
+    @app.post(f"{STEP_PATH}/passkey/create", endpoint="second_step_passkey_create")
+    def second_step_passkey_create() -> Response | tuple[Response, int]:
+        """Записать новый отпечаток и открыть сессию, прошедшую ступень (D717)."""
+        refuse_foreign_origin()
+        вход = _live()
+        if вход is None or party is None:
+            return jsonify(error="expired", login=url_for("login", second_step="expired")), 401
+        token, _pending, account = вход
+        if not REQUIRE_KEY_AT_LOGIN or not needs_step_every_login(str(account.role)):
+            return jsonify(error="forbidden"), 403
+        допущена, _, секунд = _admit(account)
+        if not допущена:
+            ответ = jsonify(error="locked")
+            ответ.headers["Retry-After"] = str(секунд)
+            return ответ, 429
+        тело = request.get_json(silent=True)
+        if not isinstance(тело, dict) or not isinstance(тело.get("credential"), dict):
+            return jsonify(error="bad"), 400
+        откуда, браузер = web_journal.login_origin(conf)
+        вызов = store.take_challenge(token, purpose=store.PURPOSE_REGISTER, user_id=account.id)
+        try:
+            if вызов is None:
+                raise webauthn_rp.PasskeyError("challenge")
+            новое = webauthn_rp.verify_registration(
+                party, credential=json.dumps(тело["credential"]), challenge=вызов
+            )
+            if len(store.status_of(account.id).passkeys) >= MAX_PASSKEYS:
+                return jsonify(error="limit"), 409
+            store.add_passkey(
+                account.id,
+                credential_id=новое.credential_id,
+                public_key=новое.public_key,
+                sign_count=новое.sign_count,
+                transports=новое.transports,
+                name=_device_name(тело.get("name")),
+            )
+        except webauthn_rp.PasskeyError:
+            _failure(token, account, result=RESULT_PASSKEY_FAIL, ip=откуда, ua=браузер)
+            if store.find_pending(token) is None:
+                return jsonify(error="expired", login=url_for("login", second_step="expired")), 401
+            return jsonify(error="failed"), 401
+        current_app.logger.info(
+            "Вторая ступень: отпечаток сохранён на входе, учётка %s", account.login
+        )
+        открыт = _open(token, account, result=RESULT_OK)
+        if открыт is None:
+            return jsonify(error="expired", login=url_for("login", second_step="expired")), 401
+        ответ = make_response(jsonify(ok=True, redirect=открыт.headers["Location"]))
+        for кука in открыт.headers.getlist("Set-Cookie"):
+            ответ.headers.add("Set-Cookie", кука)
         ответ.headers["Cache-Control"] = "no-store"
         return ответ
 

@@ -72,6 +72,7 @@ from . import (
     google_link,
     google_profile,
     landing,
+    login_alert,
     oauth,
     passkey_login,
     photo_upload,
@@ -516,7 +517,7 @@ def install(app: Flask, conf: Settings) -> None:
             account,
             ip=откуда,
             user_agent=браузер,
-            step_waived=second_step.first_step_suffices(METHOD_PASSWORD),
+            step_waived=second_step.first_step_suffices(METHOD_PASSWORD, account),
         )
         journals.record_login(
             method=METHOD_PASSWORD,
@@ -526,6 +527,7 @@ def install(app: Flask, conf: Settings) -> None:
             user_agent=браузер,
             session_id=session.session_id,
         )
+        login_alert.notify_login(account, method=METHOD_PASSWORD, ip=откуда, user_agent=браузер)
         return remember(after_login(request.form.get("next")), session)
 
     state_signer = URLSafeTimedSerializer(
@@ -718,7 +720,7 @@ def install(app: Flask, conf: Settings) -> None:
             account,
             ip=откуда,
             user_agent=браузер,
-            step_waived=second_step.first_step_suffices(METHOD_GOOGLE),
+            step_waived=second_step.first_step_suffices(METHOD_GOOGLE, account),
         )
         journals.record_login(
             method=METHOD_GOOGLE,
@@ -731,6 +733,7 @@ def install(app: Flask, conf: Settings) -> None:
         # Имя и фото из Google (D468) — после открытия сессии и мимо исхода
         # входа: сбой здесь не отнимает у человека вход.
         google_profile.remember(session.token, кто)
+        login_alert.notify_login(account, method=METHOD_GOOGLE, ip=откуда, user_agent=браузер)
         return запомнить_подсказку(
             очистить_метку(remember(after_login(вернуться), session)), кто.email
         )

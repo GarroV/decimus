@@ -16,6 +16,12 @@
   окно ключа один раз за загрузку; без метки окна нет, страница ведёт с поля кода
   (`login__methods--code-first`), кнопка ключа остаётся запасной. Отказ или закрытие окна
   молча оставляют кнопку; сообщение об ошибке — только после нажатия.
+
+  `can_create` (D717, роли с отпечатком на каждом входе): в браузере без метки, а также у
+  человека без ключей, скрипт сам открывает окно СОХРАНЕНИЯ отпечатка
+  (`data-create-options-url`, `data-create-url`) — без QR и подтверждения ключом с другого
+  устройства; успех открывает сессию. Страница тогда не «code-first»: ведёт кнопка отпечатка,
+  поле кода (если есть) остаётся запасным. Нет ни ключа, ни кода — подсказка внизу.
 #}{% extends "login_base.html" %}
 {% block page_heading %}{% endblock %}
 {% block title %}{{ t('sf.step.title') }}{% endblock %}
@@ -45,14 +51,17 @@
     {% endif %}
 
     <div class="login__block login__methods">
-    {% if has_passkeys %}
-      <div class="login__google" data-passkey-login{% if passkey_autostart %} data-passkey-autostart{% endif %}
+    {% if has_passkeys or can_create %}
+      <div class="login__google" data-passkey-login{% if passkey_autostart %} data-passkey-autostart{% endif %}{% if has_passkeys %} data-has-keys{% endif %}
            data-options-url="{{ url('/login/second-step/passkey/options') }}"
            data-verify-url="{{ url('/login/second-step/passkey/verify') }}"
+           {% if can_create %}data-create-options-url="{{ url('/login/second-step/passkey/create-options') }}"
+           data-create-url="{{ url('/login/second-step/passkey/create') }}"
+           data-msg-create-failed="{{ t('sf.step.create_failed') }}"{% endif %}
            data-msg-failed="{{ t('sf.step.passkey_failed') }}"
            data-msg-unavailable="{{ t('sf.step.passkey_unavailable') }}">
-        <button class="btn btn--primary" type="button" data-passkey-button>{{ t('sf.step.passkey') }}</button>
-        <p class="login__hint">{{ t('sf.step.passkey_hint') }}</p>
+        <button class="btn btn--primary" type="button" data-passkey-button>{{ t('sf.step.touch' if can_create else 'sf.step.passkey') }}</button>
+        <p class="login__hint">{{ t('sf.step.touch_hint' if can_create else 'sf.step.passkey_hint') }}</p>
         <div class="note note--warn login__note" role="alert" data-passkey-message hidden>
           <div><div class="note__title" data-passkey-message-text></div></div>
         </div>
@@ -61,7 +70,7 @@
       <p class="login__hint">{{ t('sf.step.passkey_off') }}</p>
     {% endif %}
 
-    {% if has_passkeys and has_code %}
+    {% if (has_passkeys or can_create) and has_code %}
       <div class="login__or" aria-hidden="true"><span>{{ t('auth.or') }}</span></div>
     {% endif %}
 
@@ -79,7 +88,7 @@
     </div>
 
     <footer class="login__foot">
-      <p>{{ t('sf.step.lost') }}</p>
+      <p>{{ t('sf.step.nomethod_help' if (can_create and no_method) else 'sf.step.lost') }}</p>
       <p><a href="{{ url_for('login') }}?lang={{ lang }}">{{ t('sf.step.restart') }}</a></p>
     </footer>
   </section>

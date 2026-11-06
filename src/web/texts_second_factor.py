@@ -15,6 +15,26 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
     },
     "sf.step.who": {"ru": "Учётка: {login}", "en": "Account: {login}"},
     "sf.step.passkey": {"ru": "Войти ключом доступа", "en": "Use a passkey"},
+    "sf.step.touch": {"ru": "Подтвердить отпечатком", "en": "Confirm with fingerprint"},
+    "sf.step.touch_hint": {
+        "ru": "Touch ID, Face ID или Windows Hello. В новом браузере отпечаток сохранится сам.",
+        "en": "Touch ID, Face ID or Windows Hello. In a new browser the fingerprint is "
+        "saved for you.",
+    },
+    "sf.step.create_failed": {
+        "ru": "Отпечаток не сохранён: окно закрыто или устройство не подошло. Нажмите "
+        "кнопку ещё раз или введите код.",
+        "en": "The fingerprint was not saved: the prompt was closed or the device did not "
+        "fit. Press the button again or enter a code.",
+    },
+    "sf.step.nomethod_help": {
+        "ru": "Не получается? Откройте Decimus в Safari или Chrome на устройстве с Touch ID, "
+        "Face ID или Windows Hello. Другого способа входа у вас нет — если и такого "
+        "устройства нет, обратитесь к главному админу.",
+        "en": "Not working? Open Decimus in Safari or Chrome on a device with Touch ID, "
+        "Face ID or Windows Hello. You have no other sign-in method — if there is no such "
+        "device, ask a superadmin.",
+    },
     "sf.step.passkey_hint": {
         "ru": "Touch ID, Face ID или ключ безопасности.",
         "en": "Touch ID, Face ID or a security key.",
