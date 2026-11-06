@@ -33,6 +33,8 @@
 .qa-delta--down { color: var(--warn-ink); }
 .qa-body { padding: 16px; }
 .qa-note { margin: 0; max-width: 60ch; }
+.qa-incomplete { font-family: inherit; white-space: nowrap; }
+.qa-how { margin: 0; padding-left: 18px; max-width: 70ch; display: grid; gap: 6px; }
 .qa-warn { color: var(--warn-ink); }
 .qa-scroll + .qa-scroll { margin-top: var(--space-4); }
 

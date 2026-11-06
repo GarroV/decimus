@@ -172,7 +172,7 @@ def test_country_without_dodois_says_it_is_not_connected(ук: FlaskClient) -> N
 
 
 def test_no_composite_score_or_ranking_anywhere(ук: FlaskClient) -> None:
-    """D677: ни ЛКО, ни ЭС, ни «Общего рейтинга», ни мест, ни весов — на обоих языках."""
+    """D677/D719: ни ЛКО, ни ЭС, ни «Общего рейтинга», ни мест — на обоих языках."""
     banned = ("ЛКО", "ЭС", "LKO", "Лучший клиентский", "Эталон стандартов", "Общий рейтинг")
     for url in (
         "/quality?month=2026-09",
@@ -183,7 +183,27 @@ def test_no_composite_score_or_ranking_anywhere(ук: FlaskClient) -> None:
         html = ук.get(url).get_data(as_text=True)
         for word in banned:
             assert word not in html, (url, word)
-        assert "Сумма весов" not in html and "Σ весов" not in html and "место" not in html
+        assert "место" not in html
+
+
+def test_country_page_shows_total_weights_and_how_it_is_computed(ук: FlaskClient) -> None:
+    html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
+
+    assert "Рейтинг, из 5" in html and ">Итог<" in html and ">Веса<" in html
+    assert "Как считается итог" in html
+    # Пороги веса РКО и вес карт — из констант, словами.
+    assert "нет проверок — 0%" in html and "меньше 2 — 10%" in html
+    assert "меньше 5 — 30%" in html and "5 и больше — 50%" in html
+    assert "Вес карт — 20%" in html and "делится на 20" in html
+    # Веса пиццерии в процентах целыми: у Warsaw-1 есть карты, КР и агрегаторы.
+    assert "20%" in html and "Итог " in html  # колонка стран слева: «Итог … · РКО … · РС …»
+    en = ук.get("/quality?country=PL&month=2026-09&lang=en").get_data(as_text=True)
+    assert "How the total is computed" in en and "Rating, of 5" in en
+
+
+def test_total_column_sorts(ук: FlaskClient) -> None:
+    assert ук.get("/quality?country=PL&month=2026-09&sort=total&dir=desc").status_code == 200
+    assert ук.get("/quality?month=2026-09&sort=w_kr&dir=asc").status_code == 200
 
 
 def test_rko_below_thresholds_is_tinted_like_ratings(ук: FlaskClient) -> None:
