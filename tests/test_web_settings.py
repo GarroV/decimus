@@ -447,3 +447,17 @@ def test_карточка_claude_предупреждает_за_неделю_д
         страница = client.get("/settings?tile=claude").get_data(as_text=True)
 
         assert ("Токен скоро истечёт" in страница) is предупреждение
+
+
+def test_токен_скоро_истекает_за_неделю_и_ближе() -> None:
+    from datetime import UTC, timedelta
+
+    now = datetime(2026, 11, 6, 12, tzinfo=UTC)
+
+    def осталось(days: float) -> users_mcp.TokenStatus:
+        return users_mcp.TokenStatus(known=True, expires_at=now + timedelta(days=days))
+
+    assert not осталось(7.5).expiring_soon(now)
+    assert осталось(6.5).expiring_soon(now)
+    assert осталось(0.1).days_left(now) == 1
+    assert not users_mcp.TokenStatus(known=True).expiring_soon(now)
