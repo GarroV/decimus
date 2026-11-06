@@ -30,10 +30,11 @@ import os
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
-from src.db import maps_store
-from src.db.errors import RatingsError
+from src.db import maps_store, service_keys
+from src.db.errors import DbError, RatingsError
 from src.db.job_lock import MAPS_LOADER_LOCK_KEY, job_lock
 from src.db.space import SYSTEM_SPACE, acting_space
+from src.health import checks
 from src.ratings import maps, pointer
 from src.ratings.pointer import PointerError
 
@@ -101,8 +102,29 @@ def _load_if_due(history: HistoryState) -> None:
             logger.info("Оценки карт: загрузку ведёт другой процесс — заход пропущен")
             return
         if _due():
+            # Отпечаток ключа снимается ДО загрузки: см. `checks.record_key_in_use`.
+            fingerprint = _key_fingerprint()
             maps.load_once()
             history.done = False  # в загрузке могли прийти новые филиалы
+            if fingerprint is not None:
+                _confirm_key(fingerprint)
+
+
+def _key_fingerprint() -> bytes | None:
+    """Отпечаток ключа Pointer; не прочитался — загрузка идёт, проверка ключа не засчитывается."""
+    try:
+        return service_keys.probe_snapshot("pointer").fingerprint
+    except DbError:
+        logger.warning("Ключ Pointer: отпечаток не снялся", exc_info=True)
+        return None
+
+
+def _confirm_key(fingerprint: bytes) -> None:
+    """Удачная суточная загрузка — это и проверка ключа Pointer (#1425)."""
+    try:
+        checks.record_key_in_use("pointer", fingerprint)
+    except DbError:
+        logger.warning("Ключ Pointer: удачная загрузка не записалась как проверка", exc_info=True)
 
 
 def _history_step(history: HistoryState) -> None:
