@@ -112,7 +112,7 @@ def _zone_of(
     if found.zone:
         return found.zone, found.source, found.options
     # Сюда доходит, только если зоны экрана нет среди зон пункта (иначе её взял бы
-    # `resolve_item_zone`): подставлять её нельзя — кухонный инвентарь получал «Фасад»
+    # `resolve_item_zone`): подставлять её нельзя — пункт кухни получал зону фасада
     # (06.11.2026). Зону спрашивают, как в обычном вводе.
     return None, "ask", found.options
 
