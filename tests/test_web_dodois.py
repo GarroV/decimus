@@ -423,16 +423,17 @@ def test_заголовки_без_реферера_без_кэша_и_без_с
     чужой: FlaskClient, ссылки: Ссылки
 ) -> None:
     # Сломанная копия: убрать `_public_headers` — Referer унесёт токен на сайт Dodo IS.
+    # `no-referrer` тоже неверно: браузер шлёт POST кнопки с `Origin: null`, вход падает 403.
     токен = _ссылка_живая(ссылки)
     for адрес in (f"/dodois/connect/{токен}", f"/dodois/connect/{токен}/status"):
         ответ = чужой.get(адрес)
-        assert ответ.headers["Referrer-Policy"] == "no-referrer"
+        assert ответ.headers["Referrer-Policy"] == "same-origin"
         assert "no-store" in ответ.headers["Cache-Control"]
     html = чужой.get(f"/dodois/connect/{токен}").get_data(as_text=True)
     внешние = re.findall(r'(?:src|href|action)="(https?://[^"]+)"', html)
     assert внешние == [], f"сторонние ресурсы на странице: {внешние}"
     неверный = чужой.get("/dodois/connect/" + "a" * 43)
-    assert неверный.headers["Referrer-Policy"] == "no-referrer"
+    assert неверный.headers["Referrer-Policy"] == "same-origin"
     assert "no-store" in неверный.headers["Cache-Control"]
 
 
