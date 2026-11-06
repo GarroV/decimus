@@ -407,6 +407,7 @@
 | `DB_STATEMENT_TIMEOUT_S` | `src/db/timeouts.py` | да |
 | `DECIMUS_MCP_TOKEN` | `tools/mcp_outside.py` | да |
 | `DECIMUS_MCP_URL` | `tools/mcp_outside.py` | да |
+| `DECIMUS_REFERENCE_ROOT` | `tools/check_reference_examples.py` | да |
 | `DEMO_PHOTOS_DIR` | `tools/seed_open_demo.py` | да |
 | `DEMO_STATE_DIR` | `tools/seed_demo.py` | да |
 | `DODO_MCP_TOKEN` | `tools/mcp_outside.py` | да |

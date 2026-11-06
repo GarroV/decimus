@@ -36,6 +36,12 @@
 .walk-dock__add--several .walk-icon { width: 16px; height: 16px; }
 .walk-dock__split .walk-dock__add:focus-visible { outline: 2px solid var(--ink-inverse); outline-offset: -4px; }
 
+/* Give the long left label room on narrow phones with Linux fallback fonts (#1518). */
+@media (max-width: 375px) {
+  .walk-dock__row .walk-dock__split { flex: 2.3; }
+  .walk-dock__next { min-width: 110px; padding-inline: 8px; }
+}
+
 .walk-batch { z-index: 10; }
 /* Длинное слово без пробелов (формулировка модели, прежний комментарий, адрес) не должно раздвигать лист:
    колонки grid без minmax(0, 1fr) растут по min-content и уводят весь лист вбок. */
