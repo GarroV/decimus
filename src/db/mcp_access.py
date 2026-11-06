@@ -117,6 +117,14 @@ select t.issued_at from mcp_tokens t join web_users u on u.id = t.user_id
  where t.user_id = %s and {_LIVE_ISSUE_SQL}
 """  # noqa: S608 — в склейке только условие модуля, данные идут параметрами
 
+#: Токен, который был, не отозван и истёк по сроку, — только чтобы назвать причину отказа (#1440).
+_SELECT_EXPIRED_SQL = """
+select exists (
+  select 1 from mcp_tokens
+   where fingerprint = %s and revoked_at is null and expires_at <= now()
+)
+"""
+
 #: Сверка предъявленного токена. Идёт по отпечатку и только среди ЖИВЫХ:
 #: отозванный токен не «находится и отклоняется», а не находится вовсе —
 #: отдельной ветки «нашли, но он отозван» здесь нет намеренно, потому что
@@ -317,6 +325,19 @@ def live_token_issued_at(user_id: str) -> datetime | None:
         cur.execute(_SELECT_LIVE_ISSUED_OF_USER_SQL, (user_id,))
         row = cur.fetchone()
     return None if row is None else row[0]
+
+
+def is_expired(token: str) -> bool:
+    """Токен выпускался, не отозван, и его срок вышел. Нужно только для текста отказа (#1440).
+
+    Живость токена решает `resolve_token`; здесь лишь причина, по которой он не нашёлся:
+    «срок вышел» человеку полезнее, чем «не опознан». Предъявивший токен уже знает его,
+    так что различие выдаёт ему только то, что токен когда-то был.
+    """
+    with _connected("сверить срок токена") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_EXPIRED_SQL, (token_fingerprint(token),))
+        row = cur.fetchone()
+    return bool(row and row[0])
 
 
 def resolve_token(token: str) -> TokenOwner | None:

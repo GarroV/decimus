@@ -426,3 +426,24 @@ def test_перевыпуск_команды_claude_идёт_через_подт
         assert "Перевыпустить команду установки" in страница
         assert "Получить команду установки" not in страница
         assert 'class="sconfirm"' in страница
+
+
+@pytest.mark.parametrize(
+    ("осталось_дней", "предупреждение"), [(30, False), (8, False), (6, True), (1, True)]
+)
+def test_карточка_claude_предупреждает_за_неделю_до_конца_срока(
+    monkeypatch: pytest.MonkeyPatch, осталось_дней: int, предупреждение: bool
+) -> None:
+    """#1440: токен гаснет молча; за неделю до конца карточка говорит перевыпустить (без писем)."""
+    from datetime import UTC, timedelta
+
+    до = datetime.now(UTC) + timedelta(days=осталось_дней) - timedelta(hours=1)
+    monkeypatch.setattr(
+        users_mcp,
+        "own_status",
+        lambda _id: users_mcp.TokenStatus(known=True, expires_at=до),
+    )
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
+        страница = client.get("/settings?tile=claude").get_data(as_text=True)
+
+        assert ("Токен скоро истечёт" in страница) is предупреждение

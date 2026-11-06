@@ -156,6 +156,41 @@ def test_незнакомый_токен_по_прежнему_отказ(db_env
     assert АРЕНДАТОР_ЧЕЛОВЕКА not in str(отказ.value)
 
 
+@requires_db
+def test_истёкший_токен_получает_отказ_с_причиной(db_env: str, pg_dsn: str) -> None:
+    """#1440: Claude Code показывает клиенту только текст 401, и «не опознан» сбивает с толку."""
+    import psycopg
+
+    личный = _выпустить()
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "update mcp_tokens set expires_at = now() - interval '1 second' where telegram_id = %s",
+            (ЧЕЛОВЕК,),
+        )
+
+    with pytest.raises(AuthError) as отказ:
+        resolve_access(_настройки(), f"Bearer {личный}")
+
+    assert "Срок токена истёк" in str(отказ.value)
+    assert "Настройках" in str(отказ.value)
+
+
+@requires_db
+def test_отозванный_токен_причиной_срока_не_называется(db_env: str) -> None:
+    """«Срок вышел» — только для неотозванного токена: перевыпуск за истечение не выдаётся."""
+    from src.db.mcp_access import resolve_token, revoke_tokens
+
+    личный = _выпустить()
+    владелец = resolve_token(личный)
+    assert владелец is not None
+    revoke_tokens(владелец.user_id)
+
+    with pytest.raises(AuthError) as отказ:
+        resolve_access(_настройки(), f"Bearer {личный}")
+
+    assert "Срок токена истёк" not in str(отказ.value)
+
+
 # --- чего личный токен НЕ даёт ------------------------------------------------
 
 
