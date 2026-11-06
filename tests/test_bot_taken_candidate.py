@@ -96,7 +96,8 @@ async def test_занятый_кандидат_остаётся_нажимаем
         monkeypatch,
         suggestion(
             candidate("CLN05", "D1", "hot_kitchen", "Нагар"),
-            candidate("CLN02", "D1", "dishwashing", "Налёт на смесителе"),
+            # D718: alternatives of one item share a message; different items do not.
+            candidate("CLN05", "D1", "dining", "Налёт на печи в зале"),
         ),
     )
     bot, session = make_bot()

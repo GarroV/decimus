@@ -799,3 +799,6 @@ _exercise_existing_action_plan_capabilities
 
 # Country contact read-state field is consumed in country/_contacts.html.
 contacts_known
+
+# D718: autouse-фикстуру из tests/conftest.py вызывает pytest (#1518).
+_деление_комментария_не_ходит_в_модель
