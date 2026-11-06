@@ -702,3 +702,37 @@ def test_zone_changed_by_hand_survives_finding_the_card_again(page):
     page.get_by_text("Search again").first.click()
     page.wait_for_function("asked.length === 3")
     assert page.evaluate("asked[2].cards[0].card_zone") == "zone_b"
+
+
+def test_recorded_text_is_the_model_wording_not_the_raw_words(page):
+    """06.11.2026: batch records went into an English report in Russian — the raw words were
+    saved as the recorded text, and auto-translation (D443) only translates the comment. The
+    recorded text is the model's wording (checklist language), as in the single-record form."""
+    line = found("c1", "ITM1", "zone_a", "screen", READY_D2)
+    line["wording"] = "Synthetic model wording."
+    start(page, [line])
+    add_photos(page, 1)
+    page.locator("[data-batch-words]").first.fill("синтетические слова аудитора")
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-save]:not([disabled])")
+    page.locator("[data-batch-save]").click()
+    page.wait_for_function("written.length === 1")
+    saved = written(page)[0]
+    assert saved["text"] == "Synthetic model wording."
+    assert saved["comment"] == "", "the wording already restates the words"
+    assert saved["words"] == "синтетические слова аудитора"
+
+
+def test_without_model_wording_the_words_go_to_the_comment(page):
+    line = found("c1", "ITM1", "zone_a", "screen", READY_D2)
+    line["wording"] = None
+    start(page, [line])
+    add_photos(page, 1)
+    page.locator("[data-batch-words]").first.fill("синтетическая заметка")
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-save]:not([disabled])")
+    page.locator("[data-batch-save]").click()
+    page.wait_for_function("written.length === 1")
+    saved = written(page)[0]
+    assert saved["comment"] == "синтетическая заметка", "a comment is what auto-translation translates"
+    assert saved["text"] != "синтетическая заметка"

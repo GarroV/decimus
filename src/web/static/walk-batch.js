@@ -337,10 +337,20 @@
 
   /* ── запись ────────────────────────────────────────────────────────── */
 
+  /* «Зафиксировано» — как в обычном вводе: формулировка модели (по кадру — её же текст «что видно»,
+     который аудитор мог поправить), она на языке чек-листа (= язык
+     отчёта). Сырые слова аудитора туда не идут: они на языке речи, и автоперевод (D443) их не
+     переводит — 06.11.2026 записи пакета ушли в английский отчёт по-русски. */
   function textOf(line) {
     var r = line.result;
     var item = itemOf(r.code);
-    return line.words.trim() || (r.photo_only && line.seen.trim()) || r.wording || (item && item.q) || r.code;
+    return (r.photo_only && line.seen.trim()) || r.wording || (item && item.q) || r.code;
+  }
+
+  /* Формулировки модели нет (пункт выбран руками): слова аудитора — комментарием, его переводит
+     автоперевод и кнопка в вычитке. Есть формулировка — она уже пересказывает те же слова. */
+  function commentOf(line) {
+    return line.result.wording ? "" : line.words.trim();
   }
 
   function addBody(line) {
@@ -348,7 +358,7 @@
     var level = levelOf(line);
     var sug = r.suggested;
     return {
-      op: "add", zone: r.zone, code: r.code, level: level, text: textOf(line), comment: "",
+      op: "add", zone: r.zone, code: r.code, level: level, text: textOf(line), comment: commentOf(line),
       repeat: line.repeat === true && LEVELS_REPEAT.indexOf(level) !== -1,
       // Кадры карточки уходят ссылкой в каждую запись строки: файл один, записей несколько.
       photos: refs(line.card), photo_assignment: null, words: line.words.trim(),
