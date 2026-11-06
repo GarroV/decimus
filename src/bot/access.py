@@ -239,6 +239,8 @@ class AccessMiddleware(BaseMiddleware):
             logger.warning("привязка по юзернейму не удалась: Telegram ID %s", log_id(user.id))
             return False
         logger.info("Telegram ID %s привязан по юзернейму к %s", log_id(user.id), log_id(login))
+        if self._pending is not None:
+            self._pending.consume(user.username)
         await _answer(event, "access.linked", login=привязка.login)
         return True
 
