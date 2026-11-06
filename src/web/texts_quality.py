@@ -19,6 +19,7 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.network": {"ru": "Все страны", "en": "All countries"},
     "quality.filter.title": {"ru": "Страны", "en": "Countries"},
     "quality.rail.line": {"ru": "РКО {rko} · РС {rs}", "en": "RKO {rko} · RS {rs}"},
+    "quality.rail.total": {"ru": "Итог {total} · {line}", "en": "Total {total} · {line}"},
     "quality.rail.units": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
     "quality.rail.none": {"ru": "нет данных", "en": "no data"},
     "quality.month.label": {"ru": "Месяц", "en": "Month"},
@@ -72,6 +73,23 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
             "over the weeks of the month."
         ),
     },
+    "quality.tip.overall": {
+        "ru": (
+            "Итог — рейтинг пиццерии из 5: сумма «вес × оценка» по РКО (÷ 20), КР, картам и "
+            "агрегаторам. Вес стоит рядом со своей оценкой; неполный итог помечен суммой весов. У "
+            "страны итог и веса считаются по её строке — от средних и долей страны, а не как "
+            "среднее итогов её пиццерий. Как считается — в блоке «Как считается итог» "
+            "на странице страны."
+        ),
+        "en": (
+            "Total is the pizzeria's rating out of 5: the sum of weight × score over RKO "
+            "(÷ 20), CR, maps and aggregators. Each weight stands next to its score; an "
+            "incomplete total shows the sum of its weights. A country's total and weights are "
+            "computed from its own row — the country's means and shares — not as the mean of "
+            "its pizzerias' totals. How it is computed — in the “How the total is computed” "
+            "block on the country page."
+        ),
+    },
     "quality.tip.tone": {
         "ru": (
             "Цвет ячейки: РКО и РС — как в «Рейтингах» (ниже 80 красный, ниже 90 жёлтый); "
@@ -122,19 +140,31 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.col.country": {"ru": "Страна", "en": "Country"},
     "quality.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
     "quality.total": {"ru": "Вся страна", "en": "Whole country"},
-    "quality.col.rko": {"ru": "РКО", "en": "RKO"},
+    "quality.col.total": {"ru": "Рейтинг, из 5", "en": "Rating, of 5"},
+    "quality.col.w_rko": {"ru": "Вес", "en": "Weight"},
+    "quality.col.w_kr": {"ru": "Вес", "en": "Weight"},
+    "quality.col.w_maps": {"ru": "Вес ({w})", "en": "Weight ({w})"},
+    "quality.col.w_aggs": {"ru": "Вес", "en": "Weight"},
+    "quality.cell.incomplete": {
+        "ru": "неполный · веса {pct}",
+        "en": "incomplete · weights {pct}",
+    },
+    "quality.col.rko": {"ru": "РКО, из 100", "en": "RKO, of 100"},
+    "quality.col.rko_adj": {"ru": "РКО adj, из 5", "en": "RKO adj, of 5"},
     "quality.col.rs": {"ru": "РС", "en": "RS"},
     "quality.col.checks": {"ru": "Проверок в нед.", "en": "Checks/wk"},
-    "quality.col.kr": {"ru": "КР", "en": "CR"},
-    "quality.col.maps": {"ru": "Карты", "en": "Maps"},
-    "quality.col.aggs": {"ru": "Агрегаторы", "en": "Aggregators"},
+    "quality.col.kr": {"ru": "Оценка", "en": "Score"},
+    "quality.col.maps": {"ru": "Оценка (G/Y)", "en": "Score (G/Y)"},
+    "quality.col.aggs": {"ru": "Оценка", "en": "Score"},
     "quality.col.share_agg": {"ru": "Агрегаторы", "en": "Aggregators"},
     "quality.col.share_app": {"ru": "Приложение и сайт", "en": "App and site"},
     "quality.col.share_other": {"ru": "Прочее", "en": "Other"},
     "quality.col.rev_dine": {"ru": "Зал", "en": "Dine-in"},
     "quality.col.rev_delivery": {"ru": "Доставка", "en": "Delivery"},
-    "quality.group.ratings": {"ru": "Рейтинги", "en": "Ratings"},
-    "quality.group.guest": {"ru": "Оценки гостей, из 5", "en": "Guest ratings, of 5"},
+    "quality.group.rko": {"ru": "РКО", "en": "RKO"},
+    "quality.group.kr": {"ru": "КР", "en": "CR"},
+    "quality.group.maps": {"ru": "Карты", "en": "Maps"},
+    "quality.group.aggs": {"ru": "Агрегаторы", "en": "Aggregators"},
     "quality.group.shares": {"ru": "Доли заказов", "en": "Order shares"},
     "quality.group.revenue": {"ru": "Выручка", "en": "Revenue"},
     "quality.no_data": {
@@ -171,6 +201,69 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.source.manager": {"ru": "Менеджер", "en": "Manager"},
     "quality.source.callcenter": {"ru": "Колл-центр", "en": "Call center"},
     "quality.source.aggregator": {"ru": "Агрегаторы", "en": "Aggregators"},
+    "quality.block.overall": {"ru": "Как считается итог", "en": "How the total is computed"},
+    "quality.overall.rko": {
+        "ru": "РКО — из 100 баллов; делится на {divisor}, получается оценка из 5.",
+        "en": "RKO is out of 100; divided by {divisor} it becomes a score out of 5.",
+    },
+    "quality.overall.rko_weight": {
+        "ru": "Вес РКО зависит от числа проверок РКО в неделю: {tiers}.",
+        "en": "The weight of RKO depends on RKO checks per week: {tiers}.",
+    },
+    "quality.overall.tier.zero": {"ru": "нет проверок — {w}", "en": "no checks — {w}"},
+    "quality.overall.tier.below": {"ru": "меньше {n} — {w}", "en": "fewer than {n} — {w}"},
+    "quality.overall.tier.from": {"ru": "{n} и больше — {w}", "en": "{n} or more — {w}"},
+    "quality.overall.maps": {"ru": "Вес карт — {w}.", "en": "The weight of maps is {w}."},
+    "quality.overall.rest": {
+        "ru": (
+            "Остаток веса делится между КР и агрегаторами по их долям в заказах «приложение и "
+            "сайт + агрегаторы»; прочие каналы не участвуют."
+        ),
+        "en": (
+            "The remaining weight is split between CR and aggregators by their shares of "
+            "“app and site + aggregators” orders; other channels do not take part."
+        ),
+    },
+    "quality.overall.sum": {
+        "ru": "Итог — сумма «вес × оценка» по компонентам.",
+        "en": "The total is the sum of weight × score over the components.",
+    },
+    "quality.overall.missing": {
+        "ru": (
+            "Компонент без оценки получает вес 0; если сумма весов стала меньше 100%, итог "
+            "делится на неё и помечается «неполный»."
+        ),
+        "en": (
+            "A component without a score gets weight 0; if the weights then add up to less "
+            "than 100%, the total is divided by that sum and marked “incomplete”."
+        ),
+    },
+    "quality.overall.country": {
+        "ru": (
+            "Итог и веса страны (строка «Вся страна») считаются по её строке: сначала средние "
+            "и доли страны, потом эти же правила — не среднее итогов пиццерий{inc}."
+        ),
+        "en": (
+            "The country's total and weights (the “Whole country” row) are computed from its "
+            "own row: first the country's means and shares, then the same rules — not the "
+            "mean of the pizzerias' totals{inc}."
+        ),
+    },
+    "quality.overall.incomplete": {
+        "ru": "; веса страны неполные — {w}",
+        "en": "; the country's weights are incomplete — {w}",
+    },
+    "quality.overall.country_none": {
+        "ru": "За этот месяц у страны нет итога.",
+        "en": "The country has no total this month.",
+    },
+    "quality.overall.table": {
+        "ru": "Веса и итог каждой пиццерии считаются по ней самой — в таблице выше.",
+        "en": (
+            "Each pizzeria's weights and total are computed from that pizzeria — see the table "
+            "above."
+        ),
+    },
     "quality.block.revenue": {"ru": "Выручка", "en": "Revenue"},
     "quality.block.aggs": {"ru": "Агрегаторы", "en": "Aggregators"},
     "quality.agg.no_collector": {"ru": "нет сбора оценок", "en": "no ratings collector"},

@@ -72,8 +72,73 @@ def test_groups_mark_first_column_of_each_group() -> None:
 
     assert [k for k, e in zip((c.key for c in qc.COLUMNS), edges, strict=True) if e] == [
         "rko",
+        "rs",
         "kr",
+        "maps",
+        "aggs",
+        "total",
         "share_agg",
         "rev_dine",
         "audit",
     ]
+
+
+def test_total_moves_like_a_score_and_is_tinted_when_worse() -> None:
+    total = qc.Column("total", "score", 2)
+    worse = qc.cell(total, D("4.40"), D("4.52"), None)
+
+    assert (worse.text, worse.delta.text, worse.tone) == ("4.40", "-0.12", "worse")
+    assert qc.cell(total, D("4.60"), D("4.52"), None).tone == ""
+
+
+def test_weight_is_whole_percent_without_movement_and_tint() -> None:
+    weight = qc.Column("w_kr", "weight")
+    c = qc.cell(weight, D("0.2333"), D("0.5"), None)
+
+    assert (c.text, c.delta.kind, c.tone) == ("23%", "", "")
+    assert qc.cell(weight, D(0), None, None).text == "0%"  # вес ноль — «0%», не прочерк
+    assert qc.cell(weight, None, None, None).text == qc.DASH  # итога нет вообще
+
+
+def test_network_columns_follow_the_analyst_prototype_order() -> None:
+    keys = [c.key for c in qc.shown(show_audit=True, country=False)]
+
+    assert keys == [
+        "rko",
+        "rko_adj",
+        "checks",
+        "w_rko",
+        "kr",
+        "w_kr",
+        "maps",
+        "w_maps",
+        "aggs",
+        "w_aggs",
+        "total",
+        "share_agg",
+        "share_app",
+        "share_other",
+    ]  # без РС, выручки и проверки; оценка рядом со своим весом
+
+
+def test_country_page_keeps_rs_revenue_and_audit() -> None:
+    keys = [c.key for c in qc.shown(show_audit=True)]
+
+    assert {"rs", "rev_dine", "rev_delivery", "audit"} <= set(keys)
+    assert "audit" not in [c.key for c in qc.shown(show_audit=False)]
+
+
+def _total_cell(values: dict) -> qc.Cell:
+    shown = qc.shown(False)
+    row = qc.cells(values, None, None, show_audit=False)
+    return next(c for col, c in zip(shown, row, strict=True) if col.key == "total")
+
+
+def test_incomplete_total_shows_sum_of_weights_without_tint() -> None:
+    values = {"total": D("4.50"), "w_sum": D("0.6793")}
+    total_cell = _total_cell(values)
+    assert (total_cell.text, total_cell.incomplete, total_cell.tone) == ("4.50", "68%", "")
+
+    assert _total_cell({"total": D("4.50"), "w_sum": D(1)}).incomplete == ""
+    # Без суммы весов пометки нет.
+    assert _total_cell({"total": D("4.50")}).incomplete == ""

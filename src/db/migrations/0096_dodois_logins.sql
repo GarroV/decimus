@@ -1,6 +1,6 @@
 -- 0096_dodois_logins.sql
 --
--- Входы в Dodo IS по странам (D640b, #951). Данные Dodo IS по странам берутся через вход
+-- Входы в Dodo IS по странам (D640, #951). Данные Dodo IS по странам берутся через вход
 -- учёткой каждой страны (OAuth2, device flow). Главный админ выдаёт коллеге одноразовую
 -- ссылку; коллега подтверждает вход на auth.dodois.com, и вход страны записывается.
 --
@@ -46,7 +46,7 @@ create table dodois.logins (
     reason text check (reason is null or reason ~ '^[a-z_]{1,40}$')
 );
 comment on table dodois.logins is
-    'Входы в Dodo IS по странам (D640b): состояние и след, без ключей. Ключи — vault.secrets.';
+    'Входы в Dodo IS по странам (D640): состояние и след, без ключей. Ключи — vault.secrets.';
 
 create table dodois.invites (
     id bigint generated always as identity primary key,

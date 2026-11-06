@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 218 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 221 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -102,6 +102,7 @@
 | `/api/v1/ratings/checkups` | GET | `swarm_api_checkups` | `src/web/swarm_api.py` |
 | `/api/v1/ratings/scores` | GET | `swarm_api_scores` | `src/web/swarm_api.py` |
 | `/api/v1/ratings/violations` | GET | `swarm_api_violations` | `src/web/swarm_api.py` |
+| `/api/v1/sales` | GET | `swarm_api_sales` | `src/web/swarm_api.py` |
 | `/auth/google/callback` | GET | `google_callback` | `src/web/auth.py` |
 | `/auth/google/mail` | GET | `google_mail_callback` | `src/web/letter_draft.py` |
 | `/calendar` | GET | `calendar` | `src/web/calendar_screen.py` |
@@ -146,6 +147,8 @@
 | `/login/passkey/verify` | POST | `passkey_login_verify` | `src/web/passkey_login.py` |
 | `/login/second-step` | GET | `second_step_page` | `src/web/second_step.py` |
 | `/login/second-step/code` | POST | `second_step_code` | `src/web/second_step.py` |
+| `/login/second-step/passkey/create` | POST | `second_step_passkey_create` | `src/web/second_step.py` |
+| `/login/second-step/passkey/create-options` | POST | `second_step_passkey_create_options` | `src/web/second_step.py` |
 | `/login/second-step/passkey/options` | POST | `second_step_passkey_options` | `src/web/second_step.py` |
 | `/login/second-step/passkey/verify` | POST | `second_step_passkey_verify` | `src/web/second_step.py` |
 | `/logout` | POST | `logout` | `src/web/auth.py` |
@@ -615,6 +618,7 @@
 | `0118_agg_unit_absent_point_links.sql` | `agg.unit_absent`, `agg.point_links` |
 | `0119_walk_log.sql` | `walk_log` |
 | `0120_walk_log_retention_30d.sql` | — |
+| `0121_api_sales_scope.sql` | — |
 <!-- map:end -->
 
 ## Makefile

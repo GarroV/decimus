@@ -447,6 +447,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0120_walk_log_retention_30d.sql": (
         "sql1:6450da72fa6374d2931de3d8674186f77aaaebc21658072c5996184c57f99162"
     ),
+    "0121_api_sales_scope.sql": (
+        "sql1:ab25c8457fc6bf0b205b21fd8be0d5d77addb9d0a2768e82c3a57a1905a5cd11"
+    ),
 }
 
 

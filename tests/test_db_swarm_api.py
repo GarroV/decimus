@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -30,8 +31,9 @@ from db_harness import слить_проверку, точка_справочн�
 from flask.testing import FlaskClient  # noqa: E402
 from test_ratings_base import COLLECTION_HEADER  # noqa: E402
 
-from src.db import api_access, queries, swarm_read  # noqa: E402
+from src.db import api_access, dodois_metrics_store, queries, swarm_read  # noqa: E402
 from src.db.reach import reach_of  # noqa: E402
+from src.domain.dodois_metrics import SalesRow  # noqa: E402
 from src.ratings.importer import CHANNEL_WEB, import_file  # noqa: E402
 from src.web import swarm_api  # noqa: E402
 from src.web.app import create_app  # noqa: E402
@@ -336,3 +338,39 @@ def test_карты_оценка_на_дату_среза(клиент: FlaskCli
     assert {u["id"]: u["maps"]["google"]["avg"] for u in тело["units"]} == {"aa" * 16: 4.4}
     assert [c["cc"] for c in тело["countries"]] == ["RS", "HR"]
     assert тело["countries"][1]["maps"]["google"]["avg"] is None
+
+
+@pytest.mark.usefixtures("рейтинги")
+def test_продажи_пиццерий_сумма_по_каналам_и_валюта_страны(клиент: FlaskClient) -> None:
+    ноябрь, октябрь = date(2026, 11, 1), date(2026, 10, 1)
+    чужая = "f" * 32  # в реестре пиццерий её нет — в ответ не попадает
+    dodois_metrics_store.replace_sales(
+        ноябрь,
+        [U1, чужая],
+        [
+            SalesRow(U1, "Website", "Delivery", 10, Decimal("100.25"), None),
+            SalesRow(U1, "Kiosk", "Dine-in", 3, Decimal("20.50"), None),
+            SalesRow(чужая, "Website", "Delivery", 1, Decimal("5"), None),
+        ],
+    )
+    dodois_metrics_store.replace_sales(
+        октябрь, [U1], [SalesRow(U1, "Website", "Delivery", 99, Decimal("999"), None)]
+    )
+    загрузка = dodois_metrics_store.start_load("RS", "sales")
+    dodois_metrics_store.finish_load(загрузка, ok=True, rows=2)
+
+    тело = _get(клиент, f"{swarm_api.SALES_PATH}?countries=RS,HR&month=2026-11")
+
+    assert тело["month"] == "2026-11"
+    assert тело["units"] == [
+        {
+            "id": U1,
+            "name": "Testville-1",
+            "cc": "RS",
+            "revenue": 120.75,
+            "orders": 13,
+            "currency": "RSD",
+        }
+    ]
+    assert list(тело["loaded"]) == ["RS"] and тело["loaded"]["RS"].endswith("Z")
+    assert _get(клиент, f"{swarm_api.SALES_PATH}?countries=RS&month=2026-12")["units"] == []

@@ -49,6 +49,7 @@ from src.db.errors import DbError
 from src.db.web_access import close_session
 from src.domain.second_factor import (
     MAX_PASSKEY_NAME,
+    MAX_PASSKEYS,
     backup_code_hash,
     is_fresh_login,
     is_required,
@@ -68,9 +69,6 @@ from .second_step import party_of
 from .sections import section
 
 logger = logging.getLogger(__name__)
-
-#: Сколько ключей доступа у человека не больше (запас на устройства, а не на перебор).
-MAX_PASSKEYS = 10
 
 SECURITY_ENDPOINT = "security_page"
 

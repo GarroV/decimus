@@ -1,9 +1,12 @@
 """Ячейки таблицы «Качества»: текст значения, движение к прошлому месяцу, подсветка.
 
 Одна таблица на страны и на пиццерии: столбцы одни (`COLUMNS`), значения приходят из
-`quality_data` (`values` пиццерии или страны). Подсветка по D677: РКО и РС — по порогам
-«Рейтингов» (ниже 80 красный, ниже 90 жёлтый, D552), остальные показатели — только если стали
-хуже прошлого месяца; доли заказов направления «лучше/хуже» не имеют и не подсвечиваются.
+`quality_data` (`values` пиццерии или страны). Порядок — как в прототипе аналитика, оценка
+рядом со своим весом (D722); сеть без РС, выручки и проверки (`country_only`). Итог и веса —
+D719: итог красится как прочие оценки (хуже прошлого месяца), веса — никак.
+Подсветка по D677: РКО и РС — по порогам «Рейтингов» (ниже 80 красный, ниже 90 жёлтый, D552),
+остальные показатели — только если стали хуже прошлого месяца; доли заказов направления
+«лучше/хуже» не имеют и не подсвечиваются.
 Пока месяц идёт, выручка без движения и без подсветки: неполный месяц против полного прошлого
 всегда «падение» (D707).
 """
@@ -31,35 +34,48 @@ class Delta:
 @dataclass(frozen=True)
 class Column:
     key: str
-    #: `score` (число со знаками), `share` (доля заказов, проценты), `money` (выручка).
+    #: `score` (число со знаками), `share` (доля заказов, проценты), `money` (выручка),
+    #: `weight` (вес компонента в итоге, проценты, без движения и подсветки).
     kind: str
     places: int = 1
     #: РКО и РС красятся по порогам рейтингов, остальные — по ухудшению.
     threshold: bool = False
     audit: bool = False
-    #: Группа верхнего этажа шапки (`ratings`, `guest`, `shares`, `revenue`); пусто — без группы.
+    #: Группа верхнего этажа шапки (`rko`, `kr`, `maps`, `aggs`, `shares`, `revenue`); пусто —
+    #: столбец на оба этажа.
     group: str = ""
+    #: Только на странице страны: в сетевой таблице столбца нет (РС, выручка, проверка).
+    country_only: bool = False
 
 
 COLUMNS = (
-    Column("rko", "score", 1, threshold=True, group="ratings"),
-    Column("rs", "score", 1, threshold=True, group="ratings"),
-    Column("checks", "score", 1, group="ratings"),
-    Column("kr", "score", 2, group="guest"),
-    Column("maps", "score", 2, group="guest"),
-    Column("aggs", "score", 2, group="guest"),
+    Column("rko", "score", 1, threshold=True, group="rko"),
+    Column("rko_adj", "score", 2, group="rko"),
+    Column("checks", "score", 1, group="rko"),
+    Column("w_rko", "weight", group="rko"),
+    Column("rs", "score", 1, threshold=True, country_only=True),
+    Column("kr", "score", 2, group="kr"),
+    Column("w_kr", "weight", group="kr"),
+    Column("maps", "score", 2, group="maps"),
+    Column("w_maps", "weight", group="maps"),
+    Column("aggs", "score", 2, group="aggs"),
+    Column("w_aggs", "weight", group="aggs"),
+    Column("total", "score", 2),
     Column("share_agg", "share", group="shares"),
     Column("share_app", "share", group="shares"),
     Column("share_other", "share", group="shares"),
-    Column("rev_dine", "money", group="revenue"),
-    Column("rev_delivery", "money", group="revenue"),
-    Column("audit", "score", 1, audit=True),
+    Column("rev_dine", "money", group="revenue", country_only=True),
+    Column("rev_delivery", "money", group="revenue", country_only=True),
+    Column("audit", "score", 1, audit=True, country_only=True),
 )
 
 
-def shown(show_audit: bool) -> tuple[Column, ...]:
-    """Столбцы, которые видит читатель: проверка — только тому, кому она открыта."""
-    return tuple(c for c in COLUMNS if show_audit or not c.audit)
+def shown(show_audit: bool, country: bool = True) -> tuple[Column, ...]:
+    """Столбцы, которые видит читатель: проверка — только тому, кому она открыта; сеть — без
+    столбцов страны."""
+    return tuple(
+        c for c in COLUMNS if (show_audit or not c.audit) and (country or not c.country_only)
+    )
 
 
 def group_starts(columns: tuple[Column, ...]) -> tuple[bool, ...]:
@@ -75,6 +91,8 @@ class Cell:
     tone: str
     #: Первый столбец группы шапки: слева от ячейки тонкая линия.
     edge: bool = False
+    #: Сумма весов итога («70%»), когда итог неполный: экран пишет под числом пометку; иначе пусто.
+    incomplete: str = ""
 
 
 def num(value: Decimal | None, places: int = 2) -> str:
@@ -136,11 +154,21 @@ def cell(
         scaled = None if now is None else now * 100
         prior = None if before is None else before * 100
         return Cell(pct(now), delta(scaled, prior, 0), "")
+    if column.kind == "weight":
+        return Cell(pct(now), Delta("", ""), "")
     if column.kind == "money":
         move = Delta("", "") if in_progress else delta_percent(now, before)
         return Cell(money(now, currency), move, _tone(column, now, move))
     move = delta(now, before, column.places)
     return Cell(num(now, column.places), move, _tone(column, now, move))
+
+
+def _incomplete(column: Column, values: Mapping[str, Decimal | None]) -> str:
+    """Пометка у итога: сумма весов меньше 100% — итог нормирован на неё (D719)."""
+    weights = values.get("w_sum")
+    if column.key != "total" or values.get("total") is None or weights is None or weights >= 1:
+        return ""
+    return pct(weights)
 
 
 def cells(
@@ -150,9 +178,11 @@ def cells(
     *,
     show_audit: bool,
     in_progress: bool = False,
+    country: bool = True,
 ) -> tuple[Cell, ...]:
-    """Ячейки строки по `COLUMNS`; столбец проверки — только тому, кто её видит."""
-    columns = shown(show_audit)
+    """Ячейки строки по `COLUMNS`; столбец проверки — только тому, кто её видит; в сетевой
+    таблице (`country=False`) нет столбцов страны."""
+    columns = shown(show_audit, country)
     return tuple(
         replace(
             cell(
@@ -163,6 +193,7 @@ def cells(
                 in_progress=in_progress,
             ),
             edge=edge,
+            incomplete=_incomplete(c, now),
         )
         for c, edge in zip(columns, group_starts(columns), strict=True)
     )

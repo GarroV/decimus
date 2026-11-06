@@ -198,7 +198,7 @@ Flask-приложение управляющей компании и партн
 «Подключения» (состояние подключений, D638) и «Ключи и API» (ключи сервисов и ключи API, D650), подключение
 Claude входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -219,6 +219,7 @@ Claude входом через сайт (OAuth).
 | `src/web/journal.py` | Журналы входов и действий на стороне веба (D462, `0067`) |
 | `src/web/journal_screen.py` | Экраны журналов (D462): «Журнал» главного админа и «Журнал входов» человека |
 | `src/web/landing.py` | Посадочная страница продукта (D524): что такое Decimus, «Войти» и «Открыть демо» |
+| `src/web/login_alert.py` | Сообщение владельцу о каждом входе главного админа в админку (D720) |
 | `src/web/notifications.py` | Колокольчик и красные точки: уведомления в приложении (#1129, D604, D614) |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения нейросетей к MCP (D417, D695) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
@@ -251,8 +252,8 @@ Claude входом через сайт (OAuth).
 <!-- map:begin files src/web/{api_feed,swarm_api}.py -->
 | Файл | Что делает |
 |---|---|
-| `src/web/api_feed.py` | Ответы API для сервисов (D426): оценки агрегаторов и топ нарушений по проверкам |
-| `src/web/swarm_api.py` | API чтения для сервисов, v1 (#567, D387, D390, D426): рейтинги, нарушения, проверки, карты, агрегаторы |
+| `src/web/api_feed.py` | Ответы API для сервисов (D426, D723): агрегаторы, топ нарушений проверок, продажи пиццерий |
+| `src/web/swarm_api.py` | API чтения для сервисов, v1 (#567, D387, D390, D426, D723): рейтинги, нарушения, проверки, карты, агрегаторы, продажи пиццерий |
 <!-- map:end -->
 
 ### Тексты
@@ -613,7 +614,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0093_ratings_rko_service_marks.sql` | «Дисквалифицировать пиццу» в фото-проверке РКО — не нарушение, а служебная пометка контроля: отчёт ресторана не идёт в пул баллов по продукту |
 | `0094_action_plan_file_parsed.sql` | Файл «туда и обратно» электронного плана, шаг 3 эпика #1168 (спека 2026-10-22-electronic-action-plan-design, «Файл туда и обратно») |
 | `0095_health_checks.sql` | Постоянная проверка подключений (D638, #1251) |
-| `0096_dodois_logins.sql` | Входы в Dodo IS по странам (D640b, #951) |
+| `0096_dodois_logins.sql` | Входы в Dodo IS по странам (D640, #951) |
 | `0097_dodois_invite_result.sql` | Новый вход заменяет рабочий вход страны только после проверки: учётка должна открывать хоть одну пиццерию |
 | `0098_country_report_langs.sql` | Языки отчёта страны, изменяемые из веба (D640, #1251, вкладка «Администрирование → Страны») |
 | `0099_health_alerts.sql` | Оповещения владельцу о смене состояния подключений (D641) |
@@ -638,6 +639,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0118_agg_unit_absent_point_links.sql` | Ручные решения по охвату агрегаторов (D700): отметка «пиццерии нет на площадке» и закреплённая привязка точки к пиццерии (docs/17-aggregators.md) |
 | `0119_walk_log.sql` | Журнал шагов обхода (D710): что аудитор ввёл и что ответила система на каждом шаге записи нарушения в мини-аппе — подбор пункта, определение класса, уточнение фактов… |
 | `0120_walk_log_retention_30d.sql` | Владелец, 05.11.2026: «Хранить 180 дней нет смысла |
+| `0121_api_sales_scope.sql` | Право `sales:month` — метод `GET /api/v1/sales` (D723): продажи пиццерий за месяц из Dodo IS, которые Децимус собирает раз в сутки в `dodois.unit_sales_month` |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -942,6 +944,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/clarifications.py` | Bounded human answers paired with untrusted clarification questions |
 | `src/domain/client_ip.py` | Чей это адрес у сервера MCP: клиент за общим прокси (D462, журнал действий) |
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
+| `src/domain/country_currency.py` | Валюта выручки Dodo IS по стране (D723): справочник, а не догадка по сумме |
 | `src/domain/coverage_exempt.py` | Где источник данных рейтингов Додо не обслуживает — и потому его пустота не дыра (D704, D706) |
 | `src/domain/coverage_rules.py` | Когда пара «страна × источник» данных рейтингов считается дырой (D704, D706, #1444) |
 | `src/domain/criteria.py` | One criteria extractor, with a consistent active-inspection edition snapshot |
@@ -973,7 +976,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/photo_upload_link.py` | Адрес загрузки кадров к черновику загрузки проверки: подписанный токен без срока |
 | `src/domain/plan_due.py` | Срок ответа партнёра планом исправлений — один на письмо, бот и веб (D617) |
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
-| `src/domain/quality.py` | Расчёты страницы «Качество» (docs/21-quality.md): среднее КР, карт и агрегаторов, доли заказов |
+| `src/domain/quality.py` | Расчёты страницы «Качество» (docs/21-quality.md): средние КР, карт и агрегаторов, доли заказов, веса и итоговый рейтинг по методике аналитика (D719) |
 | `src/domain/repeat_rule.py` | Правило «пункт уже был нарушением в прошлой проверке» (D191, D255) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
 | `src/domain/revision.py` | Отпечаток состояния проверки: поймать правку между «увидел» и «запечатал» |

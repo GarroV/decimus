@@ -569,6 +569,8 @@ second_step_page
 second_step_code
 second_step_passkey_options
 second_step_passkey_verify
+second_step_passkey_create_options
+second_step_passkey_create
 security_page
 security_relogin
 security_passkey_options

@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -75,6 +75,8 @@ class UnitHealth:
     periods: tuple[dodois_metrics.UnitRatingPeriod, ...] = ()
     #: Откуда РКО и РС: `dodois` (API), `sheet` (таблица контроля) или пусто.
     rating_source: str = ""
+    #: Итоговый рейтинг и веса (D719); `None` — у пиццерии не считался.
+    overall: q.Overall | None = None
 
 
 @dataclass(frozen=True)
@@ -125,7 +127,8 @@ class MapTotal:
 class CountryHealth:
     code: str
     units: tuple[UnitHealth, ...]
-    #: Страна: баллы — простое среднее пиццерий, доли заказов и выручка — по суммам.
+    #: Страна: баллы — простое среднее пиццерий, доли заказов и выручка — по суммам; итог и
+    #: веса считаются от этих средних и долей (D722).
     values: dict[str, Decimal | None]
     orders: q.Orders
     revenue: dict[str, Decimal]
@@ -137,6 +140,8 @@ class CountryHealth:
     periods: tuple[PeriodGroup, ...]
     dodois: str
     rating_source: str = ""
+    #: Итог и веса страны — по её строке (D722), не среднее итогов пиццерий; `None` — не считался.
+    overall: q.Overall | None = None
 
 
 def agg_key(name: str) -> str | None:
@@ -186,6 +191,34 @@ def _kr(parts: dodois_metrics.UnitKr | None) -> Decimal | None:
     )
 
 
+def overall_values(
+    *,
+    rko: Decimal | None,
+    checks: Decimal | None,
+    kr: Decimal | None,
+    maps: Decimal | None,
+    aggs: Decimal | None,
+    orders: q.Orders,
+) -> tuple[q.Overall, dict[str, Decimal] | None]:
+    """Итог и веса по показателям (пиццерии или строки страны); весов нет, если нет и итога."""
+    overall = q.overall(
+        rko=rko,
+        rko_checks_per_week=checks,
+        kr=kr,
+        maps=maps,
+        aggregators=aggs,
+        orders=orders,
+    )
+    w = overall.weights
+    # Нет итога вообще — и весов нет (прочерк), а не четыре нуля.
+    weights = (
+        {"rko": w.rko, "kr": w.kr, "maps": w.maps, "aggs": w.aggregators, "sum": w.total}
+        if overall.score is not None
+        else None
+    )
+    return overall, weights
+
+
 def _unit_values(
     *,
     rko: Decimal | None,
@@ -197,9 +230,19 @@ def _unit_values(
     aggs: Decimal | None,
     orders: q.Orders,
     revenue: dict[str, Decimal],
+    total: Decimal | None = None,
+    weights: Mapping[str, Decimal | None] | None = None,
 ) -> dict[str, Decimal | None]:
+    w = weights or {}
     return {
+        "total": total,
+        "w_rko": w.get("rko"),
+        "w_kr": w.get("kr"),
+        "w_maps": w.get("maps"),
+        "w_aggs": w.get("aggs"),
+        "w_sum": w.get("sum"),
         "rko": rko,
+        "rko_adj": None if rko is None else rko / q.RKO_DIVISOR,
         "rs": rs,
         "checks": checks,
         "kr": kr,
@@ -268,16 +311,23 @@ def _unit(
         # Заказов агрегаторов нет (Dodo IS не собран или не подключён): веса взять неоткуда,
         # оценки площадок усредняются поровну, чтобы собранные оценки не пропадали.
         aggs5 = _mean(q.five_point(score, scale) for score, scale in agg_scores.values())
+    kr5 = _kr(kr)
+    maps5 = q.maps_score([(m[1], m[2]) for m in maps])
+    overall, weights = overall_values(
+        rko=rko, checks=checks, kr=kr5, maps=maps5, aggs=aggs5, orders=orders
+    )
     values = _unit_values(
         rko=rko,
         checks=checks,
         rs=rs,
         audit=audit,
-        kr=_kr(kr),
-        maps=q.maps_score([(m[1], m[2]) for m in maps]),
+        kr=kr5,
+        maps=maps5,
         aggs=aggs5,
         orders=orders,
         revenue=dict(revenue),
+        total=overall.score,
+        weights=weights,
     )
     return UnitHealth(
         dodo_id,
@@ -292,6 +342,7 @@ def _unit(
         tuple(sorted(lines.values(), key=lambda x: -x.orders)),
         tuple(periods),
         source,
+        overall,
     )
 
 
@@ -401,14 +452,21 @@ def _country(
     def avg(key: str) -> Decimal | None:
         return _mean(v for u in units if (v := u.values[key]) is not None)
 
+    rko, checks, kr = avg("rko"), avg("checks"), avg("kr")
+    maps, aggs = avg("maps"), avg("aggs")
+    overall, weights = overall_values(
+        rko=rko, checks=checks, kr=kr, maps=maps, aggs=aggs, orders=orders
+    )
     values = _unit_values(
-        rko=avg("rko"),
-        checks=avg("checks"),
+        total=overall.score,
+        weights=weights,
+        rko=rko,
+        checks=checks,
         rs=avg("rs"),
         audit=avg("audit"),
-        kr=avg("kr"),
-        maps=avg("maps"),
-        aggs=avg("aggs"),
+        kr=kr,
+        maps=maps,
+        aggs=aggs,
         orders=orders,
         revenue=dict(revenue),
     )
@@ -426,6 +484,7 @@ def _country(
         periods=_period_groups(units),
         dodois=state,
         rating_source=_source_of(units),
+        overall=overall if overall.score is not None else None,
     )
 
 
