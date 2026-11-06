@@ -662,11 +662,9 @@ LETTER_CLEAN = {
 
 {date} мы провели проверку пиццерии {unit}{city}. Вид проверки — {type}.
 
-Итоговая оценка — {grade} ({pct}%).{grade_note} Существенных (D2) и критических (D3) нарушений не зафиксировано.
+Итоговая оценка — {grade} ({pct}%).{grade_note}
 
-{good_block}Что отметили:
-{summary_lines}
-{critical_block}Нарушений не зафиксировано. Во вложении — подробный отчёт с фотографиями. План устранения нарушений не требуется.
+{good_block}{critical_block}Нарушений не зафиксировано. Во вложении — подробный отчёт с фотографиями. План устранения нарушений не требуется.
 
 {end_block}Спасибо за работу. Готовы обсудить любой пункт отчёта.""",
     "en": """Subject: Inspection results — {unit}, {date}: grade {grade} ({pct}%)
@@ -675,11 +673,9 @@ Hello,
 
 On {date} we inspected the {unit} store{city}. Inspection type: {type}.
 
-The final grade is {grade} ({pct}%).{grade_note} No major (D2) or critical (D3) violations were recorded.
+The final grade is {grade} ({pct}%).{grade_note}
 
-{good_block}What we noted:
-{summary_lines}
-{critical_block}No violations were recorded. Attached is the detailed report with photographs. No action plan to address violations is required.
+{good_block}{critical_block}No violations were recorded. Attached is the detailed report with photographs. No action plan to address violations is required.
 
 {end_block}Thank you for your work. We are happy to walk through any item in the report.""",
 }
@@ -778,20 +774,22 @@ def letter_text(f, qk, lang):
 
 
 def summary_lines(res, lang, clean):
-    """Сводка всех нарушений D1/D2/D3, включая D1 в письме с планом."""
+    """Сводка всех нарушений D1/D2/D3, включая D1 в письме с планом.
+
+    В чистом письме (нет ни одного D1/D2/D3, D684) сводить нечего: пустая
+    строка, а не «отклонений D1: 0» — ноль отклонений, поданный находкой, и есть
+    то, от чего T128 увёл письмо идеальной проверки.
+    """
+    if clean:
+        return ""
     c = res["counts"]
     zk = "zone_name_en" if lang == "en" else "zone_name_ru"
     qk = "question_en" if lang == "en" else "question_ru"
-    if clean:
-        lines = [f"— minor D1 deviations: {c['D1']}." if lang == "en"
-                 else f"— незначительных отклонений D1: {c['D1']}."]
-        shown = ("D1",)
-    else:
-        lines = [f"— {c['D3']} critical D3, {c['D2']} major D2, {c['D1']} minor D1 violations."
-                 if lang == "en"
-                 else f"— критических D3: {c['D3']}, значительных D2: {c['D2']}, "
-                      f"незначительных D1: {c['D1']}."]
-        shown = ("D1", "D2", "D3")
+    lines = [f"— {c['D3']} critical D3, {c['D2']} major D2, {c['D1']} minor D1 violations."
+             if lang == "en"
+             else f"— критических D3: {c['D3']}, значительных D2: {c['D2']}, "
+                  f"незначительных D1: {c['D1']}."]
+    shown = ("D1", "D2", "D3")
     by_zone = {}
     for f in res["findings"]:
         if f["level"] in shown:
@@ -959,11 +957,12 @@ def build_letter(res, lang, template=1, speech_lang=None, bodies=None):
     good = feedback_block(blocks, lang, ("strengths",)) if first else ""
     growth = feedback_block(blocks, lang, ("growth",)) if first else ""
     end = "" if first else feedback_block(blocks, lang, FEEDBACK_ROLES)
-    if clean and not res["findings"]:
-        slot = "empty"
+    if clean:
+        # Нет D1/D2/D3: сводить нечего, блок «Что отметили» не печатается (D684/D685).
+        slot = "clean" if res["findings"] else "empty"
         after = growth
     else:
-        slot = "clean" if clean else "plan"
+        slot = "plan"
         parts = [x.strip("\n") for x in (crit, growth) if x]
         after = "\n" + "\n\n".join(parts) + "\n\n" if parts else ""
     # Текст из админки (`bodies`: слот → текст на языке письма) заменяет встроенный; нет
