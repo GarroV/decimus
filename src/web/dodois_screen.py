@@ -15,9 +15,11 @@
 выдачу (без перенаправления, `Cache-Control: private, no-store`), дальше — только статус:
 выдано, использовано, истекло, отозвано. Токен не пишется ни в журнал, ни в сессию.
 
-**Заслоны выдачи** — как у ключей сервисов (`connections_screen._key_action`): роль (404) →
-`refuse_foreign_origin()` → второй шаг входа в этой сессии → свежее подтверждение → предел
-попыток. Отзыв и «Проверить сейчас» ничего не выдают: роль и происхождение.
+**Заслоны выдачи** (D715): роль (404) → `refuse_foreign_origin()` → предел попыток → ключ доступа
+этой учётки, предъявленный прямо на панели (`_passkey_gate`: одноразовый вызов сессии, подпись
+проверяет `webauthn_rp`, как при входе ключом). Второго шага «в этой сессии» и свежего входа
+здесь нет: человек уже в сервисе, релогин не требуется. Отзыв и «Проверить сейчас» ничего не
+выдают: роль и происхождение.
 
 **Ключи приложения (D648).** Первым блоком вкладки — пара `client_id` / `client_secret`
 приложения Decimus в маркетплейсе Dodo IS (сервис `dodois` реестра `src/domain/service_keys.py`;
@@ -37,21 +39,22 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from flask import Flask, abort, current_app, g, make_response, render_template, request
+from flask import Flask, abort, current_app, g, jsonify, make_response, render_template, request
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import dodois_logins, web_throttle
+from src.db import dodois_logins, second_factor, web_throttle
 from src.db import ratings_read as ratings
 from src.db.errors import DbError
 from src.dodois import service
 from src.domain import dodois as rules
 from src.domain.dodois import Invite, Login
 
-from . import administration, auth, guard, service_keys_screen
+from . import administration, auth, guard, service_keys_screen, webauthn_rp
 from .db_refusal import note_target_mismatch
 from .journal import TARGET_OVERRIDE
 from .origin import refuse_foreign_origin
+from .second_step import party_of
 from .sections import section
 from .users_view import TAB_DODOIS
 
@@ -62,6 +65,9 @@ INVITES_SHOWN = 30
 ISSUE_ACTION = "dodois_invite_issue"
 REVOKE_ACTION = "dodois_invite_revoke"
 CHECK_ACTION = "dodois_check"
+OPTIONS_ACTION = "dodois_invite_options"
+#: Поле формы выдачи: ответ браузера на вызов ключа доступа (JSON), его кладёт `passkey.js`.
+ASSERTION_FIELD = "assertion"
 
 
 @dataclass(frozen=True)
@@ -149,6 +155,21 @@ def view(flash: Flash | None = None, issued: IssuedLink | None = None) -> View:
     return View(rows, invites, True, flash, issued, registry)
 
 
+def has_passkey() -> bool:
+    """У вошедшего есть ключ доступа и вход ключом на этом стенде включён: только показ.
+
+    Сбой базы — «есть»: кнопка остаётся, а сам заслон стоит на POST выдачи и от показа не зависит.
+    """
+    conf = current_app.extensions["decimus_conf"]
+    account = auth.current_account()
+    if account is None or not conf.webauthn_enabled:
+        return False
+    try:
+        return bool(second_factor.status_of(account.id).passkeys)
+    except DbError:
+        return True
+
+
 def context(
     flash: Flash | None = None,
     issued: IssuedLink | None = None,
@@ -159,6 +180,7 @@ def context(
         "dodois": view(flash, issued),
         "dodois_flash": flash,
         **service_keys_screen.app_context(key_flash),
+        "dodois_has_passkey": has_passkey,
         "dodois_now": datetime.now(UTC),
         "dodois_stamp": _stamp,
     }
@@ -196,6 +218,7 @@ def page(
         "administration/dodois.html",
         users_url=f"{request.script_root}{section('administration').path}",
         link=_link,
+        security_url=f"{request.script_root}{section('settings').path}/security",
         picked=picked,
         split_open=bool(picked),
         split_back=_link(),
@@ -262,6 +285,60 @@ def issue(by_login: str, account: Any) -> tuple[Flash | IssuedLink, int]:
     return IssuedLink(country, public_link(token), now + rules.INVITE_TTL, replaces), 200
 
 
+def _passkey_gate(login: str) -> tuple[Flash, int] | None:
+    """Заслон выдачи (D720): подтверждение ключом доступа ЭТОЙ учётки, а не свежий вход.
+
+    Порядок: предел попыток → ключ есть → ответ на вызов этой сессии проверен тем же кодом, что
+    вход ключом (`webauthn_rp`, `passkey_login`). Вызов снимается один раз до разбора ответа:
+    повторить тот же ответ нельзя. `None` — можно выдавать.
+    """
+    conf = current_app.extensions["decimus_conf"]
+    account = auth.current_account()
+    party = party_of(conf)
+    if account is None or party is None:
+        return Flash("dodois.err.no_passkey", False, {}), 403
+    from . import connections_screen
+
+    попытка = web_throttle.admit_service_key_action(tenant=connections_screen._stand(), login=login)
+    if not попытка.admitted:
+        minutes = попытка.verdict.retry_after_minutes
+        return Flash("keys.err.rate", False, {"minutes": minutes}), 429
+    сырое = request.form.get(ASSERTION_FIELD) or ""
+    try:
+        if not second_factor.status_of(account.id).passkeys:
+            return Flash("dodois.err.no_passkey", False, {}), 403
+        вызов = second_factor.take_challenge(
+            auth.current_session_token(),
+            purpose=second_factor.PURPOSE_AUTHENTICATE,
+            user_id=account.id,
+        )
+        if вызов is None or not сырое:
+            return Flash("dodois.err.passkey", False, {}), 403
+        номер = webauthn_rp.credential_id_of(сырое)
+        найден = second_factor.passkey_by_credential(номер)
+        # Ключ обязан принадлежать ЭТОМУ человеку: чужой ключ выдачу не открывает.
+        if найден is None or найден[1] != str(account.id):
+            return Flash("dodois.err.passkey", False, {}), 403
+        ключ = найден[0]
+        итог = webauthn_rp.verify_authentication(
+            party,
+            credential=сырое,
+            challenge=вызов,
+            public_key=ключ.public_key,
+            sign_count=ключ.sign_count,
+        )
+        if not second_factor.touch_passkey(
+            ключ.id, old_count=ключ.sign_count, new_count=итог.new_sign_count
+        ):
+            return Flash("dodois.err.passkey", False, {}), 403
+    except webauthn_rp.PasskeyError:
+        return Flash("dodois.err.passkey", False, {}), 403
+    except DbError as exc:
+        note_target_mismatch(exc)
+        return Flash("dodois.err.db", False, {}), 503
+    return None
+
+
 def revoke(invite_id: int) -> tuple[Flash, int]:
     setattr(g, TARGET_OVERRIDE, f"invite={invite_id}")
     try:
@@ -298,22 +375,45 @@ def install(app: Flask) -> None:
     def dodois_invite_issue() -> Response:
         login = _boss()
         refuse_foreign_origin()
-        back = f"{section('administration').path}?tab={TAB_DODOIS}"
-        refused = screen._key_gate(login, back)
-        if isinstance(refused, tuple):
-            flash, code = refused
-            return page(
-                Flash(flash.key, False, flash.params or {}),
-                code=code,
-                picked=_country_from_form() or "",
-            )
+        refused = _passkey_gate(login)
         if refused is not None:
-            return refused
+            flash, code = refused
+            return page(flash, code=code, picked=_country_from_form() or "")
         result, code = issue(login, auth.current_account())
         if isinstance(result, IssuedLink):
             web_throttle.note_service_key_ok(tenant=screen._stand(), login=login)
             return page(issued=result, code=code, picked=result.country)
         return page(result, code=code)
+
+    @app.post(f"{base}/invite/options", endpoint=OPTIONS_ACTION)
+    @guard.action("keys.manage", hidden=True)
+    def dodois_invite_options() -> Response | tuple[Response, int]:
+        """Вызов для ключа доступа под выдачу ссылки: одноразовый, привязан к этой сессии."""
+        _boss()
+        refuse_foreign_origin()
+        account = auth.current_account()
+        party = party_of(current_app.extensions["decimus_conf"])
+        if account is None or party is None:
+            return jsonify(error="off"), 400
+        try:
+            ключи = second_factor.status_of(account.id).passkeys
+            if not ключи:
+                return jsonify(error="none"), 409
+            параметры, вызов = webauthn_rp.authentication_options(
+                party, credential_ids=tuple(k.credential_id for k in ключи)
+            )
+            second_factor.store_challenge(
+                auth.current_session_token(),
+                purpose=second_factor.PURPOSE_AUTHENTICATE,
+                user_id=account.id,
+                challenge=вызов,
+            )
+        except DbError as exc:
+            note_target_mismatch(exc)
+            return jsonify(error="db"), 503
+        ответ = current_app.response_class(параметры, mimetype="application/json")
+        ответ.headers["Cache-Control"] = "no-store"
+        return ответ
 
     @app.post(f"{base}/invite/<int:invite_id>/revoke", endpoint=REVOKE_ACTION)
     @guard.action("keys.manage", hidden=True)

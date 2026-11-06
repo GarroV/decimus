@@ -14,6 +14,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -21,12 +22,12 @@ from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
 from src.db import dodois_logins as store
-from src.db import health_store, ratings_read
+from src.db import health_store, ratings_read, second_factor
 from src.dodois import client, flow, service
 from src.dodois.client import Credentials
 from src.domain import dodois as rules
 from src.domain.dodois import Invite
-from src.web import auth, dodois_connect
+from src.web import auth, dodois_connect, webauthn_rp
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 ВКЛАДКА = "/administration?tab=dodois"
@@ -101,6 +102,36 @@ class Вход:
         return вход
 
 
+ВЛАДЕЛЕЦ = "22222222-2222-2222-2222-222222222222"  # учётка двойника входа (`web_harness`)
+
+
+class _Ключ:
+    id = "k1"
+    credential_id = b"k1"
+    public_key = b"pk"
+    sign_count = 1
+
+
+@pytest.fixture(autouse=True)
+def _ключ_доступа(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ключ есть, вызов снимается, подпись сходится: проверку подписи подменяем на границе
+    `webauthn_rp` (её настоящий код — `tests/test_web_second_factor_journeys.py`)."""
+    monkeypatch.setattr(second_factor, "status_of", lambda _u: SimpleNamespace(passkeys=(_Ключ(),)))
+    monkeypatch.setattr(second_factor, "store_challenge", lambda *_a, **_k: None)
+    monkeypatch.setattr(second_factor, "take_challenge", lambda *_a, **_k: b"challenge")
+    monkeypatch.setattr(second_factor, "touch_passkey", lambda *_a, **_k: True)
+    _ключ_владельца(monkeypatch)
+    monkeypatch.setattr(webauthn_rp, "credential_id_of", lambda _сырое: b"k1")
+    monkeypatch.setattr(
+        webauthn_rp, "verify_authentication", lambda *_a, **_k: webauthn_rp.Assertion(2)
+    )
+    monkeypatch.setattr(
+        webauthn_rp,
+        "authentication_options",
+        lambda *_a, **_k: ('{"challenge": "YQ", "allowCredentials": []}', b"challenge"),
+    )
+
+
 @pytest.fixture(autouse=True)
 def _чисто() -> Iterator[None]:
     flow.forget_all()
@@ -134,7 +165,9 @@ def _стенд(
     monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str
 ) -> Iterator[tuple[FlaskClient, dict[str, list[Any]]]]:
     двери = подменить_двери(monkeypatch, tenant=tenant, role=role)
-    with собрать(tenant="HQ").test_client() as клиент:
+    with собрать(
+        tenant="HQ", webauthn_rp_id="стенд.example", webauthn_origin="https://стенд.example"
+    ).test_client() as клиент:
         assert войти(клиент).status_code == 302
         yield клиент, двери
 
@@ -159,8 +192,8 @@ def чужой(monkeypatch: pytest.MonkeyPatch, вход: Вход) -> Iterator[
         yield клиент
 
 
-def _выдать(клиент: FlaskClient, страна: str = "SI") -> tuple[Any, str]:
-    ответ = клиент.post(ВЫДАЧА, data={"country": страна}, headers=ЗАГОЛОВКИ)
+def _выдать(клиент: FlaskClient, страна: str = "SI", ответ: str = "подпись") -> tuple[Any, str]:
+    ответ = клиент.post(ВЫДАЧА, data={"country": страна, "assertion": ответ}, headers=ЗАГОЛОВКИ)
     найдено = re.search(r"/dodois/connect/([A-Za-z0-9_-]{43})", ответ.get_data(as_text=True))
     return ответ, найдено.group(1) if найдено else ""
 
@@ -293,39 +326,103 @@ def _сессия_с(monkeypatch: pytest.MonkeyPatch, **признаки: Any) -
     monkeypatch.setattr(auth, "resolve_session", _resolve)
 
 
-def test_без_второго_шага_входа_ссылку_не_выдают(
+def _ключ_владельца(monkeypatch: pytest.MonkeyPatch, владелец: str = ВЛАДЕЛЕЦ) -> None:
+    monkeypatch.setattr(second_factor, "passkey_by_credential", lambda _номер: (_Ключ(), владелец))
+
+
+def test_без_ключа_доступа_ссылку_не_выдают_и_панель_ведёт_подключить_ключ(
     стенд: tuple[FlaskClient, dict[str, list[Any]]],
     ссылки: Ссылки,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Сломанная копия: убрать `_key_gate` из `dodois_invite_issue` — падает на 200.
-    _сессия_с(monkeypatch, has_second_factor=False)
+    # Сломанная копия: убрать `_passkey_gate` из `dodois_invite_issue` — падает на 200.
+    monkeypatch.setattr(second_factor, "status_of", lambda _u: SimpleNamespace(passkeys=()))
+    панель = стенд[0].get(f"{ВКЛАДКА}&country=SI").get_data(as_text=True)
+    assert "подключите ключ доступа" in панель and 'href="/settings/security"' in панель
+    assert "data-passkey-confirm" not in панель and "Сгенерировать ссылку<" not in панель
     ответ, токен = _выдать(стенд[0])
     assert ответ.status_code == 403 and токен == "" and ссылки.зовы == []
 
 
-def test_несвежее_подтверждение_уводит_на_подтверждение(
+def test_панель_с_ключом_одна_кнопка_и_ни_плашки_ни_ухода(главный: FlaskClient) -> None:
+    html = главный.get(f"{ВКЛАДКА}&country=SI").get_data(as_text=True)
+    assert html.count("Сгенерировать ссылку") == 1 and "data-passkey-confirm" in html
+    assert "подтвердите, что это вы" not in html and "/settings/confirm" not in html
+    assert 'data-options-url="/administration/dodois/invite/options"' in html
+
+
+@pytest.mark.parametrize(
+    "изъян",
+    ["нет_вызова", "нет_ответа", "чужой_ключ", "подпись_не_сошлась", "счётчик_проигран"],
+)
+def test_выдача_без_подтверждения_ключом_отказ_и_ссылки_нет(
     стенд: tuple[FlaskClient, dict[str, list[Any]]],
     ссылки: Ссылки,
     monkeypatch: pytest.MonkeyPatch,
+    изъян: str,
 ) -> None:
-    _сессия_с(monkeypatch, signed_in_at=datetime.now(UTC) - timedelta(minutes=11))
-    ответ, _ = _выдать(стенд[0])
-    assert ответ.status_code == 302 and ссылки.зовы == []
+    # Сломанная копия каждой строки `_passkey_gate` (вызов, владелец, подпись, счётчик) —
+    # соответствующий случай падает на 200 с выданной ссылкой.
+    ответ_браузера = "подпись"
+    if изъян == "нет_вызова":
+        monkeypatch.setattr(second_factor, "take_challenge", lambda *_a, **_k: None)
+    elif изъян == "нет_ответа":
+        ответ_браузера = ""
+    elif изъян == "чужой_ключ":
+        _ключ_владельца(monkeypatch, "99999999-9999-9999-9999-999999999999")
+    elif изъян == "подпись_не_сошлась":
+
+        def _плохо(*_a: Any, **_k: Any) -> Any:
+            raise webauthn_rp.PasskeyError("bad")
+
+        monkeypatch.setattr(webauthn_rp, "verify_authentication", _плохо)
+    else:
+        monkeypatch.setattr(second_factor, "touch_passkey", lambda *_a, **_k: False)
+    ответ, токен = _выдать(стенд[0], ответ=ответ_браузера)
+    assert ответ.status_code == 403 and токен == "" and ссылки.зовы == []
+    assert "Ключ доступа не подтвердил" in ответ.get_data(as_text=True)
 
 
-def test_второй_шаг_не_пройден_в_этой_сессии_отказ(
+def test_удачная_выдача_снимает_вызов_и_принимает_счётчик_ключа(
+    стенд: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    снято: list[Any] = []
+    принято: list[Any] = []
+    monkeypatch.setattr(
+        second_factor, "take_challenge", lambda *_a, **k: снято.append(k["purpose"]) or b"c"
+    )
+    monkeypatch.setattr(
+        second_factor,
+        "touch_passkey",
+        lambda _id, *, old_count, new_count: принято.append(new_count) or True,
+    )
+    ответ, токен = _выдать(стенд[0])
+    assert ответ.status_code == 200 and токен
+    assert снято == [second_factor.PURPOSE_AUTHENTICATE] and принято == [2]
+
+
+def test_свежесть_и_второй_шаг_выдаче_больше_не_нужны(
+    стенд: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Решение владельца: «я УЖЕ В СЕРВИСЕ» — ни релогина, ни ухода на другие страницы."""
+    _сессия_с(
+        monkeypatch,
+        passed_second_step=False,
+        signed_in_at=datetime.now(UTC) - timedelta(hours=5),
+    )
+    ответ, токен = _выдать(стенд[0])
+    assert ответ.status_code == 200 and токен
+
+
+def test_вызов_для_ключа_выдаётся_только_главному_и_только_со_своей_страницы(
     стенд: tuple[FlaskClient, dict[str, list[Any]]],
-    ссылки: Ссылки,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _сессия_с(monkeypatch, passed_second_step=False)
-    ответ, _ = _выдать(стенд[0], "BG")
-    assert ответ.status_code == 403 and ссылки.зовы == []
-    # Отказ несёт кнопку «Подтвердить» с возвратом на вкладку с выбранной страной (D670).
-    html = ответ.get_data(as_text=True)
-    assert "подтвердите, что это вы" in html
-    assert 'href="/settings/security?next=%2Fadministration%3Ftab%3Ddodois%26country%3DBG"' in html
+    клиент = стенд[0]
+    чужое = клиент.post(f"{ВЫДАЧА}/options", headers={"Origin": "https://evil.example"})
+    assert чужое.status_code == 403
+    свой = клиент.post(f"{ВЫДАЧА}/options", headers=ЗАГОЛОВКИ)
+    assert свой.status_code == 200 and свой.headers["Cache-Control"] == "no-store"
+    assert "challenge" in свой.get_data(as_text=True)
 
 
 # --- выдача: ссылка видна один раз, токена нигде нет ---------------------------------------

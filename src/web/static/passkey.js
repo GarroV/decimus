@@ -192,6 +192,36 @@
     }
   }
 
+  // --- подтверждение действия ключом на месте: выдача ссылки Dodo IS (D720) ------------
+  // Нажатие -> вызов с сервера -> окно ключа -> ответ уходит в ТУ ЖЕ форму обычной отправкой,
+  // поэтому результат человек видит на том же экране. Без ответа форма на сервер не уходит.
+  function initConfirm(form) {
+    var button = form.querySelector("[data-passkey-button]");
+    var field = form.querySelector("[data-passkey-assertion]");
+    if (!button || !field || guardUnsupported(form, button)) return;
+    var busy = false;
+    form.addEventListener("submit", function (event) {
+      if (field.value) return; // ответ уже приложен — отправка идёт на сервер
+      event.preventDefault();
+      if (busy) return;
+      busy = true;
+      hide(form);
+      postJson(form.getAttribute("data-options-url"))
+        .then(function (opts) {
+          if (!opts.ok) throw new Error("options");
+          return navigator.credentials.get({ publicKey: requestOptions(opts.data) });
+        })
+        .then(function (cred) {
+          field.value = JSON.stringify(encodeAsserted(cred));
+          form.submit();
+        })
+        .catch(function () {
+          busy = false;
+          show(form, form.getAttribute("data-msg-failed") || "");
+        });
+    });
+  }
+
   // --- сохранить Touch ID в этом браузере после входа (D485) ----------------------------
   // Браузер без метки «ключ тут есть» после входа паролем или Google сам просит у устройства
   // Touch ID и создаёт ключ — без вопроса и кнопки. Если окно открыть не дали (Safari требует
@@ -246,6 +276,7 @@
   function init() {
     Array.prototype.forEach.call(document.querySelectorAll("[data-passkey-here]"), initHere);
     Array.prototype.forEach.call(document.querySelectorAll("[data-passkey-login]"), initLogin);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-passkey-confirm]"), initConfirm);
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
