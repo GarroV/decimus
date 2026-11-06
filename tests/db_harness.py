@@ -18,10 +18,14 @@ import os
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import db_names
 import pytest
 from conftest import BASE_DSN
+
+if TYPE_CHECKING:
+    from src.db.mcp_access import IssuedToken
 
 
 @contextmanager
@@ -394,3 +398,25 @@ def сделать_файловым(pg_dsn: str, request_id: str) -> None:
             (request_id,),
         )
         cur.execute("alter table action_plan_requests enable trigger action_plan_requests_guarded")
+
+
+def выпустить_токен_чата(telegram_id: int) -> "IssuedToken":
+    """Выпустить личный токен учётке, к которой привязан этот Telegram ID.
+
+    Бот и мини-апп токен больше не выпускают (D626): живой код выпускает только
+    `issue_for_account` — вошедшему на сайте. Тесту, которому нужен токен
+    «человека из чата», учётка находится по привязке, заведённой `привязать_бота`
+    (она же ставит `DATABASE_ADMIN_URL`); `chat` ставит след в строке токена.
+    """
+    import psycopg
+
+    from src.db.mcp_access import issue_for_account
+
+    with psycopg.connect(os.environ["DATABASE_ADMIN_URL"]) as conn, conn.cursor() as cur:
+        cur.execute(
+            "select user_id from bot_bindings where telegram_id = %s and unbound_at is null",
+            (telegram_id,),
+        )
+        строка = cur.fetchone()
+    assert строка is not None, f"к Telegram ID {telegram_id} не привязана учётка (привязать_бота)"
+    return issue_for_account(str(строка[0]), chat=telegram_id)

@@ -44,7 +44,7 @@ from typing import Any
 import psycopg
 
 from .config import check_environment
-from .errors import AccessError, UnboundError
+from .errors import AccessError
 from .pool import connection
 
 #: Сколько случайных байт в токене. 32 байта → 43 знака `token_urlsafe`, то
@@ -80,13 +80,6 @@ t.revoked_at is null
    and u.disabled_at is null
    and u.role = t.role
    and u.tenant_code = t.tenant_code
-"""
-
-#: Учётка живой привязки бота этого Telegram ID — дверь бота и мини-аппа к
-#: выпуску. Нет живой привязки к неотключённой учётке — строки нет.
-_ACCOUNT_OF_CHAT_SQL = """
-select u.id from bot_bindings b join web_users u on u.id = b.user_id
- where b.telegram_id = %s and b.unbound_at is null and u.disabled_at is null
 """
 
 #: Отзыв живых токенов учётки. `by` — Telegram ID отозвавшего или `0`, если
@@ -259,9 +252,9 @@ def issue_for_account(user_id: str, *, chat: int | None = None) -> IssuedToken:
     """Выпустить учётке личный токен, погасив прежний. Значение — только здесь.
 
     ОДНА функция выпуска на все двери (D448): веб выпускает вошедшему его же
-    учётке, бот и мини-апп — через `issue_token` по живой привязке бота.
-    Никто не выпускает токен другому: дверь получает учётку из своей сессии
-    или подписи Telegram, а не из запроса. Права в Claude решает роль учётки
+    учётке (бот и мини-апп токен не выпускают, D626).
+    Никто не выпускает токен другому: дверь получает учётку из своей сессии,
+    а не из запроса. Права в Claude решает роль учётки
     (`src/mcp/policy.py`), срок — `MCP_TOKEN_TTL_DAYS` (по умолчанию 30 дней).
 
     `chat` — Telegram ID, из чата которого выпуск (след); у веба `None`.
@@ -296,27 +289,6 @@ def _issue(
         expires_at=row[2],
         replaced_previous=replaced,
     )
-
-
-def issue_token(telegram_id: int) -> IssuedToken:
-    """Выпуск из бота или мини-аппа: учётка — по живой привязке этого Telegram ID.
-
-    Привязка и выпуск — в одной транзакции: отвязка, случившаяся между
-    «спросили» и «выпустили», не оставит токен на учётке, от которой чат уже
-    отвязан. Нет живой привязки к неотключённой учётке — `UnboundError`: бот и
-    мини-апп отвечают «привяжите бота к учётке в настройках веба».
-    """
-    дней = token_ttl_days()
-    token = new_token()
-    with _connected("выпустить токен доступа") as conn, conn.cursor() as cur:
-        cur.execute(_ACCOUNT_OF_CHAT_SQL, (telegram_id,))
-        row = cur.fetchone()
-        if row is None:
-            raise UnboundError(
-                "Токен выпускается на учётку сайта: привяжите бота к своей учётке "
-                "в настройках веба или выпустите токен там"
-            )
-        return _issue(cur, str(row[0]), chat=telegram_id, days=дней, token=token)
 
 
 def revoke_tokens(user_id: str, *, by: int = 0) -> int:

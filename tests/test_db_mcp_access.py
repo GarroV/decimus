@@ -21,12 +21,11 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import завести_пространства, привязать_бота
+from db_harness import выпустить_токен_чата, завести_пространства, привязать_бота
 
 psycopg = pytest.importorskip("psycopg")
 
 from src.db.mcp_access import (  # noqa: E402
-    issue_token,
     new_token,
     resolve_token,
     token_fingerprint,
@@ -86,7 +85,7 @@ def _выполнить(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> int
 def test_выпущенный_токен_сверяется_и_отдаёт_того_человека_и_арендатора(db_env: str) -> None:
     """`resolve_token` — то же самое, что спрашивает сервер MCP на каждый запрос."""
 
-    выпуск = issue_token(ОСНОВАТЕЛЬ)
+    выпуск = выпустить_токен_чата(ОСНОВАТЕЛЬ)
 
     assert выпуск.tenant == "belgrade"
     assert выпуск.replaced_previous is False
@@ -100,9 +99,9 @@ def test_выпущенный_токен_сверяется_и_отдаёт_то
 
 def test_повторный_выпуск_гасит_прежний_токен_и_ставит_replaced_previous(db_env: str) -> None:
     """У человека живым может быть только один токен — повторный выпуск это держит."""
-    первый = issue_token(ОСНОВАТЕЛЬ)
+    первый = выпустить_токен_чата(ОСНОВАТЕЛЬ)
 
-    второй = issue_token(ОСНОВАТЕЛЬ)
+    второй = выпустить_токен_чата(ОСНОВАТЕЛЬ)
 
     assert второй.replaced_previous is True
     assert второй.value != первый.value
@@ -125,7 +124,7 @@ def test_значения_токена_в_базе_нет(db_env: str) -> None:
     отпечаток, а не сырое значение, и сырого значения не должно найтись ни
     в одном столбце строки.
     """
-    выпуск = issue_token(ОСНОВАТЕЛЬ)
+    выпуск = выпустить_токен_чата(ОСНОВАТЕЛЬ)
 
     строка = _строка(
         db_env,
