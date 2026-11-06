@@ -70,7 +70,9 @@ def _tokens(text: str) -> set[str]:
     return {t.casefold() for t in _TOKEN.findall(text)}
 
 
-def split_violations(words: str, *, settings: RecognizeSettings | None = None) -> tuple[str, ...]:
+def split_violations(
+    words: str, *, settings: RecognizeSettings | None = None, max_parts: int = MAX_PARTS
+) -> tuple[str, ...]:
     """Отдельные нарушения комментария, в словах аудитора. Одно нарушение — один кусок.
 
     Слов меньше `MIN_WORDS` или комментарий пуст — модель не зовётся, ответ —
@@ -105,7 +107,7 @@ def split_violations(words: str, *, settings: RecognizeSettings | None = None) -
                 f"Деление комментария: в куске слова, которых не говорил аудитор: "
                 f"{sorted(invented)}"
             )
-    if len(parts) > MAX_PARTS:
+    if len(parts) > max_parts:
         # Лишнее не теряется: хвост остаётся последним куском, аудитор разделит его руками.
-        parts = [*parts[: MAX_PARTS - 1], " ".join(parts[MAX_PARTS - 1 :])]
+        parts = [*parts[: max_parts - 1], " ".join(parts[max_parts - 1 :])]
     return tuple(parts)
