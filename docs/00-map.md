@@ -125,7 +125,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,process_view,connect_reminder,home_board,item_labels,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -168,6 +168,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/plan_sheet.py` | Электронный план исправлений — `.xlsx` туда и обратно (шаг 3 эпика #1168) |
 | `src/web/plan_template.py` | Шаблон экшн-плана — `.xlsx` из записей проверки (#976, ступень 1) |
 | `src/web/prescriptions.py` | Предписания в вебе: вкладка «Предписания» «Действий» и записи (D266, D270, D275, D526, D599) |
+| `src/web/process_view.py` | Итог по процессам на карточке проверки (D714, прототип) |
 | `src/web/proofread.py` | «Добавить нарушение» на вычитке: подбор пункта по словам и кадрам (D535) |
 | `src/web/quality_cells.py` | Ячейки таблицы «Качества»: текст значения, движение к прошлому месяцу, подсветка |
 | `src/web/quality_data.py` | Сборка данных «Качества» за месяц: из чтений — пиццерии и страны (docs/21-quality.md) |
