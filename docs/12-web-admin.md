@@ -2973,7 +2973,7 @@ Google, заморозка и роли учёток, новые учётки и 
   Прежние крупные права миграция `0052` разложила по методам без перерыва
   (`ratings:read` → четыре первых, `inspections:read` → список и подробности);
   токен Swarm сверх того получил `aggregators:ratings` и `inspections:violations` (D426),
-  а миграция `0121` добавила `sales:month` (D713) и выдала его токену Swarm.
+  а миграция `0121` добавила `sales:month` (D723) и выдала его токену Swarm.
 - **Страны токена.** `api.tokens.countries` — страны, которые токен видит;
   пусто — вся сеть (так у Swarm). Запрос чужой страны — 403 `forbidden_country`
   (не молча урезанный ответ); без `countries` в запросе — страны токена;
@@ -3228,7 +3228,7 @@ Swarm (`DECIMUS_API_URL`): за Worker'ом сервер своего внешн
   "countries": [{ "cc": "RS", "inspections": 7, "top": [ … ] }] }
 ```
 
-### `GET /api/v1/sales?countries=&month=YYYY-MM` (D713)
+### `GET /api/v1/sales?countries=&month=YYYY-MM` (D723)
 
 Продажи пиццерий за месяц из Dodo IS, право `sales:month`. Данные собирает бот раз в
 сутки (`docs/21-quality.md`) в `dodois.unit_sales_month`; метод их только читает.
