@@ -313,12 +313,20 @@ def _passkey_gate(login: str) -> tuple[Flash, int] | None:
             user_id=account.id,
         )
         if вызов is None or not сырое:
+            _log.warning(
+                "dodois: выдача по ключу отклонена — %s",
+                "нет ответа браузера" if not сырое else "нет вызова этой сессии",
+            )
             return Flash("dodois.err.passkey", False, {}), 403
         номер = webauthn_rp.credential_id_of(сырое)
         найден = second_factor.passkey_by_credential(номер)
         # Ключ обязан принадлежать ЭТОМУ человеку: чужой ключ выдачу не открывает.
         if найден is None or найден[1] != str(account.id):
-            return Flash("dodois.err.passkey", False, {}), 403
+            _log.warning(
+                "dodois: выдача по ключу отклонена — %s",
+                "ключ не зарегистрирован" if найден is None else "ключ другой учётки",
+            )
+            return Flash("dodois.err.passkey_foreign", False, {}), 403
         ключ = найден[0]
         итог = webauthn_rp.verify_authentication(
             party,
@@ -330,8 +338,10 @@ def _passkey_gate(login: str) -> tuple[Flash, int] | None:
         if not second_factor.touch_passkey(
             ключ.id, old_count=ключ.sign_count, new_count=итог.new_sign_count
         ):
+            _log.warning("dodois: выдача по ключу отклонена — счётчик ключа не принят")
             return Flash("dodois.err.passkey", False, {}), 403
-    except webauthn_rp.PasskeyError:
+    except webauthn_rp.PasskeyError as exc:
+        _log.warning("dodois: выдача по ключу отклонена — подпись не прошла (%s)", exc)
         return Flash("dodois.err.passkey", False, {}), 403
     except DbError as exc:
         note_target_mismatch(exc)

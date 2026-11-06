@@ -174,7 +174,9 @@ def verify_authentication(
             require_user_verification=True,
         )
     except (WebAuthnException, ValueError, KeyError, TypeError) as отказ:
-        raise PasskeyError(type(отказ).__name__) from None
+        # Текст библиотеки (какая проверка не прошла: происхождение, вызов, подпись) — для
+        # журнала сервера; экрану он не показывается. Ключей и подписей в нём нет.
+        raise PasskeyError(f"{type(отказ).__name__}: {отказ}"[:300]) from None
     return Assertion(new_sign_count=проверено.new_sign_count)
 
 

@@ -117,6 +117,16 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
         "en": "The passkey did not confirm. Try again.",
     },
     "dodois.add_passkey": {"ru": "Подключить ключ", "en": "Add a passkey"},
+    "dodois.err.passkey_foreign": {
+        "ru": (
+            "Этот ключ не привязан к вашей учётке. Приложите ключ, который подключали"
+            " в «Вход и защита», или подключите там ключ этого устройства."
+        ),
+        "en": (
+            "This passkey is not linked to your account. Use the passkey you added in"
+            " “Sign-in and security”, or add this device's passkey there."
+        ),
+    },
     "dodois.err.no_passkey": {
         "ru": "Чтобы выдавать ссылки, подключите ключ доступа в «Вход и защита».",
         "en": "To issue links, add a passkey in “Sign-in and security”.",
