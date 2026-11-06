@@ -876,6 +876,9 @@ def summary_lines(res, lang, clean):
                  else f"— критических D3: {c['D3']}, значительных D2: {c['D2']}, "
                       f"незначительных D1: {c['D1']}."]
         shown = ("D1", "D2", "D3")
+    if res.get("model") == "process":
+        lines.extend(process_letter_lines(res, lang, shown, qk))
+        return "\n".join(lines)
     by_zone = {}
     for f in res["findings"]:
         if f["level"] in shown:
@@ -884,6 +887,25 @@ def summary_lines(res, lang, clean):
         lines.extend(("", f"— {z}:"))
         lines.extend(f"• {letter_text(x, qk, lang)}" for x in lst)
     return "\n".join(lines)
+
+
+def process_letter_lines(res, lang, shown, qk):
+    """D714 (прототип): нарушения письма — по процессам, одно на пункт, с зонами-адресами."""
+    nk = "name_en" if lang == "en" else "name_ru"
+    zone_name = {code: z[nk] for code, z in res["zones"].items()}
+    by_n = {f["n"]: f for f in res["findings"]}
+    zeroed_word = "process zeroed" if lang == "en" else "процесс обнулён"
+    lines = []
+    for pr in res["by_process"].values():
+        items = [it for it in pr.get("items") or () if it["level"] in shown]
+        if not items:
+            continue
+        head = f"— {pr[nk]}" + (f" ({zeroed_word}, D3)" if pr.get("zeroed") else "") + ":"
+        lines.extend(("", head))
+        for it in items:
+            where = ", ".join(zone_name.get(z, z) for z in it["zones"])
+            lines.append(f"• {letter_text(by_n[it['lead']], qk, lang)} [{where}]")
+    return lines
 
 
 def plan_due_date(res):
