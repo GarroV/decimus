@@ -326,6 +326,44 @@ def test_оценки_контроля_и_проверки_идут_без_пр�
     assert [c.checkups for c in записано["проверки"]] == [1]  # из двух окон — одна проверка
 
 
+def test_проверки_периода_начатого_до_окна_не_пишутся_неполным_счётом(
+    мир: Мир, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Окно загрузки начинается 1 сентября: неделя с 25 августа видна не вся (#1407)."""
+    мир.удачных[parse.KIND_RATINGS] = True
+    записано: list[Any] = []
+    monkeypatch.setattr(store, "replace_rating_periods", lambda *a: 0)
+
+    def заменить(начало: date, конец: date, units: Any, rows: Any) -> int:
+        записано.extend(rows)
+        return len(rows)
+
+    monkeypatch.setattr(store, "replace_checkup_periods", заменить)
+
+    def проверка(номер: str, начало: str, конец: str) -> dict[str, str]:
+        return {
+            "id": номер,
+            "unitId": А,
+            "periodFrom": начало,
+            "periodTo": конец,
+            "ratingKind": "Standards",
+            "status": "Completed",
+        }
+
+    def ответ(path: str, query: dict[str, str]) -> Response:
+        if path.endswith("/checkups"):
+            ранняя = проверка("1", "2026-08-25", "2026-08-31")
+            своя = проверка("2", "2026-10-05", "2026-10-11")
+            return _ок({"checkups": [ранняя, своя], "isEndOfListReached": True})
+        return _ок({"unitRates": [], "isEndOfListReached": True})
+
+    мир.ответ = ответ
+
+    metrics.collect_country(_вход(), [parse.KIND_RATINGS], today=СЕГОДНЯ, sleep=_без_сна)
+
+    assert [str(c.period_from) for c in записано] == ["2026-10-05"]
+
+
 def test_accounting_uses_smaller_pages_for_product_payload(мир: Мир) -> None:
     sizes = []
 
