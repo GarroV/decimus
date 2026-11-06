@@ -283,10 +283,6 @@ _MCP: dict[str, tuple[str, str]] = {
         "Сняты все фото записи черновика",
         "All photos removed from a draft finding",
     ),
-    "import_info_fields": (
-        "Прочитана информационная часть черновика",
-        "Draft information part read",
-    ),
     "import_set_info": (
         "Записана информационная часть черновика",
         "Draft information part recorded",

@@ -23,9 +23,9 @@ from typing import Any
 
 from src.domain.journal import DOOR_MCP, JOURNALED_ROLES, summarize_target
 
+from .annotations import READ, TOOL_CLASSES
 from .catalogue import find
 from .config import Access
-from .plans import READ_TOOLS as READ_PLAN_TOOLS
 
 OUTCOME_OK = "ok"
 #: Инструмент вызван и ответил отказом или ошибкой (`isError`).
@@ -36,29 +36,10 @@ OUTCOME_REJECTED = "rejected"
 
 #: Инструменты, которые ничего не меняют, хотя каталог по осторожности помечает их
 #: `writes=True` (`ToolSpec.writes`: «забыли сказать — значит пишет»). В журнал
-#: действий они не идут. Нового имени тут нет — значит, вызов пишется: лишняя строка
-#: журнала дешевле пропущенного действия. Сверяет `tests/test_mcp_audit_journal.py`.
-READ_ONLY_TOOLS = frozenset(
-    {
-        "list_inspections",
-        "unit_history",
-        "network_summary",
-        "get_inspection",
-        "findings_by_unit",
-        "inspection_letter",
-        "checklist_source",
-        "checklist_source_item",
-        "ratings_summary",
-        "ratings_units",
-        "ratings_unit_periods",
-        "aggregators_status",
-        "import_get_inspection",
-        "import_list_drafts",
-        "import_suggest_items",
-        "import_match_findings",
-    }
-    | READ_PLAN_TOOLS
-)
+#: действий они не идут. Список — класс `read` из `annotations.py` (одно место, #1340):
+#: новое имя без класса не проходит `tests/test_mcp_annotations.py`, а класс `read` у
+#: пишущего инструмента лишил бы клиента подтверждения, так что он и так проверяется.
+READ_ONLY_TOOLS = frozenset(name for name, cls in TOOL_CLASSES.items() if cls.kind == READ)
 
 
 def _outcome(answer: dict[str, Any] | None) -> str:
