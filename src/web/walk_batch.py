@@ -1,4 +1,4 @@
-"""Мини-апп обхода: пакетный подбор нарушений — `POST /tg/walk/batch` (прототип).
+"""Мини-апп обхода: пакетный подбор нарушений — `POST /tg/walk/batch`.
 
 Аудитор вкидывает до 5 кадров (карточек), к каждому пишет слова. С одного кадра — несколько
 нарушений (D713): карточка отвечает СПИСКОМ строк, по строке на нарушение. Слова с разными
@@ -25,7 +25,7 @@ from __future__ import annotations
 import contextvars
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from functools import partial
@@ -262,7 +262,7 @@ def _line(
     return out
 
 
-def _lines_in_turn(calls: list[Callable[[], dict[str, Any]]]) -> list[dict[str, Any]]:
+def _lines_in_turn(calls: Sequence[Callable[[], dict[str, Any]]]) -> list[dict[str, Any]]:
     """Строки одной карточки — одна за другой, в слоте самой карточки (предел модели считает её)."""
     return [call() for call in calls]
 

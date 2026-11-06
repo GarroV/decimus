@@ -267,7 +267,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_administration.py` | Тексты раздела «Администрирование» (D639), вкладок «Подключения» (D638) и «Ключи и API» (D650) |
 | `src/web/texts_aggregators_admin.py` | Тексты административного охвата агрегаторов (#1391) |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
-| `src/web/texts_batch.py` | Тексты пакетного ввода нарушений в обходе (прототип): несколько кадров со словами |
+| `src/web/texts_batch.py` | Тексты пакетного ввода нарушений в обходе: несколько кадров со словами |
 | `src/web/texts_clients.py` | Клиентские оценки: язык интерфейса не меняет источник и вес данных |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
@@ -321,7 +321,7 @@ Claude входом через сайт (OAuth).
 | `src/web/walk_aliases.py` | Выученные формулировки пунктов для поиска пункта в мини-аппе обхода |
 | `src/web/walk_app.py` | Сервис мини-аппа обхода: только адреса `/tg/walk*` и статика к ним |
 | `src/web/walk_auth.py` | Кто открыл мини-апп обхода — по подписи Telegram, а не по куке админки (#418) |
-| `src/web/walk_batch.py` | Мини-апп обхода: пакетный подбор нарушений — `POST /tg/walk/batch` (прототип) |
+| `src/web/walk_batch.py` | Мини-апп обхода: пакетный подбор нарушений — `POST /tg/walk/batch` |
 | `src/web/walk_finish.py` | Общая сборка отчёта для miniapp и запасного завершения через чат |
 | `src/web/walk_finish_review.py` | Read-only miniapp review of the current run; the engine owns every score |
 | `src/web/walk_level.py` | Classify only the selected item, using its complete pinned criterion and fresh facts |

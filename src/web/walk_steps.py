@@ -199,7 +199,9 @@ def _batch_line_fields(
     }
 
 
-def _batch_failed_card(raw: dict[str, Any], card: dict[str, Any], place: tuple[int, int]) -> dict:
+def _batch_failed_card(
+    raw: dict[str, Any], card: dict[str, Any], place: tuple[int, int]
+) -> dict[str, Any]:
     """Карточка не прошла (занято, сбой) — строк у неё нет, но журнал её помнит."""
     status = _text(card.get("status"))
     return {

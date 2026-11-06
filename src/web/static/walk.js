@@ -655,7 +655,7 @@
     add.appendChild(W.icon("camera"));
     add.appendChild(el("span", null, "+ " + tx("walk.add.short")));
     if (W.batch) {
-      // Сплит-кнопка (прототип): слева одно нарушение, справа несколько кадров со словами.
+      // Сплит-кнопка: слева одно нарушение, справа несколько кадров со словами.
       // Зона — подсказка на экране, в записи её называет аудитор словами.
       var split = el("div", "walk-mark walk-dock__split");
       var several = W.button("walk-dock__add walk-dock__add--several", null, function () {

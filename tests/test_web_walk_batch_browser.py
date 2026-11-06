@@ -1,4 +1,4 @@
-"""Batch entry of issues in the walk (prototype): Chromium, synthetic data, no network."""
+"""Batch entry of issues in the walk: Chromium, synthetic data, no network."""
 
 # ruff: noqa: F811
 
@@ -12,6 +12,7 @@ from test_web_walk_ux_browser import STATIC, page  # noqa: F401
 
 TEXTS = {
     "walk.batch.save_ready": "Save all ready ({n})",
+    "walk.batch.retry": "Search again",
     "walk.batch.zone": "Zone: {zone}",
     "walk.batch.photo_warn": "Cards without a comment: {n}.",
     "walk.batch.zone_words": "named in the comment",
@@ -252,6 +253,22 @@ def test_cards_without_a_decision_are_never_saved(page, status):
     page.locator("[data-batch-find]").click()
     page.wait_for_selector("[data-batch-card].is-doubt")
 
+    assert page.locator("[data-batch-save]").is_disabled()
+    assert written(page) == []
+
+
+def test_busy_model_shows_the_message_and_offers_search_again(page):
+    busy = {"id": "c1", "status": "busy", "message": "Synthetic busy message", "lines": []}
+    start(page, [busy])
+    add_photos(page, 1)
+    page.locator("[data-batch-find]").click()
+    page.wait_for_selector("[data-batch-card].is-doubt")
+
+    assert "Synthetic busy message" in page.locator("[data-batch-card]").inner_text()
+    retry = page.get_by_role("button", name=TEXTS["walk.batch.retry"])
+    assert retry.is_visible(), "a busy card can be searched again without re-adding the photo"
+    retry.click()
+    page.wait_for_function("window.asked.length === 2")
     assert page.locator("[data-batch-save]").is_disabled()
     assert written(page) == []
 
