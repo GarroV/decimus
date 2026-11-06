@@ -54,7 +54,7 @@ SERVICES: tuple[Service, ...] = (
             KeyField("client_secret", "ispring.client_secret", "ISPRING_CLIENT_SECRET"),
         ),
     ),
-    # Приложение Dodo IS (D640): пара ключей, под которой коллеги подтверждают входы стран.
+    # Приложение Dodo IS (D640b): пара ключей, под которой коллеги подтверждают входы стран.
     Service(
         "dodois",
         (

@@ -255,7 +255,13 @@ def _ratings_range(
             covered = answered if covered is None else covered & answered
     done = sorted(covered or ())
     rating_rows = [row for row in parse.merge_rating_periods(ratings) if row.dodo_id in done]
-    checkup_rows = [row for row in parse.checkup_periods(checkups) if row.dodo_id in done]
+    # Период, начавшийся раньше окна, виден не весь: проверки за его начало не запрашивались,
+    # и счёт по нему занизил бы записанный полным (upsert по ключу). Такой период не пишем (#1407).
+    checkup_rows = [
+        row
+        for row in parse.checkup_periods(checkups)
+        if row.dodo_id in done and row.period_from >= start
+    ]
     total = store.replace_rating_periods(start, stop, done, rating_rows)
     return total + store.replace_checkup_periods(start, stop, done, checkup_rows)
 

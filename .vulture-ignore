@@ -726,7 +726,7 @@ latest_own_due
 connection_health_check
 checkable
 
-# Входы в Dodo IS по странам (D640): маршруты `@app.get/post(..., endpoint=...)` и
+# Входы в Dodo IS по странам (D640b): маршруты `@app.get/post(..., endpoint=...)` и
 # `after_request` — их зовёт Flask, по имени не зовёт никто; `SOURCE_IMPORT` берёт только
 # `tools/dodois_import.py`, а `tools` vulture не сканирует.
 dodois_invite_issue

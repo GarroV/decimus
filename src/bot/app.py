@@ -428,7 +428,7 @@ async def start_polling() -> None:
     training = asyncio.create_task(learning_loader.load_forever())
     # Постоянная проверка подключений — раз в 15 минут (D638, #1251).
     health = asyncio.create_task(health_loader.check_forever())
-    # Входы в Dodo IS по странам: продление ночью, проверка раз в час (D640, #951).
+    # Входы в Dodo IS по странам: продление ночью, проверка раз в час (D640b, #951).
     dodois = asyncio.create_task(dodois_loader.run_forever())
     # Данные Dodo IS для «Качества» по странам — раз в сутки (D671).
     dodois_metrics = asyncio.create_task(dodois_metrics_loader.run_forever())
