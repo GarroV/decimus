@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -10,6 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from src.settings_read import BooleanSetting, SettingsUnavailable, read_boolean
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -49,6 +52,11 @@ def _load_action_plan_state() -> ActionPlanState:
     try:
         saved = read_boolean("action_plans_enabled")
     except SettingsUnavailable:
+        # Закрыто на отказ, но не молча (#1407): после включения планов тихий сбой чтения
+        # настройки съел бы заявку на план при принятии проверки, и следа не осталось бы.
+        logger.warning(
+            "Переключатель экшн-планов не прочитан — считается выключенным", exc_info=True
+        )
         return ActionPlanState(False, known=False)
     if saved is not None:
         return ActionPlanState(saved.enabled, saved=saved)
