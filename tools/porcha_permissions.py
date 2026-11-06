@@ -53,7 +53,7 @@ cases = [
     ),
     (
         "src/domain/permissions.py",
-        '_ALL_VIEWS_HQ = frozenset(a.code for a in _VIEWS if a.code != "view.osb")',
+        "_ALL_VIEWS_HQ = frozenset(a.code for a in _VIEWS if a.code not in _NAMED_VIEWS)",
         "_ALL_VIEWS_HQ = frozenset(a.code for a in _VIEWS)",
         T + "test_permissions_osb.py::test_страницу_осб_видят_осб_админ_и_главный_админ",
     ),
@@ -145,7 +145,7 @@ cases = [
     ),
     (
         "src/web/guard.py",
-        "            if код is not None and not can(current_actor(), код).allowed:\n",
+        "            if коды and not any(can(current_actor(), код).allowed for код in коды):\n",
         "            if False:\n",
         T + "test_web_guard.py::test_разделы_по_матрице",
     ),

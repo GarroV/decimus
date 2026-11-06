@@ -27,6 +27,7 @@ import logging
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from functools import partial
 from typing import Any
 
@@ -167,6 +168,11 @@ def _candidates_of(
             speech_lang=inspection.speech_lang,
             report_lang=inspection.report_lang,
         )
+    if words:
+        # Слова строки решают пункт, кадр — лишь подспорье: что модель «увидела» на общем кадре
+        # сверх слов (`also_seen`) — чужое нарушение, и второй строке с другими словами оно
+        # пунктом не становится. Увиденное сверх слов — путь кадра без слов (строка «увидено»).
+        offer = replace(offer, also_seen=())
     ask = Ask(
         chat_id=who,
         spoken=zone_from_words(words, chat_id=who),

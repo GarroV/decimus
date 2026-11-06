@@ -481,3 +481,35 @@ def test_параллельных_вызовов_модели_не_больше_
     assert all(c["status"] == "busy" and c["message"] for c in карточки if c not in принятых)
     assert sum(len(c["lines"]) for c in принятых) <= walk_batch.MAX_LINES_TOTAL
     assert звали[0] <= walk_batch.MAX_LINES_TOTAL
+
+
+def test_пункт_строки_решают_её_слова_а_увиденное_на_кадре_чужой_строке_не_достаётся(
+    клиент: Клиент,  # noqa: F811
+    подмена: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Общий кадр — пол; модель по словам про дверь ничего не нашла, но «увидела» пол."""
+
+    def модель(note: str, *a: Any, **kw: Any) -> Suggestion:
+        if "пол" in note:
+            return Suggestion(candidates=(ПОЛ,), needs_human=False)
+        return Suggestion(candidates=(), also_seen=(ПОЛ,), needs_human=False)
+
+    monkeypatch.setattr(ядро, "classify", модель)
+    monkeypatch.setattr(
+        walk_batch,
+        "split_violations",
+        lambda words, **kw: ("пол грязный", "дверь не закрывается"),
+    )
+
+    ответ = _пакет(
+        клиент,
+        {"id": "a", "words": "пол грязный, дверь не закрывается", "photos": [клиент.ссылка()]},
+        zone_hint="fridge",
+    )
+
+    пол, дверь = ответ.get_json()["cards"][0]["lines"]
+    assert пол["code"] == "CLN05"
+    assert дверь["status"] == "no_item" and "code" not in дверь, (
+        "строка про дверь не получает пункт про пол"
+    )

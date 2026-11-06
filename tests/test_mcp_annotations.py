@@ -20,27 +20,19 @@ def test_инструмент_с_подтверждением_обязан_бы�
             assert TOOL_CLASSES[spec.name].kind == DESTRUCTIVE, spec.name
 
 
-#: Читает, но журнал (`audit.READ_ONLY_TOOLS`) осторожно числит пишущим: лишняя строка
-#: журнала дешевле пропущенного действия. Новое имя сюда — только после чтения обработчика.
-ЧИТАЕТ_НО_ЖУРНАЛ_ПИШЕТ = frozenset({"import_info_fields"})
+def test_читающий_инструмент_не_идёт_в_журнал_действий() -> None:
+    """Журнал берёт чтение из классов (#1340): `import_info_fields` только читает, а в
+    каталоге он `writes=True` — раньше его вызовы писались как изменяющие."""
+    assert "import_info_fields" in READ_ONLY_TOOLS
+    assert {"list_action_plans", "get_action_plan"} <= READ_ONLY_TOOLS
+    for имя, класс in TOOL_CLASSES.items():
+        assert (класс.kind == READ) == (имя in READ_ONLY_TOOLS), имя
 
 
-def test_класс_read_совпадает_с_тем_что_другие_карты_считают_чтением() -> None:
-    """`writes=False` и список журнала (`audit.READ_ONLY_TOOLS`) — другие карты того же
-    свойства. Читающий по ним обязан быть `read`; `read` без их согласия — только из
-    явного списка исключений. Иначе запись, названная чтением, лишила бы клиента
-    подтверждения (`readOnlyHint`)."""
+def test_читающий_по_каталогу_инструмент_имеет_класс_read() -> None:
     for spec in TOOLS:
-        читает = not spec.writes or spec.name in READ_ONLY_TOOLS
-        класс_read = TOOL_CLASSES[spec.name].kind == READ
-        if читает:
-            assert класс_read, spec.name
-        else:
-            assert _read_допустим(spec.name, класс_read), spec.name
-
-
-def _read_допустим(имя: str, класс_read: bool) -> bool:
-    return not класс_read or имя in ЧИТАЕТ_НО_ЖУРНАЛ_ПИШЕТ
+        if not spec.writes:
+            assert TOOL_CLASSES[spec.name].kind == READ, spec.name
 
 
 def test_читающий_инструмент_идемпотентен() -> None:

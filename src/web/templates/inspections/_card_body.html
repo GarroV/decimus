@@ -458,12 +458,12 @@
         <div class="ov-card__empty">{{ t('card.info.no_methodology') }}</div>
       {% endif %}
       {% for row in info %}
-        <div class="info-row">
-          <div class="info-row__question">
+        <div class="info-field">
+          <div class="info-field__question">
             {% if row.question %}{{ row.question }}{% else %}<span class="muted">{{ item_label(row.code) }}</span>{% endif %}
-            <span class="info-row__code">{{ item_label(row.code) }}{% if info_titles_found and not row.question %} · {{ t('card.info.no_question') }}{% endif %}</span>
+            <span class="info-field__code">{{ item_label(row.code) }}{% if info_titles_found and not row.question %} · {{ t('card.info.no_question') }}{% endif %}</span>
           </div>
-          <div class="info-row__answer">{{ day(row.answer) if row.answer else '—' }}</div>
+          <div class="info-field__answer">{{ day(row.answer) if row.answer else '—' }}</div>
           {% if not row.photos_known %}
             <div class="muted">{{ t('card.findings.photos_unknown') }}</div>
           {% endif %}
@@ -487,9 +487,9 @@
         {% endfor %}
       {% endif %}
       {% for finding in recommendations %}
-        <div class="info-row">
-          <div class="info-row__question">{{ t('card.info.recommendation_for', n=finding.n, item=item_label(finding.code)) }}</div>
-          <div class="info-row__answer" lang="{{ finding.lang }}">{{ finding.comment }}</div>
+        <div class="info-field">
+          <div class="info-field__question">{{ t('card.info.recommendation_for', n=finding.n, item=item_label(finding.code)) }}</div>
+          <div class="info-field__answer" lang="{{ finding.lang }}">{{ finding.comment }}</div>
         </div>
       {% endfor %}
     </section>

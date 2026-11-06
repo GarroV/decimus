@@ -1141,19 +1141,19 @@ a[data-zoom] { cursor: zoom-in; }
    Вопрос слева, ответ справа: короткий ответ («Да», дата) читается рядом со
    своим вопросом, длинный переносится в своей колонке. На узком экране —
    друг под другом. */
-.info-row {
+.info-field {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   gap: var(--space-2) var(--space-5);
   padding: var(--space-4) var(--space-7);
   border-bottom: 1px solid var(--line-2);
 }
-.info-row:last-child { border-bottom: 0; }
-.info-row__question { font-size: var(--fs-dense); color: var(--ink-2); line-height: var(--lh-body); }
-.info-row__code { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-2); }
-.info-row__answer { font-size: var(--fs-dense); line-height: var(--lh-body); overflow-wrap: anywhere; }
+.info-field:last-child { border-bottom: 0; }
+.info-field__question { font-size: var(--fs-dense); color: var(--ink-2); line-height: var(--lh-body); }
+.info-field__code { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-2); }
+.info-field__answer { font-size: var(--fs-dense); line-height: var(--lh-body); overflow-wrap: anywhere; }
 @media (max-width: 40rem) {
-  .info-row { grid-template-columns: minmax(0, 1fr); }
+  .info-field { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ── Повод, требующий решения ───────────────────────────────────────────
@@ -2198,8 +2198,11 @@ a[data-zoom] { cursor: zoom-in; }
    заголовка `.info-row`, а не к значку: слева он начинается от поля страницы и
    на 390 px не уходит за экран. Разметка — макрос `_info_tip.html`. */
 .info-row { position: relative; display: flex; align-items: center; gap: var(--space-3); }
-/* Строка заголовка в шапке экрана — без отступов и черты строки «вопрос — ответ» выше: иначе заголовок
-   съезжает от верха и левого края колонки справа (D655). */
+/* Отступ и черта — как были у этих строк до развода имён (#1294): их брало первое определение. */
+.info-row { padding: var(--space-4) var(--space-7); border-bottom: 1px solid var(--line-2); }
+.info-row:last-child { border-bottom: 0; }
+/* Строка заголовка в шапке экрана — без отступов (D655): иначе заголовок съезжает от верха и левого
+   края колонки справа. Строка «вопрос — ответ» карточки проверки — `.info-field`, не этот класс (#1294). */
 .shead .info-row { padding: 0 0 var(--space-4); border-bottom: 0; }
 .pk-head .info-row { padding: 0; border-bottom: 0; }
 .info-tip { align-self: stretch; display: inline-flex; align-items: center; }

@@ -22,7 +22,7 @@
 6. Обмен кода (PKCE S256) → access + refresh.
 7. MCP `initialize` + `tools/list` с access-токеном → список инструментов и роль.
 8. Refresh → новая пара; MCP отвечает новым access.
-9. Отзыв подключения со своей карточки → MCP отвечает 401.
+9. Отзыв подключения в «Настройках» → MCP отвечает 401.
 
 Учётку берите тестовую: прогон заводит и отзывает настоящее подключение.
 Коды возврата: 0 — прошёл, 1 — шаг провален, 2 — не названы адреса, логин или пароль.
@@ -53,6 +53,12 @@ MCP_VAR = "MCP_PUBLIC_URL"
 #: Адрес возврата на петлю, как у Claude Code. Слушать его не нужно: прогон
 #: не идёт по редиректу, а читает код из заголовка `Location`.
 CALLBACK = "http://127.0.0.1:53682/callback"
+
+#: Где у вошедшего список его подключений и куда идёт отзыв: «Настройки» (D447;
+#: с D640 `/users` только перенаправляет). Тест `test_web_users_claude` держит
+#: эти адреса против настоящих маршрутов, чтобы они не уезжали молча (#1259).
+CONNECTIONS_PATH = "/settings?tile=claude"
+REVOKE_PATH = "/settings/claude-revoke"
 
 SESSION_COOKIE = "dodo_audit_session"
 TIMEOUT_SEC = 20.0
@@ -231,13 +237,13 @@ def _tools(b: Browser, mcp: str, access: str) -> list[str]:
 
 
 def _revoke(b: Browser, admin: str) -> None:
-    _step(9, "отзыв подключения со своей карточки")
-    карточка = b.request(f"{admin}/users?person=me")
+    _step(9, "отзыв подключения в «Настройках»")
+    карточка = b.request(f"{admin}{CONNECTIONS_PATH}")
     номера = re.findall(r'name="connection_id" value="([^"]+)"', карточка.body)
-    _need(bool(номера), "на своей карточке нет подключений — блок не показан или список пуст")
+    _need(bool(номера), "в «Настройках» нет подключений — блок не показан или список пуст")
     for номер in номера:
         ответ = b.request(
-            f"{admin}/users/claude-revoke",
+            f"{admin}{REVOKE_PATH}",
             method="POST",
             form={"connection_id": номер},
             headers={"Origin": _origin(admin)},

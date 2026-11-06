@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import pytest
+from conftest import chromium_executable
 from oauth_harness import ПамятьOAuth, _Подключение, подменить_oauth
 from web_harness import войти, подменить_двери, собрать
 
@@ -54,9 +55,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
 @pytest.fixture
 def page(стенд) -> Iterator:
     with playwright.sync_playwright() as pw:
-        executable = os.environ.get("WALK_CHROME_BIN") or pw.chromium.executable_path
-        if not Path(executable).exists():
-            pytest.skip("Chromium unavailable; set WALK_CHROME_BIN")
+        executable = chromium_executable(pw.chromium.executable_path)
         browser = pw.chromium.launch(executable_path=executable, headless=True)
         страница = browser.new_page()
         ошибки: list[str] = []

@@ -73,9 +73,9 @@ def _настройки(**env: str) -> Settings:
 
 def _выпустить(кому: int = ЧЕЛОВЕК) -> str:
     """Выпустить себе токен из бота — без чьей-либо выдачи (D448)."""
-    from src.db.mcp_access import issue_token
+    from db_harness import выпустить_токен_чата
 
-    return issue_token(кому).value
+    return выпустить_токен_чата(кому).value
 
 
 # --- вторая дверь ------------------------------------------------------------
