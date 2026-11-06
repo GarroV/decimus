@@ -107,6 +107,7 @@ from ..keyboards import (
     zones_keyboard,
 )
 from ..lang import chat_langs, chat_speech_lang, chat_voice_lang
+from ..lines import LineSeen, group_by_item, split_note
 from ..material import Comment, Material, MaterialStore, PhotoGroup
 from ..pending import Offer, PendingStore, Proposal
 from ..photos import fetch_bytes
@@ -240,6 +241,32 @@ def _reading_of(proposal: Proposal) -> float | None:
     return next((c.reading_c for c in proposal.candidates if c.reading_c is not None), None)
 
 
+def _line_text(proposal: Proposal, line: tuple[int, int], lang: str, lines: str) -> str:
+    """Заголовок строки материала (D718): какое это нарушение и по каким словам.
+
+    Со словами — строка комментария, слова называются, чтобы список читался. Без
+    слов — вещь, найденная на кадре: аудитор её не говорил, и заголовок это
+    говорит. У кадра из пачки к номеру нарушения добавляется номер кадра.
+    """
+    no, total = line
+    if proposal.note.strip():
+        return t(
+            "record.candidates_line", lang, no=no, total=total, words=proposal.note, lines=lines
+        )
+    if proposal.batch is not None:
+        frame, frames = proposal.batch
+        return t(
+            "record.candidates_seen_batch",
+            lang,
+            frame=frame,
+            frames=frames,
+            no=no,
+            total=total,
+            lines=lines,
+        )
+    return t("record.candidates_seen", lang, no=no, total=total, lines=lines)
+
+
 async def _show_candidates(
     message: Message,
     chat_id: int,
@@ -277,6 +304,8 @@ async def _show_candidates(
         text = t("record.also_seen", lang, lines=lines)
     elif proposal.correcting is not None:
         text = t("record.candidates_correcting", lang, n=proposal.correcting, lines=lines)
+    elif proposal.line is not None:
+        text = _line_text(proposal, proposal.line, lang, lines)
     elif proposal.batch is not None:
         no, total = proposal.batch
         text = t("record.candidates_batch", lang, no=no, total=total, lines=lines)
@@ -750,6 +779,9 @@ async def analyze(
     correcting: int | None = None,
     origin: int | None = None,
     batch: tuple[int, int] | None = None,
+    line: tuple[int, int] | None = None,
+    group: int = 0,
+    seen: LineSeen | None = None,
 ) -> None:
     """Сверить со списком нарушений, а если не сошлось — спросить разбор.
 
@@ -775,6 +807,12 @@ async def analyze(
     `batch` — какой это кадр пачки и сколько их всего (T206). Не пусто —
     предложение по нему живёт наравне с предложениями по соседним кадрам, а
     отбивка называет номер кадра.
+
+    `line` и `group` — одно из нескольких нарушений материала (D718): слова
+    уже поделены (`bot.lines`), и `note` здесь — слова одного нарушения.
+    `seen` собирает то, что строки предложили и что модель увидела на кадрах
+    сверх слов: «на кадрах видно ещё» показывается один раз на весь материал,
+    а не по разу на строку.
     """
     lang, report_lang = chat_langs(chat_id)
     # Зона выводится ОДНИМ местом (T263): слова аудитора, затем словарь
@@ -797,6 +835,8 @@ async def analyze(
         slot=pending.next_slot(),
         batch=batch,
         origin=origin,
+        line=line,
+        group=group,
     )
     # Вход разбора целиком (#367): на этих словах и этой зоне система дальше
     # принимает решение, и разбирающему случай нужно ровно это. Голос сюда
@@ -815,6 +855,7 @@ async def analyze(
         correcting=correcting,
         origin=origin,
         batch=list(batch) if batch else None,
+        line=list(line) if line else None,
         fast=fast,
     )
     if resolved.conflict is not None:
@@ -824,7 +865,9 @@ async def analyze(
         # управляющей компании бот не вправе (T266, требование владельца).
         await _ask_zone_conflict(message, chat_id, base, pending, resolved.conflict, lang)
         return
-    await _analyze_resolved(message, chat_id, base, pending, lang, report_lang, fast=fast)
+    await _analyze_resolved(
+        message, chat_id, base, pending, lang, report_lang, fast=fast, seen=seen
+    )
 
 
 def _frame_without_record(chat_id: int, file_ids: Sequence[str], outcome: str) -> None:
@@ -973,6 +1016,7 @@ async def _analyze_resolved(
     report_lang: str,
     *,
     fast: bool,
+    seen: LineSeen | None = None,
 ) -> None:
     """Разбор материала, у которого зона уже выведена (или её решили спросить).
 
@@ -1034,7 +1078,7 @@ async def _analyze_resolved(
     # Правило одно на бота и мини-апп (`bot.propose.model_frames`, D330).
     photo, photos = await _model_frames(bot, base)
 
-    if base.batch is None:
+    if base.batch is None and base.line is None:
         # У пачки (T206) «Разбираю…» на каждый кадр — это N одинаковых строк
         # между отбивками, то есть шум ровно там, где аудитор читает список.
         # Сколько кадров разбирается, сказано один раз, до цикла.
@@ -1086,6 +1130,15 @@ async def _analyze_resolved(
         usage=suggestion.usage,
     )
     offered = (*suggestion.candidates, *_cue_candidates(suggestion, base.note))
+    # Увиденное на кадрах сверх слов (D208): у строки со своими словами оно
+    # пункта не подменяет и не множится по строкам — собирается один раз на весь
+    # материал и показывается отдельным предложением после последней строки.
+    if seen is not None:
+        seen.offered.extend(offered)
+        seen.also.extend(suggestion.also_seen)
+        also_seen: Sequence[Candidate] = ()
+    else:
+        also_seen = suggestion.also_seen
     if not offered:
         if suggestion.question:
             await message.answer(t("record.question", lang, question=suggestion.question))
@@ -1099,12 +1152,60 @@ async def _analyze_resolved(
             _frame_without_record, chat_id, base.file_ids, sidecar.OUTCOME_NOTHING_FOUND
         )
         await _open_manual(message, chat_id, base, pending, lang)
-        await _offer_also_seen(message, chat_id, base, suggestion.also_seen, pending, lang)
+        await _offer_also_seen(message, chat_id, base, also_seen, pending, lang)
         return
 
-    proposal = replace(base, candidates=offered, question=suggestion.question)
-    await _show_candidates(message, chat_id, proposal, pending, lang)
-    await _offer_also_seen(message, chat_id, base, suggestion.also_seen, pending, lang)
+    seen_things = _seen_things(base, suggestion, offered)
+    if seen_things:
+        await _show_seen_lines(message, chat_id, base, seen_things, pending, lang)
+    else:
+        proposal = replace(base, candidates=offered, question=suggestion.question)
+        await _show_candidates(message, chat_id, proposal, pending, lang)
+    await _offer_also_seen(message, chat_id, base, also_seen, pending, lang)
+
+
+def _seen_things(
+    base: Proposal, suggestion: Suggestion, offered: Sequence[Candidate]
+) -> list[tuple[Candidate, ...]]:
+    """Что модель увидела на кадре без слов — по группе на каждую вещь, если их несколько.
+
+    Мини-апп превращает каждую увиденную вещь в свою строку с подтверждением
+    (D713), и бот делает то же (D718): «Записать №1» под общим списком гасило бы
+    остальное увиденное, как гасило остальные дефекты комментария. Пусто — это не
+    тот случай: слова есть (пункты по словам — варианты одного нарушения), идёт
+    правка записи, модель задала вопрос (кандидаты — прочтения неясного) или вещь
+    одна (прежний список, варианты класса остаются в нём).
+    """
+    if base.note.strip() or base.correcting is not None or suggestion.question:
+        return []
+    things = group_by_item(offered)
+    return things if len(things) > 1 else []
+
+
+async def _show_seen_lines(
+    message: Message,
+    chat_id: int,
+    base: Proposal,
+    things: Sequence[tuple[Candidate, ...]],
+    pending: PendingStore,
+    lang: str,
+) -> None:
+    """Каждая увиденная вещь — своё сообщение, своё предложение, своя кнопка записи.
+
+    Ничего не записывается само: запись появляется по нажатию под сообщением
+    вещи, как у любого кандидата. Первая вещь живёт в слоте самого разбора, чтобы
+    журнал и вопрос «Разобрать?» не расходились с тем, что показано.
+    """
+    group = base.group or base.slot
+    for no, candidates in enumerate(things, start=1):
+        line = replace(
+            base,
+            candidates=candidates,
+            slot=base.slot if no == 1 else pending.next_slot(),
+            line=(no, len(things)),
+            group=group,
+        )
+        await _show_candidates(message, chat_id, line, pending, lang)
 
 
 async def _reevaluate_reading(
@@ -1826,6 +1927,10 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             source=proposal.source,
             pending=pending,
             fast=False,
+            # Строка материала остаётся строкой (D718): переразбор слов одного
+            # нарушения не должен погасить соседние.
+            line=proposal.line,
+            group=proposal.group,
             # Исток записи переезжает вместе с материалом (T205): аудитор
             # сказал те же слова, и кадр к тому, что из них получится, он
             # дошлёт ответом на них же. Потеряй мы его здесь — досылка молча
@@ -2316,6 +2421,50 @@ def make_frame_handler() -> FrameHandler:
     return attach
 
 
+async def _analyze_lines(
+    message: Message,
+    chat_id: int,
+    note: str,
+    parts: Sequence[str],
+    material: Material,
+    pending: PendingStore,
+    lang: str,
+) -> None:
+    """Каждое нарушение комментария — свой разбор и своё сообщение (D718).
+
+    Строки идут по очереди, одна за другой, как в слоте мини-аппа: у каждой свои
+    кандидаты, своё предложение в `pending` и своя кнопка записи. Кадры у всех
+    строк одни — запись прикрепляет их ссылкой, а не копией. Запись одной строки
+    остальные не гасит: у них общий номер материала (`Proposal.group`).
+    """
+    await message.answer(t("record.lines", lang, count=len(parts)))
+    group = pending.next_slot()
+    seen = LineSeen()
+    for no, part in enumerate(parts, start=1):
+        await analyze(
+            message,
+            chat_id,
+            note=part,
+            file_ids=material.photo_file_ids,
+            source=domain.SOURCE_COMMENT,
+            pending=pending,
+            origin=message.message_id,
+            line=(no, len(parts)),
+            group=group,
+            seen=seen,
+        )
+    extra = seen.extra()
+    if extra:
+        base = Proposal(
+            file_ids=material.photo_file_ids,
+            source=domain.SOURCE_COMMENT,
+            note=note,
+            origin=message.message_id,
+            group=group,
+        )
+        await _offer_also_seen(message, chat_id, base, extra, pending, lang)
+
+
 def make_material_handler(
     pending: PendingStore,
 ) -> Callable[[Message, Material, str], Awaitable[None]]:
@@ -2345,6 +2494,12 @@ def make_material_handler(
                 return
             note = heard.strip()
 
+        # Комментарий с несколькими РАЗНЫМИ дефектами — несколько нарушений, как
+        # в мини-аппе (D718): «столы, плинтуса, пол грязный» не одна запись.
+        parts = await split_note(chat_id, note)
+        if len(parts) > 1:
+            await _analyze_lines(message, chat_id, note, parts, material, pending, lang)
+            return
         await analyze(
             message,
             chat_id,

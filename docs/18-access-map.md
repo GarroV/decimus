@@ -210,9 +210,9 @@ OAuth-токен, бот), закрытое триггером базы `0063` �
 
 ## Права ключа API
 
-Восемь прав, по одному на адрес (D425): `ratings:scores`, `ratings:checkups`,
+Девять прав, по одному на адрес (D425, D723): `ratings:scores`, `ratings:checkups`,
 `ratings:violations`, `maps:ratings`, `aggregators:ratings`, `inspections:list`,
-`inspections:detail`, `inspections:violations`. Перечень с адресами —
+`inspections:detail`, `inspections:violations`, `sales:month`. Перечень с адресами —
 `docs/12-web-admin.md`. Персональных данных в ответах нет, кроме имени
 девелопера страны в баллах и формулировки записи в подробностях проверки.
 

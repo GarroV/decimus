@@ -238,9 +238,13 @@ def _overall_rows(c: CountryHealth, lang: str) -> list[str]:
         t("quality.overall.sum", lang),
         t("quality.overall.missing", lang),
     ]
-    if c.with_total:
-        inc = t("quality.overall.incomplete", lang, k=c.incomplete) if c.incomplete else ""
-        rows.append(t("quality.overall.country", lang, n=c.with_total, inc=inc))
+    if c.overall is not None:
+        inc = (
+            t("quality.overall.incomplete", lang, w=_pct_whole(c.overall.weights.total))
+            if c.overall.incomplete
+            else ""
+        )
+        rows.append(t("quality.overall.country", lang, inc=inc))
     else:
         rows.append(t("quality.overall.country_none", lang))
     rows.append(t("quality.overall.table", lang))
@@ -342,6 +346,7 @@ def _network_rows(
                 c.currency,
                 show_audit=show_audit,
                 in_progress=in_progress,
+                country=False,
             ),
         }
         for c in ordered
@@ -446,14 +451,18 @@ def render(lang: str) -> str:
         for m in months
     )
     prev_month, next_month = shift(month, -1), shift(month, 1)
-    visible = shown(show_audit)
+    visible = shown(show_audit, country=bool(code))
     firsts = group_starts(visible)
     group_sizes = {g: sum(1 for c in visible if c.group == g) for g in {c.group for c in visible}}
 
     def column(key: str, group: str = "", first: bool = False) -> dict[str, Any]:
         return {
             "key": key,
-            "label": t("quality.col.unit" if key == "name" else f"quality.col.{key}", lang),
+            "label": t(
+                "quality.col.unit" if key == "name" else f"quality.col.{key}",
+                lang,
+                w=_pct_whole(q.MAPS_WEIGHT),
+            ),
             "href": link(code, order=(key, not (sort_key == key and desc))),
             "on": sort_key == key,
             "desc": sort_key == key and desc,

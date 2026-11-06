@@ -25,12 +25,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from .errors import DbError
 from .reach import Reach
 from .reach import require_reach as _require_reach
 from .reading import reading
+from .source_units import with_registry
 
 #: Потолок выдачи проверок за один запрос: дальше — сужать период.
 MAX_INSPECTIONS = 1000
@@ -410,3 +412,45 @@ def finding_counts(
         for r in _rows("число проверок для Swarm", _INSPECTION_COUNTS_SQL, params)
     ]
     return counts, totals
+
+
+# Продажи пиццерий за месяц (D723): сумма по всем источникам заказа и каналам продажи.
+# Пиццерия и страна — через реестр метрик (`source_units`), как на странице «Качество»:
+# ключ `dodo_id` тот же, что у `ratings.units`. Строк заказов в таблице нет, только агрегаты.
+_SALES_SQL = (
+    "select s.dodo_id, u.name, u.country_code, sum(s.orders)::bigint, sum(s.revenue) "
+    "from dodois.unit_sales_month s join source_units u on u.dodo_id = s.dodo_id "
+    "where u.country_code = any(%(countries)s) and s.month = %(month)s "
+    "group by 1, 2, 3 order by 3, 2, 1"
+)
+#: Когда последний раз удалась загрузка продаж по каждой стране.
+_SALES_LOADED_SQL = (
+    "select country, max(finished_at) from dodois.metric_loads "
+    "where kind = 'sales' and ok and country = any(%(countries)s) group by country"
+)
+
+
+@dataclass(frozen=True)
+class UnitSalesRow:
+    dodo_id: str
+    name: str
+    country: str
+    orders: int
+    revenue: Decimal
+
+
+def unit_sales(*, countries: Sequence[str], month: date) -> list[UnitSalesRow]:
+    """Продажи пиццерий стран за месяц (`month` — первое число), по пиццерии одна строка."""
+    if not countries:
+        return []
+    params = {"countries": list(countries), "month": month}
+    rows = _rows("продажи пиццерий для Swarm", with_registry(_SALES_SQL), params)
+    return [UnitSalesRow(str(r[0]), str(r[1]), str(r[2]), int(r[3]), r[4]) for r in rows]
+
+
+def sales_loaded(countries: Sequence[str]) -> dict[str, datetime]:
+    """Последняя удачная загрузка продаж по странам; страны без неё в словаре нет."""
+    if not countries:
+        return {}
+    rows = _rows("загрузки продаж для Swarm", _SALES_LOADED_SQL, {"countries": list(countries)})
+    return {str(r[0]): r[1] for r in rows if r[1] is not None}

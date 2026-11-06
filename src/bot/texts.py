@@ -477,6 +477,32 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Кадр {no} из {total}. Что записать?\n\n{lines}",
         "en": "Photo {no} of {total}. What should I record?\n\n{lines}",
     },
+    # Несколько нарушений из одного материала (D718, как в мини-аппе, D713): бот
+    # делит комментарий и показывает каждое своим сообщением. Сколько их, говорится
+    # один раз, до списка. Слова строки в заголовке — чтобы список читался.
+    "record.lines": {
+        "ru": "В комментарии несколько разных нарушений: {count}. На каждое будет своё сообщение.",
+        "en": "The comment names several different violations: {count}. Each gets its own message.",
+    },
+    "record.candidates_line": {
+        "ru": "Нарушение {no} из {total}: «{words}». Что записать?\n\n{lines}",
+        "en": "Violation {no} of {total}: “{words}”. What should I record?\n\n{lines}",
+    },
+    # Вещь, найденная на кадре без слов: аудитор её не называл, запись — по нажатию.
+    "record.candidates_seen": {
+        "ru": "На кадре видно, {no} из {total} — вы об этом не говорили. Записать?\n\n{lines}",
+        "en": "Seen on the photo, {no} of {total} — you did not mention it. Record it?\n\n{lines}",
+    },
+    "record.candidates_seen_batch": {
+        "ru": (
+            "Кадр {frame} из {frames}: на нём видно, {no} из {total} — "
+            "вы об этом не говорили. Записать?\n\n{lines}"
+        ),
+        "en": (
+            "Photo {frame} of {frames}: seen on it, {no} of {total} — "
+            "you did not mention it. Record it?\n\n{lines}"
+        ),
+    },
     # Кадр, присланный ответом на свои же слова, ушёл в ту запись (T205, D081).
     # Число кадров называется потому, что это единственное, что в записи
     # изменилось: пункт, класс и зона остались прежними, и «поправил» было бы

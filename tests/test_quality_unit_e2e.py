@@ -151,15 +151,21 @@ def test_ljubljana_1_without_aggregator_rating_has_incomplete_total() -> None:
     assert unit.overall is not None and unit.overall.incomplete
 
 
-def test_country_total_is_plain_mean_of_unit_totals_and_counts_incomplete() -> None:
+def test_country_total_comes_from_the_country_row_not_from_unit_totals() -> None:
     a = _unit({"wolt": (D("9.0"), 10)})
     b = _unit({})
 
     country = quality_data._country("SI", [a, b], "EUR", quality_data.DODOIS_OK)
+    row = country.values
+    expected, _ = quality_data.overall_values(
+        rko=row["rko"], checks=row["checks"], kr=row["kr"], maps=row["maps"],
+        aggs=row["aggs"], orders=country.orders,
+    )  # fmt: skip
 
-    assert country.values["total"] == ((a.values["total"] or 0) + (b.values["total"] or 0)) / 2
-    assert country.values["w_aggs"] == (a.values["w_aggs"] or 0) / 2 + 0
-    assert (country.with_total, country.incomplete) == (2, 1)
+    assert row["aggs"] == D("4.5")  # у b оценки агрегаторов нет: средняя — по a
+    assert row["total"] == expected.score
+    assert country.overall is not None and country.overall.score == row["total"]
+    assert row["rko_adj"] == (row["rko"] or 0) / 20
 
 
 def test_unit_without_any_score_has_no_total_and_no_weights() -> None:
