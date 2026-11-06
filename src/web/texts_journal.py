@@ -34,10 +34,6 @@ _WEB: dict[str, tuple[str, str]] = {
     "connections_revoke": ("Отозван ключ API", "API key revoked"),
     "connections_update": ("Изменены права ключа API", "API key settings changed"),
     "dodois_invite_issue": ("Выдана ссылка входа в Dodo IS", "Dodo IS login link issued"),
-    "dodois_invite_options": (
-        "Запрос ключа доступа для выдачи ссылки Dodo IS",
-        "Passkey request to issue a Dodo IS link",
-    ),
     "dodois_invite_revoke": ("Отозвана ссылка входа в Dodo IS", "Dodo IS login link revoked"),
     "dodois_connect_start": (
         "Вход в Dodo IS подтверждён по ссылке",
