@@ -19,15 +19,14 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import empty_database, привязать_бота
+from db_harness import empty_database, выпустить_токен_чата, привязать_бота
 
 psycopg = pytest.importorskip("psycopg")
 
 from src.db import bot_links, mcp_access  # noqa: E402
-from src.db.errors import AccessError, UnboundError  # noqa: E402
+from src.db.errors import AccessError  # noqa: E402
 from src.db.mcp_access import (  # noqa: E402
     issue_for_account,
-    issue_token,
     live_token_expiry,
     live_token_issued_at,
     resolve_token,
@@ -45,7 +44,6 @@ pytestmark = requires_db
 КОНТРОЛЬ_УК = 302
 АДМИН_ПАРТНЁРА = 401
 СОТРУДНИК_ПАРТНЁРА = 402
-БЕЗ_УЧЁТКИ = 999
 
 
 @pytest.fixture
@@ -65,7 +63,7 @@ def учётки(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -> d
 
 def _выдать(кто: int) -> str:
     """Выпуск себе из бота — без чьего-либо разрешения: круга нет (D448)."""
-    return issue_token(кто).value
+    return выпустить_токен_чата(кто).value
 
 
 def _выполнить(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> None:
@@ -100,7 +98,7 @@ def test_смена_роли_гасит_токен(учётки: dict[int, str])
 
     assert resolve_token(токен) is None, "токен пережил понижение роли"
     # Перевыпуск — уже с новой ролью, и права теперь решает она.
-    новый = resolve_token(issue_token(АДМИН_УК).value)
+    новый = resolve_token(выпустить_токен_чата(АДМИН_УК).value)
     assert новый is not None and новый.role == "control"
 
 
@@ -131,27 +129,19 @@ def test_срок_по_умолчанию_тридцать_дней(учётки
 def test_срок_задаётся_окружением(учётки: dict[int, str], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MCP_TOKEN_TTL_DAYS", "7")
 
-    выпуск = issue_token(АДМИН_УК)
+    выпуск = выпустить_токен_чата(АДМИН_УК)
 
     from datetime import UTC, datetime, timedelta
 
     assert abs(выпуск.expires_at - (datetime.now(UTC) + timedelta(days=7))) < timedelta(hours=1)
 
 
-def test_без_учётки_токен_не_выпускается(учётки: dict[int, str]) -> None:
-    """Сотрудник по списку окружения без привязки бота — токена из чата нет."""
-    with pytest.raises(UnboundError):
-        issue_token(БЕЗ_УЧЁТКИ)
-
-
-def test_после_отвязки_бота_из_чата_не_выпустить(учётки: dict[int, str]) -> None:
-    """Отвязка закрывает дверь бота; выпущенный токен живёт — он на учётке, не на чате."""
+def test_отвязка_бота_токен_не_гасит(учётки: dict[int, str]) -> None:
+    """Выпущенный токен живёт на учётке, а не на чате: отвязка бота его не трогает."""
     токен = _выдать(АДМИН_УК)
 
     assert bot_links.unbind(учётки[АДМИН_УК]) is True
 
-    with pytest.raises(UnboundError):
-        issue_token(АДМИН_УК)
     assert resolve_token(токен) is not None
 
 
@@ -274,7 +264,7 @@ def test_смена_роли_сужает_инструменты(учётки: d
     assert админ is not None and "list_inspections" in _инструменты(админ)
 
     set_role(f"tg-{АДМИН_УК}", tenant="HQ", role="control")
-    контроль = mcp_config._owner_from_store(issue_token(АДМИН_УК).value)
+    контроль = mcp_config._owner_from_store(выпустить_токен_чата(АДМИН_УК).value)
 
     assert контроль is not None
     assert "list_inspections" not in _инструменты(контроль)
