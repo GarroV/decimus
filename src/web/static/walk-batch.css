@@ -79,4 +79,4 @@
 .walk-batch .walk-sheet__foot .walk-mark + .walk-mark { margin-top: 8px; }
 
 /* Узкий экран (360 px): камеру перед «+ Нарушение» убираем, подпись важнее. */
-@media (max-width: 374px) { .walk-dock__split .walk-dock__add--main .walk-icon { display: none; } }
+@media (max-width: 413px) { .walk-dock__split .walk-dock__add--main .walk-icon { display: none; } }
