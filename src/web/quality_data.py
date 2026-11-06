@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -75,6 +75,8 @@ class UnitHealth:
     periods: tuple[dodois_metrics.UnitRatingPeriod, ...] = ()
     #: Откуда РКО и РС: `dodois` (API), `sheet` (таблица контроля) или пусто.
     rating_source: str = ""
+    #: Итоговый рейтинг и веса (D719); `None` — у пиццерии не считался.
+    overall: q.Overall | None = None
 
 
 @dataclass(frozen=True)
@@ -137,6 +139,9 @@ class CountryHealth:
     periods: tuple[PeriodGroup, ...]
     dodois: str
     rating_source: str = ""
+    #: Пиццерий с итогом и из них — с неполными весами (сумма меньше 100%, D719).
+    with_total: int = 0
+    incomplete: int = 0
 
 
 def agg_key(name: str) -> str | None:
@@ -197,8 +202,17 @@ def _unit_values(
     aggs: Decimal | None,
     orders: q.Orders,
     revenue: dict[str, Decimal],
+    total: Decimal | None = None,
+    weights: Mapping[str, Decimal | None] | None = None,
 ) -> dict[str, Decimal | None]:
+    w = weights or {}
     return {
+        "total": total,
+        "w_rko": w.get("rko"),
+        "w_kr": w.get("kr"),
+        "w_maps": w.get("maps"),
+        "w_aggs": w.get("aggs"),
+        "w_sum": w.get("sum"),
         "rko": rko,
         "rs": rs,
         "checks": checks,
@@ -268,16 +282,35 @@ def _unit(
         # Заказов агрегаторов нет (Dodo IS не собран или не подключён): веса взять неоткуда,
         # оценки площадок усредняются поровну, чтобы собранные оценки не пропадали.
         aggs5 = _mean(q.five_point(score, scale) for score, scale in agg_scores.values())
+    kr5 = _kr(kr)
+    maps5 = q.maps_score([(m[1], m[2]) for m in maps])
+    overall = q.overall(
+        rko=rko,
+        rko_checks_per_week=checks,
+        kr=kr5,
+        maps=maps5,
+        aggregators=aggs5,
+        orders=orders,
+    )
+    w = overall.weights
+    # Нет итога вообще — и весов нет (прочерк), а не четыре нуля.
+    weights = (
+        {"rko": w.rko, "kr": w.kr, "maps": w.maps, "aggs": w.aggregators, "sum": w.total}
+        if overall.score is not None
+        else None
+    )
     values = _unit_values(
         rko=rko,
         checks=checks,
         rs=rs,
         audit=audit,
-        kr=_kr(kr),
-        maps=q.maps_score([(m[1], m[2]) for m in maps]),
+        kr=kr5,
+        maps=maps5,
         aggs=aggs5,
         orders=orders,
         revenue=dict(revenue),
+        total=overall.score,
+        weights=weights,
     )
     return UnitHealth(
         dodo_id,
@@ -292,6 +325,7 @@ def _unit(
         tuple(sorted(lines.values(), key=lambda x: -x.orders)),
         tuple(periods),
         source,
+        overall,
     )
 
 
@@ -401,7 +435,19 @@ def _country(
     def avg(key: str) -> Decimal | None:
         return _mean(v for u in units if (v := u.values[key]) is not None)
 
+    scored = [u for u in units if u.overall is not None and u.overall.score is not None]
+
+    def avg_scored(key: str) -> Decimal | None:
+        return _mean(v for u in scored if (v := u.values[key]) is not None)
+
     values = _unit_values(
+        total=avg_scored("total"),
+        weights={
+            "rko": avg_scored("w_rko"),
+            "kr": avg_scored("w_kr"),
+            "maps": avg_scored("w_maps"),
+            "aggs": avg_scored("w_aggs"),
+        },
         rko=avg("rko"),
         checks=avg("checks"),
         rs=avg("rs"),
@@ -426,6 +472,8 @@ def _country(
         periods=_period_groups(units),
         dodois=state,
         rating_source=_source_of(units),
+        with_total=len(scored),
+        incomplete=sum(1 for u in scored if u.overall is not None and u.overall.incomplete),
     )
 
 

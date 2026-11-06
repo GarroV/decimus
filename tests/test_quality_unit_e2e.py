@@ -114,6 +114,63 @@ def test_ljubljana_1_september_values_from_live_inputs() -> None:
     assert v["audit"] is None  # проверок decimus у пиццерии нет
 
 
+def test_ljubljana_1_september_total_and_weights_by_hand() -> None:
+    unit = _unit({"wolt": (D("9.0"), 10)})
+    v = unit.values
+    w_rko = D("0.3")  # 4.5 проверки в неделю: от 2 до 5
+    rest = 1 - w_rko - D("0.2")  # остаток после РКО и карт
+    w_kr = rest * 780 / (1395 + 780)  # приложение и сайт против агрегаторов, прочее не в счёт
+    w_aggs = rest * 1395 / (1395 + 780)
+    expected = (
+        w_rko * (D("90.9575") / 20)
+        + w_kr * (D("4.79") * 58 + D("4.73") * 144) / 202
+        + D("0.2") * D("4.40")
+        + w_aggs * D("4.5")
+    )
+
+    assert (v["w_rko"], v["w_maps"]) == (w_rko, D("0.2"))
+    assert v["w_kr"] == w_kr and v["w_aggs"] == w_aggs
+    assert abs((v["total"] or D(0)) - expected) < D("1e-9")
+    assert round(v["total"] or D(0), 2) == D("4.54")
+    assert unit.overall is not None and not unit.overall.incomplete
+
+
+def test_ljubljana_1_without_aggregator_rating_has_incomplete_total() -> None:
+    unit = _unit({})
+    v = unit.values
+    w_kr = D("0.5") * 780 / (1395 + 780)
+    weights = D("0.3") + w_kr + D("0.2")  # агрегаторам без оценки — вес ноль
+    expected = (
+        D("0.3") * (D("90.9575") / 20)
+        + w_kr * (D("4.79") * 58 + D("4.73") * 144) / 202
+        + D("0.2") * D("4.40")
+    ) / weights
+
+    assert v["w_aggs"] == 0 and v["w_sum"] == weights < 1
+    assert abs((v["total"] or D(0)) - expected) < D("1e-9")
+    assert unit.overall is not None and unit.overall.incomplete
+
+
+def test_country_total_is_plain_mean_of_unit_totals_and_counts_incomplete() -> None:
+    a = _unit({"wolt": (D("9.0"), 10)})
+    b = _unit({})
+
+    country = quality_data._country("SI", [a, b], "EUR", quality_data.DODOIS_OK)
+
+    assert country.values["total"] == ((a.values["total"] or 0) + (b.values["total"] or 0)) / 2
+    assert country.values["w_aggs"] == (a.values["w_aggs"] or 0) / 2 + 0
+    assert (country.with_total, country.incomplete) == (2, 1)
+
+
+def test_unit_without_any_score_has_no_total_and_no_weights() -> None:
+    unit = quality_data._unit(
+        U, "Empty", "SI", scores=[], audit=None, maps=(), sales=[], agg_orders=[],
+        kr=None, agg_scores={},
+    )  # fmt: skip
+
+    assert unit.values["total"] is None and unit.values["w_rko"] is None
+
+
 def test_ljubljana_1_september_without_aggregator_rating_has_no_aggregator_score() -> None:
     unit = _unit({})  # у Словении оценки Wolt начинаются с 11.10: за сентябрь их нет нигде
 
