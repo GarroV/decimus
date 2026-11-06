@@ -59,10 +59,14 @@ def страница(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
 
 def _клиенты(
-    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str, ui_lang: str = "ru"
+    monkeypatch: pytest.MonkeyPatch,
+    tenant: str,
+    role: str,
+    ui_lang: str = "ru",
+    demo: bool = False,
 ) -> Iterator[FlaskClient]:
     подменить_двери(monkeypatch, tenant=tenant, role=role)
-    with собрать(tenant=tenant, ui_lang=ui_lang).test_client() as client:
+    with собрать(tenant=tenant, ui_lang=ui_lang, demo=demo).test_client() as client:
         assert войти(client).status_code == 302
         yield client
 
@@ -74,6 +78,26 @@ def test_кнопка_есть_у_контроля_и_админа_уК(
     for client in _клиенты(monkeypatch, tenant, role):
         текст = client.get("/administration?tab=ratings&block=aggregators").get_data(as_text=True)
         assert КНОПКА in текст and 'action="/ratings/aggregators/update' in текст
+
+
+def test_в_демо_кнопки_нет_бота_там_нет_и_заявка_не_исполнится(
+    monkeypatch: pytest.MonkeyPatch, страница: Any
+) -> None:
+    """#1297: сбор ведёт бот, а в демо его нет — кнопка обещала бы сбор, которого не будет."""
+    for client in _клиенты(monkeypatch, "HQ", "admin", ui_lang="en", demo=True):
+        текст = client.get("/administration?tab=ratings&block=aggregators").get_data(as_text=True)
+        assert КНОПКА_EN not in текст, "кнопка обновления агрегаторов осталась в демо"
+        assert "/ratings/aggregators/update" not in текст
+        assert "collects the ratings on request" not in текст
+
+
+def test_в_демо_стоящая_заявка_остаётся_видна(
+    monkeypatch: pytest.MonkeyPatch, страница: Any
+) -> None:
+    страница["открытая"] = _заявка()
+    for client in _клиенты(monkeypatch, "HQ", "admin", demo=True):
+        текст = client.get("/administration?tab=ratings&block=aggregators").get_data(as_text=True)
+        assert "Обновление в очереди с 12.10.2026" in текст
 
 
 @pytest.mark.parametrize(
