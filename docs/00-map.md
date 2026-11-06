@@ -267,6 +267,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_administration.py` | Тексты раздела «Администрирование» (D639), вкладок «Подключения» (D638) и «Ключи и API» (D650) |
 | `src/web/texts_aggregators_admin.py` | Тексты административного охвата агрегаторов (#1391) |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
+| `src/web/texts_batch.py` | Тексты пакетного ввода нарушений в обходе: несколько кадров со словами |
 | `src/web/texts_clients.py` | Клиентские оценки: язык интерфейса не меняет источник и вес данных |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
@@ -320,6 +321,7 @@ Claude входом через сайт (OAuth).
 | `src/web/walk_aliases.py` | Выученные формулировки пунктов для поиска пункта в мини-аппе обхода |
 | `src/web/walk_app.py` | Сервис мини-аппа обхода: только адреса `/tg/walk*` и статика к ним |
 | `src/web/walk_auth.py` | Кто открыл мини-апп обхода — по подписи Telegram, а не по куке админки (#418) |
+| `src/web/walk_batch.py` | Мини-апп обхода: пакетный подбор нарушений — `POST /tg/walk/batch` |
 | `src/web/walk_finish.py` | Общая сборка отчёта для miniapp и запасного завершения через чат |
 | `src/web/walk_finish_review.py` | Read-only miniapp review of the current run; the engine owns every score |
 | `src/web/walk_level.py` | Classify only the selected item, using its complete pinned criterion and fresh facts |
@@ -376,7 +378,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 77 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+69) |
+| `src/web/static/` | 79 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+71) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -1029,6 +1031,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/schema.py` | T031: схема ответа модели |
 | `src/recognize/selected_level.py` | Selected-item criterion request and a result bound to the exact factual context |
 | `src/recognize/shortlist.py` | T030: перечень кандидатов, который уходит в запрос к модели |
+| `src/recognize/split.py` | Разделить комментарий аудитора на отдельные нарушения (D713) |
 | `src/recognize/timing.py` | #1253: monotonic request-local timing; never captures input or model output |
 | `src/recognize/transcribe.py` | T033: голосовое сообщение аудитора → текст |
 | `src/recognize/translate.py` | Перевод свободного текста аудитора на язык отчёта (D394, #542) |

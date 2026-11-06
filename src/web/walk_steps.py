@@ -18,7 +18,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import replace
-from functools import wraps
+from functools import partial, wraps
 from typing import Any, ParamSpec, TypeVar
 
 from flask import Response, g, request
@@ -48,6 +48,7 @@ R = TypeVar("R")
 KIND_SUGGEST = "suggest"
 KIND_LEVEL = "level"
 KIND_FINDING = "finding"
+KIND_BATCH = "batch"
 
 #: Сколько предложенных пунктов уходит в журнал (остальные — хвост, он не нужен для разбора).
 _CANDIDATES_MAX = 5
@@ -56,6 +57,10 @@ _TEXT_MAX = 1000
 CLASS_STATUS_MANUAL = "manual"
 #: Модель недоступна, аудитор выбирает пункт вручную (`via` шага подбора).
 VIA_FALLBACK = "fallback"
+#: Шаг подбора сделан пакетным вводом (`/tg/walk/batch`): одна строка на строку карточки (D713).
+VIA_BATCH = "batch"
+#: Статусы карточки пакета, с которыми система не смогла ответить (остальные — исход, а не сбой).
+_BATCH_FAILED = {"unavailable", "busy"}
 _FINDING_STEPS = {"add": STEP_SAVE, "edit": STEP_EDIT, "drop": STEP_REMOVE}
 
 _RUN = "walk_log_run"
@@ -153,6 +158,92 @@ def _suggest_fields(body: dict[str, Any], data: dict[str, Any]) -> dict[str, Any
     }
 
 
+def _batch_line_fields(
+    raw: dict[str, Any],
+    card: dict[str, Any],
+    line: dict[str, Any],
+    place: tuple[int, int, int, int],
+) -> dict[str, Any]:
+    status = _text(line.get("status"))
+    chosen = _json(line.get("class"))
+    suggested = _json(line.get("suggested"))
+    failed = status in _BATCH_FAILED
+    card_at, cards, line_at, lines = place
+    return {
+        "words": _text(line.get("words")) or _text(raw.get("words")),
+        "photos": _count(raw.get("photos")),
+        "item_code": line.get("code"),
+        "zone": line.get("zone"),
+        "level": chosen.get("level") or chosen.get("provisional_level") or suggested.get("level"),
+        "verdict": status or None,
+        "reason": _short(chosen.get("reason"), 1500),
+        "via": VIA_BATCH,
+        "duration_ms": card.get("ms") if isinstance(card.get("ms"), int) else None,
+        "outcome": OUTCOME_ERROR if failed else OUTCOME_OK,
+        "error": _short(card.get("error_code") or status, 300) if failed else "",
+        "detail": {
+            "card": card_at,
+            "of": cards,
+            "line": line_at,
+            "lines": lines,
+            "candidates": [
+                {"code": c.get("code"), "level": c.get("level"), "zone": c.get("zone")}
+                for c in _cards(line)[:_CANDIDATES_MAX]
+            ],
+            "class_status": chosen.get("status"),
+            "zone_source": line.get("zone_source"),
+            "photo_only": line.get("photo_only") is True,
+            "pinned": bool(raw.get("code")),
+            "split_failed": card.get("split_failed") is True,
+        },
+    }
+
+
+def _batch_failed_card(
+    raw: dict[str, Any], card: dict[str, Any], place: tuple[int, int]
+) -> dict[str, Any]:
+    """Карточка не прошла (занято, сбой) — строк у неё нет, но журнал её помнит."""
+    status = _text(card.get("status"))
+    return {
+        "words": _text(raw.get("words")),
+        "photos": _count(raw.get("photos")),
+        "verdict": status or None,
+        "via": VIA_BATCH,
+        "duration_ms": card.get("ms") if isinstance(card.get("ms"), int) else None,
+        "outcome": OUTCOME_ERROR,
+        "error": _short(card.get("error_code") or status, 300),
+        "detail": {"card": place[0], "of": place[1], "line": 0, "lines": 0},
+    }
+
+
+def _batch_fields(body: dict[str, Any], data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Строка журнала на нарушение карточки (D713); отказ всего вызова — одна строка."""
+    raw_cards = body.get("cards")
+    raws = [c for c in raw_cards if isinstance(c, dict)] if isinstance(raw_cards, list) else []
+    by_id = {_text(c.get("id")): c for c in raws}
+    answers = [c for c in data.get("cards", []) if isinstance(c, dict)]
+    if not answers:
+        return [
+            {
+                "words": "",
+                "photos": sum(_count(c.get("photos")) for c in raws),
+                "via": VIA_BATCH,
+                "detail": {"cards": len(raws)},
+            }
+        ]
+    rows: list[dict[str, Any]] = []
+    for i, card in enumerate(answers):
+        raw = by_id.get(_text(card.get("id")), {})
+        lines = [x for x in card.get("lines", []) if isinstance(x, dict)]
+        if not lines:
+            rows.append(_batch_failed_card(raw, card, (i + 1, len(answers))))
+        rows.extend(
+            _batch_line_fields(raw, card, line, (i + 1, len(answers), n, len(lines)))
+            for n, line in enumerate(lines, 1)
+        )
+    return rows
+
+
 def _level_fields(body: dict[str, Any], data: dict[str, Any]) -> dict[str, Any]:
     facts = _count(body.get("clarifications"))
     level = data.get("level") or data.get("provisional_level")
@@ -194,6 +285,40 @@ def _finding_fields(body: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _step_of(
+    fields: dict[str, Any],
+    *,
+    chat_id: int,
+    inspection: Inspection,
+    status: int,
+    error: Any,
+    started: float,
+) -> WalkStep:
+    """Строка журнала из полей шага; общие для всех видов шага поля — здесь."""
+    fields = dict(fields)
+    fields["via"] = getattr(g, _VIA, None) or fields.get("via")
+    outcome = fields.pop("outcome", None) or _outcome(status)
+    row_error = fields.pop("error", None)
+    elapsed = fields.pop("duration_ms", None)
+    return WalkStep(
+        chat_id=int(chat_id),
+        step=fields.pop("step"),
+        outcome=outcome,
+        run_id=inspection.run_id,
+        tenant=inspection.tenant or HQ_TENANT,
+        unit=inspection.unit,
+        visit_date=inspection.visit_date(),
+        duration_ms=elapsed if elapsed is not None else int((time.monotonic() - started) * 1000),
+        error=row_error if row_error is not None else (_text(error) if status >= 400 else ""),
+        **{k: v for k, v in fields.items() if k != "detail"},
+        detail={
+            **fields.get("detail", {}),
+            **({"reason_code": getattr(g, _REASON)} if hasattr(g, _REASON) else {}),
+            "status": status,
+        },
+    )
+
+
 def _steps(
     kind: str,
     result: Any,
@@ -206,31 +331,26 @@ def _steps(
     body = _body()
     status = 500 if exc is not None else _status_of(result)
     data = _response_json(result) if kind != KIND_FINDING and exc is None else {}
+    error = type(exc).__name__ if exc is not None else getattr(g, _ERROR, "") or data.get("error")
+    build = partial(
+        _step_of,
+        chat_id=chat_id,
+        inspection=inspection,
+        status=status,
+        error=error,
+        started=started,
+    )
+    if kind == KIND_BATCH:
+        # Строка на нарушение карточки; отказ всего вызова или падение — одна строка с причиной.
+        rows = _batch_fields(body, data)
+        return [build({"step": STEP_SUGGEST, **row}) for row in rows]
     if kind == KIND_SUGGEST:
         fields = {"step": STEP_SUGGEST, **_suggest_fields(body, data)}
     elif kind == KIND_LEVEL:
         fields = _level_fields(body, data)
     else:
         fields = _finding_fields(body)
-    error = type(exc).__name__ if exc is not None else getattr(g, _ERROR, "") or data.get("error")
-    fields["via"] = getattr(g, _VIA, None) or fields.get("via")
-    common = WalkStep(
-        chat_id=int(chat_id),
-        step=fields.pop("step"),
-        outcome=_outcome(status),
-        run_id=inspection.run_id,
-        tenant=inspection.tenant or HQ_TENANT,
-        unit=inspection.unit,
-        visit_date=inspection.visit_date(),
-        duration_ms=int((time.monotonic() - started) * 1000),
-        error=_text(error) if status >= 400 else "",
-        **{k: v for k, v in fields.items() if k != "detail"},
-        detail={
-            **fields.get("detail", {}),
-            **({"reason_code": getattr(g, _REASON)} if hasattr(g, _REASON) else {}),
-            "status": status,
-        },
-    )
+    common = build(fields)
     steps = [common]
     if kind == KIND_FINDING and common.step == STEP_SAVE and common.verdict == CLASS_STATUS_MANUAL:
         # Класс вручную виден серверу только в этот миг: выбор делается на экране и

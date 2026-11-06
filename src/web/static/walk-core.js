@@ -30,6 +30,7 @@
     suggest: root.getAttribute("data-suggest"),
     hint: root.getAttribute("data-hint"),
     level: root.getAttribute("data-level"),
+    batch: root.getAttribute("data-batch"),
     translate: root.getAttribute("data-translate"),
     voice: root.getAttribute("data-voice"),
     app: root.getAttribute("data-app"),
@@ -104,6 +105,8 @@
     check: ["M5 12.5l4.5 4.5L19 7.5"],
     gallery: ["M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z",
       "M3 16l5-5 4 4 3-3 6 6", "M15.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"],
+    stack: ["M8 7h11a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z",
+      "M4 10v8a1 1 0 0 0 1 1h10", "M10 15l2.5-2.5 2 2 1.5-1.5 2 2"],
     mic: ["M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z", "M6 11a6 6 0 0 0 12 0", "M12 17v4"]
   };
 
@@ -204,15 +207,17 @@
       document.body.appendChild(node);
     }
     node.textContent = text;
-    if (action) {
+    // `action` — одно действие или список (после записи: «Перейти» и «Ещё пункт с этим фото»).
+    var actions = !action ? [] : Array.isArray(action) ? action : [action];
+    actions.forEach(function (one) {
       node.appendChild(document.createTextNode(" "));
-      node.appendChild(W.button("walk-toast__action", action.label, function () {
+      node.appendChild(W.button("walk-toast__action", one.label, function () {
         node.className = "walk-toast";
-        action.run();
+        one.run();
       }));
-    }
-    node.className = "walk-toast is-shown" + (tone ? " walk-toast--" + tone : "") + (action ? " has-action" : "");
+    });
+    node.className = "walk-toast is-shown" + (tone ? " walk-toast--" + tone : "") + (actions.length ? " has-action" : "");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { node.className = "walk-toast"; }, action ? 6000 : 2600);
+    toastTimer = setTimeout(function () { node.className = "walk-toast"; }, actions.length ? 8000 : 2600);
   };
 })();
