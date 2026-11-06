@@ -173,6 +173,19 @@ def run_probe(code: str) -> Outcome | None:
     return None if runner is None else runner()
 
 
+def record_key_in_use(code: str, fingerprint: bytes) -> bool:
+    """Засчитать успешный фоновый заход с этим ключом за проверку ключа (#1425).
+
+    У Pointer пробы по расписанию нет (`scheduled=False`), а после смены отпечатка
+    плитка серела до ручной кнопки, хотя ночной сбор карт тем же ключом шёл зелёным.
+    `fingerprint` снят ДО захода: ключ сменили за это время — результат отбрасывается
+    (`record_key_if_current`), и старый успех не окрасит новый ключ.
+    """
+    return health_store.record_key_if_current(
+        code, fingerprint, GREEN, "health.reason.ok", datetime.now(UTC)
+    )
+
+
 def probe_and_record(code: str) -> Outcome | None:
     """One guarded writer for web and background probes; network never holds SQL locks."""
     key_service = registry.service(code)
