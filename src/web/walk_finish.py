@@ -55,6 +55,7 @@ from src.domain import get_state, handed_over, set_report_lang
 from src.domain.errors import DomainError
 from src.domain.handover import HandedOverError
 from src.domain.log_ids import log_id
+from src.domain.revision import revision
 
 if TYPE_CHECKING:
     from aiogram import Bot
@@ -157,7 +158,7 @@ def send_summary(token: str, chat_id: int) -> str:
     return SENT
 
 
-async def _deliver_report(token: str, chat_id: int) -> None:
+async def _deliver_report(token: str, chat_id: int, expected_revision: str | None = None) -> None:
     from aiogram import Bot
 
     from src.bot.lang import chat_ui_lang
@@ -168,7 +169,13 @@ async def _deliver_report(token: str, chat_id: int) -> None:
     bot = Bot(token)
     try:
         try:
-            await deliver(_stub_message(bot, chat_id), chat_id, lang, allow_missing=False)
+            await deliver(
+                _stub_message(bot, chat_id),
+                chat_id,
+                lang,
+                allow_missing=False,
+                expected_revision=expected_revision,
+            )
         except Exception:  # — человек уже вышел из приложения: молчать нельзя
             logger.exception("Завершение из приложения: отчёт чата %s не собрался", log_id(chat_id))
             await bot.send_message(chat_id, t("finish.pdf_failed", lang))
@@ -176,9 +183,9 @@ async def _deliver_report(token: str, chat_id: int) -> None:
         await bot.session.close()
 
 
-def _run_report(token: str, chat_id: int) -> None:
+def _run_report(token: str, chat_id: int, expected_revision: str | None = None) -> None:
     try:
-        asyncio.run(_deliver_report(token, chat_id))
+        asyncio.run(_deliver_report(token, chat_id, expected_revision))
         logger.info("Завершение из приложения: сборка отчёта чата %s закончена", log_id(chat_id))
     except Exception:  # — даже письмо об отказе не ушло: остаётся журнал
         logger.exception(
@@ -233,8 +240,6 @@ def start_report(
     """
     try:
         if expected_run_id is not None:
-            from .walk_finish_review import revision
-
             inspection = get_state(chat_id)
             if inspection is None:
                 return ReportStart(NO_INSPECTION)
@@ -284,7 +289,7 @@ def start_report(
         # пространства человека и получила бы отказ (F-037, `src/db/space.py`).
         threading.Thread(
             target=contextvars.copy_context().run,
-            args=(_run_report, token, chat_id),
+            args=(_run_report, token, chat_id, expected_revision),
             name=f"walk-report-{chat_id}",
             daemon=True,
         ).start()

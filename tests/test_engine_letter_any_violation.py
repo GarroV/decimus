@@ -130,6 +130,16 @@ def test_plan_and_stored_slot_follow_violation_classes_not_grade(
         assert "перечисленные отклонения" not in letter.out
         assert "the deviations listed above" not in letter.out
         assert "в сроки, указанные в отчёте" not in letter.out
+        # D1 тоже нарушение (D684): фраза «нет D2/D3» вводила бы в заблуждение, а
+        # «D1: 0» подавало ноль находкой (T128).
+        for stale in (
+            "Существенных (D2)",
+            "No major (D2)",
+            "Что отметили",
+            "What we noted",
+            "D1: 0",
+        ):
+            assert stale not in letter.out, stale
         assert "within the deadlines stated in the report" not in letter.out
         assert "31.08.2026" not in letter.out
     bodies_file = tmp_path / "bodies.json"

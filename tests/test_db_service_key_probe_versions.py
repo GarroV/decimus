@@ -189,3 +189,55 @@ def test_client_id_display_bypasses_resolver_cache_after_another_process_update(
     field = next(f for f in displayed.fields if f.code == "client_id")
     assert field.identifier == new
     assert field.status is not None and field.status.last4 == new[-4:]
+
+
+def _load_with(monkeypatch: pytest.MonkeyPatch, action: object) -> None:
+    from src.bot import maps_loader
+    from src.ratings import maps
+
+    monkeypatch.setattr(maps, "load_once", action)
+    maps_loader._load_if_due(maps_loader.HistoryState())
+
+
+def test_successful_nightly_maps_load_confirms_the_current_pointer_key(
+    vault: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1425: Pointer не пробуется по расписанию — зелёная ночная загрузка и есть проверка ключа."""
+    service_keys.save_many({NAME: "fake-key"}, provider="pointer", by="qa")
+    health_store.record("pointer", "grey", "health.reason.credentials_recheck", datetime.now(UTC))
+
+    _load_with(monkeypatch, lambda: (0, 0))
+
+    status = health_store.probes()["pointer"]
+    assert (status.light, status.reason) == ("green", "health.reason.ok")
+
+
+def test_failed_nightly_maps_load_leaves_pointer_key_grey(
+    vault: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service_keys.save_many({NAME: "fake-key"}, provider="pointer", by="qa")
+    health_store.record("pointer", "grey", "health.reason.credentials_recheck", datetime.now(UTC))
+
+    def broken() -> tuple[int, int]:
+        raise RuntimeError("Pointer недоступен")
+
+    with pytest.raises(RuntimeError):
+        _load_with(monkeypatch, broken)
+
+    assert health_store.probes()["pointer"].light == "grey"
+
+
+def test_key_changed_during_nightly_load_is_not_confirmed(
+    vault: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Успех со старым ключом не красит новый: отпечаток снят до загрузки."""
+    service_keys.save_many({NAME: "fake-old-key"}, provider="pointer", by="qa")
+    health_store.record("pointer", "grey", "health.reason.credentials_recheck", datetime.now(UTC))
+
+    def rotate_meanwhile() -> tuple[int, int]:
+        service_keys.save_many({NAME: "fake-new-key"}, provider="pointer", by="qa")
+        return 0, 0
+
+    _load_with(monkeypatch, rotate_meanwhile)
+
+    assert health_store.probes()["pointer"].light == "grey"

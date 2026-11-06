@@ -43,12 +43,13 @@
     {% elif not enrolled %}
       <div class="note"><div class="note__text">{{ t('sf.sec.optional') }}</div></div>
     {% endif %}
-    {% if not fresh %}
+    {% if not fresh and not show_prove %}
       <div class="note note--warn" role="alert"><div class="note__text">{{ t('sf.sec.stale') }}</div></div>
       <form method="post" action="{{ base }}/relogin?lang={{ lang }}" class="sform">
+        {% if prove_next %}<input type="hidden" name="next" value="{{ prove_next }}">{% endif %}
         <button class="sbtn sbtn--primary" type="submit">{{ t('sf.sec.relogin') }}</button>
       </form>
-    {% elif enrolled and not can_remove and not can_change %}
+    {% elif show_prove or (enrolled and not can_remove and not can_change) %}
       {# Сессия после Google или пароля вторую ступень не проходила (D485): снять или заменить
          способ она не может, пока в ней не подтверждён ключ или код. #}
       <section class="scard" id="prove">

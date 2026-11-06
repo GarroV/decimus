@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 
 from src.bot.mcp_setup import MCP_URL_VAR, chatgpt_setup_command, setup_command
 from src.db import mcp_access
@@ -35,12 +35,29 @@ TARGET_CHATGPT = "chatgpt"
 TARGETS = (TARGET_CLAUDE, TARGET_CHATGPT)
 
 
+#: За сколько дней до конца срока карточка предупреждает, что токен пора перевыпустить (#1440).
+EXPIRY_WARN_DAYS = 7
+
+
 @dataclass(frozen=True)
 class TokenStatus:
     """Живой токен вошедшего глазами карточки."""
 
     known: bool
     expires_at: datetime | None = None
+
+    def days_left(self, now: datetime | None = None) -> int | None:
+        """Дней до конца срока, вверх (последний день — 1); живого токена нет — `None`."""
+        if self.expires_at is None:
+            return None
+        end = self.expires_at if self.expires_at.tzinfo else self.expires_at.replace(tzinfo=UTC)
+        left = (end - (now or datetime.now(UTC))).total_seconds()
+        return max(1, -(-int(left) // 86400))
+
+    def expiring_soon(self, now: datetime | None = None) -> bool:
+        """Срок подходит к концу: предупредить на карточке, пока токен ещё работает."""
+        left = self.days_left(now)
+        return left is not None and left <= EXPIRY_WARN_DAYS
 
 
 @dataclass(frozen=True)

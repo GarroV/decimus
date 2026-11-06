@@ -2,6 +2,9 @@
 # Обновить код открытого демо (D524) до main и пересобрать демо с нуля.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+# shellcheck source=deploy/demo/guard.sh
+source deploy/demo/guard.sh
+require_demo_tree
 
 git pull --ff-only
 # Собирается ровно `main` с GitHub, а не то, что лежит в дереве (см. GHSA-7gm6-hc9m-w3vc).

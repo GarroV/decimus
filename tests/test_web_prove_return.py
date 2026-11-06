@@ -9,8 +9,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from flask.testing import FlaskClient
@@ -18,7 +20,7 @@ from web_harness import СВОЙ, Сессия, войти, подменить_�
 
 from src.db import second_factor as store
 from src.domain.second_factor import new_backup_codes
-from src.web import auth, second_step
+from src.web import auth, second_step, security_screen
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 ЗАЩИТА = "/settings/security"
@@ -98,3 +100,46 @@ def test_чужой_путь_не_попадает_в_форму_страниц�
     страница = клиент.get(f"{ЗАЩИТА}?next=//evil.com").get_data(as_text=True)
     assert 'id="prove"' in страница  # форма подтверждения на месте
     assert 'value="//evil.com"' not in страница  # …но без чужого пути
+
+
+def _давно_вошёл(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Сессия старше окна подключения способов: так выглядит вход через Google час назад."""
+    прежняя = auth.resolve_session
+
+    def _resolve(token: str) -> Any:
+        учётка = прежняя(token)
+        учётка.signed_in_at = datetime.now(UTC) - timedelta(hours=3)
+        return учётка
+
+    monkeypatch.setattr(auth, "resolve_session", _resolve)
+
+
+def test_весь_путь_подтверждения_ключей_сервисов_через_устаревший_вход_возвращает_на_вкладку(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ломали: у устаревшего входа вместо карточки подтверждения стояло «Войти заново»
+    без пути возврата — человека выбрасывало на вход, а не на вкладку, откуда он пришёл.
+    Сломанная копия: вернуть `{% if not fresh %}` без `show_prove` — падает на `id="prove"`."""
+    _давно_вошёл(monkeypatch)
+    # 1. «Вход и защита» по ссылке отказа: карточка подтверждения на месте и несёт путь
+    адрес = f"{ЗАЩИТА}?next=%2Fadministration%3Ftab%3Ddodois%26country%3DAM"
+    ответ = клиент.get(адрес)
+    защита = ответ.get_data(as_text=True)
+    assert 'id="prove"' in защита and "relogin" not in защита
+    assert f'name="next" value="{ВКЛАДКА}"'.replace("&", "&amp;") in защита
+    # 2. верный код возвращает на ту же вкладку и страну
+    assert _доказать(клиент, next=ВКЛАДКА).headers["Location"] == ВКЛАДКА
+
+
+def test_войти_заново_у_устаревшего_входа_несёт_путь_возврата(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _давно_вошёл(monkeypatch)
+    monkeypatch.setattr(security_screen, "close_session", lambda _token: True)
+    возврат = "/administration?tab=dodois&country=TR"
+    ответ = клиент.post(f"{ЗАЩИТА}/relogin", data={"next": возврат}, headers=ЗАГОЛОВКИ)
+    адрес = urlsplit(ответ.headers["Location"])
+    assert parse_qs(адрес.query)["next"] == [возврат]
+    # чужой путь не принимается
+    чужой = клиент.post(f"{ЗАЩИТА}/relogin", data={"next": "//evil.com"}, headers=ЗАГОЛОВКИ)
+    assert "evil" not in чужой.headers["Location"]

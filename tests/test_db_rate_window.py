@@ -250,12 +250,21 @@ def test_флаг_включён_база_молчит_считаем_в_пам�
 
 @requires_db
 @pytest.mark.usefixtures("общее_окно")
-def test_замок_ключа_занят_не_ждём_а_считаем_в_памяти(db_env: str) -> None:
+def test_замок_ключа_занят_не_ждём_а_считаем_в_памяти(
+    db_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Чужой процесс держит замок ключа: запрос не блокируется и не получает отказ."""
     import time
 
     import psycopg
 
+    # Сроки раздуты, чтобы время ожидания замка (#1182) нельзя было спутать с сетью:
+    # с боевыми 0,2 с запас перед шумом базы по сети под `-n 4` был ×1,7 и тест краснел
+    # сам по себе. Ждущий замок запрос стоил бы не меньше `lock_timeout` каждый раз,
+    # а обращение без ожидания — доли секунды; граница между ними теперь в разы шире шума.
+    monkeypatch.setattr(rate_window, "LOCK_TIMEOUT_MS", 5000)
+    monkeypatch.setattr(rate_window, "STATEMENT_TIMEOUT_MS", 10000)
+    monkeypatch.setattr(rate_window, "POOL_WAIT_SEC", 5.0)
     scope, key = "test.busy", "k"
     fp = rate_window.key_fingerprint(key)
     окно = WindowLimiter(3, scope=scope)
@@ -266,13 +275,13 @@ def test_замок_ключа_занят_не_ждём_а_считаем_в_п�
         )
         rate_window.allow(scope=scope, key="прогрев", limit=1, window_sec=60)  # пул и соединение
         начало = time.monotonic()
+        прямые = [rate_window.allow(scope=scope, key=key, limit=3, window_sec=60) for _ in range(2)]
         решения = [окно.allow(key) for _ in range(4)]
         ушло = time.monotonic() - начало
 
+    assert прямые == [None, None], "замок занят: общее окно обязано ответить «решай сам»"
     assert решения == [True, True, True, False], "при занятом замке окно процесса обязано решать"
-    # Ждущий замок запрос стоил бы не меньше `lock_timeout` — предел взят от него, а не от
-    # круглой цифры: четыре обращения к базе по сети сами занимают доли секунды (~0,12 с).
-    предел = rate_window.LOCK_TIMEOUT_MS / 1000
+    предел = rate_window.LOCK_TIMEOUT_MS / 1000 / 2
     assert ушло < предел, f"запрос ждал замок {ушло:.2f} с (предел {предел:.2f} с)"
 
 

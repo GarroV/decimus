@@ -565,6 +565,18 @@ _MCP: dict[str, dict[str, str]] = {
         "ru": "Токен действует до {date}.",
         "en": "The token is valid until {date}.",
     },
+    # Предупреждение на карточке за неделю до конца срока (#1440): письма и сообщения
+    # человеку не уходят, он видит это, когда сам открыл «Настройки».
+    "users.mcp.expiring": {
+        "ru": (
+            "Токен скоро истечёт — осталось дней: {days}. После этого Claude перестанет "
+            "подключаться: перевыпустите команду установки заранее."
+        ),
+        "en": (
+            "The token expires soon — days left: {days}. After that Claude stops connecting: "
+            "reissue the install command ahead of time."
+        ),
+    },
     "users.mcp.none": {"ru": "Токена нет.", "en": "No token."},
     "users.mcp.unknown": {
         "ru": "Не удалось узнать, есть ли токен: база не ответила.",

@@ -1,9 +1,10 @@
 {# Управление площадками — только в административном блоке. #}
 {% if agg_update_notice %}<div class="rt-note" role="status">{{ t(agg_update_notice) }}</div>{% endif %}
-  <div class="rt-note">
+  {# В демо бота нет, заявка не исполнится (#1297): кнопки нет; уже стоящая заявка видна. #}
+  {% if agg_pending or not demo_mode %}<div class="rt-note">
     {% if agg_pending %}{{ t('ratings.agg.update.pending', at=agg_pending.requested_at.strftime(at_format), by=agg_pending.requested_by) }}
     {% else %}<form method="post" action="{{ url(ratings_path) }}/aggregators/update?{{ request.query_string.decode() }}" class="rt-form">
-      <button class="btn btn--sm" type="submit">{{ t('ratings.agg.update') }}</button> <span class="rt-maps__n">{{ t('ratings.agg.update.hint') }}</span></form>{% endif %}</div>
+      <button class="btn btn--sm" type="submit">{{ t('ratings.agg.update') }}</button> <span class="rt-maps__n">{{ t('ratings.agg.update.hint') }}</span></form>{% endif %}</div>{% endif %}
 {% if agg is none %}<p>{{ t('ratings.coverage.db_down') }}</p>
 {% elif not agg.gaps %}<p>{{ t('ratings.agg.gaps.none') }}</p>
 {% else %}
