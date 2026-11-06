@@ -685,3 +685,18 @@ def unwrap_untrusted_answer(answer: dict[str, Any]) -> dict[str, Any]:
         for блок in result["content"]
     ]
     return {**answer, "result": {**result, "content": content}}
+
+
+@pytest.fixture(autouse=True)
+def _деление_комментария_не_ходит_в_модель(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Бот делит комментарий на нарушения моделью (D718): тест её не зовёт.
+
+    По умолчанию комментарий остаётся одной строкой — как до деления. Тест,
+    которому нужно деление, ставит свою подмену `src.bot.lines.split_violations`
+    поверх этой.
+    """
+
+    def whole(words: str, **_: object) -> tuple[str, ...]:
+        return (" ".join(words.split()),)
+
+    monkeypatch.setattr("src.bot.lines.split_violations", whole)
