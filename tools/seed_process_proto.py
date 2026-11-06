@@ -36,6 +36,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import psycopg  # noqa: E402
 import seed_demo  # noqa: E402 -- путь к tools выставляется выше
 import seed_open_demo as od  # noqa: E402
+from seed_web_demo import _require_local_dsn  # noqa: E402
 
 from src import domain  # noqa: E402
 from src.db.accept import accept_inspection  # noqa: E402
@@ -44,6 +45,7 @@ from src.db.directory import upsert_unit  # noqa: E402
 from src.db.photos import upload_photos  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.space import SYSTEM_SPACE, acting_space, apply_space  # noqa: E402
+from src.domain.engine import chat_dir  # noqa: E402
 from src.domain.tenants import HQ_TENANT  # noqa: E402
 
 #: Чаты прототипа — из вымышленного диапазона демо, рядом с открытым демо (601…, 701).
@@ -120,7 +122,7 @@ def _has_inspection(dsn: str, unit: str) -> bool:
 def _build(chat_id: int, unit: str, notes: tuple[od.Note, ...], photos_dir: Path | None) -> None:
     """Проверка тем же кодом, что бот и мини-апп; третья зона просрочки — словом человека."""
     settings = domain.check_environment()
-    work_dir = od.chat_dir(chat_id, settings)
+    work_dir = chat_dir(chat_id, settings)
     if work_dir.exists():
         shutil.rmtree(work_dir)
     domain.start_inspection(
@@ -153,7 +155,7 @@ def seed() -> int:
     raw_dir = (os.environ.get(od.PHOTOS_VAR) or "").strip()
     photos_dir = Path(raw_dir) if raw_dir and Path(raw_dir).is_dir() else None
     dsn = check_environment().dsn
-    od._require_local_dsn(dsn)
+    _require_local_dsn(dsn)
     upload = photos_dir is not None and od._storage_ready()
     chat = FIRST_CHAT
     for number, (title, notes) in enumerate(CASES, 1):
