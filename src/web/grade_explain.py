@@ -99,13 +99,20 @@ def _breakdown_lines(raw: dict[str, Any], names: dict[str, str], lang: str) -> t
         if row["kind"] == "level":
             key = "explain.level_repeat" if row["repeat"] else "explain.level"
             out.append(t(key, lang, level=row["level"], n=row["count"], loss=loss))
+        elif row["kind"] == "d3_process":
+            # D714 (прототип): D3 стоит процессу один раз, сколько бы зон он ни задел.
+            process = view.pick(row["name_ru"], row["name_en"], lang) or row["process"]
+            key = "explain.d3_process_many" if row["count"] > 1 else "explain.d3_process"
+            out.append(t(key, lang, process=process, n=row["count"], loss=loss))
         else:
             zone = names.get(row["zone"]) or view.pick(row["name_ru"], row["name_en"], lang)
             key = "explain.d3_zone_many" if row["count"] > 1 else "explain.d3_zone"
             out.append(t(key, lang, zone=zone, n=row["count"], loss=loss))
     if raw["skipped"]:
         what = ", ".join(f"{lvl} × {n}" for lvl, n in raw["skipped"].items())
-        out.append(t("explain.skipped", lang, what=what))
+        by_process = any(row["kind"] == "d3_process" for row in raw["lines"])
+        key = "explain.skipped_process" if by_process else "explain.skipped"
+        out.append(t(key, lang, what=what))
     out.append(t("explain.total", lang, pct=number(raw["total"], lang)))
     return tuple(out)
 

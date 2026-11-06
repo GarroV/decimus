@@ -53,6 +53,9 @@ def _process(raw: Mapping[str, Any]) -> ProcessScore:
         d2=int(raw.get("D2") or 0),
         d3=int(raw.get("D3") or 0),
         loss=float(raw.get("loss") or 0.0),
+        model=str(raw.get("model") or ""),
+        zeroed=bool(raw.get("zeroed")),
+        items=tuple(dict(item) for item in raw.get("items") or ()),
     )
 
 
