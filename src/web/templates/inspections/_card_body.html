@@ -396,7 +396,8 @@
   <section class="ov-card ov-card--wide" data-violations data-findings{% if can_proof %} data-proofread data-proofread-data='{{ proof_data|tojson }}'{% endif %}>
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('card.findings.by_zone') if c.process_mode else t('card.findings.title') }}</div>
-      {{ level_chips(c) }}
+      {#- В режиме процессов счётчики классов — свёрнутые нарушения, а здесь записи: метки не ставим. #}
+      {% if not c.process_mode %}{{ level_chips(c) }}{% endif %}
       {% if can_proof %}{{ photos_toggle(violations, photos) }}{% endif %}
       {% if can_proof %}
         <button class="hbtn hbtn--primary" type="button" data-proofread-add aria-controls="compose-{{ head.id }}" aria-expanded="false">{{ icon('plus') }}<span>{{ t('proofread.add') }}</span></button>
