@@ -81,6 +81,14 @@ _SCOPES: dict[str, tuple[tuple[str, str], tuple[str, str], tuple[str, str]]] = {
             ),
         ),
     ),
+    "sales:month": (
+        ("Продажи", "Sales"),
+        ("Продажи пиццерий за месяц", "Pizzeria sales for a month"),
+        (
+            "Выручка и число заказов каждой пиццерии за месяц из Dodo IS, в валюте страны.",
+            "Revenue and order count of each pizzeria for a month from Dodo IS, in local currency.",
+        ),
+    ),
 }
 
 

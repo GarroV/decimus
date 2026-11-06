@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -57,6 +58,7 @@ from src.web.config import Settings
     swarm_api.MAPS_PATH,
     swarm_api.AGGREGATORS_PATH,
     swarm_api.INSPECTION_VIOLATIONS_PATH,
+    swarm_api.SALES_PATH,
 )
 ПЕРИОДЫ = [
     swarm_read.PeriodRow(11, date(2026, 9, 1), date(2026, 9, 15), "Сентябрь 1", "September 1"),
@@ -87,6 +89,7 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         "maps": [],
         "aggs": [],
         "findings": [],
+        "sales": [],
     }
 
     def периоды(rating_type: str, **kw: Any) -> list[swarm_read.PeriodRow]:
@@ -181,6 +184,20 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
             ],
         )
 
+    def продажи(*, countries: Any, month: date) -> list[swarm_read.UnitSalesRow]:
+        зовы["sales"].append((list(countries), month))
+        return [
+            swarm_read.UnitSalesRow("aa" * 16, "Beograd-1", "RS", 1200, Decimal("2930000.50")),
+            swarm_read.UnitSalesRow("bb" * 16, "Ljubljana-1", "SI", 800, Decimal("61000.00")),
+            swarm_read.UnitSalesRow("cc" * 16, "Nowhere-1", "ZZ", 5, Decimal("100.00")),
+        ]
+
+    monkeypatch.setattr(swarm_read, "unit_sales", продажи)
+    monkeypatch.setattr(
+        swarm_read,
+        "sales_loaded",
+        lambda countries: {"RS": datetime(2026, 11, 6, 4, 5, 9, 77, tzinfo=UTC)},
+    )
     monkeypatch.setattr(agg_store, "latest", агрегаторы)
     monkeypatch.setattr(agg_store, "last_run", lambda: datetime(2026, 10, 11, 4, 0, tzinfo=UTC))
     monkeypatch.setattr(swarm_read, "finding_counts", нарушения)
@@ -375,6 +392,10 @@ def test_только_чтение(клиент: FlaskClient) -> None:
         (f"{swarm_api.MAPS_PATH}?on=2026-10-11&compare=2026-10-11", "bad_range"),
         (f"{swarm_api.MAPS_PATH}?on=2026-10-11&compare=2026-10-12", "bad_range"),
         (f"{swarm_api.MAPS_PATH}?countries=R", "bad_countries"),
+        (f"{swarm_api.SALES_PATH}?month=2026-13", "bad_month"),
+        (f"{swarm_api.SALES_PATH}?month=2026-11-01", "bad_month"),
+        (f"{swarm_api.SALES_PATH}?month=nov", "bad_month"),
+        (f"{swarm_api.SALES_PATH}?countries=R", "bad_countries"),
     ],
 )
 def test_кривой_ввод_400(
@@ -883,3 +904,38 @@ def test_топ_нарушений_проверок_по_странам_и_се�
     }
     assert [c["cc"] for c in тело["countries"]] == ["GE", "RS"]
     assert тело["countries"][1]["top"][0]["findings"] == 5
+
+
+def test_продажи_по_пиццериям_валюта_по_стране(
+    клиент: FlaskClient, база: dict[str, list[Any]]
+) -> None:
+    тело = клиент.get(
+        f"{swarm_api.SALES_PATH}?countries=RS,SI,ZZ&month=2026-11", headers=ВЕРНЫЙ
+    ).get_json()
+    assert база["sales"] == [(["RS", "SI", "ZZ"], date(2026, 11, 1))]
+    assert тело["month"] == "2026-11"
+    assert тело["units"][0] == {
+        "id": "aa" * 16,
+        "name": "Beograd-1",
+        "cc": "RS",
+        "revenue": 2930000.5,
+        "orders": 1200,
+        "currency": "RSD",
+    }
+    assert [(u["cc"], u["currency"]) for u in тело["units"][:2]] == [("RS", "RSD"), ("SI", "EUR")]
+    # Страна, которой нет в справочнике валют: ни суммы, ни валюты — не догадка.
+    assert тело["units"][2]["currency"] is None and тело["units"][2]["revenue"] is None
+    assert тело["units"][2]["orders"] == 5
+    # Загрузка есть только у RS: у SI в `loaded` записи нет.
+    assert тело["loaded"] == {"RS": "2026-11-06T04:05:09Z"}
+
+
+def test_продажи_без_месяца_текущий_месяц(клиент: FlaskClient, база: dict[str, list[Any]]) -> None:
+    тело = клиент.get(f"{swarm_api.SALES_PATH}?countries=RS", headers=ВЕРНЫЙ).get_json()
+    месяц = datetime.now(UTC).date().replace(day=1)
+    assert база["sales"][0][1] == месяц and тело["month"] == месяц.strftime("%Y-%m")
+
+
+def test_продажи_без_стран_все_страны_imf(клиент: FlaskClient, база: dict[str, list[Any]]) -> None:
+    клиент.get(f"{swarm_api.SALES_PATH}?month=2026-11", headers=ВЕРНЫЙ)
+    assert база["sales"][0][0] == ["RS"]

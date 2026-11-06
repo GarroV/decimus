@@ -252,8 +252,8 @@ Claude входом через сайт (OAuth).
 <!-- map:begin files src/web/{api_feed,swarm_api}.py -->
 | Файл | Что делает |
 |---|---|
-| `src/web/api_feed.py` | Ответы API для сервисов (D426): оценки агрегаторов и топ нарушений по проверкам |
-| `src/web/swarm_api.py` | API чтения для сервисов, v1 (#567, D387, D390, D426): рейтинги, нарушения, проверки, карты, агрегаторы |
+| `src/web/api_feed.py` | Ответы API для сервисов (D426, D723): агрегаторы, топ нарушений проверок, продажи пиццерий |
+| `src/web/swarm_api.py` | API чтения для сервисов, v1 (#567, D387, D390, D426, D723): рейтинги, нарушения, проверки, карты, агрегаторы, продажи пиццерий |
 <!-- map:end -->
 
 ### Тексты
@@ -639,6 +639,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0118_agg_unit_absent_point_links.sql` | Ручные решения по охвату агрегаторов (D700): отметка «пиццерии нет на площадке» и закреплённая привязка точки к пиццерии (docs/17-aggregators.md) |
 | `0119_walk_log.sql` | Журнал шагов обхода (D710): что аудитор ввёл и что ответила система на каждом шаге записи нарушения в мини-аппе — подбор пункта, определение класса, уточнение фактов… |
 | `0120_walk_log_retention_30d.sql` | Владелец, 05.11.2026: «Хранить 180 дней нет смысла |
+| `0121_api_sales_scope.sql` | Право `sales:month` — метод `GET /api/v1/sales` (D723): продажи пиццерий за месяц из Dodo IS, которые Децимус собирает раз в сутки в `dodois.unit_sales_month` |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -942,6 +943,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/clarifications.py` | Bounded human answers paired with untrusted clarification questions |
 | `src/domain/client_ip.py` | Чей это адрес у сервера MCP: клиент за общим прокси (D462, журнал действий) |
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
+| `src/domain/country_currency.py` | Валюта выручки Dodo IS по стране (D723): справочник, а не догадка по сумме |
 | `src/domain/coverage_exempt.py` | Где источник данных рейтингов Додо не обслуживает — и потому его пустота не дыра (D704, D706) |
 | `src/domain/coverage_rules.py` | Когда пара «страна × источник» данных рейтингов считается дырой (D704, D706, #1444) |
 | `src/domain/criteria.py` | One criteria extractor, with a consistent active-inspection edition snapshot |
