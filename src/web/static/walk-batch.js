@@ -58,7 +58,7 @@
 
   /* Карточка — кадры и слова. Строка — одно нарушение на этих кадрах: свой пункт, зона, класс. */
   function newCard() {
-    return { id: "c" + (++seq), photos: [], words: "", lines: [], state: "new", dirty: false, finding: false, error: "", splitFailed: false };
+    return { id: "c" + (++seq), photos: [], words: "", lines: [], state: "new", dirty: false, finding: false, error: "", splitFailed: false, humanZone: null };
   }
 
   function newLine(card, id, manual) {
@@ -259,7 +259,9 @@
   /** Карточки целиком: слова делятся на строки, кадр без слов — на всё увиденное. Сохранённые и ручные строки остаются. */
   function find(list) {
     if (!list.length || b.busy) return;
-    var payload = list.map(function (c) { return { id: c.id, words: c.words.trim(), photos: refs(c) }; });
+    var payload = list.map(function (c) {
+      return { id: c.id, words: c.words.trim(), photos: refs(c), card_zone: c.humanZone || undefined };
+    });
     begin(list);
     request(payload).then(function (answers) {
       if (!b) return;
@@ -293,7 +295,7 @@
     var card = line.card;
     var payload = { id: card.id, line: line.id, words: line.words.trim(), photos: refs(card),
       photo_only: !!(line.result && line.result.photo_only) && !line.words.trim(),
-      code: line.humanCode || undefined, zone: line.humanZone || undefined };
+      code: line.humanCode || undefined, zone: line.humanZone || card.humanZone || undefined };
     var before = code(line) + "/" + zone(line);
     begin([line]);
     request([payload]).then(function (answers) {
@@ -455,6 +457,8 @@
       onPick: function (value) {
         line.humanCode = code(line);
         line.humanZone = value;
+        // Зона, выбранная руками, держится за карточкой: повторный подбор её не сбрасывает.
+        line.card.humanZone = value;
         findLine(line);
       },
     });

@@ -682,3 +682,23 @@ def test_single_form_opens_with_the_photos_of_the_record_just_saved(page):
     )
 
     assert page.evaluate("shown[shown.length-1]") == [["walk:aaa", "done"], ["walk:bbb", "done"]]
+
+
+def test_zone_changed_by_hand_survives_finding_the_card_again(page):
+    """Brasov-1, 06.11.2026: the auditor changed the zone, then edited the words — the card was
+    found again and the screen's zone came back. The hand-picked zone now rides with the card."""
+    start(page, [found("c1", "ITM1", "zone_a", "screen", NOT_ESTABLISHED)])
+    add_photos(page, 1)
+    page.locator("[data-batch-words]").first.fill("broken board")
+    page.locator("[data-batch-find]").click()
+    page.wait_for_function("asked.length === 1 && !document.querySelector('.is-finding')")
+
+    page.get_by_text("walk.batch.zone_change").first.click()
+    page.get_by_text("Dining").last.click()
+    page.wait_for_function("asked.length === 2")
+    assert page.evaluate("asked[1].cards[0].zone") == "zone_b"
+
+    page.locator("[data-batch-words]").first.fill("broken board, three of them")
+    page.get_by_text("Search again").first.click()
+    page.wait_for_function("asked.length === 3")
+    assert page.evaluate("asked[2].cards[0].card_zone") == "zone_b"
