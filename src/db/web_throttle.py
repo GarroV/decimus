@@ -482,7 +482,7 @@ def _link_key(address: str) -> tuple[str, str]:
 
 
 def link_address_verdict(*, tenant: str, address: str) -> Verdict:
-    """Заперт ли адрес для ссылок входа Dodo IS; только чтение (D640)."""
+    """Заперт ли адрес для ссылок входа Dodo IS; только чтение (D640b)."""
     scope, отпечаток = _link_key(address)
     return verdict_of(load_counter(tenant=tenant, scope=scope, fingerprint=отпечаток), scope=scope)
 
