@@ -123,6 +123,8 @@ OPEN_ENDPOINTS = frozenset(
         "second_step_code",
         "second_step_passkey_options",
         "second_step_passkey_verify",
+        "second_step_passkey_create_options",
+        "second_step_passkey_create",
         "settings_lang",
         "notifications_read",
         "notifications_read_all",

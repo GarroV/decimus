@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 218 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 220 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -146,6 +146,8 @@
 | `/login/passkey/verify` | POST | `passkey_login_verify` | `src/web/passkey_login.py` |
 | `/login/second-step` | GET | `second_step_page` | `src/web/second_step.py` |
 | `/login/second-step/code` | POST | `second_step_code` | `src/web/second_step.py` |
+| `/login/second-step/passkey/create` | POST | `second_step_passkey_create` | `src/web/second_step.py` |
+| `/login/second-step/passkey/create-options` | POST | `second_step_passkey_create_options` | `src/web/second_step.py` |
 | `/login/second-step/passkey/options` | POST | `second_step_passkey_options` | `src/web/second_step.py` |
 | `/login/second-step/passkey/verify` | POST | `second_step_passkey_verify` | `src/web/second_step.py` |
 | `/logout` | POST | `logout` | `src/web/auth.py` |
