@@ -647,14 +647,30 @@
   function renderDock(zone) {
     var dock = el("div", "walk-dock");
     var row = el("div", "walk-dock__row");
-    var add = W.hinted(W.button("walk-mark walk-dock__add", null, function () {
+    var add = W.hinted(W.button(W.batch ? "walk-dock__add walk-dock__add--main" : "walk-mark walk-dock__add", null, function () {
       // Нарушение не привязано к зоне на экране (D445): зона — мягкая подсказка,
       // запись встанет в зону пункта и слов. На «Оборудовании» подсказки нет.
       W.sheet.open({ mode: "violation", hint: zone.equipment ? null : zone.code });
     }), "add");
     add.appendChild(W.icon("camera"));
     add.appendChild(el("span", null, "+ " + tx("walk.add.short")));
-    row.appendChild(add);
+    if (W.batch) {
+      // Сплит-кнопка: слева одно нарушение, справа несколько кадров со словами.
+      // Зона — подсказка на экране, в записи её называет аудитор словами.
+      var split = el("div", "walk-mark walk-dock__split");
+      var several = W.button("walk-dock__add walk-dock__add--several", null, function () {
+        W.batch.open(zone.equipment ? null : zone.code);
+      });
+      several.setAttribute("data-batch-open", "");
+      several.setAttribute("aria-label", tx("walk.batch.open_aria"));
+      several.appendChild(W.icon("stack"));
+      several.appendChild(el("span", null, tx("walk.batch.open")));
+      split.appendChild(add);
+      split.appendChild(several);
+      row.appendChild(split);
+    } else {
+      row.appendChild(add);
+    }
     var next = nextOpen(zone.code);
     var label;
     var act;

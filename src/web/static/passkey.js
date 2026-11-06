@@ -1,5 +1,5 @@
-// Ключи доступа (WebAuthn, D463, D485): вход ключом на форме входа (и на «Подтвердите
-// вход», если вторая ступень включена), сохранение
+// Ключи доступа (WebAuthn, D463, D485, D720): вход ключом на форме входа (и на «Подтвердите
+// вход»: подтверждение ключом, а у ролей с отпечатком на каждом входе — сохранение его), сохранение
 // Touch ID в браузере после входа. Параметры и ответы — JSON, номера и вызов — base64url; браузеры без
 // `PublicKeyCredential.parse…FromJSON` обслуживаются ручным разбором, поэтому работает
 // и в Safari 16, и в Chrome. Без WebAuthn (встроенный браузер Telegram) — подсказка
@@ -147,6 +147,52 @@
     var button = root.querySelector("[data-passkey-button]");
     if (!button || guardUnsupported(root, button)) return;
     var busy = false;
+    var createUrl = root.getAttribute("data-create-url");
+    // D720: ключ здесь уже есть (метка и ключи у человека) — подтверждаем им; иначе, если страница
+    // это позволяет, СОХРАНЯЕМ отпечаток сразу, даже когда ключи есть в других браузерах.
+    var useExisting = storageGet(HERE_KEY) && root.hasAttribute("data-has-keys");
+
+    function saveHere(auto) {
+      if (busy) return;
+      busy = true;
+      hide(root);
+      postJson(root.getAttribute("data-create-options-url"))
+        .then(function (opts) {
+          if (!opts.ok) throw Object.assign(new Error("options"), { status: opts.status, data: opts.data });
+          return navigator.credentials.create({ publicKey: creationOptions(opts.data) });
+        })
+        .then(function (cred) {
+          return postJson(createUrl, { name: deviceName(), credential: encodeCreated(cred) });
+        })
+        .then(function (res) {
+          if (res.ok && res.data && res.data.redirect) {
+            storageSet(HERE_KEY);
+            window.location.href = res.data.redirect;
+            return;
+          }
+          if (res.status === 401 && res.data && res.data.error === "expired") {
+            window.location.href = res.data.login || window.location.pathname;
+            return;
+          }
+          throw new Error("create");
+        })
+        .catch(function (err) {
+          busy = false;
+          // Ключ с этого устройства уже есть (iCloud, другой профиль): метка потерялась —
+          // подтверждаем им.
+          if (err && err.name === "InvalidStateError" && root.hasAttribute("data-has-keys")) {
+            storageSet(HERE_KEY);
+            useExisting = true;
+            run(auto);
+            return;
+          }
+          if (err && err.status === 401 && err.data && err.data.error === "expired") {
+            window.location.href = err.data.login || window.location.pathname;
+            return;
+          }
+          if (!auto) show(root, root.getAttribute("data-msg-create-failed") || root.getAttribute("data-msg-failed") || "");
+        });
+    }
 
     // `auto` — запуск при открытии страницы, без нажатия: осечка тут тихая (кнопка
     // остаётся, сообщения нет). Safari и другие браузеры вправе отказать вызову без
@@ -181,11 +227,14 @@
         });
     }
 
-    button.addEventListener("click", function () { run(false); });
-    // Автозапуск — только в браузере, где ключ уже был (метка). В остальных страница
-    // ведёт с поля кода, а кнопка ключа остаётся запасной.
-    if (storageGet(HERE_KEY)) {
-      if (root.hasAttribute("data-passkey-autostart")) run(true);
+    function go(auto) { if (useExisting || !createUrl) run(auto); else saveHere(auto); }
+
+    button.addEventListener("click", function () { go(false); });
+    // Автозапуск — в браузере, где ключ уже был (метка): подтверждение; где ключа нет и страница
+    // позволяет сохранить его (D720): сохранение. Иначе страница ведёт с поля кода, а кнопка
+    // ключа остаётся запасной.
+    if (useExisting || createUrl) {
+      if (root.hasAttribute("data-passkey-autostart")) go(true);
     } else {
       var methods = root.parentNode;
       if (methods && methods.classList && methods.classList.contains("login__methods")) methods.classList.add("login__methods--code-first");

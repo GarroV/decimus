@@ -32,6 +32,8 @@ from .texts_walk import WALK_TEXTS
 from .walk_auth import (
     APP_ENDPOINT,
     APP_PATH,
+    BATCH_ENDPOINT,
+    BATCH_PATH,
     DATA_ENDPOINT,
     DATA_PATH,
     FINDING_ENDPOINT,
@@ -160,6 +162,7 @@ def install(app: Flask, *, upstream: str | None, ui_lang: str) -> None:
     route(INFO_PATH, INFO_ENDPOINT, "POST")
     route(SUGGEST_PATH, SUGGEST_ENDPOINT, "POST")
     route(LEVEL_PATH, LEVEL_ENDPOINT, "POST")
+    route(BATCH_PATH, BATCH_ENDPOINT, "POST")
     route(HINT_PATH, HINT_ENDPOINT, "POST")
     route(TRANSLATE_PATH, TRANSLATE_ENDPOINT, "POST")
     route(VOICE_PATH, VOICE_ENDPOINT, "POST", max_body=MAX_VOICE_BYTES)

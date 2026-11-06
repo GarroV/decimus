@@ -294,6 +294,52 @@ async def test_увиденное_на_кадрах_только_предлаг�
     assert [f.code for f in findings()] == ["CLN06"], "кнопка под увиденным не записала его"
 
 
+async def test_увиденное_на_кадрах_не_гасит_кнопки_под_словами_аудитора(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Два сообщения одного материала живут вместе: «Записать №1» под первым не «устарело».
+
+    Живой случай: альбом с подписью дал сообщение с кандидатами по словам и
+    второе — «на кадрах видно ещё» (D208). Второе, как одиночное предложение,
+    вытесняло первое, и нажатие под первым отвечало «предложение неактуально».
+    """
+    started()
+    ответ = Suggestion(
+        candidates=(
+            candidate("CLN05", "D1", "hot_kitchen", "по словам 1"),
+            candidate("CLN06", "D1", "hot_kitchen", "по словам 2"),
+        ),
+        needs_human=False,
+        also_seen=(candidate("PRD06", "D1", "hot_kitchen", "видно на кадре"),),
+    )
+
+    def fake(note: str, photo: object = None, zone_hint: object = None, **kw: Any) -> Suggestion:
+        return ответ
+
+    monkeypatch.setattr("src.bot.routers.record.classify", fake)
+    bot, session = make_bot()
+    dp = dispatcher()
+    await send_album(dp, bot, "d1", "d2", "d3", caption="печь грязная")
+    header = t("record.also_seen", "ru", lines="").strip()
+    also_id = next(i for i, x in zip(session.sent_ids, session.texts, strict=True) if header in x)
+    head = t("record.candidates", "ru", count=3, lines="").strip()
+    main_id = next(i for i, x in zip(session.sent_ids, session.texts, strict=True) if head in x)
+    session.clear()
+
+    await feed(dp, bot, callback(f"{PICK_PREFIX}0", message_id=main_id))
+
+    assert session.last_text != t("record.stale", "ru"), "кнопка под словами аудитора устарела"
+    assert [f.code for f in findings()] == ["CLN05"]
+
+    await feed(dp, bot, callback(f"{PICK_PREFIX}1", message_id=main_id))
+    assert session.last_text == t("record.stale", "ru"), "разговор по словам взят целиком"
+
+    await feed(dp, bot, callback(f"{PICK_PREFIX}0", message_id=also_id))
+    assert [f.code for f in findings()] == ["CLN05", "PRD06"], (
+        "кнопка под увиденным на кадрах не работает после нажатия под первым"
+    )
+
+
 async def test_второе_нажатие_под_тем_же_кадром_ничего_не_дописывает(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:

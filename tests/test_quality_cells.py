@@ -71,9 +71,39 @@ def test_groups_mark_first_column_of_each_group() -> None:
     edges = [c.edge for c in qc.cells(values, None, None, show_audit=True)]
 
     assert [k for k, e in zip((c.key for c in qc.COLUMNS), edges, strict=True) if e] == [
+        "total",
+        "w_rko",
         "rko",
         "kr",
         "share_agg",
         "rev_dine",
         "audit",
     ]
+
+
+def test_total_moves_like_a_score_and_is_tinted_when_worse() -> None:
+    total = qc.Column("total", "score", 2)
+    worse = qc.cell(total, D("4.40"), D("4.52"), None)
+
+    assert (worse.text, worse.delta.text, worse.tone) == ("4.40", "-0.12", "worse")
+    assert qc.cell(total, D("4.60"), D("4.52"), None).tone == ""
+
+
+def test_weight_is_whole_percent_without_movement_and_tint() -> None:
+    weight = qc.Column("w_kr", "weight")
+    c = qc.cell(weight, D("0.2333"), D("0.5"), None)
+
+    assert (c.text, c.delta.kind, c.tone) == ("23%", "", "")
+    assert qc.cell(weight, D(0), None, None).text == "0%"  # вес ноль — «0%», не прочерк
+    assert qc.cell(weight, None, None, None).text == qc.DASH  # итога нет вообще
+
+
+def test_incomplete_total_shows_sum_of_weights_without_tint() -> None:
+    values = {"total": D("4.50"), "w_sum": D("0.6793")}
+    total_cell = qc.cells(values, None, None, show_audit=False)[0]
+    assert (total_cell.text, total_cell.incomplete, total_cell.tone) == ("4.50", "68%", "")
+
+    full = qc.cells({"total": D("4.50"), "w_sum": D(1)}, None, None, show_audit=False)[0]
+    assert full.incomplete == ""
+    # Страна сумму весов не отдаёт — пометки нет.
+    assert qc.cells({"total": D("4.50")}, None, None, show_audit=False)[0].incomplete == ""

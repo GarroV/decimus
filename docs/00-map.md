@@ -198,7 +198,7 @@ Flask-приложение управляющей компании и партн
 «Подключения» (состояние подключений, D638) и «Ключи и API» (ключи сервисов и ключи API, D650), подключение
 Claude входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -210,8 +210,8 @@ Claude входом через сайт (OAuth).
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
 | `src/web/connections_screen.py` | Вкладки «Подключения» и «Ключи и API» раздела «Администрирование» (D638, D639, D650) |
 | `src/web/demo_entry.py` | Вход в открытое демо (D524): выбор роли и сессия без пароля — только на стенде демо |
-| `src/web/dodois_connect.py` | Публичная страница входа в Dodo IS по ссылке-приглашению (D640, #951) |
-| `src/web/dodois_screen.py` | Вкладка «Dodo IS» раздела «Администрирование»: входы по странам и ссылки (D640, D641, #951) |
+| `src/web/dodois_connect.py` | Публичная страница входа в Dodo IS по ссылке-приглашению (D640b, #951) |
+| `src/web/dodois_screen.py` | Вкладка «Dodo IS» раздела «Администрирование»: входы по странам и ссылки (D640b, D641, #951) |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
 | `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
 | `src/web/google_profile.py` | Имя и фото из Google в учётку (D468): скачать фото один раз и записать |
@@ -219,6 +219,7 @@ Claude входом через сайт (OAuth).
 | `src/web/journal.py` | Журналы входов и действий на стороне веба (D462, `0067`) |
 | `src/web/journal_screen.py` | Экраны журналов (D462): «Журнал» главного админа и «Журнал входов» человека |
 | `src/web/landing.py` | Посадочная страница продукта (D524): что такое Decimus, «Войти» и «Открыть демо» |
+| `src/web/login_alert.py` | Сообщение владельцу о каждом входе главного админа в админку (D720) |
 | `src/web/notifications.py` | Колокольчик и красные точки: уведомления в приложении (#1129, D604, D614) |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения нейросетей к MCP (D417, D695) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
@@ -267,12 +268,13 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_administration.py` | Тексты раздела «Администрирование» (D639), вкладок «Подключения» (D638) и «Ключи и API» (D650) |
 | `src/web/texts_aggregators_admin.py` | Тексты административного охвата агрегаторов (#1391) |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
+| `src/web/texts_batch.py` | Тексты пакетного ввода нарушений в обходе: несколько кадров со словами |
 | `src/web/texts_clients.py` | Клиентские оценки: язык интерфейса не меняет источник и вес данных |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
 | `src/web/texts_country_contacts.py` | Country contact directory and read-only references (D690) |
 | `src/web/texts_demo.py` | Тексты открытого демо и лендинга (D524): выбор роли, плашка, посадочная страница |
-| `src/web/texts_dodois.py` | Тексты входов в Dodo IS по странам (D640, #951): блок «Dodo IS» на «Подключениях» и публичная страница входа по ссылке |
+| `src/web/texts_dodois.py` | Тексты входов в Dodo IS по странам (D640b, #951): блок «Dodo IS» на «Подключениях» и публичная страница входа по ссылке |
 | `src/web/texts_edit.py` | Manual edit history and recoverable, revision-bound edit drafts |
 | `src/web/texts_grade.py` | Тексты «почему такая буква» и «расшифровка оценки» на карточке проверки (D490) |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
@@ -320,6 +322,7 @@ Claude входом через сайт (OAuth).
 | `src/web/walk_aliases.py` | Выученные формулировки пунктов для поиска пункта в мини-аппе обхода |
 | `src/web/walk_app.py` | Сервис мини-аппа обхода: только адреса `/tg/walk*` и статика к ним |
 | `src/web/walk_auth.py` | Кто открыл мини-апп обхода — по подписи Telegram, а не по куке админки (#418) |
+| `src/web/walk_batch.py` | Мини-апп обхода: пакетный подбор нарушений — `POST /tg/walk/batch` |
 | `src/web/walk_finish.py` | Общая сборка отчёта для miniapp и запасного завершения через чат |
 | `src/web/walk_finish_review.py` | Read-only miniapp review of the current run; the engine owns every score |
 | `src/web/walk_level.py` | Classify only the selected item, using its complete pinned criterion and fresh facts |
@@ -334,7 +337,7 @@ Claude входом через сайт (OAuth).
 | `src/web/walk_steps.py` | Журнал шагов обхода (D710): запись шага из обработчиков мини-аппа |
 | `src/web/walk_suggest.py` | Мини-апп обхода: поиск пункта по кадру и словам (D330) — `POST /tg/walk/suggest` |
 | `src/web/walk_translate.py` | Мини-апп обхода: перевод свободного текста на другой язык (D394) — `POST /tg/walk/translate` |
-| `src/web/walk_unseen.py` | Мини-апп обхода: «Ещё не смотрели» — пункты зоны, по которым записи пока нет (#837, D492) |
+| `src/web/walk_unseen.py` | Мини-апп обхода: «Ещё не смотрели» — пункты зоны, по которым записи пока нет (#837, D492b) |
 | `src/web/walk_voice.py` | Мини-апп обхода: голос → текст в поле (D652) — `POST /tg/walk/transcribe` |
 | `src/web/walk_write.py` | Запись из мини-аппа обхода (D312): кадр, нарушение, замер, рекомендация, сведения о визите |
 | `src/web/walk_write_timing.py` | Numeric-only, request-local HTTP write timing, including early/raised refusals |
@@ -376,7 +379,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 77 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+69) |
+| `src/web/static/` | 79 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+71) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -466,7 +469,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/country_report_langs.py` | Языки отчёта страны, перекрывающие файл методики (0098, D640) |
 | `src/db/coverage_store.py` | Что лежит в базе по каждой паре «страна × источник» данных рейтингов (D704, D706, #1444) |
 | `src/db/customer_ratings.py` | Месячные оценки клиентов и журнал их сбора для выбранного среза рейтингов |
-| `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640, миграция `0096`) |
+| `src/db/dodois_logins.py` | Входы в Dodo IS по странам и ссылки-приглашения в базе (D640b, миграция `0096`) |
 | `src/db/dodois_metrics.py` | Чтение данных Dodo IS для страницы «Качество» (D671, миграция `0105`): продажи, агрегаторы, КР |
 | `src/db/dodois_metrics_store.py` | Запись данных Dodo IS для «Качества» (D671, миграция `0105`): замена месяца и журнал загрузки |
 | `src/db/health_store.py` | Двери базы для вкладки «Подключения» (D638): исходы проб и последние заходы сборов |
@@ -717,7 +720,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/auditor.py` | Имя проверяющего по Telegram ID (задача T063, решение D032) |
 | `src/bot/config.py` | Окружение бота: токен, кому отвечать, как запускаться |
 | `src/bot/dates.py` | Разбор даты из живой фразы аудитора — перенесён в домен (`src/domain/dates.py`) |
-| `src/bot/dodois_loader.py` | Входы в Dodo IS по странам: ночью продлевает, раз в час проверяет «открыто X из Y» (D640) |
+| `src/bot/dodois_loader.py` | Входы в Dodo IS по странам: ночью продлевает, раз в час проверяет «открыто X из Y» (D640b) |
 | `src/bot/dodois_metrics_loader.py` | Данные Dodo IS для «Качества» по странам: продажи, агрегаторы, оценки клиентов (D671) |
 | `src/bot/errors.py` | Отказы блока `bot` |
 | `src/bot/finish_translate.py` | Автоперевод комментариев при сборке отчёта (D443) |
@@ -845,7 +848,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 
 ## src/dodois — входы в Dodo IS по странам
 
-Вкладка «Dodo IS» в «Администрировании» (`docs/12-web-admin.md`, D640, D641, #951): device flow
+Вкладка «Dodo IS» в «Администрировании» (`docs/12-web-admin.md`, D640b, D641, #951): device flow
 `auth.dodois.com`, продление и проверка «открыто X из Y». Расписание — `src/bot/dodois_loader.py`,
 правила — `src/domain/dodois.py`, база — `src/db/dodois_logins.py`, экраны — `src/web/dodois_screen.py`,
 `src/web/dodois_connect.py`.
@@ -853,10 +856,10 @@ JSON-RPC поверх одного POST на локальной петле, ли
 <!-- map:begin files src/dodois/*.py -->
 | Файл | Что делает |
 |---|---|
-| `src/dodois/client.py` | Разговор с Dodo IS: вход устройства, продление, имя учётки, счёт открытых пиццерий (D640) |
-| `src/dodois/flow.py` | Вход по ссылке: сервер начинает device flow, сам опрашивает Dodo IS и пишет вход (D640) |
+| `src/dodois/client.py` | Разговор с Dodo IS: вход устройства, продление, имя учётки, счёт открытых пиццерий (D640b) |
+| `src/dodois/flow.py` | Вход по ссылке: сервер начинает device flow, сам опрашивает Dodo IS и пишет вход (D640b) |
 | `src/dodois/metrics.py` | Суточный сбор данных Dodo IS для «Качества» по странам (D671): продажи, агрегаторы, КР |
-| `src/dodois/service.py` | Входы в Dodo IS по странам: записать вход, продлить, проверить «открыто X из Y» (D640) |
+| `src/dodois/service.py` | Входы в Dodo IS по странам: записать вход, продлить, проверить «открыто X из Y» (D640b) |
 <!-- map:end -->
 
 ## src/ratings — рейтинги и оценки площадок
@@ -946,7 +949,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/criteria.py` | One criteria extractor, with a consistent active-inspection edition snapshot |
 | `src/domain/dates.py` | Разбор даты из живой фразы аудитора (задача #220) |
 | `src/domain/demo.py` | Открытое демо: учётки ролей и переключатели — контракт между посевом и входом |
-| `src/domain/dodois.py` | Входы в Dodo IS по странам (D640, #951): правила без базы и сети |
+| `src/domain/dodois.py` | Входы в Dodo IS по странам (D640b, #951): правила без базы и сети |
 | `src/domain/dodois_metrics.py` | Данные Dodo IS для страницы «Качество» (D671): разбор ответов и свёртка в «пиццерия × месяц» |
 | `src/domain/edition.py` | Издание методики, на котором идёт проверка, и его снимок рядом с состоянием |
 | `src/domain/engine.py` | Вызов движка подпроцессом — единственный способ, которым блок его трогает |
@@ -972,9 +975,10 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/photo_upload_link.py` | Адрес загрузки кадров к черновику загрузки проверки: подписанный токен без срока |
 | `src/domain/plan_due.py` | Срок ответа партнёра планом исправлений — один на письмо, бот и веб (D617) |
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
-| `src/domain/quality.py` | Расчёты страницы «Качество» (docs/21-quality.md): среднее КР, карт и агрегаторов, доли заказов |
+| `src/domain/quality.py` | Расчёты страницы «Качество» (docs/21-quality.md): средние КР, карт и агрегаторов, доли заказов, веса и итоговый рейтинг по методике аналитика (D719) |
 | `src/domain/repeat_rule.py` | Правило «пункт уже был нарушением в прошлой проверке» (D191, D255) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
+| `src/domain/revision.py` | Отпечаток состояния проверки: поймать правку между «увидел» и «запечатал» |
 | `src/domain/revisions.py` | Stable record identity shared by manual edits and human splits |
 | `src/domain/route.py` | Маршрут обхода: в каком порядке аудитор идёт по зонам и по пунктам внутри них |
 | `src/domain/scoring.py` | Оценка проверки |
@@ -1030,6 +1034,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/schema.py` | T031: схема ответа модели |
 | `src/recognize/selected_level.py` | Selected-item criterion request and a result bound to the exact factual context |
 | `src/recognize/shortlist.py` | T030: перечень кандидатов, который уходит в запрос к модели |
+| `src/recognize/split.py` | Разделить комментарий аудитора на отдельные нарушения (D713) |
 | `src/recognize/timing.py` | #1253: monotonic request-local timing; never captures input or model output |
 | `src/recognize/transcribe.py` | T033: голосовое сообщение аудитора → текст |
 | `src/recognize/translate.py` | Перевод свободного текста аудитора на язык отчёта (D394, #542) |
@@ -1090,7 +1095,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/bench_run.py` | T035: замер точности разбора на боевых данных — число, а не мнение |
 | `tools/comment_only_measure.py` | T202: цена решения D081 «кадр с комментарием разбирается по комментарию» |
 | `tools/demo_refresh.sh` | Обновление демо-стенда из `main` (задача T102, решение D059) |
-| `tools/dodois_import.py` | Перенос нынешнего входа в Dodo IS в базу — разовый, по одной стране (D640, #951) |
+| `tools/dodois_import.py` | Перенос нынешнего входа в Dodo IS в базу — разовый, по одной стране (D640b, #951) |
 | `tools/fastpath_measure.py` | T113, T125: доля срабатываний быстрого пути — так, как его зовёт живой бот |
 | `tools/gen_map.py` | Карта кода: перегенерация таблиц в docs/ между маркерами (`make map`, #731) |
 | `tools/inspection_release_smoke.py` | Живой смоук перед выездами: демо-вход и экраны, публичные двери прода |

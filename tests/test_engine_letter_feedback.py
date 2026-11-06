@@ -30,7 +30,7 @@ from conftest import AUDIT, REPORT, Run, run_engine
     "en": ("What is going well:", "What to work on:"),
 }
 СПАСИБО = {"ru": "Спасибо за работу", "en": "Thank you for your work"}
-ЗАФИКСИРОВАЛИ = {"plan": "Что зафиксировали:", "clean": "Что отметили:"}
+ЗАФИКСИРОВАЛИ = {"plan": "Что зафиксировали:"}
 
 
 def _роли(каталог: Path, роли: dict[str, str]) -> None:
@@ -136,7 +136,7 @@ def test_шаблон_1_сильные_до_нарушений_зоны_рост
     оценка = текст.index("%).")
     assert оценка < текст.index(хорошо) < текст.index(работа), "порядок блоков шаблона 1"
     if вид != "empty":
-        ключ = ЗАФИКСИРОВАЛИ["plan" if вид == "plan" else "clean"] if язык == "ru" else None
+        ключ = ЗАФИКСИРОВАЛИ["plan"] if вид == "plan" and язык == "ru" else None
         if ключ:
             assert текст.index(хорошо) < текст.index(ключ) < текст.index(работа), (
                 "нарушения должны стоять между сильными сторонами и зонами роста"

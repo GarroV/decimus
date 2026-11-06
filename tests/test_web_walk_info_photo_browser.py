@@ -4,12 +4,26 @@ from __future__ import annotations
 
 import base64
 import io
+import time
 
 import pytest
 from PIL import Image
 from test_web_walk_ux_browser import STATIC, page  # noqa: F401
 
 from src.web.texts_walk import WALK_TEXTS
+
+
+def wait_until(browser, predicate, timeout=10.0):
+    """Poll an async in-page predicate until true.
+
+    Playwright's wait_for_function does not await a returned Promise: an async predicate is
+    always truthy, so the wait returns at once and the test races the real state.
+    """
+    deadline = time.monotonic() + timeout
+    while not browser.evaluate(predicate):
+        if time.monotonic() > deadline:
+            raise AssertionError(f"condition not reached within {timeout}s: {predicate}")
+        browser.wait_for_timeout(20)
 
 
 def bootstrap(browser, *, code="INF08", kind="text", value="", fail_status=False):
@@ -93,8 +107,8 @@ def test_info_photo_packet_survives_real_indexeddb_reload_and_saves_without_capt
             {"name": "two.jpg", "mimeType": "image/jpeg", "buffer": jpeg},
         ]
     )
-    page.wait_for_function(
-        "async()=> (await DecimusWalk.offline.list('photo-visit_info_INF08')).length===2"
+    wait_until(
+        page, "async()=> (await DecimusWalk.offline.list('photo-visit_info_INF08')).length===2"
     )
     assert page.evaluate("Number(localStorage.getItem('qa-upload-count')||0)") == 0
     page.reload()
@@ -218,12 +232,10 @@ def test_duplicate_upload_reference_does_not_leave_a_waiting_ghost(page):  # noq
             {"name": "same-two.jpg", "mimeType": "image/jpeg", "buffer": jpeg},
         ]
     )
+    # Rows stay in IndexedDB until the info save acknowledges them, so wait on the strip state.
     page.wait_for_function(
-        """async()=> {
-          const rows=await DecimusWalk.offline.list('photo-visit_info_INF08');
-          return rows.length===0 && DecimusWalk.finish.photos.refs('INF08').length===1 &&
-            !DecimusWalk.finish.photos.pending();
-        }"""
+        """()=>DecimusWalk.finish.photos.refs('INF08').length===1 &&
+          !DecimusWalk.finish.photos.pending()"""
     )
     assert page.locator(".walk-finish-photos .walk-strip__cell").count() == 1
 

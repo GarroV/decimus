@@ -49,6 +49,7 @@ from src.db.errors import DbError
 from src.db.web_access import close_session
 from src.domain.second_factor import (
     MAX_PASSKEY_NAME,
+    MAX_PASSKEYS,
     backup_code_hash,
     is_fresh_login,
     is_required,
@@ -68,9 +69,6 @@ from .second_step import party_of
 from .sections import section
 
 logger = logging.getLogger(__name__)
-
-#: Сколько ключей доступа у человека не больше (запас на устройства, а не на перебор).
-MAX_PASSKEYS = 10
 
 SECURITY_ENDPOINT = "security_page"
 
@@ -176,6 +174,7 @@ def render_page(
             qr_svg=_qr_svg(totp_uri(totp.secret, login=account.login)),
             secret_groups=_grouped(totp.secret),
         )
+    prove_next = prove_return.checked(request.values.get(prove_return.NEXT_PARAM))
     ответ = make_response(
         render_template(
             "settings/security.html",
@@ -198,7 +197,10 @@ def render_page(
             base=f"{request.script_root}{SECURITY_PATH}",
             show_required=request.args.get("required") == "1" and not status.has_factor,
             # Куда вернуть после подтверждения второго шага: только свой путь (D670).
-            prove_next=prove_return.checked(request.values.get(prove_return.NEXT_PARAM)),
+            prove_next=prove_next,
+            # Пришли за подтверждением второго шага (D670): карточка доказательства стоит и у
+            # устаревшего входа, иначе «войти заново» уводило бы мимо места, откуда пришли.
+            show_prove=bool(prove_next) and status.has_factor and not may_remove(account),
         ),
         code,
     )
@@ -242,7 +244,8 @@ def install(app: Flask, conf: Settings) -> None:
         refuse_foreign_origin()
         token = auth.current_session_token()
         close_session(token)
-        ответ = redirect(url_for("login", next=SECURITY_PATH))
+        вернуться = prove_return.checked(request.form.get(prove_return.NEXT_PARAM))
+        ответ = redirect(url_for("login", next=вернуться or SECURITY_PATH))
         ответ.delete_cookie(auth.COOKIE_NAME, path="/")
         return ответ
 

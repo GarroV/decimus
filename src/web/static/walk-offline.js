@@ -156,7 +156,7 @@
   function owns(entry) {
     var data = W.state.data;
     if (!data || !data.run_id || entry.run_id !== data.run_id) return false;
-    if (entry.key === data.key + "_draft") return true;
+    if (entry.key === data.key + "_draft" || entry.key === data.key + "_batch") return true;
     var context = data.key + "_draft_measure_";
     if (entry.key.indexOf(context) === 0) {
       var zone = entry.key.slice(context.length);

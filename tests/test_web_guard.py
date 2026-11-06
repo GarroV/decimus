@@ -13,7 +13,7 @@ from flask import Flask
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.domain.permissions import ACTION_CODES
+from src.domain.permissions import ACTION_CODES, open_to_space
 from src.web import guard
 
 ПУБЛИЧНЫЕ = {"admin_public_url": СВОЙ, "mcp_public_url": "https://mcp.example.test"}
@@ -212,6 +212,55 @@ def test_маршрут_с_действием_только_УК_партнёру
         войти(client)
         assert client.get("/zzz-hq").status_code == 404
         assert client.get("/calendar").status_code == 200  # объявленный раздел открыт
+
+
+#: Записи только УК, до которых партнёр доходит (раздел открыт ему) и получает «нет доступа»
+#: (403) от матрицы, а не 404. По D717 (п. 5, #1180) ответ партнёру «нет доступа»
+#: нормален, единого «не найдено» не вводим. Список — осознанная классификация: новая запись
+#: УК в открытом партнёру разделе обязана попасть либо сюда (403), либо в
+#: `guard.WITHOUT_SECTION_VIEW` (404), а не оказаться в одном из них молча.
+ПАРТНЁРУ_403 = frozenset(
+    {
+        "action_plan_setting", "add_space", "aggregators_absent", "aggregators_pin",
+        "aggregators_present", "aggregators_unpin", "checklists_apply",
+        "connection_health_check", "connections_issue", "connections_reissue",
+        "connections_revoke", "connections_update", "country_contact_delete",
+        "country_contact_save", "country_set_developer", "country_set_report_langs",
+        "country_set_space", "do_move", "do_retract", "dodois_check", "dodois_invite_issue",
+        "dodois_invite_revoke", "mailing_cc_add", "mailing_cc_remove", "mailing_content_save",
+        "mailing_template_save", "ratings_agg_update", "ratings_coverage_link",
+        "ratings_developer", "ratings_rule_add", "ratings_rule_remove", "ratings_settings",
+        "ratings_sheet_sync", "ratings_upload", "service_key_check", "service_key_delete",
+        "service_key_save", "space_countries", "unit_profile_save",
+    }
+)  # fmt: skip
+
+
+def _записи_только_ук(app: Flask) -> dict[str, bool]:
+    """Пишущие маршруты, все коды которых закрыты партнёру: эндпоинт → доходит ли до матрицы."""
+    итог: dict[str, bool] = {}
+    for rule in app.url_map.iter_rules():
+        if not guard._writes(rule.endpoint, frozenset(rule.methods or ())):
+            continue
+        коды = getattr(app.view_functions[rule.endpoint], guard.ACTIONS_ATTR, ())
+        if коды and not any(open_to_space(код, ПАРТНЁР) for код in коды):
+            итог[rule.endpoint] = guard.open_to_tenant(app, rule.endpoint, rule.rule, ПАРТНЁР)
+    return итог
+
+
+def test_каждая_запись_только_УК_отнесена_к_404_или_403() -> None:
+    """Третье место, где забывают: новая запись УК должна быть названа, а не угадана.
+
+    Дошла до матрицы (раздел открыт партнёру) и не в `ПАРТНЁРУ_403` — её надо либо вписать
+    сюда (партнёру «нет доступа», D717), либо в `guard.WITHOUT_SECTION_VIEW` (404)."""
+    app = собрать(tenant="HQ", **ПУБЛИЧНЫЕ)
+    записи = _записи_только_ук(app)
+    дошли = {имя for имя, открыт in записи.items() if открыт}
+    assert дошли - ПАРТНЁРУ_403 == set(), "новая запись УК не классифицирована: 403 или 404"
+    assert ПАРТНЁРУ_403 - дошли == set(), (
+        "устаревшая строка ПАРТНЁРУ_403: маршрута нет или он закрыт"
+    )
+    assert guard.WITHOUT_SECTION_VIEW <= set(app.view_functions), "строка 404 без маршрута"
 
 
 def test_разделы_только_УК_партнёру_закрыты_по_матрице() -> None:

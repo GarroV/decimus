@@ -781,6 +781,22 @@ def _owner_from_store(token: str) -> Access | None:
     )
 
 
+def _token_expired(token: str) -> bool:
+    """Личный токен существовал и истёк по сроку — чтобы 401 назвал причину (#1440).
+
+    Сбой базы здесь не страшен: отказ всё равно будет, пропадёт только уточнение.
+    """
+    try:
+        from ..db.mcp_access import is_expired
+    except ImportError:
+        return False
+    try:
+        return is_expired(token)
+    except Exception:
+        logger.warning("причина отказа токену не уточнена — база недоступна", exc_info=True)
+        return False
+
+
 def _owner_from_oauth(token: str, resource: str) -> Access | None:
     """Третья дверь (D417): access-токен OAuth, выданный админкой после входа учёткой сайта.
 
@@ -882,4 +898,9 @@ def resolve_access(settings: Settings, header: str | None) -> Access:
         через_сайт = _owner_from_oauth(token, settings.mcp_public_url)
         if через_сайт is not None:
             return через_сайт
+    if _token_expired(token):
+        raise AuthError(
+            "Срок токена истёк — выпустите новый в Настройках → Claude (MCP) "
+            "и обновите подключение в Claude"
+        )
     raise AuthError("Токен не опознан. Доступ к проверкам закрыт личным токеном")

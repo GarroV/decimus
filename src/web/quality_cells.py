@@ -1,7 +1,8 @@
 """Ячейки таблицы «Качества»: текст значения, движение к прошлому месяцу, подсветка.
 
 Одна таблица на страны и на пиццерии: столбцы одни (`COLUMNS`), значения приходят из
-`quality_data` (`values` пиццерии или страны). Подсветка по D677: РКО и РС — по порогам
+`quality_data` (`values` пиццерии или страны). Итог и веса — D719: итог красится как прочие
+оценки (хуже прошлого месяца), веса — никак. Подсветка по D677: РКО и РС — по порогам
 «Рейтингов» (ниже 80 красный, ниже 90 жёлтый, D552), остальные показатели — только если стали
 хуже прошлого месяца; доли заказов направления «лучше/хуже» не имеют и не подсвечиваются.
 Пока месяц идёт, выручка без движения и без подсветки: неполный месяц против полного прошлого
@@ -31,17 +32,24 @@ class Delta:
 @dataclass(frozen=True)
 class Column:
     key: str
-    #: `score` (число со знаками), `share` (доля заказов, проценты), `money` (выручка).
+    #: `score` (число со знаками), `share` (доля заказов, проценты), `money` (выручка),
+    #: `weight` (вес компонента в итоге, проценты, без движения и подсветки).
     kind: str
     places: int = 1
     #: РКО и РС красятся по порогам рейтингов, остальные — по ухудшению.
     threshold: bool = False
     audit: bool = False
-    #: Группа верхнего этажа шапки (`ratings`, `guest`, `shares`, `revenue`); пусто — без группы.
+    #: Группа верхнего этажа шапки (`total`, `weights`, `ratings`, `guest`, `shares`,
+    #: `revenue`); пусто — без группы.
     group: str = ""
 
 
 COLUMNS = (
+    Column("total", "score", 2, group="total"),
+    Column("w_rko", "weight", group="weights"),
+    Column("w_kr", "weight", group="weights"),
+    Column("w_maps", "weight", group="weights"),
+    Column("w_aggs", "weight", group="weights"),
     Column("rko", "score", 1, threshold=True, group="ratings"),
     Column("rs", "score", 1, threshold=True, group="ratings"),
     Column("checks", "score", 1, group="ratings"),
@@ -75,6 +83,8 @@ class Cell:
     tone: str
     #: Первый столбец группы шапки: слева от ячейки тонкая линия.
     edge: bool = False
+    #: Сумма весов итога («70%»), когда итог неполный: экран пишет под числом пометку; иначе пусто.
+    incomplete: str = ""
 
 
 def num(value: Decimal | None, places: int = 2) -> str:
@@ -136,11 +146,21 @@ def cell(
         scaled = None if now is None else now * 100
         prior = None if before is None else before * 100
         return Cell(pct(now), delta(scaled, prior, 0), "")
+    if column.kind == "weight":
+        return Cell(pct(now), Delta("", ""), "")
     if column.kind == "money":
         move = Delta("", "") if in_progress else delta_percent(now, before)
         return Cell(money(now, currency), move, _tone(column, now, move))
     move = delta(now, before, column.places)
     return Cell(num(now, column.places), move, _tone(column, now, move))
+
+
+def _incomplete(column: Column, values: Mapping[str, Decimal | None]) -> str:
+    """Пометка у итога: сумма весов меньше 100% — итог нормирован на неё (D719)."""
+    weights = values.get("w_sum")
+    if column.key != "total" or values.get("total") is None or weights is None or weights >= 1:
+        return ""
+    return pct(weights)
 
 
 def cells(
@@ -163,6 +183,7 @@ def cells(
                 in_progress=in_progress,
             ),
             edge=edge,
+            incomplete=_incomplete(c, now),
         )
         for c, edge in zip(columns, group_starts(columns), strict=True)
     )

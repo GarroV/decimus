@@ -49,6 +49,7 @@
           <p class="ssec__note">{{ t('users.mcp.unknown') }}</p>
         {% elif mcp.expires_at %}
           <p class="ssec__note"><span class="sdot sdot--ok"></span>{{ t('users.mcp.live', date=mcp.expires_at.strftime('%Y-%m-%d')) }} {{ t('settings.ai.chatgpt.shared') }}</p>
+          {% if mcp.expiring_soon() %}<p class="ssec__note" role="status"><b>{{ t('users.mcp.expiring', days=mcp.days_left()) }}</b></p>{% endif %}
           {{ confirm('chatgpt-reissue-confirm', t('settings.ai.chatgpt.reissue'), t('settings.ai.chatgpt.reissue_confirm'), t('settings.claude.reissue_yes'),
                      base ~ '/chatgpt-token?lang=' ~ lang, []) }}
         {% else %}
@@ -110,6 +111,7 @@
           <p class="ssec__note">{{ t('users.mcp.unknown') }}</p>
         {% elif mcp.expires_at %}
           <p class="ssec__note"><span class="sdot sdot--ok"></span>{{ t('users.mcp.live', date=mcp.expires_at.strftime('%Y-%m-%d')) }}</p>
+          {% if mcp.expiring_soon() %}<p class="ssec__note" role="status"><b>{{ t('users.mcp.expiring', days=mcp.days_left()) }}</b></p>{% endif %}
           {# Перевыпуск гасит прежний токен — с подтверждением (макрос общий с «Выйти везде»). #}
           {{ confirm('claude-reissue-confirm', t('settings.claude.reissue'), t('settings.claude.reissue_confirm'), t('settings.claude.reissue_yes'),
                      base ~ '/claude-token?lang=' ~ lang, []) }}

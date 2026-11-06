@@ -1,4 +1,4 @@
-"""Блок «Dodo IS» на «Подключениях» и публичная страница входа по ссылке (D640).
+"""Блок «Dodo IS» на «Подключениях» и публичная страница входа по ссылке (D640b).
 
 База, сеть и вход Dodo IS подменены на границе модулей (`dodois_logins`, `dodois.flow`).
 Здесь поверхность: кто пройдёт (404 всем, кроме главного админа, на чтение и каждую запись),
@@ -293,39 +293,22 @@ def _сессия_с(monkeypatch: pytest.MonkeyPatch, **признаки: Any) -
     monkeypatch.setattr(auth, "resolve_session", _resolve)
 
 
-def test_без_второго_шага_входа_ссылку_не_выдают(
+def test_ссылку_выдают_без_второго_шага_без_свежего_входа_и_без_ключа(
     стенд: tuple[FlaskClient, dict[str, list[Any]]],
     ссылки: Ссылки,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Сломанная копия: убрать `_key_gate` из `dodois_invite_issue` — падает на 200.
-    _сессия_с(monkeypatch, has_second_factor=False)
-    ответ, токен = _выдать(стенд[0])
-    assert ответ.status_code == 403 and токен == "" and ссылки.зовы == []
-
-
-def test_несвежее_подтверждение_уводит_на_подтверждение(
-    стенд: tuple[FlaskClient, dict[str, list[Any]]],
-    ссылки: Ссылки,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _сессия_с(monkeypatch, signed_in_at=datetime.now(UTC) - timedelta(minutes=11))
-    ответ, _ = _выдать(стенд[0])
-    assert ответ.status_code == 302 and ссылки.зовы == []
-
-
-def test_второй_шаг_не_пройден_в_этой_сессии_отказ(
-    стенд: tuple[FlaskClient, dict[str, list[Any]]],
-    ссылки: Ссылки,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _сессия_с(monkeypatch, passed_second_step=False)
-    ответ, _ = _выдать(стенд[0], "BG")
-    assert ответ.status_code == 403 and ссылки.зовы == []
-    # Отказ несёт кнопку «Подтвердить» с возвратом на вкладку с выбранной страной (D670).
-    html = ответ.get_data(as_text=True)
-    assert "подтвердите, что это вы" in html
-    assert 'href="/settings/security?next=%2Fadministration%3Ftab%3Ddodois%26country%3DBG"' in html
+    # D716: админка у одного главного админа — ни второго шага, ни свежести, ни ключа доступа.
+    # Сломанная копия: вернуть `_key_gate` в `dodois_invite_issue` — падает на 403/302.
+    _сессия_с(
+        monkeypatch,
+        has_second_factor=False,
+        passed_second_step=False,
+        signed_in_at=datetime.now(UTC) - timedelta(hours=5),
+    )
+    ответ, токен = _выдать(стенд[0], "BG")
+    assert ответ.status_code == 200 and токен != ""
+    assert "подтвердите, что это вы" not in ответ.get_data(as_text=True)
 
 
 # --- выдача: ссылка видна один раз, токена нигде нет ---------------------------------------
@@ -423,16 +406,17 @@ def test_заголовки_без_реферера_без_кэша_и_без_с
     чужой: FlaskClient, ссылки: Ссылки
 ) -> None:
     # Сломанная копия: убрать `_public_headers` — Referer унесёт токен на сайт Dodo IS.
+    # `no-referrer` тоже неверно: браузер шлёт POST кнопки с `Origin: null`, вход падает 403.
     токен = _ссылка_живая(ссылки)
     for адрес in (f"/dodois/connect/{токен}", f"/dodois/connect/{токен}/status"):
         ответ = чужой.get(адрес)
-        assert ответ.headers["Referrer-Policy"] == "no-referrer"
+        assert ответ.headers["Referrer-Policy"] == "same-origin"
         assert "no-store" in ответ.headers["Cache-Control"]
     html = чужой.get(f"/dodois/connect/{токен}").get_data(as_text=True)
     внешние = re.findall(r'(?:src|href|action)="(https?://[^"]+)"', html)
     assert внешние == [], f"сторонние ресурсы на странице: {внешние}"
     неверный = чужой.get("/dodois/connect/" + "a" * 43)
-    assert неверный.headers["Referrer-Policy"] == "no-referrer"
+    assert неверный.headers["Referrer-Policy"] == "same-origin"
     assert "no-store" in неверный.headers["Cache-Control"]
 
 

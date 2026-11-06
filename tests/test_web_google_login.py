@@ -658,3 +658,106 @@ def test_без_номера_аккаунта_google_не_пускает(
 
     assert ответ.status_code == 401
     assert сверка.звали == [], "учётку сверяли без номера аккаунта"
+
+
+# --- отпечаток при каждом входе developer / admin / superadmin (D720) -------------------
+
+ШАГ = "/login/second-step"
+РОЛИ_С_ОТПЕЧАТКОМ = ["developer", "admin", "superadmin"]
+
+
+@pytest.fixture
+def клиент_с_ключами(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
+    """Как `клиент`, но на площадке включены ключи доступа (WebAuthn)."""
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: РЕКВИЗИТЫ)
+    monkeypatch.setattr(
+        auth,
+        "find_by_email",
+        lambda email: Учётка(tenant=ТЕНАНТ) if email == ПОЧТА_СВОЯ else None,
+    )
+    app = собрать(tenant=ТЕНАНТ, webauthn_rp_id="localhost", webauthn_origin="http://localhost")
+    with app.test_client() as client:
+        yield client
+
+
+def _войти_через_google(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch, *, роль: str, есть_способ: bool
+) -> tuple[Response, list[dict[str, object]]]:
+    """Google-вход учётки с ролью; возвращает ответ и список открытых сессий."""
+    monkeypatch.setattr(auth, "find_by_email", lambda email: Учётка(tenant=ТЕНАНТ, role=роль))
+    открытые: list[dict[str, object]] = []
+
+    def открыть(account: object, **kw: object) -> Сессия:
+        открытые.append(kw)
+        return Сессия()
+
+    monkeypatch.setattr(auth, "open_session", открыть)
+    monkeypatch.setattr(auth.second_step.store, "has_any", lambda _id: есть_способ)
+    monkeypatch.setattr(auth.second_step.store, "open_pending", lambda *_a, **_k: "токен-полувхода")
+    метка = метка_захода(клиент)
+    return клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}"), открытые
+
+
+@pytest.mark.parametrize("есть_способ", [True, False])
+@pytest.mark.parametrize("роль", РОЛИ_С_ОТПЕЧАТКОМ)
+def test_после_google_сессии_нет_пока_не_подтверждён_отпечаток(
+    клиент_с_ключами: FlaskClient,
+    обмен: Обмен,
+    сверка: Сверка,
+    monkeypatch: pytest.MonkeyPatch,
+    роль: str,
+    есть_способ: bool,
+) -> None:
+    """Со способом и без: в первом случае ключ спросят, во втором — сохранят прямо на входе."""
+    ответ, открытые = _войти_через_google(
+        клиент_с_ключами, monkeypatch, роль=роль, есть_способ=есть_способ
+    )
+
+    assert ответ.status_code == 302 and ответ.headers["Location"].endswith(ШАГ)
+    assert открытые == [], "сессия открыта одним Google"
+
+
+def test_на_площадке_без_ключей_учётка_без_способа_входит_как_прежде(
+    клиент: FlaskClient, обмен: Обмен, сверка: Сверка, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Нечем сохранять отпечаток — не запираем (D483): вход как раньше."""
+    ответ, открытые = _войти_через_google(клиент, monkeypatch, роль="admin", есть_способ=False)
+
+    assert not ответ.headers["Location"].endswith(ШАГ)
+    assert len(открытые) == 1
+
+
+def test_студия_после_google_получает_сессию_сразу_даже_со_способом(
+    клиент_с_ключами: FlaskClient, обмен: Обмен, сверка: Сверка, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ответ, открытые = _войти_через_google(
+        клиент_с_ключами, monkeypatch, роль="auditor", есть_способ=True
+    )
+
+    assert not ответ.headers["Location"].endswith(ШАГ)
+    assert len(открытые) == 1 and открытые[0]["step_waived"] is True
+
+
+def test_сохранение_отпечатка_на_входе_только_ролям_с_отпечатком(
+    клиент_с_ключами: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Подделанный запрос полупройденного входа студии не даёт записать ключ без сессии."""
+    from types import SimpleNamespace
+
+    from src.web import second_step
+
+    монитор = monkeypatch
+    монитор.setattr(second_step.store, "find_pending", lambda _t: SimpleNamespace(user_id="u"))
+    монитор.setattr(second_step, "find_by_id", lambda _i: SimpleNamespace(id="u", role="auditor"))
+    приложение = клиент_с_ключами.application
+    кука = приложение.extensions[second_step.SIGNER_KEY].dumps("токен")
+    клиент_с_ключами.set_cookie(second_step.PENDING_COOKIE, кука)
+    заголовки = {"Origin": "http://localhost"}
+
+    выбор = клиент_с_ключами.post(f"{ШАГ}/passkey/create-options", headers=заголовки)
+    запись = клиент_с_ключами.post(
+        f"{ШАГ}/passkey/create", json={"credential": {}}, headers=заголовки
+    )
+
+    assert выбор.status_code == запись.status_code == 403

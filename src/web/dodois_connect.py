@@ -1,4 +1,4 @@
-"""Публичная страница входа в Dodo IS по ссылке-приглашению (D640, #951).
+"""Публичная страница входа в Dodo IS по ссылке-приглашению (D640b, #951).
 
 Главный админ выдаёт коллеге страны ссылку (`dodois_screen.py`); коллега открывает её БЕЗ
 входа в decimus, читает, что просит приложение, жмёт «Войти в Dodo IS» и подтверждает вход
@@ -19,8 +19,11 @@
 код устройства в браузер не уходит. Только что законченный вход (десять минут) виден по той же
 ссылке как «Готово», хотя ссылка уже погашена, — иначе страница ответила бы 404 в момент успеха.
 
-**Ответы без кэша, `Referrer-Policy: no-referrer`** (токен в адресе не должен утечь в Referer),
-сторонних ресурсов страница не грузит. В демо адреса закрыты (`demo_entry.LOCKED_ENDPOINTS`).
+**Ответы без кэша, `Referrer-Policy: same-origin`** (токен в адресе не должен утечь в Referer
+на чужой сайт), сторонних ресурсов страница не грузит. Не `no-referrer`: при нём браузер шлёт
+POST кнопки с `Origin: null`, заслон происхождения отвечает 403, и вход не начинается ни у кого
+(06.11.2026, ссылка Турции). `same-origin` отдаёт Referer только своему серверу, у которого
+токен и так есть. В демо адреса закрыты (`demo_entry.LOCKED_ENDPOINTS`).
 """
 
 from __future__ import annotations
@@ -157,7 +160,9 @@ def install(app: Flask, conf: Settings) -> None:
     @app.after_request
     def _public_headers(response: Response) -> Response:
         if request.endpoint in ENDPOINTS:
-            # Токен в адресе: ни в Referer, ни в кэш браузера и прокси.
-            response.headers["Referrer-Policy"] = "no-referrer"
+            # Токен в адресе: ни в Referer чужим сайтам, ни в кэш браузера и прокси.
+            # `same-origin`, а не `no-referrer`: при `no-referrer` POST кнопки уходит с
+            # `Origin: null`, и заслон происхождения отвечает 403 (см. описание модуля).
+            response.headers["Referrer-Policy"] = "same-origin"
             response.headers["Cache-Control"] = "no-store"
         return response

@@ -755,7 +755,9 @@ def _walk(photos_dir: Path | None) -> None:
     русская (для стендов с маршрутом на неё: превью, съёмка лендинга).
     """
     unit = {u.name: u for u in UNITS}["Northgate-1"]
-    today = date.today().isoformat()
+    # Дата — в календаре демо, а не сегодняшняя: `_build` сдвигает её к сегодня сам
+    # (`shifted`), и уже сегодняшняя уезжала бы в будущее на расстояние до якоря (#1296).
+    today = ANCHOR.isoformat()
     english = Visit(
         "Northgate-1",
         today,

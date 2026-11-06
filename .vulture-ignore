@@ -569,6 +569,8 @@ second_step_page
 second_step_code
 second_step_passkey_options
 second_step_passkey_verify
+second_step_passkey_create_options
+second_step_passkey_create
 security_page
 security_relogin
 security_passkey_options
@@ -724,7 +726,7 @@ latest_own_due
 connection_health_check
 checkable
 
-# Входы в Dodo IS по странам (D640): маршруты `@app.get/post(..., endpoint=...)` и
+# Входы в Dodo IS по странам (D640b): маршруты `@app.get/post(..., endpoint=...)` и
 # `after_request` — их зовёт Flask, по имени не зовёт никто; `SOURCE_IMPORT` берёт только
 # `tools/dodois_import.py`, а `tools` vulture не сканирует.
 dodois_invite_issue
@@ -735,8 +737,10 @@ dodois_connect_start
 dodois_connect_status
 _public_headers
 SOURCE_IMPORT
-# Автоматические фикстуры pytest, сбрасывающие состояние входа по ссылке между тестами.
+# Автоматические фикстуры pytest: сбрасывают состояние входа по ссылке между тестами и
+# подставляют ключ доступа под выдачу ссылки (D715).
 _чисто
+_ключ_доступа
 
 # Имя латиницей (D644): поле `name_latin` строки людей и маршрут `user_name_latin` — их читает
 # шаблон и зовёт Flask; `has_contract` строки стран читает только `administration/countries.html`.

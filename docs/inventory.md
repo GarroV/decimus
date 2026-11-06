@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 218 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 221 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -147,6 +147,8 @@
 | `/login/passkey/verify` | POST | `passkey_login_verify` | `src/web/passkey_login.py` |
 | `/login/second-step` | GET | `second_step_page` | `src/web/second_step.py` |
 | `/login/second-step/code` | POST | `second_step_code` | `src/web/second_step.py` |
+| `/login/second-step/passkey/create` | POST | `second_step_passkey_create` | `src/web/second_step.py` |
+| `/login/second-step/passkey/create-options` | POST | `second_step_passkey_create_options` | `src/web/second_step.py` |
 | `/login/second-step/passkey/options` | POST | `second_step_passkey_options` | `src/web/second_step.py` |
 | `/login/second-step/passkey/verify` | POST | `second_step_passkey_verify` | `src/web/second_step.py` |
 | `/logout` | POST | `logout` | `src/web/auth.py` |
@@ -213,6 +215,7 @@
 | `/static/<path:filename>` | GET | `static` | (библиотека) |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk_proxy.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_proxy.py` |
+| `/tg/walk/batch` | POST | `walk_batch` | `src/web/walk_proxy.py` |
 | `/tg/walk/data` | POST | `walk_data` | `src/web/walk_proxy.py` |
 | `/tg/walk/finding` | POST | `walk_finding` | `src/web/walk_proxy.py` |
 | `/tg/walk/hint` | POST | `walk_hint` | `src/web/walk_proxy.py` |
@@ -240,13 +243,14 @@
 | `/users/unfreeze` | POST | `unfreeze_user` | `src/web/users_screen.py` |
 | `/welcome` | GET | `landing` | `src/web/landing.py` |
 
-**Мини-апп обхода (`src/web/walk_app.py: create_walk_app`)** — 14 маршрутов
+**Мини-апп обхода (`src/web/walk_app.py: create_walk_app`)** — 15 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
 | `/static/<path:filename>` | GET | `static` | (библиотека) |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_settings.py` |
+| `/tg/walk/batch` | POST | `walk_batch` | `src/web/walk_batch.py` |
 | `/tg/walk/data` | POST | `walk_data` | `src/web/walk.py` |
 | `/tg/walk/finding` | POST | `walk_finding` | `src/web/walk_write.py` |
 | `/tg/walk/hint` | POST | `walk_hint` | `src/web/walk_suggest.py` |

@@ -49,7 +49,7 @@ PROBE = "probe"
 LOAD = "load"
 CONFIG = "config"
 PENDING = "pending"
-#: Входы в Dodo IS по странам (D640): строка на страну, цвет — из состояния входа.
+#: Входы в Dodo IS по странам (D640b): строка на страну, цвет — из состояния входа.
 DODOIS = "dodois"
 
 #: Группы плиток на экране, по порядку (ключ текста `health.group.<код>`).
@@ -89,7 +89,7 @@ CONNECTIONS: tuple[Connection, ...] = (
     Connection("sheet", LOAD, RATINGS, SHEET_FRESH),
     Connection("ispring", PROBE, LEARNING),
     Connection("learning", LOAD, LEARNING, DAILY_FRESH),
-    # Dodo IS по странам (D640, #951): строка на каждый вход; цвет — из `dodois.logins`,
+    # Dodo IS по странам (D640b, #951): строка на каждый вход; цвет — из `dodois.logins`,
     # которые продлевает и проверяет бот (`src/bot/dodois_loader.py`).
     Connection("dodo_is", DODOIS, DODO_IS),
 )
@@ -171,6 +171,19 @@ def run_probe(code: str) -> Outcome | None:
     """Пробовать подключение сейчас. `None` — здесь пробовать нечем."""
     runner = _RUNNERS.get(code)
     return None if runner is None else runner()
+
+
+def record_key_in_use(code: str, fingerprint: bytes) -> bool:
+    """Засчитать успешный фоновый заход с этим ключом за проверку ключа (#1425).
+
+    У Pointer пробы по расписанию нет (`scheduled=False`), а после смены отпечатка
+    плитка серела до ручной кнопки, хотя ночной сбор карт тем же ключом шёл зелёным.
+    `fingerprint` снят ДО захода: ключ сменили за это время — результат отбрасывается
+    (`record_key_if_current`), и старый успех не окрасит новый ключ.
+    """
+    return health_store.record_key_if_current(
+        code, fingerprint, GREEN, "health.reason.ok", datetime.now(UTC)
+    )
 
 
 def probe_and_record(code: str) -> Outcome | None:

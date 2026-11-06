@@ -5,9 +5,13 @@ Migros отвечает 403 адресу сервера площадки цел�
 по сети Tailscale, и ретранслятор делает ровно три вида запроса:
 
     GET  /stores/<slug>  →  GET  https://www.migros.com.tr/rest/food-bff/api/stores/<slug>
-    POST /yandex/search  →  POST https://eda.yandex.by/eats/v1/full-text-search/v1/search
-    GET  /yandex/catalog/<slug>?latitude=&longitude=
+    POST /yandex/search[?host=uz]  →  POST https://eda.yandex.by/eats/v1/full-text-search/v1/search
+    GET  /yandex/catalog/<slug>?latitude=&longitude=[&host=uz]
                          →  GET  https://eda.yandex.by/api/v2/catalog/<slug>?latitude=&longitude=
+
+Хост Яндекс Еды — по стране (#1429): Армению `.by` не знает, её Додо находится на
+`.uz`. Необязательный параметр `host` берётся только из списка `YANDEX_HOSTS`;
+без него — `.by`, поэтому прод, ещё не знающий о параметре, работает как раньше.
 
 Это не открытый прокси: хосты зашиты, `slug` и координаты проверяются по шаблону,
 тело поиска — только `text` и `location` с числами и пересобирается заново,
@@ -36,14 +40,18 @@ logger = logging.getLogger("migros_relay")
 
 UPSTREAM = "https://www.migros.com.tr/rest/food-bff/api/stores/{slug}"
 _PATH = re.compile(r"^/stores/(?P<slug>[a-z0-9][a-z0-9-]{0,159})$")
-YANDEX_HOST = "https://eda.yandex.by"
-YANDEX_SEARCH = YANDEX_HOST + "/eats/v1/full-text-search/v1/search"
-YANDEX_CARD = YANDEX_HOST + "/api/v2/catalog/{slug}?latitude={lat}&longitude={lng}"
+YANDEX_ORIGIN = "https://eda.yandex."
+#: Разрешённые зоны Яндекс Еды; первая — по умолчанию. Другого хоста ретранслятор не берёт.
+YANDEX_HOSTS = ("by", "uz")
+YANDEX_SEARCH = "/eats/v1/full-text-search/v1/search"
+YANDEX_CARD = "/api/v2/catalog/{slug}?latitude={lat}&longitude={lng}"
 YANDEX_HEADERS = {"x-platform": "desktop_web"}
 _YANDEX_CARD_PATH = re.compile(
     r"^/yandex/catalog/(?P<slug>[A-Za-z0-9][A-Za-z0-9_-]{0,159})"
-    r"\?latitude=(?P<lat>-?\d{1,3}(?:\.\d{1,10})?)&longitude=(?P<lng>-?\d{1,3}(?:\.\d{1,10})?)$"
+    r"\?latitude=(?P<lat>-?\d{1,3}(?:\.\d{1,10})?)&longitude=(?P<lng>-?\d{1,3}(?:\.\d{1,10})?)"
+    r"(?:&host=(?P<host>[a-z]{2,3}))?$"
 )
+_YANDEX_SEARCH_PATH = re.compile(r"^/yandex/search(?:\?host=(?P<host>[a-z]{2,3}))?$")
 BODY_MAX_BYTES = 2_000_000
 REQUEST_MAX_BYTES = 1_000
 TEXT_MAX_CHARS = 64
@@ -68,12 +76,26 @@ def target(path: str) -> str | None:
     return UPSTREAM.format(slug=match["slug"]) if match else None
 
 
+def _yandex_origin(host: str | None) -> str | None:
+    """Адрес Яндекс Еды по зоне из запроса; не из списка — `None`."""
+    zone = host or YANDEX_HOSTS[0]
+    return YANDEX_ORIGIN + zone if zone in YANDEX_HOSTS else None
+
+
 def yandex_card_target(path: str) -> str | None:
     """Адрес карточки Яндекс Еды для пути запроса или `None`."""
     match = _YANDEX_CARD_PATH.fullmatch(path)
-    if not match:
+    origin = _yandex_origin(match["host"]) if match else None
+    if not match or origin is None:
         return None
-    return YANDEX_CARD.format(slug=match["slug"], lat=match["lat"], lng=match["lng"])
+    return origin + YANDEX_CARD.format(slug=match["slug"], lat=match["lat"], lng=match["lng"])
+
+
+def yandex_search_target(path: str) -> str | None:
+    """Адрес поиска Яндекс Еды для пути запроса или `None`."""
+    match = _YANDEX_SEARCH_PATH.fullmatch(path)
+    origin = _yandex_origin(match["host"]) if match else None
+    return origin + YANDEX_SEARCH if origin else None
 
 
 def _coordinate(value: object, limit: float) -> float | None:
@@ -115,7 +137,7 @@ def fetch(url: str, body: bytes | None = None) -> tuple[int, bytes]:
     """Код и тело ответа площадки; не чаще раза в её паузу (`GAP_SEC`, `YANDEX_GAP_SEC`).
 
     `body` — тело POST (только поиск Яндекс Еды)."""
-    site = "yandex" if url.startswith(YANDEX_HOST) else "migros"
+    site = "yandex" if url.startswith(YANDEX_ORIGIN) else "migros"
     with _lock:
         wait = _gaps[site] - (time.monotonic() - _last[site])
         if wait > 0:
@@ -126,7 +148,7 @@ def fetch(url: str, body: bytes | None = None) -> tuple[int, bytes]:
         headers.update(YANDEX_HEADERS)
     if body is not None:
         headers["Content-Type"] = "application/json"
-    request = urllib.request.Request(  # noqa: S310 — хосты зашиты в UPSTREAM и YANDEX_HOST
+    request = urllib.request.Request(  # noqa: S310 — хосты зашиты в UPSTREAM и YANDEX_HOSTS
         url, data=body, headers=headers, method="POST" if body is not None else "GET"
     )
     opener = urllib.request.build_opener(_NoRedirect)
@@ -168,7 +190,8 @@ class Handler(BaseHTTPRequestHandler):
         self._forward(url)
 
     def do_POST(self) -> None:
-        if self.path != "/yandex/search":
+        url = yandex_search_target(self.path)
+        if url is None:
             self._send(404, b'{"error":"not_found"}')
             return
         try:
@@ -180,7 +203,7 @@ class Handler(BaseHTTPRequestHandler):
         if checked is None:
             self._send(400, b'{"error":"bad_request"}')
             return
-        self._forward(YANDEX_SEARCH, checked)
+        self._forward(url, checked)
 
     def log_message(self, format: str, *args: object) -> None:
         logger.info("%s %s", self.address_string(), format % args)

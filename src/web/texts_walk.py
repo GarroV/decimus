@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from .texts_app import APP_TEXTS
+from .texts_batch import BATCH_TEXTS
 from .texts_edit import EDIT_TEXTS
 from .texts_hints import HINT_TEXTS
 from .texts_level import LEVEL_TEXTS
@@ -717,6 +718,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.saved": {"ru": "Записано", "en": "Recorded"},
     "walk.sheet.saved_in": {"ru": "Записано: {zone}", "en": "Recorded: {zone}"},
     "walk.sheet.saved_go": {"ru": "Перейти", "en": "Go there"},
+    "walk.sheet.photo_again": {"ru": "Ещё пункт с этим фото", "en": "Another item from this photo"},
     "walk.sheet.where": {"ru": "Где?", "en": "Where?"},
     "walk.sheet.zone_other": {"ru": "Другая зона…", "en": "Another zone…"},
     "walk.sheet.need_where": {
@@ -895,6 +897,7 @@ WALK_TEXTS.update(HINT_TEXTS)
 WALK_TEXTS.update(SPLIT_TEXTS)
 
 WALK_TEXTS.update(LEVEL_TEXTS)
+WALK_TEXTS.update(BATCH_TEXTS)
 
 WALK_TEXTS.update(EDIT_TEXTS)
 

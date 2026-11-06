@@ -1325,6 +1325,16 @@ TEXTS: dict[str, dict[str, str]] = {
     # инструкцию поставить системные библиотеки. Сделать с этим на точке нельзя
     # ничего. Текст движка уходит в журнал целиком, в чат — что случилось, что
     # с записями и как попробовать снова.
+    "finish.changed_since_review": {
+        "ru": (
+            "Проверка изменилась, пока вы просматривали итог, — отчёт не собран. "
+            "Откройте итог заново и завершите проверку."
+        ),
+        "en": (
+            "The inspection changed while you were reviewing the summary — the report was "
+            "not built. Open the summary again and finish the inspection."
+        ),
+    },
     "finish.pdf_failed": {
         "ru": (
             "Отчёт не собрался. Записи проверки целы — попробуйте ещё раз командой "

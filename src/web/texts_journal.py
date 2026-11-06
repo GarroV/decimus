@@ -76,6 +76,14 @@ _WEB: dict[str, tuple[str, str]] = {
         "Второй шаг входа: ключ доступа",
         "Second sign-in step: passkey",
     ),
+    "second_step_passkey_create_options": (
+        "Второй шаг входа: запрос сохранения отпечатка",
+        "Second sign-in step: fingerprint save request",
+    ),
+    "second_step_passkey_create": (
+        "Второй шаг входа: отпечаток сохранён",
+        "Second sign-in step: fingerprint saved",
+    ),
     "passkey_login_options": ("Вход ключом: запрос ключа", "Passkey sign-in: key request"),
     "passkey_login_verify": ("Вход ключом: ключ доступа", "Passkey sign-in: passkey"),
     "security_prove_code": (

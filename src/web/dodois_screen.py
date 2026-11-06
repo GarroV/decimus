@@ -1,4 +1,4 @@
-"""Вкладка «Dodo IS» раздела «Администрирование»: входы по странам и ссылки (D640, D641, #951).
+"""Вкладка «Dodo IS» раздела «Администрирование»: входы по странам и ссылки (D640b, D641, #951).
 
 С D641 это отдельная вкладка `?tab=dodois` рядом с «Подключениями» (раньше — блок внутри них);
 формы и POST-маршруты возвращают в неё же. Страны — одна таблица (страна · статус ·
@@ -15,9 +15,10 @@
 выдачу (без перенаправления, `Cache-Control: private, no-store`), дальше — только статус:
 выдано, использовано, истекло, отозвано. Токен не пишется ни в журнал, ни в сессию.
 
-**Заслоны выдачи** — как у ключей сервисов (`connections_screen._key_action`): роль (404) →
-`refuse_foreign_origin()` → второй шаг входа в этой сессии → свежее подтверждение → предел
-попыток. Отзыв и «Проверить сейчас» ничего не выдают: роль и происхождение.
+**Заслоны выдачи** (D716): роль главного админа (404) → `refuse_foreign_origin()` → предел
+попыток. Второго шага, свежего входа и ключа доступа нет: админка у одного человека, а ссылка
+сама доступа к данным не даёт (худшее — чужая учётка Dodo IS вместо нынешней, видно на
+экране). Отзыв и «Проверить сейчас» ничего не выдают: роль и происхождение.
 
 **Ключи приложения (D648).** Первым блоком вкладки — пара `client_id` / `client_secret`
 приложения Decimus в маркетплейсе Dodo IS (сервис `dodois` реестра `src/domain/service_keys.py`;
@@ -298,17 +299,16 @@ def install(app: Flask) -> None:
     def dodois_invite_issue() -> Response:
         login = _boss()
         refuse_foreign_origin()
-        back = f"{section('administration').path}?tab={TAB_DODOIS}"
-        refused = screen._key_gate(login, back)
-        if isinstance(refused, tuple):
-            flash, code = refused
+        # D716: админка у одного главного админа — ни второго шага, ни свежего входа, ни ключа
+        # доступа; остаются роль, происхождение и предел попыток.
+        попытка = web_throttle.admit_service_key_action(tenant=screen._stand(), login=login)
+        if not попытка.admitted:
+            minutes = попытка.verdict.retry_after_minutes
             return page(
-                Flash(flash.key, False, flash.params or {}),
-                code=code,
+                Flash("keys.err.rate", False, {"minutes": minutes}),
+                code=429,
                 picked=_country_from_form() or "",
             )
-        if refused is not None:
-            return refused
         result, code = issue(login, auth.current_account())
         if isinstance(result, IssuedLink):
             web_throttle.note_service_key_ok(tenant=screen._stand(), login=login)

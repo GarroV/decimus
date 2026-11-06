@@ -41,7 +41,7 @@
   {% for c in columns if c.group %}<th class="qa-num{{ ' qa-edge' if c.edge else '' }}"{% if c.on %} aria-sort="{{ 'descending' if c.desc else 'ascending' }}"{% endif %}>{{ sort_link(c, c.label) }}</th>{% endfor %}
   </tr>
 {% endmacro %}
-{% macro tds(row_cells) %}{% for c in row_cells %}<td class="qa-num{% if c.tone %} qa-tone--{{ c.tone }}{% endif %}{% if c.edge %} qa-edge{% endif %}">{{ c.text }}{{ delta(c.delta) }}</td>{% endfor %}{% endmacro %}
+{% macro tds(row_cells) %}{% for c in row_cells %}<td class="qa-num{% if c.tone %} qa-tone--{{ c.tone }}{% endif %}{% if c.edge %} qa-edge{% endif %}">{{ c.text }}{{ delta(c.delta) }}{% if c.incomplete %}<span class="qa-delta qa-incomplete">{{ t('quality.cell.incomplete', pct=c.incomplete) }}</span>{% endif %}</td>{% endfor %}{% endmacro %}
 
 {% block pick_work %}
 {% if failed %}
@@ -103,6 +103,10 @@
         {% for u in view.units %}<tr><td>{{ u.name }}</td>{{ tds(u.cells) }}</tr>{% endfor %}
         </tbody>
       </table></div>
+    {% endcall %}
+
+    {% call pick_block(t('quality.block.overall')) %}
+      <div class="qa-body"><ul class="qa-how">{% for line in view.overall %}<li>{{ line }}</li>{% endfor %}</ul></div>
     {% endcall %}
 
     {% call pick_block(t('quality.block.aggs')) %}

@@ -66,7 +66,7 @@ LOCKED_ENDPOINTS = frozenset(
         # «Проверить сейчас» (D638) — проба настоящих провайдеров настоящими ключами.
         "connection_health_check",
         "service_key_delete",
-        # Входы в Dodo IS по странам (D640): выдача и погашение ссылок, проверка настоящим
+        # Входы в Dodo IS по странам (D640b): выдача и погашение ссылок, проверка настоящим
         # входом; публичная страница по ссылке тоже закрыта — демо ничего не подтверждает.
         "dodois_invite_issue",
         "dodois_invite_revoke",
@@ -123,6 +123,8 @@ OPEN_ENDPOINTS = frozenset(
         "second_step_code",
         "second_step_passkey_options",
         "second_step_passkey_verify",
+        "second_step_passkey_create_options",
+        "second_step_passkey_create",
         "settings_lang",
         "notifications_read",
         "notifications_read_all",
