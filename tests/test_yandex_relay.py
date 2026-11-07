@@ -161,9 +161,10 @@ def test_ретранслятор_отдаёт_поиск_и_карточку(
     assert [(p.point_key, p.score, p.votes, p.is_open) for p in найдено] == [
         ("dodo_kwls7", 4.6, 870, True)
     ]
+    # Беларусь — на `.uz` с 07.11.2026: `eda.yandex.by` отвечает 502 отовсюду.
     assert _адреса(зовы) == [
-        "https://eda.yandex.by" + migros_relay.YANDEX_SEARCH,
-        "https://eda.yandex.by/api/v2/catalog/dodo_kwls7?latitude=53.9&longitude=27.5667",
+        "https://eda.yandex.uz" + migros_relay.YANDEX_SEARCH,
+        "https://eda.yandex.uz/api/v2/catalog/dodo_kwls7?latitude=53.9&longitude=27.5667",
     ]
     assert json.loads(зовы[0][1] or b"") == ТЕЛО
 
@@ -181,7 +182,7 @@ def test_армения_идёт_на_хост_uz_через_ретрансля�
     ]
 
 
-def test_беларусь_не_шлёт_параметр_хоста_старому_ретранслятору(
+def test_зона_по_умолчанию_не_шлёт_параметр_хоста_старому_ретранслятору(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv(migros.RELAY_VAR, "https://relay.example")
@@ -196,11 +197,12 @@ def test_беларусь_не_шлёт_параметр_хоста_старом
             адреса.append(url)
             return КАРТОЧКА
 
-    yandex_eda.search(Заглушка(), 53.9, 27.5, "BY", {})  # type: ignore[arg-type]
+    yandex_eda.search(Заглушка(), 42.87, 74.57, "KG", {})  # type: ignore[arg-type]
     assert all("host=" not in url for url in адреса)
-    адреса.clear()
-    yandex_eda.search(Заглушка(), 40.18, 44.51, "AM", {})  # type: ignore[arg-type]
-    assert all("host=uz" in url for url in адреса) and len(адреса) == 2
+    for страна, lat, lng in (("AM", 40.18, 44.51), ("BY", 53.9, 27.5)):
+        адреса.clear()
+        yandex_eda.search(Заглушка(), lat, lng, страна, {})  # type: ignore[arg-type]
+        assert all("host=uz" in url for url in адреса) and len(адреса) == 2, страна
 
 
 @pytest.mark.parametrize(
@@ -294,7 +296,7 @@ def test_без_адреса_ходит_напрямую(monkeypatch: pytest.Mon
             return {}
 
     assert yandex_eda.search(Заглушка(), 1.0, 2.0, "BY", {}) == []  # type: ignore[arg-type]
-    assert адреса == ["https://eda.yandex.by" + yandex_eda.SEARCH]
+    assert адреса == ["https://eda.yandex.uz" + yandex_eda.SEARCH]
 
 
 def test_без_адреса_сбой_без_переписанной_причины(monkeypatch: pytest.MonkeyPatch) -> None:

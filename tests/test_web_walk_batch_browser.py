@@ -734,5 +734,6 @@ def test_without_model_wording_the_words_go_to_the_comment(page):
     page.locator("[data-batch-save]").click()
     page.wait_for_function("written.length === 1")
     saved = written(page)[0]
-    assert saved["comment"] == "синтетическая заметка", "a comment is what auto-translation translates"
+    # A comment is what auto-translation translates.
+    assert saved["comment"] == "синтетическая заметка"
     assert saved["text"] != "синтетическая заметка"
