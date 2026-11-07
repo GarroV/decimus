@@ -80,7 +80,7 @@
 |---|---|---|---|
 | `wolt` | AZ BG CY EE GE HR LT PL RO RS SI | каталог у координат (`restaurant-api.wolt.com/v1/pages/restaurants`) | из 10 |
 | `bolt_food` | AZ BG CY EE GE LT PL RO | `findProviders` у координат; код 5812 — Bolt в городе нет, это не сбой | из 5 |
-| `yandex_eda` | BY AM KG | полнотекстовый поиск у координат (`POST eda.yandex.<зона>/eats/v1/full-text-search/v1/search`; зона по стране — `yandex_eda.HOSTS`: BY и AM `.uz`, KG `.by`, #1429; BY на `.uz` с 07.11.2026 — `eda.yandex.by` отвечает 502 отовсюду), затем карточка точки (`x-platform: desktop_web`). Адресу сервера площадки он отвечает 429, затем 401 (D397, #670), поэтому оба запроса идут **через ретранслятор на домашнем сервере** (ниже, D661); без `MIGROS_RELAY_URL` сбор на паузе (`collect.PAUSED`), прямые запросы остаются только для ручного `run yandex_eda` | из 5 |
+| `yandex_eda` | BY AM KG | полнотекстовый поиск у координат (`POST eda.yandex.<зона>/eats/v1/full-text-search/v1/search`; зона по стране — `yandex_eda.HOSTS`: BY, AM и KG — `.uz`, #1429; с 07.11.2026 `eda.yandex.by` отвечает 502 отовсюду), затем карточка точки (`x-platform: desktop_web`). Адресу сервера площадки он отвечает 429, затем 401 (D397, #670), поэтому оба запроса идут **через ретранслятор на домашнем сервере** (ниже, D661); без `MIGROS_RELAY_URL` сбор на паузе (`collect.PAUSED`), прямые запросы остаются только для ручного `run yandex_eda` | из 5 |
 | `yemeksepeti` | TR | `disco.deliveryhero.io` — список заведений у координат, страницы по 500 | из 5 |
 | `trendyol_go` | TR | подсказки поиска у координат, затем карточка ресторана | из 5 |
 | `pyszne_pl` | PL | `jet-external … /restaurants/enriched` у координат | из 5 |

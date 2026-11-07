@@ -197,9 +197,9 @@ def test_зона_по_умолчанию_не_шлёт_параметр_хос�
             адреса.append(url)
             return КАРТОЧКА
 
-    yandex_eda.search(Заглушка(), 42.87, 74.57, "KG", {})  # type: ignore[arg-type]
+    yandex_eda.search(Заглушка(), 1.0, 2.0, "XX", {})  # type: ignore[arg-type]
     assert all("host=" not in url for url in адреса)
-    for страна, lat, lng in (("AM", 40.18, 44.51), ("BY", 53.9, 27.5)):
+    for страна, lat, lng in (("AM", 40.18, 44.51), ("BY", 53.9, 27.5), ("KG", 42.87, 74.57)):
         адреса.clear()
         yandex_eda.search(Заглушка(), lat, lng, страна, {})  # type: ignore[arg-type]
         assert all("host=uz" in url for url in адреса) and len(адреса) == 2, страна
