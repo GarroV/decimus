@@ -17,6 +17,10 @@
 Запись не меняет ответ: действие уже выполнено, и отказ журнала уходит в журнал
 процесса (`db.journals`), а не человеку.
 
+**Просмотр глазами партнёра (D726).** Пока главный админ смотрит как партнёр, журнал пишет и
+чтения: каждый GET страницы или API (кроме `static` и ответов 3xx) — действие `peek_view` НАСТОЯЩЕЙ
+учётки, цель — `as=<пространство>; <путь>` без строки запроса. Вне просмотра чтение не пишется.
+
 **Способы входа — для любой роли.** Подключение, снятие ключей и приложения и выпуск
 резервных кодов (`SECOND_FACTOR_ENDPOINTS`, D463) пишутся и у ролей, которые админами
 не являются: смена способов входа важна независимо от роли.
@@ -55,6 +59,13 @@ SECOND_FACTOR_ENDPOINTS = frozenset(
 
 #: Методы, которые считаются изменением состояния.
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+#: Код действия «открыл страницу, пока смотрел глазами партнёра» (D726): читающий запрос
+#: журналируется только при просмотре, у обычной работы чтение не пишется.
+PEEK_VIEW_ACTION = "peek_view"
+
+#: Маршруты, чьи чтения при просмотре не журналируются: отдача файлов, а не страницы.
+_NOT_A_VIEW_ENDPOINTS = frozenset({"static"})
 
 
 def client_ip(conf: Settings) -> str | None:
@@ -105,9 +116,13 @@ def install(app: Flask, conf: Settings) -> None:
 
     @app.after_request
     def _journal_action(response: Response) -> Response:
-        if request.method not in WRITE_METHODS or request.endpoint is None:
+        if request.endpoint is None:
             return response
         shown = current_account()
+        peeking = shown is not None and shown.is_peeking
+        is_write = request.method in WRITE_METHODS
+        if not is_write and not (peeking and _is_page_view(response)):
+            return response
         # Пока главный админ смотрит глазами партнёра (D726), в журнал идёт НАСТОЯЩАЯ учётка:
         # кто на деле нажал, а не вид, в котором он смотрел; вид — пометкой в цели.
         account = None if shown is None else shown.actual
@@ -116,14 +131,18 @@ def install(app: Flask, conf: Settings) -> None:
         ):
             return response
         сессия = account.session_id
-        цель = action_target()
-        if shown is not None and shown.is_peeking:
+        if is_write:
+            действие, цель = request.endpoint, action_target()
+        else:
+            # Только путь: строка запроса может нести личное (поиск по имени, фильтры).
+            действие, цель = PEEK_VIEW_ACTION, request.path
+        if peeking and shown is not None:
             цель = f"as={shown.tenant}; {цель}"[:MAX_TARGET]
         journals.record_action(
             user_id=account.id,
             role=account.role,
             tenant=account.tenant,
-            action=request.endpoint,
+            action=действие,
             target=цель,
             outcome=str(response.status_code),
             ip=client_ip(conf),
@@ -131,3 +150,14 @@ def install(app: Flask, conf: Settings) -> None:
             door=DOOR_WEB,
         )
         return response
+
+
+def _is_page_view(response: Response) -> bool:
+    """Чтение, которое стоит записать: GET настоящей страницы или API, отданный телом.
+
+    Файлы (`static`) и ответы 3xx (редирект, `304`) — не просмотр; отказ (4xx) пишется.
+    """
+    if request.method != "GET" or request.endpoint in _NOT_A_VIEW_ENDPOINTS:
+        return False
+    code = response.status_code
+    return code < 300 or code >= 400

@@ -621,6 +621,7 @@
 | `0120_walk_log_retention_30d.sql` | — |
 | `0121_api_sales_scope.sql` | — |
 | `0122_session_acting_tenant.sql` | — |
+| `0123_session_peeks_table.sql` | `web_session_peeks` |
 <!-- map:end -->
 
 ## Makefile

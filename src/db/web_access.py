@@ -275,10 +275,11 @@ _RESOLVE_SESSION_SQL = """
             or exists (select 1 from web_totp t
                         where t.user_id = u.id and t.confirmed_at is not null)),
            s.second_step_at is not null,
-           u.country_filter, s.acting_tenant,
-           coalesce((select t.name from tenants t where t.code = s.acting_tenant), '')
+           u.country_filter, k.tenant_code, coalesce(t.name, '')
       from web_sessions s
       join web_users u on u.id = s.user_id
+      left join web_session_peeks k on k.session_id = s.id
+      left join tenants t on t.code = k.tenant_code
      where s.fingerprint = %s
        and s.closed_at is null
        and s.expires_at > now()
@@ -392,8 +393,8 @@ class Account:
     #: Постоянный отбор стран экрана «Страны» (`web_users.country_filter`, `0077`,
     #: D536); `None` — отбора нет. Приезжает с сессией, как язык.
     country_filter: tuple[str, ...] | None = None
-    #: Пространство, в которое главный админ заглянул переключателем (`web_sessions.acting_tenant`,
-    #: `0122`, D726); `None` — смотрит в своё. Приезжает с сессией. Решение «действует ли оно»
+    #: Пространство, в которое главный админ заглянул переключателем (`web_session_peeks`,
+    #: `0123`, D726); `None` — смотрит в своё. Приезжает с сессией. Решение «действует ли оно»
     #: принимает заслон входа, а не эта строка: сюда оно попадает как записано.
     acting_tenant: str | None = None
     #: Название того пространства для плашки «вы смотрите как партнёр» (`tenants.name`).

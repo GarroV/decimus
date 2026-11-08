@@ -214,6 +214,12 @@ _LEGACY_WEB: dict[str, tuple[str, str]] = {
     "ratings_layout": ("Изменён состав блока рейтингов", "Ratings layout changed"),
 }
 
+#: Действия, что журнал пишет сам, без изменяющего маршрута: просмотр страниц главным админом,
+#: пока он смотрит глазами партнёра (D726).
+_VIEW: dict[str, tuple[str, str]] = {
+    "peek_view": ("Просмотр страницы глазами партнёра", "Page viewed as a partner"),
+}
+
 _CLI: dict[str, tuple[str, str]] = {
     "passkey_expired": (
         "Сняты ключи доступа, которыми не входили 30 дней",
@@ -414,7 +420,7 @@ _SCREEN: dict[str, dict[str, str]] = {
 def _build() -> dict[str, dict[str, str]]:
     return {
         **_SCREEN,
-        **_pairs("journal.action", {**_MCP, **_LEGACY_WEB, **_WEB, **_CLI}),
+        **_pairs("journal.action", {**_MCP, **_LEGACY_WEB, **_WEB, **_VIEW, **_CLI}),
         **_pairs("journal.method", _METHODS),
         **_pairs("journal.result", _RESULTS),
         **_pairs("journal.door", _DOORS),

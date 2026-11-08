@@ -51,7 +51,7 @@ class Стенд:
     ) -> None:
         self.зовы = подменить_двери(monkeypatch, tenant=tenant, role=role)
         self.учётка = _учётка(tenant=tenant, role=role, **поля)
-        #: Что записано на сессию (`web_sessions.acting_tenant`).
+        #: Что записано на сессию (`web_session_peeks`).
         self.acting: str | None = None
         self.переключения: list[tuple[str, str | None]] = []
         self.база_разрешает = True
@@ -321,6 +321,45 @@ def test_отказанная_запись_при_просмотре_пишет�
     assert запись["tenant"] == "HQ"
     assert запись["outcome"] == "403"
     assert str(запись["target"]).startswith("as=TEST;")
+
+
+def test_чтение_страницы_при_просмотре_пишется_настоящей_учёткой(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    стенд = Стенд(monkeypatch)
+    стенд.переключить("TEST")
+    стенд.зовы["action_journal"].clear()
+
+    ответ = стенд.client.get("/settings?lang=ru&q=Иван+Иванов")
+    assert ответ.status_code == 200
+
+    (запись,) = стенд.зовы["action_journal"]
+    assert запись["user_id"] == ВЛАДЕЛЕЦ
+    assert запись["role"] == "superadmin"
+    assert запись["tenant"] == "HQ"
+    assert запись["action"] == "peek_view"
+    assert запись["target"] == "as=TEST; /settings"
+    assert "Иван" not in str(запись["target"]), "строка запроса в журнал не идёт"
+
+
+def test_чтение_без_просмотра_в_журнал_не_пишется(monkeypatch: pytest.MonkeyPatch) -> None:
+    стенд = Стенд(monkeypatch)
+    стенд.зовы["action_journal"].clear()
+
+    assert стенд.client.get("/settings?lang=ru").status_code == 200
+
+    assert стенд.зовы["action_journal"] == []
+
+
+def test_отдача_файлов_при_просмотре_не_журналируется(monkeypatch: pytest.MonkeyPatch) -> None:
+    стенд = Стенд(monkeypatch)
+    стенд.переключить("TEST")
+    стенд.зовы["action_journal"].clear()
+
+    ответ = стенд.client.get("/static/decimus-web.css")
+
+    assert ответ.status_code == 200
+    assert стенд.зовы["action_journal"] == []
 
 
 # --- вторая ступень и закрытие при сомнении -----------------------------------------
