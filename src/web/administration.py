@@ -100,7 +100,7 @@ def _sees_mailings(account: object) -> bool:
 
 
 def _sees_home(account: object) -> bool:
-    """Те, у кого `service.settings`: главный админ и админ УК (D727)."""
+    """Те, у кого `service.settings`: главный админ и админ УК (D728)."""
     return role_may(
         str(getattr(account, "role", "") or ""),
         str(getattr(account, "tenant", "") or ""),
@@ -136,7 +136,7 @@ TABS: tuple[Tab, ...] = (
     Tab("aggregators", _sees_ratings),
     # Списки копий и шаблоны писем УК (D608, #1130): админ УК и главный админ.
     Tab(TAB_MAILINGS, _sees_mailings),
-    # Настройки главной: те же роли, что у переключателя экшн-планов (D727).
+    # Настройки главной: те же роли, что у переключателя экшн-планов (D728).
     Tab(TAB_HOME, _sees_home),
     Tab(
         "plans",

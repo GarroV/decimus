@@ -114,7 +114,7 @@ def снимок(**поля: object) -> ov.Overview:
 def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     """Приложение с подменённым снимком сети и вошедшим человеком.
 
-    Пиццерии «Требует внимания» включены (D727: по умолчанию выключены) — экран здесь
+    Пиццерии «Требует внимания» включены (D728: по умолчанию выключены) — экран здесь
     проверяется в полном виде; выключенный — `test_web_home_attention_setting.py`.
     """
     monkeypatch.setattr(features, "home_attention_units_enabled", lambda: True)

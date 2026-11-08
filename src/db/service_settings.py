@@ -31,7 +31,7 @@ def _save(key: str, enabled: bool, actor: str) -> None:
 
 
 def set_home_attention_units(enabled: bool, *, actor: str) -> None:
-    """Show or hide the pizzeria rows of the home «Needs attention» card (D727)."""
+    """Show or hide the pizzeria rows of the home «Needs attention» card (D728)."""
     _save("home_attention_units", enabled, actor)
 
 

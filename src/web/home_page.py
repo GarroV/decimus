@@ -212,7 +212,7 @@ def render(
         dates=(period.start, period.end),
         dates_before=(before.start, before.end) if before else None,
     )
-    # D727: пиццерии «куда смотреть» в карточке «Требует внимания» — по настройке сети.
+    # D728: пиццерии «куда смотреть» в карточке «Требует внимания» — по настройке сети.
     if not features.home_attention_units_enabled():
         snapshot = replace(snapshot, attention=())
 
