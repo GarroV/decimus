@@ -64,6 +64,7 @@ LOCKED_ENDPOINTS = frozenset(
         "service_key_save",
         # Общая настройка живого workflow не меняется посетителем демо.
         "action_plan_setting",
+        "home_setting",
         "service_key_check",
         # «Проверить сейчас» (D638) — проба настоящих провайдеров настоящими ключами.
         "connection_health_check",

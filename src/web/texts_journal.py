@@ -14,6 +14,7 @@ _WEB: dict[str, tuple[str, str]] = {
     "country_contact_save": ("Контакт страны сохранён", "Country contact saved"),
     "country_contact_delete": ("Контакт страны удалён", "Country contact deleted"),
     "unit_profile_save": ("Контакты пиццерии изменены", "Pizzeria contacts changed"),
+    "home_setting": ("Настройка «Главной» изменена", "Home setting changed"),
     "action_plan_setting": ("Настройка экшн-планов изменена", "Action-plan setting changed"),
     "actions_due": ("Срок по запросу экшн-плана", "Action plan request due date"),
     "actions_new": ("Запрос экшн-плана", "Action plan requested"),

@@ -41,6 +41,8 @@ TAB_JOURNAL = "journal"
 TAB_USAGE = "usage"
 #: Вкладка «Письма и уведомления» (D608, #1130): админ и главный админ, её ведёт `mailings_screen`.
 TAB_MAILINGS = "mailings"
+#: Вкладка «Главная» (D728): настройки сети для главной, её ведёт `home_settings`.
+TAB_HOME = "home"
 
 
 class _Row(Protocol):

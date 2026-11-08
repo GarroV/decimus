@@ -221,7 +221,7 @@ def test_маршрут_с_действием_только_УК_партнёру
 #: `guard.WITHOUT_SECTION_VIEW` (404), а не оказаться в одном из них молча.
 ПАРТНЁРУ_403 = frozenset(
     {
-        "action_plan_setting", "add_space", "aggregators_absent", "aggregators_pin",
+        "action_plan_setting", "home_setting", "add_space", "aggregators_absent", "aggregators_pin",
         "aggregators_present", "aggregators_unpin", "checklists_apply",
         "connection_health_check", "connections_issue", "connections_reissue",
         "connections_revoke", "connections_update", "country_contact_delete",

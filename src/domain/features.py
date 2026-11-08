@@ -78,3 +78,22 @@ def action_plan_state() -> ActionPlanState:
 def action_plans_enabled() -> bool:
     """Electronic action plans are paused by default by the owner's decision."""
     return action_plan_state().enabled
+
+
+HOME_ATTENTION_UNITS_KEY = "home_attention_units"
+
+
+def home_attention_units_enabled() -> bool:
+    """Пиццерии в карточке «Требует внимания» на «Главной» (D728): выкл, пока не включат.
+
+    Только сохранённый выбор: переменной окружения нет, а нечитаемая настройка
+    считается выключенной (с записью в журнал, не молча).
+    """
+    try:
+        saved = read_boolean(HOME_ATTENTION_UNITS_KEY)
+    except SettingsUnavailable:
+        logger.warning(
+            "Переключатель пиццерий «Требует внимания» не прочитан — выключен", exc_info=True
+        )
+        return False
+    return saved is not None and saved.enabled
