@@ -2223,3 +2223,28 @@ a[data-zoom] { cursor: zoom-in; }
 .page-heading { width: 100%; min-width: 0; grid-column: 1 / -1; margin: 0 0 var(--space-6); }
 .page-heading h1 { margin: 0; font-size: 28px; line-height: 1.25; font-weight: 600; letter-spacing: -.02em; }
 @media (max-width: 600px) { .page-heading h1 { font-size: 24px; } }
+
+/* Переключатель пространств главного админа (D726). Текстовый «УК / TEST»: активный — чернилами и
+   жирным, остальные приглушены; кнопки без фона и рамки, с запасом под палец. */
+.peek-switch { display: inline-flex; align-items: center; gap: 5px; padding: 0 var(--space-7); font-size: var(--fs-micro); }
+.sidenav .peek-switch { display: flex; padding-top: var(--space-3); padding-bottom: var(--space-2); }
+.acct-menu__line .peek-switch { padding: 0; }
+.peek-switch form { margin: 0; }
+.peek-switch__opt { padding: var(--space-3) var(--space-3); border: 0; background: none; font: inherit; color: var(--ink-3); cursor: pointer; }
+.peek-switch__opt:hover { color: var(--ink); }
+.peek-switch__opt[aria-pressed="true"] { color: var(--ink); font-weight: var(--w-bold); }
+.peek-switch__opt:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
+.peek-switch__sep { color: var(--ink-empty); }
+html[data-nav-collapsed="true"] .sidenav .peek-switch { display: none; }
+
+/* Тонкая полоса над содержимым, пока смотрим глазами партнёра: видна на каждой странице. */
+.peek-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-5);
+  margin-bottom: var(--space-5); padding: var(--space-3) 0;
+  border-top: 1px dashed var(--line-control-2); border-bottom: 1px dashed var(--line-control-2);
+  font-size: var(--fs-meta); color: var(--ink-3);
+}
+.peek-bar form { margin: 0; }
+.peek-bar__back { padding: var(--space-3) var(--space-2); border: 0; background: none; font: inherit; color: var(--ink); font-weight: var(--w-semibold); cursor: pointer; }
+.peek-bar__back:hover { text-decoration: underline; }
+.peek-bar__back:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }

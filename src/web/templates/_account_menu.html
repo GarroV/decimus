@@ -31,6 +31,13 @@
     {% include "_account_menu_connections.html" %}
   </div>
 
+  {% if peek_can %}
+    <div class="acct-menu__line" role="group" aria-label="{{ t('peek.switch.label') }}">
+      <span class="acct-menu__label">{{ t('peek.switch.label') }}</span>
+      {% include "peek/_switch.html" %}
+    </div>
+  {% endif %}
+
   <div class="acct-menu__line" role="group" aria-label="{{ t('menu.theme') }}">
     <span class="acct-menu__label">{{ t('menu.theme') }}</span>
     {{ theme_pick() }}

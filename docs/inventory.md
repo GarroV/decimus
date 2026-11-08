@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 221 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 222 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -212,6 +212,7 @@
 | `/settings/security/totp/start` | POST | `security_totp_start` | `src/web/security_screen.py` |
 | `/settings/sign-ins` | GET | `settings_signins` | `src/web/journal_screen.py` |
 | `/settings/sign-out-everywhere` | POST | `settings_sign_out_everywhere` | `src/web/settings_screen.py` |
+| `/space/peek` | POST | `space_peek` | `src/web/peek.py` |
 | `/static/<path:filename>` | GET | `static` | (библиотека) |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk_proxy.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_proxy.py` |
@@ -619,6 +620,7 @@
 | `0119_walk_log.sql` | `walk_log` |
 | `0120_walk_log_retention_30d.sql` | — |
 | `0121_api_sales_scope.sql` | — |
+| `0122_session_acting_tenant.sql` | — |
 <!-- map:end -->
 
 ## Makefile

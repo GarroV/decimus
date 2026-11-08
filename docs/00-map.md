@@ -198,7 +198,7 @@ Flask-приложение управляющей компании и партн
 «Подключения» (состояние подключений, D638) и «Ключи и API» (ключи сервисов и ключи API, D650), подключение
 Claude входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,peek,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -225,6 +225,7 @@ Claude входом через сайт (OAuth).
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
 | `src/web/passkey_login.py` | Вход ключом доступа без логина (D485): ключ открывает сессию сам, без второй ступени |
+| `src/web/peek.py` | Переключатель пространств главного админа: дверь и заслон «только просмотр» (D726) |
 | `src/web/people.py` | Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399) |
 | `src/web/photo_upload.py` | Загрузка кадров к черновику загрузки проверки по подписанному адресу (мимо Claude) |
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
@@ -286,6 +287,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
 | `src/web/texts_notifications.py` | Тексты уведомлений в приложении (#1129, D604, D614): колокольчик и фразы событий |
 | `src/web/texts_oauth.py` | Тексты подключения нейросетей входом через сайт (D417, D695): согласие, отказ, плитка |
+| `src/web/texts_peek.py` | Тексты переключателя пространств главного админа (D726) |
 | `src/web/texts_plan_file.py` | Тексты файла «туда и обратно» электронного плана (#1168, шаг 3): выгрузка, итог, конфликт |
 | `src/web/texts_plan_rows.py` | Тексты электронного плана исправлений (#1168): строки, путь, начало отсчёта, события |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2) и раздела «Действия» (D526): вкладка, панель, блоки, карточки |
@@ -640,6 +642,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0119_walk_log.sql` | Журнал шагов обхода (D710): что аудитор ввёл и что ответила система на каждом шаге записи нарушения в мини-аппе — подбор пункта, определение класса, уточнение фактов… |
 | `0120_walk_log_retention_30d.sql` | Владелец, 05.11.2026: «Хранить 180 дней нет смысла |
 | `0121_api_sales_scope.sql` | Право `sales:month` — метод `GET /api/v1/sales` (D723): продажи пиццерий за месяц из Dodo IS, которые Децимус собирает раз в сутки в `dodois.unit_sales_month` |
+| `0122_session_acting_tenant.sql` | Переключатель пространств главного админа (D726): `web_sessions.acting_tenant` — в чьё пространство сессия сейчас смотрит |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -972,6 +975,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/measurement_sets.py` | Human-confirmed product measurements grouped by explicit line and physical zone |
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
+| `src/domain/peek.py` | Переключатель пространств главного админа: куда можно заглянуть и кому (D726) |
 | `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |
 | `src/domain/photo_upload_link.py` | Адрес загрузки кадров к черновику загрузки проверки: подписанный токен без срока |
 | `src/domain/plan_due.py` | Срок ответа партнёра планом исправлений — один на письмо, бот и веб (D617) |

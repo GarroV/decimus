@@ -36,6 +36,7 @@ from .texts_mailings import MAILINGS_TEXTS
 from .texts_master import MASTER_TEXTS
 from .texts_notifications import NOTIFICATION_TEXTS
 from .texts_oauth import OAUTH_TEXTS
+from .texts_peek import PEEK_TEXTS
 from .texts_plan_file import PLAN_FILE_TEXTS
 from .texts_plan_rows import PLAN_ROW_TEXTS
 from .texts_plans import PLAN_TEXTS
@@ -1881,6 +1882,7 @@ _ЧАСТИ = (
     DEMO_TEXTS,
     DODOIS_TEXTS,
     OAUTH_TEXTS,
+    PEEK_TEXTS,
     CONNECTIONS_TEXTS,
     COUNTRY_TEXTS,
     GRADE_TEXTS,
@@ -1928,6 +1930,7 @@ TEXTS = {
     **MASTER_TEXTS,
     **SERVICE_KEYS_TEXTS,
     **OAUTH_TEXTS,
+    **PEEK_TEXTS,
     **NOTIFICATION_TEXTS,
     **PLAN_TEXTS,
     **PLAN_FILE_TEXTS,

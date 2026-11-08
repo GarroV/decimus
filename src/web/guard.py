@@ -56,6 +56,7 @@ WRITING_GETS = frozenset({"google_mail_callback"})
 #: Матрица их не решает: их делает любая роль, включая гостя (D440, D448).
 EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "logout": "выход закрывает свою сессию",
+    "space_peek": "переключатель пространств: дверь сама решает, кто главный админ УК (D726)",
     "settings_own_password": "свой пароль — у себя, без доступа к остальному (D447)",
     "settings_claude_token": "личный токен Claude себе выпускает любая роль (D448)",
     "settings_chatgpt_token": "личный токен для ChatGPT себе выпускает любая роль (D695)",

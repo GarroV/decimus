@@ -33,6 +33,8 @@ from .walk_auth import PAGE_PATH as WALK_PAGE_PATH
 #: Claude, ни ключи API — демо показывает продукт, а не выдаёт к нему доступ.
 LOCKED_ENDPOINTS = frozenset(
     {
+        # Переключатель пространств (D726): в демо нет пространства TEST, а учётки ролей общие.
+        "space_peek",
         "country_contact_save",
         "country_contact_delete",
         "freeze_user",

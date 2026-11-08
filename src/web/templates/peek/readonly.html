@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ t('peek.refused.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<h1 class="card__title">{{ t('peek.refused.title') }}</h1>
+</header>{% endblock %}
+
+{% block body %}
+  <div class="card"><div class="card__body">
+    <p class="muted">{{ t('peek.refused.note') }}</p>
+  </div></div>
+{% endblock %}

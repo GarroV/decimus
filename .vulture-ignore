@@ -800,3 +800,8 @@ _exercise_existing_action_plan_capabilities
 
 # Country contact read-state field is consumed in country/_contacts.html.
 contacts_known
+
+# Переключатель пространств (D726, `src/web/peek.py`): крюки и маршрут регистрирует декоратор Flask.
+_only_view
+_peek_context
+space_peek

@@ -88,6 +88,7 @@ from . import (
     notifications,
     oauth,
     osb,
+    peek,
     photo_upload,
     prescriptions,
     proofread,
@@ -229,6 +230,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     # порядке регистрации, и опознание обязано случиться раньше всего, что
     # ходит в базу за данными арендатора.
     auth.install(app, conf)
+    # Переключатель пространств (D726): заслон «только просмотр» — сразу за входом, до остальных.
+    peek.install(app)
     _install_origin_gate(app)
     _install_hq_gate(app)
     # Матрица «роль × действие» — один заслон на запись и на разделы (заменил
