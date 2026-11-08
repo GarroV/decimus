@@ -87,8 +87,9 @@ async def test_занятый_кандидат_остаётся_нажимаем
     """Кнопку не убираем: уход к модели задуман, и выбор остаётся за человеком.
 
     Нажатие положит кадр в уже существующую запись (#443, D243) — это законный
-    путь «доснять фото», а не тупик. Пропади кнопка,
-    поехали бы и номера остальных кандидатов.
+    путь «доснять фото», а не тупик. С D718 кадр без слов делится на нарушения —
+    по сообщению на пункт, у каждого своя кнопка `rec:pick:0`: занятый пункт
+    остаётся таким же нажимаемым сообщением, а не пропадает из перечня.
     """
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
     add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
@@ -105,8 +106,19 @@ async def test_занятый_кандидат_остаётся_нажимаем
     await feed(dp, bot, photo_message("frame-1", message_id=501))
     await feed(dp, bot, callback("rec:analyze:501"))
 
-    assert session.keyboard_data()[:2] == ["rec:pick:0", "rec:pick:1"]
-    assert t("record.candidate_taken_merge", "ru", n=1) in session.last_text
+    def keys(call: object) -> list[str]:
+        markup = getattr(call, "reply_markup", None)
+        return (
+            [b.callback_data or "" for row in markup.inline_keyboard for b in row] if markup else []
+        )
+
+    offers = [
+        c for c in session.calls if type(c).__name__ == "SendMessage" and "rec:pick:0" in keys(c)
+    ]
+    assert len(offers) == 2
+    taken, other = offers
+    assert t("record.candidate_taken_merge", "ru", n=1) in taken.text
+    assert t("record.candidate_taken_merge", "ru", n=1) not in other.text
 
 
 async def test_пометка_называет_номер_занявшей_записи(
