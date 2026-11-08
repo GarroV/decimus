@@ -107,18 +107,24 @@ def install(app: Flask, conf: Settings) -> None:
     def _journal_action(response: Response) -> Response:
         if request.method not in WRITE_METHODS or request.endpoint is None:
             return response
-        account = current_account()
+        shown = current_account()
+        # Пока главный админ смотрит глазами партнёра (D726), в журнал идёт НАСТОЯЩАЯ учётка:
+        # кто на деле нажал, а не вид, в котором он смотрел; вид — пометкой в цели.
+        account = None if shown is None else shown.actual
         if account is None or (
             account.role not in JOURNALED_ROLES and request.endpoint not in SECOND_FACTOR_ENDPOINTS
         ):
             return response
         сессия = account.session_id
+        цель = action_target()
+        if shown is not None and shown.is_peeking:
+            цель = f"as={shown.tenant}; {цель}"[:MAX_TARGET]
         journals.record_action(
             user_id=account.id,
             role=account.role,
             tenant=account.tenant,
             action=request.endpoint,
-            target=action_target(),
+            target=цель,
             outcome=str(response.status_code),
             ip=client_ip(conf),
             credential=f"session:{сессия}" if сессия else None,

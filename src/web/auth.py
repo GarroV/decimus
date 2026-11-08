@@ -29,6 +29,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import hmac
 from collections.abc import Mapping
@@ -55,6 +56,7 @@ from src.db.web_access import (
     resolve_session,
 )
 from src.db.web_throttle import Verdict, admit_attempt, note_success
+from src.domain import peek
 from src.domain.journal import (
     METHOD_GOOGLE,
     METHOD_PASSWORD,
@@ -206,6 +208,25 @@ CURRENT = "account"
 #: предъявляет базе ИМЕННО его — строку учётки выбирает живая сессия, а не
 #: поле формы.
 SESSION_TOKEN = "session_token"  # noqa: S105 — имя ключа в `g`, а не токен
+
+
+def peeked_view(account: Account) -> Account:
+    """Учётка так, как её видят страницы: при включённом переключателе — глазами партнёра (D726).
+
+    Условия проверяются ЗАНОВО на каждом запросе по настоящей учётке, а не берутся из
+    записи в сессии на слово: перестал быть главным админом, не прошёл вторую ступень или
+    пространство вышло из перечня — получаешь свою обычную учётку (отказ закрытием, а не
+    ошибкой). У подмены тот же `id`, а `real` хранит настоящую.
+    """
+    target = account.acting_tenant
+    if target is None:
+        return account
+    second_step_ok = account.passed_second_step or not account.has_second_factor
+    if not peek.may_peek(
+        role=account.role, tenant=account.tenant, second_step_ok=second_step_ok
+    ) or not peek.is_peek_space(target):
+        return account
+    return dataclasses.replace(account, tenant=target, role=peek.PEEK_ROLE, real=account)
 
 
 def current_account() -> Account | None:
@@ -386,6 +407,9 @@ def install(app: Flask, conf: Settings) -> None:
             if request.method == "GET":
                 return redirect(url_for("security_page", required="1"))
             return make_response("", 403)
+        # Переключатель пространств (D726): после ВСЕХ проверок настоящей учётки — вторая
+        # ступень выше — дальше страницы видят партнёрского админа, а не главного.
+        account = peeked_view(account)
         setattr(g, CURRENT, account)
         setattr(g, SESSION_TOKEN, token)
         # Пространство вошедшего — и базе (F-037): политики роли приложения

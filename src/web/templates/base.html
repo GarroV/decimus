@@ -142,6 +142,7 @@
           <img class="sidenav__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
           <span class="sidenav__name"><b>{{ t('app.name') }}</b><small>Dodo · {{ tenant }}</small></span>
         </a>
+        {% if peek_can %}{% include "peek/_switch.html" %}{% endif %}
 
         {#
           Поиск ведёт в реестр проверок по названию пиццерии. Обычная форма:
@@ -210,6 +211,16 @@
     {% endif %}
 
     <main class="page{% block page_class %}{% endblock %} shell__main">
+      {% if peek_active %}
+        {# Переключатель пространств (D726): на каждой странице видно, чьими глазами смотрим. #}
+        <div class="peek-bar" role="status">
+          <span>{{ t('peek.bar', name=peek_name) }}</span>
+          <form method="post" action="{{ url(peek_path) }}">
+            <input type="hidden" name="target" value="{{ peek_home }}">
+            <button class="peek-bar__back" type="submit">{{ t('peek.bar.back') }}</button>
+          </form>
+        </div>
+      {% endif %}
       {% if account %}
         {% block page_heading %}<header class="page-heading"><h1>{{ self.title() }}</h1></header>{% endblock %}
       {% endif %}

@@ -275,7 +275,8 @@ _RESOLVE_SESSION_SQL = """
             or exists (select 1 from web_totp t
                         where t.user_id = u.id and t.confirmed_at is not null)),
            s.second_step_at is not null,
-           u.country_filter
+           u.country_filter, s.acting_tenant,
+           coalesce((select t.name from tenants t where t.code = s.acting_tenant), '')
       from web_sessions s
       join web_users u on u.id = s.user_id
      where s.fingerprint = %s
@@ -391,6 +392,26 @@ class Account:
     #: Постоянный отбор стран экрана «Страны» (`web_users.country_filter`, `0077`,
     #: D536); `None` — отбора нет. Приезжает с сессией, как язык.
     country_filter: tuple[str, ...] | None = None
+    #: Пространство, в которое главный админ заглянул переключателем (`web_sessions.acting_tenant`,
+    #: `0122`, D726); `None` — смотрит в своё. Приезжает с сессией. Решение «действует ли оно»
+    #: принимает заслон входа, а не эта строка: сюда оно попадает как записано.
+    acting_tenant: str | None = None
+    #: Название того пространства для плашки «вы смотрите как партнёр» (`tenants.name`).
+    acting_name: str = ""
+    #: НАСТОЯЩАЯ учётка, пока человек смотрит чужими глазами (D726): у «глаз партнёра»
+    #: `id` тот же, а `tenant` и `role` — партнёрские. Безопасность (вторая ступень,
+    #: свежий вход, настройки входа) и журнал берут `actual`, а не эту подмену.
+    real: Account | None = None
+
+    @property
+    def actual(self) -> Account:
+        """Настоящая учётка: сама, если не смотрит чужими глазами."""
+        return self.real if self.real is not None else self
+
+    @property
+    def is_peeking(self) -> bool:
+        """Учётка сейчас подменена видом партнёра: только просмотр."""
+        return self.real is not None
 
 
 @dataclass(frozen=True)
@@ -1162,7 +1183,22 @@ def resolve_session(token: str) -> Account | None:
         has_second_factor=bool(row[10]),
         passed_second_step=bool(row[11]),
         country_filter=tuple(row[12]) if row[12] else None,
+        acting_tenant=row[13],
+        acting_name=str(row[14] or ""),
     )
+
+
+def set_acting_tenant(token: str, tenant: str | None) -> bool:
+    """Выставить (или снять, `None`) пространство просмотра у живой сессии главного админа (D726).
+
+    `False` — база отказала: сессия не живая, учётка не главный админ УК, вторая ступень не
+    пройдена или такого пространства нет. Какие пространства допустимы, решает вызывающий
+    (`domain.peek`): база не знает перечня, она знает только «заведено ли».
+    """
+    with _connected("переключить пространство просмотра") as conn, conn.cursor() as cur:
+        cur.execute("select set_session_acting_tenant(%s, %s)", (token, tenant))
+        row = cur.fetchone()
+    return bool(row and row[0])
 
 
 def close_session(token: str) -> bool:

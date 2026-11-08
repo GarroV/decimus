@@ -105,12 +105,16 @@ def _page_args() -> dict[str, list[str]]:
     return {key: request.args.getlist(key) for key in request.args}
 
 
-def _compute(user: str) -> State:
-    """Непрочитанное учётки; открытая страница, чей адрес совпал, отмечает свои строки."""
+def _compute(user: str, *, may_mark: bool = True) -> State:
+    """Непрочитанное учётки; открытая страница, чей адрес совпал, отмечает свои строки.
+
+    `may_mark=False` — только чтение: главный админ смотрит глазами партнёра (D726), и
+    просмотр чужих страниц не должен гасить его собственные уведомления.
+    """
     if not store.unread_count(user):
         return State()
     rows = store.list_for(user, unread_only=True)
-    if request.method == "GET":
+    if request.method == "GET" and may_mark:
         args = _page_args()
         here = {row.link for row in rows if link_matches_page(row.link, request.path, args)}
         for link in sorted(here):
@@ -132,7 +136,7 @@ def state() -> State:
     result = State()
     if account is not None:
         try:
-            result = _compute(str(account.id))
+            result = _compute(str(account.id), may_mark=not account.is_peeking)
         except DbError as exc:
             note_target_mismatch(exc)
             logger.warning("уведомления: не прочитались (%s)", type(exc).__name__)

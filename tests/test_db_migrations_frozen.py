@@ -450,6 +450,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0121_api_sales_scope.sql": (
         "sql1:ab25c8457fc6bf0b205b21fd8be0d5d77addb9d0a2768e82c3a57a1905a5cd11"
     ),
+    "0122_session_acting_tenant.sql": (
+        "sql1:a026727e3bab567db044327a21e4e6ea113124532612bd276dc2a2f5e20cec46"
+    ),
 }
 
 

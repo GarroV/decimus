@@ -76,6 +76,11 @@ class Учётка:
         self.web_lang = web_lang
         # Постоянный отбор стран (`web_users.country_filter`, 0077, D536): по умолчанию нет.
         self.country_filter = country_filter
+        # Переключатель пространств (D726): по умолчанию выключен.
+        self.acting_tenant = None
+        self.acting_name = ""
+        self.is_peeking = False
+        self.real = None
         # Имя и версия фото из Google (`web_users`, 0065): по умолчанию нет —
         # блок учётки показывает логин и инициалы.
         self.display_name = display_name
@@ -90,6 +95,10 @@ class Учётка:
         # Роль по умолчанию — узкая рабочая, не админ: двойник-администратор
         # прятал бы отказ раздела людей во всех тестах разом.
         self.role = role
+
+    @property
+    def actual(self) -> Учётка:
+        return self
 
 
 class Сессия:

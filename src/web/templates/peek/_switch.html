@@ -1,0 +1,16 @@
+{#
+  Переключатель пространств главного админа (D726): текстовый, «УК / TEST». Каждый вариант —
+  своя крошечная форма с кнопкой; активный — чернилами и жирным, остальные приглушены.
+  Показывается только настоящему главному админу УК (`peek_can`); дверь `POST /space/peek`
+  проверяет то же сама, скрытие кнопки защитой не служит.
+#}
+<div class="peek-switch" role="group" aria-label="{{ t('peek.switch.label') }}">
+  {% set here = peek_active or peek_home %}
+  {% for code in [peek_home] + peek_spaces|list %}
+    {% if not loop.first %}<span class="peek-switch__sep" aria-hidden="true">/</span>{% endif %}
+    <form method="post" action="{{ url(peek_path) }}">
+      <input type="hidden" name="target" value="{{ code }}">
+      <button class="peek-switch__opt" type="submit" aria-pressed="{{ 'true' if code == here else 'false' }}">{{ t('peek.home') if code == peek_home else code }}</button>
+    </form>
+  {% endfor %}
+</div>

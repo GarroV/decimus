@@ -102,6 +102,7 @@ _WEB: dict[str, tuple[str, str]] = {
     "letter_draft": ("Черновик письма", "Letter draft"),
     "login": ("Вход", "Sign-in"),
     "logout": ("Выход", "Sign-out"),
+    "space_peek": ("Переключено пространство просмотра", "Space view switched"),
     "methodology_add": ("Добавлен пункт методики", "Methodology item added"),
     "methodology_bot": ("Доступ бота к чек-листу", "Bot access to checklist"),
     "methodology_disable": ("Пункт методики отключён", "Methodology item disabled"),
