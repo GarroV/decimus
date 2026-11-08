@@ -2227,7 +2227,6 @@ a[data-zoom] { cursor: zoom-in; }
 /* Переключатель пространств главного админа (D726). Текстовый «УК / TEST»: активный — чернилами и
    жирным, остальные приглушены; кнопки без фона и рамки, с запасом под палец. */
 .peek-switch { display: inline-flex; align-items: center; gap: 5px; padding: 0 var(--space-7); font-size: var(--fs-micro); }
-.sidenav .peek-switch { display: flex; padding-top: var(--space-3); padding-bottom: var(--space-2); }
 .acct-menu__line .peek-switch { padding: 0; }
 .peek-switch form { margin: 0; }
 .peek-switch__opt { padding: var(--space-3) var(--space-3); border: 0; background: none; font: inherit; color: var(--ink-3); cursor: pointer; }
@@ -2236,6 +2235,24 @@ a[data-zoom] { cursor: zoom-in; }
 .peek-switch__opt:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
 .peek-switch__sep { color: var(--ink-empty); }
 html[data-nav-collapsed="true"] .sidenav .peek-switch { display: none; }
+
+/* Шапка панели: бренд и стрелка «свернуть / развернуть» в одной строке на уровне
+   лого. Стрелка — кружок на кромке панели: в узком и широком виде стоит в одном
+   месте, отдельной строки под неё нет. Панель поднята над липкими шапками
+   экранов (z 3–5), иначе кружок уходит под них. */
+.shell__nav { z-index: 6; }
+.sidenav__head { position: relative; border-bottom: 1px solid var(--line); }
+.sidenav__head .sidenav__brand { border-bottom: 0; }
+.sidenav__fold { position: absolute; top: 50%; right: -11px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink-3); cursor: pointer; transform: translateY(-50%); }
+.sidenav__fold:hover { color: var(--ink); background: var(--surface-3); }
+.sidenav__fold:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
+.sidenav__fold svg { width: 12px; height: 12px; transition: transform var(--t-state) var(--ease); }
+html[data-nav-collapsed="true"] .sidenav__fold svg { transform: rotate(180deg); }
+/* У главного админа УК строку «Dodo · HQ» под названием заменяет «УК / TEST»
+   тем же мелким капсом (D726). */
+.sidenav__head--peek .sidenav__name { align-self: flex-start; margin-top: -2px; }
+.sidenav__head .peek-switch { position: absolute; top: 30px; left: calc(var(--space-7) + 28px + var(--space-5)); gap: 2px; padding: 0; line-height: var(--lh-micro); letter-spacing: .1em; text-transform: uppercase; }
+.sidenav__head .peek-switch__opt { padding: 0 1px; }
 
 /* Тонкая полоса над содержимым, пока смотрим глазами партнёра: видна на каждой странице. */
 .peek-bar {
@@ -2248,3 +2265,8 @@ html[data-nav-collapsed="true"] .sidenav .peek-switch { display: none; }
 .peek-bar__back { padding: var(--space-3) var(--space-2); border: 0; background: none; font: inherit; color: var(--ink); font-weight: var(--w-semibold); cursor: pointer; }
 .peek-bar__back:hover { text-decoration: underline; }
 .peek-bar__back:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
+/* Узкий экран без выбора человека — панель узкая, переключатель прячется вместе
+   с названием. */
+@media (max-width: 1099px) {
+  html:not([data-nav-collapsed="false"]) .sidenav .peek-switch { display: none; }
+}

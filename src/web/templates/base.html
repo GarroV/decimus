@@ -138,17 +138,27 @@
   <div class="shell">
     {% if account %}
       <nav class="sidenav shell__nav" aria-label="{{ t('nav.sections') }}">
-        <a class="sidenav__brand" href="{{ url('/') }}?lang={{ lang }}" title="{{ t('app.tenant_label') }}: {{ tenant }}">
-          <img class="sidenav__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
-          <span class="sidenav__name"><b>{{ t('app.name') }}</b><small>Dodo · {{ tenant }}</small></span>
-        </a>
-        {% if peek_can %}{% include "peek/_switch.html" %}{% endif %}
+        {#
+          Шапка панели — одна строка на уровне лого: бренд, под названием строка
+          пространства, справа стрелка «свернуть / развернуть». Стрелка стоит на
+          кромке панели и не двигается: открывают и закрывают в одном месте.
+          У главного админа УК строку пространства заменяет переключатель
+          «УК / TEST» (D726): формы в ссылку не вкладываются, поэтому он стоит
+          рядом с ней, а не внутри.
+        #}
+        <div class="sidenav__head{% if peek_can %} sidenav__head--peek{% endif %}">
+          <a class="sidenav__brand" href="{{ url('/') }}?lang={{ lang }}" title="{{ t('app.tenant_label') }}: {{ tenant }}">
+            <img class="sidenav__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
+            <span class="sidenav__name"><b>{{ t('app.name') }}</b>{% if not peek_can %}<small>Dodo · {{ tenant }}</small>{% endif %}</span>
+          </a>
+          {% if peek_can %}{% include "peek/_switch.html" %}{% endif %}
+          <button class="sidenav__fold" type="button" data-nav-collapse data-collapse-label="{{ t('nav.collapse') }}" data-expand-label="{{ t('nav.expand') }}" aria-expanded="true" aria-label="{{ t('nav.collapse') }}" title="{{ t('nav.collapse') }}">{{ icon('cleft') }}</button>
+        </div>
 
         {#
           Поиск ведёт в реестр проверок по названию пиццерии. Обычная форма:
           без скрипта работает так же, скрипт добавляет только ⌘K и Esc.
         #}
-        <button class="sidenav__toggle" type="button" data-nav-collapse data-collapse-label="{{ t('nav.collapse') }}" data-expand-label="{{ t('nav.expand') }}" aria-expanded="true" aria-label="{{ t('nav.collapse') }}">{{ icon('cleft') }}<span class="sidenav__label">{{ t('nav.collapse') }}</span></button>
         <form class="sidenav__search" method="get" action="{{ url('/inspections') }}" role="search">
           <input type="hidden" name="lang" value="{{ lang }}">
           {# Пиццерию ищут по всей истории, а не в текущем месяце — реестр без

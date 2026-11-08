@@ -6,7 +6,10 @@
 * **Дверь** `POST /space/peek` (поле `target`: код пространства из перечня или `HQ`).
   Отказ тому, кто не главный админ УК после второй ступени, — 403, независимо от того,
   показана ли кнопка. Состояние пишется на сессию в базе (`web_session_peeks`, `0123`).
-  Вернуться — `target=HQ`, возврат всегда на главную, а не на произвольный адрес.
+  Вернуться — `target=HQ`. После переключения человек остаётся на той же странице
+  (поле `back`, только путь внутри приложения — `auth.safe_next`). Если в новом
+  пространстве эта страница закрыта (403/404 — нет раздела у роли или объект чужой),
+  следующий запрос с отметкой `_BACK_COOKIE` уводит на главную вместо отказа.
 * **Заслон записи.** Пока переключатель включён, любой изменяющий запрос отвечает 403
   со страницей «Только просмотр» — одним `before_request`, а не в каждом маршруте.
   Исключения: само переключение и выход. Сюда же — GET, который пишет (`WRITING_GETS`).
@@ -29,12 +32,19 @@ from src.domain import peek
 
 from . import auth, guard
 from .journal import WRITE_METHODS
+from .origin import over_https
 
 ENDPOINT = "space_peek"
 PATH = "/space/peek"
 
 #: Что открыто и при включённом переключателе: само переключение и выход.
 _ALWAYS_ALLOWED = frozenset({ENDPOINT, "logout"})
+
+#: Отметка «это первый запрос после переключения»: живёт один запрос и минуту.
+_BACK_COOKIE = "dodo_audit_peek_back"
+_BACK_TTL_SECONDS = 60
+#: Отказ страницы после переключения — не ошибка человека, а «здесь партнёру не видно».
+_NOT_THERE = frozenset({403, 404})
 
 
 def _second_step_ok(account: Any) -> bool:
@@ -99,4 +109,32 @@ def install(app: Flask) -> None:
             return "", 503
         if not done:
             return guard.forbidden()
+        return _back_to(request.form.get("back"))
+
+    @app.after_request
+    def _not_there_go_home(response: Response) -> Response:
+        """Первый запрос после переключения: страница закрыта в новом пространстве → главная."""
+        if _BACK_COOKIE not in request.cookies or request.endpoint == ENDPOINT:
+            return response
+        if request.method == "GET" and response.status_code in _NOT_THERE:
+            response = redirect(url_for("home"))
+        response.delete_cookie(_BACK_COOKIE, path="/")
+        return response
+
+
+def _back_to(raw: str | None) -> Response:
+    """Вернуть на страницу, откуда переключали; чужой или битый адрес — на главную."""
+    путь = auth.safe_next((raw or "").rstrip("?"))
+    if путь is None or путь.split("?", 1)[0] == PATH:
         return redirect(url_for("home"))
+    ответ = redirect(f"{request.script_root}{путь}")
+    ответ.set_cookie(
+        _BACK_COOKIE,
+        "1",
+        max_age=_BACK_TTL_SECONDS,
+        httponly=True,
+        samesite="Lax",
+        secure=over_https(),
+        path="/",
+    )
+    return ответ

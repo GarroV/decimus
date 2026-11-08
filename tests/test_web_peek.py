@@ -232,6 +232,61 @@ def test_возврат_в_ук_выключает_просмотр(monkeypatch:
     assert ПЛАШКА not in стенд.страница()
 
 
+# --- остаться на той же странице ---------------------------------------------------
+
+
+def _переключить_с(стенд: Стенд, target: str, back: str) -> Any:
+    return стенд.client.post(
+        "/space/peek", data={"target": target, "back": back}, headers=ЗАГОЛОВКИ
+    )
+
+
+def test_после_переключения_остаётся_на_той_же_странице(monkeypatch: pytest.MonkeyPatch) -> None:
+    стенд = Стенд(monkeypatch)
+
+    туда = _переключить_с(стенд, "TEST", "/settings?lang=ru")
+    assert туда.status_code == 302
+    assert туда.headers["Location"].endswith("/settings?lang=ru")
+    assert стенд.client.get("/settings?lang=ru").status_code == 200
+
+    обратно = _переключить_с(стенд, "HQ", "/settings?lang=ru")
+    assert обратно.headers["Location"].endswith("/settings?lang=ru")
+
+
+@pytest.mark.parametrize(
+    "back", ["https://evil.example/x", "//evil.example/x", "/\\evil.example", "", "/space/peek"]
+)
+def test_чужой_или_битый_адрес_возврата_ведёт_на_главную(
+    monkeypatch: pytest.MonkeyPatch, back: str
+) -> None:
+    стенд = Стенд(monkeypatch)
+
+    ответ = _переключить_с(стенд, "TEST", back)
+
+    assert ответ.status_code == 302
+    assert ответ.headers["Location"].rstrip("/").endswith(("localhost", ""))
+    assert "evil" not in ответ.headers["Location"]
+    assert not ответ.headers["Location"].endswith("/space/peek")
+
+
+def test_страница_не_видная_партнёру_уводит_на_главную(monkeypatch: pytest.MonkeyPatch) -> None:
+    партнёр = Стенд(monkeypatch, tenant="TEST", role="admin")
+    меню_партнёра = set(_меню(партнёр.страница()))
+    стенд = Стенд(monkeypatch)
+    только_ук = sorted(set(_меню(стенд.страница())) - меню_партнёра)
+    assert только_ук, "нужна страница, которой нет у партнёра"
+    путь = только_ук[0].replace("&amp;", "&")
+
+    туда = _переключить_с(стенд, "TEST", путь)
+    assert туда.headers["Location"].endswith(путь)
+    ответ = стенд.client.get(путь)
+
+    assert ответ.status_code == 302, f"{путь} → {ответ.status_code}"
+    assert ответ.headers["Location"].endswith("/")
+    # Отметка живёт один запрос: дальше закрытая страница — обычный отказ.
+    assert стенд.client.get(путь).status_code in (403, 404)
+
+
 # --- только просмотр --------------------------------------------------------------
 
 
