@@ -740,7 +740,7 @@ a.ov-table__row:focus-visible, a.ov-row:focus-visible, a.ins-row:focus-visible, 
 
 .shell { display: flex; align-items: flex-start; min-height: 100vh; }
 .shell__nav { position: sticky; top: 0; height: 100vh; }
-.shell__main { flex: 1 1 auto; min-width: 0; }
+.shell__main { flex: 1 1 auto; min-width: 0; position: relative; }
 /* Непостроенный раздел: тише остальных, но открывается и виден. */
 .sidenav__item.is-wip { color: var(--ink-empty); }
 .sidenav__item.is-wip:hover { color: var(--ink-3); }
@@ -1838,6 +1838,8 @@ a[data-zoom] { cursor: zoom-in; }
 .note[hidden] { display: none; }
 .acct-menu--up { bottom: var(--acct-y, 64px); }
 .acct-menu--down { top: var(--acct-y, 52px); }
+/* Окно колокольчика в углу страницы: правый край — по правому краю кнопки. */
+.acct-menu--right { left: auto; right: var(--acct-right, var(--space-4)); }
 .acct-menu:focus { outline: none; }
 @media (max-width: 719px) {
   .acct-menu { left: var(--space-4); right: var(--space-4); width: auto; max-height: calc(100vh - var(--acct-y, 52px) - var(--space-9)); }
@@ -2144,20 +2146,32 @@ a[data-zoom] { cursor: zoom-in; }
 }
 
 /* ── Колокольчик уведомлений (#1129, D604, D614) ─────────────────────
-   Кнопка в низу левой панели (компьютер) и в верхней полосе (телефон); окно — то же
-   `.acct-menu`/`.popover`, что у меню учётки. Красная точка — токен `--err` ядра; слово
-   «Новое» для чтения с экрана лежит рядом (`.sr-only`), цвет — не единственный признак. */
+   Кнопка в правом верхнем углу страницы (компьютер) и в верхней полосе (телефон), как в Swarm;
+   в левой панели её нет. Окно — то же `.acct-menu`/`.popover`, что у меню учётки. Число на
+   значке — токен `--err` ядра; слова «новых N» для чтения с экрана лежат в `aria-label`,
+   цвет — не единственный признак. */
 .bell { position: relative; }
-.bell__dot, .notif-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--err); }
-.bell__dot[hidden] { display: none; }
-.bell__dot { position: absolute; top: 7px; left: 20px; }
+.notif-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--err); }
+.bell__badge { position: absolute; top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--r-pill); background: var(--err); color: var(--surface); font-size: var(--fs-micro); line-height: 16px; font-weight: var(--w-bold); text-align: center; font-variant-numeric: tabular-nums; }
+.bell__badge[hidden] { display: none; }
 .notif-dot { position: absolute; top: 6px; right: 8px; }
-.mbar__bell { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; padding: var(--space-2); border: 0; background: transparent; color: var(--ink); cursor: pointer; border-radius: var(--r-control); }
-.mbar__bell .bell__label { display: none; }
-/* Размер иконки в полосе телефона: у пункта панели его задаёт ядро, здесь — сами. */
-.mbar__bell svg { width: 20px; height: 20px; flex-shrink: 0; }
-.mbar__bell .bell__dot { top: 2px; left: auto; right: 2px; }
-.bell:focus-visible, .mbar__bell:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
+.mbar__bell, .page-bell__btn { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; padding: var(--space-2); border: 0; background: transparent; color: var(--ink); cursor: pointer; border-radius: var(--r-control); }
+.mbar__bell:hover, .page-bell__btn:hover { background: var(--surface-3); }
+.mbar__bell .bell__label, .page-bell__btn .bell__label { display: none; }
+/* Размер иконки: у пункта панели его задаёт ядро, здесь — сами. */
+.mbar__bell svg, .page-bell__btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+.bell:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
+/* Компьютер: колокольчик в правом углу колонки страницы, на строке заголовка. Обёртка нулевой
+   высоты стоит в потоке сразу над заголовком (под плашкой просмотра, если она есть), кнопка
+   висит от её правого края; отрицательное поле гасит промежуток колонки. Заголовок уступает
+   место справа, чтобы действия заголовка не оказались под кнопкой. На телефоне (<720px)
+   колокольчик в полосе `mbar`, а этот скрыт. */
+.page-bell { display: none; }
+@media (min-width: 720px) {
+  .page-bell { display: block; position: relative; z-index: 4; height: 0; margin-bottom: calc(-1 * var(--space-7)); }
+  .page-bell__btn { position: absolute; top: 0; right: 0; }
+  .page-bell + .page-heading { padding-right: calc(40px + var(--space-5)); }
+}
 .tabbar__item { position: relative; }
 .notif-menu__note { margin: 0; padding: var(--space-5) var(--space-6); font-size: var(--fs-dense); color: var(--ink-2); }
 .notif-menu__list { max-height: min(420px, calc(100vh - var(--space-11, 120px))); overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--space-3); }
@@ -2234,7 +2248,19 @@ a[data-zoom] { cursor: zoom-in; }
 .peek-switch__opt[aria-pressed="true"] { color: var(--ink); font-weight: var(--w-bold); }
 .peek-switch__opt:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
 .peek-switch__sep { color: var(--ink-empty); }
-html[data-nav-collapsed="true"] .sidenav .peek-switch { display: none; }
+/* Внизу левой панели, над темой и языком: строка «УК / TEST». В свёрнутой панели (узкой) те же
+   кнопки стоят столбиком, без черты: влезают «УК» и «TEST» (D726). */
+.sidenav__foot .peek-switch { display: flex; justify-content: flex-start; gap: 2px; margin: 0 0 var(--space-2); padding: 0 var(--space-2); font-size: var(--fs-meta); }
+.sidenav__foot .peek-switch__opt { padding: var(--space-3) var(--space-4); border-radius: var(--r-control); }
+.sidenav__foot .peek-switch__opt:hover { background: var(--surface-3); }
+html[data-nav-collapsed="true"] .sidenav__foot .peek-switch { flex-direction: column; align-items: center; padding: 0; }
+html[data-nav-collapsed="true"] .sidenav__foot .peek-switch__sep { display: none; }
+html[data-nav-collapsed="true"] .sidenav__foot .peek-switch__opt { padding: var(--space-3) var(--space-2); font-size: var(--fs-micro); }
+@media (max-width: 1099px) {
+  html:not([data-nav-collapsed="false"]) .sidenav__foot .peek-switch { flex-direction: column; align-items: center; padding: 0; }
+  html:not([data-nav-collapsed="false"]) .sidenav__foot .peek-switch__sep { display: none; }
+  html:not([data-nav-collapsed="false"]) .sidenav__foot .peek-switch__opt { padding: var(--space-3) var(--space-2); font-size: var(--fs-micro); }
+}
 
 /* Шапка панели: бренд и стрелка «свернуть / развернуть» в одной строке на уровне
    лого. Стрелка — кружок на кромке панели: в узком и широком виде стоит в одном
@@ -2248,11 +2274,6 @@ html[data-nav-collapsed="true"] .sidenav .peek-switch { display: none; }
 .sidenav__fold:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
 .sidenav__fold svg { width: 12px; height: 12px; transition: transform var(--t-state) var(--ease); }
 html[data-nav-collapsed="true"] .sidenav__fold svg { transform: rotate(180deg); }
-/* У главного админа УК строку «Dodo · HQ» под названием заменяет «УК / TEST»
-   тем же мелким капсом (D726). */
-.sidenav__head--peek .sidenav__name { align-self: flex-start; margin-top: -2px; }
-.sidenav__head .peek-switch { position: absolute; top: 30px; left: calc(var(--space-7) + 28px + var(--space-5)); gap: 2px; padding: 0; line-height: var(--lh-micro); letter-spacing: .1em; text-transform: uppercase; }
-.sidenav__head .peek-switch__opt { padding: 0 1px; }
 
 /* Тонкая полоса над содержимым, пока смотрим глазами партнёра: видна на каждой странице. */
 .peek-bar {
@@ -2265,8 +2286,3 @@ html[data-nav-collapsed="true"] .sidenav__fold svg { transform: rotate(180deg); 
 .peek-bar__back { padding: var(--space-3) var(--space-2); border: 0; background: none; font: inherit; color: var(--ink); font-weight: var(--w-semibold); cursor: pointer; }
 .peek-bar__back:hover { text-decoration: underline; }
 .peek-bar__back:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
-/* Узкий экран без выбора человека — панель узкая, переключатель прячется вместе
-   с названием. */
-@media (max-width: 1099px) {
-  html:not([data-nav-collapsed="false"]) .sidenav .peek-switch { display: none; }
-}
