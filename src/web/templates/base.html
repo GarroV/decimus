@@ -25,15 +25,18 @@
   </div>
 {% endmacro %}{#
   Колокольчик уведомлений (#1129, D604, D614): кнопка, которая открывает окно `#notif-menu`
-  (`bell.js`); красная точка — когда есть непрочитанное. Состояние пересчитывается на каждой
-  странице (`notif_state`), а при переходе без перезагрузки (`nav.js`) кнопка подменяется целиком.
+  (`bell.js`); значок с числом непрочитанного — когда оно есть (100 и больше — «99+»).
+  Стоит в правом верхнем углу страницы на компьютере (`right`) и в полосе телефона (`down`);
+  из левой панели убран. Состояние пересчитывается на каждой странице (`notif_state`), а при
+  переходе без перезагрузки (`nav.js`) кнопка подменяется целиком.
 #}{% macro bell_btn(place, cls) %}
-  {% set unread = notif_state().unread %}
+  {% set unread = notif_state().count %}
   <button type="button" class="{{ cls }} bell" data-bell data-place="{{ place }}"
+          data-label-none="{{ t('notif.bell') }}"
           aria-haspopup="menu" aria-expanded="false" aria-controls="notif-menu"
           title="{{ t('notif.title') }}"
-          aria-label="{{ t('notif.bell_unread') if unread else t('notif.bell') }}">
-    {{ icon('bell') }}<span class="bell__label">{{ t('notif.title') }}</span><span class="bell__dot" aria-hidden="true"{% if not unread %} hidden{% endif %}></span>
+          aria-label="{{ t('notif.bell_count', n=unread) if unread else t('notif.bell') }}">
+    {{ icon('bell') }}<span class="bell__label">{{ t('notif.title') }}</span><span class="bell__badge" aria-hidden="true"{% if not unread %} hidden{% endif %}>{{ '99+' if unread > 99 else unread }}</span>
   </button>
 {% endmacro %}{#
   Красная точка на пункте меню раздела, где есть непрочитанное уведомление.
@@ -142,16 +145,13 @@
           Шапка панели — одна строка на уровне лого: бренд, под названием строка
           пространства, справа стрелка «свернуть / развернуть». Стрелка стоит на
           кромке панели и не двигается: открывают и закрывают в одном месте.
-          У главного админа УК строку пространства заменяет переключатель
-          «УК / TEST» (D726): формы в ссылку не вкладываются, поэтому он стоит
-          рядом с ней, а не внутри.
+          Переключатель пространств («УК / TEST», D726) — внизу панели, над темой.
         #}
-        <div class="sidenav__head{% if peek_can %} sidenav__head--peek{% endif %}">
+        <div class="sidenav__head">
           <a class="sidenav__brand" href="{{ url('/') }}?lang={{ lang }}" title="{{ t('app.tenant_label') }}: {{ tenant }}">
             <img class="sidenav__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
-            <span class="sidenav__name"><b>{{ t('app.name') }}</b>{% if not peek_can %}<small>Dodo · {{ tenant }}</small>{% endif %}</span>
+            <span class="sidenav__name"><b>{{ t('app.name') }}</b><small>Dodo · {{ tenant }}</small></span>
           </a>
-          {% if peek_can %}{% include "peek/_switch.html" %}{% endif %}
           <button class="sidenav__fold" type="button" data-nav-collapse data-collapse-label="{{ t('nav.collapse') }}" data-expand-label="{{ t('nav.expand') }}" aria-expanded="true" aria-label="{{ t('nav.collapse') }}" title="{{ t('nav.collapse') }}">{{ icon('cleft') }}</button>
         </div>
 
@@ -198,7 +198,7 @@
         {# Низ панели, как в Swarm (D470): тема, язык и явная кнопка настроек одной
            строкой. Блок учётки ниже — отдельно (D468). #}
         <div class="sidenav__foot">
-          {{ bell_btn('up', 'sidenav__item') }}
+          {% if peek_can %}{% include "peek/_switch.html" %}{% endif %}
           <div class="sidenav__prefs">
             {{ theme_pick() }}
             {% include "_langpick.html" %}
@@ -232,6 +232,8 @@
         </div>
       {% endif %}
       {% if account %}
+        {# Колокольчик справа вверху (как в Swarm); на телефоне он в полосе `mbar`. #}
+        <div class="page-bell">{{ bell_btn('right', 'page-bell__btn') }}</div>
         {% block page_heading %}<header class="page-heading"><h1>{{ self.title() }}</h1></header>{% endblock %}
       {% endif %}
       {% if passkey_here %}

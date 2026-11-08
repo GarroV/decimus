@@ -12,6 +12,7 @@ NOTIFICATION_TEXTS: dict[str, dict[str, str]] = {
     "notif.title": {"ru": "Уведомления", "en": "Notifications"},
     "notif.bell": {"ru": "Уведомления", "en": "Notifications"},
     "notif.bell_unread": {"ru": "Уведомления: есть новые", "en": "Notifications: new items"},
+    "notif.bell_count": {"ru": "Уведомления: новых {n}", "en": "Notifications: {n} new"},
     "notif.new": {"ru": "Новое", "en": "New"},
     "notif.empty": {"ru": "Пока ничего нового.", "en": "Nothing new yet."},
     "notif.failed": {
