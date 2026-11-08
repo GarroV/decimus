@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 222 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 223 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -89,6 +89,7 @@
 | `/administration/dodois/<country>/check` | POST | `dodois_check` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite` | POST | `dodois_invite_issue` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite/<int:invite_id>/revoke` | POST | `dodois_invite_revoke` | `src/web/dodois_screen.py` |
+| `/administration/home/settings` | POST | `home_setting` | `src/web/home_settings.py` |
 | `/administration/mailings/<kind>/cc/add` | POST | `mailing_cc_add` | `src/web/mailings_screen.py` |
 | `/administration/mailings/<kind>/cc/remove` | POST | `mailing_cc_remove` | `src/web/mailings_screen.py` |
 | `/administration/mailings/<kind>/content` | POST | `mailing_content_save` | `src/web/mailings_content.py` |
@@ -622,6 +623,7 @@
 | `0121_api_sales_scope.sql` | — |
 | `0122_session_acting_tenant.sql` | — |
 | `0123_session_peeks_table.sql` | `web_session_peeks` |
+| `0124_service_settings_home_attention.sql` | — |
 <!-- map:end -->
 
 ## Makefile

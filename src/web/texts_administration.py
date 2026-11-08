@@ -46,6 +46,39 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
             "Old unread notifications do not reappear."
         ),
     },
+    "administration.tab.home": {"ru": "Главная", "en": "Home"},
+    "home.setting.sub": {
+        "ru": "Настройки сети для страницы «Главная».",
+        "en": "Network-wide settings for the Home page.",
+    },
+    "home.setting.attention.title": {
+        "ru": "Пиццерии в «Требует внимания»",
+        "en": "Pizzerias in “Needs attention”",
+    },
+    "home.setting.attention.label": {
+        "ru": "Показывать пиццерии в «Требует внимания»",
+        "en": "Show pizzerias in “Needs attention”",
+    },
+    "home.setting.attention.note": {
+        "ru": (
+            "Строки с пиццериями, где в проверках периода есть критические нарушения "
+            "или оценка D. Задания в той же карточке (приёмка, планы, предписания) "
+            "настройка не трогает. Пока выключено, строк и подсказки к ним нет; "
+            "карточки нет совсем, если нет и заданий."
+        ),
+        "en": (
+            "Rows for pizzerias with critical findings or a D grade in the period's "
+            "inspections. Tasks in the same card (review, plans, orders) are not affected. "
+            "While off, there are no rows or hint for them; the card is not shown at all "
+            "if there are no tasks either."
+        ),
+    },
+    "home.setting.on": {"ru": "Включено", "en": "On"},
+    "home.setting.off": {"ru": "Выключено", "en": "Off"},
+    "home.setting.unavailable": {
+        "ru": "Настройку не удалось прочитать. Пока считается выключенной.",
+        "en": "The setting could not be read. Treated as off for now.",
+    },
     "administration.tab.plans": {"ru": "Экшн-планы", "en": "Action plans"},
     "plans.paused.title": {"ru": "Экшн-планы отключены", "en": "Action plans are paused"},
     "plans.paused.note": {

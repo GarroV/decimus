@@ -30,6 +30,7 @@ from web_harness import войти, подменить_двери, собрат�
 from src.db.errors import DbError
 from src.db.models import ORIGIN_FIELD, ORIGIN_LEGACY, InspectionRow
 from src.db.reach import own_reach
+from src.domain import features
 from src.web import home_board, home_ratings, home_ratings_block
 from src.web import overview as ov
 from src.web import overview as overview_data
@@ -111,7 +112,12 @@ def снимок(**поля: object) -> ov.Overview:
 
 @pytest.fixture
 def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
-    """Приложение с подменённым снимком сети и вошедшим человеком."""
+    """Приложение с подменённым снимком сети и вошедшим человеком.
+
+    Пиццерии «Требует внимания» включены (D727: по умолчанию выключены) — экран здесь
+    проверяется в полном виде; выключенный — `test_web_home_attention_setting.py`.
+    """
+    monkeypatch.setattr(features, "home_attention_units_enabled", lambda: True)
     подменить_двери(monkeypatch, tenant=ТЕНАНТ)
     with собрать(tenant=ТЕНАНТ).test_client() as client:
         assert войти(client).status_code == 302
