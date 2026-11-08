@@ -804,4 +804,5 @@ contacts_known
 # Переключатель пространств (D726, `src/web/peek.py`): крюки и маршрут регистрирует декоратор Flask.
 _only_view
 _peek_context
+_not_there_go_home
 space_peek
