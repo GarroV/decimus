@@ -453,6 +453,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0122_session_acting_tenant.sql": (
         "sql1:a026727e3bab567db044327a21e4e6ea113124532612bd276dc2a2f5e20cec46"
     ),
+    "0123_session_peeks_table.sql": (
+        "sql1:0e0a20cf8ba9c222521f9a9675c44a362fe89a2baaf30a4ba06a5d9fa2a49f08"
+    ),
 }
 
 

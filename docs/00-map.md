@@ -368,6 +368,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
+| `src/web/templates/peek/` | 2 | _switch.html, readonly.html |
 | `src/web/templates/prescriptions/` | 1 | not_found.html |
 | `src/web/templates/quality/` | 1 | index.html |
 | `src/web/templates/ratings/` | 10 | _macros.html, _period.html, _s_agg.html, _s_clients.html, _s_compare.html, _s_maps.html, _s_risk.html, _s_source.html, … (+2) |
@@ -643,6 +644,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0120_walk_log_retention_30d.sql` | Владелец, 05.11.2026: «Хранить 180 дней нет смысла |
 | `0121_api_sales_scope.sql` | Право `sales:month` — метод `GET /api/v1/sales` (D723): продажи пиццерий за месяц из Dodo IS, которые Децимус собирает раз в сутки в `dodois.unit_sales_month` |
 | `0122_session_acting_tenant.sql` | Переключатель пространств главного админа (D726): `web_sessions.acting_tenant` — в чьё пространство сессия сейчас смотрит |
+| `0123_session_peeks_table.sql` | Переключатель пространств (D726): состояние «в чьё пространство смотрит сессия» уходит из колонки `web_sessions.acting_tenant` (`0122`) в отдельную таблицу… |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
