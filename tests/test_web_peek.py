@@ -112,6 +112,17 @@ def _свой_вид(вид: Account, учётка: Account) -> bool:
 # --- кто вправе -----------------------------------------------------------------
 
 
+def test_переключатель_внизу_панели_а_не_у_лого(monkeypatch: pytest.MonkeyPatch) -> None:
+    html = Стенд(monkeypatch).страница()
+    панель = html.split('<nav class="sidenav', 1)[1].split('class="sidenav__user', 1)[0]
+    шапка = панель.split('class="sidenav__head', 1)[1].split('class="sidenav__search', 1)[0]
+    низ = панель.split('class="sidenav__foot', 1)[1]
+
+    assert "peek-switch" not in шапка, "переключатель остался у лого"
+    assert "peek-switch" in низ
+    assert низ.index("peek-switch") < низ.index("sidenav__prefs"), "переключатель не над темой"
+
+
 @pytest.mark.parametrize(
     ("пространство", "роль"),
     [

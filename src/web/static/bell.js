@@ -24,18 +24,24 @@
   function place(menu, trigger) {
     var rect = trigger.getBoundingClientRect();
     var up = trigger.dataset.place === "up";
+    var right = trigger.dataset.place === "right";
     menu.classList.toggle("acct-menu--up", up);
     menu.classList.toggle("acct-menu--down", !up);
+    menu.classList.toggle("acct-menu--right", right);
     if (up) {
       menu.style.setProperty("--acct-x", Math.max(8, rect.left) + "px");
       menu.style.setProperty("--acct-y", Math.round(window.innerHeight - rect.top + MENU_GAP) + "px");
     } else {
       menu.style.setProperty("--acct-y", Math.round(rect.bottom + MENU_GAP) + "px");
+      // Колокольчик в углу страницы: окно растёт влево от правого края кнопки.
+      if (right) menu.style.setProperty("--acct-right", Math.max(8, Math.round(document.documentElement.clientWidth - rect.right)) + "px");
     }
   }
 
-  function setDots(unread) {
-    document.querySelectorAll(".bell__dot").forEach(function (d) { d.hidden = !unread; });
+  // Всё прочитано: значок с числом гаснет, подпись кнопки снова без «новых».
+  function clearBadges() {
+    document.querySelectorAll(".bell__badge").forEach(function (d) { d.hidden = true; });
+    bells().forEach(function (b) { if (b.dataset.labelNone) b.setAttribute("aria-label", b.dataset.labelNone); });
   }
 
   // Сессия кончилась: заслон уводит на вход, fetch проходит редирект молча и отдал бы
@@ -110,7 +116,7 @@
       post(all.dataset.readAllUrl).then(function () {
         menu.querySelectorAll(".notif-row.is-unread").forEach(function (r) { r.classList.remove("is-unread"); });
         all.hidden = true;
-        setDots(false);
+        clearBadges();
       });
       return;
     }

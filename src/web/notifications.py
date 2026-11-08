@@ -69,9 +69,11 @@ _BASE = "/settings/notifications"
 
 @dataclass(frozen=True)
 class State:
-    """Что рисует оболочка страницы: горит ли колокольчик и на каких разделах точки."""
+    """Что рисует оболочка страницы: число на колокольчике и разделы с красной точкой."""
 
     unread: bool = False
+    #: Число для значка на колокольчике; список читается с пределом, поэтому сверху оно «много».
+    count: int = 0
     sections: frozenset[str] = frozenset()
 
 
@@ -124,7 +126,7 @@ def _compute(user: str, *, may_mark: bool = True) -> State:
     sections = frozenset(
         section for section in (SECTION_OF_KIND.get(row.kind) for row in rows) if section
     )
-    return State(unread=bool(rows), sections=sections)
+    return State(unread=bool(rows), count=len(rows), sections=sections)
 
 
 def state() -> State:

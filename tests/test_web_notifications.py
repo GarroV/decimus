@@ -163,7 +163,7 @@ def test_без_непрочитанного_точек_нет(клиент: Fla
 
     assert "data-bell" in страница
     assert "notif-dot" not in страница
-    assert 'class="bell__dot" aria-hidden="true" hidden' in страница
+    assert 'class="bell__badge" aria-hidden="true" hidden>0</span>' in страница
 
 
 def test_непрочитанное_зажигает_колокольчик_и_пункт_раздела(
@@ -173,12 +173,41 @@ def test_непрочитанное_зажигает_колокольчик_и_�
 
     страница = _страница(клиент)
 
-    assert 'class="bell__dot" aria-hidden="true">' in страница, "колокольчик без точки"
+    assert 'class="bell__badge" aria-hidden="true">1</span>' in страница, "колокольчик без числа"
     assert страница.count('class="notif-dot"') >= 1, "пункт «ОСБ» без точки"
-    assert "Уведомления: есть новые" in страница
+    assert "Уведомления: новых 1" in страница
     # Точка стоит именно на пункте «ОСБ», а не на соседних.
     пункт_осб = страница.split('href="/osb?lang=ru"')[1].split("</a>")[0]
     assert "notif-dot" in пункт_осб
+
+
+def test_число_на_колокольчике_равно_числу_непрочитанного(
+    клиент: FlaskClient, таблица: Двойник
+) -> None:
+    таблица.строки[СВОЙ] = [_строка(i, "rx_requested", f"/osb?id={i}") for i in (1, 2, 3)]
+
+    страница = _страница(клиент)
+
+    assert 'class="bell__badge" aria-hidden="true">3</span>' in страница
+    assert "Уведомления: новых 3" in страница
+
+
+def test_много_непрочитанного_показано_как_99_с_плюсом(
+    клиент: FlaskClient, таблица: Двойник
+) -> None:
+    таблица.строки[СВОЙ] = [_строка(i, "rx_requested", f"/osb?id={i}") for i in range(1, 121)]
+
+    assert 'class="bell__badge" aria-hidden="true">99+</span>' in _страница(клиент)
+
+
+def test_колокольчик_в_углу_страницы_а_не_в_левой_панели(клиент: FlaskClient) -> None:
+    страница = _страница(клиент)
+    панель = страница.split('<nav class="sidenav', 1)[1].split('class="page-bell"', 1)[0]
+
+    assert "data-bell" not in панель, "колокольчик остался в левой панели"
+    assert 'class="page-bell"' in страница
+    assert 'data-place="right"' in страница
+    assert 'data-place="down"' in страница, "в полосе телефона колокольчика нет"
 
 
 def test_точка_чужого_уведомления_не_горит(клиент: FlaskClient, таблица: Двойник) -> None:
