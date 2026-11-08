@@ -46,6 +46,7 @@ from flask import render_template, request, url_for
 
 from src.db import mcp_access, ratings_read
 from src.db.errors import DbError
+from src.domain import features
 from src.domain.tenants import HQ_TENANT
 from src.ratings import report
 
@@ -211,6 +212,9 @@ def render(
         dates=(period.start, period.end),
         dates_before=(before.start, before.end) if before else None,
     )
+    # D728: пиццерии «куда смотреть» в карточке «Требует внимания» — по настройке сети.
+    if not features.home_attention_units_enabled():
+        snapshot = replace(snapshot, attention=())
 
     def select(**изменения: str) -> str:
         """Адрес главной с изменённым срезом; пустое и умолчания из адреса выпадают."""

@@ -28,6 +28,7 @@ from .users_view import (
     TAB_CONNECTIONS,
     TAB_COUNTRIES,
     TAB_DODOIS,
+    TAB_HOME,
     TAB_JOURNAL,
     TAB_KEYS,
     TAB_MAILINGS,
@@ -98,6 +99,15 @@ def _sees_mailings(account: object) -> bool:
     )
 
 
+def _sees_home(account: object) -> bool:
+    """Те, у кого `service.settings`: главный админ и админ УК (D728)."""
+    return role_may(
+        str(getattr(account, "role", "") or ""),
+        str(getattr(account, "tenant", "") or ""),
+        "service.settings",
+    )
+
+
 @dataclass(frozen=True)
 class Tab:
     """Вкладка раздела: код (он же `?tab=`) и кому открыта."""
@@ -126,6 +136,8 @@ TABS: tuple[Tab, ...] = (
     Tab("aggregators", _sees_ratings),
     # Списки копий и шаблоны писем УК (D608, #1130): админ УК и главный админ.
     Tab(TAB_MAILINGS, _sees_mailings),
+    # Настройки главной: те же роли, что у переключателя экшн-планов (D728).
+    Tab(TAB_HOME, _sees_home),
     Tab(
         "plans",
         lambda account: role_may(
@@ -181,6 +193,7 @@ def install(app: Flask, conf: Settings) -> None:
         connections_screen,
         countries_screen,
         dodois_screen,
+        home_settings,
         journal_screen,
         mailings_screen,
         plan_archive,
@@ -193,6 +206,7 @@ def install(app: Flask, conf: Settings) -> None:
         return users_page.render(users_page.Show(tab=TAB_PEOPLE))
 
     plan_archive.install(app, conf.ui_lang)
+    home_settings.install(app, conf.ui_lang)
 
     def spaces() -> FlaskResponse | tuple[str, int]:
         return users_page.render(users_page.Show(tab=TAB_SPACES))
@@ -204,6 +218,7 @@ def install(app: Flask, conf: Settings) -> None:
         TAB_RATINGS: lambda: ratings.show_admin(conf),
         "aggregators": aggregators_admin.show,
         TAB_MAILINGS: lambda: mailings_screen.show(conf.ui_lang),
+        TAB_HOME: lambda: home_settings.show(conf.ui_lang),
         "plans": lambda: plan_archive.show(conf.ui_lang),
         TAB_JOURNAL: lambda: journal_screen.show_users(conf),
         TAB_USAGE: lambda: usage_screen.show(conf),
