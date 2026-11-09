@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -172,3 +173,15 @@ def test_раскрытия_карточки_одного_вида_с_шевро
 
     assert 'class="mx-more mx-more--card"' in страница  # «Версия чек-листа»
     assert "mx-more mx-more--card mx-more--explain" in страница
+
+
+def test_на_узком_экране_подписи_решений_не_усекаются() -> None:
+    """Подписи «Принять проверку / Исправить / Отклонить» — целиком: ни многоточия, ни nowrap."""
+    css = (Path(__file__).parent.parent / "src/web/static/decimus-web.css").read_text()
+    блок = css.split("@media (max-width: 560px) {", 1)[1].split("\n}\n", 1)[0]
+    правила = [r for r in блок.split("\n") if "hact__group--decide" in r]
+    assert правила, "правил узкого экрана для группы решений нет"
+    for правило in правила:
+        assert "text-overflow" not in правило and "nowrap" not in правило, правило
+    assert any("#accept" in r and "flex-basis: 100%" in r for r in правила)
+    assert any("height: 44px" in r for r in правила)
