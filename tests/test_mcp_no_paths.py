@@ -125,6 +125,19 @@ from src.mcp.errors import McpError
         "id": "00000000-0000-0000-0000-000000000001",
         "text": "письмо",
     },
+    "save_batch_letter": {
+        "ids": [
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+        ],
+        "text": "письмо",
+    },
+    "batch_letter": {
+        "ids": [
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+        ]
+    },
     "move_inspection": {
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "date": "2020-01-01",
@@ -317,6 +330,8 @@ from src.mcp.errors import McpError
     "import_edit_inspection": {"inspection_id": "не-uuid"},
     "move_inspection": {"inspection_id": "не-uuid", "reason": "x"},
     "save_inspection_letter": {"id": "не-uuid", "text": "x"},
+    "save_batch_letter": {"ids": ["не-uuid", "не-uuid-2"], "text": "x"},
+    "batch_letter": {"ids": ["не-uuid", "не-uuid-2"]},
     "list_action_plans": {"status": "не-статус"},
     "get_action_plan": {"request_id": "не-uuid"},
     "accept_action_plan": {"request_id": "не-uuid"},
@@ -643,12 +658,20 @@ def test_батарея_доходит_и_до_успешных_ответов(�
 
     # Инструменты плана без живой базы отвечают отказом окружения, а не JSON: их не считаем.
     # Так же — снятие кадров черновика загрузки (D627): без базы оно упирается в чтение черновика.
-    # И сохранение письма (D665): батарея зовёт его с несуществующей проверкой — отказ, не JSON.
+    # И сохранение письма (D665) и общее письмо (D739): батарея зовёт их с несуществующими
+    # проверками — отказ, не JSON.
     без_базы = sum(
         1
         for spec in TOOLS
         if spec.kind == KIND_PLAN
-        or spec.name in {"import_remove_photo", "import_clear_photos", "save_inspection_letter"}
+        or spec.name
+        in {
+            "import_remove_photo",
+            "import_clear_photos",
+            "save_inspection_letter",
+            "save_batch_letter",
+            "batch_letter",
+        }
     )
     assert len(успешные) >= len(TOOLS) - без_базы, "успешных ответов слишком мало для утверждения"
     assert any(версия for версия in версии), "ни одна правка не дошла до новой версии"

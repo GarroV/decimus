@@ -70,6 +70,7 @@ from . import (
     aggregators_actions,
     assets,
     auth,
+    batch_letter,
     calendar_screen,
     country_contacts_actions,
     country_filter,
@@ -251,6 +252,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_registry(app, conf)
     calendar_screen.install(app, conf)
     letter_draft.install(app, conf)
+    batch_letter.install(app, conf)
     actions_screen.install(app, conf)
     action_plans.install(app, conf)
     users_screen.install(app, conf)
@@ -1844,6 +1846,11 @@ def _card_context(
         levels=REVISE_LEVELS,
         report=отчёт,
         report_known=отчёт_известен,
+        batch_lines=batch_letter.card_lines(
+            inspection_id, detail.inspection.tenant_code, detail.inspection.unit_country, lang
+        )
+        if своя and not detail.inspection.on_review
+        else [],
         photos=кадры,
         photos_known=кадры_известны,
         info=поля,

@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.report.batch_letter import PLAN_DUE_DIFFERS_FIELD
 from src.report.letters import (
     BLANK_TEXT_FIELD,
     COVER_FIELDS,
@@ -196,6 +197,7 @@ _LETTER_CAVEATS = {
     FINDING_TEXT_FIELD: "letter.caveat.speech_lang",
     BLANK_TEXT_FIELD: "letter.caveat.blank",
     FEEDBACK_LANG_FIELD: "letter.caveat.feedback_lang",
+    PLAN_DUE_DIFFERS_FIELD: "batch.caveat.plan_due_differs",
 }
 
 #: Откуда взята методика письма → ключ подписи. Сборщик отвечает на это

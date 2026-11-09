@@ -23,6 +23,7 @@ from collections.abc import Mapping
 
 from .errors import WebTextError
 from .texts_administration import ADMINISTRATION_TEXTS
+from .texts_batch_letter import BATCH_LETTER_TEXTS
 from .texts_connections import CONNECTIONS_TEXTS
 from .texts_country import COUNTRY_TEXTS
 from .texts_country_contacts import CONTACT_TEXTS
@@ -2011,3 +2012,5 @@ def lang_or_default(lang: str | None, *, fallback: str) -> str:
 TEXTS.update(TIMELINE_TEXTS)
 
 TEXTS.update(CONTACT_TEXTS)
+
+TEXTS.update(BATCH_LETTER_TEXTS)

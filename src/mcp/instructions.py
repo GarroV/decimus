@@ -118,4 +118,7 @@ the partner's PDF and are not passed.
 rebuilt template. Rework it with the person; save_inspection_letter only after their \
 explicit "yes" on the final text. Then it shows in the site's inspection card and goes \
 to Gmail from there.
+- Joint letter: batch_letter (ids of accepted inspections, one country, at most 7 days \
+apart; show a refusal as is); save_batch_letter only after the person's explicit "yes". \
+Nothing is sent.
 """

@@ -30,6 +30,7 @@
 {% from "country/_head.html" import country_head, unit_head with context %}
 {% from "country/_mine.html" import mine_filter with context %}
 {% from "country/_settings.html" import settings_panel with context %}
+{% from "country/_batch.html" import batch_panel with context %}
 {% from "inspections/_row.html" import inspection_row with context %}
 {% from "inspections/_panel.html" import inspection_panel with context %}
 {% block title %}{{ t('section.country.title') }}{% endblock %}
@@ -38,6 +39,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-country.css') }}">
   <script src="{{ url_for('static', filename='country.js') }}" data-swap-safe defer></script>
+  <script src="{{ url_for('static', filename='letter.js') }}" data-swap-safe defer></script>
 {% endblock %}
 
 {% block pick_label %}{{ t('country.filter.title') }}{% endblock %}
@@ -193,6 +195,7 @@
 {% block pick_panel %}
   {% if reference %}{% include "country/_reference.html" %}
   {% elif settings_open %}{{ settings_panel(panel_settings) }}
+  {% elif batch %}{{ batch_panel(batch, view.code) }}
   {% elif card %}{{ inspection_panel(card) }}
   {% elif card_failed %}
     <div class="sdetail sdetail--hint">

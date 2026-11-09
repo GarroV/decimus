@@ -684,6 +684,25 @@ def inspection_letter(
     }
 
 
+def batch_letter(
+    *,
+    tenant: str,
+    ids: object,
+    lang: str | None = None,
+    fresh: bool = False,
+    template: int | None = None,
+) -> dict[str, object]:
+    """Общее письмо по нескольким проверкам одной страны (D739): тонкая обёртка.
+
+    Правило выбора и сборка — `src/report/batch_letter.py`, граница инструмента —
+    `src/mcp/batch_letter.py`; здесь только место обработчика инструмента проверок
+    (`tests/test_mcp_server.py`). Проверки не меняются, письмо никому не уходит.
+    """
+    from .batch_letter import batch_letter as handler
+
+    return handler(tenant=tenant, ids=ids, lang=lang, fresh=fresh, template=template)
+
+
 def findings_by_unit(*, tenant: str, unit: str, limit: int | None = None) -> dict[str, object]:
     """Записанные находки одной точки по всем её проверкам, свежие проверки первыми.
 

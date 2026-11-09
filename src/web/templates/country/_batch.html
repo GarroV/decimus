@@ -1,0 +1,140 @@
+{#
+  Панель «Общее письмо» экрана страны (D739). Два шага в одной панели, состояние в адресе:
+  без `ids` — выбор принятых проверок страны галочками (свежие сверху), с `ids` — окно письма
+  по выбранным, устроенное как окно одиночного письма (`inspections/_letter_form.html`:
+  те же классы `lt*`, тот же редактор `letter.js`). Данные — `src/web/batch_letter.py`; письмо
+  собрано кодом (`src/report/batch_letter.py`), шаблон только показывает.
+  Сохранение и черновик — обычные отправки формы (страница перезагружается с открытой панелью).
+#}
+{% macro batch_panel(b, code) %}
+  {% set base = select_url(batch='1', inspection='', settings='', saved='', reference='') %}
+  {% if b.failure %}
+    <div class="note note--error"><div><div class="note__title">{{ t('batch.failed.title') }}</div><div class="note__text">{{ b.failure }}</div></div></div>
+  {% endif %}
+  {% if b.refusal %}
+    <div class="note note--warn" role="alert"><div><div class="note__title">{{ t('batch.refused.title') }}</div><div class="note__text">{{ b.refusal }}</div></div></div>
+  {% endif %}
+
+  {% if not b.letter %}
+    {# ── Шаг 1: выбор проверок ── #}
+    <form method="get" action="{{ url('/country/' ~ code) }}" class="lt-pick">
+      <input type="hidden" name="batch" value="1">
+      <input type="hidden" name="lang" value="{{ lang }}">
+      <p class="pk-note">{{ t('batch.pick.lead', n=b.max_days) }}</p>
+      {% if b.candidates %}
+        <ul class="slist__rows">
+          {% for c in b.candidates %}
+            <li class="srow">
+              <label class="srow__main">
+                <input type="checkbox" name="ids" value="{{ c.row.id }}"{% if c.checked %} checked{% endif %}>
+                <span class="srow__title">{{ c.row.unit_name }}</span>
+                <span class="srow__meta">{{ day(c.row.inspection_date) }} · {{ c.row.pct }}{{ t('card.score.unit') }} · {{ c.row.grade }}</span>
+              </label>
+            </li>
+          {% endfor %}
+        </ul>
+        <div class="lt__actions"><button class="btn btn--primary" type="submit">{{ t('batch.pick.submit') }}</button></div>
+      {% else %}
+        <p class="pk-empty pk-empty--pad">{{ t('batch.pick.empty') }}</p>
+      {% endif %}
+    </form>
+  {% else %}
+    {# ── Шаг 2: окно письма ── #}
+    {% set L = b.letter %}
+    {% set right = b.editing %}
+    {% set template_q = ('&letter_template=' ~ b.letter_template) if b.letter_template_explicit else '' %}
+    {% set here = base ~ '&ids=' ~ b.ids_csv %}
+    <form class="lt lt--panel" method="post"{% if b.own %} action="{{ url('/country/' ~ code ~ '/batch-letter/save') }}?lang={{ lang }}"{% endif %}>
+      <div class="lt__head">
+        <div class="lt__title">
+          <h2 class="lt__name">{{ t('batch.letter.title') }}</h2>
+          <div class="lt__meta">
+            <span>{{ t('batch.letter.units', n=L.units|length) }}: {{ L.units|join(', ') }}</span>
+            <span>{{ t('batch.letter.due') }}: {{ L.plan_due }}</span>
+          </div>
+        </div>
+        <div class="lt__lang" title="{{ t('letter.lang.note') }}">
+          <span class="lt__lang-label">{{ t('letter.meta.lang') }}</span>
+          <select class="pickselect" data-pick-nav aria-label="{{ t('letter.lang.pick') }}" data-drawer-open>
+            {% for l in b.letter_langs %}
+              <option value="{{ here }}&letter_lang={{ l }}{{ template_q }}"{% if l == b.letter_lang %} selected{% endif %}>{{ l|upper }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="lt__lang" title="{{ t('letter.template.note') }}">
+          <span class="lt__lang-label">{{ t('letter.template.label') }}</span>
+          <select class="pickselect" data-pick-nav aria-label="{{ t('letter.template.pick') }}" data-drawer-open>
+            {% for n in b.letter_templates %}
+              <option value="{{ here }}&letter_lang={{ b.letter_lang }}&letter_template={{ n }}"{% if n == b.letter_template %} selected{% endif %}>{{ t('letter.template.option', n=n) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="lt__actions">
+          <a class="btn btn--ghost" href="{{ base }}">{{ t('batch.letter.change') }}</a>
+          {% if b.editing %}<a class="btn btn--ghost" href="{{ here }}&letter_lang={{ b.letter_lang }}{{ template_q }}&draft=1">{{ t('letter.draft.restore') }}</a>{% endif %}
+          {% if b.own %}
+            <button class="btn" type="submit" formaction="{{ url('/country/' ~ code ~ '/batch-letter/draft') }}?lang={{ lang }}">{{ t('letter.gmail.submit') }}</button>
+            <button class="btn btn--primary" type="submit">{{ t('letter.save.submit') }}</button>
+          {% endif %}
+        </div>
+      </div>
+
+      {% set outcome = {
+        'ok': ('ok', t('letter.gmail.ok')), 'denied': ('warn', t('letter.gmail.denied')),
+        'unavailable': ('warn', t('letter.gmail.unavailable')), 'failed': ('warn', t('letter.gmail.failed')),
+        'pdf_failed': ('warn', t('letter.gmail.pdf_failed')), 'wrong_account': ('warn', t('letter.gmail.wrong_account')),
+        'refused': ('warn', t('batch.save.refused')),
+      }.get(b.gmail_outcome) %}
+      <div class="lt__notes">
+        {% if outcome %}<p class="note note--{{ outcome[0] }}">{{ outcome[1] }}</p>{% endif %}
+        {% if b.save_outcome == 'ok' %}<p class="note note--ok">{{ t('letter.save.ok') }}</p>
+        {% elif b.save_outcome == 'failed' %}<p class="note note--warn">{{ t('letter.save.failed') }}</p>
+        {% elif b.save_outcome == 'refused' %}<p class="note note--warn">{{ t('batch.save.refused') }}</p>{% endif %}
+        {% if b.partners_differ %}<p class="note note--warn">{{ t('batch.partners.differ', names=L.partners|join(', ')) }}</p>{% endif %}
+        {% if not L.ready_to_send %}
+          <div class="note note--warn"><div>
+            <div class="note__title">{{ t('letter.caveats.title') }}</div>
+            <div class="note__text">{{ t('letter.caveats.lead') }}</div>
+            <ul class="note__list">
+              {% for word, us in b.caveat_rows %}<li>{{ word }}{% if us %} ({{ us|join(', ') }}){% endif %}</li>{% endfor %}
+            </ul>
+          </div></div>
+        {% endif %}
+        {% if b.saved and b.show_draft %}<p class="note note--info">{{ t('letter.draft.shown') }}</p>{% endif %}
+      </div>
+
+      <input type="hidden" name="ids" value="{{ b.ids_csv }}">
+      <input type="hidden" name="letter_lang" value="{{ b.letter_lang }}">
+      <div class="lt__body">
+        {% if b.own %}
+          <div class="lt__tools" role="toolbar" aria-label="{{ t('letter.format.toolbar') }}" data-letter-tools hidden>
+            <button class="lt__tool" type="button" data-cmd="bold" aria-pressed="false" title="{{ t('letter.format.bold') }}" aria-label="{{ t('letter.format.bold') }}"><b>{{ t('letter.format.bold.glyph') }}</b></button>
+            <button class="lt__tool" type="button" data-cmd="italic" aria-pressed="false" title="{{ t('letter.format.italic') }}" aria-label="{{ t('letter.format.italic') }}"><i>{{ t('letter.format.italic.glyph') }}</i></button>
+            <button class="lt__tool" type="button" data-cmd="strikeThrough" aria-pressed="false" title="{{ t('letter.format.strike') }}" aria-label="{{ t('letter.format.strike') }}"><s>{{ t('letter.format.strike.glyph') }}</s></button>
+            <button class="lt__tool lt__tool--wide" type="button" data-cmd="link" aria-pressed="false" title="{{ t('letter.format.link') }}">{{ t('letter.format.link') }}</button>
+            <span class="lt__linkbox" data-link-box hidden>
+              <input class="input lt__linkinput" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://…" aria-label="{{ t('letter.format.link.address') }}" data-link-input>
+              <button class="btn btn--sm" type="button" data-link-apply>{{ t('letter.format.link.apply') }}</button>
+              <button class="btn btn--sm btn--ghost" type="button" data-link-cancel>{{ t('letter.format.link.cancel') }}</button>
+            </span>
+            <span class="lt__toolnote" data-link-note data-select="{{ t('letter.format.link.select') }}" data-bad="{{ t('letter.format.link.bad') }}" role="status"></span>
+          </div>
+          <label class="lt__plain" data-letter-plain>
+            <span class="sr-only">{{ t('letter.edit.label') }}</span>
+            <textarea class="lt__text" id="letter-text" name="text" rows="24" spellcheck="true" lang="{{ b.letter_lang }}">{{ b.markup }}</textarea>
+          </label>
+          <div class="lt__text lt__rich" contenteditable="true" role="textbox" aria-multiline="true" aria-label="{{ t('letter.edit.label') }}" spellcheck="true" lang="{{ b.letter_lang }}" data-letter-editor data-field="letter-text" hidden>{{ letter_html(b.markup)|safe }}</div>
+        {% else %}
+          <div class="lt__text lt__rich" lang="{{ b.letter_lang }}">{{ letter_html(b.markup)|safe }}</div>
+        {% endif %}
+      </div>
+      <div class="lt__foot">
+        {% if L.ready_to_send %}<span><b class="lt__state lt__state--ok">{{ t('letter.ready.title') }}</b> {{ t('letter.ready.text') }}</span>{% endif %}
+        {% if not b.saved_known %}<span>{{ t('letter.saved.unknown') }}</span>
+        {% elif b.saved %}<span>{{ t('letter.saved.note', who=b.saved.saved_by, when=b.saved.created_at.strftime('%d.%m.%Y %H:%M')) }}</span>
+        {% else %}<span>{{ t('letter.saved.none') }}</span>{% endif %}
+        <span>{{ t('batch.letter.attach_note', n=L.units|length) }}</span>
+      </div>
+    </form>
+  {% endif %}
+{% endmacro %}

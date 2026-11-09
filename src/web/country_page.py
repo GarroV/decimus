@@ -48,10 +48,12 @@ from src.domain.tenants import HQ_TENANT
 from . import (
     action_plans,
     auth,
+    batch_letter,
     country_filter,
     country_settings,
     country_summary,
     country_units,
+    guard,
     home_ratings_block,
     inspection_timeline,
     prescriptions,
@@ -507,6 +509,13 @@ def _one_country(
         except DbError:
             reference_known = False
     card_open = bool(card is not None and card.explicit)
+    # Общее письмо (D739): панель справа по `?batch=1`; выбранные проверки — `ids`.
+    batch_open = (
+        bool(вид.code)
+        and request.args.get("batch") == "1"
+        and not (reference or settings_open or card_open)
+    )
+    batch = batch_letter.panel(вид.code, lang) if batch_open else None
     return {
         "view": вид,
         "data": data,
@@ -520,10 +529,15 @@ def _one_country(
         "rail_open": tuple(r for r in in_rail if not r.is_closed),
         "rail_closed": tuple(r for r in in_rail if r.is_closed),
         "rail_reach": _reach(units.rows),
-        "pick_open": bool(reference) or settings_open or card_open,
-        "pick_back": select(inspection="", settings="", saved="", reference=""),
+        "pick_open": bool(reference) or settings_open or card_open or batch_open,
+        "pick_back": select(inspection="", settings="", saved="", reference="", batch=""),
+        "batch": batch,
+        "batch_url": select(batch="1", inspection="", settings="", saved="", reference=""),
+        "can_batch": guard.may("inspection.letter"),
         "pick_title": (
-            t("contacts." + reference, lang)
+            t("batch.title", lang)
+            if batch_open
+            else t("contacts." + reference, lang)
             if reference
             else (
                 f"{t('country.settings.title', lang)} · {country_title(вид.code, lang)}"
@@ -537,7 +551,7 @@ def _one_country(
         "partner_reference_url": select(reference="partner", settings="", inspection=""),
         "mailing_reference_url": select(reference="mailing", settings="", inspection=""),
         "settings_open": settings_open,
-        "pick_wide": settings_open,
+        "pick_wide": settings_open or bool(batch and batch["ids"]),
         "panel_settings": (
             country_settings.load(
                 вид.code,

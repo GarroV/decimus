@@ -59,6 +59,7 @@ from src.mcp.catalogue import (
     "get_inspection",
     "findings_by_unit",
     "inspection_letter",
+    "batch_letter",
 }
 
 ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ = {
@@ -173,7 +174,7 @@ from src.mcp.catalogue import (
 ИМЕНА_ИНСТРУМЕНТОВ_ИСПРАВЛЕНИЯ = {"move_inspection"}
 
 #: Сохранение письма партнёру в проверку (D665): пишет, автор — из токена.
-ИМЕНА_ИНСТРУМЕНТОВ_ПИСЬМА = {"save_inspection_letter"}
+ИМЕНА_ИНСТРУМЕНТОВ_ПИСЬМА = {"save_inspection_letter", "save_batch_letter"}
 
 #: Электронный план исправлений (#1168, D620): чтение, вердикты УК, работа партнёра.
 ИМЕНА_ИНСТРУМЕНТОВ_ПЛАНА = {
@@ -260,7 +261,7 @@ def test_каталог_содержит_ровно_восемьдесят_ин�
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 80
+    assert len(TOOLS) == 82
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -460,7 +461,7 @@ def test_as_list_отдаёт_ровно_четыре_нужных_ключа_н
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 80
+    assert len(перечень) == 82
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema", "annotations"}
 

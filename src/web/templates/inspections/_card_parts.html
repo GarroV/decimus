@@ -116,6 +116,10 @@
           карточки — в реестре с открытым письмом: отдельной страницы письма нет. -#}
       {{ _link(registry_here(inspection=head.id, view='letter', lang=lang), 'mail', t('letter.open'), panel, short=t('card.act.letter'), drawer=panel) }}
     {% endif %}
+    {# Общее письмо (D739): строка со ссылкой на окно письма, в которое вошла проверка. #}
+    {% for line in c.batch_lines %}
+      {{ _link(line.href, 'mail', t('batch.card.line', date=line.date), panel, drawer=panel) }}
+    {% endfor %}
 
     {# Экшн-план: запрос открыт — ссылка на него; нет — УК запрашивает (D272).
        Без запроса и без права запросить кнопки нет (D217). #}

@@ -468,6 +468,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0127_maps_reviews.sql": (
         "sql1:77bd784a41f9835064ac40d1a30b9488c6a47b418cb6d1fd8bc9761f39656cc8"
     ),
+    "0128_batch_letters.sql": (
+        "sql1:d8e2926e741728d76d33ea8e7526a8e2efc7fcf587842738e858b09d45b40cbb"
+    ),
 }
 
 

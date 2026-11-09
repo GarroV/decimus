@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 224 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 226 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -115,6 +115,8 @@
 | `/calendar/trips/<trip_id>/steps/<step_id>/delete` | POST | `trip_step_delete` | `src/web/calendar_screen.py` |
 | `/country` | GET | `country_index` | `src/web/app.py` |
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
+| `/country/<code>/batch-letter/draft` | POST | `batch_letter_draft` | `src/web/batch_letter.py` |
+| `/country/<code>/batch-letter/save` | POST | `batch_letter_save` | `src/web/batch_letter.py` |
 | `/country/<code>/settings/contacts` | POST | `country_contact_save` | `src/web/country_contacts_actions.py` |
 | `/country/<code>/settings/contacts/<ident>/delete` | POST | `country_contact_delete` | `src/web/country_contacts_actions.py` |
 | `/country/<code>/settings/developer` | POST | `country_set_developer` | `src/web/country_settings.py` |
@@ -270,7 +272,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **80** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 6, letter — 1, move — 1, plan — 11, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **82** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 7, letter — 2, move — 1, plan — 11, ratings — 2, ratings_read — 4, retraction — 1).
 
 | Инструмент | Вид | Класс | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|---|
@@ -328,12 +330,14 @@
 | `import_set_info` | import | write | Record answers to information fields of a current-mode imported DRAFT (values = {code: answer}) | `src/mcp/import_info.py` |
 | `import_suggest_items` | import | read | Read-only: pick the checklist item, class and zone for ONE finding — the same pipeline as import_match_findings and the… | `src/mcp/import_suggest.py` |
 | `import_upload_photos` | import | write | Upload the photos attached to the chat to ONE imported draft | `src/mcp/import_photo_link.py` |
+| `batch_letter` | inspections | read | Read ONE joint partner letter for several recorded inspections of one country of the caller's space, as text for a… | `src/mcp/tools.py` |
 | `findings_by_unit` | inspections | read | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `get_inspection` | inspections | read | Read one recorded inspection of the caller's tenant in full: its header, the score breakdown (percentage, letter grade… | `src/mcp/tools.py` |
 | `inspection_letter` | inspections | read | Read the partner letter of one recorded inspection of the caller's tenant, as text for a human to paste into mail and… | `src/mcp/tools.py` |
 | `list_inspections` | inspections | read | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
 | `network_summary` | inspections | read | Summarize the caller's tenant network over a date range: how many inspections and units, total findings, the… | `src/mcp/tools.py` |
 | `unit_history` | inspections | read | These are our own on-site checklist inspections, not the Dodo ratings RS/RKO (those live in ratings_summary… | `src/mcp/tools.py` |
+| `save_batch_letter` | letter | write | Save the joint partner letter for several inspections of one country, the same way the Save button of the joint-letter… | `src/mcp/letter_save.py` |
 | `save_inspection_letter` | letter | write | Save the partner letter into one recorded inspection of the caller's space, the same way the Save button on the site… | `src/mcp/letter_save.py` |
 | `move_inspection` | move | write | Correct the date and/or the unit (pizzeria) of an inspection that is already accepted (or waiting for acceptance) — the… | `src/mcp/move.py` |
 | `accept_action_plan` | plan | write | Accept an action plan that waits for review: it goes to work and the partner is notified | `src/mcp/plans.py` |
@@ -628,6 +632,7 @@
 | `0125_dodois_invite_contour.sql` | — |
 | `0126_dodois_logins_delete.sql` | — |
 | `0127_maps_reviews.sql` | `maps.reviews`, `maps.reviews_sync` |
+| `0128_batch_letters.sql` | `batch_letters`, `batch_letter_inspections` |
 <!-- map:end -->
 
 ## Makefile
