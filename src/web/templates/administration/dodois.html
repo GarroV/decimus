@@ -91,7 +91,9 @@
               <span class="shealth__dot shealth__dot--{{ tone }} sdtile__dot" aria-hidden="true"></span>
               <b class="sdtile__code mono">{{ row.code }}</b>
               <small class="sdtile__name">{{ country_title(row.code) }}</small>
-              {% if row.code in dodois_cis_countries %}<small class="sdtile__note">{{ t('dodois.tile.contour.cis') }}</small>{% endif %}
+              {% if (login.contour if login is not none else ('cis' if row.code in dodois_cis_countries else 'intl')) == 'cis' %}<small class="sdtile__note">{{ t('dodois.tile.contour.cis') }}</small>{% endif %}
+              {#- За кем вход страны — видно сразу на плитке, без открытия панели. -#}
+              {% if login is not none %}{% set account = login.account_name or login.account_email %}<small class="sdtile__note sdtile__who" title="{{ account or '' }}">{% if login.source == 'import' %}{{ t('dodois.fact.owner') }}{% else %}{{ account or t('dodois.fact.unknown_account') }}{% endif %}</small>{% endif %}
               {% if login is none and latest is not none %}<small class="sdtile__note">{{ status|trim }}</small>{% endif %}
             </a>
           </li>
