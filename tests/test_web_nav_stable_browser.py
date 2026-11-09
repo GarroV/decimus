@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 import pytest
@@ -154,3 +155,63 @@ def test_ширина_содержимого_не_зависит_от_полос
     высокая = page.evaluate(ЗАМЕР)["main"]
 
     assert set(коротких.values()) == {высокая}, (коротких, высокая)
+
+
+def _метка(страница: Any) -> None:
+    """Метка на окне: пропадает, если страница перезагружена целиком."""
+    страница.evaluate("window.__same_document = 1")
+
+
+def _тот_же_документ(страница: Any) -> bool:
+    return bool(страница.evaluate("window.__same_document === 1"))
+
+
+def test_вход_в_рейтинги_без_перезагрузки_страницы(page: Any) -> None:
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _выбор(page, collapsed="false", ratings="true")
+    _открыть(page, "/settings")
+    _метка(page)
+
+    page.click("#ratings-navigation a[href^='/ratings/rko']")
+    page.wait_for_selector(".rt[data-rt-section='rko']")
+    assert _тот_же_документ(page)
+    assert page.evaluate(ЗАМЕР)["nav"] == 216
+
+    page.click("#ratings-navigation a[href^='/ratings/maps']")
+    page.wait_for_selector(".rt[data-rt-section='maps']")
+    assert _тот_же_документ(page)
+    assert page.url.split("?")[0].endswith("/ratings/maps")
+
+    page.click("#ratings-navigation a[href^='/ratings/rs']")
+    page.wait_for_selector(".rt[data-rt-section='rs']")
+    assert _тот_же_документ(page)
+    page.click("#ratings-navigation a[href^='/ratings/rko']")
+    page.wait_for_selector(".rt[data-rt-section='rko']")
+    assert _тот_же_документ(page)
+    page.go_back()
+    page.wait_for_selector(".rt[data-rt-section='rs']")
+    assert _тот_же_документ(page)
+
+
+@pytest.mark.parametrize(
+    ("выбор", "ширина_панели"),
+    [({"collapsed": "true"}, 56), ({"collapsed": "false", "ratings": "true"}, 216)],
+)
+def test_первый_кадр_уже_с_нужной_панелью(
+    page: Any, выбор: dict[str, str], ширина_панели: int
+) -> None:
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _выбор(page, **выбор)
+    page.add_init_script(
+        """(()=>{window.__first=null;function f(){const n=document.querySelector('.shell__nav'),
+        m=document.querySelector('.shell__main'),c=document.querySelector('.sidenav__branch-clip');
+        if(n&&m&&!window.__first){window.__first={nav:Math.round(n.getBoundingClientRect().width),
+        left:Math.round(m.getBoundingClientRect().left),clip:Math.round(c.getBoundingClientRect().height)};}
+        else if(!window.__first)requestAnimationFrame(f);}requestAnimationFrame(f);})()"""
+    )
+    page.goto(f"{ХОСТ}/ratings/rs?lang=ru")
+    page.wait_for_function("window.__first !== null")
+
+    первый = page.evaluate("window.__first")
+    assert (первый["nav"], первый["left"]) == (ширина_панели, ширина_панели), первый
+    assert (первый["clip"] > 0) == (ширина_панели == 216), первый
