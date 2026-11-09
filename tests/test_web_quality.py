@@ -177,6 +177,29 @@ def test_country_page_shows_all_blocks_and_core_numbers(ук: FlaskClient) -> No
     assert "Приложение" in html  # источник заказа переведён, а не «MobileApp»
 
 
+def test_periods_block_falls_back_to_stored_scores_when_dodois_has_none(
+    ук: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1604: периодов Dodo IS нет, а РКО и РС в таблице есть (из `ratings.scores`) — блок
+    «Периоды» показывает те же записанные оценки, статус публикации — как записан."""
+    wk = (date(2026, 9, 7), date(2026, 9, 13))
+    rows = (
+        quality_read.PeriodScore(PL1, "Warsaw-1", "PL", "rko", D("90"), 5, None, *wk, "calculated"),
+        quality_read.PeriodScore(PL2, "Krakow-1", "PL", "rko", D("80"), 5, None, *wk, "calculated"),
+        quality_read.PeriodScore(
+            PL1, "Warsaw-1", "PL", "rs", D("92"), None, None,
+            date(2026, 8, 31), date(2026, 9, 13), "published",
+        ),
+    )  # fmt: skip
+    monkeypatch.setattr(quality_read, "period_scores", lambda countries, month: rows)
+    html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
+    block = html.split("Периоды РКО и РС", 1)[1]
+    assert "07.09–13.09" in block and "31.08–13.09" in block
+    assert "<td>РКО, неделя</td>" in block and "<td>РС</td>" in block
+    assert "85.0" in block  # средняя двух пиццерий за неделю: (90 + 80) / 2 — записанные значения
+    assert "опубликовано" in block and "предварительно" in block.lower()
+
+
 def test_country_without_dodois_says_it_is_not_connected(ук: FlaskClient) -> None:
     html = ук.get("/quality?country=BG&month=2026-09").get_data(as_text=True)
     assert "страна не подключена" in html

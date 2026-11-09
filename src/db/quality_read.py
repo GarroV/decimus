@@ -33,11 +33,17 @@ class PeriodScore:
     collected: int | None
     #: Число проверок, которое принёс сам рейтинг (`checkups_count`); `None` — не принёс.
     checkups: int | None
+    #: Границы периода и статус публикации оценки — для строки «Периоды РКО и РС», когда
+    #: периодов из Dodo IS нет (#1604); `None` — источник их не принёс.
+    begin_on: date | None = None
+    end_on: date | None = None
+    status: str | None = None
 
 
 _SCORES_SQL = (
     "select s.unit_dodo_id, u.name, u.country_code, p.rating_type, s.score, "
-    "c.restaurant_reports + c.delivery_reports, s.checkups_count "
+    "c.restaurant_reports + c.delivery_reports, s.checkups_count, "
+    "p.begin_on, p.end_on, s.status "
     "from ratings.scores s join ratings.periods p on p.id = s.period_id "
     "join ratings.units u on u.dodo_id = s.unit_dodo_id "
     "left join ratings.collection c "
@@ -69,6 +75,9 @@ def period_scores(countries: Sequence[str], month: date) -> tuple[PeriodScore, .
             Decimal(r[4]),
             None if r[5] is None else int(r[5]),
             None if r[6] is None else int(r[6]),
+            r[7],
+            r[8],
+            r[9],
         )
         for r in rows
     )
