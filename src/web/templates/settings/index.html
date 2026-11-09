@@ -29,8 +29,8 @@
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
-  <script src="{{ url_for('static', filename='split.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='settings.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='split.js') }}" data-swap-safe defer></script>
+  <script src="{{ url_for('static', filename='settings.js') }}" data-swap-safe defer></script>
 {% endblock %}
 {% block page_class %} page--settings{% endblock %}
 {% block body %}

@@ -129,7 +129,12 @@
   });
 
   // «Назад» браузера: адрес уже сменился — панель приводится к нему.
+  // Шаг между разделами (другой путь, чем у показанной страницы) ведёт `nav.js`:
+  // сюда он не относится, а запрос панели с чужой страницы кончился бы перезагрузкой.
   window.addEventListener("popstate", function () {
+    var shown = document.documentElement.dataset.navPath;
+    if (shown && shown !== window.location.pathname) return;
+    if (!document.querySelector(".split, .pk-shell")) return;
     openDrawer(window.location.href, false);
   });
 
@@ -240,7 +245,8 @@
 
   function bind(root) {
     if (window.LetterEditor) window.LetterEditor.init(root);
-    root.querySelectorAll("form[data-autosubmit]").forEach(function (form) {
+    root.querySelectorAll("form[data-autosubmit]:not([data-split-ready])").forEach(function (form) {
+      form.setAttribute("data-split-ready", "");
       var button = form.querySelector("[data-autosubmit-button]");
       if (button) button.hidden = true;
       form.addEventListener("change", function (e) {
@@ -248,9 +254,10 @@
       });
     });
 
-    root.querySelectorAll("[data-copy]").forEach(function (button) {
+    root.querySelectorAll("[data-copy]:not([data-split-ready])").forEach(function (button) {
       var source = document.querySelector(button.dataset.copy);
       if (!source || !navigator.clipboard) return;
+      button.setAttribute("data-split-ready", "");
       button.hidden = false;
       button.addEventListener("click", function () {
         navigator.clipboard.writeText(source.textContent.trim()).then(function () {
@@ -259,9 +266,10 @@
       });
     });
 
-    root.querySelectorAll("form[data-role-by-space]").forEach(function (form) {
+    root.querySelectorAll("form[data-role-by-space]:not([data-split-ready])").forEach(function (form) {
       var select = form.querySelector("[data-space-select]");
       if (!select) return;
+      form.setAttribute("data-split-ready", "");
       function narrow() {
         var first = null;
         form.querySelectorAll(".srole[data-spaces]").forEach(function (label) {
@@ -280,4 +288,7 @@
   }
 
   bind(document);
+  // Экран, пришедший переходом `nav.js` без перезагрузки, получает свою разметку после
+  // загрузки скрипта: элементы подключаются заново (уже подключённые помечены).
+  document.addEventListener("decimus:navigation", function () { bind(document); });
 })();

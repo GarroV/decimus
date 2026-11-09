@@ -15,7 +15,7 @@
 {% block title %}{{ t('section.training.title') }}{% endblock %}
 {% block pick_assets %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-training.css') }}">
-  <script src="{{ url_for('static', filename='country.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='country.js') }}" data-swap-safe defer></script>
 {% endblock %}
 
 {% block pick_label %}{{ t('training.filter.title') }}{% endblock %}

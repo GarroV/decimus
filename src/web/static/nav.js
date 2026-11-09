@@ -7,6 +7,9 @@
 // Не загрузился скрипт, ответ не 200, сервер увёл на вход — обычный переход:
 // ссылки остаются ссылками.
 //
+// Каждый переход между разделами — подмена, перезагрузка остаётся только для
+// экрана со скриптом в `<head>` без метки `data-swap-safe` (см. ниже).
+//
 // Скрипты экрана (`<script>` внутри `<main>`, сейчас это `methodology.js`)
 // грузятся один раз. При повторном приходе на экран скрипт не запускается
 // заново — иначе его клавиши сработали бы дважды, — а получает событие
@@ -16,7 +19,7 @@
   "use strict";
   if (!window.fetch || !window.DOMParser || !history.pushState) return;
 
-  var LINKS = ".sidenav__list a, .sidenav__brand, .mbar__brand, .tabbar a";
+  var LINKS = ".sidenav__list a, .sidenav__gear, .sidenav__brand, .mbar__brand, .tabbar a";
   var root = document.documentElement;
   // Скрипты экрана, уже выполненные на этой странице. Список, а не поиск
   // тега: тег уходит вместе со старым `<main>`, а скрипт остаётся в памяти.
@@ -80,23 +83,17 @@
     return Promise.all(waits);
   }
 
-  // Скрипты экрана в `<head>` (блок `head`: `split.js` реестра и «Пользователей»,
-  // `decimus-rt.js` «Рейтингов») ищут свои элементы при загрузке, а `<head>`
-  // при переходе не меняется: экран приходил без них, и строки, отборы,
-  // кнопки молчали до перезагрузки (#664). Такой экран открывается обычным
-  // переходом. Скрипты оболочки (`data-shell` в `base.html`) общие для всех
-  // экранов и работают через события документа — они переход не ломают.
-  // Исключение — скрипт «Рейтингов»: он сам делает переходы внутри раздела и не требует
-  // загрузки до разметки, поэтому его подгружаем здесь, как скрипты `<main>`. Иначе вход в
-  // «Рейтинги» был полной перезагрузкой страницы — единственной среди разделов.
-  var SWAP_SAFE_HEAD = /\/decimus-rt\.js(\?|$)/;
-  function pageHeadScripts(doc) {
-    return Array.prototype.filter.call(doc.querySelectorAll("head script[src]:not([data-shell])"), function (s) {
-      return !SWAP_SAFE_HEAD.test(s.getAttribute("src"));
-    });
-  }
+  // Скрипты экрана в `<head>` (блок `head`: `split.js`, `proofread.js`, `country.js`,
+  // `decimus-rt.js`…) раньше искали свои элементы один раз при загрузке, а `<head>`
+  // при переходе не меняется: экран приходил без них, и строки, отборы, кнопки
+  // молчали до перезагрузки (#664). Теперь скрипт, который сам подключается
+  // заново на событие `decimus:navigation` (и вешает слушатели документа один раз),
+  // помечается в шаблоне `data-swap-safe`: его подгружает `loadHeadScripts`, а переход
+  // остаётся подменой. Скрипт без метки — по-прежнему обычный переход.
+  // Скрипты оболочки (`data-shell` в `base.html`) общие для всех экранов и работают
+  // через события документа — они переход не ломают.
   function hasPageHeadScripts(doc) {
-    return pageHeadScripts(doc).length > 0;
+    return doc.querySelectorAll("head script[src]:not([data-shell]):not([data-swap-safe])").length > 0;
   }
   function loadHeadScripts(doc) {
     doc.querySelectorAll("head script[src]:not([data-shell])").forEach(function (old) {
@@ -121,6 +118,7 @@
     sameAll(doc, ".sidenav__list");
     var newList = document.querySelector(".sidenav__list");
     if (newList) newList.scrollTop = menuScroll;
+    sameAll(doc, ".sidenav__gear");
     sameAll(doc, ".tabbar");
     sameAll(doc, ".sidenav__search");
     sameAll(doc, "[data-bell]");

@@ -37,7 +37,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-country.css') }}">
-  <script src="{{ url_for('static', filename='country.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='country.js') }}" data-swap-safe defer></script>
 {% endblock %}
 
 {% block pick_label %}{{ t('country.filter.title') }}{% endblock %}

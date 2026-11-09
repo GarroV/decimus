@@ -22,7 +22,7 @@
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   {% block split_assets %}{% endblock %}
-  <script src="{{ url_for('static', filename='split.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='split.js') }}" data-swap-safe defer></script>
 {% endblock %}
 {% block page_class %} page--split{% endblock %}
 {% block body %}

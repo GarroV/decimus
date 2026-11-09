@@ -29,7 +29,7 @@
       </div>
 </header>{% endblock %}
 
-{% block pick_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-actions.css') }}"><script src="{{ url_for('static', filename='actions.js') }}" defer></script>{% endblock %}
+{% block pick_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-actions.css') }}"><script src="{{ url_for('static', filename='actions.js') }}" data-swap-safe defer></script>{% endblock %}
 {% block pick_label %}{{ t('actions.country') }}{% endblock %}
 {% block pick_rail_mod %} pk-rail--select{% endblock %}
 {% block pick_tools %}{{ country_select() }}{% endblock %}
