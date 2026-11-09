@@ -25,7 +25,7 @@ from src.domain.dodois import Invite, Login
 ПАРА = TokenPair("access-AAAA-secret", "refresh-BBBB-secret", 86400, "openid sales")
 
 
-def _ссылка(страна: str = "SI") -> Invite:
+def _ссылка(страна: str = "SI", контур: str = rules.INTL) -> Invite:
     сейчас = datetime.now(UTC)
     return Invite(
         id=7,
@@ -39,6 +39,7 @@ def _ссылка(страна: str = "SI") -> Invite:
         issued_by_id="22222222-2222-2222-2222-222222222222",
         issued_by_role="superadmin",
         issued_by_tenant="HQ",
+        contour=контур,
     )
 
 
@@ -384,3 +385,33 @@ def test_осиротевший_поток_не_опрашивает_и_не_п�
     устройство = DeviceStart(КОД_УСТРОЙСТВА, "ABCD-1234", "https://auth.dodois.com/d", 300, 5)
     flow._run(вход, КЛЮЧИ, устройство)
     assert мир["вход"] == [] and мир["ответы_опроса"] == [ПАРА], "осиротевший поток опросил Dodo IS"
+
+
+@pytest.mark.parametrize(
+    ("страна", "контур"),
+    [("KG", rules.CIS), ("TJ", rules.CIS), ("BG", rules.INTL), ("SI", rules.INTL)],
+)
+def test_вход_страны_идёт_на_её_контур_от_старта_до_записи(
+    мир: dict[str, Any], monkeypatch: pytest.MonkeyPatch, страна: str, контур: str
+) -> None:
+    # Сломанная копия: `flow` берёт `rules.INTL` вместо `invite.contour` — `.io` не достигается.
+    ходили: list[str] = []
+    monkeypatch.setattr(
+        client,
+        "start_device",
+        lambda _c, контур_: (
+            ходили.append(контур_)
+            or DeviceStart(КОД_УСТРОЙСТВА, "ABCD-1234", "https://auth.dodois.io/device", 300, 5)
+        ),
+    )
+    monkeypatch.setattr(
+        client, "poll_device", lambda _c, контур_, _d: ходили.append(контур_) or ПАРА
+    )
+    monkeypatch.setattr(
+        client, "userinfo", lambda контур_, _a: ходили.append(контур_) or ("A", "a@x.io")
+    )
+    вход = _начать(мир, _ссылка(страна, контур))
+    flow.poll_once(вход, КЛЮЧИ, interval=5)
+    assert вход.state == flow.DONE
+    assert ходили == [контур] * 3
+    assert мир["вход"][0]["contour"] == контур

@@ -35,6 +35,7 @@ from src.web import auth, dodois_connect
 СТРАНЫ = (
     ratings_read.CountryRow("SI", "Словения", "Slovenia", None, True),
     ratings_read.CountryRow("BG", "Болгария", "Bulgaria", None, True),
+    ratings_read.CountryRow("KG", "Кыргызстан", "Kyrgyzstan", None, True),
 )
 
 
@@ -60,6 +61,7 @@ class Ссылки:
             issued_by_id=поля["issued_by_id"],
             issued_by_role=поля["issued_by_role"],
             issued_by_tenant=поля["issued_by_tenant"],
+            contour=поля.get("contour", rules.INTL),
         )
         return номер
 
@@ -159,8 +161,8 @@ def чужой(monkeypatch: pytest.MonkeyPatch, вход: Вход) -> Iterator[
         yield клиент
 
 
-def _выдать(клиент: FlaskClient, страна: str = "SI") -> tuple[Any, str]:
-    ответ = клиент.post(ВЫДАЧА, data={"country": страна}, headers=ЗАГОЛОВКИ)
+def _выдать(клиент: FlaskClient, страна: str = "SI", контур: str = rules.INTL) -> tuple[Any, str]:
+    ответ = клиент.post(ВЫДАЧА, data={"country": страна, "contour": контур}, headers=ЗАГОЛОВКИ)
     найдено = re.search(r"/dodois/connect/([A-Za-z0-9_-]{43})", ответ.get_data(as_text=True))
     return ответ, найдено.group(1) if найдено else ""
 
@@ -340,7 +342,7 @@ def test_ссылка_показана_один_раз_и_не_попадает_
     for запись in двери["action_journal"]:
         assert токен not in str(запись), "токен ссылки попал в журнал действий"
     выдача = next(з for з in двери["action_journal"] if з["action"] == "dodois_invite_issue")
-    assert выдача["target"] == "country=SI; invite=1"
+    assert выдача["target"] == "country=SI; invite=1; contour=intl"
 
 
 def test_страна_только_из_реестра(
@@ -637,3 +639,34 @@ def test_ответ_действия_это_вкладка_dodois_а_не_под
         html,
     )
     assert 'class="sdrawer' in html, "после действия открыта панель этой страны"
+
+
+# --- контур выбирает выдавший (D729) -------------------------------------------------------
+
+
+def test_контур_ссылки_пишется_и_страница_ведёт_на_его_сервер(
+    стенд: tuple[FlaskClient, dict[str, list[Any]]], ссылки: Ссылки, чужой: FlaskClient
+) -> None:
+    # Сломанная копия: `issue` не передаёт `contour` в `create_invite` — ссылка уйдёт на `.com`.
+    ответ, токен = _выдать(стенд[0], "SI", rules.CIS)
+    assert ответ.status_code == 200
+    (ссылка,) = ссылки.ссылки.values()
+    assert ссылка.contour == rules.CIS
+    html = чужой.get(f"/dodois/connect/{токен}").get_data(as_text=True)
+    assert "Подтверждайте только на auth.dodois.io" in html
+
+
+def test_неизвестный_контур_отказ_и_ссылки_нет(
+    стенд: tuple[FlaskClient, dict[str, list[Any]]], ссылки: Ссылки
+) -> None:
+    ответ, токен = _выдать(стенд[0], "SI", "moon")
+    assert ответ.status_code == 400 and not токен and not ссылки.ссылки
+
+
+@pytest.mark.parametrize(("страна", "ожидаем"), [("KG", "cis"), ("SI", "intl")])
+def test_контур_в_форме_выбран_по_стране_по_умолчанию(
+    главный: FlaskClient, страна: str, ожидаем: str
+) -> None:
+    html = главный.get(f"{ВКЛАДКА}&country={страна}").get_data(as_text=True)
+    выбран = re.search(r'<option value="(\w+)" selected>', html)
+    assert выбран and выбран.group(1) == ожидаем

@@ -53,6 +53,24 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Открыто {open} из {total}",
         "en": "{open} of {total} open",
     },
+    "dodois.tile.contour.cis": {"ru": "контур СНГ", "en": "CIS contour"},
+    "dodois.contour.label": {"ru": "Контур Dodo IS", "en": "Dodo IS contour"},
+    "dodois.contour.intl": {"ru": "международный", "en": "international"},
+    "dodois.contour.cis": {"ru": "СНГ", "en": "CIS"},
+    "dodois.err.contour": {
+        "ru": "Выберите контур из списка.",
+        "en": "Pick a contour from the list.",
+    },
+    "dodois.reason.none_open": {
+        "ru": (
+            "Вход есть, но ни одна пиццерия не открыта. Возможно, страна лежит на другом "
+            "контуре Dodo IS: выдайте новую ссылку с другим контуром."
+        ),
+        "en": (
+            "Logged in, but no pizzeria is open. The country may live on the other Dodo IS "
+            "contour: issue a new link with the other contour."
+        ),
+    },
     "dodois.tile.unchecked": {"ru": "Ещё не проверялось", "en": "Not checked yet"},
     "dodois.state.ok": {"ru": "Работает", "en": "Working"},
     "dodois.state.partial": {"ru": "Открыто не всё", "en": "Not everything open"},
@@ -133,19 +151,27 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "dodois.invite.not_applied": {
-        "ru": "Новый вход не дал доступа ни к одной пиццерии — не применён. Учётка: {who}",
-        "en": "The new login gave access to no pizzeria and was not applied. Account: {who}",
+        "ru": (
+            "Новый вход не дал доступа ни к одной пиццерии — не применён "
+            "(возможно, другой контур Dodo IS). Учётка: {who}"
+        ),
+        "en": (
+            "The new login gave access to no pizzeria and was not applied "
+            "(maybe the other Dodo IS contour). Account: {who}"
+        ),
     },
     "dodois.page.not_applied": {
         "ru": (
             "Вход не применён: у этой учётки нет доступа ни к одной пиццерии страны. "
             "Прежний вход остался. Ссылка использована; попросите выдать новую и войдите "
-            "учёткой с доступом."
+            "учёткой с доступом. Если доступ у учётки есть, возможно, страна лежит на "
+            "другом контуре Dodo IS — выдающий выберет другой контур в новой ссылке."
         ),
         "en": (
             "The login was not applied: this account has access to no pizzeria in the country. "
             "The previous login is kept. The link is used; ask for a new one and sign in with "
-            "an account that has access."
+            "an account that has access. If the account does have access, the country may live "
+            "on the other Dodo IS contour: the issuer can pick it in the new link."
         ),
     },
     "dodois.link.title": {"ru": "Ссылка для {country}", "en": "Link for {country}"},
@@ -201,11 +227,11 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
     },
     "dodois.page.safe": {
         "ru": (
-            "Подтверждайте только на auth.dodois.com. Данные людей не "
+            "Подтверждайте только на {host}. Данные людей не "
             "запрашиваются, изменить в Dodo IS ничего нельзя."
         ),
         "en": (
-            "Confirm only on auth.dodois.com. No personal data is requested and "
+            "Confirm only on {host}. No personal data is requested and "
             "nothing can be changed in Dodo IS."
         ),
     },

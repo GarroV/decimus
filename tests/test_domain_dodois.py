@@ -129,7 +129,7 @@ def test_имена_записей_ключей_входа_строчные() ->
     [
         (10, 10, (rules.OK, None)),
         (10, 7, (rules.PARTIAL, None)),
-        (10, 0, (rules.PARTIAL, None)),
+        (10, 0, (rules.PARTIAL, "none_open")),
         (0, 0, (rules.FAILED, "no_units")),
     ],
 )
@@ -190,3 +190,20 @@ def test_истёкший_ключ_доступа_продлевается_в_л
 
 def test_вход_без_отметки_продления_продлевается_сразу() -> None:
     assert rules.refresh_due(None, None, _в(14))
+
+
+def test_кыргызстан_и_таджикистан_на_контуре_снг_остальные_на_международном() -> None:
+    assert (rules.contour_for("KG"), rules.contour_for("TJ")) == (rules.CIS, rules.CIS)
+    assert {rules.contour_for(c) for c in ("BG", "HR", "ME", "RS", "SI")} == {rules.INTL}
+
+
+def test_хосты_контура_снг_это_io() -> None:
+    assert rules.HOSTS[rules.CIS].auth == "https://auth.dodois.io"
+    assert rules.HOSTS[rules.CIS].api == "https://api.dodois.io"
+    assert rules.HOSTS[rules.INTL].api == "https://api.dodois.com"
+
+
+def test_ни_одна_пиццерия_не_открыта_подсказка_про_другой_контур() -> None:
+    # Сломанная копия: убрать ветку `open_ <= 0` — причина пропадёт, подсказки не будет.
+    assert rules.counts_state(10, 0) == (rules.PARTIAL, "none_open")
+    assert rules.counts_state(10, 1) == (rules.PARTIAL, None)

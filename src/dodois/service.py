@@ -63,7 +63,7 @@ def attach(
     source: str,
     invite_id: int | None,
     now: datetime | None = None,
-    contour: str = rules.INTL,
+    contour: str | None = None,
     account: tuple[str | None, str | None] | None = None,
     access_expires_at: datetime | None = None,
     verify: bool = True,
@@ -74,6 +74,7 @@ def attach(
     (перенесённый вход); `verify=False` — не проверять «открыто X из Y» сразу.
     """
     moment = now or datetime.now(UTC)
+    contour = contour or rules.contour_for(country)
     name, email = account if account is not None else client.userinfo(contour, pair.access)
     login = store.save_login(
         country=country,

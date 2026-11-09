@@ -624,6 +624,7 @@
 | `0122_session_acting_tenant.sql` | — |
 | `0123_session_peeks_table.sql` | `web_session_peeks` |
 | `0124_service_settings_home_attention.sql` | — |
+| `0125_dodois_invite_contour.sql` | — |
 <!-- map:end -->
 
 ## Makefile
