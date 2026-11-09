@@ -257,6 +257,14 @@ def test_foreign_country_is_404(ук: FlaskClient) -> None:
     assert ук.get("/quality?country=RU").status_code == 404
 
 
+def test_rko_month_rule_is_explained_under_the_question_mark(ук: FlaskClient) -> None:
+    ru = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
+    en = ук.get("/quality?country=PL&month=2026-09&lang=en").get_data(as_text=True)
+    assert "РКО за месяц — все недели (пн–вс), у которых хоть один день в этом месяце" in ru
+    assert "неделя на стыке входит в оба месяца" in ru
+    assert "RKO for a month — every week (Mon–Sun) with at least one day" in en
+
+
 def test_english_texts_exist(ук: FlaskClient) -> None:
     html = ук.get("/quality?country=PL&month=2026-09&lang=en").get_data(as_text=True)
     assert "Order source" in html and "Pizzerias" in html and "Revenue" in html

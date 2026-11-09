@@ -324,3 +324,31 @@ def test_в_счёт_проверок_не_попадают_номера_и_лю
     (итог,) = m.checkup_periods([_проверка("secret-id-42", А, "Standards", "Completed")])
 
     assert "secret-id-42" not in repr(итог)
+
+
+# --- D735: РКО за месяц — все недели, задевшие месяц -------------------------------------
+
+
+def test_rko_week_on_the_border_belongs_to_both_months() -> None:
+    week = (date(2026, 9, 28), date(2026, 10, 4))
+
+    assert m.rating_months("rko", *week) == [date(2026, 9, 1), date(2026, 10, 1)]
+    assert m.in_rating_month("rko", *week, date(2026, 9, 1))
+    assert m.in_rating_month("rko", *week, date(2026, 10, 1))
+    assert not m.in_rating_month("rko", *week, date(2026, 8, 1))
+    assert not m.in_rating_month("rko", *week, date(2026, 11, 1))
+
+
+def test_rko_week_inside_a_month_belongs_to_it_only() -> None:
+    week = (date(2026, 10, 5), date(2026, 10, 11))
+
+    assert m.rating_months("rko", *week) == [date(2026, 10, 1)]
+    assert not m.in_rating_month("rko", *week, date(2026, 9, 1))
+
+
+def test_rs_period_still_belongs_to_one_month() -> None:
+    rs = (date(2026, 9, 14), date(2026, 10, 4))
+
+    assert m.rating_months("rs", *rs) == [date(2026, 9, 1)]
+    assert m.in_rating_month("rs", *rs, date(2026, 9, 1))
+    assert not m.in_rating_month("rs", *rs, date(2026, 10, 1))
