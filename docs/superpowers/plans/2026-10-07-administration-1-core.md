@@ -27,7 +27,7 @@
 - **«Свои» = проверку занесла учётка этого человека** (`inspections.created_by = учётка`). Проверка без автора (старая, или занесённая без привязки бота) под «свои» не попадает никогда.
 - **Новая пишущая операция без кода в каталоге — дефект**, его ловят тесты полноты (Task 12 — веб, Task 13 — бот, Task 14 — MCP).
 - **Блок 1 не трогает**: экран «Администрирование» (блок 2), токен ↔ учётку, фильтр `tools/list`, отказ `forbidden`, уход `MCP_TOKENS`/`MCP_CHECKLIST_TENANTS`/`MCP_RETRACTION_TOKENS`/`BOT_MCP_OWNER_ID`, `mcp_admins`, `/mcp_add`/`/mcp_revoke`/`/mcp_who` (блок 3); снятие заведения пиццерии из бота (#527).
-- **Тесты базы — на тестовой базе MUSPELHEIM, не на Postgres Mac** (D212). `.env` рабочей копии ведёт `DATABASE_ADMIN_URL` на `127.0.0.1:55432` — это туннель `localhost:55432 → muspelheim:15432`. Перед прогоном: `nc -z 127.0.0.1 55432 && echo туннель-жив`; молчит — `launchctl kickstart -k gui/$(id -u)/io.garva.mac-stands-tunnel` и повтор. Переключаться молча на `localhost:5432` нельзя; без туннеля никак — спросить владельца.
+- **Тесты базы — на тестовой базе MUSPELHEIM, не на Postgres Mac** (D212). `.env` рабочей копии ведёт `DATABASE_ADMIN_URL` на локальный порт туннеля к тестовой базе (порт и служба туннеля — в `.env`). Перед прогоном: `nc -z 127.0.0.1 <порт туннеля> && echo туннель-жив`; молчит — поднять туннель и повторить. Переключаться молча на `localhost:5432` нельзя; без туннеля никак — спросить владельца.
 - **Между задачами весь набор тестов зелёный** (решение координатора по предполётной сверке 07.10.2026). Ни одна задача не оставляет «ожидаемо красное до Task N»: что ломает её изменение, она чинит сама, тем же коммитом. Перед пушем каждой задачи, которая трогает `src/db/web_access.py`, `src/web/` или `tests/web_harness.py`, — ещё `.venv/bin/pytest tests/test_web_*.py -q`.
 - **Точечный прогон** файла: `make test-honest ARGS="tests/<файл>.py -q -rs"` (цель экспортирует `DATABASE_URL`, `DATABASE_APP_PASSWORD`, `DATABASE_RETRACTION_PASSWORD` из `.env`). В выводе не должно быть строк `SKIPPED` у тестов с базой: пропуск = туннель или окружение, это не зелёный прогон.
 - **Полный прогон** перед сдачей: `make check` (ставит `AUDIT_REQUIRE_DATA=1`: пропуск тестов базы роняет прогон, #207) и `make regress`.
@@ -940,7 +940,7 @@ def test_смена_пространства_проверяет_охват_ро�
 
 - [ ] **Step 2: Прогнать — ожидается FAIL**
 
-Run: `nc -z 127.0.0.1 55432 && make test-honest ARGS="tests/test_db_roles_migration.py tests/test_db_migrate_roles.py -q -rs"`
+Run: `nc -z 127.0.0.1 <порт туннеля> && make test-honest ARGS="tests/test_db_roles_migration.py tests/test_db_migrate_roles.py -q -rs"`
 Expected: FAIL — `assert [] == ['0038_roles.sql']`, `relation "roles" does not exist`; в `test_db_migrate_roles.py` лишние таблицы в ожидании. Строк `SKIPPED` нет.
 
 - [ ] **Step 3: Минимальная реализация**
@@ -4269,7 +4269,7 @@ git push
 
 - [ ] **Step 2: Полный прогон**
 
-Run: `nc -z 127.0.0.1 55432 && echo туннель-жив && make check`
+Run: `nc -z 127.0.0.1 <порт туннеля> && echo туннель-жив && make check`
 Expected: `fmt lint types test dead bounds` зелёные; сторож полноты (`AUDIT_REQUIRE_DATA=1`) не жалуется на пропуски.
 
 - [ ] **Step 3: Регрессия движка**

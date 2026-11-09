@@ -29,8 +29,8 @@
 | `src/mcp/rpc.py:64` | `version("dodo-audit-service")` → `version("decimus")` |
 | `tests/test_db_stand.py:51` | `PROJECT = "dodo_audit_service-tests"` → `"decimus-tests"` |
 | `tests/test_bot_ui_lang.py:40` | `COMPOSE_PROJECT = "dodo_audit_service-tests"` → `"decimus-tests"` |
-| `~/.claude.json` | ключ `projects["/Users/garva/Documents/projects/dodo_audit_service"]` → переносится на новый путь |
-| `~/.claude/projects/-Users-garva-Documents-projects-dodo_audit_service/` | память Claude Code — переносится на новый слаг пути |
+| `~/.claude.json` | ключ `projects["<корень проектов>/dodo_audit_service"]` → переносится на новый путь |
+| `~/.claude/projects/-<корень-проектов>-dodo_audit_service/` | память Claude Code — переносится на новый слаг пути |
 | GitHub | репозиторий `GarroV/dodo_audit_service` → `GarroV/decimus` |
 | ~30 `git worktree` в `~/Documents/workbench/worktrees/dodo_audit_service-*` | удаляются (мёртвые остатки завершённой стройки, см. проверку ниже) |
 
@@ -49,7 +49,7 @@
 - [ ] **Step 1: Повторно снять список и подтвердить чистоту (страховка на случай, если что-то изменилось между планированием и исполнением)**
 
 ```bash
-for wt in $(git worktree list --porcelain | awk '/^worktree/{print $2}' | grep -v '^/Users/garva/Documents/projects/dodo_audit_service$'); do
+for wt in $(git worktree list --porcelain | awk '/^worktree/{print $2}' | grep -v '^<корень проектов>/dodo_audit_service$'); do
   branch=$(git -C "$wt" branch --show-current 2>/dev/null)
   dirty=$(git -C "$wt" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
   cherry=$(git cherry main "$branch" 2>/dev/null | grep -c '^+')
@@ -62,7 +62,7 @@ done
 - [ ] **Step 2: Удалить подтверждённо мёртвые worktree и их локальные ветки**
 
 ```bash
-for wt in $(git worktree list --porcelain | awk '/^worktree/{print $2}' | grep -v '^/Users/garva/Documents/projects/dodo_audit_service$'); do
+for wt in $(git worktree list --porcelain | awk '/^worktree/{print $2}' | grep -v '^<корень проектов>/dodo_audit_service$'); do
   branch=$(git -C "$wt" branch --show-current 2>/dev/null)
   git worktree remove "$wt"
   git branch -d "$branch" 2>/dev/null
@@ -76,7 +76,7 @@ git worktree prune
 git worktree list
 ```
 
-Ожидание: единственная строка — основная копия `/Users/garva/Documents/projects/dodo_audit_service`.
+Ожидание: единственная строка — основная копия `<корень проектов>/dodo_audit_service`.
 
 ---
 
@@ -116,8 +116,8 @@ curl -s -o /dev/null -w "%{http_code} -> %{redirect_url}\n" https://github.com/G
 Два конфига Claude Code ключуются АБСОЛЮТНЫМ путём к папке проекта. Без переноса они не потеряются физически, но станут недостижимы для будущих сессий в новой папке — это ровно то «незаметно потеряется», от которого просил застраховаться владелец.
 
 **Files:**
-- `~/.claude.json` — ключ `projects."/Users/garva/Documents/projects/dodo_audit_service"`
-- `~/.claude/projects/-Users-garva-Documents-projects-dodo-audit-service/` — память этого проекта (MEMORY.md и файлы памяти)
+- `~/.claude.json` — ключ `projects."<корень проектов>/dodo_audit_service"`
+- `~/.claude/projects/-<корень-проектов>-dodo-audit-service/` — память этого проекта (MEMORY.md и файлы памяти)
 
 - [ ] **Step 1: Бэкап `~/.claude.json` перед хирургией (файл общий на все проекты — ошибка здесь задевает не только этот)**
 
@@ -128,23 +128,23 @@ cp ~/.claude.json ~/.claude.json.bak-rename-decimus-$(date +%Y%m%d%H%M%S)
 - [ ] **Step 2: Перенести папку**
 
 ```bash
-mv /Users/garva/Documents/projects/dodo_audit_service /Users/garva/Documents/projects/decimus
+mv <корень проектов>/dodo_audit_service <корень проектов>/decimus
 ```
 
 - [ ] **Step 3: Перенести ключ проекта в `~/.claude.json` через jq — значение не печатается и не читается, переносится программно**
 
 ```bash
 jq '
-  .projects["/Users/garva/Documents/projects/decimus"] = .projects["/Users/garva/Documents/projects/dodo_audit_service"]
-  | del(.projects["/Users/garva/Documents/projects/dodo_audit_service"])
+  .projects["<корень проектов>/decimus"] = .projects["<корень проектов>/dodo_audit_service"]
+  | del(.projects["<корень проектов>/dodo_audit_service"])
 ' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 ```
 
 - [ ] **Step 4: Проверить перенос ключа (только наличие/отсутствие ключа, не значение)**
 
 ```bash
-jq -e '.projects["/Users/garva/Documents/projects/decimus"]' ~/.claude.json >/dev/null && echo "новый ключ есть"
-jq -e '.projects["/Users/garva/Documents/projects/dodo_audit_service"]' ~/.claude.json >/dev/null 2>&1 && echo "СТАРЫЙ КЛЮЧ ЕЩЁ ЕСТЬ — откатить" || echo "старый ключ убран, ок"
+jq -e '.projects["<корень проектов>/decimus"]' ~/.claude.json >/dev/null && echo "новый ключ есть"
+jq -e '.projects["<корень проектов>/dodo_audit_service"]' ~/.claude.json >/dev/null 2>&1 && echo "СТАРЫЙ КЛЮЧ ЕЩЁ ЕСТЬ — откатить" || echo "старый ключ убран, ок"
 ```
 
 Если старый ключ всё ещё есть — восстановить `~/.claude.json` из бэкапа Step 1 и не продолжать, пока jq-выражение не исправлено.
@@ -152,14 +152,14 @@ jq -e '.projects["/Users/garva/Documents/projects/dodo_audit_service"]' ~/.claud
 - [ ] **Step 5: Перенести директорию памяти на новый слаг пути**
 
 ```bash
-mv ~/.claude/projects/-Users-garva-Documents-projects-dodo-audit-service \
-   ~/.claude/projects/-Users-garva-Documents-projects-decimus
+mv ~/.claude/projects/-<корень-проектов>-dodo-audit-service \
+   ~/.claude/projects/-<корень-проектов>-decimus
 ```
 
 - [ ] **Step 6: Убедиться, что репозиторий в новой папке жив**
 
 ```bash
-cd /Users/garva/Documents/projects/decimus
+cd <корень проектов>/decimus
 git status
 git log -1 --oneline
 ```
@@ -254,7 +254,7 @@ COMPOSE_PROJECT = "decimus-tests"
 - [ ] **Step 1: Полный набор проверок проекта**
 
 ```bash
-cd /Users/garva/Documents/projects/decimus
+cd <корень проектов>/decimus
 make check
 ```
 
@@ -331,4 +331,4 @@ EOF
 
 - **Покрытие:** каждый файл из «Файлы, которые трогает план» закрыт задачей (Task 1–7); каждая явная граница («не трогается») повторена в Global Constraints и подтверждена в Task 7 Step 1.
 - **Плейсхолдеры:** команды и код везде конкретные, без TODO/TBD.
-- **Согласованность имён:** `decimus` (пакет), `decimus-tests` (тестовый compose-стенд), `GarroV/decimus` (репозиторий), `/Users/garva/Documents/projects/decimus` (папка) — использованы одинаково во всех задачах.
+- **Согласованность имён:** `decimus` (пакет), `decimus-tests` (тестовый compose-стенд), `GarroV/decimus` (репозиторий), `<корень проектов>/decimus` (папка) — использованы одинаково во всех задачах.

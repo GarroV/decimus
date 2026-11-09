@@ -54,7 +54,7 @@ make web-user ARGS="add director --tenant demo"   # пароль спросят 
 make web-user ARGS="list --tenant demo"
 make web-user ARGS="role director admin --tenant demo"   # первый админ стенда
 make web-user ARGS="password director --tenant demo"   # сменить пароль (T340)
-make web-user ARGS="email director director@dodobrands.io --tenant demo"   # почта для входа через Google
+make web-user ARGS="email director director@example.com --tenant demo"   # почта для входа через Google
 make web-user ARGS="email director --tenant demo"   # снять почту: вход через Google закрыт, пароль снова принимается
 make web-user ARGS="freeze director --tenant demo"   # заморозить: сессии, Claude и бот закрыты (D462)
 ```
