@@ -647,6 +647,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0122_session_acting_tenant.sql` | Переключатель пространств главного админа (D726): `web_sessions.acting_tenant` — в чьё пространство сессия сейчас смотрит |
 | `0123_session_peeks_table.sql` | Переключатель пространств (D726): состояние «в чьё пространство смотрит сессия» уходит из колонки `web_sessions.acting_tenant` (`0122`) в отдельную таблицу… |
 | `0124_service_settings_home_attention.sql` | Пиццерии в карточке «Требует внимания» на «Главной» (D728) включаются настройкой сети |
+| `0125_dodois_invite_contour.sql` | Контур Dodo IS приглашения (D729) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -857,7 +858,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 ## src/dodois — входы в Dodo IS по странам
 
 Вкладка «Dodo IS» в «Администрировании» (`docs/12-web-admin.md`, D640b, D641, #951): device flow
-`auth.dodois.com`, продление и проверка «открыто X из Y». Расписание — `src/bot/dodois_loader.py`,
+`auth.dodois.com` / `auth.dodois.io` (контур выбирается в ссылке, D729), продление и проверка «открыто X из Y». Расписание — `src/bot/dodois_loader.py`,
 правила — `src/domain/dodois.py`, база — `src/db/dodois_logins.py`, экраны — `src/web/dodois_screen.py`,
 `src/web/dodois_connect.py`.
 

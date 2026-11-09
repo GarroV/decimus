@@ -24,6 +24,7 @@ import psycopg
 
 from src.domain.dodois import (
     CONTOURS,
+    INTL,
     REASONS,
     RESULT_NOT_APPLIED,
     STATES,
@@ -52,7 +53,7 @@ _LOGIN_COLUMNS = (
 )
 _INVITE_COLUMNS = (
     "id, country, issued_by, issued_at, expires_at, used_at, revoked_at, token_hash, "
-    "issued_by_id::text, issued_by_role, issued_by_tenant, result, result_account"
+    "issued_by_id::text, issued_by_role, issued_by_tenant, result, result_account, contour"
 )
 
 _VAULT_UPSERT = """
@@ -318,6 +319,7 @@ def create_invite(
     issued_by_tenant: str,
     now: datetime,
     expires_at: datetime,
+    contour: str = INTL,
 ) -> int:
     """Записать ссылку (хэш токена); номер приглашения.
 
@@ -325,6 +327,8 @@ def create_invite(
     последняя, и невидимая живая ссылка была бы неотзываемой (D651).
     """
     vault_names(country)
+    if contour not in CONTOURS:
+        raise ValueError("Неизвестный контур Dodo IS")
     try:
         with _managing() as conn, conn.cursor() as cur:
             cur.execute(
@@ -334,8 +338,8 @@ def create_invite(
             )
             cur.execute(
                 "insert into dodois.invites (country, token_hash, issued_by, issued_by_id, "
-                "issued_by_role, issued_by_tenant, issued_at, expires_at) "
-                "values (%s, %s, %s, %s, %s, %s, %s, %s) returning id",
+                "issued_by_role, issued_by_tenant, issued_at, expires_at, contour) "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning id",
                 (
                     country,
                     token_hash,
@@ -345,6 +349,7 @@ def create_invite(
                     issued_by_tenant,
                     now,
                     expires_at,
+                    contour,
                 ),
             )
             row = cur.fetchone()

@@ -140,7 +140,7 @@ def start(
         flow = Flow(invite=invite, ip=ip, started=time.monotonic())  # заглушка PENDING до сети
         _flows[invite.id] = flow
     try:
-        device = client.start_device(creds, rules.INTL)
+        device = client.start_device(creds, invite.contour)
         if not trusted_link(device.verification_uri):
             raise DodoisError(client.NETWORK)
     except BaseException:
@@ -188,7 +188,7 @@ def poll_once(
         _finish(flow, EXPIRED)
         return True, interval
     try:
-        answer = client.poll_device(creds, rules.INTL, flow._device_code)
+        answer = client.poll_device(creds, flow.invite.contour, flow._device_code)
     except DodoisError as exc:
         _finish(flow, FAILED, exc.kind)
         return True, interval
@@ -207,10 +207,10 @@ def poll_once(
     return True, interval
 
 
-def _gives_access(country: str, access: str) -> bool:
+def _gives_access(country: str, contour: str, access: str) -> bool:
     """Открывает ли новая пара хоть одну пиццерию страны (только чтение у Dodo IS)."""
     units = client.working_pizzerias(country)
-    opened = client.count_open(country, rules.INTL, access, units, datetime.now(UTC).date())
+    opened = client.count_open(country, contour, access, units, datetime.now(UTC).date())
     return opened > 0
 
 
@@ -218,8 +218,8 @@ def _complete(flow: Flow, pair: TokenPair) -> None:
     invite = flow.invite
     try:
         replaced = store.get_login(invite.country) is not None
-        name, email = client.userinfo(rules.INTL, pair.access)
-        if replaced and not _gives_access(invite.country, pair.access):
+        name, email = client.userinfo(invite.contour, pair.access)
+        if replaced and not _gives_access(invite.country, invite.contour, pair.access):
             store.reject_invite(invite.id, invite.country, name or email, datetime.now(UTC))
             _finish(flow, NOT_APPLIED)
             _journal(invite, flow.ip, replaced, applied=False)
@@ -231,6 +231,7 @@ def _complete(flow: Flow, pair: TokenPair) -> None:
             source=rules.SOURCE_INVITE,
             invite_id=invite.id,
             account=(name, email),
+            contour=invite.contour,
         )
     except store.InviteUnusable:
         _finish(flow, REVOKED)

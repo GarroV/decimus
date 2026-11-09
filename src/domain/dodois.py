@@ -33,9 +33,11 @@ SCOPES = (
 _COUNTRY = re.compile(r"[A-Z]{2}")
 
 INTL = "intl"
-#: Контур СНГ (`.io`) пока не делаем, но поле в записи есть.
+#: Контур СНГ (`.io`): те же пути и права, другие серверы (D729).
 CIS = "cis"
 CONTOURS = (INTL, CIS)
+#: Страны на контуре СНГ; все остальные — на международном (D729). Одно место правила.
+CIS_COUNTRIES = frozenset({"KG", "TJ"})
 
 
 @dataclass(frozen=True)
@@ -44,10 +46,18 @@ class ContourHosts:
     api: str
 
 
-#: Хосты по контурам. СНГ не заведён намеренно: вход такого контура клиент отклонит.
+#: Хосты по контурам. Одна пара ключей приложения принимается обоими контурами (D729).
 HOSTS: Mapping[str, ContourHosts] = {
     INTL: ContourHosts("https://auth.dodois.com", "https://api.dodois.com"),
+    CIS: ContourHosts("https://auth.dodois.io", "https://api.dodois.io"),
 }
+
+
+def contour_for(country: str) -> str:
+    """Контур Dodo IS страны: Кыргызстан и Таджикистан — СНГ, остальные — международный."""
+    return CIS if country in CIS_COUNTRIES else INTL
+
+
 #: Список работающих пиццерий страны — без ключа.
 UNITINFO_URL = "https://publicapi.dodois.io/{cc}/api/v1/unitinfo/all"
 USERINFO_PATH = "/connect/userinfo"
@@ -68,6 +78,7 @@ REASONS = (
     "rate_limited",
     "unauthorized",
     "no_units",
+    "none_open",
     "write_failed",
     "no_keys",
     "no_tokens",
@@ -120,6 +131,9 @@ def counts_state(total: int, open_: int) -> tuple[str, str | None]:
     """Состояние по счёту: все открыты — работает; не все — «открыто не всё»; пусто — сбой."""
     if total <= 0:
         return FAILED, "no_units"
+    if open_ <= 0:
+        # Вход удался, но ни одна пиццерия не открыта: частая причина — страна на другом контуре.
+        return PARTIAL, "none_open"
     if open_ < total:
         return PARTIAL, None
     return OK, None
@@ -210,6 +224,8 @@ class Invite:
     #: `not_applied` — вход по ссылке не открыл ни одной пиццерии и не заменил прежний.
     result: str | None = None
     result_account: str | None = None
+    #: Контур Dodo IS, на который ведёт ссылка (выбирает выдавший, D729).
+    contour: str = INTL
 
     def status(self, now: datetime) -> str:
         """Погашена и отозвана — раньше срока: след важнее часов."""

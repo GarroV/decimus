@@ -101,6 +101,7 @@ def _view(invite: Invite, current: flow.Flow | None, token: str) -> dict[str, An
     state = current.state if current is not None else flow.IDLE
     return {
         "country": invite.country,
+        "host": rules.HOSTS[invite.contour].auth.removeprefix("https://"),
         "state": state,
         "reason": current.reason if current is not None else "",
         "user_code": current.user_code if state == flow.PENDING and current else "",

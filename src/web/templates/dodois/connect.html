@@ -13,7 +13,7 @@
         {% if state == 'pending' %}data-status-url="{{ status_url }}" data-poll-sec="{{ poll_sec }}"{% endif %}>
     <h1 class="sdodois-page__title">{{ t('dodois.page.title') }} · {{ country_title(country) }}</h1>
     <p>{{ t('dodois.page.lead', country=country_title(country)) }}</p>
-    <p class="sdodois-page__safe">{{ t('dodois.page.safe') }}</p>
+    <p class="sdodois-page__safe">{{ t('dodois.page.safe', host=host) }}</p>
     {% if error %}
       <div class="note note--warn" role="alert"><div class="note__text">{{ t('dodois.page.err.' ~ error) }}</div></div>
     {% endif %}

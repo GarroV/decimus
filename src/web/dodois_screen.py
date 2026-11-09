@@ -161,6 +161,9 @@ def context(
         "dodois_flash": flash,
         **service_keys_screen.app_context(key_flash),
         "dodois_now": datetime.now(UTC),
+        "dodois_cis_countries": rules.CIS_COUNTRIES,
+        "dodois_contours": rules.CONTOURS,
+        "dodois_hosts": rules.HOSTS,
         "dodois_stamp": _stamp,
     }
 
@@ -237,6 +240,9 @@ def issue(by_login: str, account: Any) -> tuple[Flash | IssuedLink, int]:
     country = _country_from_form()
     if country is None:
         return Flash("dodois.err.country", False, {}), 400
+    contour = (request.form.get("contour") or "").strip()
+    if contour not in rules.CONTOURS:
+        return Flash("dodois.err.contour", False, {}), 400
     token = rules.new_token()
     now = datetime.now(UTC)
     try:
@@ -249,13 +255,14 @@ def issue(by_login: str, account: Any) -> tuple[Flash | IssuedLink, int]:
             issued_by_tenant=str(account.tenant),
             now=now,
             expires_at=now + rules.INVITE_TTL,
+            contour=contour,
         )
     except DbError as exc:
         note_target_mismatch(exc)
         _log.warning("dodois: ссылка не записана (%s)", type(exc).__name__)
         return Flash("dodois.err.db", False, {}), 503
     # Цель журнала — номер и страна; токена в ней нет, он не попадает и в форму.
-    setattr(g, TARGET_OVERRIDE, f"country={country}; invite={invite_id}")
+    setattr(g, TARGET_OVERRIDE, f"country={country}; invite={invite_id}; contour={contour}")
     try:
         replaces = dodois_logins.get_login(country)
     except DbError:

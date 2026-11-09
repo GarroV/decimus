@@ -459,6 +459,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0124_service_settings_home_attention.sql": (
         "sql1:516582fff5e4a03043e1db26629e4755a14f075928d829037df9cadf02281e7a"
     ),
+    "0125_dodois_invite_contour.sql": (
+        "sql1:60ae49162704a3bd3931527bcb2d5f0eaff653b3abc3d5e3300666d58c18079a"
+    ),
 }
 
 

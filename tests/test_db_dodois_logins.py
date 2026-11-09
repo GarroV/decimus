@@ -77,6 +77,24 @@ def _ссылка(база: str, автор: str, страна: str = "SI", хе
     )
 
 
+def test_контур_ссылки_сохраняется_и_по_умолчанию_международный(база: str, автор: str) -> None:
+    # Сломанная копия: убрать `contour` из `insert` в `create_invite` — СНГ вернётся как intl.
+    обычная = _ссылка(база, автор, "SI", "4" * 64)
+    снг = store.create_invite(
+        country="KG",
+        token_hash="5" * 64,
+        issued_by="owner",
+        issued_by_id=автор,
+        issued_by_role="superadmin",
+        issued_by_tenant="HQ",
+        now=НОВАЯ,
+        expires_at=НОВАЯ + timedelta(hours=24),
+        contour=rules.CIS,
+    )
+    assert store.get_invite(обычная).contour == rules.INTL  # type: ignore[union-attr]
+    assert store.get_invite(снг).contour == rules.CIS  # type: ignore[union-attr]
+
+
 def test_ключи_в_базе_только_шифртекстом(база: str) -> None:
     # Сломанная копия: `_put_tokens` кладёт value.encode() вместо шифртекста — тест падает.
     _вход()

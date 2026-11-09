@@ -90,6 +90,7 @@
               <span class="shealth__dot shealth__dot--{{ tone }} sdtile__dot" aria-hidden="true"></span>
               <b class="sdtile__code mono">{{ row.code }}</b>
               <small class="sdtile__name">{{ country_title(row.code) }}</small>
+              {% if row.code in dodois_cis_countries %}<small class="sdtile__note">{{ t('dodois.tile.contour.cis') }}</small>{% endif %}
               {% if login is none and latest is not none %}<small class="sdtile__note">{{ status|trim }}</small>{% endif %}
             </a>
           </li>
@@ -137,6 +138,11 @@
     <div class="sactions" id="dodois-actions">
       <form method="post" action="{{ users_url }}/dodois/invite?lang={{ lang }}">
         <input type="hidden" name="country" value="{{ row.code }}">
+        <label for="dodois-contour">{{ t('dodois.contour.label') }}</label>
+        <select id="dodois-contour" name="contour">
+            {% set default_contour = 'cis' if row.code in dodois_cis_countries else 'intl' %}
+            {% for c in dodois_contours %}<option value="{{ c }}"{% if c == default_contour %} selected{% endif %}>{{ t('dodois.contour.' ~ c) }} ({{ dodois_hosts[c].auth|replace('https://auth.', '') }})</option>{% endfor %}
+        </select>
         <button class="sbtn sbtn--primary" type="submit">{{ t('dodois.generate') }}</button>
       </form>
       {% if login is not none %}
