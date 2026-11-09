@@ -967,11 +967,11 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .hact__pop { position: absolute; left: 0; right: 0; top: calc(100% + var(--space-3)); z-index: 20; max-width: 440px;
   padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .14); }
-/* Форма действия раздвигает содержимое, а не висит поверх «Нарушений»: раскрытое
-   действие занимает свою строку группы, окно под ним — в потоке. */
-.hact .hact__pop { position: static; max-width: 440px; margin-top: var(--space-3); box-shadow: none; }
-.hact__item[open] { flex: 1 1 100%; min-width: 0; }
-.hact:has(.hact__item[open]) .hact__group { flex: 1 1 100%; }
+/* Окно действия: без скрипта — всплывающее под рядом; со скриптом (`hact.js`) переезжает
+   в слот под всем рядом и раздвигает содержимое, а кнопки ряда не двигаются. */
+.hact__slot { flex: 1 1 100%; min-width: 0; }
+.hact__slot:empty { display: none; }
+.hact__slot .hact__pop { position: static; max-width: none; margin-top: var(--space-3); box-shadow: none; }
 .hact__form { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); margin-top: var(--space-4); }
 .hact__form label { display: flex; flex-direction: column; gap: var(--space-2); align-self: stretch; }
 /* Две группы (решение отделено от второстепенного): решения слева, отчёт и письма —
