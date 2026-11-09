@@ -2,7 +2,9 @@
 
 Поиск `restaurants/in/search` прячет закрытые сейчас заведения, поэтому —
 подсказки `suggestions?text=dodo&latitude&longitude` (их не прячут), затем
-карточка `restaurants/{id}`: оценка `score.overall` из 5, число оценок
+карточка `restaurants/{id}`: оценка — среднее трёх оценок `score.flavor`,
+`score.service`, `score.delivery` (D737; нет каких-то — среднее имеющихся, нет
+ни одной — `score.overall`), из 5, число оценок
 ступенью (`score.ratingText`, «(1500+)»), координаты `location.point`
 («lat,lng»), статус. Нужны заголовки Origin и Referer сайта.
 """
@@ -39,6 +41,17 @@ def suggested_ids(payload: object) -> list[int]:
     return ids
 
 
+PARTS = ("flavor", "service", "delivery")
+
+
+def blended_score(info: dict[str, object]) -> float | None:
+    """Среднее вкуса, сервиса и доставки (D737); иначе общая `overall`."""
+    parts = [v for v in (number(dig(info, "score", p)) for p in PARTS) if v is not None]
+    if not parts:
+        return number(dig(info, "score", "overall"))
+    return round(sum(parts) / len(parts), 2)
+
+
 def card(payload: object) -> Found | None:
     info = dig(payload, "restaurant", "info")
     if (
@@ -57,7 +70,7 @@ def card(payload: object) -> Found | None:
         url=f"https://tgoyemek.com/restoranlar/{info['id']}",
         lat=number(lat),
         lng=number(lng),
-        score=number(dig(info, "score", "overall")),
+        score=blended_score(info),
         scale=SCALE,
         votes=votes,
         votes_exact=exact,
