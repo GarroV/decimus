@@ -496,6 +496,35 @@
 | `WEB_WALK_UPSTREAM` | `src/web/config.py` | да |
 <!-- map:end -->
 
+### Есть в `.env.example`, но код их не читает
+
+Эти переменные не читает код `src/`, `tools/`, `scripts/`, `engine/`, и в таблице выше их нет. Одни читает compose
+(пароли и порты служб, токен туннеля), другие вставляются на экране «Ключи и API», а `.env.example` держит их
+запасным путём. Строка «нигде не читается» — остаток прежних решений: его убирают из `.env.example`.
+
+<!-- map:begin env-unread -->
+| Переменная | Кто читает |
+|---|---|
+| `AGG_ALERT_CHAT_ID` | **нигде не читается** — остаток, убрать из `.env.example` |
+| `CLOUDFLARE_TUNNEL_TOKEN` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `DEMO_DATABASE_URL` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `DEMO_TELEGRAM_BOT_TOKEN` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `DODOIS_CLIENT_ID` | вставляется на экране «Ключи и API» (Dodo IS); здесь — запасной путь |
+| `DODOIS_CLIENT_SECRET` | вставляется на экране «Ключи и API» (Dodo IS); здесь — запасной путь |
+| `FRAMES_ROOT_PASSWORD` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `FRAMES_ROOT_USER` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `ISPRING_CLIENT_ID` | вставляется на экране «Ключи и API» (iSpring); здесь — запасной путь |
+| `ISPRING_CLIENT_SECRET` | вставляется на экране «Ключи и API» (iSpring); здесь — запасной путь |
+| `MCP_HOST_PORT` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `POSTGRES_DB` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `POSTGRES_PASSWORD` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `POSTGRES_PORT` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `POSTGRES_USER` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `S3_STAND_PORT` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `WEB_HOST_PORT` | читается compose (`docker-compose*.yml`), коду не нужна |
+| `WEB_WALK_PORT` | читается compose (`docker-compose*.yml`), коду не нужна |
+<!-- map:end -->
+
 ## Таблицы по миграциям
 
 <!-- map:begin tables -->
