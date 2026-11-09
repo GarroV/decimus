@@ -294,6 +294,17 @@ def _is_current(flow: Flow) -> bool:
         return _flows.get(flow.invite.id) is flow
 
 
+def abort_country(country: str) -> None:
+    """Оборвать идущие входы страны (отключение, #1551): потоки их больше не ведут.
+
+    Запись входа закрыта и в базе: отключение отзывает ссылки страны, а `save_login` берёт
+    только живую.
+    """
+    with _lock:
+        for key in [k for k, f in _flows.items() if f.invite.country == country]:
+            del _flows[key]
+
+
 def forget_all() -> None:
     """Забыть все входы — для тестов."""
     with _lock:

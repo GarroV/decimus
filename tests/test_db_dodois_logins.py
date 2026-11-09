@@ -283,3 +283,135 @@ def test_счёт_попыток_ссылок_свой_и_не_запирает_
     assert not web_throttle.address_verdict(tenant="HQ", address="203.0.113.5").locked
     assert web_throttle.address_verdict(tenant="HQ", address="198.51.100.9").locked
     assert not web_throttle.link_address_verdict(tenant="HQ", address="198.51.100.9").locked
+
+
+def test_отключение_удаляет_вход_и_оба_ключа_отзывает_живые_ссылки_данные_целы(
+    база: str, автор: str
+) -> None:
+    _вход("SI")
+    _вход("BG")
+    живая = _ссылка(база, автор, "SI", "b" * 64)
+    чужая_страны = _ссылка(база, автор, "BG", "c" * 64)
+    with psycopg.connect(база) as conn:
+        conn.execute(
+            "insert into dodois.metric_loads (country, kind, ok, rows) "
+            "values ('SI', 'sales', true, 5)"
+        )
+        conn.commit()
+
+    assert store.delete_login("SI", "owner", НОВАЯ) is True
+
+    assert store.get_login("SI") is None
+    assert store.read_tokens("SI") is None
+    assert store.get_login("BG") is not None and store.read_tokens("BG") is not None
+    with psycopg.connect(база) as conn:
+        имена = conn.execute("select name from vault.secrets where name like '%%si%%'").fetchall()
+        assert имена == []
+        assert conn.execute("select count(*) from dodois.metric_loads").fetchone() == (1,)
+    assert store.get_invite(живая).revoked_at is not None  # type: ignore[union-attr]
+    assert store.get_invite(чужая_страны).revoked_at is None  # type: ignore[union-attr]
+
+
+def test_отключение_не_трогает_погашенные_ссылки(база: str, автор: str) -> None:
+    _вход("SI")
+    погашенная = _ссылка(база, автор, "SI", "d" * 64)
+    _вход("SI", invite_id=погашенная)  # гасит ссылку, вход перезаписан
+
+    assert store.delete_login("SI", "owner", НОВАЯ) is True
+
+    assert store.get_invite(погашенная).revoked_at is None  # type: ignore[union-attr]
+
+
+def test_вход_начатый_до_отключения_вход_не_воскрешает(база: str, автор: str) -> None:
+    _вход("SI")
+    идущая = _ссылка(база, автор, "SI", "9" * 64)  # ссылка открыта, вход по ней ещё идёт
+    store.delete_login("SI", "owner", НОВАЯ)
+
+    with pytest.raises(store.InviteUnusable):
+        _вход("SI", store.Tokens("ДОСТУП-ПОЗЖЕ", "ПРОДЛЕНИЕ-ПОЗЖЕ"), invite_id=идущая)
+
+    assert store.get_login("SI") is None
+    assert store.read_tokens("SI") is None
+
+
+def test_отключение_отзывает_и_истёкшие_непогашенные_ссылки(база: str, автор: str) -> None:
+    _вход("SI")
+    истёкшая = _ссылка(база, автор, "SI", "8" * 64)
+    with psycopg.connect(база) as conn:
+        conn.execute(
+            "update dodois.invites set issued_at = %s, expires_at = %s where id = %s",
+            (НОВАЯ - timedelta(hours=25), НОВАЯ - timedelta(hours=1), истёкшая),
+        )
+        conn.commit()
+
+    store.delete_login("SI", "owner", НОВАЯ)
+
+    assert store.get_invite(истёкшая).revoked_at is not None  # type: ignore[union-attr]
+
+
+def test_истёкшая_ссылка_вход_не_записывает(база: str, автор: str) -> None:
+    ссылка = _ссылка(база, автор, "SI", "7" * 64)  # живёт сутки от НОВАЯ
+
+    with pytest.raises(store.InviteUnusable):
+        store.save_login(
+            country="SI",
+            contour="intl",
+            source="invite",
+            issued_by="owner",
+            account_name=None,
+            account_email=None,
+            scope="openid",
+            tokens=store.Tokens(ДОСТУП, ПРОДЛЕНИЕ),
+            access_expires_at=НОВАЯ + timedelta(days=2),
+            now=НОВАЯ + timedelta(hours=25),
+            invite_id=ссылка,
+        )
+
+    assert store.get_login("SI") is None
+
+
+def test_отключение_без_входа_ничего_не_пишет(база: str, автор: str) -> None:
+    живая = _ссылка(база, автор, "SI", "f" * 64)
+
+    assert store.delete_login("SI", "owner", НОВАЯ) is False
+
+    assert store.get_invite(живая).revoked_at is None  # type: ignore[union-attr]
+
+
+def test_после_отключения_продление_и_проверка_вход_не_воскрешают(база: str) -> None:
+    вход = _вход("SI")
+    store.delete_login("SI", "owner", НОВАЯ)
+
+    with pytest.raises(store.LoginSuperseded):
+        store.replace_tokens(
+            country="SI",
+            tokens=store.Tokens("НОВЫЙ-ДОСТУП", "НОВОЕ-ПРОДЛЕНИЕ"),
+            access_expires_at=НОВАЯ + timedelta(days=2),
+            scope=None,
+            now=НОВАЯ,
+            expect_linked_at=вход.linked_at,
+        )
+    store.record_state("SI", rules.OK, None, now=НОВАЯ, units_total=3, units_open=3)
+
+    assert store.get_login("SI") is None
+    assert store.read_tokens("SI") is None
+
+
+def test_после_отключения_страну_можно_привязать_заново(база: str) -> None:
+    _вход("SI")
+    store.delete_login("SI", "owner", НОВАЯ)
+
+    новая = _вход("SI", store.Tokens("ДОСТУП-НОВЫЙ", "ПРОДЛЕНИЕ-НОВОЕ"))
+
+    assert новая.state == rules.OK
+    ключи = store.read_tokens("SI")
+    assert ключи is not None and ключи.access == "ДОСТУП-НОВЫЙ"
+
+
+def test_у_роли_администратора_есть_право_удалять_входы(база: str) -> None:
+    with psycopg.connect(база) as conn:
+        право = conn.execute(
+            "select has_table_privilege('dodo_audit_admin', 'dodois.logins', 'DELETE'), "
+            "has_table_privilege('dodo_audit_app', 'dodois.logins', 'DELETE')"
+        ).fetchone()
+    assert право == (True, False)

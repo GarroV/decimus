@@ -126,6 +126,18 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
         "en": "The Dodo IS account did not identify itself",
     },
     "dodois.check": {"ru": "Проверить сейчас", "en": "Check now"},
+    "dodois.disconnect": {"ru": "Отключить", "en": "Disconnect"},
+    "dodois.disconnect.confirm": {
+        "ru": (
+            "Отключить страну {country}? Вход и его ключи будут удалены, живые ссылки отозваны. "
+            "Загруженные данные останутся; подключить страну снова можно новой ссылкой."
+        ),
+        "en": (
+            "Disconnect {country}? The login and its keys will be deleted and live links "
+            "revoked. Loaded data stays; you can connect the country again with a new link."
+        ),
+    },
+    "dodois.disconnect.yes": {"ru": "Да, отключить", "en": "Yes, disconnect"},
     "dodois.country": {"ru": "Страна", "en": "Country"},
     "dodois.col.status": {"ru": "Статус", "en": "Status"},
     "dodois.col.via": {"ru": "Через кого подключено", "en": "Connected via"},
@@ -194,6 +206,10 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
     "dodois.invite.status.revoked": {"ru": "Отозвана", "en": "Revoked"},
     "dodois.invite.revoke": {"ru": "Отозвать", "en": "Revoke"},
     "dodois.ok.revoked": {"ru": "Ссылка отозвана.", "en": "The link was revoked."},
+    "dodois.ok.disconnected": {
+        "ru": "Страна отключена: вход и ключи удалены.",
+        "en": "The country was disconnected: the login and keys were deleted.",
+    },
     "dodois.ok.checked": {"ru": "Проверено.", "en": "Checked."},
     "dodois.err.country": {
         "ru": "Выберите страну из списка.",

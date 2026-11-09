@@ -231,6 +231,35 @@ def test_огонёк_плитки_зелёный_красный_серый(
     assert (огонёк("SI"), огонёк("BG")) == ("green", "red")
 
 
+def test_на_плитке_видно_за_кем_вход_и_контур_по_входу(
+    главный: FlaskClient, ссылки: Ссылки, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Учётка входа — на самой плитке (имя, без имени почта); контур СНГ — по самому входу."""
+    сейчас = datetime.now(UTC)
+    монтаж = (
+        rules.Login(
+            "SI", rules.INTL, "invite", "admin", "Ana Novak", "ana@dodo.si", сейчас, "s", 3, 3,
+            None, None, None, rules.OK, None,
+        ),
+        rules.Login(
+            "BG", rules.CIS, "invite", "admin", None, "ops@dodo.bg", сейчас, "s", 3, 3,
+            None, None, None, rules.OK, None,
+        ),
+    )  # fmt: skip
+    monkeypatch.setattr(store, "list_logins", lambda: монтаж)
+    html = главный.get(ВКЛАДКА).get_data(as_text=True)
+
+    def плитка(код: str) -> str:
+        found = re.search(rf'id="dodois-{код}"[^>]*>(.*?)</a>', html, re.S)
+        assert found, код
+        return found.group(1)
+
+    assert "Ana Novak" in плитка("SI") and "sdtile__who" in плитка("SI")
+    assert "ops@dodo.bg" in плитка("BG")
+    assert "СНГ" in плитка("BG") or "CIS" in плитка("BG")
+    assert "СНГ" not in плитка("SI") and "CIS" not in плитка("SI")
+
+
 def test_выбранная_страна_открывает_панель_с_действиями(главный: FlaskClient) -> None:
     """Ломали: кнопки сидели в каждой строке; теперь — только в панели выбранной страны."""
     html = главный.get(f"{ВКЛАДКА}&country=SI").get_data(as_text=True)
@@ -261,6 +290,7 @@ def test_вкладка_стоит_после_подключений_и_ключ
         ВЫДАЧА,
         "/administration/dodois/invite/1/revoke",
         "/administration/dodois/SI/check",
+        "/administration/dodois/SI/disconnect",
     ],
 )
 def test_чужое_происхождение_отказ_и_без_действия(
@@ -364,6 +394,42 @@ def test_отзыв_гасит_ссылку_и_второй_раз_отказ(
     assert "Отозвана" in клиент.get(ВКЛАДКА).get_data(as_text=True)
     assert клиент.post(адрес, headers=ЗАГОЛОВКИ).status_code == 409
     assert чужой.get(f"/dodois/connect/{токен}").status_code == 404
+
+
+def test_отключить_только_главный_админ_с_подтверждением_и_отметкой_в_ответе(
+    стенд: tuple[FlaskClient, dict[str, list[Any]]],
+    ссылки: Ссылки,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    клиент, _ = стенд
+    звали: list[str] = []
+    monkeypatch.setattr(store, "list_logins", lambda: (_вход_страны("SI", rules.OK),))
+    monkeypatch.setattr(
+        store, "delete_login", lambda страна, _кто, _now: звали.append(страна) or True
+    )
+    панель = клиент.get(f"{ВКЛАДКА}&country=SI").get_data(as_text=True)
+    assert "/administration/dodois/SI/disconnect" in панель
+    assert "sconfirm" in панель
+
+    _, токен = _выдать(клиент)  # ссылка выдана, вход по ней уже идёт
+    идущий = flow.Flow(invite=ссылки.ссылки[1], ip=None, started=0.0)
+    flow._flows[1] = идущий
+
+    ответ = клиент.post("/administration/dodois/SI/disconnect", headers=ЗАГОЛОВКИ)
+
+    assert ответ.status_code == 200
+    assert "Страна отключена" in ответ.get_data(as_text=True)
+    assert звали == ["SI"]
+    assert flow.current(1) is None and токен
+
+
+def test_отключить_страну_без_входа_409_и_неизвестную_404(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(store, "delete_login", lambda *_a: False)
+    адрес = "/administration/dodois/{}/disconnect"
+    assert главный.post(адрес.format("SI"), headers=ЗАГОЛОВКИ).status_code == 409
+    assert главный.post(адрес.format("si"), headers=ЗАГОЛОВКИ).status_code == 404
 
 
 # --- публичная страница --------------------------------------------------------------------

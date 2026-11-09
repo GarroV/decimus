@@ -5,10 +5,11 @@
   ключами приложения маркетплейса (D648, панель из `users/_service_key_panel.html`, возврат сюда)
   → страны плитками (`sbox` / `sdtiles` / `shealth__tile`; огонёк: зелёный вход в порядке, красный сбой, серый входа нет, D655) → панель выбранной страны справа.
   Кнопок в плитках нет: выбор — `?country=<код>`, в панели — «Сгенерировать ссылку», «Проверить
-  сейчас», «Отозвать» (POST `/dodois/invite`, `/dodois/<страна>/check`, `/dodois/invite/<id>/revoke`).
+  сейчас», «Отозвать», «Отключить» (POST `/dodois/invite`, `/dodois/<страна>/check`, `/dodois/invite/<id>/revoke`, `/dodois/<страна>/disconnect`; «Отключить» — через подтверждение).
   Ссылка видна один раз, только в ответе на выдачу, в панели той страны. Тексты — `texts_dodois.py`.
 #}{% extends "_split_page.html" %}
 {% from "_info_tip.html" import info_tip %}
+{% from "_split_ui.html" import confirm %}
 
 {% from "administration/_nav.html" import admin_nav with context %}
 {% from "users/_key_refusal.html" import refusal_text with context %}
@@ -90,7 +91,9 @@
               <span class="shealth__dot shealth__dot--{{ tone }} sdtile__dot" aria-hidden="true"></span>
               <b class="sdtile__code mono">{{ row.code }}</b>
               <small class="sdtile__name">{{ country_title(row.code) }}</small>
-              {% if row.code in dodois_cis_countries %}<small class="sdtile__note">{{ t('dodois.tile.contour.cis') }}</small>{% endif %}
+              {% if (login.contour if login is not none else ('cis' if row.code in dodois_cis_countries else 'intl')) == 'cis' %}<small class="sdtile__note">{{ t('dodois.tile.contour.cis') }}</small>{% endif %}
+              {#- За кем вход страны — видно сразу на плитке, без открытия панели. -#}
+              {% if login is not none %}{% set account = login.account_name or login.account_email %}<small class="sdtile__note sdtile__who" title="{{ account or '' }}">{% if login.source == 'import' %}{{ t('dodois.fact.owner') }}{% else %}{{ account or t('dodois.fact.unknown_account') }}{% endif %}</small>{% endif %}
               {% if login is none and latest is not none %}<small class="sdtile__note">{{ status|trim }}</small>{% endif %}
             </a>
           </li>
@@ -149,6 +152,7 @@
         <form method="post" action="{{ users_url }}/dodois/{{ row.code }}/check?lang={{ lang }}">
           <button class="sbtn" type="submit">{{ t('dodois.check') }}</button>
         </form>
+        {{ confirm('dodois-disconnect-' ~ row.code, t('dodois.disconnect'), t('dodois.disconnect.confirm', country=row.code), t('dodois.disconnect.yes'), users_url ~ '/dodois/' ~ row.code ~ '/disconnect?lang=' ~ lang, ()) }}
       {% endif %}
       {% if active %}
         <form method="post" action="{{ users_url }}/dodois/invite/{{ latest.id }}/revoke?lang={{ lang }}">
