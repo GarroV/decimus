@@ -195,6 +195,11 @@
   });
 
   // Первая запись истории помечена — к ней можно вернуться кнопкой «Назад» без перезагрузки.
-  if (page()) window.history.replaceState({ rt: 1 }, "", window.location.pathname + window.location.search);
-  setUp(document);
+  function start() {
+    if (page()) window.history.replaceState({ rt: 1 }, "", window.location.pathname + window.location.search);
+    setUp(document);
+  }
+  start();
+  // Вход в раздел без перезагрузки (`nav.js`): скрипт уже загружен, разметка новая.
+  document.addEventListener("decimus:navigation", function () { if (page()) start(); });
 })();

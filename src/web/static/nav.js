@@ -86,8 +86,27 @@
   // кнопки молчали до перезагрузки (#664). Такой экран открывается обычным
   // переходом. Скрипты оболочки (`data-shell` в `base.html`) общие для всех
   // экранов и работают через события документа — они переход не ломают.
+  // Исключение — скрипт «Рейтингов»: он сам делает переходы внутри раздела и не требует
+  // загрузки до разметки, поэтому его подгружаем здесь, как скрипты `<main>`. Иначе вход в
+  // «Рейтинги» был полной перезагрузкой страницы — единственной среди разделов.
+  var SWAP_SAFE_HEAD = /\/decimus-rt\.js(\?|$)/;
+  function pageHeadScripts(doc) {
+    return Array.prototype.filter.call(doc.querySelectorAll("head script[src]:not([data-shell])"), function (s) {
+      return !SWAP_SAFE_HEAD.test(s.getAttribute("src"));
+    });
+  }
   function hasPageHeadScripts(doc) {
-    return doc.querySelector("head script[src]:not([data-shell])") !== null;
+    return pageHeadScripts(doc).length > 0;
+  }
+  function loadHeadScripts(doc) {
+    doc.querySelectorAll("head script[src]:not([data-shell])").forEach(function (old) {
+      var src = old.getAttribute("src");
+      if (loaded[src]) return;
+      loaded[src] = true;
+      var s = document.createElement("script");
+      s.src = src;
+      document.body.appendChild(s);
+    });
   }
 
   function apply(doc, url, push) {
@@ -96,6 +115,7 @@
     if (!fresh || !here) return false;
     var known = loadScripts(fresh);
     here.replaceWith(fresh);
+    loadHeadScripts(doc);
     var oldList = document.querySelector(".sidenav__list");
     var menuScroll = oldList ? oldList.scrollTop : 0;
     sameAll(doc, ".sidenav__list");
@@ -151,6 +171,8 @@
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     var link = event.target.closest && event.target.closest(LINKS);
     if (!link || !link.href || link.target) return;
+    // Пункты подменю «Рейтингов» на странице раздела ведёт `decimus-rt.js` (плавная замена).
+    if (link.hasAttribute("data-rt-nav") && document.querySelector(".rt[data-rt-section]")) return;
     var url = new URL(link.href, location.href);
     if (url.origin !== location.origin) return;
     event.preventDefault();
@@ -164,6 +186,8 @@
   window.addEventListener("popstate", function () {
     ++navigation;
     if (location.pathname === root.dataset.navPath) return;
+    // Шаги внутри «Рейтингов» ведёт `decimus-rt.js`, он на странице раздела уже работает.
+    if (document.querySelector(".rt[data-rt-section]") && /^\/ratings(\/|$)/.test(location.pathname)) return;
     go(location.href, false);
   });
 
@@ -184,7 +208,7 @@
 
   // После скриптов экрана: они могут поправить адрес (`replaceState`).
   document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("main.shell__main script[src]").forEach(function (s) {
+    document.querySelectorAll("head script[src]:not([data-shell]), main.shell__main script[src]").forEach(function (s) {
       loaded[s.getAttribute("src")] = true;
     });
     try {
