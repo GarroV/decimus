@@ -195,6 +195,18 @@ def test_yemeksepeti_trendyol_pyszne() -> None:
     assert tgo is not None and (tgo.score, tgo.votes, tgo.votes_exact) == (4.7, 1500, False)
     assert (tgo.lat, tgo.lng, tgo.is_open) == (38.4583, 27.1175, False)
 
+    def tgo_score(score: dict[str, object]) -> float | None:
+        found = trendyol.card(
+            {"restaurant": {"info": {"id": 221570, "name": "Dodo Pizza (Tuna)", "score": score}}}
+        )
+        assert found is not None
+        return found.score
+
+    # D737: среднее вкуса, сервиса и доставки; ответ карточки 221570 от 09.11.2026
+    assert tgo_score({"overall": 4.7, "service": 4.8, "flavor": 4.5, "delivery": 4.7}) == 4.67
+    assert tgo_score({"overall": 4.7, "service": 4.8, "flavor": 4.5}) == 4.65
+    assert tgo_score({"overall": 4.7}) == 4.7
+
     (py,) = pyszne.parse(
         {
             "restaurants": [
