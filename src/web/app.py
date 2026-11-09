@@ -1873,6 +1873,7 @@ def _card_context(
         worst_level=view.worst_level(detail.counts),
         # Формулировка пункта без пометки допустимых классов «(D1, D2)»: коды не показываем.
         plain=mview.plain_question,
+        level_word=lambda level: grade_explain.level_word(level, lang),
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
         kind=_kind_title(detail.inspection.kind, lang),

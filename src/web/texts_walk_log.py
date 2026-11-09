@@ -78,9 +78,9 @@ WALK_LOG_TEXTS: dict[str, dict[str, str]] = {
     "walklog.refusal": {"ru": "Отказ: {message}", "en": "Refusal: {message}"},
     "walklog.error": {"ru": "Сбой: {error}", "en": "Failure: {error}"},
     "walklog.duration": {"ru": "{ms} мс", "en": "{ms} ms"},
-    "walklog.class.D1": {"ru": "отклонение (D1)", "en": "deviation (D1)"},
-    "walklog.class.D2": {"ru": "значительное (D2)", "en": "significant (D2)"},
-    "walklog.class.D3": {"ru": "критическое (D3)", "en": "critical (D3)"},
-    "walklog.class.D0": {"ru": "замер (D0)", "en": "measurement (D0)"},
+    "walklog.class.D1": {"ru": "отклонение", "en": "deviation"},
+    "walklog.class.D2": {"ru": "значительное", "en": "significant"},
+    "walklog.class.D3": {"ru": "критическое", "en": "critical"},
+    "walklog.class.D0": {"ru": "замер", "en": "measurement"},
     "walklog.class.R": {"ru": "рекомендация", "en": "recommendation"},
 }

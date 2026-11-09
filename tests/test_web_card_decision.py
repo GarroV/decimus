@@ -135,3 +135,18 @@ def test_повтор_виден_на_самой_записи(
     страница = _открыть(стенд, monkeypatch, ПАНЕЛЬ, repeat=повтор)
 
     assert ('class="find-row__repeat"' in страница) is повтор
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+@pytest.mark.parametrize("адрес", [ПАНЕЛЬ, СТРАНИЦА], ids=["панель", "страница"])
+def test_кодов_класса_на_экране_нет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, адрес: str
+) -> None:
+    """Класс — словами: в видимом тексте карточки нет «D1», «D2», «D3»."""
+    страница = _открыть(стенд, monkeypatch, адрес)
+
+    сама = страница.split('class="sdetail spanel"', 1)[-1] if адрес == ПАНЕЛЬ else страница
+    сама = re.sub(r"<(script|style)\b.*?</\1>", "", сама, flags=re.S)
+    видимое = re.sub(r"<[^>]+>", " ", сама)
+    assert not re.findall(r"\bD[0-3]\b", видимое)
+    assert "отклонение" in видимое  # метка класса записи и чип — словом
