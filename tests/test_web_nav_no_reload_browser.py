@@ -17,7 +17,7 @@ import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, unquote, urlsplit
 
 import pytest
 from conftest import chromium_executable
@@ -91,6 +91,10 @@ def _скрипты(*имена: str) -> str:
 def _заглушка(основа: str, путь: str, панель: str | None = None) -> str:
     """Настоящая оболочка и `<head>`, но с `<main>` и скриптами экрана из `ЗАГЛУШКИ`."""
     скрипты, разметка = ЗАГЛУШКИ[путь]
+    return _страница(основа, скрипты, разметка, панель)
+
+
+def _страница(основа: str, скрипты: str, разметка: str, панель: str | None = None) -> str:
     # Адрес скрипта — как у настоящих страниц, с версией: иначе `nav.js` счёл бы его новым.
     for адрес in re.findall(r'src="(/static/[\w.-]+\?v=\w+)"', основа):
         скрипты = скрипты.replace(адрес.split("?")[0] + '"', адрес + '"')
@@ -110,6 +114,45 @@ def _заглушка(основа: str, путь: str, панель: str | None
         count=1,
         flags=re.S,
     )
+
+
+def _качество(запрос: dict[str, str]) -> str:
+    """Экран «Качество» с базой не собрать: те же ссылки внутри экрана, а в тексте — выбор из адреса."""
+    страна = запрос.get("c", "Σ")
+    месяц = запрос.get("m", "2026-10")
+    порядок = запрос.get("sort", "name")
+    return (
+        '<div class="pk-shell"><aside class="pk-rail">'
+        '<a class="pk-item" href="/quality?c=SI&amp;m=%(m)s">Словения</a>'
+        '<a class="pk-item" href="/quality?c=RS&amp;m=%(m)s">Сербия</a></aside>'
+        '<section class="pk-work"><div class="speriod">'
+        '<a class="speriod__arrow" aria-label="назад" href="/quality?c=%(c)s&amp;m=2026-09">‹</a>'
+        '<select data-pick-nav><option value="/quality?c=%(c)s&amp;m=2026-10" selected>Октябрь</option>'
+        '<option value="/quality?c=%(c)s&amp;m=2026-08">Август</option></select></div>'
+        '<table><tr><th><a class="qa-sort" href="/quality?c=%(c)s&amp;m=%(m)s&amp;sort=score">Оценка</a>'
+        '</th></tr></table><p id="state">%(c)s %(m)s %(s)s</p>'
+        '<a id="file" href="/quality/report.pdf">Файл</a>'
+        '<a id="stay" href="/quality?c=%(c)s&amp;m=%(m)s#bottom">Якорь</a></section></div>'
+        % {"c": страна, "m": месяц, "s": порядок}
+    )
+
+
+def _отбор(запрос: dict[str, str]) -> str:
+    """Реестр с отбором: обычная GET-форма, без перезагрузки и без POST."""
+    return ЗАГЛУШКИ["/inspections"][1] + (
+        '<form id="flt" method="get" action="/inspections"><input name="q" value="">'
+        '<select name="status"><option value="all">Все</option><option value="open">Открытые</option></select>'
+        '<button type="submit">Найти</button></form>'
+        '<form id="post" method="post" action="/inspections"><button>Записать</button></form>'
+        '<p id="state">%s|%s</p>' % (запрос.get("q", ""), запрос.get("status", ""))
+    )
+
+
+#: Экраны, чей текст зависит от адреса (`/quality`, `/inspections` с отбором).
+ДИНАМИКА = {
+    "/quality": (_скрипты("split.js"), _качество),
+    "/inspections": (ЗАГЛУШКИ["/inspections"][0], _отбор),
+}
 
 
 @pytest.fixture
@@ -136,6 +179,12 @@ def page(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
                 route.abort()
             elif адрес.path.startswith("/static/"):
                 route.fulfill(path=str(STATIC / адрес.path.removeprefix("/static/")))
+            elif адрес.path in ДИНАМИКА and "id=" not in адрес.query:
+                скрипты, собрать_html = ДИНАМИКА[адрес.path]
+                route.fulfill(
+                    body=_страница(основа, скрипты, собрать_html(dict(parse_qsl(адрес.query)))),
+                    content_type="text/html; charset=utf-8",
+                )
             elif без_языка in ПАНЕЛИ:
                 route.fulfill(
                     body=_заглушка(основа, адрес.path, ПАНЕЛИ[без_языка]),
@@ -276,6 +325,87 @@ def test_шаг_назад_из_панели_реестра_к_другому_р
     page.go_forward()
     page.wait_for_selector("[data-drawer]")
     assert _тот_же_документ(page)
+
+
+def _состояние(страница: Any) -> str:
+    return str(страница.inner_text("#state"))
+
+
+def test_ссылки_и_отбор_внутри_экрана_идут_подменой(page: Any) -> None:
+    page.goto(f"{ХОСТ}{ОСНОВА}?lang=ru")
+    page.evaluate("window.__same_document = 1")
+    _перейти(page, "/quality")
+    page.wait_for_selector("#state")
+    assert _состояние(page) == "Σ 2026-10 name"
+
+    def ждать(ожидаемое: str, часть_адреса: str) -> None:
+        page.wait_for_function(
+            "t => document.querySelector('#state').innerText === t", arg=ожидаемое
+        )
+        assert _тот_же_документ(page), f"{ожидаемое}: страница перезагружена целиком"
+        assert часть_адреса in page.url
+
+    page.click(".pk-rail a.pk-item >> text=Словения")  # колонка выбора
+    ждать("SI 2026-10 name", "c=SI")
+    page.click(".speriod__arrow")  # стрелка месяца
+    ждать("SI 2026-09 name", "m=2026-09")
+    page.select_option("select[data-pick-nav]", index=1)  # месяц из списка (`pick.js`)
+    ждать("SI 2026-08 name", "m=2026-08")
+    page.click(".qa-sort")  # заголовок столбца
+    ждать("SI 2026-08 score", "sort=score")
+
+    # «Назад» и «вперёд» по шагам внутри экрана тоже подмена.
+    page.go_back()
+    ждать("SI 2026-08 name", "m=2026-08")
+    page.go_back()
+    ждать("SI 2026-09 name", "m=2026-09")
+    page.go_back()
+    ждать("SI 2026-10 name", "c=SI")
+    page.go_forward()
+    ждать("SI 2026-09 name", "m=2026-09")
+
+    # Якорь на этой же странице остаётся обычным переходом по месту: не подмена.
+    page.click("#stay")
+    assert page.url.endswith("#bottom")
+    assert _тот_же_документ(page)
+
+    # Файл не подменяется: уходит обычным переходом (настоящая перезагрузка документа).
+    with page.expect_navigation():
+        page.click("#file")
+    assert not _тот_же_документ(page)
+
+
+def test_get_форма_отбора_идёт_подменой_а_post_нет(page: Any) -> None:
+    page.goto(f"{ХОСТ}{ОСНОВА}?lang=ru")
+    page.evaluate("window.__same_document = 1")
+    _перейти(page, "/inspections")
+    page.fill("#flt input[name=q]", "пицца")
+    page.select_option("#flt select", "open")
+    page.click("#flt button")
+    page.wait_for_function("document.querySelector('#state').innerText === 'пицца|open'")
+    assert _тот_же_документ(page)
+    assert "q=пицца" in unquote(page.url)
+    page.go_back()
+    page.wait_for_function("document.querySelector('#state').innerText === '|'")
+    assert _тот_же_документ(page)
+
+    # POST-форма уходит как обычно (перезагрузка документа).
+    with page.expect_navigation():
+        page.click("#post button")
+    assert not _тот_же_документ(page)
+
+
+def test_вкладки_администрирования_идут_подменой(page: Any) -> None:
+    page.goto(f"{ХОСТ}{ОСНОВА}?lang=ru")
+    page.evaluate("window.__same_document = 1")
+    _перейти(page, "/administration")
+    вкладки = page.locator("main a[href*='tab=']")
+    assert вкладки.count() >= 2, "на экране нет вкладок"
+    for номер in (1, 0):
+        цель = вкладки.nth(номер).get_attribute("href") or ""
+        вкладки.nth(номер).click()
+        page.wait_for_function("h => location.href.endsWith(h) || location.search === h.slice(h.indexOf('?'))", arg=цель)
+        assert _тот_же_документ(page), цель
 
 
 #: Скрипты, которые не из экранов за левой панелью и остаются обычными: вход, мини-приложение,
