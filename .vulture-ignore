@@ -806,3 +806,7 @@ _only_view
 _peek_context
 _not_there_go_home
 space_peek
+
+# Маршруты Flask регистрирует декоратор: 405 → главная (#1558), отключение страны Dodo IS (#1552).
+_form_only_address
+dodois_disconnect

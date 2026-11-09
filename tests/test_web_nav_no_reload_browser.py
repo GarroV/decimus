@@ -31,9 +31,6 @@ TEMPLATES = ROOT / "src/web/templates"
 ХОСТ = "http://decimus.test"
 ОСНОВА = "/settings"
 
-#: Страницы, которые отдаёт настоящее приложение без базы.
-НАСТОЯЩИЕ = ("/settings", "/administration", "/training", "/quality")
-
 
 def _скрипты(*имена: str) -> str:
     return "".join(f'<script src="/static/{n}" data-swap-safe defer></script>' for n in имена)
