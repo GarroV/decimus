@@ -76,17 +76,23 @@ class _Tokens:
     def __init__(self, keys: ClientKeys, opener: Opener) -> None:
         self._keys, self._opener = keys, opener
         self._tokens: dict[str, str | None] = {}
+        self._dead: set[str] = set()
 
     def get(self, user_id: str) -> str | None:
         if user_id not in self._tokens:
             self._tokens[user_id] = self._fetch(user_id)
         return self._tokens[user_id]
 
+    def is_dead(self, user_id: str) -> bool:
+        """Доступ человека мёртв насовсем (отозван, ключ не открылся); временный сбой — нет."""
+        return user_id in self._dead
+
     def _fetch(self, user_id: str) -> str | None:
         try:
             refresh = calendar_store.refresh_token_of(user_id)
         except secret_crypto.SecretCryptoError:
             logger.warning("календарь: ключ человека %s не открылся", _short(user_id))
+            self._dead.add(user_id)
             _fail(user_id, UNREADABLE, mark=True)
             return None
         if refresh is None:
@@ -94,6 +100,8 @@ class _Tokens:
         try:
             return access_token(self._keys, refresh, opener=self._opener)
         except CalendarError as сбой:
+            if сбой.code in DEAD_GRANT_CODES:
+                self._dead.add(user_id)
             _fail(user_id, сбой.code, mark=True)
             return None
 
@@ -140,8 +148,10 @@ def run_pass(
             return результат
         токен = токены.get(сирота.user_id)
         if токен is None:
-            # Доступ мёртв: событие снять нечем, его уберёт сам человек. Запись не держим.
-            calendar_store.forget_event(сирота.inspection_id)
+            if токены.is_dead(сирота.user_id):
+                # Доступ мёртв насовсем: событие снять нечем, его уберёт сам человек.
+                calendar_store.forget_event(сирота.inspection_id)
+            # Временный сбой (сеть, 5xx): запись остаётся до следующего прохода.
             continue
         вызовов += 1
         try:

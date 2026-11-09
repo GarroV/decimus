@@ -321,3 +321,30 @@ def test_без_клиента_google_проход_пропускается(
     итог = sync.run_pass(today=СЕГОДНЯ, opener=google)
 
     assert итог == sync.PassResult() and google.вызовы == []
+
+
+def test_временный_сбой_токена_не_стирает_запись_об_осиротевшем_событии(
+    база: База, google: Google
+) -> None:
+    база.добавить("i1", date(2026, 11, 6))
+    _проход(google)
+    база.снять("i1")
+    google.сбой_токена = _http(503)
+
+    _проход(google)
+
+    assert "i1" in база.стоит, "событие снять не удалось — запись нужна до следующего прохода"
+    google.сбой_токена = None
+    итог = _проход(google)
+    assert итог.deleted == 1 and google.календарь == {} and "i1" not in база.стоит
+
+
+def test_мёртвый_доступ_запись_об_осиротевшем_событии_забывает(база: База, google: Google) -> None:
+    база.добавить("i1", date(2026, 11, 6))
+    _проход(google)
+    база.снять("i1")
+    google.сбой_токена = _http(400, {"error": "invalid_grant"})
+
+    _проход(google)
+
+    assert "i1" not in база.стоит

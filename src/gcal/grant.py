@@ -29,21 +29,33 @@ logger = logging.getLogger(__name__)
 NONE = "none"
 OFF = "off"
 FAILED = "failed"
+#: Ключ у нас не открылся (сменили `SECRETS_KEY`): отозвать его у Google нечем, запись стёрта, а
+#: человеку сказано отозвать доступ в настройках аккаунта Google самому.
+REVOKE_MANUALLY = "revoke_manually"
 
 
 def disconnect(
     user_id: str, *, keys: ClientKeys | None = None, opener: Opener = urllib.request.urlopen
 ) -> str:
-    """Отключить календарь. Ответ: `off`, `none` (не было) или `failed` (ключ не отозван)."""
+    """Отключить календарь.
+
+    Ответ: `off`, `none` (не было), `failed` (ключ не отозван — подключение остаётся) или
+    `revoke_manually` (ключ не открылся: запись стёрта, отозвать у Google нужно самому).
+    Отзыв клиентских реквизитов не требует (`/revoke` принимает один токен), поэтому он идёт и
+    без `GOOGLE_CLIENT_ID/SECRET`; без них только не снимаются события из календаря.
+    """
     if calendar_store.grant_of(user_id) is None:
         return NONE
     ключи = keys or keys_from_env()
     try:
         ключ = calendar_store.refresh_token_of(user_id)
     except secret_crypto.SecretCryptoError:
-        ключ = None
-    if ключ is not None and ключи is not None:
-        _remove_events(user_id, ключи, ключ, opener)
+        logger.warning("календарь: ключ не открылся — отзыв у Google только вручную")
+        calendar_store.delete_grant(user_id)
+        return REVOKE_MANUALLY
+    if ключ is not None:
+        if ключи is not None:
+            _remove_events(user_id, ключи, ключ, opener)
         try:
             revoke(ключ, opener=opener)
         except CalendarError as сбой:

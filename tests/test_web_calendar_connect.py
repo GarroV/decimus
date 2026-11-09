@@ -63,6 +63,10 @@ class База:
         self.сохранено: list[dict[str, str]] = []
         self.подключение: calendar_store.Grant | None = None
         self.проверка_sub = "ok"
+        self.старый: str | None = None
+
+    def refresh_token_of(self, user_id: str) -> str | None:
+        return self.старый
 
     def save_grant(
         self, user_id: str, *, google_email: str, scope: str, refresh_token: str
@@ -78,6 +82,7 @@ def база(monkeypatch: pytest.MonkeyPatch) -> База:
     двойник = База()
     monkeypatch.setattr(calendar_store, "save_grant", двойник.save_grant)
     monkeypatch.setattr(calendar_store, "grant_of", двойник.grant_of)
+    monkeypatch.setattr(calendar_store, "refresh_token_of", двойник.refresh_token_of)
     monkeypatch.setattr(
         calendar_connect, "claim_google_sub", lambda *_a, **_k: двойник.проверка_sub
     )
@@ -386,3 +391,117 @@ def test_партнёру_календарь_не_показывается(monke
         страница = client.get("/settings?tile=google").get_data(as_text=True)
 
         assert "google-calendar" not in страница
+
+
+# ── Партнёр: «только УК» держит сервер ──────────────────────────────────
+
+
+def test_партнёр_не_уводится_к_google_даже_прямым_запросом(
+    monkeypatch: pytest.MonkeyPatch, база: База
+) -> None:
+    for client in _стенд(monkeypatch, tenant="GE"):
+        ответ = client.post("/settings/google-calendar", headers=ЗАГОЛОВКИ)
+
+        assert ответ.status_code == 302
+        assert "google=calendar_hq" in ответ.headers["Location"]
+        assert "accounts.google.com" not in ответ.headers["Location"]
+
+
+def test_возврат_партнёра_ключ_не_сохраняет(
+    monkeypatch: pytest.MonkeyPatch, база: База, обмен: Обмен
+) -> None:
+    """Кука захода подписана, но учётка партнёра: даже подложенный возврат ничего не пишет."""
+    for client in _стенд(monkeypatch, tenant="HQ"):
+        метка, _ = начать(client, обмен)
+        monkeypatch.setattr(
+            auth,
+            "resolve_session",
+            lambda token: Учётка(
+                tenant="GE", role="admin", email=ПОЧТА, signed_in_at=datetime.now(UTC)
+            ),
+        )
+
+        assert вернуться(client, метка) == "calendar_hq"
+        assert база.сохранено == []
+
+
+# ── Переподключение: прежний ключ отзывается ────────────────────────────
+
+
+class _Google:
+    def __init__(self, *, отзыв_падает: bool = False, новый_жив: bool = True) -> None:
+        self.отозвано: list[str] = []
+        self.отзыв_падает, self.новый_жив = отзыв_падает, новый_жив
+
+    def revoke(self, token: str) -> None:
+        self.отозвано.append(token)
+        if self.отзыв_падает:
+            raise gcal_client.CalendarError("http_503")
+
+    def access_token(self, keys: object, token: str) -> str:
+        if not self.новый_жив:
+            raise gcal_client.CalendarError("invalid_grant")
+        return "короткий"
+
+
+def _переподключить(
+    ук: FlaskClient, база: База, обмен: Обмен, monkeypatch: pytest.MonkeyPatch, google: _Google
+) -> str:
+    база.старый = "прежний-ключ"
+    monkeypatch.setattr(calendar_connect, "revoke", google.revoke)
+    monkeypatch.setattr(calendar_connect, "access_token", google.access_token)
+    monkeypatch.setattr(calendar_connect, "keys_from_env", lambda: gcal_client.ClientKeys("к", "с"))
+    метка, _ = начать(ук, обмен)
+    return вернуться(ук, метка)
+
+
+def test_переподключение_отзывает_прежний_ключ(
+    ук: FlaskClient, база: База, обмен: Обмен, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    google = _Google()
+
+    assert _переподключить(ук, база, обмен, monkeypatch, google) == "calendar_on"
+    assert google.отозвано == ["прежний-ключ"]
+    assert [с["key"] for с in база.сохранено] == ["долгий-ключ"]
+
+
+def test_сбой_отзыва_прежнего_ключа_подключение_не_валит(
+    ук: FlaskClient, база: База, обмен: Обмен, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    google = _Google(отзыв_падает=True)
+
+    assert _переподключить(ук, база, обмен, monkeypatch, google) == "calendar_on"
+    assert [с["key"] for с in база.сохранено] == ["долгий-ключ"]
+
+
+def test_если_отзыв_прежнего_убил_и_новый_ключ_не_сохраняется(
+    ук: FlaskClient, база: База, обмен: Обмен, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    google = _Google(новый_жив=False)
+
+    assert _переподключить(ук, база, обмен, monkeypatch, google) == "calendar_failed"
+    assert база.сохранено == []
+
+
+def test_первое_подключение_ничего_не_отзывает(
+    ук: FlaskClient, база: База, обмен: Обмен, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    google = _Google()
+    база.старый = None
+    monkeypatch.setattr(calendar_connect, "revoke", google.revoke)
+    метка, _ = начать(ук, обмен)
+
+    assert вернуться(ук, метка) == "calendar_on"
+    assert google.отозвано == []
+
+
+def test_ключ_не_открылся_человеку_сказано_отозвать_самому(
+    ук: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(gcal_grant, "disconnect", lambda user_id: gcal_grant.REVOKE_MANUALLY)
+
+    ответ = ук.post("/settings/google-calendar-off", headers=ЗАГОЛОВКИ)
+
+    assert "google=calendar_manual" in ответ.headers["Location"]
+    страница = ук.get(ответ.headers["Location"]).get_data(as_text=True)
+    assert "настройках аккаунта Google" in страница

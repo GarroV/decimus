@@ -72,6 +72,8 @@ RESULTS: dict[str, tuple[str, bool]] = {
     "calendar_account": ("settings.calendar.done.account", False),
     "calendar_failed": ("settings.calendar.done.failed", False),
     "calendar_db": ("settings.calendar.done.db", False),
+    "calendar_manual": ("settings.calendar.done.manual", False),
+    "calendar_hq": ("settings.calendar.done.hq", False),
     "calendar_revoke": ("settings.calendar.done.revoke", False),
 }
 

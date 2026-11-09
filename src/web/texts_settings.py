@@ -441,6 +441,17 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "ru": "База не ответила — ничего не изменилось. Попробуйте позже.",
         "en": "The database did not respond — nothing changed. Try again later.",
     },
+    "settings.calendar.done.manual": {
+        "ru": "Календарь отключён у нас, но ключ не открылся и отозвать его у Google мы не смогли: "
+        "отзовите доступ в настройках аккаунта Google (Безопасность → Сторонние приложения).",
+        "en": "The calendar is disconnected on our side, but the key could not be opened and we "
+        "could not revoke it at Google: revoke the access in your Google account settings "
+        "(Security → Third-party apps).",
+    },
+    "settings.calendar.done.hq": {
+        "ru": "Календарь подключается только учётками управляющей компании.",
+        "en": "The calendar can only be connected by management company accounts.",
+    },
     "settings.calendar.done.revoke": {
         "ru": "Google не отозвал доступ — календарь остался подключённым. Повторите позже.",
         "en": "Google did not revoke the access — the calendar stays connected. Try again later.",

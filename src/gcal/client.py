@@ -35,10 +35,10 @@ REVOKE_ENDPOINT = "https://oauth2.googleapis.com/revoke"
 EVENTS_ENDPOINT = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 NETWORK_TIMEOUT_SECONDS = 10
 
-#: За сколько минут до начала дня сработает уведомление. API принимает 0–40320: «утром того
-#: же дня» у события на весь день он выразить не умеет (отсчёт — от полуночи дня события), поэтому
-#: 0 — уведомление в начале дня события.
-REMINDER_MINUTES_BEFORE_START = 0
+#: Уведомление — в 9:00 накануне срока: остаётся рабочий день, чтобы дописать отчёт. У события
+#: на весь день Google отсчитывает минуты от полуночи дня события, поэтому 15 ч до неё = 9:00
+#: предыдущего дня по часовому поясу календаря человека.
+REMINDER_MINUTES_BEFORE_START = 15 * 60
 
 GOOGLE_CLIENT_ID_VAR = "GOOGLE_CLIENT_ID"
 GOOGLE_CLIENT_SECRET_VAR = "GOOGLE_CLIENT_SECRET"  # noqa: S105 — ИМЯ переменной

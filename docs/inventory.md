@@ -424,8 +424,8 @@
 | `FRAMES_DIR` | `src/bot/frame_copies.py` | да |
 | `FURCA_NOTIFY_URL` | `src/notify/furca.py` | да |
 | `FURCA_SECRET` | `src/notify/furca.py` | да |
-| `GOOGLE_CLIENT_ID` | `src/web/google_auth.py` | да |
-| `GOOGLE_CLIENT_SECRET` | `src/web/google_auth.py` | да |
+| `GOOGLE_CLIENT_ID` | `src/gcal/client.py`, `src/web/google_auth.py` | да |
+| `GOOGLE_CLIENT_SECRET` | `src/gcal/client.py`, `src/web/google_auth.py` | да |
 | `GOOGLE_FRONT_REDIRECT_URI` | `src/web/google_auth.py` | да |
 | `GOOGLE_HQ_DOMAINS` | `src/web/google_auth.py` | да |
 | `GOOGLE_MAIL_REDIRECT_URI` | `src/web/google_mail.py` | да |

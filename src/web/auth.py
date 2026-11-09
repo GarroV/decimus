@@ -946,6 +946,8 @@ def install(app: Flask, conf: Settings) -> None:
         account = resolve_session(token) if token else None
         if account is None or token is None:
             return redirect(url_for("login"))
+        if not calendar_connect.may_connect(account.tenant):
+            return google_link.back_to_settings("calendar_hq")
         if request.args.get("error"):
             return google_link.back_to_settings("calendar_denied")
         код = request.args.get("code") or ""

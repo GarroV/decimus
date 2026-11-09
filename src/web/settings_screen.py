@@ -55,6 +55,7 @@ from . import (
     account_menu,
     accounts,
     auth,
+    calendar_connect,
     google_link,
     guard,
     home_board,
@@ -524,7 +525,9 @@ def _start_google_link(conf: Settings, base: str) -> Response:
 def _start_google_calendar(conf: Settings, base: str) -> Response:
     """Увести к Google за правом на календарь: кнопка и выполнение после подтверждения."""
     вошедший = auth.current_account()
-    if вошедший is None or not getattr(вошедший, "email", None):
+    if вошедший is None or not calendar_connect.may_connect(getattr(вошедший, "tenant", None)):
+        return google_link.back_to_settings("calendar_hq")
+    if not getattr(вошедший, "email", None):
         # Без привязанной почты Google сверять, чей доступ выдан, не с чем.
         return google_link.back_to_settings("calendar_account")
     return auth.begin_google_calendar()
@@ -676,6 +679,10 @@ def _install_calendar(app: Flask, base: str, conf: Settings) -> None:
     def settings_calendar_on() -> Response:
         """Увести к Google за правом на календарь. Только POST со своей страницы."""
         refuse_foreign_origin()
+        # «Только УК» держит сервер, а не только шаблон (скрытая кнопка — не защита).
+        вошедший = auth.current_account()
+        if вошедший is None or not calendar_connect.may_connect(getattr(вошедший, "tenant", None)):
+            return google_link.back_to_settings("calendar_hq")
         # Создаёт долгоживущий доступ — только по свежему входу (`reauth`).
         if (
             переспрос := reauth.require_fresh(f"{base}?tile=google", "google-calendar")
@@ -694,6 +701,8 @@ def _install_calendar(app: Flask, base: str, conf: Settings) -> None:
             return google_link.back_to_settings("calendar_db")
         if итог == calendar_grant.FAILED:
             return google_link.back_to_settings("calendar_revoke")
+        if итог == calendar_grant.REVOKE_MANUALLY:
+            return google_link.back_to_settings("calendar_manual")
         if итог == calendar_grant.OFF:
             logger.info("календарь: %s отключил Google Календарь", log_id(_current_id()))
         return google_link.back_to_settings("calendar_off" if итог == calendar_grant.OFF else None)

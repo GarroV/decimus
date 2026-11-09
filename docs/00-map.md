@@ -200,7 +200,7 @@ Flask-приложение управляющей компании и партн
 «Подключения» (состояние подключений, D638) и «Ключи и API» (ключи сервисов и ключи API, D650), подключение
 Claude входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,peek,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,calendar_connect,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,peek,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -209,6 +209,7 @@ Claude входом через сайт (OAuth).
 | `src/web/admin_health.py` | Блок «Состояние подключений» вкладки «Подключения» (D638, #1251): строки и итог |
 | `src/web/administration.py` | Раздел «Администрирование» (D639, #1251): все настройки сервиса, вкладки по роли |
 | `src/web/auth.py` | Вход в админку: форма, сессия в подписанной куке, выход (T323, D155) |
+| `src/web/calendar_connect.py` | Подключить и отключить Google Календарь из «Настроек» (D740, D741, #1590) |
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
 | `src/web/connections_screen.py` | Вкладки «Подключения» и «Ключи и API» раздела «Администрирование» (D638, D639, D650) |
 | `src/web/demo_entry.py` | Вход в открытое демо (D524): выбор роли и сессия без пароля — только на стенде демо |
@@ -399,10 +400,11 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{batch_letters,checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
+<!-- map:begin files src/db/{batch_letters,calendar_store,checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/batch_letters.py` | D739 (#1579): общее письмо партнёру по нескольким проверкам, зафиксированное человеком |
+| `src/db/calendar_store.py` | Доступ человека к Google Календарю и события срока отчёта в базе (D740, D741, #1590) |
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
 | `src/db/config.py` | Окружение блока: где Postgres |
 | `src/db/database_target.py` | Куда ведёт строка подключения — и все ли подключения ведут в одну базу (#487) |
@@ -810,6 +812,19 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/routers/stops.py` | `/stops` — счётчик отказов мастера за период, только админам (#436) |
 | `src/bot/routers/unit.py` | «Сменить пиццерию» посреди обхода (D628): если проверку завели не на ту точку |
 | `src/bot/routers/version.py` | Команда «какая это сборка» (T246, #201) |
+<!-- map:end -->
+
+
+## Google Календарь: срок отчёта (`src/gcal/`)
+
+Событие срока отчёта в календаре проверяющего (`docs/39-calendar-deadline.md`, D740, D741): клиент Google, сводка календаря с проверками, отключение. Расписание — `src/bot/calendar_loader.py`, согласие — `src/web/calendar_connect.py`, хранение — `src/db/calendar_store.py`, правило срока — `src/domain/report_deadline.py`.
+
+<!-- map:begin files src/gcal/*.py -->
+| Файл | Что делает |
+|---|---|
+| `src/gcal/client.py` | Разговор с Google Календарём: продление доступа, события, отзыв ключа |
+| `src/gcal/grant.py` | Отключить календарь: убрать события, отозвать ключ у Google, стереть у себя (D741, #1590) |
+| `src/gcal/sync.py` | Событие срока отчёта в календаре проверяющего: свести календарь с проверками (D740, #1590) |
 <!-- map:end -->
 
 ## src/learning — обучение из iSpring

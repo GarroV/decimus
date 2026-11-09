@@ -33,7 +33,15 @@ from src.db import calendar_store, secret_crypto
 from src.db.errors import DbError
 from src.db.web_access import claim_google_sub
 from src.domain.log_ids import log_id
-from src.gcal.client import EVENTS_SCOPE, reason_code
+from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.gcal.client import (
+    EVENTS_SCOPE,
+    CalendarError,
+    access_token,
+    keys_from_env,
+    reason_code,
+    revoke,
+)
 
 from .google_auth import (
     AUTHORIZATION_ENDPOINT,
@@ -50,6 +58,11 @@ logger = logging.getLogger(__name__)
 KIND = "calendar"
 
 CONSENT_SCOPES = ("openid", "email", EVENTS_SCOPE)
+
+
+def may_connect(tenant: str | None) -> bool:
+    """Календарь подключают только учётки УК: события ставятся по проверкам пространства УК."""
+    return canonical_tenant(tenant or "") == HQ_TENANT
 
 
 def nonce_for(state: str) -> str:
@@ -136,6 +149,36 @@ def exchange(settings: GoogleSettings, *, code: str) -> CalendarConsent:
     )
 
 
+def _retire_previous_key(user_id: str, new_key: str) -> bool:
+    """Отозвать прежний ключ продления перед заменой: старый не должен остаться действующим.
+
+    Сбой отзыва — в лог, подключение не валим. Но отзыв ключа Google может снять и общее
+    согласие, из-за чего новый ключ тоже умирает; поэтому после отзыва новый ключ пробуется, и
+    если он не работает — подключение не сохраняется (`False`), а человек подключает заново.
+    """
+    try:
+        старый = calendar_store.refresh_token_of(user_id)
+    except (DbError, secret_crypto.SecretCryptoError):
+        logger.warning("календарь: прежний ключ %s не прочитан — не отозван", log_id(user_id))
+        return True
+    if not старый or старый == new_key:
+        return True
+    try:
+        revoke(старый)
+    except CalendarError as сбой:
+        logger.warning("календарь: прежний ключ %s не отозван (%s)", log_id(user_id), сбой.code)
+        return True
+    keys = keys_from_env()
+    if keys is None:
+        return True
+    try:
+        access_token(keys, new_key)
+    except CalendarError as сбой:
+        logger.warning("календарь: после отзыва прежнего ключа новый не работает (%s)", сбой.code)
+        return False
+    return True
+
+
 def finish(*, user_id: str, account_email: str | None, state: str, consent: CalendarConsent) -> str:
     """Проверить выданное и сохранить ключ. Ответ — ключ `google_link.RESULTS`.
 
@@ -162,6 +205,8 @@ def finish(*, user_id: str, account_email: str | None, state: str, consent: Cale
     if EVENTS_SCOPE not in consent.scopes:
         logger.info("календарь: подключение %s — право на события не выдано", кто)
         return "calendar_scope"
+    if not _retire_previous_key(user_id, consent.refresh_token):
+        return "calendar_failed"
     try:
         calendar_store.save_grant(
             user_id,
