@@ -216,7 +216,9 @@ def _screen(
             "code": c,
             "title": country_title(c, lang),
             "pct": percent_text(tm.trained_pct(_total(u.counters for u in us if u.matched))),
-            "meta": t("training.rail.units", lang, n=len(us)),
+            # Только сопоставленные: их же считает таблица справа и перечисляет список ниже
+            # (#1607); несопоставленные — в блоке «Не сопоставлены».
+            "meta": t("training.rail.units", lang, n=sum(1 for u in us if u.matched)),
             "href": link(c),
             "on": c == code,
             "units": tuple(

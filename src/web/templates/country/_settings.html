@@ -237,7 +237,7 @@
                 </td>
                 <td data-label="{{ t('country.card.col.stage') }}">
                   {{ badge(t('unit.stage.' ~ r.stage), {'open': 'ok', 'pipeline': 'warn', 'paused': 'warn', 'closed': 'err'}.get(r.stage, '')) }}
-                  {% if r.status and r.status != t('unit.stage.' ~ r.stage) %}<span class="ccard__aliases">{{ r.status }}</span>{% endif %}
+                  {% if extra_status(r.stage, r.status) %}<span class="ccard__aliases">{{ r.status }}</span>{% endif %}
                 </td>
                 <td data-label="{{ t('country.card.col.dates') }}" class="ccard__dates">
                   {% if r.is_closed %}

@@ -222,6 +222,30 @@ def test_где_болит_одним_блоком_и_только_при_про
     assert страница.count('cn-hurt"') == 1 and "K-041" in страница and "Чистота" in страница
 
 
+def test_подзаголовок_колонки_где_болит_только_когда_колонок_две(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1608: у единственной колонки подзаголовок повторял заголовок блока «Где болит»."""
+    вид = данные()
+    страница = открыть(стенд, monkeypatch, вид, "/country/GE")
+    колонок = страница.count('class="cn-hurt__col"')
+    подзаголовков = страница.count('class="cn-sub"')
+    assert подзаголовков == (колонок if колонок == 2 else 0), (колонок, подзаголовков)
+    только_одна = replace(вид, snapshot=replace(вид.snapshot, process_losses=()))
+    страница = открыть(стенд, monkeypatch, только_одна, "/country/GE")
+    assert страница.count('class="cn-hurt__col"') == 1 and 'class="cn-sub"' not in страница
+
+
+def test_сырой_статус_свода_не_повторяет_стадию() -> None:
+    from src.web.texts import extra_status
+
+    assert extra_status("open", "Open") == ""  # «Работает» рядом с «Open» — дубль
+    assert extra_status("open", "работает") == ""
+    assert extra_status("closed", "") == ""
+    assert extra_status("open", "Ресторан открыт") == "Ресторан открыт"
+    assert extra_status("pipeline", "Строится") == "Строится"
+
+
 def test_смена_языка_оставляет_страну_и_раскрытую_точку(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -270,6 +294,45 @@ def test_без_страны_в_адресе_справа_первая_стра�
     assert (
         "pk-item is-on" in колонка and "/country/GE" in колонка.split("pk-item is-on", 1)[1][:200]
     )
+
+
+def test_параметр_country_выбирает_страну_а_не_первую(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`/country?country=RS` (#1606) ведёт на экран Сербии, период и язык не теряются."""
+    monkeypatch.setattr(cn, "countries", lambda **_: (("GE", 3), ("RS", 2)))
+    ответ = стенд.get("/country?country=rs&period=month&lang=en")
+    assert ответ.status_code == 302
+    адрес = ответ.headers["Location"]
+    assert adres_path(адрес) == "/country/RS"
+    assert "period=month" in адрес and "lang=en" in адрес and "country=" not in адрес
+
+
+def adres_path(адрес: str) -> str:
+    return адрес.split("?", 1)[0]
+
+
+@pytest.mark.parametrize("адрес", ["/country?country=RS", "/countries"])
+def test_редирект_страны_не_принимает_служебные_параметры_url_for(
+    стенд: FlaskClient, адрес: str
+) -> None:
+    """`_external`/`_host`/`_scheme`/`_anchor` из адреса не доходят до `url_for`: редирект
+    остаётся на нашем хосте, чужой домен в Location не попадает."""
+    ответ = стенд.get(
+        f"{адрес}{'&' if '?' in адрес else '?'}_external=1&_host=evil.example"
+        "&_scheme=https&_anchor=x&period=all"
+    )
+    assert ответ.status_code in (301, 302)
+    куда = ответ.headers["Location"]
+    assert куда.startswith("/"), куда
+    assert "evil.example" not in куда and "_external" not in куда and "#" not in куда
+    assert "period=all" in куда
+
+
+def test_старый_адрес_countries_ведёт_на_экран_стран(стенд: FlaskClient) -> None:
+    ответ = стенд.get("/countries")
+    assert ответ.status_code == 301
+    assert adres_path(ответ.headers["Location"]) == "/country"
 
 
 def test_обрезанный_срез_страны_экран_называет_вслух(

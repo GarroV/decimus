@@ -36,6 +36,7 @@ import logging
 from collections.abc import Callable
 from datetime import date
 from typing import Any
+from urllib.parse import urlencode
 
 from flask import abort, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
@@ -590,6 +591,29 @@ def _one_country(
         "truncated": data.truncated,
         "country_name": country_title(вид.code, lang),
     }
+
+
+#: Ключи среза экрана страны, которые переезжают при редиректе. Белый список: адрес собирается
+#: только из них, а не из всего `request.args` (иначе `?_external=1&_host=…` через `url_for`
+#: уводил бы на чужой домен).
+SLICE_KEYS = ("period", "from", "to", "dev", "q", "unit", "fold", "lang", "inspection")
+
+
+def slice_query() -> str:
+    """Строка `?k=v` из разрешённых ключей среза; пусто, если нечего переносить."""
+    kept = [(k, v) for k in SLICE_KEYS if (v := request.args.get(k, "").strip()[:200])]
+    return f"?{urlencode(kept)}" if kept else ""
+
+
+def country_param_redirect() -> Response | None:
+    """`/country?country=XX` — страна в параметре, а не в пути (#1606): ведёт на `/country/XX`.
+
+    Переезжает только срез из `SLICE_KEYS`. Чужая страна и несуществующий код разбирает уже
+    экран страны: 404 вне охвата, пустой экран на непонятное."""
+    code = country_data.normalize_code(request.args.get("country", ""))
+    if not code:
+        return None
+    return redirect(url_for("country", code=code) + slice_query())
 
 
 def index_redirect(lang_in_url: bool, lang: str) -> Response | None:

@@ -181,6 +181,12 @@ def test_чужая_страна_партнёру_404_и_не_читается(
     assert чтения == {"load": [], "profiles": []}
 
 
+def test_чужая_страна_в_параметре_ведёт_в_то_же_404(партнёр: FlaskClient) -> None:
+    """`?country=RS` (#1606) доступ не обходит: редирект на `/country/RS`, где партнёру 404."""
+    ответ = партнёр.get("/country?country=RS", follow_redirects=True)
+    assert ответ.status_code == 404
+
+
 def test_чужая_страна_отвечает_как_несуществующий_адрес(партнёр: FlaskClient) -> None:
     нет = партнёр.get("/nothing-here-at-all")
     ответ = партнёр.get("/country/RS")

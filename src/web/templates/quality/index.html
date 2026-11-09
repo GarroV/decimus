@@ -40,7 +40,7 @@
   {% for c in columns if c.group %}<th class="qa-num{{ ' qa-edge' if c.edge else '' }}"{% if c.on %} aria-sort="{{ 'descending' if c.desc else 'ascending' }}"{% endif %}>{{ sort_link(c, c.label) }}</th>{% endfor %}
   </tr>
 {% endmacro %}
-{% macro tds(row_cells) %}{% for c in row_cells %}<td class="qa-num{% if c.tone %} qa-tone--{{ c.tone }}{% endif %}{% if c.edge %} qa-edge{% endif %}">{{ c.text }}{{ delta(c.delta) }}{% if c.incomplete %}<span class="qa-delta qa-incomplete">{{ t('quality.cell.incomplete', pct=c.incomplete) }}</span>{% endif %}</td>{% endfor %}{% endmacro %}
+{% macro tds(row_cells) %}{% for c in row_cells %}<td class="qa-num{% if c.tone %} qa-tone--{{ c.tone }}{% endif %}{% if c.edge %} qa-edge{% endif %}">{% if c.href %}<a href="{{ c.href }}">{{ c.text }}</a>{% else %}{{ c.text }}{% endif %}{{ delta(c.delta) }}{% if c.incomplete %}<span class="qa-delta qa-incomplete">{{ t('quality.cell.incomplete', pct=c.incomplete) }}</span>{% endif %}</td>{% endfor %}{% endmacro %}
 
 {% block pick_work %}
 {% if failed %}
@@ -99,7 +99,7 @@
         <thead>{{ th_row(columns, t('quality.col.unit')) }}</thead>
         <tbody>
           <tr class="qa-total"><td>{{ t('quality.total') }}</td>{{ tds(view.total) }}</tr>
-        {% for u in view.units %}<tr><td>{{ u.name }}</td>{{ tds(u.cells) }}</tr>{% endfor %}
+        {% for u in view.units %}<tr><td>{% if u.href %}<a href="{{ u.href }}">{{ u.name }}</a>{% else %}{{ u.name }}{% endif %}</td>{{ tds(u.cells) }}</tr>{% endfor %}
         </tbody>
       </table></div>
     {% endcall %}

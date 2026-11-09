@@ -12,7 +12,7 @@
 <div class="rt-section">
   <div class="pk-tiles" style="--pk-cols: {{ [agg.tiles|length, 6]|min }}">
     {% for tl in agg.tiles %}
-    {% call stat(platform_names.get(tl.platform, tl.platform), t('ratings.agg.tile.sub', n=tl.linked, m=tl.expected)) %}{% if tl.score %}{{ agg_score(tl.score.avg, tl.score.scale) }}{% else %}<span class="is-empty">—</span>{% endif %}{% endcall %}
+    {% call stat(platform_names.get(tl.platform, tl.platform), t('ratings.agg.tile.sub', n=tl.linked, m=tl.expected) if tl.expected else none) %}{% if tl.score %}{{ agg_score(tl.score.avg, tl.score.scale) }}{% else %}<span class="is-empty">—</span>{% endif %}{% endcall %}
     {% endfor %}
   </div>
 

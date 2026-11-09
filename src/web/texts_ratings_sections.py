@@ -41,6 +41,10 @@ SECTION_TEXTS: dict[str, dict[str, str]] = {
     "ratings.src.checked.sub": {"ru": "работающих пиццерий", "en": "working pizzerias"},
     "ratings.src.countries": {"ru": "По странам", "en": "By country"},
     "ratings.src.col.country": {"ru": "Страна", "en": "Country"},
+    "ratings.unit.external": {
+        "ru": "Страница пиццерии в рейтинге Dodo IS (откроется в новой вкладке)",
+        "en": "Pizzeria page in the Dodo IS rating (opens in a new tab)",
+    },
     "ratings.src.col.violations": {"ru": "Нарушений", "en": "Violations"},
     "ratings.src.col.hard": {"ru": "Хард", "en": "Hard"},
     "ratings.src.col.units": {"ru": "Пиццерий", "en": "Pizzerias"},
