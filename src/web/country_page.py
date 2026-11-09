@@ -592,6 +592,21 @@ def _one_country(
     }
 
 
+def country_param_redirect() -> Response | None:
+    """`/country?country=XX` — страна в параметре, а не в пути (#1606): ведёт на `/country/XX`.
+
+    Остальной срез адреса (период, поиск, девелопер) переезжает как есть. Чужая страна и
+    несуществующий код разбирает уже экран страны: 404 вне охвата, пустой экран на непонятное."""
+    raw = request.args.get("country", "").strip()
+    if not raw:
+        return None
+    code = country_data.normalize_code(raw)
+    if not code:
+        return None
+    rest = {k: v for k, v in request.args.items() if k != "country" and v}
+    return redirect(url_for("country", code=code, **rest))
+
+
 def index_redirect(lang_in_url: bool, lang: str) -> Response | None:
     """Единственная страна (после отбора «Мои страны») без отбора девелопера — сразу в неё."""
     страны, _ = _filtered(country_data.countries(reach=auth.current_reach()), None, lang)

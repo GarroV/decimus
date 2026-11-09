@@ -579,6 +579,10 @@ def _register_country(app: Flask, conf: Settings) -> None:
     @app.get(section("country").path, endpoint="country_index")
     def country_index() -> Any:
         язык = _lang(conf)
+        # Страна в параметре (`?country=XX`, #1606) — на экран этой страны.
+        по_параметру = country_page.country_param_redirect()
+        if по_параметру is not None:
+            return по_параметру
         # Язык переезжает, только если его выбрали в адресе: иначе переход в
         # единственную страну вешал бы `?lang=` умолчания.
         переход = country_page.index_redirect(bool(request.args.get("lang")), язык)
@@ -595,6 +599,11 @@ def _register_country(app: Flask, conf: Settings) -> None:
             kind_title=_kind_title,
             card=_registry_panel(request.args.get("inspection", "").strip()[:64], conf=conf),
         )
+
+    @app.get("/countries")
+    def countries_alias() -> Response:
+        # Старый адрес списка стран (был 404): список теперь — левая колонка «Стран».
+        return redirect(url_for("country_index", **request.args), 301)
 
     @app.get(section("country").path + "/<code>", endpoint="country")
     def country(code: str) -> Any:

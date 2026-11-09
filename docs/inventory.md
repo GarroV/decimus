@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 226 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 227 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -113,6 +113,7 @@
 | `/calendar/trips/<trip_id>/delete` | POST | `trip_delete` | `src/web/calendar_screen.py` |
 | `/calendar/trips/<trip_id>/steps` | POST | `trip_step_add` | `src/web/calendar_screen.py` |
 | `/calendar/trips/<trip_id>/steps/<step_id>/delete` | POST | `trip_step_delete` | `src/web/calendar_screen.py` |
+| `/countries` | GET | `countries_alias` | `src/web/app.py` |
 | `/country` | GET | `country_index` | `src/web/app.py` |
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
 | `/country/<code>/batch-letter/draft` | POST | `batch_letter_draft` | `src/web/batch_letter.py` |

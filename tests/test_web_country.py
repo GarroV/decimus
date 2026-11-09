@@ -272,6 +272,28 @@ def test_без_страны_в_адресе_справа_первая_стра�
     )
 
 
+def test_параметр_country_выбирает_страну_а_не_первую(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`/country?country=RS` (#1606) ведёт на экран Сербии, период и язык не теряются."""
+    monkeypatch.setattr(cn, "countries", lambda **_: (("GE", 3), ("RS", 2)))
+    ответ = стенд.get("/country?country=rs&period=month&lang=en")
+    assert ответ.status_code == 302
+    адрес = ответ.headers["Location"]
+    assert adres_path(адрес) == "/country/RS"
+    assert "period=month" in адрес and "lang=en" in адрес and "country=" not in адрес
+
+
+def adres_path(адрес: str) -> str:
+    return адрес.split("?", 1)[0]
+
+
+def test_старый_адрес_countries_ведёт_на_экран_стран(стенд: FlaskClient) -> None:
+    ответ = стенд.get("/countries")
+    assert ответ.status_code == 301
+    assert adres_path(ответ.headers["Location"]) == "/country"
+
+
 def test_обрезанный_срез_страны_экран_называет_вслух(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
