@@ -62,11 +62,13 @@ def mount(page, lang):
 @pytest.mark.parametrize("lang", ["ru", "en"])
 def test_zone_screen_tap_targets_and_feed(page, lang):
     mount(page, lang)
+    page.locator(".walk-more > .walk-cl__head").click()
+    page.wait_for_timeout(400)
     got = page.evaluate("""()=>{
       const small=[];
-      document.querySelectorAll('#walk button, #walk-zones-sheet button').forEach(b=>{
+      document.querySelectorAll('#walk button, #walk-zones-sheet button, #walk .walk-cl__act').forEach(b=>{
         const r=b.getBoundingClientRect(); if(!r.width||!r.height) return;
-        if(b.closest('.walk-zsheet__scrim,.walk-cl__wrap')) return;
+        if(b.closest('.walk-zsheet__scrim')) return;
         const need=b.classList.contains('walk-fix')?48:44;
         if(r.height<need-0.5||r.width<44-0.5) small.push([b.className,Math.round(r.width),Math.round(r.height)]);
       });

@@ -62,13 +62,21 @@
     }
 
     if (info.length) {
-      var line = el("p", "walk-unseen__info");
-      line.appendChild(el("span", "walk-unseen__label", tx("walk.unseen.info")));
+      // Замеры — такими же строками, как пункты выше: подпись, под ней строка-кнопка с «+».
+      var line = el("div", "walk-unseen__info");
+      line.appendChild(el("p", "walk-unseen__label", tx("walk.unseen.info")));
+      var rows = el("ul", "walk-cl__list");
       info.forEach(function (i) {
-        line.appendChild(W.button("walk-unseen__link", i.q, function () {
+        var li = el("li");
+        var b = W.button("walk-cl__item", null, function () {
           W.sheet.open({ mode: "measure", zone: zone.code, code: i.code, level: "D0" });
-        }));
+        });
+        b.appendChild(el("span", "walk-cl__text", i.q));
+        b.appendChild(el("span", "walk-cl__act", "+"));
+        li.appendChild(b);
+        rows.appendChild(li);
       });
+      line.appendChild(rows);
       box.appendChild(line);
     }
     return box;

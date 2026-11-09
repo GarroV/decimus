@@ -72,7 +72,10 @@
       if (!box.isConnected) { stop(); return; }
       var delta = active ? (performance.now() - anchor.at) / 1000 : 0;
       if (!Number.isFinite(delta) || delta < 0) { stop(); unknown(box, "walk.timing.unavailable"); return; }
-      value.textContent = (active ? "≈ " : "") + elapsed(active ? anchor.seconds + delta : finalSeconds);
+      var shown = elapsed(active ? anchor.seconds + delta : finalSeconds);
+      value.textContent = (active ? "≈ " : "") + shown;
+      // Знак «≈» экранный диктор не читает: подпись говорит словами.
+      if (active) value.setAttribute("aria-label", W.tx("walk.timing.approx", { time: shown }));
     }
     update();
     if (active && !box.classList.contains("is-unknown")) timer = window.setInterval(update, 1000);

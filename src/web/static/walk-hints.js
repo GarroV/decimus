@@ -368,9 +368,13 @@
       hiddenChecklist[key] = hidden;
       item.hidden = hidden;
       row.classList.toggle("is-hidden", hidden);
-      toggle.textContent = tx(hidden ? "walk.cl.show" : "walk.cl.hide");
+      var label = tx(hidden ? "walk.cl.show" : "walk.cl.hide");
+      // Скрыть — компактная иконка в строке пункта; показать — словами, чтобы строка не была пустой.
+      toggle.textContent = "";
+      toggle.classList.toggle("is-label", hidden);
+      if (hidden) toggle.textContent = label; else toggle.appendChild(W.icon("eyeoff"));
       toggle.setAttribute("aria-expanded", String(!hidden));
-      toggle.setAttribute("aria-label", toggle.textContent + ": " + item.querySelector(".walk-cl__text").textContent);
+      toggle.setAttribute("aria-label", label + ": " + item.querySelector(".walk-cl__text").textContent);
     }
     row.appendChild(toggle);
     setHidden(!!hiddenChecklist[key]);
