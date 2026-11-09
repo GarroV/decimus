@@ -328,7 +328,7 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "t": lambda key, **params: t(key, lang, **params),
             # Страна и город в справочнике — коды; на экран они идут словом.
             "city_title": lambda code: city_title(code, lang),
-            # Сырой статус свода («Open») рядом со стадией — только если он что-то добавляет (#1608).
+            # Сырой статус свода («Open») рядом со стадией — только если он что-то добавляет.
             "extra_status": lambda stage, status: extra_status(stage, status),
             "country_title": lambda code: country_title(code, lang),
             # Дата на экран — месяцем словом: `10.12.2026` путают с октябрём (#963).

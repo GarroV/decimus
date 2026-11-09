@@ -59,3 +59,20 @@ def test_dodois_rating_periods_win_over_the_control_sheet(
     assert "РКО и РС: Dodo IS, где есть" in html
     assert ">99.0<" in html  # РКО: среднее недель Dodo IS, а не 90.9 из таблицы
     assert ">11.0<" in html  # проверок в неделю: среднее по неделям Dodo IS
+
+
+def test_control_gets_no_links_to_screens_it_cannot_open(
+    monkeypatch: pytest.MonkeyPatch, чтения: None
+) -> None:
+    """#1603: у контроля экрана страны нет — имя пиццерии остаётся текстом, а не ссылкой в 403."""
+    from src.db import directory
+
+    monkeypatch.setattr(
+        directory,
+        "list_units",
+        lambda **_: [directory.Unit("unit-pl1", "Warsaw-1", PL1, (), "PL")],
+    )
+    for client in _client(monkeypatch, role="control"):
+        html = client.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
+        assert "Warsaw-1" in html
+        assert "unit=unit-pl1" not in html

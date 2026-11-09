@@ -177,6 +177,25 @@ def test_country_page_shows_all_blocks_and_core_numbers(ук: FlaskClient) -> No
     assert "Приложение" in html  # источник заказа переведён, а не «MobileApp»
 
 
+def test_unit_name_and_audit_cell_link_to_unit_screen(
+    ук: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1603: имя пиццерии ведёт на её экран, «Проверка» — к самой проверке; у пиццерии вне
+    справочника (нет цели) имя остаётся текстом."""
+    from src.db import directory
+
+    monkeypatch.setattr(
+        directory,
+        "list_units",
+        lambda **_: [directory.Unit("unit-pl1", "Warsaw-1", PL1, (), "PL")],
+    )
+    monkeypatch.setattr(quality_read, "audit_inspections", lambda *a, **k: {PL1: "insp-7"})
+    html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
+    assert re.search(r'<a href="/country/PL\?[^"]*unit=unit-pl1[^"]*">Warsaw-1</a>', html)
+    assert re.search(r'<a href="/country/PL\?[^"]*inspection=insp-7[^"]*">90\.0</a>', html)
+    assert "<td>Krakow-1</td>" in html  # в справочнике его нет — текст, не ссылка
+
+
 def test_periods_block_falls_back_to_stored_scores_when_dodois_has_none(
     ук: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

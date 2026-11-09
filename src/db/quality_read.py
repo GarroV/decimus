@@ -84,9 +84,9 @@ def period_scores(countries: Sequence[str], month: date) -> tuple[PeriodScore, .
 
 
 _AUDIT_SQL = """
-select code, pct
+select code, pct, inspection_id
 from (
-    select u.code, i.pct,
+    select u.code, i.pct, i.id as inspection_id,
            row_number() over (
                partition by u.id order by i.inspection_date desc, i.pushed_at desc
            ) as n
@@ -103,17 +103,29 @@ where n = 1
 """
 
 
-def audit_pcts(reach: Reach, countries: Sequence[str], month: date) -> dict[str, Decimal]:
-    """Процент последней принятой проверки decimus в месяце, по коду пиццерии (32 hex).
-
-    Исторические проверки (`origin = 'legacy'`, D332) не участвуют: их оценка перенесена
-    из старого отчёта. Охват — вошедшего: партнёр читает проверки своего пространства."""
+def _audit_rows(
+    reach: Reach, countries: Sequence[str], month: date
+) -> list[tuple[str, Decimal, str]]:
     охват = _require_reach(reach)
     if not countries:
-        return {}
+        return []
     with _reading("проверки для «Качества»") as conn, conn.cursor() as cur:
         cur.execute(
             _AUDIT_SQL,
             {**охват.params(), "slice": list(countries), "begin": month, "end": next_month(month)},
         )
-        return {str(code): Decimal(pct) for code, pct in cur.fetchall()}
+        return [(str(code), Decimal(pct), str(iid)) for code, pct, iid in cur.fetchall()]
+
+
+def audit_inspections(reach: Reach, countries: Sequence[str], month: date) -> dict[str, str]:
+    """Идентификатор той же последней проверки, чей процент в `audit_pcts`: ссылка из ячейки
+    «Проверка» (#1603)."""
+    return {code: iid for code, _, iid in _audit_rows(reach, countries, month)}
+
+
+def audit_pcts(reach: Reach, countries: Sequence[str], month: date) -> dict[str, Decimal]:
+    """Процент последней принятой проверки decimus в месяце, по коду пиццерии (32 hex).
+
+    Исторические проверки (`origin = 'legacy'`, D332) не участвуют: их оценка перенесена
+    из старого отчёта. Охват — вошедшего: партнёр читает проверки своего пространства."""
+    return {code: pct for code, pct, _ in _audit_rows(reach, countries, month)}

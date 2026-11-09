@@ -15,7 +15,10 @@
 {% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
 {#- Знак и цвет — по уже округлённой дельте: −0.04 показывается и красится как +0.0 (P17). -#}
 {% macro dlt(x, digits=1) %}{% if x is none %}<span class="rt-delta is-empty">—</span>{% else %}{% set r = (x|round(digits)) + 0.0 %}<span class="rt-delta {{ 'rt-delta--up' if r >= 0 else 'rt-delta--down' }}"><span class="rt-delta__arrow" aria-hidden="true">{{ '▲' if r >= 0 else '▼' }}</span>{{ ('%+.' ~ digits ~ 'f')|format(r) }}</span>{% endif %}{% endmacro %}
-{% macro unit_link(unit, name, kind) %}<a href="{{ unit_url(unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ name }}</a>{% endmacro %}
+{#- Имя пиццерии — на её экран в «Странах» (#1603); внешний Dodo IS — второй, значком. Нет цели
+    (нет права или пиццерии нет в справочнике) — прежняя внешняя ссылка по имени. -#}
+{% macro unit_link(unit, name, kind) %}{% set h = unit_href(unit) %}{% if h %}<a href="{{ h }}">{{ name }}</a> <a class="rt-ext" href="{{ unit_url(unit, kind) }}" target="_blank" rel="noopener noreferrer" aria-label="{{ t('ratings.unit.external') }}" title="{{ t('ratings.unit.external') }}">{{ icon('link') }}</a>{% else %}<a href="{{ unit_url(unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ name }}</a>{% endif %}{% endmacro %}
+{% macro country_cell(code) %}{% set h = country_href(code) %}{% if h %}<a href="{{ h }}">{{ country_name(code) }}</a>{% else %}{{ country_name(code) }}{% endif %}{% endmacro %}
 {#- Оценка агрегатора в его родной шкале: Wolt — из 10, Glovo — %, остальные — из 5. -#}
 {% macro agg_score(avg, scale) %}{% if scale == 100 %}{{ '%.1f'|format(avg) }}%{% elif scale == 10 %}{{ '%.1f'|format(avg) }}<span class="rt-src__scale">/10</span>{% else %}{{ '%.2f'|format(avg) }}<span class="rt-src__scale">/5</span>{% endif %}{% endmacro %}
 {#- Плитка ключевой цифры раздела: подпись, значение, строка под ним. -#}

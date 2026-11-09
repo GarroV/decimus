@@ -18,20 +18,21 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from flask import Flask, abort, render_template, request, url_for
 
-from src.db import dodois_metrics
+from src.db import dodois_metrics, quality_read
 from src.db import ratings_read as read
 from src.db.errors import DbError, RatingsError
 from src.domain import quality as q
 from src.ratings.countries import country_names
 
-from . import auth, guard, quality_data, ratings_freshness, ui_lang
+from . import auth, guard, quality_data, ratings_freshness, ui_lang, unit_links
 from .config import Settings
 from .geo_names import country_title as geo_title
 from .quality_cells import COLUMNS, DASH, cells, group_starts, money, num, pct, shown
@@ -178,6 +179,24 @@ def _period_rows(c: CountryHealth, lang: str) -> list[dict[str, Any]]:
     return rows
 
 
+def _audit_link(
+    cells_row: tuple[Any, ...],
+    audit_at: int | None,
+    target: unit_links.UnitTarget | None,
+    inspection: str,
+    lang: str,
+) -> tuple[Any, ...]:
+    """Ячейка «Проверка» ведёт к самой проверке (#1603); нет проверки или цели — как была."""
+    if audit_at is None or target is None or not inspection:
+        return cells_row
+    href = unit_links.unit_href(target, lang=lang, inspection=inspection)
+    return (
+        *cells_row[:audit_at],
+        replace(cells_row[audit_at], href=href),
+        *cells_row[audit_at + 1 :],
+    )
+
+
 def _unit_rows(
     c: CountryHealth,
     before: CountryHealth | None,
@@ -185,18 +204,30 @@ def _unit_rows(
     key: str,
     desc: bool,
     in_progress: bool,
+    targets: Mapping[str, unit_links.UnitTarget],
+    inspections: Mapping[str, str],
+    lang: str,
 ) -> list[dict[str, Any]]:
     prior = {u.dodo_id: u for u in before.units} if before else {}
     ordered = sorted_by(list(c.units), key, desc, lambda u: u.name.casefold(), lambda u: u.values)
+    keys = [col.key for col in shown(show_audit, True)]
+    audit_at = keys.index("audit") if "audit" in keys else None
     return [
         {
             "name": u.name,
-            "cells": cells(
-                u.values,
-                prior[u.dodo_id].values if u.dodo_id in prior else None,
-                c.currency,
-                show_audit=show_audit,
-                in_progress=in_progress,
+            "href": unit_links.unit_href(targets.get(u.dodo_id), lang=lang),
+            "cells": _audit_link(
+                cells(
+                    u.values,
+                    prior[u.dodo_id].values if u.dodo_id in prior else None,
+                    c.currency,
+                    show_audit=show_audit,
+                    in_progress=in_progress,
+                ),
+                audit_at,
+                targets.get(u.dodo_id),
+                inspections.get(u.dodo_id, ""),
+                lang,
             ),
         }
         for u in ordered
@@ -267,6 +298,8 @@ def _country_view(
     key: str,
     desc: bool,
     in_progress: bool,
+    targets: Mapping[str, unit_links.UnitTarget],
+    inspections: Mapping[str, str],
 ) -> dict[str, Any]:
     channels = [
         (ch, t(f"quality.channel.{ch}", lang)) for ch in (*quality_data.SALES_CHANNELS, "other")
@@ -280,7 +313,9 @@ def _country_view(
             show_audit=show_audit,
             in_progress=in_progress,
         ),
-        "units": _unit_rows(c, before, show_audit, key, desc, in_progress),
+        "units": _unit_rows(
+            c, before, show_audit, key, desc, in_progress, targets, inspections, lang
+        ),
         "units_total": len(c.units),
         "overall": _overall_rows(c, lang),
         "dodois_note": _dodois_note(c.dodois, lang),
@@ -413,6 +448,15 @@ def _freshness_rows(
     )
 
 
+def _audit_inspections(reach: Any, code: str, month: date) -> dict[str, str]:
+    """Проверки для ссылок из ячейки «Проверка»; сбой чтения — без ссылок, таблица жива."""
+    try:
+        return quality_read.audit_inspections(reach, (code,), month)
+    except (DbError, RatingsError):
+        log.warning("Качество: проверки для ссылок не прочитались", exc_info=True)
+        return {}
+
+
 def render(lang: str) -> str:
     """Экран «Качество»; страна, месяц и порядок — из адреса."""
     today = date.today()
@@ -507,8 +551,17 @@ def render(lang: str) -> str:
     view_source = now[code].rating_source if code else ""
     network: list[dict[str, Any]] = []
     if code:
+        targets = unit_links.by_code()
         view = _country_view(
-            now[code], before.get(code), lang, show_audit, sort_key, desc, in_progress
+            now[code],
+            before.get(code),
+            lang,
+            show_audit,
+            sort_key,
+            desc,
+            in_progress,
+            targets,
+            _audit_inspections(reach, code, month) if show_audit and targets else {},
         )
     else:
         network = _network_rows(now, before, lang, show_audit, link, sort_key, desc, in_progress)

@@ -197,7 +197,10 @@ def test_рс_плитки_страны_топ_и_боттом_из_сводки
     assert метки == ["Средняя", "Нарушений", "Хард", "Проверено"]
     assert "пиццерий: 4" in html  # из `rs_units`
     assert "на проверку 1.00" in html and "пиццерий с хардом: 2" in html
-    строка = re.search(r'<th scope="row">Сербия</th>(.*?)</tr>', html, re.S)
+    # #1603: страна в «По странам» — ссылка на её экран
+    строка = re.search(
+        r'<th scope="row"><a href="/country/RS[^"]*">Сербия</a></th>(.*?)</tr>', html, re.S
+    )
     assert строка
     ячейки = re.findall(r'<td class="num">(.*?)</td>', строка.group(1), re.S)
     assert [re.sub(r"<[^>]+>", "", x).strip() for x in ячейки] == ["91.0", "▲+0.4", "3", "2", "4"]
@@ -251,6 +254,26 @@ def test_общий_список_риска_называет_источники_
     assert "Стара-Загора-1" in html
     assert "<b>РКО</b>" in html and "<b>Wolt</b>" in html
     assert "8.5 → 8.6 → 8.7 → 8.8" in html
+
+
+def test_риск_ведёт_пиццерию_на_её_экран_а_внешнюю_ссылку_значком(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#1603: имя — на экран пиццерии, Dodo IS — второй ссылкой с подписью для скринридера."""
+    from src.db import directory
+
+    ряд = rsrc.RiskRow("a" * 32, "Стара-Загора-1", "BG", (rsrc.Source("rko", (83.0, 84.0)),))
+    подготовить(monkeypatch)
+    monkeypatch.setattr(
+        directory,
+        "list_units",
+        lambda **_: [directory.Unit("unit-1", "Стара-Загора-1", "a" * 32, (), "BG")],
+    )
+    monkeypatch.setattr(screen.ratings_risk, "build", lambda *_a, **_k: CombinedRisk((ряд,), ()))
+    html = получить(monkeypatch, "/ratings/risk")
+
+    assert re.search(r'<a href="/country/BG\?[^"]*unit=unit-1[^"]*">Стара-Загора-1</a>', html)
+    assert 'class="rt-ext"' in html and 'aria-label="Страница пиццерии в рейтинге Dodo IS' in html
 
 
 def test_риск_подписывает_родную_шкалу_площадки(monkeypatch: pytest.MonkeyPatch) -> None:
