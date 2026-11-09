@@ -603,7 +603,7 @@ def _register_country(app: Flask, conf: Settings) -> None:
     @app.get("/countries")
     def countries_alias() -> Response:
         # Старый адрес списка стран (был 404): список теперь — левая колонка «Стран».
-        return redirect(url_for("country_index", **request.args), 301)
+        return redirect(url_for("country_index") + country_page.slice_query(), 301)
 
     @app.get(section("country").path + "/<code>", endpoint="country")
     def country(code: str) -> Any:

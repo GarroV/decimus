@@ -288,6 +288,23 @@ def adres_path(адрес: str) -> str:
     return адрес.split("?", 1)[0]
 
 
+@pytest.mark.parametrize("адрес", ["/country?country=RS", "/countries"])
+def test_редирект_страны_не_принимает_служебные_параметры_url_for(
+    стенд: FlaskClient, адрес: str
+) -> None:
+    """`_external`/`_host`/`_scheme`/`_anchor` из адреса не доходят до `url_for`: редирект
+    остаётся на нашем хосте, чужой домен в Location не попадает."""
+    ответ = стенд.get(
+        f"{адрес}{'&' if '?' in адрес else '?'}_external=1&_host=evil.example"
+        "&_scheme=https&_anchor=x&period=all"
+    )
+    assert ответ.status_code in (301, 302)
+    куда = ответ.headers["Location"]
+    assert куда.startswith("/"), куда
+    assert "evil.example" not in куда and "_external" not in куда and "#" not in куда
+    assert "period=all" in куда
+
+
 def test_старый_адрес_countries_ведёт_на_экран_стран(стенд: FlaskClient) -> None:
     ответ = стенд.get("/countries")
     assert ответ.status_code == 301
