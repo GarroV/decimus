@@ -125,8 +125,31 @@
     return svg;
   };
 
+  /** Класс словами: отклонение / значительное / критическое. Код — только в данных. */
+  W.levelWord = function (code) {
+    var key = "walk.sheet.class_review.level." + code;
+    var word = W.tx(key);
+    return word && word !== key ? word : String(code);
+  };
+
   W.level = function (code) {
-    return W.el("span", "walk-level walk-level--" + String(code).toLowerCase(), code);
+    var pill = W.el("span", "walk-level walk-level--" + String(code).toLowerCase(), W.levelWord(code));
+    pill.dataset.level = code;
+    return pill;
+  };
+
+  /** Название зоны по коду (для сводок); нет в данных — код не показываем пустым. */
+  W.zoneName = function (code) {
+    var zones = (W.state.data && W.state.data.zones) || [];
+    var z = zones.filter(function (x) { return x.code === code; })[0];
+    return z ? z.title : "";
+  };
+
+  /** Пункт по коду: формулировка, иначе ярлык «Порядок 13». */
+  W.itemName = function (code) {
+    var items = (W.state.data && W.state.data.items) || [];
+    var i = items.filter(function (x) { return x.code === code; })[0];
+    return i ? (i.q || i.label || "") : "";
   };
 
   W.haptic = function (kind) {
@@ -204,6 +227,7 @@
       node = W.el("div", "walk-toast");
       node.id = "walk-toast";
       node.setAttribute("role", "status");
+      node.setAttribute("aria-live", "polite");
       document.body.appendChild(node);
     }
     node.textContent = text;
@@ -218,6 +242,6 @@
     });
     node.className = "walk-toast is-shown" + (tone ? " walk-toast--" + tone : "") + (actions.length ? " has-action" : "");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { node.className = "walk-toast"; }, actions.length ? 8000 : 2600);
+    toastTimer = setTimeout(function () { node.className = "walk-toast"; }, actions.length ? 8000 : 3000);
   };
 })();

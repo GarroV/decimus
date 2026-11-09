@@ -1,6 +1,6 @@
 /* Пакетный ввод нарушений в обходе: карточки в листе поверх экрана зоны. */
 
-/* Сплит-кнопка дока: «+ Нарушение» слева, «Несколько» справа за тонким разделителем. */
+/* Сплит-кнопка дока: «+ Нарушение» слева, «Серия фото» справа за тонким разделителем. */
 .walk-dock__row .walk-dock__split {
   flex: 1.9;
   display: flex;
@@ -81,9 +81,9 @@
 /* Узкий экран (360 px): камеру перед «+ Нарушение» убираем, подпись важнее. */
 @media (max-width: 413px) { .walk-dock__split .walk-dock__add--main .walk-icon { display: none; } }
 /* 399 px и уже (360 и 390): шрифты шире системных (Verdana, DejaVu на Linux) не умещали «+ Нарушение» на 360 —
-   подпись, «Несколько» и «Осмотрено →» чуть мельче, отступы уже. */
+   подпись, «Серия фото» и «Зона готова →» чуть мельче, отступы уже. */
 @media (max-width: 399px) {
   .walk-dock__split .walk-dock__add--main { padding: 0 3px; font-size: 13px; }
-  .walk-dock__split .walk-dock__add--several { gap: 3px; padding: 0 5px; font-size: 11px; }
+  .walk-dock__split .walk-dock__add--several { gap: 3px; padding: 0 5px; font-size: 12px; }
   .walk-dock__row .walk-dock__next { padding: 0 8px; font-size: 14px; }
 }

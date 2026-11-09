@@ -1590,8 +1590,7 @@
     } else {
       var seg = el("div", "walk-seg");
       (item(cand.code) || {levels:[]}).levels.forEach(function (level) {
-        var word = tx("walk.sheet.class_review.level." + level);
-        var button = W.button("walk-seg__opt walk-seg__opt--" + level.toLowerCase(), word === "walk.sheet.class_review.level." + level ? level : level + " · " + word, function () {
+        var button = W.button("walk-seg__opt walk-seg__opt--" + level.toLowerCase(), W.levelWord(level), function () {
           W.classReview.chooseManual(state, classContext(cand), level);
           syncClassSelections();
           changed();
@@ -1922,16 +1921,17 @@
       var box = el("div", "walk-sheet__foot");
       if (f.confirmClose) {
         box.appendChild(el("p", "walk-form__note", tx("walk.sheet.discard")));
-        var row = el("div", "walk-row");
-        row.appendChild(W.button("walk-btn walk-btn--danger", tx("walk.sheet.discard_yes"), function () {
+        // Безопасное действие — главное и первое; потеря записи — вторым, словами (не красной плашкой слева).
+        box.appendChild(W.button("walk-mark", tx("walk.sheet.discard_keep"), function () {
+          f.confirmClose = false;
+          redraw("footer");
+        }));
+        var row = el("div", "walk-row walk-row--discard");
+        row.appendChild(W.button("walk-btn walk-btn--danger-quiet", tx("walk.sheet.discard_yes"), function () {
           if (!f.n) W.local.drop(draftKey());
           else if (W.editDraft) W.editDraft.clear(f);
           f.photos.forEach(function (p) { (p.receiptIds || (p.entryId ? [p.entryId] : [])).forEach(function (id) { W.offline.remove(id); }); });
           close(true);
-        }));
-        row.appendChild(W.button("walk-btn", tx("walk.sheet.cancel"), function () {
-          f.confirmClose = false;
-          redraw("footer");
         }));
         box.appendChild(row);
         return box;
@@ -1939,6 +1939,11 @@
       if (f.error) box.appendChild(el("p", "walk-form__error", f.error));
       if (recognizing() && !f.code && !hasNoViolation()) {
         var blocked = findBlocker();
+        if (blocked === "walk.sheet.need_photo") {
+          box.appendChild(photoAction());
+          box.appendChild(el("p", "walk-sheet__why", tx(blocked)));
+          return box;
+        }
         var go = W.hinted(W.button("walk-mark walk-mark--find", f.finding ? tx("walk.sheet.finding_short") : tx("walk.sheet.find"), find), "find");
         go.disabled = !!blocked || !!f.finding;
         box.appendChild(go);
@@ -1946,6 +1951,12 @@
         return box;
       }
       var why = blocker();
+      // Кадра нет вовсе (D078): главная кнопка — сам снимок, а не серая «Сохранить».
+      if (why === "walk.sheet.need_photo" && !f.saving) {
+        box.appendChild(photoAction());
+        box.appendChild(el("p", "walk-sheet__why", tx(why)));
+        return box;
+      }
       var recheck = !f.n && !recognizing() && readingChanged() && !readingInvalid();
       var label = f.saving ? tx("walk.sheet.saving")
         : f.finding ? tx("walk.sheet.rechecking")
@@ -1988,6 +1999,15 @@
       return box;
     },
   };
+
+  /** Кнопка «Сфотографировать нарушение» вместо недоступной «Сохранить»: открывает камеру. */
+  function photoAction() {
+    var b = W.button("walk-mark walk-mark--photo", null, function () { W.photo.capture(addFiles); });
+    b.setAttribute("data-photo-cta", "");
+    b.appendChild(W.icon("camera"));
+    b.appendChild(el("span", null, tx("walk.sheet.photo_cta")));
+    return b;
+  }
 
   /** Что нашла система: карточки предложений, выбранное — сверху. */
   function found() {
@@ -2143,13 +2163,18 @@
     submit(list);
   }
 
-  /** «Записано: <зона>»; зона не та, что на экране, — со ссылкой «Перейти» (D445). */
-  function savedToast(zoneCode, more) {
+  /** «Записано: <пункт> · <класс словами>» (aria-live); без пункта — «Записано: <зона>».
+   *  Зона не та, что на экране, — со ссылкой «Перейти» (D445). */
+  function savedToast(zoneCode, more, form) {
     var z = zoneOf(zoneCode);
     var actions = more ? [more] : [];
-    if (!z) { W.toast(tx("walk.sheet.saved"), "ok", actions); return; }
-    var text = tx("walk.sheet.saved_in", { zone: z.title });
-    if (zoneCode !== W.state.open && W.goZone) actions.unshift({ label: tx("walk.sheet.saved_go"), run: function () { W.goZone(zoneCode); } });
+    if (z && zoneCode !== W.state.open && W.goZone) actions.unshift({ label: tx("walk.sheet.saved_go"), run: function () { W.goZone(zoneCode); } });
+    var chosen = form && item(form.code);
+    var text;
+    if (chosen) {
+      var word = /^D[1-3]$/.test(form.level) ? W.levelWord(form.level) : "";
+      text = tx("walk.sheet.saved_line", { item: chosen.label || chosen.q, level: word }).replace(/ · $/, "");
+    } else text = z ? tx("walk.sheet.saved_in", { zone: z.title }) : tx("walk.sheet.saved");
     W.toast(text, "ok", actions);
   }
 
@@ -2218,7 +2243,7 @@
       } else if (W.editDraft) W.editDraft.clear(form);
       W.haptic("success");
       if (remaining && remaining.length) W.toast(tx("walk.sheet.remaining_material", { n: remaining.length }), "warn");
-      else savedToast(at, photoAgain(form, confirmed));
+      else savedToast(at, photoAgain(form, confirmed), form);
       close(true);
       if (last) W.apply(last);
     }, function (err) {

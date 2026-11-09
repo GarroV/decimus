@@ -500,7 +500,7 @@
     box.appendChild(el("span", "walk-form__hint", tx("walk.batch.level_pick")));
     (item ? item.levels : []).forEach(function (level) {
       var on = line.manualLevel === level;
-      var pill = W.button("walk-btn walk-btn--small" + (on ? " is-on" : ""), level + " · " + tx("walk.sheet.class_review.level." + level), function () {
+      var pill = W.button("walk-btn walk-btn--small" + (on ? " is-on" : ""), W.levelWord(level), function () {
         line.manualLevel = level;
         draw();
       });

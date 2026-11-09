@@ -1,7 +1,7 @@
 """Тексты пакетного ввода нарушений в обходе: несколько кадров со словами."""
 
 BATCH_TEXTS: dict[str, dict[str, str]] = {
-    "walk.batch.open": {"ru": "Несколько", "en": "Several"},
+    "walk.batch.open": {"ru": "Серия фото", "en": "Photo set"},
     "walk.batch.open_aria": {
         "ru": "Несколько нарушений с фото",
         "en": "Several issues with photos",

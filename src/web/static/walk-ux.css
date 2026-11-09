@@ -62,14 +62,14 @@
   color: var(--ink-inverse);
 }
 
-.walk-tile .walk-zic { width: 20px; height: 20px; font-size: 11px; }
+.walk-tile .walk-zic { width: 20px; height: 20px; font-size: 12px; }
 .walk-tile .walk-zic .walk-icon { width: 12px; height: 12px; }
 
 /* чек-лист: больше пятнадцати пунктов — остальное по кнопке */
 .walk-cl__more {
   display: block;
   margin: 8px auto 10px;
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 16px;
   border: 1px solid var(--accent-line);
   border-radius: 18px;
@@ -128,7 +128,7 @@
 .walk-cl__visibility {
   display: block;
   margin: 0 0 8px auto;
-  min-height: 36px;
+  min-height: 44px;
   padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;

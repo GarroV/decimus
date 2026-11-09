@@ -75,6 +75,8 @@ def test_contextual_measurement_uses_active_catalogue_and_saves_in_physical_zone
       const zone=W.state.data.zones.find(z=>z.code==='dining');
       document.body.appendChild(W.qaNavigation.renderStage(zone));
     }""")
+    more = page.evaluate("DecimusWalk.tx('walk.zone.more')")
+    page.get_by_role("button", name=more).click()
     label = page.evaluate("DecimusWalk.tx('walk.zone.measure_here')")
     page.get_by_role("button", name=label, exact=True).click()
     assert page.evaluate("DecimusWalk.testSubmit.form().zoneSource") == "pick"
