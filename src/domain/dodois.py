@@ -37,7 +37,7 @@ INTL = "intl"
 CIS = "cis"
 CONTOURS = (INTL, CIS)
 #: Страны на контуре СНГ; все остальные — на международном (D729). Одно место правила.
-CIS_COUNTRIES = frozenset({"KG", "TJ"})
+CIS_COUNTRIES = frozenset({"BY", "KG", "TJ"})
 
 
 @dataclass(frozen=True)
