@@ -11,7 +11,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
+  min-height: 44px;
   margin-bottom: 8px;
 }
 
@@ -55,7 +55,7 @@
 
 .walk-app__card-title {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -108,7 +108,7 @@
 
 .walk-app__subtitle {
   margin: 16px 0 6px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -133,11 +133,11 @@
 
 .walk-top__home {
   flex: none;
-  width: 36px;
-  height: 36px;
-  margin-left: -8px;
+  width: 44px;
+  height: 44px;
+  margin-left: -12px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 22px;
   background: none;
   color: var(--accent);
   font: inherit;
@@ -182,7 +182,7 @@
 
 .walk-app__lang-opt {
   min-width: 40px;
-  min-height: 32px;
+  min-height: 44px;
   padding: 0 10px;
   border: 0;
   border-radius: 16px;

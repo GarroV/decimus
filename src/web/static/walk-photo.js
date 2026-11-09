@@ -341,6 +341,16 @@
     return W.button(cls, null, function () { openCamera(onFiles); });
   }
 
+  /** Снять кадр прямо сейчас — для кнопки внизу формы: та же камера, что у плитки «Фото».
+   *  Вызывать из обработчика нажатия: без жеста браузер не откроет поле выбора файла. */
+  function capture(onFiles) {
+    if (ownCamera()) { openCamera(onFiles); return; }
+    var input = fileInput(true, function (files) { input.remove(); onFiles(files); });
+    input.hidden = true;
+    document.body.appendChild(input);
+    input.click();
+  }
+
   /** Кнопки кадра (D503): большая «Фото» — камера, рядом «Галерея». `onFiles` получает список File. */
   function picker(label, onFiles, hero) {
     var row = W.el("div", "walk-picks" + (hero ? " walk-picks--hero" : ""));
@@ -407,5 +417,5 @@
     return box;
   }
 
-  W.photo = { compress: compress, upload: upload, profile: profile, offline: offline, view: view, remember: remember, picker: picker, thumb: thumb, block: block, closeCamera: closeCamera };
+  W.photo = { compress: compress, upload: upload, profile: profile, offline: offline, view: view, remember: remember, picker: picker, capture: capture, thumb: thumb, block: block, closeCamera: closeCamera };
 })();
