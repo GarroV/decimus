@@ -55,7 +55,7 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
     },
     "dodois.tile.contour.cis": {"ru": "контур СНГ", "en": "CIS contour"},
     "dodois.contour.label": {"ru": "Контур Dodo IS", "en": "Dodo IS contour"},
-    "dodois.contour.intl": {"ru": "международный", "en": "international"},
+    "dodois.contour.intl": {"ru": "IMF", "en": "IMF"},
     "dodois.contour.cis": {"ru": "СНГ", "en": "CIS"},
     "dodois.err.contour": {
         "ru": "Выберите контур из списка.",
