@@ -10,7 +10,7 @@
     <!-- map:end -->
 
 Виды таблиц: `files <глоб>...`, `tree <каталог>`, `migrations`, `tables`,
-`routes`, `mcp`, `env`, `make`, `toc`. Порядок везде детерминирован, поэтому
+`routes`, `mcp`, `env`, `env-unread`, `make`, `toc`. Порядок везде детерминирован, поэтому
 `tests/test_docs_map.py` сравнивает документ со свежей генерацией дословно.
 
     python tools/gen_map.py           # переписать документы
@@ -57,6 +57,7 @@ TARGETS: tuple[Path, ...] = (
     DOCS / "34-platform-edge.md",
     DOCS / "35-platform-services.md",
     DOCS / "36-walk-extras.md",
+    DOCS / "38-runbook.md",
 )
 
 #: Что карта обязана перечислить: каталоги и расширения файлов кода.
@@ -69,6 +70,16 @@ ENV_ALLOWLIST: dict[str, str] = {
     "CHECKLIST_DIR": "подставляется кодом в окружение подпроцесса движка (src/domain/engine.py)",
     "INSPECTION_FILE": "подставляется кодом в окружение подпроцесса движка (src/domain/engine.py)",
     "WALK_MOCKUP_ZONES": "ручной рычаг сборки макета (tools/walk_mockup/build.py), не настройка",
+}
+
+#: Переменные из `.env.example`, которые код не читает по имени, но они работают: ключи
+#: сервисов читаются через реестр ключей (`src/db/service_keys.py`), и AST имени не видит.
+#: Остальное, что compose не называет, — «нигде не читается»: остаток, который надо убрать.
+ENV_SCREEN_KEYS: dict[str, str] = {
+    "DODOIS_CLIENT_ID": "вставляется на экране «Ключи и API» (Dodo IS); здесь — запасной путь",
+    "DODOIS_CLIENT_SECRET": "вставляется на экране «Ключи и API» (Dodo IS); здесь — запасной путь",
+    "ISPRING_CLIENT_ID": "вставляется на экране «Ключи и API» (iSpring); здесь — запасной путь",
+    "ISPRING_CLIENT_SECRET": "вставляется на экране «Ключи и API» (iSpring); здесь — запасной путь",
 }
 
 BEGIN_RE = re.compile(r"^<!-- map:begin (.+?) -->\s*$")
@@ -436,6 +447,29 @@ def gen_env(_args: list[str]) -> list[str]:
     return table(("Переменная", "Где читается", "В `.env.example`"), rows)
 
 
+def compose_text() -> str:
+    """Тексты compose-файлов в корне: из них переменные подставляются `${NAME}`."""
+    return "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(ROOT.glob("docker-compose*.yml"))
+    )
+
+
+def gen_env_unread(_args: list[str]) -> list[str]:
+    """Переменные `.env.example`, которых код не читает: их читает compose или экран."""
+    reads = set(env_reads())
+    compose = compose_text()
+    rows = []
+    for name in sorted(env_example_names() - reads):
+        if name in ENV_SCREEN_KEYS:
+            where = ENV_SCREEN_KEYS[name]
+        elif f"${{{name}" in compose or f"$${{{name}" in compose:
+            where = "читается compose (`docker-compose*.yml`), коду не нужна"
+        else:
+            where = "**нигде не читается** — остаток, убрать из `.env.example`"
+        rows.append((f"`{name}`", _cell(where)))
+    return table(("Переменная", "Кто читает"), rows)
+
+
 # --- Makefile ---------------------------------------------------------------
 
 _TARGET_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*):(?!=)(?:\s+(.*))?$")
@@ -511,6 +545,7 @@ GENERATORS: dict[str, Callable[[list[str]], list[str]]] = {
     "routes": gen_routes,
     "mcp": gen_mcp,
     "env": gen_env,
+    "env-unread": gen_env_unread,
     "make": gen_make,
 }
 

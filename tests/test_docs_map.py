@@ -39,6 +39,7 @@ SPLIT_DOCS = (
     "34-platform-edge.md",
     "35-platform-services.md",
     "36-walk-extras.md",
+    "38-runbook.md",
 )
 
 #: Путь в обратных кавычках, который карта обязана держать живым.

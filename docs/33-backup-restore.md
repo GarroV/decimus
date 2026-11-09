@@ -1,12 +1,13 @@
 # Бэкап и восстановление
 
 Что бэкапится на проде, чем и куда, как проверить, что бэкап жив. Для того, кто отвечает за сохранность данных.
-Восстановление по шагам — **этап 2** (D738, #1572): пока здесь только то, что и как копируется.
+Восстановление по шагам — раздел «Восстановление из бэкапа по шагам» ниже; что и как копируется — разделы §8.5, §4.7, §4.8.
 
 **Содержание** (генерируется `make map`, руками не править):
 
 <!-- map:begin toc -->
 - [8.5. Бэкапы на VPS](#85-бэкапы-на-vps)
+- [Восстановление из бэкапа по шагам](#восстановление-из-бэкапа-по-шагам)
 - [4.7. Бэкап состояния — том `state` (задача #233)](#47-бэкап-состояния--том-state-задача-233)
 - [4.8. Бэкап базы проверок — задача площадки (T281, #246)](#48-бэкап-базы-проверок--задача-площадки-t281-246)
 <!-- map:end -->
@@ -23,6 +24,122 @@
   строкой `vol decimus-state decimus_state` в `targets.conf`. Том кадров
   `decimus_storage-data` — строкой `vol decimus-frames decimus_storage-data` (D635); не путать
   с томом `decimus_frames` (копии кадров бота на 7 дней, #367, в бэкап не входят намеренно).
+
+## Восстановление из бэкапа по шагам
+
+Для того, кто поднимает продукт из бэкапа: после потери базы, тома или всего сервера. Скрипты ночного бэкапа и пробного восстановления
+живут не здесь, а в репозитории `GarroV/vps-infra` (`backup/vps-backup.sh`, `backup/restore-test.sh`, `backup/lib.sh`); команды ниже взяты
+из них и из `docker-compose*.yml`. Что проверено восстановлением на деле, а что только выведено из скриптов — в конце раздела, не пропускать.
+
+**Что лежит в бэкапе** (одна ночь = каталог `/var/backups/vps/<дата>/` на сервере, 7 дней; тот же каталог — снимок restic на MUSPELHEIM, хост `vps-contabo`, тег `nightly`):
+
+| Файл | Что внутри |
+|---|---|
+| `pg-decimus.dump` | `pg_dump -Fc` базы проверок (контейнер `decimus-db-1`) |
+| `pg-decimus.counts` | число строк по каждой таблице схемы `public` на момент дампа — эталон для сверки |
+| `vol-decimus-state.tgz` | том `decimus_state`: папки идущих проверок, `access/roster.json` |
+| `vol-decimus-frames.tgz` | том `decimus_storage-data`: кадры проверок (MinIO) |
+| `vol-decimus-methodology.tgz` | том `decimus_methodology`: версии методики админки |
+| `files-config.tgz` | `/srv/decimus/.env` и `/srv/decimus/compose.edge.yaml` (с абсолютными путями), среди файлов других проектов сервера |
+
+Не в бэкапе намеренно: том `decimus_frames` (копии кадров бота на 7 дней, #367). Демо-стенд не бэкапится — пересобирается из выдуманных данных.
+
+**Главное правило.** Дамп **не** восстанавливают поверх рабочей базы: записи, сделанные людьми после дампа, пропадут. Восстановление — в **новую пустую** базу (новый VPS или чистый том),
+а прежнюю не трогать, пока не сверили результат. Откат кода без отката базы — не это, а раздел «Откат» в [`08-deploy.md`](08-deploy.md).
+
+### Шаг 0. Подготовка
+
+На новом VPS сначала то, что даёт `GarroV/vps-infra` (`docs/bootstrap.md`, `backup/README.md`): Docker, общий прокси и сеть `edge-decimus`, установленный restic, ключи `/etc/vps-backup/{rest-pass,restic-pass}`
+и доступ к MUSPELHEIM. **Копия `restic-pass` — у владельца** (на его компьютере, `~/.config/vps-infra/`); без неё бэкап не расшифровать — это единственное, чего нельзя восстановить. Звать владельца до начала.
+Затем клон репозитория и окружение:
+
+```bash
+cd /srv && git clone <адрес репозитория GarroV/decimus> decimus && cd decimus     # ветка main
+```
+
+### Шаг 1. Достать файлы бэкапа
+
+С живого сервера, где нужная ночь ещё в локальных копиях (7 дней), восстанавливать из restic не нужно: берём `/var/backups/vps/<дата>/`. Иначе из restic на MUSPELHEIM (от root; `lib.sh` задаёт репозиторий и пароль):
+
+```bash
+sudo bash -c 'source /opt/vps-backup/lib.sh; restic snapshots --host vps-contabo'                       # выбрать снимок (дата ночи)
+sudo bash -c 'source /opt/vps-backup/lib.sh; restic restore <id снимка> --target /tmp/r --include "/var/backups/vps/*/*decimus*"'
+ls /tmp/r/var/backups/vps/*/                                                                           # pg-decimus.dump, vol-decimus-*.tgz
+```
+
+Ручной restic запускать под `tmux`: убитый обрывом SSH процесс оставляет лок (`restic unlock`). Шаблон `--include` и форма `restic restore latest --host vps-contabo` те же, что в `restore-test.sh`
+(он берёт `latest`; выбор конкретного снимка по `<id>` — обычный restic, здесь не проверялся).
+
+### Шаг 2. Окружение
+
+`.env` и надстройка площадки лежат в `files-config.tgz` среди файлов других проектов — достаём только свои, остальное не разворачиваем:
+
+```bash
+mkdir -p /tmp/cfg && tar xzf /tmp/r/var/backups/vps/<дата>/files-config.tgz -C /tmp/cfg \
+  srv/decimus/.env srv/decimus/compose.edge.yaml 2>&1 | head
+install -m 600 /tmp/cfg/srv/decimus/.env /srv/decimus/.env
+cp /tmp/cfg/srv/decimus/compose.edge.yaml /srv/decimus/compose.edge.yaml
+```
+
+(GNU tar при распаковке отбрасывает ведущий `/` у путей; если в архиве пути без `srv/`, сначала `tar tzf … | grep decimus`.) `.env` содержит все ключи — не печатать и не копировать в чат. Не восстановился `SECRETS_KEY` —
+зашифрованные в базе ключи сервисов и входы Dodo IS не откроются (придётся вставить ключи заново и выпустить новые ссылки входа стран).
+
+### Шаг 3. База
+
+```bash
+cd /srv/decimus
+dc() { docker compose -f docker-compose.yml -f docker-compose.prod.yml -f compose.edge.yaml "$@"; }
+dc up -d --wait db                                                    # пустая база из POSTGRES_* в .env
+# роли приложения кластерные и в дамп не входят, а права в дампе ссылаются на них: завести до pg_restore
+dc exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "create role dodo_audit_app login" -c "create role dodo_audit_admin login"'
+dc exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner' < /tmp/r/var/backups/vps/<дата>/pg-decimus.dump
+```
+
+`pg_restore` напишет предупреждения (расширения, роли) и может вернуть код 1 — код выхода не показателен, судят по сверке строк:
+
+```bash
+dc exec -T db sh -c 'psql -tA -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<< "$(source /opt/vps-backup/lib.sh; echo "$ROW_COUNTS_SQL")" \
+  | diff - /tmp/r/var/backups/vps/<дата>/pg-decimus.counts && echo "строки совпали"
+```
+
+Накат миграций отдельно не нужен: его делает `scripts/prod-update.sh` на шаге 5. Он идемпотентен, выставит пароли ролей из `.env` (`DATABASE_APP_PASSWORD`, `DATABASE_RETRACTION_PASSWORD`)
+и добавит миграции, которых не было на момент дампа.
+
+### Шаг 4. Тома
+
+Тома создаются пустыми и наполняются архивами; после распаковки владелец — `10001:10001` (образ идёт не от root, [`08-deploy.md`](08-deploy.md) §8.3.1):
+
+```bash
+for v in state methodology; do
+  docker volume create decimus_$v
+  docker run --rm -v decimus_$v:/v -v /tmp/r/var/backups/vps/<дата>/vol-decimus-$v.tgz:/a.tgz:ro alpine \
+    sh -c 'tar xzf /a.tgz -C /v && chown -R 10001:10001 /v'
+done
+docker volume create decimus_storage-data
+docker run --rm -v decimus_storage-data:/v -v /tmp/r/var/backups/vps/<дата>/vol-decimus-frames.tgz:/a.tgz:ro alpine \
+  sh -c 'tar xzf /a.tgz -C /v'          # данные MinIO, владельца не менять
+```
+
+Имена архивов — `vol-decimus-state`, `vol-decimus-methodology`, `vol-decimus-frames` (последний — в том `decimus_storage-data`); имя проекта compose — `decimus`, поэтому тома получают префикс `decimus_`.
+
+### Шаг 5. Подъём и проверка
+
+```bash
+dc up -d --wait storage-live && dc run --rm --no-deps storage-init       # корзина и пользователь приложения — идемпотентно
+DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh    # собрать образы, накатить, поднять, смоук
+```
+
+`prod-update.sh` тянет `main` с GitHub, собирает образы, накатывает миграции, поднимает всё и делает смоук (админка `/login` — 200, MCP без токена — 401, запись обхода, хранилище методики) — это и есть проверка «поднялось».
+Дальше глазами: вход в админку; «Подключения» (после восстановления входы Dodo IS и ключи сервисов открываются, если сохранился `SECRETS_KEY`); карточка недавней проверки с кадрами; счётчики
+на «Рейтингах» совпадают со старыми. Выкатка на живой прод — только по «да» владельца и в окне ([`08-deploy.md`](08-deploy.md)); восстановление **нового** сервера выкаткой не является, пока на него не переключён адрес.
+
+### Что проверено восстановлением на деле, а что нет
+
+- **Проверено (само, каждое воскресенье):** `vps-restore-test` достаёт последний снимок с MUSPELHEIM, поднимает временный контейнер Postgres того же образа, делает `pg_restore --no-owner --no-privileges` и сверяет число строк по каждой таблице
+  с `pg-decimus.counts`; итог — `/var/lib/vps-backup/last_restore`, тревога при расхождении. Это доказывает, что **данные** базы восстанавливаются.
+- **Не проверено на деле (выведено из скриптов и compose):** роли и права после `pg_restore` без `--no-privileges` (шаг 3 с созданием ролей до дампа); накат `migrate` поверх восстановленной базы (шаг 5); распаковка томов `state`, `methodology`, кадров
+  и запуск MinIO из распакованного тома; извлечение `.env` и `compose.edge.yaml` из `files-config.tgz`; полный прогон на новом VPS целиком. Первый, кто проходит эти шаги по-настоящему, правит этот раздел по факту.
+- **Требует владельца:** `restic-pass` и `rest-pass`, значения `.env`, `SECRETS_KEY`.
 
 ## 4.7. Бэкап состояния — том `state` (задача #233)
 
