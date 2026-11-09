@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 223 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 224 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -87,6 +87,7 @@
 | `/administration/connections/keys/<service_code>/delete` | POST | `service_key_delete` | `src/web/connections_screen.py` |
 | `/administration/connections/keys/<service_code>/save` | POST | `service_key_save` | `src/web/connections_screen.py` |
 | `/administration/dodois/<country>/check` | POST | `dodois_check` | `src/web/dodois_screen.py` |
+| `/administration/dodois/<country>/disconnect` | POST | `dodois_disconnect` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite` | POST | `dodois_invite_issue` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite/<int:invite_id>/revoke` | POST | `dodois_invite_revoke` | `src/web/dodois_screen.py` |
 | `/administration/home/settings` | POST | `home_setting` | `src/web/home_settings.py` |
@@ -625,6 +626,7 @@
 | `0123_session_peeks_table.sql` | `web_session_peeks` |
 | `0124_service_settings_home_attention.sql` | — |
 | `0125_dodois_invite_contour.sql` | — |
+| `0126_dodois_logins_delete.sql` | — |
 <!-- map:end -->
 
 ## Makefile

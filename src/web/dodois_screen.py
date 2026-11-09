@@ -18,7 +18,7 @@
 **Заслоны выдачи** (D716): роль главного админа (404) → `refuse_foreign_origin()` → предел
 попыток. Второго шага, свежего входа и ключа доступа нет: админка у одного человека, а ссылка
 сама доступа к данным не даёт (худшее — чужая учётка Dodo IS вместо нынешней, видно на
-экране). Отзыв и «Проверить сейчас» ничего не выдают: роль и происхождение.
+экране). Отзыв, «Проверить сейчас» и «Отключить» ничего не выдают: роль и происхождение.
 
 **Ключи приложения (D648).** Первым блоком вкладки — пара `client_id` / `client_secret`
 приложения Decimus в маркетплейсе Dodo IS (сервис `dodois` реестра `src/domain/service_keys.py`;
@@ -63,6 +63,7 @@ INVITES_SHOWN = 30
 ISSUE_ACTION = "dodois_invite_issue"
 REVOKE_ACTION = "dodois_invite_revoke"
 CHECK_ACTION = "dodois_check"
+DISCONNECT_ACTION = "dodois_disconnect"
 
 
 @dataclass(frozen=True)
@@ -295,6 +296,19 @@ def check_now(country: str) -> tuple[Flash, int]:
     return Flash("dodois.ok.checked", login.state in (rules.OK, rules.PARTIAL), {}), 200
 
 
+def disconnect(country: str, by: str) -> tuple[Flash, int]:
+    """«Отключить»: вход страны и его ключи удаляются, живые ссылки отзываются (#1551)."""
+    setattr(g, TARGET_OVERRIDE, f"country={country}")
+    try:
+        done = dodois_logins.delete_login(country, by, datetime.now(UTC))
+    except DbError as exc:
+        note_target_mismatch(exc)
+        return Flash("dodois.err.db", False, {}), 503
+    if not done:
+        return Flash("dodois.err.no_login", False, {}), 409
+    return Flash("dodois.ok.disconnected", True, {}), 200
+
+
 def install(app: Flask) -> None:
     """Действия блока. Заслоны — общие с ключами сервисов (`connections_screen`)."""
     from . import connections_screen as screen
@@ -338,4 +352,14 @@ def install(app: Flask) -> None:
             abort(404)
         refuse_foreign_origin()
         flash, code = check_now(country)
+        return page(flash, code=code, picked=country)
+
+    @app.post(f"{base}/<country>/disconnect", endpoint=DISCONNECT_ACTION)
+    @guard.action("keys.manage", hidden=True)
+    def dodois_disconnect(country: str) -> Response:
+        login = _boss()
+        if not rules.is_country(country):
+            abort(404)
+        refuse_foreign_origin()
+        flash, code = disconnect(country, login)
         return page(flash, code=code, picked=country)

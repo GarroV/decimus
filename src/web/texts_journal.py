@@ -40,6 +40,7 @@ _WEB: dict[str, tuple[str, str]] = {
         "Вход в Dodo IS подтверждён по ссылке",
         "Dodo IS login confirmed via link",
     ),
+    "dodois_disconnect": ("Отключён вход в Dodo IS", "Dodo IS login disconnected"),
     "dodois_check": ("Проверен вход в Dodo IS", "Dodo IS login checked"),
     "service_key_check": ("Проверен ключ сервиса", "Service key checked"),
     "connection_health_check": ("Проверено подключение", "Connection checked"),

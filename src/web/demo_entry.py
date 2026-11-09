@@ -74,6 +74,7 @@ LOCKED_ENDPOINTS = frozenset(
         "dodois_invite_issue",
         "dodois_invite_revoke",
         "dodois_check",
+        "dodois_disconnect",
         "dodois_connect",
         "dodois_connect_start",
         "dodois_connect_status",

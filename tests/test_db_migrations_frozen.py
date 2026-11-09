@@ -462,6 +462,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0125_dodois_invite_contour.sql": (
         "sql1:60ae49162704a3bd3931527bcb2d5f0eaff653b3abc3d5e3300666d58c18079a"
     ),
+    "0126_dodois_logins_delete.sql": (
+        "sql1:a6d0cf78ab501b8c7af9f32c1a9ee5a4470e79a0de1ad3b9779f8bd4e617b022"
+    ),
 }
 
 

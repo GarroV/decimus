@@ -281,6 +281,34 @@ def replace_tokens(
         raise _fail("Новая пара ключей Dodo IS не записалась", exc) from exc
 
 
+def delete_login(country: str, by: str, now: datetime) -> bool:
+    """Отключить страну: удалить вход и оба ключа одной транзакцией (#1551).
+
+    Живые (не погашенные, не отозванные, не истёкшие) ссылки страны отзываются там же — иначе
+    по ним можно было бы тут же привязать страну заново. Данные показателей не трогаются.
+    `False` — входа у страны не было, не записано ничего. Продление и проверка после удаления
+    строку не воскрешают: `replace_tokens` и `record_state` только обновляют существующую.
+    """
+    access_name, refresh_name = vault_names(country)
+    try:
+        with _managing() as conn, conn.cursor() as cur:
+            cur.execute("delete from dodois.logins where country = %s", (country,))
+            if cur.rowcount != 1:
+                return False
+            cur.execute(
+                "delete from vault.secrets where name in (%s, %s)", (access_name, refresh_name)
+            )
+            cur.execute(
+                "update dodois.invites set revoked_at = %s where country = %s "
+                "and used_at is null and revoked_at is null and expires_at > %s",
+                (now, country, now),
+            )
+    except psycopg.Error as exc:
+        raise _fail("Вход Dodo IS не отключился", exc) from exc
+    logger.info("Dodo IS %s: вход отключён (%s)", country, by)
+    return True
+
+
 def record_state(
     country: str,
     state: str,
