@@ -1958,6 +1958,20 @@ TEXTS = {
 }
 
 
+def extra_status(stage: str, status: str) -> str:
+    """Сырой статус свода пиццерий, если он не пересказывает стадию на любом языке.
+
+    «Работает» рядом с «Open» — одно и то же, второе слово лишнее (#1608); «Ресторан открыт»
+    или «Строится» стадию уточняют и остаются."""
+    shown = (status or "").strip()
+    known = {
+        str(TEXTS[f"unit.stage.{stage}"][lang]).casefold()
+        for lang in ("ru", "en")
+        if f"unit.stage.{stage}" in TEXTS
+    }
+    return "" if shown.casefold() in known else shown
+
+
 def t(key: str, lang: str, /, **params: object) -> str:
     """Взять текст по ключу на нужном языке и подставить параметры.
 

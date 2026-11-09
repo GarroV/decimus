@@ -8,7 +8,7 @@
   </div>
   {% if profile %}
     <dl class="kv">
-      <div><dt class="muted">{{ t('unit.profile.status') }}</dt><dd>{{ t('unit.stage.' ~ profile.stage) }}{% if profile.status %} <span class="muted">({{ profile.status }})</span>{% endif %}</dd></div>
+      <div><dt class="muted">{{ t('unit.profile.status') }}</dt><dd>{{ t('unit.stage.' ~ profile.stage) }}{% if extra_status(profile.stage, profile.status) %} <span class="muted">({{ profile.status }})</span>{% endif %}</dd></div>
       {% if profile.address %}<div><dt class="muted">{{ t('unit.profile.address') }}</dt><dd>{{ profile.address }}</dd></div>{% endif %}
       {% if profile.partner %}<div><dt class="muted">{{ t('unit.profile.partner') }}</dt><dd>{{ profile.partner }}</dd></div>{% endif %}
       {% if show_email and profile.partner_email %}<div><dt class="muted">{{ t('unit.profile.email') }}</dt><dd>{{ profile.partner_email }}</dd></div>{% endif %}

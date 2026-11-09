@@ -1,4 +1,4 @@
-{% from "ratings/_macros.html" import unit_link with context %}
+{% from "ratings/_macros.html" import unit_link, agg_score with context %}
 {#- «Стабильно ниже порога» (D658) — один список пиццерий, низких по любому источнику:
     РС, РКО, площадки доставки и наши проверки; у строки — где именно ниже порога,
     словами, и оценки (старые первыми). Правила — под «?» у заголовка (`risk_hint`), на
@@ -10,7 +10,7 @@
     <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col">{{ t('ratings.col.sources') }}</th></tr></thead>
     <tbody>{% for u in risk.rows %}<tr data-country="{{ u.country }}">
       <th scope="row">{{ unit_link(u.unit, u.unit_name, 'rko' if u.sources[0].code == 'rko' else 'rs') }}<small>{{ country_name(u.country) }}</small></th>
-      <td class="rt-chips">{% for s in u.sources %}<span class="rt-chip"><b>{{ risk_sources.get(s.code, s.code) }}</b> <span class="rt-chip__scores">{% for x in s.scores %}{{ ('%.1f' if x > 5 else '%.2f')|format(x) }}{% if not loop.last %} → {% endif %}{% endfor %}</span></span>{% endfor %}</td>
+      <td class="rt-chips">{% for s in u.sources %}<span class="rt-chip"><b>{{ risk_sources.get(s.code, s.code) }}</b> <span class="rt-chip__scores">{% for x in s.scores %}{% if s.scale %}{{ agg_score(x, s.scale) }}{% else %}{{ ('%.1f' if x > 5 else '%.2f')|format(x) }}{% endif %}{% if not loop.last %} → {% endif %}{% endfor %}</span></span>{% endfor %}</td>
     </tr>{% endfor %}</tbody>
   </table></div>
   {% else %}<div class="rt-empty">{{ t('ratings.empty.risk') }}</div>{% endif %}

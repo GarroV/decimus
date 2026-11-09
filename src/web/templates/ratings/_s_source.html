@@ -1,4 +1,4 @@
-{% from "ratings/_macros.html" import num, dlt, unit_link, stat, rank_item, thr, block_head with context %}
+{% from "ratings/_macros.html" import num, dlt, unit_link, country_cell, stat, rank_item, thr, block_head with context %}
 {#- РС или РКО (D660): плитки, «По странам», Top-10 и Bottom-10, хард-нарушения — одного
     источника, сверху вниз на всю ширину. Всё из `report.Summary`: средние, дельты,
     нарушения, Top/Bottom и хард посчитаны ядром, здесь только показ (P16: «нет данных»
@@ -25,7 +25,7 @@
         <th scope="col" class="num">{{ t('ratings.src.col.hard') }}</th>
         <th scope="col" class="num">{{ t('ratings.src.col.units') }}</th></tr></thead>
       <tbody>{% for c in src.countries %}<tr>
-        <th scope="row">{{ country_name(c.code) }}</th>
+        <th scope="row">{{ country_cell(c.code) }}</th>
         <td class="num">{{ num(c.score) }}</td><td class="num">{{ dlt(c.delta) }}</td>
         <td class="num">{{ c.violations }}</td><td class="num">{{ c.hard }}</td><td class="num">{{ c.units }}</td>
       </tr>{% endfor %}</tbody>

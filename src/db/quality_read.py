@@ -33,11 +33,17 @@ class PeriodScore:
     collected: int | None
     #: Число проверок, которое принёс сам рейтинг (`checkups_count`); `None` — не принёс.
     checkups: int | None
+    #: Границы периода и статус публикации оценки — для строки «Периоды РКО и РС», когда
+    #: периодов из Dodo IS нет (#1604); `None` — источник их не принёс.
+    begin_on: date | None = None
+    end_on: date | None = None
+    status: str | None = None
 
 
 _SCORES_SQL = (
     "select s.unit_dodo_id, u.name, u.country_code, p.rating_type, s.score, "
-    "c.restaurant_reports + c.delivery_reports, s.checkups_count "
+    "c.restaurant_reports + c.delivery_reports, s.checkups_count, "
+    "p.begin_on, p.end_on, s.status "
     "from ratings.scores s join ratings.periods p on p.id = s.period_id "
     "join ratings.units u on u.dodo_id = s.unit_dodo_id "
     "left join ratings.collection c "
@@ -69,15 +75,18 @@ def period_scores(countries: Sequence[str], month: date) -> tuple[PeriodScore, .
             Decimal(r[4]),
             None if r[5] is None else int(r[5]),
             None if r[6] is None else int(r[6]),
+            r[7],
+            r[8],
+            r[9],
         )
         for r in rows
     )
 
 
 _AUDIT_SQL = """
-select code, pct
+select code, pct, inspection_id
 from (
-    select u.code, i.pct,
+    select u.code, i.pct, i.id as inspection_id,
            row_number() over (
                partition by u.id order by i.inspection_date desc, i.pushed_at desc
            ) as n
@@ -94,17 +103,29 @@ where n = 1
 """
 
 
-def audit_pcts(reach: Reach, countries: Sequence[str], month: date) -> dict[str, Decimal]:
-    """Процент последней принятой проверки decimus в месяце, по коду пиццерии (32 hex).
-
-    Исторические проверки (`origin = 'legacy'`, D332) не участвуют: их оценка перенесена
-    из старого отчёта. Охват — вошедшего: партнёр читает проверки своего пространства."""
+def _audit_rows(
+    reach: Reach, countries: Sequence[str], month: date
+) -> list[tuple[str, Decimal, str]]:
     охват = _require_reach(reach)
     if not countries:
-        return {}
+        return []
     with _reading("проверки для «Качества»") as conn, conn.cursor() as cur:
         cur.execute(
             _AUDIT_SQL,
             {**охват.params(), "slice": list(countries), "begin": month, "end": next_month(month)},
         )
-        return {str(code): Decimal(pct) for code, pct in cur.fetchall()}
+        return [(str(code), Decimal(pct), str(iid)) for code, pct, iid in cur.fetchall()]
+
+
+def audit_inspections(reach: Reach, countries: Sequence[str], month: date) -> dict[str, str]:
+    """Идентификатор той же последней проверки, чей процент в `audit_pcts`: ссылка из ячейки
+    «Проверка» (#1603)."""
+    return {code: iid for code, _, iid in _audit_rows(reach, countries, month)}
+
+
+def audit_pcts(reach: Reach, countries: Sequence[str], month: date) -> dict[str, Decimal]:
+    """Процент последней принятой проверки decimus в месяце, по коду пиццерии (32 hex).
+
+    Исторические проверки (`origin = 'legacy'`, D332) не участвуют: их оценка перенесена
+    из старого отчёта. Охват — вошедшего: партнёр читает проверки своего пространства."""
+    return {code: pct for code, pct, _ in _audit_rows(reach, countries, month)}

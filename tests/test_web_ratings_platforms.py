@@ -177,3 +177,31 @@ def test_карты_пиццерии_на_google_и_яндексе(monkeypatch: 
 
     assert "Пиццерии на картах" in html and "Бухарест-1" in html
     assert "4.70" in html and ">Google<" in html and ">Яндекс<" in html
+
+
+def test_раздел_не_пуст_когда_оценки_есть_а_реестра_пиццерий_нет(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#1605: `agg.units` пуст (или без работающих), охват пустой, а оценки в `agg.ratings`
+    есть — «Качество» и «Стабильно ниже порога» их показывают, раздел «Агрегаторы» тоже."""
+    from src.db import agg_store
+
+    оценки = (
+        agg_store.LatestRating("RO", "wolt", "a" * 32, 8.7, 10, 120, СЕГОДНЯ),
+        agg_store.LatestRating("RO", "glovo", "b" * 32, 88.0, 100, 80, СЕГОДНЯ),
+    )
+    monkeypatch.setattr(rp.agg_store, "units", lambda codes=None: ())
+    monkeypatch.setattr(rp.agg_store, "coverage", lambda: ())
+    monkeypatch.setattr(rp.agg_store, "point_countries", lambda key: frozenset())
+    monkeypatch.setattr(rp.agg_store, "unit_absent", lambda: frozenset())
+    monkeypatch.setattr(rp.agg_store, "open_points", lambda: ())
+    monkeypatch.setattr(ragg.agg_store, "latest", lambda countries, until=None: оценки)
+
+    вид = rp.build_agg(("RO",), until=СЕГОДНЯ, today=СЕГОДНЯ)
+
+    assert вид is not None and set(вид.platforms) == {"wolt", "glovo"}
+    assert {t.platform: (t.score.avg, t.score.scale) for t in вид.tiles} == {
+        "wolt": (8.7, 10),
+        "glovo": (88.0, 100),
+    }
+    assert вид.countries[0].scores["wolt"].avg == 8.7
