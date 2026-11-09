@@ -948,7 +948,8 @@ html[data-nav-collapsed="true"] .sidenav__sub { margin: 0; border-left: 0; }
 .hbtn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-soft, transparent); }
 .hbtn svg { width: 14px; height: 14px; flex: none; }
 .hbtn--primary { border-color: var(--accent); background: var(--accent); color: var(--ink-inverse); }
-.hbtn--primary:hover { background: var(--accent); filter: brightness(1.06); }
+.hbtn--primary:hover, .hbtn--primary:focus-visible { background: var(--accent-hover, var(--accent)); color: var(--ink-inverse); }
+.hbtn--primary:active { background: var(--accent); color: var(--ink-inverse); }
 .hbtn--danger { border-color: color-mix(in srgb, var(--err) 45%, transparent); background: transparent; color: var(--err); }
 .hbtn--danger:hover { background: color-mix(in srgb, var(--err) 10%, transparent); }
 .hbtn--err { color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, transparent); }
@@ -957,12 +958,20 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .hbtn--icon { justify-content: center; width: 36px; padding: 0; }
 .hbtn--icon svg { width: 15px; height: 15px; }
 .hact__item[open] > summary { background: var(--surface-3); }
+/* Главная кнопка в раскрытом состоянии остаётся главной: серый фон «открыто» давал
+   тёмную подпись на тёмном (тёмная тема: --ink-inverse тёмный, --surface-3 тёмный). */
+.hact__item[open] > summary.hbtn--primary { background: var(--accent); color: var(--ink-inverse); box-shadow: 0 0 0 3px var(--focus-soft, transparent); }
 /* Карточка дизайн-системы режет `overflow: hidden` всё, что выходит за неё, — и
    раскрытое окно действия («Исправить», «Отклонить») обрезалось на краю карточки. */
 .card:has(.hact__item[open]), .card:has(.tedit[open]) { overflow: visible; }
 .hact__pop { position: absolute; left: 0; right: 0; top: calc(100% + var(--space-3)); z-index: 20; max-width: 440px;
   padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .14); }
+/* Форма действия раздвигает содержимое, а не висит поверх «Нарушений»: раскрытое
+   действие занимает свою строку группы, окно под ним — в потоке. */
+.hact .hact__pop { position: static; max-width: 440px; margin-top: var(--space-3); box-shadow: none; }
+.hact__item[open] { flex: 1 1 100%; min-width: 0; }
+.hact:has(.hact__item[open]) .hact__group { flex: 1 1 100%; }
 .hact__form { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); margin-top: var(--space-4); }
 .hact__form label { display: flex; flex-direction: column; gap: var(--space-2); align-self: stretch; }
 /* Две группы (решение отделено от второстепенного): решения слева, отчёт и письма —
@@ -982,6 +991,18 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
   .hbtn--icon { width: 44px; }
   .zlist li { grid-template-columns: minmax(0, 1fr) 4.5rem auto; gap: var(--space-4); }
   .hact__group--aux { margin-left: 0; }
+}
+/* Узкий экран: решения — одна строка (подписи остаются, кнопки сжимаются), второстепенное —
+   пиктограммами в строке ниже, с чертой между группами. Имя — в aria-label и подсказке. */
+@media (max-width: 560px) {
+  .hact__group--decide { flex: 1 1 100%; flex-wrap: nowrap; }
+  .hact__group--decide .hact__item:not([open]) { flex: 1 1 0; min-width: 0; }
+  .hact__group--decide .hbtn { width: 100%; justify-content: center; padding: 0 var(--space-4); min-width: 0; }
+  .hact__group--decide .hbtn span { overflow: hidden; text-overflow: ellipsis; }
+  .hact__group--aux { flex: 1 1 100%; margin-top: var(--space-2); padding-top: var(--space-5); border-top: 1px solid var(--line); }
+  .hact__group--aux .hbtn { width: 44px; padding: 0; justify-content: center; }
+  .hact__group--aux .hbtn > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .head-line .hact__group--decide .hbtn { padding: 0 var(--space-4); }
 }
 
 .find-row {
@@ -1759,14 +1780,29 @@ a[data-zoom] { cursor: zoom-in; }
 .mx-more > summary::-webkit-details-marker { display: none; }
 .mx-more > summary::before { content: "▸ "; color: var(--ink-3); }
 .mx-more[open] > summary::before { content: "▾ "; }
-/* «Расшифровка» оценки в карточке проверки (D490): свёрнута, строки — столбиком. */
-.mx-more--explain { margin: var(--space-5) var(--space-7) var(--space-6); }
+/* Раскрытия карточки проверки («Расшифровка», «Версия чек-листа», журналы): вровень с
+   левым краем текста карточки, шеврон вместо мелкого «▸», тело — с отступом и обычным
+   размером. Вне карточки (методика) `.mx-more` прежний. */
+.mx-more--card { margin: var(--space-6) 0 0; padding: var(--space-4) var(--space-7) var(--space-6); border-top: 1px solid var(--line-2); }
+.mx-more--card > summary { font-size: 13px; font-weight: var(--w-medium); color: var(--ink); gap: var(--space-4); }
+.mx-more--card > summary::before { content: ""; flex: none; width: 7px; height: 7px; margin: 0 var(--space-2) 2px 2px;
+  border-right: 2px solid var(--ink-3); border-bottom: 2px solid var(--ink-3); transform: rotate(-45deg); transition: transform .12s; }
+.mx-more--card[open] > summary::before { content: ""; transform: rotate(45deg); }
+.mx-more--card > :not(summary) { margin-left: calc(7px + var(--space-4) + var(--space-2) + 2px); font-size: 13px; line-height: 1.45; }
+.mx-more--card .meta, .mx-more--card .muted { font-size: 12px; }
+.mx-more--explain { margin: 0; border-top: 0; border-bottom: 1px solid var(--line); }
+.explain__n { color: var(--ink-2); }
+.explain__sep { display: none; }
+.explain__v { font-variant-numeric: tabular-nums; text-align: right; }
+.explain li:last-child { padding-top: var(--space-3); border-top: 1px solid var(--line-2); color: var(--ink); }
+.kv--card { margin-top: var(--space-4); }
 .grade-reason { margin-top: var(--space-2); }
-.explain { margin: var(--space-4) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); font-size: var(--fs-meta); }
+.explain { margin: var(--space-4) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-3); font-size: 13px; max-width: 34rem; }
+.explain li { display: flex; justify-content: space-between; gap: var(--space-6); }
 .explain li:last-child { font-weight: 600; }
-.explain__note { margin: var(--space-3) 0 0; font-size: var(--fs-meta); }
+.explain__note { margin: var(--space-3) 0 0; font-size: 12px; }
 /* Справка «ключ — значение» (сборка чек-листа в карточке проверки, D218). */
-.kv { display: grid; gap: var(--space-2); margin: 0; font-size: var(--fs-meta); }
+.kv { display: grid; gap: var(--space-3); margin: 0; font-size: 13px; }
 .kv > div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: var(--space-3); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
 .mx-danger .btn--primary { background: var(--err); border-color: var(--err); }
