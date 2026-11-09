@@ -15,7 +15,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import войти, подменить_двери, собрать
 
-from src.db import agg_store, dodois_logins, dodois_metrics, maps_store, quality_read
+from src.db import agg_store, dodois_logins, dodois_metrics, maps_reviews_store, quality_read
 from src.db import ratings_read as read
 from src.db.reach import Reach
 from src.web import ratings_freshness
@@ -64,9 +64,11 @@ def чтения(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(quality_read, "period_scores", _scores)
     monkeypatch.setattr(quality_read, "audit_pcts", lambda reach, countries, month: {PL1: D("90")})
     monkeypatch.setattr(
-        maps_store,
-        "unit_scores_dated",
-        lambda provider, until: {PL1: (4.38, 100, date(2026, 9, 20))} if provider == 2 else {},
+        maps_reviews_store,
+        "monthly_stats",
+        lambda provider, *, until: maps_reviews_store.MonthlyStats(
+            {PL1: {MONTH: (100, D("438"))}} if provider == 2 else {}, MONTH
+        ),
     )
     monkeypatch.setattr(agg_store, "units", lambda countries=None: ())
     monkeypatch.setattr(
@@ -347,9 +349,11 @@ def _registry_only_units(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
     monkeypatch.setattr(
-        maps_store,
-        "unit_scores_dated",
-        lambda provider, until: {BG3: (4.2, 40, date(2026, 9, 20))} if provider == 2 else {},
+        maps_reviews_store,
+        "monthly_stats",
+        lambda provider, *, until: maps_reviews_store.MonthlyStats(
+            {BG3: {MONTH: (40, D("168"))}} if provider == 2 else {}, MONTH
+        ),
     )
 
 
