@@ -389,7 +389,13 @@ def test_осиротевший_поток_не_опрашивает_и_не_п�
 
 @pytest.mark.parametrize(
     ("страна", "контур"),
-    [("BY", rules.CIS), ("KG", rules.CIS), ("TJ", rules.CIS), ("BG", rules.INTL), ("SI", rules.INTL)],
+    [
+        ("BY", rules.CIS),
+        ("KG", rules.CIS),
+        ("TJ", rules.CIS),
+        ("BG", rules.INTL),
+        ("SI", rules.INTL),
+    ],
 )
 def test_вход_страны_идёт_на_её_контур_от_старта_до_записи(
     мир: dict[str, Any], monkeypatch: pytest.MonkeyPatch, страна: str, контур: str
