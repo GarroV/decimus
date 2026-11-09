@@ -125,12 +125,13 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
 | `src/web/actions_columns.py` | «Столбец стран слева, блоки по состоянию справа» — «ОСБ» и «Действия» (D611) |
 | `src/web/actions_screen.py` | Раздел «Действия»: экшн-планы и предписания — один экран у УК и партнёра (D526, D527) |
+| `src/web/batch_letter.py` | Общее письмо по нескольким проверкам страны: окно на экране страны (D739, #1579) |
 | `src/web/calendar_screen.py` | Раздел «Календарь» (D497): сетка месяца с проверками и поездками (D505, D506) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
 | `src/web/connect_reminder.py` | Напоминание на «Главной»: привяжите бота и подключите Claude (27.10.2026) |
@@ -361,7 +362,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
 | `src/web/templates/administration/` | 15 | _content_editor.html, _coverage.html, _health.html, _nav.html, _ratings_aggregators.html, aggregators.html, connections.html, content_editor.html, … (+7) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
-| `src/web/templates/country/` | 8 | _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, index.html |
+| `src/web/templates/country/` | 9 | _batch.html, _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, … (+1) |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
 | `src/web/templates/dodois/` | 1 | connect.html |
 | `src/web/templates/inspections/` | 12 | _card_body.html, _card_parts.html, _letter_form.html, _panel.html, _panel_fragment.html, _row.html, _split_history.html, _walk_log.html, … (+4) |
@@ -398,9 +399,10 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
+<!-- map:begin files src/db/{batch_letters,checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
 | Файл | Что делает |
 |---|---|
+| `src/db/batch_letters.py` | D739 (#1579): общее письмо партнёру по нескольким проверкам, зафиксированное человеком |
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
 | `src/db/config.py` | Окружение блока: где Postgres |
 | `src/db/database_target.py` | Куда ведёт строка подключения — и все ли подключения ведут в одну базу (#487) |
