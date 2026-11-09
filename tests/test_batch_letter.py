@@ -400,3 +400,13 @@ def test_разные_партнёры_видны_в_ответе_без_зап�
     выбор = [_проверка(1), _проверка(2, partner="Другой партнёр")]
     ответ = bl.build(выбор, tenant=ТЕНАНТ, papers=хранилище)
     assert ответ["partners"] == ["Другой партнёр", "Партнёр"]
+
+
+def test_у_каждого_кода_отказа_есть_текст_на_обоих_языках() -> None:
+    """Код отказа без текста показал бы человеку пустую строку вместо причины."""
+    from src.web.texts_batch_letter import BATCH_LETTER_TEXTS
+
+    for code in bl.REFUSAL_CODES:
+        text = BATCH_LETTER_TEXTS.get(f"batch.refuse.{code}")
+        assert text, f"нет текста отказа {code}"
+        assert text.get("ru") and text.get("en"), f"отказ {code}: нужен RU и EN"
