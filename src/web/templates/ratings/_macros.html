@@ -17,7 +17,7 @@
 {% macro dlt(x, digits=1) %}{% if x is none %}<span class="rt-delta is-empty">—</span>{% else %}{% set r = (x|round(digits)) + 0.0 %}<span class="rt-delta {{ 'rt-delta--up' if r >= 0 else 'rt-delta--down' }}"><span class="rt-delta__arrow" aria-hidden="true">{{ '▲' if r >= 0 else '▼' }}</span>{{ ('%+.' ~ digits ~ 'f')|format(r) }}</span>{% endif %}{% endmacro %}
 {% macro unit_link(unit, name, kind) %}<a href="{{ unit_url(unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ name }}</a>{% endmacro %}
 {#- Оценка агрегатора в его родной шкале: Wolt — из 10, Glovo — %, остальные — из 5. -#}
-{% macro agg_score(avg, scale) %}{% if scale == 100 %}{{ '%.1f'|format(avg) }}%{% elif scale == 10 %}{{ '%.1f'|format(avg) }}<span class="rt-src__scale">/10</span>{% else %}{{ '%.2f'|format(avg) }}{% endif %}{% endmacro %}
+{% macro agg_score(avg, scale) %}{% if scale == 100 %}{{ '%.1f'|format(avg) }}%{% elif scale == 10 %}{{ '%.1f'|format(avg) }}<span class="rt-src__scale">/10</span>{% else %}{{ '%.2f'|format(avg) }}<span class="rt-src__scale">/5</span>{% endif %}{% endmacro %}
 {#- Плитка ключевой цифры раздела: подпись, значение, строка под ним. -#}
 {% macro stat(label, sub=none) %}<div class="pk-tile"><div class="pk-tile__label">{{ label }}</div><div class="pk-tile__value">{{ caller() }}</div>{% if sub %}<div class="pk-tile__sub">{{ sub }}</div>{% endif %}</div>{% endmacro %}
 {% macro rank_item(u, kind) %}<li>

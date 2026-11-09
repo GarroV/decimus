@@ -253,6 +253,22 @@ def test_общий_список_риска_называет_источники_
     assert "8.5 → 8.6 → 8.7 → 8.8" in html
 
 
+def test_риск_подписывает_родную_шкалу_площадки(monkeypatch: pytest.MonkeyPatch) -> None:
+    """#1605: Wolt «8.7 / 10», Glovo — в процентах, а не голое «8.7» и «88.0»."""
+    ряд = rsrc.RiskRow(
+        "u1",
+        "Стара-Загора-1",
+        "BG",
+        (rsrc.Source("wolt", (8.6, 8.7), 10), rsrc.Source("glovo", (87.0, 88.0), 100)),
+    )
+    подготовить(monkeypatch)
+    monkeypatch.setattr(screen.ratings_risk, "build", lambda *_a, **_k: CombinedRisk((ряд,), ()))
+    html = получить(monkeypatch, "/ratings/risk")
+
+    assert '8.7<span class="rt-src__scale">/10</span>' in html
+    assert "88.0%" in html
+
+
 def test_точка_свежести_в_подменю_и_строка_в_шапке(monkeypatch: pytest.MonkeyPatch) -> None:
     подготовить(monkeypatch)
     rows = (
