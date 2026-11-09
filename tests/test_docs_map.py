@@ -25,7 +25,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 MAP_DOC = ROOT / "docs" / "00-map.md"
 
-#: Документы, на которые разбиты 12-web-admin и 08-deploy (D738): у каждого оглавление между маркерами.
+#: Документы, на которые разбиты 12-web-admin и 08-deploy (D738): у каждого оглавление между
+#: маркерами.
 SPLIT_DOCS = (
     "24-dodois.md",
     "26-web-access.md",
