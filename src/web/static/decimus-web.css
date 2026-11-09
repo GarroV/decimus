@@ -1155,7 +1155,8 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 @media (max-width: 560px) {
   .find-row, .find-row__summary { flex-wrap: wrap; row-gap: var(--space-2); }
   .find-item--acts > .find-row, .find-item--acts > .find-row--photos > .find-row__summary { padding-right: var(--space-7); }
-  .find-row__level, .find-row__num { display: flex; align-items: center; min-height: 44px; }
+  .find-row__num { display: flex; align-items: center; min-height: 44px; }
+  .find-row__level { align-self: center; }
   .find-row__main { flex: 1 1 100%; min-width: 0; }
   .find-row__shots, .find-row__shots--partial { flex: 1 1 100%; max-width: none; white-space: normal; text-align: left; }
 }
