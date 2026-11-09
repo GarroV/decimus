@@ -22,9 +22,10 @@ from datetime import date, timedelta
 
 import open_demo_ratings
 
-from src.db import agg_store, maps_store
+from src.db import agg_store, maps_reviews_store, maps_store
 from src.db.agg_store import PointRow, RatingRow
-from src.ratings import pointer
+from src.domain.maps_month import shift_month
+from src.ratings import maps_reviews, pointer
 
 #: Сколько недель истории: квартала хватает на текущий и прошлый срез.
 WEEKS = 14
@@ -134,6 +135,36 @@ def _maps(
     return companies, ratings, links
 
 
+def _seed_reviews(companies: Sequence[tuple[object, ...]], today: date) -> int:
+    """Поштучные оценки Google и Yandex за 12 месяцев: от них считаются карты «Качества» (D732)."""
+    start = maps_reviews.history_start(today)
+    months = [shift_month(today.replace(day=1), -i) for i in range(12, -1, -1)]
+    total = 0
+    for n, raw in enumerate(companies, start=1):
+        company = str(raw[0])
+        for provider, base in ((pointer.GOOGLE, 8), (pointer.YANDEX, 3)):
+            rows = []
+            for m, month in enumerate(months):
+                for k in range(base + (n + m) % 5):
+                    day = month.replace(day=1 + (k * 3) % 27)
+                    if day > today:
+                        continue
+                    stars = 5 if (n + m + k) % 4 else 4
+                    rows.append(
+                        (f"demo-{company}-{provider}-{m}-{k}", company, provider, stars, day, False)
+                    )
+            total += maps_reviews_store.save_reviews(
+                rows,
+                company_uuid=company,
+                provider_id=provider,
+                start=start,
+                end=today,
+                today=today,
+                backfill=True,
+            )
+    return total
+
+
 def seed(units: Sequence[tuple[str, str]], today: date) -> list[str]:
     """Записать оценки площадок доставки и карт. Возвращает строки отчёта."""
     ids = open_demo_ratings.unit_ids(units)
@@ -153,5 +184,6 @@ def seed(units: Sequence[tuple[str, str]], today: date) -> list[str]:
     maps_store.save(companies, ratings)
     maps_store.save_links(links)
     maps_store.log_load(ok=True, companies=len(companies), ratings=len(companies) * 2)
-    lines.append(f"maps: {len(companies)} companies, Google and Yandex")
+    reviews = _seed_reviews(companies, today)
+    lines.append(f"maps: {len(companies)} companies, Google and Yandex, {reviews} reviews")
     return lines

@@ -362,7 +362,28 @@ def _no_data_links(
     return [{"title": country_title(c.code, lang), "href": href(c.code)} for c in empty]
 
 
-def _freshness_rows(lang: str, show_audit: bool, source: str = "") -> tuple[str, ...]:
+CARRIED_SHOWN = 5
+
+
+def _carried_rows(c: CountryHealth | None, lang: str) -> tuple[str, ...]:
+    """Под «?»: у каких пиццерий месяц карты не принят, взято значение прошлого (D733)."""
+    if c is None:
+        return ()
+    items = [
+        f"{u.name} · {provider} ← {month_title(src, lang)}"
+        for u in c.units
+        for provider, src in u.maps_carried
+    ]
+    if not items:
+        return ()
+    more = len(items) - CARRIED_SHOWN
+    listed = "; ".join(items[:CARRIED_SHOWN]) + (f" … +{more}" if more > 0 else "")
+    return (t("quality.tip.maps_carried", lang, n=len(items), items=listed),)
+
+
+def _freshness_rows(
+    lang: str, show_audit: bool, source: str = "", carried: tuple[str, ...] = ()
+) -> tuple[str, ...]:
     try:
         states = dodois_metrics.load_states()
     except DbError:
@@ -383,6 +404,8 @@ def _freshness_rows(lang: str, show_audit: bool, source: str = "") -> tuple[str,
         t("quality.tip.tone", lang),
         *((t("quality.tip.audit", lang),) if show_audit else ()),
         t("quality.tip.fresh", lang),
+        t("quality.tip.maps", lang),
+        *carried,
         dodois,
         *errors,
         *((t(f"quality.tip.source.{source}", lang),) if source else ()),
@@ -468,6 +491,8 @@ def render(lang: str) -> str:
             "desc": sort_key == key and desc,
             "group": group,
             "group_label": t(f"quality.group.{group}", lang) if group and first else "",
+            #: Памятка под «?» у заголовка группы «Карты» (по пиццерии и по стране).
+            "group_tip": (t("quality.tip.maps_head", lang),) if group == "maps" and first else (),
             "group_span": group_sizes.get(group, 1),
             "edge": first,
         }
@@ -507,7 +532,9 @@ def render(lang: str) -> str:
         month_title=month_label(month, lang, today),
         prev_href=link(code, prev_month),
         next_href=link(code, next_month) if next_month <= today.replace(day=1) else None,
-        tip_rows=_freshness_rows(lang, show_audit, view_source),
+        tip_rows=_freshness_rows(
+            lang, show_audit, view_source, _carried_rows(now.get(code) if code else None, lang)
+        ),
         show_audit=show_audit,
         freshness=ratings_freshness.build(lang, {}),
         section_path=base,

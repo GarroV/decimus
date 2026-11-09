@@ -49,20 +49,21 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.tip.title": {"ru": "Как читать таблицу", "en": "How to read the table"},
     "quality.tip.unit": {
         "ru": (
-            "Единица — пиццерия за месяц. Страна: оценки — простое среднее её пиццерий, "
-            "доли заказов и выручка — по суммам. Под числом — движение к прошлому месяцу."
+            "Единица — пиццерия за месяц. Страна: оценки — простое среднее её пиццерий "
+            "(карты — по числу оценок), доли заказов и выручка — по суммам. Под числом — "
+            "движение к прошлому месяцу."
         ),
         "en": (
             "The unit is one pizzeria for one month. A country: ratings are the plain mean of "
-            "its pizzerias, order shares and revenue are totals. Under a number — the change "
-            "from the previous month."
+            "its pizzerias (maps — weighted by rating counts), order shares and revenue are "
+            "totals. Under a number — the change from the previous month."
         ),
     },
     "quality.tip.scores": {
         "ru": (
             "РКО, РС и проверка — сто баллов; КР, карты и агрегаторы — пять. КР: зал и "
             "доставка, среднее по числу оценок. Карты: Google и Яндекс, среднее по числу "
-            "оценок. Агрегаторы: оценки площадок в пяти баллах, среднее по заказам среди "
+            "оценок за месяц. Агрегаторы: оценки площадок в пяти баллах, среднее по заказам среди "
             "площадок с оценкой. Проверок РКО в неделю — среднее по неделям месяца."
         ),
         "en": (
@@ -109,11 +110,48 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.tip.fresh": {
         "ru": (
             "РКО — по дате начала недели; РС — по месяцу, на который падает большинство его "
-            "дней; карты и агрегаторы — последняя оценка в месяце."
+            "дней; агрегаторы — последняя оценка в месяце."
         ),
         "en": (
-            "RKO goes by the week start date; RS by the month holding most of its days; maps "
-            "and aggregators use the last rating in the month."
+            "RKO goes by the week start date; RS by the month holding most of its days; "
+            "aggregators use the last rating in the month."
+        ),
+    },
+    "quality.tip.maps": {
+        "ru": (
+            "Карты — среднее оценок, поставленных на карте в этом месяце (Google, Яндекс), без "
+            "удалённых; вес — число этих оценок. Если оценок нет или их меньше 10% от среднего за "
+            "три прошлых месяца, берётся значение прошлого месяца со своим весом. У страны — "
+            "среднее по всем оценкам её пиццерий."
+        ),
+        "en": (
+            "Maps — the mean of ratings given on the map in this month (Google, Yandex), "
+            "deleted ones excluded; the weight is their count. With no ratings, or fewer than "
+            "10% of the average of the previous three months, the previous month's value is "
+            "taken with its own weight. A country's value is the mean over all its pizzerias' "
+            "ratings."
+        ),
+    },
+    "quality.tip.maps_head": {
+        "ru": (
+            "Карта за месяц — среднее оценок, поставленных в этом месяце (удалённые не "
+            "считаются). Пиццерия — средневзвешенное карт по числу оценок, страна — по числу "
+            "оценок всех пиццерий. Если оценок нет или их меньше 10% от среднего за 3 прошлых "
+            "месяца — берётся прошлый месяц."
+        ),
+        "en": (
+            "A map's value for the month is the mean of the ratings given in that month "
+            "(deleted ones do not count). A pizzeria is the mean of its maps weighted by "
+            "rating counts, a country is weighted by the rating counts of all its pizzerias. "
+            "If there are no ratings or fewer than 10% of the average of the previous 3 "
+            "months, the previous month is taken."
+        ),
+    },
+    "quality.tip.maps_carried": {
+        "ru": "Карты, месяц перенесён из прошлого (мало оценок), пиццерий: {n} — {items}",
+        "en": (
+            "Maps, month carried over from an earlier one (too few ratings), "
+            "pizzerias: {n} — {items}"
         ),
     },
     "quality.tip.dodois": {"ru": "Dodo IS: собрано {at}", "en": "Dodo IS: collected {at}"},

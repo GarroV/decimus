@@ -465,6 +465,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0126_dodois_logins_delete.sql": (
         "sql1:a6d0cf78ab501b8c7af9f32c1a9ee5a4470e79a0de1ad3b9779f8bd4e617b022"
     ),
+    "0127_maps_reviews.sql": (
+        "sql1:77bd784a41f9835064ac40d1a30b9488c6a47b418cb6d1fd8bc9761f39656cc8"
+    ),
 }
 
 

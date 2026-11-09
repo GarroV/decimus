@@ -649,6 +649,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0124_service_settings_home_attention.sql` | Пиццерии в карточке «Требует внимания» на «Главной» (D728) включаются настройкой сети |
 | `0125_dodois_invite_contour.sql` | Контур Dodo IS приглашения (D729) |
 | `0126_dodois_logins_delete.sql` | Отключение страны от Dodo IS (#1551): главный админ снимает вход страны на вкладке «Dodo IS» |
+| `0127_maps_reviews.sql` | Оценки на картах поштучно (D732, D733, #1562): карта в «Качестве» считается по оценкам, поставленным за месяц, а не по общей оценке карточки на конец месяца |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -895,6 +896,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/ratings/links.py` | Ссылки Dodo IS в выгрузках рейтинга: id пиццерии, проверки и периода |
 | `src/ratings/maps.py` | Оценки на картах: загрузка из Pointer и сводка по странам для страницы рейтингов |
 | `src/ratings/maps_link.py` | Связь филиала Pointer с пиццерией Dodo — по координатам |
+| `src/ratings/maps_reviews.py` | Оценки на картах поштучно: загрузка из Pointer `/reviews` и сверка со счётчиком карточки |
 | `src/ratings/matching.py` | Сопоставление пиццерии рейтинга без id (D323): нормализация, разбор, допуск опечаток |
 | `src/ratings/model.py` | Общие типы рейтингов РС и РКО: что разборщики отдают импортёру |
 | `src/ratings/periods.py` | Период отчёта: месяц, квартал, период рейтинга РС (спека «Словарь», решение плана 12) или произвольный отрезок «с — по» из календаря |
@@ -978,6 +980,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/letter_template.py` | Шаблон письма партнёру: слоты, подстановки-блоки и проверка текста (D550, D608, #977, #1130) |
 | `src/domain/log_ids.py` | Идентификаторы людей и пространств в журнале — меткой, а не как есть (F-015) |
 | `src/domain/mailing_content.py` | Plain-text message/document templates |
+| `src/domain/maps_month.py` | Карта за месяц по оценкам, поставленным в этом месяце (D732, D733, docs/21-quality.md) |
 | `src/domain/measurement_sets.py` | Human-confirmed product measurements grouped by explicit line and physical zone |
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |

@@ -15,7 +15,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import войти, подменить_двери, собрать
 
-from src.db import agg_store, dodois_logins, dodois_metrics, maps_store, quality_read
+from src.db import agg_store, dodois_logins, dodois_metrics, maps_reviews_store, quality_read
 from src.db import ratings_read as read
 from src.db.reach import Reach
 from src.web import ratings_freshness
@@ -64,9 +64,11 @@ def чтения(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(quality_read, "period_scores", _scores)
     monkeypatch.setattr(quality_read, "audit_pcts", lambda reach, countries, month: {PL1: D("90")})
     monkeypatch.setattr(
-        maps_store,
-        "unit_scores_dated",
-        lambda provider, until: {PL1: (4.38, 100, date(2026, 9, 20))} if provider == 2 else {},
+        maps_reviews_store,
+        "monthly_stats",
+        lambda provider, *, until: maps_reviews_store.MonthlyStats(
+            {PL1: {MONTH: (100, D("438"))}} if provider == 2 else {}, MONTH
+        ),
     )
     monkeypatch.setattr(agg_store, "units", lambda countries=None: ())
     monkeypatch.setattr(
@@ -151,7 +153,7 @@ def test_network_table_has_one_row_per_country_and_skips_non_imf(ук: FlaskClie
         "Прочее",
     ]
     for group in ("РКО", "КР", "Карты", "Агрегаторы", "Доли заказов"):
-        assert f'class="qa-group qa-edge">{group}<' in head, group
+        assert f'class="qa-group qa-edge">{group}' in head, group
     for gone in ("РС", "Зал", "Доставка", "Проверка", "Выручка"):
         assert gone not in head, gone
 
@@ -347,9 +349,11 @@ def _registry_only_units(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
     monkeypatch.setattr(
-        maps_store,
-        "unit_scores_dated",
-        lambda provider, until: {BG3: (4.2, 40, date(2026, 9, 20))} if provider == 2 else {},
+        maps_reviews_store,
+        "monthly_stats",
+        lambda provider, *, until: maps_reviews_store.MonthlyStats(
+            {BG3: {MONTH: (40, D("168"))}} if provider == 2 else {}, MONTH
+        ),
     )
 
 
@@ -400,3 +404,14 @@ def test_header_has_two_floors_with_groups(ук: FlaskClient) -> None:
 
     assert 'colspan="4"' in html and 'colspan="2"' in html and 'rowspan="2"' in html
     assert "qa-edge" in html
+
+
+def test_maps_header_has_how_it_is_computed_tip_in_both_languages(ук: FlaskClient) -> None:
+    for url, phrase in (
+        ("/quality?month=2026-09", "среднее оценок, поставленных в этом месяце"),
+        ("/quality?country=PL&month=2026-09", "среднее оценок, поставленных в этом месяце"),
+        ("/quality?country=PL&month=2026-09&lang=en", "mean of the ratings given in that month"),
+    ):
+        html = ук.get(url).get_data(as_text=True)
+        assert phrase in html, url
+        assert html.count("info-qmaps") >= 1, url

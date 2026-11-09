@@ -18,7 +18,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,25 @@ HISTORY_WINDOW_DAYS = 30  # Pointer: «период не должен превы
 #: хранятся, но на страницу не выходят.
 GOOGLE = 2
 YANDEX = 1
+
+
+@dataclass(frozen=True)
+class MapProvider:
+    """Карта, по оценкам которой считается «Качество»: код Pointer и имя на экране."""
+
+    id: int
+    name: str
+
+
+#: Набор карт «Качества» (D733) — настройка, а не код расчёта: площадка (Tripadvisor и др.)
+#: добавляется строкой сюда, загрузка отзывов, расчёт и сверка подхватят её сами.
+MAP_PROVIDERS: tuple[MapProvider, ...] = (
+    MapProvider(GOOGLE, "Google"),
+    MapProvider(YANDEX, "Yandex"),
+)
+#: Окно одного запроса отзывов, дней. Pointer ограничивает окно истории оценок 31 днём;
+#: для `/reviews` предел не проверялся (D732) — если Pointer ответит 400, уменьшить здесь.
+REVIEWS_WINDOW_DAYS = 400
 
 
 class PointerError(RuntimeError):
@@ -207,3 +226,60 @@ def history(fetch: Fetch, company_uuid: str, start: date, end: date) -> tuple[Ra
                 if rating is not None:
                     found.append(rating)
     return tuple(found)
+
+
+@dataclass(frozen=True)
+class Review:
+    """Одна оценка на карте. Текст отзыва не берём — для расчёта он не нужен."""
+
+    id: str
+    company_uuid: str
+    provider_id: int
+    rating: int
+    published_at: date
+    is_deleted: bool
+
+
+def _review(raw: Mapping[str, Any], company_uuid: str, provider_id: int) -> Review | None:
+    """Оценка из ответа; карта и филиал — те, что запрашивали, а не то, что написано в записи."""
+    rid, rating = raw.get("id"), raw.get("rating")
+    try:
+        published = date.fromisoformat(str(raw.get("published_at"))[:10])
+    except ValueError:
+        return None
+    if isinstance(rid, bool) or not isinstance(rid, (int, str)) or not str(rid):
+        return None
+    if isinstance(rating, bool) or not isinstance(rating, int) or not 1 <= rating <= 5:
+        return None
+    return Review(
+        str(rid), company_uuid, provider_id, rating, published, raw.get("is_deleted") is True
+    )
+
+
+def reviews(
+    fetch: Fetch, company_uuid: str, provider_id: int, start: date, end: date
+) -> tuple[Review, ...]:
+    """Оценки филиала на одной карте, поставленные в `start..end` включительно.
+
+    Даты — строго без времени (с временем Pointer отвечает 400). Окно режется на куски по
+    `REVIEWS_WINDOW_DAYS`. Кривая запись отбрасывается, как и в списке филиалов; повтор одной
+    оценки на стыке страниц схлопывается по id."""
+    found: dict[str, Review] = {}
+    skipped = 0
+    cursor = start
+    while cursor <= end:
+        chunk_end = min(end, cursor + timedelta(days=REVIEWS_WINDOW_DAYS - 1))
+        path = (
+            f"/reviews?company_uuids={company_uuid}&provider_ids={provider_id}"
+            f"&published_at_from={cursor.isoformat()}&published_at_to={chunk_end.isoformat()}"
+        )
+        for raw in _pages(fetch, path):
+            review = _review(raw, company_uuid, provider_id)
+            if review is None:
+                skipped += 1
+            else:
+                found[review.id] = review
+        cursor = chunk_end + timedelta(days=1)
+    if skipped:
+        logger.warning("Pointer: пропущено кривых оценок: %d", skipped)
+    return tuple(found.values())

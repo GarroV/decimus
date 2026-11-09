@@ -32,7 +32,7 @@
     {%- if c.key == 'name' or not c.group -%}
       <th rowspan="2" class="{{ '' if c.key == 'name' else 'qa-num' }}{{ ' qa-edge' if c.edge else '' }}"{% if c.on %} aria-sort="{{ 'descending' if c.desc else 'ascending' }}"{% endif %}>{{ sort_link(c, first if c.key == 'name' else c.label) }}</th>
     {%- elif c.group_label -%}
-      <th colspan="{{ c.group_span }}" class="qa-group qa-edge">{{ c.group_label }}</th>
+      <th colspan="{{ c.group_span }}" class="qa-group qa-edge">{{ c.group_label }}{% if c.group_tip %} <span class="qa-tip">{{ info_tip(t('tip.hint'), '', c.group_tip, 'qmaps') }}</span>{% endif %}</th>
     {%- endif -%}
   {% endfor %}
   </tr>

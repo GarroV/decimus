@@ -19,7 +19,7 @@ from src.db import maps_store, service_keys
 from src.db.maps_store import LatestRating
 from src.db.space import SYSTEM_SPACE, acting_space
 
-from . import maps_link, pointer
+from . import maps_link, maps_reviews, pointer
 
 logger = logging.getLogger(__name__)
 
@@ -239,13 +239,16 @@ def load_once(fetch: pointer.Fetch | None = None) -> tuple[int, int]:
 
 def main() -> None:
     """Руками: `python -m src.ratings.maps` — снимок сегодня;
-    `python -m src.ratings.maps history 12` — история на 12 месяцев назад."""
+    `python -m src.ratings.maps history 12` — история на 12 месяцев назад;
+    `python -m src.ratings.maps reconcile` — сверка оценок выгрузки со счётчиком карточек."""
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
     args = sys.argv[1:]
     if args[:1] == ["link"]:
         link_once()
+    elif args[:1] == ["reconcile"]:
+        print(maps_reviews.report(*maps_reviews.reconcile()))
     elif args[:1] == ["history"]:
         backfill(int(args[1]) if len(args) > 1 else 12, today=date.today())
     else:
