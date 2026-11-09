@@ -4,7 +4,8 @@
   "use strict";
   function init(root) {
     var view = root.querySelector("[data-rb-view]");
-    if (!view) return;
+    if (!view || root.hasAttribute("data-rb-ready")) return;
+    root.setAttribute("data-rb-ready", "");
     function sync() {
       var max = view.scrollWidth - view.clientWidth;
       root.classList.toggle("can-prev", view.scrollLeft > 1);
@@ -18,8 +19,13 @@
       });
     });
     view.addEventListener("scroll", sync, { passive: true });
-    window.addEventListener("resize", sync);
+    window.addEventListener("resize", function () {
+      if (view.isConnected) sync();
+    });
     sync();
   }
-  document.querySelectorAll("[data-rb-scroll]").forEach(init);
+  function start() { document.querySelectorAll("[data-rb-scroll]").forEach(init); }
+  // Запускается при загрузке и при каждом приходе на экран переходом `nav.js`.
+  document.addEventListener("decimus:navigation", start);
+  start();
 })();

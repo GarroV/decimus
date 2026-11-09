@@ -184,4 +184,6 @@
 
   window.LetterEditor = { init: init };
   init(document);
+  // Экран пришёл переходом `nav.js` без перезагрузки: редактор включается на новой разметке.
+  document.addEventListener("decimus:navigation", function () { init(document); });
 })();

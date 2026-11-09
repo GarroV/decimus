@@ -19,7 +19,7 @@
 </header>{% endblock %}
 
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">
-<script src="{{ url_for('static', filename='decimus-rt.js') }}" defer></script>{% endblock %}
+<script src="{{ url_for('static', filename='decimus-rt.js') }}" data-swap-safe defer></script>{% endblock %}
 
 {% from "_info_tip.html" import fresh_tip %}
 {% from "ratings/_period.html" import period_lists with context %}

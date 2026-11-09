@@ -8,12 +8,16 @@
     "#claude": "claude", "#claude-token": "claude", "#claude-connect": "claude",
     "#bot": "bot", "#google": "google", "#google-link": "google", "#google-unlink": "google",
   };
-  var tile = TILE_BY_HASH[location.hash];
-  if (!tile) return;
-  var params = new URLSearchParams(location.search);
-  if (params.has("tile")) return;
-  params.set("tile", tile);
-  location.replace(location.pathname + "?" + params.toString() + "#connections");
+  function redirect() {
+    var tile = TILE_BY_HASH[location.hash];
+    if (!tile) return;
+    var params = new URLSearchParams(location.search);
+    if (params.has("tile")) return;
+    params.set("tile", tile);
+    location.replace(location.pathname + "?" + params.toString() + "#connections");
+  }
+  redirect();
+  document.addEventListener("decimus:navigation", redirect);
 })();
 
 // «Инструкции для проекта» (D476): раскрытие блока кладёт текст в буфер — одно
@@ -21,10 +25,13 @@
 // блоке, и его берут руками; кнопка «Скопировать ещё раз» остаётся.
 (function () {
   "use strict";
-  document.querySelectorAll("details[data-copy-on-open]").forEach(function (box) {
+  // Подключается при загрузке и при каждом приходе на экран переходом `nav.js`.
+  function init() {
+  document.querySelectorAll("details[data-copy-on-open]:not([data-copy-ready])").forEach(function (box) {
     var text = box.querySelector("pre");
     var summary = box.querySelector("summary");
     if (!text || !summary || !navigator.clipboard) return;
+    box.setAttribute("data-copy-ready", "");
     var label = summary.textContent;
     box.addEventListener("toggle", function () {
       if (!box.open) { summary.textContent = label; return; }
@@ -33,4 +40,7 @@
       }, function () { /* буфер недоступен — текст виден в блоке */ });
     });
   });
+  }
+  document.addEventListener("decimus:navigation", init);
+  init();
 })();

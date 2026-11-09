@@ -46,7 +46,7 @@
     </div>
 </header>{% endblock %}
 
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}"><script src="{{ url_for('static', filename='proofread.js') }}" defer></script><script src="{{ url_for('static', filename='letter.js') }}" defer></script>{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}"><script src="{{ url_for('static', filename='proofread.js') }}" data-swap-safe defer></script><script src="{{ url_for('static', filename='letter.js') }}" data-swap-safe defer></script>{% endblock %}
 
 {% macro row_link(row, review=false) %}
   {% set текущая = split_open and picked == row.id %}

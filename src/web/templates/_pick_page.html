@@ -30,7 +30,7 @@
 {% from "_split_ui.html" import drawer with context %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
-  <script src="{{ url_for('static', filename='split.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='split.js') }}" data-swap-safe defer></script>
   {% block pick_assets %}{% endblock %}
 {% endblock %}
 {% block page_class %} page--pick{% endblock %}

@@ -13,7 +13,7 @@
 {% from "inspections/_card_body.html" import card_body with context %}
 {% block title %}{{ head.unit_name }}{% endblock %}
 {% block page_heading %}<header class="page-heading"><h1>{{ t('registry.drawer.title') }}</h1></header>{% endblock %}
-{% block head %}<script src="{{ url_for('static', filename='proofread.js') }}" defer></script>{% endblock %}
+{% block head %}<script src="{{ url_for('static', filename='proofread.js') }}" data-swap-safe defer></script>{% endblock %}
 
 {% block body %}
  <div class="icard">

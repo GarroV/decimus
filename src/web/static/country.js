@@ -65,11 +65,20 @@
       e.preventDefault();
       swap(link.href, true);
     });
+    // Шаг в другой раздел (другой путь, чем у показанной страницы) ведёт `nav.js`.
     window.addEventListener("popstate", function (e) {
-      if (e.state && e.state.pick) swap(window.location.href, false);
+      var shown = document.documentElement.dataset.navPath;
+      if (shown && shown !== window.location.pathname) return;
+      if (e.state && e.state.pick && document.querySelector(".pk-shell")) swap(window.location.href, false);
     });
   }
 
-  if (window.history && history.replaceState) history.replaceState({ pick: true }, "", window.location.href);
-  scrollToSelected();
+  // Запускается при загрузке и при каждом приходе на экран переходом `nav.js`.
+  function init() {
+    if (!document.querySelector(".pk-shell")) return;
+    if (window.history && history.replaceState) history.replaceState({ pick: true }, "", window.location.href);
+    scrollToSelected();
+  }
+  document.addEventListener("decimus:navigation", init);
+  init();
 })();
