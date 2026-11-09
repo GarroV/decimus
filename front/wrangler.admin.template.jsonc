@@ -15,7 +15,7 @@
   "vars": { "ORIGIN_HOST": "<ORIGIN_HOST>", "STATIC_CACHE": "1" },
   // Кэш Worker'а только у точки входа статики (#698): подзапрос через EDGE мимо кэша
   // Cloudflare, и каждый файл шёл до VPS. Страницы под логином остаются без кэша.
-  // Нужен Wrangler 4.107.0+. Проверка после выкладки — docs/08-deploy.md, §8.9.
+  // Нужен Wrangler 4.107.0+. Проверка после выкладки — docs/34-platform-edge.md, §8.9.
   "cache": { "enabled": true },
   "exports": {
     "default": { "type": "worker", "cache": { "enabled": false } },

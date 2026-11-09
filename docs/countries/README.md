@@ -15,7 +15,7 @@
 
 | Что | Где канонически |
 |---|---|
-| Вход Dodo IS, контуры, «Отключить» | `docs/12-web-admin.md` (вкладка «Dodo IS»), `src/domain/dodois.py` |
+| Вход Dodo IS, контуры, «Отключить» | `docs/24-dodois.md` (вкладка «Dodo IS»), `src/domain/dodois.py` |
 | Данные Dodo IS для «Качества», итог и веса | `docs/21-quality.md` |
 | Pointer, карты, оценки поштучно | `docs/09-pointer-api.md` |
 | Агрегаторы: сбор, привязка, домашний сервер, ручные решения | `docs/17-aggregators.md` |
