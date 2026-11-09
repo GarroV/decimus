@@ -61,7 +61,9 @@ INTENT_SALT = "decimus-reauth-intent"
 INTENT_SIGNER_KEY = "decimus_reauth_intent_signer"
 
 #: Действия, которые выполняются само после подтверждения: без данных формы.
-INTENT_ACTIONS = frozenset({"claude-token", "chatgpt-token", "bot-link", "google-link"})
+INTENT_ACTIONS = frozenset(
+    {"claude-token", "chatgpt-token", "bot-link", "google-link", "google-calendar"}
+)
 
 CONFIRM_PATH = "/settings/confirm"
 CONFIRM_GOOGLE_PATH = "/settings/confirm/google"

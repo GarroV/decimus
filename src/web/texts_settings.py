@@ -371,6 +371,80 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "partner to drafts. We do not store it, so there is no status here: Google asks "
         "again, and earlier grants are revoked in your Google account settings.",
     },
+    "settings.calendar.title": {"ru": "Google Календарь", "en": "Google Calendar"},
+    "settings.calendar.none": {
+        "ru": "Календарь не подключён.",
+        "en": "Calendar is not connected.",
+    },
+    "settings.calendar.note": {
+        "ru": "Когда вы завершаете проверку управляющей компании, в вашем календаре "
+        "появляется событие на весь день: срок отправки отчёта партнёру — третий рабочий "
+        "день после проверки. Доступ — только к событиям вашего календаря; ключ хранится у нас "
+        "зашифрованным, отключить его можно здесь в любой момент. Приглашений и писем "
+        "никому не уходит.",
+        "en": "When you finish an inspection for the management company, an all-day event "
+        "appears in your calendar: the deadline for sending the report to the partner — the "
+        "third working day after the inspection. Access covers only events in your calendar; "
+        "the key is stored encrypted and you can disconnect it here at any time. No invitations "
+        "or emails are sent to anyone.",
+    },
+    "settings.calendar.on_go": {
+        "ru": "Подключить Google Календарь",
+        "en": "Connect Google Calendar",
+    },
+    "settings.calendar.on": {
+        "ru": "Календарь подключён: события ставятся в календарь аккаунта {email}.",
+        "en": "Calendar connected: events are added to the calendar of {email}.",
+    },
+    "settings.calendar.problem": {
+        "ru": "Календарь отключён или не ответил — переподключите.",
+        "en": "The calendar is disconnected or did not respond — reconnect it.",
+    },
+    "settings.calendar.reconnect": {
+        "ru": "Переподключить календарь",
+        "en": "Reconnect calendar",
+    },
+    "settings.calendar.off": {"ru": "Отключить календарь", "en": "Disconnect calendar"},
+    "settings.calendar.unknown": {
+        "ru": "Состояние календаря не прочиталось: база не ответила.",
+        "en": "The calendar status could not be read: the database did not respond.",
+    },
+    "settings.calendar.done.on": {
+        "ru": "Календарь подключён.",
+        "en": "Calendar connected.",
+    },
+    "settings.calendar.done.off": {
+        "ru": "Календарь отключён: доступ отозван у Google, ключ у нас стёрт, события сняты.",
+        "en": "Calendar disconnected: access revoked at Google, our key erased, events removed.",
+    },
+    "settings.calendar.done.denied": {
+        "ru": "Вы отказались в окне Google — календарь не подключён.",
+        "en": "You declined in the Google window — the calendar was not connected.",
+    },
+    "settings.calendar.done.scope": {
+        "ru": "В окне Google не выдано право на события календаря — отметьте его и подключите "
+        "заново.",
+        "en": "The permission to manage calendar events was not granted in the Google window — "
+        "tick it and connect again.",
+    },
+    "settings.calendar.done.account": {
+        "ru": "Доступ выдал не тот аккаунт Google, которым вы вошли, или к учётке не привязана "
+        "почта Google. Выберите свой аккаунт.",
+        "en": "Access was granted by a different Google account than the one you signed in "
+        "with, or no Google email is linked. Choose your own account.",
+    },
+    "settings.calendar.done.failed": {
+        "ru": "Google не подтвердил доступ — календарь не подключён. Попробуйте ещё раз.",
+        "en": "Google did not confirm the access — the calendar was not connected. Try again.",
+    },
+    "settings.calendar.done.db": {
+        "ru": "База не ответила — ничего не изменилось. Попробуйте позже.",
+        "en": "The database did not respond — nothing changed. Try again later.",
+    },
+    "settings.calendar.done.revoke": {
+        "ru": "Google не отозвал доступ — календарь остался подключённым. Повторите позже.",
+        "en": "Google did not revoke the access — the calendar stays connected. Try again later.",
+    },
     "settings.lang.title": {"ru": "Язык интерфейса", "en": "Interface language"},
     "settings.lang.note": {
         "ru": "Сохраняется в профиле. У бота и мини-аппа — свой язык.",

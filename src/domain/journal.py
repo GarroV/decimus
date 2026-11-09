@@ -50,6 +50,7 @@ RESULT_BACKUP_USED = "backup-used"
 #: Двери журнала действий (`action_journal.door`).
 DOOR_WEB = "web"
 DOOR_MCP = "mcp"
+DOOR_BOT = "bot"
 
 #: Роли, чьи действия пишутся в журнал: админ и главный админ (D462).
 JOURNALED_ROLES = frozenset({"admin", "superadmin"})
