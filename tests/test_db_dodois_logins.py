@@ -312,11 +312,31 @@ def test_отключение_удаляет_вход_и_оба_ключа_от�
     assert store.get_invite(чужая_страны).revoked_at is None  # type: ignore[union-attr]
 
 
-def test_отключение_не_трогает_истёкшие_и_погашенные_ссылки(база: str, автор: str) -> None:
+def test_отключение_не_трогает_погашенные_ссылки(база: str, автор: str) -> None:
     _вход("SI")
     погашенная = _ссылка(база, автор, "SI", "d" * 64)
     _вход("SI", invite_id=погашенная)  # гасит ссылку, вход перезаписан
-    истёкшая = _ссылка(база, автор, "SI", "e" * 64)
+
+    assert store.delete_login("SI", "owner", НОВАЯ) is True
+
+    assert store.get_invite(погашенная).revoked_at is None  # type: ignore[union-attr]
+
+
+def test_вход_начатый_до_отключения_вход_не_воскрешает(база: str, автор: str) -> None:
+    _вход("SI")
+    идущая = _ссылка(база, автор, "SI", "9" * 64)  # ссылка открыта, вход по ней ещё идёт
+    store.delete_login("SI", "owner", НОВАЯ)
+
+    with pytest.raises(store.InviteUnusable):
+        _вход("SI", store.Tokens("ДОСТУП-ПОЗЖЕ", "ПРОДЛЕНИЕ-ПОЗЖЕ"), invite_id=идущая)
+
+    assert store.get_login("SI") is None
+    assert store.read_tokens("SI") is None
+
+
+def test_отключение_отзывает_и_истёкшие_непогашенные_ссылки(база: str, автор: str) -> None:
+    _вход("SI")
+    истёкшая = _ссылка(база, автор, "SI", "8" * 64)
     with psycopg.connect(база) as conn:
         conn.execute(
             "update dodois.invites set issued_at = %s, expires_at = %s where id = %s",
@@ -324,10 +344,30 @@ def test_отключение_не_трогает_истёкшие_и_погаш
         )
         conn.commit()
 
-    assert store.delete_login("SI", "owner", НОВАЯ) is True
+    store.delete_login("SI", "owner", НОВАЯ)
 
-    assert store.get_invite(погашенная).revoked_at is None  # type: ignore[union-attr]
-    assert store.get_invite(истёкшая).revoked_at is None  # type: ignore[union-attr]
+    assert store.get_invite(истёкшая).revoked_at is not None  # type: ignore[union-attr]
+
+
+def test_истёкшая_ссылка_вход_не_записывает(база: str, автор: str) -> None:
+    ссылка = _ссылка(база, автор, "SI", "7" * 64)  # живёт сутки от НОВАЯ
+
+    with pytest.raises(store.InviteUnusable):
+        store.save_login(
+            country="SI",
+            contour="intl",
+            source="invite",
+            issued_by="owner",
+            account_name=None,
+            account_email=None,
+            scope="openid",
+            tokens=store.Tokens(ДОСТУП, ПРОДЛЕНИЕ),
+            access_expires_at=НОВАЯ + timedelta(days=2),
+            now=НОВАЯ + timedelta(hours=25),
+            invite_id=ссылка,
+        )
+
+    assert store.get_login("SI") is None
 
 
 def test_отключение_без_входа_ничего_не_пишет(база: str, автор: str) -> None:

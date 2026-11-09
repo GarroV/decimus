@@ -45,7 +45,7 @@ from werkzeug.wrappers import Response
 from src.db import dodois_logins, web_throttle
 from src.db import ratings_read as ratings
 from src.db.errors import DbError
-from src.dodois import service
+from src.dodois import flow, service
 from src.domain import dodois as rules
 from src.domain.dodois import Invite, Login
 
@@ -306,6 +306,7 @@ def disconnect(country: str, by: str) -> tuple[Flash, int]:
         return Flash("dodois.err.db", False, {}), 503
     if not done:
         return Flash("dodois.err.no_login", False, {}), 409
+    flow.abort_country(country)
     return Flash("dodois.ok.disconnected", True, {}), 200
 
 

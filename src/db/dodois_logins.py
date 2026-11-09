@@ -166,15 +166,17 @@ def check_secrets_key() -> None:
 def reject_invite(invite_id: int, country: str, account: str | None, now: datetime) -> None:
     """Погасить ссылку как «вход не применён»: прежний вход страны и его ключи не тронуты.
 
-    Ссылка гасится атомарно и только живая; иначе `InviteUnusable`.
+    Ссылка гасится атомарно и только живая (не погашена, не отозвана, не истекла); иначе
+    `InviteUnusable`.
     """
     vault_names(country)
     try:
         with _managing() as conn, conn.cursor() as cur:
             cur.execute(
                 "update dodois.invites set used_at = %s, result = %s, result_account = %s "
-                "where id = %s and country = %s and used_at is null and revoked_at is null",
-                (now, RESULT_NOT_APPLIED, account, invite_id, country),
+                "where id = %s and country = %s and used_at is null and revoked_at is null "
+                "and expires_at > %s",
+                (now, RESULT_NOT_APPLIED, account, invite_id, country, now),
             )
             if cur.rowcount != 1:
                 raise InviteUnusable("Ссылка уже использована или отозвана")
@@ -198,7 +200,8 @@ def save_login(
 ) -> Login:
     """Записать вход страны (заменяет прежний) вместе с ключами и погашением ссылки.
 
-    Одна транзакция: ссылка погашается, только если она ещё жива; иначе `InviteUnusable` и
+    Одна транзакция: ссылка погашается, только если она ещё жива (не погашена, не отозвана,
+    не истекла); иначе `InviteUnusable` и
     не записано ничего.
     """
     # Пробное шифрование до соединения: нет `SECRETS_KEY` — отказ до любой записи, ссылка цела.
@@ -211,8 +214,8 @@ def save_login(
             if invite_id is not None:
                 cur.execute(
                     "update dodois.invites set used_at = %s where id = %s and country = %s "
-                    "and used_at is null and revoked_at is null",
-                    (now, invite_id, country),
+                    "and used_at is null and revoked_at is null and expires_at > %s",
+                    (now, invite_id, country, now),
                 )
                 if cur.rowcount != 1:
                     raise InviteUnusable("Ссылка уже использована или отозвана")
@@ -284,8 +287,10 @@ def replace_tokens(
 def delete_login(country: str, by: str, now: datetime) -> bool:
     """Отключить страну: удалить вход и оба ключа одной транзакцией (#1551).
 
-    Живые (не погашенные, не отозванные, не истёкшие) ссылки страны отзываются там же — иначе
-    по ним можно было бы тут же привязать страну заново. Данные показателей не трогаются.
+    Все непогашенные и неотозванные ссылки страны отзываются там же (как в `create_invite`,
+    истёкшие тоже) — иначе по ним, в том числе по уже начатому входу, страну можно было бы тут
+    же привязать заново: `save_login` и `reject_invite` берут только живую ссылку. Данные
+    показателей не трогаются.
     `False` — входа у страны не было, не записано ничего. Продление и проверка после удаления
     строку не воскрешают: `replace_tokens` и `record_state` только обновляют существующую.
     """
@@ -300,8 +305,8 @@ def delete_login(country: str, by: str, now: datetime) -> bool:
             )
             cur.execute(
                 "update dodois.invites set revoked_at = %s where country = %s "
-                "and used_at is null and revoked_at is null and expires_at > %s",
-                (now, country, now),
+                "and used_at is null and revoked_at is null",
+                (now, country),
             )
     except psycopg.Error as exc:
         raise _fail("Вход Dodo IS не отключился", exc) from exc
