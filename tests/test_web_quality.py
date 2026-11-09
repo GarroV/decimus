@@ -153,7 +153,7 @@ def test_network_table_has_one_row_per_country_and_skips_non_imf(ук: FlaskClie
         "Прочее",
     ]
     for group in ("РКО", "КР", "Карты", "Агрегаторы", "Доли заказов"):
-        assert f'class="qa-group qa-edge">{group}<' in head, group
+        assert f'class="qa-group qa-edge">{group}' in head, group
     for gone in ("РС", "Зал", "Доставка", "Проверка", "Выручка"):
         assert gone not in head, gone
 
@@ -404,3 +404,14 @@ def test_header_has_two_floors_with_groups(ук: FlaskClient) -> None:
 
     assert 'colspan="4"' in html and 'colspan="2"' in html and 'rowspan="2"' in html
     assert "qa-edge" in html
+
+
+def test_maps_header_has_how_it_is_computed_tip_in_both_languages(ук: FlaskClient) -> None:
+    for url, phrase in (
+        ("/quality?month=2026-09", "среднее оценок, поставленных в этом месяце"),
+        ("/quality?country=PL&month=2026-09", "среднее оценок, поставленных в этом месяце"),
+        ("/quality?country=PL&month=2026-09&lang=en", "mean of the ratings given in that month"),
+    ):
+        html = ук.get(url).get_data(as_text=True)
+        assert phrase in html, url
+        assert html.count("info-qmaps") >= 1, url

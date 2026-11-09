@@ -491,6 +491,8 @@ def render(lang: str) -> str:
             "desc": sort_key == key and desc,
             "group": group,
             "group_label": t(f"quality.group.{group}", lang) if group and first else "",
+            #: Памятка под «?» у заголовка группы «Карты» (по пиццерии и по стране).
+            "group_tip": (t("quality.tip.maps_head", lang),) if group == "maps" and first else (),
             "group_span": group_sizes.get(group, 1),
             "edge": first,
         }

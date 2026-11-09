@@ -132,6 +132,21 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
             "ratings."
         ),
     },
+    "quality.tip.maps_head": {
+        "ru": (
+            "Карта за месяц — среднее оценок, поставленных в этом месяце (удалённые не "
+            "считаются). Пиццерия — средневзвешенное карт по числу оценок, страна — по числу "
+            "оценок всех пиццерий. Если оценок нет или их меньше 10% от среднего за 3 прошлых "
+            "месяца — берётся прошлый месяц."
+        ),
+        "en": (
+            "A map's value for the month is the mean of the ratings given in that month "
+            "(deleted ones do not count). A pizzeria is the mean of its maps weighted by "
+            "rating counts, a country is weighted by the rating counts of all its pizzerias. "
+            "If there are no ratings or fewer than 10% of the average of the previous 3 "
+            "months, the previous month is taken."
+        ),
+    },
     "quality.tip.maps_carried": {
         "ru": "Карты, месяц перенесён из прошлого (мало оценок), пиццерий: {n} — {items}",
         "en": (
