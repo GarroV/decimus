@@ -756,6 +756,20 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .sidenav__subitem:hover { text-decoration: none; color: var(--ink); background: var(--surface-2); }
 .sidenav__subitem.is-on { color: var(--accent); background: var(--accent-soft); font-weight: var(--w-semibold); }
 .sidenav__subitem .rt-fdot { flex: none; }
+/* Полоса прокрутки страницы не двигает содержимое: место под неё занято всегда, а не
+   только на экранах «Рейтингов» (там это правило жило в decimus-rt.css). */
+html { scrollbar-gutter: stable; }
+/* «Рейтинги» в узкой панели: список разделов всплывает рядом с панелью поверх страницы
+   и ничего не сдвигает (владелец 09.11.2026: «просто раскрывающий список, который ничего
+   не меняет в масштабе»). Положение по вертикали — от кнопки, его ставит nav-state.js.
+   Закрыт по умолчанию: у колонки `display: none` (в dodo-ds.css и domain.css она сетка). */
+html[data-nav-collapsed="true"] .sidenav__branch-clip { display: none; }
+html[data-nav-collapsed="true"][data-nav-fly="true"] .sidenav__branch-clip {
+  display: block; position: fixed; z-index: 60; top: var(--fly-top, 8px); left: 60px; width: 220px;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-block); box-shadow: var(--sh-pop);
+}
+html[data-nav-collapsed="true"] .sidenav__branch-clip > div { padding: var(--space-3); }
+html[data-nav-collapsed="true"] .sidenav__sub { margin: 0; border-left: 0; }
 /* Кнопка в непостроенный раздел (D139) приглушена так же, как его пункт меню. */
 .btn.is-wip { color: var(--ink-3); background: transparent; border-style: dashed; box-shadow: none; }
 
