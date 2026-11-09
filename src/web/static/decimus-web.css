@@ -1150,6 +1150,15 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 @media (max-width: 719px) {
   .find-row__shots--partial { flex: 0 1 auto; max-width: 9.5rem; white-space: normal; text-align: right; }
 }
+/* Телефон: класс и номер — первой строкой высотой с пиктограммы правки (они стоят в ней справа),
+   текст и пометка о кадрах — ниже во всю ширину, а не под пиктограммами. */
+@media (max-width: 560px) {
+  .find-row, .find-row__summary { flex-wrap: wrap; row-gap: var(--space-2); }
+  .find-item--acts > .find-row, .find-item--acts > .find-row--photos > .find-row__summary { padding-right: var(--space-7); }
+  .find-row__level, .find-row__num { display: flex; align-items: center; min-height: 44px; }
+  .find-row__main { flex: 1 1 100%; min-width: 0; }
+  .find-row__shots, .find-row__shots--partial { flex: 1 1 100%; max-width: none; white-space: normal; text-align: left; }
+}
 /* Кадры записи — миниатюры в ряд; по щелчку открываются целиком (data-zoom). */
 .find-row__gallery {
   display: flex;
