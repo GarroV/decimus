@@ -416,11 +416,12 @@ def checkup_periods(body: Any) -> list[CheckupPeriod]:
 
 
 def rating_month(kind: str, period_from: date, period_to: date) -> date:
-    """Месяц, к которому относится период оценки.
+    """Месяц, к которому относится период оценки; для РКО — месяц начала недели.
 
-    РКО — по началу периода, как в таблице контроля. Периоды РС в Dodo IS не календарные
-    половины (31.08–13.09 и 14.09–04.10, а таблица зовёт их «Сентябрь 1/2»), поэтому РС
-    относится к месяцу, на который падает большинство его дней; при равенстве — месяц начала.
+    РКО за месяц берёт все недели, задевшие месяц (D735), поэтому выбор периодов делают
+    `rating_months` и `in_rating_month`; здесь РКО — только месяц начала. Периоды РС в Dodo IS
+    не календарные половины (31.08–13.09 и 14.09–04.10, а таблица зовёт их «Сентябрь 1/2»), поэтому
+    РС относится к месяцу, на который падает большинство его дней; при равенстве — месяц начала.
     """
     start_month = first_of_month(period_from)
     if kind != RATING_RS:
@@ -431,6 +432,26 @@ def rating_month(kind: str, period_from: date, period_to: date) -> date:
     in_start = (next_month(start_month) - period_from).days
     total = (period_to - period_from).days + 1
     return end_month if total - in_start > in_start else start_month
+
+
+def rating_months(kind: str, period_from: date, period_to: date) -> list[date]:
+    """Месяцы, в которые входит период оценки.
+
+    РКО — каждый месяц, в который попал хоть один день недели (D735): неделя на стыке входит
+    в оба месяца, сумма проверок по месяцам за год больше фактической, это принято. РС — один
+    месяц (`rating_month`).
+    """
+    if kind == RATING_RS:
+        return [rating_month(kind, period_from, period_to)]
+    months = [first_of_month(period_from)]
+    while next_month(months[-1]) <= period_to:
+        months.append(next_month(months[-1]))
+    return months
+
+
+def in_rating_month(kind: str, period_from: date, period_to: date, month: date) -> bool:
+    """Входит ли период оценки в месяц (`month` — первое число); правило — `rating_months`."""
+    return month in rating_months(kind, period_from, period_to)
 
 
 def merge_rating_periods(rows: Iterable[RatingPeriod]) -> list[RatingPeriod]:

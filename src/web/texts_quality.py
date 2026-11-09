@@ -74,6 +74,16 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
             "over the weeks of the month."
         ),
     },
+    "quality.tip.rko": {
+        "ru": (
+            "РКО за месяц — все недели (пн–вс), у которых хоть один день в этом месяце; "
+            "неделя на стыке входит в оба месяца."
+        ),
+        "en": (
+            "RKO for a month — every week (Mon–Sun) with at least one day in that month; "
+            "a week on the border belongs to both months."
+        ),
+    },
     "quality.tip.overall": {
         "ru": (
             "Итог — рейтинг пиццерии из 5: сумма «вес × оценка» по РКО (÷ 20), КР, картам и "
@@ -109,11 +119,11 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     },
     "quality.tip.fresh": {
         "ru": (
-            "РКО — по дате начала недели; РС — по месяцу, на который падает большинство его "
+            "РКО — все недели, задевшие месяц; РС — по месяцу, на который падает большинство его "
             "дней; агрегаторы — последняя оценка в месяце."
         ),
         "en": (
-            "RKO goes by the week start date; RS by the month holding most of its days; "
+            "RKO takes every week touching the month; RS by the month holding most of its days; "
             "aggregators use the last rating in the month."
         ),
     },

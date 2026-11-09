@@ -45,8 +45,8 @@ def _history() -> list[dm.UnitRatingPeriod]:
 
 
 def _in_month(periods: list[dm.UnitRatingPeriod], month: date) -> list[dm.UnitRatingPeriod]:
-    """То, что отдаёт чтение за месяц: РКО по началу недели, РС — по большинству дней."""
-    return [p for p in periods if parse.rating_month(p.kind, p.period_from, p.period_to) == month]
+    """То, что отдаёт чтение за месяц: РКО — недели, задевшие месяц, РС — по большинству дней."""
+    return [p for p in periods if parse.in_rating_month(p.kind, p.period_from, p.period_to, month)]
 
 
 def _sales() -> list[dm.UnitSales]:
@@ -90,8 +90,8 @@ def test_rs_period_goes_to_the_month_holding_most_of_its_days() -> None:
         "2026-08-31",
         "2026-09-14",
     ]
-    # Неделя РКО с началом 31.08 остаётся августу, как в таблице контроля.
-    assert date(2026, 8, 31) not in {p.period_from for p in sept if p.kind == "rko"}
+    # Неделя РКО 31.08–06.09 задевает сентябрь, входит и в август, и в сентябрь (D735).
+    assert date(2026, 8, 31) in {p.period_from for p in sept if p.kind == "rko"}
     assert parse.rating_month("rs", date(2026, 9, 14), date(2026, 10, 4)) == SEPTEMBER
     assert parse.rating_month("rs", date(2026, 9, 28), date(2026, 10, 11)) == date(2026, 10, 1)
 
@@ -100,7 +100,7 @@ def test_ljubljana_1_september_values_from_live_inputs() -> None:
     unit = _unit({"wolt": (D("9.0"), 10)})
     v = unit.values
 
-    assert v["rko"] == D("90.9575")  # среднее четырёх недель с началом 07.09–28.09
+    assert v["rko"] == D("89.466")  # среднее пяти недель, задевших сентябрь: 31.08–28.09 (D735)
     assert v["checks"] == D("4.5")
     assert v["rs"] == D("90")  # (92 + 88) / 2
     assert round(v["kr"] or D(0), 6) == D("4.747228")  # (4.79×58 + 4.73×144) / 202
@@ -122,7 +122,7 @@ def test_ljubljana_1_september_total_and_weights_by_hand() -> None:
     w_kr = rest * 780 / (1395 + 780)  # приложение и сайт против агрегаторов, прочее не в счёт
     w_aggs = rest * 1395 / (1395 + 780)
     expected = (
-        w_rko * (D("90.9575") / 20)
+        w_rko * (D("89.466") / 20)
         + w_kr * (D("4.79") * 58 + D("4.73") * 144) / 202
         + D("0.2") * D("4.40")
         + w_aggs * D("4.5")
@@ -131,7 +131,7 @@ def test_ljubljana_1_september_total_and_weights_by_hand() -> None:
     assert (v["w_rko"], v["w_maps"]) == (w_rko, D("0.2"))
     assert v["w_kr"] == w_kr and v["w_aggs"] == w_aggs
     assert abs((v["total"] or D(0)) - expected) < D("1e-9")
-    assert round(v["total"] or D(0), 2) == D("4.54")
+    assert round(v["total"] or D(0), 2) == D("4.52")
     assert unit.overall is not None and not unit.overall.incomplete
 
 
@@ -141,7 +141,7 @@ def test_ljubljana_1_without_aggregator_rating_has_incomplete_total() -> None:
     w_kr = D("0.5") * 780 / (1395 + 780)
     weights = D("0.3") + w_kr + D("0.2")  # агрегаторам без оценки — вес ноль
     expected = (
-        D("0.3") * (D("90.9575") / 20)
+        D("0.3") * (D("89.466") / 20)
         + w_kr * (D("4.79") * 58 + D("4.73") * 144) / 202
         + D("0.2") * D("4.40")
     ) / weights
