@@ -15,6 +15,11 @@
 больше часа не тратит; новый день и новая суточная загрузка (новые филиалы) открывают
 проверку заново.
 
+**Оценки поштучно (#1562, D732).** Тем же кругом, в том же замке — шаг загрузки отзывов
+`maps_reviews.reviews_step`: история за год, потом раз в сутки два последних месяца. После
+того как все пары на сегодня закрыты, раз в сутки — сверка со счётчиком карточки: расхождение
+пишется в лог, людям ничего не уходит.
+
 **Один процесс на заход (F-125).** «Пора» решается по отметке в базе, и два процесса
 (перекрывшийся контейнер при выкатке, второй экземпляр) видят одну и ту же отметку и
 оба тянут из Pointer и пишут: двойная квота и задвоенные строки. Загрузка и шаг истории
@@ -35,7 +40,7 @@ from src.db.errors import DbError, RatingsError
 from src.db.job_lock import MAPS_LOADER_LOCK_KEY, job_lock
 from src.db.space import SYSTEM_SPACE, acting_space
 from src.health import checks
-from src.ratings import maps, pointer
+from src.ratings import maps, maps_reviews, pointer
 from src.ratings.pointer import PointerError
 
 logger = logging.getLogger(__name__)
@@ -46,6 +51,8 @@ FRESH_FOR_SEC = 20 * 60 * 60
 HISTORY_MONTHS = 12
 #: Запросов истории за час: ~1 с на запрос, то есть не больше пяти минут работы за круг.
 HISTORY_REQUESTS_PER_CYCLE = 300
+#: Запросов отзывов за круг: столько же, сколько у истории оценок филиалов.
+REVIEWS_REQUESTS_PER_CYCLE = 300
 
 
 def _due() -> bool:
@@ -95,6 +102,36 @@ def history_cycle(state: HistoryState, fetch: pointer.Fetch | None = None) -> bo
     return step.done
 
 
+@dataclass
+class ReviewsState:
+    """Память цикла об оценках поштучно: за какой день сверка уже сделана."""
+
+    reconciled_on: date | None = None
+
+
+def reviews_cycle(state: ReviewsState, fetch: pointer.Fetch | None = None) -> bool:
+    """Один шаг загрузки оценок; `True` — на сегодня всё загружено и сверено."""
+    today = _today()
+    step = maps_reviews.reviews_step(
+        today=today,
+        fetch=fetch or maps._key_fetch(),
+        max_requests=REVIEWS_REQUESTS_PER_CYCLE,
+    )
+    if step.requests:
+        logger.info(
+            "Оценки карт поштучно: за круг запросов %d, оценок легло %d, закрыто: %s",
+            step.requests,
+            step.saved,
+            step.done,
+        )
+    if step.done and state.reconciled_on != today:
+        mismatches, unchecked, total = maps_reviews.reconcile()
+        text = maps_reviews.report(mismatches, unchecked, total)
+        (logger.warning if mismatches else logger.info)("%s", text)
+        state.reconciled_on = today
+    return step.done
+
+
 def _load_if_due(history: HistoryState) -> None:
     """Суточная загрузка, когда пора; под замком — «пора» и загрузка не разрываются."""
     with job_lock(MAPS_LOADER_LOCK_KEY, what="оценки карт") as got:
@@ -136,6 +173,15 @@ def _history_step(history: HistoryState) -> None:
         history_cycle(history)
 
 
+def _reviews_step(state: ReviewsState) -> None:
+    """Шаг загрузки оценок под тем же замком, что и суточная загрузка."""
+    with job_lock(MAPS_LOADER_LOCK_KEY, what="оценки карт") as got:
+        if not got:
+            logger.info("Оценки карт поштучно: загрузку ведёт другой процесс — заход пропущен")
+            return
+        reviews_cycle(state)
+
+
 async def load_forever() -> None:
     """Задача бота: держит снимок оценок карт не старше суток.
 
@@ -152,6 +198,7 @@ async def _load_forever() -> None:
         logger.info("Оценки карт: %s не задан — загрузка выключена", maps.KEY_ENV)
         return
     history = HistoryState()
+    reviews = ReviewsState()
     while True:
         try:
             await asyncio.to_thread(_load_if_due, history)
@@ -167,4 +214,13 @@ async def _load_forever() -> None:
         except Exception:
             # Упавшая задача asyncio молчит — поэтому ловим всё и живём дальше.
             logger.exception("История карт: непредвиденный сбой дозагрузки")
+        try:
+            await asyncio.to_thread(_reviews_step, reviews)
+        except (PointerError, RatingsError) as exc:
+            logger.warning(
+                "Оценки карт поштучно не догрузились, продолжим в следующий круг: %s", exc
+            )
+        except Exception:
+            # Упавшая задача asyncio молчит — поэтому ловим всё и живём дальше.
+            logger.exception("Оценки карт поштучно: непредвиденный сбой загрузки")
         await asyncio.sleep(CHECK_EVERY_SEC)

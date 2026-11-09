@@ -627,6 +627,7 @@
 | `0124_service_settings_home_attention.sql` | — |
 | `0125_dodois_invite_contour.sql` | — |
 | `0126_dodois_logins_delete.sql` | — |
+| `0127_maps_reviews.sql` | `maps.reviews`, `maps.reviews_sync` |
 <!-- map:end -->
 
 ## Makefile

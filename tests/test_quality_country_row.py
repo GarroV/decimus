@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from decimal import ROUND_HALF_UP
 from decimal import Decimal as D
 
@@ -48,7 +49,11 @@ def _unit(
         total=overall.score,
         weights=weights,
     )
-    return qd.UnitHealth(name, name, "XX", values, None, (), orders, {}, {}, (), (), "", overall)
+    # Одинаковый вес оценок: страна по картам совпадает с простым средним, как в снимке аналитика.
+    maps_rows = (("Google", D(maps), 100),)
+    return qd.UnitHealth(
+        name, name, "XX", values, None, maps_rows, orders, {}, {}, (), (), "", overall
+    )
 
 
 def _pair(spread: dict[str, str], mean: dict[str, str | None], orders: q.Orders) -> list:
@@ -147,3 +152,16 @@ def test_country_rko_adj_is_row_rko_over_twenty() -> None:
     country, _ = _row(*ROWS[0][1:4])
 
     assert country.values["rko_adj"] == D("85.04") / 20
+
+
+def test_country_maps_score_is_weighted_by_ratings_count_not_mean_of_pizzerias() -> None:
+    """D734: пиццерия с 300 оценками весит втрое больше пиццерии со 100, а не поровну."""
+    orders = q.Orders(0, 0, 0)
+    few = _unit("few", rko="90", checks="3", kr="4", maps="5", aggs=None, orders=orders)
+    many = _unit("many", rko="90", checks="3", kr="4", maps="3", aggs=None, orders=orders)
+    few = dataclasses.replace(few, maps=(("Google", D(5), 100),))
+    many = dataclasses.replace(many, maps=(("Google", D(3), 300),))
+    country = qd._country("XX", [few, many], None, qd.DODOIS_OK)
+    # (5*100 + 3*300) / 400 = 3.5; простое среднее дало бы 4
+    assert country.values["maps"] == D("3.5")
+    assert country.maps[0].score == D("3.5")

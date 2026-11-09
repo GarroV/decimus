@@ -16,9 +16,10 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
-from src.db import agg_store, dodois_logins, dodois_metrics, maps_store, quality_read
+from src.db import agg_store, dodois_logins, dodois_metrics, maps_reviews_store, quality_read
 from src.db.errors import DbError
 from src.db.reach import Reach
+from src.domain import maps_month
 from src.domain import quality as q
 from src.ratings import pointer
 from src.ratings.aggregators import collect
@@ -77,6 +78,8 @@ class UnitHealth:
     rating_source: str = ""
     #: Итоговый рейтинг и веса (D719); `None` — у пиццерии не считался.
     overall: q.Overall | None = None
+    #: Карты, у которых месяц не принят (D733) и взято значение прошлого: (карта, месяц-источник).
+    maps_carried: tuple[tuple[str, date], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -265,6 +268,7 @@ def _unit(
     scores: Sequence[quality_read.PeriodScore],
     audit: Decimal | None,
     maps: tuple[tuple[str, Decimal, int], ...],
+    maps_carried: tuple[tuple[str, date], ...] = (),
     sales: Sequence[dodois_metrics.UnitSales],
     agg_orders: Sequence[dodois_metrics.UnitAggregatorOrders],
     kr: dodois_metrics.UnitKr | None,
@@ -343,6 +347,7 @@ def _unit(
         tuple(periods),
         source,
         overall,
+        maps_carried,
     )
 
 
@@ -453,7 +458,10 @@ def _country(
         return _mean(v for u in units if (v := u.values[key]) is not None)
 
     rko, checks, kr = avg("rko"), avg("checks"), avg("kr")
-    maps, aggs = avg("maps"), avg("aggs")
+    # Карты страны — средневзвешенное по числу оценок всех пиццерий за месяц (D734), а не
+    # простое среднее пиццерий; прочие баллы страны — по D722.
+    maps = q.maps_score([(score, count) for u in units for _, score, count in u.maps])
+    aggs = avg("aggs")
     overall, weights = overall_values(
         rko=rko, checks=checks, kr=kr, maps=maps, aggs=aggs, orders=orders
     )
@@ -501,15 +509,33 @@ def _month_end(month: date) -> date:
     return quality_read.next_month(month) - timedelta(days=1)
 
 
-def _fresh_maps(provider: int, month: date) -> dict[str, tuple[float, int]]:
-    """Оценки на карте, снятые внутри месяца (последняя на конец месяца, не старше его начала)."""
-    return {
-        code: (score, count)
-        for code, (score, count, on) in maps_store.unit_scores_dated(
-            provider, until=_month_end(month)
-        ).items()
-        if on >= month
-    }
+def _month_maps(
+    month: date,
+) -> tuple[dict[str, dict[str, tuple[Decimal, int]]], dict[str, dict[str, date]]]:
+    """Карты пиццерий за месяц по оценкам, поставленным в нём (D732, D733).
+
+    Набор карт — `pointer.MAP_PROVIDERS`. Возвращает значения `карта → пиццерия → (оценка, вес)`
+    и перенесённые месяцы `карта → пиццерия → месяц-источник`. Вес — число оценок месяца, из
+    которого взято значение."""
+    values: dict[str, dict[str, tuple[Decimal, int]]] = {}
+    carried: dict[str, dict[str, date]] = {}
+    for provider in pointer.MAP_PROVIDERS:
+        stats = maps_reviews_store.monthly_stats(provider.id, until=_month_end(month))
+        values[provider.name], carried[provider.name] = {}, {}
+        if stats.floor is None:
+            continue
+        for unit, months in stats.by_unit.items():
+            found = maps_month.month_value(
+                {m: maps_month.MonthStat(n, total) for m, (n, total) in months.items()},
+                month,
+                floor=stats.floor,
+            )
+            if found is None:
+                continue
+            values[provider.name][unit] = (found.score, found.count)
+            if found.carried_from is not None:
+                carried[provider.name][unit] = found.carried_from
+    return values, carried
 
 
 def load_month(
@@ -527,10 +553,7 @@ def load_month(
     for reg in agg_store.units(countries):
         names.setdefault(reg.dodo_id, (reg.name, reg.country))
     audits = quality_read.audit_pcts(reach, countries, month) if with_audit else {}
-    maps_by_provider = {
-        "Google": _fresh_maps(pointer.GOOGLE, month),
-        "Yandex": _fresh_maps(pointer.YANDEX, month),
-    }
+    maps_by_provider, maps_carried = _month_maps(month)
     agg_scores: dict[str, dict[str, tuple[Decimal, int]]] = defaultdict(dict)
     for rating in agg_store.latest(countries, until=until):
         if rating.on_date >= month:
@@ -542,7 +565,15 @@ def load_month(
     out: dict[str, CountryHealth] = {}
     for code in countries:
         out[code] = _load_country(
-            code, month, scores, names, audits, maps_by_provider, agg_scores, connected
+            code,
+            month,
+            scores,
+            names,
+            audits,
+            maps_by_provider,
+            maps_carried,
+            agg_scores,
+            connected,
         )
     return out
 
@@ -553,7 +584,8 @@ def _load_country(
     scores: dict[str, list[quality_read.PeriodScore]],
     names: dict[str, tuple[str, str]],
     audits: dict[str, Decimal],
-    maps_by_provider: dict[str, dict[str, tuple[float, int]]],
+    maps_by_provider: dict[str, dict[str, tuple[Decimal, int]]],
+    maps_carried: dict[str, dict[str, date]],
     agg_scores: dict[str, dict[str, tuple[Decimal, int]]],
     connected: frozenset[str] | None,
 ) -> CountryHealth:
@@ -591,6 +623,11 @@ def _load_country(
                 scores=scores.get(uid, []),
                 audit=audits.get(uid),
                 maps=maps,
+                maps_carried=tuple(
+                    (provider, found[uid])
+                    for provider, found in maps_carried.items()
+                    if uid in found
+                ),
                 sales=[s for s in sales if s.dodo_id == uid],
                 agg_orders=[a for a in agg_orders if a.dodo_id == uid],
                 kr=krs.get(uid),

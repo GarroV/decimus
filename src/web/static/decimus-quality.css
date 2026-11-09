@@ -42,3 +42,8 @@
   .qa-table th, .qa-table td { padding: 8px; }
   .qa-table thead th { letter-spacing: .02em; }
 }
+
+/* «?» у заголовка группы «Карты»: блок цепляется к значку, а не к строке заголовка. */
+.qa-tip { display: inline-block; vertical-align: middle; }
+.qa-tip .info-tip { position: relative; }
+.qa-tip .info-tip__pop { top: 100%; left: 0; text-align: left; font-weight: var(--w-regular, 400); }

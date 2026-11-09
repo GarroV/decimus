@@ -42,7 +42,9 @@ _SCORES_SQL = (
     "join ratings.units u on u.dodo_id = s.unit_dodo_id "
     "left join ratings.collection c "
     "on c.unit_dodo_id = s.unit_dodo_id and c.period_id = s.period_id "
-    "where u.country_code = any(%s) and p.begin_on >= %s and p.begin_on < %s "
+    "where u.country_code = any(%s) and case when p.rating_type = 'rko' "
+    "then p.begin_on < %s and coalesce(p.end_on, p.begin_on + 6) >= %s "
+    "else p.begin_on >= %s and p.begin_on < %s end "
     "order by s.unit_dodo_id, p.begin_on"
 )
 
@@ -53,10 +55,11 @@ def next_month(month: date) -> date:
 
 
 def period_scores(countries: Sequence[str], month: date) -> tuple[PeriodScore, ...]:
-    """Оценки РКО (недели) и РС (полумесяцы) пиццерий стран, начавшихся в месяце `month`."""
+    """Оценки РКО (все недели, задевшие месяц, D735) и РС (начавшиеся в месяце) пиццерий стран."""
     if not countries:
         return ()
-    rows = _rows(_SCORES_SQL, (list(countries), month, next_month(month)))
+    after = next_month(month)
+    rows = _rows(_SCORES_SQL, (list(countries), after, month, month, after))
     return tuple(
         PeriodScore(
             str(r[0]),
