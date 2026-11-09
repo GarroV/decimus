@@ -31,7 +31,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | УК | Управляющая компания: владелец методики, видит всю сеть, принимает проверки партнёров. Её пространство — `HQ` | `src/domain/tenants.py` (`HQ_TENANT`), `docs/18-access-map.md` |
 | Партнёр | Организация, чьи пиццерии проверяют; видит и правит только своё пространство и свои страны | `docs/18-access-map.md`, `src/db/reach.py` |
 | Роль | Одна из шести: в пространстве УК — главный админ (`superadmin`), админ (`admin`), контроль (`control`), аудитор (`auditor`); у партнёра — админ и аудитор | `src/domain/tenants.py`, `src/web/access_policy.py`, `src/mcp/policy.py` |
-| Контроль, контролинг | Роль УК и люди, которые ведут рейтинги: загружают и правят рейтинги, ведут своих людей; проверок не касаются никак — ни «Главной», ни «Проверок» даже на чтение (D420), после входа попадают в «Рейтинги» | `docs/12-web-admin.md` (роль «контроль»), `src/domain/permissions.py` (матрица), `src/mcp/policy.py` |
+| Контроль, контролинг | Роль УК и люди, которые ведут рейтинги: загружают и правят рейтинги, ведут своих людей; проверок не касаются никак — ни «Главной», ни «Проверок» даже на чтение (D420), после входа попадают в «Рейтинги» | `docs/26-web-access.md` (роль «контроль»), `src/domain/permissions.py` (матрица), `src/mcp/policy.py` |
 | Методика | Что и как проверяется: чек-лист, зоны, критерии классов, ставки вычетов, порядок обхода. Данные управляющей компании, вне git; версионируется изданиями | `docs/02-domain.md`, `src/domain/checklist.py`, `src/domain/version.py`, `src/domain/edition.py` |
 | Чек-лист | Перечень пунктов методики с кодами, зонами и допустимыми классами. Правится одной дверью — через хранилище версий | `engine/manage.py`, `src/mcp/checklist.py`, `src/web/methodology.py` |
 | Зона | Участок точки, на который делится оценка (десять зон, у каждой своя доля). Код зоны — сущность, название — перевод | `docs/02-domain.md`, `src/domain/checklist.py`, `src/bot/zones.py` (зона из слов аудитора) |
@@ -47,7 +47,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Снятие | Отзыв сданной проверки из истории: помечается, не удаляется, причина обязательна. Делает только роль «администратор истории» | `src/db/retract.py`, `src/mcp/retraction.py`, `docs/furca/blocks/db.md` |
 | Перенос | Смена даты и пиццерии у проверки; история каждой правки пишется самой базой | `src/db/move.py` |
 | Legacy-проверка | Историческая проверка, загруженная из старого отчёта (`origin = 'legacy'`): оценка переносится как есть и нигде не пересчитывается | `src/db/imports_legacy.py`, `src/mcp/imports.py`, `docs/14-history-import.md` |
-| План действий (экшн-план) | Ответ партнёра на запрос УК по проверке с D2/D3: файл с версиями, приём и возврат | `src/db/action_plans.py`, `src/web/action_plans.py`, `docs/12-web-admin.md` |
+| План действий (экшн-план) | Ответ партнёра на запрос УК по проверке с D2/D3: файл с версиями, приём и возврат | `src/db/action_plans.py`, `src/web/action_plans.py`, `docs/29-action-plans.md` |
 | Предписание | Письмо УК партнёру с требованием: черновик, отправка через почту сотрудника, ответ партнёра, закрытие | `src/db/prescriptions.py`, `src/web/prescriptions.py` |
 | РС, РКО | Рейтинг стандартов и рейтинг клиентского опыта: средние оценки по пиццериям из выгрузок Dodo IS; раздел «Рейтинги» | `docs/15-ratings.md`, `src/ratings/` |
 | Агрегатор | Площадка доставки с оценками пиццерий (Wolt, Glovo, Bolt Food, Yemeksepeti и др.); оценки собираются раз в сутки | `docs/17-aggregators.md`, `src/ratings/aggregators/` |
@@ -55,11 +55,11 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | Обучение | Раздел «Обучение»: обученность пиццерий по данным iSpring LMS (завершено / назначено), снимок раз в сутки; только счётчики, данных о сотрудниках нет (D575) | `docs/20-training.md`, `src/learning/`, `src/domain/training_metrics.py` |
 | Pointer | Внешний API оценок и отзывов с карт | `docs/09-pointer-api.md`, `src/ratings/pointer.py` |
 | Свод пиццерий | Таблица сведений о пиццериях, из которой наполняется справочник профилей | `docs/16-unit-profiles.md`, `src/ratings/svod.py` |
-| Swarm | Внутренняя платформа команды, главная которой показывает наши данные. Читает их по API чтения, своих копий не держит | `src/web/swarm_api.py`, `docs/12-web-admin.md` (раздел «API чтения для Swarm») |
+| Swarm | Внутренняя платформа команды, главная которой показывает наши данные. Читает их по API чтения, своих копий не держит | `src/web/swarm_api.py`, `docs/31-swarm-api.md` (раздел «API чтения для Swarm») |
 | MCP | Протокол, которым Claude у человека читает историю проверок и правит методику и рейтинги. Свой сервер, только петля, наружу — туннелем | `src/mcp/`, `docs/furca/blocks/mcp.md`, [`inventory.md`](inventory.md) |
 | Личный токен | Ключ Claude Desktop, который человек с учёткой выпускает себе сам — в своих настройках на сайте (в боте и мини-аппе подключения Claude нет, D626); никто никому его не выдаёт (D448). В базе — отпечаток, учётка, роль, срок. Права — по роли учётки и допускам пространства; срок 30 дней (`MCP_TOKEN_TTL_DAYS`); отключение учётки и смена роли гасят его сразу. Не путать со служебным токеном `MCP_TOKENS` из `.env` | `src/db/mcp_access.py`, `src/mcp/policy.py`, `docs/furca/blocks/mcp.md` |
 | Сервисный токен | Ключ внешнего сервиса к API чтения (`/api/v1/*`): только чтение, право на каждый метод, страны и срок у ключа | `src/db/api_access.py`, `tools/api_token.py`, `docs/18-access-map.md` |
-| Ключи сервисов | Ключи внешних сервисов (модель, Pointer, iSpring, приложение маркетплейса Dodo IS — реестр `src/domain/service_keys.py`): вставляются главным админом на «Ключах и API» (пара Dodo IS — на вкладке «Dodo IS»), лежат в базе зашифрованными (`SECRETS_KEY` — вне базы), иначе берутся из окружения (`OPENAI_API_KEY`, `POINTER_API_KEY`, …); сохранение — после второго шага входа, свежего подтверждения и проверки у провайдера | `src/domain/service_keys.py`, `src/db/service_keys.py`, `src/db/secret_crypto.py`, `src/web/service_keys_screen.py`, `docs/12-web-admin.md` |
+| Ключи сервисов | Ключи внешних сервисов (модель, Pointer, iSpring, приложение маркетплейса Dodo IS — реестр `src/domain/service_keys.py`): вставляются главным админом на «Ключах и API» (пара Dodo IS — на вкладке «Dodo IS»), лежат в базе зашифрованными (`SECRETS_KEY` — вне базы), иначе берутся из окружения (`OPENAI_API_KEY`, `POINTER_API_KEY`, …); сохранение — после второго шага входа, свежего подтверждения и проверки у провайдера | `src/domain/service_keys.py`, `src/db/service_keys.py`, `src/db/secret_crypto.py`, `src/web/service_keys_screen.py`, `docs/27-web-administration.md` |
 | FURCA | Процесс разработки проекта: анкета, спека, блоки с контрактами, граф задач, журнал решений. Артефакты — в `docs/furca/` | `docs/furca/`, `progress.md`, `tasks.md` |
 | D###, T###, #N | Номер решения владельца (`docs/furca/decisions.md`), номер задачи стройки (`tasks.md`), номер issue на GitHub. Ссылки на них стоят в докстрингах — это «почему так» | `docs/furca/decisions.md`, `tasks.md` |
 | Тестовая база | Тесты блока `db` и всего, что ходит в Postgres, идут на отдельной базе; без неё пропускаются, а пропуск — не зелёный | `Makefile` (`make test`), `tests/db_harness.py`, `tests/conftest.py` |
@@ -72,7 +72,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | `engine/` | Движок: оценка, PDF, правка чек-листа. Вызывается **подпроцессом**, не импортом |
 | `tools/`, `scripts/` | Операционка: сиды, замеры, учётки, проверки доступа; раскатка и смоук |
 | `tests/` | Тесты; `tests/methodology/` — синтетическая методика, по которой они идут |
-| `docs/` | Документы: предмет `01`–`18`, контракты блоков `docs/furca/`, эта карта и инвентарь |
+| `docs/` | Документы: предмет `01`–`36`, контракты блоков `docs/furca/`, эта карта и инвентарь; `docs/history/` — исторические, не инструкции |
 | `front/` | Cloudflare Worker'ы: постоянные адреса админки и MCP |
 | `deploy/`, `docker-compose*.yml`, `Dockerfile` | Сборка и состав сервисов |
 | `demo/`, `checklist-blank/` | Синтетический демо-набор; пустой бланк чек-листа |
@@ -860,7 +860,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 
 ## src/dodois — входы в Dodo IS по странам
 
-Вкладка «Dodo IS» в «Администрировании» (`docs/12-web-admin.md`, D640b, D641, #951): device flow
+Вкладка «Dodo IS» в «Администрировании» (`docs/24-dodois.md`, D640b, D641, #951): device flow
 `auth.dodois.com` / `auth.dodois.io` (контур выбирается в ссылке, D729), продление и проверка «открыто X из Y». Расписание — `src/bot/dodois_loader.py`,
 правила — `src/domain/dodois.py`, база — `src/db/dodois_logins.py`, экраны — `src/web/dodois_screen.py`,
 `src/web/dodois_connect.py`.
@@ -1177,7 +1177,7 @@ Telegram, ни HTTP, ни SQL.
 ## front/ — Cloudflare Worker'ы
 
 Постоянные адреса админки и MCP: Worker принимает запрос и пересылает его на сервер
-без своей логики (`docs/08-deploy.md`, §8.9).
+без своей логики (`docs/34-platform-edge.md`, §8.9).
 
 <!-- map:begin tree front -->
 | Каталог | Файлов | Какие |
@@ -1212,7 +1212,7 @@ Telegram, ни HTTP, ни SQL.
 | Обучение (iSpring): новый показатель или страница | Определение — только в `src/domain/training_metrics.py` (и таблица в `docs/20-training.md`); загрузка — `src/learning/` (клиент `ispring.py`, дерево `departments.py`, заход `sync.py`), расписание — `src/bot/learning_loader.py`; база — `src/db/learning_store.py` (запись), `training_read.py` (чтение), миграция `0085`; экран — `src/web/training_page.py`, `templates/training/index.html`. Данных о сотрудниках в базе и логе нет (D575): новый столбец с текстом краснит `tests/test_db_learning_schema.py` |
 | Особенность выгрузки по стране (Dodo IS, карты, агрегаторы, пояс) | `docs/countries/<КОД>.md` — файл страны, шаблон и общие правила в `docs/countries/README.md`; новая особенность дописывается тем же коммитом (D737) |
 | Подключить агрегатор доставки | Модуль в `src/ratings/aggregators/` по образцу `wolt.py` (поиск у координат) или `glovo.py` (известная точка), затем строка в `SEARCHERS` или `KNOWN` в `collect.py`; описание — `docs/17-aggregators.md` |
-| Метод API чтения для Swarm | Адрес и право — `src/web/swarm_api.py`, сборка ответа — `src/web/api_feed.py`, чтение — `src/db/swarm_read.py`, `src/ratings/feed.py`; права ключей — `src/db/api_access.py`; контракт — `docs/12-web-admin.md`, «API чтения для Swarm» |
+| Метод API чтения для Swarm | Адрес и право — `src/web/swarm_api.py`, сборка ответа — `src/web/api_feed.py`, чтение — `src/db/swarm_read.py`, `src/ratings/feed.py`; права ключей — `src/db/api_access.py`; контракт — `docs/31-swarm-api.md`, «API чтения для Swarm» |
 | Новая переменная окружения | Читается в `config.py` своего блока (`src/<блок>/config.py`) с понятным отказом на мусор; впишите в `.env.example` с комментарием — тест `tests/test_docs_map.py` требует; `make map` обновит `docs/inventory.md` |
 | Добавить язык интерфейса или отчёта | Интерфейс — языки в `src/web/texts*.py` и `src/bot/texts.py` (тесты требуют полноты по каждому языку); языки отчёта по странам — данные в `src/domain/report_langs.py`; формулировки методики — таблица `translations` (миграция `0001`) |
 | Роль «администратор истории»: снять, принять, перенести проверку | `src/db/retract.py`, `src/db/accept.py`, `src/db/move.py` — под `DATABASE_RETRACTION_URL`; веб-двери — `src/web/review.py`, `src/web/revision.py`; права держит база (миграции `0010`, `0025`, `0034`) |
@@ -1220,12 +1220,22 @@ Telegram, ни HTTP, ни SQL.
 | Пространство и страны | Завести и привязать — `tools/space.py` (`make space`), логика — `src/db/spaces.py`, `src/db/reach.py` |
 | Завести учётку веб-админки или ключ API | `tools/web_user.py` (`make web-user`), `tools/web_unlock.py` (`make web-unlock`), `tools/api_token.py` |
 | Открытое демо (публичное, для коллег) | VPS, `/srv/decimus-demo`: `deploy/demo/` (надстройка, `reset.sh` раз в час, `update.sh` после выкладки прода — иначе демо отстаёт), посев `tools/seed_open_demo.py` (+ `open_demo_ratings.py`, `open_demo_reviews.py`, `open_demo_notices.py`, `open_demo_people.py`, `open_demo_training.py`), запреты демо — `src/web/demo_entry.py`; `docs/08-deploy.md` §8.21 |
-| Показать доработку владельцу до прода | Превью-стенд на MUSPELHEIM: `deploy/preview/compose.preview.yaml`, `C:\projects\decimus-preview`, `https://<TAILNET_HOST>:9443` (только tailnet); собирать **`web` и `walk`** — мини-апп в своём образе; `docs/08-deploy.md` §8.22 |
-| Стенд Виктории (рейтинги) | MUSPELHEIM `decimus-viktoria`, ветка `stand/viktoria`, сам обновляется раз в 2 минуты; адрес `https://decimus-stand.vasiliy-garro.workers.dev`; `docs/08-deploy.md` §8.11 |
+| Показать доработку владельцу до прода | Превью-стенд на MUSPELHEIM: `deploy/preview/compose.preview.yaml`, `C:\projects\decimus-preview`, `https://<TAILNET_HOST>:9443` (только tailnet); собирать **`web` и `walk`** — мини-апп в своём образе; `docs/35-platform-services.md` §8.22 |
+| Стенд Виктории (рейтинги) | MUSPELHEIM `decimus-viktoria`, ветка `stand/viktoria`, сам обновляется раз в 2 минуты; адрес `https://decimus-stand.vasiliy-garro.workers.dev`; `docs/34-platform-edge.md` §8.9.1 |
 | Демо и стенд разработчика | `make demo` (бот), `make web-demo` и `make web-up` (админка), сиды — `tools/seed_*.py`; стенды — только на MUSPELHEIM, на Маке их нет |
+| Подключить страну Dodo IS, починить «данные Dodo IS не приходят», собрать страну руками | `docs/24-dodois.md` (таблицы `dodois.*`, фоновые задачи, где видно сбой) |
+| Вход, доступ, роли, пространства в вебе | `docs/26-web-access.md`; матрица прав — `docs/18-access-map.md` |
+| Вкладка «Администрирование» (настройки, ключи, письма, рейтинги, подключения) | `docs/27-web-administration.md` |
+| Экран проверок в вебе: карточка, приёмка, «Проверки», «Страны», «Календарь» | `docs/28-web-inspections.md` |
+| Экшн-планы, предписания, письмо партнёру | `docs/29-action-plans.md` |
+| Общие правила веб-экрана (каркас, шапка, статика, заголовки безопасности) | `docs/30-web-screen-rules.md` |
+| Бэкап и восстановление | `docs/33-backup-restore.md` |
+| MCP и вход снаружи, Cloudflare, OAuth | `docs/34-platform-edge.md` |
+| Хранилище кадров, `walk`, превью-стенд, цепочка поставки | `docs/35-platform-services.md` |
+| Откуда взялось: подъём на MUSPELHEIM, журнал раскаток | `docs/history/` — исторические, не инструкции |
 | Раскатка и откат | `docs/08-deploy.md`; на VPS — `cd /srv/decimus && git pull --ff-only && scripts/prod-update.sh` (надстройку площадки `compose.edge.yaml` скрипт подключает сам; без неё `web` теряет сеть прокси — 502), затем `deploy/demo/update.sh` в `/srv/decimus-demo`; внешний HTTP-смоук — `tools/inspection_release_smoke.py` |
 | Мини-апп обхода: экран, форма записи | Отдельный сервис `walk` (`src/web/walk_main.py`, свой образ — пересобирать вместе с `web`); экран — `src/web/static/walk.js`, форма — `walk-sheet.js`, «Ещё не смотрели» — `walk-unseen.js`, старт — `walk-app.js` + `src/web/walk_start.py`; запись — `walk_write.py`, поиск пункта — `walk_suggest.py`; тексты — `texts_walk.py`, `texts_app.py`; описание — `docs/13-walk-mini-app.md` |
-| Посадочная страница | `src/web/landing.py`, `templates/landing.html`, `static/decimus-landing.css`, `static/landing.js`; снимки — `make landing-shots`; `docs/12-web-admin.md`, раздел о посадочной |
+| Посадочная страница | `src/web/landing.py`, `templates/landing.html`, `static/decimus-landing.css`, `static/landing.js`; снимки — `make landing-shots`; `docs/32-landing-demo.md`, раздел о посадочной |
 | Написать тест | Блоки без базы — `tests/test_<блок>_*.py` с общей оснасткой `tests/*_harness.py`; с базой — `tests/test_db_*.py` (`tests/db_harness.py`), на CI пропускаются; методика тестов — `tests/methodology/` |
 
 <!-- map:begin files src/settings_read.py -->

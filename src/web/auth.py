@@ -490,7 +490,7 @@ def install(app: Flask, conf: Settings) -> None:
             # дороге проходит через фронт и прокси, Google — нет. Отказ стоит
             # ПОСЛЕ сверки пароля: до неё он рассказал бы любому, у кого какой
             # вход. Аварийный путь — снять привязку командой обслуживания
-            # (`tools/web_user.py email <логин>`, docs/12-web-admin.md).
+            # (`tools/web_user.py email <логин>`, docs/26-web-access.md).
             journals.record_login(
                 method=METHOD_PASSWORD,
                 result=RESULT_REFUSED,

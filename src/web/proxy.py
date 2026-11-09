@@ -136,7 +136,7 @@ def guard_forwarded(app: WsgiApp, settings: Settings) -> WsgiApp:
     if not front_key:
         logger.warning(
             "%s не задан: origin не проверяет ключ фронта, заголовкам X-Forwarded-* верим "
-            "любому соседу по подсети звена (docs/08-deploy.md, §8.9)",
+            "любому соседу по подсети звена (docs/34-platform-edge.md, §8.9)",
             WEB_FRONT_KEY_VAR,
         )
     refused_logged = False

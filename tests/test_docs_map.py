@@ -25,6 +25,22 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 MAP_DOC = ROOT / "docs" / "00-map.md"
 
+#: Документы, на которые разбиты 12-web-admin и 08-deploy (D738): у каждого оглавление между маркерами.
+SPLIT_DOCS = (
+    "24-dodois.md",
+    "26-web-access.md",
+    "27-web-administration.md",
+    "28-web-inspections.md",
+    "29-action-plans.md",
+    "30-web-screen-rules.md",
+    "31-swarm-api.md",
+    "32-landing-demo.md",
+    "33-backup-restore.md",
+    "34-platform-edge.md",
+    "35-platform-services.md",
+    "36-walk-extras.md",
+)
+
 #: Путь в обратных кавычках, который карта обязана держать живым.
 _PATH_IN_DOC = re.compile(
     r"`((?:src|tools|scripts|engine|docs|tests|front|deploy)/[A-Za-z0-9_./-]+\.[a-z0-9]+)`"
@@ -141,6 +157,7 @@ def test_stale_table_is_detected() -> None:
         (ROOT / "docs" / "inventory.md", ("routes", "mcp", "env", "tables", "make")),
         (ROOT / "docs" / "12-web-admin.md", ("toc",)),
         (ROOT / "docs" / "08-deploy.md", ("toc",)),
+        *((ROOT / "docs" / name, ("toc",)) for name in SPLIT_DOCS),
     ],
     ids=lambda v: v.name if isinstance(v, Path) else "kinds",
 )

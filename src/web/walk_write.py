@@ -572,7 +572,7 @@ def run_matches(inspection: Inspection, body: dict[str, Any]) -> bool:
     Запись без `run_id` принимается (#1407): экран с кодом до 31.10.2026 (#17), открытый в
     Telegram с тех пор, её так и шлёт, а отказ потерял бы его запись. Каждый такой случай
     пишется в журнал процесса строкой `LEGACY_RUN_LOG`: когда за 14 дней её нет в журнале
-    прода, совместимость снимается (`docs/12-web-admin.md`, «Обход: run_id»)."""
+    прода, совместимость снимается (`docs/27-web-administration.md`, «Обход: run_id»)."""
     if "run_id" not in body:
         logger.warning(LEGACY_RUN_LOG)
         return True
