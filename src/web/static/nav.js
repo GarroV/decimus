@@ -10,6 +10,22 @@
 // Каждый переход между разделами — подмена, перезагрузка остаётся только для
 // экрана со скриптом в `<head>` без метки `data-swap-safe` (см. ниже).
 //
+// Подмена не только для левой панели (владелец 09.11.2026: «страница прям
+// обновляется вместо плавного обновления»): так же идёт любая ссылка внутри
+// `main.shell__main` (страна и месяц «Качества», заголовок столбца, период,
+// вкладка администрирования, страница списка), отправка GET-формы отбора
+// и выбор в `select[data-pick-nav]` (`window.decimusNavigate`, его зовёт
+// `pick.js`). Слушатели стоят на `window`: он идёт ПОСЛЕ слушателей документа,
+// поэтому клик, который экран уже взял себе (`split.js`, `country.js`,
+// `decimus-rt.js`, `methodology.js`) и погасил `preventDefault`, сюда не доходит.
+// Не подменяется: клик с модификатором, `target`, `download`, `rel=external`,
+// чужой адрес, якорь на этой же странице, файл по расширению, ссылка и форма
+// с `data-no-swap` (явный выход), POST-форма. Ответ не HTML, увод, страница без
+// `main.shell__main` — обычный переход.
+// Внутри экрана (путь не меняется) прокрутка страницы и колонок выбора
+// остаётся на месте, запись истории помечается `page`, и шаг «назад» по ним
+// тоже подмена; на другой экран страница прокручивается наверх.
+//
 // Скрипты экрана (`<script>` внутри `<main>`, сейчас это `methodology.js`)
 // грузятся один раз. При повторном приходе на экран скрипт не запускается
 // заново — иначе его клавиши сработали бы дважды, — а получает событие
@@ -20,6 +36,11 @@
   if (!window.fetch || !window.DOMParser || !history.pushState) return;
 
   var LINKS = ".sidenav__list a, .sidenav__gear, .sidenav__brand, .mbar__brand, .tabbar a";
+  var PAGE_LINKS = LINKS + ", main.shell__main a[href]";
+  // Файлы открываются обычным переходом: подменять там нечего.
+  var FILE_URL = /\.(pdf|xlsx?|csv|docx?|zip|json|txt|png|jpe?g|gif|svg|webp)$/i;
+  // Колонки, у которых при подмене внутри экрана остаётся своя прокрутка.
+  var KEEP_SCROLL = ".pk-rail, .split__list";
   var root = document.documentElement;
   // Скрипты экрана, уже выполненные на этой странице. Список, а не поиск
   // тега: тег уходит вместе со старым `<main>`, а скрипт остаётся в памяти.
@@ -110,6 +131,13 @@
     var fresh = doc.querySelector("main.shell__main");
     var here = document.querySelector("main.shell__main");
     if (!fresh || !here) return false;
+    var target = new URL(url, location.href);
+    var inPage = target.pathname === root.dataset.navPath;
+    var pageScroll = window.scrollY;
+    var columns = [];
+    if (inPage) {
+      document.querySelectorAll(KEEP_SCROLL).forEach(function (node, i) { columns[i] = node.scrollTop; });
+    }
     var known = loadScripts(fresh);
     here.replaceWith(fresh);
     loadHeadScripts(doc);
@@ -124,8 +152,20 @@
     sameAll(doc, "[data-bell]");
     sameAll(doc, "form.langpill");
     document.title = doc.title;
-    if (push) history.pushState({ nav: true }, "", url);
-    window.scrollTo(0, 0);
+    if (push) {
+      if (inPage && !(history.state && history.state.page)) {
+        history.replaceState(Object.assign({}, history.state, { page: true }), "");
+      }
+      history.pushState({ nav: true, page: inPage }, "", url);
+    }
+    if (inPage) {
+      document.querySelectorAll(KEEP_SCROLL).forEach(function (node, i) {
+        if (columns[i] !== undefined) node.scrollTop = columns[i];
+      });
+    }
+    var anchor = target.hash && document.getElementById(decodeURIComponent(target.hash.slice(1)));
+    if (anchor) anchor.scrollIntoView();
+    else window.scrollTo(0, inPage ? pageScroll : 0);
     remember();
     document.dispatchEvent(new Event("decimus:navigation"));
     if (known) document.dispatchEvent(new Event("decimus:page"));
@@ -137,6 +177,7 @@
     return fetch(url, { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
       .then(function (r) {
         if (!r.ok || r.redirected) throw new Error("status " + r.status);
+        if (!/html/i.test(r.headers.get("content-type") || "")) throw new Error("not html");
         return r.text();
       })
       .then(function (html) {
@@ -165,25 +206,74 @@
       });
   }
 
-  document.addEventListener("click", function (event) {
+  // Адрес, который можно подменить (тот же сайт, не файл, не якорь на этой же странице).
+  function swappable(url) {
+    if (url.origin !== location.origin || FILE_URL.test(url.pathname)) return false;
+    return !(url.hash && url.pathname === location.pathname && url.search === location.search);
+  }
+
+  // Общий вход: уход с экрана может отменить сам экран (`decimus:leave`).
+  function open(url) {
+    var leave = new Event("decimus:leave", { cancelable: true });
+    if (!document.dispatchEvent(leave)) return;
+    go(url.href, url.href !== location.href);
+  }
+  // Для скриптов, которым нужен переход «как по ссылке» (`pick.js`); false — не подмена.
+  window.decimusNavigate = function (href) {
+    var url = new URL(href, location.href);
+    if (!swappable(url)) return false;
+    open(url);
+    return true;
+  };
+
+  window.addEventListener("click", function (event) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    var link = event.target.closest && event.target.closest(LINKS);
-    if (!link || !link.href || link.target) return;
+    var link = event.target.closest && event.target.closest(PAGE_LINKS);
+    if (!link || !link.href || (link.target && link.target !== "_self")) return;
+    if (link.hasAttribute("download") || link.hasAttribute("data-no-swap")) return;
+    if (link.getAttribute("aria-disabled") === "true" || /\bexternal\b/.test(link.getAttribute("rel") || "")) return;
     // Пункты подменю «Рейтингов» на странице раздела ведёт `decimus-rt.js` (плавная замена).
     if (link.hasAttribute("data-rt-nav") && document.querySelector(".rt[data-rt-section]")) return;
     var url = new URL(link.href, location.href);
-    if (url.origin !== location.origin) return;
+    if (!swappable(url)) return;
     event.preventDefault();
-    var leave = new Event("decimus:leave", { cancelable: true });
-    if (!document.dispatchEvent(leave)) return;
-    go(url.href, true);
+    open(url);
+  });
+
+  // Форма отбора (GET) в содержимом экрана: адрес собирается из её полей так же,
+  // как это сделал бы браузер. POST и `method=dialog` не трогаются.
+  window.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (event.defaultPrevented || !form.closest || !form.closest("main.shell__main")) return;
+    var by = event.submitter || null;
+    function own(name) { return (by && by.getAttribute("form" + name)) || form.getAttribute(name) || ""; }
+    if ((own("method") || "get").toLowerCase() !== "get") return;
+    if (form.hasAttribute("data-no-swap") || (by && by.hasAttribute("data-no-swap"))) return;
+    var tgt = own("target");
+    if (tgt && tgt !== "_self") return;
+    var url = new URL(own("action") || location.href, location.href);
+    var data = window.FormData ? new FormData(form) : null;
+    if (!data) return;
+    var params = new URLSearchParams();
+    data.forEach(function (value, name) { if (typeof value === "string") params.append(name, value); });
+    if (by && by.name && by.tagName === "BUTTON" && !params.has(by.name)) params.append(by.name, by.value);
+    url.search = params.toString();
+    url.hash = "";
+    if (!swappable(url)) return;
+    event.preventDefault();
+    open(url);
   });
 
   // Назад и вперёд между разделами. Шаги внутри одного экрана (панель
-  // «Методики» меняет только параметры адреса) — дело самого экрана.
-  window.addEventListener("popstate", function () {
+  // «Методики» меняет только параметры адреса) — дело самого экрана; шаги по
+  // записям, которые оставила подмена внутри экрана (`state.page`), ведёт `nav.js`.
+  window.addEventListener("popstate", function (event) {
     ++navigation;
-    if (location.pathname === root.dataset.navPath) return;
+    if (location.pathname === root.dataset.navPath) {
+      // Открытая панель справа ведёт `split.js`: закроет её и приведёт список к адресу.
+      if (event.state && event.state.page && !document.querySelector("[data-drawer]")) go(location.href, false);
+      return;
+    }
     // Шаги внутри «Рейтингов» ведёт `decimus-rt.js`, он на странице раздела уже работает.
     if (document.querySelector(".rt[data-rt-section]") && /^\/ratings(\/|$)/.test(location.pathname)) return;
     go(location.href, false);

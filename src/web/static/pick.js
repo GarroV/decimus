@@ -20,6 +20,8 @@
         link.remove();
         return;
       }
+      // Подмена без перезагрузки (`nav.js`); нет её или адрес не подходит — обычный переход.
+      if (window.decimusNavigate && window.decimusNavigate(select.value)) return;
       window.location.href = select.value;
     }
   });

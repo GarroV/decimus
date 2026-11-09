@@ -16,7 +16,7 @@
     <h3 class="ssec__title">{{ t('plans.file.title' if r.electronic else 'plans.upload_title') }}</h3>
     {% if r.electronic %}
       <p class="ssec__text">{{ t('plans.file.text') }}</p>
-      <a class="sbtn" href="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/template.xlsx') }}?lang={{ lang }}">{{ icon('download') }}<span>{{ t('plans.file.download') }}</span></a>
+      <a class="sbtn" href="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/template.xlsx') }}?lang={{ lang }}" data-no-swap>{{ icon('download') }}<span>{{ t('plans.file.download') }}</span></a>
     {% endif %}
     <form class="sform" method="post" enctype="multipart/form-data" data-panel-form data-upload-form
           action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/upload') }}?lang={{ lang }}">
@@ -79,7 +79,7 @@
     <section class="ssec">
       <h3 class="ssec__title">{{ t('plans.ask.title') }}</h3>
       <p class="ssec__text">{{ t('plans.ask.text_hq' if hq else 'plans.ask.text', due=day(r.due_on)) }}</p>
-      <a class="sbtn" href="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/template.xlsx') }}?lang={{ lang }}">{{ icon('download') }}<span>{{ t('plans.tpl.download') }}</span></a>
+      <a class="sbtn" href="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/template.xlsx') }}?lang={{ lang }}" data-no-swap>{{ icon('download') }}<span>{{ t('plans.tpl.download') }}</span></a>
     </section>
     {% endif %}
 

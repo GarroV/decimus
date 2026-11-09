@@ -49,7 +49,8 @@
       var lo = a < b ? a : b, hi = a < b ? b : a;
       form.elements.from.value = lo;
       form.elements.to.value = hi;
-      form.submit();
+      // `requestSubmit` пускает отправку через событие: `nav.js` подменит страницу без перезагрузки.
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
     }
 
     function draw() {

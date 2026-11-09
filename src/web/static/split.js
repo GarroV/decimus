@@ -250,7 +250,7 @@
       var button = form.querySelector("[data-autosubmit-button]");
       if (button) button.hidden = true;
       form.addEventListener("change", function (e) {
-        if (e.target && e.target.type !== "search") form.submit();
+        if (e.target && e.target.type !== "search") { if (form.requestSubmit) form.requestSubmit(); else form.submit(); }
       });
     });
 
