@@ -5,6 +5,7 @@
         без --out отчёт уходит в reports/ рядом с состоянием проверки
   report.py letter [--lang ru|en] [--bodies-file ТЕКСТЫ.json]   печатает текст письма в stdout
   report.py letter-builtin             встроенные тексты письма и подстановки (JSON), без проверки
+  report.py letter-parts               записанное письма по одной проверке частями (JSON) — для общего письма (D739)
   report.py html [--out отчёт.html] [--lang ru|en] [--photos ...]
         тот же HTML, из которого собирается PDF — для сверки вида и тестов
 
@@ -1028,6 +1029,38 @@ def build_letter(res, lang, template=1, speech_lang=None, bodies=None):
         plan_due=fmt_date(plan_due_date(res)))
 
 
+def letter_parts(res, lang, speech_lang=None):
+    """Письмо по одной проверке частями, без склейки в текст (общее письмо, D739).
+
+    Те же слова, что в одиночном письме: строка записи — `letter_text`, обратная связь —
+    `feedback_parts`, срок — `plan_due_date`. Склеивает части не движок, а общее письмо
+    (`src/report/batch_letter.py`): оно ставит несколько проверок в один текст. Ничего не
+    считается заново — оценка, буква и счётчики приходят из `compute`.
+    """
+    m = res["meta"]
+    zk = "zone_name_en" if lang == "en" else "zone_name_ru"
+    qk = "question_en" if lang == "en" else "question_ru"
+    c = res["counts"]
+    clean = not any(c[level] > 0 for level in ("D1", "D2", "D3"))
+    blocks, skipped, recorded = feedback_parts(res, lang, speech_lang)
+    return {
+        "unit": m.get("unit", ""), "date": m.get("date", ""), "city": m.get("city", ""),
+        "auditor": m.get("auditor", ""),
+        "pct": res["pct"], "grade": res["grade"],
+        "counts": {level: c[level] for level in ("D1", "D2", "D3")},
+        # Те же строки, что в одиночном письме: счёт нарушений и находки по зонам.
+        "summary": summary_lines(res, lang, clean),
+        "urgent": {level: [{"text": letter_text(f, qk, lang), "zone": f[zk]}
+                           for f in res["findings"] if f["level"] == level]
+                   for level in ("D3", "D2")},
+        "immediately": T[lang]["immediately"],
+        "feedback_heads": LETTER_FEEDBACK[lang],
+        "strengths": blocks.get("strengths", ""), "growth": blocks.get("growth", ""),
+        "feedback_skipped": skipped, "feedback_lang": recorded,
+        "plan_due": fmt_date(plan_due_date(res)),
+    }
+
+
 def letter_problems(text, res):
     """Письмо уходит партнёру: пустое или без ключевых полей — это провал, не успех."""
     m = res["meta"]
@@ -1141,6 +1174,9 @@ def main():
     a2.add_argument("--json", action="store_true",
                     help="отдать {text, feedback_skipped, feedback_lang} вместо голого текста")
     s.add_parser("letter-builtin")
+    a4 = s.add_parser("letter-parts")
+    a4.add_argument("--lang")
+    a4.add_argument("--speech-lang", help="язык, на котором записана обратная связь аудитора")
     a3 = s.add_parser("html"); a3.add_argument("--out"); a3.add_argument("--lang")
     a3.add_argument("--photos", default="all")
     a3.add_argument("--speech-lang", help="язык, на котором записана обратная связь аудитора")
@@ -1158,6 +1194,12 @@ def main():
     # на промах разбором методики значит показать человеку не ту причину.
     lang = report_lang(a.lang, st["meta"])
     res = compute(st, load_checklist(), load_zones(), load_cfg())
+    if a.cmd == "letter-parts":
+        bad = letter_problems("-", res)
+        if bad:
+            sys.exit("Письмо не собрано: " + "; ".join(bad))
+        print(json.dumps(letter_parts(res, lang, a.speech_lang), ensure_ascii=False))
+        return
     if a.cmd == "letter":
         bodies = None
         if a.bodies_file:

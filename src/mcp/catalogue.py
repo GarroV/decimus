@@ -237,6 +237,17 @@ _INSPECTION_ID_PROPERTY: dict[str, object] = {
     ),
 }
 
+_BATCH_IDS_PROPERTY: dict[str, object] = {
+    "type": "array",
+    "items": {"type": "string"},
+    "minItems": 2,
+    "description": (
+        "Identifiers (UUID, from list_inspections) of the accepted inspections that go "
+        "into one letter: one country, no more than 7 days between the earliest and "
+        "the latest inspection date."
+    ),
+}
+
 _FINDINGS_UNIT_PROPERTY: dict[str, object] = {
     "type": "string",
     "description": "Name of the unit (pizzeria) whose recorded findings to read.",
@@ -670,6 +681,92 @@ TOOLS: tuple[ToolSpec, ...] = (
             "additionalProperties": False,
         },
         handler=letter_save.save_inspection_letter,
+        kind=KIND_LETTER,
+    ),
+    ToolSpec(
+        name="batch_letter",
+        description=(
+            "Read ONE joint partner letter for several recorded inspections of one country "
+            "of the caller's space, as text for a human to paste into mail and send. "
+            "Rule, enforced here and not only on the site: at least two inspections, all "
+            "accepted, all of the caller's space and ONE country, and no more than 7 days "
+            "between the earliest and the latest inspection date; a selection that breaks "
+            "it is refused with the reason, never trimmed silently. If people saved a "
+            "joint letter for exactly this set (on the site or with save_batch_letter), "
+            "THAT letter is returned (source: 'saved'): show it as it is. Otherwise, or "
+            "with fresh=true, it is built from the recorded inspections (source: "
+            "'template'): every inspection goes through the same path as the single "
+            "letter - the methodology version it was scored by, the engine's score "
+            "checked against the recorded one - and the recorded score is what the "
+            "letter prints. If any inspection fails the check there is no letter and "
+            "the refusal names which one and why. The results table, the one-sentence "
+            "summary and the 'what to do' block are built by code from the facts; the "
+            "auditor's wording is inserted as recorded, never translated. One 'fix by' "
+            "date for the whole letter, computed like the single letter's, from the "
+            "latest inspection ('plan_due'). Read 'ready_to_send', 'not_restored' and "
+            "'caveat_units' before passing the text on; 'partners' with more than one "
+            "name is a warning to check recipients. Nothing is sent to anyone."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "ids": _BATCH_IDS_PROPERTY,
+                "lang": {
+                    "type": "string",
+                    "description": "Two-letter code of the letter language. Omit for the "
+                    "report language of the latest inspection.",
+                },
+                "fresh": {
+                    "type": "boolean",
+                    "description": "true: ignore the saved joint letter and build a new "
+                    "template. Default false.",
+                },
+                "template": {
+                    "type": "integer",
+                    "enum": [1, 2],
+                    "description": "Order of the auditors' feedback per pizzeria, as in "
+                    "inspection_letter: 1 strengths before findings and growth areas after, "
+                    "2 both at the end.",
+                },
+            },
+            "required": ["ids"],
+            "additionalProperties": False,
+        },
+        handler=tools.batch_letter,
+        history=True,
+    ),
+    ToolSpec(
+        name="save_batch_letter",
+        description=(
+            "Save the joint partner letter for several inspections of one country, the "
+            "same way the Save button of the joint-letter window on the site does: the "
+            "text is cleaned to the letter markup (plain lines plus <b> <i> <s> <a href>), "
+            "stored as a NEW version with the signed-in person as author, earlier "
+            "versions stay. Afterwards each included inspection card on the site shows "
+            "'included in the joint letter'. Nothing is sent. Call it ONLY after the "
+            "person has seen the final text and said yes explicitly. 'text' is the whole "
+            "letter. The same selection rule as batch_letter is checked again, and the "
+            "same rights as saving a single letter apply; an inspection of another space "
+            "is refused like a missing one."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "ids": _BATCH_IDS_PROPERTY,
+                "text": {
+                    "type": "string",
+                    "description": "The whole letter, as the person approved it.",
+                },
+                "lang": {
+                    "type": "string",
+                    "description": "Two-letter code of the language the text is written "
+                    "in. Omit for the report language of the latest inspection.",
+                },
+            },
+            "required": ["ids", "text"],
+            "additionalProperties": False,
+        },
+        handler=letter_save.save_batch_letter,
         kind=KIND_LETTER,
     ),
     # --- методика: чтение --------------------------------------------------

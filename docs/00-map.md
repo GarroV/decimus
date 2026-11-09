@@ -125,12 +125,13 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
 | `src/web/actions_columns.py` | «Столбец стран слева, блоки по состоянию справа» — «ОСБ» и «Действия» (D611) |
 | `src/web/actions_screen.py` | Раздел «Действия»: экшн-планы и предписания — один экран у УК и партнёра (D526, D527) |
+| `src/web/batch_letter.py` | Общее письмо по нескольким проверкам страны: окно на экране страны (D739, #1579) |
 | `src/web/calendar_screen.py` | Раздел «Календарь» (D497): сетка месяца с проверками и поездками (D505, D506) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
 | `src/web/connect_reminder.py` | Напоминание на «Главной»: привяжите бота и подключите Claude (27.10.2026) |
@@ -271,6 +272,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_aggregators_admin.py` | Тексты административного охвата агрегаторов (#1391) |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_batch.py` | Тексты пакетного ввода нарушений в обходе: несколько кадров со словами |
+| `src/web/texts_batch_letter.py` | Тексты общего письма по нескольким проверкам (D739): кнопка, выбор, окно, отказы правила |
 | `src/web/texts_clients.py` | Клиентские оценки: язык интерфейса не меняет источник и вес данных |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страны» (D467, D504, D536): колонка, шапка, плитки, пиццерии, панели |
@@ -360,7 +362,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
 | `src/web/templates/administration/` | 15 | _content_editor.html, _coverage.html, _health.html, _nav.html, _ratings_aggregators.html, aggregators.html, connections.html, content_editor.html, … (+7) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
-| `src/web/templates/country/` | 8 | _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, index.html |
+| `src/web/templates/country/` | 9 | _batch.html, _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, … (+1) |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
 | `src/web/templates/dodois/` | 1 | connect.html |
 | `src/web/templates/inspections/` | 12 | _card_body.html, _card_parts.html, _letter_form.html, _panel.html, _panel_fragment.html, _row.html, _split_history.html, _walk_log.html, … (+4) |
@@ -397,9 +399,10 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
+<!-- map:begin files src/db/{batch_letters,checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
 | Файл | Что делает |
 |---|---|
+| `src/db/batch_letters.py` | D739 (#1579): общее письмо партнёру по нескольким проверкам, зафиксированное человеком |
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
 | `src/db/config.py` | Окружение блока: где Postgres |
 | `src/db/database_target.py` | Куда ведёт строка подключения — и все ли подключения ведут в одну базу (#487) |
@@ -651,6 +654,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0125_dodois_invite_contour.sql` | Контур Dodo IS приглашения (D729) |
 | `0126_dodois_logins_delete.sql` | Отключение страны от Dodo IS (#1551): главный админ снимает вход страны на вкладке «Dodo IS» |
 | `0127_maps_reviews.sql` | Оценки на картах поштучно (D732, D733, #1562): карта в «Качестве» считается по оценкам, поставленным за месяц, а не по общей оценке карточки на конец месяца |
+| `0128_batch_letters.sql` | D739 (#1579): общее письмо партнёру по нескольким проверкам одной страны, зафиксированное человеком |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -665,6 +669,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/mcp/__main__.py` | Запуск MCP-сервера: `python -m src.mcp` (или `make mcp`) |
 | `src/mcp/annotations.py` | Классы инструментов MCP и их аннотации в `tools/list` (#1338; образец — Swarm `annotations.ts`) |
 | `src/mcp/audit.py` | Журнал изменяющих вызовов MCP: кто, какой инструмент, чем кончилось |
+| `src/mcp/batch_letter.py` | Общее письмо партнёру по нескольким проверкам одной страны для протокола MCP (D739) |
 | `src/mcp/catalogue.py` | Каталог инструментов MCP: чем агент партнёра может спросить у базы проверок и чем поправить |
 | `src/mcp/checklist.py` | Хранилище версий методики: правка через агента идёт в новую версию, а не поверх боевой |
 | `src/mcp/checklist_layout.py` | Раскладка хранилища методик: пространство, чек-лист, издания |
@@ -1064,6 +1069,8 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin files src/report/*.py -->
 | Файл | Что делает |
 |---|---|
+| `src/report/batch_letter.py` | Общее письмо партнёру по нескольким проверкам одной страны (D739) |
+| `src/report/batch_letter_texts.py` | Тексты общего письма по нескольким проверкам (D739): словарь «ключ → язык → текст» |
 | `src/report/build.py` | Сборка отчёта и письма партнёру |
 | `src/report/current_pdf.py` | Актуальный сохранённый PDF проверки для веба, почты и повторной выдачи ботом |
 | `src/report/detail_pdf.py` | PDF-отчёт из актуального снимка проверки в базе, по её версии методики |
@@ -1197,6 +1204,7 @@ Telegram, ни HTTP, ни SQL.
 | Поправить текст экрана админки | `src/web/texts.py` или `texts_<раздел>.py`: ключ `TEXTS[ключ] = {"ru": …, "en": …}`; оба языка обязательны, `tests/test_web_texts.py` это проверяет |
 | Поправить текст бота | `src/bot/texts.py` — тот же каталог по ключам; `tests/test_bot_texts.py` |
 | Поправить текст письма партнёру или PDF | Тексты отчёта и письма — в `engine/report.py` (`letter_text`, `build_letter`); пересборка по записанной проверке — `src/report/letters.py`; разметка письма в почте — `src/report/letter_markup.py` |
+| Поправить общее письмо по нескольким проверкам страны (D739) | Правило выбора, сборка и тексты — `src/report/batch_letter.py`, `batch_letter_texts.py` (слова проверки приходят от `engine/report.py letter-parts`); окно на экране страны — `src/web/batch_letter.py`, `templates/country/_batch.html`, `texts_batch_letter.py`; запись — `src/db/batch_letters.py`; MCP — `src/mcp/batch_letter.py`; описание — `docs/37-batch-letter.md` |
 | Добавить страницу или маршрут веба | Модуль с `install(app, conf)` по образцу `src/web/prescriptions.py`, вызов — в `create_app` (`src/web/app.py`); шаблон — `src/web/templates/<раздел>/`; тексты — `texts_<раздел>.py` и подключение в `texts.py`. Новый раздел навигации — ещё `SECTIONS` в `src/web/sections.py`, `SCREENS` в `app.py` (приложение не соберётся, если они разошлись) и `view.<раздел>` в матрице `src/domain/permissions.py`. Пишущий маршрут объявляет действие `@guard.action(...)` — без него он закрыт (403) и роняет `tests/test_web_guard.py` |
 | Сделать адрес открытым без входа | Только через `OPEN_ENDPOINTS` в `src/web/auth.py` — по умолчанию закрыто всё; зачем и что открыто — `docs/18-access-map.md` |
 | Дать или закрыть роли действие, ограничить раздел по роли | Одна матрица «роль × действие» — `src/domain/permissions.py` (`MATRIX`, граница — `_boundary`); веб спрашивает её заслоном `src/web/guard.py`, MCP — `src/mcp/policy.py`, бот — `src/bot/access.py`. Партнёру закрыто всё, что матрица не объявила открытым его пространству (`guard.open_to_tenant`, 404 в `_install_hq_gate` `src/web/app.py`; необъявленный маршрут называет `tests/test_web_guard.py`); «кто кем управляет» — `src/web/access_policy.py`; охват чтения — `src/db/reach.py`; потом `docs/18-access-map.md` и `make porcha-permissions` |

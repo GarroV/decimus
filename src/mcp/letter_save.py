@@ -87,3 +87,16 @@ def save_inspection_letter(
         "saved_at": saved.created_at.isoformat(),
         "note": "saved; the letter is now what the site shows in the inspection card",
     }
+
+
+def save_batch_letter(
+    *, tenant: str, actor: str, ids: object, text: str, lang: str | None = None
+) -> dict[str, object]:
+    """Сохранить ОБЩЕЕ письмо по нескольким проверкам (D739): место обработчика вида «письмо».
+
+    Правило выбора и запись — `src/mcp/batch_letter.py`; те же права и тот же автор из
+    токена, что у сохранения одиночного письма.
+    """
+    from .batch_letter import save_batch_letter as handler
+
+    return handler(tenant=tenant, actor=actor, ids=ids, text=text, lang=lang)

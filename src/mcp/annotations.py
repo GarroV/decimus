@@ -47,6 +47,7 @@ TOOL_CLASSES: dict[str, ToolClass] = {
     "get_inspection": _read(),
     "findings_by_unit": _read(),
     "inspection_letter": _read(),
+    "batch_letter": _read(),
     # Чтение методики и эталона.
     "checklist_source": _read(),
     "checklist_source_item": _read(),
@@ -77,6 +78,7 @@ TOOL_CLASSES: dict[str, ToolClass] = {
     "get_action_plan": _read(),
     # Запись: добавляет или правит.
     "save_inspection_letter": _write(False),  # каждая версия письма — новая запись истории
+    "save_batch_letter": _write(False),  # то же для общего письма
     "add_checklist_item": _write(False),
     "edit_checklist_item": _write(True),
     "restore_checklist_item": _write(True),

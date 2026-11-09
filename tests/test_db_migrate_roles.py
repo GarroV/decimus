@@ -185,6 +185,9 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # Зафиксированное письмо тоже не переписывается (`0019`): из истории
     # нельзя вынуть отправленное, иначе она перестаёт быть историей.
     "partner_letters": {"SELECT", "INSERT"},
+    # Общее письмо по нескольким проверкам и его состав (`0128`, D739) — так же заморожены.
+    "batch_letters": {"SELECT", "INSERT"},
+    "batch_letter_inspections": {"SELECT", "INSERT"},
     # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`). Круг
     # (`mcp_admins`) снят миграцией `0059` (D448).
     "mcp_tokens": {"SELECT", "INSERT"},
@@ -397,6 +400,8 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "inspection_info": {"SELECT"},
     "reports": {"SELECT"},
     "partner_letters": {"SELECT"},
+    "batch_letters": {"SELECT"},
+    "batch_letter_inspections": {"SELECT"},
     # Карту синонимов администратор читает целиком, вместе со снятыми строками
     # (`0013`, T292): в продуктовой выдаче снятых нет, а показать человеку
     # нужно именно их. Ни INSERT, ни DELETE не выдано — заводит синонимы
