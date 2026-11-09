@@ -34,8 +34,9 @@ def test_card_duration_uses_persisted_timestamps(
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: replace(detail, inspection=head))
     monkeypatch.setattr(data, "load_info_previews", lambda *_a, **_k: {})
     html = стенд.get(f"{path}{'&' if '?' in path else '?'}lang=en").get_data(as_text=True)
-    assert "Inspection duration" in html
-    assert ("01:02:03" if recorded else "Not recorded") in html
+    assert "Inspection time" in html
+    # Страна пиццерии в тестовой карточке не задана — время честно подписано UTC (D730).
+    assert ("10:00–11:02 UTC · 1 h 2 min" if recorded else "Not recorded") in html
 
 
 @админ

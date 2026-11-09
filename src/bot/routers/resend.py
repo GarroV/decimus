@@ -29,6 +29,7 @@ from ..inspection import read_inspection
 from ..lang import chat_ui_lang
 from ..photos import download_all
 from ..preliminary import remind
+from ..report_lang import inspection_country
 from ..texts import t
 
 log = logging.getLogger(__name__)
@@ -84,6 +85,7 @@ def build_resend_router() -> Router:
             return
         refs = [ref for finding in inspection.findings for ref in finding.photos]
         refs += [ref for field in inspection.info.values() for ref in field.photos]
+        country = await asyncio.to_thread(inspection_country, inspection)
         with tempfile.TemporaryDirectory(prefix="bot-resend-") as tmp:
             found = await download_all(bot, refs, Path(tmp))
             try:
@@ -92,6 +94,7 @@ def build_resend_router() -> Router:
                     chat_id,
                     fetch_photo=found.get,
                     allow_missing_photos=True,
+                    country=country,
                 )
             except (PhotoMissing, ReportError):
                 # Причина уходит в журнал целиком, аудитору — что пересборка не

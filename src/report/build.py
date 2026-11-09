@@ -15,11 +15,13 @@ from __future__ import annotations
 import json
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from src.domain.config import Settings
 from src.domain.engine import chat_dir
 from src.domain.state import read_state
+from src.domain.timing import parse_timestamp, zone_for_country
 
 from .engine import run_report, settings
 from .errors import PdfNotBuilt, PhotoMissing, ReportError
@@ -47,6 +49,8 @@ def build_pdf(
     *,
     fetch_photo: FetchPhoto | None = None,
     allow_missing_photos: bool = False,
+    finished_at: datetime | None = None,
+    country: str | None = None,
 ) -> Path:
     """Собрать отчёт по проверке этого чата и вернуть путь к файлу.
 
@@ -62,6 +66,11 @@ def build_pdf(
     партнёр справедливо оспорит. `allow_missing_photos` оставляет решение
     аудитору — он уже уехал с точки и переснять не может; тогда на месте кадра
     печатается видимая отметка, а не пустота.
+
+    Время проверки в шапке (D730): начало берётся из состояния, конец — зафиксированный
+    там же (повторная сборка), иначе `finished_at` вызывающего: бот фиксирует конец
+    ПОСЛЕ отдачи отчёта, и без этого аргумента отчёт вышел бы без конца. `country` —
+    страна пиццерии, по ней выбирается часовой пояс; неизвестна — движок печатает UTC.
     """
     env = settings(chat_id)
     plan = resolve_photos(chat_id, env, fetch_photo)
@@ -74,7 +83,13 @@ def build_pdf(
         photo_map.write_text(json.dumps(plan.mapping, ensure_ascii=False), encoding="utf-8")
         try:
             printed = run_report(
-                ["pdf", "--photo-map", str(photo_map), *_speech_args(chat_id, env)],
+                [
+                    "pdf",
+                    "--photo-map",
+                    str(photo_map),
+                    *_speech_args(chat_id, env),
+                    *_time_args(chat_id, env, finished_at, country),
+                ],
                 chat_id=chat_id,
                 settings=env,
             ).strip()
@@ -91,6 +106,23 @@ def build_pdf(
     if bad:
         raise PdfNotBuilt(f"Сборщик отчёта отчитался об успехе, но отчёта нет: {bad}")
     return out
+
+
+def _time_args(
+    chat_id: int, env: Settings, finished_at: datetime | None, country: str | None
+) -> list[str]:
+    """Время проверки для шапки отчёта (D730). Начала нет — аргументов нет, строки в шапке нет."""
+    started = read_state(chat_id, env)
+    if started is None or started.started_at is None:
+        return []
+    end = started.finished_at or parse_timestamp(finished_at)
+    args = [f"--started-at={started.started_at.isoformat()}"]
+    if end is not None:
+        args.append(f"--finished-at={end.isoformat()}")
+    zone = zone_for_country(country)
+    if zone:
+        args.append(f"--tz={zone}")
+    return args
 
 
 def _speech_args(chat_id: int, env: Settings) -> list[str]:

@@ -119,7 +119,7 @@ from . import methodology as method
 from . import methodology_view as mview
 from . import unit_card as unit_data
 from .config import Settings, load_settings
-from .dates import human_day, human_duration
+from .dates import human_day, human_inspection_time
 from .db_refusal import domain_reason, public_reason
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
@@ -329,7 +329,10 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "country_title": lambda code: country_title(code, lang),
             # Дата на экран — месяцем словом: `10.12.2026` путают с октябрём (#963).
             "day": lambda value: human_day(value, lang),
-            "duration": lambda seconds: human_duration(seconds, lang),
+            # Время проверки по часам страны пиццерии (D730): строка или «Не зафиксирована».
+            "inspection_time": lambda row: human_inspection_time(
+                row.started_at, row.finished_at, row.time_zone, lang
+            ),
             # Пункт чек-листа на экран — меткой «Порядок 13», не кодом (20.10.2026);
             # по действующей методике. Карточка проверки подставляет свои — по версии проверки.
             "item_label": lambda code: item_labels.current_label(code, lang),
