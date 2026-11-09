@@ -157,3 +157,52 @@ def test_пустое_письмо_это_провал(проверка: Path, m
     monkeypatch.setattr(build, "run_report", lambda *_a, **_k: "   \n")
     with pytest.raises(ReportError):
         build_letter(CHAT)
+
+
+def test_pdf_получает_время_проверки_для_шапки(
+    проверка: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D730: начало — из состояния, конец — от вызывающего (бот фиксирует его позже),
+    пояс — по стране пиццерии."""
+    from datetime import UTC, datetime
+
+    from src.domain import get_state
+    from src.report import build as build_module
+
+    пойманные: list[str] = []
+    настоящий = build_module.run_report
+
+    def запуск(args: list[str], **k: object) -> str:
+        пойманные.extend(args)
+        return настоящий(args, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(build_module, "run_report", запуск)
+    конец = datetime(2026, 11, 9, 5, 40, tzinfo=UTC)
+
+    build_pdf(CHAT, finished_at=конец, country="ID")
+
+    начало = get_state(CHAT).started_at
+    assert начало is not None
+    assert f"--started-at={начало.isoformat()}" in пойманные
+    assert f"--finished-at={конец.isoformat()}" in пойманные
+    assert "--tz=Asia/Jakarta" in пойманные
+
+
+def test_pdf_с_неизвестной_страной_без_пояса(
+    проверка: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.report import build as build_module
+
+    пойманные: list[str] = []
+    настоящий = build_module.run_report
+
+    def запуск(args: list[str], **k: object) -> str:
+        пойманные.extend(args)
+        return настоящий(args, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(build_module, "run_report", запуск)
+
+    build_pdf(CHAT, country=None)
+
+    assert not any(a.startswith("--tz") for a in пойманные)
+    assert any(a.startswith("--started-at=") for a in пойманные)

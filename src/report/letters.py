@@ -445,6 +445,16 @@ def state_json(
                 # одном из них.
                 "type": kind_title(строка.kind, lang),
                 "date": строка.inspection_date.isoformat(),
+                # Время проверки (D730): без начала ключей нет, и строки в шапке нет.
+                **(
+                    {
+                        "started_at": строка.started_at,
+                        **({"finished_at": строка.finished_at} if строка.finished_at else {}),
+                        **({"tz": зона} if (зона := строка.time_zone) else {}),
+                    }
+                    if строка.started_at
+                    else {}
+                ),
                 "lang": lang,
                 # Язык, на котором записана обратная связь (D663): письмо на другом
                 # языке её не вставляет. Нет сведений — ключа нет, и движок

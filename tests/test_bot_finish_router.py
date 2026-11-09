@@ -575,3 +575,30 @@ async def test_failed_repeat_delivery_keeps_confirmed_finish(
     await feed(dp, bot, callback("fin:nophoto"))
     assert not sidecar.handed_over(CHAT_ID)
     assert get_state(CHAT_ID).finished_at == finished
+
+
+async def test_report_gets_the_committed_end_of_the_inspection(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D730: конец проверки фиксируется ПОСЛЕ отдачи отчёта, а в шапке отчёта он нужен —
+    сборка получает тот же момент, который потом станет `finished_at`."""
+    started()
+    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+    настоящая = finish_module.build_pdf
+    переданное: dict[str, object] = {}
+
+    def сборка(*a: object, **k: object) -> Path:
+        переданное.update(k)
+        return настоящая(*a, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr("src.bot.routers.finish.build_pdf", сборка)
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await feed(dp, bot, text_message("/finish"))
+    await build_report(dp, bot)
+
+    итог = get_state(CHAT_ID)
+    assert итог is not None and итог.finished_at is not None
+    assert переданное["finished_at"] == итог.finished_at
+    assert len(session.documents) == 1

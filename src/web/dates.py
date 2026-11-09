@@ -14,18 +14,30 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
-from math import isfinite
 
+from ..domain.timing import local_span
 from .texts import t
 
 
-def human_duration(seconds: float | None, lang: str) -> str:
-    """Format the authoritative elapsed duration without estimating missing timestamps."""
-    if seconds is None or not isfinite(seconds) or seconds < 0:
+def human_inspection_time(
+    started_at: str | None, finished_at: str | None, zone: str | None, lang: str
+) -> str:
+    """Когда шла проверка: «10:15–12:40 · 2 ч 25 мин» по часам страны пиццерии (D730).
+
+    Начала нет — «Не зафиксирована»: ничего не досчитывается. Конца нет — «начало 10:15».
+    Зоны нет — UTC с пометкой, а не молчаливо «местное».
+    """
+    span = local_span(started_at, finished_at, zone)
+    if span is None:
         return t("card.fact.duration_unknown", lang)
-    hours, rest = divmod(int(seconds), 3600)
-    minutes, secs = divmod(rest, 60)
-    return f"{hours:02}:{minutes:02}:{secs:02}"
+    suffix = " UTC" if span.utc else ""
+    if span.end is None or span.minutes is None:
+        return t("card.fact.time_started", lang, time=f"{span.start}{suffix}")
+    hours, minutes = divmod(span.minutes, 60)
+    parts = [t("card.fact.hours", lang, n=hours)] if hours else []
+    if minutes or not hours:
+        parts.append(t("card.fact.minutes", lang, n=minutes))
+    return f"{span.start}\u2013{span.end}{suffix} \u00b7 {' '.join(parts)}"
 
 
 _ISO = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}:\d{2}))?")
