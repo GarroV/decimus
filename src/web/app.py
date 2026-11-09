@@ -2867,4 +2867,4 @@ def _register_errors(app: Flask, conf: Settings) -> None:
         if request.method not in ("GET", "HEAD"):
             return exc
         lang = request.args.get("lang")
-        return redirect(url_for("home", **({"lang": lang} if lang else {})))
+        return redirect(url_for("home", lang=lang) if lang else url_for("home"))

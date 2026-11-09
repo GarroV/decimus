@@ -117,7 +117,8 @@ def _страница(основа: str, скрипты: str, разметка: 
 
 
 def _качество(запрос: dict[str, str]) -> str:
-    """Экран «Качество» с базой не собрать: те же ссылки внутри экрана, а в тексте — выбор из адреса."""
+    """Экран «Качество» с базой не собрать: те же ссылки внутри экрана, а в тексте — выбор из
+    адреса."""
     страна = запрос.get("c", "Σ")
     месяц = запрос.get("m", "2026-10")
     порядок = запрос.get("sort", "name")
@@ -127,9 +128,11 @@ def _качество(запрос: dict[str, str]) -> str:
         '<a class="pk-item" href="/quality?c=RS&amp;m=%(m)s">Сербия</a></aside>'
         '<section class="pk-work"><div class="speriod">'
         '<a class="speriod__arrow" aria-label="назад" href="/quality?c=%(c)s&amp;m=2026-09">‹</a>'
-        '<select data-pick-nav><option value="/quality?c=%(c)s&amp;m=2026-10" selected>Октябрь</option>'
+        "<select data-pick-nav>"
+        '<option value="/quality?c=%(c)s&amp;m=2026-10" selected>Октябрь</option>'
         '<option value="/quality?c=%(c)s&amp;m=2026-08">Август</option></select></div>'
-        '<table><tr><th><a class="qa-sort" href="/quality?c=%(c)s&amp;m=%(m)s&amp;sort=score">Оценка</a>'
+        "<table><tr><th>"
+        '<a class="qa-sort" href="/quality?c=%(c)s&amp;m=%(m)s&amp;sort=score">Оценка</a>'
         '</th></tr></table><p id="state">%(c)s %(m)s %(s)s</p>'
         '<a id="file" href="/quality/report.pdf">Файл</a>'
         '<a id="stay" href="/quality?c=%(c)s&amp;m=%(m)s#bottom">Якорь</a></section></div>'
@@ -141,7 +144,8 @@ def _отбор(запрос: dict[str, str]) -> str:
     """Реестр с отбором: обычная GET-форма, без перезагрузки и без POST."""
     return ЗАГЛУШКИ["/inspections"][1] + (
         '<form id="flt" method="get" action="/inspections"><input name="q" value="">'
-        '<select name="status"><option value="all">Все</option><option value="open">Открытые</option></select>'
+        '<select name="status"><option value="all">Все</option>'
+        '<option value="open">Открытые</option></select>'
         '<button type="submit">Найти</button></form>'
         '<form id="post" method="post" action="/inspections"><button>Записать</button></form>'
         '<p id="state">%s|%s</p>' % (запрос.get("q", ""), запрос.get("status", ""))
@@ -404,7 +408,10 @@ def test_вкладки_администрирования_идут_подмен
     for номер in (1, 0):
         цель = вкладки.nth(номер).get_attribute("href") or ""
         вкладки.nth(номер).click()
-        page.wait_for_function("h => location.href.endsWith(h) || location.search === h.slice(h.indexOf('?'))", arg=цель)
+        page.wait_for_function(
+            "h => location.href.endsWith(h) || location.search === h.slice(h.indexOf('?'))",
+            arg=цель,
+        )
         assert _тот_же_документ(page), цель
 
 
