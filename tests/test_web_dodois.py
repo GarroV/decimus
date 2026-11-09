@@ -261,6 +261,7 @@ def test_вкладка_стоит_после_подключений_и_ключ
         ВЫДАЧА,
         "/administration/dodois/invite/1/revoke",
         "/administration/dodois/SI/check",
+        "/administration/dodois/SI/disconnect",
     ],
 )
 def test_чужое_происхождение_отказ_и_без_действия(
@@ -364,6 +365,42 @@ def test_отзыв_гасит_ссылку_и_второй_раз_отказ(
     assert "Отозвана" in клиент.get(ВКЛАДКА).get_data(as_text=True)
     assert клиент.post(адрес, headers=ЗАГОЛОВКИ).status_code == 409
     assert чужой.get(f"/dodois/connect/{токен}").status_code == 404
+
+
+def test_отключить_только_главный_админ_с_подтверждением_и_отметкой_в_ответе(
+    стенд: tuple[FlaskClient, dict[str, list[Any]]],
+    ссылки: Ссылки,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    клиент, _ = стенд
+    звали: list[str] = []
+    monkeypatch.setattr(store, "list_logins", lambda: (_вход_страны("SI", rules.OK),))
+    monkeypatch.setattr(
+        store, "delete_login", lambda страна, _кто, _now: звали.append(страна) or True
+    )
+    панель = клиент.get(f"{ВКЛАДКА}&country=SI").get_data(as_text=True)
+    assert "/administration/dodois/SI/disconnect" in панель
+    assert "sconfirm" in панель
+
+    _, токен = _выдать(клиент)  # ссылка выдана, вход по ней уже идёт
+    идущий = flow.Flow(invite=ссылки.ссылки[1], ip=None, started=0.0)
+    flow._flows[1] = идущий
+
+    ответ = клиент.post("/administration/dodois/SI/disconnect", headers=ЗАГОЛОВКИ)
+
+    assert ответ.status_code == 200
+    assert "Страна отключена" in ответ.get_data(as_text=True)
+    assert звали == ["SI"]
+    assert flow.current(1) is None and токен
+
+
+def test_отключить_страну_без_входа_409_и_неизвестную_404(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(store, "delete_login", lambda *_a: False)
+    адрес = "/administration/dodois/{}/disconnect"
+    assert главный.post(адрес.format("SI"), headers=ЗАГОЛОВКИ).status_code == 409
+    assert главный.post(адрес.format("si"), headers=ЗАГОЛОВКИ).status_code == 404
 
 
 # --- публичная страница --------------------------------------------------------------------
