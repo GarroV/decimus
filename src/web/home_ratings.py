@@ -18,9 +18,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from src.db import ratings_read as read
+from src.domain.dodois_metrics import in_rating_month
 from src.ratings.model import RKO, RS
 from src.ratings.summary import Fact, group_average, unit_averages
 
@@ -69,13 +70,24 @@ def month_window(until: date, n: int = MONTHS) -> tuple[date, ...]:
 
 
 def _in_month(facts: Sequence[Fact], month: date) -> list[Fact]:
-    return [f for f in facts if f.begin_on.replace(day=1) == month]
+    """Периоды месяца: РКО — все недели, задевшие месяц (D735), РС — начавшиеся в месяце."""
+    return [
+        f
+        for f in facts
+        if (
+            in_rating_month(
+                f.rating_type, f.begin_on, f.end_on or f.begin_on + timedelta(days=6), month
+            )
+            if f.rating_type == RKO
+            else f.begin_on.replace(day=1) == month
+        )
+    ]
 
 
 def monthly(
     facts: Sequence[Fact], kind: str, countries: Sequence[str], months: Sequence[date]
 ) -> tuple[float | None, ...]:
-    """Средняя группы за каждый месяц: периоды, начавшиеся в месяце, по пиццериям (D353).
+    """Средняя группы за каждый месяц по пиццериям (D353; месяц периода — `_in_month`, D735).
 
     Месяц без оценок — `None`: линия на нём рвётся, а не дорисовывается.
     """

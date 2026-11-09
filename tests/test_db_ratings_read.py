@@ -508,3 +508,40 @@ def test_поиск_пиццерии_ставит_охват_в_запросе(d
     assert {u.unit for u in везде} == {U_RS, U_BY}
     assert {u.unit for u in только_rs} == {U_RS}
     assert по_id == ()  # чужая страна не находится и по точному id
+
+
+def test_оценки_качества_берут_рко_всех_недель_месяца_а_рс_по_началу(db_env: str) -> None:
+    from src.db import quality_read
+
+    _вставить(db_env)
+    with psycopg.connect(db_env) as conn:
+        imp = conn.execute("select max(id) from ratings.imports").fetchone()[0]
+        for kind, begin, end, score in (
+            ("rko", "2026-08-31", "2026-09-06", 61),
+            ("rko", "2026-09-28", "2026-10-04", 62),
+            ("rs", "2026-09-28", "2026-10-11", 63),
+        ):
+            pid = conn.execute(
+                "insert into ratings.periods (rating_type, begin_on, end_on, title_ru, title_en) "
+                "values (%s, %s, %s, 'П', 'P') returning id",
+                (kind, begin, end),
+            ).fetchone()[0]
+            conn.execute(
+                "insert into ratings.scores (unit_dodo_id, period_id, score, source, import_id) "
+                "values (%s, %s, %s, 'sheet', %s)",
+                (U_RS, pid, score, imp),
+            )
+
+    def отбор(месяц: date) -> list[tuple[str, int]]:
+        rows = quality_read.period_scores(["RS"], месяц)
+        return sorted((r.rating_type, int(r.score)) for r in rows)
+
+    # D735: РКО 31.08–06.09 и 28.09–04.10 задевают сентябрь; 28.09–04.10 — и октябрь.
+    assert [r for r in отбор(date(2026, 9, 1)) if r[0] == "rko"] == [
+        ("rko", 61),
+        ("rko", 62),
+        ("rko", 70),
+    ]
+    assert отбор(date(2026, 10, 1)) == [("rko", 62)]
+    # РС 28.09–11.10 начался в сентябре и остаётся там.
+    assert ("rs", 63) in отбор(date(2026, 9, 1))

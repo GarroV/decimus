@@ -17,7 +17,7 @@ from typing import Any
 
 import psycopg
 
-from src.domain.dodois_metrics import KINDS, rating_month
+from src.domain.dodois_metrics import KINDS, in_rating_month, rating_month
 
 from .config import check_environment
 from .errors import RatingsError
@@ -121,9 +121,9 @@ def unit_kr(country_code: str, month: date) -> list[UnitKr]:
 def unit_rating_periods(country_code: str, month: date) -> list[UnitRatingPeriod]:
     """Оценки РКО и РС пиццерий страны за месяц и число проверок в периодах.
 
-    РКО — недели, начавшиеся в месяце; РС — периоды, большинство дней которых в месяце
-    (`rating_month`: границы РС не календарные). `kind` — `rko` или `rs`; `checkups` — `None`,
-    если счёта проверок за период нет.
+    РКО — все недели, задевшие месяц (D735: неделя на стыке входит в оба месяца); РС —
+    периоды, большинство дней которых в месяце (`rating_month`: границы РС не календарные).
+    `kind` — `rko` или `rs`; `checkups` — `None`, если счёта проверок за период нет.
     """
     rows = _unit_rows(
         "select r.dodo_id, r.kind, r.period_from, r.period_to, r.rate, r.publish_status, "
@@ -138,11 +138,15 @@ def unit_rating_periods(country_code: str, month: date) -> list[UnitRatingPeriod
         (country_code, month, month),
     )
     periods = [UnitRatingPeriod(*r) for r in rows]
-    return [p for p in periods if rating_month(p.kind, p.period_from, p.period_to) == month]
+    return [p for p in periods if in_rating_month(p.kind, p.period_from, p.period_to, month)]
 
 
 def months_with_data(country_code: str) -> list[date]:
-    """Месяцы источника, с каноническим отнесением переходящих периодов РС."""
+    """Месяцы источника; переходящий период для списка месяцев — месяц начала (РС — `rating_month`).
+
+    Нахлёст РКО (D735) список не расширяет: неделя, начавшаяся в конце месяца, не делает
+    следующий месяц «последним с данными».
+    """
     return _available_months((country_code,))
 
 

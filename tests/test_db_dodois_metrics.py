@@ -190,7 +190,7 @@ def test_повторная_загрузка_периодов_заменяет_�
     assert read.unit_rating_periods("BG", ОКТЯБРЬ) == []
 
 
-def test_рс_уходит_в_месяц_большинства_дней_а_рко_в_месяц_начала(пиццерии: str) -> None:
+def test_рс_уходит_в_месяц_большинства_дней_а_рко_во_все_месяцы_недели(пиццерии: str) -> None:
     # Живые периоды Dodo IS (28.10.2026): РС не по календарным половинам.
     store.replace_rating_periods(
         date(2026, 8, 1),
@@ -208,12 +208,17 @@ def test_рс_уходит_в_месяц_большинства_дней_а_рк
     сентябрь = [(p.kind, p.period_from, p.rate) for p in read.unit_rating_periods("BG", СЕНТЯБРЬ)]
     август = [(p.kind, p.period_from) for p in read.unit_rating_periods("BG", date(2026, 8, 1))]
 
+    октябрь = [(p.kind, p.period_from) for p in read.unit_rating_periods("BG", date(2026, 10, 1))]
+
+    # D735: РКО — все недели, задевшие месяц; неделя 28.09–04.10 в сентябре и в октябре.
     assert сентябрь == [
+        ("rko", date(2026, 8, 31), Decimal("83.5")),
         ("rko", date(2026, 9, 28), Decimal("84.33")),
         ("rs", date(2026, 8, 31), Decimal("92.00")),
         ("rs", date(2026, 9, 14), Decimal("88.00")),
     ]
     assert август == [("rko", date(2026, 8, 31))]
+    assert октябрь == [("rko", date(2026, 9, 28)), ("rs", date(2026, 10, 5))]
 
 
 def test_retry_boundary_periods_before_requested_range_is_idempotent(пиццерии: str) -> None:
