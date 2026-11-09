@@ -287,3 +287,15 @@ def test_расхождение_баз_на_вкладке_не_раскрыва
     журнал = " ".join(r.getMessage() for r in caplog.records if r.levelname == "ERROR")
     assert "shared" in журнал
     assert "db.example" in журнал
+
+
+def test_адрес_формы_открытый_переходом_ведёт_на_главную_а_не_405(
+    стенд_админа: FlaskClient,
+) -> None:
+    """После заведения человека страница стоит на `/users/add`; закладка, смена языка или
+    «обновить» открывают его запросом GET — раньше «Method Not Allowed», теперь главная."""
+    ответ = стенд_админа.get("/users/add?lang=ru")
+    assert ответ.status_code == 302
+    assert ответ.headers["Location"] == "/?lang=ru"
+    # Чужой метод по-прежнему 405: подменяется только обычное открытие адреса.
+    assert стенд_админа.put("/users/add").status_code == 405

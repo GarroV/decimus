@@ -2855,3 +2855,16 @@ def _register_errors(app: Flask, conf: Settings) -> None:
     @app.errorhandler(404)
     def _not_found(_: object) -> tuple[str, int]:
         return render_template("error_not_found.html"), 404
+
+    @app.errorhandler(405)
+    def _form_only_address(exc: Any) -> Any:
+        """Адрес формы, открытый обычным переходом, ведёт на главную, а не в «Method Not Allowed».
+
+        Страница ответа формы остаётся на её адресе (заведение человека показывает пароль один
+        раз на `/users/add`): «обновить», смена языка, закладка или открытая вкладка браузера
+        потом открывают его запросом GET. Чужие методы (не GET/HEAD) — прежний 405.
+        """
+        if request.method not in ("GET", "HEAD"):
+            return exc
+        lang = request.args.get("lang")
+        return redirect(url_for("home", **({"lang": lang} if lang else {})))
