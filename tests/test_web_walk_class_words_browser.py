@@ -31,3 +31,18 @@ def test_class_pill_is_a_word_and_keeps_the_code_in_data(page, lang):
         assert row["text"] == WORDS[lang][row["level"]], row
         assert row["word"] == row["text"]
         assert row["level"] not in row["text"], "the code must not be on screen"
+
+
+@pytest.mark.parametrize("lang", ["ru", "en"])
+def test_reading_level_and_all_class_phrases_carry_no_code(page, lang):
+    texts = {key: entry[lang] for key, entry in WALK_TEXTS.items()}
+    got = page.evaluate(
+        """texts=>{const W=DecimusWalk; W.tx=(key,p)=>{let s=texts[key]||key;
+          Object.keys(p||{}).forEach(k=>{s=s.split('{'+k+'}').join(p[k])}); return s;};
+          return ['walk.sheet.level_only','walk.sheet.class_review.proposed',
+            'walk.sheet.class_review.provisional','walk.sheet.class_review.draft_level']
+            .flatMap(k=>['D0','D1','D2','D3'].map(c=>W.tx(k,{level:W.levelWord(c)})));}""",
+        texts,
+    )
+    for text in got:
+        assert not any(code in text for code in ("D0", "D1", "D2", "D3")), text

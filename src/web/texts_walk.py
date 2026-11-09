@@ -595,6 +595,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.class_review.other_item": {"ru": "Другой пункт", "en": "Another item"},
     "walk.sheet.class_review.level.D1": {"ru": "отклонение", "en": "deviation"},
     "walk.sheet.class_review.level.D2": {"ru": "значительное", "en": "significant"},
+    "walk.sheet.class_review.level.D0": {"ru": "замер без вычета", "en": "a reading, no deduction"},
     "walk.sheet.class_review.level.D3": {"ru": "критическое", "en": "critical"},
     "walk.sheet.class_review.history": {
         "ru": "Вопросы и ответы по этому пункту",

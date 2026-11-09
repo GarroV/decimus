@@ -859,7 +859,7 @@
     var on = f.picked ? f.picked === cand : isPrimary(cand);
     var top = el("span", "walk-found__top");
     var kind = cand.level === ADVICE_LEVEL ? "advice" : cand.level === "D0" || i.measure ? "info" : /^D[1-3]$/.test(cand.level || "") ? "violation" : null;
-    top.appendChild(el("span", "walk-option__code" + (kind ? " walk-item-code--" + kind : ""), i.label || cand.code));
+    top.appendChild(el("span", "walk-option__code" + (kind ? " walk-item-code--" + kind : ""), i.label || W.itemName(cand.code)));
     if (kind) top.appendChild(el("span", "walk-item-kind walk-item-kind--" + kind, tx("walk.item.kind." + kind)));
     if (!recognizing() && cand.level && cand.level !== ADVICE_LEVEL) top.appendChild(W.level(cand.level));
     if (on) {
@@ -1393,13 +1393,13 @@
     var text = state.status === "waiting_search" ? tx("walk.sheet.class_review.waiting_search")
       : state.status === "pending" ? tx("walk.sheet.class_review.pending")
       : state.status === "manual" ? tx("walk.sheet.class_review.manual_active")
-      : state.status === "ready" ? tx("walk.sheet.class_review.proposed", {level:state.level})
+      : state.status === "ready" ? tx("walk.sheet.class_review.proposed", {level:W.levelWord(state.level)})
       : state.status === "needs_fact" ? state.needFact
       : state.status === "not_established" ? tx("walk.sheet.class_review.not_established")
       : state.message || classContext(cand).blocked || tx("walk.sheet.class_review.check_hint");
     feedback.appendChild(el("p", "walk-form__hint", text));
     if (state.status === "needs_fact" && state.provisional) {
-      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.provisional", {level:state.provisional})));
+      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.provisional", {level:W.levelWord(state.provisional)})));
     }
     if (state.clarifications.length) {
       var chainReview = el("details");
@@ -1444,7 +1444,7 @@
       feedback.appendChild(recovery);
     }
     if (classIsPrimary(cand) && f.legacyLevel && !state.level) {
-      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.draft_level", {level:f.legacyLevel})));
+      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.draft_level", {level:W.levelWord(f.legacyLevel)})));
     }
     var dead = state.status === "not_established" && !state.manualMode;
     var exits = panel.querySelector("[data-class-exits]");
@@ -1533,7 +1533,7 @@
   function classReviewBox(cand) {
     if ((item(cand.code) || {}).measure) {
       var info = section(tx("walk.sheet.level"));
-      info.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", {level:"D0"})));
+      info.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", {level:W.levelWord("D0")})));
       if (!classIsPrimary(cand)) {addExtraReadingControls(info, cand); info.appendChild(extraTextEditor(cand));}
       return info;
     }
@@ -1680,7 +1680,7 @@
       var card = el("div", "walk-choice");
       var line = el("div", "walk-choice__line");
       var kind = isAdvice() ? "advice" : chosen.measure ? "info" : "violation";
-      if (!chosen.note) line.appendChild(el("span", "walk-choice__code walk-item-code--" + kind, chosen.label || chosen.code));
+      if (!chosen.note) line.appendChild(el("span", "walk-choice__code walk-item-code--" + kind, chosen.label || W.itemName(chosen.code)));
       line.appendChild(el("span", "walk-item-kind walk-item-kind--" + kind, tx("walk.item.kind." + kind)));
       line.appendChild(el("span", "walk-choice__text", chosen.q));
       card.appendChild(line);
@@ -1785,7 +1785,7 @@
       if (reviewing()) return classReviewBox(primaryClassCandidate());
       var box = section(tx("walk.sheet.level"));
       if (it.levels.length === 1) {
-        box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", { level: it.levels[0] })));
+        box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", { level: W.levelWord(it.levels[0]) })));
         return box;
       }
       var seg = W.hinted(el("div", "walk-seg"), "level");
@@ -1921,17 +1921,18 @@
       var box = el("div", "walk-sheet__foot");
       if (f.confirmClose) {
         box.appendChild(el("p", "walk-form__note", tx("walk.sheet.discard")));
-        // Безопасное действие — главное и первое; потеря записи — вторым, словами (не красной плашкой слева).
-        box.appendChild(W.button("walk-mark", tx("walk.sheet.discard_keep"), function () {
-          f.confirmClose = false;
-          redraw("footer");
-        }));
-        var row = el("div", "walk-row walk-row--discard");
+        // Порядок единый для нижних панелей: вторичное слева, главное справа. Безопасное — главное;
+        // потеря записи — вторым, словами, без красной заливки.
+        var row = el("div", "walk-bar__row");
         row.appendChild(W.button("walk-btn walk-btn--danger-quiet", tx("walk.sheet.discard_yes"), function () {
           if (!f.n) W.local.drop(draftKey());
           else if (W.editDraft) W.editDraft.clear(f);
           f.photos.forEach(function (p) { (p.receiptIds || (p.entryId ? [p.entryId] : [])).forEach(function (id) { W.offline.remove(id); }); });
           close(true);
+        }));
+        row.appendChild(W.button("walk-mark", tx("walk.sheet.discard_keep"), function () {
+          f.confirmClose = false;
+          redraw("footer");
         }));
         box.appendChild(row);
         return box;

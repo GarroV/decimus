@@ -520,11 +520,11 @@
     if (c.status === "ready") {
       var text = el("p", "walk-batch__class");
       text.appendChild(W.level(c.level));
-      text.appendChild(document.createTextNode(" " + tx("walk.sheet.class_review.proposed", { level: c.level })));
+      text.appendChild(document.createTextNode(" " + tx("walk.sheet.class_review.proposed", { level: W.levelWord(c.level) })));
       box.appendChild(text);
     } else if (c.status === "needs_fact") {
       box.appendChild(note(c.need_fact || ""));
-      if (c.provisional_level) box.appendChild(note(tx("walk.sheet.class_review.provisional", { level: c.provisional_level })));
+      if (c.provisional_level) box.appendChild(note(tx("walk.sheet.class_review.provisional", { level: W.levelWord(c.provisional_level) })));
       box.appendChild(note(tx("walk.batch.fact_hint")));
       box.appendChild(W.button("walk-btn walk-btn--small", tx("walk.batch.retry"), function () { findLine(line); }));
     } else {
@@ -640,7 +640,7 @@
     }
     var item = itemOf(r.code);
     var head = el("p", "walk-batch__item");
-    head.appendChild(el("strong", null, (item && item.label || r.code)));
+    head.appendChild(el("strong", null, (item && item.label || W.itemName(r.code))));
     head.appendChild(document.createTextNode(" " + (item ? item.q : r.wording || "")));
     box.appendChild(head);
     if (r.photo_only && r.status !== "measure") seenPart(line, box);
@@ -868,7 +868,18 @@
       save.disabled = !good.length || b.saving || b.busy;
       foot.appendChild(save);
     }
-    if (!pending.length && !searched && !b.cards.length) foot.appendChild(el("p", "walk-sheet__why", tx("walk.batch.need_cards")));
+    if (!pending.length && !searched && !b.cards.length) {
+      // Кадров нет (D078): главная кнопка — сам выбор фото, а не пустой низ с одной строкой.
+      var choose = W.button("walk-mark walk-mark--photo", null, function () {
+        var input = node && node.querySelector("[data-batch-input]");
+        if (input) input.click();
+      });
+      choose.setAttribute("data-batch-pick-cta", "");
+      choose.appendChild(W.icon("gallery"));
+      choose.appendChild(el("span", null, tx("walk.batch.pick")));
+      foot.appendChild(choose);
+      foot.appendChild(el("p", "walk-sheet__why", tx("walk.batch.need_cards")));
+    }
     return foot;
   }
 

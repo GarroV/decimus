@@ -63,7 +63,10 @@ BATCH_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Дождитесь загрузки фото: часть ещё грузится или ждёт связи.",
         "en": "Wait for the photos: some are still uploading or waiting for a connection.",
     },
-    "walk.batch.need_cards": {"ru": "Добавьте хотя бы одно фото.", "en": "Add at least one photo."},
+    "walk.batch.need_cards": {
+        "ru": "Без фото нарушение не записать: добавьте хотя бы одно.",
+        "en": "A finding can't be saved without a photo: add at least one.",
+    },
     "walk.batch.find_failed": {
         "ru": "Не получилось подобрать пункты. Попробуйте ещё раз.",
         "en": "Could not find the items. Try again.",
