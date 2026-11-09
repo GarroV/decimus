@@ -24,7 +24,7 @@ from src.report.letters import LetterError
 from src.report.letters import sources as letter_sources
 
 from . import view
-from .texts import t
+from .texts import TEXTS, t
 
 _log = logging.getLogger(__name__)
 
@@ -84,6 +84,16 @@ def reason_text(rule: dict[str, Any], grade: str, detail: InspectionDetail, lang
     return t("grade.why.other", lang, grade=grade)
 
 
+def level_word(level: str, lang: str) -> str:
+    """Класс нарушения словами для экрана (отклонение / значительное / критическое).
+
+    Класс, которого нет в словаре (добавленный методикой), показывается как пришёл:
+    пропавшая строка расшифровки хуже незнакомого слова.
+    """
+    key = f"card.level.{level}"
+    return t(key, lang) if key in TEXTS else str(level)
+
+
 def _zone_names(detail: InspectionDetail, lang: str) -> dict[str, str]:
     return {z.code: z.name for z in view.zone_lines(detail.by_zone, lang)}
 
@@ -98,13 +108,21 @@ def _breakdown_lines(raw: dict[str, Any], names: dict[str, str], lang: str) -> t
         loss = number(row["loss"], lang)
         if row["kind"] == "level":
             key = "explain.level_repeat" if row["repeat"] else "explain.level"
-            out.append(t(key, lang, level=row["level"], n=row["count"], loss=loss))
+            out.append(
+                t(
+                    key,
+                    lang,
+                    level=level_word(row["level"], lang).capitalize(),
+                    n=row["count"],
+                    loss=loss,
+                )
+            )
         else:
             zone = names.get(row["zone"]) or view.pick(row["name_ru"], row["name_en"], lang)
             key = "explain.d3_zone_many" if row["count"] > 1 else "explain.d3_zone"
             out.append(t(key, lang, zone=zone, n=row["count"], loss=loss))
     if raw["skipped"]:
-        what = ", ".join(f"{lvl} × {n}" for lvl, n in raw["skipped"].items())
+        what = ", ".join(f"{level_word(lvl, lang)} × {n}" for lvl, n in raw["skipped"].items())
         out.append(t("explain.skipped", lang, what=what))
     out.append(t("explain.total", lang, pct=number(raw["total"], lang)))
     return tuple(out)

@@ -1868,6 +1868,11 @@ def _card_context(
         grade_explain=grade_explain.build(detail, lang),
         loss_zones=view.loss_zones(zone_lines),
         counts=view.count_lines(detail.counts),
+        # Цена решения «Принять»: сколько записей и какой класс худший (записанное, не счёт).
+        violation_count=sum(1 for f in detail.findings if f.level not in ("D0", "R")),
+        worst_level=view.worst_level(detail.counts),
+        # Формулировка пункта без пометки допустимых классов «(D1, D2)»: коды не показываем.
+        plain=mview.plain_question,
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
         kind=_kind_title(detail.inspection.kind, lang),

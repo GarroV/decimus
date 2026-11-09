@@ -81,7 +81,6 @@
 .head-line__score { display: flex; align-items: baseline; gap: var(--space-3); }
 .head-line__lead { display: flex; align-items: center; gap: var(--space-5); }
 .head-line__grow { flex: 1 1 260px; min-width: 0; }
-.head-line__counts { margin-top: var(--space-2); align-items: center; }
 
 /* ── Мелочи раскладки, чтобы не сыпать style= в шаблоны ──────────
    Инлайновый стиль в разметке — это тот же свой цвет, только
@@ -676,9 +675,11 @@ a.ov-table__row:focus-visible, a.ov-row:focus-visible, a.ins-row:focus-visible, 
 .back {
   display: inline-flex; align-items: center; gap: var(--space-2);
   align-self: flex-start;
-  font-size: var(--fs-meta); line-height: var(--lh-meta); font-weight: var(--w-medium);
+  font-size: 12px; line-height: var(--lh-meta); font-weight: var(--w-medium);
+  min-height: 32px;
   color: var(--ink-3); text-decoration: none;
 }
+@media (max-width: 719px) { .back { min-height: 44px; } }
 .back:hover { color: var(--accent); text-decoration: none; }
 /* Внутри шапки экрана — отдельной строкой над надстрочной меткой, а не вплотную к ней. */
 .ov-head .back { display: flex; width: max-content; margin-bottom: var(--space-4); }
@@ -922,7 +923,7 @@ html[data-nav-collapsed="true"] .sidenav__sub { margin: 0; border-left: 0; }
 .zlist li { display: grid; grid-template-columns: minmax(0, 18rem) 6rem auto; justify-content: start; align-items: center;
   gap: var(--space-5); padding: var(--space-2) 0; font-size: var(--fs-dense); }
 .zlist__name { min-width: 0; overflow-wrap: anywhere; color: var(--ink-2); }
-.zlist__flag { font-size: var(--fs-micro); color: var(--err); white-space: nowrap; }
+.zlist__flag { font-size: 12px; color: var(--err); white-space: nowrap; }
 .zlist li.is-zeroed .zlist__name { color: var(--err); }
 .zlist .zlist__bar { min-width: 0; flex: none; width: 100%; }
 .zlist__loss { color: var(--err); font-weight: var(--w-semibold); font-variant-numeric: tabular-nums; }
@@ -940,7 +941,7 @@ html[data-nav-collapsed="true"] .sidenav__sub { margin: 0; border-left: 0; }
 .hact { position: relative; display: flex; flex-wrap: wrap; gap: var(--space-3); flex: 1 1 100%; min-width: 0; }
 .hact__item > summary { list-style: none; }
 .hact__item > summary::-webkit-details-marker { display: none; }
-.hbtn { display: inline-flex; align-items: center; gap: var(--space-2); height: 28px; padding: 0 var(--space-5);
+.hbtn { display: inline-flex; align-items: center; gap: var(--space-2); height: 36px; padding: 0 var(--space-5);
   border: 1px solid var(--line-control, var(--line)); border-radius: var(--r-pill); background: var(--surface); color: var(--ink);
   font: inherit; font-size: 12.5px; font-weight: var(--w-medium); line-height: 1; white-space: nowrap; cursor: pointer; text-decoration: none; }
 .hbtn:hover { background: var(--surface-2); text-decoration: none; }
@@ -948,12 +949,12 @@ html[data-nav-collapsed="true"] .sidenav__sub { margin: 0; border-left: 0; }
 .hbtn svg { width: 14px; height: 14px; flex: none; }
 .hbtn--primary { border-color: var(--accent); background: var(--accent); color: var(--ink-inverse); }
 .hbtn--primary:hover { background: var(--accent); filter: brightness(1.06); }
-.hbtn--danger { border-color: transparent; background: color-mix(in srgb, var(--err) 10%, transparent); color: var(--err); }
-.hbtn--danger:hover { background: color-mix(in srgb, var(--err) 18%, transparent); }
+.hbtn--danger { border-color: color-mix(in srgb, var(--err) 45%, transparent); background: transparent; color: var(--err); }
+.hbtn--danger:hover { background: color-mix(in srgb, var(--err) 10%, transparent); }
 .hbtn--err { color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, transparent); }
 /* Кнопка-пиктограмма (D465): подпись — в aria-label и подсказке, на экране только значок. */
 a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
-.hbtn--icon { justify-content: center; width: 28px; padding: 0; }
+.hbtn--icon { justify-content: center; width: 36px; padding: 0; }
 .hbtn--icon svg { width: 15px; height: 15px; }
 .hact__item[open] > summary { background: var(--surface-3); }
 /* Карточка дизайн-системы режет `overflow: hidden` всё, что выходит за неё, — и
@@ -964,10 +965,23 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
   box-shadow: 0 8px 24px rgba(0, 0, 0, .14); }
 .hact__form { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); margin-top: var(--space-4); }
 .hact__form label { display: flex; flex-direction: column; gap: var(--space-2); align-self: stretch; }
+/* Две группы (решение отделено от второстепенного): решения слева, отчёт и письма —
+   у дальнего края, тише цветом. Окна действий по-прежнему раскрываются на ширину `.hact`. */
+.hact__group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 0; }
+.hact__group--aux { margin-left: auto; }
+.hact__group--aux .hbtn:not(.hbtn--err) { color: var(--ink-2); }
+.hact__note { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
+/* Цена решения «Принять»: буква, балл, записи, худший класс — одной строкой над кнопкой. */
+.hact__sum { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-3);
+  font-size: 13px; line-height: 1.4; color: var(--ink); }
+.hact__sum .mono { font-weight: var(--w-semibold); }
+/* Повтор виден на самой записи: вычет удвоен. */
+.find-row__repeat { font-weight: var(--w-semibold); color: var(--warn, var(--ink)); }
 @media (max-width: 719px) {
-  .hbtn { height: 36px; }
-  .hbtn--icon { width: 36px; }
+  .hbtn { height: 44px; }
+  .hbtn--icon { width: 44px; }
   .zlist li { grid-template-columns: minmax(0, 1fr) 4.5rem auto; gap: var(--space-4); }
+  .hact__group--aux { margin-left: 0; }
 }
 
 .find-row {
@@ -985,8 +999,11 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .find-item { position: relative; border-bottom: 1px solid var(--line-2); }
 .find-item:last-child { border-bottom: 0; }
 .find-item > .find-row, .find-item > .find-row--photos { border-bottom: 0; }
-.find-item--acts > .find-row { padding-right: calc(var(--space-7) + 68px); }
-.find-item--acts > .find-row--photos > .find-row__summary { padding-right: calc(var(--space-7) + 68px); }
+.find-item--acts > .find-row { padding-right: calc(var(--space-7) + 80px); }
+.find-item--acts > .find-row--photos > .find-row__summary { padding-right: calc(var(--space-7) + 80px); }
+@media (max-width: 719px) {
+  .find-item--acts > .find-row, .find-item--acts > .find-row--photos > .find-row__summary { padding-right: calc(var(--space-7) + 96px); }
+}
 /* Пиктограммы правки и удаления у строки. */
 .find-item__acts { position: absolute; top: var(--space-4); right: var(--space-7); display: flex; gap: var(--space-2); color: var(--ink-2); }
 .find-item__del:hover, .find-item__del[aria-expanded="true"] { color: var(--err); }
@@ -1083,7 +1100,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .find-row__level { flex: none; }
 .find-row__num {
   font-family: var(--font-num);
-  font-size: var(--fs-micro);
+  font-size: 12px;
   color: var(--ink-3);
   min-width: 1.5rem;
   font-variant-numeric: tabular-nums;
@@ -1091,7 +1108,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .find-row__main { flex: 1; min-width: 12rem; }
 .find-row__text { font-size: var(--fs-dense); line-height: var(--lh-body); }
 .find-row__title { display: block; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: var(--w-semibold); }
-.find-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-2); }
+.find-row__meta { display: block; font-size: 12px; color: var(--ink-3); margin-top: var(--space-2); }
 
 /* Запись с кадрами раскрывается (D219): строка та же, что у записи без них,
    справа — сколько кадров, под ней — лента копий. */
@@ -1107,7 +1124,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .find-row__summary::-webkit-details-marker { display: none; }
 .find-row__summary:hover { background: var(--surface-2); }
 .find-row__summary:focus-visible { outline: 2px solid var(--ink-2); outline-offset: -2px; }
-.find-row__shots { flex: none; font-size: var(--fs-micro); color: var(--ink-2); white-space: nowrap; }
+.find-row__shots { flex: none; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
 .find-row__shots::after { content: " ▾"; }
 .find-row--photos[open] .find-row__shots::after { content: " ▴"; }
 /* Кадры были, но показать их нечем (#422): не раскрытие, а честная пометка. */
@@ -1740,7 +1757,8 @@ a[data-zoom] { cursor: zoom-in; }
 .mx-record .btn[disabled] { opacity: .45; cursor: default; }
 
 .mx-more { margin-top: var(--space-8); border-top: 1px solid var(--line-2); padding-top: var(--space-5); }
-.mx-more > summary { cursor: pointer; font-size: var(--fs-meta); color: var(--ink-2); list-style: none; }
+.mx-more > summary { cursor: pointer; font-size: 12px; color: var(--ink-2); list-style: none; display: flex; align-items: center; min-height: 32px; }
+@media (max-width: 719px) { .mx-more > summary { min-height: 44px; } }
 .mx-more > summary::-webkit-details-marker { display: none; }
 .mx-more > summary::before { content: "▸ "; color: var(--ink-3); }
 .mx-more[open] > summary::before { content: "▾ "; }
@@ -2076,7 +2094,8 @@ a[data-zoom] { cursor: zoom-in; }
 .tip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-soft, transparent); }
 
 /* Шапка страницы проверки: действия крупнее, с короткими надписями. */
-.head-line .hbtn { height: 34px; padding: 0 var(--space-6); font-size: 13.5px; }
+.head-line .hbtn { height: 40px; padding: 0 var(--space-6); font-size: 13.5px; }
+@media (max-width: 719px) { .head-line .hbtn { height: 44px; } }
 .head-line .hbtn svg { width: 18px; height: 18px; }
 .head-line .hact { gap: var(--space-4); }
 @media (max-width: 520px) {
@@ -2207,11 +2226,12 @@ a[data-zoom] { cursor: zoom-in; }
 .tedit { position: relative; flex: none; }
 .tedit > summary { list-style: none; }
 .tedit > summary::-webkit-details-marker { display: none; }
-.tedit__btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+.tedit__btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
   border-radius: var(--r-control); color: var(--ink-3); cursor: pointer; }
 .tedit__btn:hover, .tedit[open] > .tedit__btn { background: var(--surface-2); color: var(--ink); }
 .tedit__btn:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
 .tedit__btn svg { width: 15px; height: 15px; }
+@media (max-width: 719px) { .tedit__btn { width: 44px; height: 44px; } }
 .tedit__pop { right: auto; width: min(340px, calc(100vw - 32px)); }
 /* На телефоне окно от карандаша уезжало за правый край (карандаш стоит правее середины):
    по ширине экрана с полями 16px, по высоте — там, где стояло бы в потоке. */

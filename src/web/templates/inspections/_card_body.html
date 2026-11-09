@@ -196,9 +196,10 @@
     {% endif %}
     <span class="find-row__num">{{ finding.n }}</span>
     <span class="find-row__main">
-      {% if can_proof and not informational %}<span class="find-row__title">{{ pick.question if pick else (t('card.findings.note') if finding.code == 'NOTE' else item_label(finding.code)) }}</span>{% endif %}
+      {% if can_proof and not informational %}<span class="find-row__title">{{ c.plain(pick.question) if pick else (t('card.findings.note') if finding.code == 'NOTE' else item_label(finding.code)) }}</span>{% endif %}
       {% if informational or not can_proof or not shots %}<span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>{% endif %}
       <span class="find-row__meta">
+        {% if finding.repeat and not informational %}<b class="find-row__repeat" title="{{ t('card.findings.repeat_hint') }}">{{ t('card.findings.repeat') }}</b> · {% endif %}
         {% if informational and finding.level == 'R' %}{{ t('card.findings.advice') }} · {% endif %}
         {#- Маркеры исторической записи (D332): LEGACY — пункт не назван, пустая зона — не названа. #}
         {{ t('card.findings.note') if finding.code == 'NOTE' else (t('card.findings.no_item') if finding.code == 'LEGACY' else item_label(finding.code)) }} · {{ zone_names.get(finding.zone, finding.zone) if finding.zone else t('card.findings.no_zone') }}
@@ -300,7 +301,7 @@
      поэтому кавычки атрибута — одинарные. #}
   {% if can_proof %}
     {% set pick_items = [] %}
-    {% for pick in sheet.picks %}{% set _ = pick_items.append({'c': pick.code, 'n': pick.label, 'q': pick.question, 'l': pick.levels, 'z': pick.zones}) %}{% endfor %}
+    {% for pick in sheet.picks %}{% set _ = pick_items.append({'c': pick.code, 'n': pick.label, 'q': c.plain(pick.question), 'l': pick.levels, 'z': pick.zones}) %}{% endfor %}
     {% set proof_data = {
       'items': pick_items,
       'busy': t('proofread.suggest.busy_label'),
