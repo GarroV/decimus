@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HINT = (
     "значение инфраструктуры в репозиторий не кладётся (D431): в документах — заглушка "
     "(<VPS_IP>, <ORIGIN_HOST>, <TAILNET_HOST>, <GCP_PROJECT>, <VPC_SERVICE_ID>), в "
-    "конфигах и коде — переменная окружения / front/.deploy.env (docs/08-deploy.md §8.9)"
+    "конфигах и коде — переменная окружения / front/.deploy.env (docs/34-platform-edge.md §8.9)"
 )
 
 #: (название, регулярное выражение)

@@ -541,7 +541,7 @@ def serve(settings: Settings) -> None:
     if settings.trusted_proxies > 0 and settings.trusted_proxy_addrs and not settings.front_key:
         print(
             f"[mcp] {MCP_FRONT_KEY_VAR} не задан: ключ фронта не проверяется, X-Forwarded-For "
-            f"верим любому соседу по подсети звена (docs/08-deploy.md, §8.9)",
+            f"верим любому соседу по подсети звена (docs/34-platform-edge.md, §8.9)",
             file=sys.stderr,
         )
     try:

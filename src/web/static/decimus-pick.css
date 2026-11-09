@@ -1,6 +1,6 @@
 /* Каркас «выбор слева — рабочая область справа» (D474): `templates/_pick_page.html`
    и части `_pick_ui.html`. Один на все экраны с такой раскладкой; описание —
-   `docs/12-web-admin.md`, раздел «Каркас экрана».
+   `docs/30-web-screen-rules.md`, раздел «Каркас экрана».
 
    ОБРАЗЕЦ — Swarm Brain, «Статистика → Команда» (`miniapp/src/components/stats/
    StatsDesk.tsx:43`): сетка 220px | 1fr; ниже 900px — стек, список не выше 38vh

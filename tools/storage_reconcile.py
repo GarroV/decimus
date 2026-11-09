@@ -104,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
     if всего:
         print(
             f"\nИТОГ: расхождений {всего}. Ничего не удалено — "
-            "что делать, см. docs/08-deploy.md §4.9.3"
+            "что делать, см. docs/35-platform-services.md §4.9.3"
         )
         return EXIT_DISCREPANCIES
     print("\nИТОГ: хранилище и база сходятся")

@@ -866,7 +866,7 @@ def change_own_password(token: str, *, current: str, new: str) -> bool:
 
     Это сужение поверхности, а НЕ защита от пробитого приложения: оно читает
     хеши и открывает сессии само, значит может пройти эту дверь за любого
-    (`docs/12-web-admin.md`, «Кто пишет хеш при смене с экрана»).
+    (`docs/26-web-access.md`, «Кто пишет хеш при смене с экрана»).
     """
     _checked_password(new)
     if len(current) > MAX_PASSWORD_LENGTH:

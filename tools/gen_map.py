@@ -45,6 +45,18 @@ TARGETS: tuple[Path, ...] = (
     DOCS / "inventory.md",
     DOCS / "08-deploy.md",
     DOCS / "12-web-admin.md",
+    DOCS / "24-dodois.md",
+    DOCS / "26-web-access.md",
+    DOCS / "27-web-administration.md",
+    DOCS / "28-web-inspections.md",
+    DOCS / "29-action-plans.md",
+    DOCS / "30-web-screen-rules.md",
+    DOCS / "31-swarm-api.md",
+    DOCS / "32-landing-demo.md",
+    DOCS / "33-backup-restore.md",
+    DOCS / "34-platform-edge.md",
+    DOCS / "35-platform-services.md",
+    DOCS / "36-walk-extras.md",
 )
 
 #: Что карта обязана перечислить: каталоги и расширения файлов кода.

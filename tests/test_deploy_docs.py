@@ -19,7 +19,13 @@ from pathlib import Path
 
 import pytest
 
-ДОКА = Path("docs/08-deploy.md")
+#: Документы про выкатку и службы площадки: после разбиения 08-deploy (D738) команды сборки живут не только в нём.
+ДОКИ = [
+    Path("docs/08-deploy.md"),
+    Path("docs/33-backup-restore.md"),
+    Path("docs/34-platform-edge.md"),
+    Path("docs/35-platform-services.md"),
+]
 MAKEFILE = Path("Makefile")
 
 #: Сборка образа в любом виде: `docker compose build`, `docker-compose build`.
@@ -36,7 +42,7 @@ def _блоки(текст: str) -> list[str]:
     return re.split(r"\n(?=#{2,4} )", текст)
 
 
-@pytest.mark.parametrize("файл", [ДОКА, MAKEFILE])
+@pytest.mark.parametrize("файл", [*ДОКИ, MAKEFILE])
 def test_рядом_со_сборкой_образа_всегда_стоит_версия(файл: Path) -> None:
     """Раскатывающий по доке не обязан помнить про переменную — она в процедуре."""
     for блок in _блоки(файл.read_text(encoding="utf-8")):
@@ -49,7 +55,7 @@ def test_рядом_со_сборкой_образа_всегда_стоит_в�
         )
 
 
-@pytest.mark.parametrize("файл", [ДОКА, MAKEFILE])
+@pytest.mark.parametrize("файл", [*ДОКИ, MAKEFILE])
 def test_подъём_со_сборкой_в_процедуре_не_предлагается(файл: Path) -> None:
     """`up -d --build` пересборку пропускает — и молчит об этом."""
     for строка in файл.read_text(encoding="utf-8").splitlines():
