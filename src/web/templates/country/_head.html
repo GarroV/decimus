@@ -85,7 +85,7 @@
     <dl class="cn-facts">
       {% call fact(t('country.unit.facts.city')) %}{{ city_title(row.city) or '—' }}{% endcall %}
       {% call fact(t('country.unit.facts.partner')) %}{{ row.partner or '—' }}{% endcall %}
-      {% if row.status and row.status != t('unit.stage.' ~ row.stage) %}{% call fact(t('country.unit.facts.status')) %}{{ row.status }}{% endcall %}{% endif %}
+      {% if extra_status(row.stage, row.status) %}{% call fact(t('country.unit.facts.status')) %}{{ row.status }}{% endcall %}{% endif %}
       {% call fact(t('country.unit.facts.address')) %}{{ row.address or '—' }}{% endcall %}
       {% call fact(t('country.unit.facts.opened')) %}{{ row.opened or '—' }}{% endcall %}
       {% if row.closed_on %}{% call fact(t('country.unit.facts.closed')) %}{{ row.closed_on }}{% endcall %}{% endif %}

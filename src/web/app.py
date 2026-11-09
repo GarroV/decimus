@@ -137,7 +137,7 @@ from .sections import (
     visible_sections,
 )
 from .security_screen import SECURITY_PATH, is_fresh
-from .texts import UI_LANGS, t
+from .texts import UI_LANGS, extra_status, t
 
 logger = logging.getLogger(__name__)
 
@@ -328,6 +328,8 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "t": lambda key, **params: t(key, lang, **params),
             # Страна и город в справочнике — коды; на экран они идут словом.
             "city_title": lambda code: city_title(code, lang),
+            # Сырой статус свода («Open») рядом со стадией — только если он что-то добавляет (#1608).
+            "extra_status": lambda stage, status: extra_status(stage, status),
             "country_title": lambda code: country_title(code, lang),
             # Дата на экран — месяцем словом: `10.12.2026` путают с октябрём (#963).
             "day": lambda value: human_day(value, lang),

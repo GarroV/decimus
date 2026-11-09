@@ -222,6 +222,30 @@ def test_где_болит_одним_блоком_и_только_при_про
     assert страница.count('cn-hurt"') == 1 and "K-041" in страница and "Чистота" in страница
 
 
+def test_подзаголовок_колонки_где_болит_только_когда_колонок_две(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#1608: у единственной колонки подзаголовок повторял заголовок блока «Где болит»."""
+    вид = данные()
+    страница = открыть(стенд, monkeypatch, вид, "/country/GE")
+    колонок = страница.count('class="cn-hurt__col"')
+    подзаголовков = страница.count('class="cn-sub"')
+    assert подзаголовков == (колонок if колонок == 2 else 0), (колонок, подзаголовков)
+    только_одна = replace(вид, snapshot=replace(вид.snapshot, process_losses=()))
+    страница = открыть(стенд, monkeypatch, только_одна, "/country/GE")
+    assert страница.count('class="cn-hurt__col"') == 1 and 'class="cn-sub"' not in страница
+
+
+def test_сырой_статус_свода_не_повторяет_стадию() -> None:
+    from src.web.texts import extra_status
+
+    assert extra_status("open", "Open") == ""  # «Работает» рядом с «Open» — дубль
+    assert extra_status("open", "работает") == ""
+    assert extra_status("closed", "") == ""
+    assert extra_status("open", "Ресторан открыт") == "Ресторан открыт"
+    assert extra_status("pipeline", "Строится") == "Строится"
+
+
 def test_смена_языка_оставляет_страну_и_раскрытую_точку(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
