@@ -96,7 +96,7 @@ def _открыть(
 def _строки(страница: str) -> list[str]:
     блок = re.search(r'<ul class="explain">(.*?)</ul>', страница, re.S)
     assert блок, "нет блока «Расшифровка»"
-    return re.findall(r"<li>(.*?)</li>", блок.group(1))
+    return [re.sub(r"<[^>]+>", "", x) for x in re.findall(r"<li>(.*?)</li>", блок.group(1), re.S)]
 
 
 def _причина(страница: str) -> str:

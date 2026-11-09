@@ -150,3 +150,25 @@ def test_кодов_класса_на_экране_нет(
     видимое = re.sub(r"<[^>]+>", " ", сама)
     assert not re.findall(r"\bD[0-3]\b", видимое)
     assert "отклонение" in видимое  # метка класса записи и чип — словом
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+def test_на_странице_у_второстепенных_действий_есть_имя_для_узкого_экрана(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """На узком экране подписи прячутся, поэтому имя обязано жить в `aria-label`."""
+    страница = _открыть(стенд, monkeypatch, СТРАНИЦА)
+
+    ауксы = страница.split("hact__group--aux", 1)[1]
+    assert 'aria-label="Скачать PDF"' in ауксы
+    assert 'aria-label="Письмо партнёру"' in ауксы
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+def test_раскрытия_карточки_одного_вида_с_шевроном(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    страница = _открыть(стенд, monkeypatch, СТРАНИЦА)
+
+    assert 'class="mx-more mx-more--card"' in страница  # «Версия чек-листа»
+    assert "mx-more mx-more--card mx-more--explain" in страница
