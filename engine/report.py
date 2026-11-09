@@ -13,7 +13,8 @@
 не зависел от того, что установлено на машине.
 """
 import argparse, base64, json, mimetypes, os, re, string, sys, tempfile
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from urllib.parse import quote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -32,6 +33,7 @@ T = {
     "ru": {
         "title": "Отчёт о проверке пиццерии", "unit": "Пиццерия", "city": "Город",
         "partner": "Партнёр", "auditor": "Аудитор", "type": "Вид проверки", "date": "Дата проверки",
+        "time": "Время проверки", "started": "начало",
         "result": "Результат проверки", "grade": "Оценка", "score": "Итоговый балл",
         "summary": "Сводка", "crit": "Критичность", "count": "Количество", "cost": "Вычет",
         "processes": "Итог по процессам", "process": "Процесс",
@@ -64,6 +66,7 @@ T = {
     "en": {
         "title": "Pizzeria inspection report", "unit": "Store", "city": "City",
         "partner": "Partner", "auditor": "Auditor", "type": "Inspection type", "date": "Inspection date",
+        "time": "Inspection time", "started": "started",
         "result": "Result", "grade": "Grade", "score": "Final score",
         "summary": "Summary", "crit": "Severity", "count": "Count", "cost": "Deduction",
         "processes": "Breakdown by process", "process": "Process",
@@ -353,6 +356,47 @@ def deadline_text(f, t):
     return fmt_date(f.get("due")) or t["immediately"]
 
 
+def _stamp(value):
+    """ISO со смещением -> aware datetime в UTC; пусто или без смещения — None (не гадаем)."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        return None
+    return dt.astimezone(timezone.utc).replace(second=0, microsecond=0)
+
+
+def inspection_time(meta, lang):
+    """Строка шапки «Время проверки» (D730): `10:15–12:40 (2 ч 25 мин)` по часам страны.
+
+    Ключи meta: `started_at`, `finished_at` (ISO со смещением), `tz` (IANA). Нет начала —
+    пустая строка и строки в шапке нет: ничего не досчитывается и не оценивается. Нет
+    конца (или он раньше начала) — только «начало 10:15». Нет зоны — UTC с видимой
+    пометкой, а не молчаливо «местное». Минуты — по показанным ЧЧ:ММ, чтобы строка сходилась.
+    """
+    begin = _stamp(meta.get("started_at"))
+    if begin is None:
+        return ""
+    tz_name = meta.get("tz")
+    try:
+        tz = ZoneInfo(tz_name) if tz_name else timezone.utc
+    except Exception:
+        tz, tz_name = timezone.utc, None
+    suffix = "" if tz_name else " UTC"
+    end = _stamp(meta.get("finished_at"))
+    clock = lambda d: d.astimezone(tz).strftime("%H:%M")
+    if end is None or end < begin:
+        return f"{T[lang]['started']} {clock(begin)}{suffix}"
+    mins = int((end - begin).total_seconds() // 60)
+    h, mm = divmod(mins, 60)
+    unit_h, unit_m = ("ч", "мин") if lang == "ru" else ("h", "min")
+    span = " ".join(x for x in (f"{h} {unit_h}" if h else "", f"{mm} {unit_m}" if mm or not h else "") if x)
+    return f"{clock(begin)}–{clock(end)}{suffix} ({span})"
+
+
 def build_html(res, lang, photos, src=None, speech_lang=None):
     t = T[lang]
     src = Photos() if src is None else src
@@ -381,7 +425,8 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
                  (t["partner"], m.get("partner")),
                  (t["auditor"], m.get("auditor")),
                  (t["type"], inspection_kind(m, lang)),
-                 (t["date"], fmt_date(m.get("date")))):
+                 (t["date"], fmt_date(m.get("date"))),
+                 (t["time"], inspection_time(m, lang))):
         if v:
             h.append(f'<tr><td class="k">{esc(k)}</td><td>{esc(v)}</td></tr>')
     h.append("</table>")
@@ -1072,6 +1117,12 @@ def report_lang(asked, meta):
     return lang
 
 
+def add_timing_args(parser):
+    parser.add_argument("--started-at", help="начало проверки, ISO со смещением (D730)")
+    parser.add_argument("--finished-at", help="конец проверки, ISO со смещением (D730)")
+    parser.add_argument("--tz", help="IANA-зона страны пиццерии; нет — время печатается в UTC")
+
+
 def main():
     p = argparse.ArgumentParser()
     s = p.add_subparsers(dest="cmd", required=True)
@@ -1079,6 +1130,7 @@ def main():
     a1.add_argument("--out-dir", help="каталог для собранного отчёта; по умолчанию reports/ рядом с состоянием")
     a1.add_argument("--photo-map", help="JSON-карта «ссылка на кадр: путь к файлу»")
     a1.add_argument("--speech-lang", help="язык, на котором записана обратная связь аудитора")
+    add_timing_args(a1)
     a2 = s.add_parser("letter"); a2.add_argument("--lang")
     a2.add_argument("--template", type=int, default=1,
                     help="шаблон письма (D664): 1 — сильные стороны до нарушений, зоны роста после; "
@@ -1093,6 +1145,7 @@ def main():
     a3.add_argument("--photos", default="all")
     a3.add_argument("--speech-lang", help="язык, на котором записана обратная связь аудитора")
     a3.add_argument("--photo-map", help="JSON-карта «ссылка на кадр: путь к файлу»")
+    add_timing_args(a3)
     a = p.parse_args()
     if a.cmd == "letter-builtin":
         # Встроенные тексты и подстановки — для редактора шаблона в админке, которой
@@ -1128,6 +1181,10 @@ def main():
             print(warn, file=sys.stderr)
         print(text)
         return
+    # Время проверки приходит флагами (бот) или уже лежит в meta (веб, `state_json`); флаг главнее.
+    for key in ("started_at", "finished_at", "tz"):
+        if getattr(a, key, None):
+            res["meta"][key] = getattr(a, key)
     src = Photos(load_photo_map(a.photo_map) if a.photo_map else None)
     html = build_html(res, lang, a.photos, src, a.speech_lang)
     _, skipped, recorded = feedback_parts(res, lang, a.speech_lang)

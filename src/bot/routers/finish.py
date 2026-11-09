@@ -73,7 +73,7 @@ from ..lang import chat_ui_lang
 from ..material import MaterialStore
 from ..photos import download_all
 from ..preliminary import remind
-from ..report_lang import offered_langs
+from ..report_lang import inspection_country, offered_langs
 from ..texts import t
 from .records import show_records
 
@@ -444,6 +444,8 @@ async def deliver(
     translate_failed = await asyncio.to_thread(translate_comments, chat_id, inspection)
     if translate_failed:
         await message.answer(t("finish.autotranslate_failed", lang, count=translate_failed))
+    # Страна пиццерии — для пояса времени проверки в шапке отчёта (D730).
+    country = await asyncio.to_thread(inspection_country, inspection)
     # Кадры записей и кадры информационной части (T179) — одним списком: карту
     # «ссылка → файл» блок `report` строит по обоим, и кадр поля, не скачанный
     # здесь, напечатался бы партнёру красной отметкой «фотография не приложена».
@@ -473,6 +475,8 @@ async def deliver(
                     chat_id,
                     fetch_photo=found.get,
                     allow_missing_photos=allow_missing,
+                    finished_at=finish_candidate,
+                    country=country,
                 )
             except PhotoMissing as exc:
                 # Решение «собрать без кадра» принимает аудитор, а не код: отчёт без

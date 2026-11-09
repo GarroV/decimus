@@ -82,7 +82,7 @@ select
     (select count(*) from findings f where f.inspection_id = i.id) as findings_count,
     -- Город: записанный в проверке, а пустой — город пиццерии из справочника
     -- кодом (#460): мастер бота города больше не спрашивает (D233).
-    i.pushed_at, i.started_at, i.finished_at, i.auditor,
+    i.pushed_at, i.started_at, i.finished_at, i.auditor, u.country as unit_country,
     coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
     -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
@@ -116,7 +116,7 @@ select
     (select count(*) from findings f where f.inspection_id = i.id) as findings_count,
     -- Город: записанный в проверке, а пустой — город пиццерии из справочника
     -- кодом (#460): мастер бота города больше не спрашивает (D233).
-    i.pushed_at, i.started_at, i.finished_at, i.auditor,
+    i.pushed_at, i.started_at, i.finished_at, i.auditor, u.country as unit_country,
     coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
     -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
@@ -160,7 +160,7 @@ select
     (select count(*) from findings f where f.inspection_id = i.id) as findings_count,
     -- Город: записанный в проверке, а пустой — город пиццерии из справочника
     -- кодом (#460): мастер бота города больше не спрашивает (D233).
-    i.pushed_at, i.started_at, i.finished_at, i.auditor,
+    i.pushed_at, i.started_at, i.finished_at, i.auditor, u.country as unit_country,
     coalesce(nullif(i.city, ''), u.city, '') as city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
     -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
@@ -301,6 +301,7 @@ def _row_to_inspection(row: Mapping[str, Any]) -> InspectionRow:
         pushed_at=row["pushed_at"].isoformat(),
         started_at=row["started_at"].isoformat() if row.get("started_at") else None,
         finished_at=row["finished_at"].isoformat() if row.get("finished_at") else None,
+        unit_country=str(row.get("unit_country") or ""),
         finding_history=row.get("finding_history"),
         measurement_sets=row.get("measurement_sets"),
         # Шапка письма (T176). Колонки объявлены `not null default ''`, но

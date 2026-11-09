@@ -122,6 +122,9 @@ class InspectionRow:
     speech_lang: str = ""
     started_at: str | None = None
     finished_at: str | None = None
+    #: Страна пиццерии (`units.country`): по ней выбирается часовой пояс времени проверки
+    #: (D730). Пусто — страна неизвестна, время печатается в UTC с пометкой.
+    unit_country: str = ""
     finding_history: list[dict[str, Any]] | None = None
     measurement_sets: dict[str, Any] | None = None
 
@@ -130,6 +133,15 @@ class InspectionRow:
         from src.domain.timing import duration_seconds, parse_timestamp
 
         return duration_seconds(parse_timestamp(self.started_at), parse_timestamp(self.finished_at))
+
+    @property
+    def time_zone(self) -> str | None:
+        """IANA-зона страны пиццерии; страны нет в справочнике — `None` (D730)."""
+        from src.domain.geo import CITY_COUNTRY
+        from src.domain.timing import zone_for_country
+
+        country = self.unit_country or CITY_COUNTRY.get((self.city or "").strip().lower())
+        return zone_for_country(country)
 
     @property
     def is_legacy(self) -> bool:
