@@ -665,6 +665,7 @@
 | `0127_maps_reviews.sql` | `maps.reviews`, `maps.reviews_sync` |
 | `0128_batch_letters.sql` | `batch_letters`, `batch_letter_inspections` |
 | `0129_calendar_deadline.sql` | `calendar_grants`, `calendar_events` |
+| `0130_close_invariants.sql` | — |
 <!-- map:end -->
 
 ## Makefile

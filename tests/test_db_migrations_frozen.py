@@ -474,6 +474,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0129_calendar_deadline.sql": (
         "sql1:179028d9e1baa19cc38edf49dc5b1809681fee1ec39f44532ce745be6bae27df"
     ),
+    "0130_close_invariants.sql": (
+        "sql1:258cb8af059d226d9ff728d73340f51b1c176611f23d1a4df0243ce66e566a8f"
+    ),
 }
 
 

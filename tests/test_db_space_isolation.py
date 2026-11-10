@@ -240,15 +240,27 @@ def test_новая_таблица_данных_без_политики_прос
         "0067_journals.sql: action_journal",
         "0078_model_usage.sql: model_usage",
         "0081_inspection_edits.sql: inspection_edits",
+        # Журнал шагов обхода (D710, `0119`): роли приложения выдан только `insert` (и счётчик),
+        # читает функция владельца `walk_log_read` — только главный админ и админ УК.
+        "0119_walk_log.sql: walk_log",
+        # Состояние переключателя пространств (D726, `0123`): читается при опознании сессии,
+        # когда пространство ещё неизвестно; пишет только функция владельца, роли приложения —
+        # `select`. Какое пространство допустимо, решает заслон входа, а не строка.
+        "0123_session_peeks_table.sql: web_session_peeks",
     }
     миграции = sorted((ROOT / "src" / "db" / "migrations").glob("*.sql"))
     после = [м for м in миграции if м.name > "0062"]
     без_политики = []
+    # Политика пространства может прийти НОВЫМ файлом: применённые миграции заморожены.
+    весь_текст = "\n".join(м.read_text(encoding="utf-8").lower() for м in миграции)
     for м in после:
         текст = м.read_text(encoding="utf-8").lower()
         for таблица in re.findall(r"create table (?:if not exists )?([\w.]+)\s*\(", текст):
             тело = текст.split(f"create table {таблица}", 1)[1].split(");", 1)[0]
-            if "tenant_code" in тело and "decimus_space" not in текст:
+            закрыта_позже = re.search(
+                rf"create policy \w+ on {re.escape(таблица)}\b[^;]*decimus_space", весь_текст
+            )
+            if "tenant_code" in тело and "decimus_space" not in текст and not закрыта_позже:
                 без_политики.append(f"{м.name}: {таблица}")
     без_политики = [т for т in без_политики if т not in исключения]
     assert без_политики == [], (
