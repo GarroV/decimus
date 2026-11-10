@@ -6,7 +6,8 @@
 
 Правило владельца (скилл `interface-logic`): период — календарём, с стрелками
 ← → рядом. Стрелка листает на длину выбранного: целый календарный месяц — на
-месяц, произвольный отрезок — на его же длину. «Всё время» — явный выбор
+месяц, целый год — на год (365 и 366 дней — не одна длина), произвольный
+отрезок — на его же длину. «Всё время» — явный выбор
 (`period=all`), а не отсутствие параметров: у «Главной» без параметров — текущий
 месяц, и её ссылка на «всё» обязана говорить это словами.
 
@@ -47,6 +48,15 @@ class Period:
             return self.start
         return None
 
+    @property
+    def year(self) -> int | None:
+        """Год, если отрезок — ровно один календарный год (1 января — 31 декабря)."""
+        if self.start is None or self.end is None:
+            return None
+        if self.start == date(self.start.year, 1, 1) and self.end == date(self.start.year, 12, 31):
+            return self.start.year
+        return None
+
     def params(self) -> dict[str, str]:
         """Параметры адреса этого периода (пустые значения не попадают)."""
         if self.is_all:
@@ -61,6 +71,11 @@ def month_of(day: date) -> Period:
     """Календарный месяц, в котором лежит `day`."""
     начало = day.replace(day=1)
     return Period(начало, начало.replace(day=monthrange(day.year, day.month)[1]))
+
+
+def year_of(day: date) -> Period:
+    """Календарный год, в котором лежит `day`."""
+    return Period(date(day.year, 1, 1), date(day.year, 12, 31))
 
 
 def _parse(value: str | None) -> date | None:
@@ -91,6 +106,8 @@ def shift(period: Period, step: int) -> Period | None:
     """Соседний отрезок той же длины; `None` — листать некуда (открытая граница)."""
     if period.start is None or period.end is None:
         return None
+    if period.year is not None:
+        return year_of(date(period.year + step, 1, 1))
     месяц = period.month
     if месяц is not None:
         год, номер = divmod(месяц.month - 1 + step, 12)
