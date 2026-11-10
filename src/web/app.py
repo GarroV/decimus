@@ -56,6 +56,7 @@ from src.db.reports import ReportRef
 from src.domain.errors import ValidationError
 from src.domain.features import action_plans_enabled, begin_feature_scope, end_feature_scope
 from src.domain.kinds import kind_title
+from src.domain.models import BASE_LANG, REPORT_LANGS, localized
 from src.domain.permissions import is_read_only
 from src.domain.second_factor import passkey_auto_enroll
 from src.domain.tenants import HQ_TENANT, canonical_tenant
@@ -324,6 +325,8 @@ def _register_context(app: Flask, conf: Settings) -> None:
         return {
             "lang": lang,
             "langs": UI_LANGS,
+            # Языки отчёта: подписи на них в шаблонах (`lang.name.<код>`), не язык сайта.
+            "report_langs": REPORT_LANGS,
             "action_plans_enabled": action_plans_enabled,
             "t": lambda key, **params: t(key, lang, **params),
             # Страна и город в справочнике — коды; на экран они идут словом.
@@ -543,11 +546,10 @@ def _item_titles(conf: Settings, lang: str) -> dict[str, str]:
         состав = method.load_composition(state.store, tenant=auth.current_tenant())
     except MethodologyRefused:
         return {}
-    ключ = "question_ru" if lang == "ru" else "question_en"
     подписи: dict[str, str] = {}
     for item in состав.items:
         код = str(item.get("id", "")).strip()
-        текст = str(item.get(ключ) or item.get("question_ru") or "").strip()
+        текст = localized(item, "question", lang, fall_back=(BASE_LANG,)).strip()
         if код and текст:
             подписи[код] = текст
     return подписи

@@ -16,13 +16,13 @@ from .config import check_environment
 from .edition import pin
 from .engine import run_audit
 from .errors import EngineError
-from .models import ProcessScore, Score, ZoneScore
+from .models import REPORT_LANGS, ProcessScore, Score, ZoneScore
 from .state import assert_checklist_version
 
 #: Ключи разбивки по зоне, которые не являются счётчиками записей. Всё
 #: остальное движок называет по классу (`D1`, `D2`, `D3`, а при информационных
 #: записях ещё и `D0`) — перечислять классы здесь нельзя, это методика.
-ZONE_FIELDS = ("name_ru", "name_en", "share", "loss", "score", "zeroed")
+ZONE_FIELDS = (*(f"name_{lang}" for lang in REPORT_LANGS), "share", "loss", "score", "zeroed")
 
 
 def _counts(raw: Mapping[str, Any]) -> dict[str, int]:

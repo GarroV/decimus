@@ -17,6 +17,9 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from src.domain.models import REPORT_LANGS
+from src.domain.models import localized as field_in_lang
+
 #: Как сложить пункты. Первое — умолчание: так пункты стоят и в файле методики.
 GROUPINGS = ("process", "zone", "level")
 
@@ -100,7 +103,7 @@ def is_off(item: Item) -> bool:
 
 
 def _matches(item: Item, needle: str) -> bool:
-    поля = ("id", "question_ru", "question_en", "process_ru", "process_en")
+    поля = ("id", *(f"{name}_{code}" for name in ("question", "process") for code in REPORT_LANGS))
     return any(needle in (item.get(поле) or "").casefold() for поле in поля)
 
 
@@ -121,8 +124,7 @@ def select(items: Sequence[Item], f: ItemFilter) -> tuple[Item, ...]:
 
 def localized(item: Item, field: str, lang: str) -> str:
     """Поле пункта на языке экрана (`question`, `process`); нет перевода — другой язык."""
-    other = "en" if lang == "ru" else "ru"
-    return item.get(f"{field}_{lang}") or item.get(f"{field}_{other}") or ""
+    return field_in_lang(item, field, lang, fall_back=REPORT_LANGS)
 
 
 def _keys(item: Item, by: str, lang: str) -> tuple[str, ...]:

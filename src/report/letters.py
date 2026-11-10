@@ -54,7 +54,7 @@ from ..domain.config import DATA_FILES
 from ..domain.edition import SHELF_DIR, shelf_dirs
 from ..domain.geo import CITIES
 from ..domain.kinds import kind_title
-from ..domain.models import TEXT_LANGS
+from ..domain.models import REPORT_LANGS
 from ..domain.version import compose, edition_of
 from .engine_call import AUDIT_SCRIPT as AUDIT_SCRIPT
 from .engine_call import ENGINE_TIMEOUT_SEC as ENGINE_TIMEOUT_SEC
@@ -295,9 +295,9 @@ def _lang(detail: InspectionDetail, asked: str | None) -> str:
     if asked is None:
         return detail.inspection.report_lang
     value = asked.strip().lower()
-    if value not in TEXT_LANGS:
+    if value not in REPORT_LANGS:
         raise LetterError(
-            f"Язык письма «{asked}» в методике не заведён. Доступны: {', '.join(TEXT_LANGS)}. "
+            f"Язык письма «{asked}» в методике не заведён. Доступны: {', '.join(REPORT_LANGS)}. "
             f"Движок на незнакомый язык молча собирает письмо по-русски — и отправитель "
             f"узнал бы об этом от партнёра"
         )

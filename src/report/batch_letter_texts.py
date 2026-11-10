@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from ..domain.models import TEXT_LANGS
+from ..domain.models import REPORT_LANGS
 from .errors import ReportError
 
 TEXTS: Mapping[str, Mapping[str, str]] = {
@@ -105,8 +105,8 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
 
 def say(key: str, lang: str, **values: object) -> str:
     """Текст по ключу на языке письма; незнакомый язык или ключ — отказ, не подмена русским."""
-    if lang not in TEXT_LANGS:
+    if lang not in REPORT_LANGS:
         raise ReportError(
-            f"Язык общего письма «{lang}» не заведён. Доступны: {', '.join(TEXT_LANGS)}"
+            f"Язык общего письма «{lang}» не заведён. Доступны: {', '.join(REPORT_LANGS)}"
         )
     return TEXTS[key][lang].format(**values)

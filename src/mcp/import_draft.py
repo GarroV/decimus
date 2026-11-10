@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..db.models import ORIGIN_LEGACY
-from ..domain.models import Zone
+from ..domain.models import REPORT_LANGS, Zone, localized
 from ..recognize.cues import Cue, load_cues, match_cues, match_zones
 from ..recognize.shortlist import MANUAL_ONLY
 from ..recognize.zone_words import zone_from_words
@@ -63,8 +63,7 @@ def _brief(criteria: str) -> str:
 
 
 def _question(row: dict[str, str], lang: str) -> str:
-    own, other = ("question_en", "question_ru") if lang == "en" else ("question_ru", "question_en")
-    return (row.get(own) or row.get(other) or "").strip()
+    return localized(row, "question", lang, fall_back=REPORT_LANGS).strip()
 
 
 def _candidate(

@@ -33,6 +33,7 @@ from src.db.errors import (
     MailingTemplateInputError,
 )
 from src.domain import letter_template
+from src.domain.models import REPORT_LANGS
 
 from . import administration, auth, guard, mailings_content, mailings_template, ui_lang
 from .origin import refuse_foreign_origin
@@ -64,6 +65,12 @@ class KindLine:
 
     kind: str
     cc_count: int | None
+
+
+def _screen_report_lang(conf_lang: str) -> str:
+    """Язык шаблона по умолчанию: язык сайта, если на нём печатают отчёт, иначе первый."""
+    ui = ui_lang.request_lang(conf_lang)
+    return ui if ui in REPORT_LANGS else REPORT_LANGS[0]
 
 
 def _cc_counts() -> dict[str, int] | None:
@@ -112,9 +119,7 @@ def _page(
     template = None
     if picked == templates_db.KIND_INSPECTION:
         template = mailings_template.load(
-            selected
-            or mailings_template.picked_slot()
-            or ("plan", "en" if ui_lang.request_lang(conf_lang) == "en" else "ru"),
+            selected or mailings_template.picked_slot() or ("plan", _screen_report_lang(conf_lang)),
             form_body=form_body,
             error=error,
         )
@@ -124,9 +129,7 @@ def _page(
         content_kind = request.args.get("content", picked)
         if content_kind not in (picked, "document" if picked == "prescription" else picked):
             abort(404)
-        content_lang = request.args.get(
-            "clang", "en" if ui_lang.request_lang(conf_lang) == "en" else "ru"
-        )
+        content_lang = request.args.get("clang", _screen_report_lang(conf_lang))
         try:
             content_editor = mailings_content.editor(content_kind, content_lang)
         except DbError:

@@ -31,7 +31,7 @@ from src.db import (
 from src.db.errors import DbError
 from src.db.models import InspectionRow
 from src.domain.errors import ConfigError
-from src.domain.models import TEXT_LANGS
+from src.domain.models import REPORT_LANGS
 from src.domain.tenants import HQ_TENANT
 
 from . import administration, auth, guard, partner_spaces
@@ -128,7 +128,7 @@ class Panel:
     #: Форма языков — только во вкладке «Страны» и только у `space.manage`.
     can_langs: bool = False
     #: Какие языки можно отметить: языки методики.
-    lang_options: tuple[str, ...] = TEXT_LANGS
+    lang_options: tuple[str, ...] = REPORT_LANGS
     #: Панель во вкладке «Страны»: без пиццерий, аудиторов и оценок площадок — это чтение.
     settings_only: bool = False
     #: Адрес вкладки «Страны» для ссылки «Изменить» на экране страны; пусто — вкладки нет.
@@ -301,11 +301,11 @@ def install(app: Flask) -> None:
                 country_report_langs.reset(страна)
                 return _back(страна, SAVED)
             выбрано = request.form.getlist("langs")
-            if not выбрано or any(язык not in TEXT_LANGS for язык in выбрано):
+            if not выбрано or any(язык not in REPORT_LANGS for язык in выбрано):
                 return _back(страна, LANGS_INVALID)
             country_report_langs.save(
                 страна,
-                tuple(язык for язык in TEXT_LANGS if язык in выбрано),
+                tuple(язык for язык in REPORT_LANGS if язык in выбрано),
                 actor=вошедший.login if вошедший else "",
             )
         except DbError:

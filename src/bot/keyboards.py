@@ -38,7 +38,7 @@ from .texts import UI_LANGS, t
 #: методики, а не интерфейса.
 KIND_TITLES = INSPECTION_KINDS
 
-#: Код кнопки языка отчёта = сам код языка методики (`ru`/`en`, `domain.models.TEXT_LANGS`).
+#: Код кнопки языка отчёта = сам код языка методики (`ru`/`en`, `domain.models.SPEECH_LANGS`).
 #: Второй копии не нужно: то, что летит в `callback_data`, и есть значение параметра.
 #:
 #: Надписи здесь не переводятся и переводиться не должны: язык называют на нём
@@ -157,7 +157,7 @@ def _langs_keyboard(prefix: str) -> InlineKeyboardMarkup:
 
 
 def speech_lang_keyboard() -> InlineKeyboardMarkup:
-    """Язык проверки (речи аудитора) — коды методики (`domain.models.TEXT_LANGS`)."""
+    """Язык проверки (речи аудитора) — коды методики (`domain.models.SPEECH_LANGS`)."""
     return _langs_keyboard(SPEECH_LANG_PREFIX)
 
 

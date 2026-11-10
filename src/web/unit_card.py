@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 
-from src.domain.models import NON_DEDUCTING
+from src.domain.models import NON_DEDUCTING, localized
 
 from ..db import queries
 from ..db.models import LEGACY_CODE, NO_CLASS, FindingRow, InspectionRow
@@ -138,7 +138,7 @@ def _zone_names(by_zone: Mapping[str, object], *, lang: str) -> dict[str, str]:
     имена: dict[str, str] = {}
     for код, снимок in by_zone.items():
         if isinstance(снимок, dict):
-            имена[код] = str(снимок.get("name_en" if lang == "en" else "name_ru") or код)
+            имена[код] = localized(снимок, "name", lang) or код
     return имена
 
 
@@ -160,7 +160,7 @@ def _weak(
         потеря = снимок.get("loss")
         if потеря is None:
             continue
-        имя = снимок.get("name_en" if lang == "en" else "name_ru") or код
+        имя = localized(снимок, "name", lang) or код
         процессы.append(WeakProcess(code=код, name=str(имя), loss=float(потеря)))
     процессы.sort(key=lambda p: (-p.loss, p.code))
     return tuple(p for p in процессы if p.loss > 0)[:limit]

@@ -34,7 +34,7 @@ SCHEMA: dict[str, Any] = {
 
 #: Имя языка в инструкции. Незнакомый код передаётся как есть — модель его
 #: поймёт, а язык остаётся параметром, а не константой.
-_LANG_NAMES = {"ru": "Russian", "en": "English"}
+_LANG_NAMES = {"ru": "Russian", "en": "English", "tr": "Turkish"}
 
 INSTRUCTIONS = (
     "You translate a note written by a restaurant inspector into {lang}. "
