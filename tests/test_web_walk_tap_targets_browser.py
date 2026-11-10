@@ -98,3 +98,37 @@ def test_zone_screen_tap_targets_and_feed(page, lang):
     if shots:
         Path(shots).mkdir(parents=True, exist_ok=True)
         page.screenshot(path=f"{shots}/zone-{lang}.png", full_page=True)
+
+
+# Painted size (not the tap area) of the existing elements, as on `main` before the walk-field-ux
+# branch (measured at 390×844 in this harness) (D745: «у тебя есть кнопка, она уже отрисована, она устраивает по размеру … зачем ты её
+# как-то меняешь визуально?»). width / height in px; None — not checked. Read from the CSS of main.
+MAIN_SIZES = {
+    ".walk-prevline.is-attention": (323, 26),
+    ".walk-switch__arrow--top": (40, 32),
+    ".walk-switch__main": (358, 50),
+    ".walk-dock__add--main": (127, 44),
+    ".walk-dock__next": (135, 44),
+    ".walk-fix": (135, 40),
+}
+
+
+@pytest.mark.parametrize("lang", ["ru"])
+def test_painted_sizes_stay_as_on_main(page, lang):
+    mount(page, lang)
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.wait_for_timeout(300)
+    got = page.evaluate(
+        """sel=>Object.fromEntries(sel.map(s=>{const e=document.querySelector(s);
+          if(!e) return [s,null]; const r=e.getBoundingClientRect();
+          return [s,[Math.round(r.width),Math.round(r.height)]];}))""",
+        list(MAIN_SIZES),
+    )
+    bad = []
+    for sel, (w, h) in MAIN_SIZES.items():
+        if got[sel] is None:
+            bad.append(f"{sel}: not rendered")
+            continue
+        if (w is not None and got[sel][0] != w) or (h is not None and got[sel][1] != h):
+            bad.append(f"{sel}: painted {got[sel]}, main {(w, h)}")
+    assert not bad, "painted size differs from main:\n" + "\n".join(bad)

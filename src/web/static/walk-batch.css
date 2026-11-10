@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: 48px;
+  min-height: 44px;
   margin: 0;
   border: 0;
   background: transparent;
@@ -84,6 +84,6 @@
    подпись, «Серия фото» и «Зона готова →» чуть мельче, отступы уже. */
 @media (max-width: 399px) {
   .walk-dock__split .walk-dock__add--main { padding: 0 3px; font-size: 13px; }
-  .walk-dock__split .walk-dock__add--several { gap: 3px; padding: 0 5px; font-size: 12px; }
+  .walk-dock__split .walk-dock__add--several { gap: 3px; padding: 0 5px; font-size: 11px; }
   .walk-dock__row .walk-dock__next { padding: 0 8px; font-size: 14px; }
 }

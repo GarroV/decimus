@@ -62,7 +62,7 @@
   color: var(--ink-inverse);
 }
 
-.walk-tile .walk-zic { width: 20px; height: 20px; font-size: 12px; }
+.walk-tile .walk-zic { width: 20px; height: 20px; font-size: 11px; }
 .walk-tile .walk-zic .walk-icon { width: 12px; height: 12px; }
 
 /* чек-лист: больше пятнадцати пунктов — остальное по кнопке */
@@ -131,7 +131,7 @@
   display: grid;
   place-items: center;
   min-width: 44px;
-  min-height: 44px;
+  min-height: 36px;
   margin: 0 8px 0 0;
   padding: 0 8px;
   border: 0;
@@ -139,7 +139,7 @@
   background: none;
   color: var(--ink-3);
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
 }
 .walk-cl__visibility.is-label { flex: 1; justify-items: start; padding: 0 14px; color: var(--ink-2); }
@@ -175,7 +175,8 @@
 
 /* Зона нажатия не меньше 44 px при прежнем виде (D745): видимый размер кнопок компактный, как был,
    а невидимый слой ::after выходит за границу на недостающие пиксели. Раскладку не двигает.
-   Строки списка (`walk-cl__head`, `walk-cl__item`) стоят вплотную — им 44 px видимых. */
+   Строки списка (`walk-cl__head`, `walk-cl__item`) стоят вплотную и держат прежнюю видимую высоту (40 / 38):
+   слой заходит на соседние строки на 2–3 px, раскладка не двигается. */
 .walk-pill,
 .walk-progress,
 .walk-prevline.is-attention,
@@ -193,6 +194,8 @@
 .walk-link,
 .walk-seg__opt,
 .walk-btn,
+.walk-cl__head:not(.walk-cl__head--static),
+.walk-cl__item,
 .walk-fix { position: relative; }
 
 .walk-pill::after,
@@ -212,6 +215,8 @@
 .walk-link::after,
 .walk-seg__opt::after,
 .walk-btn::after,
+.walk-cl__head:not(.walk-cl__head--static)::after,
+.walk-cl__item::after,
 .walk-fix::after {
   content: "";
   position: absolute;
