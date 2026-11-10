@@ -33,6 +33,7 @@ from src.db.errors import DbError
 from src.domain.report_deadline import event_title, report_due_date
 
 from .client import (
+    CLIENT_CONFIG_CODES,
     DEAD_GRANT_CODES,
     GONE_CODES,
     CalendarError,
@@ -102,7 +103,7 @@ class _Tokens:
         except CalendarError as сбой:
             if сбой.code in DEAD_GRANT_CODES:
                 self._dead.add(user_id)
-            _fail(user_id, сбой.code, mark=True)
+            _fail(user_id, сбой.code, mark=сбой.code not in CLIENT_CONFIG_CODES)
             return None
 
 

@@ -43,8 +43,11 @@ REMINDER_MINUTES_BEFORE_START = 15 * 60
 GOOGLE_CLIENT_ID_VAR = "GOOGLE_CLIENT_ID"
 GOOGLE_CLIENT_SECRET_VAR = "GOOGLE_CLIENT_SECRET"  # noqa: S105 — ИМЯ переменной
 
-#: Коды, после которых повтор бессмыслен, пока человек не переподключится.
-DEAD_GRANT_CODES = frozenset({"invalid_grant", "invalid_client", "unauthorized_client"})
+#: Коды, после которых повтор бессмыслен, пока человек не переподключится: доступ отозван.
+DEAD_GRANT_CODES = frozenset({"invalid_grant"})
+#: Ошибка НАШЕЙ настройки клиента Google (сменили секрет, удалили клиент) — не вина человека:
+#: подключения не помечаются мёртвыми, проход повторится, когда настройку починят.
+CLIENT_CONFIG_CODES = frozenset({"invalid_client", "unauthorized_client"})
 #: Коды, когда события уже нет в календаре (человек удалил сам): причина из тела ответа или
 #: код ответа, если тела нет.
 GONE_CODES = frozenset({"notFound", "deleted", "http_404", "http_410"})

@@ -192,7 +192,7 @@ def finish(*, user_id: str, account_email: str | None, state: str, consent: Cale
         logger.warning("календарь: подключение %s — nonce не совпал с меткой захода", кто)
         return "calendar_failed"
     своя = (account_email or "").strip().lower()
-    if not своя or not consent.email or consent.email != своя:
+    if not своя or not consent.email or consent.email.strip().lower() != своя:
         logger.warning("календарь: подключение %s — доступ выдал не тот аккаунт Google", кто)
         return "calendar_account"
     # Тот же аккаунт Google, что держит учётку (F-027), а не только та же почта.
@@ -206,6 +206,11 @@ def finish(*, user_id: str, account_email: str | None, state: str, consent: Cale
         logger.info("календарь: подключение %s — право на события не выдано", кто)
         return "calendar_scope"
     if not _retire_previous_key(user_id, consent.refresh_token):
+        # Прежний ключ уже отозван: пометить сразу, чтобы экран не показывал «подключён».
+        try:
+            calendar_store.mark_problem(user_id, "invalid_grant")
+        except DbError:
+            logger.warning("календарь: пометка отозванного ключа %s не записана", кто)
         return "calendar_failed"
     try:
         calendar_store.save_grant(
