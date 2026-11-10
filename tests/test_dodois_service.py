@@ -78,6 +78,9 @@ class Хранилище:
             access_expires_at=поля["access_expires_at"],
         )
 
+    def set_account(self, country: str, name: str | None, email: str | None) -> None:
+        self.входы[country] = replace(self.входы[country], account_name=name, account_email=email)
+
     def record_state(self, country: str, state: str, reason: str | None, **поля: Any) -> None:
         self.состояния.append((country, state, reason))
         вход = self.входы[country]
@@ -103,8 +106,16 @@ def _чисто() -> Any:
 @pytest.fixture
 def база(monkeypatch: pytest.MonkeyPatch) -> Хранилище:
     двойник = Хранилище()
-    for имя in ("get_login", "list_logins", "read_tokens", "replace_tokens", "record_state"):
+    for имя in (
+        "get_login",
+        "list_logins",
+        "read_tokens",
+        "replace_tokens",
+        "record_state",
+        "set_account",
+    ):
         monkeypatch.setattr(store, имя, getattr(двойник, имя))
+    monkeypatch.setattr(client, "userinfo", lambda *_a: (None, None))
     return двойник
 
 
@@ -317,3 +328,65 @@ def test_пара_вытесненного_входа_отбрасывается
     monkeypatch.setattr(store, "replace_tokens", заменён)
     assert service.retry_unwritten(база.входы["SI"], now=СЕЙЧАС) is True
     assert service.retry_unwritten(база.входы["SI"], now=СЕЙЧАС) is None, "пара не забыта"
+
+
+def _учётка(
+    monkeypatch: pytest.MonkeyPatch, итог: tuple[str | None, str | None] | Exception
+) -> list[str]:
+    зовы: list[str] = []
+
+    def спросить(_contour: str, access: str) -> tuple[str | None, str | None]:
+        зовы.append(access)
+        if isinstance(итог, Exception):
+            raise итог
+        return итог
+
+    monkeypatch.setattr(client, "userinfo", спросить)
+    return зовы
+
+
+def test_проверка_дозаполняет_учётку_у_входа_без_неё(
+    база: Хранилище, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _счёт(monkeypatch, 10, 10)
+    зовы = _учётка(monkeypatch, ("Ana Novak", "ana@example.com"))
+    вход = service.check("SI", now=СЕЙЧАС)
+    assert вход is not None
+    assert (вход.account_name, вход.account_email) == ("Ana Novak", "ana@example.com")
+    assert зовы == [СТАРАЯ.access]
+
+
+def test_проверка_не_спрашивает_учётку_когда_она_есть(
+    база: Хранилище, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    база.входы["SI"] = _вход(account_email="ana@example.com")
+    _счёт(monkeypatch, 10, 10)
+    зовы = _учётка(monkeypatch, ("Другой", "x@example.com"))
+    вход = service.check("SI", now=СЕЙЧАС)
+    assert зовы == []
+    assert вход is not None and вход.account_name is None
+
+
+def test_сбой_записи_учётки_не_ломает_проверку(
+    база: Хранилище, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _счёт(monkeypatch, 10, 10)
+    _учётка(monkeypatch, ("Ana Novak", None))
+
+    def падает(*_a: Any) -> None:
+        raise AccessError("база отказала")
+
+    monkeypatch.setattr(store, "set_account", падает)
+    вход = service.check("SI", now=СЕЙЧАС)
+    assert вход is not None
+    assert (вход.state, вход.account_name) == (rules.OK, None)
+
+
+def test_пустой_ответ_userinfo_оставляет_учётку_неизвестной(
+    база: Хранилище, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _счёт(monkeypatch, 10, 10)
+    _учётка(monkeypatch, (None, None))
+    вход = service.check("SI", now=СЕЙЧАС)
+    assert вход is not None
+    assert (вход.state, вход.account_name, вход.account_email) == (rules.OK, None, None)
