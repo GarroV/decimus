@@ -596,7 +596,6 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.class_review.other_item": {"ru": "Другой пункт", "en": "Another item"},
     "walk.sheet.class_review.level.D1": {"ru": "отклонение", "en": "deviation"},
     "walk.sheet.class_review.level.D2": {"ru": "значительное", "en": "significant"},
-    "walk.sheet.class_review.level.D0": {"ru": "замер без вычета", "en": "a reading, no deduction"},
     "walk.sheet.class_review.level.D3": {"ru": "критическое", "en": "critical"},
     "walk.sheet.class_review.history": {
         "ru": "Вопросы и ответы по этому пункту",
@@ -718,10 +717,6 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.delete_confirm": {"ru": "Удалить насовсем?", "en": "Delete for good?"},
     "walk.sheet.delete_yes": {"ru": "Да, удалить", "en": "Yes, delete"},
     "walk.sheet.cancel": {"ru": "Отмена", "en": "Cancel"},
-    "walk.sheet.discard": {
-        "ru": "Запись не сохранена. Закрыть без сохранения?",
-        "en": "The record is not saved. Close without saving?",
-    },
     "walk.sheet.discard_yes": {
         "ru": "Закрыть без сохранения",
         "en": "Close without saving",

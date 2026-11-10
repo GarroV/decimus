@@ -210,7 +210,7 @@
     }
     body.appendChild(el("p", "walk-form__hint", tx("records", { count: score.total })));
     Object.keys(score.counts || {}).forEach(function (level) {
-      body.appendChild(el("span", "walk-finish__count", W.levelWord(level) + ": " + score.counts[level]));
+      body.appendChild(el("span", "walk-finish__count", level + ": " + score.counts[level]));
     });
     (data().zones || []).forEach(function (zone) {
       if (!zone.recorded.length) return;

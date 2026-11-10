@@ -55,9 +55,9 @@
     return good && current.source.photos.every(function (p) {return all.indexOf(p.ref)!==-1;}) &&
       all.every(function (ref) {return current.source.photos.some(function (p) {return p.ref===ref;});});
   }
-  /** «пункт · класс словами · зона» — коды людям не показываем. */
+  /** «пункт · класс · зона»: пункт и зона названием, класс кодом (D745). */
   function label(p) {
-    return [W.itemName(p.code), p.level ? W.levelWord(p.level) : "", W.zoneName(p.zone)].filter(Boolean).join(" · ");
+    return [W.itemName(p.code), p.level || "", W.zoneName(p.zone)].filter(Boolean).join(" · ");
   }
   function sourcePreview(body) {
     var source=current.source;

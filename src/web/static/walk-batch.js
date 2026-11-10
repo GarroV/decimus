@@ -500,7 +500,7 @@
     box.appendChild(el("span", "walk-form__hint", tx("walk.batch.level_pick")));
     (item ? item.levels : []).forEach(function (level) {
       var on = line.manualLevel === level;
-      var pill = W.button("walk-btn walk-btn--small" + (on ? " is-on" : ""), W.levelWord(level), function () {
+      var pill = W.button("walk-btn walk-btn--small" + (on ? " is-on" : ""), level + " · " + tx("walk.sheet.class_review.level." + level), function () {
         line.manualLevel = level;
         draw();
       });
@@ -520,11 +520,11 @@
     if (c.status === "ready") {
       var text = el("p", "walk-batch__class");
       text.appendChild(W.level(c.level));
-      text.appendChild(document.createTextNode(" " + tx("walk.sheet.class_review.proposed", { level: W.levelWord(c.level) })));
+      text.appendChild(document.createTextNode(" " + tx("walk.sheet.class_review.proposed", { level: c.level })));
       box.appendChild(text);
     } else if (c.status === "needs_fact") {
       box.appendChild(note(c.need_fact || ""));
-      if (c.provisional_level) box.appendChild(note(tx("walk.sheet.class_review.provisional", { level: W.levelWord(c.provisional_level) })));
+      if (c.provisional_level) box.appendChild(note(tx("walk.sheet.class_review.provisional", { level: c.provisional_level })));
       box.appendChild(note(tx("walk.batch.fact_hint")));
       box.appendChild(W.button("walk-btn walk-btn--small", tx("walk.batch.retry"), function () { findLine(line); }));
     } else {

@@ -126,17 +126,8 @@
     return svg;
   };
 
-  /** Класс словами: отклонение / значительное / критическое. Код — только в данных. */
-  W.levelWord = function (code) {
-    var key = "walk.sheet.class_review.level." + code;
-    var word = W.tx(key);
-    return word && word !== key ? word : String(code);
-  };
-
   W.level = function (code) {
-    var pill = W.el("span", "walk-level walk-level--" + String(code).toLowerCase(), W.levelWord(code));
-    pill.dataset.level = code;
-    return pill;
+    return W.el("span", "walk-level walk-level--" + String(code).toLowerCase(), code);
   };
 
   /** Название зоны по коду (для сводок); нет в данных — код не показываем пустым. */
