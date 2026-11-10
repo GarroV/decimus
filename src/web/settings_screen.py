@@ -35,17 +35,27 @@ from flask import Flask, current_app, make_response, redirect, render_template, 
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import bot_links, journals, mcp_access, oauth_store, web_own_profile
+from src.db import (
+    bot_links,
+    calendar_store,
+    journals,
+    mcp_access,
+    oauth_store,
+    secret_crypto,
+    web_own_profile,
+)
 from src.db.errors import DbError
 from src.db.web_throttle import Verdict, admit_attempt, note_success
 from src.domain.journal import METHOD_MCP_TOKEN, RESULT_OK
 from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.gcal import grant as calendar_grant
 
 from . import (
     account_menu,
     accounts,
     auth,
+    calendar_connect,
     google_link,
     guard,
     home_board,
@@ -119,6 +129,30 @@ def _google_result() -> Flash | None:
     return None if ключ is None else Flash(ключ[0], ключ[1])
 
 
+@dataclass(frozen=True)
+class CalendarState:
+    """Google Календарь вошедшего: подключён ли, на какой почте и жив ли доступ."""
+
+    known: bool = True
+    connected: bool = False
+    email: str = ""
+    problem: str | None = None
+
+
+def _calendar_state(user_id: str | None) -> CalendarState:
+    """Состояние календаря; база не ответила — «неизвестно», а не «не подключён»."""
+    if user_id is None:
+        return CalendarState()
+    try:
+        grant = calendar_store.grant_of(user_id)
+    except DbError as exc:
+        note_target_mismatch(exc)
+        return CalendarState(known=False)
+    if grant is None:
+        return CalendarState()
+    return CalendarState(connected=True, email=grant.google_email, problem=grant.problem)
+
+
 #: Плитки по секциям, по значимости сверху вниз: сначала то, ради чего сюда приходят
 #: (подключить Claude, бота, Google), потом сам человек, потом вход и безопасность.
 #: Ключ секции — ключ её заголовка в текстах (`settings.group.<ключ>`).
@@ -134,6 +168,7 @@ TILES = tuple(плитка for _, плитки in TILE_GROUPS for плитка i
 #: Плитка, к которой относится исход действия: по началу ключа текста.
 _FLASH_TILE_PREFIXES = (
     ("settings.google.", "google"),
+    ("settings.calendar.", "google"),
     ("users.mcp.", "claude"),
     ("users.claude.", "claude"),
     ("users.bot.", "bot"),
@@ -299,6 +334,7 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             code_add=подключение.command,
             min_password=accounts.MIN_PASSWORD_LENGTH,
             max_password=accounts.MAX_PASSWORD_LENGTH,
+            calendar=_calendar_state(user_id),
             hq_account=вошедший is not None and canonical_tenant(вошедший.tenant) == HQ_TENANT,
             hq_domains=", ".join(sorted(load_hq_domains())),
         ),
@@ -374,6 +410,7 @@ def install(app: Flask, conf: Settings) -> None:
 
     _install_bot(app, base, conf)
     _install_google(app, base, conf)
+    _install_calendar(app, base, conf)
     ui_lang.install(app, f"{base}/lang", demo=conf.demo)
     _install_account_menu(app, base, conf)
     _install_claude_token(app, base, conf)
@@ -485,6 +522,17 @@ def _start_google_link(conf: Settings, base: str) -> Response:
     return auth.begin_google_link()
 
 
+def _start_google_calendar(conf: Settings, base: str) -> Response:
+    """Увести к Google за правом на календарь: кнопка и выполнение после подтверждения."""
+    вошедший = auth.current_account()
+    if вошедший is None or not calendar_connect.may_connect(getattr(вошедший, "tenant", None)):
+        return google_link.back_to_settings("calendar_hq")
+    if not getattr(вошедший, "email", None):
+        # Без привязанной почты Google сверять, чей доступ выдан, не с чем.
+        return google_link.back_to_settings("calendar_account")
+    return auth.begin_google_calendar()
+
+
 def _issue_token(conf: Settings, base: str, target: str) -> tuple[str, int]:
     """Выпустить себе токен и команду для `target` (Claude Desktop или ChatGPT)."""
     чей = _current_id()
@@ -522,6 +570,7 @@ def _issue_chatgpt_token(conf: Settings, base: str) -> tuple[str, int]:
 _RUN_INTENT = {
     "bot-link": _issue_bot_link,
     "google-link": _start_google_link,
+    "google-calendar": _start_google_calendar,
     "claude-token": _issue_claude_token,
     "chatgpt-token": _issue_chatgpt_token,
 }
@@ -621,6 +670,42 @@ def _install_google(app: Flask, base: str, conf: Settings) -> None:
             google_link.mask_email(вошедший.email or ""),
         )
         return google_link.back_to_settings("unlinked")
+
+
+def _install_calendar(app: Flask, base: str, conf: Settings) -> None:
+    """Google Календарь: подключить (D740, D741) и отключить. Чья учётка — решает сессия."""
+
+    @app.post(f"{base}/google-calendar")
+    def settings_calendar_on() -> Response:
+        """Увести к Google за правом на календарь. Только POST со своей страницы."""
+        refuse_foreign_origin()
+        # «Только УК» держит сервер, а не только шаблон (скрытая кнопка — не защита).
+        вошедший = auth.current_account()
+        if вошедший is None or not calendar_connect.may_connect(getattr(вошедший, "tenant", None)):
+            return google_link.back_to_settings("calendar_hq")
+        # Создаёт долгоживущий доступ — только по свежему входу (`reauth`).
+        if (
+            переспрос := reauth.require_fresh(f"{base}?tile=google", "google-calendar")
+        ) is not None:
+            return переспрос
+        return _start_google_calendar(conf, base)
+
+    @app.post(f"{base}/google-calendar-off")
+    def settings_calendar_off() -> Response:
+        """Отключить календарь: события снять, ключ отозвать у Google, стереть у себя."""
+        refuse_foreign_origin()
+        try:
+            итог = calendar_grant.disconnect(_current_id())
+        except (DbError, secret_crypto.SecretCryptoError) as exc:
+            logger.warning("календарь: отключение не удалось (%s)", exc.__class__.__name__)
+            return google_link.back_to_settings("calendar_db")
+        if итог == calendar_grant.FAILED:
+            return google_link.back_to_settings("calendar_revoke")
+        if итог == calendar_grant.REVOKE_MANUALLY:
+            return google_link.back_to_settings("calendar_manual")
+        if итог == calendar_grant.OFF:
+            logger.info("календарь: %s отключил Google Календарь", log_id(_current_id()))
+        return google_link.back_to_settings("calendar_off" if итог == calendar_grant.OFF else None)
 
 
 def _unlink_locked(приговор: Verdict) -> FlaskResponse:

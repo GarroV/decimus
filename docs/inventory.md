@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 226 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 228 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -196,6 +196,8 @@
 | `/settings/confirm` | POST | `reauth_confirm_password` | `src/web/reauth.py` |
 | `/settings/confirm/google` | POST | `reauth_confirm_google` | `src/web/reauth.py` |
 | `/settings/continue` | POST | `settings_continue` | `src/web/settings_screen.py` |
+| `/settings/google-calendar` | POST | `settings_calendar_on` | `src/web/settings_screen.py` |
+| `/settings/google-calendar-off` | POST | `settings_calendar_off` | `src/web/settings_screen.py` |
 | `/settings/google-link` | POST | `settings_google_link` | `src/web/settings_screen.py` |
 | `/settings/google-unlink` | POST | `settings_google_unlink` | `src/web/settings_screen.py` |
 | `/settings/lang` | POST | `settings_lang` | `src/web/ui_lang.py` |
@@ -422,8 +424,8 @@
 | `FRAMES_DIR` | `src/bot/frame_copies.py` | да |
 | `FURCA_NOTIFY_URL` | `src/notify/furca.py` | да |
 | `FURCA_SECRET` | `src/notify/furca.py` | да |
-| `GOOGLE_CLIENT_ID` | `src/web/google_auth.py` | да |
-| `GOOGLE_CLIENT_SECRET` | `src/web/google_auth.py` | да |
+| `GOOGLE_CLIENT_ID` | `src/gcal/client.py`, `src/web/google_auth.py` | да |
+| `GOOGLE_CLIENT_SECRET` | `src/gcal/client.py`, `src/web/google_auth.py` | да |
 | `GOOGLE_FRONT_REDIRECT_URI` | `src/web/google_auth.py` | да |
 | `GOOGLE_HQ_DOMAINS` | `src/web/google_auth.py` | да |
 | `GOOGLE_MAIL_REDIRECT_URI` | `src/web/google_mail.py` | да |
@@ -662,6 +664,7 @@
 | `0126_dodois_logins_delete.sql` | — |
 | `0127_maps_reviews.sql` | `maps.reviews`, `maps.reviews_sync` |
 | `0128_batch_letters.sql` | `batch_letters`, `batch_letter_inspections` |
+| `0129_calendar_deadline.sql` | `calendar_grants`, `calendar_events` |
 | `0130_close_invariants.sql` | — |
 <!-- map:end -->
 

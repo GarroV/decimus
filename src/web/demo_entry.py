@@ -81,6 +81,9 @@ LOCKED_ENDPOINTS = frozenset(
         # Подтверждение входа и «продолжить» выполняют то же намерение, что кнопки
         # выше (`reauth.INTENT_ACTIONS`): закрыта кнопка — закрыт и обход через них.
         "settings_continue",
+        # Календарь проверяющего (D740): доступ к чужому Google в демо не подключается.
+        "settings_calendar_on",
+        "settings_calendar_off",
         "reauth_confirm",
         "reauth_confirm_password",
         "reauth_confirm_google",

@@ -39,6 +39,7 @@ from src.domain.log_ids import log_id
 
 from . import (
     agg_loader,
+    calendar_loader,
     dodois_loader,
     dodois_metrics_loader,
     frame_copies,
@@ -432,6 +433,8 @@ async def start_polling() -> None:
     dodois = asyncio.create_task(dodois_loader.run_forever())
     # Данные Dodo IS для «Качества» по странам — раз в сутки (D671).
     dodois_metrics = asyncio.create_task(dodois_metrics_loader.run_forever())
+    # Событие срока отчёта в календаре проверяющего — сводка раз в 5 минут (D740, #1590).
+    calendar_deadline = asyncio.create_task(calendar_loader.run_forever())
     try:
         await run_polling(dispatcher, bot)
     finally:
@@ -445,6 +448,7 @@ async def start_polling() -> None:
         health.cancel()
         dodois.cancel()
         dodois_metrics.cancel()
+        calendar_deadline.cancel()
         await bot.session.close()
 
 

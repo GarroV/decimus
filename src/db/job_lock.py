@@ -40,6 +40,8 @@ DODOIS_LOADER_LOCK_KEY = 951_0001
 HEALTH_ALERTS_LOCK_KEY = 641_0001
 #: Суточный сбор данных Dodo IS для «Качества» (D671): два процесса тянули бы одно и то же.
 DODOIS_METRICS_LOCK_KEY = 671_0001
+#: Сводка событий срока отчёта с календарями (#1590): два прохода создали бы событие дважды.
+CALENDAR_LOADER_LOCK_KEY = 1590_0001
 
 
 @contextmanager
