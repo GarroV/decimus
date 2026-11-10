@@ -24,6 +24,7 @@ from src.db import trips as tr
 from src.db.directory import Unit, list_units
 from src.db.errors import DbError, TripError
 from src.db.trips import Draft, StepDraft, Trip
+from src.domain.tenants import DEVELOPER_ROLE, HQ_TENANT
 
 from . import accounts, auth, calendar_view, guard, registry_period, registry_view, ui_lang
 from . import inspections as data
@@ -103,17 +104,30 @@ def _units() -> tuple[Unit, ...]:
 
 
 def _people() -> dict[str, str]:
-    """Логин → id действующих учёток своего пространства (подсказка «Кто едет»)."""
+    """Логин → id действующих учёток своего пространства (подсказка «Кто едет»).
+
+    В УК едут только бизнес-девелоперы (10.11.2026): учётки других ролей не
+    подсказываются и не принимаются. В пространствах партнёров роли не режем.
+    """
     try:
         строки = accounts.everyone(tenant=_tenant())
     except DbError as exc:
         logger.warning("люди пространства для поездок не прочитаны: %s", exc)
         return {}
-    return {r.login: r.id for r in строки if r.disabled_at is None}
+    только_девелоперы = _tenant() == HQ_TENANT
+    return {
+        r.login: r.id
+        for r in строки
+        if r.disabled_at is None and (not только_девелоперы or r.role == DEVELOPER_ROLE)
+    }
 
 
-def _executor(name: str) -> tuple[str, str | None]:
-    """Кто едет: админ вписывает любого (учётка узнаётся по логину), сотрудник — себя."""
+def _executor(name: str, current: Trip | None = None) -> tuple[str, str | None]:
+    """Кто едет: админ выбирает из людей пространства, сотрудник — себя.
+
+    В УК принимается только логин действующего бизнес-девелопера; поездку, уже
+    записанную на другого, можно править, не меняя исполнителя (`current`).
+    """
     вошедший = auth.current_account()
     if вошедший is None:
         raise TripError("trip.err.space")
@@ -122,11 +136,17 @@ def _executor(name: str) -> tuple[str, str | None]:
     имя = " ".join(name.split())
     люди = {логин.casefold(): (логин, ид) for логин, ид in _people().items()}
     найдено = люди.get(имя.casefold())
-    return найдено if найдено is not None else (имя, None)
+    if найдено is not None:
+        return найдено
+    if _tenant() != HQ_TENANT:
+        return имя, None
+    if current is not None and имя.casefold() == current.executor_name.casefold():
+        return current.executor_name, current.executor_user_id
+    raise TripError("trip.err.who")
 
 
-def _draft_from_form(units: tuple[Unit, ...]) -> Draft:
-    имя, учётка = _executor(request.form.get("executor") or "")
+def _draft_from_form(units: tuple[Unit, ...], current: Trip | None = None) -> Draft:
+    имя, учётка = _executor(request.form.get("executor") or "", current)
     страна = (request.form.get("country") or "").strip().upper() or None
     if страна is not None and страна not in {u.country for u in units}:
         raise TripError("trip.err.country")
@@ -227,6 +247,7 @@ def _render(
         day_href=lambda d: _url("registry", lang=язык, **{"from": d, "to": d}),
         trip_href=к_поездке,
         can_add_trip=may_edit(None),
+        trip_developers_only=_tenant() == HQ_TENANT,
         new_trip_href=отбор(trip="new"),
         split_open=новая or bool(selected),
         split_back=отбор(),
@@ -384,7 +405,7 @@ def install(app: Flask, conf: Settings) -> None:
 
 def _keep_executor(trip: Trip, units: tuple[Unit, ...]) -> Draft:
     """Правка поездки: сотрудник без `trip.plan` исполнителя не меняет — остаётся он."""
-    черновик = _draft_from_form(units)
+    черновик = _draft_from_form(units, trip)
     if guard.may(PLAN):
         return черновик
     return Draft(

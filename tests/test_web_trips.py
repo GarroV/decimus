@@ -83,13 +83,16 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     )
 
     class Строка:
-        def __init__(self, login: str, ident: str) -> None:
-            self.login, self.id, self.disabled_at = login, ident, None
+        def __init__(self, login: str, ident: str, role: str = "developer") -> None:
+            self.login, self.id, self.role, self.disabled_at = login, ident, role, None
 
     monkeypatch.setattr(
         cs.accounts,
         "everyone",
-        lambda **_: (Строка("nino", "66666666-6666-6666-6666-666666666666"),),
+        lambda **_: (
+            Строка("nino", "66666666-6666-6666-6666-666666666666"),
+            Строка("osb1", "77777777-7777-7777-7777-777777777777", "osb"),
+        ),
     )
     з["store"] = [хранилище]
     return з
@@ -205,6 +208,20 @@ def test_логин_своего_пространства_связывает_у�
     первый, второй = зовы["create"][-2][0], зовы["create"][-1][0]
     assert первый.executor_user_id == "66666666-6666-6666-6666-666666666666"
     assert второй.executor_user_id is None and второй.executor_name == "Гость из офиса"
+
+
+def test_в_ук_едут_только_бизнес_девелоперы(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
+) -> None:
+    """10.11.2026: подсказка и сервер в УК берут только учётки с ролью developer."""
+    c = клиент(monkeypatch, tenant="HQ", role="admin")
+    форма = c.get("/calendar?trip=new").get_data(as_text=True)
+    assert 'value="nino"' in форма and 'value="osb1"' not in форма
+    for кто in ("osb1", "Гость из офиса"):
+        ответ = отправить(c, "/calendar/trips", **{**ФОРМА, "executor": кто})
+        assert ответ.status_code != 303
+    assert зовы["create"] == []
+    assert отправить(c, "/calendar/trips", **{**ФОРМА, "executor": "nino"}).status_code == 303
 
 
 def test_пиццерия_и_страна_вне_охвата_отказ(

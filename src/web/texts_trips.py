@@ -16,6 +16,10 @@ TRIP_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Начните писать — подскажем людей вашего пространства. Можно вписать любое имя.",
         "en": "Start typing to see people of your space. Any name can be entered.",
     },
+    "trip.who.hint_hq": {
+        "ru": "Едут только бизнес-девелоперы: начните писать логин — подскажем из них.",
+        "en": "Only business developers travel: start typing a login to pick one.",
+    },
     "trip.who.self": {
         "ru": "Вы планируете свою поездку: исполнитель — вы.",
         "en": "You are planning your own trip: you are the traveller.",
@@ -81,6 +85,10 @@ TRIP_TEXTS: dict[str, dict[str, str]] = {
     "trip.err.space": {"ru": "не опознано пространство", "en": "the space is unknown"},
     "trip.err.db": {"ru": "база недоступна ({what})", "en": "the database is unavailable ({what})"},
     "trip.err.name": {"ru": "укажите, кто едет", "en": "enter who travels"},
+    "trip.err.who": {
+        "ru": "едут только бизнес-девелоперы: выберите действующего из подсказки",
+        "en": "only business developers travel: pick an active one from the list",
+    },
     "trip.err.name_long": {
         "ru": "имя длиннее {n} знаков",
         "en": "the name is longer than {n} characters",

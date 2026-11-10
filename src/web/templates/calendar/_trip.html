@@ -18,7 +18,7 @@
              value="{{ value('executor', current.executor_name if current else '') }}">
     </label>
     <datalist id="trip-people">{% for login in trip_people %}<option value="{{ login }}">{% endfor %}</datalist>
-    <p class="ssec__note">{{ t('trip.who.hint') }}</p>
+    <p class="ssec__note">{{ t('trip.who.hint_hq' if trip_developers_only else 'trip.who.hint') }}</p>
   {% endif %}
   <label><span class="sform__label">{{ t('trip.country') }}</span>
     {% set chosen = value('country', current.country if current and current.country else '') %}
