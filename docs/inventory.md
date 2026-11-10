@@ -395,7 +395,7 @@
 | `API_TOKEN_BY` | `tools/api_token.py` | да |
 | `ATTACHMENT_MAX_MB` | `src/db/config.py` | да |
 | `AUDITOR_NAMES` | `src/bot/config.py` | да |
-| `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 7 | да |
+| `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 8 | да |
 | `BACKUP_DIR` | `tools/state_backup.py` | да |
 | `BACKUP_KEEP_DAYS` | `tools/state_backup.py` | да |
 | `BOT_MCP_URL` | `src/bot/mcp_setup.py`, `tools/mcp_outside.py` | да |
@@ -436,7 +436,7 @@
 | `LANDING_SHOTS_BASE` | `tools/landing_shots.py` | да |
 | `LANDING_SHOTS_WALK_BASE` | `tools/landing_shots.py` | да |
 | `LOG_ID_SALT` | `src/domain/log_ids.py` | да |
-| `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 2 | да |
+| `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 3 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_CONFIRM_SECRET` | `src/mcp/confirm.py` | да |
 | `MCP_FRONT_KEY` | `src/mcp/config.py` | да |
