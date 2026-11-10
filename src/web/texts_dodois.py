@@ -120,7 +120,6 @@ DODOIS_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Ключи входа не нашлись или не открылись.",
         "en": "The login keys were not found or could not be opened.",
     },
-    "dodois.fact.owner": {"ru": "Владелец (перенесённый вход)", "en": "Owner (transferred login)"},
     "dodois.fact.unknown_account": {
         "ru": "Учётка Dodo IS не назвалась",
         "en": "The Dodo IS account did not identify itself",

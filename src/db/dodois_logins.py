@@ -46,6 +46,8 @@ PROVIDER = "dodois"
 #: В `vault.secrets.last4` у ключей входа стоит заглушка: хвост настоящего ключа не хранится.
 LAST4_STUB = "****"
 SYSTEM_ACTOR = "system"
+#: Предел длины имени и почты учётки (ограничение колонок `dodois.logins`).
+ACCOUNT_MAX = 200
 
 _LOGIN_COLUMNS = (
     "country, contour, source, issued_by, account_name, account_email, linked_at, scope, "
@@ -337,6 +339,27 @@ def record_state(
             )
     except psycopg.Error as exc:
         raise _fail("Состояние входа Dodo IS не записалось", exc) from exc
+
+
+def set_account(country: str, name: str | None, email: str | None) -> None:
+    """Дописать имя и почту учётки Dodo IS входу, у которого их нет (перенесённый вход).
+
+    Трогает только эти два поля; значения длиннее колонки (200) отбрасываются, как у `userinfo`.
+    """
+    vault_names(country)
+    name = name if name and len(name) <= ACCOUNT_MAX else None
+    email = email if email and len(email) <= ACCOUNT_MAX else None
+    if name is None and email is None:
+        return
+    try:
+        with _managing() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update dodois.logins set account_name = %s, account_email = %s "
+                "where country = %s and account_name is null and account_email is null",
+                (name, email, country),
+            )
+    except psycopg.Error as exc:
+        raise _fail("Учётка входа Dodo IS не записалась", exc) from exc
 
 
 # --- приглашения ----------------------------------------------------------------------
