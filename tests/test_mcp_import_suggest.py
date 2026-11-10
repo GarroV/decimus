@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from src.domain.models import Zone
+from src.domain.models import Zone, lang_texts
 from src.mcp import import_draft as dr
 from src.mcp.errors import ToolError
 from src.recognize.cues import load_cues
@@ -83,8 +83,7 @@ def черновик(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dr.Draf
         store=object(),  # type: ignore[arg-type]
         rows=СТРОКИ,
         zones=[
-            Zone(code=z["code"], title_ru=z["name_ru"], title_en=z["name_en"], share_pct=0.0)
-            for z in ЗОНЫ
+            Zone(code=z["code"], title_texts=lang_texts(z, "name"), share_pct=0.0) for z in ЗОНЫ
         ],
         cues=load_cues(карта, chat_id=None),
         data_dir=tmp_path,

@@ -31,7 +31,8 @@ from .checklist import list_items, list_zones
 
 #: Язык → письменность, наличие которой означает «поле не на этом языке».
 #: Третий язык добавляется сюда строкой, а не правкой логики.
-FOREIGN_SCRIPT: dict[str, re.Pattern[str]] = {"en": re.compile(r"[Ѐ-ӿ]")}
+_CYRILLIC = re.compile(r"[Ѐ-ӿ]")
+FOREIGN_SCRIPT: dict[str, re.Pattern[str]] = {"en": _CYRILLIC, "tr": _CYRILLIC}
 
 
 @dataclass(frozen=True)

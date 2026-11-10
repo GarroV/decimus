@@ -12,7 +12,7 @@ from src.db.errors import ReviseError
 from src.db.inspection_edits import Editor
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.reach import reach_of
-from src.domain.models import Score
+from src.domain.models import LangTexts, Score
 from src.web import revision
 from src.web.errors import MethodologyRefused
 from src.web.methodology import Composition
@@ -33,7 +33,12 @@ from src.web.methodology import Composition
 )
 
 ОЦЕНКА = Score(
-    pct=90.0, grade="B", label_ru="", label_en="", counts={}, deductions=10.0, by_zone={}
+    pct=90.0,
+    grade="B",
+    label_texts=LangTexts(ru="", en="", tr=""),
+    counts={},
+    deductions=10.0,
+    by_zone={},
 )
 
 

@@ -24,10 +24,12 @@ DEFAULTS: dict[str, dict[str, tuple[str, str]]] = {
     "inspection": {
         "ru": ("Проверка пиццерии · {city} · {date}", "{letter_body}"),
         "en": ("Pizzeria audit · {city} · {date}", "{letter_body}"),
+        "tr": ("Pizzacı denetimi · {city} · {date}", "{letter_body}"),
     },
     "prescription": {
         "ru": ("{title}", "{document_body}"),
         "en": ("{title}", "{document_body}"),
+        "tr": ("{title}", "{document_body}"),
     },
     "plan": {
         "ru": (
@@ -37,6 +39,10 @@ DEFAULTS: dict[str, dict[str, tuple[str, str]]] = {
         "en": (
             "Action plan · {unit}",
             "Pizzeria: {unit}\nInspection: {date}\nDue: {due}\n{plan_url}",
+        ),
+        "tr": (
+            "Eylem planı · {unit}",
+            "Pizzacı: {unit}\nDenetim: {date}\nSon tarih: {due}\n{plan_url}",
         ),
     },
     "document": {
@@ -49,6 +55,11 @@ DEFAULTS: dict[str, dict[str, tuple[str, str]]] = {
             "{title}",
             "Country: {country}\nDate: {date}\nDue: {due}\nPizzerias:\n{units}\n"
             "Addresses:\n{addresses}\nBased on:\n{bases}\n\n{document_body}",
+        ),
+        "tr": (
+            "{title}",
+            "Ülke: {country}\nTarih: {date}\nSon tarih: {due}\nPizzacılar:\n{units}\n"
+            "Adresler:\n{addresses}\nDayanaklar:\n{bases}\n\n{document_body}",
         ),
     },
 }

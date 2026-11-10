@@ -348,7 +348,7 @@ def from_generated(text: str) -> str:
             out.append(_escape_text(line) + ending)
             continue
         important = (
-            line.startswith(("Тема:", "Subject:"))
+            line.startswith(("Тема:", "Subject:", "Konu:"))
             or line.rstrip().endswith(":")
             or (line.startswith("— ") and re.search(r"\bD[123]\b", line))
         )
@@ -455,7 +455,7 @@ def subject_and_body(markup: str, *, fallback: str) -> tuple[str, str]:
         offset += len(line)
         if not plain:
             continue
-        match = re.fullmatch(r"(?:Тема|Subject)\s*:\s*(.+)", plain, flags=re.IGNORECASE)
+        match = re.fullmatch(r"(?:Тема|Subject|Konu)\s*:\s*(.+)", plain, flags=re.IGNORECASE)
         if match is None:
             return fallback, markup
         subject = match.group(1).strip()

@@ -33,7 +33,7 @@ from src.db.review_edit import (  # noqa: E402
 )
 from src.domain import add_finding as walk_add_finding  # noqa: E402
 from src.domain import start_inspection  # noqa: E402
-from src.domain.models import Score  # noqa: E402
+from src.domain.models import LangTexts, Score  # noqa: E402
 
 pytestmark = requires_db
 
@@ -43,8 +43,7 @@ pytestmark = requires_db
 ОЦЕНКА = Score(
     pct=77.0,
     grade="C",
-    label_ru="",
-    label_en="",
+    label_texts=LangTexts(ru="", en="", tr=""),
     counts={"D1": 0, "D2": 2, "D3": 0},
     deductions=23.0,
     by_zone={},

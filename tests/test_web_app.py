@@ -36,6 +36,7 @@ from src.db.move import MoveRecord
 from src.db.reach import own_reach
 from src.db.retract import Retraction
 from src.domain.item_label import ItemTexts
+from src.domain.models import LangTexts
 from src.domain.tenants import canonical_tenant
 from src.web import action_plans, item_labels
 from src.web import country as country_data
@@ -49,6 +50,14 @@ from src.web.sections import SECTIONS
 from src.web.texts import t
 
 ТЕНАНТ = "default"
+
+
+def _texts(process_ru: str, process_en: str, question_ru: str, question_en: str) -> ItemTexts:
+    """Тексты пункта по-русски и по-английски (турецкого у этих примеров нет)."""
+    return ItemTexts(
+        process_texts=LangTexts(ru=process_ru, en=process_en),
+        question_texts=LangTexts(ru=question_ru, en=question_en),
+    )
 
 
 #: Сеть без единой записи: экран «Обзор» ходит в базу, а этот стенд
@@ -277,7 +286,7 @@ def test_карточка_называет_пункт_меткой_на_язык
 ) -> None:
     # Arrange — тексты пунктов берутся из методики версии проверки; здесь подменена
     # граница чтения методики, всё остальное — настоящая карточка.
-    тексты = {"CLN02": ItemTexts("Порядок", "Tidiness", "Раковина", "Sink")}
+    тексты = {"CLN02": _texts("Порядок", "Tidiness", "Раковина", "Sink")}
     monkeypatch.setattr(item_labels.info_titles, "item_texts", lambda *_a, **_k: (тексты, "found"))
     деталь = карточка(шапка())
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)

@@ -1,8 +1,8 @@
 """Типы предметной области, которыми блок разговаривает с остальными.
 
-Язык — параметр, никогда не константа: у пункта, зоны и оценки хранятся обе
-формулировки, а выбирает вызывающий. Поэтому `question`, `process`, `title` и
-`label` — методы с языком, а не поля.
+Язык — параметр, никогда не константа: у пункта, зоны и оценки хранятся формулировки
+на каждом языке отчёта (`LangTexts`, поле `<поле>_texts`), а выбирает вызывающий. Поэтому
+`question`, `process`, `title` и `label` — методы с языком, а не поля.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ SOURCES = (SOURCE_COMMENT, SOURCE_PHOTO)
 #: (`tests/test_lang_catalogs_complete.py`) падает на пропущенном переводе.
 #: Движок (`engine/audit.py: LANGS`) не импортирует `src` по контракту слоёв и
 #: держит свою копию — равенство проверяет тот же тест.
-REPORT_LANGS = ("ru", "en")
+REPORT_LANGS = ("ru", "en", "tr")
 
 #: Язык обязательных колонок методики (`question_ru`, `name_ru`): без них файл не
 #: читается, поэтому откат «нет перевода — взять базовый» возможен только на него.
@@ -45,23 +45,75 @@ BASE_LANG = "ru"
 SPEECH_LANGS = ("ru", "en")
 
 
-def pick_lang(obj: object, field: str, lang: str) -> str:
-    """Значение поля `<field>_<lang>` объекта. Неизвестный язык — отказ, а не подстановка.
+#: Язык, на который откатывается методика, когда текста на запрошенном нет
+#: (решение владельца по #1619: свой язык → английский → базовый).
+FALLBACK_LANG = "en"
 
-    Молчаливый откат на русский дал бы партнёру отчёт, в котором часть текста
-    внезапно не на его языке, и заметил бы это только он. Язык из
-    `REPORT_LANGS`, у которого поля нет, — тоже отказ: это дыра в данных или в
-    модели, а не повод подставить чужой язык.
+
+class LangTexts(dict[str, str]):
+    """Тексты одного поля методики по языкам: `{"ru": …, "en": …, "tr": …}`.
+
+    Строится один раз и не меняется: пункт, зона и оценка — неизменяемые значения, и
+    словарь внутри них не должен оставлять лазейку. Остаётся `dict`, чтобы сравниваться
+    с обычным словарём и проходить через `dataclasses.asdict`.
+    """
+
+    __slots__ = ()
+
+    def _frozen(self, *_args: object, **_kwargs: object) -> Any:
+        raise TypeError("тексты по языкам не меняются: соберите новый набор")
+
+    __setitem__ = __delitem__ = __ior__ = _frozen
+    clear = pop = popitem = setdefault = update = _frozen
+
+    def __hash__(self) -> int:  # type: ignore[override]
+        return hash(frozenset(self.items()))
+
+
+def fallback_chain(lang: str) -> tuple[str, ...]:
+    """Порядок языков, в котором ищется текст методики: свой, английский, остальные.
+
+    Английский стоит перед русским намеренно: турецкий отчёт без перевода вопроса
+    партнёру понятнее по-английски, чем по-русски. Правило одно на продукт и на движок
+    (`engine/audit.py: fill_texts`), здесь его копия для экранов и бота.
+    """
+    chain = [lang, FALLBACK_LANG, *REPORT_LANGS]
+    return tuple(dict.fromkeys(chain))
+
+
+def lang_texts(row: Mapping[str, Any], field: str) -> LangTexts:
+    """Тексты поля из строки-словаря: `<field>_<язык>` для каждого языка отчёта, что в ней есть.
+
+    Нет колонки — языка в наборе нет вовсе (а не пустой строки): колонку, которой в
+    файле нет, нельзя отличить от пустой клетки, и читатель выбирает сам, что с ней
+    делать. Значение обрезается по краям.
+    """
+    return LangTexts(
+        (lang, str(row.get(f"{field}_{lang}") or "").strip())
+        for lang in REPORT_LANGS
+        if f"{field}_{lang}" in row
+    )
+
+
+def pick_lang(obj: object, field: str, lang: str) -> str:
+    """Текст поля `field` объекта на языке. Неизвестный язык — отказ, а не подстановка.
+
+    Тексты лежат в `<field>_texts` (`LangTexts`). Молчаливый откат на русский дал бы
+    партнёру отчёт, в котором часть текста внезапно не на его языке, и заметил бы это
+    только он. Язык из `REPORT_LANGS`, которого нет в наборе (в файле методики нет такой
+    колонки), даёт пустой текст.
     """
     if lang not in REPORT_LANGS:
         raise ValidationError(
             f"Язык «{lang}» в методике не заведён. Доступны: {', '.join(REPORT_LANGS)}"
         )
     try:
-        value = getattr(obj, f"{field}_{lang}")
+        texts: LangTexts = getattr(obj, f"{field}_texts")
     except AttributeError:
-        raise ValidationError(f"У {type(obj).__name__} нет поля «{field}_{lang}»") from None
-    return str(value)
+        raise ValidationError(f"У {type(obj).__name__} нет поля «{field}_texts»") from None
+    # Колонки языка нет в файле методики — это пустой текст, как и пустая клетка: откат на
+    # другой язык решает тот, кто показывает (`fallback_chain`), а не модель.
+    return texts.get(lang, "")
 
 
 def localized(
@@ -86,10 +138,8 @@ class ChecklistItem:
 
     code: str
     kind: str
-    process_ru: str
-    process_en: str
-    question_ru: str
-    question_en: str
+    process_texts: LangTexts
+    question_texts: LangTexts
     levels: list[str]
     zones: list[str]
     days: int
@@ -110,8 +160,7 @@ class Zone:
     """Физическая зона пиццерии и её доля в оценке."""
 
     code: str
-    title_ru: str
-    title_en: str
+    title_texts: LangTexts
     share_pct: float
 
     def title(self, lang: str) -> str:
@@ -283,8 +332,7 @@ class ZoneScore:
     """Итог по одной зоне: сколько записей и сколько от доли осталось."""
 
     code: str
-    name_ru: str
-    name_en: str
+    name_texts: LangTexts
     share: float
     counts: dict[str, int]
     loss: float
@@ -306,8 +354,7 @@ class ProcessScore:
     """
 
     code: str
-    name_ru: str
-    name_en: str
+    name_texts: LangTexts
     scored: bool
     d1: int
     d2: int
@@ -324,8 +371,7 @@ class Score:
 
     pct: float
     grade: str
-    label_ru: str
-    label_en: str
+    label_texts: LangTexts
     counts: dict[str, int]
     deductions: float
     by_zone: dict[str, ZoneScore]

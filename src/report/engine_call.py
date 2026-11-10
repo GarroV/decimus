@@ -18,7 +18,10 @@ import os
 import sys
 from pathlib import Path
 
+from ..domain.checklist_store import CURRENT_LINK, ChecklistStoreError, bot_spaces
 from ..domain.checklist_store import VERSIONS_DIR as _VERSIONS_DIR
+from ..domain.edition import DEFAULT_CODE
+from ..domain.tenants import canonical_tenant
 from ..domain.version import SEGMENT_BYTES, is_one_segment
 from .errors import ReportError
 
@@ -36,6 +39,35 @@ class EngineCallError(ReportError):
 #: хранилище смотрит, и объявлено одно — ярусом ниже, рядом с раскладкой,
 #: которую читает бот (#455).
 VERSIONS_DIR = _VERSIONS_DIR
+
+
+#: Переменная движка: каталог ДЕЙСТВУЮЩЕГО издания того же чек-листа. Движок берёт оттуда
+#: перевод методики, которого нет в издании самой проверки (`engine/audit.py: resolve_text`).
+FALLBACK_DIR_VAR = "CHECKLIST_FALLBACK_DIR"
+
+
+def current_edition_dir(
+    store_root: Path | None, live: Path | None, *, tenant: str, code: str
+) -> Path | None:
+    """Каталог опубликованного издания чек-листа проверки — откуда берут недостающий перевод.
+
+    Чек-лист опознаётся парой «пространство + код» (D183): своё пространство тенанта первым,
+    эталон УК следом (`bot_spaces`). Хранилища нет или чек-лист в нём не найден — для `bizdev`
+    действующая методика `AUDIT_DATA_DIR`. Нет нигде — `None`: переводить не из чего, и движок
+    откатится на английский. Правило одно и без отказов: текст отчёта не повод его не собрать.
+    """
+    try:
+        spaces = bot_spaces(canonical_tenant(tenant))
+    except ChecklistStoreError:
+        spaces = ()
+    if store_root is not None and store_root.is_dir():
+        for space in spaces:
+            current = store_root / space / code / CURRENT_LINK
+            if current.is_dir():
+                return current.resolve()
+    if code == DEFAULT_CODE and live is not None and live.is_dir():
+        return live
+    return None
 
 
 def edition_dirs(store_root: Path, edition: str) -> list[Path]:

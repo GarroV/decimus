@@ -65,7 +65,12 @@ GOOGLE_MAIL_REDIRECT_URI_VAR = "GOOGLE_MAIL_REDIRECT_URI"
 
 #: Заголовок темы по языку ПИСЬМА (не интерфейса): партнёр читает письмо на
 #: своём языке, и тема — первое, что он видит.
-SUBJECT_TITLES = {"ru": "Проверка пиццерии", "en": "Pizzeria audit", "sr": "Провера пицерије"}
+SUBJECT_TITLES = {
+    "ru": "Проверка пиццерии",
+    "en": "Pizzeria audit",
+    "sr": "Провера пицерије",
+    "tr": "Pizzacı denetimi",
+}
 
 
 class GoogleMailError(Exception):

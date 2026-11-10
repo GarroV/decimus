@@ -20,6 +20,7 @@ from src.bot import view
 from src.db.models import FindingRow
 from src.domain import Finding, item_label, start_inspection
 from src.domain.item_label import ItemTexts
+from src.domain.models import LangTexts
 from src.mcp import tools as mcp_tools
 from src.report import info_titles
 from src.report.letters import Papers
@@ -27,10 +28,19 @@ from src.web import plan_template, review
 
 ROOT = Path(__file__).resolve().parent.parent
 
+
+def _texts(process_ru: str, process_en: str, question_ru: str, question_en: str) -> ItemTexts:
+    """Тексты пункта по-русски и по-английски (турецкого у этих примеров нет)."""
+    return ItemTexts(
+        process_texts=LangTexts(ru=process_ru, en=process_en),
+        question_texts=LangTexts(ru=question_ru, en=question_en),
+    )
+
+
 ТЕКСТЫ = {
-    "CLN13": ItemTexts("Порядок", "Tidiness", "Мебель загрязнена", "Furniture is dirty"),
-    "MGM08": ItemTexts("Документы", "Documents", "Нет журнала", ""),
-    "XYZ05": ItemTexts("Без перевода", "", "Пункт", ""),
+    "CLN13": _texts("Порядок", "Tidiness", "Мебель загрязнена", "Furniture is dirty"),
+    "MGM08": _texts("Документы", "Documents", "Нет журнала", ""),
+    "XYZ05": _texts("Без перевода", "", "Пункт", ""),
 }
 
 
@@ -114,8 +124,8 @@ def test_движок_и_домен_называют_пункт_одинаков
 
     for код, строка in (("CLN13", ТЕКСТЫ["CLN13"]), ("MGM08", ТЕКСТЫ["MGM08"])):
         csv_row = {
-            "process_ru": строка.process_ru,
-            "process_en": строка.process_en,
+            "process_ru": строка.process_texts["ru"],
+            "process_en": строка.process_texts["en"],
         }
         for язык in ("ru", "en"):
             assert движок.item_label(код, csv_row, язык) == item_label.label(код, ТЕКСТЫ, язык)

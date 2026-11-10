@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Собирает итоговый PDF-отчёт и черновик письма партнёру из inspection.json.
 
-  report.py pdf  [--out отчёт.pdf | --out-dir КАТАЛОГ] [--lang ru|en] [--photos all|d2d3|none]
+  report.py pdf  [--out отчёт.pdf | --out-dir КАТАЛОГ] [--lang ru|en|tr] [--photos all|d2d3|none]
         без --out отчёт уходит в reports/ рядом с состоянием проверки
-  report.py letter [--lang ru|en] [--bodies-file ТЕКСТЫ.json]   печатает текст письма в stdout
+  report.py letter [--lang ru|en|tr] [--bodies-file ТЕКСТЫ.json]   печатает текст письма в stdout
   report.py letter-builtin             встроенные тексты письма и подстановки (JSON), без проверки
   report.py letter-parts               записанное письма по одной проверке частями (JSON) — для общего письма (D739)
-  report.py html [--out отчёт.html] [--lang ru|en] [--photos ...]
+  report.py html [--out отчёт.html] [--lang ru|en|tr] [--photos ...]
         тот же HTML, из которого собирается PDF — для сверки вида и тестов
 
 Рендерер зафиксирован: WeasyPrint (решение D009). Шрифт с кириллицей лежит
@@ -97,10 +97,43 @@ T = {
         "photo_missing": "Photo not attached",
         "no_photo": "No photo taken",
     },
+    "tr": {
+        "title": "Pizzacı denetim raporu", "unit": "Pizzacı", "city": "Şehir",
+        "partner": "Ortak", "auditor": "Denetçi", "type": "Denetim türü", "date": "Denetim tarihi",
+        "time": "Denetim saati", "started": "başlangıç",
+        "result": "Denetim sonucu", "grade": "Not", "score": "Toplam puan",
+        "summary": "Özet", "crit": "Önem derecesi", "count": "Adet", "cost": "Puan kesintisi",
+        "processes": "Süreçlere göre sonuç", "process": "Süreç",
+        "zones": "Bölgelere göre dağılım", "zone": "Bölge", "share": "Pay", "lost": "Kaybedilen",
+        "left": "Kalan", "findings": "Tespit edilen uygunsuzluklar", "no_findings":
+        "Uygunsuzluk tespit edilmedi.", "deadline": "Son tarih", "immediately": "derhal",
+        "comment": "Öneri", "process": "Süreç", "info": "Ek bilgiler",
+        "appendix": "Ek. Bilgi amaçlı kayıtlar",
+        "appendix_note": "Bu bölüm yalnızca bilgi amaçlıdır: aşağıda listelenen kayıtlar "
+                         "uygunsuzluk değildir ve puanı etkilemez.",
+        "recorded": "Kaydedilen",
+        "feedback": "Geri bildirim", "strengths": "Güçlü yönler",
+        "growth": "Gelişim alanları",
+        "method": "Puanlama yöntemi", "zeroed": "kritik D3 uygunsuzluğu nedeniyle sıfırlandı",
+        "not_counted": "bölgenin sıfırlanmasına dahil edildi", "page": "s.",
+        "repeat": "tekrar — kesinti iki katına çıkarıldı",
+        "advice": "Öneri", "notes": "Denetçinin notları",
+        "notes_note": "Kontrol listesindeki bir maddeye bağlı olmayan genel gözlemler; puanı etkilemez.",
+        "method_text": ("Başlangıç puanı %100'dür. Her D1 uygunsuzluğu sonucu {d1} puan, "
+                        "her D2 uygunsuzluğu {d2} puan düşürür. D3 uygunsuzluğu, kaydedildiği "
+                        "bölgenin payının tamamını sıfırlar. Önceki denetimdeki bir kaydı tekrarlayan "
+                        "uygunsuzluk iki kat puan kaybettirir. Uygunsuzluk kaydedilmeyen sorular "
+                        "karşılanmış sayılır. Not: A — %95 ve üzeri, D2 ve D3 yok; B — %90 ve üzeri, "
+                        "D3 yok ve en fazla bir D2; C — iki veya daha fazla D2 ya da %90'ın altında "
+                        "sonuç; D — en az bir D3 uygunsuzluğu."),
+        "photo_app": "Fotoğraf eki",
+        "photo_missing": "Fotoğraf eklenmedi",
+        "no_photo": "Fotoğraf çekilmedi",
+    },
 }
 #: Единицы времени проверки («1 ч 20 мин») и слово в имени файла отчёта — по языкам.
-TIME_UNITS = {"ru": ("ч", "мин"), "en": ("h", "min")}
-FILE_WORDS = {"ru": "Аудит", "en": "Audit"}
+TIME_UNITS = {"ru": ("ч", "мин"), "en": ("h", "min"), "tr": ("sa", "dk")}
+FILE_WORDS = {"ru": "Аудит", "en": "Audit", "tr": "Denetim"}
 GRADE_COLOR = {"A": "#1E7A45", "B": "#7A6A17", "C": "#B4610F", "D": "#A81E1E"}
 
 # Имя продукта (D106, сужено D107): DECIMUS — имя всей системы, не персона
@@ -703,6 +736,19 @@ The final grade is {grade} ({pct}%).{grade_note}
 {critical_block}Attached is the detailed report with photographs. Following the inspection, please prepare an action plan to address the identified deviations.
 
 {end_block}Thank you for your work. We are happy to walk through any item in the report and help with prioritisation.""",
+    "tr": """Konu: Denetim sonuçları — {unit}, {date}: not {grade} (%{pct})
+
+Merhaba,
+
+{date} tarihinde {unit} pizzacısını denetledik{city}. Denetim türü: {type}.
+
+Nihai not: {grade} (%{pct}).{grade_note}
+
+{good_block}Tespit ettiklerimiz:
+{summary_lines}
+{critical_block}Fotoğraflı ayrıntılı rapor ekte yer almaktadır. Denetim sonucunda, tespit edilen uygunsuzlukların giderilmesine yönelik bir eylem planı hazırlamanızı rica ederiz.
+
+{end_block}Çalışmanız için teşekkür ederiz. Rapordaki her maddeyi sizinle değerlendirmeye ve önceliklendirme konusunda destek olmaya hazırız.""",
 }
 LETTER_CLEAN = {
     "ru": """Тема: Результаты проверки — {unit}, {date}: оценка {grade} ({pct}%)
@@ -727,6 +773,17 @@ The final grade is {grade} ({pct}%).{grade_note}
 {good_block}{critical_block}No violations were recorded. Attached is the detailed report with photographs. No action plan to address violations is required.
 
 {end_block}Thank you for your work. We are happy to walk through any item in the report.""",
+    "tr": """Konu: Denetim sonuçları — {unit}, {date}: not {grade} (%{pct})
+
+Merhaba,
+
+{date} tarihinde {unit} pizzacısını denetledik{city}. Denetim türü: {type}.
+
+Nihai not: {grade} (%{pct}).{grade_note}
+
+{good_block}{critical_block}Uygunsuzluk tespit edilmedi. Fotoğraflı ayrıntılı rapor ekte yer almaktadır. Uygunsuzlukların giderilmesi için eylem planı gerekmemektedir.
+
+{end_block}Çalışmanız için teşekkür ederiz. Rapordaki her maddeyi sizinle değerlendirmeye hazırız.""",
 }
 # Проверка без единой записи. Отдельный шаблон, а не «чистое письмо с нулём»:
 # блок «Что отметили» при отсутствии записей заставляет партнёра искать
@@ -754,6 +811,17 @@ The final grade is {grade} ({pct}%).{grade_note} No violations were recorded.
 {good_block}{critical_block}The report, with the breakdown by zone, is attached. No action plan is expected.
 
 {end_block}Thank you for your work. We are happy to walk through any item in the report.""",
+    "tr": """Konu: Denetim sonuçları — {unit}, {date}: not {grade} (%{pct})
+
+Merhaba,
+
+{date} tarihinde {unit} pizzacısını denetledik{city}. Denetim türü: {type}.
+
+Nihai not: {grade} (%{pct}).{grade_note} Uygunsuzluk tespit edilmedi.
+
+{good_block}{critical_block}Bölgelere göre dağılımı içeren rapor ekte yer almaktadır. Eylem planı beklenmemektedir.
+
+{end_block}Çalışmanız için teşekkür ederiz. Rapordaki her maddeyi sizinle değerlendirmeye hazırız.""",
 }
 #: Виды письма и их встроенные тексты. Название вида — «слот» шаблона: админка УК хранит
 #: свой текст на слот и язык (D608, #1130), и движок берёт его вместо встроенного.
@@ -792,6 +860,10 @@ GRADE_NOTE = {
            "B": " The store broadly meets the standard; deviations are minor.",
            "C": " This is below standard and requires an action plan.",
            "D": " A critical D3 violation was recorded and requires immediate action."},
+    "tr": {"A": " Pizzacı standardı karşılamaktadır.",
+           "B": " Pizzacı genel olarak standardı karşılamaktadır; sapmalar önemsizdir.",
+           "C": " Bu, standardın altındadır ve eylem planı gerektirir.",
+           "D": " Kritik bir D3 uygunsuzluğu tespit edildi; derhal harekete geçilmesi gerekir."},
 }
 
 
@@ -804,18 +876,25 @@ GRADE_NOTE = {
 #: Того, что формулировки нет, письмо партнёру не объявляет: в отчёте её
 #: отсутствие тоже видно только отсутствием строки, а отправителю об этом
 #: говорит слой MCP (`BLANK_TEXT_FIELD`) — до отправки и внутри компании.
-ITEM_REF = {"ru": "пункт стандарта «{q}»", "en": "standard item “{q}”"}
+ITEM_REF = {
+    "ru": "пункт стандарта «{q}»",
+    "en": "standard item “{q}”",
+    "tr": "standart maddesi “{q}”",
+}
 
 #: Строка сводки нарушений в письме и абзац про D3 — целиком, по языкам.
 LETTER_COUNTS = {
     "ru": "— критических D3: {d3}, значительных D2: {d2}, незначительных D1: {d1}.",
     "en": "— {d3} critical D3, {d2} major D2, {d1} minor D1 violations.",
+    "tr": "— {d3} kritik D3, {d2} önemli D2, {d1} küçük D1 uygunsuzluk.",
 }
 LETTER_CRITICAL = {
     "ru": "\nКритично (D3): {names}. По методике нарушение D3 обнуляет всю зону, "
           "в которой оно зафиксировано.\n\n",
     "en": "\nCritical (D3): {names}. Per our methodology a D3 violation zeroes "
           "the whole zone where it was found.\n\n",
+    "tr": "\nKritik (D3): {names}. Metodolojimize göre bir D3 uygunsuzluğu, "
+          "tespit edildiği bölgenin tamamını sıfırlar.\n\n",
 }
 
 
@@ -920,6 +999,7 @@ FEEDBACK_ROLES = LETTER_ROLES
 LETTER_FEEDBACK = {
     "ru": {"strengths": "Что получается хорошо:", "growth": "Над чем стоит поработать:"},
     "en": {"strengths": "What is going well:", "growth": "What to work on:"},
+    "tr": {"strengths": "İyi giden yönler:", "growth": "Üzerinde çalışılması gerekenler:"},
 }
 #: Шаблоны письма на выбор отправителя (D664).
 LETTER_TEMPLATES = (1, 2)
