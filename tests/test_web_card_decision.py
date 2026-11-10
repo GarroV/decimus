@@ -1,16 +1,16 @@
 # ruff: noqa: F811 — фикстура стенда приходит импортом из test_web_app
-"""Карточка проверки на приёмке: цена решения, две группы действий, статус один раз.
+"""Карточка проверки на приёмке (D745): принять сразу, корзина последней, классы кодами.
 
 Права считает `_card_context`; здесь проверяется, что и панель реестра, и страница
-показывают «Принять» подтверждением с ценой решения, «Отклонить» — подписанной
-кнопкой, статус «На приёмке» — одним носителем, а повтор виден на самой записи.
+принимают одной формой без подтверждения, «Удалить проверку» стоит корзиной последней
+в группе пиктограмм, класс показан кодом D1/D2/D3, статус «На приёмке» — одним носителем,
+а повтор виден на самой записи.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import re
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -47,48 +47,51 @@ def _открыть(
     return ответ.get_data(as_text=True)
 
 
-def _окно_принять(страница: str) -> str:
-    найдено = re.search(
-        r'<details class="hact__item" name="hact" id="accept">(.*?)</details>', страница, re.S
-    )
-    assert найдено, "«Принять» не раскрывающееся подтверждение"
-    return найдено.group(1)
-
-
 @pytest.mark.parametrize("стенд", ["admin"], indirect=True)
 @pytest.mark.parametrize("адрес", [ПАНЕЛЬ, СТРАНИЦА], ids=["панель", "страница"])
-def test_принять_показывает_что_подтверждается_и_последствие(
+def test_принять_принимает_сразу_одной_формой(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, адрес: str
 ) -> None:
     страница = _открыть(стенд, monkeypatch, адрес)
 
-    окно = _окно_принять(страница)
-    сводка = re.search(r'class="hact__sum">(.*?)</p>', окно, re.S)
-    assert сводка, "нет сводки цены решения"
-    текст = re.sub(r"<[^>]+>|\s+", " ", сводка.group(1))
-    assert "A" in текст and "97.5%" in текст and "записей: 1" in текст and "значительное" in текст
-    assert "D2" not in текст
-    assert "входит в историю сети" in окно  # последствие, оно же у `accept.hint`
-    # Одна форма «Принять» на карточке, и она внутри подтверждения (D401).
-    assert страница.count(f'action="/inspections/{ID}/accept') == 1
-    assert ("data-panel-form" in окно) is (адрес == ПАНЕЛЬ)
-
-
-@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
-def test_в_панели_отклонить_подписана_а_корзина_не_в_шапке(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    страница = _открыть(стенд, monkeypatch, ПАНЕЛЬ)
-
-    кнопка = re.search(
-        r'<summary class="([^"]*)"[^>]*>(?:(?!</summary>).)*Отклонить</span></summary>',
+    форма = re.search(
+        rf'<form method="post" action="/inspections/{ID}/accept\?lang=ru"([^>]*)>(.*?)</form>',
         страница,
         re.S,
     )
-    assert кнопка, "«Отклонить» без подписи"
-    assert "hbtn--danger" in кнопка.group(1) and "hbtn--icon" not in кнопка.group(1)
-    шапка_панели = страница.split("</header>", 1)[0]
-    assert "hbtn--icon hbtn--danger" not in шапка_панели
+    assert форма, "нет формы «Принять»"
+    assert "<button" in форма.group(2) and "Принять проверку" in форма.group(2)
+    assert ("data-panel-form" in форма.group(1)) is (адрес == ПАНЕЛЬ)
+    assert страница.count(f'action="/inspections/{ID}/accept') == 1
+    # Ни раскрывающегося подтверждения, ни сводки цены решения.
+    assert 'id="accept"' not in страница and "hact__sum" not in страница
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+@pytest.mark.parametrize("адрес", [ПАНЕЛЬ, СТРАНИЦА], ids=["панель", "страница"])
+def test_удалить_проверку_корзина_последней_среди_пиктограмм(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, адрес: str
+) -> None:
+    страница = _открыть(стенд, monkeypatch, адрес)
+
+    ауксы = страница.split("hact__group--aux", 1)[1]
+    окно = re.search(
+        r'<details class="hact__item" name="hact" id="retract">\s*'
+        r'<summary class="([^"]*)" aria-label="([^"]*)" data-tip="([^"]*)">(.*?)</summary>'
+        r'.*?<form method="post" action="/inspections/[^"]+/retract\?lang=ru"',
+        ауксы,
+        re.S,
+    )
+    assert окно, "корзины «Удалить проверку» нет в группе пиктограмм"
+    классы, имя, подсказка, внутри = окно.groups()
+    assert "hbtn--icon" in классы and "hbtn--danger" in классы
+    assert имя == подсказка == "Удалить проверку"
+    assert "<span>" not in внутри, "у корзины не должно быть текстовой подписи"
+    assert "required" in ауксы[окно.start() :]  # причина обязательна
+    # Последняя: после неё в группе нет ни ссылок, ни других окон.
+    хвост = ауксы[окно.end() :].split("</details>", 1)[1].split("</div>", 1)[0]
+    assert "hbtn" not in хвост and "<details" not in хвост
+    assert "<span>Отклонить" not in страница
 
 
 @pytest.mark.parametrize("стенд", ["admin"], indirect=True)
@@ -101,9 +104,10 @@ def test_решения_и_второстепенное_в_двух_группа
     остальное = страница.index("hact__group--aux")
     assert решения < остальное
     группа = страница[решения:остальное]
-    for id_ in ('id="accept"', 'id="move"', 'id="retract"'):
+    for id_ in ('id="move"', "/accept?lang="):
         assert id_ in группа, id_
     assert "/report" not in группа and "view=letter" not in группа
+    assert 'id="retract"' not in группа and 'id="retract"' in страница[остальное:]
 
 
 @pytest.mark.parametrize("стенд", ["admin"], indirect=True)
@@ -140,17 +144,20 @@ def test_повтор_виден_на_самой_записи(
 
 @pytest.mark.parametrize("стенд", ["admin"], indirect=True)
 @pytest.mark.parametrize("адрес", [ПАНЕЛЬ, СТРАНИЦА], ids=["панель", "страница"])
-def test_кодов_класса_на_экране_нет(
+def test_класс_показан_кодом_а_не_словом(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, адрес: str
 ) -> None:
-    """Класс — словами: в видимом тексте карточки нет «D1», «D2», «D3»."""
+    """Плашки записей и счётчик — D1/D2; слов «значительное/критическое» вместо кодов нет."""
     страница = _открыть(стенд, monkeypatch, адрес)
 
     сама = страница.split('class="sdetail spanel"', 1)[-1] if адрес == ПАНЕЛЬ else страница
     сама = re.sub(r"<(script|style)\b.*?</\1>", "", сама, flags=re.S)
+    метки = re.findall(r'class="tag [^"]*"[^>]*>\s*(D[0-3])\b', сама)
+    assert "D1" in метки and "D2" in метки
     видимое = re.sub(r"<[^>]+>", " ", сама)
-    assert not re.findall(r"\bD[0-3]\b", видимое)
-    assert "отклонение" in видимое  # метка класса записи и чип — словом
+    assert not re.search(r"значительное|критическое", видимое)
+    # Заголовок записи — без пометки допустимых классов «(D1, D2)».
+    assert not re.search(r"find-row__title[^>]*>[^<]*\(D[0-3]", сама)
 
 
 @pytest.mark.parametrize("стенд", ["admin"], indirect=True)
@@ -173,15 +180,3 @@ def test_раскрытия_карточки_одного_вида_с_шевро
 
     assert 'class="mx-more mx-more--card"' in страница  # «Версия чек-листа»
     assert "mx-more mx-more--card mx-more--explain" in страница
-
-
-def test_на_узком_экране_подписи_решений_не_усекаются() -> None:
-    """Подписи «Принять проверку / Исправить / Отклонить» — целиком: ни многоточия, ни nowrap."""
-    css = (Path(__file__).parent.parent / "src/web/static/decimus-web.css").read_text()
-    блок = css.split("@media (max-width: 560px) {", 1)[1].split("\n}\n", 1)[0]
-    правила = [r for r in блок.split("\n") if "hact__group--decide" in r]
-    assert правила, "правил узкого экрана для группы решений нет"
-    for правило in правила:
-        assert "text-overflow" not in правило and "nowrap" not in правило, правило
-    assert any("#accept" in r and "flex-basis: 100%" in r for r in правила)
-    assert any("height: 44px" in r for r in правила)

@@ -7,14 +7,12 @@
   в Swarm), и каждое живёт ровно в одном месте. Действию с полями (запрос
   плана, перенос, отклонение) кнопка раскрывает форму под рядом кнопок, без
   скрипта: `<details name>` держит открытой не больше одной.
-  Две группы (решение владельца, пересмотр D465): решения — «Принять проверку»
-  (главная), «Исправить», «Отклонить» (подписанная, контурная, не залитая) — и
-  второстепенное — PDF, письма, экшн-план, предписание. В панели второстепенное —
-  пиктограммы с подсказкой (`aria-label` + `data-tip`), решения подписаны. «Принять»
-  и в панели, и на странице — раскрывающееся подтверждение с ценой решения (буква,
-  балл, записи, худший класс) и последствием; в панели форму `split.js` отправляет
-  фоном (`data-panel-form`), не уводя со страницы. Корзина в панели осталась только
-  у записи. Принятую проверку не правят: кнопки «Исправить» у неё в панели нет.
+  Две группы (решение владельца, пересмотр D465; D745): решения — «Принять проверку»
+  (главная, принимает сразу) и «Исправить» — и второстепенное — PDF, письма, экшн-план,
+  предписание и корзина «Удалить проверку» последней. Второстепенное в панели —
+  пиктограммы с подсказкой (`aria-label` + `data-tip`), корзина — пиктограмма везде.
+  В панели «Принять» форму `split.js` отправляет фоном (`data-panel-form`), не уводя
+  со страницы. Принятую проверку не правят: кнопки «Исправить» у неё в панели нет.
 #}
 
 {# Подсказка — CSS `[data-tip]` (мгновенно при наведении и фокусе), не `title`
@@ -81,38 +79,18 @@
   </p>
 {% endmacro %}
 
-{# Цена решения «Принять»: что именно подтверждается — буква, балл, число записей,
-   худший класс словами. Всё записанное движком и базой, ничего не пересчитано. #}
-{% macro accept_summary(c) %}
-  {% set head = c.head %}
-  <p class="hact__sum">
-    <span class="grade tag {{ c.grade_tone(head.grade) }}">{{ head.grade or '—' }}</span>
-    <b class="mono">{{ head.pct }}{{ t('card.score.unit') }}</b>
-    {% if c.violation_count %}
-      · <span>{{ t('accept.sum.records', n=c.violation_count) }}</span>
-      {% if c.worst_level %} · <span>{{ t('accept.sum.worst', level=t('card.level.' ~ c.worst_level)) }}</span>{% endif %}
-    {% else %}
-      · <span>{{ t('accept.sum.clean') }}</span>
-    {% endif %}
-  </p>
-{% endmacro %}
-
 {% macro card_actions(c, panel=False) %}
   {% set head = c.head %}
   {% set full = url('/inspections/' ~ head.id) %}
   <div class="hact" role="group" aria-label="{{ t('card.actions.label') }}">
-   {% if c.may_accept or (c.may_move and not panel) or (c.may_retract and not head.retracted) %}
+   {% if c.may_accept or (c.may_move and not panel) %}
    <div class="hact__group hact__group--decide" role="group" aria-label="{{ t('card.actions.decide') }}">
-    {# Принять — раскрывающимся подтверждением и на странице, и в панели: сначала
-       видно, что подтверждается (буква, балл, записи, худший класс) и что будет после. #}
+    {# Принять — сразу, без подтверждения (D745): итог виден в шапке карточки. В панели
+       форму `split.js` отправляет фоном (`data-panel-form`), не уводя со страницы. #}
     {% if c.may_accept %}
-      {% call _pop('accept', 'check', t('accept.title'), 'hbtn--primary') %}
-        {{ accept_summary(c) }}
-        <p class="hact__note">{{ t('accept.hint') }}</p>
-        <form method="post" action="{{ full }}/accept?lang={{ lang }}" class="hact__form"{% if panel %} data-panel-form{% endif %} data-accept-guard data-unsaved="{{ t('proofread.unsaved') }}" data-inflight="{{ t('proofread.inflight') }}">
-          <button class="btn btn--primary btn--sm" type="submit">{{ t('accept.submit') }}</button>
-        </form>
-      {% endcall %}
+      <form method="post" action="{{ full }}/accept?lang={{ lang }}"{% if panel %} data-panel-form{% endif %} data-accept-guard data-unsaved="{{ t('proofread.unsaved') }}" data-inflight="{{ t('proofread.inflight') }}">
+        <button class="hbtn hbtn--primary" type="submit">{{ icon('check') }}<span>{{ t('accept.title') }}</span></button>
+      </form>
     {% endif %}
 
     {# «Исправить» на странице карточки — перенос по дате и пиццерии (D195). В панели
@@ -137,18 +115,6 @@
       {% endcall %}
     {% endif %}
 
-    {# Отклонить — подписанной контурной кнопкой (не пиктограммой-корзиной, она только
-       у записи) и с причиной. #}
-    {% if c.may_retract and not head.retracted %}
-      {% call _pop('retract', 'x', t('retract.title'), 'hbtn--danger', short=t('retract.short')) %}
-        <p class="hact__note">{{ t('retract.hint') }}</p>
-        <form method="post" action="{{ full }}/retract?lang={{ lang }}" class="hact__form"{% if panel %} data-panel-form{% endif %}>
-          <label><span class="field-label">{{ t('retract.reason_label') }}</span>
-            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
-          <button class="btn btn--danger btn--sm" type="submit">{{ t('retract.submit') }}</button>
-        </form>
-      {% endcall %}
-    {% endif %}
    </div>
    {% endif %}
 
@@ -196,6 +162,20 @@
     {% if c.may_prescribe %}
       {{ _link(url('/actions/prescriptions/new') ~ '?inspection=' ~ head.id ~ '&lang=' ~ lang, 'flag', t('card.act.rx'), panel) }}
     {% endif %}
+
+    {# Корзина «Удалить проверку» — последней в группе, одинаково в панели, на странице и
+       на телефоне (D745). Действие прежнее: отклонение с обязательной причиной (D194, D465);
+       форма причины раскрывается под рядом. #}
+    {% if c.may_retract and not head.retracted %}
+      {% call _pop('retract', 'trash', t('retract.icon'), 'hbtn--danger', True) %}
+        <p class="hact__note">{{ t('retract.hint') }}</p>
+        <form method="post" action="{{ full }}/retract?lang={{ lang }}" class="hact__form"{% if panel %} data-panel-form{% endif %}>
+          <label><span class="field-label">{{ t('retract.reason_label') }}</span>
+            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
+          <button class="btn btn--danger btn--sm" type="submit">{{ t('retract.submit') }}</button>
+        </form>
+      {% endcall %}
+    {% endif %}
    </div>
   </div>
 {% endmacro %}
@@ -223,7 +203,7 @@
    (D3 0) не показывается. Сводки отдельной строкой нет: одно место. #}
 {% macro level_chips(c) %}
   {% for line in c.counts if line.count|int > 0 and line.level not in ('D0', 'R') %}
-    <span class="tag tag--micro {{ line.tone }}">{{ t('card.findings.no_class') if line.level == 'NC' else c.level_word(line.level) }}<span class="tag__note">{{ line.count }}</span></span>
+    <span class="tag tag--micro {{ line.tone }}">{{ t('card.findings.no_class') if line.level == 'NC' else line.level }}<span class="tag__note">{{ line.count }}</span></span>
   {% endfor %}
 {% endmacro %}
 

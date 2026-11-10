@@ -16,7 +16,7 @@
   <section class="section">
     <h3>{{ t('walk.edit.before') if event.kind == 'edit' else t('walk.split.source') }} #{{ original.n }}</h3>
     <div class="meta"><time datetime="{{ event.at }}">{{ event.at }}</time></div>
-    <p>{{ c.item_label(original.code) }} · {{ c.level_word(original.level) }} · {{ original.zone }}</p>
+    <p>{{ original.code }} · {{ original.level }} · {{ original.zone }}</p>
     <p>{{ original.text }}</p>
     {% if original.repeat %}<p>{{ t('walk.rec.repeat') }}</p>{% endif %}
     {% if original.reading_c is defined and original.reading_c is not none %}<p>{{ original.reading_c }} °C</p>{% endif %}
@@ -25,7 +25,7 @@
     {% for part in event.after %}
     <div class="card"><div class="card__body">
       <h4>{{ t('walk.edit.after') if event.kind == 'edit' else t('walk.split.part', n=loop.index) }} · #{{ part.n }}</h4>
-      <p>{{ c.item_label(part.code) }} · {{ c.level_word(part.level) }} · {{ part.zone }}</p>
+      <p>{{ part.code }} · {{ part.level }} · {{ part.zone }}</p>
       <p>{{ part.text }}</p>
       {% if part.repeat %}<p>{{ t('walk.rec.repeat') }}</p>{% endif %}
       {% if part.reading_c is defined and part.reading_c is not none %}<p>{{ part.reading_c }} °C</p>{% endif %}

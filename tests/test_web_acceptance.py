@@ -386,10 +386,9 @@ def test_панель_ждущей_принимает_и_правит_на_ме�
 
     assert (
         'action="/inspections/11111111-1111-1111-1111-111111111111/accept?lang=ru" '
-        'class="hact__form" data-panel-form data-accept-guard' in страница
+        "data-panel-form data-accept-guard" in страница
     )
     assert "Принять проверку" in страница
-    assert 'class="hact__sum"' in страница  # сначала цена решения, потом кнопка «Принять»
     assert "/findings/f1/revise?lang=ru" in страница
     assert 'data-proofread-form="edit"' in страница and "data-panel-form" in страница
     assert "data-proofread-add" in страница  # «+ Добавить нарушение» в шапке записей

@@ -46,7 +46,7 @@
   <div class="lvls" role="radiogroup" aria-label="{{ t('revise.level') }}" data-lvls>
     {% for lvl in c.levels %}
       <label class="lvls__item"><input type="radio" name="level" value="{{ lvl }}"{% if lvl == current %} checked{% endif %}>
-        <span class="tag {{ c.level_tone(lvl) }}">{{ c.level_word(lvl) }}</span></label>
+        <span class="tag {{ c.level_tone(lvl) }}">{{ lvl }}</span></label>
     {% endfor %}
   </div>
 {% endmacro %}
@@ -192,7 +192,7 @@
     {% if informational %}
       <span class="tag tag--neutral find-row__level" aria-label="{{ t('card.findings.advice') if finding.level == 'R' else t('card.info.record') }}" title="{{ t('card.findings.advice') if finding.level == 'R' else t('card.info.record') }}">i</span>
     {% else %}
-      <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.no_class') if finding.level == 'NC' else c.level_word(finding.level) }}</span>
+      <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.no_class') if finding.level == 'NC' else finding.level }}</span>
     {% endif %}
     <span class="find-row__num">{{ finding.n }}</span>
     <span class="find-row__main">

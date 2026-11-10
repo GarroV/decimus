@@ -13,32 +13,32 @@ from __future__ import annotations
 GRADE_TEXTS: dict[str, dict[str, str]] = {
     # --- причина буквы: по условию сработавшего правила --------------------
     "grade.why.d3": {
-        "ru": "{grade} — критическое нарушение",
-        "en": "{grade} — critical violation",
+        "ru": "{grade} — критическое нарушение (D3)",
+        "en": "{grade} — critical violation (D3)",
     },
     "grade.why.d2_many": {
-        "ru": "{grade} — значительных нарушений не меньше {n}",
-        "en": "{grade} — {n} or more significant violations",
+        "ru": "{grade} — нарушений D2 не меньше {n}",
+        "en": "{grade} — {n} or more D2 violations",
     },
     "grade.why.pct_below": {
         "ru": "{grade} — балл ниже {pct}%",
         "en": "{grade} — score below {pct}%",
     },
     "grade.why.top": {
-        "ru": "{grade} — {pct}% и выше без значительных нарушений",
-        "en": "{grade} — {pct}% or higher with no significant violations",
+        "ru": "{grade} — {pct}% и выше без D2",
+        "en": "{grade} — {pct}% or higher with no D2",
     },
     "grade.why.mid_d2": {
-        "ru": "{grade} — есть значительное нарушение",
-        "en": "{grade} — there is a significant violation",
+        "ru": "{grade} — есть нарушение D2",
+        "en": "{grade} — there is a D2 violation",
     },
     "grade.why.mid_pct": {
         "ru": "{grade} — балл ниже {pct}%",
         "en": "{grade} — score below {pct}%",
     },
     "grade.why.mid_both": {
-        "ru": "{grade} — есть значительное нарушение и балл ниже {pct}%",
-        "en": "{grade} — there is a significant violation and the score is below {pct}%",
+        "ru": "{grade} — есть нарушение D2 и балл ниже {pct}%",
+        "en": "{grade} — there is a D2 violation and the score is below {pct}%",
     },
     "grade.why.other": {
         "ru": "{grade} — по правилу оценки из методики",
@@ -53,20 +53,20 @@ GRADE_TEXTS: dict[str, dict[str, str]] = {
     "explain.start": {"ru": "Старт — {pct}%", "en": "Start — {pct}%"},
     "explain.level": {"ru": "{level} × {n} — −{loss}%", "en": "{level} × {n} — −{loss}%"},
     "explain.level_repeat": {
-        "ru": "{level}, повтор × {n} — −{loss}%",
-        "en": "{level}, repeat × {n} — −{loss}%",
+        "ru": "{level} повтор × {n} — −{loss}%",
+        "en": "{level} repeat × {n} — −{loss}%",
     },
     "explain.d3_zone": {
-        "ru": "Критическое в зоне «{zone}» — зона обнулена, −{loss}%",
-        "en": "Critical in “{zone}” — the zone is zeroed, −{loss}%",
+        "ru": "D3 в зоне «{zone}» — зона обнулена, −{loss}%",
+        "en": "D3 in “{zone}” — the zone is zeroed, −{loss}%",
     },
     "explain.d3_zone_many": {
-        "ru": "Критических × {n} в зоне «{zone}» — зона обнулена, −{loss}%",
-        "en": "Critical × {n} in “{zone}” — the zone is zeroed, −{loss}%",
+        "ru": "D3 × {n} в зоне «{zone}» — зона обнулена, −{loss}%",
+        "en": "D3 × {n} in “{zone}” — the zone is zeroed, −{loss}%",
     },
     "explain.skipped": {
-        "ru": "Не снижали балл (зона уже обнулена критическим): {what}",
-        "en": "Did not lower the score (the zone is already zeroed by a critical one): {what}",
+        "ru": "Не снижали балл (зона уже обнулена D3): {what}",
+        "en": "Did not lower the score (the zone is already zeroed by D3): {what}",
     },
     "explain.total": {"ru": "Итог — {pct}%", "en": "Total — {pct}%"},
     "explain.zones_only": {

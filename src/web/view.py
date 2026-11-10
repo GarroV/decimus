@@ -61,21 +61,6 @@ def by_severity(findings: Any) -> list[Any]:
     return sorted(findings, key=lambda f: _SEVERITY_ORDER.get(str(f.level).strip().upper(), 3))
 
 
-def worst_level(counts: dict[str, Any]) -> str:
-    """Худший класс среди записанных нарушений (`D3` → `D2` → `D1`); пусто — нарушений нет.
-
-    Выбор по наличию записей класса, а не счёт: оценку не трогает, нужен только
-    подписи к решению «Принять» на карточке.
-    """
-    for level in ("D3", "D2", "D1"):
-        try:
-            if int(counts.get(level) or 0) > 0:
-                return level
-        except (TypeError, ValueError):
-            continue
-    return ""
-
-
 def pick(ru: object, en: object, lang: str) -> str:
     """Выбрать формулировку по языку интерфейса. Неизвестный язык — отказ.
 
