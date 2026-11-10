@@ -580,7 +580,6 @@ def _one_country(
         if вид.code and открытая is None
         else None,
         "can_settings": can_settings,
-        "settings_url": select(settings="1", inspection="", saved=""),
         "can_add_units": can_add_here(вид.code),
         "plans_count": len(plans["plans"]) if plans["plans_known"] else None,
         "rx_count": len(rx["rx_rows"]) if rx["rx_known"] else None,

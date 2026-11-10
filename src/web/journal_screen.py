@@ -210,7 +210,6 @@ def _render(*, own: bool, conf: Settings) -> FlaskResponse | tuple[str, int]:
             period_action=base,
             view_url=lambda view: select(view=view),
             base=base,
-            settings_url=f"{request.script_root}{section('settings').path}",
             **({} if own else administration.nav(TAB_JOURNAL)),
         ),
         503 if failed else 200,
