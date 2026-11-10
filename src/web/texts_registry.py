@@ -28,6 +28,9 @@ _PERIOD: dict[str, dict[str, str]] = {
     "registry.period.all": {"ru": "Всё время", "en": "All time"},
     "registry.period.this_month": {"ru": "Этот месяц", "en": "This month"},
     "registry.period.last_month": {"ru": "Прошлый месяц", "en": "Last month"},
+    "registry.period.this_year": {"ru": "Этот год", "en": "This year"},
+    "registry.period.last_year": {"ru": "Прошлый год", "en": "Last year"},
+    "registry.period.custom": {"ru": "Произвольный период", "en": "Custom period"},
     "registry.period.pick_end": {
         "ru": "Выберите конец периода",
         "en": "Pick the end of the period",

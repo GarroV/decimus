@@ -21,6 +21,8 @@
 .pcal__native { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
 .pcal__native .sbtn { grid-column: 1 / -1; height: 28px; }
 .pcal.is-js .pcal__native { display: none; }
+/* «Произвольный период» — поля дат видны и со скриптом, календарь остаётся под ними. */
+.pcal.is-js.is-custom .pcal__native { display: grid; margin-bottom: var(--space-3); }
 .pcal__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); }
 .pcal__month { font-size: 12.5px; font-weight: var(--w-semibold); color: var(--ink); }
 .pcal__nav { width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; color: var(--ink-2); font-size: 16px; line-height: 1; cursor: pointer; }

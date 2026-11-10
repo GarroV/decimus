@@ -53,3 +53,42 @@ def test_период_словами_и_без_повтора_общего_у_к
     assert text(date(2025, 12, 20), date(2026, 1, 5), "en") == "20 Dec 2025 — 5 Jan 2026"
     assert text(date(2026, 9, 1), None) == "1 сен 2026 — …"
     assert period_title(Period(date(2026, 9, 1), date(2026, 9, 30)), "ru") == "Сентябрь 2026"
+
+
+def test_целый_год_листается_годом_а_не_длиной_в_днях() -> None:
+    # Arrange: 2027 — 365 дней, 2028 високосный: сдвиг «на длину» промахнулся бы на день.
+    from src.web import registry_period
+
+    год = registry_period.year_of(date(2027, 6, 15))
+
+    # Act
+    следующий = registry_period.shift(год, 1)
+    предыдущий = registry_period.shift(год, -1)
+
+    # Assert
+    assert год.year == 2027 and год.month is None
+    assert следующий == Period(date(2028, 1, 1), date(2028, 12, 31))
+    assert предыдущий == Period(date(2026, 1, 1), date(2026, 12, 31))
+    assert period_title(год, "ru") == "2027"
+
+
+def test_быстрый_выбор_знает_год_и_произвольный_период() -> None:
+    from src.web import registry_period
+    from src.web.registry_view import period_quick
+
+    def select(**params: str) -> str:
+        return "?" + "&".join(f"{k}={v}" for k, v in params.items() if v)
+
+    сегодня = date(2026, 11, 10)
+
+    def выбранный(period: Period) -> str:
+        return next(q["title"] for q in period_quick(period, сегодня, "ru", select) if q["on"])
+
+    assert выбранный(registry_period.year_of(сегодня)) == "Этот год"
+    assert выбранный(registry_period.year_of(date(2025, 1, 1))) == "Прошлый год"
+    assert выбранный(Period(date(2026, 3, 5), date(2026, 9, 1))) == "Произвольный период"
+    assert выбранный(Period(None, None)) == "Всё время"
+    быстрые = period_quick(Period(None, None), сегодня, "ru", select)
+    ссылки = {q["title"]: q["href"] for q in быстрые}
+    assert ссылки["Этот год"] == "?from=2026-01-01&to=2026-12-31"
+    assert ссылки["Произвольный период"] == ""
