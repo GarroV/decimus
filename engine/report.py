@@ -21,7 +21,7 @@ from urllib.parse import quote
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from audit import (  # noqa: E402
-    LETTER_ROLES, compute, info_field, inspection_date, kind_title, load_cfg, load_checklist,
+    BASE_LANG, LANGS, LETTER_ROLES, compute, info_field, inspection_date, kind_title, load_cfg, load_checklist,
     load_state,
     load_zones, state_dir,
 )
@@ -98,6 +98,9 @@ T = {
         "no_photo": "No photo taken",
     },
 }
+#: Единицы времени проверки («1 ч 20 мин») и слово в имени файла отчёта — по языкам.
+TIME_UNITS = {"ru": ("ч", "мин"), "en": ("h", "min")}
+FILE_WORDS = {"ru": "Аудит", "en": "Audit"}
 GRADE_COLOR = {"A": "#1E7A45", "B": "#7A6A17", "C": "#B4610F", "D": "#A81E1E"}
 
 # Имя продукта (D106, сужено D107): DECIMUS — имя всей системы, не персона
@@ -220,8 +223,8 @@ def item_label(code, row, lang):
     found = re.search(r"(\d+)$", code.strip())
     if found is None or not row:
         return code
-    own, other = ("process_en", "process_ru") if lang == "en" else ("process_ru", "process_en")
-    process = (row.get(own) or row.get(other) or "").strip()
+    process = next((str(row[key]).strip() for key in (f"process_{code}" for code in (lang, *LANGS))
+                    if row.get(key)), "")
     return f"{process} {int(found.group(1))}" if process else code
 
 
@@ -234,7 +237,7 @@ def item_title(f, qk):
     обязаны называть пункт одинаково — иначе три копии одного правила
     разъедутся на первой же правке (T234).
     """
-    return clean_q(f.get(qk) or f.get("question_ru"))
+    return clean_q(f.get(qk) or f.get(f"question_{BASE_LANG}"))
 
 
 def recorded_text(f, qk):
@@ -266,7 +269,7 @@ def recorded_text(f, qk):
     text = str(f.get("evidence") or "").strip()
     if not text:
         return ""
-    if any(text == str(f.get(k) or "").strip() for k in ("question_ru", "question_en")):
+    if any(text == str(f.get(f"question_{code}") or "").strip() for code in LANGS):
         return clean_q(text)
     return text
 
@@ -393,7 +396,7 @@ def inspection_time(meta, lang):
         return f"{T[lang]['started']} {clock(begin)}{suffix}"
     mins = int((end - begin).total_seconds() // 60)
     h, mm = divmod(mins, 60)
-    unit_h, unit_m = ("ч", "мин") if lang == "ru" else ("h", "min")
+    unit_h, unit_m = TIME_UNITS[lang]
     span = " ".join(x for x in (f"{h} {unit_h}" if h else "", f"{mm} {unit_m}" if mm or not h else "") if x)
     return f"{clock(begin)}–{clock(end)}{suffix} ({span})"
 
@@ -403,10 +406,10 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
     src = Photos() if src is None else src
     m = res["meta"]
     cl = {r["id"]: r for r in load_checklist()}
-    qk = "question_en" if lang == "en" else "question_ru"
-    pk = "process_en" if lang == "en" else "process_ru"
-    zk = "zone_name_en" if lang == "en" else "zone_name_ru"
-    nk = "name_en" if lang == "en" else "name_ru"
+    qk = f"question_{lang}"
+    pk = f"process_{lang}"
+    zk = f"zone_name_{lang}"
+    nk = f"name_{lang}"
     g = res["grade"]
     h = [f"<style>{font_css()}\n{page_css(t)}\n{CSS}</style>",
          f'<div class="brand">{esc(BRAND)}</div>', f"<h1>{esc(t['title'])}</h1>",
@@ -432,7 +435,7 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
             h.append(f'<tr><td class="k">{esc(k)}</td><td>{esc(v)}</td></tr>')
     h.append("</table>")
 
-    label = res["grade_label_en"] if lang == "en" else res["grade_label_ru"]
+    label = res[f"grade_label_{lang}"]
     h.append(f'''<div class="hero"><table class="hero" style="border:0;padding:0;margin:0"><tr>
       <td class="g" style="color:{GRADE_COLOR.get(g,'#3F2A63')}">{esc(g)}</td>
       <td><div class="l">{esc(t['score'])}</div><div class="p">{res['pct']:g}%</div>
@@ -559,7 +562,7 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
         if info:
             h.append('<div class="info">')
             for k, v in info.items():
-                q = (cl.get(k, {}).get(qk) or cl.get(k, {}).get("question_ru")
+                q = (cl.get(k, {}).get(qk) or cl.get(k, {}).get(f"question_{BASE_LANG}")
                      or item_label(k, cl.get(k), lang))
                 # Маркер класса срезаем так же, как у формулировки нарушения
                 # ниже: партнёру он не адресован, а до T159 поля не печатались
@@ -581,7 +584,7 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
                              + "".join(src.html(x, t) for x in поле["photos"]) + "</div>")
             h.append("</div>")
         for k, shots in feedback_photos.items():
-            q = (cl.get(k, {}).get(qk) or cl.get(k, {}).get("question_ru")
+            q = (cl.get(k, {}).get(qk) or cl.get(k, {}).get(f"question_{BASE_LANG}")
                  or item_label(k, cl.get(k), lang))
             h.append('<div class="info"><p class="info-photo-heading"><span class="k">'
                      + esc(clean_q(q)) + ':</span></p><div class="shots">'
@@ -803,6 +806,18 @@ GRADE_NOTE = {
 #: говорит слой MCP (`BLANK_TEXT_FIELD`) — до отправки и внутри компании.
 ITEM_REF = {"ru": "пункт стандарта «{q}»", "en": "standard item “{q}”"}
 
+#: Строка сводки нарушений в письме и абзац про D3 — целиком, по языкам.
+LETTER_COUNTS = {
+    "ru": "— критических D3: {d3}, значительных D2: {d2}, незначительных D1: {d1}.",
+    "en": "— {d3} critical D3, {d2} major D2, {d1} minor D1 violations.",
+}
+LETTER_CRITICAL = {
+    "ru": "\nКритично (D3): {names}. По методике нарушение D3 обнуляет всю зону, "
+          "в которой оно зафиксировано.\n\n",
+    "en": "\nCritical (D3): {names}. Per our methodology a D3 violation zeroes "
+          "the whole zone where it was found.\n\n",
+}
+
 
 def letter_text(f, qk, lang):
     """Строка записи в письме: слова аудитора, а нет их — ссылка на пункт стандарта.
@@ -829,12 +844,9 @@ def summary_lines(res, lang, clean):
     if clean:
         return ""
     c = res["counts"]
-    zk = "zone_name_en" if lang == "en" else "zone_name_ru"
-    qk = "question_en" if lang == "en" else "question_ru"
-    lines = [f"— {c['D3']} critical D3, {c['D2']} major D2, {c['D1']} minor D1 violations."
-             if lang == "en"
-             else f"— критических D3: {c['D3']}, значительных D2: {c['D2']}, "
-                  f"незначительных D1: {c['D1']}."]
+    zk = f"zone_name_{lang}"
+    qk = f"question_{lang}"
+    lines = [LETTER_COUNTS[lang].format(d1=c["D1"], d2=c["D2"], d3=c["D3"])]
     shown = ("D1", "D2", "D3")
     by_zone = {}
     for f in res["findings"]:
@@ -979,19 +991,14 @@ def feedback_block(blocks, lang, roles):
 def build_letter(res, lang, template=1, speech_lang=None, bodies=None):
     m = res["meta"]
     c = res["counts"]
-    zk = "zone_name_en" if lang == "en" else "zone_name_ru"
-    qk = "question_en" if lang == "en" else "question_ru"
+    zk = f"zone_name_{lang}"
+    qk = f"question_{lang}"
     clean = not any(c[level] > 0 for level in ("D1", "D2", "D3"))
     crit = ""
     d3 = [f for f in res["findings"] if f["level"] == "D3"]
     if d3:
         names = "; ".join(letter_text(f, qk, lang) + f" — {f[zk]}" for f in d3)
-        if lang == "en":
-            crit = ("\nCritical (D3): " + names + ". Per our methodology a D3 violation zeroes "
-                    "the whole zone where it was found.\n\n")
-        else:
-            crit = ("\nКритично (D3): " + names + ". По методике нарушение D3 обнуляет всю зону, "
-                    "в которой оно зафиксировано.\n\n")
+        crit = LETTER_CRITICAL[lang].format(names=names)
     if template not in LETTER_TEMPLATES:
         sys.exit(f"Шаблон письма «{template}» не заведён. Доступны: "
                  f"{', '.join(map(str, LETTER_TEMPLATES))}")
@@ -1038,8 +1045,8 @@ def letter_parts(res, lang, speech_lang=None):
     считается заново — оценка, буква и счётчики приходят из `compute`.
     """
     m = res["meta"]
-    zk = "zone_name_en" if lang == "en" else "zone_name_ru"
-    qk = "question_en" if lang == "en" else "question_ru"
+    zk = f"zone_name_{lang}"
+    qk = f"question_{lang}"
     c = res["counts"]
     clean = not any(c[level] > 0 for level in ("D1", "D2", "D3"))
     blocks, skipped, recorded = feedback_parts(res, lang, speech_lang)
@@ -1097,7 +1104,8 @@ def default_name(meta, lang=None):
         v = re.sub(r'[\\/:*?"<>|]', "-", str(v or "")).strip(" .")
         return re.sub(r"\s+", " ", v) or fallback
     effective = lang or meta.get("lang") or "ru"
-    word = "Audit" if str(effective).lower().startswith("en") else "Аудит"
+    code = str(effective).lower()
+    word = FILE_WORDS.get(code) or FILE_WORDS.get(code[:2], FILE_WORDS[BASE_LANG])
     parts = [word + " " + clean(meta.get("unit"), "пиццерия")]
     if meta.get("auditor"):
         parts.append(clean(meta.get("auditor"), ""))
