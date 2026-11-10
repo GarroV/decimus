@@ -107,6 +107,7 @@
       "M3 16l5-5 4 4 3-3 6 6", "M15.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"],
     stack: ["M8 7h11a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z",
       "M4 10v8a1 1 0 0 0 1 1h10", "M10 15l2.5-2.5 2 2 1.5-1.5 2 2"],
+    eyeoff: ["M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z", "M12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z", "M4 4l16 16"],
     mic: ["M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z", "M6 11a6 6 0 0 0 12 0", "M12 17v4"]
   };
 
@@ -127,6 +128,20 @@
 
   W.level = function (code) {
     return W.el("span", "walk-level walk-level--" + String(code).toLowerCase(), code);
+  };
+
+  /** Название зоны по коду (для сводок); нет в данных — код не показываем пустым. */
+  W.zoneName = function (code) {
+    var zones = (W.state.data && W.state.data.zones) || [];
+    var z = zones.filter(function (x) { return x.code === code; })[0];
+    return z ? z.title : "";
+  };
+
+  /** Пункт по коду: формулировка, иначе ярлык «Порядок 13». */
+  W.itemName = function (code) {
+    var items = (W.state.data && W.state.data.items) || [];
+    var i = items.filter(function (x) { return x.code === code; })[0];
+    return i ? (i.q || i.label || "") : "";
   };
 
   W.haptic = function (kind) {
@@ -204,6 +219,7 @@
       node = W.el("div", "walk-toast");
       node.id = "walk-toast";
       node.setAttribute("role", "status");
+      node.setAttribute("aria-live", "polite");
       document.body.appendChild(node);
     }
     node.textContent = text;
@@ -218,6 +234,6 @@
     });
     node.className = "walk-toast is-shown" + (tone ? " walk-toast--" + tone : "") + (actions.length ? " has-action" : "");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { node.className = "walk-toast"; }, actions.length ? 8000 : 2600);
+    toastTimer = setTimeout(function () { node.className = "walk-toast"; }, actions.length ? 8000 : 3000);
   };
 })();

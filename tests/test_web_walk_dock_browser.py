@@ -1,4 +1,4 @@
-"""The dock's split button («+ Issue» | «Several») fits at phone and desktop widths, both themes.
+"""The dock's split button («+ Issue» | «Photo set») fits at phone and desktop widths, both themes.
 
 Real `walk.js` renders the dock; no server. Set WALK_SHOT_DIR to also save screenshots.
 """
@@ -68,8 +68,8 @@ def test_split_button_and_next_stay_readable(page, width, height, theme, lang):
     assert got["fits"] == [True, True, True], got
     assert got["rowFits"] and got["order"] == [True, True], got
     assert abs(got["height"][0] - got["height"][1]) <= 1, "split is as tall as the next button"
-    assert got["nextWidth"] >= 110, "«Осмотрено →» is not squeezed"
-    assert got["icon"] and got["label"] == ("Несколько" if lang == "ru" else "Several")
+    assert got["nextWidth"] >= 110, "«Зона готова →» is not squeezed"
+    assert got["icon"] and got["label"] == ("Серия фото" if lang == "ru" else "Photo set")
     assert got["aria"] == (
         "Несколько нарушений с фото" if lang == "ru" else "Several issues with photos"
     )

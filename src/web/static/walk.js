@@ -5,7 +5,7 @@
  * стоит: сверху точка, прогресс и прошлый раз одной строкой; под ними
  * переключатель зон (текущая, три подсказки «осталось», лист «Все зоны»
  * снизу по нажатию, свайп — соседняя зона); дальше прошлое, записанное,
- * чек-лист этой зоны; внизу — «+ Нарушение» и «Осмотрено →». Замеры —
+ * чек-лист этой зоны; внизу — «+ Нарушение» и «Зона готова →». Замеры —
  * последней остановкой «Печь и холодильники» (D315).
  * Зону засчитывает только явное «Осмотрено»: запись делает её «в работе».
  * Сведения о визите — отдельный лист из шапки.
@@ -341,6 +341,13 @@
       grid.appendChild(tile);
     });
     card.appendChild(grid);
+    // Действия над всей проверкой живут здесь, а не в ленте зоны.
+    if (writable() && !allDone()) {
+      card.appendChild(W.button("walk-zsheet__finish", tx("walk.finish.title"), function () {
+        setPanel(false);
+        W.finish.ask();
+      }));
+    }
     sheet.appendChild(card);
     document.body.appendChild(sheet);
   }
@@ -449,7 +456,6 @@
     line.appendChild(el("span", "walk-item__text", rec.text));
     words.appendChild(line);
     if (rec.comment) words.appendChild(el("span", "walk-rec__comment", tx("walk.rec.comment", { text: rec.comment })));
-    if (rec.repeat) words.appendChild(el("span", "walk-tag walk-tag--again", tx("walk.rec.repeat")));
     b.appendChild(words);
     if (writable()) b.appendChild(el("span", "walk-rec__chev", "›"));
     row.appendChild(b);
@@ -475,19 +481,12 @@
     zone.recorded.forEach(function (r) { rec[r.code] = r; });
     items = items.filter(function (i) { return was[i.code]; }).concat(items.filter(function (i) { return !was[i.code]; }));
 
-    var box = el("section", "walk-cl" + (S.list ? " is-open" : ""));
+    // Чек-лист лежит внутри «Ещё в зоне»: раскрыт всегда, своей кнопки раскрытия нет.
+    var box = el("section", "walk-cl is-open");
     var wrap = el("div", "walk-cl__wrap");
-    wrap.inert = !S.list;
-    var head = W.hinted(W.button("walk-cl__head", null, function () {
-      S.list = !S.list;
-      box.classList.toggle("is-open", S.list);
-      head.setAttribute("aria-expanded", S.list ? "true" : "false");
-      wrap.inert = !S.list;
-    }), "checklist");
-    head.setAttribute("aria-expanded", S.list ? "true" : "false");
+    var head = el("h3", "walk-cl__head walk-cl__head--static");
     head.appendChild(el("span", "walk-cl__title", tx("walk.cl.title")));
     head.appendChild(el("span", "walk-cl__count", tx("walk.cl.count", { count: items.length })));
-    head.appendChild(el("span", "walk-cl__caret", "▾"));
     box.appendChild(head);
 
     var inner = el("div", "walk-cl__inner");
@@ -559,7 +558,6 @@
     if (zone.equipment) {
       stage.appendChild(renderEquipment(zone));
       if (zoneDone(zone)) stage.appendChild(unmarkRow(zone));
-      if (writable() && !allDone()) stage.appendChild(finishLink());
       return stage;
     }
     if (zone.previous.length) {
@@ -579,9 +577,17 @@
     }
     var unseen = W.unseenBlock(zone, writable());
     if (unseen) stage.appendChild(unseen);
-    var list = renderChecklist(zone);
-    if (list) stage.appendChild(list);
+    var more = renderMore(zone);
+    if (more) stage.appendChild(more);
+    return stage;
+  }
 
+  /** «Ещё в зоне»: то, что нужно реже, чем «было / записано / не смотрели» — чек-лист,
+   *  замеры, рекомендация. Одна подписанная кнопка; раскрытое помним до смены зоны. */
+  function renderMore(zone) {
+    var inner = el("div", "walk-cl__inner");
+    var list = renderChecklist(zone);
+    if (list) inner.appendChild(list);
     var extra = el("div", "walk-stage__extra");
     if (writable()) {
       if (S.data.items.some(function (i) { return i.measure; })) {
@@ -594,9 +600,27 @@
       }));
     }
     if (zoneDone(zone)) extra.appendChild(unmarkButton(zone));
-    if (writable() && !allDone()) extra.appendChild(finishLink());
-    if (extra.childNodes.length) stage.appendChild(extra);
-    return stage;
+    if (extra.childNodes.length) inner.appendChild(extra);
+    if (!inner.childNodes.length) return null;
+
+    var open = S.more === zone.code;
+    var box = el("section", "walk-cl walk-more" + (open ? " is-open" : ""));
+    var wrap = el("div", "walk-cl__wrap");
+    wrap.inert = !open;
+    var head = W.hinted(W.button("walk-cl__head", null, function () {
+      open = !open;
+      S.more = open ? zone.code : null;
+      box.classList.toggle("is-open", open);
+      head.setAttribute("aria-expanded", open ? "true" : "false");
+      wrap.inert = !open;
+    }), "checklist");
+    head.setAttribute("aria-expanded", open ? "true" : "false");
+    head.appendChild(el("span", "walk-cl__title", tx("walk.zone.more")));
+    head.appendChild(el("span", "walk-cl__caret", "▾"));
+    box.appendChild(head);
+    wrap.appendChild(inner);
+    box.appendChild(wrap);
+    return box;
   }
 
   function unmarkButton(zone) {
@@ -638,11 +662,6 @@
   }
 
   function allDone() { return S.data.zones.every(zoneDone); }
-
-  /** Тихая ссылка «Завершить проверку» в конце зоны: вход виден, пока не все зоны осмотрены. */
-  function finishLink() {
-    return W.hinted(W.button("walk-link walk-link--quiet", tx("walk.finish.title"), W.finish.ask), "finish");
-  }
 
   function renderDock(zone) {
     var dock = el("div", "walk-dock");

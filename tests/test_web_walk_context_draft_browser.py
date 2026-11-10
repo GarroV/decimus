@@ -31,6 +31,10 @@ def navigation(page):
 
 
 def open_zone(page, zone):
+    more = page.evaluate("DecimusWalk.tx('walk.zone.more')")
+    head = page.locator(f'[data-qa-zone="{zone}"]').get_by_role("button", name=more)
+    if head.get_attribute("aria-expanded") == "false":
+        head.click()
     label = page.evaluate("DecimusWalk.tx('walk.zone.measure_here')")
     page.locator(f'[data-qa-zone="{zone}"]').get_by_role("button", name=label, exact=True).click()
 

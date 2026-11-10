@@ -55,10 +55,14 @@
     return good && current.source.photos.every(function (p) {return all.indexOf(p.ref)!==-1;}) &&
       all.every(function (ref) {return current.source.photos.some(function (p) {return p.ref===ref;});});
   }
+  /** «пункт · класс · зона»: пункт и зона названием, класс кодом (D745). */
+  function label(p) {
+    return [W.itemName(p.code), p.level || "", W.zoneName(p.zone)].filter(Boolean).join(" · ");
+  }
   function sourcePreview(body) {
     var source=current.source;
     body.appendChild(el("h3", "", tx("walk.split.source")));
-    body.appendChild(el("p", "", source.code+" · "+source.level+" · "+source.zone));
+    body.appendChild(el("p", "", label(source)));
     body.appendChild(el("p", "", source.text));
     if(source.comment)body.appendChild(el("p", "", source.comment));
     source.photos.forEach(function (photo,i) {var box=el("span", "walk-thumb");box.appendChild(W.photo.thumb(photo));box.appendChild(el("span", "", tx("walk.split.photo",{n:i+1})));body.appendChild(box);});
@@ -105,7 +109,7 @@
     } else {
       current.parts.forEach(function (part,i) {
         var card=el("section", "walk-form__section");card.appendChild(el("h3", "",tx("walk.split.part",{n:i+1})));
-        card.appendChild(el("p", "",part.code+" · "+part.level+" · "+part.zone));
+        card.appendChild(el("p", "",label(part)));
         card.appendChild(el("p", "",part.text));if(part.comment)card.appendChild(el("p", "",part.comment));
         card.appendChild(el("p", "",tx("walk.split.repeat")+": "+tx(part.repeat ? "walk.info.yes" : "walk.info.no")));
         card.appendChild(el("p", "",tx("walk.split.reading")+": "+(part.reading_c===null ? "—" : part.reading_c)));
@@ -164,12 +168,12 @@
         });panel.appendChild(note);return;
       }
       var source=event.before;var item=el("section", "walk-form__section");item.appendChild(el("h3", "",tx(event.kind === "edit" ? "walk.edit.before" : "walk.split.source")+" #"+source.n+" · "+event.at));
-      item.appendChild(el("p", "",source.code+" · "+source.level+" · "+source.zone+" · "+source.text));
+      item.appendChild(el("p", "",label(source)+" · "+source.text));
       if(event.kind === "edit")item.appendChild(el("p", "",tx("walk.edit.photo_refs",{n:source.photos.length})));
       if(source.repeat)item.appendChild(el("p", "",tx("walk.rec.repeat")));
       if(source.comment)item.appendChild(el("p", "",source.comment));
       if(source.reading_c !== null && source.reading_c !== undefined)item.appendChild(el("p", "",source.reading_c+" °C"));
-      event.after.forEach(function (part) {item.appendChild(el("p", "",(event.kind === "edit" ? tx("walk.edit.after")+" · " : "")+"#"+part.n+" · "+part.code+" · "+part.level+" · "+part.zone+" · "+part.text+" · "+tx(event.kind === "edit" ? "walk.edit.photo_refs" : "walk.split.photo_count",{n:part.photos.length})));if(part.repeat)item.appendChild(el("p", "",tx("walk.rec.repeat")));if(part.comment)item.appendChild(el("p", "",part.comment));if(part.reading_c !== null && part.reading_c !== undefined)item.appendChild(el("p", "",part.reading_c+" °C"));});panel.appendChild(item);
+      event.after.forEach(function (part) {item.appendChild(el("p", "",(event.kind === "edit" ? tx("walk.edit.after")+" · " : "")+"#"+part.n+" · "+label(part)+" · "+part.text+" · "+tx(event.kind === "edit" ? "walk.edit.photo_refs" : "walk.split.photo_count",{n:part.photos.length})));if(part.repeat)item.appendChild(el("p", "",tx("walk.rec.repeat")));if(part.comment)item.appendChild(el("p", "",part.comment));if(part.reading_c !== null && part.reading_c !== undefined)item.appendChild(el("p", "",part.reading_c+" °C"));});panel.appendChild(item);
     });return panel;
   }
   W.split={open:open,close:close,historyPanel:historyPanel,isOpen:function () {return !!current;}};

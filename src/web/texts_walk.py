@@ -108,6 +108,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Текущий черновик останется в зоне «{zone}».",
         "en": "The current draft will stay in “{zone}”.",
     },
+    "walk.zone.more": {"ru": "Ещё в зоне", "en": "More in this zone"},
     "walk.zone.measure_here": {"ru": "Измерения в этой зоне", "en": "Measurements in this zone"},
     "walk.zone.measure_add": {"ru": "внести", "en": "add"},
     "walk.zone.need_prev": {
@@ -125,6 +126,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Tap an item to record a finding against it.",
     },
     "walk.timing.active": {"ru": "Идёт проверка", "en": "Inspection in progress"},
+    "walk.timing.approx": {"ru": "примерно {time}", "en": "about {time}"},
     "walk.timing.finished": {"ru": "Длительность проверки", "en": "Inspection duration"},
     "walk.timing.unknown": {"ru": "Время не фиксировалось", "en": "Time was not recorded"},
     "walk.timing.unavailable": {"ru": "Время недоступно", "en": "Time unavailable"},
@@ -315,7 +317,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Zone checked, nothing found.",
     },
     "walk.zone.done_toast": {"ru": "{zone}: осмотрено", "en": "{zone}: checked"},
-    "walk.next.mark": {"ru": "Осмотрено →", "en": "Checked →"},
+    "walk.next.mark": {"ru": "Зона готова →", "en": "Zone done →"},
     "walk.next.go": {"ru": "Следующая →", "en": "Next →"},
     "walk.info.open": {"ru": "Сведения", "en": "Details"},
     "walk.zone.unmark": {"ru": "Вернуть в неосмотренные", "en": "Mark as not checked"},
@@ -542,7 +544,16 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.save": {"ru": "Сохранить", "en": "Save"},
     "walk.sheet.saving": {"ru": "Сохраняю…", "en": "Saving…"},
     "walk.sheet.add_photos": {"ru": "Добавить фото к записи", "en": "Add photos to the record"},
-    "walk.sheet.need_photo": {"ru": "Нужно фото", "en": "A photo is needed"},
+    "walk.sheet.need_photo": {
+        "ru": "Без фото нарушение не записать: оно нужно для отчёта.",
+        "en": "A finding can't be saved without a photo: the report needs it.",
+    },
+    "walk.sheet.photo_cta": {"ru": "Сфотографировать нарушение", "en": "Photograph the issue"},
+    "walk.sheet.saved_line": {
+        "ru": "Записано: {item} · {level}",
+        "en": "Recorded: {item} · {level}",
+    },
+    "walk.sheet.discard_keep": {"ru": "Продолжить запись", "en": "Keep editing"},
     "walk.sheet.need_upload": {"ru": "Дождитесь загрузки фото", "en": "Wait for the photo upload"},
     "walk.sheet.need_online": {
         "ru": "Кадры ждут связи — сохранить можно, когда они загрузятся",
@@ -706,11 +717,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.delete_confirm": {"ru": "Удалить насовсем?", "en": "Delete for good?"},
     "walk.sheet.delete_yes": {"ru": "Да, удалить", "en": "Yes, delete"},
     "walk.sheet.cancel": {"ru": "Отмена", "en": "Cancel"},
-    "walk.sheet.discard": {
-        "ru": "Запись не сохранена. Закрыть без сохранения?",
-        "en": "The record is not saved. Close without saving?",
+    "walk.sheet.discard_yes": {
+        "ru": "Закрыть без сохранения",
+        "en": "Close without saving",
     },
-    "walk.sheet.discard_yes": {"ru": "Закрыть", "en": "Close"},
     "walk.sheet.restored": {
         "ru": "Вернули несохранённый черновик.",
         "en": "Your unsaved draft is back.",

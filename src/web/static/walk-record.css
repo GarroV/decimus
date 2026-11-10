@@ -136,8 +136,8 @@
 .walk-thumb__note {
   padding: 2px;
   color: var(--ink-3);
-  font-size: 10px;
-  line-height: 12px;
+  font-size: 12px;
+  line-height: 14px;
   text-align: center;
 }
 
@@ -173,12 +173,23 @@
   right: 0;
   bottom: 0;
   z-index: 5;
-  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
   background: var(--surface);
   border-top: 1px solid var(--line);
 }
 
 .walk-dock .walk-mark { max-width: 528px; margin: 0 auto; }
+
+/* Одна нижняя панель на всём обходе: лента зоны (`walk-dock`) и форма (`walk-sheet__foot`)
+   — тот же отступ, safe-area, высота главной кнопки 48 и порядок «вторичное слева, главное справа». */
+.walk-bar__row { display: flex; gap: 8px; max-width: 528px; margin: 0 auto; }
+.walk-bar__row > .walk-btn,
+.walk-bar__row > .walk-mark { flex: 1; width: auto; margin: 0; }
+.walk-bar__row > .walk-mark { flex: 1.3; }
+.walk-dock .walk-mark,
+.walk-dock__next,
+.walk-sheet__foot .walk-mark,
+.walk-bar__row > .walk-btn { min-height: 48px; }
 
 .has-sheet .walk-dock { display: none; }
 
@@ -249,10 +260,11 @@
 }
 
 .walk-sheet__why {
-  margin: 6px 0 0;
-  font-size: 13px;
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 20px;
   text-align: center;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .walk-form__part { padding-top: 10px; }
@@ -260,7 +272,7 @@
 .walk-form__label {
   display: block;
   margin: 0 0 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -336,7 +348,7 @@
   background: var(--overlay);
   color: var(--ink-inverse);
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 14px;
   text-align: center;
 }
@@ -547,11 +559,14 @@
 .walk-seg {
   display: flex;
   gap: 0;
-  overflow: hidden;
   border: 1px solid var(--line-control);
   border-radius: 999px;
   background: var(--surface);
 }
+
+.walk-seg > :first-child { border-radius: 999px 0 0 999px; }
+.walk-seg > :last-child { border-radius: 0 999px 999px 0; }
+.walk-seg > :only-child { border-radius: 999px; }
 
 .walk-seg__opt {
   flex: 1;
@@ -778,3 +793,13 @@
 .walk-item-kind--violation, .walk-item-code--violation { background: var(--err-soft); color: var(--err); border-color: var(--err-line); }
 .walk-item-kind--advice, .walk-item-code--advice { background: var(--warn-soft); color: var(--warn-ink); border-color: var(--warn-line); }
 .walk-choice__line { flex-wrap: wrap; }
+
+/* Кадра нет (D078): главная кнопка формы — сам снимок. */
+.walk-mark--photo { display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* «Закрыть без сохранения»: второстепенное действие без красной заливки — красным только текст. */
+.walk-btn--danger-quiet { border-color: var(--line-control); background: var(--surface); color: var(--err); font-weight: 600; }
+.walk-form__error { text-align: center; }
+
+/* Развилка «закрыть без сохранения» (D745): места с несохранённым вводом обведены токеном предупреждения. */
+.walk-unsaved { outline: 2px solid var(--warn-mark); outline-offset: 2px; border-radius: 12px; }

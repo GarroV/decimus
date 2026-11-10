@@ -859,7 +859,7 @@
     var on = f.picked ? f.picked === cand : isPrimary(cand);
     var top = el("span", "walk-found__top");
     var kind = cand.level === ADVICE_LEVEL ? "advice" : cand.level === "D0" || i.measure ? "info" : /^D[1-3]$/.test(cand.level || "") ? "violation" : null;
-    top.appendChild(el("span", "walk-option__code" + (kind ? " walk-item-code--" + kind : ""), i.label || cand.code));
+    top.appendChild(el("span", "walk-option__code" + (kind ? " walk-item-code--" + kind : ""), i.label || W.itemName(cand.code)));
     if (kind) top.appendChild(el("span", "walk-item-kind walk-item-kind--" + kind, tx("walk.item.kind." + kind)));
     if (!recognizing() && cand.level && cand.level !== ADVICE_LEVEL) top.appendChild(W.level(cand.level));
     if (on) {
@@ -1681,7 +1681,7 @@
       var card = el("div", "walk-choice");
       var line = el("div", "walk-choice__line");
       var kind = isAdvice() ? "advice" : chosen.measure ? "info" : "violation";
-      if (!chosen.note) line.appendChild(el("span", "walk-choice__code walk-item-code--" + kind, chosen.label || chosen.code));
+      if (!chosen.note) line.appendChild(el("span", "walk-choice__code walk-item-code--" + kind, chosen.label || W.itemName(chosen.code)));
       line.appendChild(el("span", "walk-item-kind walk-item-kind--" + kind, tx("walk.item.kind." + kind)));
       line.appendChild(el("span", "walk-choice__text", chosen.q));
       card.appendChild(line);
@@ -1921,17 +1921,21 @@
     footer: function () {
       var box = el("div", "walk-sheet__foot");
       if (f.confirmClose) {
-        box.appendChild(el("p", "walk-form__note", tx("walk.sheet.discard")));
-        var row = el("div", "walk-row");
-        row.appendChild(W.button("walk-btn walk-btn--danger", tx("walk.sheet.discard_yes"), function () {
+        // Фразы нет: две кнопки говорят сами, а несохранённые места подсвечены (D745).
+        // Порядок единый для нижних панелей: вторичное слева, главное справа. Безопасное — главное;
+        // потеря записи — вторым, словами, без красной заливки.
+        var row = el("div", "walk-bar__row");
+        row.appendChild(W.button("walk-btn walk-btn--danger-quiet", tx("walk.sheet.discard_yes"), function () {
           if (!f.n) W.local.drop(draftKey());
           else if (W.editDraft) W.editDraft.clear(f);
           f.photos.forEach(function (p) { (p.receiptIds || (p.entryId ? [p.entryId] : [])).forEach(function (id) { W.offline.remove(id); }); });
           close(true);
         }));
-        row.appendChild(W.button("walk-btn", tx("walk.sheet.cancel"), function () {
+        row.appendChild(W.button("walk-mark", tx("walk.sheet.discard_keep"), function () {
+          var first = node && node.querySelector(".walk-unsaved");
           f.confirmClose = false;
           redraw("footer");
+          focusFirst(first);
         }));
         box.appendChild(row);
         return box;
@@ -1939,6 +1943,11 @@
       if (f.error) box.appendChild(el("p", "walk-form__error", f.error));
       if (recognizing() && !f.code && !hasNoViolation()) {
         var blocked = findBlocker();
+        if (blocked === "walk.sheet.need_photo") {
+          box.appendChild(photoAction());
+          box.appendChild(el("p", "walk-sheet__why", tx(blocked)));
+          return box;
+        }
         var go = W.hinted(W.button("walk-mark walk-mark--find", f.finding ? tx("walk.sheet.finding_short") : tx("walk.sheet.find"), find), "find");
         go.disabled = !!blocked || !!f.finding;
         box.appendChild(go);
@@ -1946,6 +1955,12 @@
         return box;
       }
       var why = blocker();
+      // Кадра нет вовсе (D078): главная кнопка — сам снимок, а не серая «Сохранить».
+      if (why === "walk.sheet.need_photo" && !f.saving) {
+        box.appendChild(photoAction());
+        box.appendChild(el("p", "walk-sheet__why", tx(why)));
+        return box;
+      }
       var recheck = !f.n && !recognizing() && readingChanged() && !readingInvalid();
       var label = f.saving ? tx("walk.sheet.saving")
         : f.finding ? tx("walk.sheet.rechecking")
@@ -1988,6 +2003,15 @@
       return box;
     },
   };
+
+  /** Кнопка «Сфотографировать нарушение» вместо недоступной «Сохранить»: открывает камеру. */
+  function photoAction() {
+    var b = W.button("walk-mark walk-mark--photo", null, function () { W.photo.capture(addFiles); });
+    b.setAttribute("data-photo-cta", "");
+    b.appendChild(W.icon("camera"));
+    b.appendChild(el("span", null, tx("walk.sheet.photo_cta")));
+    return b;
+  }
 
   /** Что нашла система: карточки предложений, выбранное — сверху. */
   function found() {
@@ -2043,6 +2067,45 @@
       var made = draw[name]();
       if (made) holder.appendChild(made);
     });
+    markUnsaved();
+  }
+
+  /** Места формы с несохранённым вводом: то же, что считает `dirty()`, но по полям (D745). */
+  function unsavedTargets() {
+    var out = [];
+    function add(target) { if (target && out.indexOf(target) === -1) out.push(target); }
+    function slot(name) { return parts[name] && parts[name].firstElementChild; }
+    function field(name, selector) { return parts[name] && parts[name].querySelector(selector); }
+    var o = f.original;
+    if (f.n ? f.photos.some(function (p) { return p.fresh; }) || f.removed.length > 0 : f.photos.length) add(slot("photos"));
+    if (!f.n && f.words) add(field("words", "textarea"));
+    if (f.n ? f.text !== o.text : f.text) add(field("text", "textarea"));
+    if (f.n ? f.comment !== o.comment : f.comment) add(field("comment", "textarea") || slot("comment"));
+    if (f.n ? f.code !== o.code : f.code !== f.preset) add(slot("item"));
+    if (f.n && f.level !== o.level) add(slot("level"));
+    if (f.n && f.zone !== o.zone) add(field("context", ".walk-ctx__pill--zone"));
+    if (f.n && f.repeat !== o.repeat) add(slot("repeat"));
+    if (f.n && readingChanged()) add(slot("reading"));
+    return out;
+  }
+
+  /** Пока показана развилка закрытия — несохранённые места обведены; иначе обводка снята. */
+  function markUnsaved() {
+    if (!node || !f) return;
+    Array.prototype.forEach.call(node.querySelectorAll(".walk-unsaved"), function (n) { n.classList.remove("walk-unsaved"); });
+    if (!f.confirmClose) return;
+    var targets = unsavedTargets();
+    targets.forEach(function (n) { n.classList.add("walk-unsaved"); });
+    if (targets[0]) targets[0].scrollIntoView({ block: "nearest" });
+  }
+
+  /** «Продолжить запись»: фокус в первое подсвеченное место (поле — само, блок — первый его элемент). */
+  function focusFirst(target) {
+    if (!target) return;
+    var focusable = target.matches("textarea, input, button") ? target : target.querySelector("textarea, input, button");
+    if (!focusable) { target.setAttribute("tabindex", "-1"); focusable = target; }
+    focusable.focus({ preventScroll: true });
+    focusable.scrollIntoView({ block: "nearest" });
   }
 
   /* ── сохранение ───────────────────────────────────────────────────── */
@@ -2143,13 +2206,18 @@
     submit(list);
   }
 
-  /** «Записано: <зона>»; зона не та, что на экране, — со ссылкой «Перейти» (D445). */
-  function savedToast(zoneCode, more) {
+  /** «Записано: <пункт> · <класс D1–D3>» (aria-live); без пункта — «Записано: <зона>».
+   *  Зона не та, что на экране, — со ссылкой «Перейти» (D445). */
+  function savedToast(zoneCode, more, form) {
     var z = zoneOf(zoneCode);
     var actions = more ? [more] : [];
-    if (!z) { W.toast(tx("walk.sheet.saved"), "ok", actions); return; }
-    var text = tx("walk.sheet.saved_in", { zone: z.title });
-    if (zoneCode !== W.state.open && W.goZone) actions.unshift({ label: tx("walk.sheet.saved_go"), run: function () { W.goZone(zoneCode); } });
+    if (z && zoneCode !== W.state.open && W.goZone) actions.unshift({ label: tx("walk.sheet.saved_go"), run: function () { W.goZone(zoneCode); } });
+    var chosen = form && item(form.code);
+    var text;
+    if (chosen) {
+      var word = /^D[1-3]$/.test(form.level) ? form.level : "";
+      text = tx("walk.sheet.saved_line", { item: chosen.label || chosen.q, level: word }).replace(/ · $/, "");
+    } else text = z ? tx("walk.sheet.saved_in", { zone: z.title }) : tx("walk.sheet.saved");
     W.toast(text, "ok", actions);
   }
 
@@ -2218,7 +2286,7 @@
       } else if (W.editDraft) W.editDraft.clear(form);
       W.haptic("success");
       if (remaining && remaining.length) W.toast(tx("walk.sheet.remaining_material", { n: remaining.length }), "warn");
-      else savedToast(at, photoAgain(form, confirmed));
+      else savedToast(at, photoAgain(form, confirmed), form);
       close(true);
       if (last) W.apply(last);
     }, function (err) {

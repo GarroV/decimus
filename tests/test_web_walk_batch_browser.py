@@ -155,6 +155,16 @@ def written(page):
     return page.evaluate("written")
 
 
+def test_without_photos_the_main_button_opens_the_gallery_not_a_dead_end(page):
+    start(page, [])
+    cta = page.locator("[data-batch-pick-cta]")
+    assert cta.is_visible() and cta.is_enabled()
+    with page.expect_file_chooser() as chooser:
+        cta.click()
+    assert chooser.value.is_multiple()
+    assert page.locator("[data-batch-save]").count() == 0, "nothing is saved without a photo"
+
+
 def test_three_cards_one_not_established_recorded_as_deviation_then_saved(page):
     start(
         page,

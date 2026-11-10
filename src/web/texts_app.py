@@ -114,7 +114,7 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     "walk.app.help.text": {
         "ru": (
             "Обход идёт зона за зоной. «+ Нарушение» — кадр и пара слов, пункт найдёт "
-            "система; проверьте и сохраните. «Осмотрено →» засчитывает зону.\n\n"
+            "система; проверьте и сохраните. «Зона готова →» засчитывает зону.\n\n"
             "«Сведения» в шапке обхода — вопросы для отчёта; заполненное здесь бот в "
             "конце не спросит.\n\n"
             "Начать и завершить проверку можно здесь или в чате (/start, /finish). "
@@ -124,7 +124,7 @@ APP_TEXTS: dict[str, dict[str, str]] = {
         ),
         "en": (
             "The walk goes zone by zone. “+ Violation” — a photo and a few words, the "
-            "system finds the item; check it and save. “Checked →” counts the zone.\n\n"
+            "system finds the item; check it and save. “Zone done →” counts the zone.\n\n"
             "“Details” in the walk header are the report questions; whatever is filled "
             "in here the bot will not ask at the end.\n\n"
             "Start and finish an inspection here or in the chat (/start, /finish). "

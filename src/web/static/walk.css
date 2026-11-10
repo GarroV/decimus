@@ -338,7 +338,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
+  /* Отступы по 7 px и компенсирующие поля: полоса прокрутки обрезает невидимую зону нажатия
+     чипов (walk-ux.css), а так зона помещается внутрь, раскладка прежняя. */
+  margin: 1px 0 -7px;
+  padding: 7px 0;
   overflow-x: auto;
   scrollbar-width: none;
   transition: opacity .2s ease;
@@ -418,7 +421,7 @@
 
 .walk-sub {
   margin: 0 0 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -452,7 +455,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 40px;
+  min-height: 44px;
   padding: 6px 14px;
   border: 0;
   background: none;
@@ -491,7 +494,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 38px;
+  min-height: 44px;
   padding: 6px 14px;
   border: 0;
   border-top: 1px solid var(--line);
@@ -586,7 +589,7 @@
   50%      { background: var(--warn-soft); }
 }
 
-/* низ экрана: «+ Нарушение» и «Осмотрено →» под большим пальцем */
+/* низ экрана: «+ Нарушение» и «Зона готова →» под большим пальцем */
 
 .walk-dock__row {
   display: flex;
@@ -769,25 +772,30 @@
 
 .walk-cl--unseen { margin-bottom: 10px; }
 
-.walk-unseen__info {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  margin: 0;
-  padding: 6px 14px 8px;
-  font-size: 13px;
-  color: var(--ink-3);
-}
+.walk-unseen__info { border-top: 1px solid var(--line); }
+.walk-unseen__label { margin: 0; padding: 8px 14px 0; font-size: 13px; color: var(--ink-3); }
 
-.walk-unseen__link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--ink-3);
+.walk-cl--unseen .walk-cl__head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* «Ещё в зоне»: реже нужное — чек-лист, замеры, рекомендация — за одной подписанной кнопкой. */
+.walk-more { margin-top: 12px; }
+.walk-cl__head--static { margin: 0; min-height: 0; padding-bottom: 2px; font-weight: 400; }
+.walk-more .walk-cl { margin: 0 10px 8px; }
+.walk-more .walk-stage__extra { padding: 0 14px 8px; margin-top: 0; }
+
+/* «Завершить проверку» — действие над всей проверкой: внизу листа зон, не в ленте зоны. */
+.walk-zsheet__finish {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  border: 1px solid var(--line-control);
+  border-radius: 24px;
+  background: var(--surface);
+  color: var(--ink);
   font: inherit;
-  text-decoration: underline;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
 }
-
-.walk-cl--unseen .walk-cl__head:focus-visible,
-.walk-unseen__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.walk-zsheet__finish:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
