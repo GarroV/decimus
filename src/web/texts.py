@@ -568,14 +568,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Принята до появления приёмки",
         "en": "Accepted before the review step existed",
     },
-    # Что подтверждается при «Принять» (цена решения): буква, балл, записи, худший класс.
-    "accept.sum.records": {"ru": "записей: {n}", "en": "records: {n}"},
-    "accept.sum.worst": {"ru": "худшее: {level}", "en": "worst: {level}"},
-    "accept.sum.clean": {"ru": "нарушений нет", "en": "no violations"},
-    # Класс нарушения словами; коды людям не показываются.
-    "card.level.D1": {"ru": "отклонение", "en": "deviation"},
-    "card.level.D2": {"ru": "значительное", "en": "significant"},
-    "card.level.D3": {"ru": "критическое", "en": "critical"},
     "card.findings.repeat": {"ru": "повтор", "en": "repeat"},
     "card.findings.repeat_hint": {
         "ru": "Повтор нарушения прошлой проверки: вычет удвоен",
@@ -978,7 +970,7 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     # --- отклонение проверки (код остаётся retract, D194) ------------------
     "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
-    "retract.short": {"ru": "Отклонить", "en": "Reject"},
+    "retract.icon": {"ru": "Удалить проверку", "en": "Delete inspection"},
     "retract.hint": {
         "ru": (
             "Отклонение — пометка, а не удаление: строка остаётся в истории вместе с причиной, "

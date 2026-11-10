@@ -1,7 +1,7 @@
 # ruff: noqa: F811
 """Ряд действий карточки проверки не двигается при раскрытии окон: реальный DOM, Chromium.
 
-Окно действия («Принять», «Отклонить») со скриптом `hact.js` встаёт в слот под всем
+Окно действия («Исправить», корзина «Удалить проверку») со скриптом `hact.js` встаёт в слот под всем
 рядом и сдвигает содержимое ниже; кнопки ряда остаются на тех же местах — иначе
 интерфейс прыгает под рукой. Страница — синтетический HTML из Flask без сервера, стили
 подключены настоящие. Снимки состояний — в каталог из `CARD_STATES_DIR`, если задан.
@@ -26,7 +26,7 @@ STATIC = Path(__file__).resolve().parents[1] / "src/web/static"
 }
 ЭКРАНЫ = {"1280": (1280, 900), "390": (390, 844)}
 ДОПУСК = 0.6
-КНОПКИ = ".hact > .hact__group > a, .hact > .hact__group > .hact__item > summary"
+КНОПКИ = ".hact .hbtn"
 
 
 @pytest.fixture(params=["chromium", "webkit"])
@@ -106,10 +106,12 @@ def test_кнопки_ряда_на_месте_при_любом_раскрыт�
             break
         закрыто = следующие
     содержимое_закрыто = _ниже_ряда(page)
-    assert len(закрыто) >= 16, "ряд не отрисован"
+    assert len(закрыто) >= 12, "ряд не отрисован"
     _снимок(page, f"{метка}-1-закрыто")
 
-    for id_ in ("accept", "retract"):
+    for номер, id_ in enumerate(("move", "retract"), start=2):
+        if not page.locator(f"#{id_}").count():
+            continue  # в панели «Исправить» нет (D465)
         page.click(f"#{id_} > summary")
         # `toggle` приходит позже щелчка: ждём, пока в слоте останется ровно открытое окно.
         page.wait_for_function(
@@ -117,7 +119,7 @@ def test_кнопки_ряда_на_месте_при_любом_раскрыт�
             " && document.querySelector('#' + id).open",
             arg=id_,
         )
-        _снимок(page, f"{метка}-{2 if id_ == 'accept' else 3}-{id_}")
+        _снимок(page, f"{метка}-{номер}-{id_}")
         assert _координаты(page) == pytest.approx(закрыто, abs=ДОПУСК), (
             f"{метка}: {id_} сдвинул ряд"
         )
@@ -135,4 +137,50 @@ def test_кнопки_ряда_на_месте_при_любом_раскрыт�
     assert page.locator(".hact__slot .hact__pop").count() == 0
     assert _координаты(page) == pytest.approx(закрыто, abs=ДОПУСК)
     assert _ниже_ряда(page) == pytest.approx(содержимое_закрыто, abs=ДОПУСК)
+    page.close()
+
+
+@админ
+@pytest.mark.parametrize("поверхность", list(ПОВЕРХНОСТИ))
+def test_на_телефоне_решения_одной_строкой_пиктограммы_ниже(
+    стенд, monkeypatch, браузер, поверхность: str
+) -> None:
+    """390px: «Принять проверку» и «Исправить» пополам, 44px, без обрезки; иначе на всю ширину."""
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+    html = стенд.get(ПОВЕРХНОСТИ[поверхность]).get_data(as_text=True)
+    page = _открыть(браузер, html, ЭКРАНЫ["390"])
+    page.wait_for_timeout(1500)  # панель выезжает анимацией
+
+    рамки = page.evaluate(
+        """() => {
+          const box = (el) => { const r = el.getBoundingClientRect();
+            const cut = el.scrollWidth > el.clientWidth + 1;
+            return {x: r.x, y: r.y, w: r.width, h: r.height, cut}; };
+          const g = document.querySelector('.hact__group--decide');
+          return {
+            decide: [...g.querySelectorAll('.hbtn')].map(box),
+            group: box(g),
+            aux: [...document.querySelectorAll('.hact__group--aux .hbtn')].map(box),
+          };
+        }"""
+    )
+    решения = рамки["decide"]
+    for кнопка in решения:
+        assert кнопка["h"] == pytest.approx(44, abs=0.6) and not кнопка["cut"], кнопка
+    if поверхность == "страница":
+        assert len(решения) == 2
+        assert решения[0]["y"] == pytest.approx(решения[1]["y"], abs=0.6), "не одной строкой"
+        assert решения[0]["w"] == pytest.approx(решения[1]["w"], abs=1.5), "не пополам"
+    else:
+        assert len(решения) == 1
+        assert решения[0]["w"] == pytest.approx(рамки["group"]["w"], abs=1.5), "не на всю ширину"
+    assert len(рамки["aux"]) >= 2
+    низ_решений = max(к["y"] + к["h"] for к in решения)
+    for значок in рамки["aux"]:
+        assert значок["w"] == pytest.approx(44, abs=0.6) and значок["h"] == pytest.approx(
+            44, abs=0.6
+        )
+        assert значок["y"] >= низ_решений, "пиктограммы не строкой ниже"
+    assert len({round(з["y"]) for з in рамки["aux"]}) == 1, "пиктограммы в одну строку"
     page.close()
