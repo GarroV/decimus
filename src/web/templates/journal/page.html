@@ -41,7 +41,7 @@
   {% if not own %}<div class="sadmin">{{ admin_nav() }}<div class="sadmin__main">{% endif %}
   <header class="shead">
 
-    {% if own %}<a class="sbtn" href="{{ settings_url }}?lang={{ lang }}">{{ t('journal.own.back') }}</a>{% endif %}
+    {% if own %}<a class="sbtn" href="{{ settings_url }}">{{ t('journal.own.back') }}</a>{% endif %}
   </header>
 
   <div class="sbox jbox">
