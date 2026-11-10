@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.domain.models import REPORT_LANGS
 from src.domain.permissions import SIDE_HQ, side_of
 
 from . import checklist as store_api
@@ -40,12 +41,18 @@ from . import tools as reads
 from . import uncovered as uncovered_api
 from .checklist import Outcome, Store
 from .errors import ChecklistError, ToolError
+from .lang_fields import cli_options, publishes_texts
 
 #: Виды пунктов, которые можно завести. `off` сюда не входит намеренно: это не
 #: вид пункта, а выключенное состояние, и включают-выключают его
 #: `remove_checklist_item` и `restore_checklist_item`. Отданный сюда, он дал бы
 #: второй способ выключить пункт — тот, которого никто не ищет в журнале.
 ITEM_KINDS = ("violation", "info", "aggregate")
+
+#: Поля пункта и зоны, у которых есть перевод на каждый язык отчёта сверх базового
+#: (`process_en`, `question_en`, `name_en` …): набор языков — `REPORT_LANGS`.
+ITEM_TEXTS = ("process", "question")
+ZONE_TEXTS = ("name",)
 
 #: Сколько знаков пояснения к правке кладём в журнал. Пояснение — строка для
 #: человека, читающего журнал через год, а не место для выгрузки данных.
@@ -183,7 +190,7 @@ def checklist_items(
         строки = [
             r
             for r in строки
-            if отбор in (r.get("process_ru", "") + r.get("process_en", "")).lower()
+            if отбор in "".join(r.get(f"process_{код}", "") for код in REPORT_LANGS).lower()
         ]
     зоны = store_api.read_items(store, version=выбранная, what="zones")
     return {
@@ -223,6 +230,7 @@ def checklist_item(
 # --- правка пунктов -----------------------------------------------------------
 
 
+@publishes_texts(*ITEM_TEXTS)
 def add_checklist_item(
     *,
     tenant: str,
@@ -231,8 +239,6 @@ def add_checklist_item(
     question_ru: str,
     levels: str,
     code: str | None = None,
-    process_en: str | None = None,
-    question_en: str | None = None,
     zones: str | None = None,
     days: int | None = None,
     criteria: str | None = None,
@@ -240,6 +246,7 @@ def add_checklist_item(
     letter_role: str | None = None,
     version_name: str | None = None,
     note: str | None = None,
+    **texts: str | None,
 ) -> dict[str, Any]:
     """Завести пункт чек-листа в новой версии методики.
 
@@ -257,9 +264,8 @@ def add_checklist_item(
         options={
             "id": code,
             "process": process,
-            "process-en": process_en,
             "question-ru": question_ru,
-            "question-en": question_en,
+            **cli_options(texts, *ITEM_TEXTS),
             "levels": levels,
             "zones": zones,
             "days": days,
@@ -272,15 +278,14 @@ def add_checklist_item(
     )
 
 
+@publishes_texts(*ITEM_TEXTS)
 def edit_checklist_item(
     *,
     tenant: str,
     store: Store,
     code: str,
     process: str | None = None,
-    process_en: str | None = None,
     question_ru: str | None = None,
-    question_en: str | None = None,
     levels: str | None = None,
     zones: str | None = None,
     days: int | None = None,
@@ -288,6 +293,7 @@ def edit_checklist_item(
     letter_role: str | None = None,
     version_name: str | None = None,
     note: str | None = None,
+    **texts: str | None,
 ) -> dict[str, Any]:
     """Поправить пункт в новой версии методики. Меняются только названные поля.
 
@@ -303,9 +309,8 @@ def edit_checklist_item(
         positional=code,
         options={
             "process": process,
-            "process-en": process_en,
             "question-ru": question_ru,
-            "question-en": question_en,
+            **cli_options(texts, *ITEM_TEXTS),
             "levels": levels,
             "zones": zones,
             "days": days,
@@ -369,17 +374,18 @@ def restore_checklist_item(
 # --- правка зон ---------------------------------------------------------------
 
 
+@publishes_texts(*ZONE_TEXTS)
 def add_zone(
     *,
     tenant: str,
     store: Store,
     code: str,
     name_ru: str,
-    name_en: str | None = None,
     share: float | None = None,
     equal_shares: bool | None = None,
     version_name: str | None = None,
     note: str | None = None,
+    **texts: str | None,
 ) -> dict[str, Any]:
     """Завести физическую зону в новой версии методики.
 
@@ -399,7 +405,7 @@ def add_zone(
         options={
             "code": code,
             "name-ru": name_ru,
-            "name-en": name_en,
+            **cli_options(texts, *ZONE_TEXTS),
             "share": share,
             "equal-shares": equal_shares,
         },
@@ -497,15 +503,16 @@ def set_zone_shares(
     )
 
 
+@publishes_texts(*ZONE_TEXTS)
 def rename_zone(
     *,
     tenant: str,
     store: Store,
     code: str,
     name_ru: str | None = None,
-    name_en: str | None = None,
     version_name: str | None = None,
     note: str | None = None,
+    **texts: str | None,
 ) -> dict[str, Any]:
     """Переименовать зону. Меняются имена, код зоны не меняется никогда.
 
@@ -520,7 +527,7 @@ def rename_zone(
         tool="rename_zone",
         command="zone-rename",
         positional=code,
-        options={"name-ru": name_ru, "name-en": name_en},
+        options={"name-ru": name_ru, **cli_options(texts, *ZONE_TEXTS)},
         version_name=version_name,
         note=note,
     )
