@@ -170,13 +170,3 @@ def test_на_странице_у_второстепенных_действий_
     ауксы = страница.split("hact__group--aux", 1)[1]
     assert 'aria-label="Скачать PDF"' in ауксы
     assert 'aria-label="Письмо партнёру"' in ауксы
-
-
-@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
-def test_раскрытия_карточки_одного_вида_с_шевроном(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    страница = _открыть(стенд, monkeypatch, СТРАНИЦА)
-
-    assert 'class="mx-more mx-more--card"' in страница  # «Версия чек-листа»
-    assert "mx-more mx-more--card mx-more--explain" in страница

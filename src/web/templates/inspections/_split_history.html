@@ -1,5 +1,5 @@
 {% if head.finding_history %}
-<details class="mx-more mx-more--card">
+<details class="mx-more">
   <summary>{{ t('walk.edit.history') if (head.finding_history|selectattr('kind', 'equalto', 'edit')|list or head.finding_history|selectattr('kind', 'equalto', 'clarification')|list) else t('walk.split.history') }}</summary>
   {% for event in head.finding_history %}
   {% if event.kind == 'clarification' %}

@@ -921,7 +921,7 @@ html[data-nav-collapsed="true"] .sidenav__sub { margin: 0; border-left: 0; }
 .zlist li { display: grid; grid-template-columns: minmax(0, 18rem) 6rem auto; justify-content: start; align-items: center;
   gap: var(--space-5); padding: var(--space-2) 0; font-size: var(--fs-dense); }
 .zlist__name { min-width: 0; overflow-wrap: anywhere; color: var(--ink-2); }
-.zlist__flag { font-size: 12px; color: var(--err); white-space: nowrap; }
+.zlist__flag { font-size: var(--fs-micro); color: var(--err); white-space: nowrap; }
 .zlist li.is-zeroed .zlist__name { color: var(--err); }
 .zlist .zlist__bar { min-width: 0; flex: none; width: 100%; }
 .zlist__loss { color: var(--err); font-weight: var(--w-semibold); font-variant-numeric: tabular-nums; }
@@ -1012,10 +1012,10 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .find-item { position: relative; border-bottom: 1px solid var(--line-2); }
 .find-item:last-child { border-bottom: 0; }
 .find-item > .find-row, .find-item > .find-row--photos { border-bottom: 0; }
-.find-item--acts > .find-row { padding-right: calc(var(--space-7) + 80px); }
-.find-item--acts > .find-row--photos > .find-row__summary { padding-right: calc(var(--space-7) + 80px); }
+.find-item--acts > .find-row { padding-right: calc(var(--space-7) + 68px); }
+.find-item--acts > .find-row--photos > .find-row__summary { padding-right: calc(var(--space-7) + 68px); }
 @media (max-width: 719px) {
-  .find-item--acts > .find-row, .find-item--acts > .find-row--photos > .find-row__summary { padding-right: calc(var(--space-7) + 96px); }
+  .find-item--acts > .find-row, .find-item--acts > .find-row--photos > .find-row__summary { padding-right: calc(var(--space-7) + 80px); }
 }
 /* Пиктограммы правки и удаления у строки. */
 .find-item__acts { position: absolute; top: var(--space-4); right: var(--space-7); display: flex; gap: var(--space-2); color: var(--ink-2); }
@@ -1111,7 +1111,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .find-row__level { flex: none; }
 .find-row__num {
   font-family: var(--font-num);
-  font-size: 12px;
+  font-size: var(--fs-micro);
   color: var(--ink-3);
   min-width: 1.5rem;
   font-variant-numeric: tabular-nums;
@@ -1119,7 +1119,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .find-row__main { flex: 1; min-width: 12rem; }
 .find-row__text { font-size: var(--fs-dense); line-height: var(--lh-body); }
 .find-row__title { display: block; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: var(--w-semibold); }
-.find-row__meta { display: block; font-size: 12px; color: var(--ink-3); margin-top: var(--space-2); }
+.find-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-2); }
 
 /* Запись с кадрами раскрывается (D219): строка та же, что у записи без них,
    справа — сколько кадров, под ней — лента копий. */
@@ -1135,7 +1135,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .find-row__summary::-webkit-details-marker { display: none; }
 .find-row__summary:hover { background: var(--surface-2); }
 .find-row__summary:focus-visible { outline: 2px solid var(--ink-2); outline-offset: -2px; }
-.find-row__shots { flex: none; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.find-row__shots { flex: none; font-size: var(--fs-micro); color: var(--ink-2); white-space: nowrap; }
 .find-row__shots::after { content: " ▾"; }
 .find-row--photos[open] .find-row__shots::after { content: " ▴"; }
 /* Кадры были, но показать их нечем (#422): не раскрытие, а честная пометка. */
@@ -1778,33 +1778,18 @@ a[data-zoom] { cursor: zoom-in; }
 .mx-record .btn[disabled] { opacity: .45; cursor: default; }
 
 .mx-more { margin-top: var(--space-8); border-top: 1px solid var(--line-2); padding-top: var(--space-5); }
-.mx-more > summary { cursor: pointer; font-size: var(--fs-meta); color: var(--ink-2); list-style: none; display: flex; align-items: center; }
+.mx-more > summary { cursor: pointer; font-size: var(--fs-meta); color: var(--ink-2); list-style: none; }
 .mx-more > summary::-webkit-details-marker { display: none; }
 .mx-more > summary::before { content: "▸ "; color: var(--ink-3); }
 .mx-more[open] > summary::before { content: "▾ "; }
-/* Раскрытия карточки проверки («Расшифровка», «Версия чек-листа», журналы): вровень с
-   левым краем текста карточки, шеврон вместо мелкого «▸», тело — с отступом и обычным
-   размером. Вне карточки (методика) `.mx-more` прежний. */
-.mx-more--card { margin: var(--space-6) 0 0; padding: var(--space-4) var(--space-7) var(--space-6); border-top: 1px solid var(--line-2); }
-.mx-more--card > summary { font-size: 13px; font-weight: var(--w-medium); color: var(--ink); gap: var(--space-4); }
-.mx-more--card > summary::before { content: ""; flex: none; width: 7px; height: 7px; margin: 0 var(--space-2) 2px 2px;
-  border-right: 2px solid var(--ink-3); border-bottom: 2px solid var(--ink-3); transform: rotate(-45deg); transition: transform .12s; }
-.mx-more--card[open] > summary::before { content: ""; transform: rotate(45deg); }
-.mx-more--card > :not(summary) { margin-left: calc(7px + var(--space-4) + var(--space-2) + 2px); font-size: 13px; line-height: 1.45; }
-.mx-more--card .meta, .mx-more--card .muted { font-size: 12px; }
-.mx-more--explain { margin: 0; border-top: 0; border-bottom: 1px solid var(--line); }
-.explain__n { color: var(--ink-2); }
-.explain__sep { display: none; }
-.explain__v { font-variant-numeric: tabular-nums; text-align: right; }
-.explain li:last-child { padding-top: var(--space-3); border-top: 1px solid var(--line-2); color: var(--ink); }
+.mx-more--explain { margin: var(--space-5) var(--space-7) var(--space-6); }
 .kv--card { margin-top: var(--space-4); }
 .grade-reason { margin-top: var(--space-2); }
-.explain { margin: var(--space-4) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-3); font-size: 13px; max-width: 34rem; }
-.explain li { display: flex; justify-content: space-between; gap: var(--space-6); }
+.explain { margin: var(--space-4) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); font-size: var(--fs-meta); }
 .explain li:last-child { font-weight: 600; }
-.explain__note { margin: var(--space-3) 0 0; font-size: 12px; }
+.explain__note { margin: var(--space-3) 0 0; font-size: var(--fs-meta); }
 /* Справка «ключ — значение» (сборка чек-листа в карточке проверки, D218). */
-.kv { display: grid; gap: var(--space-3); margin: 0; font-size: 13px; }
+.kv { display: grid; gap: var(--space-2); margin: 0; font-size: var(--fs-meta); }
 .kv > div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: var(--space-3); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
 .mx-danger .btn--primary { background: var(--err); border-color: var(--err); }
