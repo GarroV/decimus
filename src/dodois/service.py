@@ -101,6 +101,20 @@ def _note(country: str, state: str, reason: str | None, now: datetime) -> None:
         logger.error("Dodo IS %s: состояние %s не записалось", country, state, exc_info=False)
 
 
+def _fill_account(login: Login, access: str) -> None:
+    """Перенесённый вход пришёл без имени и почты: спросить учётку у Dodo IS и дописать.
+
+    Сбой не ломает проверку: плитка остаётся «учётка неизвестна», значения в журнал не идут.
+    """
+    if login.account_name or login.account_email:
+        return
+    try:
+        name, email = client.userinfo(login.contour, access)
+        store.set_account(login.country, name, email)
+    except DbError:
+        logger.warning("Dodo IS %s: учётка входа не записалась", login.country, exc_info=False)
+
+
 def check(country: str, *, now: datetime | None = None) -> Login | None:
     """Проверить вход: сколько пиццерий открыто. Записывает исход и возвращает вход."""
     moment = now or datetime.now(UTC)
@@ -125,6 +139,7 @@ def check(country: str, *, now: datetime | None = None) -> Login | None:
     except DodoisError as exc:
         _note(country, rules.FAILED, exc.kind, moment)
         return store.get_login(country)
+    _fill_account(login, tokens.access)
     state, reason = rules.counts_state(len(units), opened)
     try:
         store.record_state(

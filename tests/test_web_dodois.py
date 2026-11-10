@@ -736,3 +736,29 @@ def test_контур_в_форме_выбран_по_стране_по_умол
     html = главный.get(f"{ВКЛАДКА}&country={страна}").get_data(as_text=True)
     выбран = re.search(r'<option value="(\w+)" selected>', html)
     assert выбран and выбран.group(1) == ожидаем
+
+
+def test_перенесённый_вход_показан_как_остальные(
+    главный: FlaskClient, ссылки: Ссылки, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Вход, перенесённый инструментом, на плитке и в панели — учётка Dodo IS, не «владелец»."""
+    сейчас = datetime.now(UTC)
+    монтаж = (
+        rules.Login(
+            "SI", rules.INTL, "import", "admin", "Ana Novak", None, сейчас, "s", 3, 3,
+            None, None, None, rules.OK, None,
+        ),
+        rules.Login(
+            "BG", rules.CIS, "import", "admin", None, None, сейчас, "s", 3, 3,
+            None, None, None, rules.OK, None,
+        ),
+    )  # fmt: skip
+    monkeypatch.setattr(store, "list_logins", lambda: монтаж)
+    monkeypatch.setattr(
+        store, "get_login", lambda c: next((x for x in монтаж if x.country == c), None)
+    )
+    html = главный.get(ВКЛАДКА).get_data(as_text=True)
+    assert "Ana Novak" in html and "Учётка Dodo IS не назвалась" in html
+    assert "перенесённый вход" not in html and "transferred login" not in html
+    панель = главный.get(f"{ВКЛАДКА}&country=BG").get_data(as_text=True)
+    assert "перенесённый вход" not in панель
