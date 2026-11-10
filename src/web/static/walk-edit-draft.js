@@ -161,7 +161,7 @@
           });
         }, function () {if(item.isConnected)W.toast(W.tx("walk.err.network"),"warn");});
       });
-      item.appendChild(W.el("summary", "", [W.itemName(v.code), v.level ? W.levelWord(v.level) : "", W.zoneName(v.zone)].filter(Boolean).join(" · ")));
+      item.appendChild(W.el("summary", "", [W.itemName(v.code), v.level || "", W.zoneName(v.zone)].filter(Boolean).join(" · ")));
       item.appendChild(W.el("p", "", v.text || ""));
       if (v.comment) item.appendChild(W.el("p", "", v.comment));
       if (Array.isArray(d.class_facts) && d.class_facts.length) {

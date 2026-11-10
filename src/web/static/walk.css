@@ -77,7 +77,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 44px;
+  min-height: 32px;
   padding: 3px 12px;
   border: 1px solid var(--line-control);
   border-radius: 999px;
@@ -101,7 +101,7 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 44px;
+  min-height: 32px;
   padding: 0;
   border: 0;
   background: none;
@@ -149,11 +149,8 @@
 }
 
 .walk-prevline.is-attention {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
   justify-self: start;
-  padding: 4px 12px;
+  padding: 4px 10px;
   border-radius: 8px;
   background: var(--warn-soft);
   color: var(--warn-ink);
@@ -183,7 +180,7 @@
 
 .walk-switch__arrow {
   flex: none;
-  width: 44px;
+  width: 36px;
   border: 1px solid var(--line-control);
   border-radius: 10px;
   background: var(--surface);
@@ -195,7 +192,7 @@
 
 .walk-progress-row { display: flex; align-items: center; gap: 8px; }
 .walk-progress-row .walk-progress { flex: 1; min-width: 0; }
-.walk-switch__arrow--top { height: 44px; width: 44px; font-size: 22px; line-height: 1; }
+.walk-switch__arrow--top { height: 32px; width: 40px; font-size: 20px; line-height: 1; }
 
 .walk-switch__main {
   flex: 1;
@@ -203,7 +200,7 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
-  min-height: 44px;
+  min-height: 40px;
   padding: 6px 12px;
   border: 1px solid var(--line-control);
   border-radius: 10px;
@@ -341,7 +338,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
+  /* Отступы по 7 px и компенсирующие поля: полоса прокрутки обрезает невидимую зону нажатия
+     чипов (walk-ux.css), а так зона помещается внутрь, раскладка прежняя. */
+  margin: 1px 0 -7px;
+  padding: 7px 0;
   overflow-x: auto;
   scrollbar-width: none;
   transition: opacity .2s ease;
@@ -366,7 +366,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 44px;
+  min-height: 32px;
   padding: 3px 12px;
   border: 1px solid var(--line-control);
   border-radius: 999px;
@@ -522,28 +522,16 @@
   flex: none;
   display: grid;
   place-items: center;
-  position: relative;
-  isolation: isolate;
-  width: 44px;
-  height: 44px;
-  margin: -6px -10px -6px 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
 }
 
-/* Кружок рисуем отдельно, чтобы зона нажатия была 44×44, а вид остался прежним. */
-.walk-cl__act::before {
-  content: "";
-  position: absolute;
-  inset: 8px;
-  z-index: -1;
-  border-radius: 50%;
-  background: var(--accent-soft);
-}
-
 .walk-cl__item.is-recorded .walk-cl__text { color: var(--ink-2); }
-.walk-cl__item.is-recorded .walk-cl__act { color: var(--ok); }
-.walk-cl__item.is-recorded .walk-cl__act::before { background: var(--ok-soft); }
+.walk-cl__item.is-recorded .walk-cl__act { background: var(--ok-soft); color: var(--ok); }
 
 /* замеры зоны: что методика ждёт здесь, и что уже внесено */
 
@@ -696,7 +684,7 @@
 
 .walk-fix {
   margin-top: 8px;
-  min-height: 48px;
+  min-height: 40px;
   padding: 6px 14px;
   border: 1px solid var(--line-control);
   border-radius: 10px;

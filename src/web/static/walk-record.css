@@ -26,7 +26,7 @@
 
 .walk-add {
   flex: 1 1 140px;
-  min-height: 44px;
+  min-height: 40px;
   padding: 6px 14px;
   border: 1px solid var(--accent-line);
   border-radius: 999px;
@@ -418,7 +418,7 @@
 }
 
 .walk-chip {
-  min-height: 44px;
+  min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--line-control);
   border-radius: 999px;
@@ -538,7 +538,7 @@
 .walk-choice__text { font-size: 15px; line-height: 21px; }
 
 .walk-link {
-  min-height: 44px;
+  min-height: 40px;
   padding: 6px 0;
   border: 0;
   background: none;
@@ -559,16 +559,19 @@
 .walk-seg {
   display: flex;
   gap: 0;
-  overflow: hidden;
   border: 1px solid var(--line-control);
   border-radius: 999px;
   background: var(--surface);
 }
 
+.walk-seg > :first-child { border-radius: 999px 0 0 999px; }
+.walk-seg > :last-child { border-radius: 0 999px 999px 0; }
+.walk-seg > :only-child { border-radius: 999px; }
+
 .walk-seg__opt {
   flex: 1;
   min-width: 0;
-  min-height: 44px;
+  min-height: 36px;
   padding: 0 10px;
   border: 0;
   border-radius: 0;
@@ -612,7 +615,7 @@
 
 .walk-btn {
   flex: 1;
-  min-height: 44px;
+  min-height: 36px;
   padding: 6px 14px;
   border: 1px solid var(--line-control);
   border-radius: 999px;
@@ -623,7 +626,7 @@
   cursor: pointer;
 }
 
-.walk-btn--small { flex: none; min-height: 44px; }
+.walk-btn--small { flex: none; min-height: 32px; }
 
 .walk-btn--danger { border-color: var(--err); background: var(--err); color: var(--ink-inverse); font-weight: 600; }
 
@@ -797,3 +800,6 @@
 /* «Закрыть без сохранения»: второстепенное действие без красной заливки — красным только текст. */
 .walk-btn--danger-quiet { border-color: var(--line-control); background: var(--surface); color: var(--err); font-weight: 600; }
 .walk-form__error { text-align: center; }
+
+/* Развилка «закрыть без сохранения» (D745): места с несохранённым вводом обведены токеном предупреждения. */
+.walk-unsaved { outline: 2px solid var(--warn-mark); outline-offset: 2px; border-radius: 12px; }

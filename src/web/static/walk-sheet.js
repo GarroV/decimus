@@ -1393,13 +1393,13 @@
     var text = state.status === "waiting_search" ? tx("walk.sheet.class_review.waiting_search")
       : state.status === "pending" ? tx("walk.sheet.class_review.pending")
       : state.status === "manual" ? tx("walk.sheet.class_review.manual_active")
-      : state.status === "ready" ? tx("walk.sheet.class_review.proposed", {level:W.levelWord(state.level)})
+      : state.status === "ready" ? tx("walk.sheet.class_review.proposed", {level:state.level})
       : state.status === "needs_fact" ? state.needFact
       : state.status === "not_established" ? tx("walk.sheet.class_review.not_established")
       : state.message || classContext(cand).blocked || tx("walk.sheet.class_review.check_hint");
     feedback.appendChild(el("p", "walk-form__hint", text));
     if (state.status === "needs_fact" && state.provisional) {
-      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.provisional", {level:W.levelWord(state.provisional)})));
+      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.provisional", {level:state.provisional})));
     }
     if (state.clarifications.length) {
       var chainReview = el("details");
@@ -1444,7 +1444,7 @@
       feedback.appendChild(recovery);
     }
     if (classIsPrimary(cand) && f.legacyLevel && !state.level) {
-      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.draft_level", {level:W.levelWord(f.legacyLevel)})));
+      feedback.appendChild(el("p", "walk-form__hint", tx("walk.sheet.class_review.draft_level", {level:f.legacyLevel})));
     }
     var dead = state.status === "not_established" && !state.manualMode;
     var exits = panel.querySelector("[data-class-exits]");
@@ -1533,7 +1533,7 @@
   function classReviewBox(cand) {
     if ((item(cand.code) || {}).measure) {
       var info = section(tx("walk.sheet.level"));
-      info.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", {level:W.levelWord("D0")})));
+      info.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", {level:"D0"})));
       if (!classIsPrimary(cand)) {addExtraReadingControls(info, cand); info.appendChild(extraTextEditor(cand));}
       return info;
     }
@@ -1590,7 +1590,8 @@
     } else {
       var seg = el("div", "walk-seg");
       (item(cand.code) || {levels:[]}).levels.forEach(function (level) {
-        var button = W.button("walk-seg__opt walk-seg__opt--" + level.toLowerCase(), W.levelWord(level), function () {
+        var word = tx("walk.sheet.class_review.level." + level);
+        var button = W.button("walk-seg__opt walk-seg__opt--" + level.toLowerCase(), word === "walk.sheet.class_review.level." + level ? level : level + " · " + word, function () {
           W.classReview.chooseManual(state, classContext(cand), level);
           syncClassSelections();
           changed();
@@ -1785,7 +1786,7 @@
       if (reviewing()) return classReviewBox(primaryClassCandidate());
       var box = section(tx("walk.sheet.level"));
       if (it.levels.length === 1) {
-        box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", { level: W.levelWord(it.levels[0]) })));
+        box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", { level: it.levels[0] })));
         return box;
       }
       var seg = W.hinted(el("div", "walk-seg"), "level");
@@ -1920,7 +1921,7 @@
     footer: function () {
       var box = el("div", "walk-sheet__foot");
       if (f.confirmClose) {
-        box.appendChild(el("p", "walk-form__note", tx("walk.sheet.discard")));
+        // Фразы нет: две кнопки говорят сами, а несохранённые места подсвечены (D745).
         // Порядок единый для нижних панелей: вторичное слева, главное справа. Безопасное — главное;
         // потеря записи — вторым, словами, без красной заливки.
         var row = el("div", "walk-bar__row");
@@ -1931,8 +1932,10 @@
           close(true);
         }));
         row.appendChild(W.button("walk-mark", tx("walk.sheet.discard_keep"), function () {
+          var first = node && node.querySelector(".walk-unsaved");
           f.confirmClose = false;
           redraw("footer");
+          focusFirst(first);
         }));
         box.appendChild(row);
         return box;
@@ -2064,6 +2067,45 @@
       var made = draw[name]();
       if (made) holder.appendChild(made);
     });
+    markUnsaved();
+  }
+
+  /** Места формы с несохранённым вводом: то же, что считает `dirty()`, но по полям (D745). */
+  function unsavedTargets() {
+    var out = [];
+    function add(target) { if (target && out.indexOf(target) === -1) out.push(target); }
+    function slot(name) { return parts[name] && parts[name].firstElementChild; }
+    function field(name, selector) { return parts[name] && parts[name].querySelector(selector); }
+    var o = f.original;
+    if (f.n ? f.photos.some(function (p) { return p.fresh; }) || f.removed.length > 0 : f.photos.length) add(slot("photos"));
+    if (!f.n && f.words) add(field("words", "textarea"));
+    if (f.n ? f.text !== o.text : f.text) add(field("text", "textarea"));
+    if (f.n ? f.comment !== o.comment : f.comment) add(field("comment", "textarea") || slot("comment"));
+    if (f.n ? f.code !== o.code : f.code !== f.preset) add(slot("item"));
+    if (f.n && f.level !== o.level) add(slot("level"));
+    if (f.n && f.zone !== o.zone) add(field("context", ".walk-ctx__pill--zone"));
+    if (f.n && f.repeat !== o.repeat) add(slot("repeat"));
+    if (f.n && readingChanged()) add(slot("reading"));
+    return out;
+  }
+
+  /** Пока показана развилка закрытия — несохранённые места обведены; иначе обводка снята. */
+  function markUnsaved() {
+    if (!node || !f) return;
+    Array.prototype.forEach.call(node.querySelectorAll(".walk-unsaved"), function (n) { n.classList.remove("walk-unsaved"); });
+    if (!f.confirmClose) return;
+    var targets = unsavedTargets();
+    targets.forEach(function (n) { n.classList.add("walk-unsaved"); });
+    if (targets[0]) targets[0].scrollIntoView({ block: "nearest" });
+  }
+
+  /** «Продолжить запись»: фокус в первое подсвеченное место (поле — само, блок — первый его элемент). */
+  function focusFirst(target) {
+    if (!target) return;
+    var focusable = target.matches("textarea, input, button") ? target : target.querySelector("textarea, input, button");
+    if (!focusable) { target.setAttribute("tabindex", "-1"); focusable = target; }
+    focusable.focus({ preventScroll: true });
+    focusable.scrollIntoView({ block: "nearest" });
   }
 
   /* ── сохранение ───────────────────────────────────────────────────── */
@@ -2164,7 +2206,7 @@
     submit(list);
   }
 
-  /** «Записано: <пункт> · <класс словами>» (aria-live); без пункта — «Записано: <зона>».
+  /** «Записано: <пункт> · <класс D1–D3>» (aria-live); без пункта — «Записано: <зона>».
    *  Зона не та, что на экране, — со ссылкой «Перейти» (D445). */
   function savedToast(zoneCode, more, form) {
     var z = zoneOf(zoneCode);
@@ -2173,7 +2215,7 @@
     var chosen = form && item(form.code);
     var text;
     if (chosen) {
-      var word = /^D[1-3]$/.test(form.level) ? W.levelWord(form.level) : "";
+      var word = /^D[1-3]$/.test(form.level) ? form.level : "";
       text = tx("walk.sheet.saved_line", { item: chosen.label || chosen.q, level: word }).replace(/ · $/, "");
     } else text = z ? tx("walk.sheet.saved_in", { zone: z.title }) : tx("walk.sheet.saved");
     W.toast(text, "ok", actions);

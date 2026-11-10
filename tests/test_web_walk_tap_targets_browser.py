@@ -1,5 +1,6 @@
-"""The zone screen is used on the move, one-handed: every button is at least 44px tall (48px for
-the «Fixed / Not fixed» decisions), nothing overflows sideways at 390px, and the feed keeps only
+"""The zone screen is used on the move, one-handed: every button can be hit in a 44×44px area around
+its centre (the buttons keep their compact look — the extra area is an invisible layer, D745), nothing
+overflows sideways at 390px, and the feed keeps only
 what the auditor needs now — the checklist, measurements and recommendation sit behind one
 «More in this zone» button, «Finish the inspection» lives in the all-zones sheet.
 
@@ -65,12 +66,21 @@ def test_zone_screen_tap_targets_and_feed(page, lang):
     page.locator(".walk-more > .walk-cl__head").click()
     page.wait_for_timeout(400)
     got = page.evaluate("""()=>{
-      const small=[];
-      document.querySelectorAll('#walk button, #walk-zones-sheet button, #walk .walk-cl__act').forEach(b=>{
+      const small=[], NEED=44;
+      // The tap area, not the painted size: a point at the edge of the 44×44 box around the centre
+      // must land on the button (or something inside it).
+      document.querySelectorAll('#walk button, #walk-zones-sheet button').forEach(b=>{
         const r=b.getBoundingClientRect(); if(!r.width||!r.height) return;
         if(b.closest('.walk-zsheet__scrim')) return;
-        const need=b.classList.contains('walk-fix')?48:44;
-        if(r.height<need-0.5||r.width<44-0.5) small.push([b.className,Math.round(r.width),Math.round(r.height)]);
+        b.scrollIntoView({block:'center'});
+        const q=b.getBoundingClientRect(), cx=q.left+q.width/2, cy=q.top+q.height/2, h=NEED/2-2;
+        const miss=[[0,-h],[0,h],[-h,0],[h,0]].filter(([dx,dy])=>{
+          const x=cx+dx, y=cy+dy; if(x<0||y<0||x>innerWidth||y>innerHeight) return false;
+          const hit=document.elementFromPoint(x,y);
+          // Hitting a neighbouring button is fine (two controls closer than 8px cannot both own
+          // 44px); hitting anything else — a dead zone — is not.
+          return !(hit&&(b===hit||b.contains(hit)||hit.closest('button')));});
+        if(miss.length) small.push([b.className,Math.round(q.width),Math.round(q.height),miss.map(([dx,dy])=>{const e=document.elementFromPoint(cx+dx,cy+dy);return dx+','+dy+'->'+(e&&e.className)})]);
       });
       const more=document.querySelectorAll('.walk-more > .walk-cl__head');
       const feed=[...document.querySelectorAll('.walk-stage > *')].map(n=>n.className);
@@ -78,7 +88,7 @@ def test_zone_screen_tap_targets_and_feed(page, lang):
         feed, finishInStage:!!document.querySelector('.walk-stage .walk-link--quiet'),
         finishInSheet:!!document.querySelector('#walk-zones-sheet .walk-zsheet__finish'),
         overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth};}""")
-    assert got["small"] == [], got["small"]
+    assert got["small"] == [], "tap area too small:\n" + "\n".join(map(str, got["small"]))
     assert got["more"] == 1 and got["moreText"].startswith(
         "Ещё в зоне" if lang == "ru" else "More in this zone"
     ), got

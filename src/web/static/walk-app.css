@@ -11,7 +11,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: 38px;
   margin-bottom: 8px;
 }
 
@@ -133,11 +133,11 @@
 
 .walk-top__home {
   flex: none;
-  width: 44px;
-  height: 44px;
-  margin-left: -12px;
+  width: 36px;
+  height: 36px;
+  margin-left: -8px;
   border: 0;
-  border-radius: 22px;
+  border-radius: 18px;
   background: none;
   color: var(--accent);
   font: inherit;
@@ -182,7 +182,7 @@
 
 .walk-app__lang-opt {
   min-width: 40px;
-  min-height: 44px;
+  min-height: 32px;
   padding: 0 10px;
   border: 0;
   border-radius: 16px;
