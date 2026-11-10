@@ -44,7 +44,7 @@ def search_tags(items: Iterable[ChecklistItem], *, chat_id: int) -> list[dict[st
                 hits.update(row.codes)
         # Checklist wording is a data-owned lookup too, including editions without a cue map.
         for item in catalogue:
-            if matches(stems(item.question_ru)) or matches(stems(item.question_en)):
+            if any(matches(stems(text)) for text in item.question_texts.values()):
                 hits.add(item.code)
         result.append({"id": tag, "codes": [item.code for item in catalogue if item.code in hits]})
     return result

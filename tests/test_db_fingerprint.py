@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from src.db.fingerprint import compute_fingerprint
-from src.domain.models import Finding, Inspection, Score
+from src.domain.models import Finding, Inspection, LangTexts, Score
 
 
 def _finding(**kw: object) -> Finding:
@@ -49,8 +49,7 @@ def _score(**kw: object) -> Score:
     base: dict[str, object] = {
         "pct": 97.5,
         "grade": "A",
-        "label_ru": "Отлично",
-        "label_en": "Excellent",
+        "label_texts": LangTexts(ru="Отлично", en="Excellent", tr="Mükemmel"),
         "counts": {"D1": 1},
         "deductions": 2.5,
         "by_zone": {},

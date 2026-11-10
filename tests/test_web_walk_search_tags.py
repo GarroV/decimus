@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from test_web_walk_write import клиент  # noqa: F401
 
-from src.domain.models import ChecklistItem
+from src.domain.models import ChecklistItem, LangTexts
 from src.recognize import cues
 from src.web.walk_search_tags import search_tags
 
@@ -22,10 +22,8 @@ def item(code, *, kind="violation", question="Synthetic observation", levels=Non
     return ChecklistItem(
         code,
         kind,
-        "Synthetic process",
-        "Synthetic process",
-        question,
-        question,
+        LangTexts(ru="Synthetic process", en="Synthetic process", tr="Synthetic process"),
+        LangTexts(ru=question, en=question, tr=question),
         levels or ["D1"],
         ["zone_a"],
         0,

@@ -101,7 +101,7 @@ def test_country_with_only_unknown_languages_falls_back_to_the_default(tmp_path:
 def test_empty_default_falls_back_to_all_platform_languages(tmp_path: Path) -> None:
     data = _file(tmp_path, {"default": ["sr"], "countries": {}})
 
-    assert langs.report_langs_for(None, data_dir=data) == ["ru", "en"]
+    assert langs.report_langs_for(None, data_dir=data) == ["ru", "en", "tr"]
 
 
 @pytest.mark.parametrize("content", ["[1, 2]", "{не json"])

@@ -56,7 +56,7 @@ from src.db.reports import ReportRef
 from src.domain.errors import ValidationError
 from src.domain.features import action_plans_enabled, begin_feature_scope, end_feature_scope
 from src.domain.kinds import kind_title
-from src.domain.models import BASE_LANG, REPORT_LANGS, localized
+from src.domain.models import REPORT_LANGS, fallback_chain, localized
 from src.domain.permissions import is_read_only
 from src.domain.second_factor import passkey_auto_enroll
 from src.domain.tenants import HQ_TENANT, canonical_tenant
@@ -549,7 +549,7 @@ def _item_titles(conf: Settings, lang: str) -> dict[str, str]:
     подписи: dict[str, str] = {}
     for item in состав.items:
         код = str(item.get("id", "")).strip()
-        текст = localized(item, "question", lang, fall_back=(BASE_LANG,)).strip()
+        текст = localized(item, "question", lang, fall_back=fallback_chain(lang)).strip()
         if код and текст:
             подписи[код] = текст
     return подписи

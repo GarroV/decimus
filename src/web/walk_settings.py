@@ -180,7 +180,7 @@ def _native_finish(
     who: int, conf: WalkSettings, body: dict[str, Any], lang: str
 ) -> tuple[Response, int]:
     """Review is read-only; report delivery requires explicit run-bound confirmation."""
-    from src.bot.keyboards import LANG_LABELS
+    from src.bot.keyboards import REPORT_LANG_LABELS
     from src.domain import get_state
     from src.domain.revision import revision
 
@@ -200,7 +200,7 @@ def _native_finish(
             raise Refused("walk.finish.err.stale", 409)
         result["data"] = data
         result["report_langs"] = [
-            {"code": code, "label": LANG_LABELS.get(code, code)}
+            {"code": code, "label": REPORT_LANG_LABELS.get(code, code)}
             for code in walk_finish.offered_report_langs(who)
         ]
         return jsonify(result), 200

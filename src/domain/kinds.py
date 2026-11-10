@@ -38,9 +38,9 @@ from .errors import ValidationError
 #: полноты (`tests/test_lang_catalogs_complete.py`), а не в шапке уже собранного
 #: отчёта.
 INSPECTION_KINDS: Mapping[str, Mapping[str, str]] = {
-    "planned": {"ru": "Плановая", "en": "Planned"},
-    "repeat": {"ru": "Повторная", "en": "Repeat"},
-    "unscheduled": {"ru": "Внеплановая", "en": "Unscheduled"},
+    "planned": {"ru": "Плановая", "en": "Planned", "tr": "Planlı"},
+    "repeat": {"ru": "Повторная", "en": "Repeat", "tr": "Tekrar"},
+    "unscheduled": {"ru": "Внеплановая", "en": "Unscheduled", "tr": "Plansız"},
 }
 
 

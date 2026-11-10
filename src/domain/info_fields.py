@@ -41,9 +41,9 @@ FIELDS: tuple[InfoField, ...] = (
 
 #: Значения «да/нет» на языке ОТЧЁТА (их читает партнёр): те же слова, что бот
 #: кладёт кнопками (`info.value_yes/no` в `src/bot/texts.py`).
-_YES_NO_WORDS = {"ru": ("Да", "Нет"), "en": ("Yes", "No")}
-_YES = frozenset({"да", "yes", "y", "true", "1", "д"})
-_NO = frozenset({"нет", "no", "n", "false", "0", "н"})
+_YES_NO_WORDS = {"ru": ("Да", "Нет"), "en": ("Yes", "No"), "tr": ("Evet", "Hayır")}
+_YES = frozenset({"да", "yes", "y", "true", "1", "д", "evet", "e"})
+_NO = frozenset({"нет", "no", "n", "false", "0", "н", "hayır", "hayir", "h"})
 
 
 def yes_no_value(answer: object, lang: str) -> str | None:

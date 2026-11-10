@@ -27,7 +27,7 @@ from src.db.review_edit import Addition  # noqa: E402
 from src.db.review_edit import add_finding as add_review_finding  # noqa: E402
 from src.db.revise import Revision, revise_finding  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
-from src.domain.models import Score  # noqa: E402
+from src.domain.models import LangTexts, Score  # noqa: E402
 
 pytestmark = requires_db
 
@@ -39,8 +39,7 @@ pytestmark = requires_db
 ПЕРЕСЧЁТ = Score(
     pct=88.5,
     grade="B",
-    label_ru="Хорошо",
-    label_en="Good",
+    label_texts=LangTexts(ru="Хорошо", en="Good", tr="İyi"),
     counts={"D1": 0, "D2": 1, "D3": 0},
     deductions=11.5,
     by_zone={},
@@ -64,8 +63,7 @@ def _считать_d2(detail: InspectionDetail) -> Score:
     return Score(
         pct=100.0 - 10 * d2,
         grade="A",
-        label_ru="",
-        label_en="",
+        label_texts=LangTexts(ru="", en="", tr=""),
         counts={"D1": len(detail.findings) - d2, "D2": d2, "D3": 0},
         deductions=10.0 * d2,
         by_zone={},

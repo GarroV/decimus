@@ -17,7 +17,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from src.domain.models import REPORT_LANGS
+from src.domain.models import REPORT_LANGS, fallback_chain
 from src.domain.models import localized as field_in_lang
 
 #: Как сложить пункты. Первое — умолчание: так пункты стоят и в файле методики.
@@ -124,7 +124,7 @@ def select(items: Sequence[Item], f: ItemFilter) -> tuple[Item, ...]:
 
 def localized(item: Item, field: str, lang: str) -> str:
     """Поле пункта на языке экрана (`question`, `process`); нет перевода — другой язык."""
-    return field_in_lang(item, field, lang, fall_back=REPORT_LANGS)
+    return field_in_lang(item, field, lang, fall_back=fallback_chain(lang))
 
 
 def _keys(item: Item, by: str, lang: str) -> tuple[str, ...]:

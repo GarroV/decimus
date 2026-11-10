@@ -139,13 +139,19 @@ def _parse_date(raw: str, *, chat_id: int) -> date:
         ) from exc
 
 
+def _flat_names(payload: dict[str, Any]) -> dict[str, Any]:
+    """`name_texts` → ключи `name_<яз>`: в базе формат прежний, его читают запросы."""
+    texts = payload.pop("name_texts")
+    return {**payload, **{f"name_{lang}": text for lang, text in texts.items()}}
+
+
 def _by_zone_payload(score: Score) -> dict[str, object]:
-    return {code: asdict(zone) for code, zone in score.by_zone.items()}
+    return {code: _flat_names(asdict(zone)) for code, zone in score.by_zone.items()}
 
 
 def _by_process_payload(score: Score) -> dict[str, object]:
     """Разбивка по процессам, как её вернул движок (D507): переносится, не считается."""
-    return {key: asdict(process) for key, process in score.by_process.items()}
+    return {key: _flat_names(asdict(process)) for key, process in score.by_process.items()}
 
 
 def _tenant_code(inspection: Inspection) -> str:

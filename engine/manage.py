@@ -411,7 +411,7 @@ def cmd_zone_add(a):
     d = target_dir(create=True)
     p = os.path.join(d, "zones.csv")
     rows = list(csv.DictReader(open(p, encoding="utf-8-sig"))) if os.path.exists(p) else \
-        [dict(r, share_pct=r["share_pct"]) for r in load_zones()]
+        [dict(r, share_pct=r["share_pct"]) for r in load_zones(as_file=True)]
     if any(r["code"] == a.code for r in rows):
         sys.exit("такая зона уже есть")
     rows.append({"code": a.code, "name_ru": a.name_ru,

@@ -39,13 +39,15 @@ FIELDS = [
     "process_code",
     "process_ru",
     "process_en",
+    "process_tr",
     "question_ru",
     "question_en",
+    "question_tr",
     "levels",
     "zones",
     "days",
 ]
-ZONE_FIELDS = ["code", "name_ru", "name_en", "share_pct"]
+ZONE_FIELDS = ["code", "name_ru", "name_en", "name_tr", "share_pct"]
 
 
 def читать(path: Path) -> tuple[list[str], list[dict[str, str]]]:

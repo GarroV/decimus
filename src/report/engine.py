@@ -43,10 +43,11 @@ from src.domain.engine import (
     pause_before_retry,
     state_file,
 )
-from src.domain.errors import InspectionNotStarted
+from src.domain.errors import DomainError, InspectionNotStarted
 from src.domain.log_ids import log_id
-from src.domain.state import settings_for
+from src.domain.state import read_state, settings_for
 
+from .engine_call import FALLBACK_DIR_VAR, current_edition_dir
 from .errors import ReportError
 
 logger = logging.getLogger(__name__)
@@ -103,6 +104,11 @@ def run_report(
     env = dict(os.environ)
     env["INSPECTION_FILE"] = str(state)
     env["CHECKLIST_DIR"] = str(settings.data_dir)
+    current = _current_edition(chat_id, settings)
+    if current is None:
+        env.pop(FALLBACK_DIR_VAR, None)
+    else:
+        env[FALLBACK_DIR_VAR] = str(current)
     env.update(env_extra or {})
 
     for attempt in range(1, ENGINE_ATTEMPTS + 1):
@@ -117,6 +123,28 @@ def run_report(
         message = (done.stderr or done.stdout).strip() or "движок отказал без объяснения"
         raise ReportError(message)
     raise AssertionError("недостижимо: цикл попыток выходит возвратом или отказом")
+
+
+def _current_edition(chat_id: int, settings: Settings) -> Path | None:
+    """Действующее издание чек-листа этой проверки: откуда движок берёт недостающий перевод.
+
+    Проверка идёт по своему изданию (`settings.data_dir` — его снимок), а перевода на язык
+    отчёта в нём может не быть. Тогда движок ищет ту же строку по коду в действующем издании
+    (`engine/audit.py: resolve_text`). Чьё это издание — пишет сама проверка: тенант и код
+    чек-листа. Не прочиталась — перевод искать негде, и отчёт собирается без него.
+    """
+    try:
+        state = read_state(chat_id, settings)
+    except DomainError:
+        return None
+    if state is None:
+        return None
+    return current_edition_dir(
+        settings.checklist_store,
+        check_environment().data_dir,
+        tenant=state.tenant,
+        code=state.checklist_code,
+    )
 
 
 def _launch(
