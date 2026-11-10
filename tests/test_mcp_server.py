@@ -444,6 +444,9 @@ def test_содержимое_проверки_остаётся_нетронут
         if spec.kind == KIND_RATINGS:
             assert spec.handler.__module__ == "src.mcp.ratings_tools", spec.name
             continue
+        if spec.name == "dodois_status":
+            assert spec.handler.__module__ == "src.mcp.dodois_read", spec.name
+            continue
         if spec.kind == KIND_RATINGS_READ:
             assert spec.handler.__module__ == "src.mcp.ratings_read", spec.name
             continue
