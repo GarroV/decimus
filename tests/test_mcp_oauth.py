@@ -182,7 +182,12 @@ def test_без_oauth_документа_нет(сервер_без_oauth: str) 
 def test_контроль_видит_только_рейтинги(сервер: str) -> None:
     имена = _инструменты(сервер, "tok-control")
 
-    assert имена == {spec.name for spec in TOOLS if spec.kind in (KIND_RATINGS, KIND_RATINGS_READ)}
+    # Подключения Dodo IS — действие `keys.manage`, только главный админ УК.
+    assert имена == {
+        spec.name
+        for spec in TOOLS
+        if spec.kind in (KIND_RATINGS, KIND_RATINGS_READ) and spec.name != "dodois_status"
+    }
 
 
 def test_контроль_не_читает_проверки(сервер: str) -> None:

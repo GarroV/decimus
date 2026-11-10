@@ -35,6 +35,7 @@ from . import (
     checklist_source,
     checklist_tools,
     checklists_tools,
+    dodois_read,
     letter_save,
     move,
     phrases,
@@ -2399,6 +2400,32 @@ TOOLS: tuple[ToolSpec, ...] = (
             "additionalProperties": False,
         },
         handler=ratings_read.aggregators_status,
+        kind=KIND_RATINGS_READ,
+    ),
+    ToolSpec(
+        name="dodois_status",
+        description=(
+            "Состояние подключений Dodo IS по странам: подключена ли страна, когда привязана, "
+            "через кого, состояние и причина, когда проверена и продлена, сколько пиццерий "
+            "всего и открыто, учётка Dodo IS (без почты); ссылки-приглашения за 7 дней "
+            "(выдана, истекает, погашена или отозвана, кем выдана — без токена); загрузка "
+            "данных по видам (последняя удачная, последняя попытка и её ошибка) и сколько "
+            "пиццерий страны имеют данные за текущий месяц. Звать на вопрос «подключилась ли "
+            "страна» и «поступают ли данные». country — код страны; не задан — все. "
+            "Доступно главному админу УК."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string",
+                    "description": "Код страны из двух букв, например RS; не задан — все страны.",
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=dodois_read.dodois_status,
         kind=KIND_RATINGS_READ,
     ),
 )

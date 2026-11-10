@@ -274,7 +274,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **82** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 7, letter — 2, move — 1, plan — 11, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **83** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 7, letter — 2, move — 1, plan — 11, ratings — 2, ratings_read — 5, retraction — 1).
 
 | Инструмент | Вид | Класс | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|---|
@@ -356,6 +356,7 @@
 | `import_ratings` | ratings | write | Upload a ratings file into Decimus (standards and customer-experience ratings, IMF only) | `src/mcp/ratings_tools.py` |
 | `request_aggregators_update` | ratings | write | Запросить внеочередное обновление оценок пиццерий в агрегаторах доставки (Wolt, Glovo, Bolt Food, Yemeksepeti, Trendyol… | `src/mcp/ratings_tools.py` |
 | `aggregators_status` | ratings_read | read | Состояние сбора оценок в агрегаторах доставки: по каждому — когда был последний сбор, чем кончился (ok, failed или… | `src/mcp/ratings_read.py` |
+| `dodois_status` | ratings_read | read | Состояние подключений Dodo IS по странам: подключена ли страна, когда привязана, через кого, состояние и причина, когда… | `src/mcp/dodois_read.py` |
 | `ratings_summary` | ratings_read | read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
 | `ratings_unit_periods` | ratings_read | read | Разбивка одной пиццерии по периодам рейтинга РС и РКО — рейтингов Dodo из таблицы контроля «база рейтингов» и выгрузок… | `src/mcp/ratings_read.py` |
 | `ratings_units` | ratings_read | read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
