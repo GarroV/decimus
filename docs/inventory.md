@@ -662,6 +662,7 @@
 | `0126_dodois_logins_delete.sql` | — |
 | `0127_maps_reviews.sql` | `maps.reviews`, `maps.reviews_sync` |
 | `0128_batch_letters.sql` | `batch_letters`, `batch_letter_inspections` |
+| `0130_close_invariants.sql` | — |
 <!-- map:end -->
 
 ## Makefile
