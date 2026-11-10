@@ -33,7 +33,7 @@ start_inspection(chat_id: int, unit: str, kind: str, report_lang: str, *,
                  city: str = "", partner: str = "", contact: str = "", auditor: str = "",
                  tenant: str = "default") -> Inspection
 # Язык отчёта на старте равен языку чек-листа и меняется в конце проверки (D415):
-set_report_lang(chat_id: int, lang: str) -> Inspection   # lang из TEXT_LANGS; движок `meta --lang`
+set_report_lang(chat_id: int, lang: str) -> Inspection   # lang из REPORT_LANGS; движок `meta --lang`
 add_finding(chat_id: int, code: str, level: str, zone: str, text: str, *,
             comment: str = "", source: str = "") -> Finding   # source: SOURCE_COMMENT | SOURCE_PHOTO
 edit_finding(chat_id: int, n: int, **fields: str) -> Finding   # code, level, zone, text, comment
