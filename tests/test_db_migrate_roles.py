@@ -187,6 +187,9 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "partner_letters": {"SELECT", "INSERT"},
     # Общее письмо по нескольким проверкам и его состав (`0128`, D739) — так же заморожены.
     "batch_letters": {"SELECT", "INSERT"},
+    # Доступ к Google Календарю и события срока (`0129`, D741): DELETE — отключение.
+    "calendar_grants": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+    "calendar_events": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "batch_letter_inspections": {"SELECT", "INSERT"},
     # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`). Круг
     # (`mcp_admins`) снят миграцией `0059` (D448).

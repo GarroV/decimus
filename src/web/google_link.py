@@ -64,6 +64,17 @@ RESULTS: dict[str, tuple[str, bool]] = {
     "taken": ("settings.google.done.taken", False),
     "already": ("settings.google.done.already", False),
     "db": ("settings.google.done.db", False),
+    # Google Календарь (D740): подключение, отключение и отказы возврата.
+    "calendar_on": ("settings.calendar.done.on", True),
+    "calendar_off": ("settings.calendar.done.off", True),
+    "calendar_denied": ("settings.calendar.done.denied", False),
+    "calendar_scope": ("settings.calendar.done.scope", False),
+    "calendar_account": ("settings.calendar.done.account", False),
+    "calendar_failed": ("settings.calendar.done.failed", False),
+    "calendar_db": ("settings.calendar.done.db", False),
+    "calendar_manual": ("settings.calendar.done.manual", False),
+    "calendar_hq": ("settings.calendar.done.hq", False),
+    "calendar_revoke": ("settings.calendar.done.revoke", False),
 }
 
 

@@ -376,6 +376,9 @@ def test_вкладка_рейтинги_во_вкладках_админист�
     # Свой профиль (D447): своя почта Google и свой язык сайта.
     "/settings/google-link",
     "/settings/google-unlink",
+    # Свой Google Календарь (D740, D741): подключить и отключить.
+    "/settings/google-calendar",
+    "/settings/google-calendar-off",
     "/settings/lang",
     # Свои уведомления (#1129, D604): отметка «прочитано» — дело самого человека, любой роли.
     "/settings/notifications/1/read",
