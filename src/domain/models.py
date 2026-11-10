@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import datetime
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -25,23 +26,58 @@ SOURCE_COMMENT = "comment"
 SOURCE_PHOTO = "photo"
 SOURCES = (SOURCE_COMMENT, SOURCE_PHOTO)
 
-#: Языки, на которых методика есть в данных: колонки `*_ru` и `*_en`
-#: (`data/checklist.csv`, `data/zones.csv`). Третий язык появится строками
-#: переводов, а не правкой кода.
-TEXT_LANGS = ("ru", "en")
+#: Языки, на которых можно напечатать отчёт, письмо и методику: колонки
+#: `*_<яз>` в `data/checklist.csv`, `data/zones.csv`, `scoring.json` и ключи
+#: каталогов постоянных текстов (`docs/40-languages.md`). Третий язык — строка
+#: здесь, колонки в данных и словари; тест полноты
+#: (`tests/test_lang_catalogs_complete.py`) падает на пропущенном переводе.
+#: Движок (`engine/audit.py: LANGS`) не импортирует `src` по контракту слоёв и
+#: держит свою копию — равенство проверяет тот же тест.
+REPORT_LANGS = ("ru", "en")
+
+#: Язык обязательных колонок методики (`question_ru`, `name_ru`): без них файл не
+#: читается, поэтому откат «нет перевода — взять базовый» возможен только на него.
+BASE_LANG = "ru"
+
+#: Языки, на которых говорит аудитор: их предлагают бот и мини-апп при старте
+#: проверки (`bot.keyboards.LANG_LABELS`). Это не те же самые языки, что у
+#: отчёта: на одном говорят, на другом печатают, и список у них может разойтись.
+SPEECH_LANGS = ("ru", "en")
 
 
-def pick_text(ru: str, en: str, lang: str) -> str:
-    """Выбрать формулировку по языку. Неизвестный язык — отказ, а не подстановка.
+def pick_lang(obj: object, field: str, lang: str) -> str:
+    """Значение поля `<field>_<lang>` объекта. Неизвестный язык — отказ, а не подстановка.
 
     Молчаливый откат на русский дал бы партнёру отчёт, в котором часть текста
-    внезапно не на его языке, и заметил бы это только он.
+    внезапно не на его языке, и заметил бы это только он. Язык из
+    `REPORT_LANGS`, у которого поля нет, — тоже отказ: это дыра в данных или в
+    модели, а не повод подставить чужой язык.
     """
-    if lang == "ru":
-        return ru
-    if lang == "en":
-        return en
-    raise ValidationError(f"Язык «{lang}» в методике не заведён. Доступны: {', '.join(TEXT_LANGS)}")
+    if lang not in REPORT_LANGS:
+        raise ValidationError(
+            f"Язык «{lang}» в методике не заведён. Доступны: {', '.join(REPORT_LANGS)}"
+        )
+    try:
+        value = getattr(obj, f"{field}_{lang}")
+    except AttributeError:
+        raise ValidationError(f"У {type(obj).__name__} нет поля «{field}_{lang}»") from None
+    return str(value)
+
+
+def localized(
+    row: Mapping[str, Any], field: str, lang: str, *, fall_back: Iterable[str] = ()
+) -> str:
+    """Значение `<field>_<lang>` из словаря-строки; пусто — то же поле на языках `fall_back`.
+
+    Для строк, которые приходят словарём (CSV методики, снимок движка в базе),
+    а не объектом. Откат — только там, где его просит вызывающий: он знает, на
+    какой язык вправе вернуться экран; по умолчанию его нет.
+    """
+    for code in (lang, *fall_back):
+        value = row.get(f"{field}_{code}")
+        if value:
+            return str(value)
+    return ""
 
 
 @dataclass(frozen=True)
@@ -59,10 +95,10 @@ class ChecklistItem:
     days: int
 
     def process(self, lang: str) -> str:
-        return pick_text(self.process_ru, self.process_en, lang)
+        return pick_lang(self, "process", lang)
 
     def question(self, lang: str) -> str:
-        return pick_text(self.question_ru, self.question_en, lang)
+        return pick_lang(self, "question", lang)
 
     def applies_to(self, zone: str) -> bool:
         """Пустой список зон и `*` означают «во всех зонах» — так же читает движок."""
@@ -79,7 +115,7 @@ class Zone:
     share_pct: float
 
     def title(self, lang: str) -> str:
-        return pick_text(self.title_ru, self.title_en, lang)
+        return pick_lang(self, "title", lang)
 
 
 @dataclass(frozen=True)
@@ -256,7 +292,7 @@ class ZoneScore:
     zeroed: bool
 
     def name(self, lang: str) -> str:
-        return pick_text(self.name_ru, self.name_en, lang)
+        return pick_lang(self, "name", lang)
 
 
 @dataclass(frozen=True)
@@ -279,7 +315,7 @@ class ProcessScore:
     loss: float
 
     def name(self, lang: str) -> str:
-        return pick_text(self.name_ru, self.name_en, lang)
+        return pick_lang(self, "name", lang)
 
 
 @dataclass(frozen=True)
@@ -299,4 +335,4 @@ class Score:
     by_process: dict[str, ProcessScore] = field(default_factory=dict)
 
     def label(self, lang: str) -> str:
-        return pick_text(self.label_ru, self.label_en, lang)
+        return pick_lang(self, "label", lang)

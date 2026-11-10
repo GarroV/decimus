@@ -31,7 +31,7 @@ from src.db.errors import DatabaseTargetError, DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
 from src.db.plan_rows import TermsProvider
 from src.db.reach import Reach, reach_of
-from src.domain.models import TEXT_LANGS
+from src.domain.models import REPORT_LANGS
 from src.domain.permissions import SIDE_HQ, side_of
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report import current_pdf, info_titles, letter_markup, plan_terms
@@ -176,11 +176,11 @@ def load_card(inspection_id: str, *, reach: Reach) -> InspectionDetail | None:
 
 
 #: Языки, на которых письмо вообще может быть собрано. Берутся у МЕТОДИКИ
-#: (`domain.models.TEXT_LANGS`), а не перечисляются здесь: свой список
+#: (`domain.models.REPORT_LANGS`), а не перечисляются здесь: свой список
 #: предложил бы человеку язык, которого в методике нет, и переключение
 #: кончалось бы отказом сборщика на ровном месте. Языку ИНТЕРФЕЙСА он не
 #: равен и равным не станет: интерфейс и письмо — разные языки (`CLAUDE.md`).
-LETTER_LANGS = TEXT_LANGS
+LETTER_LANGS = REPORT_LANGS
 
 #: Шаблоны письма на выбор отправителя (D664) — перечень сборщика, а не свой список.
 LETTER_TEMPLATES = letter_templates
@@ -472,7 +472,7 @@ def load_info(
     как записан (`InfoRow`). Своего правила подписей здесь нет — оно общее с
     MCP и живёт в `src/report/info_titles.py`.
     """
-    язык = lang if lang in TEXT_LANGS else detail.inspection.report_lang
+    язык = lang if lang in REPORT_LANGS else detail.inspection.report_lang
     подписи, исход = info_titles.titles(
         detail.inspection.checklist_version, lang=язык, papers=letter_sources()
     )

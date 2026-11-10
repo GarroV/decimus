@@ -103,6 +103,20 @@ def test_база_сама_отказывает_кривому_тексту_ми
         _sql(база, _ВСТАВКА, (значение,))
 
 
+_ВСТАВКА_ЯЗЫКА = (
+    "insert into mailing_templates (kind, slot, lang, version, body, saved_by) "
+    "values ('inspection', 'plan', %s, 1, 'x', 'hq')"
+)
+
+
+def test_язык_шаблона_любой_код_из_двух_букв(база: str) -> None:
+    """0131: третий язык отчёта не упирается в проверку базы; форма кода — по-прежнему."""
+    _sql(база, _ВСТАВКА_ЯЗЫКА, ("tr",))
+    for кривой in ("", "t", "tur", "TR", "t1"):
+        with pytest.raises(psycopg.errors.CheckViolation):
+            _sql(база, _ВСТАВКА_ЯЗЫКА, (кривой,))
+
+
 def test_версия_не_дублируется(база: str) -> None:
     _sql(база, _ВСТАВКА, ("Один {unit}",))
     with pytest.raises(psycopg.errors.UniqueViolation):

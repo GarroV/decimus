@@ -18,7 +18,7 @@ from typing import Any
 from ..db.errors import ConfigError as DbConfigError
 from ..db.errors import DbError
 from ..db.models import InspectionDetail
-from ..domain.models import TEXT_LANGS
+from ..domain.models import REPORT_LANGS
 from ..report.batch_letter import BatchLetterError, check_selection
 from ..report.batch_letter import build as _build
 from ..report.letters import LetterError
@@ -110,10 +110,10 @@ def save_batch_letter(
     identifiers = _ids(ids)
     if not isinstance(text, str) or not text.strip():
         raise ToolError("Письмо не сохранено: в нём нет текста")
-    if lang is not None and lang not in TEXT_LANGS:
+    if lang is not None and lang not in REPORT_LANGS:
         raise ToolError(
             f"Письмо не сохранено: язык «{lang}» не поддерживается, "
-            f"ожидается один из: {', '.join(sorted(TEXT_LANGS))}"
+            f"ожидается один из: {', '.join(sorted(REPORT_LANGS))}"
         )
     try:
         details = _details(identifiers, tenant)

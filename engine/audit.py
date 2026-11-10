@@ -360,7 +360,13 @@ def cmd_kinds(a):
         print(f"{code} | {words}")
 
 
+#: Языки печати отчёта и письма. Движок не импортирует `src` по контракту слоёв
+#: и держит свою копию `src/domain/models.py: REPORT_LANGS`; равенство двух копий
+#: проверяет `tests/test_lang_catalogs_complete.py`.
 LANGS = ("ru", "en")
+#: Язык обязательных колонок методики (`question_ru`, `name_ru`) — копия
+#: `src/domain/models.py: BASE_LANG`, сверяется тем же тестом.
+BASE_LANG = "ru"
 META_FIELDS = ("unit", "city", "partner", "contact", "auditor", "kind", "type", "date", "lang")
 
 #: Вид проверки: код — сущность, слово — перевод (T152, T177).
@@ -406,6 +412,15 @@ def clean_date(v):
         return date.fromisoformat(v).isoformat()
     except (ValueError, TypeError):
         sys.exit(f"Дата «{v}» не в формате ISO. Нужен ГГГГ-ММ-ДД, например 2026-08-21")
+
+
+def lang_fields(field, getter):
+    """Поля `<field>_<язык>` на каждый язык печати: `{"name_ru": …, "name_en": …}`.
+
+    Ответ движка (`score --json`) несёт текст на каждом языке сразу; набор
+    языков берётся из `LANGS`, а не перечисляется по месту.
+    """
+    return {f"{field}_{lang}": getter(lang) for lang in LANGS}
 
 
 def clean_lang(v):
@@ -883,8 +898,9 @@ def breakdown(items, per_zone, cfg, pct):
         lines.append({**row, "loss": round(row["loss"], 4)})
     for code, z in per_zone.items():
         if z["zeroed"]:
-            lines.append({"kind": "d3_zone", "zone": code, "name_ru": z["name_ru"],
-                          "name_en": z["name_en"], "count": z["D3"], "loss": z["loss"]})
+            lines.append({"kind": "d3_zone", "zone": code,
+                          **lang_fields("name", lambda lang, z=z: z[f"name_{lang}"]),
+                          "count": z["D3"], "loss": z["loss"]})
     lost = sum(row["loss"] for row in lines)
     exact = (cfg["d3"].get("mode") == "zero_zone_share" and not cfg.get("cap_zone_loss_at_share")
              and round(max(cfg["start_pct"] - lost, cfg.get("floor_pct", 0.0)) + 1e-9, 2) == pct)
@@ -900,7 +916,7 @@ def compute(st, cl_rows, zones, cfg):
     d3cfg = cfg["d3"]
     d3_zones = {f["zone"] for f in st["findings"] if f["level"] == "D3"}
     counts = {"D1": 0, "D2": 0, "D3": 0}
-    per_zone = {z["code"]: {"name_ru": z["name_ru"], "name_en": z["name_en"],
+    per_zone = {z["code"]: {**lang_fields("name", lambda lang, z=z: z[f"name_{lang}"]),
                             "share": z["share_pct"], "D1": 0, "D2": 0, "D3": 0,
                             "loss": 0.0, "zeroed": False} for z in zones}
     items = []
@@ -911,7 +927,7 @@ def compute(st, cl_rows, zones, cfg):
         # Рекомендация в счётчики классов не входит: это не нарушение и не замер.
         if not advice:
             counts[lvl] = counts.get(lvl, 0) + 1
-        z = per_zone.setdefault(f["zone"], {"name_ru": f["zone"], "name_en": f["zone"],
+        z = per_zone.setdefault(f["zone"], {**lang_fields("name", lambda lang: f["zone"]),
                                             "share": 0.0, "D1": 0, "D2": 0, "D3": 0,
                                             "loss": 0.0, "zeroed": False})
         if not advice:
@@ -936,11 +952,11 @@ def compute(st, cl_rows, zones, cfg):
                     cost *= float(cfg.get("repeat_multiplier", 1.0))
         days = 0 if advice else min(r.get("days", 0), cfg["deadlines"]["max_days"].get(lvl, 99))
         due = "" if advice else (inspected + timedelta(days=days)).isoformat()
-        items.append({**f, "photos": photos_of(f), "question_ru": r.get("question_ru", ""), "question_en": r.get("question_en", ""),
+        items.append({**f, "photos": photos_of(f),
+                      **lang_fields("question", lambda lang: r.get(f"question_{lang}", "")),
                       "process_code": r.get("process_code", ""),
-                      "process_ru": r.get("process_ru", ""), "process_en": r.get("process_en", ""),
-                      "zone_name_ru": zmap.get(f["zone"], {}).get("name_ru", f["zone"]),
-                      "zone_name_en": zmap.get(f["zone"], {}).get("name_en", f["zone"]),
+                      **lang_fields("process", lambda lang: r.get(f"process_{lang}", "")),
+                      **lang_fields("zone_name", lambda lang: zmap.get(f["zone"], {}).get(f"name_{lang}", f["zone"])),
                       "days": days, "due": due, "counted": counted, "cost": cost})
 
     deductions = 0.0
@@ -988,8 +1004,9 @@ def compute(st, cl_rows, zones, cfg):
 
     def _process(i):
         key = i["process_code"] or i["process_ru"] or "—"
-        return by_process.setdefault(key, {"code": i["process_code"], "name_ru": i["process_ru"],
-                                           "name_en": i["process_en"], "scored": key in scored_processes,
+        return by_process.setdefault(key, {"code": i["process_code"],
+                                           **lang_fields("name", lambda lang: i[f"process_{lang}"]),
+                                           "scored": key in scored_processes,
                                            "D1": 0, "D2": 0, "D3": 0, "loss": 0.0})
 
     for i in items:
@@ -1019,8 +1036,9 @@ def compute(st, cl_rows, zones, cfg):
     for r in cl_rows:
         code = (r.get("process_code") or r.get("process_ru") or "").strip()
         if code and code not in by_process:
-            by_process[code] = {"code": r.get("process_code", ""), "name_ru": r.get("process_ru", ""),
-                                "name_en": r.get("process_en", ""), "scored": code in scored_processes,
+            by_process[code] = {"code": r.get("process_code", ""),
+                                **lang_fields("name", lambda lang, r=r: r.get(f"process_{lang}", "")),
+                                "scored": code in scored_processes,
                                 "D1": 0, "D2": 0, "D3": 0, "loss": 0.0}
 
     for p in by_process.values():
@@ -1030,7 +1048,7 @@ def compute(st, cl_rows, zones, cfg):
             "grade_rule": {"index": rule_index, "if": dict(grade.get("if") or {}),
                            "better_if": better_rule_if(grade, cfg)},
             "breakdown": breakdown(items, per_zone, cfg, pct),
-            "grade_label_ru": grade.get("label_ru", ""), "grade_label_en": grade.get("label_en", ""),
+            **lang_fields("grade_label", lambda lang: grade.get(f"label_{lang}", "")),
             "counts": counts, "deductions": round(deductions, 2),
             "zones": per_zone, "by_process": by_process, "findings": items,
             # Форма поля приводится к паре «текст + кадры» здесь, один раз: дальше

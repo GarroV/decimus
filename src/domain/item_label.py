@@ -25,7 +25,7 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
-from .models import TEXT_LANGS
+from .models import REPORT_LANGS
 
 #: Служебные коды без номера: их показывают человеческим названием, не кодом.
 #: `NOTE` — общая заметка (в оценке не участвует), `LEGACY` — запись исторической
@@ -95,14 +95,12 @@ def from_csv(rows: Iterable[Mapping[str, str | None]]) -> dict[str, ItemTexts]:
     return out
 
 
-def _pick(ru: str, en: str, lang: str) -> str:
+def _pick(own: ItemTexts, field: str, lang: str) -> str:
     """Текст на языке; пусто — на другом языке методики, а не пустота и не код."""
-    by_lang = {"ru": ru, "en": en}
-    if by_lang.get(lang):
-        return by_lang[lang]
-    for other in TEXT_LANGS:
-        if by_lang.get(other):
-            return by_lang[other]
+    for code in (lang, *REPORT_LANGS):
+        value = getattr(own, f"{field}_{code}", "")
+        if value:
+            return str(value)
     return ""
 
 
@@ -129,7 +127,7 @@ def label(code: str, texts: Texts | None, lang: str) -> str:
     own = None if texts is None else texts.get(key)
     if n is None or own is None:
         return code.strip()
-    process = _pick(own.process_ru, own.process_en, lang)
+    process = _pick(own, "process", lang)
     return f"{process} {n}" if process else code.strip()
 
 
@@ -139,11 +137,11 @@ def full(code: str, texts: Texts | None, lang: str) -> str:
     own = None if texts is None else texts.get(_key(code))
     if own is None or _key(code) in SPECIAL_TITLES:
         return short
-    wording = _pick(own.question_ru, own.question_en, lang)
+    wording = _pick(own, "question", lang)
     return f"{short} — {wording}" if wording else short
 
 
 def wording(code: str, texts: Texts | None, lang: str) -> str:
     """Формулировка пункта на языке (откат — на другой язык методики); нет — пустая строка."""
     own = None if texts is None else texts.get(_key(code))
-    return "" if own is None else _pick(own.question_ru, own.question_en, lang)
+    return "" if own is None else _pick(own, "question", lang)

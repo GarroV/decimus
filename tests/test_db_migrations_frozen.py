@@ -477,6 +477,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0130_close_invariants.sql": (
         "sql1:258cb8af059d226d9ff728d73340f51b1c176611f23d1a4df0243ce66e566a8f"
     ),
+    "0131_mailing_templates_lang.sql": (
+        "sql1:bb4a88d5b22fcc5866ed2391b30901db79e2a5b4f812e457adae222246a7353d"
+    ),
 }
 
 

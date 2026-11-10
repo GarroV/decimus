@@ -667,6 +667,7 @@
 | `0128_batch_letters.sql` | `batch_letters`, `batch_letter_inspections` |
 | `0129_calendar_deadline.sql` | `calendar_grants`, `calendar_events` |
 | `0130_close_invariants.sql` | — |
+| `0131_mailing_templates_lang.sql` | — |
 <!-- map:end -->
 
 ## Makefile

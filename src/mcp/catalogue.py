@@ -48,6 +48,7 @@ from . import (
 from .annotations import annotations_for
 from .confirm import TOKEN_ARGUMENT
 from .import_catalogue import IMPORT_TOOLS
+from .lang_fields import text_properties
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
 KIND_INSPECTIONS = "inspections"
@@ -943,18 +944,12 @@ TOOLS: tuple[ToolSpec, ...] = (
                         "automatically from the process name."
                     )
                 ),
-                "process_en": {
-                    "type": "string",
-                    "description": (
-                        "Process name in English. Omit to leave the English text blank."
-                    ),
-                },
-                "question_en": {
-                    "type": "string",
-                    "description": (
-                        "Checklist question text in English. Omit to leave the English text blank."
-                    ),
-                },
+                **text_properties(
+                    "process", "Process name", "Omit to leave the {title} text blank."
+                ),
+                **text_properties(
+                    "question", "Checklist question text", "Omit to leave the {title} text blank."
+                ),
                 "zones": _ZONES_PROPERTY,
                 "days": _DAYS_PROPERTY,
                 "criteria": {
@@ -1020,22 +1015,16 @@ TOOLS: tuple[ToolSpec, ...] = (
                         "Omit to keep the current value."
                     ),
                 },
-                "process_en": {
-                    "type": "string",
-                    "description": ("New process name in English. Omit to keep the current value."),
-                },
+                **text_properties("process", "New process name", "Omit to keep the current value."),
                 "question_ru": {
                     "type": "string",
                     "description": (
                         "New checklist question text in Russian. Omit to keep the current value."
                     ),
                 },
-                "question_en": {
-                    "type": "string",
-                    "description": (
-                        "New checklist question text in English. Omit to keep the current value."
-                    ),
-                },
+                **text_properties(
+                    "question", "New checklist question text", "Omit to keep the current value."
+                ),
                 "levels": _LEVELS_PROPERTY,
                 "zones": _ZONES_PROPERTY,
                 "days": _DAYS_PROPERTY,
@@ -1152,10 +1141,7 @@ TOOLS: tuple[ToolSpec, ...] = (
                     "type": "string",
                     "description": "Zone name in Russian.",
                 },
-                "name_en": {
-                    "type": "string",
-                    "description": ("Zone name in English. Omit to leave the English name blank."),
-                },
+                **text_properties("name", "Zone name", "Omit to leave the {title} name blank."),
                 "share": {
                     "type": "number",
                     "description": (
@@ -1373,10 +1359,7 @@ TOOLS: tuple[ToolSpec, ...] = (
                     "type": "string",
                     "description": "New zone name in Russian. Omit to keep the current one.",
                 },
-                "name_en": {
-                    "type": "string",
-                    "description": "New zone name in English. Omit to keep the current one.",
-                },
+                **text_properties("name", "New zone name", "Omit to keep the current one."),
                 "version_name": _VERSION_NAME_PROPERTY,
                 "note": _NOTE_PROPERTY,
             },

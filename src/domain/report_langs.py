@@ -11,11 +11,11 @@
 * `countries` — код страны ISO 3166-1 alpha-2 → список языков отчёта.
 
 Новая страна или язык — строка в файле, не релиз. Считаются только языки из
-`TEXT_LANGS`: отчёт можно напечатать лишь на том, на котором заведена методика.
+`REPORT_LANGS`: отчёт можно напечатать лишь на том, на котором заведена методика.
 Неизвестный язык пропускается со строкой в журнал, а не отказом: из-за опечатки
 в справочнике аудитор не должен остаться на точке без отчёта. Если после
 пропуска перечень пуст, берётся перечень по умолчанию, а если и он пуст, то все
-`TEXT_LANGS` — выбор из нуля вариантов человеку предложить нечем.
+`REPORT_LANGS` — выбор из нуля вариантов человеку предложить нечем.
 
 Файла нет — перечень по умолчанию, `ru` и `en`: это законное состояние (так
 работает методика, у которой отдельных правил для стран нет).
@@ -31,7 +31,7 @@ from typing import Any
 from .config import check_environment
 from .errors import ConfigError
 from .geo import CITY_COUNTRY
-from .models import TEXT_LANGS
+from .models import REPORT_LANGS
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def _clean(value: Any, where: str) -> list[str]:
     out: list[str] = []
     for raw in value:
         code = str(raw).strip().lower()
-        if code not in TEXT_LANGS:
+        if code not in REPORT_LANGS:
             logger.warning("%s: язык «%s» в методике не заведён — пропущен", where, raw)
         elif code not in out:
             out.append(code)
@@ -67,7 +67,7 @@ def load(data_dir: Path) -> tuple[list[str], dict[str, list[str]]]:
         raise ConfigError(f"Языки отчёта по странам {path} не читаются: {exc}") from exc
     if not isinstance(raw, dict):
         raise ConfigError(f"Языки отчёта по странам {path}: ожидался объект с default и countries")
-    default = _clean(raw.get("default"), f"{REPORT_LANGS_FILE}: default") or list(TEXT_LANGS)
+    default = _clean(raw.get("default"), f"{REPORT_LANGS_FILE}: default") or list(REPORT_LANGS)
     countries_raw = raw.get("countries") or {}
     if not isinstance(countries_raw, dict):
         raise ConfigError(f"Языки отчёта по странам {path}: countries должен быть объектом")

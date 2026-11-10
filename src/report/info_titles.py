@@ -20,7 +20,7 @@ import csv
 from pathlib import Path
 
 from ..domain import item_label
-from ..domain.models import TEXT_LANGS, pick_text
+from ..domain.models import REPORT_LANGS
 from .engine_call import to_log
 from .errors import ReportError
 from .letters import Papers, pinned
@@ -62,7 +62,7 @@ def titles(version: str, *, lang: str, papers: Papers) -> tuple[dict[str, str], 
     вместо них означал бы, что испорченная строка в базе прячет от человека
     документ, который уже ушёл партнёру.
     """
-    if lang not in TEXT_LANGS:
+    if lang not in REPORT_LANGS:
         return {}, NOT_AT_HAND
     try:
         найдено = pinned(version, papers)
@@ -81,9 +81,7 @@ def titles(version: str, *, lang: str, papers: Papers) -> tuple[dict[str, str], 
     подписи: dict[str, str] = {}
     for строка in строки:
         код = (строка.get(CODE_COLUMN) or "").strip().upper()
-        подпись = pick_text(
-            строка.get("question_ru", ""), строка.get("question_en", ""), lang
-        ).strip()
+        подпись = (строка.get(f"question_{lang}") or "").strip()
         # Первое вхождение кода, а не последнее: движок читает дубль так же.
         # Строка-комментарий пропускается там же.
         if код and not код.startswith("#") and подпись:

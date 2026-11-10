@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import string
 
+from .models import REPORT_LANGS
+
 #: Слоты: план при D1/D2/D3, информационные/рекомендательные записи, без записей.
 SLOT_PLAN = "plan"
 SLOT_CLEAN = "clean"
@@ -22,7 +24,7 @@ SLOT_EMPTY = "empty"
 SLOTS = (SLOT_PLAN, SLOT_CLEAN, SLOT_EMPTY)
 
 #: Языки письма, на которых админка хранит текст.
-LANGS = ("ru", "en")
+LANGS = REPORT_LANGS
 
 #: Подстановки-блоки, которые умеет движок. Порядок — порядок показа в редакторе.
 FIELDS = (
