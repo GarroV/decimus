@@ -4,7 +4,7 @@
   Строки готовит `src/web/walk_log_view.py` — здесь ничего не считается и не переводится.
 #}
 {% if c.walk_log_visible and (c.walk_log or not c.walk_log_known) %}
-<details class="mx-more">
+<details class="mx-more mx-more--card">
   <summary>{{ t('walklog.title') }}</summary>
   {% if not c.walk_log_known %}
   <div class="note mt-gap"><div><div class="note__text">{{ t('walklog.unknown') }}</div></div></div>

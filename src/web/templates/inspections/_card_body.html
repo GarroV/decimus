@@ -46,7 +46,7 @@
   <div class="lvls" role="radiogroup" aria-label="{{ t('revise.level') }}" data-lvls>
     {% for lvl in c.levels %}
       <label class="lvls__item"><input type="radio" name="level" value="{{ lvl }}"{% if lvl == current %} checked{% endif %}>
-        <span class="tag {{ c.level_tone(lvl) }}">{{ lvl }}</span></label>
+        <span class="tag {{ c.level_tone(lvl) }}">{{ c.level_word(lvl) }}</span></label>
     {% endfor %}
   </div>
 {% endmacro %}
@@ -192,13 +192,14 @@
     {% if informational %}
       <span class="tag tag--neutral find-row__level" aria-label="{{ t('card.findings.advice') if finding.level == 'R' else t('card.info.record') }}" title="{{ t('card.findings.advice') if finding.level == 'R' else t('card.info.record') }}">i</span>
     {% else %}
-      <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.no_class') if finding.level == 'NC' else finding.level }}</span>
+      <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.no_class') if finding.level == 'NC' else c.level_word(finding.level) }}</span>
     {% endif %}
     <span class="find-row__num">{{ finding.n }}</span>
     <span class="find-row__main">
-      {% if can_proof and not informational %}<span class="find-row__title">{{ pick.question if pick else (t('card.findings.note') if finding.code == 'NOTE' else item_label(finding.code)) }}</span>{% endif %}
+      {% if can_proof and not informational %}<span class="find-row__title">{{ c.plain(pick.question) if pick else (t('card.findings.note') if finding.code == 'NOTE' else item_label(finding.code)) }}</span>{% endif %}
       {% if informational or not can_proof or not shots %}<span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>{% endif %}
       <span class="find-row__meta">
+        {% if finding.repeat and not informational %}<b class="find-row__repeat" title="{{ t('card.findings.repeat_hint') }}">{{ t('card.findings.repeat') }}</b> · {% endif %}
         {% if informational and finding.level == 'R' %}{{ t('card.findings.advice') }} · {% endif %}
         {#- Маркеры исторической записи (D332): LEGACY — пункт не назван, пустая зона — не названа. #}
         {{ t('card.findings.note') if finding.code == 'NOTE' else (t('card.findings.no_item') if finding.code == 'LEGACY' else item_label(finding.code)) }} · {{ zone_names.get(finding.zone, finding.zone) if finding.zone else t('card.findings.no_zone') }}
@@ -300,7 +301,7 @@
      поэтому кавычки атрибута — одинарные. #}
   {% if can_proof %}
     {% set pick_items = [] %}
-    {% for pick in sheet.picks %}{% set _ = pick_items.append({'c': pick.code, 'n': pick.label, 'q': pick.question, 'l': pick.levels, 'z': pick.zones}) %}{% endfor %}
+    {% for pick in sheet.picks %}{% set _ = pick_items.append({'c': pick.code, 'n': pick.label, 'q': c.plain(pick.question), 'l': pick.levels, 'z': pick.zones}) %}{% endfor %}
     {% set proof_data = {
       'items': pick_items,
       'busy': t('proofread.suggest.busy_label'),
@@ -426,9 +427,9 @@
   {# Версия чек-листа (до #969 «Сборка») — свёрнутой справкой внизу (D218), и названа она ДАТОЙ:
      номер сборки человеку ничего не говорит. Номер остаётся подсказкой к дате —
      он нужен только при разборе расхождений. #}
-  <details class="mx-more">
+  <details class="mx-more mx-more--card">
     <summary>{{ t('card.build.title') }}</summary>
-    <dl class="kv mt-gap">
+    <dl class="kv kv--card">
       <div><dt class="muted">{{ t('card.build.checklist') }}</dt><dd>{{ checklist_name }}</dd></div>
       {% if head.is_legacy %}
       <div><dt class="muted">{{ t('card.legacy.method') }}</dt><dd>{{ detail.legacy_method or t('card.legacy.unlabelled') }}</dd></div>

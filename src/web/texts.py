@@ -523,17 +523,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "for the month to end."
         ),
     },
-    "accept.banner.title": {"ru": "Проверка на приёмке", "en": "Inspection awaiting review"},
-    "accept.banner.text": {
-        "ru": (
-            "Вычитайте записи и подтвердите проверку. До подтверждения она не входит в "
-            "историю сети, а её записи можно исправить."
-        ),
-        "en": (
-            "Review the records and accept the inspection. Until then it is not part of "
-            "the network history, and its records can still be corrected."
-        ),
-    },
     "accept.foreign": {
         "ru": (
             "Проверка другого пространства: вычитывает и подтверждает её то пространство, "
@@ -579,7 +568,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Принята до появления приёмки",
         "en": "Accepted before the review step existed",
     },
-    "card.accepted.waiting": {"ru": "Ждёт приёмки", "en": "Awaiting acceptance"},
+    # Что подтверждается при «Принять» (цена решения): буква, балл, записи, худший класс.
+    "accept.sum.records": {"ru": "записей: {n}", "en": "records: {n}"},
+    "accept.sum.worst": {"ru": "худшее: {level}", "en": "worst: {level}"},
+    "accept.sum.clean": {"ru": "нарушений нет", "en": "no violations"},
+    # Класс нарушения словами; коды людям не показываются.
+    "card.level.D1": {"ru": "отклонение", "en": "deviation"},
+    "card.level.D2": {"ru": "значительное", "en": "significant"},
+    "card.level.D3": {"ru": "критическое", "en": "critical"},
+    "card.findings.repeat": {"ru": "повтор", "en": "repeat"},
+    "card.findings.repeat_hint": {
+        "ru": "Повтор нарушения прошлой проверки: вычет удвоен",
+        "en": "Repeat of a violation from the previous inspection: the deduction counts double",
+    },
     "review.photo.alt": {"ru": "Кадр к записи {n}", "en": "Photo for record {n}"},
     # --- правка записи на приёмке (D200) ---------------------------------------
     "revise.level": {"ru": "Класс", "en": "Class"},
@@ -806,19 +807,17 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.fact.partner": {"ru": "Партнёр", "en": "Partner"},
     "card.fact.report_lang": {"ru": "Язык отчёта", "en": "Report language"},
     "card.score.unit": {"ru": "%", "en": "%"},
-    "card.score.note": {
-        "ru": "Вычтено {deductions} %",
-        "en": "Deducted {deductions} %",
-    },
     "card.zones.title": {"ru": "Потери по зонам", "en": "Loss by zone"},
     "card.zones.none": {"ru": "Потерь по зонам нет", "en": "No loss in any zone"},
     "card.actions.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
+    "card.actions.decide": {"ru": "Решение по проверке", "en": "Decision on the inspection"},
+    "card.actions.more": {"ru": "Отчёт, письма, план", "en": "Report, letters, plan"},
     "card.act.move": {"ru": "Исправить", "en": "Correct"},
     "card.act.rx": {"ru": "Сформировать предписание", "en": "Create compliance notice"},
     "card.act.rx_short": {"ru": "Предписание", "en": "Notice"},
     "card.act.letter": {"ru": "Письмо", "en": "Letter"},
     "card.act.plan": {"ru": "План", "en": "Plan"},
-    "card.zones.total": {"ru": "итого потеряно: {loss}", "en": "total lost: {loss}"},
+    "card.zones.total": {"ru": "Списано {loss} %", "en": "Deducted {loss} %"},
     "card.zones.zeroed": {"ru": "обнулена", "en": "zeroed"},
     "card.findings.title": {"ru": "Нарушения", "en": "Violations"},
     "card.findings.col.n": {"ru": "№", "en": "No."},
@@ -979,6 +978,7 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     # --- отклонение проверки (код остаётся retract, D194) ------------------
     "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
+    "retract.short": {"ru": "Отклонить", "en": "Reject"},
     "retract.hint": {
         "ru": (
             "Отклонение — пометка, а не удаление: строка остаётся в истории вместе с причиной, "

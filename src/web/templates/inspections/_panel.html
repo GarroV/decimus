@@ -40,8 +40,9 @@
     {% endif %}
     {% if head.retracted %}
       <div class="note note--error"><div class="note__text">{{ t('retract.banner.text', reason=head.retraction_reason or '—') }}</div></div>
-    {% elif head.on_review %}
-      <div class="note note--warn"><div class="note__text">{{ t('accept.banner.text') if c.own else t('accept.foreign') }}</div></div>
+    {% elif head.on_review and not c.own %}
+      {#- «На приёмке» говорит метка в шапке; плашка — только про отсутствие кнопки «Принять». -#}
+      <div class="note note--warn"><div class="note__text">{{ t('accept.foreign') }}</div></div>
     {% endif %}
     {% if c.plan_no_country %}
       <div class="note note--warn"><div class="note__text">{{ t('card.plan.no_country') }}</div></div>

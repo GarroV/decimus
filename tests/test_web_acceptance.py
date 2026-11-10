@@ -123,7 +123,8 @@ def test_ждущая_своя_показана_с_плашкой_правкой
 
     # Assert — принять, править на месте и отклонить можно (D465, D535); дату и
     # пиццерию ждущей тоже правят — «Исправить» шапки (#1045).
-    assert "Проверка на приёмке" in страница
+    # Статус говорит одна метка в шапке, плашки-дубля «Проверка на приёмке» нет.
+    assert "На приёмке" in страница and "Проверка на приёмке" not in страница
     assert "/accept?lang=" in страница
     assert "/findings/f1/revise?lang=" in страница
     assert 'data-proofread-form="edit"' in страница
@@ -385,9 +386,10 @@ def test_панель_ждущей_принимает_и_правит_на_ме�
 
     assert (
         'action="/inspections/11111111-1111-1111-1111-111111111111/accept?lang=ru" '
-        "data-panel-form data-accept-guard" in страница
+        'class="hact__form" data-panel-form data-accept-guard' in страница
     )
     assert "Принять проверку" in страница
+    assert 'class="hact__sum"' in страница  # сначала цена решения, потом кнопка «Принять»
     assert "/findings/f1/revise?lang=ru" in страница
     assert 'data-proofread-form="edit"' in страница and "data-panel-form" in страница
     assert "data-proofread-add" in страница  # «+ Добавить нарушение» в шапке записей

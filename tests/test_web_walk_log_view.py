@@ -70,7 +70,7 @@ def test_classes_are_named_and_offers_use_item_wording() -> None:
     (run,) = _build(row)
 
     lines = run.steps[0].lines
-    assert any(ПУНКТ in line and "значительное (D2)" in line for line in lines)
+    assert any(ПУНКТ in line and "значительное" in line for line in lines)
     assert "Путь: модель" in lines
 
 

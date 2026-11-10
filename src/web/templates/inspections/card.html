@@ -45,12 +45,11 @@
     </div>
   {% endif %}
 
-  {% if head.on_review and not head.retracted %}
+  {#- «На приёмке» говорит метка в шапке — плашки-дубля нет. Остаётся только то, чего
+      метка не объясняет: почему у вошедшего нет кнопки «Принять». -#}
+  {% if head.on_review and not head.retracted and not own %}
     <div class="note note--warn mt-gap">
-      <div>
-        <div class="note__title">{{ t('accept.banner.title') }}</div>
-        <div class="note__text">{{ t('accept.banner.text') if own else t('accept.foreign') }}</div>
-      </div>
+      <div><div class="note__text">{{ t('accept.foreign') }}</div></div>
     </div>
   {% endif %}
 
@@ -79,11 +78,8 @@
         <div class="tedit__row"><div class="card__title">{{ head.unit_name }}</div>{{ unit_pencil(c, head, False) }}</div>
         <div class="card__meta">{{ t('card.meta', date=day(head.inspection_date), kind=kind, checklist=checklist_name) }}</div>
         {{ provenance(head) }}
-        {# Сколько вычтено — одной строкой; записи по классам — метками в шапке
-           списка записей (D401), не второй раз здесь. #}
-        {% if not head.is_legacy %}
-        <div class="meta head-line__counts"><span>{{ t('card.score.note', deductions=detail.deductions) }}</span></div>
-        {% endif %}
+        {# Сколько списано — один раз, в блоке «Потери по зонам»; записи по классам —
+           метками в шапке списка записей (D401), не второй раз здесь. #}
         {{ grade_reason(c) }}
       </div>
       {% if head.retracted %}
