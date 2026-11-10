@@ -969,21 +969,20 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "The correction history is unavailable — corrections are disabled until it is back.",
     },
     # --- отклонение проверки (код остаётся retract, D194) ------------------
-    "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
+    "retract.title": {"ru": "Удалить проверку", "en": "Delete inspection"},
     "retract.icon": {"ru": "Удалить проверку", "en": "Delete inspection"},
     "retract.hint": {
         "ru": (
-            "Отклонение — пометка, а не удаление: строка остаётся в истории вместе с причиной, "
-            "обычной роли не видна, кадры убираются из хранилища. Причина обязательна."
+            "Проверка уходит из списков и аналитики, кадры убираются из хранилища; "
+            "в истории остаётся строка с причиной. Причина обязательна."
         ),
         "en": (
-            "Rejection marks, it does not delete: the row stays in history with its reason, "
-            "is invisible to the ordinary role, and the photos are purged from storage. "
-            "A reason is required."
+            "The inspection leaves the lists and analytics and its photos are purged; "
+            "a row with the reason stays in history. A reason is required."
         ),
     },
-    "retract.reason_label": {"ru": "Причина отклонения", "en": "Reason for rejection"},
-    "retract.submit": {"ru": "Отклонить проверку", "en": "Reject inspection"},
+    "retract.reason_label": {"ru": "Причина удаления", "en": "Reason for deletion"},
+    "retract.submit": {"ru": "Удалить проверку", "en": "Delete inspection"},
     "retract.done": {
         "ru": "Проверка отклонена. Кадров убрано: {photos}.",
         "en": "The inspection is rejected. Photos purged: {photos}.",
