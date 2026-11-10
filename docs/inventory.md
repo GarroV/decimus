@@ -404,6 +404,7 @@
 | `BOT_WALK_URL` | `src/bot/config.py` | да |
 | `BUILD_SHA` | `src/bot/version.py` | да |
 | `CHECKLIST_DIR` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
+| `CHECKLIST_FALLBACK_DIR` | `engine/audit.py`, `src/report/engine_call.py` | нет — подставляется кодом в окружение подпроцесса движка (src/report/engine_call.py) |
 | `COMPOSE_PROFILES` | `tools/mcp_healthcheck.py` | да |
 | `DATABASE_ADMIN_URL` | `src/db/migrate.py`, `tools/seed_web_demo.py` | да |
 | `DATABASE_APP_PASSWORD` | `src/db/migrate.py` | да |

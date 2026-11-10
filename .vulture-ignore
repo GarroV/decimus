@@ -816,3 +816,9 @@ settings_calendar_on
 settings_calendar_off
 # Автоматическая оснастка pytest: ключ шифрования тестовой базы календаря.
 ключ_шифрования
+
+# Тексты методики по языкам читает `pick_lang` по имени `<поле>_texts` через getattr
+# (`ChecklistItem.process/question`, `Zone.title`, `ZoneScore/ProcessScore.name`), поэтому
+# прямого чтения этих полей в коде нет.
+_.title_texts
+_.name_texts
