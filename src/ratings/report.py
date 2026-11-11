@@ -326,11 +326,12 @@ def build(
     *,
     kinds: Collection[str] = (RS, RKO),
     with_risk: bool = True,
+    only: Collection[str] | None = None,
 ) -> Summary:
     """Сводка за период. `kinds` и `with_risk` сужают то, что считается и читается:
     раздел, которому нужен один источник, не платит за остальные (D660). Не
     запрошенное остаётся пустым — читать его нельзя, оно не «нулевое», а не считалось."""
-    found = choices()
+    found = choices() if only is None else choices(only)
     codes = group_countries(selection, found.countries)
     period = selection.period
     prev = previous_period(period, rs_periods=found.rs_periods)

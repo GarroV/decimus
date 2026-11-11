@@ -9,13 +9,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import replace
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
 from web_harness import войти, подменить_двери, собрать
 
-from src.db import customer_ratings
+from src.db import customer_ratings, ratings_violations
 from src.db.ratings_read import CountryRow
 from src.ratings import compare as rcompare
 from src.ratings import report
@@ -75,6 +76,65 @@ def подготовить(
     вызовы: dict[str, list[Any]] = {"build": [], "compare": [], "agg": [], "maps": []}
     страна = CountryRow("RS", "Сербия", "Serbia", None, True, "CEE")
 
+    def оценки(*, countries: Any, begin: date, **_kw: Any) -> list[tuple[Any, ...]]:
+        """Сохранённые оценки: новый source builder читает ту же синтетическую выборку."""
+        rows = []
+        previous = begin < итог.selection.period.begin
+        for kind in ("rs", "rko"):
+            counts = итог.rs_units if kind == "rs" else итог.rko_units
+            for line in итог.lines:
+                mean = line.rs if kind == "rs" else line.rko
+                delta = line.rs_delta if kind == "rs" else line.rko_delta
+                # Отсутствующий итог в fixture означает отсутствие оценок источника.
+                total = итог.total.rs if kind == "rs" else итог.total.rko
+                if line.country not in countries or mean is None or total is None:
+                    continue
+                n = counts.get(line.country, 0)
+                if not n:
+                    continue
+                scores = [mean] * n
+                names = [f"Пиццерия {i}" for i in range(n)]
+                if kind == "rs" and n >= 3:
+                    scores = [97.0, 70.0] + [(mean * n - 167.0) / (n - 2)] * (n - 2)
+                    names[:2] = ["Пиццерия-Верх", "Пиццерия-Низ"]
+                for i, score in enumerate(scores):
+                    rows.append(
+                        (
+                            f"{kind}-u{i}",
+                            names[i],
+                            line.country,
+                            kind,
+                            1,
+                            begin,
+                            score - (delta or 0) if previous else score,
+                            begin,
+                        )
+                    )
+        return rows
+
+    def нарушения(kind: str, countries: Any, period: Any) -> tuple[Any, ...]:
+        block = итог.rs_cluster if kind == "rs" else итог.rko_cluster
+        if not block.total or "RS" not in countries:
+            return ()
+        return (
+            ratings_violations.Occurrence(
+                1,
+                kind,
+                "u1",
+                "Пиццерия 1",
+                "RS",
+                "Синтетическое нарушение",
+                None,
+                "violation",
+                None,
+                block.total,
+                None,
+                None,
+                None,
+                datetime(2026, 9, 1, tzinfo=UTC),
+            ),
+        )
+
     def собрать_сводку(_selection: Any, **kw: Any) -> report.Summary:
         вызовы["build"].append(kw)
         return итог
@@ -96,6 +156,14 @@ def подготовить(
     monkeypatch.setattr(screen.rcompare, "build", сравнить)
     monkeypatch.setattr(screen.read, "period_months", lambda: ())
     monkeypatch.setattr(screen.read, "rko_periods", lambda: ())
+    monkeypatch.setattr(screen.read, "source_rating_periods", lambda **_kw: ())
+    monkeypatch.setattr(screen.read, "score_facts", оценки)
+    monkeypatch.setattr(ratings_violations, "facts", нарушения)
+    monkeypatch.setattr(
+        ratings_violations,
+        "checkup_coverage",
+        lambda *_a: ratings_violations.CheckupCoverage(0, None),
+    )
     monkeypatch.setattr(screen, "_maps", lambda *_a: None)
     monkeypatch.setattr(screen, "_unit_maps", lambda _u: {})
     monkeypatch.setattr(screen, "_registry_units", lambda _c: None)

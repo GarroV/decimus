@@ -15,9 +15,10 @@ import logging
 import math
 from collections import Counter
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from types import ModuleType
+from typing import cast
 from urllib.parse import urlencode
 
 from flask import Flask, abort, redirect, render_template, request
@@ -27,14 +28,15 @@ from werkzeug.wrappers import Response
 from src.db import agg_store, maps_store
 from src.db import ratings_read as read
 from src.db import ratings_sync as sheet_state
-from src.db.errors import RatingsError
+from src.db.errors import DbError, RatingsError
 from src.db.ratings_read import REFUSED_SETTING, RatingsEditError
 from src.domain.permissions import role_may
 from src.domain.tenants import HQ_TENANT, may_manage_ratings
 from src.ratings import compare as rcompare
 from src.ratings import maps as rmaps
-from src.ratings import report, sheet_sync
+from src.ratings import report, sheet_sync, source_periods, violations_view
 from src.ratings import risk_sources as rsrc
+from src.ratings import summary as score_summary
 from src.ratings.aggregators import glovo_link, migros_link
 from src.ratings.aggregators import queue as agg_queue
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
@@ -45,6 +47,7 @@ from src.ratings.periods import (
     KIND_RATING,
     RatingPeriod,
     ReportPeriod,
+    parse_period,
     previous_period,
 )
 from src.ratings.pointer import GOOGLE
@@ -61,7 +64,9 @@ from . import (
     ratings_nav,
     ratings_platforms,
     ratings_risk,
+    ratings_scope,
     ratings_sheet,
+    ratings_trends,
     ratings_words,
     ui_lang,
 )
@@ -238,8 +243,8 @@ class SourceCountry:
     code: str
     score: float | None
     delta: float | None
-    violations: int
-    hard: int
+    violations: int | None
+    hard: int | None
     units: int
 
 
@@ -270,7 +275,12 @@ def _registry_units(codes: tuple[str, ...]) -> int | None:
         return None
 
 
-def _source(summary: report.Summary, kind: str) -> SourceView:
+def _source(
+    summary: report.Summary,
+    kind: str,
+    current: tuple[score_summary.Fact, ...] | None = None,
+    before: tuple[score_summary.Fact, ...] = (),
+) -> SourceView:
     """Раздел источника из `report.Summary` — ни одного нового расчёта оценки."""
     is_rs = kind == RS
     block = summary.rs_cluster if is_rs else summary.rko_cluster
@@ -291,7 +301,7 @@ def _source(summary: report.Summary, kind: str) -> SourceView:
     ]
     # Лучшая средняя сверху; без оценки — внизу: таблица сравнивает, а не перечисляет.
     rows.sort(key=lambda r: (r.score is None, -(r.score or 0.0), r.code))
-    return SourceView(
+    result = SourceView(
         kind=kind,
         avg=summary.total.rs if is_rs else summary.total.rko,
         avg_delta=summary.total.rs_delta if is_rs else summary.total.rko_delta,
@@ -304,6 +314,111 @@ def _source(summary: report.Summary, kind: str) -> SourceView:
         top=summary.rs_top if is_rs else summary.rko_top,
         bottom=summary.rs_bottom if is_rs else summary.rko_bottom,
     )
+    if current is None:
+        return result
+    scores, total = score_summary.score_lines(current, before, summary.countries)
+    by_code = {row.country: row for row in scores}
+    counts = score_summary.unit_counts(current, kind)
+    best, worst = score_summary.top_bottom(
+        current, kind, threshold=summary.thresholds["top_threshold"], previous=before
+    )
+    rows = [
+        replace(
+            row,
+            score=by_code[row.code].rs if is_rs else by_code[row.code].rko,
+            delta=by_code[row.code].rs_delta if is_rs else by_code[row.code].rko_delta,
+            units=counts.get(row.code, 0),
+        )
+        for row in result.countries
+    ]
+    rows.sort(key=lambda row: (row.score is None, -(row.score or 0), row.code))
+    return replace(
+        result,
+        avg=total.rs if is_rs else total.rko,
+        avg_delta=total.rs_delta if is_rs else total.rko_delta,
+        units=sum(counts.values()),
+        countries=tuple(rows),
+        top=best,
+        bottom=worst,
+    )
+
+
+def _period_view(kind: str, frame: _Frame) -> source_periods.PeriodView | None:
+    try:
+        return source_periods.load(kind, frame.codes, frame.selection.period, date.today())
+    except DbError:
+        logger.warning("Actual source periods unavailable", exc_info=True)
+        return None
+
+
+def _source_data(kind: str, frame: _Frame) -> dict[str, object]:
+    if request.args.get("actual_period") in (RS, RKO) and frame.selection.period.kind in (
+        KIND_RANGE,
+        KIND_RATING,
+    ):
+        try:
+            before_period = source_periods.previous_for(
+                kind, frame.codes, frame.selection.period, date.today()
+            )
+        except DbError:
+            before_period = None
+        frame = replace(frame, previous=before_period)
+    summary = report.build(frame.selection, kinds=(kind,), with_risk=False, only=frame.codes)
+    periods = _period_view(kind, frame)
+    context_period = parse_period(
+        request.args.get("period_context", ""), rs_periods=frame.found.rs_periods
+    )
+    cards = periods
+    if context_period and context_period != frame.selection.period:
+        cards = _period_view(
+            kind, replace(frame, selection=replace(frame.selection, period=context_period))
+        )
+    before: tuple[score_summary.Fact, ...] = ()
+    if periods is not None and frame.previous is not None:
+        try:
+            before = source_periods.load(kind, frame.codes, frame.previous, date.today()).facts
+        except DbError:
+            logger.warning("Previous source scores unavailable", exc_info=True)
+    current = periods.facts if periods is not None else None
+    if current is None:
+        saved_current, saved_before = report.period_facts(
+            frame.codes, frame.selection.period, frame.previous
+        )
+        current, before = tuple(saved_current), tuple(saved_before)
+    source = _source(summary, kind, current, before)
+    try:
+        violations = violations_view.build(
+            kind,
+            frame.codes,
+            frame.selection.period,
+            previous=frame.previous,
+            criterion=request.args.get("criterion"),
+        )
+    except DbError:
+        logger.warning("Source violations unavailable", exc_info=True)
+        violations = None
+    counts = {row.code: row.cases for row in violations.countries} if violations else {}
+    source = replace(
+        source,
+        countries=tuple(
+            replace(
+                row,
+                violations=counts.get(row.code),
+                hard=row.hard if row.code in counts and source.violations.has_data else None,
+            )
+            for row in source.countries
+        ),
+    )
+    return {
+        "src": source,
+        "thresholds": summary.thresholds,
+        "unit_maps": _unit_maps(frame.until),
+        "no_countries": not summary.countries,
+        "source_periods": periods,
+        "period_cards": cards,
+        "violation_data": violations,
+        "source_previous_title": _period_title(frame.previous, frame.found, frame.lang),
+    }
 
 
 @dataclass(frozen=True)
@@ -333,13 +448,30 @@ def _section_data(
         }
     if key in (ratings_nav.RS, ratings_nav.RKO):
         kind = RS if key == ratings_nav.RS else RKO
-        summary = report.build(sel, kinds=(kind,), with_risk=False)
-        return {
-            "src": _source(summary, kind),
-            "thresholds": summary.thresholds,
-            "unit_maps": _unit_maps(frame.until),
-            "no_countries": not summary.countries,
+        return _source_data(kind, frame)
+    if key == ratings_nav.OVERVIEW:
+        sources = (_source_data(RS, frame), _source_data(RKO, frame))
+        source_rows = {
+            kind: {row.code: row for row in cast(SourceView, source["src"]).countries}
+            for kind, source in zip((RS, RKO), sources, strict=True)
         }
+        return {
+            "overview_sources": sources,
+            "overview_countries": tuple(
+                {
+                    "code": code,
+                    "rs": source_rows[RS][code].score,
+                    "rs_delta": source_rows[RS][code].delta,
+                    "rko": source_rows[RKO][code].score,
+                    "rko_delta": source_rows[RKO][code].delta,
+                }
+                for code in codes
+                if code in source_rows[RS] and code in source_rows[RKO]
+            ),
+            "no_countries": not codes,
+        }
+    if key == ratings_nav.VIOLATIONS:
+        return _source_data(RKO if request.args.get("kind") == RKO else RS, frame)
     if key == ratings_nav.CLIENTS:
         return {
             "no_countries": not codes,
@@ -348,7 +480,7 @@ def _section_data(
             ),
         }
     if key == ratings_nav.RISK:
-        summary = report.build(sel, kinds=(), with_risk=True)
+        summary = report.build(sel, kinds=(), with_risk=True, only=codes)
         agg_names = _agg_names(lang)
         risk = ratings_risk.build(
             summary.risk,
@@ -392,15 +524,33 @@ def _section_data(
     if key == ratings_nav.COMPARE:
         return {"no_countries": not codes, "comparison": rcompare.build(sel, frame.found)}
     if key == ratings_nav.MAPS:
-        groups_lines, _ = report.build_groups(sel, frame.found)
-        groups = tuple(
-            (_group_name(g, sel, lang, frame.country_name), g.countries) for g in groups_lines
-        )
+        if sel.group == report.GROUP_IMF:
+            grouped_codes = tuple(
+                (
+                    cluster,
+                    tuple(
+                        c.code
+                        for c in frame.found.countries
+                        if c.code in codes and c.cluster == cluster
+                    ),
+                )
+                for cluster in report.CLUSTERS
+            )
+            groups = tuple(
+                (t("ratings.cluster." + cluster, lang), part)
+                for cluster, part in grouped_codes
+                if part
+            )
+            map_country_codes: tuple[str | None, ...] = tuple(None for _ in groups)
+        else:
+            groups = tuple((frame.country_name(code), (code,)) for code in codes)
+            map_country_codes = codes
         maps = _maps(groups, frame.until, frame.previous.end if frame.previous else None)
         return {
             "no_countries": not codes,
             "maps": maps if maps and any(m.as_of for m in maps) else (),
             "map_names": [name for name, _ in groups],
+            "map_country_codes": map_country_codes,
             "map_providers": rmaps.SHOWN_PROVIDERS,
             "map_units": ratings_platforms.build_maps(codes, today=date.today()),
             "agg_names": _agg_names(lang),
@@ -424,7 +574,12 @@ def _section_data(
 
 
 def render_section(
-    conf: Settings, key: str, *, notice: str | None = None, failure: str | None = None
+    conf: Settings,
+    key: str,
+    *,
+    notice: str | None = None,
+    failure: str | None = None,
+    country_code: str | None = None,
 ) -> str:
     """Раздел «Рейтингов» (D660): шапка, отбор, подменю и данные открытого раздела."""
     lang = _lang(conf)
@@ -433,8 +588,16 @@ def render_section(
     inspections = bool(account and role_may(account.role, account.tenant, "view.registry"))
     if key not in ratings_nav.visible(is_hq, inspections=inspections):
         abort(404)
+    current_kind = key if key in (RS, RKO) else (RKO if request.args.get("kind") == RKO else RS)
     today = date.today()
-    selection, found = report.select(request.args, today=today)
+    scope = ratings_scope.resolve(request.args, today=today)
+    selection, found = scope.selection, scope.choices
+    if country_code is not None:
+        code = country_code.upper()
+        if code not in {row.code for row in scope.available}:
+            abort(404)
+        selection = report.Selection(report.GROUP_COUNTRY, code, selection.period)
+        found = replace(found, countries=tuple(row for row in scope.available if row.code == code))
     names = _country_names(found.countries, lang)
 
     def country_name(code: str) -> str:
@@ -442,6 +605,25 @@ def render_section(
 
     codes = report.group_countries(selection, found.countries)
     previous = previous_period(selection.period, rs_periods=found.rs_periods)
+    actual_period = request.args.get("actual_period")
+    actual_period = actual_period if actual_period in (RS, RKO) else None
+    if actual_period and key in (RS, RKO, ratings_nav.VIOLATIONS):
+        actual_period = current_kind
+    period_context = request.args.get("period_context")
+    context_window = parse_period(period_context or "", rs_periods=found.rs_periods)
+    if (
+        not actual_period
+        or context_window is None
+        or selection.period.kind not in (KIND_RANGE, KIND_RATING)
+        or context_window.end < selection.period.begin
+        or context_window.begin > selection.period.end
+    ):
+        period_context = None
+    if actual_period and selection.period.kind in (KIND_RANGE, KIND_RATING):
+        try:
+            previous = source_periods.previous_for(actual_period, codes, selection.period, today)
+        except RatingsError:
+            previous = None
     frame = _Frame(
         lang, selection, found, codes, min(selection.period.end, today), previous, country_name
     )
@@ -452,9 +634,115 @@ def render_section(
     agg_names = _agg_names(lang)
     clients_view = data.get("clients")
     clients_status = clients_view.status if isinstance(clients_view, ratings_clients.View) else None
+
+    def section_href(
+        topic: str,
+        *,
+        scope_view: str = scope.mode,
+        period_window: str | None = None,
+        slice_group: str | None = None,
+        slice_value: str | None = None,
+        **extra: str,
+    ) -> str:
+        selected = selection
+        if slice_group in (report.GROUP_IMF, report.GROUP_CLUSTER, report.GROUP_COUNTRY):
+            selected = replace(selection, group=slice_group, value=slice_value)
+        if topic == ratings_nav.VIOLATIONS:
+            extra.setdefault("kind", current_kind)
+        if period_window:
+            parsed = parse_period(period_window, rs_periods=found.rs_periods)
+            if parsed is not None:
+                selected = replace(selected, period=parsed)
+                if topic in (RS, RKO):
+                    extra["actual_period"] = topic
+                extra["period_context"] = period_context or selection.period.key
+        elif actual_period:
+            extra["actual_period"] = topic if topic in (RS, RKO) else actual_period
+        if period_context:
+            extra.setdefault("period_context", period_context)
+        return request.script_root + ratings_nav.section_url(
+            root, topic, selected, lang, scope=scope_view, **extra
+        )
+
+    calendar = ratings_calendar.build(
+        selection.period,
+        read.period_months(),
+        found.rs_periods,
+        lang,
+        tuple(RatingPeriod(*p) for p in read.rko_periods()),
+    )
+    try:
+        windows = tuple(
+            row
+            for kind in (RS, RKO)
+            for row in read.source_rating_periods(
+                countries=codes,
+                rating_type=kind,
+                begin=date(selection.period.begin.year, 1, 1),
+                end=date(selection.period.end.year, 12, 31),
+            )
+        )
+    except DbError:
+        logger.warning("Actual calendar windows unavailable", exc_info=True)
+        windows = ()
+    options = {}
+    for kind in (RS, RKO):
+        boundaries = sorted(
+            {(row.begin_on, row.end_on) for row in windows if row.rating_type == kind}
+        )
+        options[kind] = tuple(
+            ratings_calendar.Option(
+                f"{begin.isoformat()}..{end.isoformat()}",
+                ratings_calendar.week_title(begin, end),
+                (begin, end) == (selection.period.begin, selection.period.end),
+            )
+            for begin, end in boundaries
+        )
+    calendar = replace(calendar, rs_options=options[RS], rko_options=options[RKO])
+    period_view = data.get("period_cards")
+    months: dict[date, list[source_periods.PeriodTile]] = {}
+    if isinstance(period_view, source_periods.PeriodView):
+        for tile in period_view.tiles:
+            for month in tile.months:
+                bounds = context_window if period_context and context_window else selection.period
+                if bounds.begin.replace(day=1) <= month <= bounds.end:
+                    months.setdefault(month, []).append(tile)
+    visible_countries = auth.current_reach().countries
+
+    def country_href(code: str, topic: str = key) -> str:
+        extras = {"scope": "all", "kind": topic if topic in (RS, RKO) else current_kind}
+        if actual_period:
+            extras["actual_period"] = topic if topic in (RS, RKO) else actual_period
+        if period_context:
+            extras["period_context"] = period_context
+        query = ratings_nav.query(selection, lang, **extras)
+        return f"{request.script_root}{root}/country/{code}/{topic}?{query}"
+
     return render_template(
         "ratings/index.html",
         section_key=key,
+        personal_scope=scope,
+        actual_period=actual_period,
+        period_context=period_context,
+        period_months=tuple(sorted(months.items())),
+        context_period_title=_period_title(
+            context_window if period_context else selection.period, found, lang
+        ),
+        country_card=country_code is not None,
+        selected_country=country_code.upper() if country_code else None,
+        country_topic_url=country_href,
+        section_url=section_href,
+        personal_countries=tuple(
+            row
+            for row in scope.available
+            if visible_countries is None or row.code in visible_countries
+        ),
+        personal_next=section_href(key, scope_view="mine").removeprefix(request.script_root)
+        if request.script_root
+        else section_href(key, scope_view="mine"),
+        may_see_developers=is_hq,
+        trend=ratings_trends.build,
+        score_width=lambda value: max(0.0, min(100.0, (value - 70.0) * 100.0 / 30.0)),
         subnav=ratings_nav.items(
             root,
             is_hq=is_hq,
@@ -464,6 +752,10 @@ def render_section(
             rows=rows,
             inspections=inspections,
             clients_status=clients_status,
+            scope=scope.mode,
+            actual_period=actual_period,
+            period_context=period_context,
+            violation_kind=current_kind,
         ),
         section_title=t(f"ratings.sec.{key}", lang),
         section_help=_section_help(
@@ -489,13 +781,7 @@ def render_section(
         score_tone=rl_chart.tone,
         choices=found,
         selection=selection,
-        calendar=ratings_calendar.build(
-            selection.period,
-            read.period_months(),
-            found.rs_periods,
-            lang,
-            tuple(RatingPeriod(*p) for p in read.rko_periods()),
-        ),
+        calendar=calendar,
         previous_title=_period_title(previous, found, lang),
         may_manage=may_manage(),
         unit_url=unit_rating_url,
@@ -805,6 +1091,11 @@ def install(app: Flask, conf: Settings) -> None:
     @app.get(f"{путь}/<any({names}):key>", endpoint="ratings_section")
     def ratings_section(key: str) -> str:
         return render_section(conf, key)
+
+    @app.get(f"{путь}/country/<code>/<any({names}):key>", endpoint="ratings_country")
+    def ratings_country(code: str, key: str) -> str:
+        """Country profile for this rating topic, using ratings permissions only."""
+        return render_section(conf, key, country_code=code)
 
     @app.get(f"{путь}/coverage", endpoint="ratings_coverage")
     def ratings_coverage() -> Response:

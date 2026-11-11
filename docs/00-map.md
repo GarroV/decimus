@@ -933,9 +933,11 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/ratings/sheet.py` | Лист «Качество по пиццериям» таблиц контроля (`sheet-scores`, D324) |
 | `src/ratings/sheet_sync.py` | Забор общей таблицы контроля «база рейтингов» самим decimus (D464) |
 | `src/ratings/snapshot.py` | Снимок рейтинга Dodo IS (JSON) — то, что Claude собирает в браузере сотрудника |
+| `src/ratings/source_periods.py` | D746: actual source windows, with the same per-unit fallback as Quality |
 | `src/ratings/summary.py` | Расчёты сводки рейтингов (D324): чистые функции над уже прочитанными фактами |
 | `src/ratings/svod.py` | «Свод пиццерий» девелопмента → справочник `unit_profiles` (D374–D376) |
 | `src/ratings/units_view.py` | Оценки пиццерий одним списком: РС, РКО, карта и агрегаторы (D420) |
+| `src/ratings/violations_view.py` | D746 violation analytics: one case denominator and the same scoped drilldown |
 <!-- map:end -->
 
 ### Агрегаторы доставки

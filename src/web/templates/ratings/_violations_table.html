@@ -1,0 +1,9 @@
+{% from 'ratings/_macros.html' import case_delta with context %}
+{% if violation_data and violation_data.has_data %}
+<div class="rt-scroll"><table class="rt-tbl rt-list rt-violations-table">
+<thead><tr><th>{{ t('ratings.d746.violation') }}</th><th class="num">{{ t('ratings.d746.share') }}</th><th class="num">{{ t('ratings.d746.cases') }}</th><th class="num">{{ t('ratings.src.col.units') }}</th><th class="num">{{ t('ratings.col.delta') }}</th></tr></thead>
+<tbody>{% for row in violation_rows %}<tr>
+<th><a href="{{ section_url('violations', kind=src.kind, criterion=row.key) }}">{{ row.text }}</a>{% if row.parent %}<small>{{ row.parent }}</small>{% endif %}</th>
+<td class="num">{{ '%.1f'|format(row.share) }}%</td><td class="num">{{ row.cases }}</td><td class="num">{{ row.units }}</td><td class="num">{{ case_delta(row.delta) }}</td>
+</tr>{% endfor %}</tbody></table></div>
+{% else %}<p class="rt-empty">{{ t('ratings.d746.no_violations_data') }}</p>{% endif %}

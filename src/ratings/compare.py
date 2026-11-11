@@ -16,7 +16,7 @@ from src.db.ratings_read import CountryRow
 
 from .model import RKO, RS
 from .periods import previous_period
-from .report import Choices, Selection, period_facts
+from .report import Choices, Selection, group_countries, period_facts
 from .summary import Fact, delta, group_average
 
 
@@ -79,7 +79,7 @@ def lines(
 
 def build(selection: Selection, found: Choices) -> Comparison:
     """Сравнение за период выбранного среза по всем странам охвата IMF."""
-    codes = tuple(row.code for row in found.countries)
+    codes = group_countries(selection, found.countries)
     prev = previous_period(selection.period, rs_periods=found.rs_periods)
     current, before = period_facts(codes, selection.period, prev)
-    return lines(found.countries, current, before)
+    return lines(tuple(row for row in found.countries if row.code in codes), current, before)

@@ -1,0 +1,18 @@
+{% from 'ratings/_macros.html' import dlt with context %}
+<section class="rt-violation-page">
+  <nav class="rt-country-topics" aria-label="{{ t('ratings.d746.violation_source') }}">
+  {% for kind in ('rs','rko') %}<a href="{{ section_url('violations', kind=kind) }}"{% if src.kind == kind %} aria-current="page"{% endif %}>{{ t('ratings.' ~ kind) }}</a>{% endfor %}
+  </nav>
+  <p class="rt-head__meta">{{ t('ratings.d746.share_help') }}</p>
+  <section class="pk-block">{% set violation_rows = violation_data.rows if violation_data else () %}{% include 'ratings/_violations_table.html' %}</section>
+  {% if violation_data and violation_data.selected %}{% set detail = violation_data.selected %}
+  <section class="pk-block"><header class="pk-block__head"><h2 class="pk-block__title">{{ detail.row.text }}</h2></header>
+    <div class="rt-scroll"><table class="rt-tbl rt-list"><thead><tr><th>{{ t('ratings.col.unit') }}</th><th class="num">{{ t('ratings.d746.cases') }}</th><th>{{ t('ratings.d746.source_checks') }}</th></tr></thead>
+    <tbody>{% for u in detail.units %}<tr><th>{% if u.rating_url %}<a href="{{ u.rating_url }}" target="_blank" rel="noopener">{{ u.name }}</a>{% else %}{{ u.name }}{% endif %}<small><a href="{{ country_topic_url(u.country, src.kind) }}">{{ country_name(u.country) }}</a></small></th><td class="num">{{ u.cases }}</td>
+    <td>{% for check in u.checks %}{% if check.url %}<a href="{{ check.url }}" target="_blank" rel="noopener">{{ check.occurred_at.strftime('%d.%m.%Y') if check.occurred_at else t('ratings.d746.source_check') }}</a>{% if not loop.last %} · {% endif %}{% endif %}{% endfor %}</td></tr>{% endfor %}</tbody></table></div>
+    {% if not detail.photos_available %}<p class="rt-empty">{{ t('ratings.d746.no_source_photos') }}</p>{% endif %}
+  </section>{% endif %}
+  {% if violation_data and violation_data.countries %}<section class="pk-block"><header class="pk-block__head"><h2 class="pk-block__title">{{ t('ratings.src.countries') }}</h2></header>
+    <div class="rt-scroll"><table class="rt-tbl rt-list"><thead><tr><th scope="col">{{ t('ratings.col.country') }}</th><th scope="col" class="num">{{ t('ratings.d746.cases') }}</th><th scope="col" class="num">{{ t('ratings.src.col.units') }}</th></tr></thead><tbody>{% for c in violation_data.countries %}<tr><th><a href="{{ country_topic_url(c.code, 'violations') }}">{{ country_name(c.code) }}</a></th><td class="num">{{ c.cases }}</td><td class="num">{{ c.units }}</td></tr>{% endfor %}</tbody></table></div>
+  </section>{% endif %}
+</section>

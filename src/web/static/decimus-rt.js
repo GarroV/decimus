@@ -88,6 +88,8 @@
   document.addEventListener("click", function (event) {
     var row = event.target.closest && event.target.closest(".rt-group__row");
     if (!row || event.defaultPrevented) return;
+    var nestedLink = event.target.closest("a[href]");
+    if (nestedLink && !nestedLink.hasAttribute("data-rt-country")) return;
     if (event.metaKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
     var group = row.closest(".rt-group");
@@ -121,6 +123,7 @@
     next.classList.add("is-loading");
     current.replaceWith(next);
     setUp(next);
+    document.dispatchEvent(new CustomEvent("decimus:ratings"));
     document.title = doc.title;
     // Одна перерисовка со сниженной непрозрачностью — и плавное проявление, а не вспышка.
     window.requestAnimationFrame(function () {

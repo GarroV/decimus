@@ -10,6 +10,7 @@ from datetime import UTC, date, datetime
 import pytest
 from ratings_page import ПУСТОЙ, клиент, подготовить, получить, сводка, факты
 
+from src.db.errors import RatingsError
 from src.ratings import freshness as fresh
 from src.ratings import risk_sources as rsrc
 from src.ratings.summary import CountryLine
@@ -17,7 +18,18 @@ from src.web import ratings as screen
 from src.web import ratings_nav
 from src.web.ratings_risk import CombinedRisk
 
-РАЗДЕЛЫ = ("rs", "rko", "clients", "maps", "agg", "risk", "compare", "inspections")
+РАЗДЕЛЫ = (
+    "overview",
+    "rs",
+    "rko",
+    "clients",
+    "maps",
+    "agg",
+    "risk",
+    "violations",
+    "compare",
+    "inspections",
+)
 ЗАЯВЛЕНИЕ = {"Origin": "http://localhost"}
 
 
@@ -35,19 +47,21 @@ def _заголовок(html: str) -> str:
     return найден.group(1)
 
 
-def test_подменю_в_заданном_порядке_и_голый_адрес_открывает_рс(
+def test_подменю_в_заданном_порядке_и_голый_адрес_открывает_обзор(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     подготовить(monkeypatch)
     html = получить(monkeypatch)
 
-    assert _подменю(html) == [(k, k == "rs") for k in РАЗДЕЛЫ]
-    assert _заголовок(html) == "Рейтинг стандартов (РС)"
+    assert _подменю(html) == [(k, k == "overview") for k in РАЗДЕЛЫ]
+    assert _заголовок(html) == screen.t("ratings.sec.overview", "ru")
 
 
 @pytest.mark.parametrize(
     ("раздел", "название"),
     [
+        ("overview", screen.t("ratings.sec.overview", "ru")),
+        ("violations", screen.t("ratings.sec.violations", "ru")),
         ("rs", "Рейтинг стандартов (РС)"),
         ("rko", "Рейтинг клиентского опыта (РКО)"),
         ("clients", "Оценки клиентов"),
@@ -86,7 +100,7 @@ def test_незнакомый_раздел_и_старый_open_не_ломаю�
         assert c.get("/ratings/zzz").status_code == 404
         # `?open=` из закладок молча игнорируется: открывается РС, как голый адрес
         html = c.get("/ratings?open=risk").get_data(as_text=True)
-        assert _заголовок(html) == "Рейтинг стандартов (РС)"
+        assert _заголовок(html) == screen.t("ratings.sec.overview", "ru")
 
 
 def test_срез_и_период_едут_в_подменю_и_в_фильтры_того_же_раздела(
@@ -141,11 +155,13 @@ def test_раздел_считает_только_своё(monkeypatch: pytest.M
     вызовы = подготовить(monkeypatch)
     for c in клиент(monkeypatch):
         c.get("/ratings/rs")
-        assert вызовы["build"] == [{"kinds": ("rs",), "with_risk": False}]  # РКО и риск не читались
+        assert вызовы["build"] == [
+            {"kinds": ("rs",), "with_risk": False, "only": ("RS",)}
+        ]  # РКО и риск не читались
         c.get("/ratings/rko")
-        assert вызовы["build"][-1] == {"kinds": ("rko",), "with_risk": False}
+        assert вызовы["build"][-1] == {"kinds": ("rko",), "with_risk": False, "only": ("RS",)}
         c.get("/ratings/risk")
-        assert вызовы["build"][-1] == {"kinds": (), "with_risk": True}
+        assert вызовы["build"][-1] == {"kinds": (), "with_risk": True, "only": ("RS",)}
         собрано = len(вызовы["build"])
         for раздел in ("agg", "maps", "compare", "clients"):
             c.get(f"/ratings/{раздел}")
@@ -155,7 +171,7 @@ def test_раздел_считает_только_своё(monkeypatch: pytest.M
 
 def test_хард_нарушения_режутся_на_столбцы_по_десять(monkeypatch: pytest.MonkeyPatch) -> None:
     подготовить(monkeypatch, сводка(rs_hard=факты(25)))
-    html = получить(monkeypatch)
+    html = получить(monkeypatch, "/ratings/rs")
 
     столбцы = re.findall(r'<ol class="rt-hard__col"[^>]*>(.*?)</ol>', html, flags=re.S)
     assert [len(re.findall(r'<li class="rt-hard__row"', c)) for c in столбцы] == [10, 10, 5]
@@ -177,27 +193,27 @@ def test_хард_в_разделе_только_своего_источника
 
 def test_показать_ещё_только_когда_строк_больше_двадцати(monkeypatch: pytest.MonkeyPatch) -> None:
     подготовить(monkeypatch, сводка(rs_hard=факты(25)))
-    много = получить(monkeypatch)
+    много = получить(monkeypatch, "/ratings/rs")
     assert "rt-hard__more" in много and ">Показать ещё (5)<" in много
     assert "Show more" not in много  # язык экрана — русский
     подготовить(monkeypatch, сводка(rs_hard=факты(20)))
-    assert "rt-hard__more" not in получить(monkeypatch)
+    assert "rt-hard__more" not in получить(monkeypatch, "/ratings/rs")
 
 
 def test_показать_ещё_на_английском(monkeypatch: pytest.MonkeyPatch) -> None:
     подготовить(monkeypatch, сводка(rs_hard=факты(25)))
-    assert "Show more (5)" in получить(monkeypatch, "/ratings?lang=en", ui_lang="en")
+    assert "Show more (5)" in получить(monkeypatch, "/ratings/rs?lang=en", ui_lang="en")
 
 
 def test_рс_плитки_страны_топ_и_боттом_из_сводки(monkeypatch: pytest.MonkeyPatch) -> None:
     подготовить(monkeypatch, сводка(rs_hard=факты(2)))
-    html = получить(monkeypatch)
+    html = получить(monkeypatch, "/ratings/rs")
 
     метки = re.findall(r'<div class="pk-tile__label">(.*?)</div>', html)
-    assert метки == ["Средняя", "Нарушений", "Хард", "Проверено"]
+    assert метки == ["Средняя", "Нарушений", "Хард", "Пиццерий с оценкой"]
     assert "пиццерий: 4" in html  # из `rs_units`
-    assert "на проверку 1.00" in html and "пиццерий с хардом: 2" in html
-    строка = re.search(r'<th scope="row">Сербия</th>(.*?)</tr>', html, re.S)
+    assert "пиццерий с хардом: 2" in html
+    строка = re.search(r'<th scope="row"><a[^>]*>Сербия</a></th>(.*?)</tr>', html, re.S)
     assert строка
     ячейки = re.findall(r'<td class="num">(.*?)</td>', строка.group(1), re.S)
     assert [re.sub(r"<[^>]+>", "", x).strip() for x in ячейки] == ["91.0", "▲+0.4", "3", "2", "4"]
@@ -210,6 +226,41 @@ def test_рко_берёт_свои_числа_а_не_рс(monkeypatch: pytest.
 
     assert "88.0" in html and "91.0" not in html
     assert "пиццерий: 3" in html and "Пиццерия-Верх" not in html
+
+
+def test_сохранённые_оценки_остаются_при_недоступных_api_периодах(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    подготовить(monkeypatch)
+
+    def unavailable(**_kw: object) -> None:
+        raise RatingsError("synthetic unavailable source windows")
+
+    monkeypatch.setattr(screen.read, "source_rating_periods", unavailable)
+    html = получить(monkeypatch, "/ratings/rs")
+    assert _заголовок(html) == "Рейтинг стандартов (РС)"
+    assert "91.0" in html and "пиццерий: 4" in html
+    assert "Пиццерия-Верх" in html and "Пиццерия-Низ" in html
+    # Synthetic sheet dates must never become actual Dodo IS period cards.
+    assert "data-source-period=" not in html
+
+
+def test_непрочитанные_детальные_нарушения_не_выдаются_за_ноль(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    подготовить(monkeypatch, сводка(rs_hard=факты(2)))
+
+    def unavailable(*_args: object) -> None:
+        raise RatingsError("synthetic unavailable detailed violations")
+
+    monkeypatch.setattr(screen.violations_view.read, "facts", unavailable)
+    html = получить(monkeypatch, "/ratings/rs")
+    row = re.search(r'<th scope="row"><a[^>]*>Сербия</a></th>(.*?)</tr>', html, re.S)
+    assert row
+    cells = re.findall(r'<td class="num">(.*?)</td>', row.group(1), re.S)
+    assert [re.sub(r"<[^>]+>", "", x).strip() for x in cells] == ["91.0", "▲+0.4", "—", "—", "4"]
+    # Already loaded summary hard details are still available independently.
+    assert len(re.findall(r'<li class="rt-hard__row"', html)) == 2
 
 
 def test_без_проверок_плиток_нет_а_честная_плашка(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -249,8 +300,11 @@ def test_общий_список_риска_называет_источники_
     html = получить(monkeypatch, "/ratings/risk")
 
     assert "Стара-Загора-1" in html
-    assert "<b>РКО</b>" in html and "<b>Wolt</b>" in html
-    assert "8.5 → 8.6 → 8.7 → 8.8" in html
+    assert re.search(r'<b class="rt-risk-source__name">РКО</b>', html)
+    assert re.search(r'<b class="rt-risk-source__name">Wolt</b>', html)
+    assert 'aria-label="Wolt: 8.5, 8.6, 8.7, 8.8"' in html
+    assert 'aria-label="РКО: 83.0, 83.5, 84.0"' in html
+    assert "rt-sparkline__line" in html and "▲" in html
 
 
 def test_точка_свежести_в_подменю_и_строка_в_шапке(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -291,7 +345,7 @@ def test_подменю_постоянно_но_скрипт_рейтингов_
 def test_видимость_разделов_по_пространству() -> None:
     assert ratings_nav.visible(True, inspections=True) == ratings_nav.SECTIONS
     assert "compare" not in ratings_nav.visible(False)
-    assert ratings_nav.DEFAULT == "rs"
+    assert ratings_nav.DEFAULT == "overview"
 
 
 def test_точка_раздела_без_своего_источника_берёт_худший_из_его_частей() -> None:
@@ -339,6 +393,7 @@ def test_work_sections_have_no_business_settings(
     main = re.search(r"<main\b[^>]*>(.*?)</main>", response, flags=re.S)
     assert main is not None
     assert screen.t("ratings.manage", lang) not in main.group(1)
-    assert not re.search(
-        r'<a\b[^>]*href="[^"]*/administration|<form\b[^>]*method="post"', main.group(1)
-    )
+    assert not re.search(r'<a\b[^>]*href="[^"]*/administration', main.group(1))
+    # Only the personal country preference may write from a work screen.
+    post_actions = re.findall(r'<form\b[^>]*method="post"[^>]*action="([^"]+)"', main.group(1))
+    assert post_actions == ["/country/filter"]

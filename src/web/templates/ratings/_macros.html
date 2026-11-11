@@ -44,3 +44,5 @@
   {%- elif c.state == 'missing' -%}<span class="is-empty" title="{{ t('ratings.coverage.missing') }}">—</span>
   {%- elif c.state == 'not_listed' -%}<span class="is-empty" title="{{ t('ratings.coverage.notListed') }}">—</span>
   {%- else -%}<span class="rt-cov__off" aria-hidden="true">·</span>{%- endif -%}{% endmacro %}
+
+{% macro case_delta(value) %}{% if value is none %}<span class="is-empty">—</span>{% elif value == 0 %}<span class="rt-delta">0</span>{% else %}<span class="rt-delta {{ 'rt-delta--down' if value > 0 else 'rt-delta--up' }}">{{ '▲' if value > 0 else '▼' }}{{ '%+d'|format(value) }}</span>{% endif %}{% endmacro %}

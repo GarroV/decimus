@@ -17,7 +17,7 @@
     <div class="rt-scroll"><table class="rt-maps rt-src">
       <thead><tr><th scope="col">{{ t('ratings.src.col.country') }}</th><th scope="col">{{ t('ratings.clients.unit') }}</th>
       <th scope="col" class="num">{{ t('ratings.clients.total') }}</th><th scope="col" class="num">{{ t('ratings.clients.dine') }}</th><th scope="col" class="num">{{ t('ratings.clients.delivery') }}</th></tr></thead>
-      <tbody>{% for row in clients.units %}<tr><th scope="row">{{ country_name(row.country) }}</th><td>{{ row.name }}</td>
+      <tbody>{% for row in clients.units %}<tr><th scope="row"><a href="{{ country_topic_url(row.country, 'clients') }}">{{ country_name(row.country) }}</a></th><td>{{ row.name }}</td>
       {% for score in (row.total,row.dine,row.delivery) %}<td class="num">{{ num(score.average) }} <small>({{ grp(score.count) }})</small></td>{% endfor %}
       </tr>{% endfor %}</tbody>
     </table></div>

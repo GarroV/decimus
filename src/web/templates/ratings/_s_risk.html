@@ -1,17 +1,43 @@
 {% from "ratings/_macros.html" import unit_link with context %}
-{#- «Стабильно ниже порога» (D658) — один список пиццерий, низких по любому источнику:
-    РС, РКО, площадки доставки и наши проверки; у строки — где именно ниже порога,
-    словами, и оценки (старые первыми). Правила — под «?» у заголовка (`risk_hint`), на
-    экране их нет. Предупреждений о неполноте (`risk_short`, `risk_unread`) на экране тоже
-    нет: о неполных данных сообщаем владельцу, читателю — только оценки. -#}
+{# D746: supplied risk sources grouped without inventing maps history or new thresholds. #}
+{% macro source_card(s) %}{% set history = trend(s.scores) %}
+  <div class="rt-risk-source rt-risk-source--{{ s.code }}">
+    <b class="rt-risk-source__name">{{ risk_sources.get(s.code, s.code) }}</b>
+    <div class="rt-risk-source__values">{% for point in history.scores %}
+      <span class="rt-risk-source__value">{% if point.value is none %}<span class="is-empty">—</span>{% else %}<span>{{ point.formatted }}</span>{% if point.delta is not none %}<span class="rt-delta rt-delta--{{ point.tone }}" title="{{ t('ratings.col.delta') }} {{ point.delta_text }}"><span class="rt-delta__arrow">{{ point.arrow }}</span></span>{% endif %}{% endif %}</span>
+    {% endfor %}</div>
+    {% if history.points %}<svg class="rt-sparkline" viewBox="0 0 {{ history.width }} {{ history.height }}" role="img" aria-label="{{ risk_sources.get(s.code, s.code) }}: {% for point in history.scores %}{{ point.value if point.value is not none else '—' }}{% if not loop.last %}, {% endif %}{% endfor %}">
+      <line class="rt-sparkline__guide" x1="0" y1="{{ history.height / 2 }}" x2="{{ history.width }}" y2="{{ history.height / 2 }}"></line>
+      {% for path in history.paths %}<path class="rt-sparkline__line" d="{{ path }}"></path>{% endfor %}
+      {% for point in history.points %}<circle class="rt-sparkline__dot" cx="{{ point.x }}" cy="{{ point.y }}" r="3.5"></circle>{% endfor %}
+    </svg>{% endif %}
+  </div>
+{% endmacro %}
 <div class="rt-sec">
-  {% if risk.rows %}
-  <div class="rt-card rt-alert rt-alert--warn rt-scroll"><table class="rt-maps rt-list">
-    <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col">{{ t('ratings.col.sources') }}</th></tr></thead>
+{% if risk.rows %}
+  {% set count = namespace(ratings=0, aggregators=0, inspections=0) %}
+  {% for u in risk.rows %}
+    {% if u.sources|selectattr('code', 'in', ('rs', 'rko'))|list %}{% set count.ratings = count.ratings + 1 %}{% endif %}
+    {% if u.sources|rejectattr('code', 'in', ('rs', 'rko', 'inspections'))|list %}{% set count.aggregators = count.aggregators + 1 %}{% endif %}
+    {% if u.sources|selectattr('code', 'equalto', 'inspections')|list %}{% set count.inspections = count.inspections + 1 %}{% endif %}
+  {% endfor %}
+  <div class="rt-risk-summary">
+    <div class="rt-risk-stat"><span>{{ t('ratings.src.col.units') }}</span><b data-risk-count="total">{{ risk.rows|length }}</b></div>
+    <div class="rt-risk-stat rt-risk-stat--ratings"><span>{{ t('section.ratings.title') }}</span><b data-risk-count="ratings">{{ count.ratings }}</b></div>
+    <div class="rt-risk-stat rt-risk-stat--aggregators"><span>{{ t('ratings.sec.agg') }}</span><b data-risk-count="aggregators">{{ count.aggregators }}</b></div>
+    <div class="rt-risk-stat rt-risk-stat--inspections"><span>{{ t('ratings.risk.src.inspections') }}</span><b data-risk-count="inspections">{{ count.inspections }}</b></div>
+  </div>
+  <div class="rt-card rt-scroll"><table class="rt-maps rt-list rt-risk-list">
+    <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col" class="rt-risk-group-head rt-risk-group-head--ratings">{{ t('section.ratings.title') }}</th><th scope="col" class="rt-risk-group-head rt-risk-group-head--aggregators">{{ t('ratings.sec.agg') }}</th><th scope="col" class="rt-risk-group-head rt-risk-group-head--inspections">{{ t('ratings.risk.src.inspections') }}</th></tr></thead>
     <tbody>{% for u in risk.rows %}<tr data-country="{{ u.country }}">
-      <th scope="row">{{ unit_link(u.unit, u.unit_name, 'rko' if u.sources[0].code == 'rko' else 'rs') }}<small>{{ country_name(u.country) }}</small></th>
-      <td class="rt-chips">{% for s in u.sources %}<span class="rt-chip"><b>{{ risk_sources.get(s.code, s.code) }}</b> <span class="rt-chip__scores">{% for x in s.scores %}{{ ('%.1f' if x > 5 else '%.2f')|format(x) }}{% if not loop.last %} → {% endif %}{% endfor %}</span></span>{% endfor %}</td>
+      <th scope="row">{{ unit_link(u.unit, u.unit_name, 'rko' if u.sources[0].code == 'rko' else 'rs') }}<small>{% if country_topic_url is defined %}<a href="{{ country_topic_url(u.country, 'risk') }}">{{ country_name(u.country) }}</a>{% else %}{{ country_name(u.country) }}{% endif %}</small></th>
+      {% set groups = (
+        ('ratings', u.sources|selectattr('code', 'in', ('rs', 'rko'))|list),
+        ('aggregators', u.sources|rejectattr('code', 'in', ('rs', 'rko', 'inspections'))|list),
+        ('inspections', u.sources|selectattr('code', 'equalto', 'inspections')|list)
+      ) %}
+      {% for group, sources in groups %}<td class="rt-risk-group rt-risk-group--{{ group }}">{% if sources %}<div class="rt-risk-sources">{% for s in sources %}{{ source_card(s) }}{% endfor %}</div>{% else %}<span class="is-empty">—</span>{% endif %}</td>{% endfor %}
     </tr>{% endfor %}</tbody>
   </table></div>
-  {% else %}<div class="rt-empty">{{ t('ratings.empty.risk') }}</div>{% endif %}
+{% else %}<div class="rt-empty">{{ t('ratings.empty.risk') }}</div>{% endif %}
 </div>
