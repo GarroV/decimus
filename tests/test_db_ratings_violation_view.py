@@ -80,6 +80,14 @@ def violations_data(db_env: str):
     return periods
 
 
+def facts(kind, countries, period):
+    return read.facts(kind, countries, view._window(kind, period))
+
+
+def checkup_coverage(kind, countries, period):
+    return read.checkup_coverage(kind, countries, view._window(kind, period))
+
+
 def ids(rows):
     return {row.criterion_id for row in rows}
 
@@ -87,8 +95,8 @@ def ids(rows):
 def test_rs_source_identity_wins_over_check_date_and_explicit_violation_period_wins(
     violations_data,
 ):
-    september = read.facts("rs", ("ZZ",), month_period(2026, 9))
-    october = read.facts("rs", ("ZZ",), month_period(2026, 10))
+    september = facts("rs", ("ZZ",), month_period(2026, 9))
+    october = facts("rs", ("ZZ",), month_period(2026, 10))
     assert ids(september) == {"C1"}
     assert ids(october) == {"C2", "C4", "VP"}
     period = ReportPeriod(
@@ -97,7 +105,7 @@ def test_rs_source_identity_wins_over_check_date_and_explicit_violation_period_w
         month_period(2026, 9).begin,
         month_period(2026, 9).end,
     )
-    assert ids(read.facts("rs", ("ZZ",), period)) == {"C1"}
+    assert ids(facts("rs", ("ZZ",), period)) == {"C1"}
     assert "C3" not in ids(october)  # an unknown explicit id never falls back to dates
     result = view.build("rs", ("ZZ",), month_period(2026, 10))
     chosen = next(row for row in result.rows if row.criterion_id == "VP")
@@ -111,14 +119,14 @@ def test_rs_source_identity_wins_over_check_date_and_explicit_violation_period_w
 def test_rko_rejected_is_outside_date_scope_but_week_remark_overlaps_both_months(
     violations_data,
 ):
-    assert ids(read.facts("rko", ("ZZ",), month_period(2026, 9))) == {"C5", "RW"}
-    assert ids(read.facts("rko", ("ZZ",), month_period(2026, 10))) == {"C7", "RW"}
+    assert ids(facts("rko", ("ZZ",), month_period(2026, 9))) == {"C5", "RW"}
+    assert ids(facts("rko", ("ZZ",), month_period(2026, 10))) == {"C7", "RW"}
 
 
 def test_empty_country_scope_never_reads_other_units_and_detail_has_no_photos(violations_data):
     period = month_period(2026, 10)
-    assert read.facts("rs", (), period) == ()
-    assert read.facts("rs", ("ZY",), period) == ()
+    assert facts("rs", (), period) == ()
+    assert facts("rs", ("ZY",), period) == ()
     result = view.build("rs", ("ZZ",), period)
     selected = view.build("rs", ("ZZ",), period, criterion=result.rows[0].key)
     assert result.total_cases == 4 and result.units == 1
@@ -130,7 +138,7 @@ def test_empty_country_scope_never_reads_other_units_and_detail_has_no_photos(vi
 def test_rko_can_use_the_shared_rs_period_filter_as_a_date_frame(violations_data):
     frame = month_period(2026, 10)
     period = ReportPeriod(KIND_RATING, f"rs:{violations_data[OCTOBER]}", frame.begin, frame.end)
-    assert ids(read.facts("rko", ("ZZ",), period)) == {"C7", "RW"}
+    assert ids(facts("rko", ("ZZ",), period)) == {"C7", "RW"}
 
 
 def test_metadata_coverage_is_scoped_and_does_not_multiply_violation_rows(violations_data):
@@ -139,8 +147,8 @@ def test_metadata_coverage_is_scoped_and_does_not_multiply_violation_rows(violat
     assert result.observed_checkups == 2
     assert result.coverage == "violations"
     assert result.checkups_loaded_at is not None
-    assert read.checkup_coverage("rs", (), period).count == 0
-    assert read.checkup_coverage("rs", ("ZY",), period).loaded_at is None
+    assert checkup_coverage("rs", (), period).count == 0
+    assert checkup_coverage("rs", ("ZY",), period).loaded_at is None
 
 
 def test_checkup_from_another_unit_is_not_a_proof_for_scoped_violation(
@@ -156,4 +164,4 @@ def test_checkup_from_another_unit_is_not_a_proof_for_scoped_violation(
             "update ratings.checkups set unit_dodo_id=%s where dodo_id=%s and rating_type='rs'",
             ("9" * 32, "2" * 32),
         )
-    assert "C2" not in ids(read.facts("rs", ("ZZ",), month_period(2026, 10)))
+    assert "C2" not in ids(facts("rs", ("ZZ",), month_period(2026, 10)))

@@ -14,13 +14,19 @@ from typing import Any
 
 import psycopg
 
-from src.ratings.model import RKO, RS
-from src.ratings.periods import KIND_RATING, ReportPeriod
-
 from .config import check_environment
 from .errors import RatingsError
 from .pool import connection
 from .request_memo import memoized
+
+
+@dataclass(frozen=True)
+class Window:
+    """Primitive read window; source-period interpretation belongs to the caller."""
+
+    begin: date
+    end: date
+    source_period_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -105,7 +111,7 @@ where c.rating_type = s.kind and u.country_code = any(s.countries)
 """
 
 
-def facts(kind: str, countries: Sequence[str], period: ReportPeriod) -> tuple[Occurrence, ...]:
+def facts(kind: str, countries: Sequence[str], period: Window) -> tuple[Occurrence, ...]:
     """Countable source violations; empty countries always means an empty scope."""
     params = _scope(kind, countries, period)
     if not params[1]:
@@ -114,7 +120,7 @@ def facts(kind: str, countries: Sequence[str], period: ReportPeriod) -> tuple[Oc
     return memoized(key, lambda: tuple(Occurrence(*row) for row in _query(_FACTS, params)))
 
 
-def checkup_coverage(kind: str, countries: Sequence[str], period: ReportPeriod) -> CheckupCoverage:
+def checkup_coverage(kind: str, countries: Sequence[str], period: Window) -> CheckupCoverage:
     """Known metadata checks; this does NOT establish a complete violations export."""
     params = _scope(kind, countries, period)
     if not params[1]:
@@ -124,21 +130,18 @@ def checkup_coverage(kind: str, countries: Sequence[str], period: ReportPeriod) 
 
 
 def _scope(
-    kind: str, countries: Sequence[str], period: ReportPeriod
+    kind: str, countries: Sequence[str], period: Window
 ) -> tuple[str, list[str], date, date, int | None]:
-    if kind not in (RS, RKO):
+    if kind not in ("rs", "rko"):
         raise ValueError("Unsupported rating type")
     codes = tuple(sorted(set(countries)))
     if any(len(c) != 2 or not c.isascii() or not c.isalpha() or c != c.upper() for c in codes):
         raise ValueError("Invalid country code")
     if period.end < period.begin:
         raise ValueError("Invalid period")
-    period_id = None
-    if kind == RS and period.kind == KIND_RATING:
-        raw = period.key.removeprefix("rs:")
-        if not period.key.startswith("rs:") or not raw.isascii() or not raw.isdigit():
-            raise ValueError("Invalid source period")
-        period_id = int(raw)
+    period_id = period.source_period_id
+    if period_id is not None and (type(period_id) is not int or period_id <= 0):
+        raise ValueError("Invalid source period")
     return (kind, list(codes), period.begin, period.end, period_id)
 
 

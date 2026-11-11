@@ -375,7 +375,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/peek/` | 2 | _switch.html, readonly.html |
 | `src/web/templates/prescriptions/` | 1 | not_found.html |
 | `src/web/templates/quality/` | 1 | index.html |
-| `src/web/templates/ratings/` | 10 | _macros.html, _period.html, _s_agg.html, _s_clients.html, _s_compare.html, _s_maps.html, _s_risk.html, _s_source.html, … (+2) |
+| `src/web/templates/ratings/` | 15 | _macros.html, _period.html, _period_tiles.html, _s_agg.html, _s_clients.html, _s_compare.html, _s_maps.html, _s_overview.html, … (+7) |
 | `src/web/templates/settings/` | 5 | _ai.html, confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
@@ -386,7 +386,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 79 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+71) |
+| `src/web/static/` | 83 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+75) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->

@@ -18,7 +18,7 @@ from src.db.ratings_violations import Occurrence
 
 from .links import checkup_rating_url, hex_id, unit_rating_url
 from .model import CATEGORY_REMARK, CATEGORY_VIOLATION, RKO, RS
-from .periods import ReportPeriod
+from .periods import KIND_RATING, ReportPeriod
 from .summary import normalize_text
 
 
@@ -248,6 +248,16 @@ def assemble(
     )
 
 
+def _window(kind: str, period: ReportPeriod) -> read.Window:
+    source_id = None
+    if kind == RS and period.kind == KIND_RATING:
+        raw = period.key.removeprefix("rs:")
+        if not period.key.startswith("rs:") or not raw.isascii() or not raw.isdigit():
+            raise ValueError("Invalid source period")
+        source_id = int(raw)
+    return read.Window(period.begin, period.end, source_id)
+
+
 def build(
     kind: str,
     countries: Sequence[str],
@@ -257,9 +267,9 @@ def build(
     criterion: str | None = None,
 ) -> ViolationView:
     """Load only the requested scope; provenance belongs to violation exports, not API scores."""
-    current = read.facts(kind, countries, period)
-    before = read.facts(kind, countries, previous) if previous is not None else ()
-    checks = read.checkup_coverage(kind, countries, period)
+    current = read.facts(kind, countries, _window(kind, period))
+    before = read.facts(kind, countries, _window(kind, previous)) if previous is not None else ()
+    checks = read.checkup_coverage(kind, countries, _window(kind, period))
     return assemble(
         kind,
         countries,

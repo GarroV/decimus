@@ -436,6 +436,7 @@ rko_hard
 # Раздел «Рейтинги» (`src/web/ratings.py`, T11): маршруты Flask — вызывает
 # диспетчер по адресу, регистрирует декоратор, по имени их не зовёт никто.
 ratings_index
+ratings_country
 ratings_imports
 ratings_upload
 ratings_developer
