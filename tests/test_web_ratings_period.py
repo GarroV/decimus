@@ -94,8 +94,7 @@ def test_списки_в_окне_периода_выбран_пункт_и_за
     assert совпал.count("data-pick-nav") == 2
     assert (
         '<option value="/r?period=2026-10-12..2026-10-18&amp;actual_period=rko" selected>'
-        '12.10 — 18.10.2026</option>'
-        in совпал
+        "12.10 — 18.10.2026</option>" in совпал
     )
     assert "disabled>Выбрать…</option>" in совпал  # в списке РС заглушка: неделя — не период РС
     assert совпал.count("disabled>") == 1
