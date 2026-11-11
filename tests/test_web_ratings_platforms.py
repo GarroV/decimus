@@ -107,8 +107,13 @@ def test_страна_раскрывается_сервером_по_адрес�
     assert 'class="rt-group" data-country="PL"' in открыта  # раскрыта одна, остальные нет
     # Меню оболочки тоже несёт aria-expanded, поэтому смотрим только на ссылки стран.
     assert "data-rt-country" in открыта
-    assert 'aria-expanded="true"><span class="rt-group__caret"' in открыта
-    assert 'aria-expanded="true"><span class="rt-group__caret"' not in закрыта
+    for html, expanded in ((открыта, "true"), (закрыта, "false")):
+        country = re.search(
+            r'<tbody class="rt-group[^"]*" data-country="RO">(.*?)</tbody>', html, re.S
+        )
+        assert country
+        toggle = re.search(r"<a\b[^>]*data-rt-country[^>]*>", country.group(1))
+        assert toggle and f'aria-expanded="{expanded}"' in toggle.group(0)
     # открытая страна едет в ссылки фильтров: пересчёт не сворачивает её
     assert "&amp;country=RO" in открыта.split('id="rt-bar-form"')[1].split("</form>")[0]
 
