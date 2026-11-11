@@ -835,3 +835,18 @@ def test_unknown_hard_coverage_is_distinct_from_a_known_zero(monkeypatch, known,
     else:
         assert unavailable in block.group(1)
         assert 'class="pk-block__count"' not in block.group(1)
+
+
+def test_violation_escape_closes_when_focus_is_still_outside_modal(monkeypatch, browser_page):
+    """Opening from an external KPI must not depend on the delayed details toggle event."""
+    with surface(monkeypatch, lang="ru") as (client, _state):
+        html = page_html(client, "/ratings/rko?period=2026-Q4&lang=ru")
+    page = browser_page
+    load_browser(page, html, 390)
+    opener = page.locator("[data-open-violations]")
+    opener.click()
+    page.wait_for_function("document.querySelector('[data-violations-dialog]').open")
+    # Model the race: the outside KPI retains focus until the native toggle callback runs.
+    opener.focus()
+    page.keyboard.press("Escape")
+    page.wait_for_function("!document.querySelector('[data-violations-dialog]').open")
