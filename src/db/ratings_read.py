@@ -22,6 +22,7 @@ from .config import check_environment
 from .errors import RatingsError
 from .pool import connection
 from .request_memo import memoized
+from .source_units import with_registry
 
 #: Коды отказа правки справочников: веб показывает по ним текст на языке
 #: интерфейса (P15), русский `str(exc)` остаётся журналу и MCP.
@@ -503,15 +504,28 @@ _UNIT_PERIODS = (
     "s.d3, s.d3_name, s.critical, s.critical_name, s.zeroing, s.zeroing_name, s.checkups_count, "
     "(select count(*) from ratings.checkups c where c.unit_dodo_id = s.unit_dodo_id "
     " and c.rating_type = p.rating_type "
-    " and c.occurred_at::date between p.begin_on and p.end_on), "
+    " and ((p.rating_type = 'rs' and c.period_dodo_id is not null "
+    "       and c.period_dodo_id = p.dodo_id) "
+    "      or ((p.rating_type <> 'rs' or c.period_dodo_id is null) "
+    "          and (c.occurred_at at time zone 'UTC')::date "
+    "              between p.begin_on and p.end_on))), "
     "(select count(*) from ratings.checkups c where c.unit_dodo_id = s.unit_dodo_id "
     " and c.rating_type = p.rating_type and c.acceptance = 'accepted' "
-    " and c.occurred_at::date between p.begin_on and p.end_on), "
+    " and ((p.rating_type = 'rs' and c.period_dodo_id is not null "
+    "       and c.period_dodo_id = p.dodo_id) "
+    "      or ((p.rating_type <> 'rs' or c.period_dodo_id is null) "
+    "          and (c.occurred_at at time zone 'UTC')::date "
+    "              between p.begin_on and p.end_on))), "
     "(select count(*) from ratings.violations v where v.unit_dodo_id = s.unit_dodo_id "
-    " and v.rating_type = p.rating_type and (v.period_id = p.id or exists ("
+    " and v.rating_type = p.rating_type and (v.period_id = p.id or "
+    " ((p.rating_type <> 'rs' or v.period_id is null) and exists ("
     "  select 1 from ratings.checkups c where c.rating_type = v.rating_type "
     "  and c.dodo_id = v.checkup_dodo_id "
-    "  and c.occurred_at::date between p.begin_on and p.end_on))), "
+    "  and ((p.rating_type = 'rs' and c.period_dodo_id is not null "
+    "        and c.period_dodo_id = p.dodo_id) "
+    "       or ((p.rating_type <> 'rs' or c.period_dodo_id is null) "
+    "           and (c.occurred_at at time zone 'UTC')::date "
+    "               between p.begin_on and p.end_on)))))), "
     "m.format, m.at, m.channel "
     "from ratings.scores s join ratings.periods p on p.id = s.period_id "
     "join ratings.imports m on m.id = s.import_id "
@@ -527,10 +541,55 @@ def unit_periods(
     """Разбивка пиццерии по периодам рейтинга, пересекающим `begin..end`, новые первыми.
 
     Проверки и нарушения — только загруженные у нас: `checkups_count` оценки может быть
-    больше, чем строк в `ratings.checkups`. Проверка ложится в период по дате проведения.
+    больше, чем строк в `ratings.checkups`. У РС явный период Dodo IS приоритетнее
+    даты проведения; дата в UTC используется, только когда идентификатор периода отсутствует.
+    РКО сохраняет принадлежность неделе по дате.
     Охват здесь не проверяется: `unit` приходит из `find_units`, уже отобранный по охвату.
     """
     return tuple(
         UnitPeriodRow(*r)
         for r in _rows(_UNIT_PERIODS, (unit, rating_type, rating_type, begin, end))
     )
+
+
+@dataclass(frozen=True)
+class SourceRatingPeriod:
+    """A unit's actual rating window and score returned by Dodo IS metrics."""
+
+    unit: str
+    unit_name: str
+    country: str
+    rating_type: str
+    begin_on: date
+    end_on: date
+    score: float
+    publish_status: str | None
+    checkups: int | None
+
+
+def source_rating_periods(
+    *, countries: Sequence[str], rating_type: str, begin: date, end: date
+) -> tuple[SourceRatingPeriod, ...]:
+    """Actual API windows in one bulk read, resolved through the official unit registry.
+
+    Calendar-month ownership (D735) is applied by the caller after this overlap
+    read. The sheet importer synthesizes half-month windows; those are not an
+    authoritative source of dates for these period cards.
+    """
+    if not countries:
+        return ()
+    rows = _rows(
+        with_registry(
+            "select r.dodo_id,u.name,u.country_code,r.kind,r.period_from,r.period_to,"
+            "r.rate::float,r.publish_status,c.checkups "
+            "from dodois.unit_rating_period r "
+            "join source_units u on u.dodo_id=r.dodo_id "
+            "left join dodois.unit_checkup_period c on c.dodo_id=r.dodo_id "
+            "and c.kind=r.kind and c.period_from=r.period_from "
+            "where u.country_code=any(%s) and r.kind=%s "
+            "and r.period_to >= %s and r.period_from <= %s "
+            "order by r.period_from,r.period_to,r.dodo_id"
+        ),
+        (list(countries), rating_type, begin, end),
+    )
+    return tuple(SourceRatingPeriod(*row) for row in rows)

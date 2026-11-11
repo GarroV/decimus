@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 228 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 229 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -169,13 +169,14 @@
 | `/prescriptions/files/<reply_id>` | GET | `order_file_legacy` | `src/web/prescriptions.py` |
 | `/quality` | GET | `quality` | `src/web/quality_page.py` |
 | `/ratings` | GET | `ratings` | `src/web/ratings.py` |
-| `/ratings/<any(rs,rko,clients,maps,agg,risk,compare,inspections):key>` | GET | `ratings_section` | `src/web/ratings.py` |
+| `/ratings/<any(overview,rs,rko,clients,maps,agg,risk,violations,compare,inspections):key>` | GET | `ratings_section` | `src/web/ratings.py` |
 | `/ratings/aggregators/absent` | POST | `aggregators_absent` | `src/web/aggregators_actions.py` |
 | `/ratings/aggregators/pin` | POST | `aggregators_pin` | `src/web/aggregators_actions.py` |
 | `/ratings/aggregators/present` | POST | `aggregators_present` | `src/web/aggregators_actions.py` |
 | `/ratings/aggregators/unpin` | POST | `aggregators_unpin` | `src/web/aggregators_actions.py` |
 | `/ratings/aggregators/update` | POST | `ratings_agg_update` | `src/web/ratings.py` |
 | `/ratings/countries` | POST | `ratings_developer` | `src/web/ratings.py` |
+| `/ratings/country/<code>/<any(overview,rs,rko,clients,maps,agg,risk,violations,compare,inspections):key>` | GET | `ratings_country` | `src/web/ratings.py` |
 | `/ratings/coverage` | GET | `ratings_coverage` | `src/web/ratings.py` |
 | `/ratings/coverage/link` | POST | `ratings_coverage_link` | `src/web/ratings.py` |
 | `/ratings/hard-rules` | POST | `ratings_rule_add` | `src/web/ratings.py` |

@@ -11,7 +11,7 @@
         <th scope="col" class="num">{{ t('ratings.rs') }}</th><th scope="col" class="num">{{ t('ratings.col.delta') }}</th>
         <th scope="col" class="num">{{ t('ratings.rko') }}</th><th scope="col" class="num">{{ t('ratings.col.delta') }}</th></tr></thead>
       <tbody>{% for x in rows %}<tr>
-        <th scope="row">{% if is_dev %}{{ x.key }}<small>{% for c in x.countries %}{{ country_name(c) }}{% if not loop.last %}, {% endif %}{% endfor %}</small>{% else %}{{ country_name(x.key) }}{% endif %}</th>
+        <th scope="row">{% if is_dev %}{{ x.key }}<small>{% for c in x.countries %}<a href="{{ country_topic_url(c, 'compare') }}">{{ country_name(c) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</small>{% else %}<a href="{{ country_topic_url(x.key, 'compare') }}">{{ country_name(x.key) }}</a>{% endif %}</th>
         <td class="num">{{ x.units }}</td>
         {% for v, d in ((x.rs, x.rs_delta), (x.rko, x.rko_delta)) %}
         <td class="num rt-cmp__v{% if v is not none %} is-{{ score_tone(v) }}{% endif %}">{{ num(v) }}</td><td class="num">{{ dlt(d) }}</td>

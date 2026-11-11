@@ -1,0 +1,15 @@
+<details class="rt-violations" id="source-violations" data-violations-dialog>
+  <summary class="btn btn--sm">{{ t('ratings.d746.open_violations') }}{% if violation_data and violation_data.has_data %} · {{ violation_data.total_cases }}{% endif %}</summary>
+  <div class="rt-violations__panel" role="dialog" aria-modal="true" aria-label="{{ t('ratings.d746.open_violations') }}">
+    <header><h2>{{ t('ratings.d746.top_violations') }} · {{ t('ratings.' ~ src.kind) }}</h2><div class="rt-violations__actions"><button class="btn btn--sm" type="button" data-export-violations>{{ t('ratings.d746.export') }}</button><button class="btn btn--sm" type="button" data-close-violations aria-label="{{ t('ratings.d746.close') }}">×</button></div></header>
+    <p>{{ calendar.title }} · {% if selection.group == 'country' %}{{ country_name(selection.value) }}{% elif selection.group == 'cluster' %}{{ t('ratings.cluster.' ~ selection.value) }}{% else %}{{ t('ratings.group.' ~ selection.group) }}{% endif %}</p>
+    <nav class="rt-country-topics" aria-label="{{ t('ratings.group') }}">
+      <a href="{{ section_url(section_key, slice_group='imf', show_violations='1') }}"{% if selection.group == 'imf' %} aria-current="true"{% endif %}>{{ t('ratings.group.imf') }}</a>
+      {% for code in clusters %}<a href="{{ section_url(section_key, slice_group='cluster', slice_value=code, show_violations='1') }}"{% if selection.group == 'cluster' and selection.value == code %} aria-current="true"{% endif %}>{{ t('ratings.cluster.' ~ code) }}</a>{% endfor %}
+    </nav>
+    <label class="rt-field rt-violations__country"><span class="rt-field__label">{{ t('ratings.group.country') }}</span><select class="pickselect" data-pick-nav><option value="{{ section_url(section_key, slice_group='imf', show_violations='1') }}">{{ t('ratings.d746.all') }}</option>{% for c in choices.countries %}<option value="{{ section_url(section_key, slice_group='country', slice_value=c.code, show_violations='1') }}"{% if selection.group == 'country' and selection.value == c.code %} selected{% endif %}>{{ country_name(c.code) }}</option>{% endfor %}</select></label>
+    <p>{{ t('ratings.d746.share_help') }}</p>
+    {% set violation_rows = violation_data.top if violation_data else () %}{% include 'ratings/_violations_table.html' %}
+    <a class="btn btn--primary btn--sm" href="{{ section_url('violations', kind=src.kind) }}">{{ t('ratings.d746.all_violations') }} →</a>
+  </div>
+</details>

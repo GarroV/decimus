@@ -79,7 +79,8 @@ def test_стрелка_недели_рко_листает_на_неделю() -
 
 _ХОСТ = (
     '{% from "ratings/_period.html" import period_lists with context %}'
-    "{% macro href(g, v, k) %}/r?period={{ k }}{% endmacro %}"
+    "{% macro href(g, v, k, actual=none) %}/r?period={{ k }}"
+    "{% if actual %}&amp;actual_period={{ actual }}{% endif %}{% endmacro %}"
     "{{ period_lists(c, href, 'imf', none) }}"
 )
 
@@ -92,7 +93,8 @@ def test_списки_в_окне_периода_выбран_пункт_и_за
 
     assert совпал.count("data-pick-nav") == 2
     assert (
-        '<option value="/r?period=2026-10-12..2026-10-18" selected>12.10 — 18.10.2026</option>'
+        '<option value="/r?period=2026-10-12..2026-10-18&amp;actual_period=rko" selected>'
+        '12.10 — 18.10.2026</option>'
         in совпал
     )
     assert "disabled>Выбрать…</option>" in совпал  # в списке РС заглушка: неделя — не период РС

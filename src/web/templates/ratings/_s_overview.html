@@ -1,0 +1,39 @@
+{% from 'ratings/_macros.html' import num, dlt with context %}
+{% set totals = namespace(both=0, down=0, comparable=0, growth=none, leader=none) %}
+{% for c in overview_countries %}
+  {% if c.rs_delta is not none and c.rko_delta is not none %}
+    {% set totals.comparable = totals.comparable + 1 %}
+    {% if c.rs_delta|round(1) > 0 and c.rko_delta|round(1) > 0 %}{% set totals.both = totals.both + 1 %}{% endif %}
+    {% if c.rs_delta|round(1) < 0 or c.rko_delta|round(1) < 0 %}{% set totals.down = totals.down + 1 %}{% endif %}
+  {% endif %}
+  {% if c.rs_delta is not none and c.rs_delta|round(1) > 0 and (totals.growth is none or c.rs_delta > totals.growth) %}{% set totals.growth = c.rs_delta %}{% set totals.leader = c.code %}{% endif %}
+{% endfor %}
+<div class="rt-overview">
+  <div class="rt-pair">{% for data in overview_sources %}{% set source=data.src %}
+    <section class="pk-block rt-overview-card">
+      <header class="pk-block__head"><h2 class="pk-block__title">{{ t('ratings.sec.' ~ source.kind) }}</h2><a href="{{ section_url(source.kind) }}">{{ t('ratings.d746.open_source', source=t('ratings.' ~ source.kind)) }} →</a></header>
+      <div class="rt-overview-card__score">{{ num(source.avg) }} {{ dlt(source.avg_delta) }}</div>
+      <dl class="rt-overview-facts">
+        <div><dt>{{ t('ratings.src.viol') }}</dt><dd>{% if data.violation_data and data.violation_data.has_data %}<a href="{{ section_url('violations',kind=source.kind) }}">{{ data.violation_data.total_cases }}</a>{% else %}—{% endif %}</dd></div>
+        <div><dt>{{ t('ratings.src.hard') }}</dt><dd>{% if source.violations.has_data and data.violation_data and data.violation_data.has_data %}{{ source.hard|length }}<small>{{ t('ratings.src.hard.sub', n=source.hard_units) }}</small>{% else %}—{% endif %}</dd></div>
+        <div><dt>{{ t('ratings.d746.scored') }}</dt><dd>{{ source.units }}</dd></div>
+      </dl>
+    </section>{% endfor %}
+  </div>
+  <div class="pk-tiles rt-overview-signals" style="--pk-cols:3">
+    <section class="pk-tile"><div class="pk-tile__label">{{ t('ratings.d746.both_up') }}</div><div class="pk-tile__value">{{ totals.both if totals.comparable else '—' }}</div><div class="pk-tile__sub">{{ t('ratings.d746.comparable', n=totals.comparable) }}</div></section>
+    <section class="pk-tile"><div class="pk-tile__label">{{ t('ratings.d746.any_down') }}</div><div class="pk-tile__value">{{ totals.down if totals.comparable else '—' }}</div><div class="pk-tile__sub">{{ t('ratings.d746.comparable', n=totals.comparable) }}</div></section>
+    <section class="pk-tile"><div class="pk-tile__label">{{ t('ratings.d746.biggest_rs') }}</div><div class="pk-tile__value">{{ dlt(totals.growth) }}</div>{% if totals.leader %}<a class="pk-tile__sub" href="{{ country_topic_url(totals.leader,'rs') }}">{{ country_name(totals.leader) }}</a>{% endif %}</section>
+  </div>
+  <section class="pk-block" data-overview-sort>
+    <header class="pk-block__head"><h2 class="pk-block__title">{{ t('ratings.d746.country_overview') }}</h2><label class="rt-overview-sort">{{ t('ratings.d746.sort') }} <select class="pickselect" data-overview-order>{% for field in ('rs','rko','rs_delta','rko_delta') %}<option value="{{ field }}">{{ t('ratings.d746.sort.' ~ field) }}</option>{% endfor %}</select></label></header>
+    <div class="rt-overview-scale"><span><i></i> {{ t('ratings.rs') }}</span><span><i class="is-rko"></i> {{ t('ratings.rko') }}</span><span>{{ t('ratings.d746.bar_scale') }}</span></div>
+    <div class="rt-scroll"><table class="rt-tbl rt-list rt-overview-table"><thead><tr><th>{{ t('ratings.col.country') }}</th><th>{{ t('ratings.rs') }}</th><th class="num">{{ t('ratings.col.delta') }}</th><th>{{ t('ratings.rko') }}</th><th class="num">{{ t('ratings.col.delta') }}</th><th>{{ t('ratings.d746.signal') }}</th></tr></thead>
+    <tbody>{% for c in overview_countries %}<tr data-rs="{{ c.rs if c.rs is not none else '' }}" data-rko="{{ c.rko if c.rko is not none else '' }}" data-rs_delta="{{ c.rs_delta if c.rs_delta is not none else '' }}" data-rko_delta="{{ c.rko_delta if c.rko_delta is not none else '' }}">
+      <th scope="row"><a href="{{ country_topic_url(c.code, 'overview') }}">{{ country_name(c.code) }}</a></th>
+      <td><div class="rt-overview-score">{{ num(c.rs) }}{% if c.rs is not none %}<span class="rt-overview-track"><i style="width:{{ score_width(c.rs) }}%"></i></span>{% endif %}</div></td><td class="num">{{ dlt(c.rs_delta) }}</td>
+      <td><div class="rt-overview-score">{{ num(c.rko) }}{% if c.rko is not none %}<span class="rt-overview-track rt-overview-track--rko"><i style="width:{{ score_width(c.rko) }}%"></i></span>{% endif %}</div></td><td class="num">{{ dlt(c.rko_delta) }}</td>
+      <td>{% if c.rs_delta is none or c.rko_delta is none %}<span class="rt-signal">{{ t('ratings.d746.signal.unknown') }}</span>{% elif c.rs_delta|round(1) < 0 and c.rko_delta|round(1) < 0 %}<span class="rt-signal rt-signal--down">{{ t('ratings.d746.signal.both_down') }}</span>{% elif c.rs_delta|round(1) < 0 %}<span class="rt-signal rt-signal--down">{{ t('ratings.d746.signal.rs_down') }}</span>{% elif c.rko_delta|round(1) < 0 %}<span class="rt-signal rt-signal--down">{{ t('ratings.d746.signal.rko_down') }}</span>{% elif c.rs_delta|round(1) > 0 and c.rko_delta|round(1) > 0 %}<span class="rt-signal rt-signal--up">{{ t('ratings.d746.both_up') }}</span>{% else %}<span class="rt-signal">{{ t('ratings.d746.signal.stable') }}</span>{% endif %}</td>
+    </tr>{% endfor %}</tbody></table></div>
+  </section>
+</div>

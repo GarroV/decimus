@@ -14,11 +14,11 @@
       <span class="rt-field__label">{{ label }}</span>
       <select class="pickselect" data-pick-nav data-period-list="{{ kind }}" aria-label="{{ label }}">
         {% if not options|selectattr('on')|list %}<option value="" selected disabled>{{ t('ratings.period.none') }}</option>{% endif %}
-        {% for o in options %}<option value="{{ href(group, value, o.key) }}"{% if o.on %} selected{% endif %}>{{ o.title }}</option>{% endfor %}
+        {% for o in options %}<option value="{{ href(group, value, o.key, kind) }}"{% if o.on %} selected{% endif %}>{{ o.title }}</option>{% endfor %}
       </select>
     </label>
     <noscript>
-      <span class="rt-cal__nojs">{% for o in options %}<a href="{{ href(group, value, o.key) }}"{% if o.on %} aria-current="true"{% endif %}>{{ o.title }}</a> {% endfor %}</span>
+      <span class="rt-cal__nojs">{% for o in options %}<a href="{{ href(group, value, o.key, kind) }}"{% if o.on %} aria-current="true"{% endif %}>{{ o.title }}</a> {% endfor %}</span>
     </noscript>
   {% endfor %}
 {% endmacro %}
