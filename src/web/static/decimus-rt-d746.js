@@ -67,8 +67,23 @@
       var opener = event.target.closest('[data-open-violations]');
       if (!opener) return;
       var details = document.querySelector('[data-violations-dialog]');
-      if (details) { event.preventDefault(); details.open = true; }
+      if (details) {
+        event.preventDefault();
+        details.open = true;
+        details.querySelector('[data-close-violations]').focus();
+      }
     });
+    // A KPI outside <details> can retain focus before the native toggle event.
+    // Escape belongs to the open modal even during that opening interval.
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape') return;
+      var details = document.querySelector('[data-violations-dialog][open]');
+      if (!details) return;
+      event.preventDefault();
+      event.stopPropagation();
+      details.open = false;
+      details.querySelector('summary').focus();
+    }, true);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
