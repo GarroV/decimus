@@ -483,6 +483,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0132_partner_space_safety.sql": (
         "sql1:5500e8b4125c18ee01a436710adce382b913795ad92910f8b3a38ca6260801d9"
     ),
+    "0135_web_onboarding.sql": (
+        "sql1:75b56bf8b25fb7faee9a79614bd9f9b5301bef9a27672d1fb217b3ce190d30b8"
+    ),
     "0136_feedback.sql": ("sql1:3056ada2d995412ac8b7c60bb781dd65d8ce4c24c1165c9b5663296932432977"),
 }
 
