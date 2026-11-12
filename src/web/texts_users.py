@@ -459,6 +459,88 @@ _SPACES: dict[str, dict[str, str]] = {
             "partner, or the database did not answer. Nothing was saved."
         ),
     },
+    "users.spaces.frozen_badge": {"ru": "заморожено", "en": "frozen"},
+    "users.spaces.freeze.title": {"ru": "Заморозка пространства", "en": "Freeze the space"},
+    "users.spaces.freeze.note": {
+        "ru": "Замораживает все действующие учётки пространства разом: сессии закроются, "
+        "подключения Claude и токены отзовутся, боты отвяжутся. Новые учётки в нём "
+        "не заводятся, пока пространство заморожено.",
+        "en": "Freezes every active account in the space at once: sessions close, Claude "
+        "connections and tokens are revoked, bots are unlinked. No new accounts can be "
+        "created in it while it is frozen.",
+    },
+    "users.spaces.freeze.open": {"ru": "Заморозить пространство", "en": "Freeze the space"},
+    "users.spaces.freeze.confirm": {
+        "ru": "Пространство {code}: все действующие учётки ({count}) потеряют вход сразу. "
+        "Вернуть их можно кнопкой «Разморозить пространство».",
+        "en": "Space {code}: all active accounts ({count}) lose access at once. "
+        "You can bring them back with “Unfreeze the space”.",
+    },
+    "users.spaces.freeze.yes": {"ru": "Да, заморозить пространство", "en": "Yes, freeze the space"},
+    "users.spaces.freeze.state": {
+        "ru": "Заморожено {date}, заморозил: {by}. Учёток заморожено кнопкой: {count}.",
+        "en": "Frozen {date} by {by}. Accounts frozen by the button: {count}.",
+    },
+    "users.spaces.unfreeze.open": {"ru": "Разморозить пространство", "en": "Unfreeze the space"},
+    "users.spaces.unfreeze.note": {
+        "ru": "Вернутся только учётки, замороженные этой кнопкой; замороженные раньше "
+        "по одной останутся замороженными. Люди входят заново, бота и Claude "
+        "подключают сами.",
+        "en": "Only accounts frozen by this button come back; accounts frozen one by one "
+        "earlier stay frozen. People sign in again and reconnect the bot and Claude "
+        "themselves.",
+    },
+    "users.spaces.frozen": {"ru": "Пространство заморожено.", "en": "The space is frozen."},
+    "users.spaces.already_frozen": {
+        "ru": "Пространство уже заморожено.",
+        "en": "The space is already frozen.",
+    },
+    "users.spaces.unfrozen": {"ru": "Пространство разморожено.", "en": "The space is unfrozen."},
+    "users.spaces.freeze_failed": {
+        "ru": "Не удалось заморозить пространство.",
+        "en": "Could not freeze the space.",
+    },
+    "users.spaces.unfreeze_failed": {
+        "ru": "Не удалось разморозить пространство.",
+        "en": "Could not unfreeze the space.",
+    },
+    "users.spaces.unfreeze_email_taken": {
+        "ru": "Не разморожено: почту одной из учёток за время заморозки привязали к другой "
+        "живой учётке. Снимите её у одной из двух и повторите.",
+        "en": "Not unfrozen: the email of one account was linked to another live account "
+        "while frozen. Remove it from one of the two and try again.",
+    },
+    "users.add.space_frozen": {
+        "ru": "Пространство заморожено: новых учёток в нём не заводят. Сначала разморозьте его.",
+        "en": "The space is frozen: no new accounts can be created in it. Unfreeze it first.",
+    },
+    "users.events.title": {
+        "ru": "Новое в пространствах партнёров: {count}",
+        "en": "New in partner spaces: {count}",
+    },
+    "users.events.admin_added": {
+        "ru": "В пространстве {space} новый админ: {login}",
+        "en": "New admin in space {space}: {login}",
+    },
+    "users.events.email_changed": {
+        "ru": "В пространстве {space} у учётки {login} сменилась почта",
+        "en": "In space {space} the email of account {login} was changed",
+    },
+    "users.events.by": {"ru": "завёл или изменил: {actor}", "en": "done by: {actor}"},
+    "users.events.by_none": {
+        "ru": "сама учётка или команда с сервера",
+        "en": "the account itself or a server command",
+    },
+    "users.events.seen": {"ru": "Видел", "en": "Seen"},
+    "users.events.more": {"ru": "Ещё событий: {count}", "en": "More events: {count}"},
+    "users.events.unknown": {
+        "ru": "Не удалось прочитать события пространств партнёров.",
+        "en": "Could not read the partner space events.",
+    },
+    "users.events.failed": {
+        "ru": "Не удалось отметить событие.",
+        "en": "Could not mark the event.",
+    },
     "users.spaces.countries_added": {"ru": "Страны добавлены.", "en": "Countries added."},
     "users.spaces.countries_failed": {
         "ru": (
@@ -517,13 +599,17 @@ _PROFILE: dict[str, dict[str, str]] = {
     "profile.password.submit": {"ru": "Сменить пароль", "en": "Change password"},
     "profile.password.hint": {
         "ru": "Не короче {min} знаков. После смены все остальные ваши входы закрываются, "
-        "этот остаётся.",
+        "этот остаётся. Ключ и подключение Claude отзываются: Claude нужно будет "
+        "подключить заново.",
         "en": "At least {min} characters. After the change all your other sessions are "
-        "signed out; this one stays.",
+        "signed out; this one stays. Your Claude key and connection are revoked: you will "
+        "need to reconnect Claude.",
     },
     "profile.password.ok": {
-        "ru": "Пароль сменён. Остальные ваши входы закрыты.",
-        "en": "Password changed. Your other sessions have been signed out.",
+        "ru": "Пароль сменён. Остальные входы закрыты, ключ Claude отозван: "
+        "подключите Claude заново.",
+        "en": "Password changed. Other sessions are signed out and your Claude key is "
+        "revoked: reconnect Claude.",
     },
     "profile.password.wrong": {
         "ru": "Пароль не сменён: проверьте текущий пароль.",
