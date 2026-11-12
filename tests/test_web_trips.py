@@ -2,8 +2,8 @@
 
 База здесь не поднимается — двери `src/db/trips.py` подменены и пишут, с чем их
 звали. Главное, что проверяется: пространство поездки берётся из учётки
-вошедшего, а не из адреса или формы; править может админ пространства или сам
-исполнитель; гость и чужие — нет. Что база сама не отдаёт чужого, держит
+вошедшего, а не из адреса или формы; править может админ УК; гость — нет;
+партнёру календарь и поездки закрыты целиком (D762). Что база сама не отдаёт чужого, держит
 `tests/test_db_trips.py`.
 """
 
@@ -112,21 +112,40 @@ def отправить(c: FlaskClient, путь: str, **поля: str) -> Any:
 def test_календарь_читает_поездки_только_своего_пространства(
     monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
 ) -> None:
-    """УК читает поездки УК, партнёр — свои: пространство — из учётки, не из адреса."""
-    for пространство, роль in (("HQ", "admin"), ("GE", "admin")):
-        c = клиент(monkeypatch, tenant=пространство, role=роль)
-        assert c.get("/calendar?tenant=AM&space=AM").status_code == 200
-        assert зовы["list"][-1]["tenant"] == пространство
+    """УК читает поездки УК: пространство — из учётки, не из адреса."""
+    c = клиент(monkeypatch, tenant="HQ", role="admin")
+    assert c.get("/calendar?tenant=AM&space=AM").status_code == 200
+    assert зовы["list"][-1]["tenant"] == "HQ"
+
+
+def test_партнёру_календарь_и_поездки_закрыты(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
+) -> None:
+    """D762: партнёру закрыты экран, создание и правка поездок; пункта в меню нет."""
+    зовы["store"][0][ПОЕЗДКА] = поездка()
+    for роль in ("admin", "auditor"):
+        c = клиент(monkeypatch, tenant="GE", role=роль)
+        assert c.get("/calendar").status_code in (403, 404)
+        assert отправить(c, "/calendar/trips", **ФОРМА).status_code in (403, 404)
+        assert отправить(c, f"/calendar/trips/{ПОЕЗДКА}", **ФОРМА).status_code in (403, 404)
+        assert (
+            отправить(
+                c, f"/calendar/trips/{ПОЕЗДКА}/steps", day="2026-10-20", kind="other", body="x"
+            ).status_code
+            in (403, 404)
+        )
+        assert 'href="/calendar"' not in c.get("/overview").get_data(as_text=True)
+    assert зовы["create"] == [] and зовы["update"] == [] and зовы["step"] == []
 
 
 def test_пространство_из_формы_не_подменяет_пространство_учётки(
     monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
 ) -> None:
-    c = клиент(monkeypatch, tenant="GE", role="admin")
-    ответ = отправить(c, "/calendar/trips", **ФОРМА, tenant="HQ", tenant_code="HQ")
+    c = клиент(monkeypatch, tenant="HQ", role="admin")
+    ответ = отправить(c, "/calendar/trips", **ФОРМА, tenant="GE", tenant_code="GE")
     assert ответ.status_code == 303
     _, пространство, автор = зовы["create"][-1]
-    assert пространство == "GE" and автор == СВОЙ_ID
+    assert пространство == "HQ" and автор == СВОЙ_ID
 
 
 def test_чужая_поездка_не_найдена_и_не_правится(
@@ -158,48 +177,11 @@ def test_гость_не_заводит_поездок(
     assert зовы["create"] == []
 
 
-def test_сотрудник_партнёра_планирует_только_себя(
-    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
-) -> None:
-    c = клиент(monkeypatch, tenant="GE", role="auditor")
-    assert отправить(c, "/calendar/trips", **ФОРМА).status_code == 303
-    черновик, _, _ = зовы["create"][-1]
-    assert черновик.executor_name == "director" and черновик.executor_user_id == СВОЙ_ID
-
-
-def test_сотрудник_не_правит_чужую_поездку_своего_пространства(
-    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
-) -> None:
-    зовы["store"][0][ПОЕЗДКА] = поездка(executor_user_id=None, executor_name="nino")
-    c = клиент(monkeypatch, tenant="GE", role="auditor")
-    assert отправить(c, f"/calendar/trips/{ПОЕЗДКА}", **ФОРМА).status_code == 403
-    assert (
-        отправить(
-            c, f"/calendar/trips/{ПОЕЗДКА}/steps", day="2026-10-20", kind="other", body="x"
-        ).status_code
-        == 403
-    )
-    assert зовы["update"] == [] and зовы["step"] == []
-
-
-def test_исполнитель_правит_свою_но_не_меняет_исполнителя(
-    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
-) -> None:
-    зовы["store"][0][ПОЕЗДКА] = поездка()
-    c = клиент(monkeypatch, tenant="GE", role="auditor")
-    assert (
-        отправить(c, f"/calendar/trips/{ПОЕЗДКА}", **{**ФОРМА, "executor": "nino"}).status_code
-        == 303
-    )
-    _, черновик, пространство = зовы["update"][-1]
-    assert черновик.executor_user_id == СВОЙ_ID and пространство == "GE"
-
-
 def test_логин_своего_пространства_связывает_учётку(
     monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
 ) -> None:
     """D506: вписан логин пользователя — это он; любое другое имя — просто текст."""
-    c = клиент(monkeypatch, tenant="GE", role="admin")
+    c = клиент(monkeypatch, tenant="HQ", role="admin")
     отправить(c, "/calendar/trips", **{**ФОРМА, "executor": "NINO"})
     отправить(c, "/calendar/trips", **{**ФОРМА, "executor": "Гость из офиса"})
     первый, второй = зовы["create"][-2][0], зовы["create"][-1][0]
@@ -207,23 +189,10 @@ def test_логин_своего_пространства_связывает_у�
     assert второй.executor_user_id is None and второй.executor_name == "Гость из офиса"
 
 
-def test_пиццерия_и_страна_вне_охвата_отказ(
-    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
-) -> None:
-    зовы["store"][0][ПОЕЗДКА] = поездка()
-    c = клиент(monkeypatch, tenant="GE", role="admin")
-    ответ = отправить(
-        c, f"/calendar/trips/{ПОЕЗДКА}/steps", day="2026-10-20", kind="inspection", unit=ЧУЖАЯ_ТОЧКА
-    )
-    assert ответ.status_code == 400 and "вне вашего охвата" in ответ.get_data(as_text=True)
-    assert отправить(c, "/calendar/trips", **{**ФОРМА, "country": "AM"}).status_code == 400
-    assert зовы["step"] == [] and зовы["create"] == []
-
-
 def test_чужая_страница_не_отправит_форму(
     monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
 ) -> None:
-    c = клиент(monkeypatch, tenant="GE", role="admin")
+    c = клиент(monkeypatch, tenant="HQ", role="admin")
     ответ = c.post("/calendar/trips", data=ФОРМА, headers={"Origin": "https://evil.example"})
     assert ответ.status_code == 403 and зовы["create"] == []
 
@@ -249,8 +218,8 @@ def test_экран_показывает_поездку_и_план(
         unit_name="Батуми-1",
         body="",
     )
-    зовы["store"][0][ПОЕЗДКА] = поездка(steps=(шаг,))
-    c = клиент(monkeypatch, tenant="GE", role="admin")
+    зовы["store"][0][ПОЕЗДКА] = поездка(tenant="HQ", steps=(шаг,))
+    c = клиент(monkeypatch, tenant="HQ", role="admin")
     страница = c.get(f"/calendar?from=2026-10-01&to=2026-10-31&trip={ПОЕЗДКА}").get_data(
         as_text=True
     )
