@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 229 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 233 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -90,6 +90,9 @@
 | `/administration/dodois/<country>/disconnect` | POST | `dodois_disconnect` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite` | POST | `dodois_invite_issue` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite/<int:invite_id>/revoke` | POST | `dodois_invite_revoke` | `src/web/dodois_screen.py` |
+| `/administration/feedback/<feedback_id>/review` | POST | `feedback_review` | `src/web/feedback.py` |
+| `/administration/feedback/chat` | POST | `feedback_chat` | `src/web/feedback.py` |
+| `/administration/feedback/photo/<photo_id>` | GET | `feedback_photo` | `src/web/feedback.py` |
 | `/administration/home/settings` | POST | `home_setting` | `src/web/home_settings.py` |
 | `/administration/mailings/<kind>/cc/add` | POST | `mailing_cc_add` | `src/web/mailings_screen.py` |
 | `/administration/mailings/<kind>/cc/remove` | POST | `mailing_cc_remove` | `src/web/mailings_screen.py` |
@@ -129,6 +132,7 @@
 | `/dodois/connect/<token>` | GET | `dodois_connect` | `src/web/dodois_connect.py` |
 | `/dodois/connect/<token>/start` | POST | `dodois_connect_start` | `src/web/dodois_connect.py` |
 | `/dodois/connect/<token>/status` | GET | `dodois_connect_status` | `src/web/dodois_connect.py` |
+| `/feedback` | POST | `feedback_send` | `src/web/feedback.py` |
 | `/inspections` | GET | `registry` | `src/web/app.py` |
 | `/inspections/<inspection_id>` | GET | `card` | `src/web/app.py` |
 | `/inspections/<inspection_id>/accept` | POST | `do_accept` | `src/web/app.py` |
@@ -671,6 +675,7 @@
 | `0129_calendar_deadline.sql` | `calendar_grants`, `calendar_events` |
 | `0130_close_invariants.sql` | — |
 | `0131_mailing_templates_lang.sql` | — |
+| `0136_feedback.sql` | `feedback`, `feedback_photos`, `feedback_chat` |
 <!-- map:end -->
 
 ## Makefile

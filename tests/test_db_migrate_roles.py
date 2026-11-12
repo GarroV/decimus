@@ -191,6 +191,11 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "calendar_grants": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "calendar_events": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "batch_letter_inspections": {"SELECT", "INSERT"},
+    # Отзывы из кнопки «Обратная связь» (`0136`, D761): только добавляются; править можно
+    # лишь отметки колонками (`APP_COLUMN_GRANTS`). Журнал чата Telegram — только дописывается.
+    "feedback": {"SELECT", "INSERT"},
+    "feedback_photos": {"SELECT", "INSERT"},
+    "feedback_chat": {"SELECT", "INSERT"},
     # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`). Круг
     # (`mcp_admins`) снят миграцией `0059` (D448).
     "mcp_tokens": {"SELECT", "INSERT"},
@@ -316,6 +321,8 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
 #: Здесь заслон и стоит: `fingerprint`, владелец токена, арендатор и время
 #: выпуска не правятся ни одним запросом, потому что права на них нет (`0011`).
 APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
+    # Отзыв после записи не переписывается: только «разобрано» и итог отправки в Telegram (`0136`).
+    "feedback": {"UPDATE": {"reviewed_at", "reviewed_by", "telegram_sent_at", "telegram_error"}},
     "mcp_tokens": {"UPDATE": {"revoked_at", "revoked_by"}},
     # Вторая ступень (`0068`): ни владелец, ни открытый ключ, ни отпечаток не правятся —
     # только счётчик подписей и время использования, секрет и отметки приложения,
