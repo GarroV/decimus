@@ -291,10 +291,10 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     },
     "settings.google.link_warn": {
         "ru": "После привязки вход паролем для этой учётки закроется: входить вы будете "
-        "кнопкой «Войти через Google». Ваши входы на других устройствах закроются, "
+        "кнопкой «Вход для управляющей компании». Ваши входы на других устройствах закроются, "
         "Claude, подключённый через сайт, нужно будет подключить заново.",
         "en": "Once linked, password sign-in is closed for this account: you will sign in "
-        "with the “Sign in with Google” button. Your sessions on other devices are "
+        "with the “Management company sign-in” button. Your sessions on other devices are "
         "closed, and Claude connected through the site has to be connected again.",
     },
     "settings.google.link_hq": {

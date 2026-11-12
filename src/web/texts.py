@@ -326,7 +326,10 @@ TEXTS: dict[str, dict[str, str]] = {
     # Вход через учётку Google (T332). Кнопка РЯДОМ с паролем, а не вместо:
     # у партнёра почта может оказаться не гугловой, и отнимать единственную
     # дверь ради красоты схемы нельзя.
-    "auth.google": {"ru": "Войти через Google", "en": "Sign in with Google"},
+    "auth.google": {
+        "ru": "Вход для управляющей компании (Google)",
+        "en": "Management company sign-in (Google)",
+    },
     "auth.or": {"ru": "или", "en": "or"},
     # Почта учётки пришла с другого аккаунта Google (аудит 12.10, F-027).
     "auth.google_other": {
@@ -343,9 +346,9 @@ TEXTS: dict[str, dict[str, str]] = {
     # пароль идёт через фронт и прокси, вход Google — нет. Партнёрских учёток
     # это не касается (D754): они входят и паролем.
     "auth.use_google": {
-        "ru": "К этой учётке привязана почта Google — входите кнопкой «Войти через Google». "
-        "Пароль для неё не принимается.",
-        "en": "This account has a Google address linked — use “Sign in with Google”. "
+        "ru": "К этой учётке привязана почта Google — входите кнопкой "
+        "«Вход для управляющей компании». Пароль для неё не принимается.",
+        "en": "This account has a Google address linked — use “Management company sign-in”. "
         "Password sign-in is turned off for it.",
     },
     # Две мелкие строки внизу экрана входа (D492): кто сюда допущен и что делать с

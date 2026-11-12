@@ -116,13 +116,13 @@ def test_без_реквизитов_кнопки_нет(monkeypatch: pytest.Mon
     with собрать(tenant=ТЕНАНТ).test_client() as client:
         страница = client.get(auth.LOGIN_PATH).get_data(as_text=True)
 
-    assert "Войти через Google" not in страница
+    assert "Вход для управляющей компании (Google)" not in страница
 
 
 def test_с_реквизитами_кнопка_есть(клиент: FlaskClient) -> None:
     страница = клиент.get(auth.LOGIN_PATH).get_data(as_text=True)
 
-    assert "Войти через Google" in страница
+    assert "Вход для управляющей компании (Google)" in страница
     assert auth.GOOGLE_START_PATH in страница
 
 
@@ -397,7 +397,7 @@ def test_учётка_уК_с_почтой_google_паролем_не_входи
 
     assert ответ.status_code == 403
     assert зовы["open"] == [], "сессия открылась паролем"
-    assert "Войти через Google" in ответ.get_data(as_text=True)
+    assert "Вход для управляющей компании (Google)" in ответ.get_data(as_text=True)
     assert auth.COOKIE_NAME not in ответ.headers.get("Set-Cookie", "")
 
 
