@@ -279,6 +279,10 @@ def install(
             return None
         return token, pending, account
 
+    def _has_any_method(status: store.Status) -> bool:
+        """Есть ли у учётки хоть один способ второй ступени: ключ, приложение или резервные коды."""
+        return status.has_factor or status.backup_left > 0
+
     def _page(
         token_status: store.Status,
         account: Account,
@@ -287,9 +291,13 @@ def install(
         locked_minutes: int | None = None,
         code: int = 200,
     ) -> Response:
-        # Ключ можно сохранить прямо здесь: роли с отпечатком на каждом входе (D720).
+        # Ключ можно сохранить прямо здесь: роли с отпечатком на каждом входе (D720) и только
+        # учётке без единого способа второй ступени.
         can_create = (
-            REQUIRE_KEY_AT_LOGIN and party is not None and needs_step_every_login(str(account.role))
+            REQUIRE_KEY_AT_LOGIN
+            and party is not None
+            and needs_step_every_login(str(account.role))
+            and not _has_any_method(token_status)
         )
         ответ = make_response(
             render_template(
@@ -297,7 +305,7 @@ def install(
                 failed=failed,
                 locked_minutes=locked_minutes,
                 can_create=can_create,
-                no_method=not token_status.has_factor,
+                no_method=not _has_any_method(token_status),
                 has_passkeys=bool(token_status.passkeys) and party is not None,
                 # Ключ запускается сам при открытии страницы; после осечки (код не
                 # подошёл, замок) — нет, иначе окно ключа выскакивало бы по кругу.
@@ -506,8 +514,7 @@ def install(
         """Параметры сохранения отпечатка прямо на входе (D720): браузер без метки «ключ тут есть».
 
         Сохраняется платформенный ключ для ЭТОГО человека (первая ступень уже пройдена), только
-        ролям с отпечатком на каждом входе. Ключи в других браузерах не мешают: окно открывается
-        само, без QR.
+        ролям с отпечатком на каждом входе и только учётке без единого способа второй ступени.
         """
         refuse_foreign_origin()
         вход = _live()
@@ -515,6 +522,9 @@ def install(
             return jsonify(error="expired", login=url_for("login", second_step="expired")), 401
         token, _pending, account = вход
         if not REQUIRE_KEY_AT_LOGIN or not needs_step_every_login(str(account.role)):
+            return jsonify(error="forbidden"), 403
+        # Сохранение на входе — только учётке без способов; есть способ — подтверждать им.
+        if _has_any_method(store.status_of(account.id)):
             return jsonify(error="forbidden"), 403
         ключи = store.status_of(account.id).passkeys
         if len(ключи) >= MAX_PASSKEYS:
@@ -541,6 +551,9 @@ def install(
             return jsonify(error="expired", login=url_for("login", second_step="expired")), 401
         token, _pending, account = вход
         if not REQUIRE_KEY_AT_LOGIN or not needs_step_every_login(str(account.role)):
+            return jsonify(error="forbidden"), 403
+        # Сохранение на входе — только учётке без способов; есть способ — подтверждать им.
+        if _has_any_method(store.status_of(account.id)):
             return jsonify(error="forbidden"), 403
         допущена, _, секунд = _admit(account)
         if not допущена:

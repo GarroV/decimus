@@ -149,7 +149,7 @@
     var busy = false;
     var createUrl = root.getAttribute("data-create-url");
     // D720: ключ здесь уже есть (метка и ключи у человека) — подтверждаем им; иначе, если страница
-    // это позволяет, СОХРАНЯЕМ отпечаток сразу, даже когда ключи есть в других браузерах.
+    // это позволяет (у учётки нет ни одного способа), СОХРАНЯЕМ отпечаток сразу.
     var useExisting = storageGet(HERE_KEY) && root.hasAttribute("data-has-keys");
 
     function saveHere(auto) {
