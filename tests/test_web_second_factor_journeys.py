@@ -1018,18 +1018,19 @@ def test_без_способа_отпечаток_сохраняется_на_в
     assert стенд.sql("select count(*) from web_passkeys")[0][0] == 1
 
 
-def test_в_новом_браузере_отпечаток_сохраняется_даже_при_ключе_в_другом(
+def test_со_способом_сохранение_на_входе_отказано(
     стенд: Стенд, с_ключом: VirtualAuthenticator, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(second_step, "REQUIRE_KEY_AT_LOGIN", True)
     чистый = стенд.новый_браузер()
     войти(чистый, login="dev", password=ПАРОЛЬ)
 
-    код, тело = _сохранить_на_входе(чистый, VirtualAuthenticator())
+    опции = чистый.post(f"{STEP}/passkey/create-options", headers=HDR)
+    запись = чистый.post(f"{STEP}/passkey/create", json={"credential": {}}, headers=HDR)
 
-    assert код == 200, тело
-    assert _сессия(чистый) and _доказана(стенд, чистый)
-    assert стенд.sql("select count(*) from web_passkeys")[0][0] == 2
+    assert опции.status_code == запись.status_code == 403
+    assert not _сессия(чистый)
+    assert стенд.sql("select count(*) from web_passkeys")[0][0] == 1
 
 
 def test_ключ_на_входе_обновляет_последний_вход(

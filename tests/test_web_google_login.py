@@ -773,3 +773,46 @@ def test_сохранение_отпечатка_на_входе_только_р
     )
 
     assert выбор.status_code == запись.status_code == 403
+
+
+@pytest.mark.parametrize(
+    ("способ", "ожидание"),
+    [("ключ", 403), ("приложение", 403), ("коды", 403), ("нет", 200)],
+)
+def test_сохранение_на_входе_только_учётке_без_способов(
+    клиент_с_ключами: FlaskClient,
+    monkeypatch: pytest.MonkeyPatch,
+    способ: str,
+    ожидание: int,
+) -> None:
+    """Есть любой способ второй ступени — ключ на входе не сохраняется, подтверждают им."""
+    from types import SimpleNamespace
+
+    from src.web import second_step
+
+    состояние = SimpleNamespace(
+        passkeys=(object(),) if способ == "ключ" else (),
+        totp_confirmed=способ == "приложение",
+        backup_left=3 if способ == "коды" else 0,
+        has_factor=способ in ("ключ", "приложение"),
+    )
+    монитор = monkeypatch
+    монитор.setattr(second_step.store, "find_pending", lambda _t: SimpleNamespace(user_id="u"))
+    монитор.setattr(
+        second_step,
+        "find_by_id",
+        lambda _i: SimpleNamespace(
+            id="00000000-0000-4000-8000-000000000001", role="admin", login="a"
+        ),
+    )
+    монитор.setattr(second_step.store, "status_of", lambda _i: состояние)
+    монитор.setattr(second_step.store, "store_challenge", lambda *_a, **_k: None)
+    монитор.setattr(second_step, "REQUIRE_KEY_AT_LOGIN", True)
+    кука = клиент_с_ключами.application.extensions[second_step.SIGNER_KEY].dumps("токен")
+    клиент_с_ключами.set_cookie(second_step.PENDING_COOKIE, кука)
+
+    ответ = клиент_с_ключами.post(
+        f"{ШАГ}/passkey/create-options", headers={"Origin": "http://localhost"}
+    )
+
+    assert ответ.status_code == ожидание, ответ.get_data(as_text=True)
