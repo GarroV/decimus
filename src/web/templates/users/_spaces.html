@@ -46,6 +46,27 @@
   </div>
 {% endmacro %}
 
+{# Деньги на экран: на русском запятая, на английском точка; потолок без копеек, если целый. #}
+{% macro usd(x, whole=false) -%}
+  {%- set txt = ('%.0f' if whole and x == x|round else '%.2f')|format(x) -%}
+  {{ txt|replace('.', ',') if lang == 'ru' else txt }}
+{%- endmacro %}
+
+{# Расход и лимиты пространства (D759): строка «18,40 $ из 50 $ в этом месяце» и заметка от 80 %. #}
+{% macro limit_summary(v) %}
+  {% if v.limits.monthly_spend_usd is none %}
+    <p class="ssec__text"><b>{{ usd(v.spent) }} $</b> · {{ t('users.limits.spend_nocap') }}</p>
+  {% else %}
+    <p class="ssec__text">{{ t('users.limits.spend', spent=usd(v.spent), cap=usd(v.limits.monthly_spend_usd, true)) }}</p>
+  {% endif %}
+  {% if v.partial %}<p class="ssec__note">{{ t('users.limits.partial') }}</p>{% endif %}
+  {% if v.level == 'over' %}
+    <div class="note note--warn"><div class="note__text">{{ t('users.limits.over') }}</div></div>
+  {% elif v.level == 'warn' %}
+    <div class="note note--warn"><div class="note__text">{{ t('users.limits.warn') }}</div></div>
+  {% endif %}
+{% endmacro %}
+
 {% macro country_select(options) %}
   <select class="sinput" name="countries" required>
     <option value="" selected disabled>{{ t('users.spaces.country_pick') }}</option>
@@ -102,6 +123,42 @@
       <section class="ssec">
         <h3 class="ssec__title">{{ t('users.spaces.col.people') }}</h3>
         <p class="ssec__text"><b>{{ picked.people }}</b> · <a href="{{ link(space=picked.code) }}">{{ t('users.spaces.show_people') }}</a></p>
+      </section>
+      <section class="ssec" id="space-limits">
+        <h3 class="ssec__title">{{ t('users.limits.title') }}</h3>
+        {% if limits_view is none %}
+          <p class="ssec__note">{{ t('users.limits.unknown') }}</p>
+        {% else %}
+          {{ limit_summary(limits_view) }}
+          {% if manages %}
+            <form method="post" action="{{ users_url }}/spaces/limits?lang={{ lang }}" class="sform">
+              <input type="hidden" name="code" value="{{ picked.code }}">
+              <label><span class="sform__label">{{ t('users.limits.inspections') }}</span>
+                <input class="sinput" name="inspections" type="number" min="1" step="1" inputmode="numeric"
+                       value="{{ limits_view.limits.inspections_per_unit if limits_view.limits.inspections_per_unit is not none else '' }}"
+                       placeholder="{{ t('users.limits.none') }}">
+                <small class="sform__hint">{{ t('users.limits.inspections_hint') }}</small></label>
+              <label><span class="sform__label">{{ t('users.limits.spend_cap') }}</span>
+                <input class="sinput" name="spend" type="number" min="0" step="0.01" inputmode="decimal"
+                       value="{{ limits_view.limits.monthly_spend_usd if limits_view.limits.monthly_spend_usd is not none else '' }}"
+                       placeholder="{{ t('users.limits.none') }}">
+                <small class="sform__hint">{{ t('users.limits.spend_hint') }}</small></label>
+              <div class="sactions">
+                <button class="sbtn sbtn--primary" type="submit">{{ t('users.limits.save') }}</button>
+              </div>
+            </form>
+            <p class="ssec__note">
+              {% if limits_view.is_default %}{{ t('users.limits.is_default') }}
+              {% elif limits_view.updated_by %}{{ t('users.limits.changed', who=limits_view.updated_by, when=limits_view.updated_at.strftime('%d.%m.%Y %H:%M')) }}{% endif %}
+            </p>
+          {% else %}
+            <dl class="sprops">
+              <div><dt>{{ t('users.limits.inspections') }}</dt>
+              <dd>{{ limits_view.limits.inspections_per_unit if limits_view.limits.inspections_per_unit is not none else t('users.limits.none') }}</dd></div>
+            </dl>
+            <p class="ssec__note">{{ t('users.limits.readonly') }}</p>
+          {% endif %}
+        {% endif %}
       </section>
     </article>
   {% else %}

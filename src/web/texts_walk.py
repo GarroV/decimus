@@ -792,6 +792,16 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Система ещё ищет пункт по прошлому нажатию — подождите пару секунд.",
         "en": "Still looking for the item from your last tap — give it a few seconds.",
     },
+    "walk.err.model_limit": {
+        "ru": (
+            "Месячный лимит расхода пространства исчерпан. Обратитесь в управляющую компанию. "
+            "Пункт и текст можно ввести вручную."
+        ),
+        "en": (
+            "The space's monthly spending limit has been reached. Please contact the management "
+            "company. You can still enter the item and text by hand."
+        ),
+    },
     "walk.err.recognize": {
         "ru": "Система сейчас не может найти пункт. Выберите его вручную — запись не потеряется.",
         "en": "The system can't find the item right now. Pick it yourself — nothing is lost.",

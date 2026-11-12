@@ -34,7 +34,7 @@ from src.db.previews import make_preview
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
 from src.domain.model_usage import KIND_SUGGEST, usage_scope
-from src.recognize.errors import RecognizeError
+from src.recognize.errors import ModelLimitReached, RecognizeError
 
 from .review import Sheet
 from .walk_suggest import Ask, answer
@@ -152,6 +152,8 @@ def suggest(
         found = answer(offer, ask)
     except SuggestRefused:
         raise
+    except ModelLimitReached as exc:
+        raise SuggestRefused("proofread.suggest.limit", 503) from exc
     except (RecognizeError, DomainError) as exc:
         # Модель недоступна, ключа нет, методика не читается — экран говорит
         # «не вышло, выберите пункт вручную»; подробность — в журнал сервера.

@@ -27,7 +27,7 @@ from src.db.busy_lock import WALK_VOICE, try_hold
 from src.domain import get_state
 from src.domain.log_ids import log_id
 from src.domain.model_usage import usage_scope
-from src.recognize.errors import RecognizeError
+from src.recognize.errors import ModelLimitReached, RecognizeError
 from src.recognize.transcribe import transcribe
 
 from .server_limits import walk_model_gate
@@ -95,6 +95,8 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
         try:
             with usage_scope(telegram_id=who, tenant=inspection.tenant), chat_usage(who):
                 text = transcribe(audio, lang=inspection.speech_lang)
+        except ModelLimitReached:
+            return refused("walk.err.model_limit", lang, 503)
         except RecognizeError as exc:
             # Нет ключа, ffmpeg не разобрал, пустая речь — поле остаётся как было, аудитор
             # видит просьбу сказать ещё раз. Сырой текст исключения — в журнал, не аудитору.

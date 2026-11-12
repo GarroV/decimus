@@ -21,9 +21,9 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, СВОЙ, войти, подменить_двери, собрать
 
-from src.db import bot_links
+from src.db import bot_links, space_limits
 from src.db.errors import AccessError, EmailTakenError
-from src.web import accounts, partner_spaces
+from src.web import accounts, partner_spaces, space_limits_view
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 
@@ -63,6 +63,7 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         "email": [],
         "space": [],
         "countries": [],
+        "limits": [],
     }
 
     def everyone(*, tenant: str | None) -> tuple[Any, ...]:
@@ -93,6 +94,11 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         зовы["countries"].append((code, countries))
         return countries
 
+    def set_limits(code: str, **kw: Any) -> Any:
+        зовы["limits"].append((code, kw))
+
+    monkeypatch.setattr(space_limits, "set_limits", set_limits)
+    monkeypatch.setattr(space_limits_view, "build", lambda code, **_k: None)
     monkeypatch.setattr(accounts, "everyone", everyone)
     monkeypatch.setattr(accounts, "spaces", lambda: ("AM", "GE", "HQ"))
     monkeypatch.setattr(accounts, "add", add)
@@ -147,6 +153,7 @@ def _записи(база: dict[str, list[Any]]) -> dict[str, list[Any]]:
     "email": [],
     "space": [],
     "countries": [],
+    "limits": [],
 }
 
 
@@ -423,6 +430,8 @@ def test_админ_партнёра_ведёт_людей_своего_прос
         # Пространства — не его.
         ("/users/spaces/add", {"code": "KZ", "countries": "KZ"}),
         ("/users/spaces/countries", {"code": "GE", "countries": "AZ"}),
+        # Лимиты — только УК; админ партнёра не поднимет потолок и своему пространству (D759).
+        ("/users/spaces/limits", {"code": "GE", "inspections": "999", "spend": "99999"}),
     ],
 )
 def test_админ_партнёра_вне_своего_пространства_отказ(
@@ -464,10 +473,11 @@ def test_сотрудник_партнёра_и_аудитор_уК_не_упр�
                 ("/users/email", {"login": "gia", "tenant": "GE", "email": "a@b.example"}),
                 ("/users/spaces/add", {"code": "KZ", "countries": "KZ"}),
                 ("/users/spaces/countries", {"code": "GE", "countries": "AZ"}),
+                ("/users/spaces/limits", {"code": "GE", "inspections": "999", "spend": "9"}),
             )
         ]
 
-        assert ответы == [403] * 6
+        assert ответы == [403] * 7
         for чужое in ("gia", "nino", "petr", "@mail.example"):
             assert чужое not in страница, чужое
         assert 'action="/users/add' not in страница

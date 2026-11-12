@@ -40,7 +40,7 @@ from ..domain.errors import DomainError
 from ..domain.model_usage import usage_scope
 from ..recognize.classify import PreparedRequest, finish, prepare_request
 from ..recognize.config import RecognizeSettings, load_recognize_settings
-from ..recognize.errors import RecognizeError
+from ..recognize.errors import ModelLimitReached, RecognizeError
 from ..recognize.fastpath import fast_path
 from ..recognize.level import LevelAnswer, level_from, level_request
 from ..recognize.models import UNKNOWN_ZONE, Suggestion
@@ -265,7 +265,9 @@ def match_texts(
     asking = [j for j in jobs if j.request is not None]
     answers = _in_parallel([j.request.ask.call for j in asking if j.request is not None])
     for job, answer in zip(asking, answers, strict=True):
-        if isinstance(answer, Exception):
+        if isinstance(answer, ModelLimitReached):
+            job.failure = "the space's monthly model spending limit is reached: model not used"
+        elif isinstance(answer, Exception):
             logger.warning("подбор замечания %s: модель не ответила: %s", job.n, answer)
             job.failure = "the model did not answer"
         elif job.request is not None:

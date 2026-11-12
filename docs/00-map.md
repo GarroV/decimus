@@ -202,7 +202,7 @@ Flask-приложение управляющей компании и партн
 «Подключения» (состояние подключений, D638) и «Ключи и API» (ключи сервисов и ключи API, D650), подключение
 Claude входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,calendar_connect,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,peek,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,calendar_connect,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,space_limits_view,passkey_login,peek,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -243,6 +243,7 @@ Claude входом через сайт (OAuth).
 | `src/web/security_screen.py` | Экран «Вход и защита» (`/settings/security`, D463): способы подтверждения входа |
 | `src/web/service_keys_screen.py` | Блок «Наши ключи к внешним сервисам» на «Ключах и API»: проверить, заменить, удалить (D576) |
 | `src/web/settings_screen.py` | Экран «Настройки» (`/settings`): настройки своего профиля — всё подключение в одном месте |
+| `src/web/space_limits_view.py` | Лимиты пространства для экрана «Пространства» (D759 п.5, #1670) |
 | `src/web/ui_lang.py` | Язык сайта: из профиля учётки, `?lang=` — разовый перекрёсток (D447) |
 | `src/web/usage_screen.py` | Экран «Расход модели» (D537): сколько токенов и денег ушло на модель |
 | `src/web/usage_view.py` | Расход модели (D537): из сумм базы — то, что рисует экран «Расход модели» |
@@ -469,7 +470,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,maps_reviews_store,model_key,model_usage,walk_log,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_violations,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,maps_reviews_store,model_key,model_usage,space_limits,unit_limits,walk_log,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_violations,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -514,8 +515,10 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/secret_crypto.py` | Шифрование секретов, которые лежат в базе (D491): AES-256-GCM, ключ — вне базы |
 | `src/db/service_keys.py` | Ключи внешних сервисов из базы (D576, обобщение ключа модели D491) |
 | `src/db/source_units.py` | Официальный реестр для чтения метрик: первичен справочник рейтингов (#1391) |
+| `src/db/space_limits.py` | Лимиты пространства партнёра в базе (D759, `0133`): чтение, правка, расход за месяц |
 | `src/db/training_names.py` | Столбцы счётчиков обучения (миграция 0085) — общие для записи и чтения |
 | `src/db/training_read.py` | Чтение обучения для экрана «Обучение» (схема `learning`, миграция 0085; D574, D578) |
+| `src/db/unit_limits.py` | Лимит проверок на пиццерию у пространств партнёров на время теста (D755) |
 | `src/db/walk_log.py` | Журнал шагов обхода (D710, `0119`): запись шага и чтение для карточки проверки |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
 | `src/db/web_own_profile.py` | Свой профиль с экрана «Настройки» (D447): почта Google и язык сайта — уровень базы |
@@ -663,6 +666,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0129_calendar_deadline.sql` | D740, D741 (#1590): срок отчёта по проверке УК — событием в Google Календаре проверяющего |
 | `0130_close_invariants.sql` | Три красных инварианта базы на main (проверки `test_db_definer_search_path` и `test_db_space_isolation`), закрываются новым файлом: применённые `0123` и `0128` заморожены |
 | `0131_mailing_templates_lang.sql` | Язык шаблона письма больше не пара `ru`/`en` (#541, #1619): список языков отчёта живёт в коде (`src/domain/models.py: REPORT_LANGS`), и третий язык не должен упираться в… |
+| `0133_space_limits.sql` | D755, D759 п.5 (#1670): настраиваемые лимиты пространства партнёра |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -1032,6 +1036,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/second_factor.py` | Вторая ступень входа (D463): правила без базы и без веба |
 | `src/domain/service_keys.py` | Реестр ключей внешних сервисов, которые главный админ ставит на экране (D576, #906) |
 | `src/domain/shape.py` | Оценочная форма издания: чем считали, а не что написано (T349, #337) |
+| `src/domain/space_limits.py` | Лимиты пространства партнёра (D755, D759 п.5): правило без базы и сети |
 | `src/domain/split.py` | Human-confirmed split, staged through the existing engine and committed once |
 | `src/domain/state.py` | Состояние проверки: чтение, старт и собственные поля блока |
 | `src/domain/tenants.py` | Код тенанта управляющей компании и перевод старого кода (D234, #439) |
@@ -1081,6 +1086,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/schema.py` | T031: схема ответа модели |
 | `src/recognize/selected_level.py` | Selected-item criterion request and a result bound to the exact factual context |
 | `src/recognize/shortlist.py` | T030: перечень кандидатов, который уходит в запрос к модели |
+| `src/recognize/spend_cap.py` | Потолок расхода модели на пространство в месяц (D759 п.5, #1670) |
 | `src/recognize/split.py` | Разделить комментарий аудитора на отдельные нарушения (D713) |
 | `src/recognize/timing.py` | #1253: monotonic request-local timing; never captures input or model output |
 | `src/recognize/transcribe.py` | T033: голосовое сообщение аудитора → текст |

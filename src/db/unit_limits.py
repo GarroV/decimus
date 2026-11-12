@@ -10,8 +10,9 @@
 (строка удалена, `imports.discard_draft`) и исторические (`origin = 'legacy'`,
 D332) — их место не занимает. Пространство УК лимит не касается.
 
-Система лимитов с настройками в админке — отдельно, позже (D755); пока — одна
-константа.
+Лимит — настройка пространства (`space_limits`, `0133`, D759): строки нет — умолчание
+5 (`PARTNER_INSPECTIONS_PER_UNIT`), пустое значение — без лимита, число — оно. Правит
+управляющая компания на экране «Пространства» (`src/db/space_limits.py`).
 """
 
 from __future__ import annotations
@@ -21,8 +22,10 @@ from typing import Any
 
 import psycopg
 
+from src.domain.space_limits import DEFAULT_INSPECTIONS_PER_UNIT, effective
 from src.domain.tenants import HQ_TENANT
 
+from . import space_limits
 from .config import check_environment
 from .directory import resolve_unit_id
 from .errors import DbError, InspectionLimitError
@@ -30,9 +33,9 @@ from .pool import connection
 
 logger = logging.getLogger(__name__)
 
-#: Сколько проверок на одну пиццерию доступно пространству партнёра на время
-#: теста (D755, владелец 12.11.2026). Пространства УК лимит не касается.
-PARTNER_INSPECTIONS_PER_UNIT = 5
+#: Умолчание: сколько проверок на одну пиццерию доступно пространству партнёра, у которого
+#: нет своей настройки (D755, владелец 12.11.2026). Пространства УК лимит не касается.
+PARTNER_INSPECTIONS_PER_UNIT = DEFAULT_INSPECTIONS_PER_UNIT
 
 #: Происхождение, которое в счёт не идёт: историческая загрузка (D332).
 _UNCOUNTED_ORIGIN = "legacy"
@@ -53,11 +56,20 @@ def is_exempt(tenant: str, origin: str) -> bool:
     return tenant == HQ_TENANT or origin == _UNCOUNTED_ORIGIN
 
 
-def limit_reached(tenant: str, *, existing: int, origin: str = "field") -> bool:
-    """Решение: нельзя ли заводить ещё одну проверку (чистая функция, без базы)."""
-    if is_exempt(tenant, origin):
+def limit_reached(
+    tenant: str,
+    *,
+    existing: int,
+    origin: str = "field",
+    limit: int | None = PARTNER_INSPECTIONS_PER_UNIT,
+) -> bool:
+    """Решение: нельзя ли заводить ещё одну проверку (чистая функция, без базы).
+
+    `limit` — действующий лимит пространства; `None` — без лимита.
+    """
+    if is_exempt(tenant, origin) or limit is None:
         return False
-    return existing >= PARTNER_INSPECTIONS_PER_UNIT
+    return existing >= limit
 
 
 def refuse_over_limit(
@@ -70,13 +82,16 @@ def refuse_over_limit(
     """
     if is_exempt(tenant, origin):
         return
+    limit = effective(tenant, space_limits.stored_in(cur, tenant)).inspections_per_unit
+    if limit is None:
+        return
     params = {"tenant": tenant, "unit": unit_id}
     cur.execute(_LOCK_SQL, params)
     cur.execute(_COUNT_SQL, params)
     row = cur.fetchone()
     existing = int(row[0]) if row is not None else 0
-    if limit_reached(tenant, existing=existing, origin=origin):
-        raise InspectionLimitError(unit=unit_name, limit=PARTNER_INSPECTIONS_PER_UNIT)
+    if limit_reached(tenant, existing=existing, origin=origin, limit=limit):
+        raise InspectionLimitError(unit=unit_name, limit=limit)
 
 
 def refuse_start_over_limit(tenant: str, unit_name: str) -> None:
@@ -92,13 +107,14 @@ def refuse_start_over_limit(tenant: str, unit_name: str) -> None:
     try:
         settings = check_environment()
         with connection(settings.dsn) as conn, conn.cursor() as cur:
+            limit = effective(tenant, space_limits.stored_in(cur, tenant)).inspections_per_unit
             unit_id = resolve_unit_id(conn, unit_name, tenant=HQ_TENANT)
-            if unit_id is None:
+            if unit_id is None or limit is None:
                 return
             cur.execute(_COUNT_SQL, {"tenant": tenant, "unit": unit_id})
             row = cur.fetchone()
     except (DbError, psycopg.Error) as exc:
         logger.warning("лимит проверок на старте не сверен: %s", exc)
         return
-    if limit_reached(tenant, existing=int(row[0]) if row is not None else 0):
-        raise InspectionLimitError(unit=unit_name, limit=PARTNER_INSPECTIONS_PER_UNIT)
+    if limit_reached(tenant, existing=int(row[0]) if row is not None else 0, limit=limit):
+        raise InspectionLimitError(unit=unit_name, limit=limit)

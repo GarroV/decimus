@@ -30,10 +30,11 @@ from flask import Flask, redirect, render_template, request
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response as WerkzeugResponse
 
-from src.db import bot_links, second_factor
+from src.db import bot_links, second_factor, space_limits
 from src.db.errors import DbError, EmailTakenError
 from src.domain.log_ids import log_id
 from src.domain.tenants import canonical_tenant
+from src.recognize import spend_cap
 
 from . import (
     access_policy,
@@ -46,6 +47,7 @@ from . import (
     journal_screen,
     partner_spaces,
     people,
+    space_limits_view,
 )
 from .access_policy import Scope
 from .config import Settings
@@ -144,6 +146,7 @@ def install(app: Flask, conf: Settings) -> None:
     _install_edits(app, users_path)
     _install_add_freeze(app, users_path)
     _install_spaces(app, users_path)
+    _install_space_limits(app, users_path)
     connections_screen.install(app)
     connections_screen.install_service_keys(app)
     connections_screen.install_health(app)
@@ -498,6 +501,43 @@ def _install_spaces(app: Flask, users_path: str) -> None:
             note_target_mismatch(exc)
             return render(_исход(код, "users.spaces.countries_failed", ok=False), 400)
         return render(_исход(код, "users.spaces.countries_added", ok=True))
+
+
+def _install_space_limits(app: Flask, users_path: str) -> None:
+    """Лимиты пространства партнёра (D759): правят главный админ и админ УК."""
+
+    @app.post(f"{users_path}/spaces/limits")
+    @guard.action("space.manage")
+    def space_limits_save() -> FlaskResponse | tuple[str, int]:
+        круг = people_scope()
+        if круг is None or not access_policy.manages_spaces(круг):
+            return forbidden()
+        refuse_foreign_origin()
+        код = (request.form.get("code") or "").strip()
+        вошедший = auth.current_account()
+        try:
+            space_limits.set_limits(
+                код,
+                inspections_per_unit=space_limits_view.parse_inspections(
+                    request.form.get("inspections") or ""
+                ),
+                monthly_spend_usd=space_limits_view.parse_spend(request.form.get("spend") or ""),
+                by=вошедший.login if вошедший else "",
+            )
+        except (DbError, ValueError) as exc:
+            if isinstance(exc, DbError):
+                note_target_mismatch(exc)
+            return render(
+                Show(tab=TAB_SPACES, space=код, flash=_flash("users.limits.failed", ok=False)),
+                400,
+            )
+        spend_cap.forget()
+        logger.info(
+            "Веб: лимиты пространства %s изменены учёткой %s",
+            код,
+            log_id(вошедший.id if вошедший else ""),
+        )
+        return render(Show(tab=TAB_SPACES, space=код, flash=_flash("users.limits.saved", ok=True)))
 
 
 def login_from_email(email: str) -> str:

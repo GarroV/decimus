@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 229 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 230 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -248,6 +248,7 @@
 | `/users/role` | POST | `user_role` | `src/web/users_screen.py` |
 | `/users/spaces/add` | POST | `add_space` | `src/web/users_screen.py` |
 | `/users/spaces/countries` | POST | `space_countries` | `src/web/users_screen.py` |
+| `/users/spaces/limits` | POST | `space_limits_save` | `src/web/users_screen.py` |
 | `/users/unfreeze` | POST | `unfreeze_user` | `src/web/users_screen.py` |
 | `/welcome` | GET | `landing` | `src/web/landing.py` |
 
@@ -671,6 +672,7 @@
 | `0129_calendar_deadline.sql` | `calendar_grants`, `calendar_events` |
 | `0130_close_invariants.sql` | — |
 | `0131_mailing_templates_lang.sql` | — |
+| `0133_space_limits.sql` | `space_limits` |
 <!-- map:end -->
 
 ## Makefile

@@ -748,6 +748,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Подбор уже идёт — подождите ответа.",
         "en": "A search is already running — wait for its answer.",
     },
+    "proofread.suggest.limit": {
+        "ru": (
+            "Месячный лимит расхода пространства исчерпан. Обратитесь в управляющую компанию. "
+            "Найдите пункт поиском ниже — запись можно добавить и так."
+        ),
+        "en": (
+            "The space's monthly spending limit has been reached. Please contact the management "
+            "company. Look for the item with the search below — you can still add the record."
+        ),
+    },
     "proofread.suggest.failed": {
         "ru": (
             "Подобрать пункт не получилось. Найдите его поиском ниже — запись можно добавить и так."

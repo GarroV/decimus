@@ -32,6 +32,7 @@ from . import (
     auth,
     partner_spaces,
     people,
+    space_limits_view,
 )
 from .access_policy import Scope
 from .db_refusal import note_target_mismatch
@@ -260,6 +261,27 @@ def _people_context(
     }
 
 
+def _limits_context(
+    круг: Scope | None, пространства: tuple[Any, ...], pick: Any, вкладка: str
+) -> dict[str, Any]:
+    """Лимиты и расход (D759): выбранного пространства и, у админа партнёра, своего.
+
+    Только для тех, кто пространство видит (перечень уже сужен). База молчит — `None`
+    в виде, экран говорит об этом словами, а не рисует нули.
+    """
+    свой = None
+    if круг is not None and круг.kind == access_policy.PARTNER_ADMIN and круг.tenant:
+        свой = space_limits_view.build(canonical_tenant(круг.tenant))
+    выбранное = None
+    if вкладка == TAB_SPACES and pick is not None:
+        выбранное = space_limits_view.build(pick.code)
+    return {
+        "limits_view": выбранное,
+        "limits_asked": вкладка == TAB_SPACES and pick is not None,
+        "own_limits": свой,
+    }
+
+
 def _space_context(
     круг: Scope | None,
     show: Show,
@@ -267,12 +289,14 @@ def _space_context(
     известны: bool,
     вкладка: str,
 ) -> dict[str, Any]:
+    pick = _space_pick(show, пространства)
     return {
+        **_limits_context(круг, пространства, pick, вкладка),
         "tab": вкладка,
         "partner_spaces": пространства,
         "partner_spaces_known": известны,
         "manages_spaces": круг is not None and access_policy.manages_spaces(круг),
-        "space_pick": _space_pick(show, пространства),
+        "space_pick": pick,
         "space_add": вкладка == TAB_SPACES
         and (show.add_space or request.args.get("add_space") == "1"),
         "country_options": country_options(пространства),

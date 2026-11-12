@@ -72,7 +72,7 @@ from src import domain
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
 from src.recognize.classify import album_mode, classify
-from src.recognize.errors import ModelUnavailable, RecognizeError
+from src.recognize.errors import ModelLimitReached, ModelUnavailable, RecognizeError
 from src.recognize.fastpath import NO_CUE, FastItem, fast_path
 from src.recognize.manual import ManualCandidate, manual_candidates, search_items
 from src.recognize.models import UNKNOWN_ZONE, Candidate, Suggestion
@@ -199,6 +199,9 @@ async def hear_voice(message: Message, file_id: str, lang: str) -> str | None:
             heard = await asyncio.to_thread(
                 lambda: transcribe(raw, lang=chat_voice_lang(message.chat.id))
             )
+    except ModelLimitReached:
+        await message.answer(t("record.model_limit", lang))
+        return None
     except RecognizeError as exc:
         await message.answer(t("record.voice_failed", lang, reason=f"{exc}."))
         return None
@@ -1094,6 +1097,12 @@ async def _analyze_resolved(
             photos=photos,
             sent_at=sent_at(),
         )
+    except ModelLimitReached:
+        # Потолок расхода пространства (D759): вызова не было, проверка идёт вручную.
+        journal.note(chat_id, "model_failed", slot=base.slot, kind="limit")
+        await message.answer(t("record.model_limit", lang))
+        await _open_manual(message, chat_id, base, pending, lang)
+        return
     except ModelUnavailable as exc:
         journal.note(chat_id, "model_failed", slot=base.slot, kind="unavailable", error=str(exc))
         # Модель недоступна — проверка не встаёт: тот же перечень пунктов
@@ -1246,6 +1255,10 @@ async def _reevaluate_reading(
             sent_at=sent_at(),
             reading_c=value,
         )
+    except ModelLimitReached:
+        journal.note(chat_id, "reading_failed", slot=proposal.slot, error="model_limit")
+        await message.answer(t("record.model_limit", lang))
+        return
     except (ModelUnavailable, RecognizeError) as exc:
         journal.note(chat_id, "reading_failed", slot=proposal.slot, error=str(exc))
         logger.warning("пересчёт по температуре не удался в чате %s: %s", log_id(chat_id), exc)

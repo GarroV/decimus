@@ -430,6 +430,83 @@ _SPACES: dict[str, dict[str, str]] = {
         "ru": "Страны пространства меняет главный админ или админ УК.",
         "en": "A super admin or an HQ admin changes the space's countries.",
     },
+    # Лимиты пространства (D759 п.5, #1670): раздел карточки и предупреждения. Только на экране.
+    "users.limits.title": {"ru": "Лимиты", "en": "Limits"},
+    "users.limits.unknown": {
+        "ru": "Лимиты и расход не загрузились: база не ответила.",
+        "en": "Limits and spending did not load: the database did not answer.",
+    },
+    "users.limits.spend": {
+        "ru": "{spent} $ из {cap} $ в этом месяце",
+        "en": "${spent} of ${cap} this month",
+    },
+    "users.limits.spend_nocap": {
+        "ru": "в этом месяце, потолка нет",
+        "en": "this month, no cap",
+    },
+    "users.limits.partial": {
+        "ru": "Расход — оценка по прейскуранту; модели без цены в сумму не вошли.",
+        "en": "Spending is an estimate from the price list; models without a price "
+        "are not counted.",
+    },
+    "users.limits.warn": {
+        "ru": "Израсходовано больше 80 % месячного потолка. Когда он будет достигнут, "
+        "модель в этом пространстве отключится до следующего месяца — ручной ввод останется.",
+        "en": "More than 80% of the monthly cap is spent. Once it is reached, the model stops in "
+        "this space until next month — manual entry keeps working.",
+    },
+    "users.limits.over": {
+        "ru": "Месячный потолок достигнут: модель в этом пространстве отключена до следующего "
+        "месяца или до повышения потолка. Ручной ввод работает.",
+        "en": "The monthly cap is reached: the model is off in this space until next month or "
+        "until the cap is raised. Manual entry keeps working.",
+    },
+    "users.limits.own_warn": {
+        "ru": "Расход модели вашего пространства — больше 80 % месячного потолка. После потолка "
+        "модель отключится до следующего месяца; ручной ввод останется. Поднять потолок может "
+        "управляющая компания.",
+        "en": "Your space has used over 80% of its monthly model cap. After the cap the model "
+        "stops until next month; manual entry stays. The management company can raise the cap.",
+    },
+    "users.limits.own_over": {
+        "ru": "Месячный лимит расхода пространства исчерпан. Обратитесь в управляющую компанию. "
+        "Ручной ввод работает.",
+        "en": "The space's monthly spending limit has been reached. Please contact the management "
+        "company. Manual entry keeps working.",
+    },
+    "users.limits.inspections": {"ru": "Проверок на пиццерию", "en": "Inspections per pizzeria"},
+    "users.limits.inspections_hint": {
+        "ru": "Целое от 1. Пусто — без лимита.",
+        "en": "A whole number from 1. Empty — no limit.",
+    },
+    "users.limits.spend_cap": {
+        "ru": "Потолок расхода модели в месяц, $",
+        "en": "Monthly model spending cap, $",
+    },
+    "users.limits.spend_hint": {
+        "ru": "Календарный месяц (UTC). Пусто — без потолка; 0 — модель выключена.",
+        "en": "Calendar month (UTC). Empty — no cap; 0 — the model is off.",
+    },
+    "users.limits.none": {"ru": "без лимита", "en": "no limit"},
+    "users.limits.save": {"ru": "Сохранить", "en": "Save"},
+    "users.limits.readonly": {
+        "ru": "Лимиты меняет главный админ или админ УК.",
+        "en": "A super admin or an HQ admin changes the limits.",
+    },
+    "users.limits.is_default": {
+        "ru": "Свои настройки не заданы — действуют значения по умолчанию.",
+        "en": "No settings of its own — the defaults apply.",
+    },
+    "users.limits.changed": {
+        "ru": "Менял {who}, {when} UTC.",
+        "en": "Changed by {who}, {when} UTC.",
+    },
+    "users.limits.saved": {"ru": "Лимиты сохранены.", "en": "Limits saved."},
+    "users.limits.failed": {
+        "ru": "Лимиты не сохранены: проверки — целое от 1, потолок — число от 0 с копейками.",
+        "en": "Limits not saved: inspections — a whole number from 1, cap — a number from 0 "
+        "with cents.",
+    },
     "users.spaces.show_people": {"ru": "Показать людей", "en": "Show people"},
     "users.spaces.add.open": {"ru": "Добавить пространство", "en": "Add a space"},
     "users.spaces.add.title": {"ru": "Новое пространство", "en": "New space"},

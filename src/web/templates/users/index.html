@@ -49,12 +49,20 @@
   </div>
 {% endblock %}
 
+{# Админу партнёра — предупреждение о расходе модели его пространства (D759): только на экране. #}
+{% macro own_limit_note(v) %}
+  {% if v is not none and v.level in ('warn', 'over') %}
+    <div class="note note--warn"><div class="note__text">{{ t('users.limits.own_' ~ v.level) }}</div></div>
+  {% endif %}
+{% endmacro %}
+
 {% block split_top %}
   <header class="shead">
 
     {# На телефоне левой панели нет — своя карточка открывается отсюда. #}
     {% if manage %}<a class="sbtn shead__me" href="{{ link(person='me') }}" data-drawer-open>{{ t('profile.open') }}</a>{% endif %}
   </header>
+  {{ own_limit_note(own_limits) }}
   {# Исход действия без открытой панели — над списком, иначе он потерялся бы. #}
   {% if show.flash and not split_open and tab == 'people' %}
     <div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>

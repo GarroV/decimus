@@ -33,7 +33,7 @@ from src.domain import get_state
 from src.domain.log_ids import log_id
 from src.domain.model_usage import usage_scope
 from src.domain.models import SPEECH_LANGS, Inspection
-from src.recognize.errors import RecognizeError
+from src.recognize.errors import ModelLimitReached, RecognizeError
 from src.recognize.translate import translate_text
 
 from .server_limits import walk_model_gate
@@ -112,6 +112,8 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
         try:
             with usage_scope(telegram_id=who, tenant=inspection.tenant), chat_usage(who):
                 translated = translate_text(text, lang=target)
+        except ModelLimitReached:
+            return refused("walk.err.model_limit", lang, 503)
         except RecognizeError as exc:
             # Модель недоступна — поле остаётся как было, аудитор видит причину
             # в экране. Сырой текст исключения — в журнал, не аудитору.

@@ -24,6 +24,7 @@ from src.domain.model_usage import KIND_TRANSCRIBE, build_call
 
 from .config import RecognizeSettings, load_recognize_settings
 from .errors import TranscriptionFailed
+from .spend_cap import ensure_within_cap
 
 #: Таймаут перекодировки. Голосовые аудитора короткие (секунды-десятки
 #: секунд); минута — щедрый запас на медленный старт ffmpeg в контейнере.
@@ -137,6 +138,8 @@ def transcribe(
             f"Голосовое слишком большое ({len(audio) / 1024 / 1024:.0f} МБ, предел "
             f"{MAX_AUDIO_BYTES // 1024 // 1024} МБ). Не разобрано, попросите написать текстом"
         )
+    # Месячный потолок расхода пространства (D759): достигнут — ни перекодировки, ни вызова.
+    ensure_within_cap()
     wav = _reencode(audio, cfg.ffmpeg)
     if (len(wav) - _WAV_HEADER_BYTES) / _WAV_BYTES_PER_SECOND > MAX_AUDIO_SECONDS:
         raise TranscriptionFailed(

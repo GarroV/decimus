@@ -789,6 +789,17 @@ TEXTS: dict[str, dict[str, str]] = {
     # документов, а на английском стенде ещё и русские слова. Он уходит в
     # журнал целиком (`logger.warning` в вызывающем коде), а в чат — то, что
     # нужно человеку на точке: что случилось и что делать.
+    # Месячный потолок расхода модели пространства исчерпан (D759): вызова не было.
+    "record.model_limit": {
+        "ru": (
+            "Месячный лимит расхода пространства исчерпан. Обратитесь в управляющую компанию. "
+            "Проверка продолжается вручную — пункт выберите сами."
+        ),
+        "en": (
+            "The space's monthly spending limit has been reached. Please contact the management "
+            "company. The inspection goes on by hand — pick the item yourself."
+        ),
+    },
     "record.degraded": {
         "ru": "Модель недоступна — проверка продолжается, пункт выберите сами.",
         "en": "The model is unavailable — the inspection goes on, pick the item.",

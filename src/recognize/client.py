@@ -34,6 +34,7 @@ from src.domain.model_usage import KIND_RECOGNIZE, build_call
 
 from .config import RecognizeSettings
 from .errors import ModelKeyRejected, ModelUnavailable
+from .spend_cap import ensure_within_cap
 from .timing import measure
 
 #: Имя схемы в запросе. Провайдеру оно нужно, на содержание не влияет.
@@ -182,7 +183,11 @@ def ask_model(
     `kind` — вид вызова для учёта расхода (D537, коды — `domain.model_usage`): обязателен,
     чтобы новое место вызова не могло про учёт забыть. Каждый ушедший к провайдеру запрос
     пишется строкой в `model_usage` — и удавшийся, и отказанный.
+
+    Перед запросом — месячный потолок расхода пространства (D759): достигнут — вызова нет,
+    `ModelLimitReached` (вид `ModelUnavailable`: дверь уходит на ручной выбор).
     """
+    ensure_within_cap()
     client = _new_client(settings)
     text_format = ResponseFormatTextJSONSchemaConfigParam(
         type="json_schema",
