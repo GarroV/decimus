@@ -423,13 +423,27 @@ def test_no_left_column_and_filters_block_has_country_select_and_period(ук: Fl
     html = ук.get("/quality?month=2026-09").get_data(as_text=True)
 
     assert "pk-rail" not in html and "pk-shell--solo" in html
-    filters = _between(html, 'class="qa-filters"', "</table>")
+    filters = _between(html, 'class="cstrip"', "</table>")
     select = _between(filters, "<select", "</select>")
     assert "Все страны" in select and "Польша" in select and "Болгария" in select
     assert "Россия" not in select  # вне охвата IMF
     assert "country=PL" in select
     assert "data-pcal" in filters and "speriod" in filters  # общий календарь периода
     assert 'name="from"' in filters and 'value="2026-09-01"' in filters
+
+
+def test_compact_top_has_one_h1_no_kicker_and_filters_in_strip(ук: FlaskClient) -> None:
+    for url in ("/quality?month=2026-09", "/quality?country=PL&month=2026-09"):
+        html = ук.get(url).get_data(as_text=True)
+
+        assert html.count("<h1") == 1, url
+        assert "КАЧЕСТВО · СЕТЬ" not in html.upper() and "pk-kicker" not in html, url
+        assert "pk-title" not in html and "qa-filters" not in html, url
+        header = _between(html, 'class="page-heading"', "</header>")
+        assert "info-quality" in header and "info-qfresh" in header, url  # оба «?» у заголовка
+        strip = _between(html, 'class="cstrip"', "cbar__title")
+        assert "<select" in strip and "data-pcal" in strip, url
+        assert "cbar" in html, url  # шапка блока таблицы — общим block_bar
 
 
 def test_country_filter_keeps_period_and_sort(ук: FlaskClient) -> None:

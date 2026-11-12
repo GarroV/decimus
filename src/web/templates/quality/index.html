@@ -1,13 +1,23 @@
 {#
   Экран «Качество»: рабочая страница здоровья по странам и пиццериям за период (docs/21-quality.md,
-  D677, D750). Каркас — `_pick_page.html` без левого столбца (`pick_norail`): над таблицей один блок
-  фильтров — «Страна» (список) и «Период» (общий календарь `_period.html`), ниже таблица стран или
-  страна целиком — строки пиццерий и блоки. Ни одного вычисления — всё приходит из `quality_page.py`.
+  D677, D750, D751). Каркас — `_pick_page.html` без левого столбца (`pick_norail`): один заголовок
+  страницы со значками «?»; под ним строка фильтров `strip` (D751) — «Страна» (список) и «Период»
+  (общий календарь `_period.html`); ниже таблица стран или страна целиком — строки пиццерий и блоки. Ни одного вычисления — всё приходит из `quality_page.py`.
 #}{% extends "_pick_page.html" %}
 {% from "_info_tip.html" import info_tip, fresh_tip %}
 {% from "_period.html" import period_picker with context %}
-{% from "_pick_ui.html" import pick_head, pick_block, pick_empty with context %}
+{% from "_pick_ui.html" import pick_block, pick_empty with context %}
+{% from "_compact.html" import strip, field, block_bar with context %}
 {% block title %}{{ t('section.quality.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+      {#- Один заголовок страницы (D751): что выбрано, видно в фильтре «Страна»; «?» — рядом с ним. -#}
+      <div class="info-row">
+        <h1>{{ t('quality.title') }}</h1>
+        {% if not failed %}{{ info_tip(t('tip.hint'), t('quality.tip.title'), tip_rows, 'quality') }}{{ fresh_tip(t('ratings.loaded.hint'), t('ratings.fresh.title'), freshness, 'qfresh',
+          [t('ratings.fresh.col.source'), t('ratings.fresh.col.scope'), t('ratings.fresh.col.at'), t('ratings.fresh.col.status')],
+          t('ratings.fresh.foot'), t('ratings.loaded.none')) }}{% endif %}
+      </div>
+</header>{% endblock %}
 {% block pick_assets %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-quality.css') }}">
@@ -36,26 +46,17 @@
 {% if failed %}
   <section class="pk-block"><div class="qa-body"><p class="note note--warn" role="status">{{ t('quality.failed') }}</p></div></section>
 {% else %}
-  {% set tips = info_tip(t('tip.hint'), t('quality.tip.title'), tip_rows, 'quality') ~ fresh_tip(t('ratings.loaded.hint'), t('ratings.fresh.title'), freshness, 'qfresh',
-        [t('ratings.fresh.col.source'), t('ratings.fresh.col.scope'), t('ratings.fresh.col.at'), t('ratings.fresh.col.status')],
-        t('ratings.fresh.foot'), t('ratings.loaded.none')) %}
-  {% call pick_head(kicker, title, tips) %}{% endcall %}
-
-  <div class="qa-filters" role="group" aria-label="{{ t('quality.filters.label') }}">
-    <label class="pickbox qa-filter">
-      <span class="pickbox__label">{{ t('quality.filters.country') }}</span>
-      <select class="pickselect pickbox__select" data-pick-nav aria-label="{{ t('quality.filters.country') }}">
+  {% call strip() %}
+    {% call field(t('quality.filters.country')) %}
+      <select class="pickselect" data-pick-nav aria-label="{{ t('quality.filters.country') }}">
         {% for o in countries %}<option value="{{ o.href }}"{% if o.on %} selected{% endif %}>{{ o.title }}</option>{% endfor %}
       </select>
-    </label>
-    <div class="qa-filter qa-filter--period">
-      <span class="pickbox__label">{{ t('quality.filters.period') }}</span>
-      <div class="qa-filter__row">
-        {{ period_picker(period, period_title, period_prev, period_next, period_quick, period_action, period_hidden) }}
-        {% if period_note %}<span class="qa-filter__note">{{ period_note }}</span>{% endif %}
-      </div>
-    </div>
-  </div>
+    {% endcall %}
+    {% call field(t('quality.filters.period')) %}
+      {{ period_picker(period, period_title, period_prev, period_next, period_quick, period_action, period_hidden) }}
+      {% if period_note %}<span class="qa-filter__note">{{ period_note }}</span>{% endif %}
+    {% endcall %}
+  {% endcall %}
 
   {% if latest_data_href %}
     <p class="note qa-note">{{ t('quality.latest_data', month=latest_data_title) }}
@@ -63,7 +64,8 @@
     </p>
   {% endif %}
   {% if not view %}
-    {% call pick_block(t('quality.block.network'), '', network|length) %}
+    <section class="pk-block">
+    {% call block_bar(t('quality.block.network'), [], 'qnet', network|length) %}{% endcall %}
       {% if network %}
       <div class="qa-scroll"><table class="qa-table qa-table--wide">
         <thead>{{ th_row(columns, t('quality.col.country')) }}</thead>
@@ -79,14 +81,15 @@
       {% else %}
         {% call pick_empty() %}{{ t('quality.empty.scope') }}{% endcall %}
       {% endif %}
-    {% endcall %}
+    </section>
   {% else %}
     {% if view.units_total == 0 %}
       {% call pick_empty() %}{{ t('quality.empty.country') }}{% endcall %}
     {% endif %}
     {% if view.dodois_note %}<p class="note note--warn qa-note" role="status">{{ view.dodois_note }}</p>{% endif %}
 
-    {% call pick_block(t('quality.block.units'), '', view.units|length) %}
+    <section class="pk-block">
+    {% call block_bar(t('quality.block.units'), [], 'qunits', title ~ ' · ' ~ view.units|length) %}{% endcall %}
       <div class="qa-scroll"><table class="qa-table qa-table--wide">
         <thead>{{ th_row(columns, t('quality.col.unit')) }}</thead>
         <tbody>
@@ -94,7 +97,7 @@
         {% for u in view.units %}<tr><td>{{ u.name }}</td>{{ tds(u.cells) }}</tr>{% endfor %}
         </tbody>
       </table></div>
-    {% endcall %}
+    </section>
 
     {% call pick_block(t('quality.block.overall')) %}
       <div class="qa-body"><ul class="qa-how">{% for line in view.overall %}<li>{{ line }}</li>{% endfor %}</ul></div>
