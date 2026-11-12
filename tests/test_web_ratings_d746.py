@@ -328,6 +328,41 @@ def test_violation_drilldown_uses_same_country_scope_and_discloses_missing_sourc
         assert country_links(html) == {"AA"}
 
 
+def test_violation_expands_in_place_under_its_row_with_countries_units_and_check_links(
+    monkeypatch,
+):
+    url = "/ratings/violations?period=2026-Q4&lang=en&kind=rs&scope=all"
+    with surface(monkeypatch) as (client, _state):
+        html = page_html(client, url + "&criterion=rs:criterion:K1")
+        table = html[html.index("rt-violations-table") :]
+        table = table[: table.index("</table>")]
+        # The violation column comes first and the expansion sits right under its own row.
+        assert table.index("<th>Violation</th>") < table.index('class="num">Share')
+        row, detail = table.index('id="rt-violation-open"'), table.index("rt-violation-detail")
+        assert row < detail < table.index("Service issue")
+        opened = table[detail:]
+        assert opened.index("Country A") < opened.index("Demo-AA")
+        assert opened.index("Country B") < opened.index("Demo-BB")
+        assert "<details" in opened and "checkupId=" + CHECK in opened
+        assert 'target="_blank"' in opened
+        # No separate detail block is left below the table.
+        assert html.count("saved source data contains no photos") == 1
+        # Pressing the open violation again collapses it (plain link, works without JS).
+        collapse = re.search(r'<a href="([^"]+)" aria-expanded="true"', table).group(1)
+        assert "criterion=" not in collapse
+        closed = page_html(client, collapse.replace("&amp;", "&"))
+        assert "rt-violation-detail" not in closed and 'aria-expanded="false"' in closed
+
+
+def test_violation_expansion_shows_only_the_scoped_countries(monkeypatch):
+    with surface(monkeypatch) as (client, _state):
+        html = page_html(
+            client, "/ratings/violations?period=2026-Q4&lang=en&kind=rs&criterion=rs:criterion:K1"
+        )
+        detail = html[html.index("rt-violation-detail") :]
+        assert "Demo-AA" in detail and "Demo-BB" not in detail and "Country B" not in detail
+
+
 class Stylesheets(HTMLParser):
     def __init__(self):
         super().__init__()
