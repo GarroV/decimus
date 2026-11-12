@@ -386,11 +386,23 @@ def test_экран_на_английском(ук: FlaskClient, база: Ба�
     assert "Connect Google Calendar" in страница
 
 
-def test_партнёру_календарь_не_показывается(monkeypatch: pytest.MonkeyPatch, база: База) -> None:
+def test_партнёру_календарь_показан_заглушкой_без_подключения(
+    monkeypatch: pytest.MonkeyPatch, база: База
+) -> None:
     for client in _стенд(monkeypatch, tenant="GE"):
-        страница = client.get("/settings?tile=google").get_data(as_text=True)
+        страница = client.get("/settings?tile=google&lang=en").get_data(as_text=True)
 
+        assert "Google Calendar" in страница
+        assert "In development" in страница
         assert "google-calendar" not in страница
+        assert "Connect Google Calendar" not in страница
+
+
+def test_уК_календарь_без_заглушки(ук: FlaskClient, база: База) -> None:
+    страница = ук.get("/settings?tile=google&lang=en").get_data(as_text=True)
+
+    assert "Connect Google Calendar" in страница
+    assert "still in development" not in страница
 
 
 # ── Партнёр: «только УК» держит сервер ──────────────────────────────────

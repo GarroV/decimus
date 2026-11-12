@@ -129,6 +129,18 @@ def партнёр(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[F
     yield from _стенд(monkeypatch, "GE")
 
 
+# --- баннер «Раздел в разработке» (D761) -----------------------------------
+
+def test_партнёр_видит_баннер_разработки(партнёр: FlaskClient) -> None:
+    страница = партнёр.get("/actions?lang=en").get_data(as_text=True)
+    assert 'id="actions-wip"' in страница
+    assert "Section in development" in страница
+
+
+def test_уК_баннера_не_видит(уК: FlaskClient) -> None:
+    assert 'id="actions-wip"' not in уК.get("/actions?lang=en").get_data(as_text=True)
+
+
 # --- запись УК закрыта партнёру на каждом маршруте --------------------------
 
 ЗАПИСЬ_УК = [
