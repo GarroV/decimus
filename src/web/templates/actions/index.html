@@ -36,6 +36,12 @@
 {% block pick_list %}{{ country_rail() }}{% endblock %}
 
 {% block pick_work %}
+  {% if wip_banner %}
+    <div class="note note--info" role="status" id="actions-wip">
+      <div><div class="note__title">{{ t('actions.wip.title') }}</div>
+        <div class="note__text">{{ t('actions.wip.text') }}</div></div>
+    </div>
+  {% endif %}
   {% if tab != 'osb' %}
     <nav class="stabs" aria-label="{{ t('section.actions.title') }}">
       {% if action_plans_enabled() %}      <a class="stabs__item{% if tab == 'plans' %} is-current{% endif %}" href="{{ tab_links['plans'] }}"{% if tab == 'plans' %} aria-current="page"{% endif %}>{{ t('actions.tab.plans') }}</a>{% endif %}

@@ -143,6 +143,11 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
     },
     "actions.drop.none": {"ru": "Файл не выбран", "en": "No file chosen"},
     # --- экран «Действия» --------------------------------------------------
+    "actions.wip.title": {"ru": "Раздел в разработке", "en": "Section in development"},
+    "actions.wip.text": {
+        "ru": "Раздел пока работает частично: что-то может быть недоступно или измениться.",
+        "en": "This section only partly works for now: some things may be unavailable or change.",
+    },
     "actions.count": {"ru": "в списке: {n}", "en": "in the list: {n}"},
     "actions.drawer.plan": {"ru": "Экшн-план", "en": "Action plan"},
     "actions.drawer.rx": {"ru": "Предписание", "en": "Compliance notice"},
