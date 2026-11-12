@@ -38,7 +38,7 @@
 {% from "_split_ui.html" import confirm %}
   {% set tile_icon = {'profile': 'team', 'language': 'flag', 'password': 'lock', 'security': 'check', 'signins': 'clock', 'signout': 'arrow', 'claude': 'spark', 'bot': 'tg', 'google': 'globe'} %}
   {% set tile_name = {'profile': 'settings.profile.title', 'language': 'settings.lang.title', 'password': 'profile.password.title', 'security': 'sf.sec.title', 'signins': 'journal.own.title', 'signout': 'settings.signout.title', 'claude': 'settings.claude.title', 'bot': 'settings.bot.title', 'google': 'settings.google.title'} %}
-  {% set google_login = google_enabled and me.email %}
+  {% set google_login = password_closed %}
 
   <article class="ssettings">
     {% if show.flash %}
@@ -102,7 +102,7 @@
           <div class="ssec" id="password">
             <p class="ssec__note">{{ t('settings.password.card') }}</p>
         {% if google_login %}
-              {# D450: с привязанной почтой Google паролем не входят — форма была бы
+              {# D450/D754: учётке УК с привязанной почтой Google паролем не входят — форма была бы
                  кнопкой, которая меняет то, чем войти нельзя. #}
               <p class="ssec__text"><span class="sdot"></span>{{ t('settings.password.google') }}</p>
             {% else %}
@@ -178,7 +178,7 @@
           {% else %}
           <div class="ssec" id="google">
       {% if me.email and google_enabled %}
-        <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('settings.google.linked', email=me.email) }}</p>
+        <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('settings.google.linked' if hq_account else 'settings.google.linked_partner', email=me.email) }}</p>
       {% elif me.email %}
         <p class="ssec__text"><span class="sdot"></span>{{ t('settings.google.linked_off', email=me.email) }}</p>
       {% else %}
@@ -199,7 +199,7 @@
         <details class="sfold" id="google-link">
           <summary class="sbtn sbtn--primary">{{ t('settings.google.link') }}</summary>
           <form method="post" action="{{ base }}/google-link?lang={{ lang }}" class="sform">
-            <p class="ssec__text">{{ t('settings.google.link_warn') }}</p>
+            <p class="ssec__text">{{ t('settings.google.link_warn' if hq_account else 'settings.google.link_warn_partner') }}</p>
             <p class="ssec__note">{% if hq_account %}{{ t('settings.google.link_hq', domains=hq_domains) }}{% else %}{{ t('settings.google.link_partner') }}{% endif %}</p>
             <button class="sbtn sbtn--primary" type="submit">{{ t('settings.google.link_go') }}</button>
           </form>

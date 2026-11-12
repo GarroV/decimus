@@ -126,7 +126,14 @@ def _own_binding() -> tuple[Any, bool]:
 def _google_result() -> Flash | None:
     """Исход возврата от Google (`?google=`) — только из закрытого списка."""
     ключ = google_link.RESULTS.get(request.args.get(google_link.RESULT_PARAM) or "")
-    return None if ключ is None else Flash(ключ[0], ключ[1])
+    if ключ is None:
+        return None
+    вошедший = auth.current_account()
+    если_партнёр = вошедший is not None and canonical_tenant(вошедший.tenant) != HQ_TENANT
+    if ключ[0] == "settings.google.done.linked" and если_партнёр:
+        # D754: партнёру после привязки пароль не закрывается — текст другой.
+        return Flash("settings.google.done.linked_partner", ключ[1])
+    return Flash(ключ[0], ключ[1])
 
 
 @dataclass(frozen=True)
@@ -299,6 +306,9 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
     has_google_login = bool(getattr(вошедший, "email", None)) and bool(
         current_app.extensions.get(auth.GOOGLE_ENABLED_KEY)
     )
+    is_hq = вошедший is not None and canonical_tenant(вошедший.tenant) == HQ_TENANT
+    # Пароль закрыт только учётке УК с почтой (D754): партнёр входит и паролем.
+    password_closed = has_google_login and is_hq
     lang = ui_lang.request_lang(current_app.extensions["decimus_conf"].ui_lang)
     состояния = tile_states(
         show=show,
@@ -317,8 +327,8 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             "settings/index.html",
             show=show,
             tile=selected_tile(show, request.args.get("tile")),
-            tile_states={**состояния, **_own_tile_states(вошедший, has_google_login)},
-            tile_hint=_tile_hints(вошедший, lang, has_google_login),
+            tile_states={**состояния, **_own_tile_states(вошедший, password_closed)},
+            tile_hint=_tile_hints(вошедший, lang, password_closed),
             tile_groups=TILE_GROUPS,
             me=вошедший,
             base=base,
@@ -335,7 +345,8 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             min_password=accounts.MIN_PASSWORD_LENGTH,
             max_password=accounts.MAX_PASSWORD_LENGTH,
             calendar=_calendar_state(user_id),
-            hq_account=вошедший is not None and canonical_tenant(вошедший.tenant) == HQ_TENANT,
+            hq_account=is_hq,
+            password_closed=password_closed,
             hq_domains=", ".join(sorted(load_hq_domains())),
         ),
         code,

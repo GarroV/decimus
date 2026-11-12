@@ -217,8 +217,16 @@ def ask_confirm(back: str) -> Response:
 
 
 def uses_google(account: object, google_enabled: bool) -> bool:
-    """Учётка подтверждает вход через Google: с почтой паролем не входят (D450)."""
-    return google_enabled and bool(getattr(account, "email", None))
+    """Учётка УК подтверждает вход через Google: с почтой паролем не входят (D450).
+
+    Учётки партнёров под правило не попадают (D754): они подтверждают паролем,
+    как и входят, — та же граница, что у входа в `auth.login`.
+    """
+    return (
+        google_enabled
+        and bool(getattr(account, "email", None))
+        and canonical_tenant(str(getattr(account, "tenant", ""))) == HQ_TENANT
+    )
 
 
 def google_confirms(

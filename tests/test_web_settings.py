@@ -154,19 +154,21 @@ def test_адрес_mcp_берётся_из_настройки_стенда(monk
         assert "https://mcp.example/mcp" in страница
 
 
-def _с_почтой(monkeypatch: pytest.MonkeyPatch, *, google: bool) -> Iterator[FlaskClient]:
+def _с_почтой(
+    monkeypatch: pytest.MonkeyPatch, *, google: bool, tenant: str = "HQ"
+) -> Iterator[FlaskClient]:
     """Вошедший с привязанной почтой. Входит без неё: с почтой паролем вход закрыт (D450)."""
-    подменить_двери(monkeypatch, tenant="HQ", role="admin")
+    подменить_двери(monkeypatch, tenant=tenant, role="admin")
     if google:
         реквизиты = GoogleSettings(client_id="c", client_secret="s", redirect_uri="https://x/cb")
         monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: реквизиты)
-    with собрать(tenant="HQ").test_client() as client:
+    with собрать(tenant=tenant).test_client() as client:
         assert войти(client).status_code == 302
         monkeypatch.setattr(
             auth,
             "resolve_session",
             lambda token: (
-                Учётка(tenant="HQ", role="admin", email=ПОЧТА) if token == ТОКЕН else None
+                Учётка(tenant=tenant, role="admin", email=ПОЧТА) if token == ТОКЕН else None
             ),
         )
         yield client
@@ -178,6 +180,17 @@ def test_с_почтой_и_google_пароль_закрыт_и_так_сказ�
 
         assert 'id="password-form"' not in страница, "форма смены пароля при закрытом входе паролем"
         assert "Вход паролем для этой учётки закрыт" in страница
+
+
+def test_партнёр_с_почтой_и_google_пароль_остаётся(monkeypatch: pytest.MonkeyPatch) -> None:
+    """D754: закрыт пароль только у УК; партнёр меняет его сам и ничего о закрытии не читает."""
+    for client in _с_почтой(monkeypatch, google=True, tenant="rs"):
+        страница = client.get("/settings?tile=password").get_data(as_text=True)
+        google = client.get("/settings?tile=google").get_data(as_text=True)
+
+        assert 'id="password-form"' in страница
+        assert "закрыт" not in страница
+        assert "паролем нельзя" not in google and "логином с паролем" in google
 
 
 def test_с_почтой_без_google_пароль_остаётся(monkeypatch: pytest.MonkeyPatch) -> None:

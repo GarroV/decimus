@@ -496,9 +496,16 @@ def install(app: Flask, conf: Settings) -> None:
             )
             return заперто(попытка.verdict)
         account = authenticate(имя, request.form.get("password") or "")
-        if account is not None and google is not None and account.email:
-            # Учётка с привязанной почтой Google паролем не входит: пароль по
-            # дороге проходит через фронт и прокси, Google — нет. Отказ стоит
+        if (
+            account is not None
+            and google is not None
+            and account.email
+            and canonical_tenant(account.tenant) == HQ_TENANT
+        ):
+            # Учётка УК с привязанной почтой Google паролем не входит: пароль по
+            # дороге проходит через фронт и прокси, Google — нет. Партнёрские
+            # пространства под правило не попадают (D754): у партнёра почта
+            # может быть не гугловой, и входит он логином и паролем. Отказ стоит
             # ПОСЛЕ сверки пароля: до неё он рассказал бы любому, у кого какой
             # вход. Аварийный путь — снять привязку командой обслуживания
             # (`tools/web_user.py email <логин>`, docs/26-web-access.md).

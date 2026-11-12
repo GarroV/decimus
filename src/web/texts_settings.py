@@ -258,10 +258,14 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     },
     "settings.google.title": {"ru": "Google", "en": "Google"},
     "settings.google.linked": {
-        "ru": "К учётке привязана почта {email}. Вход на сайт — только через Google, "
-        "паролем нельзя.",
-        "en": "The account is linked to {email}. You sign in with Google only, not with "
-        "a password.",
+        "ru": "К учётке привязана почта {email}. Вход на сайт — через Google.",
+        "en": "The account is linked to {email}. You sign in to the site with Google.",
+    },
+    "settings.google.linked_partner": {
+        "ru": "К учётке привязана почта {email}. Входить можно и кнопкой Google, и "
+        "логином с паролем.",
+        "en": "The account is linked to {email}. You can sign in with the Google button "
+        "or with your login and password.",
     },
     "settings.google.linked_off": {
         "ru": "К учётке привязана почта {email}, но вход через Google на этом стенде не "
@@ -278,6 +282,13 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Google sign-in is not enabled on this server — you cannot link an account yet.",
     },
     "settings.google.link": {"ru": "Привязать Google", "en": "Link Google"},
+    "settings.google.link_warn_partner": {
+        "ru": "Вход логином и паролем останется. Ваши входы на других устройствах "
+        "закроются, Claude, подключённый через сайт, нужно будет подключить заново.",
+        "en": "Signing in with your login and password stays available. Your sessions on "
+        "other devices are closed, and Claude connected through the site has to be "
+        "connected again.",
+    },
     "settings.google.link_warn": {
         "ru": "После привязки вход паролем для этой учётки закроется: входить вы будете "
         "кнопкой «Войти через Google». Ваши входы на других устройствах закроются, "
@@ -321,6 +332,10 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     "settings.google.unlink.locked": {
         "ru": "Слишком много попыток. Попробуйте через {minutes} мин.",
         "en": "Too many attempts. Try again in {minutes} min.",
+    },
+    "settings.google.done.linked_partner": {
+        "ru": "Почта Google привязана. Входить можно кнопкой Google или логином и паролем.",
+        "en": "Google account linked. You can sign in with Google or with your login and password.",
     },
     "settings.google.done.linked": {
         "ru": "Почта Google привязана. Теперь вы входите через Google, вход паролем закрыт.",
