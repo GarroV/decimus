@@ -703,9 +703,9 @@ def test_партнёру_пиццерии_в_меню_и_чужая_стран�
         "/country",
         "/overview",
         "/inspections",
-        "/calendar",
         "/admin",
         "/administration",
         "/ratings",
     ):
         assert f'href="{свой}?lang=' in страница, свой
+    assert 'href="/calendar' not in страница  # D762: календарь партнёру убран
