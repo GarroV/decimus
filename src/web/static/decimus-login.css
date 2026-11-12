@@ -66,6 +66,9 @@
 .login__google-btn:active { transform: translateY(1px); }
 .login__google-btn:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
 .login__google-mark { width: 20px; height: 20px; flex: 0 0 auto; }
+/* Пометка под надписью кнопки (D757): Google пока только для учёток УК — временно. */
+.login__google-text { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: var(--space-3) 0; }
+.login__google-note { font: var(--w-regular) var(--fs-meta) / 1.2 var(--font-ui); color: var(--ink-3); }
 
 .login__or { display: flex; align-items: center; gap: var(--space-6); font-size: var(--fs-meta); color: var(--ink-3); }
 .login__or::before, .login__or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
