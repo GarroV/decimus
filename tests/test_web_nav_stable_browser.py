@@ -215,3 +215,40 @@ def test_первый_кадр_уже_с_нужной_панелью(
     первый = page.evaluate("window.__first")
     assert (первый["nav"], первый["left"]) == (ширина_панели, ширина_панели), первый
     assert (первый["clip"] > 0) == (ширина_панели == 216), первый
+
+
+_ПУНКТЫ = """()=>{const top=n=>Math.round(n.getBoundingClientRect().top);
+  const h=n=>Math.round(n.getBoundingClientRect().height);
+  const list=document.querySelector('.sidenav__list');
+  return {
+    list: [...list.children].map(n=>[top(n), h(n)]),
+    sub: [...list.querySelectorAll('.sidenav__subitem')].map(h),
+  }}"""
+#: Внутри «Рейтингов» у пунктов подменю есть точки свежести, вне их — нет; текущий пункт отмечен.
+ПУНКТЫ_ЭКРАНЫ = ("/settings", "/training", "/ratings/overview", "/ratings/rs", "/ratings/maps")
+
+
+@pytest.mark.parametrize("язык", ["en", "ru"])
+@pytest.mark.parametrize("высота", [1100, 600])
+def test_пункты_панели_стоят_на_месте_при_переходе_между_экранами(  # type: ignore[no-untyped-def]
+    page, высота: int, язык: str
+) -> None:
+    """Раскрытая ветка «Рейтинги» занимает одну высоту на любом экране.
+
+    Владелец 12.11.2026: «левая панель прыгает». Текущий подпункт был жирнее и переносился на
+    строку длиннее, а вне «Рейтингов» у подпунктов не было места под точку свежести и подписи
+    переносились иначе: «Качество» и всё ниже уезжало на 18–36 px при переходе между экранами.
+    """
+    page.set_viewport_size({"width": 1440, "height": высота})
+    _выбор(page, collapsed="false", ratings="true")
+
+    замеры = {}
+    for путь in ПУНКТЫ_ЭКРАНЫ:
+        page.goto(f"{ХОСТ}{путь}?lang={язык}")
+        page.wait_for_timeout(300)
+        замеры[путь] = page.evaluate(_ПУНКТЫ)
+
+    эталон = замеры[ПУНКТЫ_ЭКРАНЫ[0]]
+    assert len(эталон["sub"]) > 3, эталон
+    for путь, замер in замеры.items():
+        assert замер == эталон, (путь, замер, эталон)
