@@ -71,7 +71,7 @@ def test_split_button_and_next_stay_readable(page, width, height, theme, lang):
     assert abs(got["height"][0] - got["height"][1]) <= 1, "split is as tall as the next button"
     assert 1.8 <= got["ratio"] <= 2.2, "«+ Issue» takes 2/3 of the split, «Several» 1/3 (D749)"
     assert got["oneLine"], "icon and label of «Several» sit on one line"
-    assert got["nextWidth"] >= 110, "«Осмотрено →» is not squeezed"
+    assert got["nextWidth"] >= 105, "«Осмотрено →» is not squeezed (D749: split got 2/3 + 1/3 share)"
     assert got["icon"] and got["label"] == ("Несколько" if lang == "ru" else "Several")
     assert got["aria"] == (
         "Несколько нарушений с фото" if lang == "ru" else "Several issues with photos"

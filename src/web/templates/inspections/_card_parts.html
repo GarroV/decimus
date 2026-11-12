@@ -7,7 +7,7 @@
   в Swarm), и каждое живёт ровно в одном месте. Действию с полями (запрос
   плана, перенос, отклонение) кнопка раскрывает форму под рядом кнопок, без
   скрипта: `<details name>` держит открытой не больше одной.
-  Две группы (решение владельца, пересмотр D465; D750, D749): решения — «Принять»
+  Две группы (решение владельца, пересмотр D465; D751, D749): решения — «Принять»
   (главная, принимает сразу), «Исправить» и «Отклонить» — и второстепенное — PDF (значок
   с подписью «PDF», везде), письма, экшн-план, предписание. Второстепенное в панели —
   пиктограммы с подсказкой (`aria-label` + `data-tip`).
@@ -85,7 +85,7 @@
   <div class="hact" role="group" aria-label="{{ t('card.actions.label') }}">
    {% if c.may_accept or (c.may_move and not panel) or (c.may_retract and not head.retracted) %}
    <div class="hact__group hact__group--decide" role="group" aria-label="{{ t('card.actions.decide') }}">
-    {# Принять — сразу, без подтверждения (D750): итог виден в шапке карточки. В панели
+    {# Принять — сразу, без подтверждения (D751): итог виден в шапке карточки. В панели
        форму `split.js` отправляет фоном (`data-panel-form`), не уводя со страницы. #}
     {% if c.may_accept %}
       <form method="post" action="{{ full }}/accept?lang={{ lang }}"{% if panel %} data-panel-form{% endif %} data-accept-guard data-unsaved="{{ t('proofread.unsaved') }}" data-inflight="{{ t('proofread.inflight') }}">

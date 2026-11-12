@@ -987,7 +987,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
   .zlist li { grid-template-columns: minmax(0, 1fr) 4.5rem auto; gap: var(--space-4); }
   .hact__group--aux { margin-left: 0; }
 }
-/* Узкий экран: кнопки своего обычного размера (D750 — вид готовых кнопок не меняется);
+/* Узкий экран: кнопки своего обычного размера (D751 — вид готовых кнопок не меняется);
    второстепенное и корзина — пиктограммами строкой ниже, с чертой между группами.
    Имя — в aria-label и подсказке. */
 @media (max-width: 560px) {
