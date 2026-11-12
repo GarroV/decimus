@@ -3,6 +3,7 @@
     make landing-shots                       # открытое демо, ru и en
     LANDING_SHOTS_BASE=http://127.0.0.1:8080 make landing-shots
     LANDING_SHOTS_WALK_BASE=<превью-стенд> make landing-shots
+    LANDING_SHOTS_ONLY=network,pizzerias make landing-shots   # только эти снимки
 
 Мини-апп обхода в открытом демо английский для любого браузера (D656), поэтому русские
 снимки обхода (`walk`, `match`) берутся со стенда, где задан `WEB_WALK_PREVIEW_CHAT_RU`
@@ -237,12 +238,24 @@ SHOTS: list[tuple[str, dict[str, int], Callable[[Page, str], Path]]] = [
 ]
 
 
+#: Снять только эти снимки (имена через запятую: `network,pizzerias`); пусто — все.
+ONLY = {x.strip() for x in os.environ.get("LANDING_SHOTS_ONLY", "").split(",") if x.strip()}
+
+
+def _wanted(shooter: Callable[[Page, str], Path]) -> bool:
+    return not ONLY or shooter.__name__.removeprefix("shot_") in ONLY
+
+
 def main() -> int:
     written: list[Path] = []
+    if ONLY and not any(_wanted(s) for _, _, s in SHOTS):
+        raise SystemExit(f"LANDING_SHOTS_ONLY: нет таких снимков — {sorted(ONLY)}")
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         for lang in LANGS:
             for role, viewport, shooter in SHOTS:
+                if not _wanted(shooter):
+                    continue
                 context = browser.new_context(
                     viewport=viewport, device_scale_factor=SCALE, locale=LOCALES[lang]
                 )
@@ -253,8 +266,11 @@ def main() -> int:
                 finally:
                     context.close()
         browser.close()
-    (OUT / "sizes.json").write_text(
-        json.dumps(SIZES, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    sizes_file = OUT / "sizes.json"
+    # Частичная пересъёмка не стирает размеры остальных снимков.
+    old = json.loads(sizes_file.read_text(encoding="utf-8")) if ONLY and sizes_file.exists() else {}
+    sizes_file.write_text(
+        json.dumps({**old, **SIZES}, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     for path in written:
         print(
