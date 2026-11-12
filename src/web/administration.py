@@ -28,6 +28,7 @@ from .users_view import (
     TAB_CONNECTIONS,
     TAB_COUNTRIES,
     TAB_DODOIS,
+    TAB_FEEDBACK,
     TAB_HOME,
     TAB_JOURNAL,
     TAB_KEYS,
@@ -138,6 +139,8 @@ TABS: tuple[Tab, ...] = (
     Tab(TAB_MAILINGS, _sees_mailings),
     # Настройки главной: те же роли, что у переключателя экшн-планов (D728).
     Tab(TAB_HOME, _sees_home),
+    # Отзывы из кнопки «Обратная связь» (D761): те же роли, что `service.settings`.
+    Tab(TAB_FEEDBACK, _sees_home),
     Tab(
         "plans",
         lambda account: role_may(
@@ -193,6 +196,7 @@ def install(app: Flask, conf: Settings) -> None:
         connections_screen,
         countries_screen,
         dodois_screen,
+        feedback,
         home_settings,
         journal_screen,
         mailings_screen,
@@ -207,6 +211,7 @@ def install(app: Flask, conf: Settings) -> None:
 
     plan_archive.install(app, conf.ui_lang)
     home_settings.install(app, conf.ui_lang)
+    feedback.install(app, conf)
 
     def spaces() -> FlaskResponse | tuple[str, int]:
         return users_page.render(users_page.Show(tab=TAB_SPACES))
@@ -219,6 +224,7 @@ def install(app: Flask, conf: Settings) -> None:
         "aggregators": aggregators_admin.show,
         TAB_MAILINGS: lambda: mailings_screen.show(conf.ui_lang),
         TAB_HOME: lambda: home_settings.show(conf.ui_lang),
+        TAB_FEEDBACK: lambda: feedback.show(conf.ui_lang),
         "plans": lambda: plan_archive.show(conf.ui_lang),
         TAB_JOURNAL: lambda: journal_screen.show_users(conf),
         TAB_USAGE: lambda: usage_screen.show(conf),

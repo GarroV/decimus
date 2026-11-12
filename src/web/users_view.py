@@ -43,6 +43,8 @@ TAB_USAGE = "usage"
 TAB_MAILINGS = "mailings"
 #: Вкладка «Главная» (D728): настройки сети для главной, её ведёт `home_settings`.
 TAB_HOME = "home"
+#: Вкладка «Обратная связь» (D761): отзывы из кнопки, её ведёт `feedback`.
+TAB_FEEDBACK = "feedback"
 
 
 class _Row(Protocol):

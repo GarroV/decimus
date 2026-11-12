@@ -68,6 +68,10 @@ LOCKED_ENDPOINTS = frozenset(
         # Общая настройка живого workflow не меняется посетителем демо.
         "action_plan_setting",
         "home_setting",
+        # Обратная связь (D761): в демо ничего не уходит команде, чат Telegram не меняется.
+        "feedback_send",
+        "feedback_review",
+        "feedback_chat",
         "service_key_check",
         # «Проверить сейчас» (D638) — проба настоящих провайдеров настоящими ключами.
         "connection_health_check",

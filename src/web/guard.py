@@ -64,6 +64,7 @@ EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "settings_claude_revoke": "своё подключение Claude отзывает сам (D417)",
     "settings_sign_out_everywhere": "свои входы и подключения закрывает сам (D462)",
     "settings_lang": "язык сайта своей учётки (D447)",
+    "feedback_send": "сообщение команде из кнопки «Обратная связь» пишет любой вошедший (D761)",
     "notifications_read": "своё уведомление отмечает прочитанным сам (D604)",
     "notifications_read_all": "свои уведомления отмечает прочитанными сам (D604)",
     "country_filter": "свой постоянный отбор стран экрана «Страны» (D536)",
