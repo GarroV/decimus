@@ -1014,6 +1014,18 @@ def protection_of(store: Store) -> str | None:
     return lists_door.protection_of(store)
 
 
+def foreign_of(store: Store, *, tenant: str) -> str | None:
+    """Чужое ли пространство у чек-листа: `etalon`, `foreign` или `None` — своё.
+
+    Тот же признак, что у отказа записи (`store_for` → `may_write`): экран прячет
+    кнопки правки ровно там, где запись отказала бы. Иначе админ партнёра на
+    эталоне видел бы формы правки, каждая из которых кончается отказом (D285).
+    """
+    if may_write(store, tenant=tenant):
+        return None
+    return "etalon" if store.space == DEFAULT_SPACE else "foreign"
+
+
 def is_master(store: Store) -> bool:
     """Главный ли чек-лист (D440): его правят только админы."""
     return lists_door.is_master(store)

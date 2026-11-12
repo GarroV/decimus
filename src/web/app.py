@@ -2423,6 +2423,10 @@ def _render_checklists(conf: Settings, *, notice: str | None, failure: str | Non
         states=method.CHECKLIST_STATES,
         notice=notice,
         failure=failure,
+        # Состояние меняется только у своих чек-листов, заводит их только УК (D283):
+        # строки эталона у партнёра и партнёрские у УК — без формы, которая откажет.
+        own_space=method.own_space(auth.current_tenant()),
+        can_create=auth.current_tenant() == HQ_TENANT and guard.may("checklist.manage"),
     )
 
 
@@ -2566,6 +2570,10 @@ def _render_methodology(
     # колонке и пропадали, как только выбирали пункт.
     панель = panel or (request.args.get("panel") or "").strip()
     панель = панель if панель in METHODOLOGY_PANELS and not выбран and not новый else ""
+    заводит = auth.current_tenant() == HQ_TENANT and guard.may("checklist.manage")
+    if панель == "new" and not заводит:
+        # Заводит только УК (D283): у партнёра панели нет — её форма отказала бы.
+        панель = ""
 
     def адрес(**изменения: str) -> str:
         """Адрес этого экрана с тем же чек-листом, версией и отбором.
@@ -2652,14 +2660,17 @@ def _render_methodology(
     # Правка чек-листа (D440): главный правят только админы, остальные — и
     # бизнес-девелопер. Решает та же дверь, что отказывает на записи
     # (`method.store_for`), поэтому кнопки не расходятся с отказом.
+    # Чек-лист чужого пространства (эталон у партнёра, партнёрский у УК) — только
+    # чтение для любой роли (D285): причина «эталон/чужое» важнее метки «главный».
+    чужое = method.foreign_of(склад, tenant=auth.current_tenant())
     админ = guard.may("checklist.master")
     главный = method.is_master(склад)
-    закрыт_по = method.protection_of(склад)
-    правит = guard.may("checklist.edit") and (админ or закрыт_по is None)
+    закрыт_по = чужое or method.protection_of(склад)
+    правит = чужое is None and guard.may("checklist.edit") and (админ or закрыт_по is None)
     return render_template(
         "methodology/index.html",
         composition=состав,
-        is_admin=админ,
+        is_admin=админ and чужое is None,
         master_here=главный,
         can_edit_checklist=правит,
         # Почему только чтение: метка чек-листа или роль без правки (партнёрский аудитор).
@@ -2671,6 +2682,8 @@ def _render_methodology(
         # Своё пространство вошедшего: ссылки на чек-листы другого пространства
         # несут его в адресе, а переключатели бота — только у своих (D283).
         own_space=method.own_space(auth.current_tenant()),
+        # Новый чек-лист заводит только УК (D283): у партнёра кнопки нет — дверь откажет.
+        can_create=заводит,
         picking=not _который(request),
         checklist_code=код,
         needs_name=method.needs_set_name(состав),
@@ -2696,7 +2709,8 @@ def _render_methodology(
         route_zones=обход,
         zone_card=зона,
         zone_items=dict(mview.zone_options(состав.items, состав.zones)).get(открыта_зона, 0),
-        adding=новый,
+        # Форма нового пункта — только там, где запись пройдёт (эталон у партнёра — нет).
+        adding=новый and правит,
         panel=панель,
         missing_item=пропал,
         prev_href=адрес(item=раньше) if раньше else None,
