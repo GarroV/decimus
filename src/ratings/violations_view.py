@@ -57,10 +57,33 @@ class UnitViolations:
 
 
 @dataclass(frozen=True)
+class CountryDetail:
+    code: str
+    cases: int
+    units: tuple[UnitViolations, ...]
+
+
+@dataclass(frozen=True)
 class ViolationDetail:
     row: ViolationRow
     units: tuple[UnitViolations, ...]
     photos_available: bool = False
+
+    @property
+    def countries(self) -> tuple[CountryDetail, ...]:
+        """Units grouped by country for the in-place expansion (D752); same scope, no new query."""
+        grouped: dict[str, list[UnitViolations]] = {}
+        for unit in self.units:
+            grouped.setdefault(unit.country, []).append(unit)
+        return tuple(
+            sorted(
+                (
+                    CountryDetail(code, sum(u.cases for u in rows), tuple(rows))
+                    for code, rows in grouped.items()
+                ),
+                key=lambda c: (-c.cases, c.code),
+            )
+        )
 
 
 @dataclass(frozen=True)

@@ -1,9 +1,18 @@
 {% from 'ratings/_macros.html' import case_delta with context %}
 {% if violation_data and violation_data.has_data %}
+{% set open_key = violation_data.selected.row.key if violation_inline and violation_data.selected else none %}
 <div class="rt-scroll"><table class="rt-tbl rt-list rt-violations-table">
 <thead><tr><th>{{ t('ratings.d746.violation') }}</th><th class="num">{{ t('ratings.d746.share') }}</th><th class="num">{{ t('ratings.d746.cases') }}</th><th class="num">{{ t('ratings.src.col.units') }}</th><th class="num">{{ t('ratings.col.delta') }}</th></tr></thead>
-<tbody>{% for row in violation_rows %}<tr>
-<th><a href="{{ section_url('violations', kind=src.kind, criterion=row.key) }}">{{ row.text }}</a>{% if row.parent %}<small>{{ row.parent }}</small>{% endif %}</th>
+<tbody>{% for row in violation_rows %}{% set is_open = row.key == open_key %}<tr{% if is_open %} id="rt-violation-open" class="is-open"{% endif %}>
+<th>{% if is_open %}<a href="{{ section_url('violations', kind=src.kind) }}" aria-expanded="true">{{ row.text }}</a>{% else %}<a href="{{ section_url('violations', kind=src.kind, criterion=row.key) }}{% if violation_inline %}#rt-violation-open{% endif %}"{% if violation_inline %} aria-expanded="false"{% endif %}>{{ row.text }}</a>{% endif %}{% if row.parent %}<small>{{ row.parent }}</small>{% endif %}</th>
 <td class="num">{{ '%.1f'|format(row.share) }}%</td><td class="num">{{ row.cases }}</td><td class="num">{{ row.units }}</td><td class="num">{{ case_delta(row.delta) }}</td>
-</tr>{% endfor %}</tbody></table></div>
+</tr>{% if is_open %}{% set detail = violation_data.selected %}
+<tr class="rt-violation-detail"><td colspan="5">
+{% for c in detail.countries %}<details class="rt-vcountry"{% if detail.countries|length == 1 %} open{% endif %}>
+<summary><span class="rt-vcountry__name">{{ country_name(c.code) }}</span><span class="rt-vcountry__n">{{ t('ratings.d746.cases') }}: {{ c.cases }}</span><span class="rt-vcountry__n">{{ t('ratings.src.col.units') }}: {{ c.units|length }}</span></summary>
+<ul class="rt-vunits">{% for u in c.units %}<li><span class="rt-vunits__name">{% if u.rating_url %}<a href="{{ u.rating_url }}" target="_blank" rel="noopener">{{ u.name }}</a>{% else %}{{ u.name }}{% endif %}</span><span class="rt-vunits__n">{{ t('ratings.d746.cases') }}: {{ u.cases }}</span>
+<span class="rt-vunits__checks">{{ t('ratings.d746.source_checks') }}: {% for check in u.checks %}{% if check.url %}<a href="{{ check.url }}" target="_blank" rel="noopener">{{ check.occurred_at.strftime('%d.%m.%Y') if check.occurred_at else t('ratings.d746.source_check') }}</a>{% if not loop.last %} · {% endif %}{% endif %}{% endfor %}</span></li>{% endfor %}</ul>
+</details>{% endfor %}
+{% if not detail.photos_available %}<p class="rt-empty">{{ t('ratings.d746.no_source_photos') }}</p>{% endif %}
+</td></tr>{% endif %}{% endfor %}</tbody></table></div>
 {% else %}<p class="rt-empty">{{ t('ratings.d746.no_violations_data') }}</p>{% endif %}

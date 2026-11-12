@@ -100,3 +100,35 @@ def test_панель_стоит_на_месте_при_раскрытии_ре�
         for что, значение in замер.items():
             if что != "scrolls":
                 assert значение == эталон[что], (ключ, что, значение, эталон[что])
+
+
+_ВЕРТИКАЛЬ = """() => {
+  const items = [...document.querySelectorAll('.sidenav__list > *')]
+    .filter(n => !n.classList.contains('sidenav__branch'))
+    .map(n => Math.round(n.getBoundingClientRect().height));
+  const t = document.querySelector('.sidenav__branch-toggle').getBoundingClientRect();
+  const list = document.querySelector('.sidenav__list');
+  return { items, toggleTop: Math.round(t.top), scrolls: list.scrollHeight > list.clientHeight };
+}"""
+
+
+@pytest.mark.parametrize("высота", (600, 800))
+def test_пункты_не_сжимаются_и_рейтинги_не_уезжают_вверх(page, высота: int) -> None:
+    """Раскрытая ветка не помещается — пункты держат высоту, «Рейтинги» остаются под курсором.
+
+    Владелец 12.11.2026: «левая панель до сих пор прыгает когда разворачиваешь вкладку
+    рейтингов». Без `flex-shrink: 0` у пунктов (forma 63bd06b) колонка сплющивала их с 34 до
+    18 px, и пункт «Рейтинги» уезжал вверх на ~96 px.
+    """
+    page.set_viewport_size({"width": 1440, "height": высота})
+    page.add_init_script("localStorage.setItem('decimus-nav-collapsed','false')")
+    page.goto(f"{ХОСТ}/overview")
+    page.evaluate("document.documentElement.setAttribute('data-nav-ratings-open','false')")
+    page.wait_for_timeout(300)
+    закрыта = page.evaluate(_ВЕРТИКАЛЬ)
+    page.evaluate("document.documentElement.setAttribute('data-nav-ratings-open','true')")
+    page.wait_for_timeout(400)
+    открыта = page.evaluate(_ВЕРТИКАЛЬ)
+    assert открыта["scrolls"], "проверка пустая: раскрытый список поместился, сжатию неоткуда взяться"
+    assert открыта["toggleTop"] == закрыта["toggleTop"], (закрыта, открыта)
+    assert открыта["items"] == закрыта["items"], (закрыта, открыта)
