@@ -232,7 +232,7 @@ def test_маршрут_с_действием_только_УК_партнёру
         "mailing_template_save", "ratings_agg_update", "ratings_coverage_link",
         "ratings_developer", "ratings_rule_add", "ratings_rule_remove", "ratings_settings",
         "ratings_sheet_sync", "ratings_upload", "service_key_check", "service_key_delete",
-        "service_key_save", "space_countries", "unit_profile_save",
+        "service_key_save", "space_countries", "space_limits_save", "unit_profile_save",
     }
 )  # fmt: skip
 
