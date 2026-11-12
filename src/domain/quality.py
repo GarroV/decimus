@@ -12,7 +12,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -48,6 +48,25 @@ class Orders:
 def mean(values: Sequence[Decimal]) -> Decimal | None:
     """Простое среднее; пусто — `None`, а не ноль."""
     return sum(values, ZERO) / len(values) if values else None
+
+
+def fold_months(
+    months: Sequence[Mapping[str, Decimal | None]], summed: Collection[str] = ()
+) -> dict[str, Decimal | None]:
+    """Показатели юнита за период из показателей его месяцев (п. 2 инструкции аналитика).
+
+    Показатель — простое среднее по месяцам, где он есть (месяц без значения не тянет к нулю);
+    ключи из `summed` (выручка) — сумма. Нет значения ни в одном месяце — `None`. Доли заказов
+    сюда не годятся: они считаются заново от сумм заказов за период."""
+    keys = {key for month in months for key in month}
+    out: dict[str, Decimal | None] = {}
+    for key in sorted(keys):
+        found = [v for month in months if (v := month.get(key)) is not None]
+        if key in summed:
+            out[key] = sum(found, ZERO) if found else None
+        else:
+            out[key] = mean(found)
+    return out
 
 
 def five_point(score: Decimal, scale: int) -> Decimal:

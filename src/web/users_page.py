@@ -22,6 +22,7 @@ from flask import render_template, request
 
 from src.db import bot_links
 from src.db.errors import DbError
+from src.domain.geo import COUNTRIES
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import (
@@ -274,7 +275,21 @@ def _space_context(
         "space_pick": _space_pick(show, пространства),
         "space_add": вкладка == TAB_SPACES
         and (show.add_space or request.args.get("add_space") == "1"),
+        "country_options": country_options(пространства),
     }
+
+
+def country_options(
+    пространства: tuple[Any, ...],
+) -> tuple[tuple[str, dict[str, str], str], ...]:
+    """Страны сети для выпадающего списка: (код, названия, у кого уже).
+
+    Код уходит в форму, на экране — название на языке страницы (выбирает
+    шаблон); занятая страна видна, но выбрать её нельзя: одна страна — один
+    партнёр (D284).
+    """
+    занята = {c: s.code for s in пространства for c in s.countries}
+    return tuple((код, имена, занята.get(код, "")) for код, имена in COUNTRIES.items())
 
 
 def _all_spaces() -> tuple[str, ...]:

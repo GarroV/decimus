@@ -172,6 +172,18 @@ def test_главный_админ_видит_всех_и_пространств
     assert 'value="superadmin"' in форма and 'value="admin"' in форма
 
 
+def test_страна_пространства_выбирается_списком_занятая_недоступна(
+    главный: FlaskClient,
+) -> None:
+    """Страну не вписывают кодом, а выбирают по названию; чужую не выбрать (D284)."""
+    новое = главный.get("/administration?tab=spaces&add_space=1&lang=ru").get_data(as_text=True)
+
+    assert '<select class="sinput" name="countries" required>' in новое
+    assert '<option value="RS">Сербия</option>' in новое
+    assert '<option value="AM" disabled>Армения — AM</option>' in новое
+    assert 'name="countries" required autocomplete' not in новое
+
+
 def test_главный_админ_назначает_другого_главного(
     главный: FlaskClient, база: dict[str, list[Any]]
 ) -> None:
@@ -497,7 +509,7 @@ def test_тексты_экрана_есть_по_английски(
             as_text=True
         )
 
-    for текст in ("Partner spaces", "Super admin", "Add countries", "Every space"):
+    for текст in ("Partner spaces", "Super admin", "Add a country", "Every space"):
         assert текст in страница, текст
 
 

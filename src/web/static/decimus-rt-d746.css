@@ -112,3 +112,16 @@
 .rt-period__state { font-size:var(--fs-micro); color:var(--ink-3); background:var(--surface-2); border-radius:var(--r-control); padding:3px 6px; }
 .rt-period--current { border-color:var(--line); background:var(--surface); }
 .rt-period--current .rt-period__state { color:var(--accent); }
+.rt-violations-table thead th:first-child, .rt-violations-table tbody th { text-align:left; }
+.rt-violations-table tr.is-open > * { background:var(--surface-2); }
+.rt-violations-table tr.rt-violation-detail td { text-align:left; padding:var(--space-3) var(--space-5) var(--space-4); }
+.rt-violations-table tr.rt-violation-detail:hover > * { background:transparent; }
+.rt-vcountry { border-bottom:1px solid var(--line); }
+.rt-vcountry:last-of-type { border-bottom:0; }
+.rt-vcountry > summary { display:flex; gap:var(--space-5); align-items:baseline; padding:8px 0; cursor:pointer; }
+.rt-vcountry__name { flex:1; font-weight:var(--w-semibold); }
+.rt-vcountry__n, .rt-vunits__n { font-family:var(--font-mono); font-variant-numeric:tabular-nums; color:var(--ink-3); white-space:nowrap; }
+.rt-vunits { list-style:none; margin:0 0 var(--space-3); padding:0 0 0 var(--space-5); display:grid; gap:6px; }
+.rt-vunits li { display:flex; flex-wrap:wrap; gap:4px var(--space-5); align-items:baseline; }
+.rt-vunits__name { flex:1 1 14rem; }
+.rt-vunits__checks { flex:2 1 16rem; color:var(--ink-3); }

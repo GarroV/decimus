@@ -47,3 +47,18 @@
 .qa-tip { display: inline-block; vertical-align: middle; }
 .qa-tip .info-tip { position: relative; }
 .qa-tip .info-tip__pop { top: 100%; left: 0; text-align: left; font-weight: var(--w-regular, 400); }
+
+/* Блок фильтров над таблицей (D750): «Страна» и «Период» одной строкой; на телефоне переносится. */
+.qa-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-4) var(--space-6);
+  padding: 12px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.qa-filter { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; max-width: 100%; }
+.qa-filter.pickbox { min-width: min(100%, 14rem); }
+.qa-filter .pickbox__select { width: 100%; }
+.qa-filter__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); min-width: 0; }
+.qa-filter__note { font-size: var(--fs-meta); color: var(--ink-3); max-width: 36ch; }
+@media (max-width: 719px) {
+  .qa-filters { gap: var(--space-4); }
+  .qa-filter, .qa-filter.pickbox { flex: 1 1 100%; }
+  .qa-filter__note { max-width: none; }
+}
+.pk-shell--solo { grid-template-columns: minmax(0, 1fr); }
