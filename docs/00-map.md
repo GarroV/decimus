@@ -125,7 +125,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_scope,ratings_trends,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{plan_archive,feedback,feedback_telegram,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_scope,ratings_trends,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -144,6 +144,8 @@ Flask-приложение управляющей компании и партн
 | `src/web/country_summary.py` | Сводка экрана «Страны» (D467): цифры периода и девелоперы стран |
 | `src/web/country_units.py` | Строки пиццерий экрана «Страны» (D467): одна строка на пиццерию |
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
+| `src/web/feedback.py` | Кнопка «Обратная связь» (D761 п.6) и одноимённая вкладка «Администрирования» |
+| `src/web/feedback_telegram.py` | Отправка отзыва из кнопки «Обратная связь» в чат Telegram команды (D761 п.6) |
 | `src/web/geo_names.py` | Названия стран и городов для людей — по коду из справочника точек |
 | `src/web/google_mail.py` | Черновик письма партнёру в почте вошедшего (D174, D176, #332) |
 | `src/web/grade_explain.py` | «Почему такая буква» и «расшифровка» для карточки проверки (D490) |
@@ -403,7 +405,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{batch_letters,calendar_store,checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
+<!-- map:begin files src/db/{batch_letters,feedback,calendar_store,checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/batch_letters.py` | D739 (#1579): общее письмо партнёру по нескольким проверкам, зафиксированное человеком |
@@ -412,6 +414,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/config.py` | Окружение блока: где Postgres |
 | `src/db/database_target.py` | Куда ведёт строка подключения — и все ли подключения ведут в одну базу (#487) |
 | `src/db/errors.py` | Отказы блока `db` |
+| `src/db/feedback.py` | D761 п.6: отзывы из кнопки «Обратная связь» — запись, чтение для админки, отметки |
 | `src/db/migrate.py` | Накат SQL-миграций |
 | `src/db/models.py` | Типы, которыми блок `db` разговаривает наружу |
 | `src/db/photos.py` | T094: выгрузка кадров проверки в хранилище |
