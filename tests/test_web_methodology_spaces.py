@@ -107,6 +107,8 @@ def test_ни_одна_правка_чужого_не_проходит(
     with app.test_client() as client:
         войти(client)
         for маршрут in маршруты:
+            if маршрут == "/admin/checklists":
+                continue  # заведение своего — право админа пространства (D413), ниже свой тест
             client.post(
                 маршрут.replace("<code>", чей[1]) + адрес,
                 headers={"Origin": СВОЙ},
@@ -158,3 +160,66 @@ def test_партнёру_применение_к_проду_не_показан
         войти(client)
         у_ук = client.get("/admin/checklists").get_data(as_text=True)
     assert ссылка in у_ук
+
+
+def test_админ_партнёра_заводит_свой_чек_лист_в_своём_пространстве(
+    склад: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D413: заведение — по матрице, а не по «только УК». Пространство берётся у
+    вошедшего: код совпал с эталоном, но легла копия у партнёра, эталон цел."""
+    эталон = replace(склад, space="hq", code="bizdev")
+    журнал_эталона = len(read_journal(эталон))
+    подменить_двери(monkeypatch, tenant="GE", role="admin")
+    with собрать(tenant="HQ").test_client() as client:
+        войти(client)
+        страница = client.get("/admin/checklists").get_data(as_text=True)
+        ответ = client.post(
+            "/admin/checklists",
+            headers={"Origin": СВОЙ},
+            data={"code": "kitchen", "name_ru": "Кухня", "name_en": "Kitchen", "space": "hq"},
+        )
+    assert t("checklists.new.submit", "ru") in страница, "форма заведения не видна админу партнёра"
+    assert ответ.status_code == 200
+    assert t("methodology.etalon_readonly", "ru") not in ответ.get_data(as_text=True)
+    assert (склад.root / "ge" / "kitchen").exists()
+    assert not (склад.root / "hq" / "kitchen").exists(), "чек-лист лёг в пространство УК"
+    assert len(read_journal(эталон)) == журнал_эталона
+
+
+def test_админ_партнёра_не_заводит_в_чужом_пространстве_и_в_ук(
+    склад: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    подменить_двери(monkeypatch, tenant="GE", role="admin")
+    with собрать(tenant="HQ").test_client() as client:
+        войти(client)
+        for лишнее in ("am", "hq"):
+            client.post(
+                f"/admin/checklists?space={лишнее}",
+                headers={"Origin": СВОЙ},
+                data={
+                    "code": "intruder",
+                    "name_ru": "Чужой",
+                    "name_en": "Intruder",
+                    "space": лишнее,
+                },
+            )
+    assert not (склад.root / "am" / "intruder").exists()
+    assert not (склад.root / "hq" / "intruder").exists()
+    assert (склад.root / "ge" / "intruder").exists(), (
+        "заведено у себя: адрес и форма пространство не задают"
+    )
+
+
+def test_сотрудник_партнёра_чек_лист_не_заводит(
+    склад: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    подменить_двери(monkeypatch, tenant="GE", role="auditor")
+    with собрать(tenant="HQ").test_client() as client:
+        войти(client)
+        ответ = client.post(
+            "/admin/checklists",
+            headers={"Origin": СВОЙ},
+            data={"code": "kitchen", "name_ru": "Кухня", "name_en": "Kitchen"},
+        )
+    assert ответ.status_code == 403
+    assert not (склад.root / "ge" / "kitchen").exists()

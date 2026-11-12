@@ -2214,13 +2214,8 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         state = method.load_store()
         if state.store is None:
             return _render_checklists(conf, notice=None, failure=None)
-        if auth.current_tenant() != HQ_TENANT:
-            # Чек-листы заводит УК (D283): у партнёра заведения нет — он
-            # работает по эталону и читает его.
-            отказ_заведения = t("methodology.etalon_readonly", _lang(conf))
-            if с_методики:
-                return _render_methodology(conf, notice=None, failure=отказ_заведения, panel="new")
-            return _render_checklists(conf, notice=None, failure=отказ_заведения)
+        # Заведение — по матрице (`checklist.manage`, D413): админ партнёра заводит свой
+        # чек-лист. Пространство — вошедшего (`method.create_checklist`), не из формы.
         try:
             заведён = method.create_checklist(
                 state.store,
