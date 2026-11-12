@@ -102,6 +102,20 @@
     draw();
   }
 
+  // «Произвольный период» в быстром выборе не уводит по адресу (его значение пустое,
+  // `pick.js` такое пропускает): он открывает поля «С» и «По» над календарём.
+  document.addEventListener("change", function (event) {
+    var select = event.target;
+    if (!select.matches || !select.matches("select[data-pick-nav]")) return;
+    var menu = select.closest(".speriod__menu");
+    var form = menu && menu.querySelector("form[data-pcal]");
+    var option = select.selectedOptions && select.selectedOptions[0];
+    if (!form || !option || !option.hasAttribute("data-period-custom")) return;
+    form.classList.add("is-custom");
+    var first = form.querySelector("input[name=from]");
+    if (first) first.focus();
+  });
+
   // `toggle` не всплывает — ловим на погружении.
   document.addEventListener("toggle", function (event) {
     var pick = event.target;

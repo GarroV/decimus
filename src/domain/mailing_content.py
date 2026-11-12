@@ -5,8 +5,10 @@ from __future__ import annotations
 import string
 from collections.abc import Mapping
 
+from .models import REPORT_LANGS
+
 KINDS = ("inspection", "prescription", "plan", "document")
-LANGS = ("ru", "en")
+LANGS = REPORT_LANGS
 FIELDS = {
     "inspection": ("unit", "city", "date", "letter_body"),
     "prescription": ("title", "country", "date", "due", "units", "document_body"),
@@ -15,31 +17,58 @@ FIELDS = {
 }
 
 
+#: Встроенные (тема, тело) по виду и языку — пока их не заменила правка в админке.
+#: Язык без записи — отказ в `defaults`, а не английский вместо него: полноту по
+#: языкам отчёта держит `tests/test_lang_catalogs_complete.py`.
+DEFAULTS: dict[str, dict[str, tuple[str, str]]] = {
+    "inspection": {
+        "ru": ("Проверка пиццерии · {city} · {date}", "{letter_body}"),
+        "en": ("Pizzeria audit · {city} · {date}", "{letter_body}"),
+        "tr": ("Pizzacı denetimi · {city} · {date}", "{letter_body}"),
+    },
+    "prescription": {
+        "ru": ("{title}", "{document_body}"),
+        "en": ("{title}", "{document_body}"),
+        "tr": ("{title}", "{document_body}"),
+    },
+    "plan": {
+        "ru": (
+            "План действий · {unit}",
+            "Пиццерия: {unit}\nПроверка: {date}\nСрок: {due}\n{plan_url}",
+        ),
+        "en": (
+            "Action plan · {unit}",
+            "Pizzeria: {unit}\nInspection: {date}\nDue: {due}\n{plan_url}",
+        ),
+        "tr": (
+            "Eylem planı · {unit}",
+            "Pizzacı: {unit}\nDenetim: {date}\nSon tarih: {due}\n{plan_url}",
+        ),
+    },
+    "document": {
+        "ru": (
+            "{title}",
+            "Страна: {country}\nДата: {date}\nСрок: {due}\nПиццерии:\n{units}\nАдреса:\n"
+            "{addresses}\nОснования:\n{bases}\n\n{document_body}",
+        ),
+        "en": (
+            "{title}",
+            "Country: {country}\nDate: {date}\nDue: {due}\nPizzerias:\n{units}\n"
+            "Addresses:\n{addresses}\nBased on:\n{bases}\n\n{document_body}",
+        ),
+        "tr": (
+            "{title}",
+            "Ülke: {country}\nTarih: {date}\nSon tarih: {due}\nPizzacılar:\n{units}\n"
+            "Adresler:\n{addresses}\nDayanaklar:\n{bases}\n\n{document_body}",
+        ),
+    },
+}
+
+
 def defaults(kind: str, lang: str) -> tuple[str, str]:
     if kind not in KINDS or lang not in LANGS:
         raise ValueError("Unknown template")
-    ru = lang == "ru"
-    if kind == "inspection":
-        return (
-            "Проверка пиццерии" if ru else "Pizzeria audit"
-        ) + " · {city} · {date}", "{letter_body}"
-    if kind == "prescription":
-        return "{title}", "{document_body}"
-    if kind == "plan":
-        return ("План действий" if ru else "Action plan") + " · {unit}", (
-            "Пиццерия: {unit}\nПроверка: {date}\nСрок: {due}\n{plan_url}"
-            if ru
-            else "Pizzeria: {unit}\nInspection: {date}\nDue: {due}\n{plan_url}"
-        )
-    return "{title}", (
-        "Страна: {country}\nДата: {date}\nСрок: {due}\nПиццерии:\n{units}\nАдреса:\n"
-        "{addresses}\nОснования:\n{bases}\n\n{document_body}"
-        if ru
-        else (
-            "Country: {country}\nDate: {date}\nDue: {due}\nPizzerias:\n{units}\n"
-            "Addresses:\n{addresses}\nBased on:\n{bases}\n\n{document_body}"
-        )
-    )
+    return DEFAULTS[kind][lang]
 
 
 def check(kind: str, subject: str, body: str) -> None:

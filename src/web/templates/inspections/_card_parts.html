@@ -7,10 +7,10 @@
   в Swarm), и каждое живёт ровно в одном месте. Действию с полями (запрос
   плана, перенос, отклонение) кнопка раскрывает форму под рядом кнопок, без
   скрипта: `<details name>` держит открытой не больше одной.
-  Две группы (решение владельца, пересмотр D465; D745): решения — «Принять проверку»
-  (главная, принимает сразу) и «Исправить» — и второстепенное — PDF, письма, экшн-план,
-  предписание и корзина «Удалить проверку» последней. Второстепенное в панели —
-  пиктограммы с подсказкой (`aria-label` + `data-tip`), корзина — пиктограмма везде.
+  Две группы (решение владельца, пересмотр D465; D750, D749): решения — «Принять»
+  (главная, принимает сразу), «Исправить» и «Отклонить» — и второстепенное — PDF (значок
+  с подписью «PDF», везде), письма, экшн-план, предписание. Второстепенное в панели —
+  пиктограммы с подсказкой (`aria-label` + `data-tip`).
   В панели «Принять» форму `split.js` отправляет фоном (`data-panel-form`), не уводя
   со страницы. Принятую проверку не правят: кнопки «Исправить» у неё в панели нет.
 #}
@@ -83,9 +83,9 @@
   {% set head = c.head %}
   {% set full = url('/inspections/' ~ head.id) %}
   <div class="hact" role="group" aria-label="{{ t('card.actions.label') }}">
-   {% if c.may_accept or (c.may_move and not panel) %}
+   {% if c.may_accept or (c.may_move and not panel) or (c.may_retract and not head.retracted) %}
    <div class="hact__group hact__group--decide" role="group" aria-label="{{ t('card.actions.decide') }}">
-    {# Принять — сразу, без подтверждения (D745): итог виден в шапке карточки. В панели
+    {# Принять — сразу, без подтверждения (D750): итог виден в шапке карточки. В панели
        форму `split.js` отправляет фоном (`data-panel-form`), не уводя со страницы. #}
     {% if c.may_accept %}
       <form method="post" action="{{ full }}/accept?lang={{ lang }}"{% if panel %} data-panel-form{% endif %} data-accept-guard data-unsaved="{{ t('proofread.unsaved') }}" data-inflight="{{ t('proofread.inflight') }}">
@@ -115,6 +115,19 @@
       {% endcall %}
     {% endif %}
 
+    {# «Отклонить» — третье решение в ряду (D749). Действие прежнее: отклонение с обязательной
+       причиной (D194, D465); форма причины раскрывается под рядом кнопок. #}
+    {% if c.may_retract and not head.retracted %}
+      {% call _pop('retract', 'x', t('retract.title'), 'hbtn--danger') %}
+        <p class="hact__note">{{ t('retract.hint') }}</p>
+        <form method="post" action="{{ full }}/retract?lang={{ lang }}" class="hact__form"{% if panel %} data-panel-form{% endif %}>
+          <label><span class="field-label">{{ t('retract.reason_label') }}</span>
+            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
+          <button class="btn btn--danger btn--sm" type="submit">{{ t('retract.submit') }}</button>
+        </form>
+      {% endcall %}
+    {% endif %}
+
    </div>
    {% endif %}
 
@@ -125,7 +138,7 @@
        отдаёт только сохранённый: без него ссылка вела бы в отказ. Ответ —
        вложение: щелчок скачивает файл и страницу не меняет. #}
     {% if c.report or not head.is_legacy %}
-      {{ _link(full ~ '/report?lang=' ~ lang, 'download', t('card.report.download'), panel) }}
+      {{ _link(full ~ '/report?lang=' ~ lang, 'download', t('card.report.download'), panel, tone='hbtn--pdf', short='PDF', text=True) }}
     {% endif %}
     {# Письмо партнёру — запись от имени пространства: у проверки, которую
        вошедший только читает (УК у партнёра, D283), кнопки нет. У заведённой
@@ -161,20 +174,6 @@
        выбрана основанием. Право — `may_prescribe` из `_card_context`. #}
     {% if c.may_prescribe %}
       {{ _link(url('/actions/prescriptions/new') ~ '?inspection=' ~ head.id ~ '&lang=' ~ lang, 'flag', t('card.act.rx'), panel) }}
-    {% endif %}
-
-    {# Корзина «Удалить проверку» — последней в группе, одинаково в панели, на странице и
-       на телефоне (D745). Действие прежнее: отклонение с обязательной причиной (D194, D465);
-       форма причины раскрывается под рядом. #}
-    {% if c.may_retract and not head.retracted %}
-      {% call _pop('retract', 'trash', t('retract.icon'), 'hbtn--danger', True) %}
-        <p class="hact__note">{{ t('retract.hint') }}</p>
-        <form method="post" action="{{ full }}/retract?lang={{ lang }}" class="hact__form"{% if panel %} data-panel-form{% endif %}>
-          <label><span class="field-label">{{ t('retract.reason_label') }}</span>
-            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
-          <button class="btn btn--danger btn--sm" type="submit">{{ t('retract.submit') }}</button>
-        </form>
-      {% endcall %}
     {% endif %}
    </div>
   </div>

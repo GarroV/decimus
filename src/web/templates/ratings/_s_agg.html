@@ -24,7 +24,7 @@
       {% for c in agg.countries %}{% set is_open = open_country == c.code %}
       <tbody class="rt-group{% if is_open %} is-open{% endif %}" data-country="{{ c.code }}">
         <tr class="rt-group__row">
-          <th scope="row"><a class="rt-group__toggle" data-rt-country href="{{ url(ratings_path) }}/agg?group={{ selection.group }}{% if selection.value %}&amp;value={{ selection.value|urlencode }}{% endif %}&amp;period={{ selection.period.key|urlencode }}&amp;lang={{ lang }}&amp;country={{ c.code }}" aria-expanded="{{ 'true' if is_open else 'false' }}"><span class="rt-group__caret" aria-hidden="true">▸</span> {{ country_name(c.code) }}</a><small>{{ t('ratings.coverage.units', n=c.units|length) }}</small></th>
+          <th scope="row"><a class="rt-group__toggle" data-rt-country href="{{ section_url('agg', country=c.code) }}" aria-expanded="{{ 'true' if is_open else 'false' }}" aria-label="{{ t('ratings.coverage.units', n=c.units|length) }} · {{ country_name(c.code) }}"><span class="rt-group__caret" aria-hidden="true">▸</span></a> <a href="{{ country_topic_url(c.code, 'agg') }}">{{ country_name(c.code) }}</a><small>{{ t('ratings.coverage.units', n=c.units|length) }}</small></th>
           {% for p in agg.platforms %}{% set s = c.scores.get(p) %}<td class="num">{% if s %}<b>{{ agg_score(s.avg, s.scale) }}</b><small>{{ t('ratings.agg.points', n=s.points) }}</small>{% else %}<span class="is-empty">—</span>{% endif %}</td>{% endfor %}
         </tr>
         {% for row in c.units %}<tr class="rt-group__sub">

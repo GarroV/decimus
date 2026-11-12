@@ -199,6 +199,11 @@ _WEB: dict[str, tuple[str, str]] = {
         "Personal Claude token revoked",
     ),
     "settings_continue": ("Продолжено подтверждённое действие", "Confirmed action continued"),
+    "settings_calendar_on": (
+        "Начато подключение Google Календаря",
+        "Google Calendar connection started",
+    ),
+    "settings_calendar_off": ("Отключён Google Календарь", "Google Calendar disconnected"),
     "settings_google_link": ("Привязана почта Google", "Google email linked"),
     "settings_google_unlink": ("Отвязана почта Google", "Google email unlinked"),
     "settings_lang": ("Изменён язык сайта", "Site language changed"),

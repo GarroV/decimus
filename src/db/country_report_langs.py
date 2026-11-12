@@ -2,7 +2,7 @@
 
 Читает роль приложения (бот выбирает языки в конце проверки, `bot/report_lang.py`),
 пишет администратор истории — как контакты страны (`country_contacts.py`). Какие языки
-допустимы, решает вызывающий (`TEXT_LANGS`); здесь — форма и подпись.
+допустимы, решает вызывающий (`REPORT_LANGS`); здесь — форма и подпись.
 
 `langs_for` — единая точка «какие языки у страны»: строка базы, иначе файл методики
 (`domain/report_langs.py`, который базы не знает: слои). Бот и веб зовут её, а не склеивают
@@ -16,7 +16,7 @@ import logging
 import psycopg
 
 from src.domain import report_langs
-from src.domain.models import TEXT_LANGS
+from src.domain.models import REPORT_LANGS
 
 from .config import check_environment, load_retraction_settings
 from .errors import DbError
@@ -96,7 +96,7 @@ def resolve(country: str | None) -> tuple[list[str], bool]:
                 "Языки отчёта страны %s из базы не прочитались, берём файл", code, exc_info=True
             )
         else:
-            kept = [lang for lang in (override or ()) if lang in TEXT_LANGS]
+            kept = [lang for lang in (override or ()) if lang in REPORT_LANGS]
             if kept:
                 return kept, True
     return report_langs.report_langs_for(country), False

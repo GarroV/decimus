@@ -1,6 +1,6 @@
 """Поля методики, заполненные не на том языке, на котором их напечатают (T186).
 
-`pick_text` в `models.py` честно отдаёт то, что стоит в колонке языка, и на
+`pick_lang` в `models.py` честно отдаёт то, что стоит в колонке языка, и на
 неизвестном языке отказывает — но против колонки, ЗАПОЛНЕННОЙ чужим языком, он
 бессилен: с его точки зрения данные в порядке. А отчёт печатает эти поля как
 есть (`engine/report.py`: `process_en`, `question_en`, `zone_name_en`), и
@@ -31,7 +31,8 @@ from .checklist import list_items, list_zones
 
 #: Язык → письменность, наличие которой означает «поле не на этом языке».
 #: Третий язык добавляется сюда строкой, а не правкой логики.
-FOREIGN_SCRIPT: dict[str, re.Pattern[str]] = {"en": re.compile(r"[Ѐ-ӿ]")}
+_CYRILLIC = re.compile(r"[Ѐ-ӿ]")
+FOREIGN_SCRIPT: dict[str, re.Pattern[str]] = {"en": _CYRILLIC, "tr": _CYRILLIC}
 
 
 @dataclass(frozen=True)

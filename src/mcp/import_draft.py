@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..db.models import ORIGIN_LEGACY
-from ..domain.models import Zone
+from ..domain.models import Zone, fallback_chain, lang_texts, localized
 from ..recognize.cues import Cue, load_cues, match_cues, match_zones
 from ..recognize.shortlist import MANUAL_ONLY
 from ..recognize.zone_words import zone_from_words
@@ -63,8 +63,7 @@ def _brief(criteria: str) -> str:
 
 
 def _question(row: dict[str, str], lang: str) -> str:
-    own, other = ("question_en", "question_ru") if lang == "en" else ("question_ru", "question_en")
-    return (row.get(own) or row.get(other) or "").strip()
+    return localized(row, "question", lang, fall_back=fallback_chain(lang)).strip()
 
 
 def _candidate(
@@ -160,8 +159,7 @@ def draft_from_store(
         справочник = [
             Zone(
                 code=r["code"].strip(),
-                title_ru=r.get("name_ru") or "",
-                title_en=r.get("name_en") or "",
+                title_texts=lang_texts(r, "name"),
                 share_pct=0.0,
             )
             for r in store_api.read_items(эталон, version=версия, what="zones")

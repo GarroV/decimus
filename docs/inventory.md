@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 226 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 229 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -169,13 +169,14 @@
 | `/prescriptions/files/<reply_id>` | GET | `order_file_legacy` | `src/web/prescriptions.py` |
 | `/quality` | GET | `quality` | `src/web/quality_page.py` |
 | `/ratings` | GET | `ratings` | `src/web/ratings.py` |
-| `/ratings/<any(rs,rko,clients,maps,agg,risk,compare,inspections):key>` | GET | `ratings_section` | `src/web/ratings.py` |
+| `/ratings/<any(overview,rs,rko,clients,maps,agg,risk,violations,compare,inspections):key>` | GET | `ratings_section` | `src/web/ratings.py` |
 | `/ratings/aggregators/absent` | POST | `aggregators_absent` | `src/web/aggregators_actions.py` |
 | `/ratings/aggregators/pin` | POST | `aggregators_pin` | `src/web/aggregators_actions.py` |
 | `/ratings/aggregators/present` | POST | `aggregators_present` | `src/web/aggregators_actions.py` |
 | `/ratings/aggregators/unpin` | POST | `aggregators_unpin` | `src/web/aggregators_actions.py` |
 | `/ratings/aggregators/update` | POST | `ratings_agg_update` | `src/web/ratings.py` |
 | `/ratings/countries` | POST | `ratings_developer` | `src/web/ratings.py` |
+| `/ratings/country/<code>/<any(overview,rs,rko,clients,maps,agg,risk,violations,compare,inspections):key>` | GET | `ratings_country` | `src/web/ratings.py` |
 | `/ratings/coverage` | GET | `ratings_coverage` | `src/web/ratings.py` |
 | `/ratings/coverage/link` | POST | `ratings_coverage_link` | `src/web/ratings.py` |
 | `/ratings/hard-rules` | POST | `ratings_rule_add` | `src/web/ratings.py` |
@@ -196,6 +197,8 @@
 | `/settings/confirm` | POST | `reauth_confirm_password` | `src/web/reauth.py` |
 | `/settings/confirm/google` | POST | `reauth_confirm_google` | `src/web/reauth.py` |
 | `/settings/continue` | POST | `settings_continue` | `src/web/settings_screen.py` |
+| `/settings/google-calendar` | POST | `settings_calendar_on` | `src/web/settings_screen.py` |
+| `/settings/google-calendar-off` | POST | `settings_calendar_off` | `src/web/settings_screen.py` |
 | `/settings/google-link` | POST | `settings_google_link` | `src/web/settings_screen.py` |
 | `/settings/google-unlink` | POST | `settings_google_unlink` | `src/web/settings_screen.py` |
 | `/settings/lang` | POST | `settings_lang` | `src/web/ui_lang.py` |
@@ -272,7 +275,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **82** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 7, letter — 2, move — 1, plan — 11, ratings — 2, ratings_read — 4, retraction — 1).
+Всего **83** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 7, letter — 2, move — 1, plan — 11, ratings — 2, ratings_read — 5, retraction — 1).
 
 | Инструмент | Вид | Класс | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|---|
@@ -354,6 +357,7 @@
 | `import_ratings` | ratings | write | Upload a ratings file into Decimus (standards and customer-experience ratings, IMF only) | `src/mcp/ratings_tools.py` |
 | `request_aggregators_update` | ratings | write | Запросить внеочередное обновление оценок пиццерий в агрегаторах доставки (Wolt, Glovo, Bolt Food, Yemeksepeti, Trendyol… | `src/mcp/ratings_tools.py` |
 | `aggregators_status` | ratings_read | read | Состояние сбора оценок в агрегаторах доставки: по каждому — когда был последний сбор, чем кончился (ok, failed или… | `src/mcp/ratings_read.py` |
+| `dodois_status` | ratings_read | read | Состояние подключений Dodo IS по странам: подключена ли страна, когда привязана, через кого, состояние и причина, когда… | `src/mcp/dodois_read.py` |
 | `ratings_summary` | ratings_read | read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
 | `ratings_unit_periods` | ratings_read | read | Разбивка одной пиццерии по периодам рейтинга РС и РКО — рейтингов Dodo из таблицы контроля «база рейтингов» и выгрузок… | `src/mcp/ratings_read.py` |
 | `ratings_units` | ratings_read | read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
@@ -392,7 +396,7 @@
 | `API_TOKEN_BY` | `tools/api_token.py` | да |
 | `ATTACHMENT_MAX_MB` | `src/db/config.py` | да |
 | `AUDITOR_NAMES` | `src/bot/config.py` | да |
-| `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 7 | да |
+| `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 8 | да |
 | `BACKUP_DIR` | `tools/state_backup.py` | да |
 | `BACKUP_KEEP_DAYS` | `tools/state_backup.py` | да |
 | `BOT_MCP_URL` | `src/bot/mcp_setup.py`, `tools/mcp_outside.py` | да |
@@ -401,6 +405,7 @@
 | `BOT_WALK_URL` | `src/bot/config.py` | да |
 | `BUILD_SHA` | `src/bot/version.py` | да |
 | `CHECKLIST_DIR` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
+| `CHECKLIST_FALLBACK_DIR` | `engine/audit.py`, `src/report/engine_call.py` | нет — подставляется кодом в окружение подпроцесса движка (src/report/engine_call.py) |
 | `COMPOSE_PROFILES` | `tools/mcp_healthcheck.py` | да |
 | `DATABASE_ADMIN_URL` | `src/db/migrate.py`, `tools/seed_web_demo.py` | да |
 | `DATABASE_APP_PASSWORD` | `src/db/migrate.py` | да |
@@ -422,8 +427,8 @@
 | `FRAMES_DIR` | `src/bot/frame_copies.py` | да |
 | `FURCA_NOTIFY_URL` | `src/notify/furca.py` | да |
 | `FURCA_SECRET` | `src/notify/furca.py` | да |
-| `GOOGLE_CLIENT_ID` | `src/web/google_auth.py` | да |
-| `GOOGLE_CLIENT_SECRET` | `src/web/google_auth.py` | да |
+| `GOOGLE_CLIENT_ID` | `src/gcal/client.py`, `src/web/google_auth.py` | да |
+| `GOOGLE_CLIENT_SECRET` | `src/gcal/client.py`, `src/web/google_auth.py` | да |
 | `GOOGLE_FRONT_REDIRECT_URI` | `src/web/google_auth.py` | да |
 | `GOOGLE_HQ_DOMAINS` | `src/web/google_auth.py` | да |
 | `GOOGLE_MAIL_REDIRECT_URI` | `src/web/google_mail.py` | да |
@@ -432,7 +437,7 @@
 | `LANDING_SHOTS_BASE` | `tools/landing_shots.py` | да |
 | `LANDING_SHOTS_WALK_BASE` | `tools/landing_shots.py` | да |
 | `LOG_ID_SALT` | `src/domain/log_ids.py` | да |
-| `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 2 | да |
+| `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 3 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_CONFIRM_SECRET` | `src/mcp/confirm.py` | да |
 | `MCP_FRONT_KEY` | `src/mcp/config.py` | да |
@@ -662,6 +667,9 @@
 | `0126_dodois_logins_delete.sql` | — |
 | `0127_maps_reviews.sql` | `maps.reviews`, `maps.reviews_sync` |
 | `0128_batch_letters.sql` | `batch_letters`, `batch_letter_inspections` |
+| `0129_calendar_deadline.sql` | `calendar_grants`, `calendar_events` |
+| `0130_close_invariants.sql` | — |
+| `0131_mailing_templates_lang.sql` | — |
 <!-- map:end -->
 
 ## Makefile

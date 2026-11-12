@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -243,9 +244,21 @@ def test_отказ_нет_другого_языка_не_запирает_ча�
     """Раньше 409 возвращался уже после занятия чата и запирал его до перезапуска."""
     клиент = завести(ui_lang="ru", speech_lang="ru")
     with monkeypatch.context() as m:
-        m.setattr(walk_translate, "TEXT_LANGS", ("ru",))
+        m.setattr(walk_translate, "SPEECH_LANGS", ("ru",))
         отказ = _перевести(клиент, text="Нагар на поду печи.")
 
     после = _перевести(клиент, text="Нагар на поду печи.")
 
     assert (отказ.status_code, после.status_code) == (409, 200), "чат остался занятым"
+
+
+def test_цель_перевода_язык_отчёта_если_он_не_язык_речи(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Язык отчёта выбран заранее — переводится на него; совпал с речью — другой язык речи."""
+    monkeypatch.setattr(walk_translate, "SPEECH_LANGS", ("ru", "en", "tr"))
+
+    def _проверка(speech: str, report: str) -> Any:
+        return SimpleNamespace(speech_lang=speech, report_lang=report)
+
+    assert walk_translate.translate_target(_проверка("ru", "tr")) == "tr"
+    assert walk_translate.translate_target(_проверка("ru", "ru")) == "en"
+    assert walk_translate.translate_target(_проверка("en", "en")) == "ru"

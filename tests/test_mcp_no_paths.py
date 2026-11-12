@@ -192,6 +192,7 @@ from src.mcp.errors import McpError
     "ratings_units": {},
     "ratings_unit_periods": {"unit": "Белград-1"},
     "aggregators_status": {},
+    "dodois_status": {},
     "list_inspections": {},
     "unit_history": {"unit": "Белград-1"},
     "network_summary": {},
@@ -373,6 +374,7 @@ from src.mcp.errors import McpError
     "ratings_units": {"limit": 0},
     "ratings_unit_periods": {"unit": "Белград-1", "rating_type": "xx"},
     "aggregators_status": {},
+    "dodois_status": {"country": "не страна"},
     "list_inspections": {"limit": 0},
     "unit_history": {"unit": "   "},
     "network_summary": {"date_from": "2026-09-02", "date_to": "2026-09-01"},
@@ -671,6 +673,7 @@ def test_батарея_доходит_и_до_успешных_ответов(�
             "save_inspection_letter",
             "save_batch_letter",
             "batch_letter",
+            "dodois_status",
         }
     )
     assert len(успешные) >= len(TOOLS) - без_базы, "успешных ответов слишком мало для утверждения"

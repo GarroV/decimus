@@ -68,6 +68,9 @@ MAP_SUFFIXES = (".py", ".sh", ".ps1")
 #: Новая запись без причины — не запись: тест требует понятной строки.
 ENV_ALLOWLIST: dict[str, str] = {
     "CHECKLIST_DIR": "подставляется кодом в окружение подпроцесса движка (src/domain/engine.py)",
+    "CHECKLIST_FALLBACK_DIR": (
+        "подставляется кодом в окружение подпроцесса движка (src/report/engine_call.py)"
+    ),
     "INSPECTION_FILE": "подставляется кодом в окружение подпроцесса движка (src/domain/engine.py)",
     "WALK_MOCKUP_ZONES": "ручной рычаг сборки макета (tools/walk_mockup/build.py), не настройка",
 }

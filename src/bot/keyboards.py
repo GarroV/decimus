@@ -23,6 +23,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from src.domain import INSPECTION_KINDS
 from src.domain import kind_title as domain_kind_title
 from src.domain.errors import ValidationError
+from src.domain.models import REPORT_LANGS, SPEECH_LANGS
 
 from .errors import BotTextError
 from .info import KIND_YES_NO
@@ -38,17 +39,22 @@ from .texts import UI_LANGS, t
 #: методики, а не интерфейса.
 KIND_TITLES = INSPECTION_KINDS
 
-#: Код кнопки языка отчёта = сам код языка методики (`ru`/`en`, `domain.models.TEXT_LANGS`).
+#: Код кнопки языка отчёта = сам код языка методики (`ru`/`en`, `domain.models.SPEECH_LANGS`).
 #: Второй копии не нужно: то, что летит в `callback_data`, и есть значение параметра.
 #:
 #: Надписи здесь не переводятся и переводиться не должны: язык называют на нём
 #: самом. «Русский» в английском интерфейсе ищет глазами тот, кому он нужен, а
 #: «Russian» — никто. Это тот редкий случай, когда строка мимо каталога не
 #: дефект: перевода у неё нет по существу.
-LANG_LABELS: dict[str, str] = {
+LANG_NAMES: dict[str, str] = {
     "ru": "Русский",
     "en": "English",
+    "tr": "Türkçe",
 }
+#: Языки РЕЧИ аудитора (`SPEECH_LANGS`): на турецком он не говорит, его здесь нет.
+LANG_LABELS: dict[str, str] = {code: LANG_NAMES[code] for code in SPEECH_LANGS}
+#: Языки ОТЧЁТА (`REPORT_LANGS`, #1619): на турецком отчёт печатается, а проверка не ведётся.
+REPORT_LANG_LABELS: dict[str, str] = {code: LANG_NAMES[code] for code in REPORT_LANGS}
 
 
 NEW_INSPECTION_CALLBACK = "start:new"
@@ -157,7 +163,7 @@ def _langs_keyboard(prefix: str) -> InlineKeyboardMarkup:
 
 
 def speech_lang_keyboard() -> InlineKeyboardMarkup:
-    """Язык проверки (речи аудитора) — коды методики (`domain.models.TEXT_LANGS`)."""
+    """Язык проверки (речи аудитора) — коды методики (`domain.models.SPEECH_LANGS`)."""
     return _langs_keyboard(SPEECH_LANG_PREFIX)
 
 
@@ -166,7 +172,7 @@ def report_lang_keyboard(codes: Sequence[str]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for code in codes:
         builder.button(
-            text=LANG_LABELS.get(code, code), callback_data=f"{REPORT_LANG_PREFIX}{code}"
+            text=REPORT_LANG_LABELS.get(code, code), callback_data=f"{REPORT_LANG_PREFIX}{code}"
         )
     builder.adjust(1)
     return builder.as_markup()

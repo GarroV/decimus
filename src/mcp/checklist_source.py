@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..domain.models import REPORT_LANGS
 from . import checklist as store_api
 from .checklist import Store
 
@@ -39,10 +40,8 @@ from .checklist import Store
     "id",
     "kind",
     "process_code",
-    "process_ru",
-    "process_en",
-    "question_ru",
-    "question_en",
+    *(f"process_{код}" for код in REPORT_LANGS),
+    *(f"question_{код}" for код in REPORT_LANGS),
     "levels",
     "zones",
     "days",
@@ -50,7 +49,7 @@ from .checklist import Store
 
 #: Поля зоны: код, название и доля зоны в оценке. Доля — часть эталона, а не
 #: внутренняя механика: по ней считается вычет, который партнёр видит в отчёте.
-ПОЛЯ_ЗОНЫ: tuple[str, ...] = ("code", "name_ru", "name_en", "share_pct")
+ПОЛЯ_ЗОНЫ: tuple[str, ...] = ("code", *(f"name_{код}" for код in REPORT_LANGS), "share_pct")
 
 
 def _пункт(строка: dict[str, str]) -> dict[str, Any]:
@@ -89,7 +88,7 @@ def checklist_source(
         строки = [
             r
             for r in строки
-            if отбор in (r.get("process_ru", "") + r.get("process_en", "")).lower()
+            if отбор in "".join(r.get(f"process_{код}", "") for код in REPORT_LANGS).lower()
         ]
     зоны = store_api.read_items(store, version=выбранная, what="zones")
     return {

@@ -24,7 +24,7 @@ from psycopg.types.json import Json
 from src.domain import get_state
 from src.domain import score as domain_score
 from src.domain.errors import ChecklistVersionMismatch, DomainError
-from src.domain.models import Finding, Inspection, Score
+from src.domain.models import REPORT_LANGS, Finding, Inspection, Score
 from src.domain.tenants import HQ_TENANT
 
 from .config import check_environment
@@ -139,13 +139,19 @@ def _parse_date(raw: str, *, chat_id: int) -> date:
         ) from exc
 
 
+def _flat_names(payload: dict[str, Any]) -> dict[str, Any]:
+    """`name_texts` → ключи `name_<яз>`: в базе формат прежний, его читают запросы."""
+    texts = payload.pop("name_texts")
+    return {**payload, **{f"name_{lang}": text for lang, text in texts.items()}}
+
+
 def _by_zone_payload(score: Score) -> dict[str, object]:
-    return {code: asdict(zone) for code, zone in score.by_zone.items()}
+    return {code: _flat_names(asdict(zone)) for code, zone in score.by_zone.items()}
 
 
 def _by_process_payload(score: Score) -> dict[str, object]:
     """Разбивка по процессам, как её вернул движок (D507): переносится, не считается."""
-    return {key: asdict(process) for key, process in score.by_process.items()}
+    return {key: _flat_names(asdict(process)) for key, process in score.by_process.items()}
 
 
 def _tenant_code(inspection: Inspection) -> str:
@@ -447,7 +453,8 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
 
         _push_info(cur, inspection, inspection_id=inspection_id)
 
-        for lang, label in (("ru", result.label_ru), ("en", result.label_en)):
+        for lang in REPORT_LANGS:
+            label = result.label(lang)
             if label:
                 cur.execute(
                     _INSERT_TRANSLATION_SQL,

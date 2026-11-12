@@ -27,10 +27,23 @@ AGG = "agg"
 RISK = "risk"
 COMPARE = "compare"
 INSPECTIONS = "inspections"
+OVERVIEW = "overview"
+VIOLATIONS = "violations"
 
 #: Разделы в порядке подменю.
-SECTIONS: tuple[str, ...] = (RS, RKO, CLIENTS, MAPS, AGG, RISK, COMPARE, INSPECTIONS)
-DEFAULT = RS
+SECTIONS: tuple[str, ...] = (
+    OVERVIEW,
+    RS,
+    RKO,
+    CLIENTS,
+    MAPS,
+    AGG,
+    RISK,
+    VIOLATIONS,
+    COMPARE,
+    INSPECTIONS,
+)
+DEFAULT = OVERVIEW
 #: Видны только УК (D551): партнёру чужие страны и девелоперов не показываем.
 HQ_ONLY = frozenset({COMPARE})
 
@@ -77,6 +90,10 @@ def items(
     rows: tuple[fresh.Row, ...],
     inspections: bool = False,
     clients_status: str | None = None,
+    scope: str | None = None,
+    actual_period: str | None = None,
+    period_context: str | None = None,
+    violation_kind: str = RS,
 ) -> tuple[Item, ...]:
     """Подменю для вошедшего: пункты, адреса с текущим отбором, точки свежести."""
     result = []
@@ -86,7 +103,20 @@ def items(
             Item(
                 key=key,
                 title=t(f"ratings.sec.{key}", lang),
-                href=section_url(root, key, selection, lang),
+                href=section_url(
+                    root,
+                    key,
+                    selection,
+                    lang,
+                    **({"scope": scope} if scope else {}),
+                    **(
+                        {"actual_period": key if key in (RS, RKO) else actual_period}
+                        if actual_period
+                        else {}
+                    ),
+                    **({"period_context": period_context} if period_context else {}),
+                    **({"kind": violation_kind} if key == VIOLATIONS else {}),
+                ),
                 current=key == current,
                 dot=status,
                 dot_word=t(f"ratings.fresh.word.{status}", lang) if status else "",

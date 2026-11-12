@@ -51,6 +51,7 @@ from .letters import (
     _template,
     _verify,
     _wording_langs,
+    current_edition,
     refuse_uploaded,
     state_json,
 )
@@ -214,6 +215,7 @@ def piece_for(detail: InspectionDetail, *, lang: str, papers: Papers) -> Piece:
                 ["letter-parts", f"--lang={lang}"],
                 data_dir=каталог,
                 state=состояние,
+                fallback=current_edition(detail, papers),
             )
             if код != 0:
                 raise LetterError(

@@ -44,7 +44,7 @@ from .errors import (
 )
 from .kinds import kind_title
 from .measurement_sets import read_sets
-from .models import SOURCES, TEXT_LANGS, Finding, InfoAnswer, Inspection, Suggestion
+from .models import REPORT_LANGS, SOURCES, Finding, InfoAnswer, Inspection, Suggestion
 from .tenants import HQ_TENANT, canonical_tenant
 from .timing import duration_seconds, parse_timestamp, utc_now
 
@@ -621,9 +621,10 @@ def start_inspection(
     # без слова на этом языке шапку не заполнить, а отказ «вид проверки не
     # заведён на языке sr» объясняет человеку не то, что он сделал не так.
     lang = report_lang.strip().lower()
-    if lang not in TEXT_LANGS:
+    if lang not in REPORT_LANGS:
         raise ValidationError(
-            f"Язык отчёта «{report_lang}» в методике не заведён. Доступны: {', '.join(TEXT_LANGS)}"
+            f"Язык отчёта «{report_lang}» в методике не заведён. "
+            f"Доступны: {', '.join(REPORT_LANGS)}"
         )
     # Вид проверки уезжает движку КОДОМ, а не словом (T177): слово, записанное
     # в шапку при заведении, невозможно перевести при печати на другом языке —
@@ -724,16 +725,16 @@ def set_report_lang(chat_id: int, lang: str) -> Inspection:
     Свободный текст проверки при этом не переводится (D416): формулировки
     остаются на языке чек-листа, а на это в отчёте есть пометка.
 
-    Язык вне `TEXT_LANGS` — отказ ДО движка, по той же причине, что и на старте:
+    Язык вне `REPORT_LANGS` — отказ ДО движка, по той же причине, что и на старте:
     без слова на этом языке шапку не заполнить.
     """
     from .handover import guard_writable  # handover сам читает `state_lock` отсюда
 
     guard_writable(chat_id)
     code = lang.strip().lower()
-    if code not in TEXT_LANGS:
+    if code not in REPORT_LANGS:
         raise ValidationError(
-            f"Язык отчёта «{lang}» в методике не заведён. Доступны: {', '.join(TEXT_LANGS)}"
+            f"Язык отчёта «{lang}» в методике не заведён. Доступны: {', '.join(REPORT_LANGS)}"
         )
     settings = check_environment()
     current = read_state(chat_id, settings)

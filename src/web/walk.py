@@ -34,7 +34,7 @@ from typing import Any
 from flask import Flask, Response, g, jsonify, render_template, request
 
 from src.bot.config import BotSettings
-from src.bot.keyboards import LANG_LABELS
+from src.bot.keyboards import REPORT_LANG_LABELS
 from src.db import finish_modes, queries
 from src.db.errors import DbError
 from src.db.models import PreviousFindings
@@ -359,7 +359,7 @@ def walk_payload(
         # Языки отчёта нужны только режиму «Сразу отчёт» (D449): подтверждение
         # в приложении предлагает их пилюлями. Остальным справочник не читаем.
         out["report_langs"] = [
-            {"code": code, "label": LANG_LABELS.get(code, code)}
+            {"code": code, "label": REPORT_LANG_LABELS.get(code, code)}
             for code in walk_finish.offered_report_langs(chat_id)
         ]
     return out

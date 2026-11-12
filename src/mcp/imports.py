@@ -43,7 +43,7 @@ from ..db.models import ORIGIN_IMPORT, ORIGIN_LEGACY
 from ..domain import repeat_rule
 from ..domain.auditor_name import spell_name
 from ..domain.kinds import INSPECTION_KINDS
-from ..domain.models import TEXT_LANGS
+from ..domain.models import REPORT_LANGS
 from . import import_modes as modes
 from .checklist_layout import Store
 from .db_target import config_refusal
@@ -339,8 +339,8 @@ def import_create_inspection(
     точка = _required(unit, field="unit", limit=MAX_UNIT)
     if kind not in INSPECTION_KINDS:
         raise ToolError(f"Вид проверки kind — один из: {', '.join(INSPECTION_KINDS)}")
-    if report_lang not in TEXT_LANGS:
-        raise ToolError(f"Язык отчёта report_lang — один из: {', '.join(TEXT_LANGS)}")
+    if report_lang not in REPORT_LANGS:
+        raise ToolError(f"Язык отчёта report_lang — один из: {', '.join(REPORT_LANGS)}")
     язык_слов = report_lang if text_lang is None else text_lang.strip().lower()
     if not _LANG.match(язык_слов):
         raise ToolError("text_lang — код языка из двух латинских букв (ru, en, sr …)")

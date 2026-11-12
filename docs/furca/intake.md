@@ -105,7 +105,7 @@
 
 | есть? | что именно | имя переменной | где значение | смоук-команда | результат |
 |---|---|---|---|---|---|
-| да | VPS Contabo, Linux/Docker, `/srv/decimus`, текущая площадка по `docs/08-deploy.md` §8 (домашний сервер ниже — историческое состояние сентября) | — | SSH alias `contabo`, окружение `/srv/decimus/.env` | `ssh contabo 'cd /srv/decimus && git rev-parse --short HEAD && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f compose.edge.yaml ps'` | ✅ 30.10.2026: правило планов и Информация 12c3b379; web/bot/mcp/walk/db/storage-live healthy, BUILD_SHA приложений совпадает, внешний HTTP-смоук прошёл |
+| да | VPS Contabo, Linux/Docker, `/srv/decimus`, текущая площадка по `docs/08-deploy.md` §8 (домашний сервер ниже — историческое состояние сентября) | — | SSH alias `contabo`, окружение `/srv/decimus/.env` | `ssh contabo 'cd /srv/decimus && git rev-parse --short HEAD && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f compose.edge.yaml ps'` | ✅ 11.11.2026: новые экраны D746/D747, prod и demo e2d3301f; production6healthy, четыре BUILD_SHA совпадают, внешний HTTP-смоук и live-проверки пройдены |
 
 **Что уже живёт на площадке (выяснено смоуком, не со слов):** площадка не пустая — на ней работает около двух десятков контейнеров других проектов. Часть популярных портов занята, в том числе два порта Postgres, проброшенных наружу; свободные порты подобраны отдельно. Бэкапы Postgres идут по расписанию ночью, ретеншн две недели. **Ничего чужого не трогаем**: свои контейнеры получают собственный префикс проекта, свою папку и свободные порты.
 
@@ -113,7 +113,7 @@
 
 | есть? | что именно | имя переменной | где значение | смоук-команда | результат |
 |---|---|---|---|---|---|
-| нет | своя база не поднята; чужие базы на площадке нам не принадлежат | `DATABASE_URL` | нет | `psql "$DATABASE_URL" -c 'select 1'` | ❌ |
+| да | PostgreSQL 16 проекта Decimus на VPS, существующая production-база | `DATABASE_URL` | `/srv/decimus/.env`, значение не публикуется | `docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select 1"'` | ✅ 11.11.2026: 1; db healthy |
 
 В MVP база не обязательна: состояние проверки — файл на чат (`docs/06-mvp-bot.md`). Поднимается на этапе веба; кандидат порта наружу — `5442` (`5433` и `5440` заняты).
 
@@ -121,7 +121,7 @@
 
 | есть? | что именно | имя переменной | где значение | смоук-команда | результат |
 |---|---|---|---|---|---|
-| нет | боту на long polling домен не нужен. Понадобится примерно через месяц под веб | — | — | `curl -fsS https://<адрес>/healthz` | не проверялось |
+| да | постоянный Worker-адрес админки по `docs/08-deploy.md` | `ORIGIN_HOST` | `/srv/decimus/.env` | `curl -fsS -o /dev/null -w "%{http_code}" https://decimus.vasiliy-garro.workers.dev/login` | ✅ 11.11.2026: 200 |
 
 ### E5. Сторонние API
 

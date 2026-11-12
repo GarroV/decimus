@@ -54,12 +54,12 @@ from ..domain.config import DATA_FILES
 from ..domain.edition import SHELF_DIR, shelf_dirs
 from ..domain.geo import CITIES
 from ..domain.kinds import kind_title
-from ..domain.models import TEXT_LANGS
+from ..domain.models import REPORT_LANGS
 from ..domain.version import compose, edition_of
 from .engine_call import AUDIT_SCRIPT as AUDIT_SCRIPT
 from .engine_call import ENGINE_TIMEOUT_SEC as ENGINE_TIMEOUT_SEC
+from .engine_call import FALLBACK_DIR_VAR, EngineCallError, current_edition_dir, edition_dirs
 from .engine_call import VERSIONS_DIR as VERSIONS_DIR
-from .engine_call import EngineCallError, edition_dirs
 from .engine_call import check_version as _check_version
 from .engine_call import clean as _clean
 from .engine_call import to_log as _log_paths_common
@@ -257,7 +257,28 @@ def version_of(data_dir: Path) -> str:
     return compose(data_dir, DATA_FILES)
 
 
-def _run(script: Path, args: list[str], *, data_dir: Path, state: Path) -> tuple[int, str, str]:
+def current_edition(detail: InspectionDetail, papers: Papers) -> Path | None:
+    """Действующее издание чек-листа этой проверки: откуда движок берёт недостающий перевод.
+
+    Методика проверки печатается по её собственному изданию, а слов на языке печати в нём
+    может не быть (турецкий добавили позже). Тогда движок ищет ту же строку по коду в
+    действующем издании, затем берёт английский (`engine/audit.py: resolve_text`). Оценку
+    это не касается: считается она только по изданию проверки.
+    """
+    запись = detail.inspection
+    return current_edition_dir(
+        papers.store, papers.live, tenant=запись.tenant_code, code=запись.checklist_code
+    )
+
+
+def _run(
+    script: Path,
+    args: list[str],
+    *,
+    data_dir: Path,
+    state: Path,
+    fallback: Path | None = None,
+) -> tuple[int, str, str]:
     """Запустить скрипт движка над указанной методикой и состоянием.
 
     Отдельно от `checklist._run` намеренно, и разница ровно одна: там вывод
@@ -271,6 +292,10 @@ def _run(script: Path, args: list[str], *, data_dir: Path, state: Path) -> tuple
     env = dict(os.environ)
     env["CHECKLIST_DIR"] = str(data_dir)
     env["INSPECTION_FILE"] = str(state)
+    if fallback is not None:
+        env[FALLBACK_DIR_VAR] = str(fallback)
+    else:
+        env.pop(FALLBACK_DIR_VAR, None)
     # Кэш байткода в чужом каталоге движку не нужен, а рядом с методикой он
     # выглядел бы файлом методики.
     env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -295,9 +320,9 @@ def _lang(detail: InspectionDetail, asked: str | None) -> str:
     if asked is None:
         return detail.inspection.report_lang
     value = asked.strip().lower()
-    if value not in TEXT_LANGS:
+    if value not in REPORT_LANGS:
         raise LetterError(
-            f"Язык письма «{asked}» в методике не заведён. Доступны: {', '.join(TEXT_LANGS)}. "
+            f"Язык письма «{asked}» в методике не заведён. Доступны: {', '.join(REPORT_LANGS)}. "
             f"Движок на незнакомый язык молча собирает письмо по-русски — и отправитель "
             f"узнал бы об этом от партнёра"
         )
@@ -791,13 +816,14 @@ def _letter_key(
     каталог: Path,
     шаблон: int,
     тексты: str = "",
+    перевод: Path | None = None,
 ) -> str:
     # Записанная оценка — в ключе: её сверяет `_verify`, и расхождение с движком
     # обязано всплыть отказом на каждом показе, а не только на первом.
     оценка = f"{detail.inspection.pct}\0{detail.inspection.grade}"
     # Сохранённые тексты — в ключе: правка шаблона в админке меняет письмо сразу.
     return hashlib.sha256(
-        f"{каталог}\0{язык}\0{шаблон}\0{оценка}\0{тексты}\0{вход}".encode()
+        f"{каталог}\0{перевод}\0{язык}\0{шаблон}\0{оценка}\0{тексты}\0{вход}".encode()
     ).hexdigest()
 
 
@@ -815,6 +841,7 @@ def _letter_text(
     каталог: Path,
     шаблон: int,
     тексты: str = "",
+    перевод: Path | None = None,
 ) -> tuple[str, tuple[str, ...]]:
     """Текст письма и роли обратной связи, не вставленные из-за языка (D663).
 
@@ -822,7 +849,9 @@ def _letter_text(
     JSON-ом: рядом с текстом идёт перечень не вставленного, и он обязан доехать
     до отправителя вместе с текстом, а не потеряться на stderr подпроцесса.
     """
-    ключ = _letter_key(вход, detail, язык=язык, каталог=каталог, шаблон=шаблон, тексты=тексты)
+    ключ = _letter_key(
+        вход, detail, язык=язык, каталог=каталог, шаблон=шаблон, тексты=тексты, перевод=перевод
+    )
     with _letters_lock:
         if ключ in _letters:
             _letters.move_to_end(ключ)
@@ -841,6 +870,7 @@ def _letter_text(
             аргументы,
             data_dir=каталог,
             state=состояние,
+            fallback=перевод,
         )
         if код != 0:
             raise LetterError(
@@ -965,6 +995,7 @@ def build(
         каталог=каталог,
         шаблон=шаблон,
         тексты=_bodies_json((bodies or {}).get(язык)),
+        перевод=current_edition(detail, papers),
     )
     не_восстановлено = [
         *шапки_нет,

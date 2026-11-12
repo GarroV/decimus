@@ -125,7 +125,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_scope,ratings_trends,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -181,7 +181,9 @@ Flask-приложение управляющей компании и партн
 | `src/web/ratings_nav.py` | Разделы «Рейтингов» и подменю в общей навигации (D660) |
 | `src/web/ratings_platforms.py` | Разделы «Агрегаторы» и «Карты» (D660): охват пиццерий площадками |
 | `src/web/ratings_risk.py` | Плитка «Стабильно ниже порога» (D658): собирает источники и отдаёт общий список |
+| `src/web/ratings_scope.py` | D746: one saved personal country preference shared with the Countries screen |
 | `src/web/ratings_sheet.py` | Блок «Таблица контроля» на «Загрузках»: когда забирали, чем кончилось, кнопка (D464) |
+| `src/web/ratings_trends.py` | Small rating histories as geometry and adjacent changes, without grading |
 | `src/web/ratings_words.py` | Периоды и месяцы раздела «Рейтинги» словами, а не ключами (`2026-Q3`, `2026-10`) |
 | `src/web/registry_period.py` | Период реестра проверок: «с — по» по дате обхода |
 | `src/web/registry_view.py` | Реестр проверок: отбор строк и подписи периода — без прав и без оценок |
@@ -200,7 +202,7 @@ Flask-приложение управляющей компании и партн
 «Подключения» (состояние подключений, D638) и «Ключи и API» (ключи сервисов и ключи API, D650), подключение
 Claude входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,peek,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,calendar_connect,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,peek,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -209,6 +211,7 @@ Claude входом через сайт (OAuth).
 | `src/web/admin_health.py` | Блок «Состояние подключений» вкладки «Подключения» (D638, #1251): строки и итог |
 | `src/web/administration.py` | Раздел «Администрирование» (D639, #1251): все настройки сервиса, вкладки по роли |
 | `src/web/auth.py` | Вход в админку: форма, сессия в подписанной куке, выход (T323, D155) |
+| `src/web/calendar_connect.py` | Подключить и отключить Google Календарь из «Настроек» (D740, D741, #1590) |
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
 | `src/web/connections_screen.py` | Вкладки «Подключения» и «Ключи и API» раздела «Администрирование» (D638, D639, D650) |
 | `src/web/demo_entry.py` | Вход в открытое демо (D524): выбор роли и сессия без пароля — только на стенде демо |
@@ -374,7 +377,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/peek/` | 2 | _switch.html, readonly.html |
 | `src/web/templates/prescriptions/` | 1 | not_found.html |
 | `src/web/templates/quality/` | 1 | index.html |
-| `src/web/templates/ratings/` | 10 | _macros.html, _period.html, _s_agg.html, _s_clients.html, _s_compare.html, _s_maps.html, _s_risk.html, _s_source.html, … (+2) |
+| `src/web/templates/ratings/` | 15 | _macros.html, _period.html, _period_tiles.html, _s_agg.html, _s_clients.html, _s_compare.html, _s_maps.html, _s_overview.html, … (+7) |
 | `src/web/templates/settings/` | 5 | _ai.html, confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
@@ -385,7 +388,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 80 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+72) |
+| `src/web/static/` | 84 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+76) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->
@@ -399,10 +402,11 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{batch_letters,checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
+<!-- map:begin files src/db/{batch_letters,calendar_store,checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/batch_letters.py` | D739 (#1579): общее письмо партнёру по нескольким проверкам, зафиксированное человеком |
+| `src/db/calendar_store.py` | Доступ человека к Google Календарю и события срока отчёта в базе (D740, D741, #1590) |
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
 | `src/db/config.py` | Окружение блока: где Postgres |
 | `src/db/database_target.py` | Куда ведёт строка подключения — и все ли подключения ведут в одну базу (#487) |
@@ -465,7 +469,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,maps_reviews_store,model_key,model_usage,walk_log,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,maps_reviews_store,model_key,model_usage,walk_log,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_violations,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -505,6 +509,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/ratings.py` | Запись рейтингов РС/РКО: журнал загрузок и строки схемы `ratings` (0039) |
 | `src/db/ratings_read.py` | Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039) |
 | `src/db/ratings_sync.py` | Забор общей таблицы контроля: состояние по листам и заявки «Забрать сейчас» (D464) |
+| `src/db/ratings_violations.py` | D746: scoped source rows for ratings violations, without writes or photo claims |
 | `src/db/second_factor.py` | Вторая ступень входа (D463, `0068`): хранение и одноразовые переходы |
 | `src/db/secret_crypto.py` | Шифрование секретов, которые лежат в базе (D491): AES-256-GCM, ключ — вне базы |
 | `src/db/service_keys.py` | Ключи внешних сервисов из базы (D576, обобщение ключа модели D491) |
@@ -655,6 +660,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0126_dodois_logins_delete.sql` | Отключение страны от Dodo IS (#1551): главный админ снимает вход страны на вкладке «Dodo IS» |
 | `0127_maps_reviews.sql` | Оценки на картах поштучно (D732, D733, #1562): карта в «Качестве» считается по оценкам, поставленным за месяц, а не по общей оценке карточки на конец месяца |
 | `0128_batch_letters.sql` | D739 (#1579): общее письмо партнёру по нескольким проверкам одной страны, зафиксированное человеком |
+| `0129_calendar_deadline.sql` | D740, D741 (#1590): срок отчёта по проверке УК — событием в Google Календаре проверяющего |
+| `0130_close_invariants.sql` | Три красных инварианта базы на main (проверки `test_db_definer_search_path` и `test_db_space_isolation`), закрываются новым файлом: применённые `0123` и `0128` заморожены |
+| `0131_mailing_templates_lang.sql` | Язык шаблона письма больше не пара `ru`/`en` (#541, #1619): список языков отчёта живёт в коде (`src/domain/models.py: REPORT_LANGS`), и третий язык не должен упираться в… |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -681,6 +689,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/mcp/config.py` | Окружение MCP-сервера: чей токен, чьи проверки, на каком адресе слушать |
 | `src/mcp/confirm.py` | Двухшаговое подтверждение опасных инструментов MCP (F-130, #1006) |
 | `src/mcp/db_target.py` | Непригодное окружение базы — «не задано» или «ведёт не туда» (#521) |
+| `src/mcp/dodois_read.py` | Состояние подключений Dodo IS по странам через Claude: `dodois_status` (только чтение) |
 | `src/mcp/errors.py` | Отказы блока `mcp` |
 | `src/mcp/import_batch.py` | `import_add_findings`: пакетная запись подтверждённых находок (#1017) |
 | `src/mcp/import_catalogue.py` | Каталог инструментов загрузки проверок задним числом (D305–D310, D332–D335): описания для агента |
@@ -695,6 +704,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/mcp/info_part.py` | Информационная часть записанной проверки в карточке чтения (T207) |
 | `src/mcp/install.py` | Скрипт установки, который сервер отдаёт по публичному GET (#244, D112) |
 | `src/mcp/instructions.py` | Текст `instructions` рукопожатия MCP: как вести загрузку проверки (#1018) |
+| `src/mcp/lang_fields.py` | Поля «<поле>_<язык>» инструментов правки методики: набор языков берётся из `REPORT_LANGS` |
 | `src/mcp/letter_save.py` | Инструмент «сохранить письмо партнёру в проверку» (D665) — тот же путь, что у сайта |
 | `src/mcp/letters.py` | Письмо партнёру по записанной проверке — для протокола MCP |
 | `src/mcp/methodologies.py` | Какими методиками оценены проверки ряда — справка, а не запрет (D365) |
@@ -734,6 +744,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/albums.py` | Склейка альбома по `media_group_id` в один материал (задача T054) |
 | `src/bot/app.py` | Сборка бота: диспетчер, роутеры, доступ, запуск (задача T050) |
 | `src/bot/auditor.py` | Имя проверяющего по Telegram ID (задача T063, решение D032) |
+| `src/bot/calendar_loader.py` | Событие срока отчёта в календаре проверяющего — фоновая сводка (D740, D741, #1590) |
 | `src/bot/config.py` | Окружение бота: токен, кому отвечать, как запускаться |
 | `src/bot/dates.py` | Разбор даты из живой фразы аудитора — перенесён в домен (`src/domain/dates.py`) |
 | `src/bot/dodois_loader.py` | Входы в Dodo IS по странам: ночью продлевает, раз в час проверяет «открыто X из Y» (D640b) |
@@ -808,6 +819,19 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/routers/stops.py` | `/stops` — счётчик отказов мастера за период, только админам (#436) |
 | `src/bot/routers/unit.py` | «Сменить пиццерию» посреди обхода (D628): если проверку завели не на ту точку |
 | `src/bot/routers/version.py` | Команда «какая это сборка» (T246, #201) |
+<!-- map:end -->
+
+
+## Google Календарь: срок отчёта (`src/gcal/`)
+
+Событие срока отчёта в календаре проверяющего (`docs/39-calendar-deadline.md`, D740, D741): клиент Google, сводка календаря с проверками, отключение. Расписание — `src/bot/calendar_loader.py`, согласие — `src/web/calendar_connect.py`, хранение — `src/db/calendar_store.py`, правило срока — `src/domain/report_deadline.py`.
+
+<!-- map:begin files src/gcal/*.py -->
+| Файл | Что делает |
+|---|---|
+| `src/gcal/client.py` | Разговор с Google Календарём: продление доступа, события, отзыв ключа |
+| `src/gcal/grant.py` | Отключить календарь: убрать события, отозвать ключ у Google, стереть у себя (D741, #1590) |
+| `src/gcal/sync.py` | Событие срока отчёта в календаре проверяющего: свести календарь с проверками (D740, #1590) |
 <!-- map:end -->
 
 ## src/learning — обучение из iSpring
@@ -912,9 +936,11 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/ratings/sheet.py` | Лист «Качество по пиццериям» таблиц контроля (`sheet-scores`, D324) |
 | `src/ratings/sheet_sync.py` | Забор общей таблицы контроля «база рейтингов» самим decimus (D464) |
 | `src/ratings/snapshot.py` | Снимок рейтинга Dodo IS (JSON) — то, что Claude собирает в браузере сотрудника |
+| `src/ratings/source_periods.py` | D746: actual source windows, with the same per-unit fallback as Quality |
 | `src/ratings/summary.py` | Расчёты сводки рейтингов (D324): чистые функции над уже прочитанными фактами |
 | `src/ratings/svod.py` | «Свод пиццерий» девелопмента → справочник `unit_profiles` (D374–D376) |
 | `src/ratings/units_view.py` | Оценки пиццерий одним списком: РС, РКО, карта и агрегаторы (D420) |
+| `src/ratings/violations_view.py` | D746 violation analytics: one case denominator and the same scoped drilldown |
 <!-- map:end -->
 
 ### Агрегаторы доставки
@@ -997,6 +1023,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
 | `src/domain/quality.py` | Расчёты страницы «Качество» (docs/21-quality.md): средние КР, карт и агрегаторов, доли заказов, веса и итоговый рейтинг по методике аналитика (D719) |
 | `src/domain/repeat_rule.py` | Правило «пункт уже был нарушением в прошлой проверке» (D191, D255) |
+| `src/domain/report_deadline.py` | Срок отправки отчёта партнёру и название события в календаре проверяющего (D740) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
 | `src/domain/revision.py` | Отпечаток состояния проверки: поймать правку между «увидел» и «запечатал» |
 | `src/domain/revisions.py` | Stable record identity shared by manual edits and human splits |
@@ -1156,6 +1183,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/space.py` | Пространства и их страны: завести, привязать к странам, перечислить |
 | `tools/state_backup.py` | Бэкап тома состояния стенда (`STATE_DIR`) в каталог бэкапа (задача #233) |
 | `tools/storage_reconcile.py` | Сверка хранилища файлов с таблицами — экшн-планы и предписания (#496) |
+| `tools/translate_methodology.py` | Перевод методики на язык отчёта: новое издание с заполненными колонками `*_<язык>` (#1619) |
 | `tools/unit_canon.py` | Справочник пиццерий к каноническим именам «Город-N» по-английски (D233, #440) |
 | `tools/units.py` | Справочник точек сети: загрузка с сайтов стран и заведение руками |
 | `tools/units_normalize.py` | Привести справочник пиццерий `units` к эталону `unit_profiles` (#316, #909) |
@@ -1222,7 +1250,7 @@ Telegram, ни HTTP, ни SQL.
 | Подключить агрегатор доставки | Модуль в `src/ratings/aggregators/` по образцу `wolt.py` (поиск у координат) или `glovo.py` (известная точка), затем строка в `SEARCHERS` или `KNOWN` в `collect.py`; описание — `docs/17-aggregators.md` |
 | Метод API чтения для Swarm | Адрес и право — `src/web/swarm_api.py`, сборка ответа — `src/web/api_feed.py`, чтение — `src/db/swarm_read.py`, `src/ratings/feed.py`; права ключей — `src/db/api_access.py`; контракт — `docs/31-swarm-api.md`, «API чтения для Swarm» |
 | Новая переменная окружения | Читается в `config.py` своего блока (`src/<блок>/config.py`) с понятным отказом на мусор; впишите в `.env.example` с комментарием — тест `tests/test_docs_map.py` требует; `make map` обновит `docs/inventory.md` |
-| Добавить язык интерфейса или отчёта | Интерфейс — языки в `src/web/texts*.py` и `src/bot/texts.py` (тесты требуют полноты по каждому языку); языки отчёта по странам — данные в `src/domain/report_langs.py`; формулировки методики — таблица `translations` (миграция `0001`) |
+| Добавить язык интерфейса или отчёта, выгрузить проверку на другом языке | `docs/40-languages.md` — какие бывают языки, где зашита пара ru/en, что переводится словарём, а что моделью, порядок добавления |
 | Роль «администратор истории»: снять, принять, перенести проверку | `src/db/retract.py`, `src/db/accept.py`, `src/db/move.py` — под `DATABASE_RETRACTION_URL`; веб-двери — `src/web/review.py`, `src/web/revision.py`; права держит база (миграции `0010`, `0025`, `0034`) |
 | Загрузить историческую проверку | `src/mcp/imports.py`, `import_modes.py`, запись — `src/db/imports.py`, `imports_legacy.py`; процедура — `docs/14-history-import.md` |
 | Пространство и страны | Завести и привязать — `tools/space.py` (`make space`), логика — `src/db/spaces.py`, `src/db/reach.py` |
@@ -1238,6 +1266,7 @@ Telegram, ни HTTP, ни SQL.
 | Экшн-планы, предписания, письмо партнёру | `docs/29-action-plans.md` |
 | Общие правила веб-экрана (каркас, шапка, статика, заголовки безопасности) | `docs/30-web-screen-rules.md` |
 | Сломалось: что смотреть и что делать (логи, экран здоровья, тревоги, каждая выгрузка, таблица фоновых задач бота) | `docs/38-runbook.md` |
+| Срок отчёта по проверке в календаре проверяющего (Google Календарь, ключ, отключение, сбои) | `docs/39-calendar-deadline.md`; код — `src/gcal/`, `src/bot/calendar_loader.py`, `src/web/calendar_connect.py`, `src/db/calendar_store.py`, `src/domain/report_deadline.py` |
 | Бэкап и восстановление | `docs/33-backup-restore.md` |
 | MCP и вход снаружи, Cloudflare, OAuth | `docs/34-platform-edge.md` |
 | Хранилище кадров, `walk`, превью-стенд, цепочка поставки | `docs/35-platform-services.md` |

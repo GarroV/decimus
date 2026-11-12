@@ -16,13 +16,18 @@ from .config import check_environment
 from .edition import pin
 from .engine import run_audit
 from .errors import EngineError
-from .models import ProcessScore, Score, ZoneScore
+from .models import REPORT_LANGS, LangTexts, ProcessScore, Score, ZoneScore
 from .state import assert_checklist_version
 
 #: Ключи разбивки по зоне, которые не являются счётчиками записей. Всё
 #: остальное движок называет по классу (`D1`, `D2`, `D3`, а при информационных
 #: записях ещё и `D0`) — перечислять классы здесь нельзя, это методика.
-ZONE_FIELDS = ("name_ru", "name_en", "share", "loss", "score", "zeroed")
+ZONE_FIELDS = (*(f"name_{lang}" for lang in REPORT_LANGS), "share", "loss", "score", "zeroed")
+
+
+def _texts(raw: Mapping[str, Any], field: str, *, default: str = "") -> LangTexts:
+    """Тексты на каждый язык отчёта из ответа движка; пусто — `default` (код, если названия нет)."""
+    return LangTexts((lang, str(raw.get(f"{field}_{lang}") or default)) for lang in REPORT_LANGS)
 
 
 def _counts(raw: Mapping[str, Any]) -> dict[str, int]:
@@ -32,8 +37,7 @@ def _counts(raw: Mapping[str, Any]) -> dict[str, int]:
 def _zone(code: str, raw: Mapping[str, Any]) -> ZoneScore:
     return ZoneScore(
         code=code,
-        name_ru=str(raw.get("name_ru") or code),
-        name_en=str(raw.get("name_en") or code),
+        name_texts=_texts(raw, "name", default=code),
         share=float(raw.get("share") or 0.0),
         counts=_counts(raw),
         loss=float(raw.get("loss") or 0.0),
@@ -46,8 +50,7 @@ def _zone(code: str, raw: Mapping[str, Any]) -> ZoneScore:
 def _process(raw: Mapping[str, Any]) -> ProcessScore:
     return ProcessScore(
         code=str(raw.get("code") or ""),
-        name_ru=str(raw.get("name_ru") or ""),
-        name_en=str(raw.get("name_en") or ""),
+        name_texts=_texts(raw, "name"),
         scored=bool(raw.get("scored")),
         d1=int(raw.get("D1") or 0),
         d2=int(raw.get("D2") or 0),
@@ -98,8 +101,7 @@ def parse_score(raw: Mapping[str, Any]) -> Score:
     return Score(
         pct=float(raw["pct"]),
         grade=str(raw["grade"]),
-        label_ru=str(raw.get("grade_label_ru") or ""),
-        label_en=str(raw.get("grade_label_en") or ""),
+        label_texts=_texts(raw, "grade_label"),
         counts={level: int(number) for level, number in counts.items()},
         deductions=float(raw.get("deductions") or 0.0),
         by_zone={code: _zone(code, value) for code, value in zones.items()},

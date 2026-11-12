@@ -187,6 +187,9 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "partner_letters": {"SELECT", "INSERT"},
     # Общее письмо по нескольким проверкам и его состав (`0128`, D739) — так же заморожены.
     "batch_letters": {"SELECT", "INSERT"},
+    # Доступ к Google Календарю и события срока (`0129`, D741): DELETE — отключение.
+    "calendar_grants": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+    "calendar_events": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "batch_letter_inspections": {"SELECT", "INSERT"},
     # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`). Круг
     # (`mcp_admins`) снят миграцией `0059` (D448).
@@ -204,6 +207,10 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "web_users": {"SELECT"},
     # Сессия открывается и читается; правится ровно одна колонка — ниже.
     "web_sessions": {"SELECT", "INSERT"},
+    # Журнал шагов обхода (D710, `0119`): только дописывает; читает функция владельца.
+    "walk_log": {"INSERT"},
+    # Переключатель пространств (D726, `0123`): только читает; пишет функция владельца.
+    "web_session_peeks": {"SELECT"},
     # Счётчик неудачных входов (`0015`, T325) — рабочая запись самой роли
     # приложения, а не чужая тайна: она его и заводит, и обнуляет при удачном
     # входе, и чистит от старых строк. DELETE здесь поэтому законен, в отличие

@@ -13,7 +13,7 @@
 той проверки, где она записана, а подписи вокруг — на языке интерфейса.
 
 Неизвестный язык — отказ, а не откат на русский: тем же правилом живут
-методика (`domain.models.pick_text`) и бот.
+методика (`domain.models.pick_lang`) и бот.
 """
 
 from __future__ import annotations
@@ -77,9 +77,11 @@ TEXTS: dict[str, dict[str, str]] = {
     # Название языка — на нём самом: ищущий свой язык читает его, а не перевод.
     "nav.lang.ru": {"ru": "Русский", "en": "Русский"},
     "nav.lang.en": {"ru": "English", "en": "English"},
+    "nav.lang.tr": {"ru": "Türkçe", "en": "Türkçe"},
     # Язык — словом на языке экрана (#1086): «Язык отчёта: английский», а не «en».
     "lang.name.ru": {"ru": "русский", "en": "Russian"},
     "lang.name.en": {"ru": "английский", "en": "English"},
+    "lang.name.tr": {"ru": "турецкий", "en": "Turkish"},
     "nav.sections": {"ru": "Разделы", "en": "Sections"},
     "nav.more": {"ru": "Ещё", "en": "More"},
     "split.back": {"ru": "Назад", "en": "Back"},
@@ -533,7 +535,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Here it is read-only."
         ),
     },
-    "accept.title": {"ru": "Принять проверку", "en": "Accept inspection"},
+    "accept.title": {"ru": "Принять", "en": "Accept"},
     "accept.hint": {
         "ru": (
             "После подтверждения проверка входит в историю сети, а её записи больше не "
@@ -804,7 +806,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.actions.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
     "card.actions.decide": {"ru": "Решение по проверке", "en": "Decision on the inspection"},
     "card.actions.more": {"ru": "Отчёт, письма, план", "en": "Report, letters, plan"},
-    "card.act.move": {"ru": "Исправить", "en": "Correct"},
+    "card.act.move": {"ru": "Исправить", "en": "Fix"},
     "card.act.rx": {"ru": "Сформировать предписание", "en": "Create compliance notice"},
     "card.act.rx_short": {"ru": "Предписание", "en": "Notice"},
     "card.act.letter": {"ru": "Письмо", "en": "Letter"},
@@ -969,8 +971,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "The correction history is unavailable — corrections are disabled until it is back.",
     },
     # --- отклонение проверки (код остаётся retract, D194) ------------------
-    "retract.title": {"ru": "Удалить проверку", "en": "Delete inspection"},
-    "retract.icon": {"ru": "Удалить проверку", "en": "Delete inspection"},
+    "retract.title": {"ru": "Отклонить", "en": "Reject"},
     "retract.hint": {
         "ru": (
             "Проверка уходит из списков и аналитики, кадры убираются из хранилища; "
@@ -981,8 +982,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "a row with the reason stays in history. A reason is required."
         ),
     },
-    "retract.reason_label": {"ru": "Причина удаления", "en": "Reason for deletion"},
-    "retract.submit": {"ru": "Удалить проверку", "en": "Delete inspection"},
+    "retract.reason_label": {"ru": "Причина отклонения", "en": "Reason for rejection"},
+    "retract.submit": {"ru": "Отклонить", "en": "Reject"},
     "retract.done": {
         "ru": "Проверка отклонена. Кадров убрано: {photos}.",
         "en": "The inspection is rejected. Photos purged: {photos}.",

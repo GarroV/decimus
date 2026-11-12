@@ -21,13 +21,20 @@ from src.db.queries import get_inspection  # noqa: E402
 from src.db.reach import own_reach  # noqa: E402
 from src.db.revise import Revision, revise_finding  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
-from src.domain.models import Score  # noqa: E402
+from src.domain.models import LangTexts, Score  # noqa: E402
 
 pytestmark = requires_db
 
 ТОЧКА = "Batumi-1"
 УК = own_reach("HQ")
-ОЦЕНКА = Score(pct=99.0, grade="A", label_ru="", label_en="", counts={}, deductions=1.0, by_zone={})
+ОЦЕНКА = Score(
+    pct=99.0,
+    grade="A",
+    label_texts=LangTexts(ru="", en="", tr=""),
+    counts={},
+    deductions=1.0,
+    by_zone={},
+)
 
 
 @pytest.fixture

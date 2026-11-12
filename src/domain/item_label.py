@@ -23,17 +23,17 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from .models import TEXT_LANGS
+from .models import LangTexts, fallback_chain, lang_texts
 
 #: Служебные коды без номера: их показывают человеческим названием, не кодом.
 #: `NOTE` — общая заметка (в оценке не участвует), `LEGACY` — запись исторической
 #: проверки, у которой пункта в старом отчёте не было (D332). Слова те же, что
 #: уже стоят в карточке проверки (`card.findings.note`, `card.findings.no_item`).
 SPECIAL_TITLES: dict[str, dict[str, str]] = {
-    "NOTE": {"ru": "Общая заметка", "en": "General note"},
-    "LEGACY": {"ru": "Пункт не назван", "en": "Item not given"},
+    "NOTE": {"ru": "Общая заметка", "en": "General note", "tr": "Genel not"},
+    "LEGACY": {"ru": "Пункт не назван", "en": "Item not given", "tr": "Madde belirtilmedi"},
 }
 
 _TRAILING_NUMBER = re.compile(r"(\d+)$")
@@ -43,10 +43,8 @@ _TRAILING_NUMBER = re.compile(r"(\d+)$")
 class ItemTexts:
     """Тексты одного пункта чек-листа — всё, что нужно метке."""
 
-    process_ru: str = ""
-    process_en: str = ""
-    question_ru: str = ""
-    question_en: str = ""
+    process_texts: LangTexts = field(default_factory=LangTexts)
+    question_texts: LangTexts = field(default_factory=LangTexts)
 
 
 #: Код пункта (верхним регистром) → его тексты.
@@ -67,10 +65,8 @@ def from_items(items: Iterable[object]) -> dict[str, ItemTexts]:
         out.setdefault(
             code,
             ItemTexts(
-                process_ru=str(getattr(item, "process_ru", "") or "").strip(),
-                process_en=str(getattr(item, "process_en", "") or "").strip(),
-                question_ru=str(getattr(item, "question_ru", "") or "").strip(),
-                question_en=str(getattr(item, "question_en", "") or "").strip(),
+                process_texts=LangTexts(getattr(item, "process_texts", {})),
+                question_texts=LangTexts(getattr(item, "question_texts", {})),
             ),
         )
     return out
@@ -86,24 +82,17 @@ def from_csv(rows: Iterable[Mapping[str, str | None]]) -> dict[str, ItemTexts]:
         out.setdefault(
             code,
             ItemTexts(
-                process_ru=(row.get("process_ru") or "").strip(),
-                process_en=(row.get("process_en") or "").strip(),
-                question_ru=(row.get("question_ru") or "").strip(),
-                question_en=(row.get("question_en") or "").strip(),
+                process_texts=lang_texts(row, "process"),
+                question_texts=lang_texts(row, "question"),
             ),
         )
     return out
 
 
-def _pick(ru: str, en: str, lang: str) -> str:
+def _pick(own: ItemTexts, field: str, lang: str) -> str:
     """Текст на языке; пусто — на другом языке методики, а не пустота и не код."""
-    by_lang = {"ru": ru, "en": en}
-    if by_lang.get(lang):
-        return by_lang[lang]
-    for other in TEXT_LANGS:
-        if by_lang.get(other):
-            return by_lang[other]
-    return ""
+    texts: LangTexts = getattr(own, f"{field}_texts")
+    return next((texts[code] for code in fallback_chain(lang) if texts.get(code)), "")
 
 
 def number(code: str) -> str | None:
@@ -124,12 +113,12 @@ def label(code: str, texts: Texts | None, lang: str) -> str:
         return ""
     special = SPECIAL_TITLES.get(key)
     if special is not None:
-        return special.get(lang) or special["ru"]
+        return special.get(lang) or special["en"]
     n = number(key)
     own = None if texts is None else texts.get(key)
     if n is None or own is None:
         return code.strip()
-    process = _pick(own.process_ru, own.process_en, lang)
+    process = _pick(own, "process", lang)
     return f"{process} {n}" if process else code.strip()
 
 
@@ -139,11 +128,11 @@ def full(code: str, texts: Texts | None, lang: str) -> str:
     own = None if texts is None else texts.get(_key(code))
     if own is None or _key(code) in SPECIAL_TITLES:
         return short
-    wording = _pick(own.question_ru, own.question_en, lang)
+    wording = _pick(own, "question", lang)
     return f"{short} — {wording}" if wording else short
 
 
 def wording(code: str, texts: Texts | None, lang: str) -> str:
     """Формулировка пункта на языке (откат — на другой язык методики); нет — пустая строка."""
     own = None if texts is None else texts.get(_key(code))
-    return "" if own is None else _pick(own.question_ru, own.question_en, lang)
+    return "" if own is None else _pick(own, "question", lang)

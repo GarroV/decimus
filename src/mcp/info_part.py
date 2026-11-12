@@ -45,7 +45,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..db.models import InspectionDetail
-from ..domain.models import TEXT_LANGS
+from ..domain.models import REPORT_LANGS
 from ..report.info_titles import FOUND as FOUND
 from ..report.info_titles import NOT_A_NAME, NOT_AT_HAND
 from ..report.info_titles import titles as _titles
@@ -81,9 +81,9 @@ def check_lang(asked: str | None) -> str | None:
     if asked is None:
         return None
     значение = asked.strip().lower()
-    if значение not in TEXT_LANGS:
+    if значение not in REPORT_LANGS:
         raise ToolError(
-            f"Язык «{asked}» в методике не заведён. Доступны: {', '.join(TEXT_LANGS)}. "
+            f"Язык «{asked}» в методике не заведён. Доступны: {', '.join(REPORT_LANGS)}. "
             f"Подписи полей берутся из методики, и на незаведённом языке их нет — "
             f"подставленный вместо них русский читался бы как перевод"
         )

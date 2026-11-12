@@ -35,6 +35,7 @@ from . import (
     checklist_source,
     checklist_tools,
     checklists_tools,
+    dodois_read,
     letter_save,
     move,
     phrases,
@@ -47,6 +48,7 @@ from . import (
 from .annotations import annotations_for
 from .confirm import TOKEN_ARGUMENT
 from .import_catalogue import IMPORT_TOOLS
+from .lang_fields import text_properties
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
 KIND_INSPECTIONS = "inspections"
@@ -942,18 +944,12 @@ TOOLS: tuple[ToolSpec, ...] = (
                         "automatically from the process name."
                     )
                 ),
-                "process_en": {
-                    "type": "string",
-                    "description": (
-                        "Process name in English. Omit to leave the English text blank."
-                    ),
-                },
-                "question_en": {
-                    "type": "string",
-                    "description": (
-                        "Checklist question text in English. Omit to leave the English text blank."
-                    ),
-                },
+                **text_properties(
+                    "process", "Process name", "Omit to leave the {title} text blank."
+                ),
+                **text_properties(
+                    "question", "Checklist question text", "Omit to leave the {title} text blank."
+                ),
                 "zones": _ZONES_PROPERTY,
                 "days": _DAYS_PROPERTY,
                 "criteria": {
@@ -1019,22 +1015,16 @@ TOOLS: tuple[ToolSpec, ...] = (
                         "Omit to keep the current value."
                     ),
                 },
-                "process_en": {
-                    "type": "string",
-                    "description": ("New process name in English. Omit to keep the current value."),
-                },
+                **text_properties("process", "New process name", "Omit to keep the current value."),
                 "question_ru": {
                     "type": "string",
                     "description": (
                         "New checklist question text in Russian. Omit to keep the current value."
                     ),
                 },
-                "question_en": {
-                    "type": "string",
-                    "description": (
-                        "New checklist question text in English. Omit to keep the current value."
-                    ),
-                },
+                **text_properties(
+                    "question", "New checklist question text", "Omit to keep the current value."
+                ),
                 "levels": _LEVELS_PROPERTY,
                 "zones": _ZONES_PROPERTY,
                 "days": _DAYS_PROPERTY,
@@ -1151,10 +1141,7 @@ TOOLS: tuple[ToolSpec, ...] = (
                     "type": "string",
                     "description": "Zone name in Russian.",
                 },
-                "name_en": {
-                    "type": "string",
-                    "description": ("Zone name in English. Omit to leave the English name blank."),
-                },
+                **text_properties("name", "Zone name", "Omit to leave the {title} name blank."),
                 "share": {
                     "type": "number",
                     "description": (
@@ -1372,10 +1359,7 @@ TOOLS: tuple[ToolSpec, ...] = (
                     "type": "string",
                     "description": "New zone name in Russian. Omit to keep the current one.",
                 },
-                "name_en": {
-                    "type": "string",
-                    "description": "New zone name in English. Omit to keep the current one.",
-                },
+                **text_properties("name", "New zone name", "Omit to keep the current one."),
                 "version_name": _VERSION_NAME_PROPERTY,
                 "note": _NOTE_PROPERTY,
             },
@@ -2399,6 +2383,32 @@ TOOLS: tuple[ToolSpec, ...] = (
             "additionalProperties": False,
         },
         handler=ratings_read.aggregators_status,
+        kind=KIND_RATINGS_READ,
+    ),
+    ToolSpec(
+        name="dodois_status",
+        description=(
+            "Состояние подключений Dodo IS по странам: подключена ли страна, когда привязана, "
+            "через кого, состояние и причина, когда проверена и продлена, сколько пиццерий "
+            "всего и открыто, учётка Dodo IS (без почты); ссылки-приглашения за 7 дней "
+            "(выдана, истекает, погашена или отозвана, кем выдана — без токена); загрузка "
+            "данных по видам (последняя удачная, последняя попытка и её ошибка) и сколько "
+            "пиццерий страны имеют данные за текущий месяц. Звать на вопрос «подключилась ли "
+            "страна» и «поступают ли данные». country — код страны; не задан — все. "
+            "Доступно главному админу УК."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string",
+                    "description": "Код страны из двух букв, например RS; не задан — все страны.",
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=dodois_read.dodois_status,
         kind=KIND_RATINGS_READ,
     ),
 )

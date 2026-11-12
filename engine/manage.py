@@ -49,11 +49,15 @@ import argparse, csv, json, os, re, shutil, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from audit import (  # noqa: E402
-    LETTER_ROLES, ZONE_SHARE_TOLERANCE, ZONE_SHARE_TOTAL, active_dir, data_path, is_comment_row, load_zones,
+    BASE_LANG, LANGS, LETTER_ROLES, ZONE_SHARE_TOLERANCE, ZONE_SHARE_TOTAL, active_dir, data_path, is_comment_row, load_zones,
 )
 
 PLUGIN_DATA = os.path.normpath(os.path.join(HERE, os.pardir, "data"))
-FIELDS = ["id", "kind", "process_code", "process_ru", "process_en", "question_ru", "question_en", "levels", "zones", "days"]
+FIELDS = ["id", "kind", "process_code", *[f"process_{lang}" for lang in LANGS],
+          *[f"question_{lang}" for lang in LANGS], "levels", "zones", "days"]
+# Языки сверх базового: у них свои необязательные опции `--process-<яз>`,
+# `--question-<яз>`, `--name-<яз>`.
+OTHER_LANGS = [lang for lang in LANGS if lang != BASE_LANG]
 
 # Процессы (направления методики). Код — то, чем пункт связан с процессом;
 # формулировки переводятся и правятся, код нет. Группировка отчёта и аналитики
@@ -111,7 +115,7 @@ def process_code(name_ru):
           f"Проверьте его и внесите в PROCESSES, если процесс постоянный.", file=sys.stderr)
     return code
 
-ZONE_FIELDS = ["code", "name_ru", "name_en", "share_pct"]
+ZONE_FIELDS = ["code", *[f"name_{lang}" for lang in LANGS], "share_pct"]
 # D0 — не класс нарушения, а приём: информационная запись живёт среди findings
 # с нулевым вычетом (docs/02-domain.md). Уровня не знала только эта проверка, и
 # три боевых пункта (INF09-INF11) делали `validate` красным всегда. Проверка,
@@ -224,7 +228,7 @@ def cmd_list(a):
     for r in read_rows():
         if a.process and a.process.lower() not in r["process_ru"].lower():
             continue
-        if a.q and a.q.lower() not in (r["question_ru"] + r.get("question_en", "")).lower():
+        if a.q and a.q.lower() not in "".join(r.get(f"question_{lang}", "") for lang in LANGS).lower():
             continue
         flag = "" if r.get("kind") == "violation" else f" [{r.get('kind')}]"
         print(f"{r['id']}{flag} | {r['process_ru']} | {r['question_ru'][:95]} | {r.get('levels','')} | {r.get('zones','')} | {r.get('days','')}д")
@@ -248,9 +252,12 @@ def cmd_add(a):
     levels = ";".join(x.strip().upper() for x in re.split(r"[;,]", a.levels or "D1") if x.strip())
     row = {"id": qid, "kind": a.kind or "violation",
            "process_code": process_code(a.process or ""), "process_ru": a.process or "",
-           "process_en": a.process_en or a.process or "", "question_ru": a.question_ru or "",
-           "question_en": a.question_en or "", "levels": levels, "zones": zones,
+           "question_ru": a.question_ru or "", "levels": levels, "zones": zones,
            "days": a.days if a.days is not None else 10}
+    for lang in OTHER_LANGS:
+        # Процесс без перевода берёт базовое имя: пустое раскололо бы процесс при группировке.
+        row[f"process_{lang}"] = getattr(a, f"process_{lang}") or a.process or ""
+        row[f"question_{lang}"] = getattr(a, f"question_{lang}") or ""
     role = letter_role_arg(a.letter_role)
     if role:
         row["letter_role"] = role
@@ -331,8 +338,9 @@ def cmd_edit(a):
         if r["id"].upper() != a.id.upper():
             continue
         found = True
-        for f, v in (("process_ru", a.process), ("process_en", a.process_en),
-                     ("question_ru", a.question_ru), ("question_en", a.question_en),
+        for f, v in (("process_ru", a.process), ("question_ru", a.question_ru),
+                     *[(f"process_{lang}", getattr(a, f"process_{lang}")) for lang in OTHER_LANGS],
+                     *[(f"question_{lang}", getattr(a, f"question_{lang}")) for lang in OTHER_LANGS],
                      ("zones", a.zones), ("kind", a.kind)):
             if v is not None:
                 r[f] = v
@@ -403,10 +411,11 @@ def cmd_zone_add(a):
     d = target_dir(create=True)
     p = os.path.join(d, "zones.csv")
     rows = list(csv.DictReader(open(p, encoding="utf-8-sig"))) if os.path.exists(p) else \
-        [dict(r, share_pct=r["share_pct"]) for r in load_zones()]
+        [dict(r, share_pct=r["share_pct"]) for r in load_zones(as_file=True)]
     if any(r["code"] == a.code for r in rows):
         sys.exit("такая зона уже есть")
-    rows.append({"code": a.code, "name_ru": a.name_ru, "name_en": a.name_en or a.name_ru,
+    rows.append({"code": a.code, "name_ru": a.name_ru,
+                 **{f"name_{lang}": getattr(a, f"name_{lang}") or a.name_ru for lang in OTHER_LANGS},
                  "share_pct": a.share if a.share is not None else 0})
     if a.equal_shares:
         share = уравнять_доли(rows)
@@ -586,12 +595,14 @@ def cmd_zone_rename(a):
     # Формулировки переводятся и правятся, коды нет (docs/02-domain.md).
     названные = {
         поле: значение
-        for поле, значение in (("name_ru", a.name_ru), ("name_en", a.name_en))
+        for поле, значение in (("name_ru", a.name_ru),
+                               *[(f"name_{lang}", getattr(a, f"name_{lang}")) for lang in OTHER_LANGS])
         if значение is not None
     }
     if not названные:
         sys.exit(
-            "Не названо ни одного имени: --name-ru и/или --name-en. Код зоны переименование "
+            "Не названо ни одного имени: " + " и/или ".join(f"--name-{lang}" for lang in LANGS)
+            + ". Код зоны переименование "
             "не трогает — им зона связана с пунктами чек-листа и записанными проверками"
         )
     пустые = sorted(поле for поле, значение in названные.items() if not значение.strip())
@@ -893,18 +904,20 @@ def main():
     f = s.add_parser("fork"); f.add_argument("--dir"); f.set_defaults(fn=cmd_fork)
     l = s.add_parser("list"); l.add_argument("--process"); l.add_argument("--q"); l.set_defaults(fn=cmd_list)
     ad = s.add_parser("add")
-    for x in ("id", "process", "process-en", "question-ru", "question-en", "levels", "zones", "criteria", "kind",
-              "letter-role"):
+    for x in ("id", "process", "question-ru", *[f"{f}-{lang}" for f in ("process", "question") for lang in OTHER_LANGS],
+              "levels", "zones", "criteria", "kind", "letter-role"):
         ad.add_argument("--" + x)
     ad.add_argument("--days", type=int); ad.set_defaults(fn=cmd_add)
     rm = s.add_parser("remove"); rm.add_argument("id"); rm.add_argument("--hard", action="store_true"); rm.set_defaults(fn=cmd_remove)
     rs = s.add_parser("restore"); rs.add_argument("id"); rs.set_defaults(fn=cmd_restore)
     ed = s.add_parser("edit"); ed.add_argument("id")
-    for x in ("process", "process-en", "question-ru", "question-en", "levels", "zones", "criteria", "kind",
-              "letter-role"):
+    for x in ("process", "question-ru", *[f"{f}-{lang}" for f in ("process", "question") for lang in OTHER_LANGS],
+              "levels", "zones", "criteria", "kind", "letter-role"):
         ed.add_argument("--" + x)
     ed.add_argument("--days", type=int); ed.set_defaults(fn=cmd_edit)
-    za = s.add_parser("zone-add"); za.add_argument("--code", required=True); za.add_argument("--name-ru", required=True); za.add_argument("--name-en")
+    za = s.add_parser("zone-add"); za.add_argument("--code", required=True); za.add_argument("--name-ru", required=True)
+    for lang in OTHER_LANGS:
+        za.add_argument(f"--name-{lang}")
     za.add_argument("--share", type=float, help="доля новой зоны в процентах; остальные не трогать")
     za.add_argument("--equal-shares", action="store_true", help="уравнять доли ВСЕХ зон на 100/N")
     za.set_defaults(fn=cmd_zone_add)
@@ -922,7 +935,8 @@ def main():
     zs.add_argument("--shares", required=True, help="доли зон набором: код=доля через запятую")
     zs.set_defaults(fn=cmd_zone_share)
     zn = s.add_parser("zone-rename"); zn.add_argument("code")
-    zn.add_argument("--name-ru"); zn.add_argument("--name-en")
+    for lang in LANGS:
+        zn.add_argument(f"--name-{lang}")
     zn.set_defaults(fn=cmd_zone_rename)
     s.add_parser("backfill-processes").set_defaults(fn=cmd_backfill_processes)
     s.add_parser("validate").set_defaults(fn=cmd_validate)

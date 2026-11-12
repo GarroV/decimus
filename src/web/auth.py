@@ -69,6 +69,7 @@ from src.domain.model_usage import enter_scope, leave_scope
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import (
+    calendar_connect,
     demo_entry,
     dodois_connect,
     google_link,
@@ -124,6 +125,8 @@ GOOGLE_HINT_MAX_LENGTH = 254
 
 #: Где в `app.extensions` лежит начало привязки почты Google из «Настроек».
 GOOGLE_LINK_KEY = "decimus_google_link"
+#: Начало подключения Google Календаря из «Настроек» (D740, `calendar_connect`).
+GOOGLE_CALENDAR_KEY = "decimus_google_calendar"
 
 #: Имя куки. Своё, а не `session`: рядом на той же машине живут другие стенды,
 #: и одноимённая кука соседа затирала бы нашу на общем хосте.
@@ -282,6 +285,14 @@ def begin_google_link() -> Response:
     заходов одни, различает их вид метки (`google_link.LINK_KIND`).
     """
     return current_app.extensions[GOOGLE_LINK_KEY]()  # type: ignore[no-any-return]
+
+
+def begin_google_calendar() -> Response:
+    """Увести вошедшего к Google за правом на события в его календаре (D740, D741).
+
+    Как `begin_google_link`: начало живёт в `install`, рядом с меткой и реквизитами Google.
+    """
+    return current_app.extensions[GOOGLE_CALENDAR_KEY]()  # type: ignore[no-any-return]
 
 
 def current_tenant() -> str:
@@ -641,6 +652,9 @@ def install(app: Flask, conf: Settings) -> None:
         # адрес возврата, своя ветка. Метка уже сверена выше — общим кодом.
         if isinstance(содержимое, dict) and содержимое.get("kind") == google_link.LINK_KIND:
             return очистить_метку(_вернуть_привязку(google, str(ожидаемая)))
+        # Подключение Google Календаря (D740): тот же адрес возврата, своя ветка.
+        if isinstance(содержимое, dict) and содержимое.get("kind") == calendar_connect.KIND:
+            return очистить_метку(_вернуть_календарь(google, str(ожидаемая)))
         # Подтверждение входа перед действием, создающим долгоживущий доступ.
         if isinstance(содержимое, dict) and содержимое.get("kind") == reauth.REAUTH_KIND:
             назад = reauth.safe_back(str(содержимое.get("next") or ""))
@@ -797,6 +811,32 @@ def install(app: Flask, conf: Settings) -> None:
 
     app.extensions[GOOGLE_LINK_KEY] = _начать_привязку
 
+    def _начать_календарь() -> Response:
+        """Увод к Google за правом на календарь; метка и вид захода — в подписанной куке."""
+        if google is None:
+            return redirect(url_for("settings_page"))
+        account = current_account()
+        метка = new_state()
+        ответ = redirect(
+            calendar_connect.consent_url(
+                _google_here(google),
+                state=метка,
+                login_hint=str(getattr(account, "email", "") or ""),
+            )
+        )
+        ответ.set_cookie(
+            GOOGLE_STATE_COOKIE,
+            state_signer.dumps({"state": метка, "kind": calendar_connect.KIND}),
+            max_age=GOOGLE_STATE_TTL_SECONDS,
+            httponly=True,
+            samesite="Lax",
+            secure=over_https(),
+            path="/",
+        )
+        return ответ
+
+    app.extensions[GOOGLE_CALENDAR_KEY] = _начать_календарь
+
     def _обновить_сессию(account: Account, назад: str, *, arm: bool = True) -> Response:
         """Подтверждённый вход: прежняя сессия закрывается, новая — свежая (`reauth`)."""
         прежний = token_of_request()
@@ -899,6 +939,29 @@ def install(app: Flask, conf: Settings) -> None:
             identity=кто,
             hq_domains=hq_domains,
         )
+
+    def _вернуть_календарь(реквизиты: GoogleSettings, метка: str) -> Response:
+        """Возврат подключения календаря: учётка — из сессии, исход — в «Настройки»."""
+        token = token_of_request()
+        account = resolve_session(token) if token else None
+        if account is None or token is None:
+            return redirect(url_for("login"))
+        if not calendar_connect.may_connect(account.tenant):
+            return google_link.back_to_settings("calendar_hq")
+        if request.args.get("error"):
+            return google_link.back_to_settings("calendar_denied")
+        код = request.args.get("code") or ""
+        if not код:
+            return google_link.back_to_settings("calendar_failed")
+        try:
+            выдано = calendar_connect.exchange(_google_here(реквизиты), code=код)
+        except calendar_connect.CalendarConsentError as сбой:
+            current_app.logger.warning("календарь: обмен кода не удался (%s)", сбой.code)
+            return google_link.back_to_settings("calendar_failed")
+        итог = calendar_connect.finish(
+            user_id=account.id, account_email=account.email, state=метка, consent=выдано
+        )
+        return google_link.back_to_settings(итог)
 
     def отказ_входа(
         *, забыть_подсказку: bool = False, другой_аккаунт: bool = False

@@ -29,6 +29,7 @@ from .letters import (
     _methodology,
     _run,
     _verify,
+    current_edition,
     state_json,
 )
 
@@ -78,6 +79,7 @@ def build_bytes(
             аргументы,
             data_dir=каталог,
             state=состояние,
+            fallback=current_edition(detail, papers),
         )
         if код != 0 or not файл.is_file():
             raise LetterError(

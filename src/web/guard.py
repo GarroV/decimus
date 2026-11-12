@@ -69,6 +69,8 @@ EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "country_filter": "свой постоянный отбор стран экрана «Страны» (D536)",
     "settings_google_link": "свою почту Google привязывает сам (D447, D450)",
     "settings_google_unlink": "свою почту Google отвязывает сам (D447, D450)",
+    "settings_calendar_on": "свой Google Календарь подключает сам (D740, D741)",
+    "settings_calendar_off": "свой Google Календарь отключает сам (D741)",
     "security_relogin": "выйти и войти заново, чтобы менять свои способы входа (D463)",
     "security_prove_code": "подтверждает своей сессии вторую ступень кодом приложения (D485)",
     "security_passkey_options": "свой ключ доступа: параметры регистрации (D463)",

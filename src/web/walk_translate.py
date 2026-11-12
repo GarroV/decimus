@@ -9,10 +9,12 @@
 
 Язык перевода — другой язык платформы, не язык чек-листа проверки
 (`translate_target`): язык отчёта до конца обхода равен языку чек-листа (D415),
-и переводить на него бессмысленно. Это и не язык интерфейса: аудитор может
-работать в русском интерфейсе над английским чек-листом. Опознание то же, что у
-записи: подпись Telegram в заголовке. Сданная проверка не мешает: адрес ничего
-не меняет, а проверка нужна лишь затем, чтобы знать язык отчёта.
+и переводить на него бессмысленно — тогда берётся первый другой язык речи
+(`SPEECH_LANGS`); выбрал аудитор язык отчёта заранее — переводится на него. Это и
+не язык интерфейса: аудитор может работать в русском интерфейсе над английским
+чек-листом. Опознание то же, что у записи: подпись Telegram в заголовке. Сданная
+проверка не мешает: адрес ничего не меняет, а проверка нужна лишь затем, чтобы знать
+язык отчёта.
 
 Ограничения частоты нет (D394): один перевод на чат за раз, как у поиска пункта;
 квота на число переводов — отдельное решение, если понадобится.
@@ -30,7 +32,7 @@ from src.db.busy_lock import WALK_TRANSLATE, try_hold
 from src.domain import get_state
 from src.domain.log_ids import log_id
 from src.domain.model_usage import usage_scope
-from src.domain.models import TEXT_LANGS, Inspection
+from src.domain.models import SPEECH_LANGS, Inspection
 from src.recognize.errors import RecognizeError
 from src.recognize.translate import translate_text
 
@@ -43,13 +45,17 @@ logger = logging.getLogger(__name__)
 
 
 def translate_target(inspection: Inspection) -> str | None:
-    """Язык перевода: первый язык платформы, не равный языку чек-листа проверки.
+    """Язык перевода: язык отчёта проверки; совпал с речью — первый другой язык речи.
 
     Свободный текст пишется на языке чек-листа и сам не переводится (D416);
-    кнопка у поля даёт перевод на ДРУГОЙ язык платформы. `None` — другого языка
-    нет (платформа одноязычна), кнопки не будет.
+    кнопка у поля даёт перевод на ДРУГОЙ язык: тот, на котором уйдёт отчёт.
+    Язык отчёта совпал с языком речи — переводить в него нечего, берётся первый
+    из других языков платформы (так было и до разделения списков).
+    `None` — другого языка нет (платформа одноязычна), кнопки не будет.
     """
-    return next((code for code in TEXT_LANGS if code != inspection.speech_lang), None)
+    if inspection.report_lang and inspection.report_lang != inspection.speech_lang:
+        return inspection.report_lang
+    return next((code for code in SPEECH_LANGS if code != inspection.speech_lang), None)
 
 
 def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify) -> None:

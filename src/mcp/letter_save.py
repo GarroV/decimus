@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from ..db.errors import ConfigError as DbConfigError
 from ..db.errors import DbError
-from ..domain.models import TEXT_LANGS
+from ..domain.models import REPORT_LANGS
 from .db_target import config_refusal
 from .errors import ToolError
 from .tools import _require_inspection_id
@@ -46,10 +46,10 @@ def save_inspection_letter(
     ident = _require_inspection_id(id)
     if not isinstance(text, str) or not text.strip():
         raise ToolError("Письмо не сохранено: в нём нет текста")
-    if lang is not None and lang not in TEXT_LANGS:
+    if lang is not None and lang not in REPORT_LANGS:
         raise ToolError(
             f"Письмо не сохранено: язык «{lang}» не поддерживается, "
-            f"ожидается один из: {', '.join(sorted(TEXT_LANGS))}"
+            f"ожидается один из: {', '.join(sorted(REPORT_LANGS))}"
         )
     try:
         detail = queries.get_inspection(ident, reach=own_reach(tenant))

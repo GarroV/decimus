@@ -146,7 +146,7 @@ def test_на_телефоне_кнопки_обычного_размера_пи
     стенд, monkeypatch, браузер, поверхность: str
 ) -> None:
     """390px: кнопки прежнего размера (как на main) — не растянуты
-    ни по высоте, ни по ширине (D745); подписи целиком; пиктограммы строкой ниже."""
+    ни по высоте, ни по ширине (D750); подписи целиком; пиктограммы строкой ниже."""
     _приёмка(monkeypatch)
     _лист(monkeypatch)
     html = стенд.get(ПОВЕРХНОСТИ[поверхность]).get_data(as_text=True)
@@ -162,7 +162,8 @@ def test_на_телефоне_кнопки_обычного_размера_пи
           return {
             decide: [...g.querySelectorAll('.hbtn')].map(box),
             group: box(g),
-            aux: [...document.querySelectorAll('.hact__group--aux .hbtn')].map(box),
+            aux: [...document.querySelectorAll('.hact__group--aux .hbtn:not(.hbtn--pdf)')].map(box),
+            pdf: [...document.querySelectorAll('.hbtn--pdf')].map(box),
           };
         }"""
     )
@@ -174,11 +175,11 @@ def test_на_телефоне_кнопки_обычного_размера_пи
         assert not кнопка["cut"], кнопка
         assert кнопка["w"] < рамки["group"]["w"] - 40, f"кнопка растянута по ширине: {кнопка}"
     if поверхность == "страница":
-        assert len(решения) == 2
-        assert решения[0]["y"] == pytest.approx(решения[1]["y"], abs=0.6), "не одной строкой"
+        assert len(решения) == 3  # Принять, Исправить, Отклонить
     else:
-        assert len(решения) == 1
-    assert len(рамки["aux"]) >= 2
+        assert len(решения) == 2  # Принять, Отклонить (правки даты и пиццерии в панели нет)
+    assert len({round(к["y"]) for к in решения}) == 1, "решения не одной строкой"
+    assert len(рамки["aux"]) >= 1
     низ_решений = max(к["y"] + к["h"] for к in решения)
     for значок in рамки["aux"]:
         assert значок["w"] == pytest.approx(прежняя, abs=0.6) and значок["h"] == pytest.approx(
@@ -186,4 +187,5 @@ def test_на_телефоне_кнопки_обычного_размера_пи
         ), f"размер пиктограммы изменён: {значок}"
         assert значок["y"] >= низ_решений, "пиктограммы не строкой ниже"
     assert len({round(з["y"]) for з in рамки["aux"]}) == 1, "пиктограммы в одну строку"
+    assert len(рамки["pdf"]) == 1 and not рамки["pdf"][0]["cut"], "подпись «PDF» обрезана или нет"
     page.close()

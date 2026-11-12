@@ -987,15 +987,18 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
   .zlist li { grid-template-columns: minmax(0, 1fr) 4.5rem auto; gap: var(--space-4); }
   .hact__group--aux { margin-left: 0; }
 }
-/* Узкий экран: кнопки своего обычного размера (D745 — вид готовых кнопок не меняется);
+/* Узкий экран: кнопки своего обычного размера (D750 — вид готовых кнопок не меняется);
    второстепенное и корзина — пиктограммами строкой ниже, с чертой между группами.
    Имя — в aria-label и подсказке. */
 @media (max-width: 560px) {
   .hact__group--decide { flex: 1 1 100%; }
+  /* Три решения («Принять», «Исправить», «Отклонить») в одну строку: без значков, подписи целиком (D749). */
+  .hact__group--decide .hbtn svg { display: none; }
+  .hact__group--aux .hbtn--pdf { width: auto; padding: 0 var(--space-4); }
   .hact__group--aux { flex: 1 1 100%; margin-top: var(--space-2); padding-top: var(--space-5); border-top: 1px solid var(--line); }
-  .hact__group--aux .hbtn { width: 36px; padding: 0; justify-content: center; }
-  .head-line .hact__group--aux .hbtn { width: 34px; padding: 0; }
-  .hact__group--aux .hbtn > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .hact__group--aux .hbtn:not(.hbtn--pdf) { width: 36px; padding: 0; justify-content: center; }
+  .head-line .hact__group--aux .hbtn:not(.hbtn--pdf) { width: 34px; padding: 0; }
+  .hact__group--aux .hbtn:not(.hbtn--pdf) > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 
 .find-row {

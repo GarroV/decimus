@@ -3,11 +3,14 @@
   `‹ Октябрь 2026 ›`, по заголовку открывается маленький календарь.
 
   ОСНОВА БЕЗ JS: `<details>` раскрывается сам; внутри выпадающий список быстрых выборов
-  («Всё время», «Этот месяц», «Прошлый»; D611 — не ряд кнопок; переходит по выбору через
+  («Всё время», месяц, год, «Произвольный период»; D611 — не ряд кнопок; переходит по выбору через
   `pick.js`, без скрипта работает форма) и обычная GET-форма с двумя полями
   даты и кнопкой «Применить». С `static/period.js` поля и кнопка прячутся, а
   вместо них рисуется месяц с выбором отрезка двумя щелчками (начало → конец,
   порядок не важен), как у Swarm (`RangePicker.tsx`); второй щелчок применяет.
+
+  «Произвольный период» не переходит по адресу: он открывает поля «С» и «По» (`.is-custom`),
+  чтобы ввести даты за несколько месяцев или лет без листания календаря.
 
   Адреса стрелок и быстрых выборов собраны заранее в обработчике (`registry_view`).
   hidden — словарь параметров, которые форма обязана сохранить (язык, отбор).
@@ -26,11 +29,11 @@
             <span class="pickbox__label">{{ t('registry.period.quick') }}</span>
             <select class="pickselect pickbox__select" data-pick-nav aria-label="{{ t('registry.period.quick') }}">
               {% if not quick|selectattr('on')|list %}<option value="" selected disabled>{{ title }}</option>{% endif %}
-              {% for q in quick %}<option value="{{ q.href }}"{% if q.on %} selected{% endif %}>{{ q.title }}</option>{% endfor %}
+              {% for q in quick %}<option value="{{ q.href }}"{% if q.custom %} data-period-custom{% endif %}{% if q.on %} selected{% endif %}>{{ q.title }}</option>{% endfor %}
             </select>
           </label>
         {% endif %}
-        <form method="get" action="{{ action }}" class="pcal"
+        <form method="get" action="{{ action }}" class="pcal{% if quick|selectattr('custom')|selectattr('on')|list %} is-custom{% endif %}"
               data-pcal data-from="{{ period.start or '' }}" data-to="{{ period.end or '' }}"
               data-weekdays="{{ t('registry.weekdays') }}"
               data-months="{% for m in range(1, 13) %}{{ t('registry.month.' ~ m) }}{% if not loop.last %}|{% endif %}{% endfor %}"

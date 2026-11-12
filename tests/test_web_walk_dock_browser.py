@@ -61,6 +61,7 @@ def test_split_button_and_next_stay_readable(page, width, height, theme, lang):
         fits:[main,several,next].map(fits), height:[r(split).height,r(next).height],
         order:[r(main).right<=r(several).left+1, r(split).right<=r(next).left+1],
         rowFits:row.scrollWidth<=row.clientWidth+1, nextWidth:r(next).width,
+        ratio:r(main).width/r(several).width, oneLine:several.querySelector('span').getBoundingClientRect().height<20,
         aria:several.getAttribute('aria-label'), label:several.textContent.trim(),
         icon:!!several.querySelector('svg'), mainText:main.textContent.trim(),
       };}""")
@@ -68,6 +69,8 @@ def test_split_button_and_next_stay_readable(page, width, height, theme, lang):
     assert got["fits"] == [True, True, True], got
     assert got["rowFits"] and got["order"] == [True, True], got
     assert abs(got["height"][0] - got["height"][1]) <= 1, "split is as tall as the next button"
+    assert 1.8 <= got["ratio"] <= 2.2, "«+ Issue» takes 2/3 of the split, «Several» 1/3 (D749)"
+    assert got["oneLine"], "icon and label of «Several» sit on one line"
     assert got["nextWidth"] >= 110, "«Осмотрено →» is not squeezed"
     assert got["icon"] and got["label"] == ("Несколько" if lang == "ru" else "Several")
     assert got["aria"] == (

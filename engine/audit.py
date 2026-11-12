@@ -92,7 +92,95 @@ def is_comment_row(qid):
 LETTER_ROLES = ("strengths", "growth")
 
 
-def load_checklist():
+def resolve_text(field, lang, *rows):
+    """Текст методики `<field>_<lang>` — ОДНО правило отката на весь движок (#1619).
+
+    `rows` идут по убыванию приоритета: строка из издания самой проверки, затем та же
+    строка (по КОДУ, не по формулировке) из действующего издания этого чек-листа. Порядок:
+    нужный язык — в обеих; не нашёлся — английский — в обеих; и в самом конце базовый, чтобы
+    отчёт не остался без слов. Пустая строка и отсутствующая колонка — одно и то же.
+    """
+    for code in dict.fromkeys((lang, FALLBACK_LANG, BASE_LANG)):
+        for row in rows:
+            value = str((row or {}).get(f"{field}_{code}") or "").strip()
+            if value:
+                return value
+    return ""
+
+
+def fill_texts(own, fields, fallback=None):
+    """Копия строки с заполненным `<поле>_<язык>` на каждом языке печати (`resolve_text`).
+
+    `fallback` — та же строка из действующего издания или `None`. Исходная строка не
+    меняется: заполненное — для печати, а не для записи обратно в файлы методики.
+    """
+    out = dict(own)
+    for field in fields:
+        for lang in LANGS:
+            out[f"{field}_{lang}"] = resolve_text(field, lang, own, fallback)
+    return out
+
+
+def fallback_dir():
+    """Каталог действующего издания того же чек-листа — или `None`, если искать негде или незачем."""
+    raw = (os.environ.get(FALLBACK_DIR_VAR) or "").strip()
+    if not raw or not os.path.isdir(raw):
+        return None
+    if os.path.realpath(raw) == os.path.realpath(active_dir()):
+        return None
+    return raw
+
+
+def fallback_rows(name, key):
+    """Строки файла `name` действующего издания по коду `key`. Нет файла или он битый — пусто."""
+    root = fallback_dir()
+    path = os.path.join(root, name) if root else ""
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            return {(r.get(key) or "").strip(): r for r in csv.DictReader(f)}
+    except (OSError, csv.Error, UnicodeDecodeError):
+        return {}
+
+
+def fallback_cfg():
+    """`scoring.json` действующего издания. Нет файла или он битый — пусто."""
+    root = fallback_dir()
+    path = os.path.join(root, "scoring.json") if root else ""
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def rule_key(rule):
+    """Правило буквы связывается с тем же правилом другого издания буквой и условием."""
+    return (rule.get("grade"), json.dumps(rule.get("if") or {}, sort_keys=True))
+
+
+def fill_cfg_texts(cfg):
+    """Копия `scoring.json` с подписью оценки и словом срока «немедленно» на каждом языке печати."""
+    other = fallback_cfg()
+    out = dict(cfg)
+    grades = dict(cfg.get("grades") or {})
+    other_grades = other.get("grades") or {}
+    other_rules = {rule_key(r): r for r in other_grades.get("rules") or []}
+    grades["rules"] = [fill_texts(r, ("label",), other_rules.get(rule_key(r)))
+                       for r in grades.get("rules") or []]
+    if "fallback" in grades:
+        grades["fallback"] = fill_texts(grades["fallback"], ("label",), other_grades.get("fallback"))
+    out["grades"] = grades
+    if "deadlines" in cfg:
+        out["deadlines"] = fill_texts(cfg["deadlines"], ("d3_note",), other.get("deadlines"))
+    return out
+
+
+def load_checklist(as_file=False):
     """Вопросы чек-листа. Дубль id и нечитаемый срок устранения — отказ, не подмена.
 
     Раньше дубль id пропускался с предупреждением в sys.stderr, которое никто
@@ -105,6 +193,10 @@ def load_checklist():
     Пустая клетка days остаётся нулём и отказа не вызывает: это осознанное
     решение — manage.py add без --days пишет в CSV именно пустоту, и запрет
     сломал бы штатное заведение пункта.
+
+    Тексты процесса и вопроса приходят заполненными на каждый язык печати (`fill_texts`):
+    нет перевода в издании проверки — берётся из действующего издания по коду пункта, затем
+    английский. `as_file=True` отдаёт строки как в файле — так читает тот, кто их потом пишет.
     """
     path = data_path("checklist.csv")
     with open(path, encoding="utf-8-sig") as f:
@@ -150,10 +242,13 @@ def load_checklist():
             )
         r["letter_role"] = role
         out.append(r)
-    return out
+    if as_file:
+        return out
+    other = fallback_rows("checklist.csv", "id")
+    return [fill_texts(r, ("process", "question"), other.get(r["id"])) for r in out]
 
 
-def load_zones():
+def load_zones(as_file=False):
     """Физические зоны и их доли. Сумма долей обязана сходиться к 100%.
 
     Раньше несходящаяся сумма молча переписывала ВСЕ доли на равные (100/N).
@@ -189,12 +284,16 @@ def load_zones():
             f"ожидается {ZONE_SHARE_TOTAL:g}%. Файл: {path}. "
             f"Поправьте колонку share_pct — считать оценку по такой методике нельзя."
         )
-    return rows
+    if as_file:
+        return rows
+    other = fallback_rows("zones.csv", "code")
+    return [fill_texts(r, ("name",), other.get(r["code"].strip())) for r in rows]
 
 
-def load_cfg():
+def load_cfg(as_file=False):
     with open(data_path("scoring.json"), encoding="utf-8") as f:
-        return json.load(f)
+        cfg = json.load(f)
+    return cfg if as_file else fill_cfg_texts(cfg)
 
 
 def zone_codes(cl_row, zones):
@@ -360,7 +459,19 @@ def cmd_kinds(a):
         print(f"{code} | {words}")
 
 
-LANGS = ("ru", "en")
+#: Языки печати отчёта и письма. Движок не импортирует `src` по контракту слоёв
+#: и держит свою копию `src/domain/models.py: REPORT_LANGS`; равенство двух копий
+#: проверяет `tests/test_lang_catalogs_complete.py`.
+LANGS = ("ru", "en", "tr")
+#: Язык обязательных колонок методики (`question_ru`, `name_ru`) — копия
+#: `src/domain/models.py: BASE_LANG`, сверяется тем же тестом.
+BASE_LANG = "ru"
+#: Язык, на который откатывается текст методики, если на нужном его нет нигде (#1619):
+#: свой язык → английский → базовый.
+FALLBACK_LANG = "en"
+#: Каталог ДЕЙСТВУЮЩЕГО (опубликованного) издания того же чек-листа: там ищется перевод,
+#: которого нет в издании самой проверки. Не задан или не открывается — искать негде.
+FALLBACK_DIR_VAR = "CHECKLIST_FALLBACK_DIR"
 META_FIELDS = ("unit", "city", "partner", "contact", "auditor", "kind", "type", "date", "lang")
 
 #: Вид проверки: код — сущность, слово — перевод (T152, T177).
@@ -386,9 +497,9 @@ META_FIELDS = ("unit", "city", "partner", "contact", "auditor", "kind", "type", 
 #: держит честным тест `test_engine_kind_code.py`, а команда `kinds` — его
 #: единственный способ прочитать эту таблицу, не импортируя движок.
 INSPECTION_KINDS = {
-    "planned": {"ru": "Плановая", "en": "Planned"},
-    "repeat": {"ru": "Повторная", "en": "Repeat"},
-    "unscheduled": {"ru": "Внеплановая", "en": "Unscheduled"},
+    "planned": {"ru": "Плановая", "en": "Planned", "tr": "Planlı"},
+    "repeat": {"ru": "Повторная", "en": "Repeat", "tr": "Tekrar"},
+    "unscheduled": {"ru": "Внеплановая", "en": "Unscheduled", "tr": "Plansız"},
 }
 DEFAULT_KIND = "planned"
 
@@ -406,6 +517,24 @@ def clean_date(v):
         return date.fromisoformat(v).isoformat()
     except (ValueError, TypeError):
         sys.exit(f"Дата «{v}» не в формате ISO. Нужен ГГГГ-ММ-ДД, например 2026-08-21")
+
+
+def text_in(row, field, lang):
+    """Текст `<field>_<язык>` строки; нет колонки или пусто — en, затем ru."""
+    for code in (lang, FALLBACK_LANG, "ru"):
+        value = row.get(f"{field}_{code}")
+        if value:
+            return value
+    return ""
+
+
+def lang_fields(field, getter):
+    """Поля `<field>_<язык>` на каждый язык печати: `{"name_ru": …, "name_en": …}`.
+
+    Ответ движка (`score --json`) несёт текст на каждом языке сразу; набор
+    языков берётся из `LANGS`, а не перечисляется по месту.
+    """
+    return {f"{field}_{lang}": getter(lang) for lang in LANGS}
 
 
 def clean_lang(v):
@@ -883,8 +1012,9 @@ def breakdown(items, per_zone, cfg, pct):
         lines.append({**row, "loss": round(row["loss"], 4)})
     for code, z in per_zone.items():
         if z["zeroed"]:
-            lines.append({"kind": "d3_zone", "zone": code, "name_ru": z["name_ru"],
-                          "name_en": z["name_en"], "count": z["D3"], "loss": z["loss"]})
+            lines.append({"kind": "d3_zone", "zone": code,
+                          **lang_fields("name", lambda lang, z=z: text_in(z, "name", lang)),
+                          "count": z["D3"], "loss": z["loss"]})
     lost = sum(row["loss"] for row in lines)
     exact = (cfg["d3"].get("mode") == "zero_zone_share" and not cfg.get("cap_zone_loss_at_share")
              and round(max(cfg["start_pct"] - lost, cfg.get("floor_pct", 0.0)) + 1e-9, 2) == pct)
@@ -900,7 +1030,7 @@ def compute(st, cl_rows, zones, cfg):
     d3cfg = cfg["d3"]
     d3_zones = {f["zone"] for f in st["findings"] if f["level"] == "D3"}
     counts = {"D1": 0, "D2": 0, "D3": 0}
-    per_zone = {z["code"]: {"name_ru": z["name_ru"], "name_en": z["name_en"],
+    per_zone = {z["code"]: {**lang_fields("name", lambda lang, z=z: text_in(z, "name", lang)),
                             "share": z["share_pct"], "D1": 0, "D2": 0, "D3": 0,
                             "loss": 0.0, "zeroed": False} for z in zones}
     items = []
@@ -911,7 +1041,7 @@ def compute(st, cl_rows, zones, cfg):
         # Рекомендация в счётчики классов не входит: это не нарушение и не замер.
         if not advice:
             counts[lvl] = counts.get(lvl, 0) + 1
-        z = per_zone.setdefault(f["zone"], {"name_ru": f["zone"], "name_en": f["zone"],
+        z = per_zone.setdefault(f["zone"], {**lang_fields("name", lambda lang: f["zone"]),
                                             "share": 0.0, "D1": 0, "D2": 0, "D3": 0,
                                             "loss": 0.0, "zeroed": False})
         if not advice:
@@ -936,11 +1066,11 @@ def compute(st, cl_rows, zones, cfg):
                     cost *= float(cfg.get("repeat_multiplier", 1.0))
         days = 0 if advice else min(r.get("days", 0), cfg["deadlines"]["max_days"].get(lvl, 99))
         due = "" if advice else (inspected + timedelta(days=days)).isoformat()
-        items.append({**f, "photos": photos_of(f), "question_ru": r.get("question_ru", ""), "question_en": r.get("question_en", ""),
+        items.append({**f, "photos": photos_of(f),
+                      **lang_fields("question", lambda lang: r.get(f"question_{lang}", "")),
                       "process_code": r.get("process_code", ""),
-                      "process_ru": r.get("process_ru", ""), "process_en": r.get("process_en", ""),
-                      "zone_name_ru": zmap.get(f["zone"], {}).get("name_ru", f["zone"]),
-                      "zone_name_en": zmap.get(f["zone"], {}).get("name_en", f["zone"]),
+                      **lang_fields("process", lambda lang: r.get(f"process_{lang}", "")),
+                      **lang_fields("zone_name", lambda lang: zmap.get(f["zone"], {}).get(f"name_{lang}", f["zone"])),
                       "days": days, "due": due, "counted": counted, "cost": cost})
 
     deductions = 0.0
@@ -988,8 +1118,9 @@ def compute(st, cl_rows, zones, cfg):
 
     def _process(i):
         key = i["process_code"] or i["process_ru"] or "—"
-        return by_process.setdefault(key, {"code": i["process_code"], "name_ru": i["process_ru"],
-                                           "name_en": i["process_en"], "scored": key in scored_processes,
+        return by_process.setdefault(key, {"code": i["process_code"],
+                                           **lang_fields("name", lambda lang: text_in(i, "process", lang)),
+                                           "scored": key in scored_processes,
                                            "D1": 0, "D2": 0, "D3": 0, "loss": 0.0})
 
     for i in items:
@@ -1019,8 +1150,9 @@ def compute(st, cl_rows, zones, cfg):
     for r in cl_rows:
         code = (r.get("process_code") or r.get("process_ru") or "").strip()
         if code and code not in by_process:
-            by_process[code] = {"code": r.get("process_code", ""), "name_ru": r.get("process_ru", ""),
-                                "name_en": r.get("process_en", ""), "scored": code in scored_processes,
+            by_process[code] = {"code": r.get("process_code", ""),
+                                **lang_fields("name", lambda lang, r=r: r.get(f"process_{lang}", "")),
+                                "scored": code in scored_processes,
                                 "D1": 0, "D2": 0, "D3": 0, "loss": 0.0}
 
     for p in by_process.values():
@@ -1030,7 +1162,7 @@ def compute(st, cl_rows, zones, cfg):
             "grade_rule": {"index": rule_index, "if": dict(grade.get("if") or {}),
                            "better_if": better_rule_if(grade, cfg)},
             "breakdown": breakdown(items, per_zone, cfg, pct),
-            "grade_label_ru": grade.get("label_ru", ""), "grade_label_en": grade.get("label_en", ""),
+            **lang_fields("grade_label", lambda lang: grade.get(f"label_{lang}", "")),
             "counts": counts, "deductions": round(deductions, 2),
             "zones": per_zone, "by_process": by_process, "findings": items,
             # Форма поля приводится к паре «текст + кадры» здесь, один раз: дальше

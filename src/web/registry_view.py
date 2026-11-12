@@ -61,7 +61,7 @@ class Filter:
 
 
 def period_title(period: Period, lang: str) -> str:
-    """Подпись периода: «Октябрь 2026», «1 — 15 окт 2026» или «Всё время».
+    """Подпись периода: «Октябрь 2026», «2026», «1 — 15 окт 2026» или «Всё время».
 
     Месяц — словом (#963, #978): ISO-даты в шапке и на кнопке периода читались
     как служебная строка и не помещались в кнопку. Общее у краёв не повторяется:
@@ -69,6 +69,8 @@ def period_title(period: Period, lang: str) -> str:
     """
     if period.is_all:
         return t("registry.period.all", lang)
+    if period.year is not None:
+        return str(period.year)
     месяц = period.month
     if месяц is not None:
         return f"{t(f'registry.month.{месяц.month}', lang)} {месяц.year}"
@@ -105,7 +107,10 @@ def period_link(period: Period, step: int, select: Callable[..., str]) -> str | 
 def period_quick(
     period: Period, today: date, lang: str, select: Callable[..., str]
 ) -> tuple[dict[str, object], ...]:
-    """Быстрые выборы периода: всё время, этот месяц, прошлый.
+    """Быстрые выборы периода: всё время, месяц, год и «Произвольный период».
+
+    «Произвольный период» выбран, когда ни один из остальных не подошёл; он не
+    ведёт по адресу (`custom`), а открывает поля «С» и «По» (`period.js`).
 
     Адреса явные (с датами или `period=all`), а не «без параметров»: у «Проверок»
     без параметров — всё время, у «Главной» — месяц, и ссылка не должна
@@ -113,7 +118,9 @@ def period_quick(
     """
     этот = registry_period.month_of(today)
     прошлый = registry_period.month_of(today.replace(day=1) - timedelta(days=1))
-    return (
+    этот_год = registry_period.year_of(today)
+    прошлый_год = registry_period.year_of(date(today.year - 1, 1, 1))
+    готовые = (
         {
             "title": t("registry.period.all", lang),
             "href": select(**{"from": "", "to": "", "period": registry_period.ALL}),
@@ -128,6 +135,25 @@ def period_quick(
             "title": t("registry.period.last_month", lang),
             "href": select(period="", **прошлый.params()),
             "on": period == прошлый,
+        },
+        {
+            "title": t("registry.period.this_year", lang),
+            "href": select(period="", **этот_год.params()),
+            "on": period == этот_год,
+        },
+        {
+            "title": t("registry.period.last_year", lang),
+            "href": select(period="", **прошлый_год.params()),
+            "on": period == прошлый_год,
+        },
+    )
+    return (
+        *готовые,
+        {
+            "title": t("registry.period.custom", lang),
+            "href": "",
+            "custom": True,
+            "on": not any(q["on"] for q in готовые),
         },
     )
 

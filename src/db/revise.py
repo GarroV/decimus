@@ -293,6 +293,6 @@ def _write_score(cur: Any, ident: str, tenant: str, score: Score) -> None:
             "Оценку не удалось записать: проверка перестала ждать приёмки, пока её правили",
             code="revise_stale",
         )
-    for lang, label in (("ru", score.label_ru), ("en", score.label_en)):
+    for lang, label in score.label_texts.items():
         if label:
             cur.execute(_INSERT_TRANSLATION_SQL, ("inspection", ident, "grade_label", lang, label))

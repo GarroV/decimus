@@ -16,7 +16,7 @@ from pathlib import Path
 from . import edition, route, version
 from .config import DATA_FILES, Settings, check_environment
 from .errors import ConfigError, ValidationError
-from .models import ChecklistItem, Zone
+from .models import ChecklistItem, Zone, lang_texts
 
 
 def _settings(chat_id: int | None) -> Settings:
@@ -77,10 +77,8 @@ def _item(row: dict[str, str | None], path: Path, line: int) -> ChecklistItem:
     return ChecklistItem(
         code=code,
         kind=_text(row, "kind") or "violation",
-        process_ru=_text(row, "process_ru"),
-        process_en=_text(row, "process_en"),
-        question_ru=_text(row, "question_ru"),
-        question_en=_text(row, "question_en"),
+        process_texts=lang_texts(row, "process"),
+        question_texts=lang_texts(row, "question"),
         levels=levels,
         zones=zones,
         days=days,
@@ -145,8 +143,7 @@ def _zones(settings: Settings) -> list[Zone]:
     zones = [
         Zone(
             code=_text(row, "code"),
-            title_ru=_text(row, "name_ru"),
-            title_en=_text(row, "name_en"),
+            title_texts=lang_texts(row, "name"),
             share_pct=float(_text(row, "share_pct") or 0),
         )
         for row in _rows(settings.data_dir / "zones.csv")

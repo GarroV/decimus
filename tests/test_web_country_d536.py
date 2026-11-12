@@ -509,7 +509,7 @@ def test_аудиторы_страны_по_числу_проверок() -> Non
 
 def test_у_каждого_языка_методики_есть_название_для_карточки() -> None:
     """D543: карточка зовёт язык `nav.lang.<код>`; язык методики без названия уронил бы её."""
-    from src.domain.models import TEXT_LANGS
+    from src.domain.models import REPORT_LANGS
     from src.web.texts import TEXTS
 
-    assert [code for code in TEXT_LANGS if f"nav.lang.{code}" not in TEXTS] == []
+    assert [code for code in REPORT_LANGS if f"nav.lang.{code}" not in TEXTS] == []

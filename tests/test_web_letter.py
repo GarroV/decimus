@@ -32,7 +32,7 @@ from flask.testing import FlaskClient
 from test_web_app import ТЕНАНТ, карточка, шапка
 from web_harness import войти, подменить_двери, собрать
 
-from src.domain.models import TEXT_LANGS
+from src.domain.models import REPORT_LANGS
 from src.report.letter_markup import to_plain
 from src.report.letters import (
     BLANK_TEXT_FIELD,
@@ -256,7 +256,7 @@ def test_переключатель_предлагает_только_языки
     страница = стенд.get(f"/inspections/{ПРОВЕРКА}/letter").get_data(as_text=True)
 
     # Assert
-    for код in TEXT_LANGS:
+    for код in REPORT_LANGS:
         assert f"letter_lang={код}" in страница
     assert "letter_lang=fr" not in страница
 

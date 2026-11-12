@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from src.domain.models import Zone
+from src.domain.models import Zone, lang_texts
 from src.mcp import import_draft as dr
 from src.mcp import import_match as im
 from src.mcp import import_suggest as sug
@@ -77,7 +77,7 @@ def черновик(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> dr.Dr
         строки = [dict(r) for r in csv.DictReader(f)]
     with (МЕТОДИКА / "zones.csv").open(encoding="utf-8-sig", newline="") as f:
         зоны = [
-            Zone(code=r["code"], title_ru=r["name_ru"], title_en=r["name_en"], share_pct=0.0)
+            Zone(code=r["code"], title_texts=lang_texts(r, "name"), share_pct=0.0)
             for r in csv.DictReader(f)
         ]
     monkeypatch.setattr(

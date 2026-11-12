@@ -599,7 +599,7 @@
 
 .walk-dock__next {
   flex: 1;
-  min-height: 44px;
+  min-height: 40px;
   padding: 0 12px;
   border: 1px solid var(--ok-line);
   border-radius: 22px;

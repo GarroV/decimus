@@ -1,9 +1,8 @@
 # ruff: noqa: F811 — фикстура стенда приходит импортом из test_web_app
-"""Карточка проверки на приёмке (D745): принять сразу, корзина последней, классы кодами.
+"""Карточка проверки на приёмке (D750, D749): принять сразу, «Отклонить» в ряду решений, классы кодами.
 
 Права считает `_card_context`; здесь проверяется, что и панель реестра, и страница
-принимают одной формой без подтверждения, «Удалить проверку» стоит корзиной последней
-в группе пиктограмм, класс показан кодом D1/D2/D3, статус «На приёмке» — одним носителем,
+принимают одной формой без подтверждения, «Отклонить» стоит третьим в ряду решений, класс показан кодом D1/D2/D3, статус «На приёмке» — одним носителем,
 а повтор виден на самой записи.
 """
 
@@ -60,7 +59,7 @@ def test_принять_принимает_сразу_одной_формой(
         re.S,
     )
     assert форма, "нет формы «Принять»"
-    assert "<button" in форма.group(2) and "Принять проверку" in форма.group(2)
+    assert "<button" in форма.group(2) and "<span>Принять</span>" in форма.group(2)
     assert ("data-panel-form" in форма.group(1)) is (адрес == ПАНЕЛЬ)
     assert страница.count(f'action="/inspections/{ID}/accept') == 1
     # Ни раскрывающегося подтверждения, ни сводки цены решения.
@@ -69,29 +68,38 @@ def test_принять_принимает_сразу_одной_формой(
 
 @pytest.mark.parametrize("стенд", ["admin"], indirect=True)
 @pytest.mark.parametrize("адрес", [ПАНЕЛЬ, СТРАНИЦА], ids=["панель", "страница"])
-def test_удалить_проверку_корзина_последней_среди_пиктограмм(
+def test_отклонить_кнопка_с_подписью_в_ряду_решений(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, адрес: str
 ) -> None:
     страница = _открыть(стенд, monkeypatch, адрес)
 
-    ауксы = страница.split("hact__group--aux", 1)[1]
+    решения = страница.split("hact__group--decide", 1)[1].split("hact__group--aux", 1)[0]
     окно = re.search(
         r'<details class="hact__item" name="hact" id="retract">\s*'
-        r'<summary class="([^"]*)" aria-label="([^"]*)" data-tip="([^"]*)">(.*?)</summary>'
+        r'<summary class="([^"]*)">(.*?)</summary>'
         r'.*?<form method="post" action="/inspections/[^"]+/retract\?lang=ru"',
-        ауксы,
+        решения,
         re.S,
     )
-    assert окно, "корзины «Удалить проверку» нет в группе пиктограмм"
-    классы, имя, подсказка, внутри = окно.groups()
-    assert "hbtn--icon" in классы and "hbtn--danger" in классы
-    assert имя == подсказка == "Удалить проверку"
-    assert "<span>" not in внутри, "у корзины не должно быть текстовой подписи"
-    assert "required" in ауксы[окно.start() :]  # причина обязательна
-    # Последняя: после неё в группе нет ни ссылок, ни других окон.
-    хвост = ауксы[окно.end() :].split("</details>", 1)[1].split("</div>", 1)[0]
-    assert "hbtn" not in хвост and "<details" not in хвост
-    assert "<span>Отклонить" not in страница
+    assert окно, "«Отклонить» нет в ряду решений"
+    классы, внутри = окно.groups()
+    assert "hbtn--danger" in классы and "hbtn--icon" not in классы
+    assert "<span>Отклонить</span>" in внутри
+    assert "required" in решения[окно.start() :]  # причина обязательна
+    assert "Удалить проверку" not in страница
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+@pytest.mark.parametrize("адрес", [ПАНЕЛЬ, СТРАНИЦА], ids=["панель", "страница"])
+def test_pdf_значок_с_подписью_pdf(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, адрес: str
+) -> None:
+    страница = _открыть(стенд, monkeypatch, адрес)
+
+    ссылка = re.search(r'<a class="hbtn ([^"]*)" href="[^"]*/report[^"]*"[^>]*>(.*?)</a>', страница, re.S)
+    assert ссылка, "нет ссылки на PDF"
+    assert "hbtn--pdf" in ссылка.group(1) and "hbtn--icon" not in ссылка.group(1)
+    assert "<svg" in ссылка.group(2) and "<span>PDF</span>" in ссылка.group(2)
 
 
 @pytest.mark.parametrize("стенд", ["admin"], indirect=True)
@@ -104,10 +112,10 @@ def test_решения_и_второстепенное_в_двух_группа
     остальное = страница.index("hact__group--aux")
     assert решения < остальное
     группа = страница[решения:остальное]
-    for id_ in ('id="move"', "/accept?lang="):
+    for id_ in ('id="move"', "/accept?lang=", 'id="retract"'):
         assert id_ in группа, id_
     assert "/report" not in группа and "view=letter" not in группа
-    assert 'id="retract"' not in группа and 'id="retract"' in страница[остальное:]
+    assert 'id="retract"' not in страница[остальное:]
 
 
 @pytest.mark.parametrize("стенд", ["admin"], indirect=True)

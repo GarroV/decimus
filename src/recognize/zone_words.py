@@ -21,14 +21,14 @@ import re
 from collections.abc import Mapping, Sequence
 
 from src import domain
-from src.domain.models import TEXT_LANGS, Zone
+from src.domain.models import SPEECH_LANGS, Zone
 
 from . import language
 from .cues import stems, words_and_gaps
 
 #: Языки названий зон. Совпадает с языками интерфейса бота (`bot.texts.UI_LANGS`);
 #: расхождение ловит `tests/test_bot_zone_from_words.py`.
-NAME_LANGS = TEXT_LANGS
+NAME_LANGS = SPEECH_LANGS
 
 #: Как зоны называют вслух — то, чего в `data/zones.csv` нет.
 #:

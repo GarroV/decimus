@@ -202,3 +202,56 @@ def _available_months(countries: Sequence[str]) -> list[date]:
 def latest_available_month(countries: Sequence[str]) -> date | None:
     months = _available_months(countries)
     return months[0] if months else None
+
+
+@dataclass(frozen=True)
+class KindLoad:
+    """Журнал загрузки одного вида данных страны: последняя удачная и последняя попытка."""
+
+    country: str
+    kind: str
+    ok_at: datetime | None
+    ok_rows: int | None
+    attempt_at: datetime | None
+    attempt_ok: bool | None
+    attempt_error: str | None
+
+
+@dataclass(frozen=True)
+class CountryData:
+    """Сколько пиццерий страны имеют данные за месяц и самый свежий месяц с данными."""
+
+    country: str
+    units_with_data: int
+    latest_month: date | None
+
+
+def kind_loads() -> list[KindLoad]:
+    """По каждой стране и виду — последняя удачная загрузка и последняя завершённая попытка."""
+    rows = _rows(
+        "select country, kind, "
+        "  (select finished_at from dodois.metric_loads o where o.country = l.country "
+        "     and o.kind = l.kind and o.ok order by finished_at desc limit 1), "
+        "  (select rows from dodois.metric_loads o where o.country = l.country "
+        "     and o.kind = l.kind and o.ok order by finished_at desc limit 1), "
+        "  finished_at, ok, error "
+        "from (select distinct on (country, kind) * from dodois.metric_loads "
+        "      where finished_at is not null order by country, kind, started_at desc) l "
+        "order by country, kind",
+        (),
+    )
+    return [KindLoad(*r) for r in rows]
+
+
+def country_data(month: date) -> list[CountryData]:
+    """Пиццерии со строками продаж, агрегаторов или КР за `month` и свежайший месяц данных."""
+    rows = _unit_rows(
+        "with d as (select dodo_id, month from dodois.unit_sales_month "
+        "  union all select dodo_id, month from dodois.unit_aggregator_month "
+        "  union all select dodo_id, month from dodois.unit_kr_month) "
+        "select u.country_code, count(distinct d.dodo_id) filter (where d.month = %s), "
+        "  max(d.month) from d join source_units u on u.dodo_id = d.dodo_id "
+        "group by u.country_code order by u.country_code",
+        (month,),
+    )
+    return [CountryData(*r) for r in rows]
