@@ -293,6 +293,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
 | `src/web/texts_notifications.py` | Тексты уведомлений в приложении (#1129, D604, D614): колокольчик и фразы событий |
 | `src/web/texts_oauth.py` | Тексты подключения нейросетей входом через сайт (D417, D695): согласие, отказ, плитка |
+| `src/web/texts_onboarding.py` | Тексты онбординга (D756, D759 п.6, #1668): «Начало работы», тур по интерфейсу, готовность |
 | `src/web/texts_peek.py` | Тексты переключателя пространств главного админа (D726) |
 | `src/web/texts_plan_file.py` | Тексты файла «туда и обратно» электронного плана (#1168, шаг 3): выгрузка, итог, конфликт |
 | `src/web/texts_plan_rows.py` | Тексты электронного плана исправлений (#1168): строки, путь, начало отсчёта, события |
@@ -373,7 +374,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/mailings/` | 2 | document.html, plan_letter.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
-| `src/web/templates/overview/` | 1 | index.html |
+| `src/web/templates/overview/` | 2 | _start.html, index.html |
 | `src/web/templates/peek/` | 2 | _switch.html, readonly.html |
 | `src/web/templates/prescriptions/` | 1 | not_found.html |
 | `src/web/templates/quality/` | 1 | index.html |
@@ -388,9 +389,10 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 84 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+76) |
+| `src/web/static/` | 86 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+78) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
+| `src/web/static/vendor/driver/` | 4 | LICENSE, SOURCE.md, driver.css, driver.js |
 <!-- map:end -->
 
 ## src/db — база и хранилище
@@ -664,6 +666,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0129_calendar_deadline.sql` | D740, D741 (#1590): срок отчёта по проверке УК — событием в Google Календаре проверяющего |
 | `0130_close_invariants.sql` | Три красных инварианта базы на main (проверки `test_db_definer_search_path` и `test_db_space_isolation`), закрываются новым файлом: применённые `0123` и `0128` заморожены |
 | `0131_mailing_templates_lang.sql` | Язык шаблона письма больше не пара `ru`/`en` (#541, #1619): список языков отчёта живёт в коде (`src/domain/models.py: REPORT_LANGS`), и третий язык не должен упираться в… |
+| `0135_web_onboarding.sql` | Онбординг партнёра (D756, D759 п.6, #1668): две личные пометки учётки |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -1168,6 +1171,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/plan_rows_backfill.py` | Строки для старых открытых запросов экшн-плана — разовый доливщик (#1168) |
 | `tools/porcha_core.py` | Порча ядра (#268): испорченный расчёт обязан уронить прогон |
 | `tools/porcha_mcp.py` | Порча обёртки чужого текста и аннотаций MCP (#1338): сломанная защита обязана уронить тест |
+| `tools/porcha_onboarding.py` | Порча ядра «Начала работы» (D756, #1668): сломанная защита обязана уронить свой тест |
 | `tools/porcha_permissions.py` | Порча матрицы прав (D408): каждая сломанная защита обязана уронить свой тест |
 | `tools/porcha_ratings.py` | Порча защит рейтингов: каждая сломанная защита обязана уронить свой тест |
 | `tools/porcha_second_factor.py` | Порча второй ступени входа (D463): каждая сломанная защита обязана уронить свой тест |

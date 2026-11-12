@@ -184,6 +184,10 @@ _WEB: dict[str, tuple[str, str]] = {
     ),
     "save_letter": ("Письмо сохранено", "Letter saved"),
     "settings_bot_link": ("Выпущена ссылка привязки бота", "Bot link issued"),
+    "settings_onboarding": (
+        "Отмечен тур или скрыта карточка «Начало работы»",
+        "Tour marked as seen or the Getting started card hidden",
+    ),
     "settings_bot_unlink": ("Отвязан свой бот", "Own bot unlinked"),
     "settings_claude_revoke": (
         "Отключено своё подключение Claude",

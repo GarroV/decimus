@@ -55,7 +55,7 @@
   </select>
 {% endmacro %}
 
-{% macro space_card(picked, adding, manages, show, link, options) %}
+{% macro space_card(picked, adding, manages, show, link, options, readiness=()) %}
   {% if adding and manages %}
     <article class="sdetail" aria-labelledby="space-add-title">
       <header class="sdetail__head"><div class="sdetail__who">
@@ -103,6 +103,18 @@
         <h3 class="ssec__title">{{ t('users.spaces.col.people') }}</h3>
         <p class="ssec__text"><b>{{ picked.people }}</b> · <a href="{{ link(space=picked.code) }}">{{ t('users.spaces.show_people') }}</a></p>
       </section>
+      {% if readiness %}
+      <section class="ssec" data-readiness>
+        <h3 class="ssec__title">{{ t('readiness.title') }}</h3>
+        <p class="ssec__note">{{ t('readiness.note') }}</p>
+        <ul class="ssec__text">
+          {% for row in readiness %}
+          <li data-readiness-row="{{ row.key }}" data-state="{{ row.state }}">{{ t('readiness.' ~ row.key) }} — <b>{{ t('readiness.yes' if row.state == 'done' else ('readiness.unknown' if row.state == 'unknown' else 'readiness.no')) }}</b></li>
+          {% endfor %}
+        </ul>
+        {% if readiness | rejectattr('state', 'equalto', 'done') | list | length == 0 %}<p class="ssec__note">{{ t('readiness.ready') }}</p>{% endif %}
+      </section>
+      {% endif %}
     </article>
   {% else %}
     <div class="sdetail sdetail--hint"><p class="sdetail__title">{{ t('users.spaces.none') }}</p></div>

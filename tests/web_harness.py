@@ -76,6 +76,9 @@ class Учётка:
         self.web_lang = web_lang
         # Постоянный отбор стран (`web_users.country_filter`, 0077, D536): по умолчанию нет.
         self.country_filter = country_filter
+        # Онбординг (D756, 0135): тур не видел, карточку не скрывал.
+        self.tour_seen_at = None
+        self.start_hidden_at = None
         # Переключатель пространств (D726): по умолчанию выключен.
         self.acting_tenant = None
         self.acting_name = ""

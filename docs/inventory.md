@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 229 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 230 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -206,6 +206,7 @@
 | `/settings/notifications` | GET | `notifications_menu` | `src/web/notifications.py` |
 | `/settings/notifications/<int:notification_id>/read` | POST | `notifications_read` | `src/web/notifications.py` |
 | `/settings/notifications/read-all` | POST | `notifications_read_all` | `src/web/notifications.py` |
+| `/settings/onboarding` | POST | `settings_onboarding` | `src/web/onboarding_screen.py` |
 | `/settings/password` | POST | `settings_own_password` | `src/web/settings_screen.py` |
 | `/settings/security` | GET | `security_page` | `src/web/security_screen.py` |
 | `/settings/security/backup/generate` | POST | `security_backup_generate` | `src/web/security_screen.py` |
@@ -671,6 +672,7 @@
 | `0129_calendar_deadline.sql` | `calendar_grants`, `calendar_events` |
 | `0130_close_invariants.sql` | — |
 | `0131_mailing_templates_lang.sql` | — |
+| `0135_web_onboarding.sql` | — |
 <!-- map:end -->
 
 ## Makefile
@@ -703,6 +705,7 @@
 | `make migrate` | накат SQL-миграций; на накатанной базе ничего не делает |
 | `make porcha` | порча ядра: испорченный расчёт обязан уронить прогон (без базы, нужны data/ и examples/) |
 | `make porcha-mcp` | порча обёртки чужого текста и аннотаций MCP: каждая сломанная защита обязана уронить свой тест (без базы) |
+| `make porcha-onboarding` | порча ядра «Начала работы»: каждое сломанное правило шагов обязано уронить свой тест (без базы) |
 | `make porcha-permissions` | порча матрицы прав: каждая сломанная защита обязана уронить свой тест (без базы) |
 | `make porcha-second-factor` | порча второй ступени входа (D463): каждая сломанная защита обязана уронить свой тест (нужна тестовая база) |
 | `make processhint` | замер признака «<описание>, это <процесс>»: сколько раз он срабатывает зря |
