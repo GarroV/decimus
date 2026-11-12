@@ -1,18 +1,22 @@
-"""Экран «Качество»: рабочая страница здоровья по странам и пиццериям за месяц.
+"""Экран «Качество»: рабочая страница здоровья по странам и пиццериям за период.
 
 Вопрос экрана: «как работают пиццерии сети — рейтинги, оценки клиентов, агрегаторы, каналы,
-выручка, наша проверка — и что за месяц стало хуже». Есть итоговый рейтинг и веса компонентов
+выручка, наша проверка — и что за период стало хуже». Есть итоговый рейтинг и веса компонентов
 по методике аналитика (D719), мест нет (D677).
-Каркас — общий шаблон «выбор слева — рабочая область справа» (`_pick_page.html`, D474, D655),
-как у «Стран»: слева страны, справа таблица стран или страна целиком — строки пиццерий и блоки.
+Каркас — общий шаблон `_pick_page.html` без левого столбца (D750): над таблицей один блок
+фильтров — «Страна» (выпадающий список) и «Период» (общий календарь `_period.html`); ниже
+таблица стран или страна целиком — строки пиццерий и блоки.
 
-Состояние в адресе: `/quality?country=<код>&month=<ГГГГ-ММ>&sort=<столбец>&dir=desc`. Период —
-один месяц на экран, по умолчанию текущий (идёт, помечен). Доступ как у «Рейтингов»: УК видит
-страны IMF, партнёр — те, что в охвате его пространства (`auth.current_reach`); чужая страна в
-адресе — 404.
+Состояние в адресе: `/quality?country=<код>&from=<дата>&to=<дата>&sort=<столбец>&dir=desc`.
+Период по умолчанию — текущий месяц (идёт, помечен); старый `?month=ГГГГ-ММ` открывает этот
+месяц. Данные помесячные, поэтому период переводится в целые месяцы, которые он задевает
+(не больше `MAX_MONTHS`), и показатели пиццерии сворачиваются в среднее по месяцам
+(`quality_data.load_period`); движение — к предыдущему периоду той же длины в месяцах.
+Доступ как у «Рейтингов»: УК видит страны IMF, партнёр — те, что в охвате его пространства
+(`auth.current_reach`); чужая страна в адресе — 404.
 
 Ничего не считает сам: средние и доли — `src/domain/quality.py`, сборка входов —
-`quality_data`, ячейки — `quality_cells`. Здесь выбор месяца, страны, порядка и подписи.
+`quality_data`, ячейки — `quality_cells`. Здесь период, страна, порядок и подписи.
 """
 
 from __future__ import annotations
@@ -31,7 +35,7 @@ from src.db.errors import DbError, RatingsError
 from src.domain import quality as q
 from src.ratings.countries import country_names
 
-from . import auth, guard, quality_data, ratings_freshness, ui_lang
+from . import auth, guard, quality_data, ratings_freshness, registry_period, registry_view, ui_lang
 from .config import Settings
 from .geo_names import country_title as geo_title
 from .quality_cells import COLUMNS, DASH, cells, group_starts, money, num, pct, shown
@@ -41,8 +45,9 @@ from .texts import t
 
 log = logging.getLogger(__name__)
 
-#: Месяцев в выборе периода: дальше назад выбирать незачем.
-MONTHS_SHOWN = 24
+#: Месяцев в периоде: больше не читаем (каждый месяц — отдельное чтение, и столько же — для
+#: сравнения); длиннее период берёт последние.
+MAX_MONTHS = 12
 SORT_KEYS = ("name", *(c.key for c in COLUMNS))
 
 
@@ -79,27 +84,62 @@ def month_title(month: date, lang: str) -> str:
     )
 
 
-def month_label(month: date, lang: str, today: date) -> str:
-    """Название месяца; текущий, ещё не закончившийся, помечен «месяц идёт»."""
-    title = month_title(month, lang)
-    if month < today.replace(day=1):
-        return title
-    return t("quality.month.in_progress", lang, title=title)
-
-
 def _scope(reach_countries: tuple[str, ...] | None) -> tuple[str, ...]:
     imf = [row.code for row in read.countries() if row.is_imf]
     return tuple(c for c in imf if reach_countries is None or c in reach_countries)
 
 
-def _available_months(today: date, scope: tuple[str, ...]) -> tuple[date, ...]:
-    """Месяцы выбора: те, где у рейтингов или у Dodo IS что-то есть, плюс текущий."""
-    found = set(read.period_months())
-    for code in scope:
-        found.update(dodois_metrics.months_with_data(code))
-    found.add(default_month(today))
-    limit = today.replace(day=1)
-    return tuple(sorted((m for m in found if m <= limit), reverse=True))[:MONTHS_SHOWN]
+def resolve_period(args: Mapping[str, str], today: date) -> registry_period.Period:
+    """Период из адреса; старый `?month=` — этот месяц. Открытые края и будущее достраиваются:
+    нет начала — `MAX_MONTHS` назад от конца, нет конца — сегодня, начало в будущем — текущий месяц."""
+    legacy = args.get("month")
+    if legacy and not any(args.get(k) for k in ("from", "to", "period")):
+        return registry_period.month_of(parse_month(legacy, today))
+    found = registry_period.read(args, today=today)
+    end = found.end or today
+    start = found.start or shift(min(end, today).replace(day=1), 1 - MAX_MONTHS)
+    if start > today:
+        return registry_period.month_of(today)
+    return registry_period.Period(start, end)
+
+
+def period_months(period: registry_period.Period, today: date) -> tuple[date, ...]:
+    """Целые месяцы, которые задевает период (от старого к новому), не больше `MAX_MONTHS`."""
+    assert period.start is not None and period.end is not None
+    first = period.start.replace(day=1)
+    last = min(period.end, today).replace(day=1)
+    count = (last.year - first.year) * 12 + last.month - first.month + 1
+    return tuple(shift(last, -i) for i in range(min(count, MAX_MONTHS) - 1, -1, -1))
+
+
+def span_title(months: tuple[date, ...], lang: str) -> str:
+    """Месяцы периода словами: «сентябрь 2026» или «сен–окт 2026»."""
+    first, last = months[0], months[-1]
+    if first == last:
+        return month_title(first, lang)
+
+    def short(m: date) -> str:
+        return t(f"date.mon.{m.month}", lang)
+
+    if first.year == last.year:
+        return f"{short(first)}–{short(last)} {last.year}"
+    return f"{short(first)} {first.year} – {short(last)} {last.year}"
+
+
+def period_note(
+    months: tuple[date, ...], period: registry_period.Period, lang: str, today: date
+) -> str:
+    """Подпись у календаря: по каким месяцам считается период и что последний ещё идёт."""
+    running = months[-1] >= today.replace(day=1)
+    if len(months) == 1:
+        return t("quality.month.in_progress", lang, title=span_title(months, lang)) if running else ""
+    note = t("quality.period.by_months", lang, span=span_title(months, lang))
+    if running:
+        note += " " + t("quality.period.running", lang)
+    assert period.start is not None
+    if period.start.replace(day=1) < months[0]:
+        note += " " + t("quality.period.capped", lang, n=MAX_MONTHS)
+    return note
 
 
 def sorted_by[T](
@@ -303,17 +343,6 @@ def _country_view(
     }
 
 
-def _rail_line(c: CountryHealth, lang: str) -> str:
-    rko, rs = c.values.get("rko"), c.values.get("rs")
-    total = c.values.get("total")
-    if rko is not None or rs is not None:
-        line = t("quality.rail.line", lang, rko=num(rko, 1), rs=num(rs, 1))
-        return t("quality.rail.total", lang, total=num(total, 2), line=line) if total else line
-    if c.units:
-        return t("quality.rail.units", lang, n=len(c.units))
-    return t("quality.rail.none", lang)
-
-
 def _has_values(c: CountryHealth) -> bool:
     return any(v is not None for v in c.values.values())
 
@@ -413,12 +442,23 @@ def _freshness_rows(
     )
 
 
+def _next_link(
+    period: registry_period.Period, today: date, select: Callable[..., str]
+) -> str | None:
+    """Стрелка «позже»: в будущее листать некуда."""
+    following = registry_period.shift(period, 1)
+    if following is None or following.start is None or following.start > today:
+        return None
+    return registry_view.period_link(period, 1, select)
+
+
 def render(lang: str) -> str:
-    """Экран «Качество»; страна, месяц и порядок — из адреса."""
+    """Экран «Качество»; страна, период и порядок — из адреса."""
     today = date.today()
     reach = auth.current_reach()
     code = (request.args.get("country") or "").strip().upper()[:2] or None
-    month = parse_month(request.args.get("month", ""), today)
+    period = resolve_period(request.args, today)
+    months = period_months(period, today)
     sort_key = request.args.get("sort", "name")
     sort_key = sort_key if sort_key in SORT_KEYS else "name"
     desc = request.args.get("dir") == "desc"
@@ -428,53 +468,50 @@ def render(lang: str) -> str:
     #: проверок, ни столбца «Проверка».
     show_audit = guard.may("inspection.read")
 
-    def link(
-        country: str | None,
-        to_month: date | None = None,
-        order: tuple[str, bool] | None = None,
-    ) -> str:
-        params: dict[str, Any] = {"month": f"{(to_month or month):%Y-%m}"}
-        if country:
-            params["country"] = country
-        picked, picked_desc = order if order else (sort_key, desc)
-        if picked != "name":
-            params["sort"], params["dir"] = picked, "desc" if picked_desc else "asc"
-        if keep_lang:
-            params["lang"] = keep_lang
-        return url_for("quality", **params)
+    def select(**changes: str) -> str:
+        """Адрес экрана с этими изменениями; остальное (страна, период, порядок) сохраняется."""
+        params: dict[str, str] = {
+            "country": code or "",
+            "sort": sort_key if sort_key != "name" else "",
+            "dir": ("desc" if desc else "asc") if sort_key != "name" else "",
+            "lang": keep_lang,
+            **period.params(),
+            **changes,
+        }
+        return url_for("quality", **{k: v for k, v in params.items() if v})
+
+    def link(country: str | None) -> str:
+        return select(country=country or "")
+
+    def order_link(key: str, descending: bool) -> str:
+        if key == "name":
+            return select(sort="", dir="")
+        return select(sort=key, dir="desc" if descending else "asc")
 
     try:
         scope = _scope(reach.countries)
         if code and code not in scope:
             abort(404)
-        months = _available_months(today, scope)
-        now = quality_data.load_month(reach, scope, month, with_audit=show_audit)
-        before = quality_data.load_month(reach, scope, shift(month, -1), with_audit=show_audit)
+        now = quality_data.load_period(reach, scope, months, with_audit=show_audit)
+        before_months = tuple(shift(m, -len(months)) for m in months)
+        before = quality_data.load_period(reach, scope, before_months, with_audit=show_audit)
     except (DbError, RatingsError):
         log.exception("Качество: данные не прочитались")
         return render_template(
-            "quality/index.html", failed=True, rail=(), view=None, section_path=base
+            "quality/index.html", failed=True, view=None, section_path=base, pick_norail=True
         )
-    rail = tuple(
-        {
-            "code": c.code,
-            "title": country_title(c.code, lang),
-            "meta": _rail_line(c, lang),
-            "href": link(c.code),
-            "on": c.code == code,
-        }
-        for c in sorted(now.values(), key=lambda c: country_title(c.code, lang).casefold())
-    )
     try:
         latest_data = dodois_metrics.latest_available_month((code,) if code else scope)
     except (DbError, RatingsError):
         log.warning("Качество: последний месяц данных не прочитался")
         latest_data = None
-    options = tuple(
-        {"href": link(code, m), "title": month_label(m, lang, today), "on": m == month}
-        for m in months
+    countries = (
+        {"href": link(None), "title": t("quality.network", lang), "on": not code},
+        *(
+            {"href": link(c), "title": country_title(c, lang), "on": c == code}
+            for c in sorted(scope, key=lambda c: country_title(c, lang).casefold())
+        ),
     )
-    prev_month, next_month = shift(month, -1), shift(month, 1)
     visible = shown(show_audit, country=bool(code))
     firsts = group_starts(visible)
     group_sizes = {g: sum(1 for c in visible if c.group == g) for g in {c.group for c in visible}}
@@ -487,7 +524,7 @@ def render(lang: str) -> str:
                 lang,
                 w=_pct_whole(q.MAPS_WEIGHT),
             ),
-            "href": link(code, order=(key, not (sort_key == key and desc))),
+            "href": order_link(key, not (sort_key == key and desc)),
             "on": sort_key == key,
             "desc": sort_key == key and desc,
             "group": group,
@@ -502,7 +539,7 @@ def render(lang: str) -> str:
         column("name"),
         *(column(c.key, c.group, f) for c, f in zip(visible, firsts, strict=True)),
     )
-    in_progress = month >= today.replace(day=1)
+    in_progress = months[-1] >= today.replace(day=1)
     view: dict[str, Any] | None = None
     view_source = now[code].rating_source if code else ""
     network: list[dict[str, Any]] = []
@@ -512,27 +549,49 @@ def render(lang: str) -> str:
         )
     else:
         network = _network_rows(now, before, lang, show_audit, link, sort_key, desc, in_progress)
+    quick_all = t("registry.period.all", lang)
+    hidden = {
+        k: v
+        for k, v in {
+            "country": code or "",
+            "sort": sort_key if sort_key != "name" else "",
+            "dir": ("desc" if desc else "asc") if sort_key != "name" else "",
+            "lang": keep_lang,
+        }.items()
+        if v
+    }
+    span = span_title(months, lang)
     return render_template(
         "quality/index.html",
         failed=False,
         view=view,
         network=network,
         no_data=_no_data_links(now, lang, link) if not code else [],
-        no_data_title=month_title(month, lang).lower()
-        if lang == "ru"
-        else month_title(month, lang),
+        no_data_title=span.lower() if lang == "ru" else span,
         columns=columns,
-        rail=rail,
+        pick_norail=True,
         code=code,
         title=country_title(code, lang) if code else t("quality.network", lang),
         kicker=t("quality.kicker.country" if code else "quality.kicker.network", lang),
-        network_href=link(None),
-        month_options=options,
-        latest_data_href=link(code, latest_data) if latest_data and latest_data < month else None,
+        countries=countries,
+        period=period,
+        period_title=registry_view.period_title(period, lang),
+        period_prev=registry_view.period_link(period, -1, select),
+        period_next=_next_link(period, today, select),
+        period_quick=tuple(
+            o
+            for o in registry_view.period_quick(period, today, lang, select)
+            if o["title"] != quick_all
+        ),
+        period_hidden=hidden,
+        period_action=base,
+        period_note=period_note(months, period, lang, today),
+        latest_data_href=(
+            select(period="", **registry_period.month_of(latest_data).params())
+            if latest_data and latest_data < months[0]
+            else None
+        ),
         latest_data_title=month_title(latest_data, lang) if latest_data else None,
-        month_title=month_label(month, lang, today),
-        prev_href=link(code, prev_month),
-        next_href=link(code, next_month) if next_month <= today.replace(day=1) else None,
         tip_rows=_freshness_rows(
             lang, show_audit, view_source, _carried_rows(now.get(code) if code else None, lang)
         ),

@@ -644,3 +644,128 @@ def _load_country(
         state = DODOIS_NOT_COLLECTED
     currency = next((s.currency for s in sales if s.currency), None)
     return _country(code, units, currency, state)
+
+
+#: Показатели, которые за период складываются; остальные — среднее по месяцам (`q.fold_months`).
+_SUMMED = ("rev_dine", "rev_delivery")
+
+
+def _sum_dicts(parts: Iterable[Mapping[str, Decimal]]) -> dict[str, Decimal]:
+    out: dict[str, Decimal] = defaultdict(Decimal)
+    for part in parts:
+        for key, amount in part.items():
+            out[key] += amount
+    return dict(out)
+
+
+def _kr_side(pairs: list[tuple[Decimal, int]]) -> tuple[Decimal | None, int]:
+    count = sum(n for _, n in pairs)
+    return (sum((a * n for a, n in pairs), Decimal(0)) / count, count) if count else (None, 0)
+
+
+def _fold_kr(parts: Sequence[dodois_metrics.UnitKr]) -> dodois_metrics.UnitKr | None:
+    """КР за период: средняя по отзывам всех месяцев, отдельно зал и доставка."""
+    dine = [(p.dine_in_avg, p.dine_in_count) for p in parts if p.dine_in_avg is not None]
+    delivery = [(p.delivery_avg, p.delivery_count) for p in parts if p.delivery_avg is not None]
+    da, dn = _kr_side([(a, n) for a, n in dine if n > 0])
+    va, vn = _kr_side([(a, n) for a, n in delivery if n > 0])
+    if da is None and va is None:
+        return None
+    return dodois_metrics.UnitKr(parts[-1].dodo_id, da, dn, va, vn)
+
+
+def _fold_maps(months: Sequence[UnitHealth]) -> tuple[tuple[str, Decimal, int], ...]:
+    """Карты за период: оценка — среднее по месяцам, отзывов — сумма месяцев."""
+    seen: dict[str, list[tuple[Decimal, int]]] = defaultdict(list)
+    for u in months:
+        for provider, score, count in u.maps:
+            seen[provider].append((score, count))
+    return tuple(
+        (provider, q.mean([s for s, _ in found]) or Decimal(0), sum(c for _, c in found))
+        for provider, found in sorted(seen.items())
+    )
+
+
+def _fold_aggs(months: Sequence[UnitHealth]) -> tuple[AggLine, ...]:
+    """Агрегаторы за период: заказы — сумма, оценка площадки — среднее месяцев, где она есть."""
+    orders: dict[str, int] = defaultdict(int)
+    scores: dict[str, list[Decimal]] = defaultdict(list)
+    keys: dict[str, str | None] = {}
+    scales: dict[str, int | None] = {}
+    for u in months:
+        for line in u.aggs:
+            orders[line.name] += line.orders
+            keys[line.name] = line.key
+            if line.score is not None:
+                scores[line.name].append(line.score)
+                scales[line.name] = line.scale
+    lines = (
+        AggLine(name, keys[name], n, q.mean(scores[name]), scales.get(name))
+        for name, n in orders.items()
+    )
+    return tuple(sorted(lines, key=lambda x: -x.orders))
+
+
+def _fold_unit(months: Sequence[UnitHealth]) -> UnitHealth:
+    """Пиццерия за период: показатели — среднее её месяцев (итог — среднее месячных итогов),
+    заказы и выручка — суммы, доли заказов — от сумм. `months` — по порядку, свежий последним."""
+    last = months[-1]
+    orders = q.Orders(
+        sum(u.orders.aggregators for u in months),
+        sum(u.orders.app_site for u in months),
+        sum(u.orders.other for u in months),
+    )
+    values = q.fold_months([u.values for u in months], _SUMMED)
+    values.update(
+        share_agg=q.share(orders.aggregators, orders.total),
+        share_app=q.share(orders.app_site, orders.total),
+        share_other=q.share(orders.other, orders.total),
+    )
+    kr_parts = [u.kr_parts for u in months if u.kr_parts is not None]
+    sources = {u.rating_source for u in months if u.rating_source}
+    return UnitHealth(
+        dodo_id=last.dodo_id,
+        name=last.name,
+        country=last.country,
+        values=values,
+        kr_parts=_fold_kr(kr_parts) if kr_parts else None,
+        maps=_fold_maps(months),
+        orders=orders,
+        revenue=_sum_dicts(u.revenue for u in months),
+        revenue_by_source=_sum_dicts(u.revenue_by_source for u in months),
+        aggs=_fold_aggs(months),
+        periods=tuple(p for u in months for p in u.periods),
+        rating_source="mixed" if len(sources) > 1 else next(iter(sources), ""),
+        # Итог пиццерии за период — среднее месячных (`values["total"]`); разбор по весам
+        # одного месяца к периоду не относится, на экране он не читается.
+        overall=None,
+        maps_carried=tuple(dict.fromkeys(c for u in months for c in u.maps_carried)),
+    )
+
+
+def fold_periods(loaded: Sequence[Mapping[str, CountryHealth]]) -> dict[str, CountryHealth]:
+    """Страны за период из загруженных месяцев (по порядку, свежий последним).
+
+    Один месяц — как есть. Несколько: пиццерия сворачивается `_fold_unit`, страна считается
+    тем же путём, что за месяц (`_country`), но от свёрнутых пиццерий (D750)."""
+    if len(loaded) == 1:
+        return dict(loaded[0])
+    out: dict[str, CountryHealth] = {}
+    for code in loaded[-1]:
+        by_unit: dict[str, list[UnitHealth]] = defaultdict(list)
+        for month in loaded:
+            for u in month[code].units:
+                by_unit[u.dodo_id].append(u)
+        units = [_fold_unit(parts) for parts in by_unit.values()]
+        states = [month[code].dodois for month in loaded]
+        state = DODOIS_OK if DODOIS_OK in states else states[-1]
+        currency = next((c for month in loaded if (c := month[code].currency)), None)
+        out[code] = _country(code, units, currency, state)
+    return out
+
+
+def load_period(
+    reach: Reach, countries: Sequence[str], months: Sequence[date], *, with_audit: bool = True
+) -> dict[str, CountryHealth]:
+    """«Качество» стран за целые месяцы: каждый читается `load_month`, потом сворачивается."""
+    return fold_periods([load_month(reach, countries, m, with_audit=with_audit) for m in months])

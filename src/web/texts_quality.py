@@ -1,4 +1,4 @@
-"""Тексты экрана «Качество»: колонка стран, таблицы, блоки, пояснение, пустые состояния.
+"""Тексты экрана «Качество»: фильтры, таблицы, блоки, пояснение, пустые состояния.
 
 Отдельным модулем, как у «Обучения» (`texts_training.py`): `texts.py` уже длиннее предела
 файла. Сливаются в общий каталог (`texts.TEXTS`) — `t()` знает один словарь.
@@ -16,15 +16,22 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.title": {"ru": "Качество", "en": "Quality"},
     "quality.kicker.network": {"ru": "Качество · сеть", "en": "Quality · network"},
     "quality.kicker.country": {"ru": "Качество · страна", "en": "Quality · country"},
+    "quality.filters.label": {"ru": "Фильтры", "en": "Filters"},
+    "quality.filters.country": {"ru": "Страна", "en": "Country"},
+    "quality.filters.period": {"ru": "Период", "en": "Period"},
+    "quality.period.by_months": {
+        "ru": "Считается по месяцам: {span}.",
+        "en": "Calculated by month: {span}.",
+    },
+    "quality.period.running": {
+        "ru": "Последний месяц ещё идёт.",
+        "en": "The last month is still in progress.",
+    },
+    "quality.period.capped": {
+        "ru": "Период длиннее {n} месяцев — взяты последние.",
+        "en": "The period is longer than {n} months — the latest are taken.",
+    },
     "quality.network": {"ru": "Все страны", "en": "All countries"},
-    "quality.filter.title": {"ru": "Страны", "en": "Countries"},
-    "quality.rail.line": {"ru": "РКО {rko} · РС {rs}", "en": "RKO {rko} · RS {rs}"},
-    "quality.rail.total": {"ru": "Итог {total} · {line}", "en": "Total {total} · {line}"},
-    "quality.rail.units": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
-    "quality.rail.none": {"ru": "нет данных", "en": "no data"},
-    "quality.month.label": {"ru": "Месяц", "en": "Month"},
-    "quality.month.prev": {"ru": "Предыдущий месяц", "en": "Previous month"},
-    "quality.month.next": {"ru": "Следующий месяц", "en": "Next month"},
     "quality.month.in_progress": {
         "ru": "{title} · месяц идёт",
         "en": "{title} · month in progress",
