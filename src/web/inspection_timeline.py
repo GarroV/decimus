@@ -10,6 +10,10 @@ from datetime import date, timedelta
 from src.db import inspection_timeline as store
 from src.db.errors import DbError
 from src.db.reach import Reach
+from src.domain.errors import ValidationError
+from src.domain.kinds import kind_title
+
+from .geo_names import country_title
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +29,17 @@ class Bucket:
 
 
 @dataclass(frozen=True)
+class Detail:
+    """Проверка в подсказке точки: всё уже словами, шаблон ничего не переводит."""
+
+    id: str
+    unit: str
+    country: str
+    kind: str
+    pct: float
+
+
+@dataclass(frozen=True)
 class Point:
     """Наблюдаемая дата: сохранённые оценки, без выдуманных промежуточных измерений."""
 
@@ -33,6 +48,7 @@ class Point:
     average: float
     x: float
     y: float
+    details: tuple[Detail, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -57,7 +73,11 @@ class Timeline:
 
 
 def build(
-    rows: tuple[store.Month | store.Day, ...], args: Mapping[str, str], *, today: date
+    rows: tuple[store.Month | store.Day, ...],
+    args: Mapping[str, str],
+    *,
+    today: date,
+    lang: str = "ru",
 ) -> Timeline:
     """Средняя взвешена числом проверок; пустой месяц не становится нулевой оценкой."""
     years = tuple(range(min(r.start.year for r in rows), today.year + 1)) if rows else ()
@@ -86,7 +106,7 @@ def build(
     count = sum(n for n, _ in totals.values())
     total = sum(s for _, s in totals.values())
     selected = tuple(r for r in rows if grain != "month" or r.start.year == year)
-    points, ticks = _plot(selected)
+    points, ticks = _plot(selected, lang)
     return Timeline(
         grain,
         year,
@@ -99,14 +119,31 @@ def build(
     )
 
 
+def _kind(code: str, lang: str) -> str:
+    """Вид проверки словами; неизвестный код не стирает строку подсказки — показывается как есть."""
+    try:
+        return kind_title(code, lang)
+    except ValidationError:
+        return code
+
+
+def _detail(item: store.Item, lang: str) -> Detail:
+    return Detail(
+        item.id, item.unit, country_title(item.country, lang), _kind(item.kind, lang), item.pct
+    )
+
+
 def _plot(
-    rows: tuple[store.Month | store.Day, ...],
+    rows: tuple[store.Month | store.Day, ...], lang: str
 ) -> tuple[tuple[Point, ...], tuple[Tick, ...]]:
     """Общая шкала 0–100 и непрерывная шкала дат; повторные даты объединяются."""
     daily: dict[date, tuple[int, float]] = {}
+    items: dict[date, tuple[Detail, ...]] = {}
     for row in rows:
         n, total = daily.get(row.start, (0, 0.0))
         daily[row.start] = (n + row.count, total + row.total)
+        if isinstance(row, store.Day):
+            items[row.start] = (*items.get(row.start, ()), *(_detail(i, lang) for i in row.items))
     observed = sorted(day for day, (n, _) in daily.items() if n)
     if not observed:
         return (), ()
@@ -123,6 +160,7 @@ def _plot(
             round(daily[day][1] / daily[day][0], 1),
             x(day),
             248 - 2 * daily[day][1] / daily[day][0],
+            items.get(day, ()),
         )
         for day in observed
     )
@@ -135,11 +173,18 @@ def _plot(
 
 
 def load(
-    *, reach: Reach, countries: tuple[str, ...], args: Mapping[str, str], today: date
+    *,
+    reach: Reach,
+    countries: tuple[str, ...],
+    args: Mapping[str, str],
+    today: date,
+    lang: str,
 ) -> Timeline:
     """Отказ чтения явно отличается от отсутствия проверок."""
     try:
-        return build(store.days(reach=reach, countries=countries, today=today), args, today=today)
+        return build(
+            store.days(reach=reach, countries=countries, today=today), args, today=today, lang=lang
+        )
     except DbError:
         log.warning("История проверок не прочиталась", exc_info=True)
         return Timeline(failed=True)

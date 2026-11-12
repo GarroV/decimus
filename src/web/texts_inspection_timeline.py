@@ -50,4 +50,13 @@ TIMELINE_TEXTS = {
         "en": "Could not load inspection history. Refresh the page.",
     },
     "history.table": {"ru": "Данные графика", "en": "Chart data"},
+    # D751: подсказка точки графика и значок «?» блока.
+    "history.tip.label": {"ru": "Пояснение к блоку", "en": "About this block"},
+    "history.tip.more": {"ru": "и ещё {n}", "en": "and {n} more"},
+    "history.tip.open": {"ru": "Открыть проверку", "en": "Open the inspection"},
+    "history.tip.average": {"ru": "Среднее", "en": "Average"},
+    "history.tip.point": {
+        "ru": "{date} · результат {score}% · проверок: {count}",
+        "en": "{date} · score {score}% · inspections: {count}",
+    },
 }

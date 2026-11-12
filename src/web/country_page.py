@@ -575,7 +575,7 @@ def _one_country(
         "trend": _trend(история),
         "country_inspections": проверки,
         "timeline": inspection_timeline.load(
-            reach=reach, countries=(вид.code,), args=request.args, today=today
+            reach=reach, countries=(вид.code,), args=request.args, today=today, lang=lang
         )
         if вид.code and открытая is None
         else None,

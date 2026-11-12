@@ -1,5 +1,16 @@
-{# Общий блок; работает без JavaScript, таблица доступна с телефона и клавиатуры. #}
-{% macro score_plot(width) %}
+{#
+  Блок «История проверок» — один на «Рейтинги → Проверки» и на экран «Страны» (D751). Шапка блока
+  (`_compact.html`): заголовок, «?» с пояснениями, сводка «Проверок · средний результат» и
+  выбор группировки и года, который применяется сразу (без скрипта — кнопка «Показать»).
+  График «Динамика результатов» — без своей рамки внутри блока.
+
+  Подсказка точки (наведение, нажатие на телефоне, фокус с клавиатуры) — HTML поверх SVG, без
+  скрипта: пиццерия (ссылка на проверку), страна, вид, результат; у точки-сводки за день — до
+  8 проверок и «и ещё N». Положение — в процентах рамки рисунка, поэтому одно и то же для
+  широкого и узкого вида (на телефоне строк меньше — подсказка должна помещаться в рисунок).
+#}
+{% macro score_plot(width, limit) %}
+      <div class="ih-plot ih-plot--{{ 'wide' if width > 600 else 'narrow' }}">
       <svg viewBox="0 0 {{ width }} 300" width="100%" role="group" aria-label="{{ t('history.results') }}">
         <title>{{ t('history.results') }}</title>
         {% for value in (0, 25, 50, 75, 100) %}{% set y = 248 - value * 2 %}
@@ -15,42 +26,58 @@
           <polyline class="ih-line" points="{% for p in timeline.points %}{{ 48 + p.x * (width - 72) }},{{ p.y }} {% endfor %}"/>
         {% endif %}
         {% for p in timeline.points %}
-          <g class="ih-point" tabindex="0" role="img" aria-label="{{ p.day.strftime('%d.%m.%Y') }} · {{ p.average }}% · {{ t('history.count') }}: {{ p.count }}">
-            <title>{{ p.day.strftime('%d.%m.%Y') }} · {{ p.average }}% · {{ t('history.count') }}: {{ p.count }}</title>
-            <circle class="ih-point__hit" cx="{{ 48 + p.x * (width - 72) }}" cy="{{ p.y }}" r="12"/>
-            <circle class="ih-point__dot" cx="{{ 48 + p.x * (width - 72) }}" cy="{{ p.y }}" r="5"/>
-          </g>
+          <circle class="ih-point__dot" cx="{{ 48 + p.x * (width - 72) }}" cy="{{ p.y }}" r="5"/>
           {% if loop.first or loop.last %}<text class="ih-value" x="{{ 48 + p.x * (width - 72) + (8 if loop.first else -8) }}" y="{{ p.y - 14 }}" text-anchor="{{ 'start' if loop.first else 'end' }}">{{ '%.1f'|format(p.average) }}</text>{% endif %}
         {% endfor %}
       </svg>
+      <div class="ih-pts">
+        {% for p in timeline.points %}
+          {% set left = (48 + p.x * (width - 72)) / width * 100 %}
+          {% set shown = p.details[:limit] %}
+          {% set tip_id = 'ih-tip-' ~ width ~ '-' ~ loop.index %}
+          <div class="ih-pt{% if left > 55 %} ih-pt--rtl{% endif %}{% if p.y < 148 %} ih-pt--high{% endif %}" style="--x:{{ '%.2f'|format(left) }}%;--y:{{ '%.2f'|format(p.y / 3) }}%">
+            <span class="ih-pt__hit" tabindex="0" role="button" aria-label="{{ t('history.tip.point', date=p.day.strftime('%d.%m.%Y'), score='%.1f'|format(p.average), count=p.count) }}" aria-describedby="{{ tip_id }}"></span>
+            <div class="ih-tip popover" id="{{ tip_id }}" role="tooltip">
+              <div class="ih-tip__head"><b>{{ p.day.strftime('%d.%m.%Y') }}</b><span>{{ '%.1f'|format(p.average) }}%{% if p.count > 1 %} · {{ t('history.tip.average') }}{% endif %}</span></div>
+              <ul class="ih-tip__list">
+                {% for d in shown %}
+                  <li><span class="ih-tip__what"><a href="{{ url_for('card', inspection_id=d.id) }}" title="{{ t('history.tip.open') }}">{{ d.unit }}</a><small>{{ d.country }} · {{ d.kind }}</small></span><b>{{ '%.1f'|format(d.pct) }}</b></li>
+                {% endfor %}
+              </ul>
+              {% if p.count > shown|length %}<div class="ih-tip__more">{{ t('history.tip.more', n=p.count - shown|length) }}</div>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      </div>
 {% endmacro %}
 {% if timeline %}
-{% from "_pick_ui.html" import pick_block with context %}
-{% call pick_block(t('history.title'), '', '' if timeline.failed else timeline.count) %}
-  <p class="pk-empty pk-empty--pad">{{ t('history.note') }}</p>
+{% from "_compact.html" import block_bar with context %}
+{% set tip_rows = [t('history.note'), t('history.daily')] %}
+{% if timeline.points|length == 1 %}{% set _ = tip_rows.append(t('history.single')) %}{% endif %}
+{% set summary %}{% if not timeline.failed and timeline.years %}{{ t('history.count') }}: <strong>{{ timeline.count }}</strong> · {{ t('history.average') }}: <strong>{{ '%.1f'|format(timeline.average) if timeline.average is not none else '—' }}</strong>{% endif %}{% endset %}
+<section class="pk-block ih-block">
+{% call block_bar(t('history.title'), tip_rows, 'history', summary) %}
+  {% if not timeline.failed and timeline.years %}
+    <form method="get" class="ih-controls" data-history-auto>
+      {% for key, value in request.args.items() %}{% if key not in ('history_grain', 'history_year', 'inspection', 'settings') %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
+      <select name="history_grain" class="pickselect" aria-label="{{ t('history.period') }}" title="{{ t('history.period') }}">
+        <option value="year"{% if timeline.grain == 'year' %} selected{% endif %}>{{ t('history.years') }}</option>
+        <option value="month"{% if timeline.grain == 'month' %} selected{% endif %}>{{ t('history.months') }}</option>
+      </select>
+      <select name="history_year" class="pickselect" aria-label="{{ t('history.year') }}" title="{{ t('history.year') }}">{% for year in timeline.years|reverse %}<option{% if year == timeline.year %} selected{% endif %}>{{ year }}</option>{% endfor %}</select>
+      <noscript><button class="btn btn--sm" type="submit">{{ t('history.show') }}</button></noscript>
+    </form>
+  {% endif %}
+{% endcall %}
   {% if timeline.failed %}<p class="pk-empty pk-empty--pad" role="alert">{{ t('history.failed') }}</p>
   {% elif not timeline.years %}<p class="pk-empty pk-empty--pad">{{ t('history.empty') }}</p>
   {% else %}
-    <form method="get" class="ih-controls">
-      {% for key, value in request.args.items() %}{% if key not in ('history_grain', 'history_year', 'inspection', 'settings') %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
-      <label>{{ t('history.period') }}
-        <select name="history_grain" class="pickselect">
-          <option value="year"{% if timeline.grain == 'year' %} selected{% endif %}>{{ t('history.years') }}</option>
-          <option value="month"{% if timeline.grain == 'month' %} selected{% endif %}>{{ t('history.months') }}</option>
-        </select>
-      </label>
-      <label>{{ t('history.year') }}
-        <select name="history_year" class="pickselect">{% for year in timeline.years|reverse %}<option{% if year == timeline.year %} selected{% endif %}>{{ year }}</option>{% endfor %}</select>
-      </label>
-      <button class="btn btn--sm" type="submit">{{ t('history.show') }}</button>
-    </form>
-    <p class="pk-empty pk-empty--pad">{{ t('history.count') }}: <strong>{{ timeline.count }}</strong> · {{ t('history.average') }}: <strong>{{ '%.1f'|format(timeline.average) if timeline.average is not none else '—' }}</strong></p>
     <section class="ih-chart" aria-label="{{ t('history.results') }}">
       <div class="ih-chart__head"><h3>{{ t('history.results') }}</h3><span>{{ t('history.scale') }}</span></div>
       {% if timeline.points %}
-      <div class="ih-plot ih-plot--wide">{{ score_plot(960) }}</div>
-      <div class="ih-plot ih-plot--narrow">{{ score_plot(360) }}</div>
-      <p class="ih-chart__note">{{ t('history.daily') }}{% if timeline.points|length == 1 %} {{ t('history.single') }}{% endif %}</p>
+      {{ score_plot(960, 8) }}
+      {{ score_plot(360, 5) }}
       {% else %}<p class="ih-chart__note">{{ t('history.empty_period') }}</p>{% endif %}
     </section>
     <section class="ih-chart ih-chart--counts" aria-label="{{ t('history.volume') }}">
@@ -72,5 +99,6 @@
       </tbody></table>{% endif %}
     </details>
   {% endif %}
-{% endcall %}
+</section>
+<script src="{{ url_for('static', filename='history.js') }}" data-swap-safe defer></script>
 {% endif %}

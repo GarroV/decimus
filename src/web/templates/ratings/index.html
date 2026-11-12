@@ -27,6 +27,7 @@
 
 {% from "_info_tip.html" import fresh_tip %}
 {% from "ratings/_period.html" import period_lists with context %}
+{% from "_compact.html" import strip, scope_menu with context %}
 {#- Адрес этого раздела с другим срезом или периодом; открытая страна «Агрегаторов» едет дальше. -#}
 {% macro href(group, value=none, period=selection.period.key, actual=actual_period) -%}
   {{ url(ratings_path) }}/{{ section_key }}?group={{ group }}{% if value %}&amp;value={{ value|urlencode }}{% endif %}&amp;period={{ period|urlencode }}&amp;lang={{ lang }}{% if period_context %}&amp;period_context={{ period_context|urlencode }}{% endif %}&amp;scope={{ personal_scope.mode }}{% if actual %}&amp;actual_period={{ actual }}{% endif %}{% if section_key == 'violations' %}&amp;kind={{ src.kind }}{% endif %}{% if open_country %}&amp;country={{ open_country|urlencode }}{% endif %}
@@ -44,6 +45,7 @@
 
 
   <div class="rt-controls">
+  {% call strip() %}
   <form class="rt-bar" id="rt-bar-form" data-rt-auto method="get" action="{{ url(ratings_path) }}/{{ section_key }}" aria-label="{{ t('ratings.group') }}">
     <input type="hidden" name="group" value="{{ selection.group }}">
     <input type="hidden" name="lang" value="{{ lang }}">
@@ -106,23 +108,10 @@
   </form>
 
 
-  <div class="rt-personal">
-    <div class="rt-personal__choices">
-      <a href="{{ section_url(section_key, scope_view='mine') }}" data-rt-scope="mine"{% if personal_scope.mode == 'mine' %} aria-current="true"{% endif %}>{{ t('ratings.d746.mine') }}</a>
-      <a href="{{ section_url(section_key, scope_view='all') }}" data-rt-scope="all"{% if personal_scope.mode == 'all' %} aria-current="true"{% endif %}>{{ t('ratings.d746.all') }}</a>
-    </div>
-    <details class="rt-personal__edit">
-      <summary>{{ t('ratings.d746.choose_countries') }}</summary>
-      <form method="post" action="{{ url_for('country_filter') }}">
-        <input type="hidden" name="next" value="{{ personal_next }}">
-        <div class="rt-personal__countries">
-        {% for c in personal_countries %}<label><input type="checkbox" name="countries" value="{{ c.code }}"{% if c.code in personal_scope.saved %} checked{% endif %}> {{ country_name(c.code) }}</label>{% endfor %}
-        </div>
-        <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.d746.save_countries') }}</button>
-        <button class="btn btn--sm" name="reset" value="1" type="submit">{{ t('ratings.d746.reset_countries') }}</button>
-      </form>
-    </details>
-  </div>
+  {% set scope_countries = [] %}
+  {% for c in personal_countries %}{% set _ = scope_countries.append((c.code, country_name(c.code))) %}{% endfor %}
+  {{ scope_menu(personal_scope.mode, section_url(section_key, scope_view='mine'), section_url(section_key, scope_view='all'), scope_countries, personal_scope.saved, personal_next) }}
+  {% endcall %}
   {% if section_key in ('rs', 'rko') %}{% include 'ratings/_period_tiles.html' %}{% endif %}
   </div>
   {% if country_card %}<nav class="rt-country-topics" aria-label="{{ t('ratings.d746.country_topics') }}">
