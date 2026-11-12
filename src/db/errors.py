@@ -335,3 +335,24 @@ class MailingTemplateError(DbError):
 
 class MailingTemplateInputError(MailingTemplateError):
     """Шаблон не принят из-за самого текста или адреса слота: причина — человеку словами."""
+
+
+class InspectionLimitError(UnitRefusedError, HistoryImportError):
+    """У пиццерии пространства партнёра исчерпан лимит проверок тестового периода (D755).
+
+    Наследует и `UnitRefusedError`, и `HistoryImportError`: проверка заводится
+    двумя путями (слив из бота и черновик загрузки для веба и MCP), и каждый
+    уже ловит свой тип. Бот разбирает этот отказ раньше «точки нет» и говорит
+    своим текстом; веб и агент получают `str(exc)` — по-русски и по-английски.
+    Повтор не поможет: лимит поднимает управляющая компания.
+    """
+
+    def __init__(self, *, unit: str, limit: int) -> None:
+        super().__init__(
+            f"Для пиццерии «{unit}» достигнут лимит тестового периода: {limit} проверок. "
+            f"Обратитесь к управляющей компании. / "
+            f"The pizzeria «{unit}» has reached the test-period limit of {limit} inspections. "
+            f"Please contact the management company.",
+            unit=unit,
+        )
+        self.limit = limit

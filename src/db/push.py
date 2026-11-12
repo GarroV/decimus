@@ -32,6 +32,7 @@ from .directory import insert_typed_unit, resolve_unit_id
 from .errors import PushError, UnitRefusedError, VersionMismatchError
 from .fingerprint import compute_fingerprint, previous_fingerprints
 from .pool import connection
+from .unit_limits import refuse_over_limit
 
 #: Арендатор по умолчанию, пока в проверке своего не задано. Совпадает со
 #: значением `domain.state.DEFAULT_TENANT` буквально: второй копии константы
@@ -364,6 +365,12 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
         # пространства заводит команда (`make space`). Незаведённое — отказ
         # ссылки на `tenants` или сторожа точки, а не новая строка (#340).
         unit_id = _unit_of_inspection(conn, cur, inspection, tenant_code=tenant_code)
+
+        # Лимит тестового периода (D755). Повторный слив уже лежащей проверки
+        # новой не заводит — её не отказываем, даже если место кончилось на ней.
+        cur.execute(_SELECT_BY_FINGERPRINT_SQL, (fingerprint,))
+        if cur.fetchone() is None:
+            refuse_over_limit(cur, tenant=tenant_code, unit_id=unit_id, unit_name=inspection.unit)
 
         try:
             cur.execute(

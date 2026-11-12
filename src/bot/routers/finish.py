@@ -247,6 +247,20 @@ async def archive(
             current=exc.current,
         )
         return
+    except db.InspectionLimitError as exc:
+        # Лимит тестового периода (D755): тип раньше `UnitRefusedError`, от
+        # которого он наследует, — иначе текст сказал бы «точки нет в
+        # пространстве», а точка есть, места нет.
+        logger.warning("слив проверки чата %s отклонён лимитом: %s", log_id(chat_id), exc)
+        await stops.refuse(
+            message,
+            lang,
+            step="finish.archive",
+            key="finish.limit_reached",
+            unit=exc.unit,
+            limit=exc.limit,
+        )
+        return
     except db.UnitRefusedError as exc:
         # Сторож справочника пространства (#482): база ответила, и ответила
         # «нет». Текст «база не ответила» звал бы подождать и не начинать новую,
