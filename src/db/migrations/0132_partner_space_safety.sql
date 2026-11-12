@@ -71,7 +71,11 @@ declare
     момент timestamptz := now();
     сделано integer;
 begin
-    if p_code = 'HQ' or not exists (select 1 from public.tenants where code = p_code) then
+    -- Строка пространства запирается ДО отметки: сторож учёток читает её `for share`, поэтому
+    -- заведение, перевод или разморозка учётки, идущие параллельно, дожидаются нас и видят
+    -- заморозку, а не проскакивают между проверкой и отметкой.
+    perform 1 from public.tenants where code = p_code for update;
+    if p_code = 'HQ' or not found then
         raise exception 'freeze_space: % is not a partner space', p_code
             using errcode = 'P0001';
     end if;
@@ -92,7 +96,8 @@ language plpgsql security definer set search_path = pg_catalog, public, pg_temp 
 declare
     сделано integer;
 begin
-    if p_code = 'HQ' or not exists (select 1 from public.tenants where code = p_code) then
+    perform 1 from public.tenants where code = p_code for update;
+    if p_code = 'HQ' or not found then
         raise exception 'unfreeze_space: % is not a partner space', p_code
             using errcode = 'P0001';
     end if;
@@ -130,8 +135,10 @@ begin
        and (tg_op = 'INSERT'
             or new.tenant_code is distinct from old.tenant_code
             or old.disabled_at is not null)
+       -- `for share`: пока идёт `freeze_space` (он держит строку `for update`), ждём его конца.
        and exists (
-           select 1 from public.tenants where code = new.tenant_code and frozen_at is not null
+           select 1 from public.tenants
+            where code = new.tenant_code and frozen_at is not null for share
        ) then
         raise exception 'space % is frozen', new.tenant_code using errcode = 'P0001';
     end if;

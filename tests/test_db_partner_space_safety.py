@@ -113,6 +113,18 @@ def test_разморозка_возвращает_только_замороже
     assert space_freeze.frozen_spaces() == {}
 
 
+def test_отдельная_заморозка_после_пространственной_переживает_разморозку_пространства(
+    учётки: dict[int, str], pg_dsn: str
+) -> None:
+    space_freeze.freeze_space("GE", by=учётки[АДМИН_УК])
+
+    assert freeze_account(_логин(СОТРУДНИК_GE), tenant="GE", by=учётки[АДМИН_УК]) is True
+    assert space_freeze.unfreeze_space("GE") == 2
+
+    assert not _живая(pg_dsn, учётки[СОТРУДНИК_GE]), "разморозка пространства оживила учётку"
+    assert _живая(pg_dsn, учётки[АДМИН_GE])
+
+
 def test_в_замороженном_пространстве_учётку_не_завести(учётки: dict[int, str]) -> None:
     space_freeze.freeze_space("GE", by=None)
 
@@ -146,7 +158,9 @@ def test_после_разморозки_учётку_снова_завести_
     space_freeze.freeze_space("GE", by=None)
     space_freeze.unfreeze_space("GE")
 
-    создана = create_account("novichok", tenant="GE", password="пароль-новичка-1234", role="auditor")
+    создана = create_account(
+        "novichok", tenant="GE", password="пароль-новичка-1234", role="auditor"
+    )
 
     assert создана.login == "novichok"
 
