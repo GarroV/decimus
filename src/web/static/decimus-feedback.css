@@ -1,0 +1,96 @@
+/* Кнопка «Обратная связь» и её окно (D761 п.6). Только токены ядра, своих цветов нет.
+   Кнопка плавает справа снизу; на телефоне встаёт НАД нижней панелью (`.tabbar`),
+   а не на неё, и остаётся кружком со значком. Окно — родной <dialog>: фокус, Esc и
+   подложку держит браузер. */
+
+.fb-fab {
+  position: fixed;
+  right: var(--space-7);
+  bottom: var(--space-7);
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-7);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: var(--w-medium) var(--fs-dense) / 1 var(--font-ui);
+  box-shadow: var(--sh-pop);
+  cursor: pointer;
+}
+.fb-fab:hover { background: var(--surface-3); }
+.fb-fab svg { width: 18px; height: 18px; flex: none; }
+
+/* Место под кнопку в конце страницы: последняя строка не прячется под ней. */
+.page { padding-bottom: calc(var(--space-9) * 2 + var(--tap-min)); }
+
+@media (max-width: 719px) {
+  .fb-fab {
+    width: var(--tap-min);
+    padding: 0;
+    justify-content: center;
+    right: var(--space-6);
+    /* Нижняя панель: отступы 2×space-2, строка tap-min, рамка 1px, безопасная зона. */
+    bottom: calc(var(--tap-min) + var(--space-2) * 2 + 1px + env(safe-area-inset-bottom, 0px) + var(--space-5));
+  }
+  .fb-fab__label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .page { padding-bottom: calc(var(--space-12) + var(--tap-min) * 2 + var(--space-5)); }
+}
+
+.fb-dialog {
+  width: min(480px, calc(100vw - var(--space-9)));
+  max-height: calc(100dvh - var(--space-9));
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-screen);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--sh-modal);
+  overflow: auto;
+}
+.fb-dialog::backdrop { background: rgba(10, 13, 17, .45); }
+.fb-dialog__head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  padding: var(--space-6) var(--space-7);
+  background: var(--surface-3); border-bottom: 1px solid var(--line);
+}
+.fb-dialog__title { margin: 0; font-size: var(--fs-title); font-weight: var(--w-semibold); }
+.fb-dialog__form { display: flex; flex-direction: column; gap: var(--space-6); padding: var(--space-7); }
+.fb-dialog__lead, .fb-dialog__hint { margin: 0; color: var(--ink-2); font-size: var(--fs-dense); }
+.fb-dialog__text {
+  width: 100%; min-height: 7rem; resize: vertical; padding: var(--space-4);
+  border: 1px solid var(--line-control); border-radius: var(--r-control);
+  background: var(--surface); color: var(--ink); font: var(--w-regular) var(--fs-body) / 1.4 var(--font-ui);
+}
+.fb-dialog__text:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-soft); outline: none; }
+.fb-dialog__files { width: 100%; font-size: var(--fs-dense); }
+.fb-dialog__names { margin: 0; color: var(--ink-3); font-size: var(--fs-micro); overflow-wrap: anywhere; }
+.fb-dialog__status { margin: 0; min-height: 1.2em; font-size: var(--fs-dense); color: var(--ink-2); }
+.fb-dialog__status.is-bad { color: var(--err); }
+.fb-dialog__actions { display: flex; justify-content: flex-end; gap: var(--space-4); }
+
+/* Вкладка администрирования: карточка отзыва. */
+.fbadmin { display: flex; flex-direction: column; gap: var(--space-6); }
+.fbitem {
+  display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6) var(--space-7);
+  border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface);
+}
+.fbitem.is-done { background: var(--surface-2); }
+.fbitem__head { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); justify-content: space-between; font-size: var(--fs-dense); }
+.fbitem__who { font-weight: var(--w-semibold); }
+.fbitem__meta { color: var(--ink-3); }
+.fbitem__page { margin: 0; color: var(--ink-3); font-size: var(--fs-micro); overflow-wrap: anywhere; }
+.fbitem__body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fbitem__photos { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.fbitem__photos img { display: block; width: 96px; height: 96px; object-fit: cover; border-radius: var(--r-control); border: 1px solid var(--line); }
+.fbitem__foot { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-6); align-items: center; justify-content: space-between; font-size: var(--fs-micro); color: var(--ink-3); }
+.fbchat { display: flex; flex-direction: column; gap: var(--space-4); max-width: 32rem; padding: var(--space-6) var(--space-7); border: 1px solid var(--line); border-radius: var(--r-block); }
+.fbchat form { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: end; }
+.fb-dialog__head svg { width: 16px; height: 16px; }
+.fb-dialog__actions .btn { flex: 1 1 0; min-width: 0; }

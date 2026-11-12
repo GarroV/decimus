@@ -29,6 +29,7 @@ from .texts_country import COUNTRY_TEXTS
 from .texts_country_contacts import CONTACT_TEXTS
 from .texts_demo import DEMO_TEXTS
 from .texts_dodois import DODOIS_TEXTS
+from .texts_feedback import FEEDBACK_TEXTS
 from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_inspection_timeline import TIMELINE_TEXTS
@@ -1893,6 +1894,7 @@ _ЧАСТИ = (
     TEXTS,
     DEMO_TEXTS,
     DODOIS_TEXTS,
+    FEEDBACK_TEXTS,
     OAUTH_TEXTS,
     PEEK_TEXTS,
     CONNECTIONS_TEXTS,
@@ -1937,6 +1939,7 @@ TEXTS = {
     **DEMO_TEXTS,
     **DODOIS_TEXTS,
     **GRADE_TEXTS,
+    **FEEDBACK_TEXTS,
     **HOME_TEXTS,
     **JOURNAL_TEXTS,
     **MASTER_TEXTS,

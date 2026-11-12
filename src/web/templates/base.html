@@ -82,6 +82,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-domain.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-web.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-pick.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-feedback.css') }}">
   {#- Стили одного раздела — только на его страницах (рейтинги: decimus-rt.css). -#}
   {% block head %}{% endblock %}
   <script data-shell src="{{ url_for('static', filename='pick.js') }}" defer></script>
@@ -90,6 +91,7 @@
   <script data-shell src="{{ url_for('static', filename='bell.js') }}" defer></script>
   <script data-shell src="{{ url_for('static', filename='nav.js') }}" defer></script>
   <script data-shell src="{{ url_for('static', filename='photo-zoom.js') }}" defer></script>
+  <script data-shell src="{{ url_for('static', filename='feedback.js') }}" defer></script>
 </head>
 <body>
   {% if demo_mode %}
@@ -264,6 +266,49 @@
   #}
   {% if account %}
     {% include "_account_menu.html" %}
+    {#-
+      «Обратная связь» (D761 п.6): плавающая кнопка справа снизу и окно с формой на каждой
+      странице вошедшего, любой роли и пространства. Поведение — `feedback.js`; форма шлёт
+      `POST /feedback`. В мини-аппе обхода (`walk.html`) каркаса нет, и кнопки нет. В демо
+      окно открывается, но поля отключены и отправка закрыта (`demo_entry.LOCKED_ENDPOINTS`).
+    -#}
+    <button type="button" class="fb-fab" data-feedback-open aria-haspopup="dialog"
+            title="{{ t('feedback.button') }}" aria-label="{{ t('feedback.button') }}">
+      {{ icon('feedback') }}<span class="fb-fab__label">{{ t('feedback.button') }}</span>
+    </button>
+    <dialog class="fb-dialog" id="feedback-dialog" aria-labelledby="feedback-title"
+            data-max-photos="{{ feedback_max_photos }}" data-max-bytes="{{ feedback_max_bytes }}"
+            data-err-many="{{ t('feedback.err.too_many_photos', max=feedback_max_photos) }}"
+            data-err-big="{{ t('feedback.err.photo_big', mb=feedback_max_mb) }}"
+            data-err-network="{{ t('feedback.err.network') }}"
+            data-sending="{{ t('feedback.sending') }}"
+            data-cancel="{{ t('feedback.cancel') }}" data-close="{{ t('feedback.close') }}"
+            {% if demo_mode %}data-demo="1"{% endif %}>
+      <div class="fb-dialog__head">
+        <h2 class="fb-dialog__title" id="feedback-title">{{ t('feedback.title') }}</h2>
+        <button type="button" class="btn btn--ghost btn--sm" data-fb-cancel aria-label="{{ t('feedback.close') }}">{{ icon('x') }}</button>
+      </div>
+      <form class="fb-dialog__form" data-fb-form method="post" enctype="multipart/form-data"
+            action="{{ url('/feedback') }}?lang={{ lang }}">
+        <input type="hidden" name="page" value="" data-fb-page>
+        <p class="fb-dialog__lead">{{ t('feedback.lead') }}</p>
+        {% if demo_mode %}<p class="fb-dialog__status is-bad" role="note">{{ t('feedback.demo') }}</p>{% endif %}
+        <label class="field-label" for="feedback-text">{{ t('feedback.text.label') }}</label>
+        <textarea class="fb-dialog__text" id="feedback-text" name="text" data-fb-text required
+                  maxlength="{{ feedback_max_text }}" placeholder="{{ t('feedback.text.placeholder') }}"
+                  {% if demo_mode %}disabled{% endif %}></textarea>
+        <label class="field-label" for="feedback-photos">{{ t('feedback.photos.label', max=feedback_max_photos) }}</label>
+        <input class="fb-dialog__files" id="feedback-photos" type="file" name="photos" multiple data-fb-photos
+               accept="image/jpeg,image/png,image/webp" {% if demo_mode %}disabled{% endif %}>
+        <p class="fb-dialog__hint">{{ t('feedback.photos.hint', mb=feedback_max_mb) }}</p>
+        <p class="fb-dialog__names" data-fb-names></p>
+        <p class="fb-dialog__status" role="status" aria-live="polite" data-fb-status></p>
+        <div class="fb-dialog__actions">
+          <button type="button" class="btn" data-fb-cancel data-fb-cancel-label>{{ t('feedback.cancel') }}</button>
+          <button type="submit" class="btn btn--primary" data-fb-send{% if demo_mode %} disabled{% endif %}>{{ t('feedback.send') }}</button>
+        </div>
+      </form>
+    </dialog>
     {#- Окно колокольчика (#1129): пустое, список приходит фрагментом при каждом открытии. -#}
     <div class="popover acct-menu notif-menu" id="notif-menu" role="menu" aria-label="{{ t('notif.title') }}" tabindex="-1" hidden>
       <div class="popover__group" role="presentation">{{ t('notif.title') }}</div>
