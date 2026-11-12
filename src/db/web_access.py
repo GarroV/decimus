@@ -42,6 +42,7 @@ import re
 import secrets
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Literal
@@ -140,6 +141,13 @@ _FREEZE_USER_SQL = """
      where tenant_code = %(tenant)s and login = %(login)s and disabled_at is null
        and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
 """
+
+#: Учётка, замороженная кнопкой пространства (`0132`) и затем заморожена ОТДЕЛЬНО: `disabled_at`
+#: уже стоит, и основной запрос её не трогает, а отметка `space_frozen_at` оживила бы её
+#: разморозкой пространства. Снимает отметку функция базы: права писать её у роли нет.
+_FREEZE_SPACE_FROZEN_USER_SQL = (
+    "select freeze_account_apart(%(tenant)s, %(login)s, %(roles)s, %(by)s)"
+)
 
 #: Разморозка снимает только отметку: закрытое заморозкой (`0063`) остаётся
 #: закрытым. Условие на роль цели — то же, что у заморозки.
@@ -543,6 +551,23 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
 
 
+#: Кто правит учётки в этом запросе (`web_users.id`); `None` — команда с машины. Дверь пишет
+#: его в транзакцию (`dodo.actor`), и триггер событий пространств партнёров (`0132`) подпишет
+#: «кто завёл админа / сменил почту». Контекстная переменная, а не параметр: подпись
+#: заведения, роли и почты остаётся прежней, а забыть передать «кто» на новом пути нельзя.
+_ACTOR: ContextVar[str | None] = ContextVar("web_access_actor", default=None)
+
+
+@contextmanager
+def acting_as(user_id: str | None) -> Iterator[None]:
+    """Править учётки от имени `user_id`: правка внутри блока подписывается им в базе."""
+    метка = _ACTOR.set(user_id)
+    try:
+        yield
+    finally:
+        _ACTOR.reset(метка)
+
+
 @contextmanager
 def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """Подключение, которым МОЖНО тронуть строку учётки.
@@ -567,6 +592,10 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     _, dsn = managing_dsn(зачем)
     try:
         with psycopg.connect(dsn) as conn:
+            актор = _ACTOR.get()
+            if актор:
+                # Локально для транзакции: до её конца подпись видит триггер `0132`.
+                conn.execute("select set_config('dodo.actor', %s, true)", (актор,))
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
@@ -730,7 +759,19 @@ def freeze_account(
                     "by": by,
                 },
             )
-        return cur.rowcount > 0
+            if cur.rowcount > 0:
+                return True
+        cur.execute(
+            _FREEZE_SPACE_FROZEN_USER_SQL,
+            {
+                "tenant": tenant,
+                "login": login.strip().lower(),
+                "roles": _roles_param(only_roles),
+                "by": by,
+            },
+        )
+        строка = cur.fetchone()
+        return bool(строка and строка[0])
 
 
 def unfreeze_account(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:

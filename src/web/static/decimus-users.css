@@ -55,3 +55,16 @@
 /* Должность — значимые данные, её не обрезаем ради фиксированной узкой капсулы. */
 .slist--users .srow__role { white-space: normal; overflow: visible; }
 .srow__role .sbadge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+
+/* ── События в пространствах партнёров (D759): блок ограниченной ширины, строки списком ── */
+.sevents { max-width: 720px; margin-bottom: var(--space-6); padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--r-block); }
+.sevents__title { margin: 0 0 var(--space-4); font-size: 1rem; }
+.sevents__list { margin: 0; padding: 0; list-style: none; }
+.sevents__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) 0; }
+.sevents__row + .sevents__row { border-top: 1px solid var(--line); }
+.sevents__text { min-width: 0; overflow-wrap: anywhere; }
+.sevents__text small { display: block; opacity: .7; }
+@media (max-width: 899px) {
+  .sevents__row { flex-direction: column; align-items: stretch; }
+  .sevents .sbtn { min-height: 44px; width: 100%; }
+}

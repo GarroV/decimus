@@ -20,7 +20,7 @@ from typing import Any
 
 from flask import render_template, request
 
-from src.db import bot_links
+from src.db import bot_links, partner_events
 from src.db.errors import DbError
 from src.domain.geo import COUNTRIES
 from src.domain.tenants import HQ_TENANT, canonical_tenant
@@ -260,6 +260,38 @@ def _people_context(
     }
 
 
+def _frozen(круг: Scope | None, вкладка: str) -> tuple[dict[str, Any], bool]:
+    """Замороженные пространства для вкладки «Пространства» и признак «прочиталось».
+
+    Не прочиталось — кнопки заморозки не рисуются: «не заморожено» по умолчанию было бы враньём.
+    """
+    if круг is None or вкладка != TAB_SPACES or not access_policy.manages_spaces(круг):
+        return {}, True
+    try:
+        return dict(partner_spaces.frozen_spaces()), True
+    except DbError as exc:
+        note_target_mismatch(exc)
+        return {}, False
+
+
+def _partner_events(круг: Scope | None, вкладка: str) -> tuple[tuple[Any, ...], int, bool]:
+    """Непросмотренные события пространств партнёров: (строки, всего, прочиталось ли).
+
+    Только тем, кто ведёт пространства (D759): остальным блок не строится вовсе.
+    """
+    вошедший = auth.current_account()
+    if круг is None or вкладка != TAB_PEOPLE or вошедший is None:
+        return (), 0, True
+    if not access_policy.manages_spaces(круг):
+        return (), 0, True
+    try:
+        строки, всего = partner_events.unseen(вошедший.id)
+    except DbError as exc:
+        note_target_mismatch(exc)
+        return (), 0, False
+    return строки, всего, True
+
+
 def _space_context(
     круг: Scope | None,
     show: Show,
@@ -267,7 +299,14 @@ def _space_context(
     известны: bool,
     вкладка: str,
 ) -> dict[str, Any]:
+    замороженные, заморозка_известна = _frozen(круг, вкладка)
+    события, события_всего, события_известны = _partner_events(круг, вкладка)
     return {
+        "space_frozen": замороженные,
+        "space_frozen_known": заморозка_известна,
+        "partner_events": события,
+        "partner_events_total": события_всего,
+        "partner_events_known": события_известны,
         "tab": вкладка,
         "partner_spaces": пространства,
         "partner_spaces_known": известны,
