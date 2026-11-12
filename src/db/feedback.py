@@ -5,9 +5,10 @@
 базы (`0136`) дополнительно не дают партнёру читать чужие строки. Текст после записи не
 меняется — правятся лишь отметка «разобрано» и итог отправки в Telegram.
 
-Предел частоты держит сама запись: под рекомендательным замком на учётку считается число её
-отзывов за последний час, и сверх предела — `FeedbackRateLimited`, строка не ложится. Окно
-общее для всех процессов (считает база), а не в памяти одного.
+Предел частоты — `take_attempt`: его зовут ПЕРВЫМ, до разбора фото, и каждая попытка (и
+принятая, и отклонённая) пишется в `feedback_attempts`. Сверх `MAX_PER_HOUR` за час —
+`FeedbackRateLimited`. Окно общее для всех процессов (считает база) и считается под
+рекомендательным замком на учётку.
 
 Чат Telegram — журнал `feedback_chat`: текущий чат — последняя строка, пустой — «выключено».
 Строк нет — отправки нет: миграция чат не задаёт.
@@ -26,16 +27,21 @@ from .pool import connection
 
 #: Сколько отзывов в час разрешено одной учётке.
 MAX_PER_HOUR = 10
+#: Отклонённые попытки пишутся, пока их не больше этого числа пределов: поток сверх него
+#: уже остановлен, а таблицу он раздувать не должен.
+ATTEMPT_LOG_FACTOR = 3
 #: Сколько записей читает экран админки за раз (новые сверху).
 LIST_LIMIT = 200
 
 _LOCK_SQL = "select pg_advisory_xact_lock(hashtextextended(%s, 0))"
 
-_COUNT_RECENT_SQL = """
-select count(*) from feedback
+_COUNT_ATTEMPTS_SQL = """
+select count(*) from feedback_attempts
 where login = %(login)s and tenant_code = %(tenant)s
-  and created_at > clock_timestamp() - interval '1 hour'
+  and attempted_at > clock_timestamp() - interval '1 hour'
 """
+
+_INSERT_ATTEMPT_SQL = "insert into feedback_attempts (tenant_code, login) values (%s, %s)"
 
 _INSERT_SQL = """
 insert into feedback (id, tenant_code, login, role, page, lang, body)
@@ -120,12 +126,11 @@ def save(
     lang: str,
     body: str,
     photos: Sequence[bytes] = (),
-    max_per_hour: int = MAX_PER_HOUR,
 ) -> str:
     """Записать отзыв с кадрами одной транзакцией и вернуть его номер.
 
     Кадры приходят уже проверенными и сжатыми в JPEG (`src/web/feedback.py`): сюда не
-    доходит ничего, что не картинка. Предел частоты — отказ `FeedbackRateLimited`.
+    доходит ничего, что не картинка. Предел частоты уже взят `take_attempt` до разбора.
     """
     new_id = str(uuid.uuid4())
     params = {
@@ -139,16 +144,33 @@ def save(
     }
     with connection(check_environment().dsn) as conn:
         with conn.cursor() as cur:
-            cur.execute(_LOCK_SQL, (f"feedback:{tenant}:{login}",))
-            cur.execute(_COUNT_RECENT_SQL, params)
-            row = cur.fetchone()
-            if row is not None and int(row[0]) >= max_per_hour:
-                raise FeedbackRateLimited("Слишком много отзывов за последний час")
             cur.execute(_INSERT_SQL, params)
             for position, data in enumerate(photos, start=1):
                 cur.execute(_INSERT_PHOTO_SQL, (new_id, position, len(data), data))
         conn.commit()
     return new_id
+
+
+def take_attempt(*, tenant: str, login: str, max_per_hour: int = MAX_PER_HOUR) -> None:
+    """Записать попытку отправки и отказать, если за час их уже `max_per_hour`.
+
+    Зовётся до чтения формы и фото: отказ дёшев (одна строка и один подсчёт), а тяжёлый
+    разбор картинок не начинается. Отклонённая попытка тоже остаётся в счёте, поэтому
+    поток запросов сам себя не освобождает.
+    """
+    over = False
+    with connection(check_environment().dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute(_LOCK_SQL, (f"feedback:{tenant}:{login}",))
+            cur.execute(_COUNT_ATTEMPTS_SQL, {"tenant": tenant, "login": login})
+            row = cur.fetchone()
+            made = 0 if row is None else int(row[0])
+            over = made >= max_per_hour
+            if made < max_per_hour * ATTEMPT_LOG_FACTOR:
+                cur.execute(_INSERT_ATTEMPT_SQL, (tenant, login))
+        conn.commit()
+    if over:
+        raise FeedbackRateLimited("Слишком много отзывов за последний час")
 
 
 def entries(*, limit: int = LIST_LIMIT) -> tuple[Entry, ...]:

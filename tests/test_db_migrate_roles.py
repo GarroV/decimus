@@ -196,6 +196,7 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "feedback": {"SELECT", "INSERT"},
     "feedback_photos": {"SELECT", "INSERT"},
     "feedback_chat": {"SELECT", "INSERT"},
+    "feedback_attempts": {"SELECT", "INSERT"},
     # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`). Круг
     # (`mcp_admins`) снят миграцией `0059` (D448).
     "mcp_tokens": {"SELECT", "INSERT"},

@@ -58,6 +58,10 @@ FEEDBACK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Фото больше {mb} МБ.",
         "en": "A photo is larger than {mb} MB.",
     },
+    "feedback.err.photo_pixels": {
+        "ru": "Фото слишком большое по размеру в пикселях (не больше {px} млн).",
+        "en": "The photo is too large in pixels (up to {px} million).",
+    },
     "feedback.err.photo_type": {
         "ru": "Принимаются только фото JPEG, PNG и WebP.",
         "en": "Only JPEG, PNG and WebP photos are accepted.",

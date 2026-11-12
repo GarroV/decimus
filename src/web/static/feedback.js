@@ -27,7 +27,7 @@
     var box = dialog();
     if (!box || box.open) return;
     reset(box);
-    field(box, "page").value = location.pathname + location.search;
+    field(box, "page").value = location.pathname; // только путь: в запросе бывают имена и поиск
     box.returnTarget = trigger;
     box.showModal();
     var first = field(box, "text");

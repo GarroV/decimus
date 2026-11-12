@@ -80,30 +80,43 @@ def test_partner_cannot_write_into_another_space(spaces: None) -> None:
         )
 
 
+def _attempt(space: str = "RS", login: str = "anna") -> None:
+    with acting_space(space):
+        store.take_attempt(tenant=space, login=login)
+
+
 def test_rate_limit_per_login_within_the_hour(spaces: None) -> None:
     for _ in range(store.MAX_PER_HOUR):
-        _save("RS")
+        _attempt()
     with pytest.raises(store.FeedbackRateLimited):
-        _save("RS")
-    _save("RS", login="other")  # другая учётка — своё окно
+        _attempt()
+    _attempt(login="other")  # другая учётка — своё окно
 
 
-def test_old_entries_do_not_count(spaces: None, pg_dsn: str) -> None:
+def test_refused_attempts_stay_in_the_count_and_the_log_is_bounded(
+    spaces: None, pg_dsn: str
+) -> None:
     for _ in range(store.MAX_PER_HOUR):
-        _save("RS")
+        _attempt()
+    for _ in range(store.MAX_PER_HOUR * 4):
+        with pytest.raises(store.FeedbackRateLimited):
+            _attempt()
     with psycopg.connect(pg_dsn) as conn:
-        conn.execute("update feedback set created_at = now() - interval '2 hours'")
-    _save("RS")
+        [(n,)] = conn.execute("select count(*) from feedback_attempts").fetchall()
+    assert n == store.MAX_PER_HOUR * store.ATTEMPT_LOG_FACTOR
 
 
-def test_rejected_entry_leaves_nothing_behind(spaces: None) -> None:
+def test_old_attempts_do_not_count(spaces: None, pg_dsn: str) -> None:
     for _ in range(store.MAX_PER_HOUR):
-        _save("RS")
-    with pytest.raises(store.FeedbackRateLimited):
-        _save("RS", photos=[JPEG])
-    with acting_space("HQ"):
-        assert len(store.entries()) == store.MAX_PER_HOUR
-        assert all(not e.photo_ids for e in store.entries())
+        _attempt()
+    with psycopg.connect(pg_dsn) as conn:
+        conn.execute("update feedback_attempts set attempted_at = now() - interval '2 hours'")
+    _attempt()
+
+
+def test_partner_cannot_log_attempts_for_another_space(spaces: None) -> None:
+    with acting_space("RS"), pytest.raises(psycopg.Error):
+        store.take_attempt(tenant="GE", login="x")
 
 
 @pytest.mark.parametrize(

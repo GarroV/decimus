@@ -43,7 +43,7 @@ def _entry(**over: Any) -> db_feedback.Entry:
         tenant="RS",
         login="anna",
         role="auditor",
-        page="/inspections?period=all",
+        page="/inspections",
         lang="ru",
         body="Кнопка не нажимается",
         created_at=datetime(2026, 11, 12, 9, 30, tzinfo=UTC),
@@ -68,6 +68,8 @@ class Store:
         self.chat: str | None = None
         self.chat_writes: list[tuple[str | None, str]] = []
         self.save_error: Exception | None = None
+        self.attempts: list[tuple[str, str]] = []
+        self.attempt_error: Exception | None = None
         self.send_result: str | None = None
 
 
@@ -85,6 +87,12 @@ def store(monkeypatch: pytest.MonkeyPatch) -> Store:
         s.sent.append((chat, text))
         return s.send_result
 
+    def take_attempt(**kw: Any) -> None:
+        s.attempts.append((kw["tenant"], kw["login"]))
+        if s.attempt_error is not None:
+            raise s.attempt_error
+
+    monkeypatch.setattr(db_feedback, "take_attempt", take_attempt)
     monkeypatch.setattr(db_feedback, "save", save)
     monkeypatch.setattr(db_feedback, "chat_id", lambda: s.chat)
     monkeypatch.setattr(
@@ -137,8 +145,8 @@ def test_any_signed_in_role_can_send(monkeypatch, store, tenant, role):
     assert saved["lang"] == "ru"
     assert saved["body"] == "Не работает кнопка"
     assert len(saved["photos"]) == 1
-    # Адрес страницы — путь и запрос; хост из формы в базу не попадает.
-    assert saved["page"] == "/inspections?x=1"
+    # Страница — только путь: ни хоста, ни запроса (в нём бывают имена и поиск).
+    assert saved["page"] == "/inspections"
 
 
 def test_signed_out_cannot_send(store):
@@ -211,13 +219,75 @@ def test_type_is_checked_by_content_not_name(monkeypatch, store, name, raw):
     assert store.saved == []
 
 
-def test_rate_limit_answers_429(monkeypatch, store):
-    store.save_error = db_feedback.FeedbackRateLimited("limit")
+def test_rate_limit_answers_429_before_any_photo_is_parsed(monkeypatch, store):
+    store.attempt_error = db_feedback.FeedbackRateLimited("limit")
+    parsed: list[int] = []
+    real = web_feedback.read_photos
+    monkeypatch.setattr(web_feedback, "read_photos", lambda files: parsed.append(1) or real(files))
     client = _client(monkeypatch, "RS", "auditor")
-    response = _post(client)
+    response = _post(client, photos=[("a.jpg", _image())])
     assert response.status_code == 429
     assert response.get_json()["ok"] is False
-    assert store.sent == []
+    assert parsed == [], "предел частоты проверен ПОСЛЕ разбора фото"
+    assert store.saved == [] and store.sent == []
+
+
+def test_every_attempt_is_counted_even_a_refused_one(monkeypatch, store):
+    client = _client(monkeypatch, "RS", "auditor")
+    assert _post(client, text="  ").status_code == 400  # отклонена — но в счёте
+    assert _post(client, photos=[("x.jpg", b"not an image")]).status_code == 400
+    assert _post(client).status_code == 200
+    assert store.attempts == [("RS", "director")] * 3
+
+
+@pytest.mark.parametrize("side", [9000, 30000])
+def test_huge_png_that_is_tiny_in_bytes_is_refused_not_a_500(monkeypatch, store, side):
+    # 81 и 900 Мпикс: в пару килобайт сжатого PNG, а в памяти — сотни МБ и гигабайты.
+    # Первый проходит порог бомбы Pillow, но не наш предел; второй — сама бомба.
+    out = io.BytesIO()
+    Image.new("1", (side, side)).save(out, format="PNG")
+    assert len(out.getvalue()) < 200_000
+    client = _client(monkeypatch, "RS", "auditor")
+    response = _post(client, photos=[("bomb.png", out.getvalue())])
+    assert response.status_code == 400, response.get_data(as_text=True)
+    if side == 9000:
+        assert "пикселях" in response.get_json()["message"]
+    assert store.saved == []
+
+
+def test_decompression_bomb_error_is_a_refusal(monkeypatch, store):
+    from PIL import Image as PilImage
+
+    def boom(*_a, **_k):
+        raise PilImage.DecompressionBombError("too big")
+
+    monkeypatch.setattr(web_feedback, "_check_pixels", lambda data: None)
+    monkeypatch.setattr(web_feedback, "make_preview", boom)
+    client = _client(monkeypatch, "RS", "auditor")
+    assert _post(client, photos=[("a.jpg", _image())]).status_code == 400
+    assert store.saved == []
+
+
+def test_pixel_limit_is_the_shared_one():
+    from src.domain.uploads import MAX_PIXELS
+
+    assert web_feedback.MAX_PIXELS == MAX_PIXELS
+
+
+def test_partner_gets_no_photo_by_id(monkeypatch, store):
+    """IDOR: фото отзыва по угаданному номеру — только админу УК; партнёру не отдаётся."""
+    called: list[str] = []
+    monkeypatch.setattr(
+        db_feedback,
+        "photo",
+        lambda pid: called.append(pid) or ("image/jpeg", b"\xff\xd8\xff-secret"),
+    )
+    for role in ("admin", "auditor"):
+        client = _client(monkeypatch, "RS", role)
+        response = client.get("/administration/feedback/photo/22222222-2222-2222-2222-222222222222")
+        assert response.status_code in {403, 404}
+        assert b"secret" not in response.get_data()
+    assert called == [], "база опрошена до проверки прав"
 
 
 def test_failed_save_is_told_and_nothing_is_sent(monkeypatch, store):
@@ -250,7 +320,7 @@ def test_chat_set_sends_after_save_and_records_result(monkeypatch, store):
     assert _post(client, photos=[("a.jpg", _image())]).status_code == 200
     [(chat, text)] = store.sent
     assert chat == CHAT
-    assert "director" in text and "RS" in text and "/inspections?x=1" in text
+    assert "director" in text and "RS" in text and "Страница: /inspections" in text
     assert "Не работает кнопка" in text and "Фото: 1" in text
     assert store.delivery == [("33333333-3333-3333-3333-333333333333", True, None)]
 

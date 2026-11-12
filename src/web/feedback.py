@@ -5,7 +5,7 @@
 (`POST /feedback`, JSON в ответ): текст до `MAX_TEXT` знаков и до `MAX_PHOTOS` фото. Тип фото
 определяется по байтам (`db.photo_intake.sniff_image`), а не по имени и заголовку клиента;
 сохраняется сжатая JPEG-копия (`db.previews.make_preview`, тот же путь, что у кадров проверок).
-Автоматически прикладываются адрес страницы (без хоста), язык, учётка, роль, пространство,
+Автоматически прикладываются путь страницы (без хоста и запроса), язык, учётка, роль, пространство,
 время. Предел — `db.feedback.MAX_PER_HOUR` отзывов в час на учётку; сверх него отказ.
 
 Отправлять может любой вошедший: маршрут в `guard.EXEMPT_ENDPOINTS`, как прочие дела самого
@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import io
 import logging
 import re
 from datetime import UTC, datetime
@@ -38,6 +39,7 @@ from flask import (
     render_template,
     request,
 )
+from PIL import Image, UnidentifiedImageError
 from werkzeug.datastructures import FileStorage
 from werkzeug.exceptions import RequestEntityTooLarge
 
@@ -46,7 +48,7 @@ from src.db.errors import DbError, StorageError
 from src.db.photo_intake import sniff_image
 from src.db.previews import make_preview
 from src.domain.tenants import canonical_tenant
-from src.domain.uploads import MAX_UPLOAD_BYTES
+from src.domain.uploads import MAX_PIXELS, MAX_UPLOAD_BYTES
 
 from . import administration, auth, feedback_telegram, guard, ui_lang
 from .config import Settings
@@ -78,11 +80,9 @@ def _mb() -> int:
 
 
 def page_of(raw: str | None) -> str:
-    """Адрес страницы, с которой пишут: путь и запрос без хоста, не длиннее предела."""
-    parts = urlsplit((raw or "").strip())
-    path = parts.path or "/"
-    query = f"?{parts.query}" if parts.query else ""
-    return f"{path}{query}"[:MAX_PAGE_CHARS]
+    """Страница, с которой пишут: только путь, без хоста и запроса (в нём бывают имена, поиск)."""
+    path = urlsplit((raw or "").strip()).path or "/"
+    return path[:MAX_PAGE_CHARS]
 
 
 class Refused(Exception):
@@ -93,6 +93,21 @@ class Refused(Exception):
         self.code = code
         self.status = status
         self.params = params
+
+
+def _check_pixels(data: bytes) -> None:
+    """Размер кадра в пикселях — по заголовку, ДО разбора: малый по весу PNG бывает гигантским.
+
+    Предел — тот же, что у кадров мини-аппа (`domain.uploads.MAX_PIXELS`). Бомба распаковки
+    Pillow — не `OSError`, поэтому ловится отдельно и даёт отказ, а не 500.
+    """
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            width, height = image.size
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError, SyntaxError) as exc:
+        raise Refused("photo_type") from exc
+    if width * height > MAX_PIXELS:
+        raise Refused("photo_pixels", mb=_mb(), px=MAX_PIXELS // 1_000_000)
 
 
 def read_photos(files: list[FileStorage]) -> list[bytes]:
@@ -107,9 +122,10 @@ def read_photos(files: list[FileStorage]) -> list[bytes]:
             raise Refused("photo_big", 413, mb=_mb())
         if sniff_image(data) not in PHOTO_TYPES:
             raise Refused("photo_type")
+        _check_pixels(data)
         try:
             ready.append(make_preview(data))
-        except StorageError as exc:
+        except (StorageError, Image.DecompressionBombError) as exc:
             raise Refused("photo_type") from exc
     return ready
 
@@ -124,6 +140,16 @@ def _send(conf: Settings) -> Response:
     account = auth.current_account()
     if account is None:
         abort(403)
+    space = canonical_tenant(account.tenant)
+    # Предел частоты — ДО разбора формы и фото: отказ дёшев, тяжёлая работа не начинается,
+    # а отклонённая попытка тоже в счёте.
+    try:
+        db_feedback.take_attempt(tenant=space, login=account.login)
+    except db_feedback.FeedbackRateLimited:
+        return _answer(lang, ok=False, key="feedback.err.rate", status=429)
+    except (DbError, psycopg.Error):
+        logger.exception("Попытка отправки отзыва не записана")
+        return _answer(lang, ok=False, key="feedback.err.failed", status=503)
     request.max_content_length = MAX_UPLOAD_BYTES * MAX_PHOTOS + FORM_OVERHEAD_BYTES
     try:
         body = (request.form.get("text") or "").strip()
@@ -143,7 +169,6 @@ def _send(conf: Settings) -> Response:
             status=refusal.status,
             **refusal.params,
         )
-    space = canonical_tenant(account.tenant)
     g.journal_target = f"photos={len(photos)}"
     try:
         feedback_id = db_feedback.save(
@@ -155,8 +180,6 @@ def _send(conf: Settings) -> Response:
             body=body,
             photos=photos,
         )
-    except db_feedback.FeedbackRateLimited:
-        return _answer(lang, ok=False, key="feedback.err.rate", status=429)
     except (DbError, psycopg.Error):
         logger.exception("Отзыв не сохранён")
         return _answer(lang, ok=False, key="feedback.err.failed", status=503)

@@ -479,7 +479,7 @@
 | `SECRETS_KEY` | `src/db/secret_crypto.py` | да |
 | `SEED_WEB_DEMO_FORCE` | `tools/seed_web_demo.py` | да |
 | `STATE_DIR` | `src/domain/config.py`, `src/report/letters.py`, `tools/state_backup.py` | да |
-| `TELEGRAM_BOT_TOKEN` | `src/bot/config.py`, `src/health/checks.py`, `src/web/walk_auth.py` | да |
+| `TELEGRAM_BOT_TOKEN` | `src/bot/config.py`, `src/health/checks.py`, `src/web/feedback_telegram.py` и ещё 1 | да |
 | `WALK_MOCKUP_ZONES` | `tools/walk_mockup/build.py` | нет — ручной рычаг сборки макета (tools/walk_mockup/build.py), не настройка |
 | `WALK_MODEL_MAX_CONCURRENT` | `src/web/server_limits.py` | да |
 | `WALK_USERS` | `src/domain/walk_users.py` | да |
@@ -675,7 +675,7 @@
 | `0129_calendar_deadline.sql` | `calendar_grants`, `calendar_events` |
 | `0130_close_invariants.sql` | — |
 | `0131_mailing_templates_lang.sql` | — |
-| `0136_feedback.sql` | `feedback`, `feedback_photos`, `feedback_chat` |
+| `0136_feedback.sql` | `feedback`, `feedback_photos`, `feedback_chat`, `feedback_attempts` |
 <!-- map:end -->
 
 ## Makefile

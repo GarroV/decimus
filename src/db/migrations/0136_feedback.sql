@@ -14,6 +14,9 @@
 -- пустой `telegram_chat_id` значит «выключено». Миграция ни одной строки не добавляет:
 -- чат не задан, значит ничего не отправляется.
 --
+-- `feedback_attempts` — попытки отправки (любые, и принятые, и отклонённые): предел частоты
+-- считается по ней ДО разбора фото, чтобы поток тяжёлых запросов останавливался дёшево.
+--
 -- Видимость по пространству: пишет каждый в своё; читает УК (вся сеть) и пространство-автор.
 -- Строка, добавленная без `returning`, читателя не требует: партнёр свой отзыв пишет, а чужие
 -- не видит. Раннер оборачивает файл в одну транзакцию сам — begin/commit здесь не нужны.
@@ -52,6 +55,18 @@ create table feedback_chat (
     changed_by text not null,
     changed_at timestamptz not null default now()
 );
+
+create table feedback_attempts (
+    id bigint generated always as identity primary key,
+    tenant_code text not null references tenants (code),
+    login text not null check (length(btrim(login)) > 0),
+    attempted_at timestamptz not null default now()
+);
+
+create index feedback_attempts_by_login on feedback_attempts (login, attempted_at desc);
+
+comment on table feedback_attempts is
+    'Попытки отправки отзыва (D761): предел частоты на учётку; считаются и отклонённые.';
 
 comment on table feedback is
     'Отзывы из кнопки «Обратная связь» (D761): текст, откуда и от кого. Меняются только '
@@ -95,6 +110,15 @@ alter table feedback_chat force row level security;
 create policy feedback_chat_app_access on feedback_chat
     for all to dodo_audit_app using (true) with check (true);
 
-grant select, insert on feedback, feedback_photos, feedback_chat to dodo_audit_app;
+alter table feedback_attempts enable row level security;
+alter table feedback_attempts force row level security;
+create policy feedback_attempts_app_access on feedback_attempts
+    for all to dodo_audit_app using (true) with check (true);
+create policy feedback_attempts_space on feedback_attempts as restrictive
+    for all to dodo_audit_app
+    using (decimus_space_writes(tenant_code)) with check (decimus_space_writes(tenant_code));
+
+grant select, insert on feedback, feedback_photos, feedback_chat, feedback_attempts
+    to dodo_audit_app;
 grant update (reviewed_at, reviewed_by, telegram_sent_at, telegram_error)
     on feedback to dodo_audit_app;
