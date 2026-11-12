@@ -45,7 +45,7 @@
       <div class="ins-row cl-row">
         <span class="ins-row__main">
           <span class="ins-row__title">
-            <a class="ins-row__unit" href="{{ url_for('methodology') }}?checklist={{ item.code }}"
+            <a class="ins-row__unit" href="{{ url_for('methodology', checklist=item.code, space=(item.space if item.space != own_space else None)) }}"
                {% if item.version %}title="{{ item.version }}"{% endif %}>{{ item.name_ru if lang == 'ru' else (item.name_en or item.name_ru) }}</a>
             {% if item.in_production %}
               <span class="tag tag--ok tag--micro">{{ t('checklists.in_production') }}</span>
@@ -56,6 +56,7 @@
             · {{ item.name_en if lang == 'ru' else item.name_ru }}
           </span>
         </span>
+        {% if may("checklist.manage") and item.space == own_space %}
         <form method="post" action="{{ url_for('checklists_state', code=item.code) }}" class="row row--tight">
           <select class="input input--sm" name="state" aria-label="{{ t('checklists.col.state') }}">
             {% for state in states %}
@@ -64,6 +65,9 @@
           </select>
           <button type="submit" class="btn btn--sm btn--ghost">{{ t('checklists.state.submit') }}</button>
         </form>
+        {% else %}
+          <span class="tag tag--neutral tag--micro">{{ t('checklists.state.' ~ item.state) }}</span>
+        {% endif %}
         {% if not item.in_production and may("checklist.apply") %}
           <a class="btn btn--sm" href="{{ url_for('checklists_apply_preview', code=item.code) }}">{{ t('checklists.apply.open') }}</a>
         {% endif %}
@@ -75,6 +79,7 @@
 
   {# Новый — одной строкой полей. Почему пустой, а не копия, и что значит код,
      сказано подсказками у полей, а не абзацем над формой. #}
+  {% if can_create %}
   <section class="ov-card ov-card--wide">
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('checklists.new.title') }}</div>
@@ -91,4 +96,5 @@
     </form>
     <p class="field-note cl-new__hint">{{ t('checklists.new.code.hint') }}</p>
   </section>
+  {% endif %}
 {% endblock %}

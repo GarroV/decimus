@@ -50,6 +50,16 @@ MASTER_TEXTS: dict[str, dict[str, str]] = {
             "only admins edit it. You can view it here but not change it."
         ),
     },
+    # Заголовки плашки «только чтение» для чек-листа чужого пространства; текст под
+    # ними — `methodology.etalon_readonly` / `methodology.foreign_readonly` (texts.py).
+    "methodology.etalon.readonly.title": {
+        "ru": "Эталон УК: только чтение",
+        "en": "HQ reference checklist: read-only",
+    },
+    "methodology.foreign.readonly.title": {
+        "ru": "Чек-лист другого пространства: только чтение",
+        "en": "Another space's checklist: read-only",
+    },
     "methodology.apply_admins_only": {
         "ru": "Применять чек-лист к проду могут только админы: указатель прода один на всю сеть.",
         "en": "Only admins can apply a checklist to production: one pointer for all.",

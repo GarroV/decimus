@@ -202,7 +202,7 @@
     <div class="pk-rail pk-rail--inline">
       <div class="mx-rail__head mx-rail__head--list">
         <span>{{ t('methodology.rail.title') }}</span>
-        <a class="btn btn--sm" href="{{ href(panel='new', item='') }}" data-mx-open>{{ t('methodology.rail.new') }}</a>
+        {% if can_create %}<a class="btn btn--sm" href="{{ href(panel='new', item='') }}" data-mx-open>{{ t('methodology.rail.new') }}</a>{% endif %}
       </div>
       <div class="pk-rail__list">
         {% for r in rail if r.state != 'retired' %}{{ rail_row(r) }}{% endfor %}
@@ -509,10 +509,12 @@
           {% else %}
             <p class="mx-panel__hint">{{ t('methodology.diff.none') }}</p>
           {% endfor %}
+          {% if can_edit_checklist %}
           <form class="mx-drawer__foot" method="post" action="{{ action('methodology_publish') }}">
             <input type="hidden" name="version" value="{{ composition.latest }}">
             <button class="btn btn--primary" type="submit">{{ t('methodology.publish.submit') }}</button>
           </form>
+          {% endif %}
         </div>
 
       {% elif zone_card %}
@@ -691,7 +693,7 @@
                 </div>
                 {# Переключатель — только у чек-листа своего пространства: эталон у
                    партнёра и чек-лист партнёра у УК — только чтение (D283). #}
-                {% if r.space == own_space and (r.wants_bot or not r.bot_block) %}
+                {% if r.space == own_space and may("checklist.manage") and (r.wants_bot or not r.bot_block) %}
                   <form method="post" action="{{ action('methodology_bot', code=r.code) }}">
                     <input type="hidden" name="on" value="{{ '0' if r.wants_bot else '1' }}">
                     <button type="submit" class="mx-toggle{% if r.wants_bot %} is-on{% endif %}" role="switch" aria-checked="{{ 'true' if r.wants_bot else 'false' }}"
@@ -700,8 +702,8 @@
                       <span class="mx-toggle__text">{{ t('methodology.bot.on') if r.wants_bot else t('methodology.bot.off') }}</span>
                     </button>
                   </form>
-                {% elif r.space != own_space %}
-                  {# Чужое — без переключателя, но с состоянием: читать его можно. #}
+                {% elif r.space != own_space or not may("checklist.manage") %}
+                  {# Чужое или роль без права — без переключателя, но с состоянием. #}
                   <span class="mx-botlist__why">{{ t('methodology.bot.on') if r.in_bot else t('methodology.bot.off') }}</span>
                 {% else %}
                   <span class="mx-botlist__why" title="{{ t('methodology.bot.why.' ~ r.bot_block ~ '.hint') }}">{{ t('methodology.bot.why.' ~ r.bot_block) }}</span>
