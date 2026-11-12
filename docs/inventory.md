@@ -435,6 +435,7 @@
 | `GOOGLE_REDIRECT_URI` | `src/web/google_auth.py` | да |
 | `INSPECTION_FILE` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
 | `LANDING_SHOTS_BASE` | `tools/landing_shots.py` | да |
+| `LANDING_SHOTS_ONLY` | `tools/landing_shots.py` | да |
 | `LANDING_SHOTS_WALK_BASE` | `tools/landing_shots.py` | да |
 | `LOG_ID_SALT` | `src/domain/log_ids.py` | да |
 | `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 3 | да |
