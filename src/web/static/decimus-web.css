@@ -754,8 +754,13 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .sidenav__sub { display: flex; flex-direction: column; margin: 2px 0 var(--space-3) 30px; border-left: 1px solid var(--line); }
 .sidenav__subitem { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 6px 10px; border-radius: var(--r-control); font-size: 13px; line-height: 18px; color: var(--ink-2); }
 .sidenav__subitem:hover { text-decoration: none; color: var(--ink); background: var(--surface-2); }
-.sidenav__subitem.is-on { color: var(--accent); background: var(--accent-soft); font-weight: var(--w-semibold); }
+.sidenav__subitem.is-on { color: var(--accent); background: var(--accent-soft); }
 .sidenav__subitem .rt-fdot { flex: none; }
+/* Высота пункта не зависит от страницы: текущий пункт не жирнее остальных (иначе его подпись
+   переносится на строку дольше и всё ниже уезжает), а у пункта без точки свежести — место под
+   неё (на страницах вне «Рейтингов» точек нет, и подписи переносились иначе: владелец
+   12.11.2026, «левая панель прыгает»). Ширина места — как у `.rt-fdot` (`decimus-rt.css`). */
+.sidenav__subitem--nodot::after { content: ""; flex: none; width: .6rem; }
 /* Полоса прокрутки страницы не двигает содержимое: место под неё занято всегда, а не
    только на экранах «Рейтингов» (там это правило жило в decimus-rt.css). */
 html { scrollbar-gutter: stable; }

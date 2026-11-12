@@ -21,7 +21,7 @@
 
 .login {
   width: 100%;
-  max-width: 19.5rem;
+  max-width: 22rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -52,13 +52,16 @@
 /* Блок способов входа */
 .login__block { width: 100%; display: flex; flex-direction: column; gap: var(--space-6); }
 .login__google { display: flex; flex-direction: column; gap: var(--space-4); }
+.login__google-wrap { display: flex; flex-direction: column; gap: var(--space-4); margin-bottom: var(--space-2); }
 
+/* Кнопка Google — тех же 44px, радиуса и кегля, что поля и «Войти»: значок и надпись —
+   одна группа по центру. Пометка (D757) — подпись под кнопкой, а не внутри неё. */
 .login__google-btn {
-  display: flex; align-items: center; justify-content: center; gap: var(--space-6);
-  width: 100%; min-height: 52px; padding: 0 var(--space-8);
-  border: 1px solid var(--line-control); border-radius: 16px;
+  display: flex; align-items: center; justify-content: center; gap: var(--space-5);
+  width: 100%; min-height: 44px; padding: 0 var(--space-7);
+  border: 1px solid var(--line-control); border-radius: 12px;
   background: var(--surface); color: var(--ink);
-  font: var(--w-semibold) 15px / 1 var(--font-ui);
+  font: var(--w-semibold) var(--fs-lead) / 1 var(--font-ui);
   box-shadow: var(--sh-card);
   transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease), transform var(--t-state) var(--ease);
 }
@@ -66,9 +69,7 @@
 .login__google-btn:active { transform: translateY(1px); }
 .login__google-btn:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
 .login__google-mark { width: 20px; height: 20px; flex: 0 0 auto; }
-/* Пометка под надписью кнопки (D757): Google пока только для учёток УК — временно. */
-.login__google-text { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: var(--space-3) 0; }
-.login__google-note { font: var(--w-regular) var(--fs-meta) / 1.2 var(--font-ui); color: var(--ink-3); }
+.login__google-note { margin: 0; font: var(--w-regular) var(--fs-meta) / var(--lh-meta) var(--font-ui); color: var(--ink-3); text-align: center; text-wrap: balance; width: max-content; max-width: calc(100vw - 2 * var(--space-7)); align-self: center; }
 
 .login__or { display: flex; align-items: center; gap: var(--space-6); font-size: var(--fs-meta); color: var(--ink-3); }
 .login__or::before, .login__or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
@@ -96,6 +97,7 @@
 
 /* Две мелкие строки внизу */
 .login__foot { display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); }
+.login__foot { width: max-content; max-width: calc(100vw - 2 * var(--space-7)); }
 .login__foot p { margin: 0; text-wrap: balance; }
 .login__foot a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
 

@@ -6,7 +6,7 @@
     {% set menu_items = subnav if subnav is defined and subnav else ratings_menu %}
     <nav class="sidenav__sub" aria-label="{{ t('ratings.sec.nav') }}"{% if current_key == 'ratings' %} data-rt-subnav{% endif %}>
       {% for i in menu_items %}
-      <a class="sidenav__subitem{% if i.current %} is-on{% endif %}" href="{{ i.href }}"{% if current_key == 'ratings' %} data-rt-nav{% endif %}{% if i.current %} aria-current="page"{% endif %}>
+      <a class="sidenav__subitem{% if i.current %} is-on{% endif %}{% if not i.dot %} sidenav__subitem--nodot{% endif %}" href="{{ i.href }}"{% if current_key == 'ratings' %} data-rt-nav{% endif %}{% if i.current %} aria-current="page"{% endif %}>
         <span>{{ i.title }}</span>{% if i.dot %}<i class="rt-fdot rt-fdot--{{ i.dot }}" title="{{ i.dot_word }}" role="img" aria-label="{{ i.dot_word }}"></i>{% endif %}
       </a>
       {% endfor %}
