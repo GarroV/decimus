@@ -73,20 +73,21 @@ def _стенд(
     минут: int,
     email: str | None = None,
     google: bool = True,
+    tenant: str = "HQ",
 ) -> Iterator[tuple[FlaskClient, Двери]]:
     двери = Двери(monkeypatch)
-    подменить_двери(monkeypatch, tenant="HQ", role="admin")
+    подменить_двери(monkeypatch, tenant=tenant, role="admin")
     if google:
         monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: РЕКВИЗИТЫ)
-    with собрать(tenant="HQ", bot_username="decimus_demo_bot").test_client() as client:
+    with собрать(tenant=tenant, bot_username="decimus_demo_bot").test_client() as client:
         assert войти(client).status_code == 302
         когда = datetime.now(UTC) - timedelta(minutes=минут)
 
         def _resolve(token: str) -> Учётка | None:
             if token == ТОКЕН:
-                return Учётка(tenant="HQ", role="admin", email=email, signed_in_at=когда)
+                return Учётка(tenant=tenant, role="admin", email=email, signed_in_at=когда)
             if token == НОВЫЙ_ТОКЕН:
-                return Учётка(tenant="HQ", role="admin", email=email)
+                return Учётка(tenant=tenant, role="admin", email=email)
             return None
 
         monkeypatch.setattr(auth, "resolve_session", _resolve)
@@ -208,6 +209,21 @@ def test_учётка_с_google_паролем_не_подтверждает(mon
         )
 
         assert ответ.status_code == 403 and двери.открыто == []
+
+
+def test_партнёр_с_почтой_подтверждает_паролем(monkeypatch: pytest.MonkeyPatch) -> None:
+    """D754: граница та же, что у входа — через Google подтверждает только УК."""
+    for client, двери in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, email=ПОЧТА, tenant="rs"):
+        страница = client.get(reauth.CONFIRM_PATH).get_data(as_text=True)
+        assert 'name="password"' in страница and "Подтвердить через Google" not in страница
+
+        ответ = client.post(
+            reauth.CONFIRM_PATH,
+            data={"password": "верный-пароль", "next": "/settings#bot"},
+            headers=ЗАГОЛОВКИ,
+        )
+
+        assert ответ.status_code == 302 and двери.открыто == ["director"]
 
 
 # ── Подтверждение через Google ─────────────────────────────────────────
