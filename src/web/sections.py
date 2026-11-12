@@ -75,7 +75,8 @@ SECTIONS: tuple[Section, ...] = (
     Section(key="overview", path="/overview", built=True, icon="home"),
     Section(key="registry", path="/inspections", built=True, icon="task"),
     # Сетка месяца с проверками по дням (D497); «Где нужно проверить» снят.
-    Section(key="calendar", path="/calendar", built=True, icon="cal"),
+    # Пока только УК (D762): партнёру раздел убран, адрес ему закрыт.
+    Section(key="calendar", path="/calendar", built=True, hq_only=True, icon="cal"),
     # «Действия» (D526): экшн-планы и предписания — один раздел у УК и партнёра,
     # вкладки «Экшн-планы» и «Предписания», выбранная строка — в панели справа
     # (D527). Раздел открыт обеим сторонам: объём сведений и кнопки решает охват и

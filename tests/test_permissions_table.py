@@ -25,7 +25,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
 # «Страна» открыта и партнёру (D508): экран пиццерии, в пределах его стран.
 # «Действия» — один раздел у УК и партнёра (D526): разделов «только УК» среди видов нет.
 # «ОСБ» (D599) — страница только УК: партнёру её нет.
-ВИДЫ_ПАРТНЁРА = ВИДЫ_ВСЕ - {"view.osb"}
+ВИДЫ_ПАРТНЁРА = ВИДЫ_ВСЕ - {"view.osb", "view.calendar"}  # календарь партнёру закрыт (D762)
 
 РАБОТА_УК = {
     "inspection.read",
@@ -76,8 +76,6 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
     "plan.submit",
     "checklist.read",
     "ratings.read",
-    # Свои поездки — где сам исполнитель (D506).
-    "trip.own",
 }
 
 ГОСТЬ_УК = {
@@ -133,7 +131,6 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "phrases.manage",
         "people.manage",
         "people.role",
-        "trip.plan",
         "view.administration",
     },
     (SIDE_PARTNER, "auditor"): СОТРУДНИК_ПАРТНЁРА,

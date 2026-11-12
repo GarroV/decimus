@@ -64,7 +64,8 @@ _VIEWS: tuple[Action, ...] = (
     # «Обучение» (D578, #906): все, кроме контроля (D420: контроль ведёт только «Рейтинги»);
     # партнёр — свои страны (охват).
     Action("view.training", "view", writes=False),
-    Action("view.calendar", "view", writes=False),
+    # «Календарь» (D762): пока только УК — партнёру раздел убран владельцем 12.11.2026.
+    Action("view.calendar", "view", hq_only=True, writes=False),
     Action("view.admin", "view", writes=False),
     # «Действия» (D526): экшн-планы и предписания — раздел УК и партнёра; кнопки
     # УК и партнёра различают действия `plan.*` и `prescription.*`.
@@ -112,7 +113,8 @@ ACTIONS: tuple[Action, ...] = (
     # пространствам в нём нет, поэтому партнёру не выдаётся (D460, ревью безопасности).
     Action("phrases.raw", "checklist", hq_only=True, writes=False),
     # Поездки «Календаря» (D505, D506): только своё пространство — и у УК тоже,
-    # поездки партнёра УК не трогает. `trip.plan` — любые поездки пространства,
+    # поездки партнёра УК не трогает. Партнёру права сняты вместе с календарём
+    # (D762): других входов в поездки у него нет. `trip.plan` — любые поездки пространства,
     # `trip.own` — только те, где человек сам исполнитель.
     Action("trip.plan", "trip", own_space=True),
     Action("trip.own", "trip", own_space=True),
@@ -238,7 +240,6 @@ _PARTNER_AUDITOR = _ALL_VIEWS_PARTNER | _codes(
     "plan.submit",
     "checklist.read",
     "ratings.read",
-    "trip.own",
 )
 
 #: Чтение всей сети (D429, D440): гость и основа ОСБ.
@@ -289,7 +290,6 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
         "inspection.revise",
         "people.manage",
         "people.role",
-        "trip.plan",
         "view.administration",  # D640: «Люди» и «Пространства партнёров» своего пространства
     ),
     (SIDE_PARTNER, "auditor"): _PARTNER_AUDITOR,

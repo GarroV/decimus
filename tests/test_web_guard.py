@@ -211,7 +211,7 @@ def test_маршрут_с_действием_только_УК_партнёру
     with app.test_client() as client:
         войти(client)
         assert client.get("/zzz-hq").status_code == 404
-        assert client.get("/calendar").status_code == 200  # объявленный раздел открыт
+        assert client.get("/country").status_code == 200  # объявленный раздел открыт
 
 
 #: Записи только УК, до которых партнёр доходит (раздел открыт ему) и получает «нет доступа»
