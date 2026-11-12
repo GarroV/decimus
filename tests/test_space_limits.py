@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from src.db import space_limits as db_limits
-from src.domain.model_usage import usage_scope
+from src.domain.model_usage import ModelCall, usage_scope
 from src.domain.space_limits import (
     DEFAULT_INSPECTIONS_PER_UNIT,
     DEFAULT_MONTHLY_SPEND_USD,
@@ -239,3 +239,93 @@ def test_достигнутый_потолок_не_пускает_голос_н
         transcribe(b"voice", settings=_settings())
 
     assert ушло == []
+
+
+# --- кэш не отстаёт от вызовов и не прячет границу ----------------------------------
+
+
+def _заполнить_кэш(spent: str, cap: str = "50") -> list[str]:
+    seen: list[str] = []
+    ensure_within_cap("GE", clock=lambda: 100.0, read=_read(spent, cap, seen))
+    return seen
+
+
+def _платный_вызов(input_tokens: int) -> ModelCall:
+    return ModelCall(
+        kind="recognize", model="gpt-5.6-sol", ok=True, input_tokens=input_tokens, tenant="GE"
+    )
+
+
+def test_оплаченный_вызов_прибавляется_к_кэшу_и_тот_выводит_к_границе_и_к_чтению_базы() -> None:
+    seen = _заполнить_кэш("10")  # 10 из 50, кэш свежий: следующая проверка базу не читает
+    # 10 млн токенов входа gpt-5.6-sol = 40 $: кэш дорос до 50 $ — это уже граница.
+    spend_cap.note_call(_платный_вызов(10_000_000))
+
+    # Граница — кэш не верим: база (в ней вызов уже записан) говорит 50 — вызов закрыт.
+    with pytest.raises(ModelLimitReached):
+        ensure_within_cap("GE", clock=lambda: 101.0, read=_read("50", "50", seen))
+
+    assert seen == ["GE", "GE"]  # без прибавки кэш остался бы «10» и базу не спросил бы
+
+
+def test_вызов_без_пространства_или_без_кэша_кэш_не_трогает() -> None:
+    seen = _заполнить_кэш("10")
+    big = 10**7
+    spend_cap.note_call(ModelCall(kind="recognize", model="gpt-5.6-sol", ok=True, input_tokens=big))
+    spend_cap.note_call(
+        ModelCall(kind="recognize", model="gpt-5.6-sol", ok=True, input_tokens=big, tenant="AM")
+    )
+
+    ensure_within_cap("GE", clock=lambda: 101.0, read=_read("10", "50", seen))
+
+    assert seen == ["GE"]
+
+
+def test_от_девяноста_процентов_потолка_кэш_не_используется() -> None:
+    seen = _заполнить_кэш("45")  # ровно 90 % от 50
+
+    ensure_within_cap("GE", clock=lambda: 101.0, read=_read("45", "50", seen))
+    ensure_within_cap("GE", clock=lambda: 102.0, read=_read("45", "50", seen))
+
+    assert seen == ["GE", "GE", "GE"]
+
+
+def test_ниже_девяноста_процентов_кэш_работает() -> None:
+    seen = _заполнить_кэш("44.99")
+
+    ensure_within_cap("GE", clock=lambda: 101.0, read=_read("44.99", "50", seen))
+
+    assert seen == ["GE"]
+
+
+def test_пачка_проверяется_один_раз_с_оценкой_стоимости() -> None:
+    reserve = spend_cap.ESTIMATED_CALL_USD * 10
+
+    ensure_within_cap("GE", read=_read("40", "50"), reserve=reserve)  # 40,5 < 50
+    spend_cap.forget()
+    with pytest.raises(ModelLimitReached):
+        ensure_within_cap("GE", read=_read("49.6", "50"), reserve=reserve)  # 49,6 + 0,5 ≥ 50
+
+
+def test_точки_вызова_провайдера_прибавляют_стоимость_к_кэшу(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.recognize import client
+    from src.recognize import transcribe as voice
+
+    monkeypatch.setattr("src.db.model_usage.record", lambda _call: None)
+    seen = _заполнить_кэш("10")
+
+    with usage_scope(tenant="GE"):
+        client._note("recognize", "gpt-5.6-sol", {"input": 10_000_000}, ok=True)
+
+    # +40 $ дошли до кэша: он у границы, следующая проверка идёт в базу.
+    ensure_within_cap("GE", clock=lambda: 101.0, read=_read("10", "50", seen))
+    assert seen == ["GE", "GE"]
+
+    spend_cap.forget()
+    seen = _заполнить_кэш("10")
+    with usage_scope(tenant="GE"):
+        voice._note("gpt-5.6-sol", type("U", (), {"input_tokens": 10_000_000})(), ok=True)
+    ensure_within_cap("GE", clock=lambda: 101.0, read=_read("10", "50", seen))
+    assert seen == ["GE", "GE"]

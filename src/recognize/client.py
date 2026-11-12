@@ -34,7 +34,7 @@ from src.domain.model_usage import KIND_RECOGNIZE, build_call
 
 from .config import RecognizeSettings
 from .errors import ModelKeyRejected, ModelUnavailable
-from .spend_cap import ensure_within_cap
+from .spend_cap import ensure_within_cap, note_call
 from .timing import measure
 
 #: Имя схемы в запросе. Провайдеру оно нужно, на содержание не влияет.
@@ -144,15 +144,15 @@ def _usage(raw_usage: Any) -> dict[str, int]:
 
 def _note(kind: str, model: str, usage: dict[str, int], *, ok: bool) -> None:
     """Учесть вызов (D537). Сбой учёта в журнал процесса, ответ человеку он не меняет."""
-    model_usage.record(
-        build_call(
-            kind,
-            model,
-            ok=ok,
-            input_tokens=usage.get("input"),
-            output_tokens=usage.get("output"),
-        )
+    call = build_call(
+        kind,
+        model,
+        ok=ok,
+        input_tokens=usage.get("input"),
+        output_tokens=usage.get("output"),
     )
+    model_usage.record(call)
+    note_call(call)
 
 
 def ask_model(

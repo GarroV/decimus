@@ -480,6 +480,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0131_mailing_templates_lang.sql": (
         "sql1:bb4a88d5b22fcc5866ed2391b30901db79e2a5b4f812e457adae222246a7353d"
     ),
+    "0133_space_limits.sql": (
+        "sql1:2a72d690b63102f83f5c2a8f0a5a58d0c17c404f739721ade525e87cfb5e7f2a"
+    ),
 }
 
 

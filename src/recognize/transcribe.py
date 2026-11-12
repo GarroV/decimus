@@ -24,7 +24,7 @@ from src.domain.model_usage import KIND_TRANSCRIBE, build_call
 
 from .config import RecognizeSettings, load_recognize_settings
 from .errors import TranscriptionFailed
-from .spend_cap import ensure_within_cap
+from .spend_cap import ensure_within_cap, note_call
 
 #: Таймаут перекодировки. Голосовые аудитора короткие (секунды-десятки
 #: секунд); минута — щедрый запас на медленный старт ffmpeg в контейнере.
@@ -101,16 +101,16 @@ def _reencode(audio: bytes, ffmpeg: str) -> bytes:
 def _note(model: str, usage: object | None, *, ok: bool) -> None:
     """Учесть расшифровку (D537): токены, если провайдер их отдал, иначе секунды звука."""
     seconds = getattr(usage, "seconds", None)
-    model_usage.record(
-        build_call(
-            KIND_TRANSCRIBE,
-            model,
-            ok=ok,
-            input_tokens=getattr(usage, "input_tokens", None),
-            output_tokens=getattr(usage, "output_tokens", None),
-            audio_seconds=float(seconds) if isinstance(seconds, int | float) else None,
-        )
+    call = build_call(
+        KIND_TRANSCRIBE,
+        model,
+        ok=ok,
+        input_tokens=getattr(usage, "input_tokens", None),
+        output_tokens=getattr(usage, "output_tokens", None),
+        audio_seconds=float(seconds) if isinstance(seconds, int | float) else None,
     )
+    model_usage.record(call)
+    note_call(call)
 
 
 def transcribe(

@@ -32,7 +32,7 @@ import psycopg
 
 from src.db import space_limits
 from src.db.errors import AccessError, DbError
-from src.domain.model_usage import current_scope
+from src.domain.model_usage import ModelCall, current_scope
 from src.domain.space_limits import (
     LEVEL_OVER,
     effective,
@@ -50,6 +50,12 @@ logger = logging.getLogger(__name__)
 #: Сколько секунд в процессе держится прочитанное. Превышение за это время — на нескольких
 #: вызовах подряд, а не на сотнях: цена вызова ≈1 $, потолок — десятки.
 CACHE_SECONDS = 10.0
+
+#: С какой доли потолка кэш не используется: сумма читается из базы на каждый вызов.
+NEAR_CAP_SHARE = Decimal("0.9")
+#: Оценка одного вызова модели для пачки (`reserve`), $: проверка «влезет ли пачка» до её
+#: запуска. Замер D755: ≈1 $ на всю проверку (десятки вызовов) — на вызов порядка 0,05 $.
+ESTIMATED_CALL_USD = Decimal("0.05")
 
 _CENTS = Decimal("0.01")
 
@@ -108,13 +114,45 @@ def forget() -> None:
         _cache.clear()
 
 
+def _near_cap(spend: Spend) -> bool:
+    return spend.cap is not None and spend.spent >= spend.cap * NEAR_CAP_SHARE
+
+
+def note_call(call: ModelCall, prices: dict[str, Price] | None = None) -> None:
+    """Прибавить стоимость только что оплаченного вызова к закэшированной сумме пространства.
+
+    Кэш не отстаёт от вызовов этого процесса: между чтениями из базы сумма растёт сама.
+    Нет записи в кэше (или вызов без пространства, цены, токенов) — ничего не делает.
+    """
+    if not call.tenant:
+        return
+    cost = estimate_cost(
+        call.model,
+        input_tokens=call.input_tokens or 0,
+        output_tokens=call.output_tokens or 0,
+        audio_seconds=call.audio_seconds or 0.0,
+        prices=prices,
+    )
+    if not cost:
+        return
+    код = canonical_tenant(call.tenant)
+    with _lock:
+        hit = _cache.get(код)
+        if hit is not None:
+            old = hit[1]
+            _cache[код] = (
+                hit[0],
+                Spend(old.spent + Decimal(repr(cost)), old.partial, old.cap),
+            )
+
+
 def _cached(
     tenant: str, *, clock: Callable[[], float], read: Callable[[str], Spend]
 ) -> Spend | None:
     now = clock()
     with _lock:
         hit = _cache.get(tenant)
-        if hit is not None and now - hit[0] < CACHE_SECONDS:
+        if hit is not None and now - hit[0] < CACHE_SECONDS and not _near_cap(hit[1]):
             return hit[1]
     try:
         fresh = read(tenant)
@@ -131,16 +169,22 @@ def ensure_within_cap(
     *,
     clock: Callable[[], float] = time.monotonic,
     read: Callable[[str], Spend] | None = None,
+    reserve: Decimal = Decimal(0),
 ) -> None:
     """Отказ `ModelLimitReached`, если потолок расхода пространства достигнут.
 
     `tenant` не задан — берётся из контекста обращения; нет и там — проверки нет.
-    `clock` и `read` — швы для теста.
+    `reserve` — оценка стоимости пачки, которая сейчас уйдёт к провайдеру: расход плюс запас
+    не должен дойти до потолка (`ESTIMATED_CALL_USD` на вызов). `clock` и `read` — швы для теста.
     """
     код = tenant if tenant is not None else current_scope().tenant
     if not код or is_hq(код):
         return
     spend = _cached(canonical_tenant(код), clock=clock, read=read or month_spend)
-    if spend is not None and spend.cap is not None and spend.level == LEVEL_OVER:
+    if (
+        spend is not None
+        and spend.cap is not None
+        and spend_level(spend.spent + reserve, spend.cap) == LEVEL_OVER
+    ):
         logger.info("потолок расхода модели достигнут: %s %s из %s $", код, spend.spent, spend.cap)
         raise ModelLimitReached

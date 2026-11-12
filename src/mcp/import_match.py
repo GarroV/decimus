@@ -44,6 +44,7 @@ from ..recognize.errors import ModelLimitReached, RecognizeError
 from ..recognize.fastpath import fast_path
 from ..recognize.level import LevelAnswer, level_from, level_request
 from ..recognize.models import UNKNOWN_ZONE, Suggestion
+from ..recognize.spend_cap import ESTIMATED_CALL_USD, ensure_within_cap
 from ..recognize.zone_words import zone_from_words
 from . import checklist as store_api
 from .checklist_layout import Store
@@ -263,6 +264,14 @@ def match_texts(
         _prepare(draft, job, cfg)
 
     asking = [j for j in jobs if j.request is not None]
+    try:
+        # Пачка уходит разом: потолок расхода сверяется один раз, с оценкой стоимости пачки (D759).
+        ensure_within_cap(reserve=ESTIMATED_CALL_USD * len(asking))
+    except ModelLimitReached:
+        asking = []
+        for job in jobs:
+            if job.request is not None:
+                job.failure = "the space's monthly model spending limit is reached: model not used"
     answers = _in_parallel([j.request.ask.call for j in asking if j.request is not None])
     for job, answer in zip(asking, answers, strict=True):
         if isinstance(answer, ModelLimitReached):
