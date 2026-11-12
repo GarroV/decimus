@@ -7,7 +7,7 @@
 
 | Файл здесь | Оригинал в `forma` | Коммит-источник |
 |---|---|---|
-| `dodo-ds.css` | `dodo/core/dodo-ds.css` | `7312ce8` (сохраняемая ширина навигации, 02.11.2026) |
+| `dodo-ds.css` | `dodo/core/dodo-ds.css` | `be15c68` (пункты навигации не сжимаются, 12.11.2026) |
 | `decimus-domain.css` | `dodo/decimus/domain.css` | `7312ce8` |
 | `fonts/*.woff2` (13 файлов) | `dodo/core/fonts/` | `f70045d` |
 | `icons.json` | `dodo/core/icons.json` | `e9a04dc` (значок `download`, forma#19, 19.10.2026) |
