@@ -21,7 +21,7 @@ from src.db.errors import DbError
 from src.domain.permissions import role_may
 from src.domain.tenants import canonical_tenant
 
-from . import account_menu, users_claude
+from . import account_menu, auth, users_claude
 from .onboarding import Facts, SpaceFacts
 from .settings_screen import BOT_USERNAME_KEY
 
@@ -84,7 +84,7 @@ def person_facts(account: Any, *, tenant: str) -> Facts:
         if overview is not None:
             mine = next((row for row in overview if row.code == код), None)
             people = mine is not None and mine.people >= _PEOPLE_MIN
-    first = _first_inspection(код) if role_may(account.role, код, "inspection.conduct") else None
+    first = _first_inspection() if role_may(account.role, код, "inspection.conduct") else None
     return Facts(
         bot_bound=_connection_state(rows, "bot"),
         claude_connected=_connection_state(rows, "claude"),
@@ -94,9 +94,9 @@ def person_facts(account: Any, *, tenant: str) -> Facts:
     )
 
 
-def _first_inspection(tenant: str) -> bool | None:
+def _first_inspection() -> bool | None:
     """Есть ли у пространства хоть одна проверка: принятая или ждущая вычитки."""
-    охват = reach.own_reach(tenant)
+    охват = auth.current_reach()
 
     def has() -> bool:
         return bool(
