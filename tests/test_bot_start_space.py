@@ -115,3 +115,32 @@ async def test_партнёру_чужая_страна_и_вне_справоч
         assert get_state(CHAT_ID) is None
     assert ответы[0] == ответы[1]
     assert "только" in ответы[0], ответы[0]
+
+
+async def test_лимит_тестового_периода_отказывает_на_старте_до_обхода(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D755: шестая проверка партнёра не начинается — аудитор не обходит пиццерию зря."""
+    from src.bot.routers import start as start_router
+    from src.bot.texts import t
+    from src.db.errors import InspectionLimitError
+
+    def отказ(tenant: str, unit: str) -> None:
+        raise InspectionLimitError(unit=unit, limit=5)
+
+    monkeypatch.setattr(start_router, "refuse_start_over_limit", отказ)
+    monkeypatch.setattr(
+        start_router,
+        "match_unit",
+        lambda *_a, **_k: unit_pick.UnitMatch(name="Batumi-1", suggestions=(), checked=True),
+    )
+    bot, session = make_bot()
+    dp = _диспетчер()
+    await feed(dp, bot, text_message("/start"))
+    await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
+    await feed(dp, bot, text_message("Батуми 1"))
+    await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
+
+    assert get_state(CHAT_ID) is None, "проверка не должна начаться"
+    assert session.last_text == t("start.limit_reached", "ru", unit="Batumi-1", limit=5)

@@ -213,3 +213,25 @@ async def test_stops_без_базы_не_показывает_счётчик(do
 
     assert session.last_text == t("stops.unreadable", "ru")
     assert "start.unit" not in session.last_text
+
+
+async def test_лимит_проверок_на_финише_говорит_своим_текстом_а_не_точки_нет(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """D755: отказ лимита наследует отказ точки, но текст у него свой и счётчик свой."""
+    from src.bot.routers import finish
+
+    def слив(chat_id: int) -> str:
+        raise db.InspectionLimitError(unit="Batumi-1", limit=5)
+
+    monkeypatch.setattr(db, "push_inspection", слив, raising=False)
+    bot, session = make_bot()
+    caplog.set_level(logging.WARNING, logger="src.bot.stops")
+
+    await finish.archive(_сообщение(bot), CHAT_ID, {}, "ru", allow_missing=True)
+
+    assert session.last_text == t("finish.limit_reached", "ru", unit="Batumi-1", limit=5)
+    assert "лимит тестового периода: 5 проверок" in session.last_text
+    assert [(r["step"], r["reason"]) for r in строки_счётчика(domain_env)] == [
+        ("finish.archive", "finish.limit_reached")
+    ]

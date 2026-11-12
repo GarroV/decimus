@@ -25,7 +25,8 @@ from aiogram.types import CallbackQuery, Message
 from src import domain
 from src.db.auditor_card import name_by_telegram_or_none
 from src.db.directory import upsert_unit
-from src.db.errors import DbError
+from src.db.errors import DbError, InspectionLimitError
+from src.db.unit_limits import refuse_start_over_limit
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
 from src.domain.unit_name import UNIT_NAME_BYTE_LIMIT as UNIT_NAME_BYTE_LIMIT
@@ -559,6 +560,20 @@ def build_start_router(
             settings.auditor_names,
             card_name,
         )
+        try:
+            # Лимит тестового периода (D755): отказ до обхода, а не на сдаче.
+            await asyncio.to_thread(refuse_start_over_limit, space, unit)
+        except InspectionLimitError as exc:
+            await state.clear()
+            await stops.refuse(
+                message,
+                lang,
+                step="start.speech_lang",
+                key="start.limit_reached",
+                unit=exc.unit,
+                limit=exc.limit,
+            )
+            return
         try:
             # Подпроцесс — в поток: старт проверки не должен останавливать бота
             # для остальных аудиторов (T101).

@@ -169,6 +169,26 @@ def test_чек_лист_из_нескольких_выбирается_и_за�
     assert get_state(АУДИТОР) is None, "без выбранного чек-листа проверка не начинается"
 
 
+def test_лимит_тестового_периода_отказывает_на_старте(
+    клиент: Клиент, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D755: шестая проверка партнёра в мини-аппе не начинается."""
+    from src.db.errors import InspectionLimitError
+
+    def отказ(tenant: str, unit: str) -> None:
+        raise InspectionLimitError(unit=unit, limit=5)
+
+    monkeypatch.setattr(walk_start, "refuse_start_over_limit", отказ)
+
+    ответ = клиент.старт()
+
+    assert ответ.status_code == 403
+    assert "достигнут лимит тестового периода: 5" in ответ.get_json()["error"] or (
+        "лимит" in str(ответ.get_json())
+    )
+    assert get_state(АУДИТОР) is None
+
+
 def test_чек_листов_нет_старт_отказывает(клиент: Клиент, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(walk_start, "open_checklists", lambda _space: [])
 

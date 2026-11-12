@@ -70,6 +70,7 @@ from .reach import own_reach
 from .revise import _write_score
 from .stamp import CHANNEL_MCP
 from .storage import PhotoStorage, object_key
+from .unit_limits import refuse_over_limit
 
 logger = logging.getLogger(__name__)
 
@@ -436,6 +437,10 @@ def _insert_draft(conn: psycopg.Connection[Any], spec: NewDraft, tenant: str) ->
             raise _unit_refused(spec.unit, tenant)
         if not spec.second_visit:
             _refuse_same_visit(cur, unit_id, spec)
+        # Лимит тестового периода (D755); историческая загрузка в счёт не идёт.
+        refuse_over_limit(
+            cur, tenant=tenant, unit_id=unit_id, unit_name=spec.unit, origin=spec.origin
+        )
         try:
             cur.execute(
                 _INSERT_DRAFT_SQL,

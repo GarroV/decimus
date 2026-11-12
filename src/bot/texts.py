@@ -1441,6 +1441,31 @@ TEXTS: dict[str, dict[str, str]] = {
             "inspection again with the right name (/start)."
         ),
     },
+    # Лимит проверок на пиццерию у партнёра на время теста (D755): повтор не
+    # поможет, лимит поднимает управляющая компания.
+    # То же на старте проверки (D755): отказ до обхода, а не после него.
+    "start.limit_reached": {
+        "ru": (
+            "Для пиццерии «{unit}» достигнут лимит тестового периода: {limit} проверок. "
+            "Обратитесь к управляющей компании."
+        ),
+        "en": (
+            "The pizzeria «{unit}» has reached the test-period limit of {limit} "
+            "inspections. Please contact the management company."
+        ),
+    },
+    "finish.limit_reached": {
+        "ru": (
+            "Отчёт и письмо на месте, но в историю проверок эта проверка не записалась: "
+            "для пиццерии «{unit}» достигнут лимит тестового периода: {limit} проверок. "
+            "Обратитесь к управляющей компании."
+        ),
+        "en": (
+            "The report and the letter are yours, but this inspection did not reach the "
+            "history: the pizzeria «{unit}» has reached the test-period limit of {limit} "
+            "inspections. Please contact the management company."
+        ),
+    },
     # Хранилище кадров лежит на сдаче (#459, D259). Обещание «догрузит сам»
     # честное только здесь: строки кадров в базе есть, байты у телеграма, и
     # дозагрузка (`photo_backfill`) их вернёт. Кадр, которого нет у телеграма,
