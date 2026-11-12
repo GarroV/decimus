@@ -1,0 +1,55 @@
+{#
+  Плотный верх экранов статистики (D751) — ОДИН общий приём вместо отдельной вёрстки на каждом
+  экране: заголовок страницы и фильтры одной строкой, пояснения — под «?», выбор группировки
+  и сводка блока — в его шапке. Образец для «Рейтингов», «Проверок», «Стран»; «Обучение» и
+  «Качество» берут тот же заголовок страницы и тот же блок с шапкой. Стили — `decimus-web.css`,
+  раздел «Плотный верх (D751)». Подключать `with context` (нужны `t`, `url_for`).
+
+  `strip()` — строка фильтров под заголовком: тело вызова — поля (`field`) и меню. Одна строка,
+  на 390 px переносится, горизонтальной прокрутки нет. Отдельной рамки-карточки у неё нет.
+  `field(label)` — поле «подпись слева, выбор справа».
+  `scope_menu(...)` — «Мои страны / Все страны» и «Выбрать мои страны…» одним выпадающим
+  меню рядом со срезом, а не отдельным рядом под ним.
+  `block_bar(title, rows, key, summary)` — шапка блока: заголовок, «?» с пояснением
+  (`rows` — готовые строки, пусто — значка нет), сводка («Проверок · средний результат») и
+  справа тело вызова — управление блоком (группировка, год).
+#}
+{% from "_info_tip.html" import info_tip %}
+
+{% macro strip() %}<div class="cstrip">{{ caller() }}</div>{% endmacro %}
+
+{% macro field(label) %}<div class="cfield"><span class="cfield__label">{{ label }}</span>{{ caller() }}</div>{% endmacro %}
+
+{#- `countries` — пары (код, название) доступных стран; `saved` — коды сохранённого отбора;
+    `mine_href`, `all_href` — адреса того же экрана с отбором «мои» и «все»; `next` — куда вернуться. -#}
+{% macro scope_menu(mode, mine_href, all_href, countries, saved, next) %}
+  <details class="cscope pick">
+    <summary class="cscope__title">{{ t('ratings.d746.mine') if mode == 'mine' else t('ratings.d746.all') }}</summary>
+    <div class="cscope__pop">
+      <div class="cscope__choices">
+        <a href="{{ mine_href }}" data-rt-scope="mine"{% if mode == 'mine' %} aria-current="true"{% endif %}>{{ t('ratings.d746.mine') }}</a>
+        <a href="{{ all_href }}" data-rt-scope="all"{% if mode == 'all' %} aria-current="true"{% endif %}>{{ t('ratings.d746.all') }}</a>
+      </div>
+      <details class="cscope__edit">
+        <summary>{{ t('ratings.d746.choose_countries') }}…</summary>
+        <form method="post" action="{{ url_for('country_filter') }}">
+          <input type="hidden" name="next" value="{{ next }}">
+          <div class="cscope__countries">
+            {% for code, name in countries %}<label><input type="checkbox" name="countries" value="{{ code }}"{% if code in saved %} checked{% endif %}> {{ name }}</label>{% endfor %}
+          </div>
+          <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.d746.save_countries') }}</button>
+          <button class="btn btn--sm" name="reset" value="1" type="submit">{{ t('ratings.d746.reset_countries') }}</button>
+        </form>
+      </details>
+    </div>
+  </details>
+{% endmacro %}
+
+{% macro block_bar(title, rows, key, summary='') %}
+  <header class="cbar info-row">
+    <h2 class="cbar__title">{{ title }}</h2>
+    {% if rows %}{{ info_tip(t('history.tip.label'), '', rows, key) }}{% endif %}
+    {% if summary %}<span class="cbar__summary">{{ summary }}</span>{% endif %}
+    {% if caller is defined %}<div class="cbar__tools">{{ caller() }}</div>{% endif %}
+  </header>
+{% endmacro %}

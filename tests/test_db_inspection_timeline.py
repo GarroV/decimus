@@ -51,6 +51,11 @@ def test_history_is_complete_and_scoped(pg_dsn: str, db_env: str) -> None:
     assert [d.start for d in daily] == [date(2024, 1, n) for n in (10, 11, 12, 13)]
     assert [d.count for d in daily] == [995, 1, 1, 1]
     assert sum(d.total for d in daily) == 998 * 93.5
+    # Подсказка точки (D751): первые DAY_ITEMS проверок дня тем же запросом.
+    assert len(daily[0].items) == 8
+    assert len(daily[1].items) == 1
+    first = daily[1].items[0]
+    assert (first.unit, first.country, first.kind, first.pct) == ("Baku-1", "AZ", "planned", 93.5)
     assert days(reach=Reach("HQ", None, ("AZ",)), countries=("RS",), today=today) == ()
     assert days(reach=hq, countries=(), today=today) == ()
     assert days(reach=Reach("HQ", (), None), countries=None, today=today) == ()

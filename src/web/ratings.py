@@ -443,7 +443,11 @@ def _section_data(
         return {
             "no_countries": not codes,
             "timeline": inspection_timeline.load(
-                reach=auth.current_reach(), countries=codes, args=request.args, today=date.today()
+                reach=auth.current_reach(),
+                countries=codes,
+                args=request.args,
+                today=date.today(),
+                lang=lang,
             ),
         }
     if key in (ratings_nav.RS, ratings_nav.RKO):

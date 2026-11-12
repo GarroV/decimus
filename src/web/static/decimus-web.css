@@ -2300,3 +2300,51 @@ html[data-nav-collapsed="true"] .sidenav__fold svg { transform: rotate(180deg); 
 .peek-bar__back { padding: var(--space-3) var(--space-2); border: 0; background: none; font: inherit; color: var(--ink); font-weight: var(--w-semibold); cursor: pointer; }
 .peek-bar__back:hover { text-decoration: underline; }
 .peek-bar__back:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
+
+/* ── Плотный верх (D751) ─────────────────────────────────────────────────────
+   Один общий приём для экранов статистики («Проверки», «Рейтинги», «Страны», «Обучение», «Качество»):
+   заголовок меньше и без лишних полей, фильтры одной строкой сразу под ним, шапка блока несёт
+   «?», сводку и управление блоком. Разметка — макросы `_compact.html`. Размеры заголовка и
+   отступы — свои (в дизайн-системе forma токена «плотная страница» нет). */
+@media (min-width: 720px) {
+  .page { padding-top: var(--space-6); gap: var(--space-6); }
+  .page-bell { margin-bottom: calc(-1 * var(--space-6)); }
+}
+.page-heading { margin: 0; }
+.page-heading h1 { font-size: 22px; line-height: 28px; letter-spacing: -.015em; }
+@media (max-width: 600px) { .page-heading h1 { font-size: 20px; line-height: 26px; } }
+
+/* Строка фильтров: без рамки-карточки, одной строкой, на телефоне переносится. */
+.cstrip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-7); min-width: 0; }
+.cstrip > form { margin: 0; }
+.cfield { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.cfield__label { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink-2); white-space: nowrap; }
+
+/* «Мои страны / Все страны» и «Выбрать мои страны…» — одно выпадающее меню в строке фильтров. */
+.cscope { position: relative; }
+.cscope__title { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: var(--space-3);
+  height: 36px; padding: 0 var(--space-7); background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-control); font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink); }
+.cscope__title::-webkit-details-marker { display: none; }
+.cscope__title::after { content: "▾"; font-size: .7em; color: var(--ink-3); }
+.cscope[open] > .cscope__title { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+.cscope__pop { position: absolute; z-index: 20; top: calc(100% + var(--space-2)); left: 0; width: min(22rem, calc(100vw - 2rem));
+  padding: var(--space-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
+  box-shadow: var(--sh-lg); }
+.cscope__choices { display: flex; flex-direction: column; }
+.cscope__choices a { padding: var(--space-4) var(--space-5); border-radius: var(--r-control); color: var(--ink-2); text-decoration: none; }
+.cscope__choices a:hover { background: var(--surface-2); }
+.cscope__choices [aria-current] { color: var(--accent); background: var(--accent-soft); font-weight: var(--w-semibold); }
+.cscope__edit { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.cscope__edit > summary { cursor: pointer; padding: var(--space-4) var(--space-5); color: var(--accent); }
+.cscope__edit form { padding: var(--space-3) var(--space-5) var(--space-4); }
+.cscope__countries { display: grid; gap: var(--space-4); max-height: 40vh; overflow: auto; margin-bottom: var(--space-5); }
+.cscope__countries label { display: flex; align-items: center; gap: var(--space-3); }
+
+/* Шапка блока: заголовок, «?», сводка слева; управление блоком — справа, применяется сразу. */
+.cbar.info-row { flex-wrap: wrap; gap: var(--space-4) var(--space-7); padding: var(--space-5) var(--space-7);
+  border-bottom: 1px solid var(--line); }
+.cbar__title { margin: 0; font: var(--w-semibold) 11px / 1 var(--font-num); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.cbar__summary { font-size: var(--fs-dense); color: var(--ink-2); }
+.cbar__summary strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.cbar__tools { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
