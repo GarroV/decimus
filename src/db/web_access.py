@@ -144,14 +144,10 @@ _FREEZE_USER_SQL = """
 
 #: Учётка, замороженная кнопкой пространства (`0132`) и затем заморожена ОТДЕЛЬНО: `disabled_at`
 #: уже стоит, и основной запрос её не трогает, а отметка `space_frozen_at` оживила бы её
-#: разморозкой пространства. Одиночная заморозка снимает отметку и подписывает себя.
-_FREEZE_SPACE_FROZEN_USER_SQL = """
-    update web_users
-       set space_frozen_at = null, disabled_by = %(by)s
-     where tenant_code = %(tenant)s and login = %(login)s
-       and disabled_at is not null and space_frozen_at is not null
-       and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
-"""
+#: разморозкой пространства. Снимает отметку функция базы: права писать её у роли нет.
+_FREEZE_SPACE_FROZEN_USER_SQL = (
+    "select freeze_account_apart(%(tenant)s, %(login)s, %(roles)s, %(by)s)"
+)
 
 #: Разморозка снимает только отметку: закрытое заморозкой (`0063`) остаётся
 #: закрытым. Условие на роль цели — то же, что у заморозки.
@@ -780,7 +776,8 @@ def freeze_account(
                 "by": by,
             },
         )
-        return cur.rowcount > 0
+        строка = cur.fetchone()
+        return bool(строка and строка[0])
 
 
 def unfreeze_account(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:

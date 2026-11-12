@@ -457,6 +457,10 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "country_report_langs": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "mailing_cc": {"SELECT", "INSERT", "DELETE"},
     "mailing_templates": {"SELECT", "INSERT"},
+    # События в пространствах партнёров и отметки «Видел» (`0132`, D759): события администратор
+    # только читает (пишет триггер), отметку — читает и дописывает.
+    "partner_account_events": {"SELECT"},
+    "partner_event_seen": {"SELECT", "INSERT"},
     "service_settings": {"SELECT", "INSERT", "UPDATE"},
 }
 
@@ -510,6 +514,7 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
             "created_at",
             "email",
             "display_name_latin",
+            "space_frozen_at",
         },
         "INSERT": {"tenant_code", "login", "password_hash", "role", "email"},
         "UPDATE": {

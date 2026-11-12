@@ -128,19 +128,47 @@ comment on function unfreeze_space(text) is
     'Снять заморозку пространства и вернуть учётки, замороженные этой кнопкой (D759); '
     'замороженные по одной остаются замороженными. Возвращает число возвращённых учёток.';
 
+-- Учётка, замороженная кнопкой пространства и затем заморожена ОТДЕЛЬНО: `disabled_at` уже
+-- стоит, и обычная одиночная заморозка её не трогает, а отметка `space_frozen_at` оживила бы
+-- её разморозкой пространства. Функция снимает отметку и подписывает одиночную заморозку.
+-- Определитель, потому что у роли администратора истории нет права писать `space_frozen_at`
+-- (и не должно быть: отметку ставят только функции этого файла).
+create function freeze_account_apart(p_tenant text, p_login text, p_roles text[], p_by uuid)
+    returns boolean
+language plpgsql security definer set search_path = pg_catalog, public, pg_temp as $$
+begin
+    update public.web_users
+       set space_frozen_at = null, disabled_by = p_by
+     where tenant_code = p_tenant and login = p_login
+       and disabled_at is not null and space_frozen_at is not null
+       and (p_roles is null or role = any(p_roles));
+    return found;
+end $$;
+
+revoke all on function freeze_account_apart(text, text, text[], uuid) from public;
+grant execute on function freeze_account_apart(text, text, text[], uuid) to dodo_audit_admin;
+
+comment on function freeze_account_apart(text, text, text[], uuid) is
+    'Одиночная заморозка учётки, уже замороженной кнопкой пространства (D759): снимает '
+    'space_frozen_at, чтобы разморозка пространства её не вернула. true — такая учётка была.';
+
 create function web_users_frozen_space_guard() returns trigger
 language plpgsql security definer set search_path = pg_catalog, public, pg_temp as $$
+declare
+    заморожено timestamptz;
 begin
     if new.disabled_at is null
        and (tg_op = 'INSERT'
             or new.tenant_code is distinct from old.tenant_code
-            or old.disabled_at is not null)
-       -- `for share`: пока идёт `freeze_space` (он держит строку `for update`), ждём его конца.
-       and exists (
-           select 1 from public.tenants
-            where code = new.tenant_code and frozen_at is not null for share
-       ) then
-        raise exception 'space % is frozen', new.tenant_code using errcode = 'P0001';
+            or old.disabled_at is not null) then
+        -- `for share` БЕЗ условия на `frozen_at`: блокировка берётся при любом значении, и пока
+        -- идёт `freeze_space` (он держит строку `for update`), мы ждём его конца и читаем уже
+        -- свежее значение. Условие в запросе пропустило бы строку со старым `null` из снимка.
+        select t.frozen_at into заморожено
+          from public.tenants t where t.code = new.tenant_code for share;
+        if заморожено is not null then
+            raise exception 'space % is frozen', new.tenant_code using errcode = 'P0001';
+        end if;
     end if;
     return new;
 end $$;

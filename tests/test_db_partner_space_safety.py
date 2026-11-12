@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import выпустить_токен_чата, привязать_бота
+from db_harness import set_retraction_env, выпустить_токен_чата, привязать_бота
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -37,12 +37,17 @@ pytestmark = requires_db
 
 @pytest.fixture
 def учётки(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -> dict[int, str]:
-    return {
+    люди = {
         АДМИН_УК: привязать_бота(pg_dsn, monkeypatch, АДМИН_УК, tenant="HQ", role="admin"),
         АДМИН_GE: привязать_бота(pg_dsn, monkeypatch, АДМИН_GE, tenant="GE", role="admin"),
         СОТРУДНИК_GE: привязать_бота(pg_dsn, monkeypatch, СОТРУДНИК_GE, tenant="GE"),
         СОТРУДНИК_GE_2: привязать_бота(pg_dsn, monkeypatch, СОТРУДНИК_GE_2, tenant="GE"),
     }
+    # Дальше всё идёт под рабочей ролью площадки — администратором истории, а не владельцем
+    # схемы (`привязать_бота` ставит владельца): `_managing` берёт её первой. Тест под
+    # владельцем не поймал бы отсутствующие права.
+    set_retraction_env(db_env, monkeypatch)
+    return люди
 
 
 def _логин(tg: int) -> str:
@@ -213,3 +218,14 @@ def test_видел_отмечается_у_каждого_отдельно(уч
     assert any(e.id == событие.id for e in partner_events.unseen(второй)[0]), (
         "отметка одного скрыла событие у другого"
     )
+
+
+def test_тесты_идут_под_рабочей_ролью_а_не_владельцем(учётки: dict[int, str]) -> None:
+    """Страховка набора: иначе нехватка прав у роли площадки осталась бы незамеченной."""
+    import os
+
+    from src.db.database_target import managing_dsn
+
+    имя, _ = managing_dsn("проверка роли")
+    assert имя == "DATABASE_RETRACTION_URL"
+    assert os.environ["DATABASE_RETRACTION_URL"]
