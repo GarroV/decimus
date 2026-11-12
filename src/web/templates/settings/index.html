@@ -206,7 +206,14 @@
         </details>
       {% endif %}
       <p class="ssec__note">{{ t('settings.google.gmail') }}</p>
-      {% if hq_account and me.email and google_enabled %}
+      {% if not hq_account and google_enabled %}
+        {# D761: партнёру плитка календаря видна, но выключена: подключение у партнёра закрыто сервером. #}
+        <div class="ssec" id="calendar" aria-disabled="true">
+          <h3 class="ssec__title">{{ t('settings.calendar.title') }}</h3>
+          <p class="ssec__text"><span class="sdot"></span>{{ t('settings.calendar.wip') }}</p>
+          <p class="ssec__note">{{ t('settings.calendar.wip_text') }}</p>
+        </div>
+      {% elif hq_account and me.email and google_enabled %}
         {# Google Календарь (D740, D741): срок отчёта событием в календаре проверяющего. #}
         <div class="ssec" id="calendar">
           <h3 class="ssec__title">{{ t('settings.calendar.title') }}</h3>

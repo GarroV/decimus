@@ -387,6 +387,11 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "again, and earlier grants are revoked in your Google account settings.",
     },
     "settings.calendar.title": {"ru": "Google Календарь", "en": "Google Calendar"},
+    "settings.calendar.wip": {"ru": "В разработке", "en": "In development"},
+    "settings.calendar.wip_text": {
+        "ru": "Подключение Google Календаря для партнёров пока в разработке.",
+        "en": "Google Calendar connection for partners is still in development.",
+    },
     "settings.calendar.none": {
         "ru": "Календарь не подключён.",
         "en": "Calendar is not connected.",
