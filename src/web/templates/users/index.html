@@ -55,6 +55,35 @@
     {# На телефоне левой панели нет — своя карточка открывается отсюда. #}
     {% if manage %}<a class="sbtn shead__me" href="{{ link(person='me') }}" data-drawer-open>{{ t('profile.open') }}</a>{% endif %}
   </header>
+  {# События в пространствах партнёров (D759): только тем, кто ведёт пространства; только на экране. #}
+  {% if tab == 'people' and manages_spaces %}
+    {% if not partner_events_known %}
+      <div class="note note--warn"><div class="note__text">{{ t('users.events.unknown') }}</div></div>
+    {% elif partner_events %}
+      <section class="sevents" aria-labelledby="sevents-title">
+        <h2 class="sevents__title" id="sevents-title">{{ t('users.events.title', count=partner_events_total) }}</h2>
+        <ul class="sevents__list">
+          {% for e in partner_events %}
+            <li class="sevents__row">
+              <span class="sevents__text">
+                {% if e.kind == 'admin_added' %}
+                  {{ t('users.events.admin_added', space=e.tenant, login=e.login) }}
+                {% else %}
+                  {{ t('users.events.email_changed', space=e.tenant, login=e.login) }}
+                {% endif %}
+                <small>{{ e.occurred_at.strftime('%Y-%m-%d %H:%M') }} · {{ t('users.events.by', actor=e.actor) if e.actor else t('users.events.by_none') }}</small>
+              </span>
+              <form method="post" action="{{ users_url }}/events/seen?lang={{ lang }}">
+                <input type="hidden" name="event" value="{{ e.id }}">
+                <button class="sbtn" type="submit">{{ t('users.events.seen') }}</button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+        {% if partner_events_total > partner_events|length %}<p class="ssec__note">{{ t('users.events.more', count=partner_events_total - partner_events|length) }}</p>{% endif %}
+      </section>
+    {% endif %}
+  {% endif %}
   {# Исход действия без открытой панели — над списком, иначе он потерялся бы. #}
   {% if show.flash and not split_open and tab == 'people' %}
     <div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>

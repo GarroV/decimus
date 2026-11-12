@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 229 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 232 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -242,12 +242,15 @@
 | `/users/add` | POST | `add_user` | `src/web/users_screen.py` |
 | `/users/bot-unlink` | POST | `bot_unlink` | `src/web/users_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
+| `/users/events/seen` | POST | `partner_event_seen` | `src/web/users_screen.py` |
 | `/users/freeze` | POST | `freeze_user` | `src/web/users_screen.py` |
 | `/users/name-latin` | POST | `user_name_latin` | `src/web/users_screen.py` |
 | `/users/reset-second-factor` | POST | `reset_second_factor` | `src/web/users_screen.py` |
 | `/users/role` | POST | `user_role` | `src/web/users_screen.py` |
 | `/users/spaces/add` | POST | `add_space` | `src/web/users_screen.py` |
 | `/users/spaces/countries` | POST | `space_countries` | `src/web/users_screen.py` |
+| `/users/spaces/freeze` | POST | `freeze_space` | `src/web/users_screen.py` |
+| `/users/spaces/unfreeze` | POST | `unfreeze_space` | `src/web/users_screen.py` |
 | `/users/unfreeze` | POST | `unfreeze_user` | `src/web/users_screen.py` |
 | `/welcome` | GET | `landing` | `src/web/landing.py` |
 
@@ -671,6 +674,7 @@
 | `0129_calendar_deadline.sql` | `calendar_grants`, `calendar_events` |
 | `0130_close_invariants.sql` | — |
 | `0131_mailing_templates_lang.sql` | — |
+| `0132_partner_space_safety.sql` | `partner_account_events`, `partner_event_seen` |
 <!-- map:end -->
 
 ## Makefile

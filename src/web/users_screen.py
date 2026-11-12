@@ -30,10 +30,10 @@ from flask import Flask, redirect, render_template, request
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response as WerkzeugResponse
 
-from src.db import bot_links, second_factor
+from src.db import bot_links, partner_events, second_factor
 from src.db.errors import DbError, EmailTakenError
 from src.domain.log_ids import log_id
-from src.domain.tenants import canonical_tenant
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import (
     access_policy,
@@ -94,6 +94,15 @@ def _settings_url() -> str:
     """«Настройки» с языком из запроса — туда ведёт `/users` тем, у кого нет вкладок."""
     lang = request.args.get("lang") or ""
     return f"{request.script_root}{section('settings').path}" + (f"?lang={lang}" if lang else "")
+
+
+def _space_is_frozen(space: str) -> bool:
+    """Заморожено ли пространство целиком (D759). Не прочиталось — `False`: заведение всё равно
+    не пройдёт сторожа в базе (`0132`), здесь только внятный отказ вместо «не вышло»."""
+    try:
+        return canonical_tenant(space) in partner_spaces.frozen_spaces()
+    except DbError:
+        return False
 
 
 def _flash(key: str, *, ok: bool, **params: object) -> Flash:
@@ -191,7 +200,8 @@ def _install_edits(app: Flask, users_path: str) -> None:
             return render(Show(flash=_flash("users.edit.failed", ok=False)), 503)
         if цель is None:
             return forbidden()
-        исход = действие(цель.login, цель.tenant, _touchable_roles(круг, цель.tenant))
+        with accounts.acting_as(вошедший.id if вошедший else None):
+            исход = действие(цель.login, цель.tenant, _touchable_roles(круг, цель.tenant))
         удача = исход.status == 200 and исход.key != "edit.missing"
         return render(
             Show(person=цель.id, flash=_flash(f"users.{исход.key}", ok=удача)), исход.status
@@ -309,11 +319,17 @@ def _install_add_freeze(app: Flask, users_path: str) -> None:
                 return render(Show(add=True, flash=_flash("users.add.role_space", ok=False)), 400)
             if not access_policy.may_grant(круг, tenant=пространство, role=роль):
                 return forbidden()
-            заведённый = accounts.add(логин, tenant=пространство, role=роль)
+            if _space_is_frozen(пространство):
+                return render(Show(add=True, flash=_flash("users.add.space_frozen", ok=False)), 409)
+            вошедший = auth.current_account()
+            with accounts.acting_as(вошедший.id if вошедший else None):
+                заведённый = accounts.add(логин, tenant=пространство, role=роль)
+                почта_не_легла = bool(почта) and not _set_email(
+                    круг, заведённый.login, пространство, почта
+                )
         except DbError as exc:
             note_target_mismatch(exc)
             return render(Show(add=True, flash=_flash("users.add.failed", ok=False)), 400)
-        почта_не_легла = bool(почта) and not _set_email(круг, заведённый.login, пространство, почта)
         return render(Show(add=True, added=заведённый, added_email_failed=почта_не_легла))
 
     def _цель_заморозки() -> tuple[Scope, str, str] | FlaskResponse:
@@ -498,6 +514,89 @@ def _install_spaces(app: Flask, users_path: str) -> None:
             note_target_mismatch(exc)
             return render(_исход(код, "users.spaces.countries_failed", ok=False), 400)
         return render(_исход(код, "users.spaces.countries_added", ok=True))
+
+    def _пространство_из_формы() -> str:
+        return (request.form.get("code") or "").strip()
+
+    @app.post(f"{users_path}/spaces/freeze")
+    @guard.action("space.manage")
+    def freeze_space() -> FlaskResponse | tuple[str, int]:
+        """Заморозить всё пространство партнёра (D759): учётки замораживаются тем же механизмом,
+        что по одной, и пространство получает отметку. УК не замораживается."""
+        отказ = _ведёт_пространства()
+        if отказ is not None:
+            return отказ
+        код = canonical_tenant(_пространство_из_формы())
+        вошедший = auth.current_account()
+        if not _is_partner_space(код):
+            return forbidden()
+        try:
+            число = partner_spaces.freeze_space(код, by=вошедший.id if вошедший else None)
+        except DbError as exc:
+            note_target_mismatch(exc)
+            return render(_исход(код, "users.spaces.freeze_failed", ok=False), 400)
+        logger.info(
+            "Веб: учётка %s заморозила пространство %s (учёток: %d)",
+            log_id(вошедший.id if вошедший else ""),
+            log_id(код),
+            число,
+        )
+        if not число:
+            return render(_исход(код, "users.spaces.already_frozen", ok=False))
+        return render(_исход(код, "users.spaces.frozen", ok=True))
+
+    @app.post(f"{users_path}/spaces/unfreeze")
+    @guard.action("space.manage")
+    def unfreeze_space() -> FlaskResponse | tuple[str, int]:
+        """Разморозить пространство (D759): возвращаются только учётки, замороженные его кнопкой."""
+        отказ = _ведёт_пространства()
+        if отказ is not None:
+            return отказ
+        код = canonical_tenant(_пространство_из_формы())
+        if not _is_partner_space(код):
+            return forbidden()
+        try:
+            число = partner_spaces.unfreeze_space(код)
+        except EmailTakenError:
+            return render(_исход(код, "users.spaces.unfreeze_email_taken", ok=False), 409)
+        except DbError as exc:
+            note_target_mismatch(exc)
+            return render(_исход(код, "users.spaces.unfreeze_failed", ok=False), 400)
+        вошедший = auth.current_account()
+        logger.info(
+            "Веб: учётка %s разморозила пространство %s (учёток: %d)",
+            log_id(вошедший.id if вошедший else ""),
+            log_id(код),
+            число,
+        )
+        return render(_исход(код, "users.spaces.unfrozen", ok=True))
+
+    @app.post(f"{users_path}/events/seen")
+    @guard.action("space.manage")
+    def partner_event_seen() -> FlaskResponse | tuple[str, int]:
+        """Отметить «Видел» у события пространства партнёра (D759): своя отметка у каждого."""
+        отказ = _ведёт_пространства()
+        if отказ is not None:
+            return отказ
+        вошедший = auth.current_account()
+        try:
+            событие = int(request.form.get("event") or "")
+        except ValueError:
+            return render(Show(flash=_flash("users.events.failed", ok=False)), 400)
+        try:
+            partner_events.mark_seen(вошедший.id if вошедший else "", событие)
+        except DbError as exc:
+            note_target_mismatch(exc)
+            return render(Show(flash=_flash("users.events.failed", ok=False)), 503)
+        return render(Show())
+
+
+def _is_partner_space(код: str) -> bool:
+    """Заведено ли пространство партнёра с таким кодом (по базе, а не по форме)."""
+    try:
+        return any(s.code == код and s.code != HQ_TENANT for s in partner_spaces.overview())
+    except DbError:
+        return False
 
 
 def login_from_email(email: str) -> str:

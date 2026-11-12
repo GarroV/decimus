@@ -432,7 +432,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,pushed,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_limits,unit_profiles,unit_scores,units}.py -->
+<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,pushed,queries,reach,partner_events,retract,review_edit,revise,space_freeze,spaces,swarm_read,synonyms,translate_modes,trips,unit_limits,unit_profiles,unit_scores,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -449,6 +449,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/letters.py` | T333 (#310): письмо партнёру, зафиксированное человеком |
 | `src/db/mcp_access.py` | Личный доступ к MCP: токены учёток сайта (T253, D098; аудит 12.10, D448) |
 | `src/db/move.py` | Перенос проверки по дате и пиццерии — с историей каждой правки (D195) |
+| `src/db/partner_events.py` | События в пространствах партнёров для экрана «Пользователи» (D759, миграция `0132`) |
 | `src/db/photo_intake.py` | Приём кадра по ссылке загрузки: тип — по сигнатуре байт, а не по имени и заголовку клиента |
 | `src/db/push.py` | T093: слив завершённой проверки в базу |
 | `src/db/pushed.py` | Где проверка чата лежит в истории и ждёт ли она приёмки (напоминание боту, 27.10.2026) |
@@ -457,6 +458,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/retract.py` | T210, T233: снятие сданной проверки из истории |
 | `src/db/review_edit.py` | Правка проверки на приёмке сверх исправления записи: новая запись и кадры (D465) |
 | `src/db/revise.py` | Правка записи проверки на приёмке — вместе с пересчитанной оценкой (D200) |
+| `src/db/space_freeze.py` | Заморозка всего пространства партнёра одной кнопкой (D759, миграция `0132`) |
 | `src/db/spaces.py` | Пространства и их страны — заводит команда проекта (D284, D287, волна 1 — #340) |
 | `src/db/swarm_read.py` | Чтение для API Swarm (#567, D387): рейтинги, собираемость, нарушения, проверки |
 | `src/db/synonyms.py` | T284: карта синонимов формулировок — где живёт выученное (D119) |
@@ -664,6 +666,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0129_calendar_deadline.sql` | D740, D741 (#1590): срок отчёта по проверке УК — событием в Google Календаре проверяющего |
 | `0130_close_invariants.sql` | Три красных инварианта базы на main (проверки `test_db_definer_search_path` и `test_db_space_isolation`), закрываются новым файлом: применённые `0123` и `0128` заморожены |
 | `0131_mailing_templates_lang.sql` | Язык шаблона письма больше не пара `ru`/`en` (#541, #1619): список языков отчёта живёт в коде (`src/domain/models.py: REPORT_LANGS`), и третий язык не должен упираться в… |
+| `0132_partner_space_safety.sql` | Защита пространства партнёра (D759, пункты 1–3): три независимых куска одной миграции |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
