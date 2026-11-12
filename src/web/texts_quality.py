@@ -14,9 +14,6 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     "quality.latest_open": {"ru": "Открыть этот месяц", "en": "Open this month"},
     "section.quality.title": {"ru": "Качество", "en": "Quality"},
     "quality.title": {"ru": "Качество", "en": "Quality"},
-    "quality.kicker.network": {"ru": "Качество · сеть", "en": "Quality · network"},
-    "quality.kicker.country": {"ru": "Качество · страна", "en": "Quality · country"},
-    "quality.filters.label": {"ru": "Фильтры", "en": "Filters"},
     "quality.filters.country": {"ru": "Страна", "en": "Country"},
     "quality.filters.period": {"ru": "Период", "en": "Period"},
     "quality.period.by_months": {
