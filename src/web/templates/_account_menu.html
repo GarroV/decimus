@@ -31,6 +31,19 @@
     {% include "_account_menu_connections.html" %}
   </div>
 
+  {#- Помощь (D756): «Начало работы» — только партнёру; тур — любой роли (скрипт открывает кнопку). -#}
+  {% if tour %}
+    <div class="popover__group" role="presentation">{{ t('menu.help') }}</div>
+    {% if start_link %}
+      <a class="popover__row acct-menu__row" role="menuitem" href="{{ start_link }}">
+        <span class="acct-menu__name">{{ t('menu.start') }}</span>
+      </a>
+    {% endif %}
+    <button class="popover__row acct-menu__row acct-menu__tour" type="button" role="menuitem" data-tour-start hidden>
+      <span class="acct-menu__name">{{ t('menu.tour') }}</span>
+    </button>
+  {% endif %}
+
   {% if peek_can %}
     <div class="acct-menu__line" role="group" aria-label="{{ t('peek.switch.label') }}">
       <span class="acct-menu__label">{{ t('peek.switch.label') }}</span>

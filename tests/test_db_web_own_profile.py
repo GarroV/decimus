@@ -28,6 +28,7 @@ from src.db.web_own_profile import (  # noqa: E402
     own_avatar,
     save_google_profile,
     set_country_filter,
+    set_onboarding,
     set_web_lang,
     unlink_google,
 )
@@ -247,6 +248,48 @@ def test_отбор_стран_хранится_за_учёткой(обе_ро�
     with pytest.raises(AccessError):
         set_country_filter(сессия.token, ("georgia",))
     assert set_country_filter("нет-такой-сессии", ("GE",)) is False
+
+
+# ── Онбординг: тур и карточка «Начало работы» (D756, 0135) ────────────
+
+
+def test_пометки_онбординга_пишутся_своей_учётке_и_только_ей(обе_роли: str) -> None:
+    сессия = open_session(create_account("lena", tenant=ТЕНАНТ, password=ПАРОЛЬ))
+    сосед = open_session(create_account("petr", tenant=ТЕНАНТ, password=ПАРОЛЬ))
+    до = resolve_session(сессия.token)
+    assert до is not None and до.tour_seen_at is None and до.start_hidden_at is None
+
+    assert set_onboarding(сессия.token, tour_seen=True) is True
+    assert set_onboarding(сессия.token, start="hide") is True
+
+    после = resolve_session(сессия.token)
+    assert после is not None and после.tour_seen_at is not None
+    assert после.start_hidden_at is not None
+    чужой = resolve_session(сосед.token)
+    assert чужой is not None and чужой.tour_seen_at is None and чужой.start_hidden_at is None
+
+    # Метка тура ставится один раз: повтор её не двигает; «показать» снимает только скрытие.
+    первая = после.tour_seen_at
+    assert set_onboarding(сессия.token, tour_seen=True, start="show") is True
+    снова = resolve_session(сессия.token)
+    assert снова is not None and снова.tour_seen_at == первая and снова.start_hidden_at is None
+
+
+def test_пометки_онбординга_без_живой_сессии_не_пишутся_и_чужое_слово_отказ(
+    обе_роли: str,
+) -> None:
+    сессия = open_session(create_account("lena", tenant=ТЕНАНТ, password=ПАРОЛЬ))
+
+    assert set_onboarding("нет-такой-сессии", tour_seen=True) is False
+    with pytest.raises(ValueError):
+        set_onboarding(сессия.token, start="delete")
+    # Слово, которого нет в `START_ACTIONS`, база тоже не принимает, даже в обход обёртки.
+    with pytest.raises(AccessError):
+        from src.db import web_own_profile
+
+        web_own_profile._one(
+            "select set_own_onboarding(%s, %s, %s)", (сессия.token, False, "delete"), "проверка"
+        )
 
 
 # ── Имя и фото из Google (D468, 0065) ─────────────────────────────────

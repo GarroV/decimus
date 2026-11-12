@@ -197,7 +197,7 @@
 
 {% block split_detail %}
   {% if tab == 'spaces' %}
-    {{ space_card(space_pick, space_add, manages_spaces, show, link, country_options) }}
+    {{ space_card(space_pick, space_add, manages_spaces, show, link, country_options, space_readiness) }}
   {% elif card == 'add' %}
     {{ add_card(show, add_spaces, grantable, link) }}
   {% elif card in ('person', 'me') %}

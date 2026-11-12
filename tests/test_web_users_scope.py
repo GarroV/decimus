@@ -551,3 +551,65 @@ def test_админ_ук_по_занятой_почте_видит_причин�
 
     assert ответ.status_code == 409
     assert "уже привязана" in ответ.get_data(as_text=True)
+
+
+# --- «Готовность к работе» в карточке пространства (D756) ---------------------
+
+
+def _готовность(monkeypatch: pytest.MonkeyPatch, **факты: bool | None) -> None:
+    from src.web import onboarding, onboarding_facts
+
+    base = {"countries": True, "units": True, "checklist": True} | факты
+    monkeypatch.setattr(onboarding_facts, "space_facts", lambda _t: onboarding.SpaceFacts(**base))
+
+
+def test_у_ук_в_карточке_пространства_три_строки_готовности(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _готовность(monkeypatch, units=False)
+
+    страница = главный.get("/administration?tab=spaces&space_code=GE&lang=ru").get_data(
+        as_text=True
+    )
+
+    assert "Готовность к работе" in страница
+    строки = страница.split("data-readiness-row=")[1:]
+    assert [s.split('"')[1] for s in строки] == ["countries", "units", "checklist"]
+    assert 'data-readiness-row="units" data-state="waiting"' in страница
+    assert 'data-readiness-row="countries" data-state="done"' in страница
+    assert "Пространство готово." not in страница
+
+
+def test_готовое_пространство_подписано_готовым(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _готовность(monkeypatch)
+
+    страница = главный.get("/administration?tab=spaces&space_code=GE&lang=ru").get_data(
+        as_text=True
+    )
+
+    assert "Пространство готово." in страница
+
+
+def test_готовность_не_прочиталась_не_выдаётся_за_нет(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _готовность(monkeypatch, checklist=None)
+
+    страница = главный.get("/administration?tab=spaces&space_code=GE&lang=ru").get_data(
+        as_text=True
+    )
+
+    assert 'data-readiness-row="checklist" data-state="unknown"' in страница
+    assert "не прочиталось" in страница
+
+
+def test_партнёру_готовность_в_его_карточке_не_показывается(
+    админ_GE: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _готовность(monkeypatch)
+
+    страница = админ_GE.get("/administration?tab=spaces&lang=ru").get_data(as_text=True)
+
+    assert "data-readiness" not in страница

@@ -30,6 +30,8 @@ from . import (
     accounts,
     administration,
     auth,
+    onboarding,
+    onboarding_facts,
     partner_spaces,
     people,
 )
@@ -315,7 +317,25 @@ def _space_context(
         "space_add": вкладка == TAB_SPACES
         and (show.add_space or request.args.get("add_space") == "1"),
         "country_options": country_options(пространства),
+        "space_readiness": (
+            _space_readiness(вкладка, _space_pick(show, пространства))
+            if круг is not None and access_policy.manages_spaces(круг)
+            else ()
+        ),
     }
+
+
+def _space_readiness(вкладка: str, выбрано: Any) -> tuple[onboarding.Step, ...]:
+    """Готовность выбранного пространства (D756): страны, пиццерии, чек-лист.
+
+    Те же три строки, по которым партнёр видит «ждёт управляющую компанию»: одна функция
+    `onboarding.space_rows`. Показывается управляющей компании (партнёру в своей карточке
+    она ни к чему). Читаем только на вкладке «Пространства», чтобы остальные вкладки не
+    платили за три запроса.
+    """
+    if вкладка != TAB_SPACES or выбрано is None:
+        return ()
+    return onboarding.space_rows(onboarding_facts.space_facts(выбрано.code))
 
 
 def country_options(

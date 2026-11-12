@@ -39,6 +39,10 @@ _FINISH_SQL = "select finish_own_google_link(%s, %s, %s, %s)"
 _UNLINK_SQL = "select unlink_own_google(%s, %s)"
 _SET_LANG_SQL = "select set_own_web_lang(%s, %s)"
 _SET_COUNTRY_FILTER_SQL = "select set_own_country_filter(%s, %s)"
+_SET_ONBOARDING_SQL = "select set_own_onboarding(%s, %s, %s)"
+
+#: Что можно сделать с карточкой «Начало работы»: скрыть или показать снова (0135).
+START_ACTIONS: frozenset[str] = frozenset({"hide", "show"})
 _SET_GOOGLE_PROFILE_SQL = "select set_own_google_profile(%s, %s, %s, %s)"
 
 #: Своё фото — по живой сессии, тем же условием, что у опознания. Чужой ключ
@@ -144,6 +148,19 @@ def set_country_filter(token: str, countries: tuple[str, ...]) -> bool:
     """
     return bool(
         _one(_SET_COUNTRY_FILTER_SQL, (token, list(countries) or None), "сохранить отбор стран")
+    )
+
+
+def set_onboarding(token: str, *, tour_seen: bool = False, start: str | None = None) -> bool:
+    """Записать пометки онбординга своей учётке (D756, `0135`). `False` — сессии нет.
+
+    `tour_seen` ставит метку «тур пройден» один раз; `start` — `hide` скрывает карточку
+    «Начало работы», `show` возвращает; `None` её не трогает.
+    """
+    if start is not None and start not in START_ACTIONS:
+        raise ValueError(f"start: {sorted(START_ACTIONS)}, а не {start!r}")
+    return bool(
+        _one(_SET_ONBOARDING_SQL, (token, tour_seen, start), "сохранить пометки онбординга")
     )
 
 

@@ -1,0 +1,30 @@
+/* Тур по интерфейсу (D756): оформление окна шага поверх driver.js (vendor/driver/).
+   Грузится вместе с библиотекой при запуске тура, а не на каждой странице. Цвета — токены
+   ядра, поэтому тёмная тема работает без отдельных правил. */
+.driver-popover.decimus-tour {
+  min-width: 260px; max-width: min(360px, calc(100vw - 32px)); padding: 16px;
+  font-family: var(--font-sans, inherit); color: var(--ink); background-color: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: var(--r-block, 10px); box-shadow: var(--sh-card, 0 6px 24px rgba(10, 13, 17, .18));
+}
+.decimus-tour .driver-popover-title { padding-right: 28px; font-size: 16px; font-weight: var(--w-semibold, 600); line-height: 1.35; color: var(--ink); }
+.decimus-tour .driver-popover-description { font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
+.decimus-tour .driver-popover-description b { color: var(--ink); font-weight: var(--w-semibold, 600); }
+.decimus-tour .tour-link { display: inline-block; margin-top: 8px; color: var(--accent); font-weight: var(--w-semibold, 600); }
+.decimus-tour .driver-popover-close-btn { color: var(--ink-3); width: 36px; height: 36px; font-size: 20px; line-height: 36px; border-radius: 8px; }
+.decimus-tour .driver-popover-close-btn:hover, .decimus-tour .driver-popover-close-btn:focus-visible { color: var(--ink); background: var(--surface-3); }
+.decimus-tour .driver-popover-progress-text { color: var(--ink-3); font-size: 12px; font-family: var(--font-mono, inherit); }
+.decimus-tour .driver-popover-footer-btn {
+  min-height: 32px; padding: 0 12px; font-size: 13px; line-height: 30px; color: var(--ink);
+  background-color: var(--surface); border: 1px solid var(--line-control); border-radius: 8px;
+}
+.decimus-tour .driver-popover-footer-btn:hover { background-color: var(--surface-3); }
+.decimus-tour .driver-popover-next-btn { color: var(--ink-inverse, #fff); background-color: var(--accent); border-color: var(--accent); }
+.decimus-tour .driver-popover-next-btn:hover { background-color: var(--accent-hover); }
+.decimus-tour .driver-popover-footer-btn:focus-visible, .decimus-tour .tour-link:focus-visible { outline: var(--focus-outline, 2px solid var(--accent)); outline-offset: 2px; }
+.decimus-tour .driver-popover-arrow-side-left { border-left-color: var(--surface); }
+.decimus-tour .driver-popover-arrow-side-right { border-right-color: var(--surface); }
+.decimus-tour .driver-popover-arrow-side-top { border-top-color: var(--surface); }
+.decimus-tour .driver-popover-arrow-side-bottom { border-bottom-color: var(--surface); }
+/* Невидимая рамка вокруг группы пунктов панели: библиотека подсвечивает один элемент, а группа — несколько. */
+.tour-span { position: fixed; z-index: -1; opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .driver-fade .driver-overlay, .driver-fade .driver-popover { animation: none; } }

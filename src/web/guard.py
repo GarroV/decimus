@@ -68,6 +68,7 @@ EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "notifications_read": "своё уведомление отмечает прочитанным сам (D604)",
     "notifications_read_all": "свои уведомления отмечает прочитанными сам (D604)",
     "country_filter": "свой постоянный отбор стран экрана «Страны» (D536)",
+    "settings_onboarding": "свои пометки онбординга: тур пройден, карточка скрыта (D756)",
     "settings_google_link": "свою почту Google привязывает сам (D447, D450)",
     "settings_google_unlink": "свою почту Google отвязывает сам (D447, D450)",
     "settings_calendar_on": "свой Google Календарь подключает сам (D740, D741)",

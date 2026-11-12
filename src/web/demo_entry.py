@@ -144,6 +144,8 @@ OPEN_ENDPOINTS = frozenset(
         "notifications_read",
         "notifications_read_all",
         "country_filter",
+        # Онбординг (D756): в демо пометка тура лежит в куке браузера, а не в общей учётке.
+        "settings_onboarding",
         "photo_upload_post",
         "rx_create",
         "rx_close",
