@@ -389,16 +389,27 @@ def _войти_паролем(client: FlaskClient) -> Response:
     )
 
 
-def test_учётка_с_почтой_google_паролем_не_входит(monkeypatch: pytest.MonkeyPatch) -> None:
-    зовы = подменить_двери(monkeypatch, tenant=ТЕНАНТ, email=ПОЧТА_СВОЯ)
+def test_учётка_уК_с_почтой_google_паролем_не_входит(monkeypatch: pytest.MonkeyPatch) -> None:
+    зовы = подменить_двери(monkeypatch, tenant="HQ", email=ПОЧТА_СВОЯ)
     monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: РЕКВИЗИТЫ)
-    with собрать(tenant=ТЕНАНТ).test_client() as client:
+    with собрать(tenant="HQ").test_client() as client:
         ответ = _войти_паролем(client)
 
     assert ответ.status_code == 403
     assert зовы["open"] == [], "сессия открылась паролем"
     assert "Войти через Google" in ответ.get_data(as_text=True)
     assert auth.COOKIE_NAME not in ответ.headers.get("Set-Cookie", "")
+
+
+def test_партнёр_с_почтой_google_входит_паролем(monkeypatch: pytest.MonkeyPatch) -> None:
+    """D754: правило «с почтой — только Google» держится за пространство УК."""
+    зовы = подменить_двери(monkeypatch, tenant=ТЕНАНТ, email=ПОЧТА_СВОЯ)
+    monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: РЕКВИЗИТЫ)
+    with собрать(tenant=ТЕНАНТ).test_client() as client:
+        ответ = _войти_паролем(client)
+
+    assert ответ.status_code == 302
+    assert зовы["open"], "сессия не открылась паролем"
 
 
 def test_без_реквизитов_google_пароль_остаётся(monkeypatch: pytest.MonkeyPatch) -> None:
