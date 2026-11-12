@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from src.db import accept, mailing_templates, move, previews, queries, reports, retract
@@ -54,6 +54,17 @@ class Registry:
     #: Проверки на приёмке (D199) — обойдены, ждут вычитки и подтверждения.
     #: Отдельным списком, а не в `rows`: в историю сети они ещё не входят.
     review: tuple[InspectionRow, ...] = ()
+    #: Принятые, прочитанные с отбором по месту, букве, виду и названию — только
+    #: когда период не поместился в предел и строки `rows` для отбора неполны.
+    #: `None` — `rows` уже всё множество периода, отбор делает экран.
+    accepted: tuple[InspectionRow, ...] | None = None
+    #: Принятые периода по месту `(страна, город, число)` с отбором по букве, виду
+    #: и названию, но без отбора по месту: счётчики стран и «N из M» читают
+    #: настоящее число, а не длину первой страницы. `None` — не читалось.
+    place_counts: tuple[tuple[str, str, int], ...] | None = None
+    #: Записи ждущих приёмки по классам `{id: {класс: число}}`. `None` — не
+    #: прочиталось: строка приёмки тогда молчит, а не врёт «без нарушений».
+    review_classes: Mapping[str, Mapping[str, int]] | None = field(default=None)
 
     @property
     def retracted_count(self) -> int:
@@ -110,8 +121,30 @@ def load_dated(*, reach: Reach, date_from: date, date_to: date) -> tuple[Inspect
     )
 
 
+def _review_classes(reach: Reach) -> dict[str, dict[str, int]] | None:
+    """Записи ждущих приёмки по классам — одним запросом на всю очередь.
+
+    Не прочиталось — `None` и строка в журнал: строка «что внутри» из-за
+    второстепенного чтения не роняет реестр, но и «без нарушений» не говорит.
+    """
+    try:
+        return queries.review_class_counts(reach=reach)
+    except DbError:
+        logger.warning("Записи ждущих приёмки по классам не прочитались", exc_info=True)
+        return None
+
+
 def load_registry(
-    *, reach: Reach, limit: int, date_from: date | None = None, date_to: date | None = None
+    *,
+    reach: Reach,
+    limit: int,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    country: str = "",
+    city: str = "",
+    grade: str = "",
+    kind: str = "",
+    q: str = "",
 ) -> Registry:
     """Проверки в охвате, свежие по дате обхода — первыми, и отдельно — ждущие приёмки.
 
@@ -121,22 +154,94 @@ def load_registry(
     Период (`date_from`/`date_to`, по дате обхода) сужает только историю:
     очередь приёмки показывается целиком — ждущая не должна потеряться за
     выбранным месяцем.
+
+    Отбор (`country`, `city`, `grade`, `kind`, `q`) читается в базе, а не поверх
+    первой страницы: счётчик «Принятых» называет настоящее число проверок по тем
+    же условиям, и когда их больше предела, список — последние `limit` из них.
     """
     review = tuple(queries.list_inspections(reach=reach, limit=REVIEW_LIMIT, on_review=True))
+    classes = _review_classes(reach)
+    narrow = _Narrowing(date_from, date_to, country, city, grade, kind, q)
     if sees_retracted(reach):
         try:
-            rows = queries.list_inspections(
-                reach=reach,
-                limit=limit,
-                include_retracted=True,
-                date_from=date_from,
-                date_to=date_to,
-            )
-            return Registry(rows=tuple(rows), retracted_visible=True, review=review)
+            return _read_history(reach, limit, review, classes, narrow, include_retracted=True)
         except DbError as exc:
             _log_admin_read_failed("реестр", exc)
-    rows = queries.list_inspections(reach=reach, limit=limit, date_from=date_from, date_to=date_to)
-    return Registry(rows=tuple(rows), retracted_visible=False, review=review)
+    return _read_history(reach, limit, review, classes, narrow, include_retracted=False)
+
+
+@dataclass(frozen=True)
+class _Narrowing:
+    """Период и отбор реестра — одним значением на оба чтения («Принятые» и счёт)."""
+
+    date_from: date | None
+    date_to: date | None
+    country: str
+    city: str
+    grade: str
+    kind: str
+    q: str
+
+    @property
+    def active(self) -> bool:
+        return any((self.country, self.city, self.grade, self.kind, self.q))
+
+
+def _read_history(
+    reach: Reach,
+    limit: int,
+    review: tuple[InspectionRow, ...],
+    classes: dict[str, dict[str, int]] | None,
+    narrow: _Narrowing,
+    *,
+    include_retracted: bool,
+) -> Registry:
+    """Принятые периода: страница строк и счёт по месту — под одной ролью чтения."""
+    rows = tuple(
+        queries.list_inspections(
+            reach=reach,
+            limit=limit,
+            include_retracted=include_retracted,
+            date_from=narrow.date_from,
+            date_to=narrow.date_to,
+        )
+    )
+    counts = queries.count_by_place(
+        reach=reach,
+        include_retracted=include_retracted,
+        date_from=narrow.date_from,
+        date_to=narrow.date_to,
+        grade=narrow.grade,
+        kind=narrow.kind,
+        q=narrow.q,
+    )
+    # Период поместился в предел — `rows` и есть всё множество, отбор сделает экран.
+    # Не поместился — отбираем в базе: иначе страна или буква, которых нет среди
+    # последних `limit` проверок сети, показали бы пустой список при ненулевом счёте.
+    accepted = None
+    if len(rows) >= limit and narrow.active:
+        accepted = tuple(
+            queries.list_inspections(
+                reach=reach,
+                limit=limit,
+                include_retracted=include_retracted,
+                date_from=narrow.date_from,
+                date_to=narrow.date_to,
+                country=narrow.country,
+                city=narrow.city,
+                grade=narrow.grade,
+                kind=narrow.kind,
+                q=narrow.q,
+            )
+        )
+    return Registry(
+        rows=rows,
+        retracted_visible=include_retracted,
+        review=review,
+        accepted=accepted,
+        place_counts=tuple((c, g, n) for (c, g), n in sorted(counts.items())),
+        review_classes=classes,
+    )
 
 
 def _log_admin_read_failed(where: str, exc: DbError) -> None:

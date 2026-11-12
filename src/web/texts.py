@@ -514,17 +514,14 @@ TEXTS: dict[str, dict[str, str]] = {
     "registry.review.wait_new": {"ru": "ждёт меньше суток", "en": "waiting under a day"},
     "registry.review.hint": {
         "ru": (
-            "Обход закончен, но проверка ещё не вычитана. В историю сети, обзор и "
-            "карточки точек она попадёт после подтверждения. Страна и город "
-            "отбирают и здесь, период — нет: приёмка не ждёт конца месяца."
+            "Ждут вычитки. Город и страна отбирают и здесь; период, оценка и вид — только принятые."
         ),
         "en": (
-            "The visit is over, but nobody has reviewed the inspection yet. It joins the "
-            "network history, the overview and unit cards once it is accepted. Country "
-            "and city filter this list too; the period does not: review never waits "
-            "for the month to end."
+            "Awaiting review. City and country filter here too; period, grade and type "
+            "apply to accepted only."
         ),
     },
+    "registry.review.no_findings": {"ru": "без нарушений", "en": "no violations"},
     "accept.banner.title": {"ru": "Проверка на приёмке", "en": "Inspection awaiting review"},
     "accept.banner.text": {
         "ru": (

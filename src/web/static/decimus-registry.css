@@ -18,6 +18,10 @@
 .sbar--registry .sbar__search { display: contents; }
 
 
+/* Видимый фокус строки: то же кольцо, что у пунктов меню (`--focus-outline`); у `.srow` общий
+   каркас гасит контур, а строка вплотную к краю блока — кольцо внутрь, иначе его срежет. */
+a.srow:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
+
 /* ── список: буква | пиццерия + мета | итог | дата ──────────────────── */
 .slist--registry { --slist-cols: 30px minmax(0, 1fr) 64px 92px; }
 .slist--registry + .slist--registry { border-top: 1px solid var(--line); }
@@ -64,6 +68,8 @@
   .slist--tocheck .srow { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 0 var(--space-4); }
   .slist--tocheck .srow > .srow__cell { grid-column: 2; font-size: 11.5px; color: var(--ink-3); }
   .slist__group, .slist__note { padding-left: var(--space-5); padding-right: var(--space-5); }
+  /* «На приёмке»: вторая линия с «ждёт N дн.» и классами записей не обрезается многоточием. */
+  .slist--review .srow__main small { white-space: normal; }
 }
 
 /* ── панель проверки: широкая, левым краем почти к названию пиццерии ──
@@ -90,7 +96,30 @@
 .rg-rail { position: static; max-height: none; overflow: visible; }
 /* Карточка отбора — та же `.pk-rail` (подложка, отступ, подпись), что и колонка стран под ней. */
 .rg-filters { display: grid; gap: var(--space-3); margin-bottom: var(--space-6); }
-.rg-filters > :not(.mx-rail__head) { margin-inline: 2px; }
+/* Поля отбора лежат в `<details class="rg-fold">`: на десктопе он раскрыт принудительно и
+   без строки-заголовка (виден прежний заголовок колонки), на телефоне свёрнут. */
+.rg-fold__body { display: grid; gap: var(--space-3); }
+.rg-fold__body > :not(.mx-rail__head) { margin-inline: 2px; }
+.rg-fold__sum { display: none; cursor: pointer; list-style: none; }
+.rg-fold__sum::-webkit-details-marker { display: none; }
+.rg-fold__sum::after { content: ""; flex: none; width: 6px; height: 6px; margin-right: 4px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+.rg-fold[open] > .rg-fold__sum::after { transform: translateY(1px) rotate(-135deg); }
+.rg-fold[open] > .rg-fold__sum { margin-bottom: var(--space-3); }
+@media (min-width: 1024px) {
+  @supports selector(::details-content) {
+    .rg-fold::details-content { content-visibility: visible; }
+  }
+}
+@media (max-width: 1023px) {
+  .rg-fold__sum { display: flex; }
+  .rg-fold__body > .mx-rail__head { display: none; }
+}
+/* Браузер без `::details-content` не раскроет закрытый `<details>` на десктопе:
+   там строка «Отбор» остаётся и на широком экране, чтобы поля можно было открыть. */
+@supports not selector(::details-content) {
+  .rg-fold__sum { display: flex; }
+  .rg-fold__body > .mx-rail__head { display: none; }
+}
 /* Период в колонке — на всю её ширину (#978): подпись получает всё место между
    стрелками. Узкой колонке перенос разрешён только у тире — даты внутри
    неразрывны (`registry_view.period_title`), год не уезжает от месяца. */
@@ -105,6 +134,16 @@
   .rg-shell .mx-rail { display: grid; }
   .rg-countries { display: none; }
   .rg-country-chip { display: block; }
+}
+/* Планшет и телефон: «На приёмке» — первой, «Отбор» следом, «Принятые» последними.
+   Обёртки списка растворяются (`display: contents`), и три блока становятся детьми одной
+   сетки каркаса; карточка со скруглением и рамкой переезжает с общей обёртки на каждый
+   блок, а внутри блоков ничего не меняется. */
+@media (max-width: 1023px) {
+  .rg-shell > .mx-main, .rg-shell .split, .rg-shell .split__list, .rg-shell .sbox { display: contents; }
+  .rg-shell .slist { order: 3; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block); overflow: hidden; }
+  .rg-shell .slist--review { order: 1; }
+  .rg-rail { order: 2; }
 }
 
 /* ── «Календарь» (D497): сетка месяца, неделя с понедельника ──

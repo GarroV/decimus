@@ -17,7 +17,7 @@ import hashlib
 import io
 import logging
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import date
@@ -485,13 +485,14 @@ def _pick(
     href: Callable[[str], str],
     title: Callable[[str], str] = str,
     key: str = "",
+    empty_count: int | None = None,
 ) -> Pick:
     """Собрать чип отбора. Вариант «не сужать» всегда первый.
 
     Снять отбор должно быть так же легко, как поставить: если «все» спрятано
     в конце списка или его нет вовсе, человек снимает фильтр правкой адреса.
     """
-    опции = [PickOption(title=empty_title, href=href(""), selected=not current)]
+    опции = [PickOption(title=empty_title, href=href(""), selected=not current, count=empty_count)]
     опции += [
         PickOption(
             title=title(value),
@@ -717,12 +718,6 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # «Проверки» открываются всем временем (D487 вернул умолчание D404 поверх
         # D466): месяц прятал проверки, и их искали; месяц — одной кнопкой.
         период = registry_period.read(request.args, today=date.today(), default_all=True)
-        registry_data = data.load_registry(
-            reach=auth.current_reach(),
-            limit=REGISTRY_LIMIT,
-            date_from=период.start,
-            date_to=период.end,
-        )
         отбор_в = registry_view.Filter(
             grade=request.args.get("grade", "").strip().upper()[:1],
             kind=request.args.get("kind", "").strip()[:20],
@@ -736,14 +731,40 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             unchecked=registry_view.UNCHECKED_SHOWN
             and request.args.get("unchecked", "").strip() == "1",
         )
+        registry_data = data.load_registry(
+            reach=auth.current_reach(),
+            limit=REGISTRY_LIMIT,
+            date_from=период.start,
+            date_to=период.end,
+            country=отбор_в.country,
+            city=отбор_в.city,
+            grade=отбор_в.grade,
+            kind=отбор_в.kind,
+            q=отбор_в.q,
+        )
         гео = data.load_geography(reach=auth.current_reach())
 
         def место(row: InspectionRow) -> tuple[str, str]:
             страна_точки, город_точки = гео.get(row.unit_name, ("", ""))
             return страна_точки or "", город_точки or ""
 
-        строки = tuple(row for row in registry_data.rows if отбор_в.keeps(row, место(row)))
+        принятые = (
+            registry_data.accepted if registry_data.accepted is not None else registry_data.rows
+        )
+        строки = tuple(row for row in принятые if отбор_в.keeps(row, место(row)))
         язык = _lang(conf)
+        # Сколько принятых откроется списком: настоящее число по тем же условиям,
+        # а не длина первой страницы (предел `REGISTRY_LIMIT`, #5 «Лимит молчит»).
+        места_счёт = registry_view.place_totals(registry_data, отбор_в, место)
+        принятых_всего = sum(
+            n
+            for (страна_м, город_м), n in места_счёт.items()
+            if (not отбор_в.country or страна_м == отбор_в.country)
+            and (not отбор_в.city or город_м == отбор_в.city)
+        )
+        # Счёт по месту не прочитан (подмена в тестах) или расходится со списком —
+        # верим тому, что видно: подсказки о пределе тогда нет.
+        сколько_принятых = max(принятых_всего, len(строки))
 
         def отбор(**изменения: str) -> str:
             параметры = {**отбор_в.params(), **период.params(), "lang": язык, **изменения}
@@ -767,7 +788,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # по стране (D548), и страна, где всё ещё на приёмке, иначе пропадала из
         # рейла — выбрать её было нельзя (#1047). Буква и вид — только по принятым.
         чипы = _registry_picks(
-            registry_data.rows, отбор_в, место, отбор, язык, review=registry_data.review
+            registry_data.rows,
+            отбор_в,
+            место,
+            отбор,
+            язык,
+            review=registry_data.review,
+            totals=места_счёт,
         )
         # Буква и вид — про проверки, у точек без проверки их нет: чипов нет.
         чипы = tuple(ч for ч in чипы if not отбор_в.unchecked or ч.key in ("country", "city"))
@@ -793,7 +820,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             to_check=без_проверки,
             unit_href=lambda item: _unit_href(item, lang=язык),
             review_wait=ждёт_дней,
+            review_classes=registry_view.review_classes_lines(
+                на_приёмке, registry_data.review_classes, язык
+            ),
             rows=строки,
+            accepted_total=сколько_принятых,
+            accepted_limit=REGISTRY_LIMIT,
+            filters_changed=registry_view.filters_changed(отбор_в, период),
             # Страна — колонкой слева (D498), остальные размерности — в блоке фильтров.
             picks=tuple(ч for ч in чипы if ч.key != "country"),
             country_pick=next((ч for ч in чипы if ч.key == "country"), None),
@@ -1608,30 +1641,33 @@ def _registry_picks(
     select: Callable[..., str],
     lang: str,
     review: tuple[InspectionRow, ...] = (),
+    totals: Mapping[tuple[str, str], int] | None = None,
 ) -> tuple[Pick, ...]:
     """Чипы отбора реестра — страна, город, буква, вид — со счётом по периоду.
 
-    Страна и город считают и `review` — ждущие приёмки: счёт равен тому, что
-    покажет щелчок (принятые за период плюс блок «На приёмке»).
+    Счёт страны и города — принятые проверки в выбранном периоде и отборе, ровно
+    то, что откроет щелчок по списку «Принятые» (`totals`, #registry-ux). Ждущие
+    приёмки в счёт не входят, но страна или город, где всё ещё на приёмке, остаются
+    в списке с нулём: блок «На приёмке» режется по ним (D548, #1047).
     """
     чипы = []
-    места = rows + review
-    страны = tuple(
-        (код, sum(1 for row in места if place(row)[0] == код))
-        for код in sorted({place(row)[0] for row in места} - {""})
-    )
+    итоги = totals if totals is not None else {}
+    ждущие = {place(row) for row in review}
+    по_странам: dict[str, int] = {}
+    for (код, _), число in итоги.items():
+        по_странам[код] = по_странам.get(код, 0) + число
+    for код, _ in ждущие:
+        по_странам.setdefault(код, 0)
+    страны = tuple((код, по_странам[код]) for код in sorted(по_странам.keys() - {""}))
     # Города — только выбранной страны, как и на «Обзоре».
-    города = tuple(
-        (код, sum(1 for row in места if place(row)[1] == код))
-        for код in sorted(
-            {
-                place(row)[1]
-                for row in места
-                if not current.country or place(row)[0] == current.country
-            }
-            - {""}
-        )
-    )
+    по_городам: dict[str, int] = {}
+    for (код_страны, код), число in итоги.items():
+        if not current.country or код_страны == current.country:
+            по_городам[код] = по_городам.get(код, 0) + число
+    for код_страны, код in ждущие:
+        if not current.country or код_страны == current.country:
+            по_городам.setdefault(код, 0)
+    города = tuple((код, по_городам[код]) for код in sorted(по_городам.keys() - {""}))
     if страны:
         чипы.append(
             _pick(
@@ -1642,6 +1678,7 @@ def _registry_picks(
                 href=lambda значение: select(country=значение, city=""),
                 title=lambda код: country_title(код, lang),
                 key="country",
+                empty_count=sum(итоги.values()),
             )
         )
     if города:

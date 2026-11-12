@@ -52,7 +52,7 @@
   {% set текущая = split_open and picked == row.id %}
   {% call inspection_row(row, select_url(inspection=row.id), current=текущая,
                          checklist=(checklist_names.get(row.checklist_code, row.checklist_code) if checklist_names is not none else none)) %}
-    {%- if review %} · <span class="srow__warn">{% if review_wait[row.id] %}{{ t('registry.review.wait', days=review_wait[row.id]) }}{% else %}{{ t('registry.review.wait_new') }}{% endif %}</span>{% endif %}
+    {%- if review %} · <span class="srow__warn">{% if review_wait[row.id] %}{{ t('registry.review.wait', days=review_wait[row.id]) }}{% else %}{{ t('registry.review.wait_new') }}{% endif %}</span>{% if review_classes.get(row.id) %} · {{ review_classes[row.id] }}{% endif %}{% endif %}
   {% endcall %}
 {% endmacro %}
 
@@ -74,6 +74,11 @@
 <div class="mx-shell rg-shell">
   <aside class="mx-rail rg-rail" aria-label="{{ t('registry.filters.title') }}">
     <div class="rg-filters pk-rail pk-rail--inline">
+      {# Телефон: «Отбор» свёрнут под заголовком с числом изменённых полей (`decimus-registry.css`),
+         на десктопе строки-заголовка нет, а поля раскрыты. Без скриптов — обычный `<details>`. #}
+      <details class="rg-fold">
+      <summary class="mx-rail__head mx-rail__head--list rg-fold__sum"><span>{{ t('registry.filters.title') }}{% if filters_changed %} · {{ filters_changed }}{% endif %}</span></summary>
+      <div class="rg-fold__body">
       <div class="mx-rail__head mx-rail__head--list"><span>{{ t('registry.filters.title') }}</span></div>
       {# Период: стрелки листают на длину выбранного, по заголовку — календарь (`_period.html`). #}
       {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
@@ -103,6 +108,8 @@
       </form>
       {% endif %}
       {% if filters.active %}<a class="sbtn sbtn--ghost rg-reset" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
+      </div>
+      </details>
     </div>
     {% if country_pick %}
       <div class="rg-countries pk-rail pk-rail--inline">
@@ -172,7 +179,7 @@
     {# «Принятые» — единственный блок, на который действуют период и отбор. #}
     <div class="slist slist--registry">
       <div class="slist__group">
-        <span>{{ t('registry.accepted.title') }}</span><span class="sbadge">{{ rows|length }}</span>
+        <span>{{ t('registry.accepted.title') }}</span><span class="sbadge">{% if accepted_total > accepted_limit %}{{ t('registry.accepted.of_total', shown=rows|length, total=accepted_total) }}{% else %}{{ rows|length }}{% endif %}</span>
       </div>
       <p class="slist__note">{{ t('registry.accepted.hint') }}</p>
       {% if rows %}
@@ -183,6 +190,7 @@
           <span class="is-num">{{ t('registry.col.date') }}</span>
         </div>
         <ul class="slist__rows">{% for row in rows %}{{ row_link(row) }}{% endfor %}</ul>
+        {% if accepted_total > accepted_limit %}<p class="slist__note">{{ t('registry.accepted.limit_note', n=accepted_limit) }}</p>{% endif %}
       {% elif registry.rows %}
         {# Строки есть, но отбор их все отсёк — это другое состояние, чем пустой
            реестр, и говорить о нём надо иначе: тут виноват отбор, а не база. #}
