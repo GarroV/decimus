@@ -13,6 +13,7 @@
 |---|---|---|---|
 | Снимки экранов на посадочной странице — 7 штук на каждый язык (`ru`, `en`): `walk`, `match`, `report`, `plan`, `actions`, `network`, `pizzerias` | `src/web/static/landing/<имя>-<язык>.webp`, размеры — `sizes.json`; показываются на `/welcome` ([32-landing-demo — «Посадочная страница»](32-landing-demo.md#посадочная-страница-и-открытое-демо-d524)) | `make landing-shots` — одна команда, сама входит на демо-стенд, обходит экраны и пишет снимки; потом посмотреть каждый и закоммитить | 2026-10-23 |
 | Тексты посадочной страницы (ключи `landing.*`, оба языка) | `src/web/texts_demo.py` | правкой словаря, тест `tests/test_web_landing.py` сверяет полноту двух языков | 2026-10-19 |
+| «Начало работы» и тур по интерфейсу партнёра (ключи `onboarding.*`, `tour.*`, `readiness.*`, `menu.start`, `menu.tour`, оба языка; снимков нет) | `src/web/texts_onboarding.py`, шаги — `src/web/onboarding_tour.py` | правкой словаря; тесты `tests/test_web_onboarding_tour.py`, `tests/test_web_texts.py` | 2026-11-12 |
 | Карточка Decimus в хабе imf-vc | `src/content/projects/decimus.yaml` в `GarroV/imf-vc` | правкой YAML и пушем в `main` imf-vc (см. `CLAUDE.md`) | не сверялась |
 
 ## Какие экраны попадают на снимки

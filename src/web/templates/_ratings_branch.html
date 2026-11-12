@@ -1,4 +1,4 @@
-<div class="sidenav__branch">
+<div class="sidenav__branch" data-tour-group="{{ item.group }}">
   <button class="{% if item.key == current_key %}sidenav__current{% else %}sidenav__item{% endif %} sidenav__branch-toggle" type="button" data-nav-ratings-toggle aria-expanded="{{ 'true' if current_key == 'ratings' else 'false' }}" aria-controls="ratings-navigation" title="{{ title }}">
     {{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span><span class="sidenav__branch-arrow" aria-hidden="true">{{ icon('cright') }}</span>
   </button>

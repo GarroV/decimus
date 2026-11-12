@@ -37,6 +37,7 @@ from .texts_mailings import MAILINGS_TEXTS
 from .texts_master import MASTER_TEXTS
 from .texts_notifications import NOTIFICATION_TEXTS
 from .texts_oauth import OAUTH_TEXTS
+from .texts_onboarding import ONBOARDING_TEXTS
 from .texts_peek import PEEK_TEXTS
 from .texts_plan_file import PLAN_FILE_TEXTS
 from .texts_plan_rows import PLAN_ROW_TEXTS
@@ -1921,6 +1922,7 @@ _ЧАСТИ = (
     WALK_LOG_TEXTS,
     ADMINISTRATION_TEXTS,
     MAILINGS_TEXTS,
+    ONBOARDING_TEXTS,
 )
 _ПЕРЕСЕЧЕНИЕ = {
     ключ
@@ -1963,6 +1965,7 @@ TEXTS = {
     **WALK_LOG_TEXTS,
     **ADMINISTRATION_TEXTS,
     **MAILINGS_TEXTS,
+    **ONBOARDING_TEXTS,
 }
 
 

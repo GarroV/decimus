@@ -31,7 +31,7 @@
   переходе без перезагрузки (`nav.js`) кнопка подменяется целиком.
 #}{% macro bell_btn(place, cls) %}
   {% set unread = notif_state().count %}
-  <button type="button" class="{{ cls }} bell" data-bell data-place="{{ place }}"
+  <button type="button" class="{{ cls }} bell" data-bell data-tour="bell" data-place="{{ place }}"
           data-label-none="{{ t('notif.bell') }}"
           aria-haspopup="menu" aria-expanded="false" aria-controls="notif-menu"
           title="{{ t('notif.title') }}"
@@ -90,6 +90,8 @@
   <script data-shell src="{{ url_for('static', filename='bell.js') }}" defer></script>
   <script data-shell src="{{ url_for('static', filename='nav.js') }}" defer></script>
   <script data-shell src="{{ url_for('static', filename='photo-zoom.js') }}" defer></script>
+  {#- Тур по интерфейсу (D756): сам контроллер маленький, библиотека подгружается при запуске. -#}
+  {% if account and tour %}<script data-shell src="{{ url_for('static', filename='onboarding-tour.js') }}" defer></script>{% endif %}
 </head>
 <body>
   {% if demo_mode %}
@@ -132,7 +134,7 @@
       {{ bell_btn('down', 'mbar__bell') }}
       {# На телефоне левой панели нет: аватар открывает то же меню учётки (D468),
          а тема и язык лежат в нём. Без скрипта — ссылка в «Настройки». #}
-      <a class="mbar__me" href="{{ settings_url }}" data-acct-menu data-place="down" title="{{ t('menu.title') }}" aria-label="{{ t('menu.title') }}">
+      <a class="mbar__me" href="{{ settings_url }}" data-acct-menu data-tour="menu" data-place="down" title="{{ t('menu.title') }}" aria-label="{{ t('menu.title') }}">
         {{ acct_avatar() }}
       </a>
     </header>
@@ -159,7 +161,7 @@
           Поиск ведёт в реестр проверок по названию пиццерии. Обычная форма:
           без скрипта работает так же, скрипт добавляет только ⌘K и Esc.
         #}
-        <form class="sidenav__search" method="get" action="{{ url('/inspections') }}" role="search">
+        <form class="sidenav__search" data-tour="search" method="get" action="{{ url('/inspections') }}" role="search">
           <input type="hidden" name="lang" value="{{ lang }}">
           {# Пиццерию ищут по всей истории, а не в текущем месяце — реестр без
              периода в адресе открывается месяцем. #}
@@ -181,12 +183,12 @@
             {% if item.key == 'ratings' %}
               {% include '_ratings_branch.html' %}
             {% elif item.path == current_path %}
-              <span class="sidenav__current" aria-current="page" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</span>
+              <span class="sidenav__current" aria-current="page" data-tour-group="{{ item.group }}" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</span>
             {% elif item.key == current_key %}
               {# Вложенная страница раздела: пункт подсвечен и ведёт на раздел. #}
-              <a class="sidenav__current" aria-current="location" href="{{ url(item.path) }}?lang={{ lang }}" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</a>
+              <a class="sidenav__current" aria-current="location" data-tour-group="{{ item.group }}" href="{{ url(item.path) }}?lang={{ lang }}" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</a>
             {% else %}
-              <a class="sidenav__item{% if not item.built %} is-wip{% endif %}"
+              <a class="sidenav__item{% if not item.built %} is-wip{% endif %}" data-tour-group="{{ item.group }}"
                  href="{{ url(item.path) }}?lang={{ lang }}"
                  title="{{ title }}{% if not item.built %} · {{ t('nav.wip') }}{% endif %}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span>{{ section_dot(item.key) }}</a>
             {% endif %}
@@ -202,7 +204,7 @@
           <div class="sidenav__prefs">
             {{ theme_pick() }}
             {% include "_langpick.html" %}
-            <a class="sidenav__gear{% if current_key == 'settings' %} is-current{% endif %}" href="{{ settings_url }}"
+            <a class="sidenav__gear{% if current_key == 'settings' %} is-current{% endif %}" data-tour="settings" href="{{ settings_url }}"
                title="{{ t('section.settings.title') }}" aria-label="{{ t('section.settings.title') }}"
                {% if current_key == 'settings' %}aria-current="page"{% endif %}>{{ icon('sliders') }}</a>
           </div>
@@ -211,7 +213,7 @@
         <div class="sidenav__user">
           {# Блок учётки открывает меню поверх страницы (D468); без скрипта —
              ссылка в «Настройки» (D447). Выход, тема и язык — в меню. #}
-          <a class="sidenav__me" href="{{ settings_url }}" data-acct-menu data-place="up" title="{{ t('menu.title') }}">
+          <a class="sidenav__me" href="{{ settings_url }}" data-acct-menu data-tour="menu" data-place="up" title="{{ t('menu.title') }}">
             {{ acct_avatar() }}
             <span class="sidenav__who"><b>{{ shown_name }}</b><small>{{ t(role_key(account.role, account.tenant)) }}</small></span>
             <span class="sidenav__chev" aria-hidden="true">{{ icon('cright') }}</span>
@@ -263,6 +265,7 @@
     продукта целиком остаётся в боковом меню компьютера (D138).
   #}
   {% if account %}
+    {% if tour %}<div hidden data-tour-config='{{ tour|tojson }}'></div>{% endif %}
     {% include "_account_menu.html" %}
     {#- Окно колокольчика (#1129): пустое, список приходит фрагментом при каждом открытии. -#}
     <div class="popover acct-menu notif-menu" id="notif-menu" role="menu" aria-label="{{ t('notif.title') }}" tabindex="-1" hidden>
@@ -280,7 +283,7 @@
          {% if item.key == current_key %}aria-current="page"{% endif %}
          title="{{ t('section.' ~ item.key ~ '.title') }}">{{ icon(item.icon) }}<span>{{ t('section.' ~ item.key ~ '.title') }}</span>{{ section_dot(item.key) }}</a>
     {%- endmacro %}
-    <nav class="tabbar" aria-label="{{ t('nav.sections') }}">
+    <nav class="tabbar" data-tour="tabbar" aria-label="{{ t('nav.sections') }}">
       {% for item in main_tabs %}{{ tab(item, 'tabbar__item') }}{% endfor %}
       {% if more_tabs %}
       <details class="tabbar__more">

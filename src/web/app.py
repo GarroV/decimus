@@ -89,6 +89,7 @@ from . import (
     navigation,
     notifications,
     oauth,
+    onboarding_screen,
     osb,
     peek,
     photo_upload,
@@ -247,6 +248,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_units(app, conf)
     unit_add.install(app, conf)
     country_filter.install(app)
+    onboarding_screen.install(app)
     country_settings.install(app)
     country_contacts_actions.install(app, conf.ui_lang)
     mailings_screen.install(app, conf.ui_lang)
@@ -390,6 +392,8 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Touch ID на этом устройстве (D485): после входа паролем или Google браузер без
             # метки сам просит сохранить ключ; здесь — только допуск и адреса, решает passkey.js.
             "passkey_here": _passkey_here(account, conf),
+            # Тур по интерфейсу и ссылка «Начало работы» в меню учётки (D756).
+            **onboarding_screen.shell_context(account, lang),
         }
 
 

@@ -60,6 +60,9 @@
 
   {% if data.truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=data.inspections|length) }}</div></div></div>{% endif %}
 
+  {# «Начало работы» (D756): карточка партнёра над доской; УК, демо и завершённое — без неё. #}
+  {% if start_card %}{% include 'overview/_start.html' %}{% endif %}
+
   {# ── Требует внимания (D398, D471): полоса во всю ширину над верхним рядом; задания
         доски стикерами, ниже пиццерии «куда смотреть» — в несколько колонок. Нечего
         показать — полосы нет, «всё сделано» не пишем. Отказ доски — строка с

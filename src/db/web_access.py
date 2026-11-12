@@ -275,7 +275,8 @@ _RESOLVE_SESSION_SQL = """
             or exists (select 1 from web_totp t
                         where t.user_id = u.id and t.confirmed_at is not null)),
            s.second_step_at is not null,
-           u.country_filter, k.tenant_code, coalesce(t.name, '')
+           u.country_filter, k.tenant_code, coalesce(t.name, ''),
+           u.tour_seen_at, u.start_hidden_at
       from web_sessions s
       join web_users u on u.id = s.user_id
       left join web_session_peeks k on k.session_id = s.id
@@ -399,6 +400,11 @@ class Account:
     acting_tenant: str | None = None
     #: Название того пространства для плашки «вы смотрите как партнёр» (`tenants.name`).
     acting_name: str = ""
+    #: Когда человек прошёл или закрыл тур по интерфейсу (`web_users.tour_seen_at`, `0135`,
+    #: D756); `None` — не видел. Приезжает с сессией, как язык.
+    tour_seen_at: datetime | None = None
+    #: Когда скрыл карточку «Начало работы» (`web_users.start_hidden_at`, `0135`); `None` — нет.
+    start_hidden_at: datetime | None = None
     #: НАСТОЯЩАЯ учётка, пока человек смотрит чужими глазами (D726): у «глаз партнёра»
     #: `id` тот же, а `tenant` и `role` — партнёрские. Безопасность (вторая ступень,
     #: свежий вход, настройки входа) и журнал берут `actual`, а не эту подмену.
@@ -1186,6 +1192,8 @@ def resolve_session(token: str) -> Account | None:
         country_filter=tuple(row[12]) if row[12] else None,
         acting_tenant=row[13],
         acting_name=str(row[14] or ""),
+        tour_seen_at=row[15],
+        start_hidden_at=row[16],
     )
 
 
