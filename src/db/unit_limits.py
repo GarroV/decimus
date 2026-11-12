@@ -16,11 +16,19 @@ D332) — их место не занимает. Пространство УК �
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+import psycopg
 
 from src.domain.tenants import HQ_TENANT
 
-from .errors import InspectionLimitError
+from .config import check_environment
+from .directory import resolve_unit_id
+from .errors import DbError, InspectionLimitError
+from .pool import connection
+
+logger = logging.getLogger(__name__)
 
 #: Сколько проверок на одну пиццерию доступно пространству партнёра на время
 #: теста (D755, владелец 12.11.2026). Пространства УК лимит не касается.
@@ -68,4 +76,29 @@ def refuse_over_limit(
     row = cur.fetchone()
     existing = int(row[0]) if row is not None else 0
     if limit_reached(tenant, existing=existing, origin=origin):
+        raise InspectionLimitError(unit=unit_name, limit=PARTNER_INSPECTIONS_PER_UNIT)
+
+
+def refuse_start_over_limit(tenant: str, unit_name: str) -> None:
+    """Ранний отказ на СТАРТЕ проверки: аудитор не обходит пиццерию зря (D755).
+
+    Зовут бот и мини-апп до `start_inspection`. Считает тем же подсчётом, что и
+    заслон на вставке (он остаётся последней линией, там же и замок). Сбой базы
+    или незнакомая точка старт не останавливают: проверка идёт без базы (D027),
+    а точку со справочником сверит слив.
+    """
+    if is_exempt(tenant, "field"):
+        return
+    try:
+        settings = check_environment()
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
+            unit_id = resolve_unit_id(conn, unit_name, tenant=HQ_TENANT)
+            if unit_id is None:
+                return
+            cur.execute(_COUNT_SQL, {"tenant": tenant, "unit": unit_id})
+            row = cur.fetchone()
+    except (DbError, psycopg.Error) as exc:
+        logger.warning("лимит проверок на старте не сверен: %s", exc)
+        return
+    if limit_reached(tenant, existing=int(row[0]) if row is not None else 0):
         raise InspectionLimitError(unit=unit_name, limit=PARTNER_INSPECTIONS_PER_UNIT)

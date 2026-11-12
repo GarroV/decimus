@@ -62,7 +62,8 @@ from src.bot.unit_pick import (
 from src.db import checklist_langs
 from src.db.auditor_card import name_by_telegram_or_none
 from src.db.directory import upsert_unit
-from src.db.errors import DbError
+from src.db.errors import DbError, InspectionLimitError
+from src.db.unit_limits import refuse_start_over_limit
 from src.domain import (
     drop_inspection,
     get_state,
@@ -308,6 +309,13 @@ class _Wizard:
         if _state_of(self.who) == STATE_RUNNING and not replace:
             raise Refused(self.say("walk.start.err.running"), 409, need="replace")
         unit = self.unit(body)
+        try:
+            # Лимит тестового периода (D755): отказ до обхода, а не на сдаче.
+            refuse_start_over_limit(self.space, unit)
+        except InspectionLimitError as exc:
+            raise Refused(
+                self.say("walk.start.err.limit").format(unit=exc.unit, limit=exc.limit), 403
+            ) from exc
         names = self.bot.auditor_names if self.bot is not None else {}
         auditor = auditor_name(self.who, full_name, names, name_by_telegram_or_none(self.who))
         try:

@@ -74,6 +74,16 @@ APP_TEXTS: dict[str, dict[str, str]] = {
             "if it fails again, tell the administrator."
         ),
     },
+    "walk.start.err.limit": {
+        "ru": (
+            "Для пиццерии «{unit}» достигнут лимит тестового периода: {limit} проверок. "
+            "Обратитесь к управляющей компании."
+        ),
+        "en": (
+            "The pizzeria «{unit}» has reached the test-period limit of {limit} "
+            "inspections. Please contact the management company."
+        ),
+    },
     "walk.start.err.checklist_gone": {
         "ru": "Этот чек-лист только что закрыли. Выберите другой.",
         "en": "That checklist was just closed. Pick another one.",

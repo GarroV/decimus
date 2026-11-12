@@ -81,3 +81,11 @@ def test_подсчёт_не_берёт_снятые_и_исторические
     sql = unit_limits._COUNT_SQL
     assert "retracted_at is null" in sql
     assert "origin <> 'legacy'" in sql
+
+
+def test_ранний_отказ_на_старте_ук_и_без_базы_проходит(monkeypatch: pytest.MonkeyPatch) -> None:
+    """УК не ходит в базу; у партнёра без базы старт не блокируется (заслон — на вставке)."""
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    unit_limits.refuse_start_over_limit("HQ", "Batumi-1")
+    unit_limits.refuse_start_over_limit("GE", "Batumi-1")
