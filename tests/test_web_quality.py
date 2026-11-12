@@ -245,14 +245,14 @@ def test_default_month_is_the_current_one_and_marked_in_progress(ук: FlaskClie
     html = ук.get("/quality").get_data(as_text=True)
 
     assert "месяц идёт" in html
-    assert f"?month={date.today():%Y-%m}" in html or f"month={date.today():%Y-%m}" in html
+    assert f"from={date.today():%Y-%m}-01" in html  # ссылки несут период явно
 
 
 def test_past_month_is_not_marked_in_progress(ук: FlaskClient) -> None:
     html = ук.get("/quality?month=2026-09").get_data(as_text=True)
 
-    # Выбран прошлый месяц: пометка только у текущего в списке выбора.
-    assert html.count("месяц идёт") == 1
+    # Выбран прошлый месяц: пометки «месяц идёт» нет нигде.
+    assert "месяц идёт" not in html
 
 
 def test_foreign_country_is_404(ук: FlaskClient) -> None:
@@ -331,7 +331,7 @@ def test_empty_later_month_links_to_saved_data_without_changing_default(
     html = response.get_data(as_text=True)
     assert response.status_code == 200
     assert "Последний месяц с сохранёнными данными Dodo IS" in html
-    assert "month=2026-09" in html
+    assert "from=2026-09-01" in html and "to=2026-09-30" in html
     assert calls == [("PL",)]
 
 
@@ -396,16 +396,6 @@ def test_network_moves_countries_without_values_under_the_table(
     assert "qa-nodata" in html and "country=SK" in html.split("qa-nodata")[1]
 
 
-def test_rail_says_pizzerias_count_when_country_has_units_but_no_rko_rs(
-    monkeypatch: pytest.MonkeyPatch, чтения: None
-) -> None:
-    _registry_only_units(monkeypatch)
-    monkeypatch.setattr(quality_read, "period_scores", lambda countries, month: ())
-    html = next(_client(monkeypatch)).get("/quality?month=2026-09").get_data(as_text=True)
-
-    assert "пиццерий: 2" in html  # BG: две пиццерии с одними оценками, РКО и РС нет
-
-
 def test_header_has_two_floors_with_groups(ук: FlaskClient) -> None:
     html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
 
@@ -422,6 +412,125 @@ def test_maps_header_has_how_it_is_computed_tip_in_both_languages(ук: FlaskCli
         html = ук.get(url).get_data(as_text=True)
         assert phrase in html, url
         assert html.count("info-qmaps") >= 1, url
+
+
+def _between(html: str, start: str, end: str) -> str:
+    first = html.index(start)
+    return html[first : html.index(end, first)]
+
+
+def test_no_left_column_and_filters_block_has_country_select_and_period(ук: FlaskClient) -> None:
+    html = ук.get("/quality?month=2026-09").get_data(as_text=True)
+
+    assert "pk-rail" not in html and "pk-shell--solo" in html
+    filters = _between(html, 'class="qa-filters"', "</table>")
+    select = _between(filters, "<select", "</select>")
+    assert "Все страны" in select and "Польша" in select and "Болгария" in select
+    assert "Россия" not in select  # вне охвата IMF
+    assert "country=PL" in select
+    assert "data-pcal" in filters and "speriod" in filters  # общий календарь периода
+    assert 'name="from"' in filters and 'value="2026-09-01"' in filters
+
+
+def test_country_filter_keeps_period_and_sort(ук: FlaskClient) -> None:
+    html = ук.get("/quality?month=2026-09&sort=total&dir=desc").get_data(as_text=True)
+    select = _between(html, "<select", "</select>")
+
+    assert "country=PL" in select and "from=2026-09-01" in select
+    assert "sort=total" in select and "dir=desc" in select
+
+
+def test_period_form_keeps_country_and_sort(ук: FlaskClient) -> None:
+    html = ук.get("/quality?country=PL&month=2026-09&sort=rko&dir=asc").get_data(as_text=True)
+    form = _between(html, "data-pcal", "pcal__native")
+
+    assert 'name="country" value="PL"' in form and 'name="sort" value="rko"' in form
+    assert 'name="dir" value="asc"' in form
+
+
+def test_country_page_has_country_selected_and_no_rail(ук: FlaskClient) -> None:
+    html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
+
+    assert "pk-rail" not in html
+    assert re.search(r'<option value="[^"]*country=PL[^"]*" selected>', html)
+
+
+def test_old_month_address_opens_that_month(ук: FlaskClient) -> None:
+    html = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
+
+    row = _between(html, "<td>Warsaw-1</td>", "</tr>")
+    assert "90.9" in row
+    assert 'value="2026-09-01"' in html and 'value="2026-09-30"' in html
+
+
+def test_period_from_to_opens_the_month_it_touches(ук: FlaskClient) -> None:
+    html = ук.get("/quality?country=PL&from=2026-09-10&to=2026-09-20").get_data(as_text=True)
+
+    assert "90.9" in _between(html, "<td>Warsaw-1</td>", "</tr>")
+
+
+def test_two_month_period_averages_units_and_says_by_months(
+    monkeypatch: pytest.MonkeyPatch, ук: FlaskClient
+) -> None:
+    # Октябрь: РКО Warsaw-1 — 70, Krakow-1 нет. За два месяца: Warsaw-1 (90.89 + 70) / 2.
+    october = date(2026, 10, 1)
+    base = _scores
+
+    def scores(countries: object, month: date) -> tuple[quality_read.PeriodScore, ...]:
+        if month == october:
+            return (quality_read.PeriodScore(PL1, "Warsaw-1", "PL", "rko", D("70"), 5, None),)
+        return base(countries, month)
+
+    monkeypatch.setattr(quality_read, "period_scores", scores)
+    html = ук.get("/quality?country=PL&from=2026-09-01&to=2026-10-31").get_data(as_text=True)
+    row = _between(html, "<td>Warsaw-1</td>", "</tr>")
+
+    assert "80.4" in row and "90.9" not in row  # (90.89 + 70) / 2 = 80.445
+    assert "Считается по месяцам: сен–окт 2026." in html
+    krakow = _between(html, "<td>Krakow-1</td>", "</tr>")
+    assert "80.0" in krakow  # единственный месяц с данными — не тянет к нулю
+
+
+def test_future_start_falls_back_to_current_month(ук: FlaskClient) -> None:
+    html = ук.get("/quality?from=2099-01-01&to=2099-02-01").get_data(as_text=True)
+
+    assert "месяц идёт" in html
+
+
+def test_foreign_country_is_404_with_period(ук: FlaskClient) -> None:
+    assert ук.get("/quality?country=RU&from=2026-09-01&to=2026-10-31").status_code == 404
+
+
+def test_filters_in_english(ук: FlaskClient) -> None:
+    html = ук.get("/quality?month=2026-09&lang=en").get_data(as_text=True)
+
+    assert "All countries" in html and ">Country<" in html and ">Period<" in html
+
+
+def test_period_sums_orders_and_revenue_and_shares_come_from_the_sums(
+    monkeypatch: pytest.MonkeyPatch, чтения: None
+) -> None:
+    from src.web import quality_data
+
+    october = date(2026, 10, 1)
+    monkeypatch.setattr(
+        dodois_metrics,
+        "unit_sales",
+        lambda code, month: (
+            _poland_sales(code, month)
+            if month == MONTH
+            else [dodois_metrics.UnitSales(PL1, "Dine-in", "Dine-in", 60, D("6000"), "PLN")]
+            if code == "PL" and month == october
+            else []
+        ),
+    )
+    found = quality_data.load_period(Reach("HQ", None, ("PL",)), ("PL",), (MONTH, october))["PL"]
+    values = found.units[0].values if found.units[0].dodo_id == PL1 else found.units[1].values
+
+    assert values["rev_dine"] == D("10000")  # 4000 + 6000
+    # доля «прочих» — от сумм заказов: (40 + 60) / (100 + 60) = 62.5%, а не среднее 40% и 100%
+    assert values["share_other"] == D("0.625")
+    assert found.values["rev_dine"] == D("10000") and found.currency == "PLN"
 
 
 def test_question_mark_is_short(ук: FlaskClient) -> None:

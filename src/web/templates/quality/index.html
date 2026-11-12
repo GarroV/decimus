@@ -1,26 +1,16 @@
 {#
-  Экран «Качество»: рабочая страница здоровья по странам и пиццериям за месяц (docs/21-quality.md,
-  D677). Каркас — общий шаблон «выбор слева — рабочая область справа» (`_pick_page.html`, D474,
-  D655), как у «Стран»: слева страны, справа таблица стран или страна целиком — строки пиццерий и
-  блоки. Ни одного вычисления — всё приходит из `quality_page.py`.
+  Экран «Качество»: рабочая страница здоровья по странам и пиццериям за период (docs/21-quality.md,
+  D677, D750). Каркас — `_pick_page.html` без левого столбца (`pick_norail`): над таблицей один блок
+  фильтров — «Страна» (список) и «Период» (общий календарь `_period.html`), ниже таблица стран или
+  страна целиком — строки пиццерий и блоки. Ни одного вычисления — всё приходит из `quality_page.py`.
 #}{% extends "_pick_page.html" %}
 {% from "_info_tip.html" import info_tip, fresh_tip %}
-{% from "_pick_ui.html" import pick_item, pick_head, pick_block, pick_empty, pick_tile, pick_tiles with context %}
+{% from "_period.html" import period_picker with context %}
+{% from "_pick_ui.html" import pick_head, pick_block, pick_empty with context %}
 {% block title %}{{ t('section.quality.title') }}{% endblock %}
 {% block pick_assets %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-quality.css') }}">
-{% endblock %}
-
-{% block pick_label %}{{ t('quality.filter.title') }}{% endblock %}
-
-{% block pick_list %}
-  {% if not failed %}
-    {{ pick_item(network_href, t('quality.network'), '', '', not code, code='Σ') }}
-    {% for row in rail %}
-      {{ pick_item(row.href, row.title, row.meta, '', row.on, code=row.code) }}
-    {% endfor %}
-  {% endif %}
 {% endblock %}
 
 {% macro delta(d) %}{% if d.kind %}<span class="qa-delta qa-delta--{{ d.kind }}">{{ d.text }}</span>{% endif %}{% endmacro %}
@@ -49,21 +39,23 @@
   {% set tips = info_tip(t('tip.hint'), t('quality.tip.title'), tip_rows, 'quality') ~ fresh_tip(t('ratings.loaded.hint'), t('ratings.fresh.title'), freshness, 'qfresh',
         [t('ratings.fresh.col.source'), t('ratings.fresh.col.scope'), t('ratings.fresh.col.at'), t('ratings.fresh.col.status')],
         t('ratings.fresh.foot'), t('ratings.loaded.none')) %}
-  {% call pick_head(kicker, title, tips) %}
-    <div class="pk-head__period">
-      <div class="speriod" role="group" aria-label="{{ t('quality.month.label') }}">
-        <a class="speriod__arrow" href="{{ prev_href }}" aria-label="{{ t('quality.month.prev') }}">{{ icon('cleft') }}</a>
-        <label class="pickbox">
-          <select class="pickselect pickbox__select" data-pick-nav aria-label="{{ t('quality.month.label') }}">
-            {% if not month_options|selectattr('on')|list %}<option value="" selected disabled>{{ month_title }}</option>{% endif %}
-            {% for o in month_options %}<option value="{{ o.href }}"{% if o.on %} selected{% endif %}>{{ o.title }}</option>{% endfor %}
-          </select>
-        </label>
-        {% if next_href %}<a class="speriod__arrow" href="{{ next_href }}" aria-label="{{ t('quality.month.next') }}">{{ icon('cright') }}</a>
-        {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cright') }}</span>{% endif %}
+  {% call pick_head(kicker, title, tips) %}{% endcall %}
+
+  <div class="qa-filters" role="group" aria-label="{{ t('quality.filters.label') }}">
+    <label class="pickbox qa-filter">
+      <span class="pickbox__label">{{ t('quality.filters.country') }}</span>
+      <select class="pickselect pickbox__select" data-pick-nav aria-label="{{ t('quality.filters.country') }}">
+        {% for o in countries %}<option value="{{ o.href }}"{% if o.on %} selected{% endif %}>{{ o.title }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="qa-filter qa-filter--period">
+      <span class="pickbox__label">{{ t('quality.filters.period') }}</span>
+      <div class="qa-filter__row">
+        {{ period_picker(period, period_title, period_prev, period_next, period_quick, period_action, period_hidden) }}
+        {% if period_note %}<span class="qa-filter__note">{{ period_note }}</span>{% endif %}
       </div>
     </div>
-  {% endcall %}
+  </div>
 
   {% if latest_data_href %}
     <p class="note qa-note">{{ t('quality.latest_data', month=latest_data_title) }}

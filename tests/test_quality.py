@@ -180,3 +180,17 @@ def test_nothing_known_gives_no_score() -> None:
     )
     assert r.score is None
     assert not r.incomplete
+
+
+def test_fold_months_is_mean_over_months_with_value_and_sum_for_summed_keys() -> None:
+    sept = {"rko": D("90"), "total": D("4.0"), "kr": None, "rev_dine": D("4000")}
+    octo = {"rko": D("70"), "total": D("4.6"), "kr": None, "rev_dine": D("6000"), "maps": D("4.2")}
+
+    folded = q.fold_months([sept, octo], summed={"rev_dine"})
+
+    assert folded["rko"] == D("80")  # (90 + 70) / 2
+    assert folded["total"] == D("4.3")  # среднее месячных итогов: (4.0 + 4.6) / 2
+    assert folded["rev_dine"] == D("10000")  # выручка — сумма
+    assert folded["maps"] == D("4.2")  # месяц без значения не тянет к нулю
+    assert folded["kr"] is None  # ни в одном месяце — нет данных, а не ноль
+    assert q.fold_months([sept], summed={"rev_dine"})["rko"] == D("90")
