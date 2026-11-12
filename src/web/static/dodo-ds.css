@@ -1,4 +1,4 @@
-/* forma dodo/core/dodo-ds.css sha256:a2ab38b2eac60f379d94fc6904d754f9faff7ec93923781e5e788c54a3d5674e — не править здесь, правка идёт в GarroV/forma */
+/* forma dodo/core/dodo-ds.css sha256:9a39b916ef3d85ca4536c95234f8819fa40d404c3679228b215e9515b7c531cc — не править здесь, правка идёт в GarroV/forma */
 /* ═══════════════════════════════════════════════════════════════════════════
    DODO — ЕДИНАЯ ДИЗАЙН-СИСТЕМА ТРЁХ ПРОДУКТОВ
    Собрана 17.09.2026 из двух источников:
@@ -1021,6 +1021,9 @@ a:hover { color: var(--accent-press); text-decoration: underline; }
 .sidenav__field input:not(:placeholder-shown) + .kbd { display: none; }
 
 .sidenav__list { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5) var(--space-4); }
+/* Пункты не сжимаются, когда список не помещается по высоте: иначе раскрытая ветка сплющивает
+   все пункты до высоты текста, и пункт уезжает из-под курсора. Лишнее прокручивается. */
+.sidenav__list > * { flex-shrink: 0; }
 .sidenav__group { padding: var(--space-6) var(--space-5) var(--space-2); font-size: var(--fs-micro); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: var(--w-semibold); }
 .sidenav__group:first-child { padding-top: var(--space-2); }
 .sidenav__item, .sidenav__current { position: relative; display: flex; align-items: center; gap: var(--space-5); width: 100%; height: 34px; padding: 0 var(--space-5); border: 0; border-radius: var(--r-control); background: transparent; font: inherit; font-size: 13.5px; text-align: left; white-space: nowrap; cursor: pointer; transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
