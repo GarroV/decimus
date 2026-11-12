@@ -434,7 +434,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,pushed,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_profiles,unit_scores,units}.py -->
+<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,pushed,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_limits,unit_profiles,unit_scores,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -464,6 +464,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/synonyms.py` | T284: карта синонимов формулировок — где живёт выученное (D119) |
 | `src/db/translate_modes.py` | Перевод комментариев на язык отчёта, выбранный аудитором (D443): чтение и запись |
 | `src/db/trips.py` | Поездки «Календаря» (D497, D505, D506): чтение и запись |
+| `src/db/unit_limits.py` | Лимит проверок на пиццерию у пространств партнёров на время теста (D755) |
 | `src/db/unit_profiles.py` | Справочник сведений о пиццериях (`unit_profiles`, миграция 0046): запись и чтение |
 | `src/db/unit_scores.py` | Оценки последних проверок пиццерий — для плитки «Стабильно ниже порога» (D658) |
 | `src/db/units.py` | Нормализация названия точки для сопоставления повторного ввода |
