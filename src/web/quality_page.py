@@ -399,13 +399,10 @@ def _freshness_rows(
     errors = (t("quality.tip.dodois_error", lang, countries=", ".join(failed)),) if failed else ()
     return (
         t("quality.tip.unit", lang),
-        t("quality.tip.scores", lang),
-        t("quality.tip.rko", lang),
         t("quality.tip.overall", lang),
+        t("quality.tip.rko", lang),
         t("quality.tip.tone", lang),
         *((t("quality.tip.audit", lang),) if show_audit else ()),
-        t("quality.tip.fresh", lang),
-        t("quality.tip.maps", lang),
         *carried,
         dodois,
         *errors,
