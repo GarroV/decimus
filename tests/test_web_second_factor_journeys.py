@@ -607,7 +607,9 @@ def test_изменяющие_маршруты_экрана_не_открыва�
 ) -> None:
     стенд.вход_паролем("dev")
     for путь in ("totp/start", "totp/confirm", "totp/remove", "backup/generate", "passkey/options"):
-        assert стенд.client.get(f"{SECURITY}/{путь}", headers=HDR).status_code == 405, путь
+        # GET по адресу формы ведёт на главную (общий 405 → главная), действия не выполняет.
+        r = стенд.client.get(f"{SECURITY}/{путь}", headers=HDR)
+        assert r.status_code == 302 and r.headers["Location"] == "/", путь
         r = стенд.client.post(f"{SECURITY}/{путь}", headers={"Origin": "https://evil.example"})
         assert r.status_code >= 400, путь
     assert not стенд.sql("select 1 from web_totp")
