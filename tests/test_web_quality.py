@@ -262,9 +262,8 @@ def test_foreign_country_is_404(ук: FlaskClient) -> None:
 def test_rko_month_rule_is_explained_under_the_question_mark(ук: FlaskClient) -> None:
     ru = ук.get("/quality?country=PL&month=2026-09").get_data(as_text=True)
     en = ук.get("/quality?country=PL&month=2026-09&lang=en").get_data(as_text=True)
-    assert "РКО за месяц — все недели (пн–вс), у которых хоть один день в этом месяце" in ru
-    assert "неделя на стыке входит в оба месяца" in ru
-    assert "RKO for a month — every week (Mon–Sun) with at least one day" in en
+    assert "РКО за месяц — все недели, задевшие месяц." in ru
+    assert "RKO for a month — every week touching the month." in en
 
 
 def test_english_texts_exist(ук: FlaskClient) -> None:
@@ -429,7 +428,7 @@ def test_no_left_column_and_filters_block_has_country_select_and_period(ук: Fl
     assert "Все страны" in select and "Польша" in select and "Болгария" in select
     assert "Россия" not in select  # вне охвата IMF
     assert "country=PL" in select
-    assert 'data-pcal' in filters and "speriod" in filters  # общий календарь периода
+    assert "data-pcal" in filters and "speriod" in filters  # общий календарь периода
     assert 'name="from"' in filters and 'value="2026-09-01"' in filters
 
 
@@ -532,3 +531,13 @@ def test_period_sums_orders_and_revenue_and_shares_come_from_the_sums(
     # доля «прочих» — от сумм заказов: (40 + 60) / (100 + 60) = 62.5%, а не среднее 40% и 100%
     assert values["share_other"] == D("0.625")
     assert found.values["rev_dine"] == D("10000") and found.currency == "PLN"
+
+
+def test_question_mark_is_short(ук: FlaskClient) -> None:
+    """Подсказка «?» — несколько коротких строк, а не простыня (владелец 12.11.2026)."""
+    from src.web import quality_page
+
+    rows = quality_page._freshness_rows("ru", show_audit=True)
+    method = [r for r in rows if not r.startswith(("Dodo IS", "РКО и РС"))]
+    assert len(method) <= 5
+    assert all(len(r) <= 90 for r in method), method

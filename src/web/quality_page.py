@@ -22,7 +22,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -91,7 +91,8 @@ def _scope(reach_countries: tuple[str, ...] | None) -> tuple[str, ...]:
 
 def resolve_period(args: Mapping[str, str], today: date) -> registry_period.Period:
     """Период из адреса; старый `?month=` — этот месяц. Открытые края и будущее достраиваются:
-    нет начала — `MAX_MONTHS` назад от конца, нет конца — сегодня, начало в будущем — текущий месяц."""
+    нет начала — `MAX_MONTHS` назад от конца, нет конца — сегодня, начало в будущем — текущий
+    месяц."""
     legacy = args.get("month")
     if legacy and not any(args.get(k) for k in ("from", "to", "period")):
         return registry_period.month_of(parse_month(legacy, today))
@@ -105,9 +106,8 @@ def resolve_period(args: Mapping[str, str], today: date) -> registry_period.Peri
 
 def period_months(period: registry_period.Period, today: date) -> tuple[date, ...]:
     """Целые месяцы, которые задевает период (от старого к новому), не больше `MAX_MONTHS`."""
-    assert period.start is not None and period.end is not None
-    first = period.start.replace(day=1)
-    last = min(period.end, today).replace(day=1)
+    first = (period.start or today).replace(day=1)
+    last = min(period.end or today, today).replace(day=1)
     count = (last.year - first.year) * 12 + last.month - first.month + 1
     return tuple(shift(last, -i) for i in range(min(count, MAX_MONTHS) - 1, -1, -1))
 
@@ -132,12 +132,13 @@ def period_note(
     """Подпись у календаря: по каким месяцам считается период и что последний ещё идёт."""
     running = months[-1] >= today.replace(day=1)
     if len(months) == 1:
-        return t("quality.month.in_progress", lang, title=span_title(months, lang)) if running else ""
+        return (
+            t("quality.month.in_progress", lang, title=span_title(months, lang)) if running else ""
+        )
     note = t("quality.period.by_months", lang, span=span_title(months, lang))
     if running:
         note += " " + t("quality.period.running", lang)
-    assert period.start is not None
-    if period.start.replace(day=1) < months[0]:
+    if (period.start or today).replace(day=1) < months[0]:
         note += " " + t("quality.period.capped", lang, n=MAX_MONTHS)
     return note
 
@@ -428,13 +429,10 @@ def _freshness_rows(
     errors = (t("quality.tip.dodois_error", lang, countries=", ".join(failed)),) if failed else ()
     return (
         t("quality.tip.unit", lang),
-        t("quality.tip.scores", lang),
-        t("quality.tip.rko", lang),
         t("quality.tip.overall", lang),
+        t("quality.tip.rko", lang),
         t("quality.tip.tone", lang),
         *((t("quality.tip.audit", lang),) if show_audit else ()),
-        t("quality.tip.fresh", lang),
-        t("quality.tip.maps", lang),
         *carried,
         dodois,
         *errors,
@@ -470,7 +468,7 @@ def render(lang: str) -> str:
 
     def select(**changes: str) -> str:
         """Адрес экрана с этими изменениями; остальное (страна, период, порядок) сохраняется."""
-        params: dict[str, str] = {
+        params: dict[str, Any] = {
             "country": code or "",
             "sort": sort_key if sort_key != "name" else "",
             "dir": ("desc" if desc else "asc") if sort_key != "name" else "",

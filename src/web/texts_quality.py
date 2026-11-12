@@ -55,99 +55,24 @@ QUALITY_TEXTS: dict[str, dict[str, str]] = {
     # --- пояснение под «?»
     "quality.tip.title": {"ru": "Как читать таблицу", "en": "How to read the table"},
     "quality.tip.unit": {
-        "ru": (
-            "Единица — пиццерия за месяц. Страна: оценки — простое среднее её пиццерий "
-            "(карты — по числу оценок), доли заказов и выручка — по суммам. Под числом — "
-            "движение к прошлому месяцу."
-        ),
-        "en": (
-            "The unit is one pizzeria for one month. A country: ratings are the plain mean of "
-            "its pizzerias (maps — weighted by rating counts), order shares and revenue are "
-            "totals. Under a number — the change from the previous month."
-        ),
-    },
-    "quality.tip.scores": {
-        "ru": (
-            "РКО, РС и проверка — сто баллов; КР, карты и агрегаторы — пять. КР: зал и "
-            "доставка, среднее по числу оценок. Карты: Google и Яндекс, среднее по числу "
-            "оценок за месяц. Агрегаторы: оценки площадок в пяти баллах, среднее по заказам среди "
-            "площадок с оценкой. Проверок РКО в неделю — среднее по неделям месяца."
-        ),
-        "en": (
-            "RKO, RS and inspection are out of 100; CR, maps and aggregators out of 5. CR: "
-            "dine-in and delivery, mean weighted by rating counts. Maps: Google and Yandex, "
-            "mean weighted by rating counts. Aggregators: platform ratings in five points, "
-            "mean weighted by orders among rated platforms. RKO checks per week — the mean "
-            "over the weeks of the month."
-        ),
-    },
-    "quality.tip.rko": {
-        "ru": (
-            "РКО за месяц — все недели (пн–вс), у которых хоть один день в этом месяце; "
-            "неделя на стыке входит в оба месяца."
-        ),
-        "en": (
-            "RKO for a month — every week (Mon–Sun) with at least one day in that month; "
-            "a week on the border belongs to both months."
-        ),
+        "ru": "Строка — страна или пиццерия за месяц. Под числом — изменение к прошлому месяцу.",
+        "en": "A row is a country or pizzeria per month. Under a number — change vs last month.",
     },
     "quality.tip.overall": {
-        "ru": (
-            "Итог — рейтинг пиццерии из 5: сумма «вес × оценка» по РКО (÷ 20), КР, картам и "
-            "агрегаторам. Вес стоит рядом со своей оценкой; неполный итог помечен суммой весов. У "
-            "страны итог и веса считаются по её строке — от средних и долей страны, а не как "
-            "среднее итогов её пиццерий. Как считается — в блоке «Как считается итог» "
-            "на странице страны."
-        ),
-        "en": (
-            "Total is the pizzeria's rating out of 5: the sum of weight × score over RKO "
-            "(÷ 20), CR, maps and aggregators. Each weight stands next to its score; an "
-            "incomplete total shows the sum of its weights. A country's total and weights are "
-            "computed from its own row — the country's means and shares — not as the mean of "
-            "its pizzerias' totals. How it is computed — in the “How the total is computed” "
-            "block on the country page."
-        ),
+        "ru": "Рейтинг из 5 — сумма «оценка × вес». Как считается — на странице страны.",
+        "en": "Rating out of 5 = sum of score × weight. How — on the country page.",
+    },
+    "quality.tip.rko": {
+        "ru": "РКО за месяц — все недели, задевшие месяц.",
+        "en": "RKO for a month — every week touching the month.",
     },
     "quality.tip.tone": {
-        "ru": (
-            "Цвет ячейки: РКО и РС — как в «Рейтингах» (ниже 80 красный, ниже 90 жёлтый); "
-            "остальные показатели — жёлтым, если стали хуже прошлого месяца. Доли заказов "
-            "не подсвечиваются; выручка в идущем месяце — тоже, и движения у неё нет."
-        ),
-        "en": (
-            "Cell colour: RKO and RS as in Ratings (below 80 red, below 90 amber); other "
-            "figures turn amber when worse than the previous month. Order shares are not "
-            "coloured; revenue in a month still in progress is not, and shows no change."
-        ),
+        "ru": "Красный — РКО или РС ниже 80. Жёлтый — ниже 90 или хуже прошлого месяца.",
+        "en": "Red — RKO or RS below 80. Amber — below 90 or worse than last month.",
     },
     "quality.tip.audit": {
-        "ru": "Проверка — процент последней принятой проверки decimus в месяце.",
-        "en": "Inspection — the percentage of the last accepted decimus inspection in the month.",
-    },
-    "quality.tip.fresh": {
-        "ru": (
-            "РКО — все недели, задевшие месяц; РС — по месяцу, на который падает большинство его "
-            "дней; агрегаторы — последняя оценка в месяце."
-        ),
-        "en": (
-            "RKO takes every week touching the month; RS by the month holding most of its days; "
-            "aggregators use the last rating in the month."
-        ),
-    },
-    "quality.tip.maps": {
-        "ru": (
-            "Карты — среднее оценок, поставленных на карте в этом месяце (Google, Яндекс), без "
-            "удалённых; вес — число этих оценок. Если оценок нет или их меньше 10% от среднего за "
-            "три прошлых месяца, берётся значение прошлого месяца со своим весом. У страны — "
-            "среднее по всем оценкам её пиццерий."
-        ),
-        "en": (
-            "Maps — the mean of ratings given on the map in this month (Google, Yandex), "
-            "deleted ones excluded; the weight is their count. With no ratings, or fewer than "
-            "10% of the average of the previous three months, the previous month's value is "
-            "taken with its own weight. A country's value is the mean over all its pizzerias' "
-            "ratings."
-        ),
+        "ru": "Проверка — последняя проверка decimus в месяце.",
+        "en": "Inspection — the last decimus inspection in the month.",
     },
     "quality.tip.maps_head": {
         "ru": (
