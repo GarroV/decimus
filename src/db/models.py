@@ -218,6 +218,12 @@ class FindingRow:
     #: всеми выборками (пусто — выборка версию не несёт): нужна тем, кто называет
     #: пункт человеку по тексту ТОГО издания (метка «Порядок 13», `domain.item_label`).
     checklist_version: str = ""
+    #: Исходник аудитора, когда `text` / `comment` выше — перевод на другой язык (D744, #1619).
+    #: `None` — показан сам исходник. Язык исходника — `source_lang`; пока перевод не
+    #: подставлен, `source_lang` пуст и исходник лежит в `text` / `comment` на языке `lang`.
+    original_text: str | None = None
+    original_comment: str | None = None
+    source_lang: str = ""
 
     def corrections(self) -> tuple[str, ...]:
         """Что из предложенного моделью аудитор поправил: `code`, `level`, `zone`.

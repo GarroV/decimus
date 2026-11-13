@@ -19,6 +19,7 @@ from src.db.reach import Reach
 from src.db.storage import S3PhotoStorage, key_of_uri
 
 from . import detail_pdf
+from .finding_text import localize
 from .letters import AUDIT_SCRIPT, REPORT_SCRIPT, state_json
 from .letters import sources as letter_sources
 
@@ -47,6 +48,9 @@ def ensure_report(detail: InspectionDetail, *, reach: Reach) -> reports.ReportRe
             raise StorageError("Сохранённого отчёта исторической проверки нет")
         return ref
     shots = previews.report_photos(head.id, reach=reach)
+    # Слова аудитора — на языке отчёта (D744): переведённый текст входит в отпечаток, поэтому
+    # перевод нужен ДО него. Исходник в базе остаётся, перевод кладётся рядом.
+    current = localize(current, current.inspection.report_lang).detail
     fingerprint = _report_fingerprint(current, shots)
     if ref is not None and f"/reports/{fingerprint}/" in ref.storage_path:
         return ref
@@ -104,6 +108,10 @@ def _rebuild_report(
 
 def _assert_report_source(inspection_id: str, *, fingerprint: str, reach: Reach) -> None:
     current = queries.get_inspection(inspection_id, reach=reach, include_on_review=True)
+    if current is not None:
+        # Только лежащие переводы: модель здесь не зовётся, а перевод, положенный при сборке,
+        # уже лежит и даёт тот же текст.
+        current = localize(current, current.inspection.report_lang, allow_model=False).detail
     if (
         current is None
         or _report_fingerprint(current, previews.report_photos(inspection_id, reach=reach))

@@ -32,6 +32,7 @@ import asyncio
 import logging
 import tempfile
 from collections.abc import Callable, Mapping
+from functools import partial
 from pathlib import Path
 
 from aiogram import F, Router
@@ -40,6 +41,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, FSInputFile, Message
 
 from src import db, domain
+from src.db import finding_translations
 from src.domain.errors import ChecklistVersionMismatch, DomainError
 from src.domain.handover import HandedOverError
 from src.domain.log_ids import log_id
@@ -51,7 +53,7 @@ from src.report import PhotoMissing, ReportError, build_letter_notes, build_pdf
 
 from .. import item_labels, sealed, sidecar, stops, view
 from ..errors import BotNotesError, ChangedSinceReviewError
-from ..finish_translate import translate_comments
+from ..finish_translate import Translated, translate_comments
 from ..inspection import read_inspection
 from ..keyboards import (
     FINISH_BUILD_CALLBACK,
@@ -199,6 +201,7 @@ async def archive(
     allow_missing: bool,
     report: Path | None = None,
     lost: int = 0,
+    translated: Translated | None = None,
 ) -> None:
     """Отправить завершённую проверку в историю: сама проверка, затем кадры (T123).
 
@@ -261,6 +264,19 @@ async def archive(
         logger.exception("слив проверки чата %s не удался", log_id(chat_id))
         await stops.refuse(message, lang, step="finish.archive", key="finish.not_archived")
         return
+
+    if translated is not None and translated.texts:
+        # Перевод, по которому собран отчёт аудитора, ложится рядом с исходником (D744):
+        # веб и письмо возьмут его из базы и модель по второму разу не позовут.
+        try:
+            await asyncio.to_thread(
+                finding_translations.store_by_number,
+                inspection_id,
+                translated.lang,
+                translated.texts,
+            )
+        except db.DbError:
+            logger.exception("переводы проверки чата %s не сохранились", log_id(chat_id))
 
     try:
         await asyncio.to_thread(
@@ -440,10 +456,12 @@ async def deliver(
     if await refuse_if_sealed(message, chat_id, lang):
         return
     await message.answer(t("finish.building", lang))
-    # Автоперевод комментариев (D443): до сборки, чтобы в отчёт легли переведённые.
-    translate_failed = await asyncio.to_thread(translate_comments, chat_id, inspection)
-    if translate_failed:
-        await message.answer(t("finish.autotranslate_failed", lang, count=translate_failed))
+    # Автоперевод комментариев (D443): до сборки, чтобы в отчёт легли переведённые. Исходник в
+    # проверке не меняется (D744): перевод идёт только в этот отчёт и письмо, а после слива
+    # ложится в `translations` рядом с исходником.
+    translated = await asyncio.to_thread(translate_comments, chat_id, inspection)
+    if translated.failed:
+        await message.answer(t("finish.autotranslate_failed", lang, count=translated.failed))
     # Страна пиццерии — для пояса времени проверки в шапке отчёта (D730).
     country = await asyncio.to_thread(inspection_country, inspection)
     # Кадры записей и кадры информационной части (T179) — одним списком: карту
@@ -477,6 +495,7 @@ async def deliver(
                     allow_missing_photos=allow_missing,
                     finished_at=finish_candidate,
                     country=country,
+                    texts=translated.texts,
                 )
             except PhotoMissing as exc:
                 # Решение «собрать без кадра» принимает аудитор, а не код: отчёт без
@@ -530,7 +549,9 @@ async def deliver(
         except (DomainError, OSError):
             logger.exception("накопитель чата %s не уехал в историю", log_id(chat_id))
         try:
-            letter = await asyncio.to_thread(build_letter_notes, chat_id)
+            letter = await asyncio.to_thread(
+                partial(build_letter_notes, chat_id, texts=translated.texts)
+            )
         except ReportError:
             # Свой текст, а не тот же: отчёт аудитор к этому моменту уже
             # получил, и «отчёт не собрался» было бы неправдой (T151).
@@ -561,6 +582,7 @@ async def deliver(
             allow_missing=allow_missing,
             report=pdf,
             lost=len(set(refs) - set(found)),
+            translated=translated,
         )
         # Последним сообщением: отчёт предварительный, принять его надо в вебе. После
         # слива, а не до: ссылка ведёт на строку истории, которой до него нет.

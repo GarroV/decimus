@@ -14,18 +14,24 @@ from __future__ import annotations
 
 import json
 import tempfile
+import uuid
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 from src.domain.config import Settings
-from src.domain.engine import chat_dir
+from src.domain.engine import chat_dir, state_file
 from src.domain.state import read_state
 from src.domain.timing import parse_timestamp, zone_for_country
 
 from .engine import run_report, settings
 from .errors import PdfNotBuilt, PhotoMissing, ReportError
 from .photos import FetchPhoto, misses_text, resolve_photos
+
+#: Поле записи в переводе (`translations.field`) → ключ записи в файле состояния движка.
+_STATE_KEYS = {"text": "evidence", "comment": "comment"}
 
 #: Меньше этого не бывает даже у пустого отчёта — значит, собралась заглушка.
 PDF_MIN_BYTES = 1000
@@ -44,6 +50,33 @@ def _pdf_problem(path: Path) -> str | None:
     return None
 
 
+@contextmanager
+def _translated_state(
+    chat_id: int, env: Settings, texts: Mapping[int, Mapping[str, str]] | None
+) -> Iterator[dict[str, str] | None]:
+    """Копия состояния проверки с переведённым текстом записей — только для этой сборки (D744).
+
+    Исходник в состоянии не меняется: слив запишет его на языке речи, а перевод уйдёт в
+    `translations` рядом. Движку копия подаётся переменной `INSPECTION_FILE`; лежит она в
+    папке чата, потому что отчёт движок кладёт рядом с файлом состояния. Переводов нет —
+    `None`, сборка идёт по настоящему состоянию.
+    """
+    if not texts:
+        yield None
+        return
+    path = state_file(chat_id, env)
+    state = json.loads(path.read_text(encoding="utf-8"))
+    for finding in state.get("findings", []):
+        for name, text in texts.get(int(finding.get("n", 0)), {}).items():
+            finding[_STATE_KEYS[name]] = text
+    copy = path.with_name(f".{path.stem}-translated-{uuid.uuid4().hex}.json")
+    copy.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+    try:
+        yield {"INSPECTION_FILE": str(copy)}
+    finally:
+        copy.unlink(missing_ok=True)
+
+
 def build_pdf(
     chat_id: int,
     *,
@@ -51,6 +84,7 @@ def build_pdf(
     allow_missing_photos: bool = False,
     finished_at: datetime | None = None,
     country: str | None = None,
+    texts: Mapping[int, Mapping[str, str]] | None = None,
 ) -> Path:
     """Собрать отчёт по проверке этого чата и вернуть путь к файлу.
 
@@ -71,6 +105,9 @@ def build_pdf(
     там же (повторная сборка), иначе `finished_at` вызывающего: бот фиксирует конец
     ПОСЛЕ отдачи отчёта, и без этого аргумента отчёт вышел бы без конца. `country` —
     страна пиццерии, по ней выбирается часовой пояс; неизвестна — движок печатает UTC.
+
+    `texts` — перевод свободного текста записей на язык отчёта (номер записи → поле → текст,
+    D744): печатается он, а исходник в проверке остаётся нетронутым.
     """
     env = settings(chat_id)
     plan = resolve_photos(chat_id, env, fetch_photo)
@@ -82,17 +119,19 @@ def build_pdf(
         photo_map = Path(tmp) / "photo-map.json"
         photo_map.write_text(json.dumps(plan.mapping, ensure_ascii=False), encoding="utf-8")
         try:
-            printed = run_report(
-                [
-                    "pdf",
-                    "--photo-map",
-                    str(photo_map),
-                    *_speech_args(chat_id, env),
-                    *_time_args(chat_id, env, finished_at, country),
-                ],
-                chat_id=chat_id,
-                settings=env,
-            ).strip()
+            with _translated_state(chat_id, env, texts) as extra:
+                printed = run_report(
+                    [
+                        "pdf",
+                        "--photo-map",
+                        str(photo_map),
+                        *_speech_args(chat_id, env),
+                        *_time_args(chat_id, env, finished_at, country),
+                    ],
+                    chat_id=chat_id,
+                    settings=env,
+                    env_extra=extra,
+                ).strip()
         except PdfNotBuilt:
             raise
         except ReportError as exc:
@@ -147,20 +186,24 @@ class BuiltLetter:
     feedback_lang: str
 
 
-def build_letter_notes(chat_id: int, template: int = 1) -> BuiltLetter:
+def build_letter_notes(
+    chat_id: int, template: int = 1, *, texts: Mapping[int, Mapping[str, str]] | None = None
+) -> BuiltLetter:
     """Собрать письмо партнёру и вернуть вместе с перечнем не вставленного.
 
     Шаблон выбирает движок по наличию D2 и D3: чистая проверка не требует плана
     действий по нарушениям, которых нет. `template` — порядок обратной связи
     аудитора (D664): 1 — сильные стороны до нарушений, зоны роста после; 2 — обе
-    части в конце. Бот собирает шаблон 1.
+    части в конце. Бот собирает шаблон 1. `texts` — перевод текста записей, как у `build_pdf`.
     """
     env = settings(chat_id)
-    raw = run_report(
-        ["letter", f"--template={template}", "--json", *_speech_args(chat_id, env)],
-        chat_id=chat_id,
-        settings=env,
-    )
+    with _translated_state(chat_id, env, texts) as extra:
+        raw = run_report(
+            ["letter", f"--template={template}", "--json", *_speech_args(chat_id, env)],
+            chat_id=chat_id,
+            settings=env,
+            env_extra=extra,
+        )
     try:
         answer = json.loads(raw)
         text = str(answer["text"]).strip()

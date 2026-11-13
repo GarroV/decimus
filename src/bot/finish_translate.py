@@ -1,4 +1,4 @@
-"""Автоперевод комментариев при сборке отчёта (D443).
+"""Автоперевод комментариев при сборке отчёта (D443, D744).
 
 Аудитор пишет «что видно» и рекомендации на языке чек-листа (`speech_lang`), а
 язык отчёта выбирается только в конце проверки (D441) — раньше перевода
@@ -7,14 +7,14 @@
 перед сборкой PDF, той же функцией, что и кнопка под полем (D394):
 `recognize.translate.translate_text`.
 
-Что переводится: комментарий записи и текст рекомендации (`R`) — только
-свободный текст аудитора. Формулировка нарушения привязана к коду пункта и
-берётся из методики на языке отчёта (D416), её не трогаем. Сведения о визите
-здесь не переводятся: их заполняют отдельно, и кнопка у поля остаётся.
+Что переводится: комментарий и текст записи — свободный текст аудитора (текст, которым
+служит вопрос пункта, не переводится: его печатает методика, `report.finding_text`).
+Сведения о визите здесь не переводятся: их заполняют отдельно.
 
-Переведённый текст ложится в запись вместо исходного: в отчёт идёт то, что
-сохранено в проверке, а правка оригинала возможна в вычитке. Повторный запуск
-безопасен — модель возвращает текст на нужном языке без изменений.
+**Исходник не затирается** (D744): перевод в запись не пишется, возвращается вызывающему.
+Тот отдаёт его сборке PDF и письма (`report.build`) и кладёт в `translations` рядом с
+исходником, когда проверка слита (`db.finding_translations`). До D744 перевод ложился в
+запись вместо исходника, и слив записывал его под языком речи.
 
 Отказ перевода — модель недоступна, перевод слишком длинный — отчёт не роняет:
 запись остаётся как написана, число таких записей возвращается вызывающему,
@@ -24,24 +24,20 @@
 from __future__ import annotations
 
 import logging
-from typing import Literal, TypedDict
+from dataclasses import dataclass, field
 
 from src import domain
 from src.db import translate_modes
 from src.db.errors import DbError
-from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
-from src.recognize.errors import RecognizeError
-from src.recognize.translate import translate_text
+from src.report.finding_text import finding_text
 
 from .usage import chat_usage
 
 logger = logging.getLogger(__name__)
 
-#: Рекомендация партнёру (уровень `R`): её текст — свободный, а не из методики.
-ADVICE_LEVEL = "R"
-#: Предел длины записи — как у поля в мини-аппе (`web.walk_write.MAX_TEXT`).
-MAX_TEXT = 1000
+#: Поля записи со свободным текстом аудитора (`translations.field`).
+FIELDS = ("text", "comment")
 
 
 def mode_of(chat_id: int) -> str:
@@ -54,66 +50,46 @@ def mode_of(chat_id: int) -> str:
     return mode if mode in translate_modes.MODES else translate_modes.DEFAULT_MODE
 
 
-class _TranslatedFields(TypedDict, total=False):
-    comment: str
-    text: str
+@dataclass(frozen=True)
+class Translated:
+    """Переводы записей на язык отчёта: номер записи → поле → текст. Исходник не затронут."""
+
+    texts: dict[int, dict[str, str]] = field(default_factory=dict)
+    #: Сколько полей перевести не удалось (0 — всё хорошо или перевод не нужен).
+    failed: int = 0
+    #: Язык, на который переведено.
+    lang: str = ""
 
 
-def _fields(finding: domain.Finding) -> dict[Literal["comment", "text"], str]:
-    """Поля записи со свободным текстом аудитора и их значения; пустые не берём."""
-    fields: dict[Literal["comment", "text"], str] = {"comment": finding.comment}
-    if finding.level == ADVICE_LEVEL:
-        fields["text"] = finding.text
-    return {name: value for name, value in fields.items() if value.strip()}
+def translate_comments(chat_id: int, inspection: domain.Inspection) -> Translated:
+    """Перевести свободный текст записей на язык отчёта, если человек выбрал «Автоматически».
 
-
-def translate_comments(chat_id: int, inspection: domain.Inspection) -> int:
-    """Перевести комментарии на язык отчёта, если человек выбрал «Автоматически».
-
-    Возвращает, сколько полей перевести не удалось (0 — всё хорошо или перевод не
-    нужен). Язык отчёта равен языку чек-листа — переводить нечего.
+    Язык отчёта равен языку чек-листа — переводить нечего. Запись проверки не меняется.
     """
     target = inspection.report_lang
     if target == inspection.speech_lang or mode_of(chat_id) != translate_modes.AUTO:
-        return 0
+        return Translated()
     with chat_usage(chat_id):
         return _translate_findings(chat_id, inspection, target)
 
 
-def _translate_findings(chat_id: int, inspection: domain.Inspection, target: str) -> int:
+def _translate_findings(chat_id: int, inspection: domain.Inspection, target: str) -> Translated:
+    texts: dict[int, dict[str, str]] = {}
     failed = 0
     for finding in inspection.findings:
-        done: _TranslatedFields = {}
-        for name, source in _fields(finding).items():
-            try:
-                translated = translate_text(source, lang=target)
-            except RecognizeError:
-                logger.warning(
-                    "Автоперевод: запись #%s чата %s не переведена",
-                    finding.n,
-                    log_id(chat_id),
-                    exc_info=True,
-                )
-                failed += 1
+        done: dict[str, str] = {}
+        for name in FIELDS:
+            source = getattr(finding, name)
+            if not source.strip():
                 continue
-            if len(translated) > MAX_TEXT:
+            wording = finding_text(source, source_lang=inspection.speech_lang, lang=target)
+            if wording.origin == "failed":
                 logger.warning(
-                    "Автоперевод: запись #%s чата %s — перевод слишком длинный",
-                    finding.n,
-                    log_id(chat_id),
+                    "Автоперевод: запись #%s чата %s не переведена", finding.n, log_id(chat_id)
                 )
                 failed += 1
-            elif translated != source:
-                done[name] = translated
+            elif wording.origin == "new":
+                done[name] = wording.text
         if done:
-            try:
-                domain.edit_finding(chat_id, finding.n, zone_by_person=False, repeat=None, **done)
-            except DomainError:
-                logger.warning(
-                    "Автоперевод: запись #%s чата %s не сохранилась",
-                    finding.n,
-                    log_id(chat_id),
-                    exc_info=True,
-                )
-                failed += len(done)
-    return failed
+            texts[finding.n] = done
+    return Translated(texts, failed, target)

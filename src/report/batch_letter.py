@@ -36,6 +36,7 @@ from typing import Any
 from ..db.models import InspectionDetail
 from .batch_letter_texts import say
 from .engine_call import clean as _clean
+from .finding_text import localize
 from .letters import (
     BLANK_TEXT_FIELD,
     FEEDBACK_LANG_FIELD,
@@ -204,6 +205,8 @@ def piece_for(detail: InspectionDetail, *, lang: str, papers: Papers) -> Piece:
     """
     try:
         refuse_uploaded(detail)
+        # Слова аудитора — на языке письма; исходник в базе остаётся (D744, #1619).
+        detail = localize(detail, lang).detail
         каталог, _ = _methodology(detail.inspection.checklist_version, papers)
         вход = state_json(detail, lang=lang)
         with tempfile.TemporaryDirectory(prefix="mcp-batch-letter-") as рядом:

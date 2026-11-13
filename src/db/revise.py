@@ -93,6 +93,11 @@ set code = %(code)s, level = %(level)s, zone = %(zone)s, zone_unusual = %(zone_u
 where id = %(finding)s and inspection_id = %(id)s
 """
 
+_DROP_STALE_TRANSLATIONS_SQL = """
+delete from translations
+where entity_type = 'finding' and entity_id = %s and field = 'text' and lang <> %s
+"""
+
 # `origin <> 'legacy'`: оценку исторической движок не пишет никогда (D332).
 # Заслон здесь второй — первый стоит в `_apply` до движка, третий в базе
 # (`inspections_legacy_score_as_is`, 0042).
@@ -248,6 +253,9 @@ def _apply(
             _INSERT_TRANSLATION_SQL,
             ("finding", запись, "text", язык_речи, revision.text.strip()),
         )
+        # Исходник правлен — переводы прежнего текста на другие языки устарели (D744): они
+        # переведутся заново из нового исходника при следующей сборке отчёта или письма.
+        cur.execute(_DROP_STALE_TRANSLATIONS_SQL, (запись, язык_речи))
         _write_score(cur, ident, tenant, score)
         прежняя = next((f for f in detail.findings if f.id == запись), None)
         record_edit(

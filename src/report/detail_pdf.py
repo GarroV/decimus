@@ -21,6 +21,7 @@ from pathlib import Path
 
 from ..db.models import InspectionDetail
 from .engine_call import clean as _clean
+from .finding_text import localize
 from .letters import (
     REPORT_SCRIPT,
     LetterError,
@@ -46,6 +47,8 @@ def build_bytes(
 ) -> bytes:
     """Собрать PDF по записанной проверке и вернуть его байты — или `LetterError`."""
     язык = _lang(detail, lang)
+    # Слова аудитора — на языке отчёта; исходник в базе остаётся (D744).
+    detail = localize(detail, язык).detail
     каталог, _ = _methodology(detail.inspection.checklist_version, papers)
     with tempfile.TemporaryDirectory(prefix="mcp-report-") as рядом:
         состояние = Path(рядом) / "inspection.json"
