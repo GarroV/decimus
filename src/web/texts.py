@@ -320,7 +320,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Выездные проверки пиццерий Dodo",
         "en": "Dodo pizzeria field inspections",
     },
-    "auth.login": {"ru": "Логин", "en": "Login"},
+    "auth.login": {"ru": "Логин или почта", "en": "Login or email"},
     "auth.password": {"ru": "Пароль", "en": "Password"},
     "auth.submit": {"ru": "Войти", "en": "Sign in"},
     # Вход через учётку Google (T332). Кнопка РЯДОМ с паролем, а не вместо:

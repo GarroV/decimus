@@ -437,6 +437,25 @@ def admit_attempt(*, tenant: str, address: str, login: str) -> Attempt:
     return Attempt(admitted=True, verdict=_строже(стало))
 
 
+def charge_login(*, tenant: str, login: str) -> Attempt:
+    """Скрытый счётчик учётки: записать попытку только на ключ её логина.
+
+    Для входа по почте: видимый приговор формы идёт по введённому значению
+    (`admit_attempt`), а эта запись не даёт логину и почте одного человека двух
+    независимых лимитов. `admitted=False` — по логину лимит уже исчерпан; форма
+    отвечает тем же «не подошли», а не «заперто» (иначе блокировка выдала бы,
+    что эта почта привязана), и scrypt всё равно считает.
+    """
+    ключи = ((SCOPE_LOGIN, key_fingerprint(login)),)
+    with attempt_transaction(tenant=tenant, keys=ключи) as строки:
+        scope, отпечаток = ключи[0]
+        запрет = verdict_of(строки.load(scope=scope, fingerprint=отпечаток), scope=scope)
+        if запрет.locked:
+            return Attempt(admitted=False, verdict=запрет)
+        стало = verdict_of(строки.bump(scope=scope, fingerprint=отпечаток), scope=scope)
+    return Attempt(admitted=True, verdict=стало)
+
+
 def note_success(*, tenant: str, login: str) -> None:
     """Забыть неудачи логина: человек доказал, что он тот самый.
 

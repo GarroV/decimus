@@ -37,6 +37,7 @@ from src.db.web_access import (  # noqa: E402
     freeze_account,
     list_accounts,
     list_spaces,
+    login_key,
     new_session_token,
     normalize_email,
     open_session,
@@ -46,6 +47,12 @@ from src.db.web_access import (  # noqa: E402
     session_fingerprint,
     set_email,
     set_role,
+)
+from src.db.web_throttle import (  # noqa: E402
+    FAILURES_BEFORE_LOCK,
+    SCOPE_LOGIN,
+    admit_attempt,
+    charge_login,
 )
 
 pytestmark = requires_db
@@ -124,6 +131,69 @@ def test_отключённая_учётка_не_опознаётся(обе_р
     create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     assert freeze_account("director", tenant=ТЕНАНТ) is True
     assert authenticate("director", ПАРОЛЬ) is None
+
+
+# --- вход по почте вместо логина (13.11.2026) --------------------------------
+
+
+def test_вход_по_почте_пускает_в_ту_же_учётку(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    учётка = authenticate("p@example.org", ПАРОЛЬ)
+    assert учётка is not None
+    assert учётка.login == "partner"
+    assert учётка.tenant == ЧУЖОЙ
+
+
+def test_вход_по_почте_не_зависит_от_регистра_и_краёв(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    учётка = authenticate("  P@Example.ORG ", ПАРОЛЬ)
+    assert учётка is not None and учётка.login == "partner"
+
+
+def test_вход_по_почте_с_чужим_паролем_отказывает(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    assert authenticate("p@example.org", ПАРОЛЬ + "!") is None
+
+
+def test_незнакомая_почта_не_опознаётся(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    assert authenticate("other@example.org", ПАРОЛЬ) is None
+
+
+def test_почта_без_привязки_к_учётке_не_пускает(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    assert authenticate("p@example.org", ПАРОЛЬ) is None
+
+
+def test_замороженная_учётка_по_почте_не_входит(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    assert freeze_account("partner", tenant=ЧУЖОЙ) is True
+    assert authenticate("p@example.org", ПАРОЛЬ) is None
+
+
+def test_скрытый_счётчик_почты_исчерпывает_лимит_логина(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    порог = FAILURES_BEFORE_LOCK[SCOPE_LOGIN]
+    for _ in range(порог):
+        assert charge_login(tenant=ТЕНАНТ, login=login_key("P@example.org")).admitted
+    assert not charge_login(tenant=ТЕНАНТ, login="partner").admitted
+    assert not admit_attempt(tenant=ТЕНАНТ, address="203.0.113.8", login="partner").admitted
+
+
+def test_ключ_счётчика_для_неизвестной_и_замороженной_почты_как_введён(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    assert login_key("nobody@example.org") == "nobody@example.org"
+    assert login_key("partner") == "partner"
+    assert login_key(" P@Example.org") == "partner"
+    freeze_account("partner", tenant=ЧУЖОЙ)
+    assert login_key("p@example.org") == "p@example.org"
 
 
 # --- логин единый на систему (D282) ------------------------------------------

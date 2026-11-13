@@ -52,10 +52,12 @@ from src.db.web_access import (
     claim_google_sub,
     close_session,
     find_by_email,
+    login_key,
     open_session,
+    password_hash,
     resolve_session,
 )
-from src.db.web_throttle import Verdict, admit_attempt, note_success
+from src.db.web_throttle import Verdict, admit_attempt, charge_login, note_success
 from src.domain import peek
 from src.domain.journal import (
     METHOD_GOOGLE,
@@ -321,6 +323,23 @@ def current_reach() -> Reach:
     return охват
 
 
+def _сверить(ввод: str, пароль: str, stand: str) -> Account | None:
+    """Логин или почта + пароль → учётка. Для почты — ещё и скрытый счётчик учётки.
+
+    Видимый лимит формы (`admit_attempt`) уже взят по введённому значению: так
+    блокировка ничего не рассказывает о том, привязана ли почта. Если почта
+    разрешилась в учётку, попытка списывается и на ключ её логина — логин и
+    почта одного человека не получают двух лимитов. Лимит логина исчерпан —
+    отказ тот же «не подошли» даже при верном пароле, а scrypt всё равно
+    считается: время не отличает почту привязанную от непривязанной.
+    """
+    логин = login_key(ввод)
+    if логин != ввод and not charge_login(tenant=stand, login=логин).admitted:
+        password_hash(пароль)
+        return None
+    return authenticate(ввод, пароль)
+
+
 def install(app: Flask, conf: Settings) -> None:
     """Повесить заслон и зарегистрировать вход с выходом."""
     signer = URLSafeTimedSerializer(
@@ -495,7 +514,8 @@ def install(app: Flask, conf: Settings) -> None:
                 result=RESULT_RATE_LIMITED,
             )
             return заперто(попытка.verdict)
-        account = authenticate(имя, request.form.get("password") or "")
+        пароль = request.form.get("password") or ""
+        account = _сверить(имя, пароль, рубеж)
         if (
             account is not None
             and google is not None
@@ -549,6 +569,7 @@ def install(app: Flask, conf: Settings) -> None:
             )
             return страница, 401
         note_success(tenant=рубеж, login=имя)
+        note_success(tenant=рубеж, login=account.login)
         # Первая ступень пройдена. Есть второй способ — сессии пока нет (D463).
         вторая = second_step.begin(
             account, method=METHOD_PASSWORD, next_path=safe_next(request.form.get("next"))
