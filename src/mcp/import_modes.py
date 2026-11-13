@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..db.models import LEGACY_VERSION_PREFIX
 from .checklist import current_version
-from .checklist_layout import Store, locate
+from .checklist_layout import CURRENT_LINK, Store, locate
 from .errors import ChecklistError, ToolError
 
 if TYPE_CHECKING:
@@ -196,15 +196,19 @@ def soft_warnings(store: Store, *, code: str | None, zone: str | None) -> list[s
     глянуть, не опечатка ли это.
     """
     предупреждения: list[str] = []
+    # Действующая методика — опубликованное издание в хранилище, а не `AUDIT_DATA_DIR`:
+    # по нему идут новые проверки (#1633). Хранилище ещё не заведено — каталог из окружения.
+    действующая = store.home / CURRENT_LINK
+    каталог = действующая if действующая.is_dir() else store.live
     if code is not None:
-        коды = _ids(store.live / "checklist.csv", "id")
+        коды = _ids(каталог / "checklist.csv", "id")
         if коды is not None and code not in коды:
             предупреждения.append(
                 f"code {code} is not in the current checklist — kept as given (old "
                 f"checklists have their own codes); check it is not a typo"
             )
     if zone is not None:
-        зоны = _ids(store.live / "zones.csv", "id")
+        зоны = _ids(каталог / "zones.csv", "id")
         if зоны is not None and zone not in зоны:
             предупреждения.append(
                 f"zone {zone} is not in the current zone directory — kept as given; check it "

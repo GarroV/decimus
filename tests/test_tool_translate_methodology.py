@@ -14,10 +14,18 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from mcp_checklist_harness import build_edition
+from mcp_checklist_harness import build_edition, build_methodology
 
 from src.domain.models import REPORT_LANGS
-from src.mcp.checklist import Store, read_items, read_journal, tip_version, versions
+from src.mcp.checklist import (
+    Store,
+    current_version,
+    read_items,
+    read_journal,
+    tip_version,
+    versions,
+)
+from src.mcp.errors import ChecklistError
 from tools import translate_methodology as tool
 
 ДЕНЬ = date(2026, 9, 3)
@@ -95,7 +103,8 @@ def test_процесс_уходит_модели_один_раз_а_не_на_�
 def test_переведённое_не_затирается_без_force(store: Store) -> None:
     _edit(store, _Фальшивая())
     второй = _Фальшивая()
-    assert _edit(store, второй) is None, "переводить нечего — издания быть не должно"
+    # Основа названа явно: по умолчанию берётся действующее издание, а оно ещё не переведено.
+    assert _edit(store, второй, base=tip_version(store)) is None, "издания быть не должно"
     assert second_calls(второй) == 0
     assert len(versions(store)) == 2, "основа и одно переведённое издание"
 
@@ -168,6 +177,54 @@ def test_класс_в_начале_вопроса_не_уходит_модел�
         monkey.undo()
     assert показано == ["Пол чистый"]
     assert ответ["question:A1"] == "(D1, D2) T:Пол чистый"
+
+
+@pytest.mark.parametrize("разделитель", ["", " ", "  ", "\t"])
+def test_класс_ставится_обратно_с_тем_же_разделителем(разделитель: str) -> None:
+    """Сколько пробелов было после «(D1, D2)», столько и вернулось: ни съеденного, ни
+    выдуманного (#1630). Без пробела в источнике — без пробела и в переводе."""
+
+    class Ответ:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self.payload = payload
+
+    def фальшивая_модель(**kw: object) -> Ответ:
+        вход = json.loads(str(kw["question"]))
+        return Ответ({"items": [{"id": r["id"], "text": f"  T:{r['ru']}  "} for r in вход]})
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(tool, "ask_model", фальшивая_модель)
+    try:
+        run = tool.model_translator(settings=_Настройки())  # type: ignore[arg-type]
+        ответ = run([tool.Item("question:A1", f"(D1, D2){разделитель}Пол чистый", "")], "tr")
+    finally:
+        monkey.undo()
+    assert ответ["question:A1"] == f"(D1, D2){разделитель}T:Пол чистый"
+
+
+def test_основа_по_умолчанию_действующее_издание_а_не_последнее_в_журнале(store: Store) -> None:
+    действующее = current_version(store)
+    _edit(store, _Фальшивая())  # не опубликовано: последнее в журнале, но не действующее
+    assert tip_version(store) != действующее
+
+    ещё = _Фальшивая()
+    # От последнего в журнале переводить было бы нечего (там всё переведено) — модель не
+    # позвали бы и издания не было бы. От действующего есть что переводить; получается то же
+    # издание, что уже записано, — хранилище отказывает и называет основу.
+    with pytest.raises(ChecklistError, match=действующее):
+        _edit(store, ещё)
+    assert ещё.shown, "модели не показано ничего: основа взята не действующая"
+
+
+def test_основа_без_имени_набора_даёт_подсказку_а_не_трейсбек(tmp_path: Path) -> None:
+    live = build_methodology(tmp_path / "live-no-name")
+    безымянное = Store(root=tmp_path / "store-no-name", live=live)
+
+    with pytest.raises(tool.TranslateError, match="--version-name"):
+        _edit(безымянное, _Фальшивая())
+
+    # С названным набором то же издание принимается.
+    assert _edit(безымянное, _Фальшивая(), version_name="imf") is not None
 
 
 class _Настройки:

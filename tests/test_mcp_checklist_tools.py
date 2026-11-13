@@ -323,15 +323,35 @@ def test_публикация_делает_версию_действующей(t
     assert current_version(рабочее) == новая
 
 
-def test_публикация_которую_движок_не_увидит_это_отказ(store: Store) -> None:
-    """Молчаливый сбой худшего вида: агент говорит «опубликовано», а проверки
-    продолжают считаться по прежней методике."""
+def test_публикация_идёт_когда_боту_достаточно_хранилища(
+    store: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """С волны 3 бот берёт издание из указателя хранилища: `AUDIT_DATA_DIR` — обычный каталог
+    и указателем не является, а публиковать можно (#1633)."""
+    monkeypatch.setenv("MCP_CHECKLIST_STORE", str(store.root))
     новая = _завести(store, code="TST01")["version"]
+
+    ответ = инструменты.publish_checklist_version(tenant=АРЕНДАТОР, store=store, version=новая)
+
+    assert ответ["published"] == новая
+    assert current_version(store) == новая
+
+
+def test_публикация_которую_бот_не_увидит_это_отказ(
+    store: Store, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Молчаливый сбой худшего вида: агент говорит «опубликовано», а проверки
+    продолжают считаться по прежней методике. Бот читает не то хранилище, куда пишет правка."""
+    новая = _завести(store, code="TST01")["version"]
+    прежняя = current_version(store)
+    monkeypatch.setenv("MCP_CHECKLIST_STORE", str(tmp_path / "другое-хранилище"))
 
     with pytest.raises(ChecklistError) as отказ:
         инструменты.publish_checklist_version(tenant=АРЕНДАТОР, store=store, version=новая)
 
-    assert "AUDIT_DATA_DIR" in str(отказ.value)
+    assert отказ.value.refusal == "bot_cannot_see_store"
+    assert "MCP_CHECKLIST_STORE" in str(отказ.value)
+    assert current_version(store) == прежняя  # указатель не тронут
 
 
 # --- настройка существующей зоны (T313) ---------------------------------------

@@ -55,7 +55,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-from ..domain.config import DATA_FILES, REQUIRED_DATA_FILES
+from ..domain.config import CHECKLIST_STORE_VAR, DATA_FILES, REQUIRED_DATA_FILES
 from ..domain.criteria import criteria_section
 from ..domain.engine import ENGINE_ATTEMPTS, pause_before_retry
 from ..domain.version import (
@@ -1112,35 +1112,68 @@ def _store_refuses(
     return refusal
 
 
+def _bot_blind_spot(store: Store) -> str | None:
+    """Почему бот НЕ увидит публикацию в этом хранилище, — или `None`, если увидит.
+
+    С волны 3 (#423) бот берёт издание новой проверки из указателя `current` самого
+    чек-листа в хранилище (`bot_checklists.available` / `source_for`), а не из
+    `AUDIT_DATA_DIR`: переставленный указатель доходит до новых проверок, где бы ни
+    лежал `AUDIT_DATA_DIR`. Поэтому «`AUDIT_DATA_DIR` не равен указателю» — больше не беда.
+    Беда в двух случаях, и только они здесь отказ:
+
+    * хранилище, в которое пишет эта правка, — не то, что названо в `MCP_CHECKLIST_STORE`
+      окружения процесса: бот читает названное там, и публикация лежала бы в стороне;
+    * чек-лист хранилище не знает (`known`) или у него нет указателя-каталога: бот при
+      таком хранилище откатывается на «один `bizdev` из `AUDIT_DATA_DIR`» и издания не
+      увидит.
+
+    Переменная не задана вовсе — говорить за бота нечем, и это не отказ: сам сервер без неё
+    правку методики не принимает, а в тестах её нет.
+    """
+    named = (os.environ.get(CHECKLIST_STORE_VAR) or "").strip()
+    if named and os.path.realpath(os.path.expanduser(named)) != os.path.realpath(store.root):
+        _to_log(
+            "бот читает другое хранилище",
+            MCP_CHECKLIST_STORE=named,
+            this_store=store.root,
+        )
+        return "store_differs"
+    if (store.space, store.code) not in known(store.root) or not _link(store).is_dir():
+        _to_log("бот не найдёт чек-лист в хранилище", store=store.root, checklist=store.home)
+        return "checklist_unknown"
+    return None
+
+
 def publish(store: Store, *, tenant: str, version: str) -> dict[str, object]:
     """Сделать версию действующей: перестановка указателя, а не перезапись методики.
 
-    Отказ, если движок читает не хранилище. Публикация, которой движок не
-    увидит, — молчаливый сбой худшего вида: агент говорит «опубликовано», а
-    проверки продолжают считаться по прежней методике.
+    Отказ, если бот публикации НЕ увидит: хранилище, куда пишет правка, — не то, что
+    названо в `MCP_CHECKLIST_STORE`, или чек-листа в нём бот не найдёт (`_bot_blind_spot`).
+    Публикация, которой никто не увидит, — молчаливый сбой худшего вида: агент говорит
+    «опубликовано», а проверки продолжают считаться по прежней методике.
+
+    `AUDIT_DATA_DIR` отказом больше не служит. С волны 3 новая проверка берёт издание из
+    указателя хранилища, а не из этого каталога; ручная правка файлов в `AUDIT_DATA_DIR`,
+    наоборот, в новые проверки уже не попадает (docs/10-checklist-configuration.md).
     """
     прежняя = _ensure(store)
     цель = _version_dir(store, version)
-    # Сторож стоит только над чек-листом, ПРИМЕНЁННЫМ к проду. У остальных
-    # движок методику и не читает — это их нормальное состояние, а не беда:
-    # издание черновика публикуется внутри чек-листа и прода не касается.
+    # Сторож стоит над КАЖДЫМ чек-листом: бот читает из хранилища не только применённый к
+    # проду, но и всё, что открыто галочкой «в боте».
     в_проде = applied(store.root) == (store.space, store.code)
-    если_читает = os.path.realpath(store.live)
-    если_указатель = os.path.realpath(_link(store))
-    if в_проде and если_читает != если_указатель:
-        _to_log(
-            "движок читает методику не из хранилища версий",
-            AUDIT_DATA_DIR=store.live,
-            MCP_CHECKLIST_STORE=store.root,
-        )
+    причина = _bot_blind_spot(store)
+    if причина is not None:
         raise ChecklistError(
-            f"Движок читает методику не из хранилища версий: AUDIT_DATA_DIR указывает на "
-            f"обычный каталог, а не на указатель «{CURRENT_LINK}» внутри хранилища "
-            f"MCP_CHECKLIST_STORE. Публикация переставляет этот указатель — движок её не "
-            f"увидит, и проверки продолжат считаться по прежней методике. Чтобы публикация "
-            f"работала, AUDIT_DATA_DIR должен указывать на сам указатель «{CURRENT_LINK}» "
-            f"внутри хранилища. {IN_LOG}",
-            refusal="engine_reads_outside_store",
+            f"Бот не увидит эту публикацию: он читает издания из указателя «{CURRENT_LINK}» "
+            f"чек-листа в хранилище, названном в MCP_CHECKLIST_STORE, а здесь "
+            + (
+                "правка пишет в другое хранилище, чем названо в окружении процесса. "
+                if причина == "store_differs"
+                else "хранилище этот чек-лист не знает или указателя у него нет. "
+            )
+            + f"Публикация переставила бы указатель, а проверки продолжили бы считаться по "
+            f"прежней методике. {IN_LOG}",
+            refusal="bot_cannot_see_store",
             params={"link": CURRENT_LINK},
         )
     _point_at(store, цель.name)
