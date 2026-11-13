@@ -4,8 +4,8 @@
   Итог (подключено ли что-нибудь) — сверху, под ним три способа, у каждого свои строки.
 
   Менять способы можно только сразу после входа (не позже 10 минут): старее — сверху
-  кнопка «Войти заново», а действия не показаны. Админу и главному админу без способа
-  сюда ведёт заслон, остальное для них закрыто.
+  кнопка «Войти заново», а действия не показаны. Партнёру подключение предлагается
+  добровольно внутри системы и не блокирует доступ к разделам.
 
   Секреты: QR и ключ приложения — пока приложение не подтверждено; резервные коды — один
   раз, ответом на выпуск. В адрес они не попадают.
@@ -16,7 +16,7 @@
 <div class="shead__main">
       <div class="info-row">
         <h1 class="shead__title">{{ t('sf.sec.title') }}</h1>
-        {{ info_tip(t('tip.hint'), '', [t('sf.sec.sub'), t('sf.sec.sub.fallback')], 'security') }}
+        {{ info_tip(t('tip.hint'), '', [t('sf.partner.sub')] if tenant != 'HQ' else [t('sf.sec.sub'), t('sf.sec.sub.fallback')], 'security') }}
       </div>
     </div>
 </header>{% endblock %}
@@ -41,7 +41,7 @@
     {% if show_required or (required and not enrolled) %}
       <div class="note note--warn" role="alert"><div class="note__text">{{ t('sf.sec.required') }}</div></div>
     {% elif not enrolled %}
-      <div class="note"><div class="note__text">{{ t('sf.sec.optional') }}</div></div>
+      <div class="note"><div class="note__text">{{ t('sf.partner.optional' if tenant != 'HQ' else 'sf.sec.optional') }}</div></div>
     {% endif %}
     {% if not fresh and not show_prove %}
       <div class="note note--warn" role="alert"><div class="note__text">{{ t('sf.sec.stale') }}</div></div>

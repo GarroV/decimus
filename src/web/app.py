@@ -391,17 +391,30 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Touch ID на этом устройстве (D485): после входа паролем или Google браузер без
             # метки сам просит сохранить ключ; здесь — только допуск и адреса, решает passkey.js.
             "passkey_here": _passkey_here(account, conf),
+            "security_reminder": (
+                account is not None
+                and canonical_tenant(account.tenant) != HQ_TENANT
+                and not account.has_second_factor
+                and request.path != SECURITY_PATH
+                and not conf.demo
+                and account.real is None
+            ),
         }
 
 
 def _passkey_here(account: Any, conf: Settings) -> dict[str, str] | None:
     """Адреса и номер сессии для автосохранения Touch ID; `None` — не предлагать.
 
-    Предлагается ролям веба, кроме гостя (`passkey_auto_enroll`), пока вход свежий (окно
+    Предлагается ролям веба УК, кроме гостя (`passkey_auto_enroll`), пока вход свежий (окно
     подключения у сервера короткое, а предложение стоит сразу после входа) и не на самом
     экране защиты — там своя кнопка. Ключи выключены на площадке — не предлагать.
     """
-    if account is None or request.path == SECURITY_PATH or not conf.webauthn_enabled:
+    if (
+        account is None
+        or canonical_tenant(account.tenant) != HQ_TENANT
+        or request.path == SECURITY_PATH
+        or not conf.webauthn_enabled
+    ):
         return None
     if not passkey_auto_enroll(str(account.role)) or not is_fresh(account):
         return None

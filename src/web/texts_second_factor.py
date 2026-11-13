@@ -7,6 +7,33 @@
 from __future__ import annotations
 
 SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
+    "sf.reminder.title": {"ru": "Защитите свою учётку", "en": "Protect your account"},
+    "sf.reminder.text": {
+        "ru": "Подключите второй фактор — код из приложения на телефоне. После подключения "
+        "он будет нужен при входе вместе с паролем. Можно настроить позже в «Вход и защита».",
+        "en": "Connect a second factor: a code from an app on your phone. Once connected, "
+        "you will need it alongside your password to sign in. You can set it up later "
+        "under Sign-in and protection.",
+    },
+    "sf.reminder.setup": {"ru": "Подключить защиту", "en": "Set up protection"},
+    "sf.reminder.later": {"ru": "Позже", "en": "Later"},
+    "sf.partner.sub": {
+        "ru": "Подключите приложение-аутентификатор. После подключения при входе "
+        "понадобятся пароль и код из приложения. Сохраните резервные коды на случай "
+        "потери телефона.",
+        "en": "Connect an authenticator app. Once connected, sign-in requires your password "
+        "and an app code. Save backup codes in case you lose your phone.",
+    },
+    "sf.partner.optional": {
+        "ru": "Защита пока не подключена. Вы можете подключить её сейчас или продолжить работу "
+        "и вернуться позже.",
+        "en": "Protection is not set up yet. You can connect it now or keep working "
+        "and return later.",
+    },
+    "sf.partner.card": {
+        "ru": "Второй фактор — приложение-аутентификатор и резервные коды.",
+        "en": "Second factor: authenticator app and backup codes.",
+    },
     # --- «Подтвердите вход» после первой ступени ------------------------------------
     "sf.step.title": {"ru": "Подтвердите вход", "en": "Confirm sign-in"},
     "sf.step.lead": {
