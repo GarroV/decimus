@@ -1123,6 +1123,24 @@ def authenticate(login: str, password: str) -> Account | None:
     )
 
 
+def login_key(ввод: str) -> str:
+    """Ключ счётчика попыток для введённого в поле «Логин или почта».
+
+    Ввод с «@» разрешается в логин живой учётки с такой почтой: счётчик ведётся
+    по логину, поэтому почта и логин одного человека — один лимит, а не два
+    (иначе перебор получал бы вдвое больше попыток). Нет такой почты, учётка
+    заморожена или в поле логин — ввод как введён, чтобы отказы оставались
+    одинаковыми и по ключу ничего не рассказывали. Это один дешёвый запрос по
+    индексу; зовётся до `authenticate`, на scrypt не влияет.
+    """
+    if "@" not in ввод:
+        return ввод
+    with _connected("найти учётку") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_USER_BY_EMAIL_FOR_LOGIN_SQL, (ввод.strip().lower(),))
+        row = cur.fetchone()
+    return ввод if row is None else str(row[1])
+
+
 def open_session(
     account: Account,
     *,

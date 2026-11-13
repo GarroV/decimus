@@ -37,6 +37,7 @@ from src.db.web_access import (  # noqa: E402
     freeze_account,
     list_accounts,
     list_spaces,
+    login_key,
     new_session_token,
     normalize_email,
     open_session,
@@ -47,6 +48,7 @@ from src.db.web_access import (  # noqa: E402
     set_email,
     set_role,
 )
+from src.db.web_throttle import FAILURES_BEFORE_LOCK, SCOPE_LOGIN, admit_attempt  # noqa: E402
 
 pytestmark = requires_db
 
@@ -167,6 +169,26 @@ def test_замороженная_учётка_по_почте_не_входит
     set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
     assert freeze_account("partner", tenant=ЧУЖОЙ) is True
     assert authenticate("p@example.org", ПАРОЛЬ) is None
+
+
+def test_почта_и_логин_одного_человека_делят_один_лимит_попыток(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    порог = FAILURES_BEFORE_LOCK[SCOPE_LOGIN]
+    for _ in range(порог):
+        admit_attempt(tenant=ТЕНАНТ, address="203.0.113.7", login=login_key("P@example.org"))
+    по_логину = admit_attempt(tenant=ТЕНАНТ, address="203.0.113.8", login=login_key("partner"))
+    assert not по_логину.admitted, "почта и логин одного человека дали два отдельных лимита"
+
+
+def test_ключ_счётчика_для_неизвестной_и_замороженной_почты_как_введён(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    assert login_key("nobody@example.org") == "nobody@example.org"
+    assert login_key("partner") == "partner"
+    assert login_key(" P@Example.org") == "partner"
+    freeze_account("partner", tenant=ЧУЖОЙ)
+    assert login_key("p@example.org") == "p@example.org"
 
 
 # --- логин единый на систему (D282) ------------------------------------------

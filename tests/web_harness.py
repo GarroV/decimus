@@ -245,6 +245,7 @@ def подменить_двери(
         return True
 
     monkeypatch.setattr(auth, "authenticate", _authenticate)
+    monkeypatch.setattr(auth, "login_key", lambda ввод: ввод)
     monkeypatch.setattr(auth, "open_session", _open)
     monkeypatch.setattr(auth, "resolve_session", _resolve)
     monkeypatch.setattr(auth, "close_session", _close)

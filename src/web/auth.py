@@ -52,6 +52,7 @@ from src.db.web_access import (
     claim_google_sub,
     close_session,
     find_by_email,
+    login_key,
     open_session,
     resolve_session,
 )
@@ -477,7 +478,10 @@ def install(app: Flask, conf: Settings) -> None:
                 next_path=safe_next(request.args.get("next")),
             )
         refuse_foreign_origin()
-        имя = request.form.get("login") or ""
+        введено = request.form.get("login") or ""
+        # Счётчик и журнал — по логину учётки, если ввод (почта) в неё
+        # разрешился: логин и почта одного человека делят один лимит.
+        имя = login_key(введено)
         адрес = client_address(trusted_proxies=conf.trusted_proxies)
         # ОДНИМ движением: пустить ли к сверке пароля и записать саму попытку.
         # Раздельные «спросить» и «записать» пропускали мимо порога столько
@@ -495,7 +499,7 @@ def install(app: Flask, conf: Settings) -> None:
                 result=RESULT_RATE_LIMITED,
             )
             return заперто(попытка.verdict)
-        account = authenticate(имя, request.form.get("password") or "")
+        account = authenticate(введено, request.form.get("password") or "")
         if (
             account is not None
             and google is not None
