@@ -40,6 +40,45 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Первая проверка пройдена. Подтвердите, что это вы: ключом доступа или кодом.",
         "en": "The first check is done. Confirm it is you with a passkey or a code.",
     },
+    "sf.step.lead_key": {
+        "ru": "Подтвердите вход сохранённым ключом доступа.",
+        "en": "Confirm sign-in with your saved passkey.",
+    },
+    "sf.step.passkey_origin": {
+        "ru": "Ключ привязан к адресу {origin}. Откройте его, чтобы войти ключом.",
+        "en": "The passkey belongs to {origin}. Open that address to sign in with it.",
+    },
+    "sf.step.canonical": {"ru": "Открыть адрес ключа", "en": "Open the passkey address"},
+    "sf.step.passkey_hint_no_code": {
+        "ru": "Ключ должен быть доступен этому браузеру. Если он сохранён в другом браузере "
+        "или профиле, попробуйте войти там.",
+        "en": "The passkey must be available to this browser. If you saved it in another "
+        "browser or profile, try signing in there.",
+    },
+    "sf.step.passkey_failed_no_code": {
+        "ru": "Подтверждение не завершено. Нажмите «Войти ключом доступа» ещё раз. "
+        "Если ключ недоступен, обратитесь к главному админу для восстановления входа.",
+        "en": "Confirmation was not completed. Press Use a passkey again. If the passkey "
+        "is unavailable, ask a superadmin to restore access.",
+    },
+    "sf.step.passkey_unavailable_no_code": {
+        "ru": "Ключи доступа в этом браузере недоступны. Откройте браузер, где сохранён ключ. "
+        "Нет доступа к нему — обратитесь к главному админу.",
+        "en": "Passkeys are unavailable in this browser. Open the browser where you saved "
+        "the passkey. If you cannot access it, ask a superadmin.",
+    },
+    "sf.step.passkey_unavailable_first": {
+        "ru": "Этот браузер не поддерживает ключи доступа. Откройте Decimus в Safari или Chrome "
+        "с поддержкой ключей. Если это невозможно, обратитесь к главному админу.",
+        "en": "This browser does not support passkeys. Open Decimus in Safari or Chrome with "
+        "passkey support. If this is not possible, ask a superadmin.",
+    },
+    "sf.step.passkey_off_no_code": {
+        "ru": "Ключи доступа на этом адресе не включены, а запасной способ не подключён. "
+        "Обратитесь к главному админу для восстановления входа.",
+        "en": "Passkeys are not enabled at this address, and no fallback is connected. "
+        "Ask a superadmin to restore access.",
+    },
     "sf.step.who": {"ru": "Учётка: {login}", "en": "Account: {login}"},
     "sf.step.passkey": {"ru": "Войти ключом доступа", "en": "Use a passkey"},
     "sf.step.touch": {"ru": "Подтвердить отпечатком", "en": "Confirm with fingerprint"},
@@ -53,6 +92,12 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
         "кнопку ещё раз или введите код.",
         "en": "The fingerprint was not saved: the prompt was closed or the device did not "
         "fit. Press the button again or enter a code.",
+    },
+    "sf.step.create_failed_no_code": {
+        "ru": "Ключ не сохранён. Нажмите «Подтвердить отпечатком» ещё раз. Если устройство "
+        "не поддерживает ключи доступа, обратитесь к главному админу.",
+        "en": "The passkey was not saved. Press Confirm with fingerprint again. If the device "
+        "does not support passkeys, ask a superadmin.",
     },
     "sf.step.nomethod_help": {
         "ru": "Не получается? Откройте Decimus в Safari или Chrome на устройстве с Touch ID, "
