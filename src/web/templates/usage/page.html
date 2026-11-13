@@ -103,10 +103,12 @@
           </div>
         </section>
 
-        {% macro table(title, lines, label_of, note=none, href_of=none) %}
+        {% macro table(title, lines, label_of, note=none, href_of=none, loop_key='t') %}
           <section class="usec">
-            <h2 class="usec__title">{{ title }}</h2>
-            {% if note %}<p class="usec__note">{{ note }}</p>{% endif %}
+            <div class="info-row usec__head">
+              <h2 class="usec__title">{{ title }}</h2>
+              {% if note %}{{ info_tip(t('tip.hint'), '', [note], 'usage-' ~ loop_key) }}{% endif %}
+            </div>
             <ul class="jlist ulist">
               <li class="jrow jrow--head" aria-hidden="true">
                 <span>{{ t('usage.col.name') }}</span><span>{{ t('usage.col.calls') }}</span><span>{{ t('usage.col.tokens') }}</span><span>{{ t('usage.col.cost') }}</span>
@@ -123,8 +125,8 @@
           </section>
         {% endmacro %}
         {{ table(t('usage.kinds.title'), kinds, kind_label) }}
-        {{ table(t('usage.people.title'), people, person_label, t('usage.person.unknown_hint') if has_system_calls else none) }}
-        {{ table(t('usage.inspections.title'), inspections, inspection_label, t('usage.inspections.note'), inspection_href) }}
+        {{ table(t('usage.people.title'), people, person_label, t('usage.person.unknown_hint') if has_system_calls else none, none, 'people') }}
+        {{ table(t('usage.inspections.title'), inspections, inspection_label, t('usage.inspections.note'), inspection_href, 'insp') }}
       {% endif %}
     {% endif %}
   </div>

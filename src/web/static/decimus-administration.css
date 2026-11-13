@@ -6,6 +6,10 @@
 .sadmin__nav { position: sticky; top: var(--space-6); }
 .sadmin__main { min-width: 0; max-width: 1040px; }
 
+/* Шапка вкладки одна на все: строка заголовка со «?» без отступов общего `.info-row` (иначе
+   заголовок и колонка ниже съезжают на 16px у вкладок, где «?» есть). */
+.page-heading .info-row { padding: 0; border-bottom: 0; }
+
 /* Плотность вкладок (D766): заголовок раздела со «?» вместо абзаца, настройка одной строкой,
    простые списки без плашек. Общие классы — вкладки остаются на одном каркасе. */
 .ssec__head.info-row { padding: 0; border-bottom: 0; margin-bottom: var(--space-3); }
@@ -22,6 +26,12 @@
 .sadmin .stile { padding: var(--space-4) var(--space-5); }
 .sadmin .sconn__panel { padding: var(--space-5) var(--space-6); }
 .sadmin .scard { padding: var(--space-5) var(--space-6); }
+/* «Подключения»: плитки одной высоты, плотнее. */
+.sadmin .shealth__tiles { grid-auto-rows: 1fr; gap: var(--space-2); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.sadmin .shealth__tile { padding: var(--space-2) var(--space-4); gap: 0; }
+.sadmin .shealth { margin: var(--space-4) 0; }
+.sadmin .skeys__actions .sbtn, .sadmin .skeys__actions summary.sbtn { height: 26px; padding: 0 var(--space-5); font-size: var(--fs-meta); }
+.dodois-rail { max-width: none; }
 
 .shealth { margin: var(--space-6) 0; }
 .shealth__head { display: flex; align-items: center; gap: var(--space-3); }
@@ -76,10 +86,10 @@
    панель ограниченной ширины, без карточки на каждую настройку. Пояснения — под «?» у подписи (D632). */
 
 .cblocks { display: flex; flex-direction: column; max-width: 760px; }
-.cblock { display: grid; grid-template-columns: 170px minmax(0, 1fr); column-gap: var(--space-5); align-items: start; min-width: 0; padding: var(--space-3) 0; border-top: 1px solid var(--line); }
+.cblock { display: grid; grid-template-columns: 230px minmax(0, 1fr); column-gap: var(--space-5); align-items: start; min-width: 0; padding: var(--space-3) 0; border-top: 1px solid var(--line); }
 .cblock:first-child { border-top: 0; }
 .cblock__head.info-row { padding: 0; border-bottom: 0; min-height: 32px; align-items: center; }
-.cblock__title { margin: 0; font-size: var(--fs-meta); font-weight: var(--w-semibold); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); }
+.cblock__title { white-space: nowrap; margin: 0; font-size: var(--fs-meta); font-weight: var(--w-semibold); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); }
 .cblock__body { min-width: 0; }
 .cblock__line, .cadd > summary, .clist__line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); min-height: 32px; }
 .cblock__value { margin: 0; font-size: var(--fs-body); line-height: 20px; color: var(--ink); overflow-wrap: anywhere; }
@@ -104,12 +114,13 @@
 .cform__actions { display: flex; gap: var(--space-3); }
 /* Пиццерии страны: плотные строки «имя · адрес», правка раскрывается под строкой. */
 .cblock--units { display: block; }
-.cblock__bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); min-height: 32px; }
+.cblock__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-5); min-height: 32px; }
 .cblock__item { padding: var(--space-2) 0; border-top: 1px solid var(--line); }
 .cblock__item > summary { font-size: var(--fs-body); line-height: 20px; }
 .cblock__item[open] > .cblock__form { margin-bottom: var(--space-3); }
 
 @media (max-width: 719px) {
+  .cblock__title { white-space: normal; }
   .cblock { grid-template-columns: minmax(0, 1fr); }
   .cblock .sbtn { min-height: 44px; }
   .cform { grid-template-columns: minmax(0, 1fr); align-items: stretch; }

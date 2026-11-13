@@ -8,7 +8,6 @@
 <section class="scard shealth" id="health" aria-labelledby="health-title">
   <header class="shealth__head">
     <h2 class="shealth__title" id="health-title">{{ t('health.title') }}</h2>
-    {{ info_tip(t('tip.hint'), '', [t('health.sub')], 'health') }}
   </header>
   {% if health_flash %}
     <div class="note {{ 'note--ok' if health_flash.ok else 'note--warn' }}"><div class="note__text">

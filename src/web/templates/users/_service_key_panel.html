@@ -45,7 +45,7 @@
           </form>
         {% endif %}
         <details class="sfold"{% if own_flash and not ks.flash.ok %} open{% endif %}>
-          <summary class="sbtn sbtn--primary">{{ t('keys.save') }}</summary>
+          <summary class="sbtn">{{ t('keys.save') }}</summary>
           <form method="post" action="{{ users_url }}/connections/keys/{{ svc.code }}/save?lang={{ lang }}" class="sform skeys__form" autocomplete="off">
             {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
             {% for f in svc.fields %}

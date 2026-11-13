@@ -2,8 +2,14 @@
 {% from "administration/_nav.html" import admin_nav with context %}
 {% from "administration/_parts.html" import sec_title with context %}
 {% block title %}{{ t('administration.tab.plans') }}{% endblock %}
+{% from "_info_tip.html" import info_tip %}
 {% block page_heading %}<header class="page-heading">
-<h1 class="shead__title">{{ t('administration.tab.plans') }}</h1>
+<div class="shead__main">
+  <div class="info-row">
+    <h1 class="shead__title">{{ t('administration.tab.plans') }}</h1>
+    {{ info_tip(t('tip.hint'), '', [t('plans.setting.note' if feature.enabled else 'plans.paused.note')], 'plans-page') }}
+  </div>
+</div>
 </header>{% endblock %}
 
 {% block head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">{% endblock %}
@@ -13,7 +19,7 @@
   {{ admin_nav() }}
   <div class="sadmin__main">
     <section class="ssec ssec--first apanel">
-      {{ sec_title(t('plans.setting.title'), [t('plans.setting.note' if feature.enabled else 'plans.paused.note'), t('plans.setting.activation_note')], 'plans-setting') }}
+      {{ sec_title(t('plans.setting.title'), [t('plans.setting.activation_note')], 'plans-setting') }}
       {% if not feature.known %}<p role="alert">{{ t('plans.setting.unavailable') }}</p>{% endif %}
       {% if save_failed %}<p role="alert">{{ t('plans.setting.failed') }}</p>{% endif %}
       {% if outcome == 'ok' %}<p role="status">{{ t('plans.setting.saved') }}</p>{% endif %}
