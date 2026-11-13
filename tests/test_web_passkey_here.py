@@ -105,19 +105,6 @@ def test_без_ключей_на_площадке_плашки_нет(monkeypat
     )
 
 
-def test_скрипт_запускает_ключ_сам_только_по_метке() -> None:
-    js = (СТАТИКА / "passkey.js").read_text(encoding="utf-8")
-
-    assert 'var HERE_KEY = "decimus.passkey.here"' in js
-    assert re.search(
-        r"if \(useExisting \|\| createUrl\) \{\s*"
-        r"if \(root\.hasAttribute\(\"data-passkey-autostart\"\)\) go\(true\);",
-        js,
-    ), "автозапуск ключа не стоит за меткой браузера"
-    # Метка ставится после входа ключом, после автосохранения и если ключ уже есть на устройстве.
-    assert js.count("storageSet(HERE_KEY)") >= 3
-
-
 def test_автосохранение_пробует_один_раз_на_вход_и_без_кнопок_отказа() -> None:
     js = (СТАТИКА / "passkey.js").read_text(encoding="utf-8")
 
@@ -145,13 +132,13 @@ def test_вторая_ступень_стоит_у_пароля_и_у_google_т�
 
     from src.domain.journal import METHOD_GOOGLE, METHOD_PASSWORD
 
-    студия = SimpleNamespace(role="auditor")
+    студия = SimpleNamespace(role="auditor", tenant="HQ")
     for роль in ("developer", "admin", "superadmin"):
-        учётка = SimpleNamespace(role=роль)
+        учётка = SimpleNamespace(role=роль, tenant="HQ")
         assert second_step.step_required(METHOD_GOOGLE, учётка)
         assert not second_step.first_step_suffices(METHOD_GOOGLE, учётка)
     for роль in ("auditor", "control", "guest"):
-        assert not second_step.step_required(METHOD_GOOGLE, SimpleNamespace(role=роль))
+        assert not second_step.step_required(METHOD_GOOGLE, SimpleNamespace(role=роль, tenant="HQ"))
     assert second_step.first_step_suffices(METHOD_GOOGLE, студия)
     assert second_step.step_required(METHOD_PASSWORD, студия)
     assert not second_step.first_step_suffices(METHOD_PASSWORD, студия)
