@@ -56,6 +56,8 @@
             · {{ item.name_en if lang == 'ru' else item.name_ru }}
           </span>
         </span>
+        {# Чужой чек-лист (эталон у партнёра) — без смены состояния (D761 п.4); применение — только УК по матрице. #}
+        {% if item.space == own_space %}
         <form method="post" action="{{ url_for('checklists_state', code=item.code) }}" class="row row--tight">
           <select class="input input--sm" name="state" aria-label="{{ t('checklists.col.state') }}">
             {% for state in states %}
@@ -64,6 +66,9 @@
           </select>
           <button type="submit" class="btn btn--sm btn--ghost">{{ t('checklists.state.submit') }}</button>
         </form>
+        {% else %}
+          <span class="mx-muted">{{ t('checklists.state.' ~ item.state) }}</span>
+        {% endif %}
         {% if not item.in_production and may("checklist.apply") %}
           <a class="btn btn--sm" href="{{ url_for('checklists_apply_preview', code=item.code) }}">{{ t('checklists.apply.open') }}</a>
         {% endif %}

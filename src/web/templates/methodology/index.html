@@ -170,7 +170,7 @@
 {% macro rail_row(r) %}
   {% call pick_item(url_for('methodology', checklist=r.code, space=(r.space if r.space != own_space else None), lang=lang),
                     (r.name_ru if lang == 'ru' else (r.name_en or r.name_ru)),
-                    (r.items if r.items is not none else '—')|string ~ ' · ' ~ t('checklists.state.' ~ r.state),
+                    edition_label(r, lang) ~ ' · ' ~ t('checklists.state.' ~ r.state),
                     on=(r.code == checklist_code)) %}
     {% if r.in_bot %}<span class="mx-rail__bot-mark" title="{{ t('methodology.rail.bot_mark') }}">{{ icon('tg') }}<span class="mx-sr">{{ t('methodology.rail.bot_mark') }}</span></span>{% endif %}
   {% endcall %}
@@ -249,7 +249,6 @@
           <a class="pick__item mx-switch__manage" href="{{ url_for('checklists', lang=lang) }}">{{ t('methodology.lists.manage') }}</a>
         </div>
       </details>
-      <span class="section__num">{{ t('methodology.count', count=composition.items|length) }}</span>
     </div>
     <div class="mx-bar__actions">
       {% if composition.pending_changes %}
@@ -279,7 +278,9 @@
           <button class="btn" type="submit" title="{{ t('methodology.master.hint') }}">{{ t('methodology.master.unset') if master_here else t('methodology.master.set') }}</button>
         </form>
       {% endif %}
-      <a class="btn{% if panel == 'scoring' %} is-on{% endif %}" href="{{ href(panel='scoring', item='') }}" data-mx-open>{{ t('methodology.bar.scoring') }}</a>
+      {% if can_edit_checklist %}
+        <a class="btn{% if panel == 'scoring' %} is-on{% endif %}" href="{{ href(panel='scoring', item='') }}" data-mx-open>{{ t('methodology.bar.scoring') }}</a>
+      {% endif %}
       <a class="btn{% if panel == 'versions' %} is-on{% endif %}" href="{{ href(panel='versions', item='') }}" data-mx-open>{{ t('methodology.versions.title') }}</a>
       {% if editable %}
         <a class="btn btn--primary" href="{{ href(new='1', item='') }}" data-mx-open>{{ t('methodology.add.open') }}</a>
@@ -509,10 +510,12 @@
           {% else %}
             <p class="mx-panel__hint">{{ t('methodology.diff.none') }}</p>
           {% endfor %}
-          <form class="mx-drawer__foot" method="post" action="{{ action('methodology_publish') }}">
-            <input type="hidden" name="version" value="{{ composition.latest }}">
-            <button class="btn btn--primary" type="submit">{{ t('methodology.publish.submit') }}</button>
-          </form>
+          {% if can_edit_checklist %}
+            <form class="mx-drawer__foot" method="post" action="{{ action('methodology_publish') }}">
+              <input type="hidden" name="version" value="{{ composition.latest }}">
+              <button class="btn btn--primary" type="submit">{{ t('methodology.publish.submit') }}</button>
+            </form>
+          {% endif %}
         </div>
 
       {% elif zone_card %}
@@ -684,7 +687,7 @@
               <li class="mx-botlist__row{% if r.state == 'retired' %} is-retired{% endif %}">
                 <div class="mx-botlist__what">
                   <span class="mx-botlist__name">{{ r.name_ru if lang == 'ru' else (r.name_en or r.name_ru) }}</span>
-                  <span class="mx-botlist__meta">{{ t('checklists.state.' ~ r.state) }} · {{ t('methodology.bot.items', count=r.items if r.items is not none else 0) }}</span>
+                  <span class="mx-botlist__meta">{{ t('checklists.state.' ~ r.state) }} · {{ edition_label(r, lang) }}</span>
                   {% if r.wants_bot and r.bot_block %}
                     <span class="mx-botlist__stuck">{{ t('methodology.bot.stuck', why=t('methodology.bot.why.' ~ r.bot_block)) }}</span>
                   {% endif %}

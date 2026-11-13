@@ -823,3 +823,5 @@ settings_calendar_off
 # прямого чтения этих полей в коде нет.
 _.title_texts
 _.name_texts
+# Заслон записи в чужой чек-лист (D761 п.4): крюк `@app.before_request`, регистрирует декоратор.
+_foreign_checklist_write

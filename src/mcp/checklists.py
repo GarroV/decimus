@@ -49,7 +49,7 @@ from ..domain.checklist_store import count_violations as _violations
 from ..domain.checklist_store import meta_or_default as _meta_or_default
 from ..domain.checklist_store import published_edition as _published_edition
 from ..domain.config import DATA_FILES, REQUIRED_DATA_FILES
-from ..domain.version import VERSION_FILE, compose
+from ..domain.version import VERSION_FILE, compose, published
 from ..report.engine_call import REPO_ROOT, VERSIONS_DIR
 from .checklist import (
     _engine_accepts,
@@ -179,6 +179,9 @@ class Summary:
     zones: tuple[tuple[str, float], ...]
     penalty: tuple[tuple[str, float], ...]
     start_pct: float
+    #: Имя и день публикации издания (из его `VERSION`); у издания без метки — `None`.
+    edition_name: str | None = None
+    day: str | None = None
 
 
 def _zones(каталог: Path) -> tuple[tuple[str, float], ...]:
@@ -222,6 +225,7 @@ def summary(store: Store) -> Summary | None:
         return None
     каталог = _version_dir(store, издание)
     начало, ставки = _rates(каталог)
+    метка = published(каталог)
     return Summary(
         checklist=store.code,
         name_ru=карточка.name_ru,
@@ -231,6 +235,8 @@ def summary(store: Store) -> Summary | None:
         zones=_zones(каталог),
         penalty=ставки,
         start_pct=начало,
+        edition_name=метка[0] if метка else None,
+        day=метка[1] if метка else None,
     )
 
 

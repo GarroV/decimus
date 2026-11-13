@@ -794,17 +794,44 @@ def store_for(
     if найдено is None:
         raise MethodologyRefused(t("methodology.not_found", lang, code=code or ""))
     if write and not may_write(найдено, tenant=tenant):
-        ключ = (
-            "methodology.etalon_readonly"
-            if найдено.space == DEFAULT_SPACE
-            else "methodology.foreign_readonly"
-        )
+        ключ = f"methodology.{foreign_kind(найдено)}_readonly"
         raise MethodologyRefused(t(ключ, lang))
     if write and not role_may(role, tenant, "checklist.master"):
         причина = lists_door.protection_of(найдено)
         if причина is not None:
             raise MethodologyRefused(t(f"methodology.{причина}_readonly", lang))
     return найдено
+
+
+def is_own(store: Store, *, tenant: str) -> bool:
+    """Чек-лист из пространства вошедшего: только такой он вправе менять (D761 п.4).
+
+    Эталон у партнёра и чек-лист партнёра у УК — чтение. Тот же признак, что решает
+    отказ на записи (`store_for`), поэтому кнопки экрана не расходятся с отказом.
+    """
+    return may_write(store, tenant=tenant)
+
+
+def foreign_kind(store: Store) -> str:
+    """Чей чужой чек-лист: `etalon` — эталон УК, `foreign` — другого пространства."""
+    return "etalon" if store.space == DEFAULT_SPACE else "foreign"
+
+
+def foreign_refusal_key(
+    state_store: Store, code: str | None, *, tenant: str, space: str | None
+) -> str | None:
+    """Ключ отказа, если запрос целит в чек-лист чужого пространства, иначе `None` (D761 п.4).
+
+    Нужен заслону записи: такой запрос отвечает 403 до обработчика, а не словами
+    на странице с кодом 200. Не найден — не «чужой»: об этом скажет обычный путь.
+    """
+    try:
+        найдено = locate(state_store, tenant=tenant, code=code, space=space)
+    except McpError:
+        return None
+    if найдено is None or may_write(найдено, tenant=tenant):
+        return None
+    return f"methodology.{foreign_kind(найдено)}_readonly"
 
 
 def own_space(tenant: str) -> str:
@@ -844,8 +871,9 @@ class RailRow:
     #: Бот действительно даёт начать по нему проверку (волна 3): флаг поднят и
     #: заслонов нет. Этим числом говорит блок «Доступ в боте».
     in_bot: bool
-    #: Пунктов с нарушением в опубликованном издании; `None` — издания нет.
-    items: int | None
+    #: Опубликованное издание: имя и день из его метки; `None` — издания нет (D764).
+    edition_name: str | None
+    edition_day: str | None
     #: Почему в бот открыть нельзя — код (`checklists.BOT_BLOCK_*`), `None` — можно.
     bot_block: str | None = None
     #: Флаг методиста «открыть в боте». Бывает поднят у негодного чек-листа —
@@ -858,6 +886,18 @@ class RailRow:
     space: str = DEFAULT_SPACE
     #: Метка «главный» (D440): правят только админы.
     master: bool = False
+
+
+def edition_label(row: RailRow, lang: str) -> str:
+    """Версия, по которой идут проверки, словами: «версия от 10.11.2026» (D764).
+
+    Дня нет — имя издания; издания нет — «—». Число пунктов здесь не показывается:
+    оно считалось по виду строк и расходилось с шапкой экрана.
+    """
+    день = (row.edition_day or "").strip()
+    if len(день) == 10 and день[4] == "-" and день[7] == "-":
+        return t("methodology.rail.edition", lang, day=f"{день[8:]}.{день[5:7]}.{день[:4]}")
+    return row.edition_name or "—"
 
 
 def _rail_key(row: RailRow) -> tuple[int, str]:
@@ -899,7 +939,8 @@ def checklist_rail(
                 name_en=c.name_en,
                 state=c.state,
                 in_bot=c.in_bot and нельзя is None,
-                items=сводка.items if сводка else None,
+                edition_name=сводка.edition_name if сводка else None,
+                edition_day=сводка.day if сводка else None,
                 bot_block=нельзя,
                 wants_bot=c.in_bot,
                 space=c.space,

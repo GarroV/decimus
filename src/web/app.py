@@ -276,6 +276,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     dodois_connect.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
+    _install_foreign_checklist_gate(app, conf)
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
     # адреса обхода передаются отдельному сервису со своим томом на запись.
     walk_proxy.install(app, upstream=conf.walk_upstream, ui_lang=conf.ui_lang)
@@ -2416,6 +2417,7 @@ def _render_checklists(conf: Settings, *, notice: str | None, failure: str | Non
         "methodology/checklists.html",
         checklists=перечень,
         states=method.CHECKLIST_STATES,
+        own_space=method.own_space(auth.current_tenant()),
         notice=notice,
         failure=failure,
     )
@@ -2459,6 +2461,49 @@ def _author(conf: Settings) -> str:
     """
     account = auth.current_account()
     return account.login if account else "web"
+
+
+#: Правящие маршруты «Методики» и перечня чек-листов, чей целевой чек-лист назван
+#: в адресе. Заведение нового (`checklists_create`) сюда не входит: оно всегда в
+#: своём пространстве (D413).
+_CHECKLIST_WRITE_PREFIXES = ("methodology_", "checklists_")
+_CHECKLIST_WRITE_SKIP = frozenset({"checklists_create"})
+_WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+def _install_foreign_checklist_gate(app: Flask, conf: Settings) -> None:
+    """Запись в чек-лист чужого пространства — 403 до обработчика (D761 п.4).
+
+    Эталон УК у партнёра и чек-лист партнёра у УК — только чтение. Дверь и так
+    отказывает (`method.store_for`), но словами на странице с кодом 200; здесь тот
+    же отказ получает честный статус, и новый правящий маршрут закрыт от партнёра с
+    момента появления: заслон смотрит на префикс имени маршрута, а не на их список.
+    """
+
+    @app.before_request
+    def _foreign_checklist_write() -> tuple[str, int] | None:
+        endpoint = request.endpoint or ""
+        if request.method not in _WRITE_METHODS or endpoint in _CHECKLIST_WRITE_SKIP:
+            return None
+        if not endpoint.startswith(_CHECKLIST_WRITE_PREFIXES):
+            return None
+        state = method.load_store()
+        if state.store is None:
+            return None
+        по_пути = endpoint.startswith("checklists_")
+        код = (request.view_args or {}).get("code") if по_пути else _который(request)
+        ключ = method.foreign_refusal_key(
+            state.store,
+            код,
+            tenant=auth.current_tenant(),
+            space=_которое_пространство(request),
+        )
+        if ключ is None:
+            return None
+        текст = t(ключ, _lang(conf))
+        if по_пути:
+            return _render_checklists(conf, notice=None, failure=текст), 403
+        return _render_methodology(conf, notice=None, failure=текст), 403
 
 
 def _apply(conf: Settings, действие: Any) -> _Итог:
@@ -2647,16 +2692,22 @@ def _render_methodology(
     # Правка чек-листа (D440): главный правят только админы, остальные — и
     # бизнес-девелопер. Решает та же дверь, что отказывает на записи
     # (`method.store_for`), поэтому кнопки не расходятся с отказом.
-    админ = guard.may("checklist.master")
+    # Чужой чек-лист (эталон у партнёра, чек-лист партнёра у УК) — только чтение
+    # (D761 п.4): ни кнопки метки, ни оценки, ни «+ Пункт», что бы ни разрешала роль.
+    своё = method.is_own(склад, tenant=auth.current_tenant())
+    админ = guard.may("checklist.master") and своё
     главный = method.is_master(склад)
     закрыт_по = method.protection_of(склад)
-    правит = guard.may("checklist.edit") and (админ or закрыт_по is None)
+    правит = своё and guard.may("checklist.edit") and (админ or закрыт_по is None)
+    if not своё:
+        закрыт_по = method.foreign_kind(склад)
     return render_template(
         "methodology/index.html",
         composition=состав,
         is_admin=админ,
         master_here=главный,
         can_edit_checklist=правит,
+        edition_label=method.edition_label,
         # Почему только чтение: метка чек-листа или роль без правки (партнёрский аудитор).
         protected_by=закрыт_по or (None if правит else "role"),
         checklists=перечень,

@@ -109,7 +109,7 @@ def test_ни_одна_правка_чужого_не_проходит(
         for маршрут in маршруты:
             if маршрут == "/admin/checklists":
                 continue  # заведение своего — право админа пространства (D413), ниже свой тест
-            client.post(
+            ответ = client.post(
                 маршрут.replace("<code>", чей[1]) + адрес,
                 headers={"Origin": СВОЙ},
                 data={
@@ -123,6 +123,10 @@ def test_ни_одна_правка_чужого_не_проходит(
                     "name_en": "Capture",
                 },
             )
+            # D761 п.4: отказ — настоящий 403, а не слова на странице с кодом 200.
+            if not маршрут.startswith("/admin/"):
+                continue  # «/administration/…» — другой раздел, чек-листов не касается
+            assert ответ.status_code == 403, f"POST {маршрут}: {ответ.status_code}, ждали 403"
     assert len(read_journal(цель)) == журнал
     assert tip_version(цель) == издание
     for пространство in ("ge", "am") if кто != "HQ" else ():
@@ -223,3 +227,57 @@ def test_сотрудник_партнёра_чек_лист_не_заводит
         )
     assert ответ.status_code == 403
     assert not (склад.root / "ge" / "kitchen").exists()
+
+
+#: Кнопки изменения, которых у чужого чек-листа быть не должно (D761 п.4).
+def _кнопки_правки() -> list[str]:
+    return [
+        t("methodology.master.unset", "ru"),
+        t("methodology.master.set", "ru"),
+        t("methodology.bar.scoring", "ru"),
+        t("methodology.add.open", "ru"),
+        t("methodology.publish.submit", "ru"),
+    ]
+
+
+@pytest.mark.parametrize("кто", ["GE", "AM"])
+def test_у_партнёра_эталон_без_кнопок_изменения(
+    склад: Store, monkeypatch: pytest.MonkeyPatch, кто: str
+) -> None:
+    """Админ партнёра видит эталон УК только на чтение: ни метки, ни оценки, ни «+ Пункт»."""
+    подменить_двери(monkeypatch, tenant=кто, role="admin")
+    with собрать(tenant="HQ").test_client() as client:
+        войти(client)
+        страница = client.get("/admin?checklist=bizdev").get_data(as_text=True)
+        перечень = client.get("/admin/checklists").get_data(as_text=True)
+    for кнопка in _кнопки_правки():
+        assert кнопка not in страница, f"у партнёра на эталоне осталась кнопка «{кнопка}»"
+    assert t("methodology.etalon_readonly", "ru") in страница
+    assert "/admin/checklists/bizdev/" not in перечень, "в перечне у партнёра правка эталона"
+
+
+def test_у_партнёра_свой_чек_лист_правится(склад: Store, monkeypatch: pytest.MonkeyPatch) -> None:
+    """D762: свой чек-лист партнёр по-прежнему правит — кнопки на месте, правка проходит."""
+    подменить_двери(monkeypatch, tenant="AM", role="admin")
+    with собрать(tenant="HQ").test_client() as client:
+        войти(client)
+        страница = client.get("/admin?checklist=rnd").get_data(as_text=True)
+        ответ = client.post(
+            "/admin/checklists/rnd/state?checklist=rnd",
+            headers={"Origin": СВОЙ},
+            data={"state": "draft"},
+        )
+    assert t("methodology.bar.scoring", "ru") in страница
+    assert ответ.status_code != 403
+
+
+def test_колонка_чек_листов_называет_версию_а_не_число_пунктов(
+    склад: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D764: подпись строки — «версия от <день> · состояние»; числа пунктов нет — оно спорило с шапкой."""
+    подменить_двери(monkeypatch, tenant="HQ", role="admin")
+    with собрать(tenant="HQ").test_client() as client:
+        войти(client)
+        страница = client.get("/admin?checklist=bizdev").get_data(as_text=True)
+    assert "версия от " in страница
+    assert "Пунктов:" not in страница
