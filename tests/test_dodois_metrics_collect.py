@@ -643,3 +643,23 @@ def test_accounting_page_budget_failure_never_replaces_a_partial_month(
     assert not outcome.ok
     assert outcome.error and outcome.error.startswith("unknown_shape")
     assert мир.агрегаторы == []
+
+
+def test_ratings_ask_at_most_30_units_per_call(мир: Мир, monkeypatch: pytest.MonkeyPatch) -> None:
+    """На 40 пиццериях контроль Dodo IS отвечает 401 (BY, 56 пиццерий): пачка не больше 30."""
+    monkeypatch.setattr(store, "replace_rating_periods", lambda *a: 0)
+    monkeypatch.setattr(store, "replace_checkup_periods", lambda *a: 0)
+    units = [f"{i:032x}" for i in range(56)]
+
+    def answer(path: str, query: dict[str, str]) -> Response:
+        if len(query["units"].split(",")) > 30:
+            return Response(401, {}, None)
+        return _ок([])
+
+    мир.ответ = answer
+    metrics._ratings_range("cis", ДОСТУП, units, [date(2026, 11, 1)], СЕГОДНЯ, _без_сна)
+    asked = [set(q["units"].split(",")) for _, q in мир.запросы]
+    assert asked and max(len(u) for u in asked) <= 30
+    for path in [*parse.RATING_PATHS.values(), parse.CHECKUPS_PATH]:
+        covered = set().union(*(set(q["units"].split(",")) for p, q in мир.запросы if p == path))
+        assert covered == set(units)

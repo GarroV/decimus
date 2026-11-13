@@ -15,6 +15,7 @@
   // открывается. Хранилище бывает закрыто (приватное окно) — любая осечка читается как «нет».
   var HERE_KEY = "decimus.passkey.here";
   var TRIED_KEY = "decimus.passkey.tried";
+  var LOGIN_TRIED_KEY = "decimus.passkey.login-tried";
 
   function storageGet(key) {
     try { return window.localStorage.getItem(key) === "1"; } catch (e) { return false; }
@@ -145,7 +146,16 @@
   // --- вход ключом на «Подтвердите вход» ---------------------------------------------
   function initLogin(root) {
     var button = root.querySelector("[data-passkey-button]");
-    if (!button || guardUnsupported(root, button)) return;
+    if (!button) return;
+    var origin = root.getAttribute("data-passkey-origin");
+    if (origin && new URL(origin).origin !== window.location.origin) {
+      button.disabled = true;
+      show(root, root.getAttribute("data-msg-origin") || "");
+      var canonical = root.querySelector("[data-passkey-origin-link]");
+      if (canonical) canonical.hidden = false;
+      return;
+    }
+    if (guardUnsupported(root, button)) return;
     var busy = false;
     var createUrl = root.getAttribute("data-create-url");
     // D720: ключ здесь уже есть (метка и ключи у человека) — подтверждаем им; иначе, если страница
@@ -190,20 +200,18 @@
             window.location.href = err.data.login || window.location.pathname;
             return;
           }
-          if (!auto) show(root, root.getAttribute("data-msg-create-failed") || root.getAttribute("data-msg-failed") || "");
+          show(root, root.getAttribute("data-msg-create-failed") || root.getAttribute("data-msg-failed") || "");
         });
     }
 
-    // `auto` — запуск при открытии страницы, без нажатия: осечка тут тихая (кнопка
-    // остаётся, сообщения нет). Safari и другие браузеры вправе отказать вызову без
-    // жеста пользователя (NotAllowedError) — тогда человек просто нажимает кнопку.
+    // Отказ автоматического окна тоже объясняется: иначе человек остаётся на немом экране.
     function run(auto) {
       if (busy) return;
       busy = true;
       hide(root);
       postJson(root.getAttribute("data-options-url"))
         .then(function (opts) {
-          if (!opts.ok) throw new Error("options");
+          if (!opts.ok) throw Object.assign(new Error("options"), { status: opts.status, data: opts.data });
           return navigator.credentials.get({ publicKey: requestOptions(opts.data) });
         })
         .then(function (cred) {
@@ -221,9 +229,13 @@
           }
           throw new Error("verify");
         })
-        .catch(function () {
+        .catch(function (err) {
           busy = false;
-          if (!auto) show(root, root.getAttribute("data-msg-failed") || "");
+          if (err && err.status === 401 && err.data && err.data.error === "expired") {
+            window.location.href = err.data.login || window.location.pathname;
+            return;
+          }
+          show(root, root.getAttribute("data-msg-failed") || "");
         });
     }
 
@@ -234,7 +246,15 @@
     // позволяет сохранить его (D720): сохранение. Иначе страница ведёт с поля кода, а кнопка
     // ключа остаётся запасной.
     if (useExisting || createUrl) {
-      if (root.hasAttribute("data-passkey-autostart")) go(true);
+      if (root.hasAttribute("data-passkey-autostart")) {
+        var attempt = root.getAttribute("data-attempt");
+        if (attempt && storageValue(LOGIN_TRIED_KEY) === attempt) {
+          show(root, root.getAttribute(createUrl && !useExisting ? "data-msg-create-failed" : "data-msg-failed") || "");
+        } else {
+          if (attempt) storageSetValue(LOGIN_TRIED_KEY, attempt);
+          go(true);
+        }
+      }
     } else {
       var methods = root.parentNode;
       if (methods && methods.classList && methods.classList.contains("login__methods")) methods.classList.add("login__methods--code-first");
