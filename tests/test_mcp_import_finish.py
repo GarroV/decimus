@@ -93,7 +93,7 @@ def мир(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     def читать(ident: str, *, tenant: str) -> tuple[InspectionDetail, Any]:
         return _детали(мир.origin), SimpleNamespace(origin=мир.origin)
 
-    def принять(ident: str, *, tenant: str, actor: str) -> None:
+    def принять(ident: str, *, tenant: str, actor: str, **_: object) -> None:
         мир.принято.append(ident)
 
     def выгрузить(ident: str, *, data: bytes, **_: object) -> None:

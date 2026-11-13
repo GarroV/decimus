@@ -686,13 +686,25 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
             "Confirm with the person first: history — the score and status exactly "
             "as in the old report; current — the engine's score vs the reported one. The "
             "call must name the unit and the date as recorded; on mismatch nothing is "
-            "accepted."
+            "accepted.\n\n"
+            "If the draft repeats word for word an already accepted inspection of the same "
+            "unit within two weeks (same findings, same score), nothing is accepted: the "
+            "date of the accepted one is probably wrong — fix it with move_inspection and "
+            "discard this draft. Pass confirm_duplicate=true only when the person says it "
+            "really is another visit."
         ),
         input_schema=_schema(
             {
                 "inspection_id": _ID,
                 "confirm_unit": _CONFIRM_UNIT,
                 "confirm_date": _CONFIRM_DATE,
+                "confirm_duplicate": {
+                    "type": "boolean",
+                    "description": (
+                        "True only after the person confirmed this is a different visit, "
+                        "not a repeat of an accepted inspection with another date."
+                    ),
+                },
             },
             ["inspection_id", "confirm_unit", "confirm_date"],
         ),

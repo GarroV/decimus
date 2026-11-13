@@ -1076,6 +1076,7 @@ def import_accept_inspection(
     inspection_id: str,
     confirm_unit: str,
     confirm_date: str,
+    confirm_duplicate: bool = False,
 ) -> dict[str, object]:
     """Подтвердить загруженный черновик (D308): он входит в историю точки рядом с обходами."""
     from ..db.accept import accept_inspection
@@ -1087,7 +1088,9 @@ def import_accept_inspection(
         raise ToolError(f"Проверка {ident} уже подтверждена — второй раз подтверждать нечего")
     _confirm(detail, unit=confirm_unit, day=confirm_date, что="подтверждение")
     with _db(accept=True):
-        accept_inspection(ident, tenant=tenant, actor=actor)
+        accept_inspection(
+            ident, tenant=tenant, actor=actor, allow_duplicate=bool(confirm_duplicate)
+        )
     история = шапка.origin == ORIGIN_LEGACY
     итог = {} if история else _finish(ident, tenant=tenant)
     return {

@@ -35,6 +35,7 @@ from src.domain.errors import ConfigError as DomainConfigError
 
 from .action_plans import open_auto_request, today
 from .config import load_retraction_settings
+from .duplicates import find_duplicate
 from .errors import AcceptError, ActionPlanError, ConfigError
 from .models import UPLOADED_ORIGINS
 from .plan_rows import TermsProvider
@@ -60,7 +61,12 @@ where id = %(id)s and tenant_code = %(tenant)s and status = 'draft' and retracte
 
 
 def accept_inspection(
-    inspection_id: str, *, tenant: str, actor: str, terms: TermsProvider | None = None
+    inspection_id: str,
+    *,
+    tenant: str,
+    actor: str,
+    terms: TermsProvider | None = None,
+    allow_duplicate: bool = False,
 ) -> None:
     """Подтвердить проверку на приёмке.
 
@@ -68,6 +74,8 @@ def accept_inspection(
     отклонена, не назван подтверждающий. `terms` — дни и формулировки записей от
     движка для строк экшн-плана (`plan_rows.TermsProvider`): их даёт вызывающий,
     блок `db` движок не зовёт; без них запрос плана заводится без строк.
+    Загруженная проверка, повторяющая принятую той же точки с другой датой, —
+    отказ `accept_duplicate` (#1635), если человек не подтвердил `allow_duplicate`.
     """
     ident = _require_inspection_id(inspection_id)
     tenant_code = _require_tenant(tenant)
@@ -80,7 +88,7 @@ def accept_inspection(
     settings = load_retraction_settings()
     try:
         with connection(settings.dsn) as conn:
-            происхождение = _apply(conn, ident, tenant_code, автор)
+            происхождение = _apply(conn, ident, tenant_code, автор, allow_duplicate)
             # Загруженная задним числом проверка (текущая или историческая,
             # D334) запроса экшн-плана не открывает и никому ничего не шлёт
             # (D310): проверка трёхлетней давности не может требовать от
@@ -102,7 +110,9 @@ def accept_inspection(
         ) from exc
 
 
-def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: str) -> str:
+def _apply(
+    conn: psycopg.Connection[Any], ident: str, tenant: str, автор: str, allow_duplicate: bool
+) -> str:
     """Перевести ждущую в принятые; вернуть происхождение проверки (0038)."""
     with conn.cursor() as cur:
         cur.execute(_SELECT_HEAD_SQL, {"id": ident, "tenant": tenant})
@@ -123,6 +133,8 @@ def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: s
                 f"Проверка {ident} уже принята — подтверждать второй раз нечего",
                 code="accept_already",
             )
+        if происхождение in UPLOADED_ORIGINS and not allow_duplicate:
+            _refuse_duplicate(cur, ident)
         cur.execute(_ACCEPT_SQL, {"id": ident, "tenant": tenant, "actor": автор})
         if cur.rowcount != 1:
             raise AcceptError(
@@ -131,6 +143,22 @@ def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: s
                 f"обязано идти под ролью администратора истории"
             )
     return str(происхождение)
+
+
+def _refuse_duplicate(cur: Any, ident: str) -> None:
+    """Отказ, если загруженная проверка повторяет принятую с другой датой (#1635)."""
+    найденная = find_duplicate(cur, ident)
+    if найденная is None:
+        return
+    другая, дата = найденная
+    raise AcceptError(
+        f"Проверка {ident} слово в слово повторяет принятую проверку {другая} от "
+        f"{дата.isoformat()} той же точки: те же записи и та же оценка. Если дата в "
+        f"{другая} неверна — перенесите её (move_inspection), а этот черновик "
+        f"удалите; если это правда другой визит — подтвердите ещё раз с "
+        f"confirm_duplicate=true",
+        code="accept_duplicate",
+    )
 
 
 def _open_plan_request(
