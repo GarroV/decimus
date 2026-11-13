@@ -236,6 +236,17 @@
         <div class="page-bell">{{ bell_btn('right', 'page-bell__btn') }}</div>
         {% block page_heading %}<header class="page-heading"><h1>{{ self.title() }}</h1></header>{% endblock %}
       {% endif %}
+      {% if security_reminder %}
+        <aside class="note note--info" data-security-reminder data-session="{{ account.session_id }}" aria-label="{{ t('sf.reminder.title') }}">
+          <div>
+            <div class="note__title">{{ t('sf.reminder.title') }}</div>
+            <p class="note__text">{{ t('sf.reminder.text') }}</p>
+            <a class="btn btn--sm" href="{{ url('/settings/security') }}?lang={{ lang }}">{{ t('sf.reminder.setup') }}</a>
+            <button class="btn btn--sm btn--ghost" type="button" data-security-later hidden>{{ t('sf.reminder.later') }}</button>
+          </div>
+        </aside>
+        <script src="{{ url_for('static', filename='security-reminder.js') }}" defer></script>
+      {% endif %}
       {% if passkey_here %}
         {# После входа паролем или Google (D485): браузер без метки «ключ тут есть» сам просит у
            устройства Touch ID и сохраняет ключ. Эта строка скрыта и показывается, только если

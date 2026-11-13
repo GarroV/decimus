@@ -10,6 +10,10 @@
 самостоятельный способ входа (`passkey_login.py`). Всё ниже описывает ступень как она работает
 там, где она включена.
 
+**Партнёры (не HQ) подключают защиту добровольно внутри системы:** до подключения
+входят одним паролем, после подключения проходят вторую ступень. Обязательного
+подключения способа на входе нет, включая админов.
+
 **Сессия выдаётся только после обеих ступеней.** Первая (Google или пароль) у человека
 со вторым способом открывает не сессию, а «полупройденный вход» (`web_second_steps`):
 строку на 5 минут, одноразовую, привязанную к браузеру подписанной кукой
@@ -78,6 +82,7 @@ from src.domain.second_factor import (
     needs_step_every_login,
     normalize_totp_code,
 )
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import journal as web_journal
 from . import login_alert, prove_return, webauthn_rp
@@ -149,6 +154,9 @@ REQUIRE_KEY_AT_LOGIN = True
 
 def step_required(method: str, account: Any) -> bool:
     """Нужна ли вторая ступень этой учётке после первой ступени этим способом (`METHOD_*`)."""
+    # Наличие способа читается в _begin из базы: у учётки до сессии этого поля ещё нет.
+    if canonical_tenant(account.tenant) != HQ_TENANT:
+        return STEP_AT_PASSWORD
     if method == METHOD_GOOGLE:
         return needs_step_every_login(str(account.role))
     return STEP_AT_PASSWORD
@@ -167,7 +175,7 @@ def first_step_suffices(method: str, account: Any) -> bool:
 
 def must_enroll(account: Any) -> bool:
     """Админу или главному админу без второго способа доступен только экран подключения."""
-    if not ENFORCE_ENROLL:
+    if not ENFORCE_ENROLL or canonical_tenant(account.tenant) != HQ_TENANT:
         return False
     return is_required(str(account.role)) and not bool(getattr(account, "has_second_factor", True))
 
@@ -245,7 +253,10 @@ def install(
         # Нет способа: роли с отпечатком на каждом входе всё равно ведут на страницу ступени, где
         # он сохраняется (D720). Ключи на площадке выключены — сохранять нечем, вход как раньше.
         must_create = (
-            REQUIRE_KEY_AT_LOGIN and party is not None and needs_step_every_login(str(account.role))
+            canonical_tenant(account.tenant) == HQ_TENANT
+            and REQUIRE_KEY_AT_LOGIN
+            and party is not None
+            and needs_step_every_login(str(account.role))
         )
         if not must_create and not store.has_any(account.id):
             return None
@@ -290,6 +301,7 @@ def install(
         failed: bool = False,
         locked_minutes: int | None = None,
         code: int = 200,
+        attempt_id: str | None = None,
     ) -> Response:
         # Ключ можно сохранить прямо здесь: роли с отпечатком на каждом входе (D720) и только
         # учётке без единого способа второй ступени.
@@ -316,6 +328,8 @@ def install(
                 has_code=token_status.totp_confirmed or token_status.backup_left > 0,
                 passkeys_off=bool(token_status.passkeys) and party is None,
                 login=account.login,
+                attempt_id=attempt_id,
+                passkey_origin=party.origin if party is not None else None,
             ),
             code,
         )
@@ -389,8 +403,8 @@ def install(
         вход = _live()
         if вход is None:
             return _expired()
-        _, _pending, account = вход
-        return _page(store.status_of(account.id), account)
+        _, pending, account = вход
+        return _page(store.status_of(account.id), account, attempt_id=pending.id)
 
     @app.post(f"{STEP_PATH}/code", endpoint="second_step_code")
     def second_step_code() -> Response:

@@ -36,7 +36,7 @@
     <header class="login__brand">
       <img class="login__mark" src="{{ url_for('static', filename='mark-small.svg') }}" alt="" width="72" height="72">
       <h1 class="login__name login__name--step">{{ t('sf.step.title') }}</h1>
-      <p class="login__sub">{{ t('sf.step.lead') }}</p>
+      <p class="login__sub">{{ t('sf.step.lead_key' if has_passkeys and not has_code else 'sf.step.lead') }}</p>
       <p class="login__who">{{ t('sf.step.who', login=login) }}</p>
     </header>
 
@@ -52,22 +52,25 @@
 
     <div class="login__block login__methods">
     {% if has_passkeys or can_create %}
-      <div class="login__google" data-passkey-login{% if passkey_autostart %} data-passkey-autostart{% endif %}{% if has_passkeys %} data-has-keys{% endif %}
+      <div class="login__google" data-passkey-login{% if passkey_autostart %} data-passkey-autostart{% endif %}{% if has_passkeys %} data-has-keys{% endif %}{% if attempt_id %} data-attempt="{{ attempt_id }}"{% endif %}
+           data-passkey-origin="{{ passkey_origin or '' }}"
+           data-msg-origin="{{ t('sf.step.passkey_origin', origin=passkey_origin or '') }}"
            data-options-url="{{ url('/login/second-step/passkey/options') }}"
            data-verify-url="{{ url('/login/second-step/passkey/verify') }}"
            {% if can_create %}data-create-options-url="{{ url('/login/second-step/passkey/create-options') }}"
            data-create-url="{{ url('/login/second-step/passkey/create') }}"
-           data-msg-create-failed="{{ t('sf.step.create_failed') }}"{% endif %}
-           data-msg-failed="{{ t('sf.step.passkey_failed') }}"
-           data-msg-unavailable="{{ t('sf.step.passkey_unavailable') }}">
+           data-msg-create-failed="{{ t('sf.step.create_failed' if has_code else 'sf.step.create_failed_no_code') }}"{% endif %}
+           data-msg-failed="{{ t('sf.step.passkey_failed' if has_code else 'sf.step.passkey_failed_no_code') }}"
+           data-msg-unavailable="{{ t('sf.step.passkey_unavailable_first' if can_create else ('sf.step.passkey_unavailable' if has_code else 'sf.step.passkey_unavailable_no_code')) }}">
         <button class="btn btn--primary" type="button" data-passkey-button>{{ t('sf.step.touch' if can_create else 'sf.step.passkey') }}</button>
-        <p class="login__hint">{{ t('sf.step.touch_hint' if can_create else 'sf.step.passkey_hint') }}</p>
+        <p class="login__hint">{{ t('sf.step.touch_hint' if can_create else ('sf.step.passkey_hint' if has_code else 'sf.step.passkey_hint_no_code')) }}</p>
+        {% if passkey_origin %}<a class="login__hint" data-passkey-origin-link hidden href="{{ passkey_origin }}">{{ t('sf.step.canonical') }}</a>{% endif %}
         <div class="note note--warn login__note" role="alert" data-passkey-message hidden>
           <div><div class="note__title" data-passkey-message-text></div></div>
         </div>
       </div>
     {% elif passkeys_off %}
-      <p class="login__hint">{{ t('sf.step.passkey_off') }}</p>
+      <p class="login__hint">{{ t('sf.step.passkey_off' if has_code else 'sf.step.passkey_off_no_code') }}</p>
     {% endif %}
 
     {% if (has_passkeys or can_create) and has_code %}
