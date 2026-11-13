@@ -301,6 +301,7 @@ def install(
         failed: bool = False,
         locked_minutes: int | None = None,
         code: int = 200,
+        attempt_id: str | None = None,
     ) -> Response:
         # Ключ можно сохранить прямо здесь: роли с отпечатком на каждом входе (D720) и только
         # учётке без единого способа второй ступени.
@@ -327,6 +328,8 @@ def install(
                 has_code=token_status.totp_confirmed or token_status.backup_left > 0,
                 passkeys_off=bool(token_status.passkeys) and party is None,
                 login=account.login,
+                attempt_id=attempt_id,
+                passkey_origin=party.origin if party is not None else None,
             ),
             code,
         )
@@ -400,8 +403,8 @@ def install(
         вход = _live()
         if вход is None:
             return _expired()
-        _, _pending, account = вход
-        return _page(store.status_of(account.id), account)
+        _, pending, account = вход
+        return _page(store.status_of(account.id), account, attempt_id=pending.id)
 
     @app.post(f"{STEP_PATH}/code", endpoint="second_step_code")
     def second_step_code() -> Response:
