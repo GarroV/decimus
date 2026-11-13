@@ -54,6 +54,10 @@ KR_PATH = "/customer-feedback/customer-ratings"
 #: Пиццерий в одном запросе: продажи и заказы — до 30, оценки — до 100 (документация).
 SALES_UNITS_PER_CALL = 30
 KR_UNITS_PER_CALL = 100
+#: Контроль (РКО, РС, проверки) — до 30: на 40 пиццериях Dodo IS отвечает 401, хотя каждая
+#: из них по отдельности отдаётся (проба на BY, 56 пиццерий, 13.11.2026). Документация
+#: предел не называет.
+RATINGS_UNITS_PER_CALL = 30
 #: Строк на страницу заказов и предохранитель от бесконечной выдачи.
 PAGE_SIZE = 1000
 MAX_PAGES = 500
@@ -243,7 +247,7 @@ def _ratings_range(
                 )
 
             answered: set[str] = set()
-            for batch, items in _each_batch(units, KR_UNITS_PER_CALL, get):
+            for batch, items in _each_batch(units, RATINGS_UNITS_PER_CALL, get):
                 answered.update(batch)
                 if kind:
                     parsed = parse.rating_periods(items, kind)
