@@ -95,6 +95,7 @@ def test_проценты_не_среднее_процентов(ук: FlaskClie
 def test_страна_и_пиццерия_выбираются_фильтрами_без_левого_столбца(ук: FlaskClient) -> None:
     page = ук.get("/training/RO?unit=d-ro-1").get_data(as_text=True)
     assert "pk-rail" not in page and "pk-item" not in page
+    assert "pk-shell--solo" in page  # без этого класса рабочая область сжимается в узкую колонку
     assert page.count("data-pick-nav") == 2
     assert '<option value="/training/RO" selected>Румыния · 30.0%</option>' in page
     assert '<option value="/training">Все страны · 34.0%</option>' in page

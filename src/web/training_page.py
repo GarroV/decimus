@@ -156,7 +156,7 @@ def _empty(*, failed: bool) -> str:
     Ключи iSpring задаются только в администрировании (D689), без ссылки на рабочем экране.
     """
     return render_template(
-        "training/index.html",
+        "training/index.html", pick_norail=True,
         view=None,
         failed=failed,
         may_configure=guard.may("keys.manage"),
@@ -282,7 +282,7 @@ def _screen(
 
     course_rows, course_total = _course_rows(courses, lang)
     return render_template(
-        "training/index.html",
+        "training/index.html", pick_norail=True,
         view=True,
         failed=False,
         country_options=country_options,
