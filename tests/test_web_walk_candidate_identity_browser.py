@@ -124,10 +124,11 @@ def load_sheet(page, cards, photos=None, confirm=True, choose=True, items=None, 
 
 
 def confirm_assignment(page, index, frames=(0,)):
+    if not page.locator("[data-photo-assignment]").count():
+        return  # one frame: assigned to every finding automatically
     box = page.locator("[data-photo-assignment]").nth(index)
     for frame in frames:
         box.locator(f'[data-frame-index="{frame}"]').check()
-    box.locator("[data-photo-confirm]").check()
 
 
 def row_for_zone(page, zone):
