@@ -9,11 +9,12 @@
         <small>{{ t('ratings.d746.period_units', n=tile.units) }}</small>
         {% if tile.state == 'current' %}<span class="rt-period__state">{{ t('ratings.d746.period.current') }}</span>{% endif %}
       </a>{% endmacro %}
-{% if period_cards %}
+{% if period_cards and not period_cards.tiles %}
+<p class="rt-periods-empty">{{ t('ratings.d746.no_actual_periods') }}</p>
+{% elif period_cards %}
 <section class="rt-periods" aria-label="{{ t('ratings.d746.periods.' ~ src.kind) }}">
   <header class="info-row"><h2>{{ t('ratings.d746.periods.' ~ src.kind) }}</h2>{{ info_tip(t('ratings.tip.label'), '', [t('ratings.d746.source.' ~ (period_cards.source or 'none'))], 'periods-' ~ src.kind) }}</header>
   {% if src.kind == 'rko' %}<a class="rt-period-reset" href="{{ section_url(src.kind, period_window=period_context or selection.period.key) }}">{{ t('ratings.d746.whole_period') }} · {{ context_period_title }} →</a>{% endif %}
-  {% if period_cards.tiles %}
     <div class="rt-months">
     {% if src.kind != 'rko' %}{% set all_on = not period_context and selection.period.kind not in ('range', 'rating') %}<section class="rt-month"><div class="rt-month__tiles">
       <a class="rt-period rt-period--all{% if all_on %} is-selected{% endif %}" href="{{ section_url(src.kind, period_window=period_context or selection.period.key) }}"{% if all_on %} aria-current="true"{% endif %}><b>{{ t('ratings.d746.whole_period') }}</b><span class="rt-period__dates">{{ context_period_title }}</span><small>{{ t('ratings.d746.period_average') }}</small></a>
@@ -22,6 +23,5 @@
       <div class="rt-month__tiles">{% for tile in tiles %}{{ ptile(tile, 'rt-week' if src.kind == 'rko' else 'rt-period') }}{% endfor %}</div>
     </section>{% endfor %}
     </div>
-  {% else %}<p class="rt-empty">{{ t('ratings.d746.no_actual_periods') }}</p>{% endif %}
 </section>
 {% endif %}

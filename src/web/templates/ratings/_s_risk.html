@@ -27,7 +27,7 @@
     <div class="rt-risk-stat rt-risk-stat--aggregators"><span>{{ t('ratings.sec.agg') }}</span><b data-risk-count="aggregators">{{ count.aggregators }}</b></div>
     <div class="rt-risk-stat rt-risk-stat--inspections"><span>{{ t('ratings.risk.src.inspections') }}</span><b data-risk-count="inspections">{{ count.inspections }}</b></div>
   </div>
-  <div class="rt-card rt-scroll"><table class="rt-maps rt-list rt-risk-list">
+  <div class="rt-card rt-scroll rt-risk-card"><table class="rt-maps rt-list rt-risk-list">
     <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col" class="rt-risk-group-head rt-risk-group-head--ratings">{{ t('section.ratings.title') }}</th><th scope="col" class="rt-risk-group-head rt-risk-group-head--aggregators">{{ t('ratings.sec.agg') }}</th><th scope="col" class="rt-risk-group-head rt-risk-group-head--inspections">{{ t('ratings.risk.src.inspections') }}</th></tr></thead>
     <tbody>{% for u in risk.rows %}<tr data-country="{{ u.country }}">
       <th scope="row">{{ unit_link(u.unit, u.unit_name, 'rko' if u.sources[0].code == 'rko' else 'rs') }}<small>{% if country_topic_url is defined %}<a href="{{ country_topic_url(u.country, 'risk') }}">{{ country_name(u.country) }}</a>{% else %}{{ country_name(u.country) }}{% endif %}</small></th>

@@ -44,6 +44,7 @@
 .rt-risk-stat--inspections, .rt-risk-group--inspections, .rt-risk-group-head--inspections { --rt-trend-color: var(--brand-green); }
 .rt-risk-stat[class*="rt-risk-stat--"] > span::before, .rt-risk-group-head::before { content: ""; display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--rt-trend-color, var(--accent)); }
 .rt-risk-group-head::before { margin-right: var(--space-2); }
+.rt-risk-card { max-width: 60rem; }
 .rt-risk-list { width: 100%; min-width: 58rem; table-layout: fixed; }
 .rt-risk-list th:first-child { width: 11rem; }
 .rt-risk-list th { vertical-align: top; }
