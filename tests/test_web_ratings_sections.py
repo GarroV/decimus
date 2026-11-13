@@ -207,7 +207,7 @@ def test_показать_ещё_на_английском(monkeypatch: pytest.M
 
 def _пиццерий_с_оценкой(html: str) -> str:
     """Число в плитке «Пиццерий с оценкой» (подписи «пиццерий: N» у «Средней» больше нет, D767)."""
-    m = re.search(r"Пиццерий с оценкой.*?pk-tile__value\">\s*(\d+)\s*<", html, re.S)
+    m = re.search(r"С оценкой.*?pk-tile__value\">\s*(\d+)\s*<", html, re.S)
     assert m
     return m.group(1)
 
