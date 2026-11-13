@@ -38,6 +38,7 @@ from src.web.config import Settings
 СЕКРЕТ = "ключ-подписи-куки-этого-набора-длиннее-тридцати-двух"
 
 ЛОГИН = "director"
+ПОЧТА = "director@example.org"
 ПАРОЛЬ = "верный-пароль"
 ТОКЕН = "сессионный-токен"
 СВОЙ = "http://localhost"
@@ -216,9 +217,12 @@ def подменить_двери(
         "action_journal": [],
     }
 
+    def _login_key(ввод: str) -> str:
+        return ЛОГИН if ввод.strip().lower() == ПОЧТА else ввод
+
     def _authenticate(login: str, password: str) -> Учётка | None:
         зовы["authenticate"].append((login, password))
-        if login == ЛОГИН and password == ПАРОЛЬ:
+        if _login_key(login) == ЛОГИН and password == ПАРОЛЬ:
             return Учётка(tenant=tenant, role=role, email=email)
         return None
 
@@ -245,7 +249,7 @@ def подменить_двери(
         return True
 
     monkeypatch.setattr(auth, "authenticate", _authenticate)
-    monkeypatch.setattr(auth, "login_key", lambda ввод: ввод)
+    monkeypatch.setattr(auth, "login_key", _login_key)
     monkeypatch.setattr(auth, "open_session", _open)
     monkeypatch.setattr(auth, "resolve_session", _resolve)
     monkeypatch.setattr(auth, "close_session", _close)

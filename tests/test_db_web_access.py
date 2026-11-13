@@ -48,7 +48,12 @@ from src.db.web_access import (  # noqa: E402
     set_email,
     set_role,
 )
-from src.db.web_throttle import FAILURES_BEFORE_LOCK, SCOPE_LOGIN, admit_attempt  # noqa: E402
+from src.db.web_throttle import (  # noqa: E402
+    FAILURES_BEFORE_LOCK,
+    SCOPE_LOGIN,
+    admit_attempt,
+    charge_login,
+)
 
 pytestmark = requires_db
 
@@ -171,14 +176,14 @@ def test_замороженная_учётка_по_почте_не_входит
     assert authenticate("p@example.org", ПАРОЛЬ) is None
 
 
-def test_почта_и_логин_одного_человека_делят_один_лимит_попыток(обе_роли: str) -> None:
+def test_скрытый_счётчик_почты_исчерпывает_лимит_логина(обе_роли: str) -> None:
     create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
     set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
     порог = FAILURES_BEFORE_LOCK[SCOPE_LOGIN]
     for _ in range(порог):
-        admit_attempt(tenant=ТЕНАНТ, address="203.0.113.7", login=login_key("P@example.org"))
-    по_логину = admit_attempt(tenant=ТЕНАНТ, address="203.0.113.8", login=login_key("partner"))
-    assert not по_логину.admitted, "почта и логин одного человека дали два отдельных лимита"
+        assert charge_login(tenant=ТЕНАНТ, login=login_key("P@example.org")).admitted
+    assert not charge_login(tenant=ТЕНАНТ, login="partner").admitted
+    assert not admit_attempt(tenant=ТЕНАНТ, address="203.0.113.8", login="partner").admitted
 
 
 def test_ключ_счётчика_для_неизвестной_и_замороженной_почты_как_введён(обе_роли: str) -> None:
