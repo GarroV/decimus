@@ -118,6 +118,15 @@ _SELECT_USER_SQL = """
      where login = %s and disabled_at is null
 """
 
+#: Тот же набор колонок, но по почте: вход принимает логин ИЛИ почту (13.11.2026).
+#: Почта хранится в нижнем регистре и без краёв (`0021`), поэтому сравнение
+#: прямое и идёт по частичному уникальному индексу живых (`0075`).
+_SELECT_USER_BY_EMAIL_FOR_LOGIN_SQL = """
+    select id, login, tenant_code, password_hash, role, email
+      from web_users
+     where email = %s and disabled_at is null
+"""
+
 #: Пустое пространство (`null`) — люди всех пространств: экран админа УК
 #: (D286). Условие в тексте неизменно, охват приходит параметром (S608).
 _LIST_USERS_SQL = """
@@ -1089,11 +1098,20 @@ def authenticate(login: str, password: str) -> Account | None:
 
     Пароль длиннее `MAX_PASSWORD_LENGTH` — `None` сразу, без scrypt: такого
     пароля нет ни у кого, и быстрый отказ не выдаёт, заведён ли логин.
+
+    **Вместо логина можно ввести почту, привязанную к учётке** (13.11.2026:
+    партнёр вписал в поле свою почту). Логин «@» содержать не может
+    (`LOGIN_PATTERN`), поэтому «@» во вводе однозначно значит почту; регистр и
+    края не важны. Дальше всё как для логина: незнакомая почта — тоже scrypt
+    вхолостую и тот же `None`, замороженная учётка не входит (у неё и почты в
+    поиске нет: `disabled_at is null`).
     """
     if len(password) > MAX_PASSWORD_LENGTH:
         return None
+    ввод = login.strip().lower()
+    запрос = _SELECT_USER_BY_EMAIL_FOR_LOGIN_SQL if "@" in ввод else _SELECT_USER_SQL
     with _connected("сверить учётку") as conn, conn.cursor() as cur:
-        cur.execute(_SELECT_USER_SQL, (login.strip().lower(),))
+        cur.execute(запрос, (ввод,))
         row = cur.fetchone()
     if row is None:
         password_hash(password)

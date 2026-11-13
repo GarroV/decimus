@@ -126,6 +126,49 @@ def test_отключённая_учётка_не_опознаётся(обе_р
     assert authenticate("director", ПАРОЛЬ) is None
 
 
+# --- вход по почте вместо логина (13.11.2026) --------------------------------
+
+
+def test_вход_по_почте_пускает_в_ту_же_учётку(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    учётка = authenticate("p@example.org", ПАРОЛЬ)
+    assert учётка is not None
+    assert учётка.login == "partner"
+    assert учётка.tenant == ЧУЖОЙ
+
+
+def test_вход_по_почте_не_зависит_от_регистра_и_краёв(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    учётка = authenticate("  P@Example.ORG ", ПАРОЛЬ)
+    assert учётка is not None and учётка.login == "partner"
+
+
+def test_вход_по_почте_с_чужим_паролем_отказывает(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    assert authenticate("p@example.org", ПАРОЛЬ + "!") is None
+
+
+def test_незнакомая_почта_не_опознаётся(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    assert authenticate("other@example.org", ПАРОЛЬ) is None
+
+
+def test_почта_без_привязки_к_учётке_не_пускает(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    assert authenticate("p@example.org", ПАРОЛЬ) is None
+
+
+def test_замороженная_учётка_по_почте_не_входит(обе_роли: str) -> None:
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email="p@example.org")
+    assert freeze_account("partner", tenant=ЧУЖОЙ) is True
+    assert authenticate("p@example.org", ПАРОЛЬ) is None
+
+
 # --- логин единый на систему (D282) ------------------------------------------
 # Ревью Task 4 круг 1, Minor 4: раздел «границы арендатора» держал ровно один
 # тест и про ту же историю — логин не повторяется. Перенесён сюда, одним
