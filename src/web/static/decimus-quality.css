@@ -51,5 +51,3 @@
 /* Подпись у календаря в строке фильтров (D751: сама строка — общий `strip`, `decimus-web.css`). */
 .qa-filter__note { font-size: var(--fs-meta); color: var(--ink-3); max-width: 36ch; }
 @media (max-width: 719px) { .qa-filter__note { max-width: none; } }
-.pk-shell--solo { grid-template-columns: minmax(0, 1fr); }
-.page-heading .info-row { padding: 0; border-bottom: 0; }

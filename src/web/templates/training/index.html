@@ -1,39 +1,28 @@
 {#
-  Экран «Обучение» (D578, #906): обученность пиццерий по данным iSpring. Каркас — общий
-  шаблон «выбор слева — рабочая область справа» (`_pick_page.html`, D474), как у «Стран»:
-  слева «Все страны» и страны с обученностью (выбранная раскрывается своими пиццериями),
-  справа плитки, список худших сверху и курсы выбранного. Один вопрос: насколько обучены
-  люди и где хуже всего.
+  Экран «Обучение» (D578, #906): обученность пиццерий по данным iSpring. Каркас —
+  `_pick_page.html` без левого столбца (`pick_norail`, D751 — как у «Качества»): один заголовок
+  страницы со значком «?» (свежесть данных), под ним строка фильтров `strip` — «Страна» и,
+  когда страна выбрана, «Пиццерия» (списки с обученностью в подписи); ниже плитки, список худших
+  и курсы выбранного. Один вопрос: насколько обучены люди и где хуже всего.
 
-  Состояние в адресе (`/training/<страна>?unit=<подразделение>`), без скриптов всё —
-  ссылки; `country.js` лишь подменяет колонку и область без перескока страницы.
-  Ни одного вычисления: всё приходит из `src/web/training_page.py`. Данных о сотрудниках
-  на экране нет — только счётчики (D575).
+  Состояние в адресе (`/training/<страна>?unit=<подразделение>`): выбор в списке переводит
+  на адрес (`pick.js`, `data-pick-nav`). Ни одного вычисления: всё приходит из
+  `src/web/training_page.py`. Данных о сотрудниках на экране нет — только счётчики (D575).
 #}{% extends "_pick_page.html" %}
 {% from "_info_tip.html" import info_tip %}
-{% from "_pick_ui.html" import pick_item, pick_head, pick_sub, pick_block, pick_empty, pick_tile, pick_tiles with context %}
+{% from "_pick_ui.html" import pick_block, pick_empty, pick_tile, pick_tiles with context %}
+{% from "_compact.html" import strip, field with context %}
+
 {% block title %}{{ t('section.training.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+      {#- Один заголовок страницы (D751): что выбрано, видно в фильтрах; «?» — рядом с ним. -#}
+      <div class="info-row">
+        <h1>{{ t('training.title') }}</h1>
+        {% if view %}{{ info_tip(t('tip.hint'), '', [t('training.asof', date=on_date.strftime('%d.%m.%Y')), t('training.asof.hint')], 'training') }}{% endif %}
+      </div>
+</header>{% endblock %}
 {% block pick_assets %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-training.css') }}">
-  <script src="{{ url_for('static', filename='country.js') }}" data-swap-safe defer></script>
-{% endblock %}
-
-{% block pick_label %}{{ t('training.filter.title') }}{% endblock %}
-
-{% block pick_list %}
-  {% if view %}
-    {{ pick_item(network_href, t('training.network'), '', network_pct, network_on, code='Σ') }}
-    {% for row in rail %}
-      {{ pick_item(row.href, row.title, row.meta, row.pct, row.on, code=row.code, expanded=(row.on if row.units else none)) }}
-      {% if row.on and row.units %}
-        {% call pick_sub() %}
-          {% for u in row.units %}{{ pick_item(u.href, u.title, '', u.pct, u.on, sub=true) }}{% endfor %}
-        {% endcall %}
-      {% endif %}
-    {% endfor %}
-  {% else %}
-    <p class="pk-empty pk-empty--rail">{{ t('training.empty.title') }}</p>
-  {% endif %}
 {% endblock %}
 
 {% macro bar(pct) %}
@@ -58,7 +47,21 @@
     </div>
   </section>
 {% else %}
-  {% call pick_head(kicker, title, info_tip(t('tip.hint'), '', [t('training.asof', date=on_date.strftime('%d.%m.%Y')), t('training.asof.hint')], 'training')) %}{% endcall %}
+  {% call strip() %}
+    {% call field(t('training.filter.country')) %}
+      <select class="pickselect" data-pick-nav aria-label="{{ t('training.filter.country') }}">
+        {% for o in country_options %}<option value="{{ o.href }}"{% if o.on %} selected{% endif %}>{{ o.title }}</option>{% endfor %}
+      </select>
+    {% endcall %}
+    {% if unit_options %}
+      {% call field(t('training.filter.unit')) %}
+        <select class="pickselect" data-pick-nav aria-label="{{ t('training.filter.unit') }}">
+          {% for o in unit_options %}<option value="{{ o.href }}"{% if o.on %} selected{% endif %}>{{ o.title }}</option>{% endfor %}
+        </select>
+      {% endcall %}
+    {% endif %}
+  {% endcall %}
+
 
   {% call pick_tiles(5) %}
     {% for tile in tiles %}

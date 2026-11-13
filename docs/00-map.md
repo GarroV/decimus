@@ -307,7 +307,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_service_keys.py` | Тексты блока «Наши ключи к внешним сервисам» на вкладке «Ключи и API» (D491, D576) |
 | `src/web/texts_settings.py` | Тексты экрана «Настройки» (D447): подключения, Google, язык, пароль |
 | `src/web/texts_split.py` | Human split and its source history; shared by the walk and history card |
-| `src/web/texts_training.py` | Тексты экрана «Обучение» (D578, #906): колонка, плитки, списки, пустое состояние |
+| `src/web/texts_training.py` | Тексты экрана «Обучение» (D578, #906): фильтры, плитки, списки, пустое состояние |
 | `src/web/texts_trips.py` | Тексты поездок «Календаря» (D505, D506): сетка, карточка, план, отказы |
 | `src/web/texts_units.py` | Тексты заведения пиццерии из веб-админки (#437, D233, D240) |
 | `src/web/texts_usage.py` | Тексты экрана «Расход модели» (D537): вкладка «Администрирования», расход токенов |

@@ -156,10 +156,9 @@ def _empty(*, failed: bool) -> str:
     Ключи iSpring задаются только в администрировании (D689), без ссылки на рабочем экране.
     """
     return render_template(
-        "training/index.html",
+        "training/index.html", pick_norail=True,
         view=None,
         failed=failed,
-        rail=(),
         may_configure=guard.may("keys.manage"),
     )
 
@@ -211,52 +210,63 @@ def _screen(
     by_country: dict[str, list[training_read.UnitTotals]] = {}
     for u in units:
         by_country.setdefault(u.country_code, []).append(u)
-    rail = tuple(
+    country_options = (
         {
-            "code": c,
-            "title": country_title(c, lang),
-            "pct": percent_text(tm.trained_pct(_total(u.counters for u in us if u.matched))),
-            "meta": t("training.rail.units", lang, n=len(us)),
-            "href": link(c),
-            "on": c == code,
-            "units": tuple(
+            "title": f"{t('training.network', lang)} · "
+            f"{percent_text(tm.trained_pct(_total(u.counters for u in matched)))}",
+            "href": link(None),
+            "on": code is None and picked is None,
+        },
+        *(
+            {
+                "title": f"{country_title(c, lang)} · "
+                f"{percent_text(tm.trained_pct(_total(u.counters for u in us if u.matched)))}",
+                "href": link(c),
+                "on": c == code,
+            }
+            for c, us in sorted(
+                by_country.items(), key=lambda kv: country_title(kv[0], lang).casefold()
+            )
+        ),
+    )
+    unit_options = (
+        (
+            {
+                "title": t("training.filter.all_units", lang),
+                "href": link(code),
+                "on": picked is None,
+            },
+            *(
                 {
-                    "title": u.title,
-                    "pct": percent_text(tm.trained_pct(u.counters)),
-                    "href": link(c, u.department_id),
+                    "title": f"{u.title} · {percent_text(tm.trained_pct(u.counters))}",
+                    "href": link(code, u.department_id),
                     "on": picked is not None and u.department_id == picked.department_id,
                 }
-                for u in sorted(us, key=lambda x: x.title.casefold())
+                for u in sorted(by_country.get(code, ()), key=lambda x: x.title.casefold())
                 if u.matched
             ),
-        }
-        for c, us in sorted(
-            by_country.items(), key=lambda kv: country_title(kv[0], lang).casefold()
         )
+        if code
+        else ()
     )
 
     if picked is not None:
         counters = picked.counters
-        title = picked.title
         courses = training_read.course_totals(on_date, scope, department=picked.department_id)
         rows: tuple[Row, ...] = ()
         rows_title = ""
         lost: tuple[training_read.UnitTotals, ...] = ()
-        kicker = country_title(picked.country_code, lang)
     elif code:
         in_country = [u for u in matched if u.country_code == code]
         counters = _total(u.counters for u in in_country)
-        title = country_title(code, lang)
         courses = training_read.course_totals(on_date, scope, country=code)
         rows = worst_first(
             _row(u.title, link(code, u.department_id), u.counters) for u in in_country
         )
         rows_title = t("training.block.units", lang)
         lost = tuple(u for u in unmatched if u.country_code == code)
-        kicker = t("training.kicker.country", lang)
     else:
         counters = _total(u.counters for u in matched)
-        title = t("training.network", lang)
         courses = training_read.course_totals(on_date, scope)
         rows = worst_first(
             _row(
@@ -269,20 +279,15 @@ def _screen(
         )
         rows_title = t("training.block.countries", lang)
         lost = unmatched
-        kicker = t("training.kicker.network", lang)
 
     course_rows, course_total = _course_rows(courses, lang)
     return render_template(
-        "training/index.html",
+        "training/index.html", pick_norail=True,
         view=True,
         failed=False,
-        rail=rail,
-        network_href=link(None),
-        network_on=code is None and picked is None,
-        network_pct=percent_text(tm.trained_pct(_total(u.counters for u in matched))),
+        country_options=country_options,
+        unit_options=unit_options,
         on_date=on_date,
-        title=title,
-        kicker=kicker,
         tiles=_tiles(counters, lang),
         empty_counters=counters.assigned == 0,
         rows_title=rows_title,
