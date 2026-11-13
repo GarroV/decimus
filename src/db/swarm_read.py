@@ -152,12 +152,14 @@ left join lateral (
       and p.status = 'finalized'
       and p.retracted_at is null
       and (%(tenants)s::text[] is null or p.tenant_code = any(%(tenants)s))
+      and (%(reader)s::text <> 'HQ' or p.tenant_code = 'HQ' or p.status <> 'finalized')
       and (p.inspection_date, p.pushed_at) < (i.inspection_date, i.pushed_at)
     order by p.inspection_date desc, p.pushed_at desc
     limit 1
 ) prev on true
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and (%(id)s::uuid is null or i.id = %(id)s::uuid)
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
@@ -363,6 +365,7 @@ where i.status = 'finalized'
   and i.retracted_at is null
   and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
 group by u.country, f.code
@@ -376,6 +379,7 @@ where i.status = 'finalized'
   and i.retracted_at is null
   and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
 group by u.country

@@ -27,6 +27,7 @@ select date_trunc('month', i.inspection_date)::date, count(*), sum(i.pct)
 from inspections i join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and (%(selected)s::text[] is null or u.country = any(%(selected)s))
   and i.status = 'finalized'
   and i.inspection_date <= %(today)s
@@ -81,6 +82,7 @@ select i.inspection_date, count(*), sum(i.pct),
 from inspections i join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and (%(selected)s::text[] is null or u.country = any(%(selected)s))
   and i.status = 'finalized'
   and i.inspection_date <= %(today)s

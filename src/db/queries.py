@@ -95,6 +95,7 @@ from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -129,6 +130,7 @@ from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and u.name_normalized = %(unit)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
@@ -224,6 +226,7 @@ join inspections i on i.id = f.inspection_id
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and u.name_normalized = %(unit)s
   and i.status = 'finalized'
 order by i.inspection_date desc, i.pushed_at desc, f.n
@@ -703,6 +706,7 @@ from inspections i
      cross join lateral jsonb_each(i.by_process) as proc
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and i.status = 'finalized'
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
@@ -742,6 +746,7 @@ with записи as (
          join units u on u.id = i.unit_id
     where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
       and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
       and i.status = 'finalized'
       and f.level not in ('D0', 'R')
       -- Маркеры исторической записи (`models.LEGACY_CODE`, `models.NO_CLASS`,
@@ -790,6 +795,7 @@ with срез as (
          join units u on u.id = i.unit_id
     where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
       and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
       and i.status = 'finalized'
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
@@ -944,6 +950,7 @@ with точки as (
          join units u on u.id = i.unit_id
     where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
       and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
       and i.status = 'finalized'
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
@@ -1006,6 +1013,7 @@ from findings f
      join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and i.status = 'finalized'
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
@@ -1343,6 +1351,7 @@ from units u
            and i.status = 'finalized'
            and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
            and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+           and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
 where u.tenant_code = 'HQ' and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and u.merged_into is null
 group by u.id, u.name, u.code
@@ -1384,6 +1393,7 @@ from inspections i
      cross join lateral jsonb_each(i.by_process) as proc
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
   and i.status = 'finalized'
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
@@ -1446,6 +1456,7 @@ _ITEM_RECORDS = """
          join units u on u.id = i.unit_id
     where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
       and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
       and f.code = %(code)s
       and i.checklist_code = %(checklist)s
       and i.status = 'finalized'

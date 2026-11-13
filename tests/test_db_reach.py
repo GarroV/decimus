@@ -42,8 +42,11 @@ def _ids(reach: Reach) -> set[str]:
     return {row.id for row in queries.list_inspections(reach=reach, limit=100)}
 
 
-def test_уК_читает_все_проверки(сеть: dict[str, str]) -> None:
-    assert set(сеть.values()) <= _ids(reach_of("HQ"))
+def test_уК_читает_все_проверки_кроме_самопроверок_партнёров(сеть: dict[str, str]) -> None:
+    """#1532: принятая проверка партнёра — внутренняя, в списки и сводки УК не идёт."""
+    видно = _ids(reach_of("HQ"))
+    assert {сеть["уК_батуми"], сеть["уК_ереван"]} <= видно
+    assert сеть["партнёр_батуми"] not in видно
 
 
 def test_партнёр_видит_только_свою_страну(сеть: dict[str, str]) -> None:
@@ -97,6 +100,13 @@ def test_сводки_и_справочные_чтения_стоят_на_ох�
     assert [s[3] for s in queries.systemic_findings(reach=ge)] == [1]
     assert {f.inspection_id for f in queries.findings_by_unit(reach=ge, unit="Yerevan-1")} == set()
     assert queries.units_total(reach=reach_of("HQ")) == 2
+
+
+def test_сводки_уК_не_считают_самопроверки_партнёра(сеть: dict[str, str]) -> None:
+    """#1532 (D024, D144): те же чтения, что у партнёра выше, у УК без его принятой проверки."""
+    уК = reach_of("HQ")
+    assert set(queries.class_counts(reach=уК)) == {сеть["уК_батуми"], сеть["уК_ереван"]}
+    assert set(queries.worst_processes(reach=уК)) == {сеть["уК_батуми"], сеть["уК_ереван"]}
 
 
 def _след_проверки(pg_dsn: str, inspection_id: str) -> None:

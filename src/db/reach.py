@@ -27,6 +27,17 @@ REACH_SQL = (
     "and (%(countries)s::text[] is null or u.country = any(%(countries)s))"
 )
 
+#: Что считается в статистике УК (#1532; D024, D144; владелец 07.11.2026: самостоятельные
+#: проверки партнёров внутренние и в общую статистику не попадают). Читает УК
+#: (`reader` = `HQ`) — из чужих пространств в сводки, списки и историю точки не идёт
+#: ничего: проверки партнёра, назначенные ему управляющей компанией, появятся тут вместе
+#: с назначением (#416), пока оно не заведено, партнёрская проверка — всегда самопроверка.
+#: Ждущие приёмки (`status <> 'finalized'`) условие не режет: это очередь, а не статистика,
+#: и УК видит её на чтение (D283). Партнёр читает свою страну целиком (D289), для него
+#: условие пусто. Вписано литералом в запросы статистики; их перечень и сверка —
+#: `tests/test_db_counted_static.py`.
+COUNTED_SQL = "(%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')"
+
 #: Условие охвата для запроса по справочнику: справочник один, и он у УК (D284).
 UNIT_REACH_SQL = (
     "u.tenant_code = 'HQ' and (%(countries)s::text[] is null or u.country = any(%(countries)s))"
@@ -46,11 +57,12 @@ class Reach:
     tenants: tuple[str, ...] | None
     countries: tuple[str, ...] | None
 
-    def params(self) -> dict[str, list[str] | None]:
+    def params(self) -> dict[str, str | list[str] | None]:
         """Параметры запроса: массивы, а не текст условия."""
         return {
             "tenants": None if self.tenants is None else list(self.tenants),
             "countries": None if self.countries is None else list(self.countries),
+            "reader": self.tenant,
         }
 
 
