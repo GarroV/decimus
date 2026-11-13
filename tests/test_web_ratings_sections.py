@@ -217,7 +217,7 @@ def test_рс_плитки_страны_топ_и_боттом_из_сводки
     html = получить(monkeypatch, "/ratings/rs")
 
     метки = re.findall(r'<div class="pk-tile__label">(.*?)</div>', html)
-    assert метки == ["Средняя", "Нарушений", "Хард", "Пиццерий с оценкой"]
+    assert метки == ["Средняя", "Нарушений", "Хард", "С оценкой"]
     assert _пиццерий_с_оценкой(html) == "4"  # из `rs_units`
     assert "пиццерий: 4" not in html
     assert "пиццерий с хардом: 2" in html

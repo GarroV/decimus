@@ -193,7 +193,7 @@ SECTION_TEXTS.update(
             "ru": "Даты периодов пока не получены",
             "en": "Period dates are not available yet",
         },
-        "ratings.d746.scored": {"ru": "Пиццерий с оценкой", "en": "Pizzerias with scores"},
+        "ratings.d746.scored": {"ru": "С оценкой", "en": "With scores"},
         "ratings.d746.eligibility": {
             "ru": "Число обязательных участников периода пока не подтверждено",
             "en": "The number of required participants is not confirmed yet",
