@@ -498,6 +498,7 @@ def _section_data(
             "risk": risk,
             "risk_short": summary.risk_short,
             "risk_hint": (
+                t("ratings.risk.hint.lead", lang),
                 t(
                     "ratings.risk.hint.rs",
                     lang,
@@ -778,7 +779,7 @@ def render_section(
         section_dot=clients_status
         if key == ratings_nav.CLIENTS
         else ratings_freshness.section_status(rows, key),
-        freshness=ratings_freshness.lines_of(rows, lang, agg_names),
+        freshness=ratings_freshness.lines_of(rows, lang, agg_names, key),
         notice=notice,
         failure=failure,
         clusters=report.CLUSTERS,

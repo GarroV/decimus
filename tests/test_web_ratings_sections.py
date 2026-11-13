@@ -67,7 +67,7 @@ def test_подменю_в_заданном_порядке_и_голый_адр�
         ("clients", "Оценки клиентов"),
         ("maps", "Карты"),
         ("agg", "Агрегаторы"),
-        ("risk", "Стабильно ниже порога"),
+        ("risk", "Пиццерии в зоне риска"),
         ("compare", "Девелоперы и страны"),
     ],
 )
@@ -205,13 +205,21 @@ def test_показать_ещё_на_английском(monkeypatch: pytest.M
     assert "Show more (5)" in получить(monkeypatch, "/ratings/rs?lang=en", ui_lang="en")
 
 
+def _пиццерий_с_оценкой(html: str) -> str:
+    """Число в плитке «Пиццерий с оценкой» (подписи «пиццерий: N» у «Средней» больше нет, D767)."""
+    m = re.search(r"С оценкой.*?pk-tile__value\">\s*(\d+)\s*<", html, re.S)
+    assert m
+    return m.group(1)
+
+
 def test_рс_плитки_страны_топ_и_боттом_из_сводки(monkeypatch: pytest.MonkeyPatch) -> None:
     подготовить(monkeypatch, сводка(rs_hard=факты(2)))
     html = получить(monkeypatch, "/ratings/rs")
 
     метки = re.findall(r'<div class="pk-tile__label">(.*?)</div>', html)
-    assert метки == ["Средняя", "Нарушений", "Хард", "Пиццерий с оценкой"]
-    assert "пиццерий: 4" in html  # из `rs_units`
+    assert метки == ["Средняя", "Нарушений", "Хард", "С оценкой"]
+    assert _пиццерий_с_оценкой(html) == "4"  # из `rs_units`
+    assert "пиццерий: 4" not in html
     assert "пиццерий с хардом: 2" in html
     строка = re.search(r'<th scope="row"><a[^>]*>Сербия</a></th>(.*?)</tr>', html, re.S)
     assert строка
@@ -225,7 +233,7 @@ def test_рко_берёт_свои_числа_а_не_рс(monkeypatch: pytest.
     html = получить(monkeypatch, "/ratings/rko")
 
     assert "88.0" in html and "91.0" not in html
-    assert "пиццерий: 3" in html and "Пиццерия-Верх" not in html
+    assert _пиццерий_с_оценкой(html) == "3" and "Пиццерия-Верх" not in html
 
 
 def test_сохранённые_оценки_остаются_при_недоступных_api_периодах(
@@ -239,7 +247,7 @@ def test_сохранённые_оценки_остаются_при_недос�
     monkeypatch.setattr(screen.read, "source_rating_periods", unavailable)
     html = получить(monkeypatch, "/ratings/rs")
     assert _заголовок(html) == "Рейтинг стандартов (РС)"
-    assert "91.0" in html and "пиццерий: 4" in html
+    assert "91.0" in html and _пиццерий_с_оценкой(html) == "4"
     assert "Пиццерия-Верх" in html and "Пиццерия-Низ" in html
     # Synthetic sheet dates must never become actual Dodo IS period cards.
     assert "data-source-period=" not in html
@@ -365,6 +373,47 @@ def test_точка_раздела_без_своего_источника_бер
     assert rf.section_status((), "agg") is None
 
 
+def test_таблица_свежести_зоны_риска_без_лишних_источников_и_площадки_одной_строкой() -> None:
+    from src.web import ratings_freshness as rf
+
+    строки = (
+        fresh.Row("rs", fresh.Status.FRESH, begin_on=date(2026, 10, 16), end_on=date(2026, 10, 31)),
+        fresh.Row("rko", fresh.Status.FRESH),
+        fresh.Row("sheet", fresh.Status.FRESH),
+        fresh.Row("maps", fresh.Status.FRESH),
+        fresh.Row(
+            "agg", fresh.Status.FRESH, "glovo", arrived=datetime(2026, 10, 27, 9, 0, tzinfo=UTC)
+        ),
+        fresh.Row(
+            "agg", fresh.Status.LAG, "wolt", arrived=datetime(2026, 10, 25, 7, 30, tzinfo=UTC)
+        ),
+    )
+    names = {"glovo": "Glovo", "wolt": "Wolt"}
+
+    risk = rf.lines_of(строки, "ru", names, "risk")
+    full = rf.lines_of(строки, "ru", names)
+
+    assert risk is not None and full is not None
+    assert [x.name for x in risk.lines] == ["РС", "РКО", "Площадки доставки (2)"]
+    assert (risk.lines[-1].status, risk.lines[-1].arrived) == ("lag", "25.10 07:30")
+    assert risk.worst == "lag"
+    assert len(full.lines) == 6  # у остальных разделов таблица прежняя
+
+
+def test_зона_риска_называется_по_новому_и_объясняет_источники_под_вопросом(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    подготовить(monkeypatch)
+    monkeypatch.setattr(screen.ratings_risk, "build", lambda *_a, **_k: CombinedRisk((), ()))
+    ru = получить(monkeypatch, "/ratings/risk")
+    en = получить(monkeypatch, "/ratings/risk?lang=en")
+
+    assert "Стабильно ниже порога" not in ru and "Consistently below" not in en
+    assert "Пиццерия попадает сюда, если хотя бы в одном источнике" in ru
+    assert "РС и РКО — средняя ниже" in ru and "Наши проверки — оценка ниже" in ru
+    assert "Pizzerias at risk" in en and "A pizzeria is listed here if" in en
+
+
 def test_строка_шапки_у_сборов_называет_самый_ранний_приход() -> None:
     from src.web import ratings_freshness as rf
 
@@ -397,3 +446,11 @@ def test_work_sections_have_no_business_settings(
     # Only the personal country preference may write from a work screen.
     post_actions = re.findall(r'<form\b[^>]*method="post"[^>]*action="([^"]+)"', main.group(1))
     assert post_actions == ["/country/filter"]
+
+
+def test_нет_дат_периодов_одна_тихая_строка_без_блока(monkeypatch: pytest.MonkeyPatch) -> None:
+    подготовить(monkeypatch)
+    html = получить(monkeypatch, "/ratings/rs")
+    # Заглушка — абзац без рамки блока; блока «rt-periods» без плиток нет.
+    if "data-source-period=" not in html:
+        assert 'class="rt-periods-empty"' in html and 'class="rt-periods"' not in html

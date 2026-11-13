@@ -35,15 +35,16 @@
 .rt-map-cell__body { display: flex; align-items: center; gap: var(--space-3); min-width: 8rem; }
 .rt-map-cell__reading { min-width: 3.5rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .rt-map-cell meter { max-width: 11rem; min-width: 3rem; }
-.rt-risk-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
-.rt-risk-stat { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface); }
+.rt-risk-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 11.5rem)); gap: var(--space-3); }
+.rt-risk-stat { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface); }
 .rt-risk-stat > span { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--ink-2); font-size: var(--fs-dense); font-weight: var(--w-semibold); }
-.rt-risk-stat > b { color: var(--ink); font-size: 1.8rem; font-weight: var(--w-semibold); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.rt-risk-stat > b { color: var(--ink); font-size: 1.4rem; font-weight: var(--w-semibold); line-height: 1.1; font-variant-numeric: tabular-nums; }
 .rt-risk-stat--ratings, .rt-risk-group--ratings, .rt-risk-group-head--ratings { --rt-trend-color: var(--accent); }
 .rt-risk-stat--aggregators, .rt-risk-group--aggregators, .rt-risk-group-head--aggregators { --rt-trend-color: var(--brand-orange); }
 .rt-risk-stat--inspections, .rt-risk-group--inspections, .rt-risk-group-head--inspections { --rt-trend-color: var(--brand-green); }
 .rt-risk-stat[class*="rt-risk-stat--"] > span::before, .rt-risk-group-head::before { content: ""; display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--rt-trend-color, var(--accent)); }
 .rt-risk-group-head::before { margin-right: var(--space-2); }
+.rt-risk-card { max-width: 60rem; }
 .rt-risk-list { width: 100%; min-width: 58rem; table-layout: fixed; }
 .rt-risk-list th:first-child { width: 11rem; }
 .rt-risk-list th { vertical-align: top; }

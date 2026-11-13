@@ -11,10 +11,13 @@
 <p class="rt-shown">{{ t('ratings.d746.shown') }} <strong>{{ calendar.title }}</strong></p>
 <div class="rt-section">
   <div class="pk-tiles" style="--pk-cols: 4">
-    {% call stat(t('ratings.src.avg'), t('ratings.src.avg.sub', n=src.units) if src.units else none) %}{{ num(src.avg) }} {{ dlt(src.avg_delta) }}{% endcall %}
-    {% call stat(t('ratings.src.viol')) %}{% if violation_data and violation_data.has_data %}<a href="#source-violations" data-open-violations>{{ violation_data.total_cases }}</a>{% else %}<span class="is-empty">—</span>{% endif %}{% endcall %}
+    {#- Число пиццерий — в плитке «Пиццерий с оценкой» рядом, подписи у «Средней» нет. -#}
+    {% call stat(t('ratings.src.avg')) %}{{ num(src.avg) }} {{ dlt(src.avg_delta) }}{% endcall %}
+    {#- Плитка «Нарушений» сама открывает разбор (скрипт) или, без скрипта, ведёт на страницу нарушений: отдельной кнопки рядом нет. -#}
+    {% if violation_data and violation_data.has_data %}{% call stat(t('ratings.src.viol'), href=section_url('violations', kind=src.kind)) %}{{ violation_data.total_cases }}{% endcall %}
+    {% else %}{% call stat(t('ratings.src.viol')) %}<span class="is-empty">—</span>{% endcall %}{% endif %}
     {% call stat(t('ratings.src.hard'), t('ratings.src.hard.sub', n=src.hard_units) if src.hard else none) %}{% if v.has_data and violation_data and violation_data.has_data %}{{ src.hard|length }}{% else %}<span class="is-empty">—</span>{% endif %}{% endcall %}
-    {% call stat(t('ratings.d746.scored'), t('ratings.d746.eligibility')) %}{{ src.units }}{% endcall %}
+    {% call stat(t('ratings.d746.scored'), tip=[t('ratings.d746.eligibility')], key='scored') %}{{ src.units }}{% endcall %}
   </div>
 
   {% include 'ratings/_violations_dialog.html' %}
