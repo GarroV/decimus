@@ -363,7 +363,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 27 | _account_menu.html, _account_menu_connections.html, _compact.html, _info_tip.html, _inspection_timeline.html, _langpick.html, _login_lang.html, _notifications_menu.html, … (+19) |
 | `src/web/templates/actions/` | 11 | _columns.html, _list_plans.html, _list_rx.html, _panel_fragment.html, _panel_plan.html, _panel_rx.html, _plan_file.html, _plan_rows.html, … (+3) |
-| `src/web/templates/administration/` | 16 | _content_editor.html, _coverage.html, _health.html, _nav.html, _parts.html, _ratings_aggregators.html, aggregators.html, connections.html, … (+8) |
+| `src/web/templates/administration/` | 15 | _content_editor.html, _coverage.html, _health.html, _nav.html, _ratings_aggregators.html, aggregators.html, connections.html, content_editor.html, … (+7) |
 | `src/web/templates/calendar/` | 2 | _trip.html, index.html |
 | `src/web/templates/country/` | 9 | _batch.html, _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, … (+1) |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |

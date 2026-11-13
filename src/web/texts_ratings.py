@@ -126,8 +126,8 @@ _SCREEN: dict[str, dict[str, str]] = {
         "en": "No ratings for the selected period; showing data as of {date}.",
     },
     "ratings.risk.tile": {
-        "ru": "Пиццерии, стабильно низкие по любому источнику",
-        "en": "Pizzerias consistently low by any source",
+        "ru": "Пиццерии в зоне риска по любому источнику",
+        "en": "Pizzerias at risk by any source",
     },
     "ratings.col.sources": {"ru": "Где ниже порога", "en": "Below the threshold in"},
     "ratings.risk.hint.lead": {
@@ -194,8 +194,8 @@ _SCREEN: dict[str, dict[str, str]] = {
         "en": "No pizzerias at or below the threshold.",
     },
     "ratings.empty.risk": {
-        "ru": "Пиццерий стабильно ниже порога нет.",
-        "en": "No pizzerias are consistently below the threshold.",
+        "ru": "Пиццерий в зоне риска нет.",
+        "en": "No pizzerias at risk.",
     },
     "ratings.risk.short": {
         "ru": "Недостаточно периодов для оценки: {types}.",

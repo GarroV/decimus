@@ -14,11 +14,11 @@
 {% elif period_cards %}
 <section class="rt-periods" aria-label="{{ t('ratings.d746.periods.' ~ src.kind) }}">
   <header class="info-row"><h2>{{ t('ratings.d746.periods.' ~ src.kind) }}</h2>{{ info_tip(t('ratings.tip.label'), '', [t('ratings.d746.source.' ~ (period_cards.source or 'none'))], 'periods-' ~ src.kind) }}</header>
-  {% if src.kind == 'rko' %}<a class="rt-period-reset" href="{{ section_url(src.kind, period_window=period_context or selection.period.key) }}">{{ t('ratings.d746.whole_period') }} · {{ context_period_title }} →</a>{% endif %}
     <div class="rt-months">
-    {% if src.kind != 'rko' %}{% set all_on = not period_context and selection.period.kind not in ('range', 'rating') %}<section class="rt-month"><div class="rt-month__tiles">
-      <a class="rt-period rt-period--all{% if all_on %} is-selected{% endif %}" href="{{ section_url(src.kind, period_window=period_context or selection.period.key) }}"{% if all_on %} aria-current="true"{% endif %}><b>{{ t('ratings.d746.whole_period') }}</b><span class="rt-period__dates">{{ context_period_title }}</span><small>{{ t('ratings.d746.period_average') }}</small></a>
-    </div></section>{% endif %}
+    {#- «Весь период» — плитка того же размера, что и периоды, у РС и у РКО; ведёт к периоду, из которого выбрана неделя или период. -#}
+    {% set all_on = not period_context and selection.period.kind not in ('range', 'rating') %}<section class="rt-month"><div class="rt-month__tiles">
+      <a class="rt-period rt-period--all{% if all_on %} is-selected{% endif %}" href="{{ section_url(src.kind, period_window=period_context or selection.period.key) }}"{% if all_on %} aria-current="true"{% endif %} title="{{ t('ratings.d746.period_average') }}"><b>{{ t('ratings.d746.whole_period') }}</b><small>{{ context_period_title }}</small></a>
+    </div></section>
     {% for month, tiles in period_months %}<section class="rt-month"><h3>{{ month_title(month) }}</h3>
       <div class="rt-month__tiles">{% for tile in tiles %}{{ ptile(tile, 'rt-week' if src.kind == 'rko' else 'rt-period') }}{% endfor %}</div>
     </section>{% endfor %}

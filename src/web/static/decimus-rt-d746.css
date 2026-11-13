@@ -19,8 +19,8 @@
 .rt-period strong, .rt-week strong { font:var(--w-semibold) 18px/22px var(--font-mono,monospace); }
 .rt-period small, .rt-week small { color:var(--ink-3); font-size:var(--fs-micro); }
 .rt-period__dates { white-space:nowrap; font-size:var(--fs-meta); color:var(--ink-2); }
-.rt-period--all { width:auto; max-width:13rem; }
-.rt-period--all b { font-size:var(--fs-dense); }
+.rt-period--all b { font-size:var(--fs-dense); line-height:22px; }
+.rt-period--all small { white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .rt-period--upcoming { border-style:dashed; }
 .rt-overview { display:grid; gap:var(--space-6); }
 .rt-overview-card { padding:var(--space-5); }
@@ -78,7 +78,6 @@
 .rt-d746 .rt-cal__arrow { width:36px; height:36px; border-radius:var(--r-control); }
 .rt-d746 .rt-cal__title { min-height:36px; padding:0 16px; border-radius:var(--r-control); }
 .rt-d746 .rt-period.is-selected, .rt-d746 .rt-week.is-selected { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); background:var(--surface-2); }
-.rt-period-reset { font-size:var(--fs-meta); align-self:flex-start; }
 .rt-shown { margin:0; color:var(--ink-3); font-size:var(--fs-dense); }
 .rt-shown strong { margin-left:var(--space-3); color:var(--ink); }
 .rt-overview-card { padding:22px 24px; }
@@ -130,7 +129,9 @@
 @media(max-width:620px) {
  .rt-d746 .pk-tiles .pk-tile:nth-child(even) .info-tip__pop { left:auto; right:0; }
 }
-.rt-d746 .pk-tile__head .pk-tile__label { white-space:nowrap; }
+.rt-d746 .pk-tile__head { min-width:0; flex-wrap:nowrap; }
+.rt-d746 .pk-tile__head .pk-tile__label { white-space:nowrap; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.rt-d746 .pk-tile__head .info-tip { flex:none; }
 .rt-periods-empty { margin:0; color:var(--ink-3); font-size:var(--fs-meta); }
 /* Обзор: две карточки РС/РКО в стиле плиток итогов, ограниченной ширины. */
 .rt-overview .rt-pair { max-width:46rem; gap:var(--space-3); }
@@ -140,3 +141,4 @@
 .rt-d746 .rt-overview-facts { gap:var(--space-3); padding-top:var(--space-2); margin-top:var(--space-2); }
 .rt-d746 .rt-overview-facts dd { margin-top:2px; font-size:var(--fs-body); }
 @media(max-width:640px) { .rt-d746 .rt-overview-card { padding:var(--space-3); } .rt-d746 .rt-overview-card__score { font-size:22px; } }
+.rt-period--all { min-height:5.55rem; }
