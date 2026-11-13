@@ -680,24 +680,29 @@ def test_без_номера_аккаунта_google_не_пускает(
 
 @pytest.fixture
 def клиент_с_ключами(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
-    """Как `клиент`, но на площадке включены ключи доступа (WebAuthn)."""
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    """Учётки УК с включёнными ключами доступа (WebAuthn)."""
+    подменить_двери(monkeypatch, tenant="HQ")
     monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: РЕКВИЗИТЫ)
     monkeypatch.setattr(
         auth,
         "find_by_email",
-        lambda email: Учётка(tenant=ТЕНАНТ) if email == ПОЧТА_СВОЯ else None,
+        lambda email: Учётка(tenant="HQ") if email == ПОЧТА_СВОЯ else None,
     )
-    app = собрать(tenant=ТЕНАНТ, webauthn_rp_id="localhost", webauthn_origin="http://localhost")
+    app = собрать(tenant="HQ", webauthn_rp_id="localhost", webauthn_origin="http://localhost")
     with app.test_client() as client:
         yield client
 
 
 def _войти_через_google(
-    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch, *, роль: str, есть_способ: bool
+    клиент: FlaskClient,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    роль: str,
+    есть_способ: bool,
+    tenant: str = "HQ",
 ) -> tuple[Response, list[dict[str, object]]]:
     """Google-вход учётки с ролью; возвращает ответ и список открытых сессий."""
-    monkeypatch.setattr(auth, "find_by_email", lambda email: Учётка(tenant=ТЕНАНТ, role=роль))
+    monkeypatch.setattr(auth, "find_by_email", lambda email: Учётка(tenant=tenant, role=роль))
     открытые: list[dict[str, object]] = []
 
     def открыть(account: object, **kw: object) -> Сессия:
@@ -740,15 +745,30 @@ def test_на_площадке_без_ключей_учётка_без_спос�
     assert len(открытые) == 1
 
 
-def test_студия_после_google_получает_сессию_сразу_даже_со_способом(
+def test_партнёр_после_google_подтверждает_подключённую_защиту(
     клиент_с_ключами: FlaskClient, обмен: Обмен, сверка: Сверка, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ответ, открытые = _войти_через_google(
-        клиент_с_ключами, monkeypatch, роль="auditor", есть_способ=True
+        клиент_с_ключами, monkeypatch, роль="auditor", есть_способ=True, tenant=ТЕНАНТ
     )
 
+    assert ответ.headers["Location"].endswith(ШАГ)
+    assert not открытые
+
+
+@pytest.mark.parametrize("role", ["admin", "auditor"])
+def test_партнёр_без_защиты_после_google_входит_сразу(
+    клиент_с_ключами: FlaskClient,
+    обмен: Обмен,
+    сверка: Сверка,
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+) -> None:
+    ответ, открытые = _войти_через_google(
+        клиент_с_ключами, monkeypatch, роль=role, есть_способ=False, tenant=ТЕНАНТ
+    )
     assert not ответ.headers["Location"].endswith(ШАГ)
-    assert len(открытые) == 1 and открытые[0]["step_waived"] is True
+    assert len(открытые) == 1
 
 
 def test_сохранение_отпечатка_на_входе_только_ролям_с_отпечатком(

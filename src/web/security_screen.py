@@ -13,8 +13,9 @@
 вторую ступень, так что «свежий вход» — настоящий, а не просто пароль). Угнанная сессия
 сама добавить себе ключ не может.
 
-**Админ и главный админ без способа попадают сюда после первого входа** и больше никуда
-(`auth._guard`, `second_step.ENROLL_ENDPOINTS`). Последний способ им не снять
+**Партнёру подключение предлагается внутри системы и не блокирует работу (D769).**
+Старый заслон разделов до подключения выключен (`second_step.ENFORCE_ENROLL`).
+Последний способ админу и главному админу не снять
 (`remove_*` возвращает `LAST_FACTOR`).
 
 Секреты: ключ приложения показывается, только пока приложение не подтверждено (QR и ключ
@@ -60,6 +61,7 @@ from src.domain.second_factor import (
     normalize_totp_code,
     totp_uri,
 )
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import auth, prove_return, webauthn_rp
 from .config import Settings
@@ -190,12 +192,14 @@ def render_page(
             can_change=may_change(account),
             can_prove_with_key=bool(status.passkeys) and conf.webauthn_enabled,
             can_prove_with_code=status.totp_confirmed or status.backup_left > 0,
-            required=is_required(account.role),
+            required=is_required(account.role) and canonical_tenant(account.tenant) == HQ_TENANT,
             enrolled=status.has_factor,
             passkeys_enabled=conf.webauthn_enabled,
             max_passkeys=MAX_PASSKEYS,
             base=f"{request.script_root}{SECURITY_PATH}",
-            show_required=request.args.get("required") == "1" and not status.has_factor,
+            show_required=request.args.get("required") == "1"
+            and not status.has_factor
+            and canonical_tenant(account.tenant) == HQ_TENANT,
             # Куда вернуть после подтверждения второго шага: только свой путь (D670).
             prove_next=prove_next,
             # Пришли за подтверждением второго шага (D670): карточка доказательства стоит и у
