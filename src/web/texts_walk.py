@@ -685,21 +685,17 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Photos for this finding",
     },
     "walk.sheet.photo_assignment.hint": {
-        "ru": "Выберите кадры, подтверждающие именно этот факт, и проверьте привязку.",
-        "en": "Choose the photos supporting this particular fact and check the assignment.",
+        "ru": "Отметьте кадры, подтверждающие именно этот факт.",
+        "en": "Mark the photos supporting this particular fact.",
     },
     "walk.sheet.photo_assignment.frame": {"ru": "Кадр {n}", "en": "Frame {n}"},
-    "walk.sheet.photo_assignment.confirm": {
-        "ru": "Проверил: выбранные фото относятся к этой записи",
-        "en": "I checked: the selected photos belong to this finding",
-    },
     "walk.sheet.photo_assignment.need": {
-        "ru": "Выберите и подтвердите фото для каждой выбранной записи",
-        "en": "Choose and confirm photos for each selected finding",
+        "ru": "Отметьте фото для каждой выбранной записи",
+        "en": "Mark photos for each selected finding",
     },
     "walk.err.photo_assignment": {
-        "ru": "Привязка фото устарела или не подтверждена. Выберите фото записи заново.",
-        "en": "Photo assignment is stale or unconfirmed. Select this finding's photos again.",
+        "ru": "Привязка фото устарела или не выбрана. Отметьте фото записи заново.",
+        "en": "Photo assignment is stale or empty. Mark this finding's photos again.",
     },
     "walk.sheet.need_zone": {"ru": "Выберите зону", "en": "Choose a zone"},
     "walk.sheet.delete": {"ru": "Удалить запись", "en": "Delete the record"},

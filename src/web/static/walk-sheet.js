@@ -909,7 +909,14 @@
   }
 
   /** Модель предлагает кадры; выбранная человеком привязка хранится отдельно. */
-  function assignmentEnabled() { return recognizing() && f.found && f.found.length > 1; }
+  function assignmentEnabled() {
+    return recognizing() && f.found && f.found.length > 1 && readyFrameRefs().length !== 1;
+  }
+
+  /** Готовые кадры без повторов: один кадр привязан ко всем записям сам (D768). */
+  function readyFrameRefs() {
+    return readyPhotos().map(function (p) { return p.ref; }).filter(function (ref, i, all) { return all.indexOf(ref) === i; });
+  }
 
   function primaryPhotoCandidate() {
     if (f.picked) return f.picked;
@@ -941,20 +948,22 @@
     if (typeof count !== "number" || Math.floor(count) !== count || count < 0 || count !== modelRefs.length) {
       count = 0; modelRefs = [];
     }
+    var single = source.length === 1;
     var raw = validFrameIndices(cand.frame_indices, count);
     var proposed = raw ? raw.map(function (i) { return source.indexOf(modelRefs[i]); }) : [];
     if (proposed.some(function (i) { return i < 0; })) proposed = [];
+    var assigned = single ? [0] : snapshot === f.asked ? proposed : [];
     cand.photoAssignment = {
       key: key, source_photos: source, model_source_photos: modelRefs,
       model_frame_indices: raw,
-      assigned_frame_indices: snapshot === f.asked ? proposed : [], confirmed: false,
+      assigned_frame_indices: assigned, confirmed: assigned.length > 0,
     };
     return cand.photoAssignment;
   }
 
   function assignmentReady(cand) {
     var state = frameAssignment(cand);
-    return state.confirmed && state.assigned_frame_indices.length > 0;
+    return state.assigned_frame_indices.length > 0;
   }
 
   function assignmentPayload(cand) {
@@ -986,8 +995,9 @@
         state.assigned_frame_indices = state.assigned_frame_indices.filter(function (i) { return i !== index; });
         if (input.checked) state.assigned_frame_indices.push(index);
         state.assigned_frame_indices.sort(function (a, b) { return a - b; });
-        state.confirmed = false;
+        state.confirmed = state.assigned_frame_indices.length > 0;
         classSelectionChanged();
+        if (state.confirmed && classSelected(cand)) requestClass(cand);
         redraw("item", "level", "footer");
       });
       label.appendChild(input);
@@ -996,21 +1006,6 @@
       label.appendChild(el("span", null, tx("walk.sheet.photo_assignment.frame", { n: index + 1 })));
       box.appendChild(label);
     });
-    var label = el("label", "walk-option");
-    var confirm = document.createElement("input");
-    confirm.type = "checkbox";
-    confirm.setAttribute("data-photo-confirm", "");
-    confirm.checked = state.confirmed;
-    confirm.disabled = !state.assigned_frame_indices.length;
-    confirm.addEventListener("change", function () {
-      state.confirmed = confirm.checked;
-      classSelectionChanged();
-      if (confirm.checked && classSelected(cand)) requestClass(cand);
-      redraw("item", "level", "footer");
-    });
-    label.appendChild(confirm);
-    label.appendChild(el("span", null, tx("walk.sheet.photo_assignment.confirm")));
-    box.appendChild(label);
     return box;
   }
 
