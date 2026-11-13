@@ -432,7 +432,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,pushed,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_limits,unit_profiles,unit_scores,units}.py -->
+<!-- map:begin files src/db/{accept,duplicates,photo_intake,bot_langs,bot_links,auditor_card,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,inspection_edits,letters,mcp_access,move,push,pushed,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,trips,unit_limits,unit_profiles,unit_scores,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -441,6 +441,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/bot_links.py` | Привязка бота к учётке через веб (D286): выпуск ссылки, погашение, привязка, отвязка |
 | `src/db/checklist_langs.py` | Язык чек-листа, выбранный аудитором при старте проверки (D451): чтение и запись |
 | `src/db/directory.py` | T092: справочник точек и карта синонимов |
+| `src/db/duplicates.py` | Та же проверка, заведённая второй раз с другой датой (#1635) |
 | `src/db/fingerprint.py` | Отпечаток содержимого завершённой проверки |
 | `src/db/finish_modes.py` | Режим «Завершить» в мини-аппе, выбранный аудитором (D449): чтение и запись |
 | `src/db/imports.py` | Загрузка проверки задним числом поштучно: черновик, записи, кадры (D305–D310, D334) |
@@ -1205,7 +1206,7 @@ Telegram, ни HTTP, ни SQL.
 | `scripts/accept-clone.sh` | Свежий клон main для приёмки: клонирует, подкладывает данные вне git, ставит окружение |
 | `scripts/check_run_complete.py` | Сторож полноты прогона: краснеет, когда проверки не выполнялись |
 | `scripts/deploy.sh` | Раскатка на площадку одной командой (T246, #201) |
-| `scripts/duplicate_visits.py` | Найти проверки-дубли (одна проверка в базе дважды с разными датами) и, по команде, снять лишнюю (#1635) |
+| `scripts/duplicate_visits.py` | Найти проверки-дубли — одну проверку в базе дважды с разными датами (#1635) |
 | `scripts/prod-update.sh` | Обновление прода на Linux (VPS) — запускается НА САМОМ СЕРВЕРЕ из каталога репозитория |
 | `scripts/smoke.sh` | Смоук раскатанного бота на целевой площадке |
 | `scripts/verify-source.sh` | Сверка источника перед сборкой образа (см |
