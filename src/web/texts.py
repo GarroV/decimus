@@ -1329,7 +1329,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "already scored stay on their own version and are not recalculated."
         ),
     },
-    "methodology.count": {"ru": "Пунктов: {count}", "en": "{count} items"},
     # --- чек-листы как сущности (T347) ---------------------------------------
     #
     # Продукт несёт не один эталон, а много: девелоперский аудит, аудит РНД,
@@ -1582,7 +1581,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Inspections in progress are not affected: they finish on the checklist "
         "they were started with.",
     },
-    "methodology.bot.items": {"ru": "пунктов: {count}", "en": "items: {count}"},
     "methodology.bot.on": {"ru": "в боте", "en": "in bot"},
     "methodology.bot.off": {"ru": "выключен", "en": "off"},
     "methodology.bot.toggle": {"ru": "Доступ в боте: {name}", "en": "Bot access: {name}"},

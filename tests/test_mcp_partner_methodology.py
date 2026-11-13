@@ -26,7 +26,7 @@ from src.mcp.checklist_tools import uncovered_phrases
 from src.mcp.checklists import create
 from src.mcp.config import MIN_TOKEN_LENGTH, Settings
 from src.mcp.errors import ToolError
-from src.mcp.rpc import ETALON_READONLY_FOR_PARTNER, ROLE_CLOSED
+from src.mcp.rpc import ETALON_READONLY_FOR_PARTNER, PROD_POINTER_HQ_ONLY, ROLE_CLOSED
 from src.mcp.server import _checklist_for, _checklist_source_for
 
 ПАРТНЁР = "GE"
@@ -293,3 +293,55 @@ def test_накопитель_слов_аудиторов_партнёру_не_
             tenant=ПАРТНЁР, store=Store(root=настройки.checklist_store, live=настройки.data_dir)
         )
     assert адрес["read_all_called"] is False
+
+
+# --- D761 п.4: эталон УК партнёру — только чтение, ни одним пишущим инструментом ---------
+
+ПИШУЩИЕ_ИНСТРУМЕНТЫ = sorted(
+    spec.name for spec in TOOLS if spec.kind == KIND_CHECKLIST and spec.writes
+)
+
+
+def _годные_аргументы(имя: str) -> dict[str, Any]:
+    """Аргументы, проходящие разбор схемы инструмента: отказ тогда может быть только по праву."""
+    схема = next(spec for spec in TOOLS if spec.name == имя).input_schema
+    свойства: dict[str, Any] = dict(схема.get("properties", {}))  # type: ignore[call-overload]
+    годные: dict[str, Any] = {}
+    for ключ in schema_required(схема):
+        описание = свойства.get(ключ, {})
+        if "enum" in описание:
+            годные[ключ] = описание["enum"][0]
+        else:
+            годные[ключ] = {
+                "integer": 1,
+                "number": 1,
+                "boolean": True,
+                "array": [],
+                "object": {},
+            }.get(описание.get("type"), "x")
+    годные["checklist"] = "bizdev"
+    return годные
+
+
+def schema_required(схема: dict[str, object]) -> list[str]:
+    return [str(k) for k in схема.get("required", [])]  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("роль", ["admin", "auditor"])
+@pytest.mark.parametrize("инструмент", ПИШУЩИЕ_ИНСТРУМЕНТЫ)
+def test_партнёр_не_меняет_эталон_УК_ни_одним_пишущим_инструментом(
+    настройки: Settings, инструмент: str, роль: str
+) -> None:
+    """Каждый пишущий инструмент методики с годными аргументами и кодом эталона: отказ и
+    эталон байт в байт прежний. Отказ — по праву (роль или эталон), а не по схеме."""
+    до = _снимок(настройки)
+
+    ответ = _вызов(инструмент, _годные_аргументы(инструмент), настройки, role=роль)
+
+    assert _отказ(ответ), f"{инструмент}: партнёру не отказано"
+    assert _текст(ответ) in (
+        ETALON_READONLY_FOR_PARTNER.format(код="bizdev"),
+        ROLE_CLOSED.format(роль=роль),
+        PROD_POINTER_HQ_ONLY,
+    ), f"{инструмент}: отказ не по праву — тест проверяет не то: {_текст(ответ)[:200]}"
+    assert _снимок(настройки) == до
