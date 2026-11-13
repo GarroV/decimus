@@ -60,6 +60,8 @@ def _scope(row: fresh.Row, lang: str) -> str:
 
 
 def _name(row: fresh.Row, lang: str, agg_names: dict[str, str]) -> str:
+    if row.kind == fresh.KIND_AGG and row.count:
+        return t("ratings.fresh.name.agg_all", lang, n=row.count)
     if row.kind == fresh.KIND_AGG:
         return agg_names.get(row.code, row.code)
     return t(f"ratings.fresh.name.{row.kind}", lang)
@@ -72,9 +74,18 @@ def _arrived(row: fresh.Row, lang: str) -> str:
 
 
 def lines_of(
-    rows: tuple[fresh.Row, ...], lang: str, agg_names: dict[str, str]
+    rows: tuple[fresh.Row, ...],
+    lang: str,
+    agg_names: dict[str, str],
+    section: str | None = None,
 ) -> FreshTable | None:
-    """Строки для шаблона и худший цвет; `None` — строк нет."""
+    """Строки для шаблона и худший цвет; `None` — строк нет.
+
+    У «Пиццерий в зоне риска» таблица короче остальных: только источники, из которых
+    сделан раздел, а площадки доставки — одной строкой (владелец 13.11.2026).
+    """
+    if section == RISK_SECTION:
+        rows = fresh.collapse_aggregators(_of_section(rows, section))
     worst = fresh.worst(r.status for r in rows)
     if worst is None:
         return None
@@ -103,6 +114,7 @@ def read_rows(now: datetime) -> tuple[fresh.Row, ...]:
     aggregators = {s.aggregator: s.last_ok for s in agg_store.load_states() if s.last_ok}
     return fresh.build(
         today=now.astimezone(fresh.local_zone()).date(),
+        now=now,
         rs=facts.get(fresh.KIND_RS),
         rko=facts.get(fresh.KIND_RKO),
         sheet_checked=read.sheet_last_checked(),
@@ -124,14 +136,15 @@ def build(
 
 
 #: Источники раздела (D660): по ним считается точка в подменю и строка в шапке. У
-#: «Стабильно ниже порога» и «Девелоперов и стран» своего источника нет — берётся худший
+#: «Пиццерии в зоне риска» и «Девелоперов и стран» своего источника нет — берётся худший
 #: из тех, из которых они сделаны; у «Оценок клиентов» источника ещё нет — точки нет.
+RISK_SECTION = "risk"
 SECTION_SOURCES: dict[str, tuple[str, ...]] = {
     "rs": (fresh.KIND_RS,),
     "rko": (fresh.KIND_RKO,),
     "maps": (fresh.KIND_MAPS,),
     "agg": (fresh.KIND_AGG,),
-    "risk": (fresh.KIND_RS, fresh.KIND_RKO, fresh.KIND_AGG),
+    RISK_SECTION: (fresh.KIND_RS, fresh.KIND_RKO, fresh.KIND_AGG),
     "compare": (fresh.KIND_RS, fresh.KIND_RKO),
 }
 

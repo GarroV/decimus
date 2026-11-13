@@ -18,7 +18,7 @@ SECTION_TEXTS: dict[str, dict[str, str]] = {
     "ratings.sec.clients": {"ru": "Оценки клиентов", "en": "Customer ratings"},
     "ratings.sec.maps": {"ru": "Карты", "en": "Maps"},
     "ratings.sec.agg": {"ru": "Агрегаторы", "en": "Delivery apps"},
-    "ratings.sec.risk": {"ru": "Стабильно ниже порога", "en": "Consistently below threshold"},
+    "ratings.sec.risk": {"ru": "Пиццерии в зоне риска", "en": "Pizzerias at risk"},
     "ratings.sec.compare": {"ru": "Девелоперы и страны", "en": "Developers and countries"},
     "ratings.sec.fresh.rs": {
         "ru": "Данные за {span}, пришли {at}",
@@ -176,7 +176,6 @@ SECTION_TEXTS.update(
         "ratings.d746.country_topics": {"ru": "Рейтинги страны", "en": "Country ratings"},
         "ratings.d746.periods.rs": {"ru": "Периоды РС", "en": "RS periods"},
         "ratings.d746.periods.rko": {"ru": "Недели РКО", "en": "CER weeks"},
-        "ratings.d746.actual_dates": {"ru": "Даты периодов Dodo IS", "en": "Dodo IS period dates"},
         "ratings.d746.period.closed": {"ru": "завершился", "en": "ended"},
         "ratings.d746.period.current": {"ru": "идёт", "en": "in progress"},
         "ratings.d746.period.upcoming": {"ru": "впереди", "en": "upcoming"},
@@ -253,8 +252,8 @@ SECTION_TEXTS.update(
 SECTION_TEXTS["ratings.d746.bar_scale"] = {"ru": "Шкала полос: 70–100", "en": "Bar scale: 70–100"}
 
 SECTION_TEXTS["ratings.d746.period_units"] = {
-    "ru": "Dodo IS: пиццерий {n}",
-    "en": "Dodo IS: {n} pizzerias",
+    "ru": "пиццерий: {n}",
+    "en": "pizzerias: {n}",
 }
 
 SECTION_TEXTS.update(

@@ -1,29 +1,27 @@
+{#- Периоды РС и недели РКО: компактные плитки фиксированной ширины, сверху оценка, под ней даты
+    и число пиццерий. «Завершился» не пишем (это норма), помечен только идущий. Клик сужает
+    экран до периода; происхождение оценок — под «?» у заголовка, не подписью. -#}
 {% from 'ratings/_macros.html' import num with context %}
+{% from '_info_tip.html' import info_tip %}
+{% macro ptile(tile, cls) %}<a class="{{ cls }} rt-period--{{ tile.state }}{% if selection.period.key == tile.key %} is-selected{% endif %}"{% if selection.period.key == tile.key %} aria-current="true"{% endif %} href="{{ section_url(src.kind, period_window=tile.key) }}" data-source-period="{{ tile.key }}">
+        <strong>{{ num(tile.avg) }}</strong>
+        <span class="rt-period__dates">{{ tile.begin_on.strftime('%d.%m') }} — {{ tile.end_on.strftime('%d.%m') }}</span>
+        <small>{{ t('ratings.d746.period_units', n=tile.units) }}</small>
+        {% if tile.state == 'current' %}<span class="rt-period__state">{{ t('ratings.d746.period.current') }}</span>{% endif %}
+      </a>{% endmacro %}
 {% if period_cards %}
 <section class="rt-periods" aria-label="{{ t('ratings.d746.periods.' ~ src.kind) }}">
+  <header class="info-row"><h2>{{ t('ratings.d746.periods.' ~ src.kind) }}</h2>{{ info_tip(t('ratings.tip.label'), '', [t('ratings.d746.source.' ~ (period_cards.source or 'none'))], 'periods-' ~ src.kind) }}</header>
   {% if src.kind == 'rko' %}<a class="rt-period-reset" href="{{ section_url(src.kind, period_window=period_context or selection.period.key) }}">{{ t('ratings.d746.whole_period') }} · {{ context_period_title }} →</a>{% endif %}
-  <header><h2>{{ t('ratings.d746.periods.' ~ src.kind) }}</h2><span>{{ t('ratings.d746.actual_dates') }}</span></header>
   {% if period_cards.tiles %}
-    {% if src.kind == 'rko' %}
-    <div class="rt-weeks">
+    <div class="rt-months">
+    {% if src.kind != 'rko' %}{% set all_on = not period_context and selection.period.kind not in ('range', 'rating') %}<section class="rt-month"><div class="rt-month__tiles">
+      <a class="rt-period rt-period--all{% if all_on %} is-selected{% endif %}" href="{{ section_url(src.kind, period_window=period_context or selection.period.key) }}"{% if all_on %} aria-current="true"{% endif %}><b>{{ t('ratings.d746.whole_period') }}</b><span class="rt-period__dates">{{ context_period_title }}</span><small>{{ t('ratings.d746.period_average') }}</small></a>
+    </div></section>{% endif %}
     {% for month, tiles in period_months %}<section class="rt-month"><h3>{{ month_title(month) }}</h3>
-      {% for tile in tiles %}<a class="rt-week rt-period--{{ tile.state }}{% if selection.period.key == tile.key %} is-selected{% endif %}"{% if selection.period.key == tile.key %} aria-current="true"{% endif %} href="{{ section_url(src.kind, period_window=tile.key) }}" data-source-period="{{ tile.key }}">
-        <span class="rt-period__dates">{{ tile.begin_on.strftime('%d.%m') }} — {{ tile.end_on.strftime('%d.%m') }}</span>
-        <strong>{{ num(tile.avg) }}</strong><small>{{ t('ratings.d746.period.' ~ tile.state) }} · {{ t('ratings.d746.period_units', n=tile.units) }}</small>
-      </a>{% endfor %}
+      <div class="rt-month__tiles">{% for tile in tiles %}{{ ptile(tile, 'rt-week' if src.kind == 'rko' else 'rt-period') }}{% endfor %}</div>
     </section>{% endfor %}
     </div>
-    {% else %}
-    <div class="rt-period-grid">
-      <a class="rt-period rt-period--all{% if not period_context and selection.period.kind not in ('range', 'rating') %} is-selected{% endif %}" href="{{ section_url(src.kind, period_window=period_context or selection.period.key) }}"{% if not period_context and selection.period.kind not in ('range', 'rating') %} aria-current="true"{% endif %}><b>{{ t('ratings.d746.whole_period') }}</b><span>{{ context_period_title }}</span><small>{{ t('ratings.d746.period_average') }}</small></a>
-      {% for month, tiles in period_months %}{% for tile in tiles %}
-      <a class="rt-period rt-period--{{ tile.state }}{% if selection.period.key == tile.key %} is-selected{% endif %}"{% if selection.period.key == tile.key %} aria-current="true"{% endif %} href="{{ section_url(src.kind, period_window=tile.key) }}" data-source-period="{{ tile.key }}">
-        <span class="rt-period__heading"><b>{{ month_title(month) }} · {{ loop.index }}</b><span class="rt-period__state">{{ t('ratings.d746.period.' ~ tile.state) }}</span></span>
-        <span class="rt-period__dates">{{ tile.begin_on.strftime('%d.%m') }} — {{ tile.end_on.strftime('%d.%m') }}</span>
-        <strong>{{ num(tile.avg) }}</strong><small>{{ t('ratings.d746.period_units', n=tile.units) }}</small>
-      </a>{% endfor %}{% endfor %}</div>
-    {% endif %}
   {% else %}<p class="rt-empty">{{ t('ratings.d746.no_actual_periods') }}</p>{% endif %}
-  <p class="rt-periods__source">{{ t('ratings.d746.source.' ~ (period_cards.source or 'none')) }}</p>
 </section>
 {% endif %}

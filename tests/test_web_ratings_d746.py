@@ -432,7 +432,7 @@ def test_dialog_keyboard_focus_and_responsive_rating_controls(
         html = page_html(client, f"/ratings/rs?period=2026-Q4&lang={lang}")
     load_browser(page, html, width)
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
-    trigger = page.locator("[data-violations-dialog] > summary")
+    trigger = page.locator("[data-open-violations]")
     trigger.click()
     panel = page.locator('[role="dialog"]')
     page.wait_for_function("document.querySelector('[data-violations-dialog]').open")
@@ -474,15 +474,13 @@ def test_dialog_binds_after_partial_ratings_navigation(monkeypatch, browser_page
       old.replaceWith(fresh);
       document.dispatchEvent(new CustomEvent('decimus:ratings'));
     }""")
-    page.locator("[data-violations-dialog] > summary").click()
+    page.locator("[data-open-violations]").click()
     page.wait_for_function(
         "document.activeElement===document.querySelector('[data-close-violations]')"
     )
     page.keyboard.press("Escape")
     assert not page.locator("[data-violations-dialog]").evaluate("e=>e.open")
-    assert page.locator("[data-violations-dialog] > summary").evaluate(
-        "e=>e===document.activeElement"
-    )
+    assert page.locator("[data-open-violations]").evaluate("e=>e===document.activeElement")
 
 
 def gallery_contracts(monkeypatch):
@@ -885,3 +883,23 @@ def test_violation_escape_closes_when_focus_is_still_outside_modal(monkeypatch, 
     opener.focus()
     page.keyboard.press("Escape")
     page.wait_for_function("!document.querySelector('[data-violations-dialog]').open")
+
+
+@pytest.mark.parametrize("lang", ["ru", "en"])
+def test_period_tiles_are_compact_and_summary_tiles_carry_no_service_text(monkeypatch, lang):
+    """D766: у плитки периода нет «завершился» и служебных подписей, «Нарушений» — сама ссылка."""
+    with surface(monkeypatch, lang=lang) as (client, _state):
+        html = page_html(client, f"/ratings/rko?period=2026-Q4&lang={lang}")
+    for gone in ("Даты периодов Dodo IS", "Dodo IS period dates", "завершился", "ended"):
+        assert gone not in html
+    assert 'class="rt-week' in html and "<strong>" in html
+    # Служебное про происхождение оценок — под «?», а не подписью внизу блока.
+    assert "rt-periods__source" not in html
+    assert 'id="info-periods-rko"' in html
+    # Длинное пояснение плитки «Пиццерий с оценкой» лежит под «?», не в самой плитке.
+    assert 'id="info-tile-scored"' in html
+    assert 'pk-tile__sub">Число обязательных' not in html
+    assert 'pk-tile__sub">The number' not in html
+    # Плитка «Нарушений» открывает разбор сама, кнопки рядом с ней нет.
+    assert re.search(r'<a class="pk-tile pk-tile--link"[^>]*data-open-violations', html)
+    assert '<summary class="btn' not in html

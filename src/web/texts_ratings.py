@@ -61,6 +61,7 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.fresh.name.rs": {"ru": "РС", "en": "Standards"},
     "ratings.fresh.name.rko": {"ru": "РКО", "en": "Customer exp."},
     "ratings.fresh.name.sheet": {"ru": "Таблица контроля", "en": "Control spreadsheet"},
+    "ratings.fresh.name.agg_all": {"ru": "Площадки доставки ({n})", "en": "Delivery apps ({n})"},
     "ratings.fresh.name.maps": {"ru": "Карты (Google, Яндекс)", "en": "Maps (Google, Yandex)"},
     "ratings.fresh.scope.rs": {"ru": "за {span}", "en": "for {span}"},
     "ratings.fresh.scope.rko": {"ru": "неделя {span}", "en": "week {span}"},
@@ -129,24 +130,31 @@ _SCREEN: dict[str, dict[str, str]] = {
         "en": "Pizzerias consistently low by any source",
     },
     "ratings.col.sources": {"ru": "Где ниже порога", "en": "Below the threshold in"},
+    "ratings.risk.hint.lead": {
+        "ru": "Пиццерия попадает сюда, если хотя бы в одном источнике она стабильно ниже порога.",
+        "en": (
+            "A pizzeria is listed here if it is consistently below the threshold "
+            "in at least one source."
+        ),
+    },
     "ratings.risk.hint.rs": {
-        "ru": "РС и РКО: средняя ниже {x} (последних периодов: {n}).",
-        "en": "Standards and customer experience: average below {x} (last periods: {n}).",
+        "ru": "РС и РКО — средняя ниже {x} за последние периоды (их {n}).",
+        "en": "Standards and customer experience: average below {x} over the last {n} periods.",
     },
     "ratings.risk.hint.agg": {
         "ru": (
-            "Площадки доставки: оценка ниже порога площадки в каждом из последних "
-            "снимков (их {agg}). Порог: Wolt — {wolt} из 10, Glovo — {glovo} %, "
-            "остальные — {share} % шкалы."
+            "Площадки доставки — оценка ниже порога площадки в каждом из последних {agg} снимков "
+            "(Wolt — ниже {wolt} из 10, Glovo — ниже {glovo} %, остальные — ниже {share} % шкалы)."
         ),
         "en": (
-            "Delivery apps: rating below the app's threshold in each of the last "
-            "{agg} snapshots. Threshold: Wolt {wolt} of 10, Glovo {glovo}%, others "
-            "{share}% of the scale."
+            "Delivery apps: rating below the app's threshold in each of the last {agg} snapshots "
+            "(Wolt below {wolt} of 10, Glovo below {glovo}%, others below {share}% of the scale)."
         ),
     },
     "ratings.risk.hint.insp": {
-        "ru": "Наши проверки: оценка ниже {x} в каждой из последних принятых проверок (их {insp}).",
+        "ru": (
+            "Наши проверки — оценка ниже {x} в каждой из последних принятых проверок (их {insp})."
+        ),
         "en": "Our inspections: score below {x} in each of the last {insp} accepted inspections.",
     },
     "ratings.risk.src.inspections": {"ru": "Наши проверки", "en": "Our inspections"},

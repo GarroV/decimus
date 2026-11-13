@@ -18,8 +18,9 @@
 {% macro unit_link(unit, name, kind) %}<a href="{{ unit_url(unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ name }}</a>{% endmacro %}
 {#- Оценка агрегатора в его родной шкале: Wolt — из 10, Glovo — %, остальные — из 5. -#}
 {% macro agg_score(avg, scale) %}{% if scale == 100 %}{{ '%.1f'|format(avg) }}%{% elif scale == 10 %}{{ '%.1f'|format(avg) }}<span class="rt-src__scale">/10</span>{% else %}{{ '%.2f'|format(avg) }}{% endif %}{% endmacro %}
-{#- Плитка ключевой цифры раздела: подпись, значение, строка под ним. -#}
-{% macro stat(label, sub=none) %}<div class="pk-tile"><div class="pk-tile__label">{{ label }}</div><div class="pk-tile__value">{{ caller() }}</div>{% if sub %}<div class="pk-tile__sub">{{ sub }}</div>{% endif %}</div>{% endmacro %}
+{#- Плитка ключевой цифры раздела: подпись, значение, строка под ним. `tip` — строки под «?» рядом с
+    подписью (длинное пояснение не лежит в плитке); `href` — плитка-ссылка (открывает разбор), `key` — id значка. -#}
+{% macro stat(label, sub=none, tip=none, href=none, key='stat') %}{% if href %}<a class="pk-tile pk-tile--link" href="{{ href }}" data-open-violations><div class="pk-tile__label">{{ label }}</div><div class="pk-tile__value">{{ caller() }}</div>{% if sub %}<div class="pk-tile__sub">{{ sub }}</div>{% endif %}</a>{% else %}<div class="pk-tile">{% if tip %}<div class="pk-tile__head info-row"><div class="pk-tile__label">{{ label }}</div>{{ info_tip(t('ratings.tip.label'), '', tip, 'tile-' ~ key) }}</div>{% else %}<div class="pk-tile__label">{{ label }}</div>{% endif %}<div class="pk-tile__value">{{ caller() }}</div>{% if sub %}<div class="pk-tile__sub">{{ sub }}</div>{% endif %}</div>{% endif %}{% endmacro %}
 {% macro rank_item(u, kind) %}<li>
     {% set m = unit_maps.get(u.unit) %}
     <span class="rt-rank__name">{{ unit_link(u.unit, u.unit_name, kind) }}<small>{{ country_name(u.country) }}{% if m %} · <span class="rt-rank__map" title="{{ t('ratings.maps.unit_title', n=m[1]) }}">Google {{ '%.1f'|format(m[0]) }}</span>{% endif %}</small></span>
