@@ -34,6 +34,7 @@ from src.domain.second_factor import (  # noqa: E402
     totp_step_now,
 )
 from src.web import auth, landing, oauth, second_step  # noqa: E402
+from src.web.texts import t  # noqa: E402
 
 pytestmark = requires_db
 
@@ -135,6 +136,64 @@ def _код(секрет: str, шаг: int) -> str:
 
 def _ввести_код(client: FlaskClient, код: str) -> int:
     return client.post(f"{STEP}/code", data={"code": код}, headers=HDR).status_code
+
+
+@pytest.mark.parametrize("role", ["admin", "auditor"])
+@pytest.mark.parametrize("with_factor", [False, True])
+def test_partner_soft_second_factor_enrollment(
+    стенд: Стенд, monkeypatch: pytest.MonkeyPatch, role: str, with_factor: bool
+) -> None:
+    """До подключения пароль открывает страницы; после подключения нужен код."""
+    monkeypatch.setattr(second_step, "REQUIRE_KEY_AT_LOGIN", True)
+    monkeypatch.setattr(second_step, "ENFORCE_ENROLL", True)
+    завести_пространства(стенд.dsn, "partner-login")
+    create_account("partner-login", tenant="partner-login", password=ПАРОЛЬ, role=role)
+    account = authenticate("partner-login", ПАРОЛЬ)
+    assert account is not None
+    стенд.ид["partner-login"] = account.id
+    if with_factor:
+        секрет = стенд.с_приложением("partner-login")
+    response = стенд.вход_паролем("partner-login")
+    assert response.status_code == 302
+    if with_factor:
+        assert STEP in response.location
+        assert not _сессия(стенд.client)
+        assert стенд.client.get("/settings").status_code == 302
+        assert _ввести_код(стенд.client, _код(секрет, totp_step_now())) == 302
+        page = стенд.client.get("/settings")
+        assert page.status_code == 200
+        assert b"data-security-reminder" not in page.data
+        assert b"data-passkey-here" not in page.data
+        return
+    assert STEP not in response.location
+    assert _сессия(стенд.client)
+    page = стенд.client.get("/settings")
+    assert page.status_code == 200
+    assert b"data-passkey-here" not in page.data
+    assert b"data-security-reminder" in page.data
+    assert стенд.sql("select second_step_at from web_sessions where user_id = %s", account.id) == [
+        (None,)
+    ]
+    security = стенд.client.get(SECURITY)
+    assert security.status_code == 200
+    assert b"data-security-reminder" not in security.data
+    assert t("sf.sec.required", "ru") not in security.get_data(as_text=True)
+    assert t("sf.partner.optional", "ru") in security.get_data(as_text=True)
+    assert стенд.client.post(f"{SECURITY}/totp/start", headers=HDR).status_code == 200
+    setup = sf.totp_of(account.id)
+    assert setup is not None
+    confirm = стенд.client.post(
+        f"{SECURITY}/totp/confirm",
+        data={"code": _код(setup.secret, totp_step_now() - 1)},
+        headers=HDR,
+    )
+    assert confirm.status_code == 200
+    assert b"data-security-reminder" not in стенд.client.get("/settings").data
+    assert стенд.client.post("/logout", headers=HDR).status_code == 302
+    assert STEP in стенд.вход_паролем("partner-login").location
+    assert not _сессия(стенд.client)
+    assert _ввести_код(стенд.client, _код(setup.secret, totp_step_now())) == 302
+    assert стенд.client.get("/settings").status_code == 200
 
 
 # --- полувход не открывает ничего --------------------------------------------

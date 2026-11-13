@@ -441,8 +441,8 @@ _SPACES: dict[str, dict[str, str]] = {
     "users.spaces.add.name": {"ru": "Название", "en": "Name"},
     "users.spaces.add.countries": {"ru": "Страна", "en": "Country"},
     "users.spaces.add.countries_hint": {
-        "ru": "Пиццерии этой страны увидит партнёр. Вторую страну — в карточке пространства. Занятые страны недоступны: одна страна — один партнёр.",
-        "en": "The partner sees this country's pizzerias. Add a second one on the space card. Taken countries are greyed out: one country — one partner.",
+        "ru": "Пиццерии этой страны увидит партнёр. Вторую страну — в карточке пространства. Занятые страны недоступны: одна страна — один партнёр.",  # noqa: E501
+        "en": "The partner sees this country's pizzerias. Add a second one on the space card. Taken countries are greyed out: one country — one partner.",  # noqa: E501
     },
     "users.spaces.add.submit": {"ru": "Добавить", "en": "Add"},
     "users.spaces.countries.add": {"ru": "Добавить страну", "en": "Add a country"},

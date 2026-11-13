@@ -130,7 +130,7 @@
           </div>
           {% elif tile == 'security' %}
           <div class="ssec" id="security">
-            <p class="ssec__text"><span class="sdot{% if me.has_second_factor %} sdot--ok{% endif %}"></span>{{ t('sf.sec.status_on' if me.has_second_factor else 'sf.sec.status_off') }} · {{ t('sf.sec.card') }}</p>
+            <p class="ssec__text"><span class="sdot{% if me.has_second_factor %} sdot--ok{% endif %}"></span>{{ t('sf.sec.status_on' if me.has_second_factor else 'sf.sec.status_off') }} · {{ t('sf.partner.card' if tenant != 'HQ' else 'sf.sec.card') }}</p>
             <a class="sbtn sbtn--primary" href="{{ url('/settings/security') }}?lang={{ lang }}">{{ t('sf.sec.open') }}</a>
           </div>
           {% elif tile == 'signins' %}
