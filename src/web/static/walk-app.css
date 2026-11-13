@@ -199,6 +199,22 @@
   color: var(--ink-inverse);
 }
 
+/* Язык интерфейса и подсказки — родной выпадающий список (D743), в духе веба. */
+.walk-app__select {
+  flex: none;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--line-control);
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* Пилюля на всю ширину: режим «Завершить» (D449) и язык отчёта в подтверждении. */
 .walk-app__lang--wide { display: flex; width: 100%; }
 

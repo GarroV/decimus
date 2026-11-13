@@ -122,14 +122,16 @@
 
 | Где | Сейчас |
 |---|---|
-| Язык сайта: шапка, меню учётки, лендинг, «Настройки» — `templates/_langpick.html` | пилюля сегментами (`.langpill`) |
-| Вход — `templates/_login_lang.html` | пилюля; при > 2 языках — меню `<details>` |
-| Язык письма — `_letter_form.html`, `country/_batch.html` | `<select class="pickselect">` |
+| Язык сайта: шапка, меню учётки, лендинг, «Настройки» — `templates/_langpick.html` | `<select class="pickselect langsel__select">` с кодами `RU`/`EN`/`TR`, сам отправляет форму (`pick.js`), без скрипта — кнопка в `<noscript>` |
+| Вход — `templates/_login_lang.html` | тот же список в правом верхнем углу, любое число языков |
+| Язык письма — `_letter_form.html`, `country/_batch.html` | `<select class="pickselect">`, пункты — коды заглавными |
 | Языки отчёта страны — `country/_settings.html` | флажки |
-| Мини-апп: язык интерфейса, язык отчёта, подсказки — `walk-app.js`, `walk-finish.js`, `walk-hints.js` | пилюля |
+| Мини-апп: язык интерфейса, подсказки — `walk-app.js`, `walk-hints.js` | родной `<select class="walk-app__select">` (язык — кодами) |
+| Мини-апп: язык отчёта — `walk-finish.js`, `walk-finish-native.js` | пилюля (заменит другой этап #1619 флажками) |
 
 D743: переключатели языка — выпадающим списком в дизайне forma, языки кодами
-(`RU`, `EN`, `TR`). Пока — прежние: турецкий в них появляется там, где страна его предлагает
+(`RU`, `EN`, `TR`); сделано для сайта, входа и мини-аппа (кроме языка отчёта). Пилюля
+`.langpill` осталась только в копии дизайн-системы `dodo-ds.css` — это дело forma. Турецкий в них появляется там, где страна его предлагает
 (кнопки бота `report_lang_keyboard`, пилюли мини-аппа `walk-finish.js`, флажки «Страны»);
 подписи — `REPORT_LANG_LABELS` (`src/bot/keyboards.py`), `nav.lang.tr` и `lang.name.tr` в
 `src/web/texts.py`.

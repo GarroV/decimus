@@ -1,32 +1,32 @@
 {#
-  Выбор языка интерфейса — пилюлей ядра (`.langpill`, forma 30.09.2026):
-  одна капсула, текущий сегмент залит мягким акцентом, как текущая тема рядом.
+  Выбор языка интерфейса — выпадающий список с кодами языков (`RU`, `EN`, `TR`),
+  D743: один вид на все переключатели языка. Полное название — в `title` пункта.
 
-  Форма GET, а не ссылки: сегмент — кнопка с aria-pressed, читалка говорит
-  «нажата», а не «ссылка». Работает без скрипта. Прочие параметры адреса
-  (отбор, страница) едут скрытыми полями: смена языка не должна сбрасывать
+  Выбор отправляет форму сам (`pick.js`, `data-lang-submit`); без скрипта рядом
+  появляется кнопка из <noscript>. Форма GET, а не ссылки: прочие параметры адреса
+  (отбор, страница) едут скрытыми полями — смена языка не должна сбрасывать
   выборку, которую человек только что собрал.
 #}
+{% macro lang_select() %}
+  <select class="pickselect langsel__select" name="lang" data-lang-submit aria-label="{{ t('nav.lang') }}">
+    {% for code in langs %}
+      <option value="{{ code }}" lang="{{ code }}" title="{{ t('nav.lang.' ~ code) }}"{% if code == lang %} selected{% endif %}>{{ code|upper }}</option>
+    {% endfor %}
+  </select>
+  <noscript><button class="langsel__go" type="submit">{{ t('nav.lang.apply') }}</button></noscript>
+{% endmacro %}
 {% if account %}
 {# Вошедший: выбор сохраняется в профиль (D447) — форма POST, назад на эту же
    страницу с её параметрами, но без разового `?lang=`. #}
-<form class="langpill" method="post" action="{{ url(lang_save_path) }}" role="group" aria-label="{{ t('nav.lang') }}">
+<form class="langsel" method="post" action="{{ url(lang_save_path) }}">
   <input type="hidden" name="next" value="{{ lang_next() }}">
-  {% for code in langs %}
-    <button class="langpill__item" type="submit" name="lang" value="{{ code }}"
-            aria-pressed="{{ 'true' if code == lang else 'false' }}"
-            title="{{ t('nav.lang.' ~ code) }}" lang="{{ code }}">{{ code }}</button>
-  {% endfor %}
+  {{ lang_select() }}
 </form>
 {% else %}
-<form class="langpill" method="get" action="{{ url(current_path) }}" role="group" aria-label="{{ t('nav.lang') }}">
+<form class="langsel" method="get" action="{{ url(current_path) }}">
   {% for key, value in request.args.items(multi=True) if key != 'lang' %}
     <input type="hidden" name="{{ key }}" value="{{ value }}">
   {% endfor %}
-  {% for code in langs %}
-    <button class="langpill__item" type="submit" name="lang" value="{{ code }}"
-            aria-pressed="{{ 'true' if code == lang else 'false' }}"
-            title="{{ t('nav.lang.' ~ code) }}" lang="{{ code }}">{{ code }}</button>
-  {% endfor %}
+  {{ lang_select() }}
 </form>
 {% endif %}

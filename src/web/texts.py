@@ -75,6 +75,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.wip": {"ru": "в разработке", "en": "in progress"},
     "nav.lang": {"ru": "Язык интерфейса", "en": "Interface language"},
     # Название языка — на нём самом: ищущий свой язык читает его, а не перевод.
+    "nav.lang.apply": {"ru": "Выбрать", "en": "Apply"},
     "nav.lang.ru": {"ru": "Русский", "en": "Русский"},
     "nav.lang.en": {"ru": "English", "en": "English"},
     "nav.lang.tr": {"ru": "Türkçe", "en": "Türkçe"},

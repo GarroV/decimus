@@ -148,22 +148,22 @@
     return box;
   }
 
-  /** Язык интерфейса пилюлей в шапке главной (D414): тот же выбор, что в настройках. */
+  /** Язык интерфейса выпадающим списком кодов в шапке главной (D414, D743): тот же выбор, что в настройках. */
   function langPill() {
-    var pill = W.hinted(el("div", "walk-app__lang"), "lang");
-    pill.setAttribute("role", "group");
-    pill.setAttribute("aria-label", tx("walk.app.lang"));
+    var sel = W.hinted(el("select", "walk-app__select"), "lang");
+    sel.setAttribute("aria-label", tx("walk.app.lang"));
     (app().langs || []).forEach(function (l) {
-      var on = l.code === data().lang;
-      var b = W.button("walk-app__lang-opt" + (on ? " is-on" : ""), l.code.toUpperCase(), function () {
-        if (on) return;
-        act({ op: "lang", lang: l.code }).then(function (body) { if (body) W.apply(body); });
-      });
-      b.setAttribute("aria-label", l.label);
-      b.setAttribute("aria-pressed", on ? "true" : "false");
-      pill.appendChild(b);
+      var o = el("option", null, l.code.toUpperCase());
+      o.value = l.code;
+      o.title = l.label;
+      o.selected = l.code === data().lang;
+      sel.appendChild(o);
     });
-    return pill;
+    sel.addEventListener("change", function () {
+      if (sel.value === data().lang) return;
+      act({ op: "lang", lang: sel.value }).then(function (body) { if (body) W.apply(body); });
+    });
+    return sel;
   }
 
   /** Режим «Завершить» (D449): подпись, пилюля на всю ширину и строка пояснения. */

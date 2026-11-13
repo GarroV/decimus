@@ -332,20 +332,19 @@
   function settingsRows(list) {
     var box = el("div", "walk-app__row");
     box.appendChild(el("span", "walk-app__row-label", tx("walk.app.hints")));
-    var pill = el("div", "walk-app__lang");
-    pill.setAttribute("role", "group");
-    pill.setAttribute("aria-label", tx("walk.app.hints"));
+    var sel = el("select", "walk-app__select");
+    sel.setAttribute("aria-label", tx("walk.app.hints"));
     [[true, "walk.app.hints.on"], [false, "walk.app.hints.off"]].forEach(function (o) {
-      var on = hintsOn() === o[0];
-      var b = W.button("walk-app__lang-opt" + (on ? " is-on" : ""), tx(o[1]), function () {
-        if (on) return;
-        savePrefs({ hints: o[0] });
-        W.render();
-      });
-      b.setAttribute("aria-pressed", on ? "true" : "false");
-      pill.appendChild(b);
+      var opt = el("option", null, tx(o[1]));
+      opt.value = o[0] ? "1" : "0";
+      opt.selected = hintsOn() === o[0];
+      sel.appendChild(opt);
     });
-    box.appendChild(pill);
+    sel.addEventListener("change", function () {
+      savePrefs({ hints: sel.value === "1" });
+      W.render();
+    });
+    box.appendChild(sel);
     list.appendChild(box);
     var again = W.button("walk-app__row is-link walk-app__row--quiet", null, function () {
       savePrefs({ welcomed: true, home: false, walk: false });

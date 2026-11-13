@@ -96,31 +96,8 @@
 .login__foot p { margin: 0; text-wrap: balance; }
 .login__foot a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
 
-/* Язык — в правом верхнем углу; 2 языка — пилюля, больше — меню (D475) */
-.page--login > .langpill,
+/* Язык — в правом верхнем углу: выпадающий список с кодами (D743) */
 .login__lang { position: absolute; top: calc(var(--space-7) + env(safe-area-inset-top, 0px)); right: var(--space-7); margin: 0; z-index: 2; }
-.page--login > .langpill .langpill__item { min-width: 34px; height: 28px; }
-.login__langmenu { position: relative; }
-.login__langmenu summary {
-  display: grid; place-items: center; min-width: 44px; height: 44px; margin: -8px;
-  list-style: none; cursor: pointer; border-radius: var(--r-pill);
-  font-size: var(--fs-dense); font-weight: var(--w-medium); color: var(--ink-2); text-transform: uppercase;
-}
-.login__langmenu summary::-webkit-details-marker { display: none; }
-.login__langmenu summary:hover { color: var(--ink); }
-.login__langmenu summary:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
-.login__langlist {
-  position: absolute; right: 0; top: calc(100% + var(--space-4)); min-width: 10rem;
-  display: flex; flex-direction: column; padding: var(--space-2);
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block); box-shadow: var(--sh-card);
-}
-.login__langlist button {
-  min-height: 44px; padding: 0 var(--space-6); border: 0; border-radius: var(--r-control);
-  background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer;
-}
-.login__langlist button:hover { background: var(--surface-3); }
-.login__langlist button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); cursor: default; }
-.login__langlist button:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
 
 @media (max-width: 719px) {
   .page--login { padding: var(--space-12) var(--space-7) var(--space-10); }

@@ -150,7 +150,7 @@
     sameAll(doc, ".tabbar");
     sameAll(doc, ".sidenav__search");
     sameAll(doc, "[data-bell]");
-    sameAll(doc, "form.langpill");
+    sameAll(doc, "form.langsel");
     document.title = doc.title;
     if (push) {
       if (inPage && !(history.state && history.state.page)) {
