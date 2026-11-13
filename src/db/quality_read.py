@@ -87,6 +87,7 @@ from (
       and u.code is not null and u.merged_into is null
       and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
       and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
       and u.country = any(%(slice)s)
       and i.inspection_date >= %(begin)s::date and i.inspection_date < %(end)s::date
 ) последние
