@@ -307,8 +307,9 @@ def test_карточку_страны_открывает_каждый_кому_
     _пиццерии(monkeypatch)
     monkeypatch.setattr(country_contacts, "for_country", lambda code: ())
     главная = открыть(девелопер, monkeypatch, данные(), "/country/GE")
-    assert "reference=partner" in главная and "reference=mailing" in главная
-    assert "Партнёр" in главная and "Почты для рассылки" in главная
+    # D766: кнопок «Партнёр» и «Почты для рассылки» на экране страны нет, адреса справки живы.
+    assert "reference=partner" not in главная and "reference=mailing" not in главная
+    assert "Почты для рассылки" not in главная
     действия = главная.split('class="cn-head__actions"', 1)[1].split("</div>", 1)[0]
     assert "settings=1" not in действия
     for справка in ("partner", "mailing"):

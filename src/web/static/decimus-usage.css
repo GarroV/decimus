@@ -2,7 +2,11 @@
    ядра (`.stats`), столбики по дням и строки со срезами. Цвета — токены ядра; светлая и
    тёмная темы работают без правок. Столбики — обычные блоки, без графической библиотеки. */
 
-.ustats { padding: var(--space-7); }
+.ustats { padding: var(--space-5) var(--space-7); grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); }
+.ustats .stat { padding: var(--space-3) var(--space-5); box-shadow: none; }
+.ustats .stat__value { margin-top: var(--space-1); font-size: 20px; line-height: 26px; }
+.usec__head.info-row { padding: 0; border-bottom: 0; margin: 0 0 var(--space-4); }
+.usec__head .usec__title { margin: 0; }
 .usec { padding: var(--space-6) var(--space-7) var(--space-4); border-top: 1px solid var(--line); }
 .usec__title { margin: 0 0 var(--space-4); font-family: var(--font-mono); font-size: 11px; line-height: 14px;
   font-weight: var(--w-semibold); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
@@ -35,8 +39,8 @@
 .ushare__fill { display: block; height: 100%; background: var(--accent); }
 
 @media (max-width: 860px) {
-  .ustats { padding: var(--space-5); grid-template-columns: 1fr 1fr; gap: var(--space-4); }
-  .ustats .stat { padding: var(--space-5); }
+  .ustats { padding: var(--space-5); grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+  .ustats .stat { padding: var(--space-3) var(--space-4); }
   .ulist .jcell:first-child::before { display: none; }
   .usec { padding: var(--space-5); }
   .usec .jlist { margin: 0 calc(var(--space-5) * -1); }

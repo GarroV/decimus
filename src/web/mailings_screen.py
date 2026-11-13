@@ -105,7 +105,12 @@ def _page(
         KindLine(kind, None if counts is None else counts.get(kind, 0)) for kind in SHOWN_KINDS
     )
     # Отказ сохранить шаблон приходит POST-ом без `kind`: страницу открываем на виде шаблона.
-    picked = templates_db.KIND_INSPECTION if selected else request.args.get("kind", "").strip()
+    # Без выбора открыт первый вид, как первая страна во вкладке «Страны» (D766).
+    picked = (
+        templates_db.KIND_INSPECTION
+        if selected
+        else request.args.get("kind", "").strip() or SHOWN_KINDS[0]
+    )
     if picked and picked not in SHOWN_KINDS:
         abort(404)
     emails: tuple[str, ...] | None = ()
