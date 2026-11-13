@@ -36,7 +36,13 @@
 {% block body %}
   <div class="sadmin">
     {{ admin_nav() }}
-    <div class="sadmin__main">{{ super() }}</div>
+    <div class="sadmin__main countryadmininline">
+      <section class="countryadmininline__list">{{ self.split_list() }}</section>
+      <section class="countryadmininline__detail">
+        <h2 class="sdetail__title">{{ self.split_title() }}</h2>
+        {{ self.split_detail() }}
+      </section>
+    </div>
   </div>
 {% endblock %}
 
@@ -54,7 +60,7 @@
       <div class="pk-rail__list">
         {% for line in lines %}
           {% set meta = '—' if line.cc_count is none else (t('mailings.cc.count', count=line.cc_count) if line.cc_count else t('mailings.cc.none')) %}
-          {{ pick_item(kind_url(line.kind), t('mailings.kind.' ~ line.kind), meta, on=(split_open and picked == line.kind), drawer=true) }}
+          {{ pick_item(kind_url(line.kind), t('mailings.kind.' ~ line.kind), meta, on=(split_open and picked == line.kind), drawer=false) }}
         {% endfor %}
       </div>
     </div>

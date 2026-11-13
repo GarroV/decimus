@@ -1,5 +1,6 @@
 {% extends "_split_page.html" %}
 {% from "administration/_nav.html" import admin_nav with context %}
+{% from "_pick_ui.html" import pick_item %}
 {% block title %}{{ t('administration.tab.aggregators') }} · {{ t('section.administration.title') }}{% endblock %}
 {% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endblock %}
 {% macro name(row) %}{{ row.name_en if lang == 'en' else row.name_ru }}{% endmacro %}
@@ -9,8 +10,7 @@
 {% block page_heading %}<header class="page-heading"><div class="shead__main"><div class="info-row"><h1 class="shead__title">{{ t('administration.tab.aggregators') }}</h1>{{ info_tip(t('tip.hint'), '', [t('aggadmin.sub')], 'aggregators') }}</div></div></header>{% endblock %}
 {% block split_list %}<div class="sbox">
 {% if not known %}<div class="note note--error"><div>{{ t('aggadmin.failed') }}</div></div>
-{% else %}<ul class="sdtiles">{% for row in rows %}<li><a class="shealth__tile sdtile{% if selected and selected.code == row.code %} is-on{% endif %}" href="{{ link(row.code) }}" data-drawer-open{% if selected and selected.code == row.code %} aria-current="true"{% endif %}>
-<span class="shealth__dot shealth__dot--{{ row.tone }} sdtile__dot" aria-hidden="true"></span><b class="sdtile__code mono">{{ row.code }}</b><small class="sdtile__name">{{ name(row) }}</small><small class="sdtile__note">{{ t('aggadmin.tone.' ~ row.tone) }}</small></a></li>{% endfor %}</ul>{% endif %}</div>{% endblock %}
+{% else %}<div class="pk-rail pk-rail--inline pk-rail--col"><div class="pk-rail__list">{% for row in rows %}{% call pick_item(link(row.code), name(row), t('aggadmin.tone.' ~ row.tone), on=(selected and selected.code == row.code), code=row.code, drawer=true) %}<span class="shealth__dot shealth__dot--{{ row.tone }}" aria-hidden="true"></span>{% endcall %}{% endfor %}</div></div>{% endif %}</div>{% endblock %}
 {% block split_title %}{% if selected %}{{ name(selected) }} · {{ t('administration.tab.aggregators') }}{% endif %}{% endblock %}
 {% block split_detail %}{% if selected %}
 {% if result == 'failed' %}<div class="note note--error"><div>{{ t('aggadmin.action.failed') }}</div></div>{% endif %}

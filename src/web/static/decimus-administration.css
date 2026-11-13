@@ -5,6 +5,18 @@
 .sadmin { display: grid; grid-template-columns: var(--rail-w, 300px) minmax(0, 1fr); gap: var(--space-7); align-items: start; }
 .sadmin__nav { position: sticky; top: var(--space-6); }
 .sadmin__main { min-width: 0; max-width: 1040px; }
+.sadmin__fold { display: none; }
+@media (max-width: 899px) {
+  .sadmin__fold { display: block; }
+  .sadmin__rail { display: none; }
+  .sadmin__fold > summary { list-style: none; cursor: pointer; padding: var(--space-4) var(--space-5); border: 1px solid var(--line); border-radius: var(--r-block, 12px); background: var(--surface-2); font-weight: var(--w-semibold); }
+  .sadmin__fold > summary::-webkit-details-marker { display: none; }
+  .sadmin__fold > summary::after { content: "▾"; float: right; color: var(--ink-3); }
+  .sadmin__fold[open] > summary::after { content: "▴"; }
+  .sadmin__foldlist { display: flex; flex-direction: column; margin-top: var(--space-2); padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--r-block, 12px); background: var(--surface-2); }
+  .sadmin__foldlink { padding: var(--space-3) var(--space-5); border-radius: var(--r-control, 8px); color: var(--ink); text-decoration: none; }
+  .sadmin__foldlink.is-on { background: var(--accent-soft); font-weight: var(--w-semibold); }
+}
 
 /* Шапка вкладки одна на все: строка заголовка со «?» без отступов общего `.info-row` (иначе
    заголовок и колонка ниже съезжают на 16px у вкладок, где «?» есть). */
@@ -27,6 +39,18 @@
 .sadmin .sconn__panel { padding: var(--space-5) var(--space-6); }
 .sadmin .scard { padding: var(--space-5) var(--space-6); }
 /* «Подключения»: плитки одной высоты, плотнее. */
+/* Состояния подключений — строки: точка · имя · состояние · когда · действия. */
+.shealth__rows { list-style: none; margin: 0; padding: 0; }
+.shealth__row { display: grid; grid-template-columns: 12px minmax(150px, 1.1fr) minmax(0, 2fr) minmax(0, 1fr) auto; align-items: center; gap: var(--space-4); padding: var(--space-2) 0; border-top: 1px solid var(--line); min-height: 36px; }
+.shealth__rname { font-size: var(--fs-dense); overflow-wrap: anywhere; }
+.shealth__reason, .shealth__when { color: var(--ink-3); font-size: var(--fs-meta); overflow-wrap: anywhere; }
+.shealth__acts { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); }
+.shealth__acts .shealth__act { margin: 0; }
+.shealth__acts .sbtn { height: 26px; padding: 0 var(--space-5); font-size: var(--fs-meta); }
+@media (max-width: 719px) {
+  .shealth__row { grid-template-columns: 12px minmax(0, 1fr); }
+  .shealth__reason, .shealth__when, .shealth__acts { grid-column: 2; justify-content: flex-start; }
+}
 .sadmin .shealth__tiles { grid-auto-rows: 1fr; gap: var(--space-2); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .sadmin .shealth__tile { padding: var(--space-2) var(--space-4); gap: 0; }
 .sadmin .shealth { margin: var(--space-4) 0; }
@@ -86,7 +110,7 @@
    панель ограниченной ширины, без карточки на каждую настройку. Пояснения — под «?» у подписи (D632). */
 
 .cblocks { display: flex; flex-direction: column; max-width: 760px; }
-.cblock { display: grid; grid-template-columns: 230px minmax(0, 1fr); column-gap: var(--space-5); align-items: start; min-width: 0; padding: var(--space-3) 0; border-top: 1px solid var(--line); }
+.cblock { display: grid; grid-template-columns: 210px minmax(0, 1fr); column-gap: var(--space-5); align-items: start; min-width: 0; padding: var(--space-3) 0; border-top: 1px solid var(--line); }
 .cblock:first-child { border-top: 0; }
 .cblock__head.info-row { padding: 0; border-bottom: 0; min-height: 32px; align-items: center; }
 .cblock__title { white-space: nowrap; margin: 0; font-size: var(--fs-meta); font-weight: var(--w-semibold); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); }

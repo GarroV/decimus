@@ -43,11 +43,11 @@
 {% from "_info_tip.html" import info_tip %}
 
 {# Короткая настройка одной строкой: подпись со «?» — значение — действие справа; форма раскрывается под строкой. #}
-{% macro _line(key, label, note, value, edit_label, open=false) %}
+{% macro _line(key, label, notes, value, edit_label, open=false) %}
   <section class="cblock" aria-labelledby="cb-{{ key }}">
     <div class="info-row cblock__head">
       <h3 class="cblock__title" id="cb-{{ key }}">{{ label }}</h3>
-      {{ info_tip(t('tip.hint'), '', [note], 'cb-' ~ key) }}
+      {{ info_tip(t('tip.hint'), '', notes, 'cb-' ~ key) }}
     </div>
     <div class="cblock__body">
       {% if edit_label %}
@@ -67,7 +67,7 @@
     {{ contact_block(s, 'partner') }}
     {{ contact_block(s, 'mailing') }}
 
-    {% call _line('developer', t('country.block.developer'), t('country.block.developer_note'), s.developer,
+    {% call _line('developer', t('country.block.developer'), [t('country.block.developer_note')], s.developer,
                   (t('country.card.edit') if s.developer else t('country.block.assign')) if s.can_edit else '', s.saved == 'failed') %}
       <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/developer') }}?lang={{ lang }}">
         <label><span class="sform__label">{{ t('country.settings.developer') }}</span>
@@ -77,8 +77,8 @@
       </form>
     {% endcall %}
 
-    {% set langs_value = (s.report_langs|map('upper')|join(' · ') ~ ' · ' ~ (t('country.langs.custom') if s.langs_custom else t('country.langs.default'))) if s.report_langs else '' %}
-    {% call _line('langs', t('country.block.langs'), t('country.block.langs_note'), langs_value,
+    {% set langs_value = s.report_langs|map('upper')|join(' · ') if s.report_langs else '' %}
+    {% call _line('langs', t('country.block.langs'), [t('country.langs.custom') if s.langs_custom else t('country.langs.default'), t('country.block.langs_note')], langs_value,
                   t('country.card.edit') if s.can_langs else '', s.saved == 'langs_invalid') %}
       <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/report-langs') }}?lang={{ lang }}">
         <div class="sroles">
