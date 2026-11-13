@@ -1,4 +1,4 @@
-"""Тексты экрана «Обучение» (D578, #906): колонка, плитки, списки, пустое состояние.
+"""Тексты экрана «Обучение» (D578, #906): фильтры, плитки, списки, пустое состояние.
 
 Отдельным модулем, как у «Стран» (`texts_country.py`): `texts.py` уже длиннее предела
 файла. Сливаются в общий каталог (`texts.TEXTS`) — `t()` знает один словарь.
@@ -8,10 +8,11 @@ from __future__ import annotations
 
 TRAINING_TEXTS: dict[str, dict[str, str]] = {
     "section.training.title": {"ru": "Обучение", "en": "Training"},
-    "training.kicker.network": {"ru": "Обучение · сеть", "en": "Training · network"},
-    "training.kicker.country": {"ru": "Обучение · страна", "en": "Training · country"},
     "training.network": {"ru": "Все страны", "en": "All countries"},
-    "training.filter.title": {"ru": "Страны и пиццерии", "en": "Countries and pizzerias"},
+    "training.title": {"ru": "Обучение", "en": "Training"},
+    "training.filter.country": {"ru": "Страна", "en": "Country"},
+    "training.filter.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "training.filter.all_units": {"ru": "Все пиццерии", "en": "All pizzerias"},
     "training.rail.units": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
     "training.asof": {"ru": "Данные на {date}", "en": "Data as of {date}"},
     "training.asof.hint": {
