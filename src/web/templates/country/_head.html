@@ -1,6 +1,7 @@
 {#
   Шапка экрана «Страны» (D536, D418). Первая строка — название и период рядом,
-  кнопки действий справа; ниже — сведения раздельными подписанными блоками, а
+  кнопки действий справа (новая пиццерия, «Экшн-планы», «Предписания»; общее письмо
+  и контакты партнёра с экрана страны убраны, D766); ниже — сведения раздельными подписанными блоками, а
   не одной строкой текста: «Девелопер», «Партнёры» (метками), «Пиццерии» (число и
   значки стадий). На узком экране всё переносится строками, ничего не уезжает.
   Ни одного вычисления — приходит готовое.
@@ -43,13 +44,6 @@
         <a class="btn btn--sm" href="{{ url(actions_path) }}?tab=prescriptions{% if rx_act_hq %}&amp;country={{ view.code }}{% endif %}&amp;lang={{ lang }}"
            title="{{ t('country.rx.act') if rx_act_hq else t('country.rx.mine') }}">
           {{ t('country.rx.title') }}<span class="cn-count{% if rx_count %} is-on{% endif %}">{{ '—' if rx_count is none else rx_count }}</span></a>
-        {% if can_batch %}
-          <a class="btn btn--sm" href="{{ batch_url }}" data-drawer-open>{{ t('batch.open') }}</a>
-        {% endif %}
-        {% if can_settings %}
-          <a class="btn btn--sm" href="{{ partner_reference_url }}" data-drawer-open>{{ t('contacts.partner') }}</a>
-          {% if is_hq %}<a class="btn btn--sm" href="{{ mailing_reference_url }}" data-drawer-open>{{ t('contacts.mailing') }}</a>{% endif %}
-        {% endif %}
       </div>
     </div>
     <dl class="cn-facts">

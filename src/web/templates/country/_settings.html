@@ -14,14 +14,16 @@
    и кнопка, форма раскрывается внутри блока. Адреса и поля форм те же, что были. #}
 
 {% macro _contacts(s) %}
-  <section class="cblock cblock--wide" aria-labelledby="cb-unit-contacts">
-    <h3 class="cblock__title" id="cb-unit-contacts">{{ t('country.contacts.units') }}</h3>
-    {% if s.can_units %}<p><a class="sbtn sbtn--primary" href="{{ url('/country/' ~ s.code ~ '/units/new') }}?lang={{ lang }}">{{ t('unitnew.open') }}</a></p>{% endif %}
+  <section class="cblock cblock--units" aria-labelledby="cb-unit-contacts">
+    <div class="cblock__bar">
+      <h3 class="cblock__title" id="cb-unit-contacts">{{ t('country.contacts.units') }}</h3>
+      {% if s.can_units %}<a class="sbtn clist__btn" href="{{ url('/country/' ~ s.code ~ '/units/new') }}?lang={{ lang }}">{{ t('unitnew.open') }}</a>{% endif %}
+    </div>
     {% if s.profiles_failed %}<p role="alert">{{ t('country.card.profiles_failed') }}</p>
     {% else %}
       {% for u in s.rows %}
         <details class="sfold cblock__item">
-          <summary>{{ u.name }} · {{ u.address or '—' }}</summary>
+          <summary>{{ u.name }}{% if u.address %} <span class="is-muted">· {{ u.address }}</span>{% endif %}</summary>
           {% if s.can_units %}
             <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/unit-profile') }}?lang={{ lang }}">
               <input type="hidden" name="unit_key" value="{{ u.key }}">
@@ -31,65 +33,67 @@
               <label><span class="sform__label">{{ t('country.contacts.partner_email') }}</span><input class="sinput" type="email" name="partner_email" value="{{ u.partner_email }}" maxlength="200"></label>
               <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.save') }}</button>
             </form>
-          {% else %}<p>{{ u.partner }} · {{ u.partner_email }}</p>{% endif %}
+          {% elif u.partner or u.partner_email %}<p class="cblock__note">{{ u.partner }}{% if u.partner and u.partner_email %} · {% endif %}{{ u.partner_email }}</p>{% endif %}
         </details>
       {% else %}<p class="cblock__note">{{ t('country.card.no_units') }}</p>{% endfor %}
     {% endif %}
   </section>
 {% endmacro %}
 {% from "country/_contacts.html" import contact_block with context %}
+{% from "_info_tip.html" import info_tip %}
+
+{# Короткая настройка одной строкой: подпись со «?» — значение — действие справа; форма раскрывается под строкой. #}
+{% macro _line(key, label, note, value, edit_label, open=false) %}
+  <section class="cblock" aria-labelledby="cb-{{ key }}">
+    <div class="info-row cblock__head">
+      <h3 class="cblock__title" id="cb-{{ key }}">{{ label }}</h3>
+      {{ info_tip(t('tip.hint'), '', [note], 'cb-' ~ key) }}
+    </div>
+    <div class="cblock__body">
+      {% if edit_label %}
+        <details class="cblock__edit"{% if open %} open{% endif %}>
+          <summary class="cblock__line"><span class="cblock__value{% if not value %} cblock__value--none{% endif %}">{{ value or t('country.card.unset') }}</span><span class="sbtn clist__btn">{{ edit_label }}</span></summary>
+          {{ caller() }}
+        </details>
+      {% else %}
+        <div class="cblock__line"><span class="cblock__value{% if not value %} cblock__value--none{% endif %}">{{ value or t('country.card.unset') }}</span></div>
+      {% endif %}
+    </div>
+  </section>
+{% endmacro %}
 
 {% macro _blocks(s) %}
   <div class="cblocks">
     {{ contact_block(s, 'partner') }}
     {{ contact_block(s, 'mailing') }}
 
-    <section class="cblock cblock--wide" aria-labelledby="cb-developer">
-      <h3 class="cblock__title" id="cb-developer">{{ t('country.block.developer') }}</h3>
-      {% if s.developer %}<p class="cblock__value">{{ s.developer }}</p>
-      {% else %}<p class="cblock__value cblock__value--none">{{ t('country.card.unset') }}</p>{% endif %}
-      <p class="cblock__note">{{ t('country.block.developer_note') }}</p>
-      {% if s.can_edit %}
-        <details class="sfold"{% if s.saved == 'failed' %} open{% endif %}>
-          <summary class="sbtn{{ '' if s.developer else ' sbtn--primary' }}">{{ t('country.card.edit') if s.developer else t('country.block.assign') }}</summary>
-          <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/developer') }}?lang={{ lang }}">
-            <label><span class="sform__label">{{ t('country.settings.developer') }}</span>
-              <input class="sinput" type="text" name="developer" value="{{ s.developer }}" maxlength="120" autocomplete="off"></label>
-            <p class="cblock__note">{{ t('country.settings.developer_hint') }}</p>
-            <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.save') }}</button>
-          </form>
-        </details>
-      {% endif %}
-    </section>
+    {% call _line('developer', t('country.block.developer'), t('country.block.developer_note'), s.developer,
+                  (t('country.card.edit') if s.developer else t('country.block.assign')) if s.can_edit else '', s.saved == 'failed') %}
+      <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/developer') }}?lang={{ lang }}">
+        <label><span class="sform__label">{{ t('country.settings.developer') }}</span>
+          <input class="sinput" type="text" name="developer" value="{{ s.developer }}" maxlength="120" autocomplete="off"></label>
+        <p class="cblock__note">{{ t('country.settings.developer_hint') }}</p>
+        <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.save') }}</button>
+      </form>
+    {% endcall %}
 
-    <section class="cblock cblock--wide" aria-labelledby="cb-langs">
-      <h3 class="cblock__title" id="cb-langs">{{ t('country.block.langs') }}</h3>
-      {% if s.report_langs %}
-        <p class="cblock__value">{{ s.report_langs|map('upper')|join(' · ') }} <small>{{ t('country.langs.custom') if s.langs_custom else t('country.langs.default') }}</small></p>
-        <p class="cblock__note">{{ t('country.block.langs_note') }}</p>
-      {% else %}
-        <p class="cblock__value cblock__value--none">—</p>
-        <p class="cblock__note">{{ t('country.block.langs_note') }}</p>
-      {% endif %}
-      {% if s.can_langs %}
-        <details class="sfold"{% if s.saved == 'langs_invalid' %} open{% endif %}>
-          <summary class="sbtn">{{ t('country.card.edit') }}</summary>
-          <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/report-langs') }}?lang={{ lang }}">
-            <div class="sroles">
-              {% for code in s.lang_options %}
-                <label class="srole"><input type="checkbox" name="langs" value="{{ code }}"{% if code in s.report_langs %} checked{% endif %}>
-                  <span><b>{{ t('nav.lang.' ~ code) }}</b></span></label>
-              {% endfor %}
-            </div>
-            <p class="cblock__note">{{ t('country.langs.hint') }}</p>
-            <div class="sactions">
-              <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.save') }}</button>
-              {% if s.langs_custom %}<button class="sbtn" type="submit" name="reset" value="1">{{ t('country.langs.reset') }}</button>{% endif %}
-            </div>
-          </form>
-        </details>
-      {% endif %}
-    </section>
+    {% set langs_value = (s.report_langs|map('upper')|join(' · ') ~ ' · ' ~ (t('country.langs.custom') if s.langs_custom else t('country.langs.default'))) if s.report_langs else '' %}
+    {% call _line('langs', t('country.block.langs'), t('country.block.langs_note'), langs_value,
+                  t('country.card.edit') if s.can_langs else '', s.saved == 'langs_invalid') %}
+      <form class="sform cblock__form" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/report-langs') }}?lang={{ lang }}">
+        <div class="sroles">
+          {% for code in s.lang_options %}
+            <label class="srole"><input type="checkbox" name="langs" value="{{ code }}"{% if code in s.report_langs %} checked{% endif %}>
+              <span><b>{{ t('nav.lang.' ~ code) }}</b></span></label>
+          {% endfor %}
+        </div>
+        <p class="cblock__note">{{ t('country.langs.hint') }}</p>
+        <div class="sactions">
+          <button class="sbtn sbtn--primary" type="submit">{{ t('country.settings.save') }}</button>
+          {% if s.langs_custom %}<button class="sbtn" type="submit" name="reset" value="1">{{ t('country.langs.reset') }}</button>{% endif %}
+        </div>
+      </form>
+    {% endcall %}
 
     {{ _contacts(s) }}
   </div>

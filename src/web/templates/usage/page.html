@@ -20,7 +20,7 @@
 <div class="shead__main">
       <div class="info-row">
         <h1 class="shead__title">{{ t(admin_heading) }}</h1>
-        {{ info_tip(t('tip.hint'), '', [t('usage.sub')], 'usage') }}
+        {{ info_tip(t('tip.hint'), '', [t('usage.sub'), t('usage.estimate.note')], 'usage') }}
       </div>
     </div>
 </header>{% endblock %}
@@ -73,7 +73,6 @@
           {% elif total.cost_partial %}<div class="stat__delta">* {{ t('usage.stat.partial') }}</div>{% endif %}
         </div>
       </div>
-      <p class="jcount">{{ t('usage.estimate.note') }}</p>
 
       {% if not total.calls %}
         <div class="sempty"><p class="sempty__title">{{ t('usage.empty.title') }}</p><p class="sempty__text">{{ t('usage.empty.text') }}</p></div>

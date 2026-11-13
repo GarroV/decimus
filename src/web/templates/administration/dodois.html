@@ -136,11 +136,10 @@
     {% if latest is not none and latest.result == 'not_applied' %}
       <div class="note note--warn"><div class="note__text">{{ t('dodois.invite.not_applied', who=latest.result_account or '—') }}</div></div>
     {% endif %}
-    <p class="ssec__note">{{ t('dodois.issue_hint') }}</p>
     <div class="sactions" id="dodois-actions">
       <form method="post" action="{{ users_url }}/dodois/invite?lang={{ lang }}">
         <input type="hidden" name="country" value="{{ row.code }}">
-        <label for="dodois-contour">{{ t('dodois.contour.label') }}</label>
+        <div class="info-row ssec__head"><label for="dodois-contour">{{ t('dodois.contour.label') }}</label>{{ info_tip(t('tip.hint'), '', [t('dodois.issue_hint')], 'dodois-issue') }}</div>
         <select id="dodois-contour" name="contour">
             {% set default_contour = 'cis' if row.code in dodois_cis_countries else 'intl' %}
             {% for c in dodois_contours %}<option value="{{ c }}"{% if c == default_contour %} selected{% endif %}>{{ t('dodois.contour.' ~ c) }} ({{ dodois_hosts[c].auth|replace('https://auth.', '') }})</option>{% endfor %}

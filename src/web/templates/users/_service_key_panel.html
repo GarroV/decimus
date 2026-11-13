@@ -7,14 +7,17 @@
   по умолчанию название сервиса. `compact` (вкладка «Dodo IS», D651) — без абзаца о назначении и
   подсказки об удалении, состояние ключей одной строкой.
 #}
+{% from "_info_tip.html" import info_tip %}
 {% set key_icon = {'openai': 'spark', 'pointer': 'globe', 'ispring': 'book', 'dodois': 'link'} %}
 {% from "users/_key_refusal.html" import refusal_text with context %}
 {% macro key_panel(svc, ks, back='', title='', compact=false) %}
     {% set own_flash = ks.flash and ks.flash.service == svc.code %}
     <div class="sconn__panel{{ ' sconn__panel--compact' if compact else '' }}" id="service-key-{{ svc.code }}">
-      <h3 class="sconn__panel__title">{{ icon(key_icon[svc.code]) }}<span>{{ title or t('keys.service.' ~ svc.code) }}</span>
+      {% set has_stored = svc.fields | selectattr('status') | list %}
+      {% set panel_notes = [] if compact else ([t('keys.purpose.' ~ svc.code)] + ([t('keys.delete_hint')] if has_stored else [])) %}
+      <h3 class="sconn__panel__title info-row">{{ icon(key_icon[svc.code]) }}<span>{{ title or t('keys.service.' ~ svc.code) }}</span>
+        {% if panel_notes %}{{ info_tip(t('tip.hint'), '', panel_notes, 'keypanel-' ~ svc.code) }}{% endif %}
         <small>{{ t('keys.configured' if svc.configured else 'keys.not_configured') }}</small></h3>
-      {% if not compact %}<p class="ssec__note">{{ t('keys.purpose.' ~ svc.code) }}</p>{% endif %}
       {% if own_flash %}
         <div class="note {{ 'note--ok' if ks.flash.ok else 'note--warn' }}" role="status"><div class="note__text">{{ refusal_text(ks.flash.key, ks.flash.params) }}</div></div>
       {% endif %}
@@ -64,8 +67,5 @@
           </form>
         {% endif %}
       </div>
-      {% if not compact and svc.fields | selectattr('status') | list %}
-        <small class="sform__hint">{{ t('keys.delete_hint') }}</small>
-      {% endif %}
     </div>
 {% endmacro %}

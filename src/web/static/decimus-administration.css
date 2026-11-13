@@ -4,7 +4,24 @@
 
 .sadmin { display: grid; grid-template-columns: var(--rail-w, 300px) minmax(0, 1fr); gap: var(--space-7); align-items: start; }
 .sadmin__nav { position: sticky; top: var(--space-6); }
-.sadmin__main { min-width: 0; }
+.sadmin__main { min-width: 0; max-width: 1040px; }
+
+/* Плотность вкладок (D766): заголовок раздела со «?» вместо абзаца, настройка одной строкой,
+   простые списки без плашек. Общие классы — вкладки остаются на одном каркасе. */
+.ssec__head.info-row { padding: 0; border-bottom: 0; margin-bottom: var(--space-3); }
+.ssec__head .ssec__title { margin: 0; }
+.ssec--first { margin-top: 0; padding-top: 0; border-top: 0; }
+.apanel { max-width: 760px; }
+.aform { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); margin: 0; }
+.aform label { font-size: var(--fs-body); color: var(--ink); }
+.alist { margin: 0; padding: 0; list-style: none; }
+.alist li { padding: var(--space-2) 0; border-top: 1px solid var(--line); font-size: var(--fs-body); }
+.alist li:first-child { border-top: 0; }
+.sconn__panel__title.info-row { padding: 0; border-bottom: 0; }
+/* Плитки и панель сервисов во вкладках — плотнее, чем в личных «Настройках». */
+.sadmin .stile { padding: var(--space-4) var(--space-5); }
+.sadmin .sconn__panel { padding: var(--space-5) var(--space-6); }
+.sadmin .scard { padding: var(--space-5) var(--space-6); }
 
 .shealth { margin: var(--space-6) 0; }
 .shealth__head { display: flex; align-items: center; gap: var(--space-3); }
@@ -55,42 +72,45 @@
 .sdodois-page__code code { font-size: var(--fs-title); letter-spacing: 0.08em; }
 .sdodois-page__wait { color: var(--ink-3); }
 
-/* Вкладка «Страны» (D640): настройки страны — блоки-плитки. */
+/* Вкладка «Страны» (D640, D766): настройки страны — строки «подпись · значение · действие»,
+   панель ограниченной ширины, без карточки на каждую настройку. Пояснения — под «?» у подписи (D632). */
 
-.cblocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); max-width: 760px; align-items: stretch; }
-.cblock { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: var(--space-6); border: 1px solid var(--line-strong); border-radius: var(--r-block, 12px); background: var(--surface); }
-.cblock--wide { grid-column: 1 / -1; }
+.cblocks { display: flex; flex-direction: column; max-width: 760px; }
+.cblock { display: grid; grid-template-columns: 170px minmax(0, 1fr); column-gap: var(--space-5); align-items: start; min-width: 0; padding: var(--space-3) 0; border-top: 1px solid var(--line); }
+.cblock:first-child { border-top: 0; }
+.cblock__head.info-row { padding: 0; border-bottom: 0; min-height: 32px; align-items: center; }
 .cblock__title { margin: 0; font-size: var(--fs-meta); font-weight: var(--w-semibold); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); }
-.cblock__value { margin: 0; font-size: 18px; line-height: 24px; font-weight: var(--w-semibold); color: var(--ink); overflow-wrap: anywhere; }
-.cblock__value small { margin-left: var(--space-3); font-size: var(--fs-meta); font-weight: var(--w-regular); color: var(--ink-3); }
-.cblock__value--none { font-weight: var(--w-regular); color: var(--ink-3); }
+.cblock__body { min-width: 0; }
+.cblock__line, .cadd > summary, .clist__line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); min-height: 32px; }
+.cblock__value { margin: 0; font-size: var(--fs-body); line-height: 20px; color: var(--ink); overflow-wrap: anywhere; }
+.cblock__value--none { color: var(--ink-3); }
 .cblock__note { margin: 0; font-size: var(--fs-dense); line-height: 18px; color: var(--ink-2); }
-.cblock > .sbtn, .cblock .sfold > summary { align-self: flex-start; margin-top: var(--space-2); }
-.cblock .sfold { margin-top: var(--space-2); }
-.cblock .sfold > summary { margin-top: 0; }
+.cblock summary { list-style: none; cursor: pointer; }
+.cblock summary::-webkit-details-marker { display: none; }
 .cblock__form { margin-top: var(--space-3); max-width: 32rem; }
 .cblock__form textarea { resize: vertical; }
-/* Контакты страны («Партнёр», «Почты для рассылки»): компактный список, действия справа, форма по «+ Добавить». */
-.cblock__head.info-row { padding: 0; border-bottom: 0; }
-.cblock summary { list-style: none; }
-.cblock summary::-webkit-details-marker { display: none; }
+.cblock .clist__btn { flex: none; height: 26px; padding: 0 var(--space-5); font-size: var(--fs-meta); }
 .clist { margin: 0; padding: 0; list-style: none; }
 .clist__row { position: relative; border-top: 1px solid var(--line); }
 .clist__row:first-child { border-top: 0; }
-.clist__line { display: flex; align-items: center; gap: var(--space-5); min-height: 40px; padding: var(--space-3) 0; }
-.clist__edit > .clist__line { padding-right: 5.5rem; cursor: pointer; }
+.clist__edit > .clist__line { padding-right: 5.5rem; }
 .clist__text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-body); }
 .clist__text span { color: var(--ink-2); }
-.cblock .clist__btn { height: 26px; padding: 0 var(--space-5); font-size: var(--fs-meta); }
-.clist__del { position: absolute; top: 7px; right: 0; margin: 0; }
-.cblock .cadd > summary { display: inline-flex; margin-top: var(--space-3); cursor: pointer; }
+.clist__del { position: absolute; top: 3px; right: 0; margin: 0; }
+.cadd > summary { justify-content: flex-start; }
+.cadd--empty > summary { justify-content: space-between; }
 .cform { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto; align-items: end; gap: var(--space-5); margin: var(--space-3) 0 var(--space-5); }
 .cform label { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .cform__actions { display: flex; gap: var(--space-3); }
-.cblock__item { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--r-md, 8px); background: var(--surface-2); }
+/* Пиццерии страны: плотные строки «имя · адрес», правка раскрывается под строкой. */
+.cblock--units { display: block; }
+.cblock__bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); min-height: 32px; }
+.cblock__item { padding: var(--space-2) 0; border-top: 1px solid var(--line); }
+.cblock__item > summary { font-size: var(--fs-body); line-height: 20px; }
+.cblock__item[open] > .cblock__form { margin-bottom: var(--space-3); }
 
 @media (max-width: 719px) {
-  .cblocks { grid-template-columns: minmax(0, 1fr); }
+  .cblock { grid-template-columns: minmax(0, 1fr); }
   .cblock .sbtn { min-height: 44px; }
   .cform { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
   .cblock .clist__btn { height: auto; min-height: 36px; width: 5.5rem; }
