@@ -93,11 +93,23 @@ def _batches(units: list[str], size: int) -> list[list[str]]:
 def _each_batch(
     units: list[str], size: int, get: Callable[[list[str]], Response]
 ) -> Iterator[tuple[list[str], Any]]:
-    """Пачки пиццерий с ответом 200; отказ по доступу делит пачку, пока не найдёт, на ком он."""
+    """Пачки пиццерий с ответом 200; отказ по доступу делит пачку, пока не найдёт, на ком он.
+
+    401 на пачке из нескольких пиццерий тоже делит её: так Dodo IS отвечает на слишком большой
+    запрос (#1709), а не только на истёкший вход. Живой отказ входа дойдёт до одной пиццерии и
+    там поднимется как раньше — вид не молча «пустой», а упавший.
+    """
     queue = _batches(units, size)
     while queue:
         batch = queue.pop(0)
-        response = get(batch)
+        try:
+            response = get(batch)
+        except DodoisError as exc:
+            if exc.kind != client.UNAUTHORIZED or len(batch) < 2:
+                raise
+            middle = len(batch) // 2
+            queue[:0] = [batch[:middle], batch[middle:]]
+            continue
         if response.status == 200:
             yield batch, response.body
         elif len(batch) > 1:

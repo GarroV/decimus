@@ -663,3 +663,36 @@ def test_ratings_ask_at_most_30_units_per_call(мир: Мир, monkeypatch: pyte
     for path in [*parse.RATING_PATHS.values(), parse.CHECKUPS_PATH]:
         covered = set().union(*(set(q["units"].split(",")) for p, q in мир.запросы if p == path))
         assert covered == set(units)
+
+
+def _ключ_отвергнут_на_пачке() -> DodoisError:
+    return DodoisError(client.UNAUTHORIZED)
+
+
+def test_401_на_пачке_из_нескольких_пиццерий_делит_пачку_а_не_роняет_вид(мир: Мир) -> None:
+    # #1709: Dodo IS отвечает 401 на слишком большой запрос при живом входе.
+    мир.удачных[parse.KIND_KR] = True
+
+    def ответ(path: str, query: dict[str, str]) -> Response:
+        if "," in query["units"]:
+            raise _ключ_отвергнут_на_пачке()
+        return _ок({"customerRatings": []})
+
+    мир.ответ = ответ
+
+    исходы = metrics.collect_country(_вход(), [parse.KIND_KR], today=СЕГОДНЯ, sleep=_без_сна)
+
+    assert [o.ok for o in исходы] == [True]
+
+
+def test_401_на_одной_пиццерии_остаётся_отказом_входа(мир: Мир) -> None:
+    мир.удачных[parse.KIND_KR] = True
+
+    def ответ(path: str, query: dict[str, str]) -> Response:
+        raise _ключ_отвергнут_на_пачке()
+
+    мир.ответ = ответ
+
+    исходы = metrics.collect_country(_вход(), [parse.KIND_KR], today=СЕГОДНЯ, sleep=_без_сна)
+
+    assert [o.ok for o in исходы] == [False]
