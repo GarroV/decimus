@@ -95,7 +95,20 @@
       <div class="sside">
         {# ── Приложение-аутентификатор ────────────────────────────────────── #}
         <section class="scard" id="totp">
-          <h2 class="scard__title">{{ t('sf.totp.title') }}</h2>
+          {# Справка — под «?» у заголовка (D632), не простынёй; кнопки в тексте — из словаря. #}
+          <div class="info-row scard__head-tip">
+            <h2 class="scard__title">{{ t('sf.totp.title') }}</h2>
+            {{ info_tip(t('sf.totp.help.label'), '', [
+              t('sf.totp.help.what'),
+              t('sf.totp.help.setup'),
+              t('sf.totp.help.s1'),
+              t('sf.totp.help.s2', start=t('sf.totp.start')),
+              t('sf.totp.help.s3'),
+              t('sf.totp.help.s4', confirm=t('sf.totp.confirm')),
+              t('sf.totp.help.login', step=t('sf.step.title')),
+              t('sf.totp.help.bad'),
+            ], 'totp') }}
+          </div>
           <p class="ssec__note">{{ t('sf.totp.lead') }}</p>
           {% if status.totp_confirmed %}
             <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('sf.totp.on') }}</p>

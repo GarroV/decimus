@@ -30,6 +30,9 @@
 .scard__title { margin: 0 0 var(--space-5); font-family: var(--font-mono); font-size: 11px; line-height: 14px; font-weight: var(--w-semibold);
   letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
 .scard__head .scard__title { margin: 0; }
+/* Заголовок карточки со значком «?»: строка без отступов и черты, заголовок без нижнего поля. */
+.scard .scard__head-tip { padding: 0; border-bottom: 0; margin-bottom: var(--space-5); }
+.scard .scard__head-tip .scard__title { margin: 0; }
 .scard__count { font-size: 12px; color: var(--ink-3); }
 .scard .langpill { margin: 0 0 var(--space-4); }
 

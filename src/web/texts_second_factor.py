@@ -196,10 +196,48 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
     # приложение
     "sf.totp.title": {"ru": "Приложение-аутентификатор", "en": "Authenticator app"},
     "sf.totp.lead": {
-        "ru": "Запасной способ. Google Authenticator, 1Password, Authy и любое другое с кодами "
-        "из шести цифр. При входе код не спрашивается.",
-        "en": "A fallback. Google Authenticator, 1Password, Authy or any app with six-digit "
-        "codes. Sign-in does not ask for the code.",
+        "ru": "Запасной способ входа, когда нет Touch ID.",
+        "en": "A fallback sign-in method for when there is no Touch ID.",
+    },
+    # Справка под «?» у заголовка: одна строка — один факт; названия кнопок подставляются из
+    # `sf.totp.start` и `sf.totp.confirm`, чтобы не разойтись с кнопками.
+    "sf.totp.help.label": {"ru": "Как пользоваться приложением", "en": "How to use the app"},
+    "sf.totp.help.what": {
+        "ru": "Запасной способ подтвердить вход, когда нет Touch ID: чужой компьютер, Windows "
+        "без отпечатка.",
+        "en": "A fallback way to confirm sign-in when there is no Touch ID: someone else's "
+        "computer, Windows without a fingerprint.",
+    },
+    "sf.totp.help.setup": {"ru": "Подключить (один раз):", "en": "Connect (once):"},
+    "sf.totp.help.s1": {
+        "ru": "1. Поставьте на телефон приложение с кодами: Google Authenticator, 1Password, "
+        "Authy или любое другое.",
+        "en": "1. Install a code app on your phone: Google Authenticator, 1Password, Authy or "
+        "any other.",
+    },
+    "sf.totp.help.s2": {
+        "ru": "2. Нажмите «{start}» ниже.",
+        "en": "2. Press “{start}” below.",
+    },
+    "sf.totp.help.s3": {
+        "ru": "3. В приложении нажмите «+» и отсканируйте QR-код (или введите ключ вручную).",
+        "en": "3. In the app press “+” and scan the QR code (or type the key by hand).",
+    },
+    "sf.totp.help.s4": {
+        "ru": "4. Введите шесть цифр из приложения и нажмите «{confirm}».",
+        "en": "4. Enter the six digits from the app and press “{confirm}”.",
+    },
+    "sf.totp.help.login": {
+        "ru": "При входе: после логина и пароля на странице «{step}» введите шесть цифр из "
+        "приложения, если отпечаток недоступен.",
+        "en": "Signing in: after the login and password, on the “{step}” page enter the six "
+        "digits from the app if the fingerprint is not available.",
+    },
+    "sf.totp.help.bad": {
+        "ru": "Код не подходит: проверьте, что время на телефоне ставится автоматически, и "
+        "введите свежий код.",
+        "en": "The code does not work: check that the phone sets its time automatically, and "
+        "enter a fresh code.",
     },
     "sf.totp.on": {"ru": "Приложение подключено.", "en": "App connected."},
     "sf.totp.off": {"ru": "Приложение не подключено.", "en": "No app connected."},
