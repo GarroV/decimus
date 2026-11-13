@@ -887,7 +887,7 @@ def test_violation_escape_closes_when_focus_is_still_outside_modal(monkeypatch, 
 
 @pytest.mark.parametrize("lang", ["ru", "en"])
 def test_period_tiles_are_compact_and_summary_tiles_carry_no_service_text(monkeypatch, lang):
-    """D766: у плитки периода нет «завершился» и служебных подписей, «Нарушений» — сама ссылка."""
+    """D767: у плитки периода нет «завершился» и служебных подписей, «Нарушений» — сама ссылка."""
     with surface(monkeypatch, lang=lang) as (client, _state):
         html = page_html(client, f"/ratings/rko?period=2026-Q4&lang={lang}")
     for gone in ("Даты периодов Dodo IS", "Dodo IS period dates", "завершился", "ended"):
