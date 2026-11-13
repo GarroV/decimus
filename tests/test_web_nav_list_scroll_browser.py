@@ -129,6 +129,8 @@ def test_пункты_не_сжимаются_и_рейтинги_не_уезж�
     page.evaluate("document.documentElement.setAttribute('data-nav-ratings-open','true')")
     page.wait_for_timeout(400)
     открыта = page.evaluate(_ВЕРТИКАЛЬ)
-    assert открыта["scrolls"], "проверка пустая: раскрытый список поместился, сжатию неоткуда взяться"
+    assert открыта["scrolls"], (
+        "проверка пустая: раскрытый список поместился, сжатию неоткуда взяться"
+    )
     assert открыта["toggleTop"] == закрыта["toggleTop"], (закрыта, открыта)
     assert открыта["items"] == закрыта["items"], (закрыта, открыта)
