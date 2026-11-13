@@ -7,11 +7,18 @@
 {% from "_pick_ui.html" import pick_item %}
 {% macro admin_nav() %}
   <nav class="sadmin__nav" aria-label="{{ t('administration.tabs') }}">
-    <div class="pk-rail pk-rail--inline">
+    <div class="pk-rail pk-rail--inline sadmin__rail">
       <div class="mx-rail__head mx-rail__head--list"><span>{{ t('section.administration.title') }}</span></div>
       <div class="pk-rail__list">
         {% for tab in admin_tabs %}{{ pick_item(admin_url(tab.key), t(admin_title(tab)), on=(tab.key == admin_tab)) }}{% endfor %}
       </div>
     </div>
+    {#- Телефон: список сложен в details с текущей вкладкой в строке, без скрипта (D766). -#}
+    <details class="sadmin__fold">
+      <summary>{{ t('section.administration.title') }}: {% for tab in admin_tabs if tab.key == admin_tab %}{{ t(admin_title(tab)) }}{% endfor %}</summary>
+      <div class="sadmin__foldlist">
+        {% for tab in admin_tabs %}<a class="sadmin__foldlink{% if tab.key == admin_tab %} is-on{% endif %}" href="{{ admin_url(tab.key) }}"{% if tab.key == admin_tab %} aria-current="page"{% endif %}>{{ t(admin_title(tab)) }}</a>{% endfor %}
+      </div>
+    </details>
   </nav>
 {% endmacro %}

@@ -105,6 +105,7 @@
 @media (max-width: 899px) {
   .pk-shell { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
   .pk-rail { position: static; max-height: 38vh; }
+  .pk-rail--inline { max-height: none; overflow: visible; }
   .pk-head { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "actions" "facts" "period"; }
   .pk-head__actions { justify-content: flex-start; }
 }
@@ -192,7 +193,8 @@
 /* D690: country administration uses the available page area, without a drawer. */
 .countryadmininline { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .countryadmininline__list, .countryadmininline__detail { min-width: 0; }
-.countryadmininline__detail .cblocks { margin-top: 16px; }
+.countryadmininline__detail .cblocks { margin-top: 8px; }
+.countryadmininline__detail { max-width: 800px; }
 /* Столбец стран — одна рамка: счётчик и строки на всю её ширину, без вложенной коробки. */
 .countryrail { max-width: none; }
 .countryrail__count { margin: 0; padding: 4px 10px 6px; font-size: 12.5px; color: var(--ink-3); }

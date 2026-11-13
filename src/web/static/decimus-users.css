@@ -1,8 +1,9 @@
 /* Экран «Пользователи» поверх каркаса `decimus-split.css`: колонки списка
    людей и пространств и выбор роли карточками «название + что может». */
 
-.slist--users { --slist-cols: minmax(0, 1fr) 72px minmax(138px, 160px) 90px 90px; }
-.slist--users.slist--nobot { --slist-cols: minmax(0, 1fr) 72px minmax(138px, 160px) 90px; }
+.slist--users { --slist-cols: minmax(0, 1fr) 124px minmax(138px, 160px) 90px 90px; }
+.slist--users.slist--nobot { --slist-cols: minmax(0, 1fr) 124px minmax(138px, 160px) 90px; }
+.slist--users .slist__head > span, .slist--spaces .slist__head > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .slist--spaces { --slist-cols: minmax(0, 1fr) minmax(0, 1fr) 64px; }
 
 /* Роль — должность словом и одна строка, что она может (владелец 09.10.2026). */

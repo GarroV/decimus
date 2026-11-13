@@ -4,6 +4,7 @@
   заводят пространства и страны; админ партнёра видит своё на чтение.
 #}
 
+{% from "administration/_parts.html" import sec_title with context %}
 {% macro spaces_list(rows, known, picked, manages, link) %}
   <div class="sbox">
     <div class="sbar">
@@ -85,7 +86,7 @@
       </div></header>
       {% if show.flash %}<div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>{% endif %}
       <section class="ssec">
-        <h3 class="ssec__title">{{ t('users.spaces.col.countries') }}</h3>
+        {{ sec_title(t('users.spaces.col.countries'), [t('users.spaces.add.countries_hint') if manages else t('users.spaces.readonly')], 'space-countries', '', 3) }}
         <p class="ssec__text">{% for c in picked.countries %}<span class="sbadge mono">{{ c }}</span> {% else %}—{% endfor %}</p>
         {% if manages %}
           <form method="post" action="{{ users_url }}/spaces/countries?lang={{ lang }}" class="sform sform--inline">
@@ -94,9 +95,6 @@
               {{ country_select(options) }}</label>
             <button class="sbtn" type="submit">{{ t('users.spaces.countries.submit') }}</button>
           </form>
-          <p class="ssec__note">{{ t('users.spaces.add.countries_hint') }}</p>
-        {% else %}
-          <p class="ssec__note">{{ t('users.spaces.readonly') }}</p>
         {% endif %}
       </section>
       <section class="ssec">

@@ -1,0 +1,12 @@
+{#
+  Общие части вкладок администрирования (D766). Заголовок раздела со «?»: пояснение
+  не висит абзацем в теле, а лежит под значком у заголовка (D632). Несколько
+  пояснений одного раздела идут столбиком под одним значком.
+#}
+{% from "_info_tip.html" import info_tip %}
+{% macro sec_title(title, notes, key, id='', level=2) %}
+  <div class="info-row ssec__head">
+    <h{{ level }} class="ssec__title"{% if id %} id="{{ id }}"{% endif %}>{{ title }}</h{{ level }}>
+    {% if notes %}{{ info_tip(t('tip.hint'), '', notes, key) }}{% endif %}
+  </div>
+{% endmacro %}
