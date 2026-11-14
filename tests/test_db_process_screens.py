@@ -20,8 +20,9 @@ psycopg = pytest.importorskip("psycopg")
 from db_harness import accept_pushed, слить_проверку, точка_справочника  # noqa: E402
 
 from src.db import queries  # noqa: E402
+from src.db.push import _flat_names  # noqa: E402
 from src.db.reach import reach_of  # noqa: E402
-from src.domain.models import ProcessScore  # noqa: E402
+from src.domain.models import REPORT_LANGS, LangTexts, ProcessScore  # noqa: E402
 
 pytestmark = requires_db
 
@@ -106,7 +107,18 @@ def test_карточка_проверки_отдаёт_разбивку_или_
 
 def test_запросы_читают_поля_снимка_процесса_по_настоящим_именам() -> None:
     """Опечатка в `proc.value ->> '…'` не роняет запрос, а молча обнуляет экран (#354)."""
-    поля = {поле.name for поле in dataclasses.fields(ProcessScore)}
+    # Поля — какими их пишет слив в базу (`name_texts` → `name_<яз>`, #1619),
+    # а не полями датакласса: запросы читают записанное.
+    образец = ProcessScore(
+        code="A",
+        name_texts=LangTexts((яз, яз) for яз in REPORT_LANGS),
+        scored=True,
+        d1=0,
+        d2=0,
+        d3=0,
+        loss=0.0,
+    )
+    поля = set(_flat_names(dataclasses.asdict(образец)))
     sqls = {
         имя: значение
         for имя, значение in vars(queries).items()
