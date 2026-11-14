@@ -42,7 +42,7 @@ from src.domain import dodois_metrics as parse
 from src.domain.dodois import Login
 
 from . import client
-from .client import DodoisError, Response
+from .client import UNAUTHORIZED, DodoisError, Response
 
 logger = logging.getLogger(__name__)
 
@@ -93,11 +93,22 @@ def _batches(units: list[str], size: int) -> list[list[str]]:
 def _each_batch(
     units: list[str], size: int, get: Callable[[list[str]], Response]
 ) -> Iterator[tuple[list[str], Any]]:
-    """Пачки пиццерий с ответом 200; отказ по доступу делит пачку, пока не найдёт, на ком он."""
+    """Пачки пиццерий с ответом 200; отказ по доступу делит пачку, пока не найдёт, на ком он.
+
+    401 на пачке из нескольких пиццерий тоже делит её: контроль Dodo IS отвечает так на
+    слишком большой запрос (#1709). 401 на одной пиццерии — мёртвый вход, он поднимается.
+    """
     queue = _batches(units, size)
     while queue:
         batch = queue.pop(0)
-        response = get(batch)
+        try:
+            response = get(batch)
+        except DodoisError as exc:
+            if exc.kind != UNAUTHORIZED or len(batch) == 1:
+                raise
+            middle = len(batch) // 2
+            queue[:0] = [batch[:middle], batch[middle:]]
+            continue
         if response.status == 200:
             yield batch, response.body
         elif len(batch) > 1:

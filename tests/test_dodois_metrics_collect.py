@@ -15,7 +15,7 @@ import pytest
 from src.db import dodois_logins as logins
 from src.db import dodois_metrics_store as store
 from src.dodois import client, metrics
-from src.dodois.client import DodoisError, Response
+from src.dodois.client import UNAUTHORIZED, DodoisError, Response
 from src.domain import dodois as rules
 from src.domain import dodois_metrics as parse
 
@@ -663,3 +663,26 @@ def test_ratings_ask_at_most_30_units_per_call(мир: Мир, monkeypatch: pyte
     for path in [*parse.RATING_PATHS.values(), parse.CHECKUPS_PATH]:
         covered = set().union(*(set(q["units"].split(",")) for p, q in мир.запросы if p == path))
         assert covered == set(units)
+
+
+def test_401_on_multi_unit_batch_splits_it() -> None:
+    """Контроль Dodo IS отвечает 401 на слишком большой пачке (#1709): пачка делится."""
+    units = [f"{i:032x}" for i in range(8)]
+
+    def get(batch: list[str]) -> Response:
+        if len(batch) > 3:
+            raise DodoisError(UNAUTHORIZED)
+        return _ок(batch)
+
+    got = [u for batch, _ in metrics._each_batch(units, 8, get) for u in batch]
+    assert sorted(got) == units
+
+
+def test_401_on_single_unit_is_dead_login() -> None:
+    """401 на одной пиццерии — мёртвый вход: делить нечего, отказ поднимается."""
+
+    def get(batch: list[str]) -> Response:
+        raise DodoisError(UNAUTHORIZED)
+
+    with pytest.raises(DodoisError):
+        list(metrics._each_batch([f"{i:032x}" for i in range(4)], 4, get))

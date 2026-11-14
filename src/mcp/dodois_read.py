@@ -94,6 +94,11 @@ def _loads(country: str, loads: list[dodois_metrics.KindLoad]) -> list[dict[str,
     ]
 
 
+def _failing(country: str, loads: list[dodois_metrics.KindLoad]) -> list[str]:
+    """Виды, чья последняя попытка не удалась: вход может быть жив, а вид стоять (#1709)."""
+    return sorted(x.kind for x in loads if x.country == country and x.attempt_ok is False)
+
+
 def _data(data: dodois_metrics.CountryData | None, month: date) -> dict[str, object]:
     return {
         "month": month.isoformat(),
@@ -139,17 +144,24 @@ def dodois_status(*, tenant: str, country: str | None = None) -> dict[str, objec
                 "invites_last_7_days": [
                     _invite(i, now) for i in invites if i.country == c and i.issued_at >= since
                 ],
+                "failing_kinds": _failing(c, loads),
                 "data_loads": _loads(c, loads),
                 "data": _data(data.get(c), month),
             }
         )
     return {
         "status": "ok",
+        "failing": [
+            {"country": r["country"], "kinds": r["failing_kinds"]}
+            for r in rows
+            if r["failing_kinds"]
+        ],
         "countries": rows,
         "note": (
             "Только страны со входом, ссылкой за неделю или загрузкой данных; нужную страну "
             "можно спросить кодом. data_loads — журнал часовой загрузки метрик по видам "
-            "(sales, aggregators, kr, ratings); units_with_data — пиццерии страны со строками "
-            "за текущий месяц"
+            "(sales, aggregators, kr, ratings); failing — страны и виды, чья последняя "
+            "загрузка не удалась (state входа при этом может быть ok); units_with_data — "
+            "пиццерии страны со строками за текущий месяц"
         ),
     }
