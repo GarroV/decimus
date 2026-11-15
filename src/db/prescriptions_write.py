@@ -46,6 +46,7 @@ from .prescriptions import (
 )
 from .reach import Reach
 from .storage import PhotoStorage, S3PhotoStorage
+from .timeouts import timed_connect
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,7 @@ def _actor(actor: str) -> str:
 
 def _admin(what: str) -> psycopg.Connection[Any]:
     try:
-        conn = psycopg.connect(load_retraction_settings().dsn)
+        conn = timed_connect(load_retraction_settings().dsn)
         conn.execute(_TIMEOUTS_SQL)
         conn.commit()
         return conn

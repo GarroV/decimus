@@ -37,6 +37,7 @@ from .database_target import managing_dsn
 from .errors import AccessError
 from .mcp_access import new_token, token_fingerprint
 from .pool import connection
+from .timeouts import timed_connect
 
 SCOPE_RATING_SCORES = "ratings:scores"
 SCOPE_RATING_CHECKUPS = "ratings:checkups"
@@ -205,7 +206,7 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """Роль администратора истории (а без неё — владельца схемы), как у учёток."""
     _, dsn = managing_dsn(зачем)
     try:
-        with psycopg.connect(dsn) as conn:
+        with timed_connect(dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc

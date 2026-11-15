@@ -10,9 +10,13 @@
 сессии (предписания УК, `set local` в коде) сильнее стартового значения, а
 `RESET ALL` пула возвращает именно к нему.
 
-Не касается: наката миграций (`migrate.py`), подключений владельца схемы и
-администратора истории, одноразовых инструментов `tools/` — им срок задаёт
-своё место или не нужен вовсе.
+**Прямое соединение открывается одной дверью — `timed_connect`** (она же
+`psycopg.connect` поверх `timed_dsn`). Касается и ролей администратора истории и
+владельца схемы: зависшая блокировка держит их так же. Голый `psycopg.connect`
+в `src/` ловит `tests/test_db_connect_bounded.py`; исключения названы там же —
+накат миграций (`migrate.py`: долгая правка схемы, срок ей не задаётся) и
+`src/settings_read.py` (ярус ниже базы, свои короткие сроки прямо в вызове).
+Одноразовые инструменты `tools/` и `scripts/` правилом не охвачены.
 
 Настройка (необязательная): `DB_STATEMENT_TIMEOUT_S` (по умолчанию 30),
 `DB_LOCK_TIMEOUT_S` (по умолчанию 10), `DB_BATCH_STATEMENT_TIMEOUT_S` (пакетные
@@ -25,7 +29,9 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
+import psycopg
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 log = logging.getLogger(__name__)
@@ -80,3 +86,12 @@ def timed_dsn(dsn: str, *, batch: bool = False) -> str:
         if flags:
             extra["options"] = " ".join(flags)
     return make_conninfo(dsn, **extra) if extra else dsn
+
+
+def timed_connect(dsn: str, *, batch: bool = False, **kwargs: Any) -> psycopg.Connection[Any]:
+    """`psycopg.connect` со сроками по умолчанию (`timed_dsn`).
+
+    Именованные параметры уходят в `psycopg.connect` как есть и перекрывают
+    одноимённые из строки: `connect_timeout=3` короче общего, `autocommit=True`.
+    """
+    return psycopg.connect(timed_dsn(dsn, batch=batch), **kwargs)

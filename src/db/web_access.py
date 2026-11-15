@@ -57,6 +57,7 @@ from .errors import AccessError, EmailTakenError, SecondStepRequiredError
 from .pool import connection
 from .reading import reading
 from .space_guard import require_space
+from .timeouts import timed_connect
 
 #: Сколько живёт сессия. Рабочий день с запасом: короче — человек вводит пароль
 #: посреди работы, длиннее — забытая на чужом экране вкладка переживает ночь.
@@ -575,7 +576,7 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """
     _, dsn = managing_dsn(зачем)
     try:
-        with psycopg.connect(dsn) as conn:
+        with timed_connect(dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc

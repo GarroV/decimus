@@ -27,7 +27,7 @@ import psycopg
 
 from .config import check_environment
 from .errors import DbError
-from .timeouts import timed_dsn
+from .timeouts import timed_connect
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class Hold:
 def try_hold(namespace: int, key: str) -> Hold:
     """Занять операцию `key` в пространстве `namespace`. Не ждёт: занято — `acquired=False`."""
     try:
-        conn = psycopg.connect(timed_dsn(check_environment().dsn), autocommit=True)
+        conn = timed_connect(check_environment().dsn, autocommit=True)
     except (psycopg.Error, DbError) as exc:
         logger.warning(
             "Замок «уже выполняется» недоступен (%s) — держим в памяти процесса", type(exc).__name__

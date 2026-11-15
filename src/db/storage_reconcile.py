@@ -32,15 +32,13 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
-import psycopg
-
 from .action_plans import STORAGE_PREFIX as ACTION_PLANS_PREFIX
 from .config import check_environment, load_storage_settings
 from .errors import StorageError
 from .prescriptions_write import STORAGE_PREFIX as PRESCRIPTIONS_PREFIX
 from .space import apply_space
 from .storage import S3PhotoStorage, StoredObject, key_of_uri
-from .timeouts import timed_dsn
+from .timeouts import timed_connect
 
 #: Сколько ждать, прежде чем объект без строки считать расхождением. Загрузка
 #: файла и коммит строки занимают секунды; 10 минут — тот же запас, что у
@@ -182,7 +180,7 @@ def reconcile_live(
     сверка только читает список.
     """
     store = S3PhotoStorage(load_storage_settings())
-    with psycopg.connect(timed_dsn(check_environment().dsn)) as conn:
+    with timed_connect(check_environment().dsn) as conn:
         apply_space(conn)
         conn.set_read_only(True)
 

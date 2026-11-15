@@ -21,6 +21,7 @@ from src.domain.models import REPORT_LANGS
 from .config import check_environment, load_retraction_settings
 from .errors import DbError
 from .pool import connection
+from .timeouts import timed_connect
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def read_all() -> dict[str, tuple[str, ...]]:
 
 def _run(sql: str, params: tuple[object, ...]) -> None:
     try:
-        with psycopg.connect(load_retraction_settings().dsn) as conn:
+        with timed_connect(load_retraction_settings().dsn) as conn:
             conn.execute(sql, params)
     except psycopg.Error as exc:
         raise DbError(

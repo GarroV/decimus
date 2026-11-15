@@ -228,14 +228,16 @@ docker run --rm \
 `src/report/engine.py`); лишняя ждёт очереди до `QUEUE_WAIT_SEC`, потом отказ
 «сборка занята».
 
-**Сроки базы.** Соединения роли приложения (пул `src/db/pool.py` и прямые
-подключения слива, рейтингов, агрегаторов, OAuth) получают при старте
-`statement_timeout` 30 с, `lock_timeout` 10 с и `connect_timeout` 10 с
-(`src/db/timeouts.py`); пакетные загрузки рейтингов (`ratings_sync`,
-`agg_store`, `ratings/importer`) — `statement_timeout` 300 с
-(`DB_BATCH_STATEMENT_TIMEOUT_S`), остальные сроки те же. Не затронуты: накат миграций, подключения владельца
-схемы и администратора истории вне пула, `tools/`; предписания УК держат свои
-5 с / 15 с. Настройка: `DB_STATEMENT_TIMEOUT_S`, `DB_LOCK_TIMEOUT_S`, `DB_BATCH_STATEMENT_TIMEOUT_S` (секунды;
+**Сроки базы.** Каждое соединение продукта — пул `src/db/pool.py` и все прямые
+подключения, включая роли администратора истории и владельца схемы, —
+открывается через `timed_connect` (`src/db/timeouts.py`) и получает при старте
+`statement_timeout` 30 с, `lock_timeout` 10 с и `connect_timeout` 10 с;
+пакетные загрузки рейтингов (`ratings_sync`, `agg_store`, `ratings/importer`) и
+сверка рецепта (`recipe_audit`) — `statement_timeout` 300 с
+(`DB_BATCH_STATEMENT_TIMEOUT_S`), остальные сроки те же. Голый `psycopg.connect`
+в `src/` ловит `tests/test_db_connect_bounded.py`. Не затронуты: накат миграций,
+`src/settings_read.py` (свои 3 с / 1 с), `tools/` и `scripts/`; предписания УК
+и короткие настройки бота держат свои, более тесные сроки поверх общих. Настройка: `DB_STATEMENT_TIMEOUT_S`, `DB_LOCK_TIMEOUT_S`, `DB_BATCH_STATEMENT_TIMEOUT_S` (секунды;
 `0` — не ставить). Если `DATABASE_URL` поведёт через пулер, не принимающий
 стартовый параметр `options` (Supabase), — обе переменные в `0`.
 

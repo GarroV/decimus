@@ -6,6 +6,7 @@ import psycopg
 
 from .config import load_retraction_settings
 from .errors import DbError
+from .timeouts import timed_connect
 
 _SAVE_SQL = """
 insert into service_settings (key, enabled, notifications_after, changed_by)
@@ -23,7 +24,7 @@ def _save(key: str, enabled: bool, actor: str) -> None:
     if type(enabled) is not bool or not actor.strip():
         raise ValueError("A boolean choice and actor are required")
     try:
-        with psycopg.connect(load_retraction_settings().dsn, connect_timeout=3) as conn:
+        with timed_connect(load_retraction_settings().dsn, connect_timeout=3) as conn:
             conn.execute("set local statement_timeout = '3000ms'")
             conn.execute(_SAVE_SQL, (key, enabled, actor.strip()))
     except psycopg.Error as exc:
