@@ -9,8 +9,8 @@
 #
 # Решение владельца 12.10.2026: проверки больше не блокируют слияние (продукт ещё
 # не в работе, «влить все и там уже тестировать»). PR-прогон справочный; ворота —
-# прогон на `main` после слияния: если он красный, заводится задача «main красный»,
-# а когда снова зелёный — закрывается. Красный main чинится раньше новых слияний.
+# прогон на `main` после слияния: покраснел — владельцу уходит сообщение в Telegram,
+# позеленел — второе. Красный main чинится раньше новых слияний.
 #
 # Расход: репозиторий публичный, минуты Actions бесплатны.
 name: Проверки PR
@@ -25,8 +25,8 @@ permissions:
   contents: read
 
 env:
-  # Заголовок — он же ключ поиска: задача одна, вторую не плодим.
-  ISSUE_TITLE: "main красный"
+  ALERT_FAIL: "DECIMUS: main красный — починить раньше новых слияний."
+  ALERT_OK: "DECIMUS: main снова зелёный."
 
 concurrency:
   group: pr-checks-${{ github.event.pull_request.number || 'main' }}
@@ -133,37 +133,37 @@ jobs:
           path: sbom.cdx.json
           retention-days: 30
 
-  # Ворота: вердикт обоих заданий по прогону на main доставляется задачей.
+  # Ворота: вердикт обоих заданий по прогону на main доставляется владельцу в Telegram.
   main-gate:
     if: always() && github.event_name == 'push'
     needs: [checks, audit]
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    # Задач не заводит: репозиторий публичный, наши задачи живут только в приватном
+    # GarroV/backlog (решение владельца 15.11.2026). Сигнал уходит владельцу в Telegram,
+    # и только при смене состояния — упало / восстановилось, без повтора каждый прогон.
     permissions:
-      issues: write
+      actions: read
     steps:
-      - name: Открыть задачу, если main красный
-        if: needs.checks.result != 'success' || needs.audit.result != 'success'
+      - name: Сообщить владельцу, если состояние сменилось
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          FAILED: ${{ needs.checks.result != 'success' || needs.audit.result != 'success' }}
+          TG_TOKEN: ${{ secrets.ALERT_TG_TOKEN }}
+          TG_CHAT: ${{ secrets.ALERT_TG_CHAT }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          issue_no=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number -q '.[0].number')
-          if [ -n "$issue_no" ]; then
-            gh issue comment "$issue_no" --body "main всё ещё красный (${GITHUB_SHA::8}): $RUN_URL"
-            exit 0
+          prev=$(gh run list --workflow pr-checks.yml --branch "$GITHUB_REF_NAME" --event "$GITHUB_EVENT_NAME" \
+            --status completed -L 1 --json conclusion -q '.[0].conclusion')
+          now=ok; [ "$FAILED" = true ] && now=fail
+          was=ok; [ -n "$prev" ] && [ "$prev" != success ] && was=fail
+          if [ "$now" = "$was" ]; then echo "Состояние прежнее ($now) — молчу."; exit 0; fi
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+            echo "::error::Нет секретов ALERT_TG_TOKEN / ALERT_TG_CHAT — оповещение не доставлено."; exit 1
           fi
-          printf 'Проверки на main упали на %s. Прогон: %s\n\nКрасный main чинится раньше новых слияний. Задача закроется сама, когда прогон на main станет зелёным.\n' "${GITHUB_SHA::8}" "$RUN_URL" > /tmp/body.md
-          gh issue create --title "$ISSUE_TITLE" --body-file /tmp/body.md
-
-      - name: Закрыть задачу, когда main снова зелёный
-        if: needs.checks.result == 'success' && needs.audit.result == 'success'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          issue_no=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number -q '.[0].number')
-          if [ -n "$issue_no" ]; then
-            gh issue close "$issue_no" --comment "main снова зелёный (${GITHUB_SHA::8})."
-          fi
+          if [ "$now" = fail ]; then text="$ALERT_FAIL $RUN_URL"; else text="$ALERT_OK"; fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 \
+            "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" --data-urlencode "text=${text}")
+          [ "$code" = 200 ] || { echo "::error::Telegram ответил $code — оповещение не доставлено."; exit 1; }
