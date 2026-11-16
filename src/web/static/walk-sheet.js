@@ -894,7 +894,7 @@
     var also = isAlso(cand);
     var t = W.button("walk-found__also" + (also ? " is-on" : ""), tx(also ? "walk.sheet.also_on" : "walk.sheet.also"), function () { toggleAlso(cand); });
     t.setAttribute("aria-pressed", String(also));
-    t.disabled = !also && (!extraZone(cand) || isPrimary(cand) || (assignmentEnabled() && !assignmentReady(cand)));
+    t.disabled = !also && (!extraZone(cand) || isPrimary(cand));
     if (!extraZone(cand)) t.title = tx("walk.sheet.need_zone");
     row.appendChild(b);
     row.appendChild(t);
@@ -908,8 +908,8 @@
     return group;
   }
 
-  /** Модель предлагает кадры; выбранная человеком привязка хранится отдельно. */
-  function assignmentEnabled() { return recognizing() && f.found && f.found.length > 1; }
+  /** Распределяем кадры между выбранными записями, а не вариантами пункта от модели. */
+  function assignmentEnabled() { return recognizing() && f.also.length > 0; }
 
   function primaryPhotoCandidate() {
     if (f.picked) return f.picked;
@@ -972,7 +972,7 @@
   }
 
   function photoAssignmentControl(cand) {
-    if (!assignmentEnabled()) return null;
+    if (!assignmentEnabled() || (cand !== primaryPhotoCandidate() && !isAlso(cand))) return null;
     var state = frameAssignment(cand);
     var box = section(tx("walk.sheet.photo_assignment.title"), tx("walk.sheet.photo_assignment.hint"));
     box.setAttribute("data-photo-assignment", cand.code);
@@ -1028,10 +1028,12 @@
   function isAlso(cand) { return f.also.some(function (c) { return sameCandidate(c, cand); }); }
 
   function toggleAlso(cand) {
-    if (!isAlso(cand) && (!extraZone(cand) || isPrimary(cand) || (assignmentEnabled() && !assignmentReady(cand)))) return;
+    if (!isAlso(cand) && (!extraZone(cand) || isPrimary(cand))) return;
+    var wasAssignment = assignmentEnabled();
     f.also = isAlso(cand) ? f.also.filter(function (c) { return !sameCandidate(c, cand); }) : f.also.concat([cand]);
     W.haptic();
     changed();
+    if (wasAssignment !== assignmentEnabled()) requestClass(primaryClassCandidate());
     if (isAlso(cand)) requestClass(cand);
     redraw("item", "level", "footer");
   }
@@ -1126,7 +1128,13 @@
   }
 
   function classPhotoRefs(cand) {
-    if (assignmentEnabled()) return assignmentReady(cand) ? assignedPhotos(cand) : null;
+    if (assignmentEnabled()) {
+      if (assignmentReady(cand)) return assignedPhotos(cand);
+      // У основной записи уже есть кадры одиночного ввода. Пока человек распределяет
+      // их между записями, не теряем проверку класса по тем же фактам; сохранение
+      // всё равно ждёт привязки. Изменённый набор кадров потребует новой проверки.
+      if (!classIsPrimary(cand)) return null;
+    }
     return readyPhotos().map(function (p) { return p.ref; }).filter(function (ref, i, all) { return all.indexOf(ref) === i; });
   }
   function classFactsBinding(cand) {
@@ -1223,9 +1231,9 @@
     var words = [primary ? f.words.trim() : "", state.additionalWords, state.answerQuestion ? "" : state.answer.trim()].filter(Boolean).join("\n");
     var chain = state.clarifications.slice();
     if (state.answerQuestion && state.answer.trim()) chain.push({question:state.answerQuestion, answer:state.answer.trim()});
-    var confirmed = !assignmentEnabled() || assignmentReady(cand);
-    var photos = assignmentEnabled() ? (confirmed ? assignedPhotos(cand) : [])
-      : readyPhotos().map(function (p) { return p.ref; }).filter(function (ref, i, all) { return all.indexOf(ref) === i; });
+    var selectedPhotos = classPhotoRefs(cand);
+    var confirmed = selectedPhotos !== null;
+    var photos = selectedPhotos || [];
     var body = { run_id: f.run_id, checklist_version: W.state.data.checklist_version,
       code: cand.code, zone: zone || null, words: words, photos: photos, clarifications:chain,
       reading_c: reading.confirmed ? reading.value : null,

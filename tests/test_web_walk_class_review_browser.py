@@ -46,7 +46,8 @@ def load(page, *, reading=None, second_reading=None, same_code=False):
 
 def choose(page, index):
     page.locator(".walk-found__card").nth(index).click()
-    confirm_assignment(page, index)
+    if page.locator("[data-photo-assignment]").count():
+        confirm_assignment(page, index)
 
 
 def resolve(page, index=0, **result):
@@ -270,7 +271,6 @@ def test_late_reply_cannot_cross_item_or_override_manual_class(browser_page, sam
     load(page, same_code=same_code)
     choose(page, 0)
     page.wait_for_function("levelCalls.length === 1")
-    confirm_assignment(page, 1)
     page.locator(".walk-found__card").nth(1).click()
     page.wait_for_function("levelCalls.length === 2")
     resolve(page, 0, level="D2")
@@ -334,7 +334,6 @@ def test_human_item_facts_survive_switch_without_becoming_another_items_facts(br
     load(page)
     choose(page, 0)
     page.locator(".walk-class-review__facts").fill("Only the first item's human fact")
-    confirm_assignment(page, 1)
     page.locator(".walk-found__card").nth(1).click()
     page.wait_for_function("levelCalls.length === 2")
     assert "Only the first" not in page.evaluate("levelCalls[1].words")
@@ -395,10 +394,11 @@ def test_extra_question_and_answer_do_not_change_primary_class_or_reading(browse
     load(page)
     choose(page, 0)
     resolve(page, level="D1")
-    confirm_assignment(page, 1)
     page.locator(".walk-found__row").filter(has_text="Synthetic second item").locator(
         ".walk-found__also"
     ).click()
+    confirm_assignment(page, 0)
+    confirm_assignment(page, 1)
     page.wait_for_function("levelCalls.length === 2")
     assert page.evaluate("levelCalls[1].words") == ""
     resolve(
@@ -440,10 +440,11 @@ def test_each_selected_item_confirms_its_own_reading_without_copying_primary_num
     page.locator("[data-reading-confirm]").check()
     page.wait_for_function("levelCalls.length === 1")
     resolve(page, level="D1")
-    confirm_assignment(page, 1)
     page.locator(".walk-found__row").filter(has_text="Synthetic second item").locator(
         ".walk-found__also"
     ).click()
+    confirm_assignment(page, 0)
+    confirm_assignment(page, 1)
     extra = page.locator('[data-class-review="SYN02"]')
     assert extra.locator("[data-extra-reading]").input_value() == "8"
     assert page.evaluate("levelCalls.length") == 1
@@ -614,7 +615,6 @@ def test_changed_facts_require_explicit_review_before_reusing_chain(browser_page
     page.locator(".walk-area--words").fill("Changed human observation")
     assert page.locator("[data-class-check]").is_disabled()
     assert page.get_by_role("button", name="Save", exact=True).is_disabled()
-    confirm_assignment(page, 0)
     page.get_by_role("button", name="walk.sheet.class_review.reaffirm", exact=True).click()
     page.locator("[data-class-check]").click()
     page.wait_for_function("levelCalls.length === 3")
@@ -678,10 +678,11 @@ def test_extra_finding_exposes_full_independent_editable_description(browser_pag
     load(page)
     choose(page, 0)
     resolve(page, level="D1")
-    confirm_assignment(page, 1)
     page.locator(".walk-found__row").filter(has_text="Synthetic second item").locator(
         ".walk-found__also"
     ).click()
+    confirm_assignment(page, 0)
+    confirm_assignment(page, 1)
     page.wait_for_function("levelCalls.length === 2")
     resolve(page, 1, level="D2")
     editor = page.locator('[data-extra-text="SYN02"]')
@@ -729,13 +730,14 @@ def test_repeated_extra_toggle_preserves_ready_result_without_new_request(browse
     load(page)
     choose(page, 0)
     resolve(page, level="D1")
-    confirm_assignment(page, 1)
     extra_toggle = (
         page.locator(".walk-found__row")
         .filter(has_text="Synthetic second item")
         .locator(".walk-found__also")
     )
     extra_toggle.click()
+    confirm_assignment(page, 0)
+    confirm_assignment(page, 1)
     page.wait_for_function("levelCalls.length === 2")
     resolve(page, 1, level="D2")
     extra_toggle.click()
@@ -766,13 +768,14 @@ def test_extra_reply_while_deselected_does_not_leave_a_stuck_pending_check(brows
     load(page)
     choose(page, 0)
     resolve(page, level="D1")
-    confirm_assignment(page, 1)
     toggle = (
         page.locator(".walk-found__row")
         .filter(has_text="Synthetic second item")
         .locator(".walk-found__also")
     )
     toggle.click()
+    confirm_assignment(page, 0)
+    confirm_assignment(page, 1)
     page.wait_for_function("levelCalls.length === 2")
     toggle.click()
     resolve(page, 1, level="D2")

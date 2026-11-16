@@ -130,6 +130,11 @@ def confirm_assignment(page, index, frames=(0,)):
     box.locator("[data-photo-confirm]").check()
 
 
+def confirm_selected_assignments(page):
+    for index in range(page.locator("[data-photo-assignment]").count()):
+        confirm_assignment(page, index)
+
+
 def row_for_zone(page, zone):
     return page.locator(".walk-found__row").filter(
         has=page.locator(".walk-found__card", has_text=zone)
@@ -142,6 +147,7 @@ def test_same_code_in_two_zones_is_saved_as_two_operations(browser_page):
     # Make B primary, then retain A as a separate additional finding.
     row_for_zone(page, "Zone B").locator(".walk-found__card").click()
     row_for_zone(page, "Zone A").locator(".walk-found__also").click()
+    confirm_selected_assignments(page)
     page.get_by_role("button", name="Save 2", exact=True).click()
     page.wait_for_function("ops.length === 2 && !document.querySelector('.walk-sheet')")
     ops = page.evaluate("ops")
@@ -170,6 +176,7 @@ def test_unknown_zone_never_inherits_primary_zone_and_does_not_erase_other_zone(
     assert page.get_by_role("button", name="Save 2", exact=True).is_disabled()
     # Explicit human choice resolves the unknown candidate; another zone survives.
     page.locator(".walk-where").get_by_role("button", name="Zone A", exact=True).click()
+    confirm_selected_assignments(page)
     page.get_by_role("button", name="Save 2", exact=True).click()
     page.wait_for_function("ops.length === 2 && !document.querySelector('.walk-sheet')")
     assert [op["zone"] for op in page.evaluate("ops")] == ["zone_a", "zone_b"]
@@ -191,6 +198,7 @@ def test_explicitly_resolved_candidate_can_be_kept_when_primary_changes(browser_
     row_for_zone(page, "Zone B").locator(".walk-found__card").click()
     # The formerly unknown card keeps the auditor's explicit zone after switching.
     page.locator(".walk-found__row").last.locator(".walk-found__also").click()
+    confirm_selected_assignments(page)
     page.get_by_role("button", name="Save 2", exact=True).click()
     page.wait_for_function("ops.length === 2 && !document.querySelector('.walk-sheet')")
     ops = page.evaluate("ops")
@@ -205,6 +213,7 @@ def test_multi_save_requires_current_run_and_authoritative_photo_receipt(browser
     page = browser_page
     load_sheet(page, [card("zone_a", "Synthetic A"), card("zone_b", "Synthetic B")])
     row_for_zone(page, "Zone B").locator(".walk-found__also").click()
+    confirm_selected_assignments(page)
     page.evaluate(
         """invalid=>{
       window.responseMutation=(response)=>{
