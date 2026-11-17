@@ -279,20 +279,20 @@
   /** Что мешает спросить систему: без кадра нарушение не разбирается (D078). */
   function findBlocker() {
     if (!readyPhotos().length) return missingPhoto();
-    if (uploading()) return "walk.sheet.need_upload";
+    if (f.restoringPhotos || uploading()) return "walk.sheet.need_upload";
     return null;
   }
 
   /** Готовых кадров нет: загружаются, ждут связи или не снято вовсе. */
   function missingPhoto() {
-    if (uploading()) return "walk.sheet.need_upload";
+    if (f.restoringPhotos || uploading()) return "walk.sheet.need_upload";
     return waitingPhotos().length ? "walk.sheet.need_online" : "walk.sheet.need_photo";
   }
 
   function blocker() {
     // Рекомендации кадр не обязателен: «крышка открывается туго» не снять.
     if (!isAdvice() && !readyPhotos().length) return missingPhoto();
-    if (uploading()) return "walk.sheet.need_upload";
+    if (f.restoringPhotos || uploading()) return "walk.sheet.need_upload";
     // Кадр, ждущий связи, нельзя бросить за порогом записи: она ушла бы без него.
     if (waitingPhotos().length) return "walk.sheet.need_online";
     if (f.photos.some(function (p) { return p.state === "failed" && !p.entryId; })) return "walk.offline.nostore";
@@ -333,10 +333,84 @@
       level: f.level || f.legacyLevel || null, text: f.text,
       comment: f.comment, repeat: f.repeat, words: f.words, reading: f.reading,
       reading_source: f.readingSource || "model", reading_confirmed: !!f.readingConfirmed,
-      class_facts: classFactDrafts(),
+      class_facts: classFactDrafts(), selection: selectionDraft(),
       photos: readyPhotos().map(function (p) { return p.ref; }),
       reconcile: !!f.reconcile, submitted_ops: f.submitted_ops || [],
     }));
+  }
+
+  function draftCandidate(cand) {
+    var copy = {};
+    ["code", "level", "zone", "wording", "confidence", "reading_c", "flags", "frame_refs", "frame_count", "frame_indices", "resolution"].forEach(function (key) {
+      if (cand[key] !== undefined) copy[key] = cand[key];
+    });
+    return JSON.parse(JSON.stringify(copy));
+  }
+
+  /** Persist human selections, never a settled model class or its pending request. */
+  function selectionDraft() {
+    if (!recognizing() || !f.code || (!f.picked && !f.also.length)) return null;
+    function selected(cand, primary) {
+      var copy = draftCandidate(cand);
+      if (primary) copy.resolution = Object.assign({}, copy.resolution || {}, {zone:f.zone, source:f.zoneSource});
+      var state = classState(cand), context = classContext(cand);
+      return {candidate:copy, assignment:assignmentEnabled() ? assignmentPayload(cand) : null,
+        manual:state.status === "manual" && state.key === context.key && !context.blocked ? {level:state.level, scope:context.scope} : null};
+    }
+    return {version:1, run_id:f.run_id, key:draftKey(), checklist_version:W.state.data.checklist_version,
+      words:f.words.trim(), photos:readyPhotos().map(function (p) {return p.ref;}),
+      asked:f.asked || null, via:f.via || null, primary_picked:!!f.picked,
+      primary:selected(primaryPhotoCandidate(), true), additional:f.also.map(function (cand) {return selected(cand, false);})};
+  }
+
+  function restoreSelection(saved) {
+    if (!saved || saved.version !== 1 || saved.run_id !== f.run_id || saved.key !== draftKey() ||
+        saved.checklist_version !== W.state.data.checklist_version || !saved.primary || !Array.isArray(saved.additional)) return;
+    var entries = [saved.primary].concat(saved.additional).map(function (entry) {
+      return entry && entry.candidate ? Object.assign({}, entry, {candidate:draftCandidate(entry.candidate)}) : entry;
+    });
+    var pairs = [];
+    // Restore the complete selection or none of it; never silently drop a row.
+    var valid = entries.every(function (entry, at) {
+      var cand = entry && entry.candidate, known = cand && item(cand.code);
+      var zone = cand && extraZone(cand);
+      if (!known || known.note || (at > 0 && !zone) || (at === 0 && (cand.code !== f.code || zone !== f.zone))) return false;
+      var pair = JSON.stringify([cand.code, zone]);
+      if (pairs.indexOf(pair) !== -1) return false;
+      pairs.push(pair);
+      return true;
+    });
+    if (!valid) return;
+    f.found = entries.map(function (entry) {return entry.candidate;});
+    if (saved.primary_picked) f.picked = f.found[0];
+    else {f.manualPhotoCandidate = f.found.shift();}
+    f.also = entries.slice(1).map(function (entry) {return entry.candidate;});
+    f.zoneSource = (entries[0].candidate.resolution || {}).source || null;
+    f.asked = typeof saved.asked === "string" ? saved.asked : null;
+    f.via = saved.via;
+    var sameEvidence = saved.words === f.words.trim() && JSON.stringify(saved.photos) === JSON.stringify(readyPhotos().map(function (p) {return p.ref;}));
+    entries.forEach(function (entry) {
+      var cand = entry.candidate, old = entry.assignment;
+      var state = frameAssignment(cand);
+      var indices = old && validFrameIndices(old.assigned_frame_indices, state.source_photos.length);
+      if (sameEvidence && old && indices && JSON.stringify(old.source_photos) === JSON.stringify(state.source_photos)) {
+        state.assigned_frame_indices = indices;
+        state.confirmed = old.confirmed === true && indices.length > 0;
+      }
+      cand.draftManual = sameEvidence ? entry.manual : null;
+    });
+  }
+
+  function restoreManualSelections() {
+    if (!recognizing() || !f.code) return;
+    selectedClassCandidates().forEach(function (cand) {
+      var manual = cand.draftManual;
+      delete cand.draftManual;
+      if (!manual) return;
+      var state = classState(cand), context = classContext(cand);
+      if (!context.blocked && manual.scope === context.scope) W.classReview.chooseManual(state, context, manual.level);
+    });
+    syncClassSelections();
   }
 
   function changed() {
@@ -499,6 +573,10 @@
       changed();
       redraw("photos", "item", "footer");
       W.offline.kick();
+    }).finally(function () {
+      if (f !== mine) return;
+      f.restoringPhotos = false;
+      redraw("footer");
     });
   }
 
@@ -2221,7 +2299,7 @@
           run_id: runId, mode: f.mode, zone: null, code: null, level: null, text: "", comment: "", repeat: false,
           reading: null, words: f.words, photos: remaining.filter(function (p) { return p.ref; }).map(function (p) { return p.ref; }),
           queued: remaining.filter(function (p) { return p.ref; }).map(function (p) { return p.ref; }),
-          reconcile: false, submitted_ops: [],
+          reconcile: false, submitted_ops: [], selection: null,
         }));
       } else if (W.editDraft) W.editDraft.clear(form);
       W.haptic("success");
@@ -2408,6 +2486,7 @@
         f.repeat = !!draft.repeat;
         f.reconcile = !!draft.reconcile; f.submitted_ops = draft.submitted_ops || [];
         f.photos = (draft.photos || []).map(function (ref) { return { id: ++seq, ref: ref, own: true, state: "done", fresh: true }; });
+        restoreSelection(draft.selection);
         f.restored = true;
       } else if (draft && draft.mode === f.mode && (draft.queued || []).length) {
         // Пункт задан явно — черновик не трогаем, но кадры, дошедшие без связи, возвращаем.
@@ -2423,6 +2502,8 @@
       f.unregisterDraft = W.offline.register(f.draftKey, {uploaded: adopt, failed: uploadFailed});
     }
     syncMeasurementEditMode();
+    restoreManualSelections();
+    f.restoringPhotos = (!f.n || hasEditDraft()) && W.offline.available();
     build();
     restoreWaiting();
     if (f.n && W.editDraft) {
