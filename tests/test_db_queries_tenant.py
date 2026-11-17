@@ -153,7 +153,7 @@ on conflict do nothing
 _ТОЧКА_SQL = """
 insert into units (tenant_code, name, name_normalized, country)
 values (%(tenant)s, 'Нагрузочная', 'нагрузочная',
-       (select min(country) from space_countries where tenant_code = %(tenant)s))
+       %(country)s)
 returning id
 """
 
@@ -164,18 +164,19 @@ insert into inspections (
     pushed_at
 )
 select
-    %(tenant)s, %(unit_id)s, 1, 'planned', current_date, 'ru',
+    %(tenant)s, %(unit_id)s, 1, 'planned', current_date - (g %% 730), 'ru',
     'ru', 'ru', 'v1', 97.5, 'A', %(tenant)s || '-' || g,
     now() - (g || ' minutes')::interval
 from generate_series(1, %(сколько)s) g
 """
 
 
-def _насыпать(dsn: str, *, арендатор: str, сколько: int) -> None:
+def _насыпать(dsn: str, *, арендатор: str, сколько: int, страна: str | None = None) -> None:
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(_НАПОЛНИТЬ_SQL, {"tenant": арендатор})
-        cur.execute(_СТРАНА_SQL, {"tenant": арендатор})
-        cur.execute(_ТОЧКА_SQL, {"tenant": арендатор})
+        if арендатор != "HQ":
+            cur.execute(_СТРАНА_SQL, {"tenant": арендатор})
+        cur.execute(_ТОЧКА_SQL, {"tenant": арендатор, "country": страна or арендатор})
         row = cur.fetchone()
         assert row is not None
         cur.execute(
@@ -201,32 +202,52 @@ def test_выборка_идёт_по_индексу_а_не_полным_про
     _насыпать(pg_dsn, арендатор=АРЕНДАТОР_А, сколько=8000)
     _насыпать(pg_dsn, арендатор=АРЕНДАТОР_Б, сколько=2000)
 
-    # Два охвата: свой тенант (изоляция партнёров) и вся сеть (УК, D283). Тенант
-    # приходит массивом, и под `= any(...)` Postgres 16 не берёт порядок дат из
-    # индекса «тенант + дата»; ведёт индекс по дате обхода (миграция 0030).
-    for охват in (own_reach(АРЕНДАТОР_А), reach_of("HQ")):
+    # D770: принятые самопроверки партнёров не входят в статистику УК.
+    # У каждого проверяемого охвата есть тысячи подходящих строк, а не пустая выдача.
+    _насыпать(pg_dsn, арендатор="HQ", сколько=4000, страна=АРЕНДАТОР_А)
+    for охват, expected_tenant, eligible in (
+        (own_reach(АРЕНДАТОР_А), АРЕНДАТОР_А, 8000),
+        (reach_of("HQ"), "HQ", 4000),
+    ):
+        params = {
+            **охват.params(),
+            "limit": DEFAULT_LIMIT,
+            "date_from": None,
+            "date_to": None,
+            "city": None,
+            "country": None,
+            "grade": None,
+        }
         with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
             cur.execute(
-                "explain " + _LIST_ALL_SQL,
-                {
-                    **охват.params(),
-                    "limit": DEFAULT_LIMIT,
-                    "date_from": None,
-                    "date_to": None,
-                    # Отбор по месту и букве не задан — «все» (#470).
-                    "city": None,
-                    "country": None,
-                    "grade": None,
-                },
+                "select count(*) from inspections where tenant_code = %s and status = 'finalized'",
+                (expected_tenant,),
             )
-            план = "\n".join(строка[0] for строка in cur.fetchall())
+            assert cur.fetchone() == (eligible,)
+            cur.execute(_LIST_ALL_SQL, params)
+            rows = cur.fetchall()
+            assert len(rows) == DEFAULT_LIMIT
+            assert {row[1] for row in rows} == {expected_tenant}
+            cur.execute("explain (analyze, buffers, format json) " + _LIST_ALL_SQL, params)
+            plan = cur.fetchone()[0][0]["Plan"]
 
-        assert "Seq Scan on inspections" not in план, (
-            f"выборка проверок {охват} читает таблицу целиком:\n{план}"
+        def nodes(node):
+            yield node
+            for child in node.get("Plans", []):
+                yield from nodes(child)
+
+        scans = [node for node in nodes(plan) if node.get("Relation Name") == "inspections"]
+        assert scans, "план не содержит проверяемую таблицу"
+        assert all(node["Node Type"] in ("Index Scan", "Index Only Scan") for node in scans), scans
+        assert any(node.get("Index Name") == "inspections_date_idx" for node in scans), scans
+        # Ограничена работа чтения, а не только размер ответа. Время зависит
+        # от нагрузки стенда, поэтому миллисекунды условием не служат.
+        inspected = sum(
+            (node["Actual Rows"] + node.get("Rows Removed by Filter", 0)) * node["Actual Loops"]
+            for node in scans
         )
-        assert "inspections_date_idx" in план, (
-            f"выборка {охват} не пользуется индексом по дате обхода:\n{план}"
-        )
+        assert plan["Actual Rows"] == DEFAULT_LIMIT
+        assert inspected <= DEFAULT_LIMIT * 10, (охват, inspected, scans)
 
 
 _ЖДУЩИЕ_SQL = """

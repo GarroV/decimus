@@ -156,12 +156,14 @@ def test_агрегаторы_значок_устаревших_прочерк_�
     # Старая страница охвата ведёт сюда, страна не теряется.
     assert страница_охвата.status_code == 302
     assert страница_охвата.headers["Location"].endswith("/ratings/agg?country=PL")
-    # Glovo у «Старой» старше недели: значок с датой и причина словами. Свежий Wolt — без значка.
+    # D705: дата старой оценки остаётся, операционные причины — в администрировании.
     устарел = (СЕГОДНЯ - timedelta(days=9)).strftime("%d.%m.%Y")
     assert f"Данные от {устарел}, новые не приходят" in html
     assert html.count('class="rt-stale"') == 1
-    assert f"Glovo: оценка не обновляется с {устарел}" in html
-    assert "Glovo: не привязана" in html  # у «Новой» нет Glovo
+    assert f"Glovo: оценка не обновляется с {устарел}" not in html
+    assert "Glovo: не привязана" not in html
+    новая = html.split('<th scope="row">Новая</th>', 1)[1].split("</tr>", 1)[0]
+    assert '<span class="is-empty" title="Точка не привязана">—</span>' in новая
     assert "98.3%" in html and "9.2<span" in html
     # Гость-не-управляющий формы привязки не видит.
     assert "привязать" not in html

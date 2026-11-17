@@ -122,14 +122,20 @@ def test_блок_агрегаторов_на_странице_и_сбой_ст�
         assert войти(client).status_code == 302
         ответ = client.get("/ratings/agg?group=country&value=RS")
         прошлый = client.get("/ratings/agg?group=country&value=RS&period=2026-01")
+        управление = client.get("/administration?tab=aggregators&country=RS")
     assert ответ.status_code == 200
     блок = ответ.get_data(as_text=True)
     assert '9.2<span class="rt-src__scale">/10</span>' in блок and "98.3%" in блок
-    assert "Не собралось: Glovo." in блок and "HTTP 503" in блок
+    # D705: рабочая страница показывает данные; диагностика — в администрировании.
+    assert "Не собралось:" not in блок and "HTTP 503" not in блок
+    assert управление.status_code == 200
+    диагностика = управление.get_data(as_text=True)
+    assert "Сбой общего сборщика" in диагностика and "HTTP 503" in диагностика
     assert "за выбранный период оценок нет" not in блок
     # Истории до первого сбора нет: на прошлый период — последние данные с датой.
     блок = прошлый.get_data(as_text=True)
-    assert "98.3%" in блок and "за выбранный период оценок нет" in блок
+    assert "98.3%" in блок
+    assert f"За выбранный период оценок нет — показаны данные на {date.today():%d.%m.%Y}." in блок
 
 
 def test_unmatched_batch_counts_exclude_manual_non_pizzerias(db_env: str) -> None:
