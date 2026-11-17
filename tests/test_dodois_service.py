@@ -7,8 +7,11 @@
 
 from __future__ import annotations
 
+import base64
+import os
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -67,6 +70,8 @@ class Хранилище:
         return self.ключи.get(country)
 
     def replace_tokens(self, **поля: Any) -> None:
+        if поля.get("expect_linked_at") != self.входы[поля["country"]].linked_at:
+            raise store.LoginSuperseded("Synthetic relink")
         self.записей_пары += 1
         if self.падает_запись > 0:
             self.падает_запись -= 1
@@ -78,10 +83,24 @@ class Хранилище:
             access_expires_at=поля["access_expires_at"],
         )
 
-    def set_account(self, country: str, name: str | None, email: str | None) -> None:
+    def set_account(
+        self,
+        country: str,
+        name: str | None,
+        email: str | None,
+        *,
+        expect_linked_at=None,
+    ) -> None:
+        if expect_linked_at is not None and self.входы[country].linked_at != expect_linked_at:
+            return
         self.входы[country] = replace(self.входы[country], account_name=name, account_email=email)
 
     def record_state(self, country: str, state: str, reason: str | None, **поля: Any) -> None:
+        if (
+            поля.get("expect_linked_at") is not None
+            and self.входы[country].linked_at != поля["expect_linked_at"]
+        ):
+            return
         self.состояния.append((country, state, reason))
         вход = self.входы[country]
         self.входы[country] = replace(
@@ -97,7 +116,9 @@ class Хранилище:
 
 
 @pytest.fixture(autouse=True)
-def _чисто() -> Any:
+def _чисто(domain_env, monkeypatch) -> Any:
+    monkeypatch.setenv("SECRETS_KEY", base64.b64encode(os.urandom(32)).decode())
+    Path(os.environ["STATE_DIR"]).mkdir(parents=True, exist_ok=True)
     service.forget_unwritten()
     yield
     service.forget_unwritten()
@@ -373,7 +394,7 @@ def test_сбой_записи_учётки_не_ломает_проверку(
     _счёт(monkeypatch, 10, 10)
     _учётка(monkeypatch, ("Ana Novak", None))
 
-    def падает(*_a: Any) -> None:
+    def падает(*_a: Any, **_kwargs: Any) -> None:
         raise AccessError("база отказала")
 
     monkeypatch.setattr(store, "set_account", падает)
@@ -390,3 +411,250 @@ def test_пустой_ответ_userinfo_оставляет_учётку_неи
     вход = service.check("SI", now=СЕЙЧАС)
     assert вход is not None
     assert (вход.state, вход.account_name, вход.account_email) == (rules.OK, None, None)
+
+
+def test_rotated_pair_survives_process_memory_loss(база, monkeypatch):
+    calls = _продление(monkeypatch, НОВАЯ)
+    _счёт(monkeypatch, 4, 4)
+    monkeypatch.setattr(service, "credentials", lambda: КЛЮЧИ)
+    база.падает_запись = 99
+    service.run_pass(now=СЕЙЧАС, sleep=lambda _: None)
+    service.forget_unwritten()
+    база.падает_запись = 0
+    service.run_pass(now=СЕЙЧАС + timedelta(hours=1), sleep=lambda _: None)
+    assert calls == [СТАРАЯ.refresh]
+    assert база.ключи["SI"] == store.Tokens(НОВАЯ.access, НОВАЯ.refresh)
+    assert база.входы["SI"].state == rules.OK
+
+
+def test_pending_pair_is_encrypted_private_and_readable_by_fresh_process(база, monkeypatch):
+    import stat
+    import subprocess
+    import sys
+
+    from src.dodois import refresh_outbox as outbox
+
+    _продление(monkeypatch, НОВАЯ)
+    база.падает_запись = 99
+    assert not service.refresh(база.входы["SI"], КЛЮЧИ, now=СЕЙЧАС, sleep=lambda _: None)
+    path = Path(os.environ["STATE_DIR"]) / outbox.DIRECTORY / "SI.bin"
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    blob = path.read_bytes()
+    for value in (НОВАЯ.access, НОВАЯ.refresh, СТАРАЯ.refresh):
+        assert value.encode() not in blob
+    script = """
+from src.dodois.refresh_outbox import locked
+with locked('SI') as journal:
+    held = journal.read()
+    assert held.pair.refresh == 'new-refresh-DDDD'
+print('recovered')
+"""
+    result = subprocess.run(  # noqa: S603 -- fixed interpreter and synthetic script
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=Path(__file__).resolve().parents[1],
+    )
+    assert result.stdout.strip() == "recovered"
+
+
+@pytest.mark.parametrize("failure", ["state_missing", "key_missing", "fsync_failed"])
+def test_unwritable_handoff_refuses_before_provider(база, monkeypatch, failure, tmp_path):
+    from src.dodois import refresh_outbox as outbox
+
+    calls = _продление(monkeypatch, НОВАЯ)
+    if failure == "state_missing":
+        monkeypatch.setenv("STATE_DIR", str(tmp_path / "missing"))
+    elif failure == "key_missing":
+        monkeypatch.delenv("SECRETS_KEY")
+    else:
+
+        def failed(*args):
+            raise OSError("Synthetic fsync failure")
+
+        monkeypatch.setattr(outbox.os, "fsync", failed)
+    assert not service.refresh(база.входы["SI"], КЛЮЧИ, now=СЕЙЧАС, sleep=lambda _: None)
+    assert not calls
+    assert база.ключи["SI"] == СТАРАЯ
+
+
+def test_uncertain_response_is_not_retried_after_restart(база, monkeypatch):
+    calls = _продление(monkeypatch, DodoisError(client.NETWORK))
+    assert not service.refresh(база.входы["SI"], КЛЮЧИ, now=СЕЙЧАС)
+    service.forget_unwritten()
+    assert not service.refresh(база.входы["SI"], КЛЮЧИ, now=СЕЙЧАС + timedelta(hours=1))
+    assert calls == [СТАРАЯ.refresh]
+    assert база.входы["SI"].state == rules.FAILED
+    assert база.входы["SI"].reason == "network"
+
+
+def test_failed_ready_write_does_not_reuse_rotated_token_after_restart(база, monkeypatch):
+    from src.dodois import refresh_outbox as outbox
+
+    calls = _продление(monkeypatch, НОВАЯ)
+    original = outbox.Journal.write
+
+    def fail_ready(self, pending):
+        if pending.pair is not None:
+            raise OSError("Synthetic ready persistence failure")
+        original(self, pending)
+
+    monkeypatch.setattr(outbox.Journal, "write", fail_ready)
+    assert not service.refresh(база.входы["SI"], КЛЮЧИ, now=СЕЙЧАС)
+    assert база.записей_пары == 0
+    service.forget_unwritten()
+    monkeypatch.setattr(outbox.Journal, "write", original)
+    assert not service.refresh(база.входы["SI"], КЛЮЧИ, now=СЕЙЧАС + timedelta(hours=1))
+    assert calls == [СТАРАЯ.refresh]
+    assert база.входы["SI"].state != rules.EXPIRED
+
+
+@pytest.mark.parametrize("response", [НОВАЯ, RefreshRejected(), DodoisError(client.NETWORK)])
+def test_relinked_login_ignores_late_provider_response(база, monkeypatch, response):
+    original = база.входы["SI"]
+    replacement = replace(original, linked_at=СЕЙЧАС, state=rules.OK, reason=None)
+    new_tokens = store.Tokens("replacement-access", "replacement-refresh")
+
+    def relink(*args):
+        база.входы["SI"] = replacement
+        база.ключи["SI"] = new_tokens
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    monkeypatch.setattr(client, "refresh_tokens", relink)
+    service.refresh(original, КЛЮЧИ, now=СЕЙЧАС, sleep=lambda _: None)
+    assert база.входы["SI"] == replacement
+    assert база.ключи["SI"] == new_tokens
+    service.forget_unwritten()
+    service.retry_unwritten(replacement, now=СЕЙЧАС)
+    assert база.входы["SI"] == replacement
+    assert база.ключи["SI"] == new_tokens
+
+
+def test_late_check_failure_does_not_change_relinked_login(база, monkeypatch):
+    original = база.входы["SI"]
+    replacement = replace(original, linked_at=СЕЙЧАС, state=rules.OK, reason=None)
+    monkeypatch.setattr(client, "working_pizzerias", lambda _: ["synthetic-unit"])
+
+    def failed(*args):
+        база.входы["SI"] = replacement
+        raise DodoisError(client.NETWORK)
+
+    monkeypatch.setattr(client, "count_open", failed)
+    service.check("SI", now=СЕЙЧАС)
+    assert база.входы["SI"] == replacement
+
+
+def test_country_lock_blocks_another_process(база):
+    import subprocess
+    import sys
+
+    from src.dodois import refresh_outbox as outbox
+
+    script = """
+from src.dodois import refresh_outbox as outbox
+outbox.LOCK_TIMEOUT_SECONDS = 0.1
+try:
+    with outbox.locked('SI'):
+        raise AssertionError('Concurrent provider refresh would be allowed')
+except outbox.OutboxError:
+    print('blocked')
+"""
+    with outbox.locked("SI"):
+        result = subprocess.run(  # noqa: S603 -- fixed interpreter and synthetic script
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=Path(__file__).resolve().parents[1],
+        )
+    assert result.stdout.strip() == "blocked"
+
+
+def test_concurrent_refresh_uses_source_token_only_once(база, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    entered, release = Event(), Event()
+    calls = []
+    source = база.входы["SI"]
+
+    def provider(*args):
+        calls.append(args[-1])
+        entered.set()
+        assert release.wait(5)
+        return НОВАЯ
+
+    monkeypatch.setattr(client, "refresh_tokens", provider)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(service.refresh, source, КЛЮЧИ, now=СЕЙЧАС)
+        assert entered.wait(5)
+        second = pool.submit(service.refresh, source, КЛЮЧИ, now=СЕЙЧАС)
+        release.set()
+        assert first.result(timeout=10)
+        assert second.result(timeout=10)
+    assert calls == [СТАРАЯ.refresh]
+
+
+def test_stale_process_cache_cannot_delete_another_process_ready_pair(база, monkeypatch):
+    from src.dodois import refresh_outbox as outbox
+
+    _продление(monkeypatch, НОВАЯ)
+    база.падает_запись = 99
+    assert not service.refresh(база.входы["SI"], КЛЮЧИ, now=СЕЙЧАС, sleep=lambda _: None)
+    assert service._unwritten
+    replacement = replace(база.входы["SI"], linked_at=СЕЙЧАС)
+    база.входы["SI"] = replacement
+    newer = TokenPair("newer-access", "newer-refresh", 86400, "openid sales")
+    with outbox.locked("SI") as journal:
+        journal.write(
+            outbox.Pending(
+                "SI",
+                "intl",
+                replacement.linked_at,
+                СЕЙЧАС + timedelta(minutes=1),
+                service._source_hash("replacement-refresh"),
+                newer,
+            )
+        )
+    база.падает_запись = 0
+    assert service.retry_unwritten(replacement, now=СЕЙЧАС, sleep=lambda _: None)
+    assert база.ключи["SI"] == store.Tokens(newer.access, newer.refresh)
+
+
+@pytest.mark.parametrize("country", ["../SI", "SI/../../x", "si", "", "SLO"])
+def test_country_cannot_escape_outbox(country):
+    from src.dodois import refresh_outbox as outbox
+
+    with pytest.raises(outbox.OutboxError):
+        with outbox.locked(country):
+            pytest.fail("Invalid country acquired a refresh lock")
+
+
+@pytest.mark.parametrize("damage", ["ciphertext", "key", "country"])
+def test_pending_authentication_failure_never_calls_provider(база, monkeypatch, damage):
+    from src.dodois import refresh_outbox as outbox
+
+    calls = _продление(monkeypatch, НОВАЯ)
+    база.падает_запись = 99
+    assert not service.refresh(база.входы["SI"], КЛЮЧИ, now=СЕЙЧАС, sleep=lambda _: None)
+    service.forget_unwritten()
+    root = Path(os.environ["STATE_DIR"]) / outbox.DIRECTORY
+    path = root / "SI.bin"
+    if damage == "ciphertext":
+        blob = bytearray(path.read_bytes())
+        blob[-1] ^= 1
+        path.write_bytes(blob)
+    elif damage == "key":
+        monkeypatch.setenv("SECRETS_KEY", base64.b64encode(os.urandom(32)).decode())
+    else:
+        (root / "RS.bin").write_bytes(path.read_bytes())
+        with outbox.locked("RS") as journal:
+            with pytest.raises(outbox.OutboxError):
+                journal.read()
+        return
+    assert not service.refresh(база.входы["SI"], КЛЮЧИ, now=СЕЙЧАС + timedelta(hours=1))
+    assert calls == [СТАРАЯ.refresh]

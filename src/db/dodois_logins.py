@@ -324,6 +324,7 @@ def record_state(
     now: datetime,
     units_total: int | None = None,
     units_open: int | None = None,
+    expect_linked_at: datetime | None = None,
 ) -> None:
     """Состояние входа после проверки или отказа; счёт пиццерий не затирается, если не передан."""
     vault_names(country)
@@ -334,14 +335,29 @@ def record_state(
             cur.execute(
                 "update dodois.logins set state = %s, reason = %s, checked_at = %s, "
                 "units_total = coalesce(%s, units_total), units_open = coalesce(%s, units_open) "
-                "where country = %s",
-                (state, reason, now, units_total, units_open, country),
+                "where country = %s and (%s::timestamptz is null or linked_at = %s)",
+                (
+                    state,
+                    reason,
+                    now,
+                    units_total,
+                    units_open,
+                    country,
+                    expect_linked_at,
+                    expect_linked_at,
+                ),
             )
     except psycopg.Error as exc:
         raise _fail("Состояние входа Dodo IS не записалось", exc) from exc
 
 
-def set_account(country: str, name: str | None, email: str | None) -> None:
+def set_account(
+    country: str,
+    name: str | None,
+    email: str | None,
+    *,
+    expect_linked_at: datetime | None = None,
+) -> None:
     """Дописать имя и почту учётки Dodo IS входу, у которого их нет (перенесённый вход).
 
     Трогает только эти два поля; значения длиннее колонки (200) отбрасываются, как у `userinfo`.
@@ -355,8 +371,9 @@ def set_account(country: str, name: str | None, email: str | None) -> None:
         with _managing() as conn, conn.cursor() as cur:
             cur.execute(
                 "update dodois.logins set account_name = %s, account_email = %s "
-                "where country = %s and account_name is null and account_email is null",
-                (name, email, country),
+                "where country = %s and account_name is null and account_email is null "
+                "and (%s::timestamptz is null or linked_at = %s)",
+                (name, email, country, expect_linked_at, expect_linked_at),
             )
     except psycopg.Error as exc:
         raise _fail("Учётка входа Dodo IS не записалась", exc) from exc

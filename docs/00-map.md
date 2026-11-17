@@ -904,6 +904,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/dodois/client.py` | Разговор с Dodo IS: вход устройства, продление, имя учётки, счёт открытых пиццерий (D640b) |
 | `src/dodois/flow.py` | Вход по ссылке: сервер начинает device flow, сам опрашивает Dodo IS и пишет вход (D640b) |
 | `src/dodois/metrics.py` | Суточный сбор данных Dodo IS для «Качества» по странам (D671): продажи, агрегаторы, КР |
+| `src/dodois/refresh_outbox.py` | Encrypted durable refresh handoff, serialized per country across processes |
 | `src/dodois/service.py` | Входы в Dodo IS по странам: записать вход, продлить, проверить «открыто X из Y» (D640b) |
 <!-- map:end -->
 

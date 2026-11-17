@@ -7,9 +7,9 @@
 прежний мёртв. Поэтому новая пара пишется атомарно (`replace_tokens`) и, если запись не
 легла, пробуется ещё несколько раз с той же парой в памяти; не легла совсем — состояние
 «запись не легла, повторяем» (`write_failed`) и строка в журнале процесса без значений.
-Незаписанная пара живёт в памяти процесса бота (`_unwritten`), и каждый следующий заход
+Незаписанная пара зашифрована в STATE_DIR; каждый следующий заход
 (раз в час) сначала повторяет запись, а к Dodo IS за новой парой не ходит: ключ продления
-в базе уже мёртв, ещё одно продление дало бы «вход истёк». Перезапуск бота эту пару теряет.
+в базе уже мёртв, ещё одно продление дало бы «вход истёк». Очередь переживает перезапуск.
 Отказ Dodo IS в продлении — «вход истёк»: прежняя пара остаётся в базе, ничего не стирается.
 
 **Оповещения** о сбое входа шлёт не этот модуль, а `src/health/alerts.py` после захода
@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from collections.abc import Callable
@@ -31,6 +32,7 @@ from src.domain import dodois as rules
 from src.domain.dodois import Login
 
 from . import client
+from . import refresh_outbox as outbox
 from .client import Credentials, DodoisError, RefreshRejected, TokenPair
 
 logger = logging.getLogger(__name__)
@@ -39,9 +41,9 @@ logger = logging.getLogger(__name__)
 WRITE_TRIES = 4
 WRITE_RETRY_SECONDS = 2.0
 
-#: Пары, которые Dodo IS уже выдал, а записать не удалось: страна → (пара, когда, `linked_at`
-#: входа, которому она принадлежит). Только память процесса, значения наружу не печатаются.
-_unwritten: dict[str, tuple[TokenPair, datetime, datetime]] = {}
+#: Аварийная копия ответа, пока его запись на диск не удалась. Диск — источник истины;
+#: кеш используется только вместе с собственным точным inflight marker.
+_unwritten: dict[str, outbox.Pending] = {}
 
 
 def credentials() -> Credentials | None:
@@ -94,9 +96,16 @@ def attach(
     return check(country, now=moment) or login
 
 
-def _note(country: str, state: str, reason: str | None, now: datetime) -> None:
+def _note(
+    country: str,
+    state: str,
+    reason: str | None,
+    now: datetime,
+    *,
+    linked_at: datetime | None = None,
+) -> None:
     try:
-        store.record_state(country, state, reason, now=now)
+        store.record_state(country, state, reason, now=now, expect_linked_at=linked_at)
     except DbError:
         logger.error("Dodo IS %s: состояние %s не записалось", country, state, exc_info=False)
 
@@ -110,7 +119,7 @@ def _fill_account(login: Login, access: str) -> None:
         return
     try:
         name, email = client.userinfo(login.contour, access)
-        store.set_account(login.country, name, email)
+        store.set_account(login.country, name, email, expect_linked_at=login.linked_at)
     except DbError:
         logger.warning("Dodo IS %s: учётка входа не записалась", login.country, exc_info=False)
 
@@ -128,22 +137,28 @@ def check(country: str, *, now: datetime | None = None) -> Login | None:
         tokens = store.read_tokens(country)
     except DbError:
         logger.warning("Dodo IS %s: ключи входа не прочитались", country, exc_info=False)
-        _note(country, rules.FAILED, "no_tokens", moment)
+        _note(country, rules.FAILED, "no_tokens", moment, linked_at=login.linked_at)
         return store.get_login(country)
     if tokens is None:
-        _note(country, rules.FAILED, "no_tokens", moment)
+        _note(country, rules.FAILED, "no_tokens", moment, linked_at=login.linked_at)
         return store.get_login(country)
     try:
         units = client.working_pizzerias(country)
         opened = client.count_open(country, login.contour, tokens.access, units, moment.date())
     except DodoisError as exc:
-        _note(country, rules.FAILED, exc.kind, moment)
+        _note(country, rules.FAILED, exc.kind, moment, linked_at=login.linked_at)
         return store.get_login(country)
     _fill_account(login, tokens.access)
     state, reason = rules.counts_state(len(units), opened)
     try:
         store.record_state(
-            country, state, reason, now=moment, units_total=len(units), units_open=opened
+            country,
+            state,
+            reason,
+            now=moment,
+            units_total=len(units),
+            units_open=opened,
+            expect_linked_at=login.linked_at,
         )
     except DbError:
         logger.error("Dodo IS %s: итог проверки не записался", country)
@@ -165,7 +180,7 @@ def _write_pair(
             )
         except store.LoginSuperseded:
             logger.info("Dodo IS %s: вход заменён за время продления", login.country)
-            return True
+            raise
         except DbError:
             logger.error(
                 "Dodo IS %s: новая пара ключей не легла (попытка %d из %d)",
@@ -180,6 +195,66 @@ def _write_pair(
     return False
 
 
+def _source_hash(refresh_token: str) -> str:
+    return hashlib.sha256(refresh_token.encode()).hexdigest()
+
+
+def _pending(journal: outbox.Journal, country: str) -> outbox.Pending | None:
+    """Disk wins over another process's stale cache; cache only fills its own marker."""
+    saved = journal.read()
+    cached = _unwritten.get(country)
+    if (
+        saved is not None
+        and saved.pair is None
+        and cached is not None
+        and (
+            cached.linked_at == saved.linked_at
+            and cached.contour == saved.contour
+            and cached.source_hash == saved.source_hash
+            and cached.moment == saved.moment
+        )
+    ):
+        return cached
+    _unwritten.pop(country, None)
+    return saved
+
+
+def _retry_locked(
+    login: Login,
+    journal: outbox.Journal,
+    held: outbox.Pending,
+    now: datetime,
+    sleep: Callable[[float], None],
+) -> bool:
+    if held.linked_at != login.linked_at or held.contour != login.contour:
+        journal.clear()
+        _unwritten.pop(login.country, None)
+        return True
+    if held.pair is None:
+        # A request may have rotated the token before its response was lost.
+        # Never send that token again merely because this process restarted.
+        logger.error(
+            "Dodo IS %s: исход продления неизвестен; прежний refresh не повторяется", login.country
+        )
+        _note(login.country, rules.FAILED, "network", now, linked_at=held.linked_at)
+        return False
+    journal.write(held)
+    held_login = replace(login, linked_at=held.linked_at)
+    try:
+        written = _write_pair(held_login, held.pair, held.moment, sleep)
+    except store.LoginSuperseded:
+        journal.clear()
+        _unwritten.pop(login.country, None)
+        return True
+    if written:
+        journal.clear()
+        _unwritten.pop(login.country, None)
+        _note(login.country, rules.OK, None, now, linked_at=held.linked_at)
+        return True
+    _note(login.country, rules.FAILED, "write_failed", now, linked_at=held.linked_at)
+    return False
+
+
 def refresh(
     login: Login,
     creds: Credentials,
@@ -187,29 +262,55 @@ def refresh(
     now: datetime | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> bool:
-    """Продлить вход. `True` — новая пара записана. Исход ошибки уходит в состояние входа."""
+    """Rotate under the country lock; commit the encrypted pair before DB retries."""
     moment = now or datetime.now(UTC)
     try:
-        tokens = store.read_tokens(login.country)
+        with outbox.locked(login.country) as journal:
+            journal.preflight()
+            current = store.get_login(login.country)
+            if current is None or current.linked_at != login.linked_at:
+                return True
+            held = _pending(journal, login.country)
+            if held is not None:
+                return _retry_locked(current, journal, held, moment, sleep)
+            if current.refreshed_at != login.refreshed_at:
+                return True
+            tokens = store.read_tokens(login.country)
+            if tokens is None:
+                _note(login.country, rules.FAILED, "no_tokens", moment, linked_at=login.linked_at)
+                return False
+            held = outbox.Pending(
+                login.country, login.contour, login.linked_at, moment, _source_hash(tokens.refresh)
+            )
+            journal.write(held)
+            try:
+                pair = client.refresh_tokens(creds, login.contour, tokens.refresh)
+            except RefreshRejected:
+                journal.clear()
+                _note(
+                    login.country,
+                    rules.EXPIRED,
+                    "refresh_rejected",
+                    moment,
+                    linked_at=login.linked_at,
+                )
+                return False
+            except DodoisError as exc:
+                _note(login.country, rules.FAILED, exc.kind, moment, linked_at=login.linked_at)
+                return False
+            held = replace(held, pair=pair)
+            _unwritten[login.country] = held  # emergency retry if FS fails after provider replied
+            journal.write(held)
+            return _retry_locked(current, journal, held, moment, sleep)
+    except outbox.OutboxError:
+        logger.error(
+            "Dodo IS %s: очередь продления недоступна; запрос не повторяется", login.country
+        )
+        _note(login.country, rules.FAILED, "write_failed", moment, linked_at=login.linked_at)
+        return False
     except DbError:
-        _note(login.country, rules.FAILED, "no_tokens", moment)
+        _note(login.country, rules.FAILED, "no_tokens", moment, linked_at=login.linked_at)
         return False
-    if tokens is None:
-        _note(login.country, rules.FAILED, "no_tokens", moment)
-        return False
-    try:
-        pair = client.refresh_tokens(creds, login.contour, tokens.refresh)
-    except RefreshRejected:
-        _note(login.country, rules.EXPIRED, "refresh_rejected", moment)
-        return False
-    except DodoisError as exc:
-        _note(login.country, rules.FAILED, exc.kind, moment)
-        return False
-    if _write_pair(login, pair, moment, sleep):
-        return True
-    _unwritten[login.country] = (pair, moment, login.linked_at)
-    _note(login.country, rules.FAILED, "write_failed", moment)
-    return False
 
 
 def retry_unwritten(
@@ -218,26 +319,29 @@ def retry_unwritten(
     now: datetime | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> bool | None:
-    """Повторить запись пары, которую Dodo IS выдал, а база не приняла.
-
-    `None` — незаписанной пары нет; `True` — легла (или вход заменён — пара не нужна);
-    `False` — не легла, пара остаётся в памяти, состояние «запись не легла, повторяем».
-    """
-    held = _unwritten.get(login.country)
-    if held is None:
-        return None
-    pair, moment, linked_at = held
-    held_login = replace(login, linked_at=linked_at)
-    if _write_pair(held_login, pair, moment, sleep):
-        del _unwritten[login.country]
-        _note(login.country, rules.OK, None, now or datetime.now(UTC))
-        return True
-    _note(login.country, rules.FAILED, "write_failed", now or datetime.now(UTC))
-    return False
+    """Recover durable pairs before any new refresh, including after a restart."""
+    moment = now or datetime.now(UTC)
+    try:
+        with outbox.locked(login.country) as journal:
+            held = _pending(journal, login.country)
+            if held is None:
+                return None
+            current = store.get_login(login.country)
+            if current is None:
+                journal.clear()
+                _unwritten.pop(login.country, None)
+                return True
+            return _retry_locked(current, journal, held, moment, sleep)
+    except (outbox.OutboxError, DbError):
+        logger.error(
+            "Dodo IS %s: отложенная пара не восстановлена; запрос не повторяется", login.country
+        )
+        _note(login.country, rules.FAILED, "write_failed", moment, linked_at=login.linked_at)
+        return False
 
 
 def forget_unwritten() -> None:
-    """Забыть незаписанные пары — для тестов."""
+    """Сбросить только аварийный RAM-кеш; устойчивую очередь не трогать."""
     _unwritten.clear()
 
 
@@ -261,7 +365,7 @@ def run_pass(
         ):
             creds = creds or credentials()
             if creds is None:
-                _note(login.country, rules.FAILED, "no_keys", moment)
+                _note(login.country, rules.FAILED, "no_keys", moment, linked_at=login.linked_at)
                 continue
             if not refresh(login, creds, now=moment, sleep=sleep):
                 continue
