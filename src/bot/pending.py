@@ -56,6 +56,7 @@ class Offer:
     anchor_id: int
     file_ids: tuple[str, ...]
     question_id: int | None = None
+    run_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,8 @@ class Proposal:
 
     file_ids: tuple[str, ...]
     source: str
+    run_id: str = ""
+    finding_revision: str | None = None
     note: str = ""
     candidates: tuple[Candidate, ...] = ()
     manual: tuple[ManualCandidate, ...] = ()
@@ -215,6 +218,10 @@ class PendingStore:
             self._chats[chat_id] = ChatPending()
         return self._chats[chat_id]
 
+    def accepts(self, chat_id: int, proposal: Proposal) -> bool:
+        """A late result keeps the run it came from, even after memory was reset."""
+        return self._guard.matches(chat_id, proposal.run_id)
+
     def next_slot(self) -> int:
         """Номер нового разговора о материале. Сквозной, а не по чату: он и не
         обязан быть коротким, а сквозной не даст спутать чаты при отладке."""
@@ -223,7 +230,9 @@ class PendingStore:
     # --- вопрос «Разобрать?» (T067) ---
 
     def offer(self, chat_id: int, offer: Offer) -> None:
-        self._chat(chat_id).offers[offer.anchor_id] = offer
+        chat = self._chat(chat_id)
+        if self._guard.matches(chat_id, offer.run_id):
+            chat.offers[offer.anchor_id] = offer
 
     def take_offer(self, chat_id: int, anchor_id: int) -> Offer | None:
         """Забрать вопрос по нажатию. Второе нажатие той же кнопки — уже `None`."""
@@ -264,6 +273,8 @@ class PendingStore:
         — тогда нажатие ищет предложение по последнему показанному, как раньше.
         """
         chat = self._chat(chat_id)
+        if not self.accepts(chat_id, proposal):
+            return
         if proposal.batch is None:
             for slot, живое in list(chat.live.items()):
                 if (

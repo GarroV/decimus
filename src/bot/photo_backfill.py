@@ -254,6 +254,12 @@ async def _backfill_forever(bot: Bot) -> None:
 
     last_stale = float("-inf")
     while True:
+        from .finish_archive import retry_once
+
+        try:
+            await retry_once()
+        except (db.DbError, OSError, ValueError):
+            logger.exception("Durable archive queue unreadable; retry scheduled")
         await _pass(fetch, stale=False)
         if time.monotonic() - last_stale >= STALE_EVERY_SEC:
             last_stale = time.monotonic()

@@ -41,6 +41,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -298,7 +299,7 @@ def read_uncovered(*, chat_id: int | None = None) -> tuple[UncoveredEntry, ...]:
     return tuple(entries)
 
 
-def archive_uncovered(chat_id: int) -> int:
+def archive_uncovered(chat_id: int, *, expected_run_id: str | None = None) -> int:
     """Перенести все записи `open` этого чата в конец `history`. Вернуть, сколько перенесено.
 
     Идемпотентна: второй вызов находит пустой `open` и не пишет вообще ничего
@@ -307,8 +308,13 @@ def archive_uncovered(chat_id: int) -> int:
     прошла вовсе без непокрытых случаев) — тоже ноль, а не отказ: это такое же
     законное «нечего переносить», как и второй вызов.
     """
+    from .handover import holding_notes
+    from .state import run_id
+
     path = _uncovered_path(chat_id)
-    with state_lock(path):
+    with holding_notes(chat_id) if expected_run_id is not None else nullcontext(), state_lock(path):
+        if expected_run_id is not None and run_id(chat_id) != expected_run_id:
+            return 0
         open_entries, history = _load_raw(path)
         if not open_entries:
             return 0

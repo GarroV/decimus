@@ -55,7 +55,7 @@ from src.domain import check_environment
 from src.domain.engine import chat_dir
 from src.domain.errors import DomainError
 from src.domain.handover import HANDED_OVER_KEY, NEVER_HANDED_OVER, NOTES_FILE_NAME
-from src.domain.state import state_lock
+from src.domain.state import run_id, state_lock
 
 from . import journal
 from .errors import BotNotesError, ChangedSinceReviewError
@@ -338,7 +338,12 @@ def _lock(chat_id: int) -> Iterator[None]:
         raise BotNotesError(f"Заметки бота заняты другим процессом: {notes_path(chat_id)}") from exc
 
 
-def _change(chat_id: int, изменение: Callable[[Notes], Notes | None]) -> None:
+def _change(
+    chat_id: int,
+    изменение: Callable[[Notes], Notes | None],
+    *,
+    expected_run_id: str | None = None,
+) -> None:
     """Прочитать, дополнить и записать — целиком под замком.
 
     Именно тройка целиком, а не одна запись: основа, прочитанная до чужой
@@ -346,6 +351,8 @@ def _change(chat_id: int, изменение: Callable[[Notes], Notes | None]) -
     молча. `None` от `изменение` означает «писать нечего».
     """
     with _lock(chat_id):
+        if expected_run_id is not None and run_id(chat_id) != expected_run_id:
+            return
         новые = изменение(read(chat_id))
         if новые is not None:
             _write(chat_id, новые)
@@ -421,7 +428,9 @@ def remember_outcome(chat_id: int, file_ids: Iterable[str], outcome: str) -> Non
     _change(chat_id, отметить)
 
 
-def remember_record(chat_id: int, message_id: int, n: int) -> None:
+def remember_record(
+    chat_id: int, message_id: int, n: int, *, expected_run_id: str | None = None
+) -> None:
     """Запомнить, каким сообщением показана запись (T204).
 
     Повтор того же сообщения не дублируется: показ пересобирается при каждой
@@ -435,10 +444,12 @@ def remember_record(chat_id: int, message_id: int, n: int) -> None:
             return None
         return replace(notes, records=(*notes.records, добавляемое))
 
-    _change(chat_id, дополнить)
+    _change(chat_id, дополнить, expected_run_id=expected_run_id)
 
 
-def remember_origin(chat_id: int, message_id: int, n: int) -> None:
+def remember_origin(
+    chat_id: int, message_id: int, n: int, *, expected_run_id: str | None = None
+) -> None:
     """Запомнить, из какого сообщения АУДИТОРА выросла запись (T205).
 
     Ответом на это сообщение аудитор присылает кадр, и кадр уходит в ту же
@@ -453,10 +464,12 @@ def remember_origin(chat_id: int, message_id: int, n: int) -> None:
             return None
         return replace(notes, origins=(*notes.origins, добавляемое))
 
-    _change(chat_id, дополнить)
+    _change(chat_id, дополнить, expected_run_id=expected_run_id)
 
 
-def remember_repeat_ask(chat_id: int, message_id: int, n: int, code: str) -> None:
+def remember_repeat_ask(
+    chat_id: int, message_id: int, n: int, code: str, *, expected_run_id: str | None = None
+) -> None:
     """Запомнить, каким сообщением задан вопрос о повторе записи #`n` (D255)."""
 
     def дополнить(notes: Notes) -> Notes | None:
@@ -465,7 +478,7 @@ def remember_repeat_ask(chat_id: int, message_id: int, n: int, code: str) -> Non
             return None
         return replace(notes, repeat_asks=(*notes.repeat_asks, добавляемое))
 
-    _change(chat_id, дополнить)
+    _change(chat_id, дополнить, expected_run_id=expected_run_id)
 
 
 def repeat_ask_of(chat_id: int, message_id: int) -> RepeatAsk | None:
@@ -527,6 +540,11 @@ def mark_handed_over(
         return replace(notes, handed_over_findings=findings)
 
     _change(chat_id, seal)
+
+
+def unmark_handed_over_locked(chat_id: int) -> None:
+    """Caller holds the shared notes lock and has checked the run identity."""
+    _write(chat_id, replace(read(chat_id), handed_over_findings=NEVER_HANDED_OVER))
 
 
 def unmark_handed_over(chat_id: int) -> None:

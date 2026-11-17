@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 import tempfile
 from collections.abc import Sequence
+from contextlib import nullcontext
 from dataclasses import asdict, replace
 from enum import Enum
 from pathlib import Path
@@ -21,7 +22,7 @@ from .clarifications import MAX_LEVEL_WORDS, bound_class_context
 from .config import Settings
 from .engine import DOMAIN_KEY, option, run_audit, state_file
 from .errors import EngineError, ValidationError
-from .handover import guard_writable
+from .handover import guard_writable, while_open
 from .measurement_sets import bound_scope
 from .models import READING_MAX_C, READING_MIN_C, SOURCES, Finding, Suggestion
 from .revisions import digest, finding_revision
@@ -129,6 +130,7 @@ def add_finding(
     photos: Sequence[str] = (),
     reading_c: float | None = None,
     class_context: dict[str, Any] | None = None,
+    expected_run_id: str | None = None,
 ) -> Finding:
     """Зафиксировать запись.
 
@@ -218,24 +220,30 @@ def add_finding(
             )
         return after
 
-    if class_context is None:
+    if class_context is None and expected_run_id is None:
         return perform(settings)
     path = state_file(chat_id, settings)
-    with state_lock(path):
+    with while_open(chat_id) if expected_run_id is not None else nullcontext(), state_lock(path):
         raw = _read_raw(path)
         inspection = _inspection(chat_id, raw, path)
-        chain = bound_class_context(
-            class_context,
-            run_id=inspection.run_id,
-            checklist_version=inspection.checklist_version,
-            code=code,
-            zone=zone,
-            photos=frames,
-            words=words,
+        if expected_run_id is not None and inspection.run_id != expected_run_id:
+            raise EditConflict("Сменился запуск проверки; старый результат не принят")
+        chain = (
+            None
+            if class_context is None
+            else bound_class_context(
+                class_context,
+                run_id=inspection.run_id,
+                checklist_version=inspection.checklist_version,
+                code=code,
+                zone=zone,
+                photos=frames,
+                words=words,
+            )
         )
         measurement = (
             bound_scope(inspection, class_context["measurement_context"], code=code, zone=zone)
-            if "measurement_context" in class_context
+            if class_context is not None and "measurement_context" in class_context
             else None
         )
         with tempfile.TemporaryDirectory(prefix=".clarification-", dir=path.parent) as temp:
@@ -257,7 +265,8 @@ def add_finding(
             if measurement is not None:
                 event["measurement_context"] = measurement.data
                 event["measurement_scope_hash"] = measurement.context["scope_hash"]
-            block["finding_history"] = [*inspection.finding_history, event]
+            if class_context is not None:
+                block["finding_history"] = [*inspection.finding_history, event]
             result[DOMAIN_KEY] = block
             _write_atomic(path, result)
             return after
@@ -283,6 +292,8 @@ def edit_finding(
     reading_c: float | _Unset | None = _UNSET,
     photos: Sequence[str] | None = None,
     source_revision: str | None = None,
+    expected_run_id: str | None = None,
+    source_settings: Settings | None = None,
     request_id: str | None = None,
     class_context: dict[str, Any] | None = None,
     context_words: str | None = None,
@@ -298,8 +309,9 @@ def edit_finding(
     нарушение, это — сколько за него вычесть. И у него три состояния, а не два:
     `None` значит «не трогать», и без этого снять пометку было бы нечем.
     """
-    guard_writable(chat_id)
-    settings = settings_for(chat_id)
+    if source_settings is None:
+        guard_writable(chat_id)
+    settings = source_settings or settings_for(chat_id)
     unknown = sorted(set(fields) - set(FIELD_OPTIONS))
     if unknown:
         raise ValidationError(
@@ -343,9 +355,18 @@ def edit_finding(
             {"base": signature, "class_context": class_context, "context_words": context_words}
         )
     path = state_file(chat_id, settings)
-    with state_lock(path):
+    with (
+        (
+            while_open(chat_id)
+            if expected_run_id is not None and source_settings is None
+            else nullcontext()
+        ),
+        state_lock(path),
+    ):
         raw = _read_raw(path)
         inspection = _inspection(chat_id, raw, path)
+        if expected_run_id is not None and inspection.run_id != expected_run_id:
+            raise EditConflict("Сменился запуск проверки; старый результат не принят")
         source = inspection.finding(n)
         if request_id is not None:
             for event in inspection.finding_history:
@@ -484,7 +505,7 @@ def drop_finding(chat_id: int, n: int) -> None:
         )
 
 
-def attach_photo(chat_id: int, n: int, file_id: str) -> None:
+def attach_photo(chat_id: int, n: int, file_id: str, *, expected_run_id: str | None = None) -> None:
     """Прикрепить кадр к записи.
 
     В боте кадр хранится идентификатором телеграма и скачивается только на
@@ -494,6 +515,16 @@ def attach_photo(chat_id: int, n: int, file_id: str) -> None:
     guard_writable(chat_id)
     settings = settings_for(chat_id)
     photo = _clean_photo(file_id, f"записи #{n}")
+    if expected_run_id is not None:
+        current = _finding_after(chat_id, settings, n, "photo")
+        edit_finding(
+            chat_id,
+            n,
+            expected_run_id=expected_run_id,
+            source_revision=finding_revision(current),
+            photos=current.photos if photo in current.photos else [*current.photos, photo],
+        )
+        return
     run_audit(["photo", str(n), option("add", photo)], chat_id=chat_id, settings=settings)
     after = _finding_after(chat_id, settings, n, "photo")
     if photo not in after.photos:

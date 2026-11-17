@@ -1404,21 +1404,21 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     # --- слив завершённой проверки в историю (T123) ---
     #
-    # Оба сообщения приходят ПОСЛЕ отчёта и письма: они у аудитора на руках, и
+    # Сообщения приходят после PDF: документ у аудитора на руках, и
     # ничего из сделанного не отменяется. Сказать всё равно надо — молчание
     # оставило бы человека уверенным, что история сохранена. Причина отказа
     # (адрес базы, текст драйвера) сюда не попадает: аудитору она ничего не
     # объясняет, её место в журнале.
     "finish.not_archived": {
         "ru": (
-            "Отчёт и письмо на месте, но в историю проверок эта проверка не записалась — "
-            "база не ответила. Не начинайте новую: пока проверка лежит здесь, её ещё можно "
-            "сохранить, а новая её сотрёт."
+            "Отчёт выдан, но проверка ещё не записана в историю: база недоступна. "
+            "Проверка сохранена для повторной записи; бот попробует снова. "
+            "Новую проверку можно начать."
         ),
         "en": (
-            "The report and the letter are yours, but this inspection did not reach the "
-            "history — the database did not answer. Do not start a new one yet: while this "
-            "inspection is still here it can be saved, and a new one erases it."
+            "The report is yours, but the inspection has not reached the history yet: "
+            "the database is unavailable. The inspection is saved and the bot will retry. "
+            "You can start a new inspection."
         ),
     },
     # Слив отклонён сторожем справочника (#482): точки нет среди точек

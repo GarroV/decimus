@@ -174,23 +174,51 @@ async def _revise(
     ответ не идёт (D295).
     """
     n = finding.n
+    inspection = read_inspection(chat_id)
+    if inspection is None:
+        return True
+    run_id = inspection.run_id
+    source_revision = domain.finding_revision(finding)
     revision = await _revision(chat_id, finding, note, report_lang)
     if revision is None:
         await message.answer(t("correct.revise_failed", lang, n=n))
         return True
+    current = read_inspection(chat_id)
+    target = None if current is None else current.finding(n)
+    if (
+        current is None
+        or current.run_id != run_id
+        or target is None
+        or domain.finding_revision(target) != source_revision
+    ):
+        await message.answer(t("correct.revise_failed", lang, n=n))
+        return True
     if revision.kind == "other":
         return False
-    await apply_edit(message, chat_id, n, lang, text=revision.text)
+    await apply_edit(
+        message,
+        chat_id,
+        n,
+        lang,
+        text=revision.text,
+        expected_run_id=run_id,
+        source_revision=source_revision,
+    )
     inspection = read_inspection(chat_id)
     after = None if inspection is None else inspection.finding(n)
-    if after is None or after.text != revision.text:
+    if (
+        inspection is None
+        or inspection.run_id != run_id
+        or after is None
+        or after.text != revision.text
+    ):
         # Отказ движка `apply_edit` уже сказал аудитору сам.
         return True
     sent = await message.answer(t("correct.revised", lang, n=n, text=revision.text))
     # Ответом на подтверждение правят ту же запись (T204), а кадр ответом на
     # свои слова ложится в неё же (T205) — как у правки через разбор.
-    remember_shown(chat_id, sent, n)
-    remember_origin(chat_id, message.message_id, n)
+    remember_shown(chat_id, sent, n, expected_run_id=run_id)
+    remember_origin(chat_id, message.message_id, n, expected_run_id=run_id)
     return True
 
 
@@ -231,6 +259,18 @@ def build_correct_router(*, pending: PendingStore) -> Router:
             if heard is None:
                 return
             note = heard.strip()
+        current = read_inspection(chat_id)
+        source = inspection.finding(n)
+        target = None if current is None else current.finding(n)
+        if (
+            current is None
+            or current.run_id != inspection.run_id
+            or source is None
+            or target is None
+            or domain.finding_revision(source) != domain.finding_revision(target)
+        ):
+            await message.answer(t("correct.revise_failed", lang, n=n))
+            return
         if not note:
             await message.answer(t("correct.empty", lang, n=n))
             return
@@ -252,6 +292,7 @@ def build_correct_router(*, pending: PendingStore) -> Router:
             source=domain.SOURCE_COMMENT,
             pending=pending,
             correcting=n,
+            expected_run_id=inspection.run_id,
             # Ответ аудитора становится истоком поправленной записи (T205):
             # кадр к ней он досылает ответом на свои же слова, и слова эти —
             # последние сказанные о записи, а не те, с которых она началась.

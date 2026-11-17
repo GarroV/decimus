@@ -40,7 +40,7 @@ class Личность:
 
 
 def _предложение() -> Proposal:
-    return Proposal(file_ids=("f1",), source="comment", slot=1)
+    return Proposal(file_ids=("f1",), source="comment", slot=1, run_id="A")
 
 
 def test_смена_личности_сбрасывает_предложения() -> None:

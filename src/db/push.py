@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
 from datetime import date
 from typing import Any
@@ -23,6 +24,7 @@ from psycopg.types.json import Json
 
 from src.domain import get_state
 from src.domain import score as domain_score
+from src.domain.config import Settings as DomainSettings
 from src.domain.errors import ChecklistVersionMismatch, DomainError
 from src.domain.models import REPORT_LANGS, Finding, Inspection, Score
 from src.domain.tenants import HQ_TENANT
@@ -472,7 +474,12 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
     return str(inspection_id)
 
 
-def push_inspection(chat_id: int, *, allow_unknown_version: bool = False) -> str:
+def push_inspection(
+    chat_id: int,
+    *,
+    allow_unknown_version: bool = False,
+    source_settings: DomainSettings | None = None,
+) -> str:
     """Слить завершённую проверку чата в базу и вернуть её `id`.
 
     Повторяемо: второй вызов на той же завершённой проверке находит запись по
@@ -494,7 +501,14 @@ def push_inspection(chat_id: int, *, allow_unknown_version: bool = False) -> str
     """
     settings = check_environment()
     try:
-        inspection = get_state(chat_id)
+        if source_settings is None:
+            inspection = get_state(chat_id)
+        else:
+            from src.domain.completion import validate
+            from src.domain.state import read_state
+
+            validate(chat_id, source_settings)
+            inspection = read_state(chat_id, source_settings)
         if inspection is None:
             raise PushError(f"В чате {chat_id} нет проверки — сливать нечего")
         if not (inspection.checklist_version or "").strip() and not allow_unknown_version:
@@ -505,7 +519,17 @@ def push_inspection(chat_id: int, *, allow_unknown_version: bool = False) -> str
                 f"в ней нет по происхождению — слить можно явно, "
                 f"push_inspection(chat_id, allow_unknown_version=True)"
             )
-        result = domain_score(chat_id)
+        if source_settings is None:
+            result = domain_score(chat_id)
+        else:
+            from src.domain.engine import run_audit
+            from src.domain.scoring import parse_score
+
+            result = parse_score(
+                json.loads(
+                    run_audit(["score", "--json"], chat_id=chat_id, settings=source_settings)
+                )
+            )
         with connection(settings.dsn) as conn:
             return _push(conn, inspection, result)
     except PushError:

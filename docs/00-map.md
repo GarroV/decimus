@@ -752,6 +752,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/dodois_loader.py` | Входы в Dodo IS по странам: ночью продлевает, раз в час проверяет «открыто X из Y» (D640b) |
 | `src/bot/dodois_metrics_loader.py` | Данные Dodo IS для «Качества» по странам: продажи, агрегаторы, оценки клиентов (D671) |
 | `src/bot/errors.py` | Отказы блока `bot` |
+| `src/bot/finish_archive.py` | Retry acknowledged report archives from durable snapshots without chat messages |
 | `src/bot/finish_translate.py` | Автоперевод комментариев при сборке отчёта (D443) |
 | `src/bot/frame_copies.py` | Копии присланных кадров на диске площадки, на 7 дней (#367, решение владельца D179) |
 | `src/bot/health_loader.py` | Постоянная проверка подключений (D638, #1251): раз в 15 минут — пробы ключей и служб |
@@ -988,6 +989,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/checklist_store.py` | Раскладка хранилища методик — та её часть, которую читает бот (#455) |
 | `src/domain/clarifications.py` | Bounded human answers paired with untrusted clarification questions |
 | `src/domain/client_ip.py` | Чей это адрес у сервера MCP: клиент за общим прокси (D462, журнал действий) |
+| `src/domain/completion.py` | Durable run snapshots awaiting archival after the auditor received the PDF |
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
 | `src/domain/country_currency.py` | Валюта выручки Dodo IS по стране (D723): справочник, а не догадка по сумме |
 | `src/domain/coverage_exempt.py` | Где источник данных рейтингов Додо не обслуживает — и потому его пустота не дыра (D704, D706) |

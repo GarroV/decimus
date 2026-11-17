@@ -40,11 +40,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, FSInputFile, Message
 
 from src import db, domain
+from src.domain import completion
+from src.domain.config import Settings
 from src.domain.errors import ChecklistVersionMismatch, DomainError
 from src.domain.handover import HandedOverError
 from src.domain.log_ids import log_id
 from src.domain.revision import revision
-from src.domain.state import finish_inspection
+from src.domain.state import read_state
 from src.domain.timing import utc_now
 from src.domain.translation import untranslated
 from src.report import PhotoMissing, ReportError, build_letter_notes, build_pdf
@@ -199,7 +201,8 @@ async def archive(
     allow_missing: bool,
     report: Path | None = None,
     lost: int = 0,
-) -> None:
+    source_settings: Settings | None = None,
+) -> bool:
     """Отправить завершённую проверку в историю: сама проверка, затем кадры (T123).
 
     Зовётся ПОСЛЕ того, как отчёт и письмо уже у аудитора, и ни один её исход
@@ -220,10 +223,15 @@ async def archive(
     обслуживает и других аудиторов, и таймеры альбомов (T101).
     """
     try:
-        inspection_id = await asyncio.to_thread(db.push_inspection, chat_id)
+        if source_settings is None:
+            inspection_id = await asyncio.to_thread(db.push_inspection, chat_id)
+        else:
+            inspection_id = await asyncio.to_thread(
+                db.push_inspection, chat_id, source_settings=source_settings
+            )
     except db.ConfigError as exc:
         logger.info("проверка чата %s не сливается в историю: %s", log_id(chat_id), exc)
-        return
+        return True
     except db.VersionMismatchError as exc:
         # Расхождение версии методики — не отказ базы (T182, задача #149). Связь
         # цела, строка не легла из-за того, что методику переиздали между итогом
@@ -246,7 +254,7 @@ async def archive(
             recorded=exc.recorded,
             current=exc.current,
         )
-        return
+        return False
     except db.InspectionLimitError as exc:
         # Лимит тестового периода (D755): тип раньше `UnitRefusedError`, от
         # которого он наследует, — иначе текст сказал бы «точки нет в
@@ -260,7 +268,7 @@ async def archive(
             unit=exc.unit,
             limit=exc.limit,
         )
-        return
+        return False
     except db.UnitRefusedError as exc:
         # Сторож справочника пространства (#482): база ответила, и ответила
         # «нет». Текст «база не ответила» звал бы подождать и не начинать новую,
@@ -270,11 +278,11 @@ async def archive(
         await stops.refuse(
             message, lang, step="finish.archive", key="finish.unit_refused", unit=exc.unit
         )
-        return
+        return False
     except db.DbError:
         logger.exception("слив проверки чата %s не удался", log_id(chat_id))
         await stops.refuse(message, lang, step="finish.archive", key="finish.not_archived")
-        return
+        return False
 
     try:
         await asyncio.to_thread(
@@ -302,13 +310,13 @@ async def archive(
             logger.warning(
                 "отчёт проверки %s в хранилище не выгружен: хранилище недоступно", inspection_id
             )
-        return
+        return False
     except db.DbError:
         logger.exception("выгрузка кадров проверки чата %s не удалась", log_id(chat_id))
         await message.answer(t("finish.photos_not_archived", lang))
 
     if report is None:
-        return
+        return True
 
     # Готовый отчёт уезжает в хранилище (T336, #317). Тот самый файл, что
     # получил аудитор, а не пересобранный: пересборка дала бы второй документ,
@@ -325,6 +333,7 @@ async def archive(
         logger.info("отчёт проверки чата %s не выгружается: %s", log_id(chat_id), exc)
     except (db.DbError, OSError):
         logger.exception("выгрузка отчёта проверки чата %s не удалась", log_id(chat_id))
+        return False
     else:
         logger.info(
             "отчёт проверки %s в хранилище: %s (%d байт%s)",
@@ -333,6 +342,8 @@ async def archive(
             stored.size_bytes,
             ", уже лежал" if stored.already else "",
         )
+
+    return True
 
 
 async def warn_untranslated(message: Message, inspection: domain.Inspection, lang: str) -> None:
@@ -401,7 +412,11 @@ def _seal(
 
     def unchanged() -> bool:
         current = read_inspection(chat_id)
-        return current is not None and revision(current) == expected_revision
+        return (
+            current is not None
+            and revision(current) == expected_revision
+            and not sidecar.handed_over(chat_id)
+        )
 
     try:
         sidecar.mark_handed_over(
@@ -415,12 +430,15 @@ def _seal(
     return True
 
 
-def _unseal(chat_id: int, sealed: bool) -> None:
+def _unseal(chat_id: int, sealed: bool, run_id: str = "") -> None:
     """Отчёт не собрался — снять печать, поставленную перед сборкой (#546)."""
     if not sealed:
         return
     try:
-        sidecar.unmark_handed_over(chat_id)
+        with domain.holding_notes(chat_id):
+            if domain.run_id(chat_id) != run_id:
+                return
+            sidecar.unmark_handed_over_locked(chat_id)
     except BotNotesError:
         logger.exception("печать проверки чата %s не снялась", log_id(chat_id))
 
@@ -453,34 +471,41 @@ async def deliver(
         return
     if await refuse_if_sealed(message, chat_id, lang):
         return
+    source_revision = revision(inspection)
+    if expected_revision is not None and expected_revision != source_revision:
+        await stops.refuse(message, lang, step="finish.seal", key="finish.changed_since_review")
+        return
     await message.answer(t("finish.building", lang))
-    # Автоперевод комментариев (D443): до сборки, чтобы в отчёт легли переведённые.
-    translate_failed = await asyncio.to_thread(translate_comments, chat_id, inspection)
-    if translate_failed:
-        await message.answer(t("finish.autotranslate_failed", lang, count=translate_failed))
-    # Страна пиццерии — для пояса времени проверки в шапке отчёта (D730).
-    country = await asyncio.to_thread(inspection_country, inspection)
-    # Кадры записей и кадры информационной части (T179) — одним списком: карту
-    # «ссылка → файл» блок `report` строит по обоим, и кадр поля, не скачанный
-    # здесь, напечатался бы партнёру красной отметкой «фотография не приложена».
-    # Печать ДО сборки (#546): с этой секунды мини-апп и бот запись не принимают,
-    # и в отчёт ложится ровно то, что попадёт в историю. Отчёт не соберётся —
-    # печать снимается ниже. Проверка перечитывается уже запечатанной.
     finish_candidate = utc_now()
     try:
-        sealed = _seal(chat_id, inspection, expected_revision=expected_revision)
+        sealed = _seal(chat_id, inspection, expected_revision=source_revision)
     except ChangedSinceReviewError:
         await stops.refuse(message, lang, step="finish.seal", key="finish.changed_since_review")
         return
-    inspection = read_inspection(chat_id) or inspection
-    if sealed:
-        _seal(chat_id, inspection)  # число записей — уже по запечатанной
+    if not sealed:
+        raise DomainError("Проверка не запечатана; сдача отменена")
+    try:
+        job = await asyncio.to_thread(
+            completion.snapshot, chat_id, inspection.run_id, source_revision
+        )
+        translate_failed = await asyncio.to_thread(
+            translate_comments, chat_id, inspection, source_settings=job
+        )
+        if translate_failed:
+            await message.answer(t("finish.autotranslate_failed", lang, count=translate_failed))
+        inspection = read_state(chat_id, job) or inspection
+        country = await asyncio.to_thread(inspection_country, inspection)
+        await asyncio.to_thread(completion.finish_snapshot, chat_id, job, finish_candidate)
+    except BaseException:
+        _unseal(chat_id, sealed, inspection.run_id)
+        raise
     refs = [ref for finding in inspection.findings for ref in finding.photos]
     refs += [ref for field in inspection.info.values() for ref in field.photos]
     with tempfile.TemporaryDirectory(prefix="bot-report-") as tmp:
         # Кадры живут только на время сборки: своего хранилища фотографий у
         # продукта нет (`docs/06-mvp-bot.md`, технические требования), хватает
         # идентификатора телеграма.
+        pdf_delivered = False
         try:
             found = await download_all(bot, refs, Path(tmp))
             try:
@@ -491,6 +516,7 @@ async def deliver(
                     allow_missing_photos=allow_missing,
                     finished_at=finish_candidate,
                     country=country,
+                    source_settings=job,
                 )
             except PhotoMissing as exc:
                 # Решение «собрать без кадра» принимает аудитор, а не код: отчёт без
@@ -503,7 +529,7 @@ async def deliver(
                     reply_markup=without_photos_keyboard(lang),
                     reason=exc,
                 )
-                _unseal(chat_id, sealed)
+                _unseal(chat_id, sealed, inspection.run_id)
                 return
             except ReportError:
                 # Текст движка — для того, кто чинит стенд: в нём внутренности
@@ -511,16 +537,35 @@ async def deliver(
                 # библиотеки (T151). Аудитору на точке нужен не он.
                 logger.exception("отчёт чата %s не собрался", log_id(chat_id))
                 await stops.refuse(message, lang, step="finish.build", key="finish.pdf_failed")
-                _unseal(chat_id, sealed)
+                _unseal(chat_id, sealed, inspection.run_id)
                 return
 
-            await message.answer_document(FSInputFile(pdf))
-            inspection = await asyncio.to_thread(
-                finish_inspection, chat_id, inspection.run_id, finish_candidate
+            filename = pdf.name
+            pdf = await asyncio.to_thread(completion.prepare, chat_id, job, pdf, found)
+            await message.answer_document(FSInputFile(pdf, filename=filename))
+            pdf_delivered = True
+            await asyncio.to_thread(completion.mark, chat_id, job, "delivered")
+            await asyncio.to_thread(
+                completion.publish_finished, chat_id, job, inspection.run_id, source_revision
             )
+            inspection = read_state(chat_id, job) or inspection
         except BaseException:
-            _unseal(chat_id, sealed)
+            if not pdf_delivered:
+                _unseal(chat_id, sealed, inspection.run_id)
             raise
+        # Archive is mandatory; optional follow-up messages cannot skip it.
+        archived = await archive(
+            message,
+            chat_id,
+            found,
+            lang,
+            allow_missing=allow_missing,
+            report=pdf,
+            lost=len(set(refs) - set(found)),
+            source_settings=job,
+        )
+        if archived:
+            await asyncio.to_thread(completion.mark, chat_id, job, "archived")
         # Сразу под документом, а не до сборки: предупреждение говорит о том,
         # что в этом самом файле напечатано, и читается вместе с ним.
         await warn_untranslated(message, inspection, lang)
@@ -540,11 +585,13 @@ async def deliver(
         # отметка о сдаче: отчёт уже у аудитора. Цена названа: накопитель
         # останется открытым и доедет до истории следующим завершением.
         try:
-            await asyncio.to_thread(domain.archive_uncovered, chat_id)
+            await asyncio.to_thread(
+                domain.archive_uncovered, chat_id, expected_run_id=inspection.run_id
+            )
         except (DomainError, OSError):
             logger.exception("накопитель чата %s не уехал в историю", log_id(chat_id))
         try:
-            letter = await asyncio.to_thread(build_letter_notes, chat_id)
+            letter = await asyncio.to_thread(build_letter_notes, chat_id, source_settings=job)
         except ReportError:
             # Свой текст, а не тот же: отчёт аудитор к этому моменту уже
             # получил, и «отчёт не собрался» было бы неправдой (T151).
@@ -565,17 +612,6 @@ async def deliver(
                     )
                 )
 
-        # После отчёта, а не вместо: не собравшееся письмо проверку в истории
-        # не отменяет — она завершена ровно тем, что документ уже у аудитора.
-        await archive(
-            message,
-            chat_id,
-            found,
-            lang,
-            allow_missing=allow_missing,
-            report=pdf,
-            lost=len(set(refs) - set(found)),
-        )
         # Последним сообщением: отчёт предварительный, принять его надо в вебе. После
         # слива, а не до: ссылка ведёт на строку истории, которой до него нет.
         await remind(message, chat_id, lang)
