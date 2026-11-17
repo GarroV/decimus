@@ -179,7 +179,7 @@ jobs:
             [ "$looked" -lt 20 ] || break
             [[ "$run_id" =~ ^[0-9]+$ ]] || { echo "::error::Некорректная история Actions."; exit 1; }
             looked=$((looked + 1))
-            checkpoint=$(gh api "repos/$GH_REPO/actions/runs/$run_id/jobs?filter=all" --paginate --slurp --jq '
+            checkpoint=$(gh api "repos/$GH_REPO/actions/runs/$run_id/jobs?filter=all" --paginate --slurp | jq -r '
               [.[].jobs[].steps[]? | select(.name |
                 startswith("Telegram state ") or startswith("Telegram acknowledged "))] |
               if length == 0 then "legacy" else

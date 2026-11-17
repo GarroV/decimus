@@ -28,6 +28,7 @@ def delivery(request, tmp_path: Path):
         "python3": shutil.which("python3"),
         "mktemp": "/usr/bin/mktemp",
         "rm": "/bin/rm",
+        "jq": jq,
     }.items():
         assert path
         (bindir / name).symlink_to(path)
@@ -35,6 +36,9 @@ def delivery(request, tmp_path: Path):
     gh.write_text("""#!/usr/bin/env python3
 import json, os, re, subprocess, sys
 args = sys.argv[1:]
+if "--slurp" in args and ("--jq" in args or "--template" in args):
+    sys.stderr.write("the --slurp option is not supported with --jq or --template")
+    sys.exit(1)
 with open(os.environ["GH_CALLS"], "a") as f: f.write(json.dumps(args)+"\\n")
 if os.environ.get("GH_FAIL") in ("1", args[0]): sys.exit(1)
 if args[0] == "run":
@@ -284,3 +288,10 @@ def test_new_run_reads_newest_chronological_checkpoint_from_unordered_history(de
     assert delivery.outputs == {"state": "ok", "source": "carried", "delivered": "false"}
     api_calls = [call for call in delivery.gh_calls if call[0] == "api"]
     assert len(api_calls) == 1 and "/runs/102/jobs" in api_calls[0][1]
+
+
+def test_healthy_legacy_checkpoint_uses_supported_cli_flags(delivery) -> None:
+    result = delivery.run(history={"42": "legacy"}, failed=False)
+    assert result.returncode == 0, result.stderr
+    assert delivery.calls == []
+    assert delivery.outputs["state"] == "ok"
