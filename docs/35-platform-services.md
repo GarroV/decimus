@@ -388,6 +388,12 @@ set P=docker compose -p decimus-preview -f docker-compose.yml -f deploy/preview/
 
 ## 8.25. Хранение голоса у OpenAI (F-112)
 
+Диагностика ошибок провайдера проходит через `recognize/provider_errors.py`:
+в предметную ошибку попадают только разрешённый тип SDK, числовой HTTP-статус
+и известный машинный код. Текст ответа, тело, URL и сырая цепочка причин не
+передаются в журналы. Для ffmpeg сохраняется код отказа без метаданных из stderr.
+Эта граница проверяется синтетическими маркерами; она не доказывает прошлую утечку.
+
 Кадры и записи уходят в OpenAI с `store=False` (Responses API,
 `src/recognize/client.py`). У расшифровки голосовых (`audio.transcriptions`,
 `src/recognize/transcribe.py`) такого параметра нет — проверено по типам SDK

@@ -208,7 +208,7 @@ def test_отказ_провайдера_это_ModelUnavailable(monkeypatch: py
     _patch_client(monkeypatch, _FakeClient(responses=fake_responses))
 
     # Act / Assert
-    with pytest.raises(ModelUnavailable, match="лимит запросов"):
+    with pytest.raises(ModelUnavailable, match="OpenAIError"):
         ask_model(
             kind="recognize",
             instructions="сис",

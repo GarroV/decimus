@@ -140,7 +140,7 @@ def test_отказ_провайдера_это_TranscriptionFailed(monkeypatch:
     _patch_openai(monkeypatch, _FakeClient(audio=_FakeAudio(transcriptions=fake_transcriptions)))
 
     # Act / Assert
-    with pytest.raises(TranscriptionFailed, match="лимит запросов"):
+    with pytest.raises(TranscriptionFailed, match="OpenAIError"):
         transcribe(b"ogg", settings=_settings())
 
 

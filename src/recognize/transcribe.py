@@ -24,6 +24,7 @@ from src.domain.model_usage import KIND_TRANSCRIBE, build_call
 
 from .config import RecognizeSettings, load_recognize_settings
 from .errors import TranscriptionFailed
+from .provider_errors import safe_provider_error
 
 #: Таймаут перекодировки. Голосовые аудитора короткие (секунды-десятки
 #: секунд); минута — щедрый запас на медленный старт ffmpeg в контейнере.
@@ -73,22 +74,21 @@ def _reencode(audio: bytes, ffmpeg: str) -> bytes:
                 capture_output=True,
                 timeout=REENCODE_TIMEOUT,
             )
-        except FileNotFoundError as exc:
+        except FileNotFoundError:
             raise TranscriptionFailed(
                 f"Не найден ffmpeg ({ffmpeg}). Голосовое не перекодировано, "
                 "попросите аудитора написать текстом"
-            ) from exc
-        except subprocess.TimeoutExpired as exc:
+            ) from None
+        except subprocess.TimeoutExpired:
             raise TranscriptionFailed(
                 f"Перекодировка не уложилась в {REENCODE_TIMEOUT:.0f} с. "
                 "Голосовое не разобрано, попросите написать текстом"
-            ) from exc
+            ) from None
         except subprocess.CalledProcessError as exc:
-            stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
             raise TranscriptionFailed(
-                f"ffmpeg не смог перекодировать голосовое: {stderr.strip() or exc}. "
+                f"ffmpeg не смог перекодировать голосовое (код {exc.returncode}). "
                 "Попросите написать текстом"
-            ) from exc
+            ) from None
         data = dst.read_bytes()
         if not data:
             raise TranscriptionFailed(
@@ -157,7 +157,9 @@ def transcribe(
         )
     except OpenAIError as exc:
         _note(cfg.transcribe_model, None, ok=False)
-        raise TranscriptionFailed(f"Транскрипция не ответила: {exc}") from exc
+        raise TranscriptionFailed(
+            f"Транскрипция не ответила ({safe_provider_error(exc)})"
+        ) from None
 
     text = result.text.strip()
     _note(cfg.transcribe_model, getattr(result, "usage", None), ok=bool(text))

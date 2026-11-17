@@ -1081,6 +1081,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/process_hint.py` | Указание аудитора «<описание>, это <процесс>» (T166, D077) |
 | `src/recognize/prompt.py` | T031/T032: текст запроса к модели — правила фиксации и перечень кандидатов |
 | `src/recognize/provenance.py` | Photo evidence indices from untrusted model/client data; no ownership decisions |
+| `src/recognize/provider_errors.py` | Allowlisted provider error metadata for operational diagnostics |
 | `src/recognize/revise.py` | Правка записи ответом словами (#454, решения D294, D295) |
 | `src/recognize/rules_check.py` | T032: страховка после модели — код-уровневая проверка формулировки |
 | `src/recognize/schema.py` | T031: схема ответа модели |

@@ -34,6 +34,7 @@ from src.domain.model_usage import KIND_RECOGNIZE, build_call
 
 from .config import RecognizeSettings
 from .errors import ModelKeyRejected, ModelUnavailable
+from .provider_errors import safe_provider_error
 from .timing import measure
 
 #: Имя схемы в запросе. Провайдеру оно нужно, на содержание не влияет.
@@ -84,10 +85,12 @@ def verify_key(api_key: str) -> None:
     client = OpenAI(api_key=api_key, timeout=VERIFY_TIMEOUT, max_retries=0)
     try:
         client.models.list()
-    except (AuthenticationError, PermissionDeniedError) as exc:
-        raise ModelKeyRejected("Провайдер не принял ключ модели") from exc
+    except (AuthenticationError, PermissionDeniedError):
+        raise ModelKeyRejected("Провайдер не принял ключ модели") from None
     except OpenAIError as exc:
-        raise ModelUnavailable(f"Не удалось проверить ключ модели ({type(exc).__name__})") from exc
+        raise ModelUnavailable(
+            f"Не удалось проверить ключ модели ({safe_provider_error(exc)})"
+        ) from None
 
 
 #: Явная точка кэша провайдера (GPT-5.6 и новее, документация prompt-caching, 26.10.2026):
@@ -227,7 +230,7 @@ def ask_model(
             )
     except OpenAIError as exc:
         _note(kind, used_model, {}, ok=False)
-        raise ModelUnavailable(f"Модель не ответила: {exc}") from exc
+        raise ModelUnavailable(f"Модель не ответила ({safe_provider_error(exc)})") from None
     raw_usage = response.usage
     usage = _usage(raw_usage)
     if getattr(response, "status", None) == "incomplete":
@@ -243,7 +246,7 @@ def ask_model(
         _note(kind, used_model, usage, ok=False)
         raise ModelUnavailable(
             f"Ответ модели не разобран как JSON, хотя запрошена строгая схема: {exc}"
-        ) from exc
+        ) from None
     if not isinstance(payload, dict):
         _note(kind, used_model, usage, ok=False)
         raise ModelUnavailable("Ответ модели — не объект, хотя запрошена строгая схема")
