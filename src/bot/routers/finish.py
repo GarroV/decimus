@@ -314,6 +314,7 @@ async def archive(
     except db.DbError:
         logger.exception("выгрузка кадров проверки чата %s не удалась", log_id(chat_id))
         await message.answer(t("finish.photos_not_archived", lang))
+        return False
 
     if report is None:
         return True

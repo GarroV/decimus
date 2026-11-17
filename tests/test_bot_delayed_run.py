@@ -387,3 +387,26 @@ def test_archive_cleanup_keeps_pending_and_recent_deliveries(domain_env, tmp_pat
     completion.prune_archived()
     assert not state_file(CHAT_ID, env).exists()
     assert domain.get_state(CHAT_ID).run_id == source.run_id
+
+
+@pytest.mark.asyncio
+async def test_photo_archive_error_keeps_durable_evidence(domain_env, monkeypatch):
+    from src import db
+
+    monkeypatch.setattr(db, "push_inspection", lambda *args, **kwargs: "inspection-id")
+
+    def broken(*args, **kwargs):
+        raise db.PushError("Synthetic photo metadata failure")
+
+    monkeypatch.setattr(db, "upload_photos", broken)
+    bot, _session = make_bot()
+    assert (
+        await finish.archive(
+            text_message("/finish").as_(bot),
+            CHAT_ID,
+            {},
+            "ru",
+            allow_missing=True,
+        )
+        is False
+    )

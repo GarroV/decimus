@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import time
 from dataclasses import replace
@@ -30,6 +31,26 @@ JOBS_DIR = "completed-runs"
 ARCHIVED_KEEP_SEC = 24 * 60 * 60
 
 
+def _sync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _commit(path: Path, raw: dict[str, object]) -> None:
+    _write_atomic(path, raw)
+    _sync_directory(path.parent)
+
+
+def _copy_durable(source: Path, dest: Path) -> None:
+    shutil.copyfile(source, dest)
+    with dest.open("rb") as saved:
+        os.fsync(saved.fileno())
+    _sync_directory(dest.parent)
+
+
 def snapshot(chat_id: int, run_id: str, expected_revision: str) -> Settings:
     """Copy a sealed run under the state lock, never a replacement visit."""
     env = check_environment()
@@ -45,7 +66,9 @@ def snapshot(chat_id: int, run_id: str, expected_revision: str) -> Settings:
         kept = edition_snapshot(env, current.checklist_version, current.checklist_code)
         if kept is not None:
             pinned = replace(pinned, data_dir=kept)
-        _write_atomic(dest, _read_raw(source))
+        _commit(dest, _read_raw(source))
+        for directory in (dest.parent.parent, env.state_dir / JOBS_DIR, env.state_dir):
+            _sync_directory(directory)
     return replace(pinned, state_dir=target.state_dir)
 
 
@@ -54,18 +77,19 @@ def prepare(chat_id: int, env: Settings, pdf: Path, photos: dict[str, str]) -> P
     root = chat_dir(chat_id, env)
     report = root / "report" / pdf.name
     report.parent.mkdir(exist_ok=True)
-    shutil.copyfile(pdf, report)
+    _copy_durable(pdf, report)
     saved: dict[str, str] = {}
     frames = root / "photos"
     frames.mkdir(exist_ok=True)
     for index, (ref, path) in enumerate(photos.items()):
         dest = frames / str(index)
-        shutil.copyfile(path, dest)
+        _copy_durable(Path(path), dest)
         saved[ref] = str(dest)
     inspection = read_state(chat_id, env)
     if inspection is None:
         raise DomainError("Снимок проверки отсутствует")
-    _write_atomic(
+    _sync_directory(root)
+    _commit(
         root / "delivery.json",
         {
             "version": 1,
@@ -89,7 +113,7 @@ def mark(chat_id: int, env: Settings, stage: str) -> None:
         raw["stage"] = stage
         if stage == "archived":
             raw["archived_at"] = time.time()
-        _write_atomic(path, raw)
+        _commit(path, raw)
 
 
 def pending() -> list[tuple[int, Settings, dict[str, str]]]:
@@ -118,7 +142,7 @@ def finish_snapshot(chat_id: int, env: Settings, finished_at: datetime) -> None:
         block = dict(raw[DOMAIN_KEY])
         block["finished_at"] = finished_at.isoformat()
         raw[DOMAIN_KEY] = block
-        _write_atomic(path, raw)
+        _commit(path, raw)
 
 
 def publish_finished(chat_id: int, env: Settings, run_id: str, source_revision: str) -> None:
@@ -131,7 +155,7 @@ def publish_finished(chat_id: int, env: Settings, run_id: str, source_revision: 
             return
         if revision(current) != source_revision:
             raise DomainError("Содержимое сданной проверки изменилось")
-        _write_atomic(path, _read_raw(state_file(chat_id, env)))
+        _commit(path, _read_raw(state_file(chat_id, env)))
 
 
 def report_path(chat_id: int, env: Settings) -> Path:
