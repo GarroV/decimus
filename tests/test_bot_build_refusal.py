@@ -129,7 +129,7 @@ async def test_неудача_письма_не_называется_несоб�
 
     начать_с_записью()
 
-    def письмо_не_собралось(chat_id: int) -> object:
+    def письмо_не_собралось(chat_id: int, **_kwargs: object) -> object:
         raise ReportError("движок отказал: /var/folders/tmp/xxx.html")
 
     monkeypatch.setattr("src.bot.routers.finish.build_letter_notes", письмо_не_собралось)

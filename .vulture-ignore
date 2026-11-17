@@ -825,3 +825,6 @@ _.title_texts
 _.name_texts
 # Заслон записи в чужой чек-лист (D761 п.4): крюк `@app.before_request`, регистрирует декоратор.
 _foreign_checklist_write
+
+# pytest autouse: asserts real browser drafts emit no JavaScript page errors.
+no_browser_errors

@@ -594,7 +594,12 @@ def install(
                 sign_count=новое.sign_count,
                 transports=новое.transports,
                 name=_device_name(тело.get("name")),
+                # Фактор мог появиться после предварительного status: только
+                # отсутствие способов под замком записи разрешает первый ключ.
+                only_if_first=True,
             )
+        except store.NotFirstFactorError:
+            return jsonify(error="forbidden"), 403
         except webauthn_rp.PasskeyError:
             _failure(token, account, result=RESULT_PASSKEY_FAIL, ip=откуда, ua=браузер)
             if store.find_pending(token) is None:

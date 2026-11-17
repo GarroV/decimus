@@ -57,6 +57,7 @@ class Google:
         self.сбой_токена: urllib.error.HTTPError | None = None
         self.сбой_событий: urllib.error.HTTPError | None = None
         self.следующий = 1
+        self.удалённые: set[str] = set()
 
     def __call__(self, запрос: Any, timeout: float) -> Ответ:
         адрес = urllib.parse.urlsplit(запрос.full_url)
@@ -66,22 +67,33 @@ class Google:
             if self.сбой_токена:
                 raise self.сбой_токена
             return Ответ({"access_token": "короткий"})
-        assert urllib.parse.parse_qs(адрес.query) == {"sendUpdates": ["none"]}
+        assert urllib.parse.parse_qs(адрес.query) == (
+            {} if метод == "GET" else {"sendUpdates": ["none"]}
+        )
         if self.сбой_событий:
             raise self.сбой_событий
         тело = json.loads(запрос.data) if запрос.data else {}
         номер = адрес.path.rsplit("/", 1)[-1]
         if метод == "POST":
-            новый = f"ev{self.следующий}"
+            новый = тело.get("id") or f"ev{self.следующий}"
+            if новый in self.календарь or новый in self.удалённые:
+                raise _http(409, {"error": {"errors": [{"reason": "duplicate"}]}})
             self.следующий += 1
-            self.календарь[новый] = тело
+            self.календарь[новый] = {**тело, "id": новый, "organizer": {"self": True}}
             return Ответ({"id": новый})
+        if номер in self.удалённые:
+            if метод == "GET":
+                return Ответ({"id": номер, "status": "cancelled"})
+            raise _http(410)
         if номер not in self.календарь:
             raise _http(404, {"error": {"errors": [{"reason": "notFound"}]}})
+        if метод == "GET":
+            return Ответ(self.календарь[номер])
         if метод == "PATCH":
             self.календарь[номер] |= тело
         else:
             del self.календарь[номер]
+            self.удалённые.add(номер)
         return Ответ()
 
 
@@ -189,7 +201,11 @@ def test_завершённая_проверка_получает_событие
     assert событие["summary"] == "Отправить отчёт по проверке — Белград-1 (06.11)"
     assert событие["description"] == "Проверка в Decimus: https://d.test/i1"
     assert "attendees" not in событие
-    assert база.стоит["i1"] == ("ev1", date(2026, 11, 11), событие["summary"])
+    assert база.стоит["i1"] == (
+        next(iter(google.календарь)),
+        date(2026, 11, 11),
+        событие["summary"],
+    )
 
 
 def test_название_на_английском_для_английского_интерфейса(база: База, google: Google) -> None:
@@ -217,12 +233,13 @@ def test_перенос_даты_сдвигает_то_же_событие(ба�
     база.добавить("i1", date(2026, 11, 6))
     _проход(google)
 
+    original = база.стоит["i1"][0]
     база.добавить("i1", date(2026, 11, 4))  # `move_inspection`: среда → срок в понедельник
     итог = _проход(google)
 
     assert итог.updated == 1 and len(google.календарь) == 1
-    assert google.календарь["ev1"]["start"] == {"date": "2026-11-09"}
-    assert база.стоит["i1"][0] == "ev1", "номер события не меняется"
+    assert google.календарь[база.стоит["i1"][0]]["start"] == {"date": "2026-11-09"}
+    assert база.стоит["i1"][0] == original, "номер события не меняется"
 
 
 def test_перенос_пиццерии_переименовывает_событие(база: База, google: Google) -> None:
@@ -232,7 +249,10 @@ def test_перенос_пиццерии_переименовывает_собы
     база.добавить("i1", date(2026, 11, 6), unit="Нови-Сад")
     _проход(google)
 
-    assert google.календарь["ev1"]["summary"] == "Отправить отчёт по проверке — Нови-Сад (06.11)"
+    assert (
+        google.календарь[база.стоит["i1"][0]]["summary"]
+        == "Отправить отчёт по проверке — Нови-Сад (06.11)"
+    )
 
 
 def test_отклонённая_проверка_снимает_событие(база: База, google: Google) -> None:
@@ -249,12 +269,16 @@ def test_отклонённая_проверка_снимает_событие(�
 def test_событие_удалённое_человеком_пересоздаётся_при_переносе(база: База, google: Google) -> None:
     база.добавить("i1", date(2026, 11, 6))
     _проход(google)
+    old_id = база.стоит["i1"][0]
+    google.удалённые.add(old_id)
     google.календарь.clear()
 
     база.добавить("i1", date(2026, 11, 5))
     _проход(google)
 
-    assert list(google.календарь) == ["ev2"] and база.стоит["i1"][0] == "ev2"
+    assert len(google.календарь) == 1
+    assert база.стоит["i1"][0] != old_id
+    assert база.стоит["i1"][0] in google.календарь
 
 
 def test_старая_проверка_нового_события_не_получает(база: База, google: Google) -> None:
@@ -348,3 +372,115 @@ def test_мёртвый_доступ_запись_об_осиротевшем_с
     _проход(google)
 
     assert "i1" not in база.стоит
+
+
+def test_database_failure_after_create_recovers_the_same_event(база, google, monkeypatch):
+    from src.db.errors import AccessError
+
+    база.добавить("synthetic", date(2026, 11, 6))
+
+    def broken(*args, **kwargs):
+        raise AccessError("Synthetic persistence failure")
+
+    monkeypatch.setattr(calendar_store, "remember_event", broken)
+    with pytest.raises(AccessError):
+        _проход(google)
+    assert len(google.календарь) == 1
+    original = next(iter(google.календарь))
+    monkeypatch.setattr(calendar_store, "remember_event", база.remember_event)
+    _проход(google)
+    assert list(google.календарь) == [original]
+    assert база.стоит["synthetic"][0] == original
+
+
+def test_lost_create_response_recovers_same_event(база, google):
+    база.добавить("synthetic", date(2026, 11, 6))
+    lost = True
+
+    def transport(request, timeout):
+        nonlocal lost
+        result = google(request, timeout)
+        if request.get_method() == "POST" and "/events" in request.full_url and lost:
+            lost = False
+            raise urllib.error.URLError("Synthetic lost response")
+        return result
+
+    assert _проход(transport).failed == 1
+    original = next(iter(google.календарь))
+    assert not база.стоит
+    assert _проход(transport).updated == 1
+    assert list(google.календарь) == [original]
+    assert база.стоит["synthetic"][0] == original
+
+
+def test_conflicting_event_must_be_ours_before_update(база, google):
+    база.добавить("synthetic", date(2026, 11, 6))
+    identity = sync._event_identity(ЛЮДИ, "synthetic")
+    google.календарь[identity] = {
+        "id": identity,
+        "summary": "Unrelated",
+        "organizer": {"self": True},
+    }
+    assert _проход(google).failed == 1
+    assert google.календарь[identity]["summary"] == "Unrelated"
+    assert not any(method == "PATCH" for method, _ in google.вызовы)
+    assert not база.стоит
+
+
+def test_conflicting_invitation_must_not_be_modified(база, google):
+    база.добавить("synthetic", date(2026, 11, 6))
+    _проход(google)
+    identity = next(iter(google.календарь))
+    база.стоит.clear()
+    google.календарь[identity]["organizer"] = {"self": False}
+    google.вызовы.clear()
+    assert _проход(google).failed == 1
+    assert not any(method == "PATCH" for method, _ in google.вызовы)
+
+
+def test_deleted_event_replacement_survives_database_failure(база, google, monkeypatch):
+    from src.db.errors import AccessError
+
+    база.добавить("synthetic", date(2026, 11, 6))
+    _проход(google)
+    old_id = база.стоит["synthetic"][0]
+    google.удалённые.add(old_id)
+    google.календарь.clear()
+    база.добавить("synthetic", date(2026, 11, 5))
+
+    def broken(*args, **kwargs):
+        raise AccessError("Synthetic persistence failure")
+
+    monkeypatch.setattr(calendar_store, "remember_event", broken)
+    with pytest.raises(AccessError):
+        _проход(google)
+    replacement = next(iter(google.календарь))
+    assert replacement != old_id
+    monkeypatch.setattr(calendar_store, "remember_event", база.remember_event)
+    _проход(google)
+    assert list(google.календарь) == [replacement]
+    assert база.стоит["synthetic"][0] == replacement
+
+
+def test_event_identity_is_stable_and_scoped():
+    identity = sync._event_identity("user-a", "inspection-a")
+    assert identity == sync._event_identity("user-a", "inspection-a")
+    assert identity != sync._event_identity("user-b", "inspection-a")
+    assert identity != sync._event_identity("user-a", "inspection-b")
+    assert len(identity) >= 5 and set(identity) <= set("0123456789abcdefghijklmnopqrstuv")
+
+
+def test_physical_request_budget_includes_tombstone_recovery(база, google, monkeypatch):
+    monkeypatch.setattr(sync, "MAX_CALLS_PER_PASS", 9)
+    for no in range(10):
+        inspection = f"inspection-{no}"
+        база.добавить(inspection, date(2026, 11, 6))
+        identity = sync._event_identity(ЛЮДИ, inspection)
+        for _ in range(3):
+            google.удалённые.add(identity)
+            identity = sync._event_identity(ЛЮДИ, inspection, identity)
+    result = _проход(google)
+    assert len(google.вызовы) == 9
+    assert result.failed == 0
+    assert not база.проблемы and not база.журнал
+    assert not result.skipped_users

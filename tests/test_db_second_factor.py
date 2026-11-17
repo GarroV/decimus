@@ -432,3 +432,91 @@ def test_два_параллельных_первых_ключа_записыв�
             исходы = list(пул.map(попытка, [круг * 10 + i for i in range(4)]))
         assert sum(исходы) == 1, f"«первым» записалось {sum(исходы)} способов: {исходы}"
         assert len(sf.status_of(uid).passkeys) == 1
+
+
+def test_unproved_key_checks_factor_after_waiting_for_account_lock(люди: Люди) -> None:
+    """Фактор в конкурирующей транзакции виден до допуска записи, а не после него."""
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import UTC, datetime, timedelta
+
+    uid = люди.ид["dev"]
+    since = datetime.now(UTC)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with psycopg.connect(люди.dsn) as conn:
+            conn.execute(
+                "select pg_advisory_xact_lock(%s, hashtext(%s))", (sf.ADVISORY_NAMESPACE, uid)
+            )
+            conn.execute(
+                "insert into web_totp(user_id, secret, confirmed_at) values (%s, %s, %s)",
+                (uid, new_totp_secret(), since - timedelta(hours=1)),
+            )
+            pending = pool.submit(sf.add_passkey, uid, enrollment_since=since, **_ключ("dev"))
+            try:
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    waiting = conn.execute(
+                        "select exists(select 1 from pg_stat_activity"
+                        " where datname = current_database() and wait_event = 'advisory'"
+                        " and pid <> pg_backend_pid())"
+                    ).fetchone()
+                    if waiting and waiting[0]:
+                        break
+                    assert not pending.done(), "запись не дождалась замка учётки"
+                    time.sleep(0.02)
+                else:
+                    pytest.fail("не наблюдалось ожидание замка учётки")
+            finally:
+                conn.commit()
+        with pytest.raises(sf.FactorProofRequiredError):
+            pending.result(timeout=10)
+    assert sf.status_of(uid).passkeys == ()
+    assert sf.status_of(uid).totp_confirmed
+
+
+def test_first_enrollment_session_can_add_parallel_keys(люди: Люди) -> None:
+    """Продолжение первого подключения не превращается в запрет второй записи."""
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import UTC, datetime
+
+    uid = люди.ид["dev"]
+    since = datetime.now(UTC)
+
+    def enroll(n: int) -> sf.Passkey:
+        return sf.add_passkey(uid, enrollment_since=since, **_ключ("dev", n))
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        keys = list(pool.map(enroll, range(4)))
+    assert {key.id for key in sf.status_of(uid).passkeys} == {key.id for key in keys}
+
+
+def test_closed_session_cannot_finish_key_setup(люди: Люди) -> None:
+    """Завершение настройки проверяет действительность исходной сессии."""
+    account = authenticate("anna", ПАРОЛЬ)
+    assert account is not None
+    previous = open_session(account)
+    current = open_session(account)
+    original = resolve_session(previous.token)
+    assert original is not None and original.signed_in_at is not None
+    assert sf.begin_totp(account.id, new_totp_secret())
+    assert sf.confirm_totp(
+        account.id, step=2000, keep_session_id=current.session_id, only_if_first=True
+    )
+    assert resolve_session(previous.token) is None
+    with pytest.raises(sf.FactorProofRequiredError):
+        sf.add_passkey(
+            account.id,
+            keep_session_id=previous.session_id,
+            enrollment_since=original.signed_in_at,
+            **_ключ("anna"),  # type: ignore[arg-type]
+        )
+    assert sf.status_of(account.id).passkeys == ()
+    # Та же настройка из действующей сессии по-прежнему завершается.
+    sf.add_passkey(
+        account.id,
+        keep_session_id=current.session_id,
+        enrollment_since=original.signed_in_at,
+        **_ключ("anna", 2),  # type: ignore[arg-type]
+    )
+    assert len(sf.status_of(account.id).passkeys) == 1
+    assert resolve_session(current.token) is not None

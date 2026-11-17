@@ -55,7 +55,9 @@ def _quietly(запомнить: Callable[[], None], chat_id: int, n: int, по�
         )
 
 
-def remember(chat_id: int, sent: Message | None, n: int) -> None:
+def remember(
+    chat_id: int, sent: Message | None, n: int, *, expected_run_id: str | None = None
+) -> None:
     """Запомнить сообщение, которым показана запись #`n`.
 
     Отказ заметок наружу не пускается: запись уже сделана и показана, а потеря
@@ -69,14 +71,18 @@ def remember(chat_id: int, sent: Message | None, n: int) -> None:
     if sent is None:
         return
     _quietly(
-        lambda: sidecar.remember_record(chat_id, sent.message_id, n),
+        lambda: sidecar.remember_record(
+            chat_id, sent.message_id, n, expected_run_id=expected_run_id
+        ),
         chat_id,
         n,
         "правка ответом на неё работать не будет",
     )
 
 
-def remember_repeat_ask(chat_id: int, sent: Message | None, n: int, code: str) -> None:
+def remember_repeat_ask(
+    chat_id: int, sent: Message | None, n: int, code: str, *, expected_run_id: str | None = None
+) -> None:
     """Запомнить сообщение с вопросом о повторе записи #`n` (D255).
 
     Отказ заметок гасится по тому же правилу: вопрос уже задан, и кнопки
@@ -85,14 +91,18 @@ def remember_repeat_ask(chat_id: int, sent: Message | None, n: int, code: str) -
     if sent is None:
         return
     _quietly(
-        lambda: sidecar.remember_repeat_ask(chat_id, sent.message_id, n, code),
+        lambda: sidecar.remember_repeat_ask(
+            chat_id, sent.message_id, n, code, expected_run_id=expected_run_id
+        ),
         chat_id,
         n,
         "ответ словами на вопрос о повторе работать не будет",
     )
 
 
-def remember_origin(chat_id: int, message_id: int | None, n: int) -> None:
+def remember_origin(
+    chat_id: int, message_id: int | None, n: int, *, expected_run_id: str | None = None
+) -> None:
     """Запомнить сообщение аудитора, из которого выросла запись #`n` (T205).
 
     Отказ заметок гасится по тому же правилу и по той же причине, что и у
@@ -106,7 +116,7 @@ def remember_origin(chat_id: int, message_id: int | None, n: int) -> None:
     if message_id is None:
         return
     _quietly(
-        lambda: sidecar.remember_origin(chat_id, message_id, n),
+        lambda: sidecar.remember_origin(chat_id, message_id, n, expected_run_id=expected_run_id),
         chat_id,
         n,
         "кадр ответом на свои слова в неё не попадёт",

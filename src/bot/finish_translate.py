@@ -29,6 +29,7 @@ from typing import Literal, TypedDict
 from src import domain
 from src.db import translate_modes
 from src.db.errors import DbError
+from src.domain.config import Settings
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
 from src.recognize.errors import RecognizeError
@@ -67,7 +68,9 @@ def _fields(finding: domain.Finding) -> dict[Literal["comment", "text"], str]:
     return {name: value for name, value in fields.items() if value.strip()}
 
 
-def translate_comments(chat_id: int, inspection: domain.Inspection) -> int:
+def translate_comments(
+    chat_id: int, inspection: domain.Inspection, *, source_settings: Settings | None = None
+) -> int:
     """Перевести комментарии на язык отчёта, если человек выбрал «Автоматически».
 
     Возвращает, сколько полей перевести не удалось (0 — всё хорошо или перевод не
@@ -77,10 +80,16 @@ def translate_comments(chat_id: int, inspection: domain.Inspection) -> int:
     if target == inspection.speech_lang or mode_of(chat_id) != translate_modes.AUTO:
         return 0
     with chat_usage(chat_id):
-        return _translate_findings(chat_id, inspection, target)
+        return _translate_findings(chat_id, inspection, target, source_settings=source_settings)
 
 
-def _translate_findings(chat_id: int, inspection: domain.Inspection, target: str) -> int:
+def _translate_findings(
+    chat_id: int,
+    inspection: domain.Inspection,
+    target: str,
+    *,
+    source_settings: Settings | None = None,
+) -> int:
     failed = 0
     for finding in inspection.findings:
         done: _TranslatedFields = {}
@@ -107,7 +116,16 @@ def _translate_findings(chat_id: int, inspection: domain.Inspection, target: str
                 done[name] = translated
         if done:
             try:
-                domain.edit_finding(chat_id, finding.n, zone_by_person=False, repeat=None, **done)
+                domain.edit_finding(
+                    chat_id,
+                    finding.n,
+                    zone_by_person=False,
+                    repeat=None,
+                    expected_run_id=inspection.run_id,
+                    source_settings=source_settings,
+                    source_revision=domain.finding_revision(finding),
+                    **done,
+                )
             except DomainError:
                 logger.warning(
                     "Автоперевод: запись #%s чата %s не сохранилась",

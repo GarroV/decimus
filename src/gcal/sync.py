@@ -21,6 +21,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import urllib.request
 from collections.abc import Callable
@@ -35,6 +37,7 @@ from src.domain.report_deadline import event_title, report_due_date
 from .client import (
     CLIENT_CONFIG_CODES,
     DEAD_GRANT_CODES,
+    DUPLICATE_CODES,
     GONE_CODES,
     CalendarError,
     ClientKeys,
@@ -43,6 +46,7 @@ from .client import (
     create_event,
     delete_event,
     event_body,
+    get_event,
     keys_from_env,
     update_event,
 )
@@ -57,6 +61,7 @@ DEAD_CODES = tuple(sorted(DEAD_GRANT_CODES | {UNREADABLE}))
 STALE_DAYS = 1
 #: Сколько вызовов Google за проход: остальное — следующим. Один проход не должен висеть часами.
 MAX_CALLS_PER_PASS = 60
+BUDGET_EXHAUSTED = "call_budget_exhausted"
 
 
 @dataclass
@@ -69,6 +74,24 @@ class PassResult:
 
 
 LinkFor = Callable[[str], str | None]
+
+
+class _Budget:
+    """Bound physical requests, including token refresh and conflict recovery."""
+
+    def __init__(self, opener: Opener) -> None:
+        self.opener = opener
+        self.used = 0
+
+    @property
+    def exhausted(self) -> bool:
+        return self.used >= MAX_CALLS_PER_PASS
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        if self.exhausted:
+            raise CalendarError(BUDGET_EXHAUSTED)
+        self.used += 1
+        return self.opener(*args, **kwargs)
 
 
 class _Tokens:
@@ -101,6 +124,8 @@ class _Tokens:
         try:
             return access_token(self._keys, refresh, opener=self._opener)
         except CalendarError as сбой:
+            if сбой.code == BUDGET_EXHAUSTED:
+                return None
             if сбой.code in DEAD_GRANT_CODES:
                 self._dead.add(user_id)
             _fail(user_id, сбой.code, mark=сбой.code not in CLIENT_CONFIG_CODES)
@@ -141,23 +166,26 @@ def run_pass(
     if ключи is None:
         logger.info("календарь: нет GOOGLE_CLIENT_ID/SECRET — проход пропущен")
         return результат
-    токены = _Tokens(ключи, opener)
-    вызовов = 0
+    budget = _Budget(opener)
+    токены = _Tokens(ключи, budget)
 
     for сирота in calendar_store.orphans():
-        if вызовов >= MAX_CALLS_PER_PASS:
+        if budget.exhausted:
             return результат
         токен = токены.get(сирота.user_id)
         if токен is None:
+            if budget.exhausted:
+                return результат
             if токены.is_dead(сирота.user_id):
                 # Доступ мёртв насовсем: событие снять нечем, его уберёт сам человек.
                 calendar_store.forget_event(сирота.inspection_id)
             # Временный сбой (сеть, 5xx): запись остаётся до следующего прохода.
             continue
-        вызовов += 1
         try:
-            delete_event(токен, сирота.event_id, opener=opener)
+            delete_event(токен, сирота.event_id, opener=budget)
         except CalendarError as сбой:
+            if сбой.code == BUDGET_EXHAUSTED:
+                return результат
             результат.failed += 1
             _fail(сирота.user_id, сбой.code, inspection_id=сирота.inspection_id, mark=False)
             continue
@@ -172,22 +200,32 @@ def run_pass(
             continue
         if not кандидат.event_id and срок < today - timedelta(days=STALE_DAYS):
             continue
-        if вызовов >= MAX_CALLS_PER_PASS:
+        if budget.exhausted:
             break
         токен = токены.get(кандидат.user_id)
         if токен is None:
+            if budget.exhausted:
+                break
             if кандидат.user_id not in результат.skipped_users:
                 результат.skipped_users.append(кандидат.user_id)
             continue
-        вызовов += 1
         тело = event_body(
             title=название,
             description=_description(link_for(кандидат.inspection_id), кандидат.ui_lang),
             due=срок,
         )
         try:
-            номер, создано = _push(токен, кандидат.event_id, тело, opener)
+            номер, создано = _push(
+                токен,
+                кандидат.event_id,
+                тело,
+                budget,
+                user_id=кандидат.user_id,
+                inspection_id=кандидат.inspection_id,
+            )
         except CalendarError as сбой:
+            if сбой.code == BUDGET_EXHAUSTED:
+                break
             результат.failed += 1
             _fail(кандидат.user_id, сбой.code, inspection_id=кандидат.inspection_id, mark=True)
             continue
@@ -202,15 +240,61 @@ def run_pass(
     return результат
 
 
+def _event_identity(user_id: str, inspection_id: str, predecessor: str = "") -> str:
+    # Hex is a subset of Calendar's base32hex alphabet (0-9, a-v).
+    source = json.dumps(["decimus-calendar-v1", user_id, inspection_id, predecessor])
+    return "d" + hashlib.sha256(source.encode()).hexdigest()
+
+
 def _push(
-    token: str, event_id: str | None, body: dict[str, Any], opener: Opener
+    token: str,
+    event_id: str | None,
+    body: dict[str, Any],
+    opener: Opener,
+    *,
+    user_id: str,
+    inspection_id: str,
 ) -> tuple[str, bool]:
-    """Создать событие или сдвинуть имеющееся. Пропавшее из календаря пересоздаётся."""
+    """Keep creation identity across failed DB writes and lost HTTP responses."""
     if event_id:
         try:
             update_event(token, event_id, body, opener=opener)
             return event_id, False
-        except CalendarError as сбой:
-            if сбой.code not in GONE_CODES:
+        except CalendarError as exc:
+            if exc.code not in GONE_CODES:
                 raise
-    return create_event(token, body, opener=opener), True
+    owner = _event_identity(user_id, inspection_id)
+    desired = _event_identity(user_id, inspection_id, event_id or "")
+    # Deleted IDs can remain tombstones. Successors are deterministic too, so
+    # failed remember_event never turns a replacement into another new event.
+    for _ in range(8):
+        payload = {**body, "id": desired, "extendedProperties": {"private": {"decimus": owner}}}
+        try:
+            return create_event(token, payload, opener=opener), True
+        except CalendarError as exc:
+            if exc.code not in DUPLICATE_CODES:
+                raise
+        try:
+            existing = get_event(token, desired, opener=opener)
+        except CalendarError as exc:
+            if exc.code not in GONE_CODES:
+                raise
+            desired = _event_identity(user_id, inspection_id, desired)
+            continue
+        if existing.get("status") == "cancelled":
+            desired = _event_identity(user_id, inspection_id, desired)
+            continue
+        properties = existing.get("extendedProperties")
+        private = properties.get("private") if isinstance(properties, dict) else None
+        organizer = existing.get("organizer")
+        if (
+            existing.get("id") != desired
+            or not isinstance(private, dict)
+            or private.get("decimus") != owner
+            or not isinstance(organizer, dict)
+            or organizer.get("self") is not True
+        ):
+            raise CalendarError("event_identity_conflict")
+        update_event(token, desired, body, opener=opener)
+        return desired, False
+    raise CalendarError("event_tombstone_limit")

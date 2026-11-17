@@ -665,6 +665,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0129_calendar_deadline.sql` | D740, D741 (#1590): срок отчёта по проверке УК — событием в Google Календаре проверяющего |
 | `0130_close_invariants.sql` | Три красных инварианта базы на main (проверки `test_db_definer_search_path` и `test_db_space_isolation`), закрываются новым файлом: применённые `0123` и `0128` заморожены |
 | `0131_mailing_templates_lang.sql` | Язык шаблона письма больше не пара `ru`/`en` (#541, #1619): список языков отчёта живёт в коде (`src/domain/models.py: REPORT_LANGS`), и третий язык не должен упираться в… |
+| `0132_photo_backfill_fairness.sql` | Отметка задаёт порядок попыток, а не бессрочную аренду |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -752,6 +753,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/dodois_loader.py` | Входы в Dodo IS по странам: ночью продлевает, раз в час проверяет «открыто X из Y» (D640b) |
 | `src/bot/dodois_metrics_loader.py` | Данные Dodo IS для «Качества» по странам: продажи, агрегаторы, оценки клиентов (D671) |
 | `src/bot/errors.py` | Отказы блока `bot` |
+| `src/bot/finish_archive.py` | Retry acknowledged report archives from durable snapshots without chat messages |
 | `src/bot/finish_translate.py` | Автоперевод комментариев при сборке отчёта (D443) |
 | `src/bot/frame_copies.py` | Копии присланных кадров на диске площадки, на 7 дней (#367, решение владельца D179) |
 | `src/bot/health_loader.py` | Постоянная проверка подключений (D638, #1251): раз в 15 минут — пробы ключей и служб |
@@ -902,6 +904,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/dodois/client.py` | Разговор с Dodo IS: вход устройства, продление, имя учётки, счёт открытых пиццерий (D640b) |
 | `src/dodois/flow.py` | Вход по ссылке: сервер начинает device flow, сам опрашивает Dodo IS и пишет вход (D640b) |
 | `src/dodois/metrics.py` | Суточный сбор данных Dodo IS для «Качества» по странам (D671): продажи, агрегаторы, КР |
+| `src/dodois/refresh_outbox.py` | Encrypted durable refresh handoff, serialized per country across processes |
 | `src/dodois/service.py` | Входы в Dodo IS по странам: записать вход, продлить, проверить «открыто X из Y» (D640b) |
 <!-- map:end -->
 
@@ -988,6 +991,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/checklist_store.py` | Раскладка хранилища методик — та её часть, которую читает бот (#455) |
 | `src/domain/clarifications.py` | Bounded human answers paired with untrusted clarification questions |
 | `src/domain/client_ip.py` | Чей это адрес у сервера MCP: клиент за общим прокси (D462, журнал действий) |
+| `src/domain/completion.py` | Durable run snapshots awaiting archival after the auditor received the PDF |
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
 | `src/domain/country_currency.py` | Валюта выручки Dodo IS по стране (D723): справочник, а не догадка по сумме |
 | `src/domain/coverage_exempt.py` | Где источник данных рейтингов Додо не обслуживает — и потому его пустота не дыра (D704, D706) |
@@ -1078,6 +1082,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/recognize/process_hint.py` | Указание аудитора «<описание>, это <процесс>» (T166, D077) |
 | `src/recognize/prompt.py` | T031/T032: текст запроса к модели — правила фиксации и перечень кандидатов |
 | `src/recognize/provenance.py` | Photo evidence indices from untrusted model/client data; no ownership decisions |
+| `src/recognize/provider_errors.py` | Allowlisted provider error metadata for operational diagnostics |
 | `src/recognize/revise.py` | Правка записи ответом словами (#454, решения D294, D295) |
 | `src/recognize/rules_check.py` | T032: страховка после модели — код-уровневая проверка формулировки |
 | `src/recognize/schema.py` | T031: схема ответа модели |
@@ -1149,6 +1154,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/dodois_import.py` | Перенос нынешнего входа в Dodo IS в базу — разовый, по одной стране (D640b, #951) |
 | `tools/fastpath_measure.py` | T113, T125: доля срабатываний быстрого пути — так, как его зовёт живой бот |
 | `tools/gen_map.py` | Карта кода: перегенерация таблиц в docs/ между маркерами (`make map`, #731) |
+| `tools/image_preflight.py` | Check copied source readability and application imports under the runtime UID |
 | `tools/inspection_release_smoke.py` | Живой смоук перед выездами: демо-вход и экраны, публичные двери прода |
 | `tools/landing_shots.py` | Снимки живых экранов для посадочной страницы (D545) — одной командой |
 | `tools/loadcheck.py` | Замер потолка нагрузки: сколько одновременных проверок продукт держит |
@@ -1220,7 +1226,7 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin tree front -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `front/` | 6 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.demo.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
+| `front/` | 8 | .deploy.env.example, deploy.sh, package-lock.json, package.json, wrangler.admin.template.jsonc, wrangler.demo.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
 | `front/src/` | 2 | index.js, proxy.js |
 | `front/test/` | 1 | proxy.test.mjs |
 <!-- map:end -->

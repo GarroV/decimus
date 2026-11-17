@@ -415,3 +415,36 @@ def test_у_роли_администратора_есть_право_удаля
             "has_table_privilege('dodo_audit_app', 'dodois.logins', 'DELETE')"
         ).fetchone()
     assert право == (True, False)
+
+
+def test_late_state_and_account_results_do_not_change_relinked_login(база: str) -> None:
+    old = _вход()
+    linked = НОВАЯ + timedelta(minutes=1)
+    with psycopg.connect(база) as conn:
+        conn.execute(
+            "update dodois.logins set linked_at = %s, account_name = null, account_email = null "
+            "where country = 'SI'",
+            (linked,),
+        )
+    before = store.get_login("SI")
+    store.record_state(
+        "SI",
+        rules.EXPIRED,
+        "refresh_rejected",
+        now=linked,
+        units_total=9,
+        units_open=0,
+        expect_linked_at=old.linked_at,
+    )
+    store.set_account("SI", "Stale account", "stale@example.com", expect_linked_at=old.linked_at)
+    assert store.get_login("SI") == before
+    store.record_state(
+        "SI",
+        rules.FAILED,
+        "network",
+        now=linked,
+        units_total=9,
+        expect_linked_at=linked,
+    )
+    after = store.get_login("SI")
+    assert after.state == rules.FAILED and after.units_total == 9

@@ -27,7 +27,7 @@ def _начать() -> None:
 
 
 def _правка_из_другой_вкладки(*_a: object, **_k: object) -> int:
-    """Подмена автоперевода: он идёт между проверкой отпечатка и печатью."""
+    """Правка между начальной сверкой отпечатка и атомарной печатью."""
     add_finding(CHAT_ID, code="CLN06", level="D1", zone="hot_kitchen", text="Жир на вытяжке")
     return 0
 
@@ -38,7 +38,15 @@ async def test_правка_между_сверкой_и_печатью_отчё
 ) -> None:
     _начать()
     увиденное = revision(get_state(CHAT_ID))  # type: ignore[arg-type]
-    monkeypatch.setattr("src.bot.routers.finish.translate_comments", _правка_из_другой_вкладки)
+    from src.bot.routers import finish
+
+    original = finish._seal
+
+    def racing_seal(*args, **kwargs):
+        _правка_из_другой_вкладки()
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(finish, "_seal", racing_seal)
     bot, session = make_bot()
 
     await deliver(

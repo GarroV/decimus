@@ -108,6 +108,8 @@ async def apply_edit(
     *,
     zone_by_person: bool = False,
     repeat: bool | None = None,
+    expected_run_id: str | None = None,
+    source_revision: str | None = None,
     **fields: Unpack[_EditFields],
 ) -> None:
     """Поправить запись и показать её заново; отказ движка — аудитору как есть.
@@ -131,6 +133,8 @@ async def apply_edit(
                 n,
                 zone_by_person=zone_by_person,
                 repeat=repeat,
+                expected_run_id=expected_run_id,
+                source_revision=source_revision,
                 **fields,
             )
         )

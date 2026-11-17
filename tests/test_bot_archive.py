@@ -80,7 +80,7 @@ def подменить_слив(monkeypatch: pytest.MonkeyPatch, ответ: obj
     """Подменить `push_inspection` там, где его берёт бот."""
     вызовы = Calls()
 
-    def fake(chat_id: int) -> str:
+    def fake(chat_id: int, *, source_settings: object = None) -> str:
         вызовы.append((chat_id,))
         if isinstance(ответ, Exception):
             raise ответ
@@ -197,7 +197,7 @@ async def test_слив_идёт_после_того_как_отчёт_отда�
     подменить_выгрузку(monkeypatch)
     видел: list[str] = []
 
-    def fake(chat_id: int) -> str:
+    def fake(chat_id: int, *, source_settings: object = None) -> str:
         видел.extend(type(c).__name__ for c in session.calls)
         return "insp-1"
 
@@ -223,7 +223,7 @@ async def test_отказ_слива_не_отменяет_отчёт_и_наз�
     session = await проверка_через_бота(monkeypatch)
 
     assert отправленные_документы(session), "из-за базы аудитор остался без отчёта"
-    assert session.last_text == t("finish.not_archived", "ru")
+    assert t("finish.not_archived", "ru") in session.texts
     assert not выгрузки, "кадры поехали в хранилище проверки, которой в базе нет"
 
 
@@ -237,7 +237,7 @@ async def test_отказ_хранилища_называется_отдельн
     session = await проверка_через_бота(monkeypatch)
 
     assert отправленные_документы(session)
-    assert session.last_text == t("finish.photos_not_archived", "ru")
+    assert t("finish.photos_not_archived", "ru") in session.texts
 
 
 async def test_лежащее_хранилище_не_роняет_сдачу_и_обещает_дозагрузку(
@@ -256,7 +256,7 @@ async def test_лежащее_хранилище_не_роняет_сдачу_и
     session = await проверка_через_бота(monkeypatch)
 
     assert отправленные_документы(session), "лежащее хранилище оставило аудитора без отчёта"
-    assert session.last_text == t("finish.photos_deferred", "ru")
+    assert t("finish.photos_deferred", "ru") in session.texts
     assert not отчёты, "отчёт поехал в хранилище, про которое уже известно, что оно лежит"
 
 
@@ -298,7 +298,7 @@ async def test_отказ_сторожа_точки_не_называется_о
     assert t("finish.not_archived", "ru") not in session.texts, (
         "отказ сторожа справочника назван отказом базы"
     )
-    assert session.last_text == t("finish.unit_refused", "ru", unit="Yerevan-1")
+    assert t("finish.unit_refused", "ru", unit="Yerevan-1") in session.texts
     assert not выгрузки, "кадры поехали в хранилище проверки, которой в базе нет"
 
 
@@ -372,7 +372,11 @@ async def test_расхождение_версии_на_сливе_даёт_те
 
     session = await проверка_через_бота(monkeypatch)
 
-    последнее = [c for c in session.calls if type(c).__name__ == "SendMessage"][-1]
+    последнее = [
+        c
+        for c in session.calls
+        if type(c).__name__ == "SendMessage" and "2026-08-01" in str(c.text)
+    ][-1]
     кнопки = [
         кнопка.callback_data
         for ряд in (последнее.reply_markup.inline_keyboard if последнее.reply_markup else [])

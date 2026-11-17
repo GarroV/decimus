@@ -1,0 +1,8 @@
+{
+  "name": "decimus-front-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned deployment tools for the Decimus Cloudflare front",
+  "engines": {"node": ">=22.12.0"},
+  "devDependencies": {"wrangler": "4.163.0"}
+}

@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -64,7 +63,23 @@ def test_слив_кладёт_разбивку_движка_и_вклады_с�
 
     # Assert
     assert эталон.by_process, "движок не вернул разбивку — проверка ничего не проверяет"
-    assert хранится == {k: asdict(v) for k, v in эталон.by_process.items()}
+    assert set(хранится) == set(эталон.by_process)
+    # Публичный контракт хранения (docs/40-languages.md): имена плоские,
+    # числовые значения переносятся из движка без пересчёта. Не зовём _flat_names.
+    for code, process in эталон.by_process.items():
+        expected = {
+            "code": process.code,
+            "scored": process.scored,
+            "d1": process.d1,
+            "d2": process.d2,
+            "d3": process.d3,
+            "loss": process.loss,
+            **{f"name_{lang}": text for lang, text in process.name_texts.items()},
+        }
+        assert хранится[code] == expected
+        assert "name_texts" not in хранится[code]
+        for lang in ("ru", "en"):
+            assert хранится[code][f"name_{lang}"] == process.name(lang)
     сумма = sum(p["loss"] for p in хранится.values())
     assert сумма > 0, "вклады нулевые — сходство с вычетом ничего не значит"
     assert сумма == pytest.approx(float(вычет), abs=0.05)

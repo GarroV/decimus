@@ -46,6 +46,7 @@ from src.db.config import load_storage_settings
 from src.db.photos import PENDING_BATCH
 from src.db.space import SYSTEM_SPACE, acting_space
 from src.db.storage import S3PhotoStorage
+from src.domain.errors import DomainError
 
 from .photos import MAX_PARALLEL, fetch_bytes
 
@@ -254,6 +255,12 @@ async def _backfill_forever(bot: Bot) -> None:
 
     last_stale = float("-inf")
     while True:
+        from .finish_archive import retry_once
+
+        try:
+            await retry_once()
+        except (db.DbError, DomainError, OSError, ValueError):
+            logger.exception("Durable archive queue unreadable; retry scheduled")
         await _pass(fetch, stale=False)
         if time.monotonic() - last_stale >= STALE_EVERY_SEC:
             last_stale = time.monotonic()

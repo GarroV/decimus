@@ -131,6 +131,32 @@ def option(name: str, value: str) -> str:
     return f"--{name}={value}"
 
 
+#: Диагностика называет только известную операцию. Остальные аргументы —
+#: контакт, формулировка, комментарий и пути — принадлежат предметному состоянию,
+#: а не общему журналу процесса или цепочке исключений.
+_DIAGNOSTIC_OPERATIONS = frozenset(
+    {
+        "index",
+        "detail",
+        "zones",
+        "kinds",
+        "init",
+        "meta",
+        "add",
+        "edit",
+        "photo",
+        "drop",
+        "info",
+        "list",
+        "score",
+    }
+)
+
+
+def _diagnostic_operation(args: Sequence[str]) -> str:
+    return args[0] if args and args[0] in _DIAGNOSTIC_OPERATIONS else "audit"
+
+
 def run_audit(
     args: Sequence[str],
     *,
@@ -172,7 +198,7 @@ def run_audit(
             pause_before_retry(attempt)
             continue
         message = (done.stderr or done.stdout).strip() or "движок отказал без объяснения"
-        raise EngineError(message, code=done.returncode, command=" ".join(args))
+        raise EngineError(message, code=done.returncode, command=_diagnostic_operation(args))
     raise AssertionError("недостижимо: цикл попыток выходит возвратом или отказом")
 
 
@@ -190,13 +216,13 @@ def _launch(
             text=True,
             timeout=TIMEOUT_SEC,
         )
-    except subprocess.TimeoutExpired as exc:
+    except subprocess.TimeoutExpired:
         raise EngineError(
             f"Движок не ответил за {TIMEOUT_SEC:g} с — состояние проверки занято "
-            f"другим процессом. Команда: {' '.join(args)}",
+            f"другим процессом. Операция: {_diagnostic_operation(args)}",
             code=-1,
-            command=" ".join(args),
-        ) from exc
+            command=_diagnostic_operation(args),
+        ) from None
 
 
 def _refuse_no_verdict(args: Sequence[str], *, output: str, attempt: int, chat_id: int) -> None:
@@ -208,7 +234,7 @@ def _refuse_no_verdict(args: Sequence[str], *, output: str, attempt: int, chat_i
     выданный за слова движка, посылает человека искать дефект в методике
     (T189), которого там нет.
     """
-    command = " ".join(args)
+    command = _diagnostic_operation(args)
     again = RUNTIME_BEFORE_SCRIPT in output and attempt < ENGINE_ATTEMPTS
     started = "старт не состоялся" if RUNTIME_BEFORE_SCRIPT in output else "умер после старта"
     logger.warning(

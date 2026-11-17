@@ -295,6 +295,10 @@ class NotFirstFactorError(Exception):
     """Способ подключали как ПЕРВЫЙ, но у человека уже есть другой (проиграна гонка, D485)."""
 
 
+class FactorProofRequiredError(Exception):
+    """Ключ без доказательства второй ступени нельзя добавить к способам старше входа."""
+
+
 def _factor_count(cur: Any, user_id: str) -> int:
     cur.execute(
         "select (select count(*) from web_passkeys where user_id = %(u)s)"
@@ -341,14 +345,35 @@ def add_passkey(
     name: str,
     keep_session_id: str | None = None,
     only_if_first: bool = False,
+    enrollment_since: datetime | None = None,
 ) -> Passkey:
     """Записать новый ключ доступа. Первый способ человека закрывает его ДРУГИЕ сессии.
 
     `only_if_first` — вызывающий считает этот способ первым (у учётки их не было); если к
     моменту вставки способ уже есть — `NotFirstFactorError`, ключ не записан.
+    `enrollment_since` — вход без доказательства ступени: допустимы только
+    способы, подключённые не раньше этого входа. Проверяется под тем же замком,
+    что запись, иначе изменение факторов после чтения открывает обход.
+    Переданный `keep_session_id` должен оставаться действующим в момент записи.
     """
     with _connected("записать ключ доступа") as conn, conn.cursor() as cur:
         _take_first_slot(cur, user_id, only_if_first=only_if_first)
+        if keep_session_id is not None:
+            # A first-factor setup in another session may have closed this
+            # session while its registration response was being verified.
+            # Recheck under the same account lock before persisting the key.
+            cur.execute(
+                "select 1 from web_sessions s join web_users u on u.id = s.user_id"
+                " where s.id = %s and s.user_id = %s and s.closed_at is null"
+                " and s.expires_at > clock_timestamp() and u.disabled_at is null",
+                (keep_session_id, user_id),
+            )
+            if cur.fetchone() is None:
+                raise FactorProofRequiredError(user_id)
+        if enrollment_since is not None and not _factors_all_newer_than(
+            cur, user_id, enrollment_since
+        ):
+            raise FactorProofRequiredError(user_id)
         _close_others_if_first(cur, user_id, keep_session_id)
         cur.execute(
             "insert into web_passkeys (user_id, credential_id, public_key, sign_count,"
@@ -362,6 +387,18 @@ def add_passkey(
     return _passkey(строка)
 
 
+def _factors_all_newer_than(cur: Any, user_id: str, since: datetime) -> bool:
+    cur.execute(
+        "select not exists (select 1 from web_passkeys where user_id = %(u)s"
+        "                    and created_at < %(s)s)"
+        "   and not exists (select 1 from web_totp where user_id = %(u)s"
+        "                    and confirmed_at is not null and confirmed_at < %(s)s)",
+        {"u": user_id, "s": since},
+    )
+    строка = cur.fetchone()
+    return bool(строка and строка[0])
+
+
 def factors_all_newer_than(user_id: str, since: datetime) -> bool:
     """Все способы входа человека созданы не раньше `since` (или их нет): до этой сессии их не было.
 
@@ -369,15 +406,7 @@ def factors_all_newer_than(user_id: str, since: datetime) -> bool:
     (резервные коды) без доказательства ступени. Сессия при уже имевшемся способе — нельзя.
     """
     with _connected("сверить давность способов входа") as conn, conn.cursor() as cur:
-        cur.execute(
-            "select not exists (select 1 from web_passkeys where user_id = %(u)s"
-            "                    and created_at < %(s)s)"
-            "   and not exists (select 1 from web_totp where user_id = %(u)s"
-            "                    and confirmed_at is not null and confirmed_at < %(s)s)",
-            {"u": user_id, "s": since},
-        )
-        строка = cur.fetchone()
-    return bool(строка and строка[0])
+        return _factors_all_newer_than(cur, user_id, since)
 
 
 def purge_idle_passkeys(

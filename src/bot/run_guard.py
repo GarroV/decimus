@@ -44,5 +44,8 @@ class RunGuard:
         self._seen[chat_id] = now
         return before is not None and before != now
 
+    def matches(self, chat_id: int, run_id: str) -> bool:
+        return self._current is None or self._current(chat_id) == run_id
+
     def forget(self, chat_id: int) -> None:
         self._seen.pop(chat_id, None)

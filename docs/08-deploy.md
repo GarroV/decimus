@@ -165,8 +165,8 @@ DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 
 [`scripts/prod-update.sh`](../scripts/prod-update.sh) делает по порядку:
 `git pull --ff-only` → сверка источника (`scripts/verify-source.sh`: HEAD = `main` на GitHub, дерево чистое, [§8.23](35-platform-services.md)) → проверка утечки методики (`tools/methodology_leak.py data --tracked-only`, D517: цитата останавливает раскатку, обход `LEAK_CHECK=0`) → сборка с `BUILD_SHA` (вместе с профилем `backup`) →
-база с ожиданием здоровья →
-накат миграций → `up -d --wait` → смоук (`/login` 200, MCP без токена 401,
+допуск каждого образа от uid/gid 10001 (читаемость кода и импорт bot/web/walk/mcp) →
+база с ожиданием здоровья → накат миграций → `up -d --wait` → смоук (`/login` 200, MCP без токена 401,
 админка не пишет в `state`, сервис обхода пишет, `/tg/walk` 200 — [§8.14](35-platform-services.md)).
 Один и тот же порядок для первого подъёма и для каждого обновления: накат
 идемпотентен, корзина заводится с `--ignore-existing`. Первый подъём с переносом
@@ -186,6 +186,14 @@ dc ps; dc logs -f bot
 Бот, MCP, веб и обход работают от пользователя `app` (uid/gid `10001`,
 `Dockerfile`), у сервисов отобраны все привилегии ядра и запрещено их
 повышение (`cap_drop: [ALL]`, `no-new-privileges`, `docker-compose.yml`).
+Права скопированного кода нормализуются в образе независимо от umask checkout:
+каталоги доступны для прохода, файлы — для чтения, исполняемость скриптов сохраняется.
+Проверка `tools/image_preflight.py` выполняется после `USER app` при сборке и
+повторно для каждого готового сервиса до первого `up` при обновлении. Она требует
+фактический uid/gid 10001, открывает все скопированные файлы и импортирует входы
+приложений без запуска серверов и заданий. Отказ оставляет работающие службы
+на прежних образах. Права секретов и изменяемых томов этим не меняются.
+
 Новый пустой том наследует владельца каталога образа и поднимается сам. Тома,
 созданные до этого изменения, принадлежат root (`state`, `frames`,
 `methodology`) — **до первой выкатки образа с `USER`** их владельца меняют
@@ -323,7 +331,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml -f compose.edge.
 | Сброс | `deploy/demo/reset.sh`: тома `pgdata`, `state`, `methodology` заново → миграции → `tools/seed_open_demo.py` → подъём, около минуты. Cron пользователя `garva`: `17 * * * *`, лог `~/decimus-demo-reset.log` |
 | Обновление кода | `deploy/demo/update.sh`: `git pull`, сверка источника ([§8.23](35-platform-services.md)), сборка, сброс. Запускать **только из `/srv/decimus-demo`**: оба скрипта (`update.sh`, `reset.sh`) сами отказывают (`deploy/demo/guard.sh`, #1246), если дерево не `/srv/decimus-demo` и в его настройках нет `AUDIT_DATA_DIR` на `demo/data`; а из `/srv/decimus` compose возьмёт боевой `.env` (боевые пароли, ключи хранилища, токен бота) и поднимет демо на нём. Токен бота у демо-`walk` перекрыт пустым значением в `compose.demo.yaml` (иначе `walk_auth` отказывается стартовать, #1222), остальное — нет |
 | Caddy | `vps-infra` `edge/sites/decimus-demo.caddy` (`<DEMO_ORIGIN_HOST>` → `decimus-demo-web:8267`): сайт без ключа фронта, заголовки фронта срезаются (как у стенда [§8.9.1](34-platform-edge.md)) |
-| Адрес | https://decimus-demo.vasiliy-garro.workers.dev — Worker `decimus-demo` (`front/deploy.sh demo`, шаблон `front/wrangler.demo.template.jsonc`, `DEMO_ORIGIN_HOST` в `front/.deploy.env`). Секрет `FRONT_KEY` свой, случайный (без него Worker отвечает 503): `openssl rand -hex 32 \| npx wrangler secret put FRONT_KEY --name decimus-demo` |
+| Адрес | https://decimus-demo.vasiliy-garro.workers.dev — Worker `decimus-demo` (`front/deploy.sh demo`, шаблон `front/wrangler.demo.template.jsonc`, `DEMO_ORIGIN_HOST` в `front/.deploy.env`). Секрет `FRONT_KEY` свой, случайный (без него Worker отвечает 503): `openssl rand -hex 32 \| front/node_modules/.bin/wrangler secret put FRONT_KEY --name decimus-demo` |
 
 На проде `WEB_DEMO_URL` — адрес Worker'а демо: по нему кнопка «Открыть демо» на
 посадочной странице.

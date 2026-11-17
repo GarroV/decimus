@@ -64,7 +64,10 @@ def test_контроль_грузит_партнёр_видит(
             assert f"За период нет данных {label}." in text
             assert "Нарушений не найдено." not in text
         risk = client.get("/ratings/risk?group=developer&value=Dev+One&period=2026-Q1")
-        assert "Недостаточно периодов для оценки: РС, РКО." in risk.get_data(as_text=True)
+        assert risk.status_code == 200
+        риск_текст = risk.get_data(as_text=True)
+        assert "Недостаточно периодов" not in риск_текст  # D705: без диагностики сбора
+        assert "Пиццерий стабильно ниже порога нет." in риск_текст
         # Дельта к периоду РС подписана его названием, а не ключом `rs:<id>` (P39):
         # догружаем прошлый период РС с оценкой — в первом снимке он пустой.
         прошлый = snapshot(history=[{"score": 90, "status": "1", "period": ПРОШЛЫЙ_РС}], remarks=[])
@@ -76,11 +79,12 @@ def test_контроль_грузит_партнёр_видит(
             as_text=True
         )
         # Календарь «с — по»: даты периода РС узнаются как он сам — его имя в
-        # заголовке и «Δ к прошлому периоду РС» его названием.
-        период = client.get(f"/ratings?group=developer&value=Dev+One&{СЕНТЯБРЬ_2}")
+        # заголовке и подсказке сравнения самостоятельного раздела РС (D660).
+        период = client.get(f"/ratings/rs?group=developer&value=Dev+One&{СЕНТЯБРЬ_2}")
         период_текст = период.get_data(as_text=True)
         assert "Сентябрь 2 часть 2026" in период_текст.split("rt-cal__title")[1][:80]
-        assert "Δ к Сентябрь 1 часть 2026" in период_текст and "Δ к rs:" not in период_текст
+        assert "Изменение — к предыдущему периоду (Сентябрь 1 часть 2026)." in период_текст
+        assert "Изменение — к предыдущему периоду (rs:" not in период_текст
         # Вторая страна того же девелопера участвует в самостоятельном сравнении.
         ответ = client.post(
             "/ratings/countries", data={"code": "BY", "developer": "Dev One"}, headers=ORIGIN

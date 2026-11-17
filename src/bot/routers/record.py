@@ -143,6 +143,7 @@ def make_waiting_handler(pending: PendingStore) -> WaitingHandler:
     """Кадр без комментария — спросить «Разобрать?» и запомнить вопрос (T067)."""
 
     async def ask(message: Message, group: PhotoGroup, lang: str) -> None:
+        run_id = domain.run_id(group.chat_id)
         count = len(group.photo_file_ids)
         key = "material.photo_taken" if count == 1 else "material.album_taken"
         anchor = group.message_ids[0]
@@ -153,6 +154,7 @@ def make_waiting_handler(pending: PendingStore) -> WaitingHandler:
             group.chat_id,
             Offer(
                 anchor_id=anchor,
+                run_id=run_id,
                 file_ids=group.photo_file_ids,
                 question_id=getattr(sent, "message_id", None),
             ),
@@ -223,6 +225,8 @@ async def _hand(
     (T206) получило бы отказ — то есть правило разошлось бы ровно там, где оно
     и нужно.
     """
+    if not pending.accepts(chat_id, proposal):
+        return
     sent = await message.answer(text, reply_markup=markup)
     pending.propose(chat_id, proposal, at=getattr(sent, "message_id", None))
 
@@ -576,6 +580,8 @@ async def _try_fast(
         # словам аудитора одинаково, заводит он запись или поправляет.
         correcting=base.correcting,
         origin=base.origin,
+        expected_run_id=base.run_id,
+        source_revision=base.finding_revision,
     )
     if saved is None:
         return False
@@ -683,6 +689,8 @@ async def _try_learned(
         suggested=None,
         correcting=base.correcting,
         origin=base.origin,
+        expected_run_id=base.run_id,
+        source_revision=base.finding_revision,
     )
     if saved is None:
         return False
@@ -763,6 +771,8 @@ async def _correct_zone(message: Message, chat_id: int, base: Proposal, lang: st
         zone_spoken=True,
         zone_from_cues=False,
         origin=base.origin,
+        expected_run_id=base.run_id,
+        source_revision=base.finding_revision,
     )
     return saved is not None
 
@@ -782,6 +792,7 @@ async def analyze(
     line: tuple[int, int] | None = None,
     group: int = 0,
     seen: LineSeen | None = None,
+    expected_run_id: str | None = None,
 ) -> None:
     """Сверить со списком нарушений, а если не сошлось — спросить разбор.
 
@@ -814,6 +825,9 @@ async def analyze(
     сверх слов: «на кадрах видно ещё» показывается один раз на весь материал,
     а не по разу на строку.
     """
+    inspection = read_inspection(chat_id)
+    if inspection is None or (expected_run_id is not None and inspection.run_id != expected_run_id):
+        return
     lang, report_lang = chat_langs(chat_id)
     # Зона выводится ОДНИМ местом (T263): слова аудитора, затем словарь
     # объектов карты кадров, а не вывелось — спросим кнопками. Памяти о прошлой
@@ -824,7 +838,10 @@ async def analyze(
     # Пункт здесь ещё не выбран, поэтому `item_code` пуст: зоны кнопок сузит
     # тот, кто спрашивает, — он к тому времени пункт уже знает.
     resolved = await asyncio.to_thread(resolve_zone, note, None, chat_id=chat_id)
+    addressed = None if correcting is None else inspection.finding(correcting)
     base = Proposal(
+        run_id=inspection.run_id,
+        finding_revision=None if addressed is None else domain.finding_revision(addressed),
         file_ids=file_ids,
         source=source,
         note=note,
@@ -1324,6 +1341,8 @@ async def _analyze_frames(
     file_ids: tuple[str, ...],
     pending: PendingStore,
     lang: str,
+    *,
+    expected_run_id: str | None = None,
 ) -> None:
     """Разобрать кадры, по которым аудитор нажал «Разобрать?» (D046, T206).
 
@@ -1347,6 +1366,7 @@ async def _analyze_frames(
     `docs/06-mvp-bot.md`, шаг 3, и человек платит её осознанно: он видит, сколько
     кадров разбирается, до того как разбор начнётся.
     """
+    run_id = expected_run_id if expected_run_id is not None else domain.run_id(chat_id)
     if len(file_ids) <= 1:
         await analyze(
             message,
@@ -1355,6 +1375,7 @@ async def _analyze_frames(
             file_ids=file_ids,
             source=domain.SOURCE_PHOTO,
             pending=pending,
+            expected_run_id=run_id,
         )
         return
     sent = len(file_ids)
@@ -1381,6 +1402,7 @@ async def _analyze_frames(
             file_ids=(file_id,),
             source=domain.SOURCE_PHOTO,
             pending=pending,
+            expected_run_id=run_id,
             batch=(no, total),
         )
 
@@ -1438,6 +1460,8 @@ async def _save(
     correcting: int | None = None,
     origin: int | None = None,
     reading_c: float | None = None,
+    expected_run_id: str | None = None,
+    source_revision: str | None = None,
 ) -> Message | None:
     """Зафиксировать запись и показать её (T055, T121), а с T204 — и поправить.
 
@@ -1556,10 +1580,17 @@ async def _save(
                 zone=zone,
                 text=text,
                 zone_by_person=zone_spoken,
+                expected_run_id=expected_run_id,
+                source_revision=source_revision,
             )
             if reading_c is not None:
                 finding = await asyncio.to_thread(
-                    domain.set_reading, chat_id, correcting, reading_c
+                    domain.edit_finding,
+                    chat_id,
+                    correcting,
+                    reading_c=reading_c,
+                    expected_run_id=expected_run_id,
+                    source_revision=domain.finding_revision(finding),
                 )
         else:
             finding = await asyncio.to_thread(
@@ -1574,8 +1605,12 @@ async def _save(
                 suggested=suggested,
                 zone_by_person=zone_spoken,
                 reading_c=reading_c,
+                expected_run_id=expected_run_id,
             )
     except DomainError as exc:
+        latest = read_inspection(chat_id)
+        if expected_run_id is not None and (latest is None or latest.run_id != expected_run_id):
+            return None
         taken = (
             refusal.occupied_by(chat_id, code, zone) if correcting is None and file_ids else None
         )
@@ -1596,6 +1631,7 @@ async def _save(
                 lang=lang,
                 origin=origin,
                 reason=str(exc),
+                expected_run_id=expected_run_id,
             )
         # Отказ движка разбирается, а не пересказывается (T127): пункт и зона
         # называются по-человечески, а занятая пара «пункт + зона» без кадров
@@ -1642,11 +1678,14 @@ async def _save(
         return None
     for file_id in file_ids:
         try:
-            await asyncio.to_thread(domain.attach_photo, chat_id, finding.n, file_id)
+            await asyncio.to_thread(
+                domain.attach_photo,
+                chat_id,
+                finding.n,
+                file_id,
+                expected_run_id=expected_run_id,
+            )
         except DomainError:
-            # Запись уже есть, и терять её из-за одного кадра нельзя. Молчанием
-            # это не станет: не прикрепившийся кадр остаётся в заметках без
-            # записи и попадёт в список кадров без записи при завершении (T068).
             logger.exception("кадр %s не прикрепился к записи #%s", file_id, finding.n)
     # Зона записи здесь НЕ запоминается (T264, #218). Раньше запоминалась и
     # подставлялась следующему кадру первой догадкой (D048) — и это был весь
@@ -1659,6 +1698,8 @@ async def _save(
     # выброшенного числа значило бы платить подпроцессом (26 мс) за каждую
     # запись впустую.
     saved = read_inspection(chat_id)
+    if expected_run_id is not None and (saved is None or saved.run_id != expected_run_id):
+        return None
     current = None if saved is None else saved.finding(finding.n)
     shown = current or finding
     journal.note(
@@ -1735,11 +1776,11 @@ async def _save(
     # ведётся здесь, а не в роутере правки: показ записи собирается в этом
     # месте, и любой другой был бы вторым списком мест, который однажды отстал
     # бы от первого на один показ.
-    remember_shown(chat_id, sent, finding.n)
+    remember_shown(chat_id, sent, finding.n, expected_run_id=expected_run_id)
     # А ответом на СВОЁ сообщение аудитор досылает в эту запись кадр (T205). Обе
     # карты ведутся рядом по той же причине: запись показана здесь, и разнеси их
     # по разным местам — одна отстала бы от другой на один путь фиксации.
-    remember_origin(chat_id, origin, finding.n)
+    remember_origin(chat_id, origin, finding.n, expected_run_id=expected_run_id)
     if correcting is None and auto is None and not learned:
         # Совпадение было НЕПРЯМЫМ: сверка со списком нарушений пункт не нашла,
         # а человек его назвал — кнопкой кандидата или в ручном перечне. С D119
@@ -1806,7 +1847,13 @@ async def _ask_repeat(
         ),
         reply_markup=repeat_keyboard(shown.n, shown.code, lang),
     )
-    remember_repeat_ask(chat_id, asked, shown.n, shown.code)
+    remember_repeat_ask(
+        chat_id,
+        asked,
+        shown.n,
+        shown.code,
+        expected_run_id=None if saved is None else saved.run_id,
+    )
 
 
 def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Router:
@@ -1843,7 +1890,9 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
         # кадр, по которому разбор уже идёт.
         store.queue(chat_id).resolve_reply(offer.anchor_id, Comment(text=""))
         await _drop_question(message, chat_id, offer)
-        await _analyze_frames(message, chat_id, offer.file_ids, pending, lang)
+        await _analyze_frames(
+            message, chat_id, offer.file_ids, pending, lang, expected_run_id=offer.run_id
+        )
 
     @router.callback_query(F.data == READING_CALLBACK)
     async def on_fix_reading(callback: CallbackQuery, state: FSMContext) -> None:
@@ -1937,6 +1986,7 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             # перестала бы работать ровно у тех записей, которые переразобраны
             # моделью, то есть у самых спорных.
             origin=proposal.origin,
+            expected_run_id=proposal.run_id,
         )
 
     @router.callback_query(F.data.startswith(PICK_PREFIX))
@@ -2036,6 +2086,8 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             # кандидатов и кнопкой.
             correcting=proposal.correcting,
             origin=proposal.origin,
+            expected_run_id=proposal.run_id,
+            source_revision=proposal.finding_revision,
         ):
             pending.take_proposal(chat_id, at=message.message_id)
 
@@ -2073,6 +2125,8 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             suggested=_model_suggestion(proposal),
             correcting=proposal.correcting,
             origin=proposal.origin,
+            expected_run_id=proposal.run_id,
+            source_revision=proposal.finding_revision,
         ):
             pending.take_proposal(chat_id, at=message.message_id)
 
@@ -2217,6 +2271,8 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             suggested=None,
             correcting=proposal.correcting,
             origin=proposal.origin,
+            expected_run_id=proposal.run_id,
+            source_revision=proposal.finding_revision,
         ):
             pending.take_proposal(chat_id, at=message.message_id)
 
@@ -2405,7 +2461,9 @@ def make_frame_handler() -> FrameHandler:
         )
         frame_copies.received(message.bot, chat_id, [(message.message_id, file_id)])
         try:
-            await asyncio.to_thread(domain.attach_photo, chat_id, n, file_id)
+            await asyncio.to_thread(
+                domain.attach_photo, chat_id, n, file_id, expected_run_id=inspection.run_id
+            )
         except DomainError:
             logger.exception("кадр %s не прикрепился к записи #%s ответом", file_id, n)
             await message.answer(t("record.frame_failed", lang, n=n))
@@ -2429,6 +2487,8 @@ async def _analyze_lines(
     material: Material,
     pending: PendingStore,
     lang: str,
+    *,
+    expected_run_id: str | None = None,
 ) -> None:
     """Каждое нарушение комментария — свой разбор и своё сообщение (D718).
 
@@ -2437,6 +2497,7 @@ async def _analyze_lines(
     строк одни — запись прикрепляет их ссылкой, а не копией. Запись одной строки
     остальные не гасит: у них общий номер материала (`Proposal.group`).
     """
+    run_id = expected_run_id if expected_run_id is not None else domain.run_id(chat_id)
     await message.answer(t("record.lines", lang, count=len(parts)))
     group = pending.next_slot()
     seen = LineSeen()
@@ -2452,10 +2513,12 @@ async def _analyze_lines(
             line=(no, len(parts)),
             group=group,
             seen=seen,
+            expected_run_id=run_id,
         )
     extra = seen.extra()
     if extra:
         base = Proposal(
+            run_id=run_id,
             file_ids=material.photo_file_ids,
             source=domain.SOURCE_COMMENT,
             note=note,
@@ -2483,6 +2546,7 @@ def make_material_handler(
 
     async def handle(message: Message, material: Material, lang: str) -> None:
         chat_id = material.chat_id
+        run_id = domain.run_id(chat_id)
         offer = pending.take_offer_for(chat_id, material.photo_file_ids)
         if offer is not None:
             await _drop_question(message, chat_id, offer)
@@ -2498,7 +2562,9 @@ def make_material_handler(
         # в мини-аппе (D718): «столы, плинтуса, пол грязный» не одна запись.
         parts = await split_note(chat_id, note)
         if len(parts) > 1:
-            await _analyze_lines(message, chat_id, note, parts, material, pending, lang)
+            await _analyze_lines(
+                message, chat_id, note, parts, material, pending, lang, expected_run_id=run_id
+            )
             return
         await analyze(
             message,
@@ -2508,6 +2574,7 @@ def make_material_handler(
             source=domain.SOURCE_COMMENT,
             pending=pending,
             origin=message.message_id,
+            expected_run_id=run_id,
         )
 
     return handle

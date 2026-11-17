@@ -16,7 +16,9 @@
 
 Подтверждение берёт замок строки (`for update`) — тот же, что берёт правка
 записи (`revise.py`), поэтому правка и подтверждение одной проверки идут по
-очереди.
+очереди. Переходы разных проверок одной точки дополнительно сериализуются
+транзакционным advisory lock: после ожидания поиск дубля видит commit первого
+подтверждения, даже если даты и строки проверок разные.
 
 Подтверждение обойдённой проверки с любым D1/D2/D3 тем же движением открывает
 запрос экшн-плана. Загруженная задним числом — текущая (`origin = 'import'`) и
@@ -45,7 +47,7 @@ from .queries import _require_inspection_id, _require_tenant
 logger = logging.getLogger(__name__)
 
 _SELECT_HEAD_SQL = """
-select status, retracted_at, origin
+select status, retracted_at, origin, unit_id::text
 from inspections
 where id = %(id)s and tenant_code = %(tenant)s
 for update
@@ -122,7 +124,7 @@ def _apply(
                 f"Проверки {ident} у арендатора {tenant} нет — подтверждать нечего",
                 code="inspection_not_found",
             )
-        статус, отклонена, происхождение = шапка
+        статус, отклонена, происхождение, unit_id = шапка
         if отклонена is not None:
             raise AcceptError(
                 f"Проверка {ident} отклонена — отклонённую не подтверждают",
@@ -133,6 +135,13 @@ def _apply(
                 f"Проверка {ident} уже принята — подтверждать второй раз нечего",
                 code="accept_already",
             )
+        # Разные черновики одной точки имеют разные row locks. Сериализуем
+        # весь переход в finalized: импорт должен видеть и одновременно
+        # принимаемый обход. Следующий запрос READ COMMITTED увидит его commit.
+        cur.execute(
+            "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+            (f"decimus.accept.unit:{tenant}:{unit_id}",),
+        )
         if происхождение in UPLOADED_ORIGINS and not allow_duplicate:
             _refuse_duplicate(cur, ident)
         cur.execute(_ACCEPT_SQL, {"id": ident, "tenant": tenant, "actor": автор})

@@ -53,7 +53,9 @@ from .view import zone_title
 logger = logging.getLogger(__name__)
 
 
-async def _attach(chat_id: int, n: int, file_ids: Sequence[str]) -> int:
+async def _attach(
+    chat_id: int, n: int, file_ids: Sequence[str], *, run_id: str | None = None
+) -> int:
     """Прикрепить кадры к записи #`n`. Возвращает, сколько легло.
 
     Не прикрепившийся кадр не теряется: он в списке присланного и найдётся при
@@ -62,7 +64,9 @@ async def _attach(chat_id: int, n: int, file_ids: Sequence[str]) -> int:
     attached = 0
     for file_id in file_ids:
         try:
-            await asyncio.to_thread(domain.attach_photo, chat_id, n, file_id)
+            await asyncio.to_thread(
+                domain.attach_photo, chat_id, n, file_id, expected_run_id=run_id
+            )
         except DomainError:
             logger.exception("кадр %s не прикрепился к занятой записи #%s", file_id, n)
             continue
@@ -70,8 +74,20 @@ async def _attach(chat_id: int, n: int, file_ids: Sequence[str]) -> int:
     return attached
 
 
-async def _rewrite(chat_id: int, taken: domain.Finding, words: str, report_lang: str) -> str:
+async def _rewrite(
+    chat_id: int,
+    taken: domain.Finding,
+    words: str,
+    report_lang: str,
+    *,
+    expected_run_id: str | None = None,
+) -> str:
     """Новый текст записи — или прежний, если свести не вышло. Сбой — в лог."""
+    inspection = read_inspection(chat_id)
+    if inspection is None or (expected_run_id is not None and inspection.run_id != expected_run_id):
+        return taken.text
+    run_id = inspection.run_id if expected_run_id is None else expected_run_id
+    source_revision = domain.finding_revision(taken)
     try:
         with chat_usage(chat_id):
             text = await asyncio.to_thread(merge_wording, taken.text, words, lang=report_lang)
@@ -86,7 +102,14 @@ async def _rewrite(chat_id: int, taken: domain.Finding, words: str, report_lang:
     if text == taken.text:
         return text
     try:
-        await asyncio.to_thread(domain.edit_finding, chat_id, taken.n, text=text)
+        await asyncio.to_thread(
+            domain.edit_finding,
+            chat_id,
+            taken.n,
+            text=text,
+            expected_run_id=run_id,
+            source_revision=source_revision,
+        )
     except DomainError:
         logger.exception(
             "сведённый комментарий записи #%s в чате %s движок не принял — остался прежним",
@@ -107,6 +130,7 @@ async def into_taken(
     lang: str,
     origin: int | None,
     reason: str,
+    expected_run_id: str | None = None,
 ) -> Message | None:
     """Положить кадры в занятую запись, свести её текст и показать её.
 
@@ -115,7 +139,11 @@ async def into_taken(
     """
     item = refusal.item_title(taken.code, lang, chat_id=chat_id)
     place = zone_title(taken.zone, lang, chat_id=chat_id)
-    attached = await _attach(chat_id, taken.n, file_ids)
+    before = read_inspection(chat_id)
+    if before is None or (expected_run_id is not None and before.run_id != expected_run_id):
+        return None
+    run_id = before.run_id if expected_run_id is None else expected_run_id
+    attached = await _attach(chat_id, taken.n, file_ids, run_id=run_id)
     if attached == 0:
         await message.answer(t("record.merge_failed", lang, item=item, zone=place))
         journal.note(
@@ -123,10 +151,20 @@ async def into_taken(
         )
         return None
     inspection = read_inspection(chat_id)
+    if inspection is None or inspection.run_id != run_id:
+        return None
     report_lang = DEFAULT_LANG if inspection is None else inspection.report_lang
-    text = await _rewrite(chat_id, taken, words, report_lang)
+    current = None if inspection is None else inspection.finding(taken.n)
+    if current is None:
+        return None
+    text = await _rewrite(chat_id, current, words, report_lang, expected_run_id=run_id)
     after = read_inspection(chat_id)
-    current = None if after is None else after.finding(taken.n)
+    if after is None or after.run_id != run_id:
+        return None
+    current = after.finding(taken.n)
+    if current is None:
+        return None
+    text = current.text
     # Число кадров — из проверки, а не прибавлением: показанное число обязано
     # быть тем, что уедет в отчёт.
     count = len((current or taken).photos)
@@ -136,8 +174,8 @@ async def into_taken(
     )
     # Это показ записи: ответ словами на него правит её (T204), а кадр ответом
     # на своё сообщение ложится в неё же (T205).
-    remember_shown(chat_id, sent, taken.n)
-    remember_origin(chat_id, origin, taken.n)
+    remember_shown(chat_id, sent, taken.n, expected_run_id=run_id)
+    remember_origin(chat_id, origin, taken.n, expected_run_id=run_id)
     journal.note(
         chat_id,
         "merged",

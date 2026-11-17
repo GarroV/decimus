@@ -51,6 +51,7 @@ def build_pdf(
     allow_missing_photos: bool = False,
     finished_at: datetime | None = None,
     country: str | None = None,
+    source_settings: Settings | None = None,
 ) -> Path:
     """Собрать отчёт по проверке этого чата и вернуть путь к файлу.
 
@@ -72,7 +73,7 @@ def build_pdf(
     ПОСЛЕ отдачи отчёта, и без этого аргумента отчёт вышел бы без конца. `country` —
     страна пиццерии, по ней выбирается часовой пояс; неизвестна — движок печатает UTC.
     """
-    env = settings(chat_id)
+    env = source_settings or settings(chat_id)
     plan = resolve_photos(chat_id, env, fetch_photo)
     if plan.misses and not allow_missing_photos:
         raise PhotoMissing(misses_text(plan.misses), misses=plan.misses)
@@ -147,7 +148,9 @@ class BuiltLetter:
     feedback_lang: str
 
 
-def build_letter_notes(chat_id: int, template: int = 1) -> BuiltLetter:
+def build_letter_notes(
+    chat_id: int, template: int = 1, *, source_settings: Settings | None = None
+) -> BuiltLetter:
     """Собрать письмо партнёру и вернуть вместе с перечнем не вставленного.
 
     Шаблон выбирает движок по наличию D2 и D3: чистая проверка не требует плана
@@ -155,7 +158,7 @@ def build_letter_notes(chat_id: int, template: int = 1) -> BuiltLetter:
     аудитора (D664): 1 — сильные стороны до нарушений, зоны роста после; 2 — обе
     части в конце. Бот собирает шаблон 1.
     """
-    env = settings(chat_id)
+    env = source_settings or settings(chat_id)
     raw = run_report(
         ["letter", f"--template={template}", "--json", *_speech_args(chat_id, env)],
         chat_id=chat_id,
