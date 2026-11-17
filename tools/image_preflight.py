@@ -13,6 +13,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# File execution starts with /app/tools on sys.path, unlike the application's
+# python -m entrypoints. Resolve imports from this image, independent of cwd or
+# editable-install finder behavior.
+sys.path.insert(0, str(ROOT))
 RUNTIME_ID = 10001
 ENTRY_MODULES = {
     "bot": "src.bot.app",

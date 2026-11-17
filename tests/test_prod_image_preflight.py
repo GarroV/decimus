@@ -119,3 +119,53 @@ def test_preflight_imports_each_entry_without_starting_application_main(monkeypa
     monkeypatch.setattr(image_preflight.importlib, "import_module", entry)
     image_preflight.preflight(["bot", "web", "walk", "mcp"])
     assert imported == list(image_preflight.ENTRY_MODULES.values())
+
+
+def test_checker_file_resolves_its_sources_from_an_unrelated_working_directory(tmp_path: Path):
+    image = tmp_path / "image"
+    for name in ("src/bot", "src/web", "src/mcp", "engine", "tools", "checklist-blank"):
+        (image / name).mkdir(parents=True, exist_ok=True)
+    checker = image / "tools/image_preflight.py"
+    shutil.copy(ROOT / "tools/image_preflight.py", checker)
+    (image / "pyproject.toml").write_text("")
+    for name in ("src", "src/bot", "src/web", "src/mcp"):
+        (image / name / "__init__.py").write_text("")
+    entries = (
+        "src/bot/app.py",
+        "src/web/__main__.py",
+        "src/web/walk_main.py",
+        "src/mcp/__main__.py",
+    )
+    for name in entries:
+        (image / name).write_text(
+            "def main():\n raise AssertionError('application must not start')\n"
+        )
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    # Identity is shimmed solely to reach imports; actual UID proof is a Docker check.
+    code = """
+import os,runpy,sys
+from pathlib import Path
+for name in ('getuid','geteuid','getgid','getegid'):
+    setattr(os,name,lambda:10001)
+sys.argv=[sys.argv[1],'bot','web','walk','mcp']
+root=Path(sys.argv[0]).resolve().parents[1]
+try:
+    runpy.run_path(sys.argv[0],run_name='__main__')
+except SystemExit as stopped:
+    if stopped.code:
+        raise
+for name in ('src.bot.app','src.web.__main__','src.web.walk_main','src.mcp.__main__'):
+    assert Path(sys.modules[name].__file__).is_relative_to(root), 'wrong source root'
+"""
+    result = subprocess.run(  # noqa: S603 — copied checker and synthetic packages, no app entry calls
+        [sys.executable, "-c", code, str(checker)],
+        cwd=elsewhere,
+        env={"PATH": os.environ["PATH"], "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.count("import OK") == 4
