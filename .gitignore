@@ -67,6 +67,7 @@ backups/
 
 # Служебный кэш wrangler (данные учётки Cloudflare) — не в git (#449)
 .wrangler/
+front/node_modules/
 
 # Фронт Cloudflare (D431): значения инфраструктуры и собранные из шаблонов конфиги
 front/.deploy.env

@@ -1225,7 +1225,7 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin tree front -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `front/` | 6 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.demo.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
+| `front/` | 8 | .deploy.env.example, deploy.sh, package-lock.json, package.json, wrangler.admin.template.jsonc, wrangler.demo.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
 | `front/src/` | 2 | index.js, proxy.js |
 | `front/test/` | 1 | proxy.test.mjs |
 <!-- map:end -->

@@ -222,7 +222,7 @@ SNI и Host, по которым Caddy выбирает сайт, — его DNS
 вне git); наружу он ничего не публикует и видит только Caddy. **Другого пути
 нет (D521, 16.10.2026):** туннель лёг — Worker отвечает 502 `upstream
 unavailable, please retry` и пишет `tunnel failed` (журналы Worker'ов выключены,
-строку видно только в `npx wrangler tail <имя>`); привязки `EDGE` нет — 503. Сайты
+строку видно только в `./node_modules/.bin/wrangler tail <имя>`); привязки `EDGE` нет — 503. Сайты
 decimus в Caddy (`GarroV/vps-infra: edge/sites/decimus.caddy`) отдают продукт
 только запросу из сети туннеля с верным ключом фронта, всё прочее получает 403 —
 в том числе прямой заход на имя сайта из интернета. До 16.10 при упавшем туннеле
@@ -260,13 +260,16 @@ front/test/proxy.test.mjs` (входит в `tests/test_front_worker.py`). На�
 
 Выкладка, из `front/`:
 
-1. один раз: `cp .deploy.env.example .deploy.env` и вписать значения (ID
+1. до загрузки окружения с доступами: `npm ci --ignore-scripts` (Node.js >=22.12.0).
+   Версия Wrangler и всё дерево закреплены в `package.json` / `package-lock.json`;
+   `deploy.sh` не устанавливает пакеты и отказывает без локального binary;
+2. один раз: `cp .deploy.env.example .deploy.env` и вписать значения (ID
    VPC-сервиса — в панели Cloudflare → Workers VPC; имена сайтов — как в
    `/srv/edge/sites` на VPS);
-2. `./deploy.sh admin` и `./deploy.sh mcp` (лишние аргументы уходят в
+3. `./deploy.sh admin` и `./deploy.sh mcp` (лишние аргументы уходят в
    `wrangler deploy`, например `--dry-run`).
 
-Секрет `FRONT_KEY` задаётся отдельно (`npx wrangler secret put FRONT_KEY -c
+Секрет `FRONT_KEY` задаётся отдельно (`./node_modules/.bin/wrangler secret put FRONT_KEY -c
 wrangler.admin.jsonc`, после первого запуска `deploy.sh`) и выкладкой не
 затирается. Журналы Worker'ов выключены (`observability.enabled: false`): через
 них идут пароли, ключи и тела форм; код их тоже не пишет, в консоль уходит
@@ -283,7 +286,7 @@ wrangler.admin.jsonc`, после первого запуска `deploy.sh`) и 
 D521): новый ключ генерируется в файл (`openssl rand -hex 32`), значение нигде не
 печатается; в сниппете на время смены стоят оба ключа (две строки `header
 X-Decimus-Front-Key …` в одном именованном сопоставителе — Caddy сравнивает их по
-«или»), `caddy reload`; затем `npx wrangler secret put FRONT_KEY -c
+«или»), `caddy reload`; затем `./node_modules/.bin/wrangler secret put FRONT_KEY -c
 wrangler.admin.jsonc < файл` и то же для `wrangler.mcp.jsonc` (значение — со
 стандартного ввода, не аргументом); затем в сниппете остаётся только новый ключ и
 снова `caddy reload` (`docker compose exec caddy caddy reload --config
@@ -347,7 +350,7 @@ Funnel не зависит: `https://decimus-stand.vasiliy-garro.workers.dev`. �
 после него пересоздать звено — `up -d --force-recreate web-link`; автообновление стенда
 делает это само.
 
-**Откат.** `npx wrangler delete -c wrangler.stand.jsonc` в `front/`, удалить файл сайта
+**Откат.** `./node_modules/.bin/wrangler delete -c wrangler.stand.jsonc` в `front/`, удалить файл сайта
 в Caddy и перезагрузить конфиг, на площадке `tailscale serve --tcp=9030 off`.
 
 ## 8.19. Подключение нейросетей входом через сайт (OAuth, D417, D695)

@@ -12,6 +12,14 @@ case "$target" in
   *) echo "usage: $0 admin|mcp|stand|demo [wrangler deploy args]" >&2; exit 2 ;;
 esac
 
+# Установка выполняется отдельно, до загрузки окружения с доступами. Здесь
+# нет npx/npm fallback: исполняется только дерево из package-lock.json.
+wrangler="./node_modules/.bin/wrangler"
+[ -x "$wrangler" ] || {
+  echo "нет локального Wrangler — сначала cd front && npm ci --ignore-scripts" >&2
+  exit 1
+}
+
 [ -f .deploy.env ] || { echo "нет front/.deploy.env — см. .deploy.env.example" >&2; exit 1; }
 set -a
 # shellcheck disable=SC1091
@@ -36,4 +44,4 @@ sed -e "s|<VPC_SERVICE_ID>|$VPC_SERVICE_ID|g" \
 if grep -q '<[A-Z_]*>' <(grep -v '^ *//' "$out"); then
   echo "в $out остались незаполненные заглушки" >&2; exit 1
 fi
-npx wrangler deploy -c "$out" "$@"
+"$wrangler" deploy -c "$out" "$@"
