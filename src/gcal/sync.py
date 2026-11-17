@@ -61,6 +61,7 @@ DEAD_CODES = tuple(sorted(DEAD_GRANT_CODES | {UNREADABLE}))
 STALE_DAYS = 1
 #: Сколько вызовов Google за проход: остальное — следующим. Один проход не должен висеть часами.
 MAX_CALLS_PER_PASS = 60
+BUDGET_EXHAUSTED = "call_budget_exhausted"
 
 
 @dataclass
@@ -73,6 +74,24 @@ class PassResult:
 
 
 LinkFor = Callable[[str], str | None]
+
+
+class _Budget:
+    """Bound physical requests, including token refresh and conflict recovery."""
+
+    def __init__(self, opener: Opener) -> None:
+        self.opener = opener
+        self.used = 0
+
+    @property
+    def exhausted(self) -> bool:
+        return self.used >= MAX_CALLS_PER_PASS
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        if self.exhausted:
+            raise CalendarError(BUDGET_EXHAUSTED)
+        self.used += 1
+        return self.opener(*args, **kwargs)
 
 
 class _Tokens:
@@ -105,6 +124,8 @@ class _Tokens:
         try:
             return access_token(self._keys, refresh, opener=self._opener)
         except CalendarError as сбой:
+            if сбой.code == BUDGET_EXHAUSTED:
+                return None
             if сбой.code in DEAD_GRANT_CODES:
                 self._dead.add(user_id)
             _fail(user_id, сбой.code, mark=сбой.code not in CLIENT_CONFIG_CODES)
@@ -145,23 +166,26 @@ def run_pass(
     if ключи is None:
         logger.info("календарь: нет GOOGLE_CLIENT_ID/SECRET — проход пропущен")
         return результат
-    токены = _Tokens(ключи, opener)
-    вызовов = 0
+    budget = _Budget(opener)
+    токены = _Tokens(ключи, budget)
 
     for сирота in calendar_store.orphans():
-        if вызовов >= MAX_CALLS_PER_PASS:
+        if budget.exhausted:
             return результат
         токен = токены.get(сирота.user_id)
         if токен is None:
+            if budget.exhausted:
+                return результат
             if токены.is_dead(сирота.user_id):
                 # Доступ мёртв насовсем: событие снять нечем, его уберёт сам человек.
                 calendar_store.forget_event(сирота.inspection_id)
             # Временный сбой (сеть, 5xx): запись остаётся до следующего прохода.
             continue
-        вызовов += 1
         try:
-            delete_event(токен, сирота.event_id, opener=opener)
+            delete_event(токен, сирота.event_id, opener=budget)
         except CalendarError as сбой:
+            if сбой.code == BUDGET_EXHAUSTED:
+                return результат
             результат.failed += 1
             _fail(сирота.user_id, сбой.code, inspection_id=сирота.inspection_id, mark=False)
             continue
@@ -176,14 +200,15 @@ def run_pass(
             continue
         if not кандидат.event_id and срок < today - timedelta(days=STALE_DAYS):
             continue
-        if вызовов >= MAX_CALLS_PER_PASS:
+        if budget.exhausted:
             break
         токен = токены.get(кандидат.user_id)
         if токен is None:
+            if budget.exhausted:
+                break
             if кандидат.user_id not in результат.skipped_users:
                 результат.skipped_users.append(кандидат.user_id)
             continue
-        вызовов += 1
         тело = event_body(
             title=название,
             description=_description(link_for(кандидат.inspection_id), кандидат.ui_lang),
@@ -194,11 +219,13 @@ def run_pass(
                 токен,
                 кандидат.event_id,
                 тело,
-                opener,
+                budget,
                 user_id=кандидат.user_id,
                 inspection_id=кандидат.inspection_id,
             )
         except CalendarError as сбой:
+            if сбой.code == BUDGET_EXHAUSTED:
+                break
             результат.failed += 1
             _fail(кандидат.user_id, сбой.code, inspection_id=кандидат.inspection_id, mark=True)
             continue

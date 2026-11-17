@@ -110,6 +110,8 @@ def _call(opener: Opener, запрос: urllib.request.Request) -> dict[str, Any
     try:
         with opener(запрос, timeout=NETWORK_TIMEOUT_SECONDS) as ответ:
             сырое = ответ.read()
+    except CalendarError:
+        raise
     except Exception as сбой:
         raise CalendarError(reason_code(сбой)) from сбой
     if not сырое:

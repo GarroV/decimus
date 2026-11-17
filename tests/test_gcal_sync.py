@@ -468,3 +468,19 @@ def test_event_identity_is_stable_and_scoped():
     assert identity != sync._event_identity("user-b", "inspection-a")
     assert identity != sync._event_identity("user-a", "inspection-b")
     assert len(identity) >= 5 and set(identity) <= set("0123456789abcdefghijklmnopqrstuv")
+
+
+def test_physical_request_budget_includes_tombstone_recovery(база, google, monkeypatch):
+    monkeypatch.setattr(sync, "MAX_CALLS_PER_PASS", 9)
+    for no in range(10):
+        inspection = f"inspection-{no}"
+        база.добавить(inspection, date(2026, 11, 6))
+        identity = sync._event_identity(ЛЮДИ, inspection)
+        for _ in range(3):
+            google.удалённые.add(identity)
+            identity = sync._event_identity(ЛЮДИ, inspection, identity)
+    result = _проход(google)
+    assert len(google.вызовы) == 9
+    assert result.failed == 0
+    assert not база.проблемы and not база.журнал
+    assert not result.skipped_users
