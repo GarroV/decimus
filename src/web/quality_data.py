@@ -708,27 +708,30 @@ def _fold_aggs(months: Sequence[UnitHealth]) -> tuple[AggLine, ...]:
 
 def _fold_unit(months: Sequence[UnitHealth]) -> UnitHealth:
     """Пиццерия за период: показатели — среднее её месяцев (итог — среднее месячных итогов),
-    заказы и выручка — суммы, доли заказов — от сумм. `months` — по порядку, свежий последним."""
+    КР — по числу отзывов, заказы и выручка — суммы, доли заказов — от сумм.
+    `months` — по порядку, свежий последним."""
     last = months[-1]
     orders = q.Orders(
         sum(u.orders.aggregators for u in months),
         sum(u.orders.app_site for u in months),
         sum(u.orders.other for u in months),
     )
+    kr_parts = [u.kr_parts for u in months if u.kr_parts is not None]
+    period_kr = _fold_kr(kr_parts) if kr_parts else None
     values = q.fold_months([u.values for u in months], _SUMMED)
     values.update(
+        kr=_kr(period_kr),
         share_agg=q.share(orders.aggregators, orders.total),
         share_app=q.share(orders.app_site, orders.total),
         share_other=q.share(orders.other, orders.total),
     )
-    kr_parts = [u.kr_parts for u in months if u.kr_parts is not None]
     sources = {u.rating_source for u in months if u.rating_source}
     return UnitHealth(
         dodo_id=last.dodo_id,
         name=last.name,
         country=last.country,
         values=values,
-        kr_parts=_fold_kr(kr_parts) if kr_parts else None,
+        kr_parts=period_kr,
         maps=_fold_maps(months),
         orders=orders,
         revenue=_sum_dicts(u.revenue for u in months),
