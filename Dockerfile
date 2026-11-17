@@ -51,6 +51,14 @@ COPY tools ./tools
 # «Новый чек-лист» в контейнере отказывает «бланк неполный» (#758).
 COPY checklist-blank ./checklist-blank
 
+# Checkout под umask 077 даёт новые исходники 0600 и каталоги 0700.
+# COPY сохраняет режимы и root-владельца: штатный app иначе не прочтёт код.
+# Нормализуем только скопированный код; секретов и изменяемых томов здесь нет.
+# X сохраняет исполняемость скриптов, но не делает исполняемым обычный исходник.
+RUN find /app/src /app/engine /app/tools /app/checklist-blank -type d -exec chmod 0755 {} + \
+    && find /app/src /app/engine /app/tools /app/checklist-blank -type f -exec chmod u=rwX,go=rX {} + \
+    && chmod 0644 /app/pyproject.toml /app/requirements.txt /app/requirements-build.txt
+
 # Зависимости — из lockfile с хэшами (`requirements.txt`, всё дерево продукта,
 # см. GHSA-7gm6-hc9m-w3vc): `--require-hashes` отказывает на любом пакете, чьего хэша нет в
 # файле или не совпал, а транзитивные версии не плавают между сборками. Файл
@@ -93,6 +101,10 @@ RUN groupadd --system --gid 10001 app \
     && mkdir -p /app/state /app/frames /app/methodology \
     && chown app:app /app/state /app/frames /app/methodology
 USER app
+
+# Установка от root не доказывает, что app читает код. До принятия образа
+# проверяем все скопированные файлы и входы приложений фактическим uid/gid.
+RUN python tools/image_preflight.py bot web walk mcp
 
 # Версия сборки (T246, #201). Внутри контейнера нет ни `.git`, ни репозитория,
 # поэтому спросить git о версии некому — значение обязано попасть в образ при

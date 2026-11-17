@@ -1153,6 +1153,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/dodois_import.py` | Перенос нынешнего входа в Dodo IS в базу — разовый, по одной стране (D640b, #951) |
 | `tools/fastpath_measure.py` | T113, T125: доля срабатываний быстрого пути — так, как его зовёт живой бот |
 | `tools/gen_map.py` | Карта кода: перегенерация таблиц в docs/ между маркерами (`make map`, #731) |
+| `tools/image_preflight.py` | Check copied source readability and application imports under the runtime UID |
 | `tools/inspection_release_smoke.py` | Живой смоук перед выездами: демо-вход и экраны, публичные двери прода |
 | `tools/landing_shots.py` | Снимки живых экранов для посадочной страницы (D545) — одной командой |
 | `tools/loadcheck.py` | Замер потолка нагрузки: сколько одновременных проверок продукт держит |

@@ -86,6 +86,15 @@ fi
 step "сборка образа с версией $sha"
 BUILD_SHA="$sha" "${compose[@]}" --profile backup --profile migrate build
 
+# Проверяем каждый собранный образ с его штатным пользователем и окружением
+# ДО первого up: дефект прав или импорта не должен заменить здоровый сервис.
+# --no-deps не поднимает зависимости; entrypoint запускает только проверку,
+# а не бота, сервер или фоновые задания. Сам checker требует uid/gid 10001.
+step "допуск образов от пользователя приложения"
+for service in bot web walk mcp; do
+    "${compose[@]}" run --rm --no-deps --entrypoint python "$service" tools/image_preflight.py "$service"
+done
+
 step "база"
 "${compose[@]}" up -d --wait db
 
