@@ -157,7 +157,9 @@ def test_delivery_failure_is_retried_during_same_red_episode(delivery, failure) 
 
 
 def test_silent_red_runs_carry_forward_last_ack_in_one_lookup(delivery) -> None:
-    result = delivery.run(history={str(i): "fail" for i in range(2000, 1000, -1)})
+    result = delivery.run(
+        history={str(i): "fail" for i in range(2000, 1000, -1)}, GITHUB_RUN_ID="2001"
+    )
     assert result.returncode == 0, result.stderr
     assert delivery.calls == []
     assert delivery.outputs == {"state": "fail", "source": "carried", "delivered": "false"}
@@ -199,7 +201,9 @@ def test_github_api_error_never_sends_or_advances_state(delivery, operation) -> 
 
 @pytest.mark.parametrize("failed", [True, False])
 def test_history_queries_are_bounded_without_losing_red_retry(delivery, failed) -> None:
-    result = delivery.run(history={str(i): "pending" for i in range(100, 60, -1)}, failed=failed)
+    result = delivery.run(
+        history={str(i): "pending" for i in range(100, 60, -1)}, failed=failed, GITHUB_RUN_ID="101"
+    )
     assert len([call for call in delivery.gh_calls if call[0] == "api"]) == 20
     if failed:
         assert result.returncode == 0
@@ -242,3 +246,41 @@ def test_receipt_and_checkpoint_require_successful_delivery_step(workflow, job) 
     assert steps[2]["if"] == "success() && steps.delivery.outputs.state != ''"
     assert definition["jobs"][job]["permissions"] == {"actions": "read"}
     assert all("uses" not in step for step in steps), "notification job must not checkout code"
+
+
+def test_delayed_older_red_run_cannot_override_newer_delivered_recovery(delivery) -> None:
+    # B completes first and delivers recovery from an acknowledged red episode.
+    newer = delivery.run(history={"100": "fail"}, failed=False, GITHUB_RUN_ID="102")
+    assert newer.returncode == 0, newer.stderr
+    assert len(delivery.calls) == 1
+    assert delivery.outputs["state"] == "ok" and delivery.outputs["delivered"] == "true"
+    # Delayed pending A starts only after B has completed. Its old result must
+    # neither send a new red message nor overwrite B's state checkpoint.
+    older = delivery.run(history={"102": "ok", "100": "fail"}, GITHUB_RUN_ID="101")
+    assert older.returncode == 0, older.stderr
+    assert delivery.calls == []
+    assert delivery.outputs == {}
+    assert not any(call[0] == "api" for call in delivery.gh_calls)
+
+
+def test_rerunning_an_old_run_is_stale_even_with_its_own_previous_receipt(delivery) -> None:
+    result = delivery.run(
+        history={"102": "ok", "101": "ack-fail"}, GITHUB_RUN_ID="101", GITHUB_RUN_ATTEMPT="2"
+    )
+    assert result.returncode == 0, result.stderr
+    assert delivery.calls == []
+    assert delivery.outputs == {}
+
+
+def test_new_run_reads_newest_chronological_checkpoint_from_unordered_history(delivery) -> None:
+    # Delivery completion order or an old rerun must not select an older state.
+    result = delivery.run(
+        history={"100": "fail", "102": "ok", "101": "pending"},
+        failed=False,
+        GITHUB_RUN_ID="103",
+    )
+    assert result.returncode == 0, result.stderr
+    assert delivery.calls == []
+    assert delivery.outputs == {"state": "ok", "source": "carried", "delivered": "false"}
+    api_calls = [call for call in delivery.gh_calls if call[0] == "api"]
+    assert len(api_calls) == 1 and "/runs/102/jobs" in api_calls[0][1]

@@ -161,7 +161,17 @@ jobs:
           # A failed send leaves no checkpoint; retry on the next scheduled/main run.
           was=unknown; source=unknown; looked=0
           runs=$(gh run list --workflow "$ALERT_WORKFLOW" --branch "$GITHUB_REF_NAME" --event "$GITHUB_EVENT_NAME" \
-            --status completed -L 20 --json databaseId -q '.[].databaseId')
+            --status completed -L 20 --json databaseId -q 'sort_by(.databaseId) | reverse | .[].databaseId')
+          # Pending jobs/reruns can start out of order despite serialization.
+          # A completed newer run supersedes this result, including its checkpoint.
+          [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ ]] || { echo "::error::Некорректный ID прогона."; exit 1; }
+          for run_id in $runs; do
+            [[ "$run_id" =~ ^[0-9]+$ ]] || { echo "::error::Некорректная история Actions."; exit 1; }
+            if [ "$run_id" -gt "$GITHUB_RUN_ID" ]; then
+              echo "Более новый прогон уже завершён — устаревший результат пропущен."
+              exit 0
+            fi
+          done
           if [ -z "$runs" ]; then was=ok; source=migration-baseline; fi
           # A rerun may already have a receipt in an earlier attempt of THIS run.
           if [ "${GITHUB_RUN_ATTEMPT:-1}" -gt 1 ]; then runs="$GITHUB_RUN_ID $runs"; fi
