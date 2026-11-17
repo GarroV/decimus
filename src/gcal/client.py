@@ -50,6 +50,7 @@ DEAD_GRANT_CODES = frozenset({"invalid_grant"})
 CLIENT_CONFIG_CODES = frozenset({"invalid_client", "unauthorized_client"})
 #: Коды, когда события уже нет в календаре (человек удалил сам): причина из тела ответа или
 #: код ответа, если тела нет.
+DUPLICATE_CODES = frozenset({"duplicate", "http_409"})
 GONE_CODES = frozenset({"notFound", "deleted", "http_404", "http_410"})
 
 Opener = Callable[..., Any]
@@ -180,7 +181,8 @@ def _event_request(
     if event_id is not None:
         адрес += "/" + urllib.parse.quote(event_id, safe="")
     # Письма никому не уходят ни при каком исходе: гостей нет, и сам запрос это говорит.
-    адрес += "?" + urllib.parse.urlencode({"sendUpdates": "none"})
+    if method != "GET":
+        адрес += "?" + urllib.parse.urlencode({"sendUpdates": "none"})
     return urllib.request.Request(  # noqa: S310
         адрес,
         data=None if body is None else json.dumps(body).encode(),
@@ -196,7 +198,16 @@ def create_event(
     номер = _call(opener, _event_request(token, "POST", body)).get("id")
     if not isinstance(номер, str) or not номер:
         raise CalendarError("no_event_id")
+    if body.get("id") is not None and номер != body["id"]:
+        raise CalendarError("event_id_mismatch")
     return номер
+
+
+def get_event(
+    token: str, event_id: str, *, opener: Opener = urllib.request.urlopen
+) -> dict[str, Any]:
+    """Read the precise object before recovering a create conflict."""
+    return _call(opener, _event_request(token, "GET", None, event_id))
 
 
 def update_event(

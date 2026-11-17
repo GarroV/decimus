@@ -21,6 +21,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import urllib.request
 from collections.abc import Callable
@@ -35,6 +37,7 @@ from src.domain.report_deadline import event_title, report_due_date
 from .client import (
     CLIENT_CONFIG_CODES,
     DEAD_GRANT_CODES,
+    DUPLICATE_CODES,
     GONE_CODES,
     CalendarError,
     ClientKeys,
@@ -43,6 +46,7 @@ from .client import (
     create_event,
     delete_event,
     event_body,
+    get_event,
     keys_from_env,
     update_event,
 )
@@ -186,7 +190,14 @@ def run_pass(
             due=срок,
         )
         try:
-            номер, создано = _push(токен, кандидат.event_id, тело, opener)
+            номер, создано = _push(
+                токен,
+                кандидат.event_id,
+                тело,
+                opener,
+                user_id=кандидат.user_id,
+                inspection_id=кандидат.inspection_id,
+            )
         except CalendarError as сбой:
             результат.failed += 1
             _fail(кандидат.user_id, сбой.code, inspection_id=кандидат.inspection_id, mark=True)
@@ -202,15 +213,61 @@ def run_pass(
     return результат
 
 
+def _event_identity(user_id: str, inspection_id: str, predecessor: str = "") -> str:
+    # Hex is a subset of Calendar's base32hex alphabet (0-9, a-v).
+    source = json.dumps(["decimus-calendar-v1", user_id, inspection_id, predecessor])
+    return "d" + hashlib.sha256(source.encode()).hexdigest()
+
+
 def _push(
-    token: str, event_id: str | None, body: dict[str, Any], opener: Opener
+    token: str,
+    event_id: str | None,
+    body: dict[str, Any],
+    opener: Opener,
+    *,
+    user_id: str,
+    inspection_id: str,
 ) -> tuple[str, bool]:
-    """Создать событие или сдвинуть имеющееся. Пропавшее из календаря пересоздаётся."""
+    """Keep creation identity across failed DB writes and lost HTTP responses."""
     if event_id:
         try:
             update_event(token, event_id, body, opener=opener)
             return event_id, False
-        except CalendarError as сбой:
-            if сбой.code not in GONE_CODES:
+        except CalendarError as exc:
+            if exc.code not in GONE_CODES:
                 raise
-    return create_event(token, body, opener=opener), True
+    owner = _event_identity(user_id, inspection_id)
+    desired = _event_identity(user_id, inspection_id, event_id or "")
+    # Deleted IDs can remain tombstones. Successors are deterministic too, so
+    # failed remember_event never turns a replacement into another new event.
+    for _ in range(8):
+        payload = {**body, "id": desired, "extendedProperties": {"private": {"decimus": owner}}}
+        try:
+            return create_event(token, payload, opener=opener), True
+        except CalendarError as exc:
+            if exc.code not in DUPLICATE_CODES:
+                raise
+        try:
+            existing = get_event(token, desired, opener=opener)
+        except CalendarError as exc:
+            if exc.code not in GONE_CODES:
+                raise
+            desired = _event_identity(user_id, inspection_id, desired)
+            continue
+        if existing.get("status") == "cancelled":
+            desired = _event_identity(user_id, inspection_id, desired)
+            continue
+        properties = existing.get("extendedProperties")
+        private = properties.get("private") if isinstance(properties, dict) else None
+        organizer = existing.get("organizer")
+        if (
+            existing.get("id") != desired
+            or not isinstance(private, dict)
+            or private.get("decimus") != owner
+            or not isinstance(organizer, dict)
+            or organizer.get("self") is not True
+        ):
+            raise CalendarError("event_identity_conflict")
+        update_event(token, desired, body, opener=opener)
+        return desired, False
+    raise CalendarError("event_tombstone_limit")
