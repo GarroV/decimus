@@ -231,7 +231,9 @@ async def archive(
             )
     except db.ConfigError as exc:
         logger.info("проверка чата %s не сливается в историю: %s", log_id(chat_id), exc)
-        return True
+        # Legacy callers may intentionally operate without a database. A durable
+        # delivery must remain pending until its required archive really succeeds.
+        return source_settings is None
     except db.VersionMismatchError as exc:
         # Расхождение версии методики — не отказ базы (T182, задача #149). Связь
         # цела, строка не легла из-за того, что методику переиздали между итогом
@@ -293,6 +295,7 @@ async def archive(
         )
     except db.ConfigError as exc:
         logger.info("кадры проверки чата %s не выгружаются: %s", log_id(chat_id), exc)
+        return False
     except db.PhotosDeferredError as exc:
         # Хранилище лежит (#459, D259: оно на MUSPELHEIM, а тот засыпает).
         # Проверка в истории, кадры в базе строками без ссылки — их дольёт
@@ -332,6 +335,7 @@ async def archive(
         stored = await asyncio.to_thread(db.upload_report, inspection_id, data=data)
     except db.ConfigError as exc:
         logger.info("отчёт проверки чата %s не выгружается: %s", log_id(chat_id), exc)
+        return False
     except (db.DbError, OSError):
         logger.exception("выгрузка отчёта проверки чата %s не удалась", log_id(chat_id))
         return False
