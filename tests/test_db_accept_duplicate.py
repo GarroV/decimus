@@ -108,3 +108,61 @@ def test_тот_же_набор_далеко_по_дате_не_повтор(с�
     ответ = _принять(хранилище, вторая, "2026-11-09")
 
     assert ответ["id"] == вторая
+
+
+def test_parallel_duplicates_require_explicit_confirmation(
+    сеть: None, хранилище: Store, pg_dsn: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Второй accept ждёт commit первого, затем видит принятый дубль."""
+    from concurrent.futures import ThreadPoolExecutor
+    from contextvars import copy_context
+    from threading import Event
+    from time import monotonic, sleep
+
+    from src.db import accept
+
+    first = _проверка(хранилище, "2026-11-02")
+    second = _проверка(хранилище, "2026-11-09")
+    checked, release = Event(), Event()
+    original = accept._refuse_duplicate
+
+    def hold_first(cur: Any, ident: str) -> None:
+        original(cur, ident)
+        if ident == first:
+            checked.set()
+            assert release.wait(15), "first acceptance was not released"
+
+    monkeypatch.setattr(accept, "_refuse_duplicate", hold_first)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        a = executor.submit(copy_context().run, _принять, хранилище, first, "2026-11-02")
+        try:
+            assert checked.wait(10)
+            b = executor.submit(copy_context().run, _принять, хранилище, second, "2026-11-09")
+            deadline = monotonic() + 5
+            waiting = False
+            with psycopg.connect(pg_dsn, autocommit=True) as conn:
+                while monotonic() < deadline and not b.done():
+                    waiting = bool(
+                        conn.execute(
+                            "select count(*) from pg_stat_activity "
+                            "where datname = current_database() and wait_event = 'advisory'"
+                        ).fetchone()[0]
+                    )
+                    if waiting:
+                        break
+                    sleep(0.02)
+            assert waiting, "parallel acceptance bypassed the unit lock"
+        finally:
+            release.set()
+        assert a.result(timeout=15)["id"] == first
+        with pytest.raises(ToolError, match="повторяет принятую"):
+            b.result(timeout=15)
+    with psycopg.connect(pg_dsn) as conn:
+        statuses = dict(
+            conn.execute(
+                "select id::text, status from inspections where id = any(%s::uuid[])",
+                ([first, second],),
+            ).fetchall()
+        )
+    assert statuses == {first: "finalized", second: "draft"}
+    assert _принять(хранилище, second, "2026-11-09", confirm_duplicate=True)["id"] == second
