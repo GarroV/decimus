@@ -410,3 +410,62 @@ async def test_photo_archive_error_keeps_durable_evidence(domain_env, monkeypatc
         )
         is False
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["merge", "rewrite", "correct"])
+async def test_delayed_callee_cannot_adopt_already_replaced_run(domain_env, monkeypatch, operation):
+    from src.bot.routers import correct
+    from src.recognize.revise import Revision
+
+    source = start()
+    target = replace_run()
+    assert domain.finding_revision(source.findings[0]) == domain.finding_revision(
+        target.findings[0]
+    )
+    calls = []
+
+    def model(*args, **kwargs):
+        calls.append(True)
+        return "Stale model text"
+
+    async def revise(*args, **kwargs):
+        calls.append(True)
+        return Revision("wording", "Stale model text")
+
+    monkeypatch.setattr(merged, "merge_wording", model)
+    monkeypatch.setattr(correct, "_revision", revise)
+    bot, _ = make_bot()
+    message = text_message("Old words").as_(bot)
+    if operation == "merge":
+        await merged.into_taken(
+            message,
+            CHAT_ID,
+            source.findings[0],
+            file_ids=("old-photo",),
+            words="Old words",
+            lang="ru",
+            origin=1,
+            reason="synthetic duplicate",
+            expected_run_id=source.run_id,
+        )
+    elif operation == "rewrite":
+        await merged._rewrite(
+            CHAT_ID,
+            source.findings[0],
+            "Old words",
+            "ru",
+            expected_run_id=source.run_id,
+        )
+    else:
+        await correct._revise(
+            message,
+            CHAT_ID,
+            source.findings[0],
+            "Old words",
+            lang="ru",
+            report_lang="ru",
+            expected_run_id=source.run_id,
+        )
+    assert not calls
+    assert domain.get_state(CHAT_ID).findings[0] == target.findings[0]

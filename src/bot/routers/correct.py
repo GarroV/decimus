@@ -166,6 +166,7 @@ async def _revise(
     *,
     lang: str,
     report_lang: str,
+    expected_run_id: str | None = None,
 ) -> bool:
     """Правка текста той же записи (D294). Возврат — обработан ли ответ.
 
@@ -175,9 +176,9 @@ async def _revise(
     """
     n = finding.n
     inspection = read_inspection(chat_id)
-    if inspection is None:
+    if inspection is None or (expected_run_id is not None and inspection.run_id != expected_run_id):
         return True
-    run_id = inspection.run_id
+    run_id = inspection.run_id if expected_run_id is None else expected_run_id
     source_revision = domain.finding_revision(finding)
     revision = await _revision(chat_id, finding, note, report_lang)
     if revision is None:
@@ -278,7 +279,13 @@ def build_correct_router(*, pending: PendingStore) -> Router:
             return
         finding = inspection.finding(n)
         if finding is not None and await _revise(
-            message, chat_id, finding, note, lang=lang, report_lang=inspection.report_lang
+            message,
+            chat_id,
+            finding,
+            note,
+            lang=lang,
+            report_lang=inspection.report_lang,
+            expected_run_id=inspection.run_id,
         ):
             return
 

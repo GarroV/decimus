@@ -1631,6 +1631,7 @@ async def _save(
                 lang=lang,
                 origin=origin,
                 reason=str(exc),
+                expected_run_id=expected_run_id,
             )
         # Отказ движка разбирается, а не пересказывается (T127): пункт и зона
         # называются по-человечески, а занятая пара «пункт + зона» без кадров

@@ -74,12 +74,19 @@ async def _attach(
     return attached
 
 
-async def _rewrite(chat_id: int, taken: domain.Finding, words: str, report_lang: str) -> str:
+async def _rewrite(
+    chat_id: int,
+    taken: domain.Finding,
+    words: str,
+    report_lang: str,
+    *,
+    expected_run_id: str | None = None,
+) -> str:
     """Новый текст записи — или прежний, если свести не вышло. Сбой — в лог."""
     inspection = read_inspection(chat_id)
-    if inspection is None:
+    if inspection is None or (expected_run_id is not None and inspection.run_id != expected_run_id):
         return taken.text
-    run_id = inspection.run_id
+    run_id = inspection.run_id if expected_run_id is None else expected_run_id
     source_revision = domain.finding_revision(taken)
     try:
         with chat_usage(chat_id):
@@ -123,6 +130,7 @@ async def into_taken(
     lang: str,
     origin: int | None,
     reason: str,
+    expected_run_id: str | None = None,
 ) -> Message | None:
     """Положить кадры в занятую запись, свести её текст и показать её.
 
@@ -132,9 +140,9 @@ async def into_taken(
     item = refusal.item_title(taken.code, lang, chat_id=chat_id)
     place = zone_title(taken.zone, lang, chat_id=chat_id)
     before = read_inspection(chat_id)
-    if before is None:
+    if before is None or (expected_run_id is not None and before.run_id != expected_run_id):
         return None
-    run_id = before.run_id
+    run_id = before.run_id if expected_run_id is None else expected_run_id
     attached = await _attach(chat_id, taken.n, file_ids, run_id=run_id)
     if attached == 0:
         await message.answer(t("record.merge_failed", lang, item=item, zone=place))
@@ -149,7 +157,7 @@ async def into_taken(
     current = None if inspection is None else inspection.finding(taken.n)
     if current is None:
         return None
-    text = await _rewrite(chat_id, current, words, report_lang)
+    text = await _rewrite(chat_id, current, words, report_lang, expected_run_id=run_id)
     after = read_inspection(chat_id)
     if after is None or after.run_id != run_id:
         return None
