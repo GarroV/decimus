@@ -488,3 +488,35 @@ def test_first_enrollment_session_can_add_parallel_keys(люди: Люди) -> N
     with ThreadPoolExecutor(max_workers=4) as pool:
         keys = list(pool.map(enroll, range(4)))
     assert {key.id for key in sf.status_of(uid).passkeys} == {key.id for key in keys}
+
+
+def test_closed_session_cannot_finish_key_setup(люди: Люди) -> None:
+    """Завершение настройки проверяет действительность исходной сессии."""
+    account = authenticate("anna", ПАРОЛЬ)
+    assert account is not None
+    previous = open_session(account)
+    current = open_session(account)
+    original = resolve_session(previous.token)
+    assert original is not None and original.signed_in_at is not None
+    assert sf.begin_totp(account.id, new_totp_secret())
+    assert sf.confirm_totp(
+        account.id, step=2000, keep_session_id=current.session_id, only_if_first=True
+    )
+    assert resolve_session(previous.token) is None
+    with pytest.raises(sf.FactorProofRequiredError):
+        sf.add_passkey(
+            account.id,
+            keep_session_id=previous.session_id,
+            enrollment_since=original.signed_in_at,
+            **_ключ("anna"),  # type: ignore[arg-type]
+        )
+    assert sf.status_of(account.id).passkeys == ()
+    # Та же настройка из действующей сессии по-прежнему завершается.
+    sf.add_passkey(
+        account.id,
+        keep_session_id=current.session_id,
+        enrollment_since=original.signed_in_at,
+        **_ключ("anna", 2),  # type: ignore[arg-type]
+    )
+    assert len(sf.status_of(account.id).passkeys) == 1
+    assert resolve_session(current.token) is not None

@@ -354,9 +354,22 @@ def add_passkey(
     `enrollment_since` — вход без доказательства ступени: допустимы только
     способы, подключённые не раньше этого входа. Проверяется под тем же замком,
     что запись, иначе изменение факторов после чтения открывает обход.
+    Переданный `keep_session_id` должен оставаться действующим в момент записи.
     """
     with _connected("записать ключ доступа") as conn, conn.cursor() as cur:
         _take_first_slot(cur, user_id, only_if_first=only_if_first)
+        if keep_session_id is not None:
+            # A first-factor setup in another session may have closed this
+            # session while its registration response was being verified.
+            # Recheck under the same account lock before persisting the key.
+            cur.execute(
+                "select 1 from web_sessions s join web_users u on u.id = s.user_id"
+                " where s.id = %s and s.user_id = %s and s.closed_at is null"
+                " and s.expires_at > clock_timestamp() and u.disabled_at is null",
+                (keep_session_id, user_id),
+            )
+            if cur.fetchone() is None:
+                raise FactorProofRequiredError(user_id)
         if enrollment_since is not None and not _factors_all_newer_than(
             cur, user_id, enrollment_since
         ):
