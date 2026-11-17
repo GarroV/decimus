@@ -671,6 +671,7 @@
 | `0129_calendar_deadline.sql` | `calendar_grants`, `calendar_events` |
 | `0130_close_invariants.sql` | — |
 | `0131_mailing_templates_lang.sql` | — |
+| `0132_photo_backfill_fairness.sql` | — |
 <!-- map:end -->
 
 ## Makefile

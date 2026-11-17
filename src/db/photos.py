@@ -78,13 +78,22 @@ where id = %s and storage_path is null
 #: идут: кадр, который телеграм не отдаёт неделями, иначе вечно занимал бы
 #: место в выборке (ревью #514).
 _SELECT_ALL_PENDING_SQL = """
+with pending as materialized (
+    select id from photos
+    where storage_path is null and purged_at is null
+      and created_at < now() - make_interval(secs => %(min_age)s)
+      and (%(max_age)s::float8 is null or created_at >= now() - make_interval(secs => %(max_age)s))
+    order by backfill_attempted_at nulls first, created_at, id
+    limit %(limit)s
+    for update skip locked
+), claimed as (
+    update photos p set backfill_attempted_at = clock_timestamp()
+    from pending where p.id = pending.id
+    returning p.inspection_id, p.telegram_file_id, p.created_at, p.id
+)
 select inspection_id, telegram_file_id, created_at
-from photos
-where storage_path is null and purged_at is null
-  and created_at < now() - make_interval(secs => %(min_age)s)
-  and (%(max_age)s::float8 is null or created_at >= now() - make_interval(secs => %(max_age)s))
+from claimed
 order by created_at, id
-limit %(limit)s
 """
 
 _INSPECTION_EXISTS_SQL = "select 1 from inspections where id = %s"
@@ -120,7 +129,8 @@ class PendingUpload:
     waiting_since: datetime
 
 
-#: Сколько кадров брать за один проход дозагрузки. Остаток возьмёт следующий.
+#: Сколько кадров брать за один проход дозагрузки. Следующий берёт те, которые
+#: не пробовали дольше всего: постоянный отказ в начале не заслоняет хвост.
 PENDING_BATCH = 1000
 
 
@@ -132,6 +142,10 @@ def pending_photo_uploads(
     Читает только базу: хранилище здесь не трогается, поэтому ответ есть и
     тогда, когда оно лежит, — и это ровно тот момент, когда он нужен.
     `max_age_sec` отрезает застарелые кадры (у них свой, редкий проход).
+    Пакет атомарно отмечается временем попытки ещё до скачивания. Следующий
+    проход начинает с кадров без попыток, затем с наиболее давней попыткой.
+    Отказ или падение процесса не теряет кадр и не блокирует его навсегда;
+    параллельная выборка пропускает ещё заблокированные строки.
     """
     settings = check_environment()
     params = {"min_age": min_age_sec, "max_age": max_age_sec, "limit": limit}
