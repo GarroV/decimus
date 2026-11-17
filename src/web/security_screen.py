@@ -118,7 +118,7 @@ def may_remove(account: Any, *, now: datetime | None = None) -> bool:
 
 
 def may_change(account: Any, *, now: datetime | None = None) -> bool:
-    """Подключать приложение и выпускать резервные коды (D485).
+    """Подключать способы входа и выпускать резервные коды (D485).
 
     Нет способов — достаточно свежего входа (первый способ). Способ УЖЕ есть — сессии, которой
     хватило Google или пароля, нельзя: угнанная почта не должна выпускать себе коды и
@@ -127,8 +127,10 @@ def may_change(account: Any, *, now: datetime | None = None) -> bool:
     """
     if not is_fresh(account, now=now):
         return False
-    if not bool(getattr(account, "has_second_factor", False)) or may_remove(account, now=now):
+    if may_remove(account, now=now):
         return True
+    # Состояние факторов могло измениться после опознания сессии: отсутствие
+    # способа в account не разрешает пропустить актуальную проверку базы.
     since = getattr(account, "signed_in_at", None)
     return since is not None and store.factors_all_newer_than(account.id, since)
 
@@ -259,9 +261,9 @@ def install(app: Flask, conf: Settings) -> None:
         account = _me()
         if party is None:
             return jsonify(error="off"), 400
-        if not is_fresh(account):
-            return _stale_response(json_body=True)
         try:
+            if not may_change(account):
+                return _stale_response(json_body=True)
             ключи = store.status_of(account.id).passkeys
             if len(ключи) >= MAX_PASSKEYS:
                 return jsonify(error="limit"), 409
@@ -290,12 +292,12 @@ def install(app: Flask, conf: Settings) -> None:
         account = _me()
         if party is None:
             return jsonify(error="off"), 400
-        if not is_fresh(account):
-            return _stale_response(json_body=True)
-        тело = request.get_json(silent=True)
-        if not isinstance(тело, dict) or not isinstance(тело.get("credential"), dict):
-            return jsonify(error="bad"), 400
         try:
+            if not may_change(account):
+                return _stale_response(json_body=True)
+            тело = request.get_json(silent=True)
+            if not isinstance(тело, dict) or not isinstance(тело.get("credential"), dict):
+                return jsonify(error="bad"), 400
             вызов = store.take_challenge(
                 auth.current_session_token(), purpose=store.PURPOSE_REGISTER, user_id=account.id
             )
@@ -316,10 +318,12 @@ def install(app: Flask, conf: Settings) -> None:
                 transports=новое.transports,
                 name=имя,
                 keep_session_id=account.session_id,
-                only_if_first=not bool(getattr(account, "has_second_factor", False)),
+                # Повторить допуск под замком записи: предварительные чтения
+                # могли устареть. Эта же сессия вправе продолжить первый setup.
+                enrollment_since=(None if account.passed_second_step else account.signed_in_at),
             )
-        except store.NotFirstFactorError:
-            return jsonify(error="limit"), 409
+        except store.FactorProofRequiredError:
+            return _stale_response(json_body=True)
         except webauthn_rp.PasskeyError:
             return jsonify(error="failed"), 400
         except DbError as exc:

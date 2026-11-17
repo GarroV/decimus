@@ -432,3 +432,59 @@ def test_два_параллельных_первых_ключа_записыв�
             исходы = list(пул.map(попытка, [круг * 10 + i for i in range(4)]))
         assert sum(исходы) == 1, f"«первым» записалось {sum(исходы)} способов: {исходы}"
         assert len(sf.status_of(uid).passkeys) == 1
+
+
+def test_unproved_key_checks_factor_after_waiting_for_account_lock(люди: Люди) -> None:
+    """Фактор в конкурирующей транзакции виден до допуска записи, а не после него."""
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import UTC, datetime, timedelta
+
+    uid = люди.ид["dev"]
+    since = datetime.now(UTC)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with psycopg.connect(люди.dsn) as conn:
+            conn.execute(
+                "select pg_advisory_xact_lock(%s, hashtext(%s))", (sf.ADVISORY_NAMESPACE, uid)
+            )
+            conn.execute(
+                "insert into web_totp(user_id, secret, confirmed_at) values (%s, %s, %s)",
+                (uid, new_totp_secret(), since - timedelta(hours=1)),
+            )
+            pending = pool.submit(sf.add_passkey, uid, enrollment_since=since, **_ключ("dev"))
+            try:
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    waiting = conn.execute(
+                        "select exists(select 1 from pg_stat_activity"
+                        " where datname = current_database() and wait_event = 'advisory'"
+                        " and pid <> pg_backend_pid())"
+                    ).fetchone()
+                    if waiting and waiting[0]:
+                        break
+                    assert not pending.done(), "запись не дождалась замка учётки"
+                    time.sleep(0.02)
+                else:
+                    pytest.fail("не наблюдалось ожидание замка учётки")
+            finally:
+                conn.commit()
+        with pytest.raises(sf.FactorProofRequiredError):
+            pending.result(timeout=10)
+    assert sf.status_of(uid).passkeys == ()
+    assert sf.status_of(uid).totp_confirmed
+
+
+def test_first_enrollment_session_can_add_parallel_keys(люди: Люди) -> None:
+    """Продолжение первого подключения не превращается в запрет второй записи."""
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import UTC, datetime
+
+    uid = люди.ид["dev"]
+    since = datetime.now(UTC)
+
+    def enroll(n: int) -> sf.Passkey:
+        return sf.add_passkey(uid, enrollment_since=since, **_ключ("dev", n))
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        keys = list(pool.map(enroll, range(4)))
+    assert {key.id for key in sf.status_of(uid).passkeys} == {key.id for key in keys}
