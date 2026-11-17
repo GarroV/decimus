@@ -76,3 +76,24 @@ async def test_редкий_проход_по_застарелым_идёт_ра
         await photo_backfill.backfill_forever(bot=None)  # type: ignore[arg-type]
 
     assert вызовы == [False, True, False, False], "редкий проход не раз в сутки"
+
+
+@pytest.mark.parametrize("malformed", [False, True])
+async def test_archive_configuration_failure_does_not_stop_photo_queue(monkeypatch, malformed):
+    from src.bot import finish_archive
+    from src.domain.errors import ConfigError, DomainError
+
+    calls = _подменить(monkeypatch, [ПУСТО] * 3, кругов=2)
+    archive_calls = []
+
+    async def unavailable():
+        archive_calls.append(True)
+        if malformed:
+            raise DomainError("Synthetic malformed archive state")
+        raise ConfigError("Synthetic missing archive configuration")
+
+    monkeypatch.setattr(finish_archive, "retry_once", unavailable)
+    with pytest.raises(_Хватит):
+        await photo_backfill.backfill_forever(bot=None)
+    assert len(archive_calls) == 2
+    assert len(calls) == 3

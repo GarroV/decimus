@@ -337,7 +337,9 @@ def test_память_бота_о_прежней_проверке_не_дост�
     start_inspection(АУДИТОР, unit="Podgorica-2", kind="planned", report_lang="en")
     pending = PendingStore(run_id)
     store = MaterialStore(run_id)
-    pending.propose(АУДИТОР, Proposal(file_ids=("f1",), source="comment", slot=1), at=10)
+    pending.propose(
+        АУДИТОР, Proposal(file_ids=("f1",), source="comment", slot=1, run_id=run_id(АУДИТОР)), at=10
+    )
     store.queue(АУДИТОР).hold_comment(Comment(text="слово старой"))
     assert pending.proposal(АУДИТОР, at=10) is not None, "до старта предложение живо"
 
