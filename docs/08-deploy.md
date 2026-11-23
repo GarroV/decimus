@@ -281,6 +281,20 @@ CSV рейтингов — 500 000 (`docs/15-ratings.md`).
 После штатного восстановления таймер снимается. Это разовое разрешение
 владельца, общее ночное окно не отменено.
 
+### Целевой накат веба 23.11.2026 (D777)
+
+Пакет D776 не менял схему, бота, MCP или обход. По команде владельца «кати сейчас»
+обновлены только `web` продакшена и `web` демо: source/leak-check, `build web`,
+`image_preflight.py web`, затем `up -d --no-deps --no-build --pull never --wait web`.
+Прод использовал штатный `.git/prod-update.lock`, демо — `/tmp/decimus-demo-reset.lock`.
+Полный сброс демо и миграции не выполнялись. Ночное окно в целом не отменено.
+
+Резерв: `~/.local/state/decimus/rollbacks/country-20261123-prod/` и
+`country-20261123-demo/`: manifest, прежний web-образ и `rollback.yaml`; в проде
+также дамп базы, проверенный `pg_restore --list`. Вернуть только веб — штатный
+compose с этим `rollback.yaml`, `up -d --no-deps --no-build --pull never --wait web`.
+Бот и текущие обходы при выкладке не перезапускались.
+
 ## Откат
 
 Автоматического отката нет: `scripts/prod-update.sh` только едет вперёд, и `git checkout` старого коммита его не вернёт —
