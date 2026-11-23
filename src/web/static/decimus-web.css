@@ -2353,3 +2353,11 @@ html[data-nav-collapsed="true"] .sidenav__fold svg { transform: rotate(180deg); 
 .cbar__summary { font-size: var(--fs-dense); color: var(--ink-2); }
 .cbar__summary strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 .cbar__tools { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+
+/* Immediate acknowledgement while the selected page is being requested. */
+.navigation-status { position: fixed; top: var(--space-4); right: var(--space-4); z-index: 1000;
+  padding: var(--space-3) var(--space-5); border: 1px solid var(--line-2); border-radius: var(--r-control);
+  background: var(--surface); color: var(--ink); font-size: var(--fs-dense); }
+.navigation-status[hidden] { display: none; }
+.is-navigating, .is-navigating a { cursor: progress; }
+.sidenav__list a.is-pending { outline: 2px solid var(--accent); outline-offset: -2px; }

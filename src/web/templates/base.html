@@ -83,6 +83,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-web.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-pick.css') }}">
   {#- Стили одного раздела — только на его страницах (рейтинги: decimus-rt.css). -#}
+  <script data-shell src="{{ url_for('static', filename='navigation-state.js') }}" defer></script>
   {% block head %}{% endblock %}
   <script data-shell src="{{ url_for('static', filename='pick.js') }}" defer></script>
   <script data-shell src="{{ url_for('static', filename='period.js') }}" defer></script>
@@ -92,6 +93,7 @@
   <script data-shell src="{{ url_for('static', filename='photo-zoom.js') }}" defer></script>
 </head>
 <body>
+  <div class="navigation-status" data-navigation-status role="status" aria-live="polite" hidden>{{ t('navigation.loading') }}</div>
   {% if demo_mode %}
     {# Стенд открытого демо (D524): на каждой странице видно, что данные выдуманные. #}
     <div class="demo-bar" role="note">

@@ -139,7 +139,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/country.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
 | `src/web/country_contacts_actions.py` | Validated country-contact writes; HQ administration only, without outbound mail |
 | `src/web/country_filter.py` | Постоянный отбор стран экрана «Страны» (D536): «мне нужен только Кавказ» |
-| `src/web/country_page.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
+| `src/web/country_page.py` | Экран «Страны»: фильтры над статистикой страны и историей пиццерии |
 | `src/web/country_settings.py` | Карточка страны для чтения и административные формы (D539, D640, D690) |
 | `src/web/country_summary.py` | Сводка экрана «Страны» (D467): цифры периода и девелоперы стран |
 | `src/web/country_units.py` | Строки пиццерий экрана «Страны» (D467): одна строка на пиццерию |
@@ -388,7 +388,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 85 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+77) |
+| `src/web/static/` | 86 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+78) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->

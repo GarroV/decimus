@@ -28,9 +28,6 @@
         <div class="pk-kicker">{{ t('country.kicker') }}</div>
         <h2 class="pk-title">{{ country_name or '—' }}</h2>
       </div>
-      <div class="cn-head__period">
-        {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), period_hidden) }}
-      </div>
       <div class="cn-head__actions">
         {% if can_add_units and not read_only %}
           <a class="btn btn--sm btn--primary" href="{{ url('/country/' ~ view.code ~ '/units/new') }}?lang={{ lang }}">＋ {{ t('unitnew.open') }}</a>

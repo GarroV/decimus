@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from functools import lru_cache
 
 from src.db import ratings_violations as read
 from src.db.ratings_violations import Occurrence
@@ -146,25 +147,31 @@ def _scoped(
     )
 
 
-def _grouped(facts: Sequence[Occurrence]) -> dict[str, list[Occurrence]]:
+def _grouped(
+    facts: Sequence[Occurrence], identify: Callable[[Occurrence], str] = identity
+) -> dict[str, list[Occurrence]]:
     groups: dict[str, list[Occurrence]] = {}
     for fact in facts:
-        groups.setdefault(identity(fact), []).append(fact)
+        groups.setdefault(identify(fact), []).append(fact)
     return groups
 
 
 def _rows(
-    current: Sequence[Occurrence], before: Sequence[Occurrence] | None
+    current: Sequence[Occurrence],
+    before: Sequence[Occurrence] | None,
+    *,
+    identify: Callable[[Occurrence], str] = identity,
+    normalize: Callable[[str], str] = normalize_text,
 ) -> tuple[ViolationRow, ...]:
-    groups = _grouped(current)
-    previous = _grouped(before or ())
+    groups = _grouped(current, identify)
+    previous = _grouped(before or (), identify)
     total = sum(f.amount for f in current)
     result = []
     for key, facts in groups.items():
         names: Counter[str] = Counter()
         for fact in facts:
             names[fact.text] += fact.amount
-        text = min(names, key=lambda value: (-names[value], normalize_text(value), value))
+        text = min(names, key=lambda value: (-names[value], normalize(value), value))
         exemplar = min((f for f in facts if f.text == text), key=lambda f: f.row_id)
         count = sum(f.amount for f in facts)
         was = None if before is None else sum(f.amount for f in previous.get(key, ()))
@@ -184,7 +191,7 @@ def _rows(
                 100 * (count - was) / was if was else None,
             )
         )
-    return tuple(sorted(result, key=lambda row: (-row.cases, normalize_text(row.text), row.key)))
+    return tuple(sorted(result, key=lambda row: (-row.cases, normalize(row.text), row.key)))
 
 
 def _detail(kind: str, row: ViolationRow, facts: Sequence[Occurrence]) -> ViolationDetail:
@@ -242,18 +249,40 @@ def assemble(
     past = _scoped(kind, countries, before) if previous is not None else ()
     # An empty export does not establish that the previous window was clean.
     baseline = past if past else None
-    rows = _rows(current, baseline)
+    # Each legacy label repeats for many units, weeks and country summaries.
+    # Keep this cache local to one assembly; no data survives the request.
+    normalized = lru_cache(maxsize=None)(normalize_text)
+
+    @lru_cache(maxsize=None)
+    def legacy_key(kind: str, text: str, parent: str) -> str:
+        payload = "\x00".join((normalized(text), normalized(parent)))
+        return f"{kind}:legacy:{hashlib.sha256(payload.encode()).hexdigest()[:24]}"
+
+    def identify(fact: Occurrence) -> str:
+        if fact.criterion_id:
+            return f"{fact.kind}:criterion:{fact.criterion_id}"
+        return legacy_key(fact.kind, fact.text, fact.parent or "")
+
+    rows = _rows(current, baseline, identify=identify, normalize=normalized)
+    current_by_country: dict[str, list[Occurrence]] = {}
+    past_by_country: dict[str, list[Occurrence]] = {}
+    for fact in current:
+        current_by_country.setdefault(fact.country, []).append(fact)
+    for fact in past:
+        past_by_country.setdefault(fact.country, []).append(fact)
     by_country = tuple(
         CountryViolations(
             code,
-            sum(f.amount for f in current if f.country == code),
-            len({f.unit for f in current if f.country == code}),
+            sum(f.amount for f in country_facts),
+            len({f.unit for f in country_facts}),
             _rows(
-                tuple(f for f in current if f.country == code),
-                tuple(f for f in past if f.country == code) or None,
+                country_facts,
+                past_by_country.get(code) or None,
+                identify=identify,
+                normalize=normalized,
             ),
         )
-        for code in sorted({f.country for f in current})
+        for code, country_facts in sorted(current_by_country.items())
     )
     chosen = next((r for r in rows if r.key == criterion), None)
     return ViolationView(
