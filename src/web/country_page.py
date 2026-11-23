@@ -173,7 +173,6 @@ def render(
         return _url("country", code=target, **period.params(), dev=dev, lang=lang)
 
     # The country selector needs names, not a network-wide history aggregation.
-    # Do not read rail_stats merely to render a filter.
     dev_pick = (
         pick(
             label=t("country.dev.label", lang),

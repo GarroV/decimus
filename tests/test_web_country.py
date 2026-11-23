@@ -25,7 +25,6 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     # экрану в этих тестах она не нужна, отдельные наборы подменяют своё сами.
     monkeypatch.setattr(cn, "countries", lambda **_: (("GE", 1),))
     monkeypatch.setattr(country_summary, "developers_of", lambda _codes: ({}, {}, False))
-    monkeypatch.setattr(cn, "rail_stats", lambda **_: {})
     monkeypatch.setattr(country_units, "load", lambda **_: country_units.UnitsData())
     monkeypatch.setattr(country_units, "history", lambda **kw: kw["fallback"])
     monkeypatch.setattr(
@@ -134,8 +133,8 @@ def с_таблицей(monkeypatch: pytest.MonkeyPatch, *строки: country_
 def test_страна_и_пиццерия_выбираются_фильтрами_без_второй_колонки(стенд, monkeypatch):
     с_таблицей(monkeypatch, строка_таблицы())
     monkeypatch.setattr(
-        cn,
-        "rail_stats",
+        cn.queries,
+        "country_summary",
         lambda **kw: pytest.fail("Filter must not aggregate every country's history"),
     )
     страница = открыть(стенд, monkeypatch, с_точкой(данные()), "/country/GE")
