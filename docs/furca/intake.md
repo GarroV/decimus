@@ -105,7 +105,7 @@
 
 | есть? | что именно | имя переменной | где значение | смоук-команда | результат |
 |---|---|---|---|---|---|
-| да | VPS Contabo, Linux/Docker, `/srv/decimus`, текущая площадка по `docs/08-deploy.md` §8 (домашний сервер ниже — историческое состояние сентября) | — | SSH alias `contabo`, окружение `/srv/decimus/.env` | `ssh contabo 'cd /srv/decimus && git rev-parse --short HEAD && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f compose.edge.yaml ps'` | ✅ 11.11.2026: новые экраны D746/D747, prod и demo e2d3301f; production6healthy, четыре BUILD_SHA совпадают, внешний HTTP-смоук и live-проверки пройдены |
+| да | VPS Contabo, Linux/Docker, `/srv/decimus`, текущая площадка по `docs/08-deploy.md` §8 (домашний сервер ниже — историческое состояние сентября) | — | SSH alias `contabo`, окружение `/srv/decimus/.env` | `ssh contabo 'cd /srv/decimus && git rev-parse --short HEAD && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f compose.edge.yaml ps'` | ✅ 23.11.2026: прод 064ff8f3; шесть служб healthy, BUILD_SHA четырёх приложений совпадает; заморозка снята, исходный прокси восстановлен, аварийный таймер выключен; внешний CFT-смоук пройден |
 
 **Что уже живёт на площадке (выяснено смоуком, не со слов):** площадка не пустая — на ней работает около двух десятков контейнеров других проектов. Часть популярных портов занята, в том числе два порта Postgres, проброшенных наружу; свободные порты подобраны отдельно. Бэкапы Postgres идут по расписанию ночью, ретеншн две недели. **Ничего чужого не трогаем**: свои контейнеры получают собственный префикс проекта, свою папку и свободные порты.
 
@@ -113,7 +113,7 @@
 
 | есть? | что именно | имя переменной | где значение | смоук-команда | результат |
 |---|---|---|---|---|---|
-| да | PostgreSQL 16 проекта Decimus на VPS, существующая production-база | `DATABASE_URL` | `/srv/decimus/.env`, значение не публикуется | `docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select 1"'` | ✅ 11.11.2026: 1; db healthy |
+| да | PostgreSQL 16 проекта Decimus на VPS, существующая production-база | `DATABASE_URL` | `/srv/decimus/.env`, значение не публикуется | `docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select 1"'` | ✅ 23.11.2026: SELECT 1 → 1; db healthy, резерв базы проверен pg_restore --list |
 
 В MVP база не обязательна: состояние проверки — файл на чат (`docs/06-mvp-bot.md`). Поднимается на этапе веба; кандидат порта наружу — `5442` (`5433` и `5440` заняты).
 
@@ -121,7 +121,7 @@
 
 | есть? | что именно | имя переменной | где значение | смоук-команда | результат |
 |---|---|---|---|---|---|
-| да | постоянный Worker-адрес админки по `docs/08-deploy.md` | `ORIGIN_HOST` | `/srv/decimus/.env` | `curl -fsS -o /dev/null -w "%{http_code}" https://decimus.vasiliy-garro.workers.dev/login` | ✅ 11.11.2026: 200 |
+| да | постоянный Worker-адрес админки по `docs/08-deploy.md` | `ORIGIN_HOST` | `/srv/decimus/.env` | `curl -fsS -o /dev/null -w "%{http_code}" https://decimus.vasiliy-garro.workers.dev/login` | ✅ 23.11.2026: /login 200, /tg/walk 200, MCP без токена 401; JS поездок и CSS календаря по внешнему адресу точно совпадают с релизом |
 
 ### E5. Сторонние API
 
