@@ -154,7 +154,7 @@
    поездка не читалась проверкой. Отменённая — зачёркнута, прошедшая — приглушена.
    Карточка — в панели справа, детали формы общие (`decimus-split.css`). */
 .cal__trip {
-  display: flex; min-width: 0; padding: 2px var(--space-2); border-radius: 6px;
+  display: flex; flex-direction: column; min-width: 0; padding: 2px var(--space-2); border-radius: 6px;
   background: var(--surface-2); box-shadow: inset 3px 0 0 var(--warn);
   color: var(--ink); font-size: var(--fs-dense); text-decoration: none;
 }
@@ -175,3 +175,10 @@
 .trip-step__done { font-size: var(--fs-meta); color: var(--ok); }
 .trip-step__del { height: 26px; padding: 0 var(--space-3); }
 .trip-add { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line); }
+.cal__traveller { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-3); }
+.trip-visit { margin: 0; min-width: 0; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--r-control); }
+.trip-step__edit { grid-column: 1 / -1; font-size: var(--fs-meta); }
+.trip-step__edit summary { cursor: pointer; color: var(--ink-2); }
+.trip-step__edit .sform { margin-top: var(--space-3); }
+[data-trip-unit-picker] { display: grid; gap: var(--space-2); }
+.trip-day[data-trip-selected-day] { color: var(--ink); }

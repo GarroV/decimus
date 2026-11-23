@@ -9,6 +9,52 @@
 
 {% macro value(name, fallback) %}{{ trip_form.get(name, fallback) if trip_form else fallback }}{% endmacro %}
 
+{% macro unit_picker(name, selected='', country='') %}
+  <div data-trip-unit-picker>
+    <input class="sinput" type="search" data-trip-unit-search autocomplete="off"
+           aria-label="{{ t('trip.unit.search') }}" placeholder="{{ t('trip.unit.search') }}">
+    <select class="sinput" name="{{ name }}" aria-label="{{ t('trip.step.unit') }}" data-trip-unit-select data-country="{{ country or '' }}">
+      <option value="">{{ t('trip.step.unit.none') }}</option>
+      {% for unit in trip_units %}<option value="{{ unit.id }}" data-country="{{ unit.country or '' }}"{% if selected == unit.id %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}
+    </select>
+  </div>
+{% endmacro %}
+
+{% macro visit_row(row) %}
+  <fieldset class="trip-visit sform" data-trip-visit>
+    <div class="trip-dates">
+      <label><span class="sform__label">{{ t('trip.step.day') }}</span>
+        <input class="sinput" type="date" name="visit_day" value="{{ row.day }}"></label>
+      <label><span class="sform__label">{{ t('trip.step.at') }}</span>
+        <input class="sinput" type="time" name="visit_at" value="{{ row.at }}"></label>
+    </div>
+    <div><span class="sform__label">{{ t('trip.step.unit') }}</span>
+      {{ unit_picker('visit_unit', row.unit) }}
+    </div>
+    <button class="sbtn sbtn--ghost" type="button" data-trip-visit-remove>{{ t('trip.step.delete') }}</button>
+  </fieldset>
+{% endmacro %}
+
+{% macro step_fields(fields) %}
+  <div class="trip-dates">
+    <label><span class="sform__label">{{ t('trip.step.day') }}</span>
+      <select class="sinput" name="day">
+        {% for day in trip.days %}<option value="{{ day.isoformat() }}"{% if fields.get('day') == day.isoformat() %} selected{% endif %}>{{ t('calendar.wd.' ~ day.isoweekday()) }}, {{ day.isoformat() }}</option>{% endfor %}
+      </select></label>
+    <label><span class="sform__label">{{ t('trip.step.at') }}</span>
+      <input class="sinput" type="time" name="at" value="{{ fields.get('at', '') }}"></label>
+  </div>
+  <label><span class="sform__label">{{ t('trip.step.kind') }}</span>
+    <select class="sinput" name="kind">
+      {% for code in trip_kinds %}<option value="{{ code }}"{% if fields.get('kind', 'inspection') == code %} selected{% endif %}>{{ t('trip.kind.' ~ code) }}</option>{% endfor %}
+    </select></label>
+  <div><span class="sform__label">{{ t('trip.step.unit') }}</span>
+    {{ unit_picker('unit', fields.get('unit', ''), trip.country) }}
+  </div>
+  <label><span class="sform__label">{{ t('trip.step.body') }}</span>
+    <input class="sinput" name="body" maxlength="500" autocomplete="off" placeholder="{{ t('trip.step.body.hint') }}" value="{{ fields.get('body', '') }}"></label>
+{% endmacro %}
+
 {% macro trip_fields(current) %}
   {% if trip_self_only %}
     <p class="ssec__note">{{ t('trip.who.self') }}</p>
@@ -59,6 +105,16 @@
         <button class="sbtn sbtn--ghost trip-step__del" type="submit">{{ t('trip.step.delete') }}</button>
       </form>
     {% endif %}
+    {% if trip_editable %}
+      {% set editing = trip_form.get('step_id') == step.id %}
+      <details class="trip-step__edit"{% if editing %} open{% endif %}>
+        <summary>{{ t('trip.step.edit') }}</summary>
+        <form class="sform" method="post" action="{{ trip_action(trip.id, 'steps', step.id) }}">
+          {{ step_fields(trip_form if editing else {'day': day.isoformat(), 'at': step.at.strftime('%H:%M') if step.at else '', 'kind': step.kind, 'unit': step.unit_id or '', 'body': step.body}) }}
+          <button class="sbtn" type="submit">{{ t('trip.save') }}</button>
+        </form>
+      </details>
+    {% endif %}
   </li>
 {% endmacro %}
 
@@ -70,11 +126,17 @@
     <p class="ssec__note">{{ t('trip.not_found') }}</p>
   {% elif trip_new %}
     <section class="ssec">
-      <form method="post" action="{{ trip_action() }}" class="sform">
+      <form method="post" action="{{ trip_action() }}" class="sform" data-trip-create data-max-steps="{{ trip_max_steps }}">
         {{ trip_fields(none) }}
+        <h3 class="ssec__title">{{ t('trip.visits') }}</h3>
+        <p class="ssec__note">{{ t('trip.visits.hint') }}</p>
+        <div class="sform" data-trip-visits>
+          {% for row in trip_visits %}{{ visit_row(row) }}{% endfor %}
+        </div>
+        <template data-trip-visit-template>{{ visit_row({'day': '', 'at': '', 'unit': ''}) }}</template>
+        <button class="sbtn sbtn--ghost" type="button" data-trip-visit-add>{{ t('trip.visit.add') }}</button>
         <button class="sbtn sbtn--primary" type="submit">{{ t('trip.create') }}</button>
       </form>
-      <p class="ssec__note">{{ t('trip.plan.after_create') }}</p>
     </section>
   {% elif trip %}
     <section class="ssec">
@@ -99,32 +161,14 @@
       <h3 class="ssec__title">{{ t('trip.plan') }}</h3>
       {% set days_with_steps = trip.days | select('in', trip.steps | map(attribute='day') | list) | list %}
       {% for day in days_with_steps %}
-        <h4 class="trip-day">{{ t('calendar.wd.' ~ day.isoweekday()) }}, {{ day.isoformat() }}</h4>
+        <h4 class="trip-day"{% if trip_selected_day == day %} data-trip-selected-day{% endif %}>{{ t('calendar.wd.' ~ day.isoweekday()) }}, {{ day.isoformat() }}</h4>
         <ul class="trip-steps">{% for step in trip.steps_on(day) %}{{ step_line(step, day) }}{% endfor %}</ul>
       {% else %}
         <p class="ssec__note">{{ t('trip.plan.empty') }}</p>
       {% endfor %}
       {% if trip_editable %}
         <form method="post" action="{{ trip_action(trip.id, 'steps') }}" class="sform trip-add">
-          <div class="trip-dates">
-            <label><span class="sform__label">{{ t('trip.step.day') }}</span>
-              <select class="sinput" name="day">
-                {% for day in trip.days %}<option value="{{ day.isoformat() }}"{% if trip_form.get('day') == day.isoformat() %} selected{% endif %}>{{ t('calendar.wd.' ~ day.isoweekday()) }}, {{ day.isoformat() }}</option>{% endfor %}
-              </select></label>
-            <label><span class="sform__label">{{ t('trip.step.at') }}</span>
-              <input class="sinput" type="time" name="at" value="{{ trip_form.get('at', '') }}"></label>
-          </div>
-          <label><span class="sform__label">{{ t('trip.step.kind') }}</span>
-            <select class="sinput" name="kind">
-              {% for code in trip_kinds %}<option value="{{ code }}"{% if trip_form.get('kind') == code %} selected{% endif %}>{{ t('trip.kind.' ~ code) }}</option>{% endfor %}
-            </select></label>
-          <label><span class="sform__label">{{ t('trip.step.unit') }}</span>
-            <select class="sinput" name="unit">
-              <option value="">{{ t('trip.step.unit.none') }}</option>
-              {% for unit in trip_units %}<option value="{{ unit.id }}"{% if trip_form.get('unit') == unit.id %} selected{% endif %}>{{ unit.name }}</option>{% endfor %}
-            </select></label>
-          <label><span class="sform__label">{{ t('trip.step.body') }}</span>
-            <input class="sinput" name="body" maxlength="500" autocomplete="off" placeholder="{{ t('trip.step.body.hint') }}" value="{{ trip_form.get('body', '') }}"></label>
+          {{ step_fields(trip_form if not trip_form.get('step_id') else {}) }}
           <button class="sbtn" type="submit">{{ t('trip.step.add') }}</button>
         </form>
       {% endif %}

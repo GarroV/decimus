@@ -9,7 +9,8 @@
 
 from __future__ import annotations
 
-from datetime import date
+import re
+from datetime import date, time
 from typing import Any
 
 import pytest
@@ -58,8 +59,11 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         найдена = хранилище.get(trip_id)
         return найдена if найдена is not None and найдена.tenant == tenant else None
 
-    def _create(draft: tr.Draft, *, tenant: str, actor_id: str) -> str:
+    def _create(
+        draft: tr.Draft, *, tenant: str, actor_id: str, steps: tuple[tr.StepDraft, ...] = ()
+    ) -> str:
         з["create"].append((tr.check_draft(draft), tenant, actor_id))
+        з.setdefault("visits", []).append(steps)
         return ПОЕЗДКА
 
     def _update(trip_id: str, draft: tr.Draft, *, tenant: str) -> bool:
@@ -74,6 +78,12 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     monkeypatch.setattr(cs.tr, "create_trip", _create)
     monkeypatch.setattr(cs.tr, "update_trip", _update)
     monkeypatch.setattr(cs.tr, "add_step", _add_step)
+
+    def _update_step(trip: tr.Trip, step_id: str, step: tr.StepDraft) -> bool:
+        з.setdefault("step_update", []).append((trip.id, step_id, tr.check_step(step, trip)))
+        return True
+
+    monkeypatch.setattr(cs.tr, "update_step", _update_step)
     monkeypatch.setattr(cs.tr, "delete_trip", lambda *a, **k: True)
     monkeypatch.setattr(cs.data, "load_dated", lambda **_: ())
     monkeypatch.setattr(
@@ -255,3 +265,108 @@ def test_экран_показывает_поездку_и_план(
         as_text=True
     )
     assert "cal__trip" in страница and "Батуми-1" in страница and "Добавить в план" in страница
+
+
+def test_создание_с_несколькими_посещениями_одного_дня(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
+) -> None:
+    c = клиент(monkeypatch, tenant="GE", role="admin")
+    response = c.post(
+        "/calendar/trips",
+        headers={"Origin": СВОЙ},
+        data={
+            **ФОРМА,
+            "visit_day": ["2026-10-21", "2026-10-21"],
+            "visit_unit": [ТОЧКА, ТОЧКА],
+            "visit_at": ["10:00", ""],
+        },
+    )
+    assert response.status_code == 303
+    visits = зовы["visits"][-1]
+    assert len(visits) == 2
+    assert visits[0].unit_id == ТОЧКА and visits[0].at == time(10)
+    assert visits[1].at is None and visits[1].day == date(2026, 10, 21)
+
+
+@pytest.mark.parametrize(
+    "field,value", [("visit_day", "2026-11-01"), ("visit_unit", ЧУЖАЯ_ТОЧКА), ("visit_at", "oops")]
+)
+def test_ошибка_посещения_сохраняет_форму_и_не_создаёт_поездку(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]], field: str, value: str
+) -> None:
+    c = клиент(monkeypatch, tenant="GE", role="admin")
+    form = {**ФОРМА, "visit_day": "2026-10-21", "visit_unit": ТОЧКА, "visit_at": "10:00"}
+    form[field] = value
+    response = c.post("/calendar/trips", data=form, headers={"Origin": СВОЙ})
+    assert response.status_code == 400 and зовы["create"] == []
+    html = response.get_data(as_text=True)
+    assert 'value="Кто-то"' in html and f'value="{form["visit_day"]}"' in html
+
+
+def test_календарь_показывает_точки_только_в_день_посещения(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
+) -> None:
+    step = tr.Step(
+        "77777777-7777-7777-7777-777777777777",
+        date(2026, 10, 21),
+        time(10),
+        "inspection",
+        ТОЧКА,
+        "Батуми-1",
+        "",
+    )
+    зовы["store"][0][ПОЕЗДКА] = поездка(steps=(step,))
+    c = клиент(monkeypatch, tenant="GE", role="admin")
+    html = c.get("/calendar?from=2026-10-01&to=2026-10-31").get_data(as_text=True)
+    days = dict(re.findall(r'<span class="cal__num">(\d+)</span>(.*?)</div>', html, re.S))
+    assert "Батуми-1 · 10:00" in days["21"]
+    assert "Батуми-1" not in days["20"] + days["22"]
+    assert "trip_day=2026-10-21" in days["21"]
+
+
+def test_посещение_можно_перенести_и_чужой_шаг_не_правится(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
+) -> None:
+    step = tr.Step(
+        "77777777-7777-7777-7777-777777777777",
+        date(2026, 10, 21),
+        None,
+        "inspection",
+        ТОЧКА,
+        "Батуми-1",
+        "",
+    )
+    зовы["store"][0][ПОЕЗДКА] = поездка(steps=(step,))
+    c = клиент(monkeypatch, tenant="GE", role="admin")
+    form = {"day": "2026-10-22", "kind": "inspection", "unit": ТОЧКА, "at": "12:30"}
+    path = f"/calendar/trips/{ПОЕЗДКА}/steps/{step.id}"
+    assert отправить(c, path, **form).status_code == 303
+    assert зовы["step_update"][-1][2].day == date(2026, 10, 22)
+    assert отправить(c, path, **{**form, "day": "2026-11-01"}).status_code == 400
+    assert отправить(c, path.replace(step.id, ЧУЖАЯ_ТОЧКА), **form).status_code == 404
+    assert len(зовы["step_update"]) == 1
+
+
+@pytest.mark.parametrize("tenant,role", [("HQ", "guest"), ("GE", "auditor")])
+def test_посещение_не_правит_гость_или_другой_исполнитель(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]], tenant: str, role: str
+) -> None:
+    step = tr.Step(
+        "77777777-7777-7777-7777-777777777777",
+        date(2026, 10, 21),
+        None,
+        "inspection",
+        ТОЧКА,
+        "Батуми-1",
+        "",
+    )
+    зовы["store"][0][ПОЕЗДКА] = поездка(tenant=tenant, steps=(step,), executor_user_id=None)
+    c = клиент(monkeypatch, tenant=tenant, role=role)
+    response = отправить(
+        c,
+        f"/calendar/trips/{ПОЕЗДКА}/steps/{step.id}",
+        day="2026-10-22",
+        kind="inspection",
+        unit=ТОЧКА,
+    )
+    assert response.status_code == 403 and not зовы.get("step_update")
