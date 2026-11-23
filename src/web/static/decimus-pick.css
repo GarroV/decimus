@@ -200,3 +200,6 @@
   .countryadmininline { grid-template-columns: minmax(0, 1fr); }
   .countryadmininline__list { max-height: 32vh; overflow-y: auto; }
 }
+
+/* D776: screens with filters use the full working area. */
+.pk-shell.pk-shell--solo { grid-template-columns: minmax(0, 1fr); }
