@@ -213,6 +213,20 @@ def _тот_же_документ(страница: Any) -> bool:
     return bool(страница.evaluate("window.__same_document === 1"))
 
 
+def test_ссылка_рейтинга_до_подключения_его_скрипта_не_перезагружает_страницу(page: Any) -> None:
+    page.goto(f"{ХОСТ}{ОСНОВА}?lang=ru")
+    page.evaluate("""() => {
+      window.__same_document = 1;
+      document.querySelector('main.shell__main').insertAdjacentHTML('beforeend',
+        '<div class="rt" data-rt-section="rko"><a id="early-rating" data-rt-nav '
+        + 'href="/settings?lang=ru&early=1">Next section</a></div>');
+    }""")
+    page.locator("#early-rating").click()
+    page.wait_for_url("**early=1")
+    assert _тот_же_документ(page)
+    assert not page.locator("[data-navigation-status]").is_visible()
+
+
 def _перейти(страница: Any, путь: str) -> None:
     """Щелчок по пункту левой панели; страница не должна перезагрузиться."""
     страница.locator(f".sidenav a[href^='{путь}?']").first.click()

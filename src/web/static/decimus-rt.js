@@ -134,26 +134,30 @@
 
   function go(target, push) {
     var url = new URL(target, window.location.href);
+    if (!window.decimusNavigation) { window.location.href = url.href; return; }
+    if (window.decimusNavigation.isPending(url.href)) return;
     if (!ours(url)) { window.location.href = url.href; return; }
     var mine = ++ticket;
+    var pending = window.decimusNavigation.start(url.href);
     var current = page();
     var sameSection = current && url.pathname.replace(/\/$/, "") === window.location.pathname.replace(/\/$/, "");
     if (current) current.classList.add("is-loading");
-    fetch(url.href, { credentials: "same-origin", headers: { "X-Requested-With": "decimus-rt" } })
+    fetch(url.href, { credentials: "same-origin", signal: pending.signal, headers: { "X-Requested-With": "decimus-rt" } })
       .then(function (res) {
         if (!res.ok) throw new Error("status " + res.status);
         return res.text().then(function (text) { return { text: text, url: res.url }; });
       })
       .then(function (got) {
-        if (mine !== ticket) return;
+        if (mine !== ticket || !pending.current()) return;
         var landed = new URL(got.url);
         if (!ours(landed) || !swap(got.text, landed)) throw new Error("not a ratings page");
         if (push) window.history.pushState({ rt: 1 }, "", landed.pathname + landed.search);
         if (!sameSection) window.scrollTo(0, 0);
       })
       .catch(function () {
-        if (mine === ticket) window.location.href = url.href;
-      });
+        if (mine === ticket && pending.current()) window.location.href = url.href;
+      })
+      .finally(pending.finish);
   }
 
   function plainClick(event) {

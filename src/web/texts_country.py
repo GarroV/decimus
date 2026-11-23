@@ -7,6 +7,9 @@
 from __future__ import annotations
 
 COUNTRY_TEXTS: dict[str, dict[str, str]] = {
+    "country.filter.choose": {"ru": "Выберите страну", "en": "Choose a country"},
+    "country.filter.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "country.filter.all_units": {"ru": "Все пиццерии", "en": "All pizzerias"},
     "country.contacts.units": {
         "ru": "Пиццерии: адреса и контакты партнёров",
         "en": "Pizzerias: addresses and partner contacts",

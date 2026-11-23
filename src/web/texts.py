@@ -68,6 +68,7 @@ UI_LANG_VAR = "WEB_UI_LANG"
 DEFAULT_UI_LANG = "ru"
 
 TEXTS: dict[str, dict[str, str]] = {
+    "navigation.loading": {"ru": "Загрузка…", "en": "Loading…"},
     # --- шапка и навигация -------------------------------------------------
     "app.name": {"ru": "DECIMUS", "en": "DECIMUS"},
     "app.mark": {"ru": "Аудиты", "en": "Audits"},

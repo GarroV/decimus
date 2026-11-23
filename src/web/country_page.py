@@ -1,39 +1,22 @@
-"""Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512).
+"""Экран «Страны»: фильтры над статистикой страны и историей пиццерии.
 
-Каркас — общий шаблон «выбор слева — рабочая область справа»
-(`templates/_pick_page.html`, `docs/30-web-screen-rules.md`). Слева поиск, отбор
-«Девелопер» и страны списком по алфавиту названия (код, средняя за период, пиццерий; D536);
-над списком — постоянный отбор «Мои страны» (`country_filter.py`, хранится в
-профиле). Выбранная страна раскрывается списком своих пиццерий и сворачивается
-повторным нажатием (`fold=1`). Справа: у страны — шапка (название и период в
-одной строке, сведения отдельными блоками), статистика страны и ниже список её
-проверок; у пиццерии — её сведения, цифры и ниже список её проверок. Проверка из
-списка и «Карточка страны» (D539, всем, кому видна страна) открываются панелью справа на
-этом же экране (D527), а не отдельной страницей.
-Состояние живёт в адресе: период `from` / `to`,
-`unit=<ключ>` (выбранная пиццерия), `inspection=<id>` (панель проверки),
-`settings=1` (панель настроек страны), `fold=1` (список пиццерий свёрнут), `dev=<девелопер>`
-(отбор стран), `q=<поиск>` —
-ссылку на открытое отправляют коллеге, и он видит ровно это; без скриптов всё —
-ссылки и обычная форма поиска.
+Одна рабочая область на всю ширину, без внутреннего столбца стран (D776).
+Сверху — сохранённый отбор «Мои страны», девелопер (только УК), страна,
+пиццерия и период. Смена страны сбрасывает пиццерию и панели, но сохраняет
+период и язык. Без явной страны открывается первая по алфавиту либо сводка
+стран выбранного девелопера. Выбор живёт в адресе; работает общий nav.js.
 
-Ничего не считает: цифры — снимок «Обзора» с отбором по стране
-(`country.py`), рейтинги — `home_ratings_block` теми же функциями, что у
-«Рейтингов» и «Главной», строки таблицы — `country_units.py`. Предписания и
-экшн-планы с экрана ушли: их счётчики в шапке ведут в «Действия» с отбором по
-стране, и ничего не теряется.
-
-Кто видит экран, решает матрица (`view.country`) и охват вошедшего
-(`auth.current_reach`). Партнёр (D508) попадает сюда с «Главной» и видит ровно
-то же, но только свои страны: чужая страна в адресе — тот же 404, что у
-несуществующей; выбора девелопера у него нет, а выбор страны — только если
-стран в пространстве больше одной.
+Данные и расчёты остаются у country.py, country_units.py и home_ratings_block.
+Фильтр страны строится без чтения статистики всей сети. Партнёр выбирает
+только страны своего охвата; чужая страна в адресе отвечает 404 до чтения.
+Карточка проверки, контакты и сводное письмо открываются прежней панелью справа.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -63,7 +46,7 @@ from . import (
 )
 from . import country as country_data
 from . import overview as overview_data
-from .geo_names import city_title, country_title
+from .geo_names import country_title
 from .sections import section
 from .texts import t
 from .unit_add import can_add_here
@@ -133,6 +116,10 @@ def render(
         abort(404)
     все_страны = country_data.countries(reach=reach)
     страны, отбор = _filtered(все_страны, code, lang)
+    # A direct link to an accessible country with no units still has a truthful
+    # selected option instead of displaying another country by browser default.
+    if code and code not in {c for c, _n in страны}:
+        страны = tuple(sorted((*страны, (code, 0)), key=lambda row: _alpha(row[0], lang)))
     # Девелопер — понятие УК (D508): партнёру ни списка, ни отбора по нему.
     devs, dev_of, devs_failed = (
         country_summary.developers_of([c for c, _n in страны]) if уК else ({}, {}, False)
@@ -156,6 +143,8 @@ def render(
                 search_hidden={},
                 single_country=False,
                 pick_open=False,
+                pick_norail=True,
+                country_pick=None,
                 mine=_my_countries(все_страны, отбор, lang, None),
             )
         code = в_колонке[0][0]
@@ -180,18 +169,11 @@ def render(
         return _url("country", code=code or "-", **params)
 
     def to_country(target: str) -> str:
-        """Строка колонки: тот же период, девелопер и поиск; без пиццерии и панелей.
+        """Смена страны сохраняет период и девелопера, сбрасывает пиццерию и панели."""
+        return _url("country", code=target, **period.params(), dev=dev, lang=lang)
 
-        Повторное нажатие на уже выбранную страну (без выбранной пиццерии)
-        сворачивает её список пиццерий, ещё одно — разворачивает (D536).
-        """
-        fold = "1" if target == code and not unit_key and not folded and not combined else ""
-        return _url(
-            "country", code=target, **period.params(), dev=dev, q=query, fold=fold, lang=lang
-        )
-
-    stats = country_data.rail_stats(reach=reach, dates=_dates(period))
-    rail = _rail(в_колонке, query, lang, stats, to_country, current=None if combined else code)
+    # The country selector needs names, not a network-wide history aggregation.
+    # Do not read rail_stats merely to render a filter.
     dev_pick = (
         pick(
             label=t("country.dev.label", lang),
@@ -208,9 +190,22 @@ def render(
         if devs
         else None
     )
+    country_pick = pick(
+        label=t("country.col.country", lang),
+        empty_title=t("country.dev.label", lang),
+        current="" if combined else code,
+        values=tuple((c, None) for c, _n in в_колонке),
+        href=lambda c: (
+            to_country(c) if c else _url("country_index", dev=dev, lang=lang, **period.params())
+        ),
+        title=lambda c: country_title(c, lang) or c,
+    )
+    if not combined:
+        country_pick = replace(country_pick, options=country_pick.options[1:])
     common: dict[str, Any] = {
         "choices": страны,
-        "rail": rail,
+        "pick_norail": True,
+        "country_pick": country_pick if уК or len(в_колонке) > 1 else None,
         "dev": dev,
         "dev_pick": dev_pick,
         "devs_failed": devs_failed,
@@ -235,7 +230,9 @@ def render(
         "period_prev": registry_view.period_link(period, -1, select),
         "period_next": registry_view.period_link(period, 1, select),
         "period_quick": registry_view.period_quick(period, today, lang, select),
-        "period_hidden": {k: v for k, v in (("dev", dev), ("q", query), ("lang", lang)) if v},
+        "period_hidden": {
+            k: v for k, v in (("dev", dev), ("q", query), ("lang", lang), ("unit", unit_key)) if v
+        },
         "select_url": select,
         "all_time_url": select(**{"from": "", "to": "", "period": registry_period.ALL}),
         "item_titles": item_titles,
@@ -259,21 +256,35 @@ def render(
             **common,
             **_combined(devs[dev], to_country, period, before, limit),
         )
+    content = _one_country(
+        code or "",
+        dev_of.get(code or "", ""),
+        select,
+        query,
+        period,
+        before,
+        limit,
+        today,
+        lang,
+        card,
+    )
+    rows = content["units"].rows
+    unit_names = {
+        row.key: row.name + (" · " + t("unit.stage.closed", lang) if row.is_closed else "")
+        for row in rows
+    }
+    content["unit_pick"] = pick(
+        label=t("country.filter.unit", lang),
+        empty_title=t("country.filter.all_units", lang),
+        current=content["open_row"].key if content["open_row"] else "",
+        values=tuple((row.key, None) for row in rows),
+        href=lambda key: select(unit=key, fold="", inspection="", settings="", saved=""),
+        title=lambda key: unit_names[key],
+    )
     return render_template(
         "country/index.html",
         **common,
-        **_one_country(
-            code or "",
-            dev_of.get(code or "", ""),
-            select,
-            query,
-            period,
-            before,
-            limit,
-            today,
-            lang,
-            card,
-        ),
+        **content,
     )
 
 
@@ -336,62 +347,6 @@ def _my_countries(
         "next": request.full_path.rstrip("?"),
         "current": current,
     }
-
-
-def _rail(
-    countries: tuple[tuple[str, int], ...],
-    query: str,
-    lang: str,
-    stats: dict[str, tuple[float | None, int]],
-    to_country: Callable[[str], str],
-    *,
-    current: str | None,
-) -> tuple[dict[str, Any], ...]:
-    """Строки колонки стран по алфавиту названия: код, название, пиццерий, средняя, проверок.
-
-    Поиск — по названию на языке экрана и по коду, без учёта регистра; выбранная
-    страна остаётся в колонке при любом запросе — под ней её пиццерии.
-    """
-    needle = query.casefold()
-    rows = []
-    for code, units in sorted(countries, key=lambda пара: _alpha(пара[0], lang)):
-        title = country_title(code, lang) or code
-        if (
-            needle
-            and code != current
-            and needle not in title.casefold()
-            and needle not in code.casefold()
-        ):
-            continue
-        average, inspections = stats.get(code, (None, 0))
-        rows.append(
-            {
-                "code": code,
-                "title": title,
-                "units": units,
-                "average": average,
-                "inspections": inspections,
-                "href": to_country(code),
-                "on": code == current,
-            }
-        )
-    return tuple(rows)
-
-
-def _reach(rows: tuple[country_units.UnitRow, ...]) -> tuple[int, int]:
-    """Сколько работающих пиццерий проверяли хоть раз и сколько их всего (D549).
-
-    Закрытые не считаются: в них проверять нечего. Строка над списком отвечает на
-    вопрос «сколько в стране ещё ни разу не видели», который раньше задавала
-    галочка реестра.
-    """
-    живые = [r for r in rows if not r.is_closed]
-    return sum(1 for r in живые if r.last_ever or r.last), len(живые)
-
-
-def _unit_matches(row: country_units.UnitRow, needle: str, lang: str) -> bool:
-    """Поиск по колонке: название пиццерии или её город."""
-    return needle in row.name.casefold() or needle in (city_title(row.city, lang) or "").casefold()
 
 
 def _dates(period: registry_period.Period) -> tuple[date | None, date | None]:
@@ -477,14 +432,6 @@ def _one_country(
     история: tuple[InspectionRow, ...] = ()
     if открытая is not None and открытая.unit_id:
         история = country_units.history(reach=reach, name=открытая.name, fallback=вид.history)
-    needle = query.casefold()
-    in_rail = tuple(
-        r
-        for r in units.rows
-        if not needle
-        or (открытая is not None and r.key == открытая.key)
-        or _unit_matches(r, needle, lang)
-    )
     plans = _country_plans(вид.code)
     rx = prescriptions.country_block(вид.code)
     # Проверки страны за период, свежие сверху (D536): тот же срез, что плитки выше.
@@ -526,9 +473,6 @@ def _one_country(
         "partners": _partners(units.rows),
         "developer": developer,
         "open_row": открытая,
-        "rail_open": tuple(r for r in in_rail if not r.is_closed),
-        "rail_closed": tuple(r for r in in_rail if r.is_closed),
-        "rail_reach": _reach(units.rows),
         "pick_open": bool(reference) or settings_open or card_open or batch_open,
         "pick_back": select(inspection="", settings="", saved="", reference="", batch=""),
         "batch": batch,

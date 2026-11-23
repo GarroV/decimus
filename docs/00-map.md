@@ -139,7 +139,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/country.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
 | `src/web/country_contacts_actions.py` | Validated country-contact writes; HQ administration only, without outbound mail |
 | `src/web/country_filter.py` | Постоянный отбор стран экрана «Страны» (D536): «мне нужен только Кавказ» |
-| `src/web/country_page.py` | Экран «Страны» (прежде «Пиццерии»): снимок страны и история пиццерии (D260, D262, D512) |
+| `src/web/country_page.py` | Экран «Страны»: фильтры над статистикой страны и историей пиццерии |
 | `src/web/country_settings.py` | Карточка страны для чтения и административные формы (D539, D640, D690) |
 | `src/web/country_summary.py` | Сводка экрана «Страны» (D467): цифры периода и девелоперы стран |
 | `src/web/country_units.py` | Строки пиццерий экрана «Страны» (D467): одна строка на пиццерию |

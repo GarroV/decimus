@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from typing import Any
 
@@ -31,8 +32,9 @@ def стенд(база_стенд: FlaskClient) -> FlaskClient:  # noqa: F811
 
 
 def колонка(страница: str) -> str:
-    """Список колонки выбора — без блока «Мои страны» над ним (в нём тоже есть адреса)."""
-    return страница.split('class="pk-rail__list"', 1)[1].split("</aside>", 1)[0]
+    return re.search(r'aria-label="(?:Страна|Country)"[^>]*>(.*?)</select>', страница, re.S).group(
+        1
+    )
 
 
 # ── порядок: по алфавиту названия, а не по числу пиццерий ──────────────────
@@ -77,40 +79,6 @@ def test_вход_без_страны_открывает_первую_по_ал�
 # ── сворачивание: повторное нажатие на выбранную страну ────────────────────
 
 
-def test_выбранная_страна_сворачивается_повторным_нажатием(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(cn, "countries", lambda **_: СТРАНЫ)
-    с_таблицей(monkeypatch, строка_таблицы())
-    развёрнута = колонка(открыть(стенд, monkeypatch, с_точкой(данные()), "/country/GE"))
-    assert "Батуми-1" in развёрнута and 'aria-expanded="true"' in развёрнута
-    # Ссылка выбранной строки ведёт на свёрнутое состояние…
-    строка_ge = next(ч for ч in развёрнута.split("<a ") if "/country/GE" in ч and "is-on" in ч)
-    assert "fold=1" in строка_ge
-    # …а там пиццерий в колонке нет, строка помнит «свёрнуто», и следующее нажатие развернёт.
-    свёрнута = колонка(открыть(стенд, monkeypatch, с_точкой(данные()), "/country/GE?fold=1"))
-    assert "Батуми-1" not in свёрнута and 'aria-expanded="false"' in свёрнута
-    строка_ge = next(ч for ч in свёрнута.split("<a ") if "/country/GE" in ч and "is-on" in ч)
-    assert "fold=1" not in строка_ge
-
-
-def test_выбранная_пиццерия_держит_список_раскрытым_даже_при_fold(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    с_таблицей(monkeypatch, строка_таблицы())
-    рейка = колонка(открыть(стенд, monkeypatch, с_точкой(данные()), "/country/GE?unit=u-1&fold=1"))
-    assert "Батуми-1" in рейка
-
-
-def test_нажатие_на_другую_страну_не_несёт_fold(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(cn, "countries", lambda **_: СТРАНЫ)
-    рейка = колонка(открыть(стенд, monkeypatch, данные(), "/country/GE?fold=1"))
-    ссылка_am = next(ч for ч in рейка.split("<a ") if "/country/AM" in ч)
-    assert "fold" not in ссылка_am
-
-
 # ── справа: у страны — проверки страны, у пиццерии — её проверки ───────────
 
 
@@ -118,7 +86,9 @@ def test_у_страны_под_статистикой_список_её_про�
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     вид = данные()
-    справа = открыть(стенд, monkeypatch, вид, "/country/GE").split("</aside>", 1)[1]
+    справа = открыть(стенд, monkeypatch, вид, "/country/GE").split('<section class="pk-work">', 1)[
+        1
+    ]
     assert справа.index("cn-facts") < справа.index("pk-tiles") < справа.index("slist__rows")
     assert f"inspection={вид.snapshot.inspections[0].id}" in справа
 
@@ -131,7 +101,9 @@ def test_шапка_держит_период_в_строке_названия_�
         строка_таблицы(),
         строка_таблицы(key="u-2", name="X-2", unit_id="u-2", partner="ИП Лотос"),
     )
-    справа = открыть(стенд, monkeypatch, с_точкой(данные()), "/country/GE").split("</aside>", 1)[1]
+    справа = открыть(стенд, monkeypatch, с_точкой(данные()), "/country/GE").split(
+        '<section class="pk-work">', 1
+    )[1]
     строка_названия = справа.split('class="cn-facts"', 1)[0]
     assert "speriod" in строка_названия and "cn-head__actions" in строка_названия
     факты = справа.split('class="cn-facts"', 1)[1].split("</dl>", 1)[0]

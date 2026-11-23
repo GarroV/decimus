@@ -1,25 +1,6 @@
-{#
-  Экран «Страны» (D536; прежде «Пиццерии», D512, и «Страна»; D260, D262, D296, D467,
-  D474, D504, D527) — статистика по стране (D500). Каркас — общий шаблон «выбор
-  слева — рабочая область справа» (`_pick_page.html`): слева «Мои страны» (постоянный
-  отбор, `_mine.html`), поиск, отбор «Девелопер» (только УК) и страны списком по
-  алфавиту (код, средняя за период, пиццерий); выбранная страна раскрывается списком
-  своих пиццерий и сворачивается повторным нажатием. Справа: у страны — шапка
-  (`_head.html`), плитки, «Где болит» и ниже список проверок страны за период; у
-  пиццерии — её сведения, цифры и ниже список её проверок. Проверка из списка и
-  «Карточка страны» (D539; правка — только администратор) открываются панелью справа (D527).
-  Партнёр (D508) видит то же, но только свои страны; с одной страной выбирать
-  нечего — в колонке только её пиццерии. Состояние в адресе (`from`/`to`, `unit`,
-  `inspection`, `settings`, `fold`, `dev`, `q`), без скриптов всё работает ссылками и
-  обычными формами.
-
-  Ни одного вычисления: всё приходит из `src/web/country_page.py`. Предписаний и
-  экшн-планов здесь нет — счётчики в шапке ведут в «Действия» с отбором по стране.
-
-  Отбор «Девелопер» без страны в адресе — сводка по всем его странам (`combined`):
-  в колонке строка «сводка по группе», справа общие цифры и строка на каждую страну.
-  Строки сводки не ссылки (D527): страну выбирают в колонке слева.
-#}{% extends "_pick_page.html" %}
+{# Страны: фильтры над рабочей областью, без внутренней колонки (D776).
+   Выбор страны/пиццерии/периода хранится в URL; переходы ведёт общий nav.js.
+   Сведения, статистика и проверки — под фильтрами, панели — на том же экране. #}{% extends "_pick_page.html" %}
 {% from "_info_tip.html" import info_tip %}
 {% from "_pick.html" import pick %}
 {% from "_pick_ui.html" import pick_item, pick_search, pick_head, pick_sub, pick_block, pick_empty, pick_tile, pick_tiles with context %}
@@ -38,60 +19,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-country.css') }}">
-  <script src="{{ url_for('static', filename='country.js') }}" data-swap-safe defer></script>
   <script src="{{ url_for('static', filename='letter.js') }}" data-swap-safe defer></script>
 {% endblock %}
 
-{% block pick_label %}{{ t('country.filter.title') }}{% endblock %}
-
-{% block pick_tools %}
-  {% if mine %}{{ mine_filter(mine) }}{% endif %}
-  {{ pick_search(url(current_path), query, t('country.search'), search_hidden) }}
-  {% if dev_pick %}{{ pick(dev_pick) }}{% endif %}
-{% endblock %}
-
-{% macro unit_line(row) %}
-  {% set last_note = (t('country.units.last', date=row.last_ever or row.last.when) ~ ('' if row.last else ' · ' ~ t('country.units.not_in_period')))
-                     if (row.last_ever or row.last) else t('country.units.never') %}
-  {% call pick_item(select_url(unit=row.key, fold='', inspection='', settings='', saved=''), row.name,
-                    (city_title(row.city) or '') ~ ((' · ' ~ t('unit.stage.' ~ row.stage)) if row.stage in ('pipeline', 'paused') else '') ~ ' · ' ~ last_note,
-                    on=(open_row and row.key == open_row.key), sub=true) %}
-    {% if row.last %}<span class="pk-item__tag grade tag {{ grade_tone(row.last.grade) }}">{{ row.last.grade or '—' }}</span>{% endif %}
-  {% endcall %}
-{% endmacro %}
-
-{% block pick_list %}
-  {% if group_row %}
-    {{ pick_item(group_row.href, group_row.title, t('country.rail.group', n=group_row.count), group_row.units, group_row.on, code='Σ') }}
-  {% endif %}
-  {% for row in rail %}
-    {% if not single_country %}
-      {{ pick_item(row.href, row.title,
-                   (t('country.rail.average', avg='%.1f'|format(row.average)) if row.average is not none else t('country.rail.no_inspections')),
-                   row.units, row.on, code=row.code,
-                   expanded=((not folded or open_row is not none) if row.on and not combined else none)) }}
-    {% endif %}
-    {% if row.on and units is defined and not combined and (not folded or open_row) %}
-      {% if units.profiles_failed or units.ratings_failed or units.maps_failed %}
-        <p class="pk-note">{{ t('country.units.profiles_failed') if units.profiles_failed else t('country.units.ratings_failed') if units.ratings_failed else t('country.units.maps_failed') }}</p>
-      {% endif %}
-      {% call pick_sub() %}
-        {% if rail_reach[1] %}<p class="pk-note">{{ t('country.units.reach', done=rail_reach[0], total=rail_reach[1], never=rail_reach[1] - rail_reach[0]) }}</p>{% endif %}
-        {% for r in rail_open %}{{ unit_line(r) }}{% else %}<p class="pk-note">{{ t('country.units.empty') }}</p>{% endfor %}
-        {% if rail_closed %}
-          <details class="pk-closed"{% if open_row and open_row.is_closed %} open{% endif %}>
-            <summary>{{ t('country.units.closed', n=rail_closed|length) }}</summary>
-            {% for r in rail_closed %}{{ unit_line(r) }}{% endfor %}
-          </details>
-        {% endif %}
-      {% endcall %}
-    {% endif %}
-  {% else %}
-    <p class="pk-empty pk-empty--rail">{{ t('country.choose.empty') }}</p>
-  {% endfor %}
-{% endblock %}
-
 {% block pick_work %}
+  <div class="cn-filters" role="group" aria-label="{{ t('country.filter.title') }}">
+    {% if mine %}{{ mine_filter(mine) }}{% endif %}
+    {% if dev_pick %}{{ pick(dev_pick) }}{% endif %}
+    {% if country_pick %}{{ pick(country_pick) }}{% endif %}
+    {% if unit_pick %}{{ pick(unit_pick) }}{% endif %}
+    {% if period %}{{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), period_hidden) }}{% endif %}
+  </div>
 {% if view is none and not combined %}
   {% call pick_empty() %}{{ t('country.choose.empty') }}{% endcall %}
 {% else %}
@@ -101,11 +39,7 @@
 
   {% if combined %}
     {# ── Сводка девелопера: общие цифры его стран и строка на каждую (D527: без переходов) ── #}
-    {% call pick_head(t('country.dev.label'), dev, info_tip(t('tip.counts'), '', [t('country.dev.countries', n=dev_rows|length)], 'dev')) %}
-      <div class="pk-head__period">
-        {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), period_hidden) }}
-      </div>
-    {% endcall %}
+    {% call pick_head(t('country.dev.label'), dev, info_tip(t('tip.counts'), '', [t('country.dev.countries', n=dev_rows|length)], 'dev')) %}{% endcall %}
     {# Срез длиннее предела ряда (#470): сказать вслух, а не обрезать молча. #}
     {% if truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=limit) }}</div></div></div>{% endif %}
     {{ nothing(summary) }}

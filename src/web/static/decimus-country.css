@@ -6,6 +6,14 @@
    токенов. Если для блока не хватает компонента в forma — он заводится там, а
    здесь остаётся временной раскладкой. */
 
+.cn-filters { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-4); margin-bottom: var(--space-6); }
+.cn-filters > .pickbox { flex: 1 1 12rem; min-width: 0; max-width: 24rem; }
+.cn-filters > .cn-mine { flex: 0 1 14rem; min-width: 0; }
+.cn-filters > .cn-mine .cn-mine__summary { white-space: nowrap; }
+.cn-filters .pickbox__select { max-width: 100%; }
+@media (max-width: 719px) {
+  .cn-filters > .pickbox, .cn-filters > .cn-mine { flex: 1 1 100%; max-width: none; }
+}
 .cn-count { margin-left: var(--space-3); font-family: var(--font-num); font-variant-numeric: tabular-nums;
   color: var(--ink-3); font-weight: var(--w-semibold); }
 .cn-count.is-on { color: var(--accent); }

@@ -173,23 +173,25 @@
   }
 
   function go(url, push) {
+    if (!window.decimusNavigation) { window.location.assign(url); return; }
     var current = ++navigation;
-    return fetch(url, { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+    var pending = window.decimusNavigation.start(url);
+    return fetch(url, { credentials: "same-origin", signal: pending.signal, headers: { "X-Requested-With": "fetch" } })
       .then(function (r) {
         if (!r.ok || r.redirected) throw new Error("status " + r.status);
         if (!/html/i.test(r.headers.get("content-type") || "")) throw new Error("not html");
         return r.text();
       })
       .then(function (html) {
-        if (current !== navigation) return null;
+        if (current !== navigation || !pending.current()) return null;
         var doc = new DOMParser().parseFromString(html, "text/html");
         if (hasPageHeadScripts(doc)) throw new Error("head scripts");
         return ensureStyles(doc).then(function () { return doc; });
       })
       .then(function (doc) {
-        if (!doc || current !== navigation) return;
+        if (!doc || current !== navigation || !pending.current()) return;
         var swap = function () {
-          if (current !== navigation) return;
+          if (current !== navigation || !pending.current()) return;
           if (!apply(doc, url, push)) throw new Error("layout");
         };
         if (document.startViewTransition) {
@@ -202,8 +204,9 @@
         swap();
       })
       .catch(function () {
-        if (current === navigation) window.location.assign(url);
-      });
+        if (current === navigation && pending.current()) window.location.assign(url);
+      })
+      .finally(pending.finish);
   }
 
   // Адрес, который можно подменить (тот же сайт, не файл, не якорь на этой же странице).
@@ -214,6 +217,7 @@
 
   // Общий вход: уход с экрана может отменить сам экран (`decimus:leave`).
   function open(url) {
+    if (window.decimusNavigation && window.decimusNavigation.isPending(url.href)) return;
     var leave = new Event("decimus:leave", { cancelable: true });
     if (!document.dispatchEvent(leave)) return;
     go(url.href, url.href !== location.href);
@@ -232,8 +236,9 @@
     if (!link || !link.href || (link.target && link.target !== "_self")) return;
     if (link.hasAttribute("download") || link.hasAttribute("data-no-swap")) return;
     if (link.getAttribute("aria-disabled") === "true" || /\bexternal\b/.test(link.getAttribute("rel") || "")) return;
-    // Пункты подменю «Рейтингов» на странице раздела ведёт `decimus-rt.js` (плавная замена).
-    if (link.hasAttribute("data-rt-nav") && document.querySelector(".rt[data-rt-section]")) return;
+    // Ratings handles the click at document and prevents its default action.
+    // Until its asynchronously loaded script is ready, the shell handles it:
+    // skipping data-rt-nav here used to start a full document navigation.
     var url = new URL(link.href, location.href);
     if (!swappable(url)) return;
     event.preventDefault();
