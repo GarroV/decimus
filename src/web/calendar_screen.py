@@ -32,6 +32,7 @@ from .geo_names import country_title
 from .origin import refuse_foreign_origin
 from .sections import section
 from .texts import t
+from .trip_dates import creation_dates
 
 logger = logging.getLogger(__name__)
 
@@ -125,17 +126,24 @@ def _executor(name: str) -> tuple[str, str | None]:
     return найдено if найдено is not None else (имя, None)
 
 
-def _draft_from_form(units: tuple[Unit, ...]) -> Draft:
+def _draft_from_form(
+    units: tuple[Unit, ...], *, visits: list[dict[str, str]] | None = None
+) -> Draft:
     имя, учётка = _executor(request.form.get("executor") or "")
     страна = (request.form.get("country") or "").strip().upper() or None
     if страна is not None and страна not in {u.country for u in units}:
         raise TripError("trip.err.country")
+    first, last = (
+        creation_dates(request.form.get("from"), request.form.get("to"), visits)
+        if visits is not None
+        else (_parse_date(request.form.get("from")), _parse_date(request.form.get("to")))
+    )
     return Draft(
         executor_name=имя,
         executor_user_id=учётка,
         country=страна,
-        date_from=_parse_date(request.form.get("from")),
-        date_to=_parse_date(request.form.get("to")),
+        date_from=first,
+        date_to=last,
         status=(request.form.get("status") or "planned").strip(),
         note=request.form.get("note") or "",
     )
@@ -337,7 +345,7 @@ def install(app: Flask, conf: Settings) -> None:
         вошедший = auth.current_account()
         try:
             units = _units()
-            draft = tr.check_draft(_draft_from_form(units))
+            draft = tr.check_draft(_draft_from_form(units, visits=_visit_rows()))
             visits = _visits_from_form(units, draft)
             ид = tr.create_trip(
                 draft,

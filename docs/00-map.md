@@ -125,7 +125,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_scope,ratings_trends,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,trip_dates,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_scope,ratings_trends,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -191,6 +191,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/revision.py` | Правка записи на приёмке с пересчётом отчёта (D200) |
 | `src/web/to_inspect.py` | «Где не проведено» на «Проверках» (D399; D418, D466, D497 — переезды; D501 — вернулся сюда) |
 | `src/web/training_page.py` | Экран «Обучение»: обученность пиццерий по данным iSpring (D574, D575, D578, #906) |
+| `src/web/trip_dates.py` | Даты новой поездки: посещения определяют период, отдельный диапазон необязателен |
 | `src/web/unit_add.py` | Новая пиццерия из веб-админки: экран страны → «Добавить пиццерию» (#437, D240) |
 | `src/web/unit_card.py` | Карточка точки: где пиццерия сейчас, куда движется и что у неё не чинится |
 <!-- map:end -->
@@ -388,7 +389,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 85 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+77) |
+| `src/web/static/` | 86 | SOURCE.md, actions.js, apple-touch-icon.png, bell.js, country.js, decimus-actions.css, decimus-administration.css, decimus-country.css, … (+78) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 | `src/web/static/landing/` | 15 | actions-en.webp, actions-ru.webp, match-en.webp, match-ru.webp, network-en.webp, network-ru.webp, pizzerias-en.webp, pizzerias-ru.webp, … (+7) |
 <!-- map:end -->

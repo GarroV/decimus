@@ -182,3 +182,5 @@
 .trip-step__edit .sform { margin-top: var(--space-3); }
 [data-trip-unit-picker] { display: grid; gap: var(--space-2); }
 .trip-day[data-trip-selected-day] { color: var(--ink); }
+.trip-period summary { cursor: pointer; font-size: var(--fs-meta); color: var(--ink-2); }
+.trip-period[open] .trip-dates { margin-top: var(--space-3); }

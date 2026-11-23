@@ -49,9 +49,29 @@ TRIP_TEXTS: dict[str, dict[str, str]] = {
         "en": "Nothing planned for this day.",
     },
     "trip.visits": {"ru": "План посещений", "en": "Visit plan"},
+    "trip.period.optional": {
+        "ru": "Период поездки · необязательно",
+        "en": "Trip period · optional",
+    },
+    "trip.period.hint": {
+        "ru": (
+            "Период включит все даты посещений. Укажите отдельно дни дороги; "
+            "без плана достаточно даты «С»."
+        ),
+        "en": (
+            "The period includes all visit dates. Add travel days here; "
+            "without a plan, a start date is enough."
+        ),
+    },
     "trip.visits.hint": {
-        "ru": "Добавьте пиццерии по дням. Время необязательно; маршрут можно заполнить позже.",
-        "en": "Add pizzerias by day. Time is optional; the route can be added later.",
+        "ru": (
+            "Выберите дату и пиццерию. Время необязательно, "
+            "период поездки определится автоматически."
+        ),
+        "en": (
+            "Choose a date and pizzeria. Time is optional; "
+            "the trip period is calculated automatically."
+        ),
     },
     "trip.visit.add": {"ru": "Добавить посещение", "en": "Add visit"},
     "trip.unit.search": {"ru": "Поиск пиццерии", "en": "Search pizzerias"},
@@ -61,6 +81,12 @@ TRIP_TEXTS: dict[str, dict[str, str]] = {
         "en": "add no more than {n} visits at once",
     },
     "trip.err.step_time": {"ru": "укажите корректное время", "en": "enter a valid time"},
+    "trip.err.date_invalid": {"ru": "укажите корректную дату", "en": "enter a valid date"},
+    "trip.err.visit_day": {"ru": "укажите дату посещения", "en": "enter the visit date"},
+    "trip.err.plan_dates": {
+        "ru": "укажите дату посещения или поездки",
+        "en": "enter a visit date or a trip date",
+    },
     "trip.step.add": {"ru": "Добавить в план", "en": "Add to plan"},
     "trip.step.day": {"ru": "День", "en": "Day"},
     "trip.step.at": {"ru": "Время", "en": "Time"},
