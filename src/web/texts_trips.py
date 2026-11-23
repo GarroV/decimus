@@ -48,10 +48,19 @@ TRIP_TEXTS: dict[str, dict[str, str]] = {
         "ru": "На этот день ничего не запланировано.",
         "en": "Nothing planned for this day.",
     },
-    "trip.plan.after_create": {
-        "ru": "План по дням появится после создания поездки.",
-        "en": "The day-by-day plan becomes available once the trip is created.",
+    "trip.visits": {"ru": "План посещений", "en": "Visit plan"},
+    "trip.visits.hint": {
+        "ru": "Добавьте пиццерии по дням. Время необязательно; маршрут можно заполнить позже.",
+        "en": "Add pizzerias by day. Time is optional; the route can be added later.",
     },
+    "trip.visit.add": {"ru": "Добавить посещение", "en": "Add visit"},
+    "trip.unit.search": {"ru": "Поиск пиццерии", "en": "Search pizzerias"},
+    "trip.step.edit": {"ru": "Изменить посещение", "en": "Edit visit"},
+    "trip.err.steps_many": {
+        "ru": "добавьте не больше {n} посещений за один раз",
+        "en": "add no more than {n} visits at once",
+    },
+    "trip.err.step_time": {"ru": "укажите корректное время", "en": "enter a valid time"},
     "trip.step.add": {"ru": "Добавить в план", "en": "Add to plan"},
     "trip.step.day": {"ru": "День", "en": "Day"},
     "trip.step.at": {"ru": "Время", "en": "Time"},

@@ -141,17 +141,55 @@ def _draft_from_form(units: tuple[Unit, ...]) -> Draft:
     )
 
 
-def _step_from_form(units: tuple[Unit, ...]) -> StepDraft:
+def _step_from_form(units: tuple[Unit, ...], *, country: str | None = None) -> StepDraft:
     точка = (request.form.get("unit") or "").strip() or None
-    if точка is not None and точка not in {u.id for u in units}:
+    if точка is not None and точка not in {
+        u.id for u in units if not country or u.country == country
+    }:
         raise TripError("trip.err.unit")
+    at = _step_time(request.form.get("at"))
     return StepDraft(
         day=_parse_date(request.form.get("day")),
-        at=_parse_time(request.form.get("at")),
+        at=at,
         kind=(request.form.get("kind") or "").strip(),
         unit_id=точка,
         body=request.form.get("body") or "",
     )
+
+
+def _step_time(raw: str | None) -> time | None:
+    parsed = _parse_time(raw)
+    if raw and raw.strip() and parsed is None:
+        raise TripError("trip.err.step_time")
+    return parsed
+
+
+def _visit_rows() -> list[dict[str, str]]:
+    columns = [request.form.getlist(f"visit_{key}") for key in ("day", "unit", "at")]
+    if len({len(c) for c in columns}) != 1 or len(columns[0]) > tr.MAX_STEPS:
+        raise TripError("trip.err.steps_many", n=tr.MAX_STEPS)
+    return [
+        dict(zip(("day", "unit", "at"), row, strict=True)) for row in zip(*columns, strict=True)
+    ]
+
+
+def _visits_from_form(units: tuple[Unit, ...], draft: Draft) -> tuple[StepDraft, ...]:
+    allowed = {u.id for u in units if not draft.country or u.country == draft.country}
+    steps = []
+    for row in _visit_rows():
+        if not row["unit"] and not row["at"]:
+            continue  # Пустая строка с предложенной датой не обязывает заполнять маршрут.
+        if row["unit"] not in allowed:
+            raise TripError("trip.err.unit" if row["unit"] else "trip.err.step_unit")
+        step = StepDraft(
+            day=_parse_date(row["day"]),
+            at=_step_time(row["at"]),
+            kind="inspection",
+            unit_id=row["unit"],
+            body="",
+        )
+        steps.append(tr.check_step(step, draft))
+    return tuple(steps)
 
 
 def _reason(exc: TripError, lang: str) -> str:
@@ -211,8 +249,15 @@ def _render(
     новая = selected == "new" and may_edit(None)
     точки = _units() if (новая or открыта is not None) else ()
 
-    def к_поездке(ид: str) -> str:
-        return отбор(trip=ид)
+    def к_поездке(ид: str, day: date | None = None) -> str:
+        return отбор(trip=ид, trip_day=day.isoformat() if day else "")
+
+    visit_rows = []
+    if новая and request.method == "POST":
+        try:
+            visit_rows = _visit_rows()
+        except TripError:
+            pass
 
     return render_template(
         "calendar/index.html",
@@ -237,13 +282,12 @@ def _render(
         trip_self_only=not guard.may(PLAN),
         trip_failure=failure,
         trip_form=form or {},
+        trip_visits=visit_rows or [{"day": "", "unit": "", "at": ""}],
+        trip_max_steps=tr.MAX_STEPS,
+        trip_selected_day=_parse_date(request.args.get("trip_day")),
         trip_people=tuple(sorted(_people())) if (новая or открыта) and guard.may(PLAN) else (),
         trip_countries=tuple(sorted({u.country for u in точки if u.country})),
-        trip_units=tuple(
-            u
-            for u in точки
-            if открыта is None or not открыта.country or u.country == открыта.country
-        ),
+        trip_units=точки,
         trip_done=_done_by_unit(открыта) if открыта is not None else {},
         trip_kinds=tr.KINDS,
         trip_statuses=tr.STATUSES,
@@ -292,10 +336,14 @@ def install(app: Flask, conf: Settings) -> None:
         язык = _lang(conf)
         вошедший = auth.current_account()
         try:
+            units = _units()
+            draft = tr.check_draft(_draft_from_form(units))
+            visits = _visits_from_form(units, draft)
             ид = tr.create_trip(
-                _draft_from_form(_units()),
+                draft,
                 tenant=_tenant(),
                 actor_id=вошедший.id if вошедший else "",
+                steps=visits,
             )
         except TripError as exc:
             return _render(
@@ -357,13 +405,38 @@ def install(app: Flask, conf: Settings) -> None:
         if отказ is not None:
             return отказ
         try:
-            tr.add_step(поездка, _step_from_form(_units()))
+            tr.add_step(поездка, _step_from_form(_units(), country=поездка.country))
         except TripError as exc:
             return _render(
                 conf,
                 selected=поездка.id,
                 failure=_reason(exc, _lang(conf)),
                 form=dict(request.form),
+                status=400,
+            )
+        return _back(поездка.id)
+
+    @app.post(f"{путь}/trips/<trip_id>/steps/<step_id>", endpoint="trip_step_update")
+    @guard.action(PLAN, OWN, object_in_route=True)
+    def trip_step_update(trip_id: str, step_id: str) -> Response | tuple[str, int]:
+        refuse_foreign_origin()
+        поездка = _own_trip(trip_id)
+        if поездка is None or not any(s.id == step_id for s in поездка.steps):
+            return _render(conf, selected=trip_id, status=404)
+        отказ = _permit(поездка)
+        if отказ is not None:
+            return отказ
+        try:
+            if not tr.update_step(
+                поездка, step_id, _step_from_form(_units(), country=поездка.country)
+            ):
+                return _render(conf, selected=trip_id, status=404)
+        except TripError as exc:
+            return _render(
+                conf,
+                selected=trip_id,
+                failure=_reason(exc, _lang(conf)),
+                form={**dict(request.form), "step_id": step_id},
                 status=400,
             )
         return _back(поездка.id)

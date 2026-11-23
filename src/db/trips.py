@@ -20,7 +20,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, time, timedelta
 from typing import Any
 
@@ -41,6 +41,7 @@ MAX_BODY = 500
 MAX_DAYS = 62
 #: Сколько поездок читать за раз: сетка рисует не больше трёх месяцев.
 LIST_LIMIT = 500
+MAX_STEPS = 200
 
 
 @dataclass(frozen=True)
@@ -160,6 +161,12 @@ delete from trip_steps
  where tenant_code = %(tenant)s and trip_id = %(id)s and id = %(step)s
 """
 
+_UPDATE_STEP_SQL = """
+update trip_steps set day = %(day)s, at = %(at)s, kind = %(kind)s,
+       unit_id = %(unit_id)s, body = %(body)s
+ where tenant_code = %(tenant)s and trip_id = %(id)s and id = %(step)s
+"""
+
 
 def _space(tenant: str) -> str:
     код = canonical_tenant(tenant or "")
@@ -203,7 +210,7 @@ def _trip(row: tuple[Any, ...], steps: tuple[Step, ...] = ()) -> Trip:
 
 
 def list_trips(*, tenant: str, date_from: date, date_to: date) -> tuple[Trip, ...]:
-    """Поездки пространства, задевающие отрезок `date_from` — `date_to` (без шагов)."""
+    """Поездки с планом: два запроса на всю сетку, независимо от числа поездок."""
     with _db("прочитать поездки") as conn, conn.cursor() as cur:
         cur.execute(
             _LIST_SQL,
@@ -214,7 +221,32 @@ def list_trips(*, tenant: str, date_from: date, date_to: date) -> tuple[Trip, ..
                 "limit": LIST_LIMIT,
             },
         )
-        return tuple(_trip(r) for r in cur.fetchall())
+        trips = tuple(_trip(r) for r in cur.fetchall())
+        if not trips:
+            return ()
+        cur.execute(
+            """select s.trip_id, s.id, s.day, s.at, s.kind, s.unit_id, u.name, s.body
+                 from trip_steps s left join units u on u.id = s.unit_id
+                where s.tenant_code = %(tenant)s and s.trip_id = any(%(ids)s::uuid[])
+                order by s.day, s.at nulls first, s.created_at""",
+            {"tenant": _space(tenant), "ids": [t.id for t in trips]},
+        )
+        steps: dict[str, list[Step]] = {}
+        for row in cur.fetchall():
+            steps.setdefault(str(row[0]), []).append(_step(row[1:]))
+        return tuple(replace(t, steps=tuple(steps.get(t.id, ()))) for t in trips)
+
+
+def _step(row: tuple[Any, ...]) -> Step:
+    return Step(
+        id=str(row[0]),
+        day=row[1],
+        at=row[2],
+        kind=str(row[3]),
+        unit_id=None if row[4] is None else str(row[4]),
+        unit_name=None if row[5] is None else str(row[5]),
+        body=str(row[6]),
+    )
 
 
 def get_trip(trip_id: str, *, tenant: str) -> Trip | None:
@@ -229,18 +261,7 @@ def get_trip(trip_id: str, *, tenant: str) -> Trip | None:
         if row is None:
             return None
         cur.execute(_STEPS_SQL, params)
-        steps = tuple(
-            Step(
-                id=str(s[0]),
-                day=s[1],
-                at=s[2],
-                kind=str(s[3]),
-                unit_id=None if s[4] is None else str(s[4]),
-                unit_name=None if s[5] is None else str(s[5]),
-                body=str(s[6]),
-            )
-            for s in cur.fetchall()
-        )
+        steps = tuple(_step(s) for s in cur.fetchall())
     return _trip(row, steps)
 
 
@@ -287,18 +308,29 @@ def _params(draft: Draft) -> dict[str, Any]:
     }
 
 
-def create_trip(draft: Draft, *, tenant: str, actor_id: str) -> str:
-    """Завести поездку в своём пространстве; вернуть её `id`."""
+def create_trip(
+    draft: Draft,
+    *,
+    tenant: str,
+    actor_id: str,
+    steps: tuple[StepDraft, ...] = (),
+) -> str:
+    """Поездка и начальный план сохраняются одной транзакцией, целиком или никак."""
     чистый = check_draft(draft)
+    if len(steps) > MAX_STEPS:
+        raise TripError("trip.err.steps_many", n=MAX_STEPS)
+    план = tuple(check_step(step, чистый) for step in steps)
     автор = _uuid(actor_id)
     if автор is None:
         raise TripError("trip.err.space")
     with _db("сохранить поездку") as conn, conn.cursor() as cur:
         cur.execute(_INSERT_SQL, {**_params(чистый), "tenant": _space(tenant), "actor": автор})
         row = cur.fetchone()
+        if row is None:
+            raise TripError("trip.err.db", what="insert")
+        for step in план:
+            cur.execute(_INSERT_STEP_SQL, _step_params(str(row[0]), tenant, step))
         conn.commit()
-    if row is None:
-        raise TripError("trip.err.db", what="insert")
     return str(row[0])
 
 
@@ -333,9 +365,14 @@ def delete_trip(trip_id: str, *, tenant: str) -> bool:
     return удалено
 
 
-def check_step(step: StepDraft, trip: Trip) -> StepDraft:
+def check_step(step: StepDraft, trip: Trip | Draft) -> StepDraft:
     """Проверить шаг плана против его поездки."""
-    if step.day is None or not trip.date_from <= step.day <= trip.date_to:
+    if (
+        step.day is None
+        or trip.date_from is None
+        or trip.date_to is None
+        or not trip.date_from <= step.day <= trip.date_to
+    ):
         raise TripError("trip.err.step_day")
     if step.kind not in KINDS:
         raise TripError("trip.err.step_kind")
@@ -350,23 +387,37 @@ def check_step(step: StepDraft, trip: Trip) -> StepDraft:
     return StepDraft(day=step.day, at=step.at, kind=step.kind, unit_id=точка, body=текст)
 
 
+def _step_params(trip_id: str, tenant: str, step: StepDraft) -> dict[str, Any]:
+    return {
+        "id": trip_id,
+        "tenant": _space(tenant),
+        "day": step.day,
+        "at": step.at,
+        "kind": step.kind,
+        "unit_id": step.unit_id,
+        "body": step.body,
+    }
+
+
 def add_step(trip: Trip, step: StepDraft) -> None:
     """Добавить шаг в план поездки (поездка уже прочитана своим пространством)."""
     чистый = check_step(step, trip)
     with _db("сохранить шаг плана") as conn, conn.cursor() as cur:
-        cur.execute(
-            _INSERT_STEP_SQL,
-            {
-                "id": trip.id,
-                "tenant": _space(trip.tenant),
-                "day": чистый.day,
-                "at": чистый.at,
-                "kind": чистый.kind,
-                "unit_id": чистый.unit_id,
-                "body": чистый.body,
-            },
-        )
+        cur.execute(_INSERT_STEP_SQL, _step_params(trip.id, trip.tenant, чистый))
         conn.commit()
+
+
+def update_step(trip: Trip, step_id: str, step: StepDraft) -> bool:
+    """Правка только шага этой поездки и этого пространства."""
+    ident = _uuid(step_id)
+    if ident is None:
+        return False
+    чистый = check_step(step, trip)
+    with _db("сохранить шаг плана") as conn, conn.cursor() as cur:
+        cur.execute(_UPDATE_STEP_SQL, {**_step_params(trip.id, trip.tenant, чистый), "step": ident})
+        changed = cur.rowcount == 1
+        conn.commit()
+    return changed
 
 
 def delete_step(trip: Trip, step_id: str) -> bool:

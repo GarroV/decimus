@@ -25,7 +25,7 @@
 </header>{% endblock %}
 
 {% block page_class %} page--wide{% endblock %}
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}"><script src="{{ url_for('static', filename='trips.js') }}" data-swap-safe defer></script>{% endblock %}
 
 {% block split_top %}
 
@@ -50,8 +50,17 @@
               <span class="cal__num">{{ day.day.day }}</span>
               {% if day.in_month %}
                 {% for trip_row in day.trips %}
-                  <a class="cal__trip cal__trip--{{ trip_row.status }}" href="{{ trip_href(trip_row.id) }}" data-drawer-open
+                  {% set visits = trip_row.steps_on(day.day) | selectattr('unit_name') | list %}
+                  {% for visit in visits %}
+                    <a class="cal__trip cal__trip--{{ trip_row.status }}" href="{{ trip_href(trip_row.id, day.day) }}" data-drawer-open
+                       title="{{ t('trip.status.' ~ trip_row.status) }} · {{ visit.unit_name }} · {{ trip_row.executor_name }}">
+                      <span class="cal__unit">{{ visit.unit_name }}{% if visit.at %} · {{ visit.at.strftime('%H:%M') }}{% endif %}</span>
+                      <small class="cal__traveller">{{ trip_row.executor_name }}</small>
+                    </a>
+                  {% else %}
+                  <a class="cal__trip cal__trip--{{ trip_row.status }}" href="{{ trip_href(trip_row.id, day.day) }}" data-drawer-open
                      title="{{ trip_row.executor_name }}{% if trip_row.country %} · {{ country_title(trip_row.country) }}{% endif %}"><span class="cal__unit">{{ trip_row.executor_name }}{% if trip_row.country %} · {{ trip_row.country }}{% endif %}</span></a>
+                  {% endfor %}
                 {% endfor %}
                 {% for row in day.shown %}
                   <a class="cal__item" href="{{ card_href(row) }}" title="{{ row.unit_name }} · {{ row.grade }}"><span class="cal__unit">{{ row.unit_name }}</span><b class="cal__grade">{{ row.grade }}</b></a>
