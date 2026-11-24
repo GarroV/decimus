@@ -104,7 +104,7 @@ _SCREEN: dict[str, dict[str, str]] = {
     "users.tab.people": {"ru": "Люди", "en": "People"},
     "users.add.open": {"ru": "Добавить человека", "en": "Add a person"},
     # Фильтры — одной строкой над списком.
-    "users.filter.search": {"ru": "Логин или почта", "en": "Login or email"},
+    "users.filter.search": {"ru": "Поиск по почте", "en": "Search by email"},
     "users.filter.space_all": {"ru": "Все пространства", "en": "All spaces"},
     "users.filter.role_all": {"ru": "Все роли", "en": "All roles"},
     "users.filter.auditor_any": {"ru": "Аудитор или сотрудник", "en": "Auditor or staff"},
@@ -630,6 +630,52 @@ _CARD: dict[str, dict[str, str]] = {
 }
 
 USERS_TEXTS: dict[str, dict[str, str]] = {
+    "users.tab.spaces": {"ru": "Пространства партнёров", "en": "Partner spaces"},
+    "users.space.people": {"ru": "Люди · {n}", "en": "People · {n}"},
+    "users.space.empty": {
+        "ru": "В пространстве пока нет людей. Добавьте первого человека.",
+        "en": "No people in this space yet. Add the first person.",
+    },
+    "users.space.email_hint": {
+        "ru": "Эта почта — логин для входа.",
+        "en": "This email is the sign-in identity.",
+    },
+    "users.space.settings": {"ru": "Настройки пространства", "en": "Space settings"},
+    "users.delete.open": {"ru": "Удалить", "en": "Delete"},
+    "users.delete.yes": {"ru": "Удалить через 30 дней", "en": "Delete in 30 days"},
+    "users.delete.confirm": {
+        "ru": (
+            "Удалить {login}? Доступ закроется сразу. Через 30 дней личные данные и способы "
+            "входа будут стёрты без восстановления. История проверок и действий сохранится. "
+            "До срока удаление можно отменить."
+        ),
+        "en": (
+            "Delete {login}? Access closes immediately. In 30 days personal details and "
+            "credentials will be permanently erased. Inspection and action history remains. "
+            "You can cancel before that date."
+        ),
+    },
+    "users.delete.due": {"ru": "Удаление: {date}", "en": "Deletion: {date}"},
+    "users.delete.cancel": {"ru": "Отменить удаление", "en": "Cancel deletion"},
+    "users.delete.cancelled": {
+        "ru": (
+            "Удаление отменено. Учётка остаётся замороженной; "
+            "доступ можно восстановить отдельно."
+        ),
+        "en": "Deletion cancelled. The account remains frozen; restore access separately.",
+    },
+    "users.delete.scheduled": {
+        "ru": "Доступ закрыт. Учётка будет удалена через 30 дней.",
+        "en": "Access closed. The account will be deleted in 30 days.",
+    },
+    "users.delete.failed": {
+        "ru": "Не удалось изменить удаление учётки. Обновите страницу и проверьте её состояние.",
+        "en": "Could not change account deletion. Reload and check its status.",
+    },
+    "users.delete.unchanged": {
+        "ru": "Состояние не изменено: удаление уже назначено либо срок отмены прошёл.",
+        "en": "Unchanged: deletion is already scheduled or the cancellation deadline has passed.",
+    },
     **_ROLES,
     **_SCREEN,
     **_PANEL,

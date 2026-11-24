@@ -1,8 +1,32 @@
 /* Экран «Пользователи» поверх каркаса `decimus-split.css`: колонки списка
    людей и пространств и выбор роли карточками «название + что может». */
 
-.slist--users { --slist-cols: minmax(0, 1fr) 72px minmax(138px, 160px) 90px 90px; }
-.slist--users.slist--nobot { --slist-cols: minmax(0, 1fr) 72px minmax(138px, 160px) 90px; }
+.slist--users { --slist-cols: minmax(0, 1.5fr) minmax(110px, .45fr) minmax(140px, .8fr) minmax(95px, .5fr) minmax(130px, .65fr); }
+.slist--users.slist--nobot { --slist-cols: minmax(0, 1.5fr) minmax(110px, .45fr) minmax(140px, .8fr) minmax(130px, .65fr); }
+.slist--users .slist__head > span { min-width: 0; white-space: normal; overflow-wrap: anywhere; padding-inline-end: var(--space-2); }
+.slist--users .srow__cell { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.slist--users .srow__main { min-width: 0; overflow-wrap: anywhere; }
+
+.partner-people { min-width: 0; }
+.partner-people__toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: var(--space-6); margin-bottom: var(--space-8); }
+.partner-people__toolbar .pickbox { width: min(100%, 25rem); }
+.partner-people__layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(250px, 1fr); gap: var(--space-7); align-items: start; }
+.partner-people__add { padding: var(--space-7); min-width: 0; }
+.partner-people__add h2, .partner-people__members h2 { margin: 0; font-size: var(--fs-lead); overflow-wrap: anywhere; }
+.partner-people__add p { color: var(--ink-2); }
+.partner-person { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-6); padding: var(--space-7); border-top: 1px solid var(--line); }
+.partner-person__identity { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; overflow-wrap: anywhere; }
+.partner-person__status { color: var(--ink-2); font-size: var(--fs-meta); }
+.partner-person__role { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.partner-person__actions { grid-column: 1 / -1; display: flex; gap: var(--space-4); flex-wrap: wrap; }
+.partner-people__settings { margin-top: var(--space-7); }
+.partner-people .ssecret { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.partner-people .ssecret code { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 1150px) { .partner-people__layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 719px) { .partner-person { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 719px) {
+  .sadmin__nav .pk-rail--inline { max-height: 38vh; overflow-y: auto; }
+}
 .slist--spaces { --slist-cols: minmax(0, 1fr) minmax(0, 1fr) 64px; }
 
 /* Роль — должность словом и одна строка, что она может (владелец 09.10.2026). */

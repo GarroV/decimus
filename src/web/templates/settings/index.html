@@ -76,8 +76,7 @@
           {% if tile == 'profile' %}
           <div class="ssec" id="profile">
             <div class="sname">
-              <span class="sname__main">{{ me.display_name or me.login }}</span>
-              {% if me.display_name %}<span class="sname__sub mono">{{ me.login }}</span>{% endif %}
+              <span class="sname__main">{{ me.display_name or me.email or me.login }}</span>
             </div>
             <div class="srow2">
               <span class="srow2__label">{{ t('settings.profile.role') }}</span>
@@ -90,7 +89,11 @@
             </div>
             <div class="srow2">
               <span class="srow2__label">{{ t('settings.profile.account') }}</span>
-              <span class="srow2__value mono">{{ me.login }}</span>
+              <span class="srow2__value">{{ me.email or me.login }}</span>
+            </div>
+            <div class="srow2">
+              <span class="srow2__label">{{ t('profile.password.title') }}</span>
+              <span class="srow2__act"><a class="sbtn" href="{{ base }}?lang={{ lang }}&tile=password">{{ t('profile.password.submit') }}</a></span>
             </div>
           </div>
           {% elif tile == 'language' %}

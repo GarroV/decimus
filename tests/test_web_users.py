@@ -21,7 +21,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
-from src.web import accounts, people, users_screen
+from src.web import accounts, people
 from src.web.accounts import everyone as настоящий_перечень
 
 #: Админ УК: управлять людьми может только он (D288).
@@ -84,7 +84,9 @@ def test_аудитор_не_заводит_людей_даже_прямой_о�
     )
 
     ответ = стенд_аудитора.post(
-        "/users/add", data={"login": "chuzhoy", "role": "admin"}, headers=СВОЙ
+        "/users/add",
+        data={"email": "new-person@test.invalid", "login": "chuzhoy", "role": "admin"},
+        headers=СВОЙ,
     )
 
     # Заслон стоит на ДЕЙСТВИИ, а не на ссылке: спрятанная кнопка не мешает
@@ -114,7 +116,14 @@ def test_пароль_заведённого_показан_один_раз_и_�
     )
 
     ответ = стенд_админа.post(
-        "/users/add", data={"login": "petr", "role": "developer", "tenant": ТЕНАНТ}, headers=СВОЙ
+        "/users/add",
+        data={
+            "email": "new-person@test.invalid",
+            "login": "petr",
+            "role": "developer",
+            "tenant": ТЕНАНТ,
+        },
+        headers=СВОЙ,
     )
 
     # Страница, а не перенаправление: пароль в адресе остался бы в истории
@@ -126,12 +135,13 @@ def test_пароль_заведённого_показан_один_раз_и_�
 
 
 def test_логин_берётся_из_почты(стенд_админа: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    """D488: в форме только почта и роль — логин система берёт из почты."""
+    """Публичный логин — полная почта, создаётся одной дверью с паролем."""
     заведённые: list[str] = []
 
-    def _добавить(login: str, **_: object) -> accounts.Added:
-        заведённые.append(login)
-        return accounts.Added(login=login, role="developer", password="x")
+    def _добавить(login: str, **kwargs: object) -> accounts.Added:
+        email = str(kwargs["email"])
+        заведённые.append(email)
+        return accounts.Added(login=login, role="developer", password="x", email=email)
 
     monkeypatch.setattr(accounts, "add", _добавить)
     monkeypatch.setattr(people, "change_email", lambda **_: people.Outcome("email.ok", 200))
@@ -143,13 +153,37 @@ def test_логин_берётся_из_почты(стенд_админа: Flas
     )
 
     assert ответ.status_code == 200
-    assert заведённые == ["n.kushnirchuk"]
+    assert заведённые == ["N.Kushnirchuk@dodobrands.io"]
+    assert "N.Kushnirchuk@dodobrands.io" in ответ.get_data(as_text=True)
 
 
-def test_логин_из_почты_по_форме() -> None:
-    assert users_screen.login_from_email("a.b-c@x.io") == "a.b-c"
-    assert users_screen.login_from_email("Иван+tag@x.io") == "tag"
-    assert users_screen.login_from_email("") == ""
+def test_однобуквенная_почта_принимается(
+    стенд_админа: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        accounts, "add", lambda login, **kw: accounts.Added(login, "developer", "x", kw["email"])
+    )
+    response = стенд_админа.post(
+        "/users/add",
+        data={"email": "a@example.org", "role": "developer", "tenant": ТЕНАНТ},
+        headers=СВОЙ,
+    )
+    assert response.status_code == 200
+    assert "a@example.org" in response.get_data(as_text=True)
+
+
+def test_без_почты_не_создаётся_неполная_учётка(
+    стенд_админа: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    called = []
+    monkeypatch.setattr(accounts, "add", lambda *args, **kw: called.append(kw))
+    response = стенд_админа.post(
+        "/users/add",
+        data={"login": "old-alias", "role": "developer", "tenant": ТЕНАНТ},
+        headers=СВОЙ,
+    )
+    assert response.status_code == 400
+    assert called == []
 
 
 def test_себя_заморозить_нельзя(стенд_админа: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -199,7 +233,11 @@ def test_сотрудник_партнёра_не_заводит_людей(monk
     подменить_двери(monkeypatch, tenant="GE", role="auditor")
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
-        ответ = client.post("/users/add", headers=СВОЙ, data={"login": "x", "tenant": "GE"})
+        ответ = client.post(
+            "/users/add",
+            headers=СВОЙ,
+            data={"email": "new-person@test.invalid", "login": "x", "tenant": "GE"},
+        )
         отключение = client.post("/users/freeze", headers=СВОЙ, data={"login": "x", "tenant": "GE"})
     assert ответ.status_code == 403 and заведено == []
     assert отключение.status_code == 403
@@ -220,7 +258,11 @@ def test_админ_уК_заводит_человека_в_выбранное_�
     подменить_двери(monkeypatch, tenant="HQ", role="admin")
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
-        client.post("/users/add", headers=СВОЙ, data={"login": "ge-director", "tenant": "GE"})
+        client.post(
+            "/users/add",
+            headers=СВОЙ,
+            data={"email": "new-person@test.invalid", "login": "ge-director", "tenant": "GE"},
+        )
     assert заведено == [("ge-director", "GE")]
 
 
@@ -232,7 +274,11 @@ def test_незаведённое_пространство_в_форме_это_
     подменить_двери(monkeypatch, tenant="HQ", role="admin")
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
-        ответ = client.post("/users/add", headers=СВОЙ, data={"login": "x", "tenant": "ZZ"})
+        ответ = client.post(
+            "/users/add",
+            headers=СВОЙ,
+            data={"email": "new-person@test.invalid", "login": "x", "tenant": "ZZ"},
+        )
     assert ответ.status_code == 400 and заведено == []
 
 

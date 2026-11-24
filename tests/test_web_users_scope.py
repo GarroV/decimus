@@ -69,7 +69,9 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         зовы["everyone"].append(tenant)
         return tuple(r for r in ПЕРЕЧЕНЬ if tenant is None or r.tenant == tenant)
 
-    def add(login: str, *, tenant: str, role: str = "auditor") -> accounts.Added:
+    def add(
+        login: str, *, tenant: str, role: str = "auditor", email: str | None = None
+    ) -> accounts.Added:
         зовы["add"].append((login, tenant, role))
         return accounts.Added(login=login, role=role, password="одноразовый-пароль-24-знака")
 
@@ -206,7 +208,14 @@ def test_главный_админ_назначает_другого_главн�
 
 def test_главный_админ_заводит_админа_уК(главный: FlaskClient, база: dict[str, list[Any]]) -> None:
     ответ = главный.post(
-        "/users/add", data={"login": "newdev", "tenant": "HQ", "role": "admin"}, headers=ЗАГОЛОВКИ
+        "/users/add",
+        data={
+            "email": "new-person@test.invalid",
+            "login": "newdev",
+            "tenant": "HQ",
+            "role": "admin",
+        },
+        headers=ЗАГОЛОВКИ,
     )
 
     assert ответ.status_code == 200
@@ -296,7 +305,14 @@ def test_админ_уК_заводит_админа_и_ведёт_других_
 ) -> None:
     """D440 («Admin too»): админа заводит и админ; главного — нет (см. выше)."""
     добавлен = админ_уК.post(
-        "/users/add", data={"login": "newadm", "tenant": "HQ", "role": "admin"}, headers=ЗАГОЛОВКИ
+        "/users/add",
+        data={
+            "email": "new-person@test.invalid",
+            "login": "newadm",
+            "tenant": "HQ",
+            "role": "admin",
+        },
+        headers=ЗАГОЛОВКИ,
     )
     отключён = админ_уК.post(
         "/users/freeze", data={"login": "kostya", "tenant": "HQ"}, headers=ЗАГОЛОВКИ
@@ -324,7 +340,14 @@ def test_админ_уК_заводит_пространство_и_админа
         headers=ЗАГОЛОВКИ,
     )
     человек = админ_уК.post(
-        "/users/add", data={"login": "aidar", "tenant": "GE", "role": "admin"}, headers=ЗАГОЛОВКИ
+        "/users/add",
+        data={
+            "email": "new-person@test.invalid",
+            "login": "aidar",
+            "tenant": "GE",
+            "role": "admin",
+        },
+        headers=ЗАГОЛОВКИ,
     )
 
     assert пространство.status_code == 200 and "Пространство заведено" in пространство.get_data(
@@ -384,7 +407,14 @@ def test_админ_партнёра_ведёт_людей_своего_прос
     админ_GE: FlaskClient, база: dict[str, list[Any]]
 ) -> None:
     заведение = админ_GE.post(
-        "/users/add", data={"login": "lado", "tenant": "GE", "role": "auditor"}, headers=ЗАГОЛОВКИ
+        "/users/add",
+        data={
+            "email": "new-person@test.invalid",
+            "login": "lado",
+            "tenant": "GE",
+            "role": "auditor",
+        },
+        headers=ЗАГОЛОВКИ,
     )
     роль = админ_GE.post(
         "/users/role", data={"login": "gia", "tenant": "GE", "role": "admin"}, headers=ЗАГОЛОВКИ

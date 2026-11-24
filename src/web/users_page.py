@@ -17,8 +17,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from typing import Any
+from urllib.parse import urlencode
 
-from flask import render_template, request
+from flask import abort, render_template, request
 
 from src.db import bot_links
 from src.db.errors import DbError
@@ -35,6 +36,7 @@ from . import (
 )
 from .access_policy import Scope
 from .db_refusal import note_target_mismatch
+from .geo_names import country_title
 from .sections import section
 from .users_view import (
     TAB_PEOPLE,
@@ -200,6 +202,13 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
     экран = f"{request.script_root}{section('administration').path}"
     язык = request.args.get("lang") or ""
 
+    if вкладка == TAB_SPACES:
+        if круг is None:
+            abort(403)
+        return _render_partner_people(
+            show, code, круг, люди, известны, пространства, пр_известны, адрес, экран, язык
+        )
+
     def link(**extra: str) -> str:
         return screen_url(экран, lang=язык, f=f, **{"tab": TAB_PEOPLE, **extra})
 
@@ -236,6 +245,85 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
     )
 
 
+def _render_partner_people(
+    show: Show,
+    status: int,
+    scope: Scope,
+    rows: tuple[Any, ...],
+    known: bool,
+    spaces: tuple[Any, ...],
+    spaces_known: bool,
+    users_url: str,
+    screen: str,
+    lang: str,
+) -> tuple[str, int]:
+    """A selected partner space and its people, without a drawer or a second list."""
+    key = canonical_tenant(show.space or request.args.get("space_code", ""))
+    picked = next((s for s in spaces if s.code == key), None)
+    adding = show.add_space or request.args.get("add_space") == "1"
+    if key and picked is None and spaces_known and not adding and not show.space:
+        abort(404)
+    picked = picked or (spaces[0] if spaces else None)
+    members = tuple(r for r in rows if picked and canonical_tenant(r.tenant) == picked.code)
+
+    def label(space: Any) -> str:
+        if len(space.countries) == 1:
+            country = space.countries[0]
+            defaults = {
+                space.code.casefold(),
+                country_title(country, "ru").casefold(),
+                country_title(country, "en").casefold(),
+            }
+            if not space.name or space.name.casefold() in defaults:
+                return country_title(country, lang or "ru")
+        return str(space.name or space.code)
+
+    def link(**extra: str) -> str:
+        args = {
+            "tab": TAB_SPACES,
+            "lang": lang,
+            "space_code": picked.code if picked else "",
+            **extra,
+        }
+        return screen + "?" + urlencode({k: v for k, v in args.items() if v})
+
+    def action(name: str) -> str:
+        return (
+            users_url
+            + "/"
+            + name
+            + "?"
+            + urlencode(
+                {"tab": TAB_SPACES, "space_code": picked.code if picked else "", "lang": lang}
+            )
+        )
+
+    return render_template(
+        "users/spaces.html",
+        **administration.nav(TAB_SPACES),
+        **_people_context(scope, members, members, Filters(off=True), known, {}),
+        tab=TAB_SPACES,
+        partner_spaces=spaces,
+        partner_spaces_known=spaces_known,
+        space_pick=picked,
+        space_label=label,
+        space_add=adding,
+        manages_spaces=access_policy.manages_spaces(scope),
+        country_options=country_options(spaces),
+        role_choices=lambda row: role_choices(scope, row),
+        grantable=lambda space: access_policy.grantable_roles(scope, space),
+        show=show,
+        me=auth.current_account(),
+        link=link,
+        action=action,
+        users_url=users_url,
+        new_email=request.form.get("email", "") if request.endpoint == "add_user" else "",
+        new_role=request.form.get("role", "auditor")
+        if request.endpoint == "add_user"
+        else "auditor",
+    ), status
+
+
 def _people_context(
     круг: Scope | None,
     люди: tuple[accounts.AccountRow, ...],
@@ -256,6 +344,7 @@ def _people_context(
         "space_filter": sorted({canonical_tenant(r.tenant) for r in люди}),
         "bindings": привязки,
         "may_unfreeze": круг is not None and access_policy.may_unfreeze(круг),
+        "may_delete": круг is not None and круг.kind == access_policy.SUPER,
         "may_reset_factor": круг is not None and access_policy.may_reset_second_factor(круг),
     }
 

@@ -92,7 +92,7 @@
       {% if next_path %}<input type="hidden" name="next" value="{{ next_path }}">{% endif %}
       <label class="sr-only" for="login">{{ t('auth.login') }}</label>
       <input class="input" id="login" name="login" type="text" placeholder="{{ t('auth.login') }}"
-             autocomplete="username" autocapitalize="none" spellcheck="false"
+             autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false"
              {% if not google_enabled %}autofocus{% endif %} required>
 
       <label class="sr-only" for="password">{{ t('auth.password') }}</label>

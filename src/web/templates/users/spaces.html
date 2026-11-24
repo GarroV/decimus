@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "administration/_nav.html" import admin_nav with context %}
+{% from "users/_spaces.html" import space_card, country_select with context %}
+{% from "_split_ui.html" import confirm %}
+{% block title %}{{ t('users.tab.spaces') }}{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <script src="{{ url_for('static', filename='split.js') }}" data-swap-safe defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">
+{% endblock %}
+{% block page_heading %}<header class="page-heading"><h1>{{ t('users.tab.spaces') }}</h1></header>{% endblock %}
+{% block body %}
+<div class="sadmin">{{ admin_nav() }}<section class="sadmin__main partner-people">
+  {% if not partner_spaces_known %}<div class="note note--warn">{{ t('users.spaces.unknown') }}</div>
+  {% elif partner_spaces %}
+    <div class="partner-people__toolbar">
+      <label class="pickbox"><span class="pickbox__label">{{ t('users.drawer.space') }}</span>
+        <select class="pickselect" data-pick-nav aria-label="{{ t('users.drawer.space') }}">
+          {% for space in partner_spaces %}<option value="{{ link(space_code=space.code) }}"{% if space_pick.code == space.code %} selected{% endif %}>{{ space_label(space) }}</option>{% endfor %}
+        </select>
+      </label>
+      {% if manages_spaces %}<a class="sbtn" href="{{ link(add_space='1') }}">{{ t('users.spaces.add.open') }}</a>{% endif %}
+    </div>
+  {% else %}<p>{{ t('users.spaces.none') }}</p>{% if manages_spaces %}<a class="sbtn" href="{{ link(add_space='1') }}">{{ t('users.spaces.add.open') }}</a>{% endif %}{% endif %}
+  {% if show.flash %}<div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}" role="status">{{ t(show.flash.key, **show.flash.params) }}</div>{% endif %}
+  {% if space_add %}{{ space_card(space_pick, true, manages_spaces, show, link, country_options) }}
+  {% elif space_pick %}
+  <div class="partner-people__layout">
+    <section class="sbox partner-people__members" aria-labelledby="members-title">
+      <header class="sbar"><h2 id="members-title">{{ t('users.space.people', n=people|length) }}</h2></header>
+      {% if not people_known %}<p class="sempty">{{ t('users.unknown') }}</p>
+      {% elif not people %}<p class="sempty">{{ t('users.space.empty') }}</p>
+      {% endif %}
+      {% for row in people %}
+      <article class="partner-person">
+        <div class="partner-person__identity"><strong>{{ row.email or row.login }}</strong>
+          {% if row.name_latin is defined and row.name_latin %}<span>{{ row.name_latin }}</span>{% endif %}
+          <span class="partner-person__status">{{ t('users.status.off') if row.disabled_at else t('users.status.active') }}</span>
+        </div>
+        {% set roles = role_choices(row) %}
+        {% if roles %}<form method="post" action="{{ action('role') }}" class="partner-person__role">
+          <input type="hidden" name="login" value="{{ row.login }}"><input type="hidden" name="tenant" value="{{ row.tenant }}">
+          <label><span class="sr-only">{{ t('users.col.role') }}</span><select class="sinput" name="role" aria-label="{{ t('users.col.role') }}: {{ row.email or row.login }}">{% for role in roles %}<option value="{{ role }}"{% if role == row.role %} selected{% endif %}>{{ t(role_key(role, row.tenant)) }}</option>{% endfor %}</select></label>
+          <button class="sbtn" type="submit">{{ t('users.save') }}</button>
+        </form>{% else %}<span>{{ t(role_key(row.role, row.tenant)) }}</span>{% endif %}
+        <div class="partner-person__actions">
+          {% if row.id != me.id %}
+            {% if row.disabled_at and may_unfreeze and not row.delete_after %}<form method="post" action="{{ action('unfreeze') }}"><input type="hidden" name="login" value="{{ row.login }}"><input type="hidden" name="tenant" value="{{ row.tenant }}"><button class="sbtn">{{ t('users.unfreeze.open') }}</button></form>
+            {% elif not row.disabled_at %}{{ confirm('freeze-' ~ row.id, t('users.freeze.open'), t('users.freeze.confirm', login=row.email or row.login), t('users.freeze.yes'), action('freeze'), [('login',row.login),('tenant',row.tenant)]) }}{% endif %}
+          {% endif %}
+          {% if may_delete and row.id != me.id %}
+            {% if row.delete_after %}<p>{{ t('users.delete.due', date=row.delete_after.strftime('%d.%m.%Y')) }}</p><form method="post" action="{{ action('cancel-deletion') }}"><input type="hidden" name="login" value="{{ row.login }}"><input type="hidden" name="tenant" value="{{ row.tenant }}"><button class="sbtn">{{ t('users.delete.cancel') }}</button></form>
+            {% else %}{{ confirm('delete-' ~ row.id, t('users.delete.open'), t('users.delete.confirm', login=row.email or row.login), t('users.delete.yes'), action('delete'), [('login',row.login),('tenant',row.tenant)]) }}{% endif %}
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+    <section class="sbox partner-people__add">
+      {% if show.added %}
+        <h2>{{ t('users.added.title', login=show.added.email or new_email or show.added.login) }}</h2>
+        <p>{{ t('users.added.text') }}</p>
+        <dl class="sprops"><div><dt>{{ t('auth.login') }}</dt><dd>{{ show.added.email or new_email or show.added.login }}</dd></div></dl>
+        <div class="ssecret"><code id="new-password">{{ show.added.password }}</code><button class="sbtn" data-copy="#new-password" data-copied="{{ t('users.added.copied') }}" hidden type="button">{{ t('users.added.copy') }}</button></div>
+        <a class="sbtn sbtn--primary" href="{{ link() }}">{{ t('users.added.done') }}</a>
+      {% else %}
+        <h2>{{ t('users.add.title') }}</h2>
+        <form method="post" action="{{ action('add') }}" class="sform">
+          <input type="hidden" name="tenant" value="{{ space_pick.code }}">
+          <label><span class="sform__label">{{ t('auth.login') }}</span><input class="sinput" type="email" name="email" required autocomplete="off" value="{{ new_email }}"><small>{{ t('users.space.email_hint') }}</small></label>
+          <label><span class="sform__label">{{ t('users.col.role') }}</span><select class="sinput" name="role">{% for role in grantable(space_pick.code) %}<option value="{{ role }}"{% if role == new_role %} selected{% endif %}>{{ t(role_key(role,space_pick.code)) }}</option>{% endfor %}</select></label>
+          <button class="sbtn sbtn--primary" type="submit">{{ t('users.add.submit') }}</button>
+        </form>
+      {% endif %}
+    </section>
+  </div>
+  {% if manages_spaces %}<details class="sfold partner-people__settings"><summary>{{ t('users.space.settings') }}</summary>
+    <p>{{ t('users.spaces.col.countries') }}: {% for country in space_pick.countries %}{{ country_title(country) }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+    <form method="post" action="{{ action('spaces/countries') }}" class="sform sform--row"><input type="hidden" name="code" value="{{ space_pick.code }}"><label><span class="sform__label">{{ t('users.spaces.countries.add') }}</span>{{ country_select(country_options) }}</label><button class="sbtn">{{ t('users.spaces.countries.submit') }}</button></form>
+  </details>{% endif %}
+  {% endif %}
+</section></div>
+{% endblock %}

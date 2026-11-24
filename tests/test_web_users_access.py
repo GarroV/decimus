@@ -420,7 +420,12 @@ def test_добавить_контроль_партнёру_отказ_до_ба
     monkeypatch.setattr(accounts, "add", завести)
     ответ = админ_ук.post(
         "/users/add",
-        data={"login": "ctl", "tenant": "GE", "role": "control"},
+        data={
+            "email": "new-person@test.invalid",
+            "login": "ctl",
+            "tenant": "GE",
+            "role": "control",
+        },
         headers=ЗАГОЛОВКИ,
     )
 
@@ -535,7 +540,9 @@ def люди_контроля(
     зовы["add"] = []
     зовы["disable"] = []
 
-    def _завести(login: str, *, tenant: str, role: str = "auditor") -> accounts.Added:
+    def _завести(
+        login: str, *, tenant: str, role: str = "auditor", email: str | None = None
+    ) -> accounts.Added:
         зовы["add"].append((login, tenant, role))
         return accounts.Added(login=login, role=role, password="одноразовый-пароль-24-знака")
 
@@ -563,7 +570,14 @@ def test_контроль_заводит_контроль_в_уК(
     контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
 ) -> None:
     ответ = контроль.post(
-        "/users/add", data={"login": "olga", "tenant": "HQ", "role": "control"}, headers=ЗАГОЛОВКИ
+        "/users/add",
+        data={
+            "email": "new-person@test.invalid",
+            "login": "olga",
+            "tenant": "HQ",
+            "role": "control",
+        },
+        headers=ЗАГОЛОВКИ,
     )
 
     assert ответ.status_code == 200

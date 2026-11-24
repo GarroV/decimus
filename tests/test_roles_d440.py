@@ -107,7 +107,9 @@ def _двери(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         monkeypatch.setattr(data, имя, дверь)
     monkeypatch.setattr(revision, "revise_card", lambda *_a, **_k: зовы["revise_card"].append(1))
 
-    def добавить(login: str, *, tenant: str, role: str = "auditor") -> accounts.Added:
+    def добавить(
+        login: str, *, tenant: str, role: str = "auditor", email: str | None = None
+    ) -> accounts.Added:
         зовы["add"].append((tenant, role))
         return accounts.Added(login=login, role=role, password="одноразовый-пароль-24-знака")
 
@@ -231,7 +233,12 @@ def test_админ_партнёра_заводит_сотрудника_и_ад
     for роль in ("auditor", "admin"):
         ответ = клиент.post(
             "/users/add",
-            data={"login": f"p-{роль}", "tenant": ПАРТНЁР, "role": роль},
+            data={
+                "email": "new-person@test.invalid",
+                "login": f"p-{роль}",
+                "tenant": ПАРТНЁР,
+                "role": роль,
+            },
             headers=ЗАГОЛОВКИ,
         )
         assert ответ.status_code == 200, ответ.data[:200]
@@ -246,7 +253,12 @@ def test_админ_партнёра_не_заводит_роли_уК(
     for роль in ("developer", "guest", "superadmin", "control"):
         клиент.post(
             "/users/add",
-            data={"login": "x", "tenant": ПАРТНЁР, "role": роль},
+            data={
+                "email": "new-person@test.invalid",
+                "login": "x",
+                "tenant": ПАРТНЁР,
+                "role": роль,
+            },
             headers=ЗАГОЛОВКИ,
         )
 

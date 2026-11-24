@@ -23,7 +23,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from collections.abc import Callable
 
 from flask import Flask, redirect, render_template, request
@@ -79,10 +78,25 @@ def _target(scope: Scope, login: str, tenant: str) -> accounts.AccountRow | None
     """
     имя = login.strip().lower()
     где = canonical_tenant(tenant)
+    if not _selected_space_allows(scope, где):
+        return None
     for строка in access_policy.visible(scope, source(scope)):
         if строка.login.strip().lower() == имя and canonical_tenant(строка.tenant) == где:
             return строка
     return None
+
+
+def _selected_space_allows(scope: Scope, tenant: str) -> bool:
+    """The context of an inline space form cannot silently switch its target."""
+    if request.args.get("tab") != TAB_SPACES:
+        return True
+    selected = canonical_tenant(request.args.get("space_code", ""))
+    return bool(
+        selected
+        and selected == tenant
+        and selected != "HQ"
+        and (access_policy.manages_spaces(scope) or selected == scope.tenant)
+    )
 
 
 def _touchable_roles(scope: Scope, tenant: str) -> tuple[str, ...]:
@@ -143,6 +157,9 @@ def install(app: Flask, conf: Settings) -> None:
 
     _install_edits(app, users_path)
     _install_add_freeze(app, users_path)
+    from .users_deletion_screen import install as install_deletion
+
+    install_deletion(app, users_path)
     _install_spaces(app, users_path)
     connections_screen.install(app)
     connections_screen.install_service_keys(app)
@@ -263,18 +280,6 @@ def _install_edits(app: Flask, users_path: str) -> None:
 def _install_add_freeze(app: Flask, users_path: str) -> None:
     """Добавить человека, заморозить и разморозить."""
 
-    def _set_email(круг: Scope, логин: str, пространство: str, почта: str) -> bool:
-        вошедший = auth.current_account()
-        исход = people.change_email(
-            login=логин,
-            tenant=пространство,
-            email=почта,
-            actor_login=вошедший.login if вошедший else "",
-            actor_tenant=вошедший.tenant if вошедший else "",
-            only_roles=_touchable_roles(круг, пространство),
-        )
-        return исход.key == "email.ok"
-
     @app.post(f"{users_path}/add")
     @guard.action("people.manage")
     def add_user() -> FlaskResponse | tuple[str, int]:
@@ -282,8 +287,7 @@ def _install_add_freeze(app: Flask, users_path: str) -> None:
 
         Страница, а не перенаправление: пароль в адресе остался бы в истории
         браузера и в журнале обратного прокси. Пространство или роль вне охвата
-        — подделка, отказ 403 до базы. Почта для Google необязательна и
-        задаётся той же дверью, что в карточке, уже после заведения.
+        — подделка, отказ 403 до базы. Почта и пароль создаются атомарно.
         """
         круг = people_scope()
         if круг is None:
@@ -292,14 +296,10 @@ def _install_add_freeze(app: Flask, users_path: str) -> None:
         роль = request.form.get("role") or accounts.ROLE_AUDITOR
         пространство = canonical_tenant((request.form.get("tenant") or "").strip())
         почта = (request.form.get("email") or "").strip()
+        if not _selected_space_allows(круг, пространство):
+            return forbidden()
         if not access_policy.grantable_roles(круг, пространство):
             return forbidden()
-        if почта and not people.EMAIL_SHAPE.match(почта):
-            return render(Show(add=True, flash=_flash("users.email.shape", ok=False)), 400)
-        # Логин не спрашиваем (D488): берётся из почты, имя подтянет Google при входе.
-        логин = (request.form.get("login") or "").strip() or login_from_email(почта)
-        if not логин:
-            return render(Show(add=True, flash=_flash("users.email.shape", ok=False)), 400)
         try:
             if пространство not in accounts.spaces():
                 return render(
@@ -309,12 +309,15 @@ def _install_add_freeze(app: Flask, users_path: str) -> None:
                 return render(Show(add=True, flash=_flash("users.add.role_space", ok=False)), 400)
             if not access_policy.may_grant(круг, tenant=пространство, role=роль):
                 return forbidden()
-            заведённый = accounts.add(логин, tenant=пространство, role=роль)
+            if not people.EMAIL_SHAPE.match(почта):
+                return render(Show(add=True, flash=_flash("users.email.shape", ok=False)), 400)
+            # Existing login keys are internal; all newly created web accounts need an email.
+            логин = (request.form.get("login") or "").strip() or "email-account"
+            заведённый = accounts.add(логин, tenant=пространство, role=роль, email=почта)
         except DbError as exc:
             note_target_mismatch(exc)
             return render(Show(add=True, flash=_flash("users.add.failed", ok=False)), 400)
-        почта_не_легла = bool(почта) and not _set_email(круг, заведённый.login, пространство, почта)
-        return render(Show(add=True, added=заведённый, added_email_failed=почта_не_легла))
+        return render(Show(add=True, added=заведённый))
 
     def _цель_заморозки() -> tuple[Scope, str, str] | FlaskResponse:
         """Общее у заморозки и разморозки: охват, происхождение, логин и пространство из формы."""
@@ -324,6 +327,8 @@ def _install_add_freeze(app: Flask, users_path: str) -> None:
         refuse_foreign_origin()
         логин = (request.form.get("login") or "").strip()
         пространство = canonical_tenant((request.form.get("tenant") or "").strip())
+        if not _selected_space_allows(круг, пространство):
+            return forbidden()
         return круг, логин, пространство
 
     @app.post(f"{users_path}/freeze")
@@ -498,10 +503,3 @@ def _install_spaces(app: Flask, users_path: str) -> None:
             note_target_mismatch(exc)
             return render(_исход(код, "users.spaces.countries_failed", ok=False), 400)
         return render(_исход(код, "users.spaces.countries_added", ok=True))
-
-
-def login_from_email(email: str) -> str:
-    """Логин из почты: часть до @, строчная латиница, цифры, точка, дефис (D488)."""
-    имя = email.split("@", 1)[0].strip().lower()
-    имя = re.sub(r"[^a-z0-9._-]+", "-", имя).strip("._-")[:64]
-    return имя if len(имя) >= 2 else ""
