@@ -658,10 +658,7 @@ USERS_TEXTS: dict[str, dict[str, str]] = {
     "users.delete.due": {"ru": "Удаление: {date}", "en": "Deletion: {date}"},
     "users.delete.cancel": {"ru": "Отменить удаление", "en": "Cancel deletion"},
     "users.delete.cancelled": {
-        "ru": (
-            "Удаление отменено. Учётка остаётся замороженной; "
-            "доступ можно восстановить отдельно."
-        ),
+        "ru": "Удаление отменено. Учётка заморожена; её можно разморозить отдельно.",
         "en": "Deletion cancelled. The account remains frozen; restore access separately.",
     },
     "users.delete.scheduled": {
