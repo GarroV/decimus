@@ -82,6 +82,7 @@ from . import (
     grade_explain,
     guard,
     home_page,
+    inspection_followup,
     item_labels,
     journal,
     letter_draft,
@@ -246,6 +247,11 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_country(app, conf)
     _register_units(app, conf)
     unit_add.install(app, conf)
+    inspection_followup.install(
+        app,
+        conf,
+        render_card=lambda ident: _render_card(ident, conf=conf, notice=None, failure=None),
+    )
     country_filter.install(app)
     country_settings.install(app)
     country_contacts_actions.install(app, conf.ui_lang)
@@ -1828,6 +1834,11 @@ def _card_context(
     без_страны = план_нужен and action_plans.unit_without_country(inspection_id)
     return dict(
         **журнал_обхода,
+        **inspection_followup.card_context(
+            inspection_id,
+            finalized=not detail.inspection.on_review,
+            retracted=detail.inspection.retracted,
+        ),
         plan=план,
         plan_known=план_известен,
         # Запрос открывается панелью «Действий» (D527) — у УК и у партнёра тем же адресом.

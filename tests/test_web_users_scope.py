@@ -274,10 +274,11 @@ def test_админ_партнёра_в_общем_списке_и_карточ�
     """#1122: при открытой карточке колонки списка прячутся, и «Админ · GE» читали как админа УК."""
     страница = админ_уК.get("/administration?tab=people&person=id-nino").get_data(as_text=True)
 
-    строка_nino = страница[страница.index("<b>nino") : страница.index("nino@mail.example")]
-    assert ">GE</em>" in строка_nino, "пространство партнёра видно рядом с логином"
-    строка_kostya = страница[страница.index("<b>kostya") : страница.index("kostya@mail.example")]
-    assert "</em>" not in строка_kostya, "у людей УК бейджа пространства нет"
+    at = страница.index("nino@mail.example")
+    partner = страница[страница.rfind('<a class="srow', 0, at) : страница.index("</a>", at)]
+    assert 'data-label="Пространство">GE</span>' in partner
+    identity = partner[partner.index('<span class="srow__main">') : partner.index("</span>")]
+    assert "<em" not in identity, "пространство показано в своей колонке один раз"
     assert "пространство партнёра GE" in страница, "карточка называет пространство словами"
 
 

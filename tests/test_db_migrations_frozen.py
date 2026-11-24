@@ -483,6 +483,12 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0132_photo_backfill_fairness.sql": (
         "sql1:bdb184a14e907b91354942a0c55381e4b17ee82237d362c94abd2afd07461392"
     ),
+    "0133_user_deletion.sql": (
+        "sql1:b97f1509f6308cb51af4f0f38555828f644de08566c0b1a472cf5156eb2cb760"
+    ),
+    "0134_inspection_followup.sql": (
+        "sql1:9af99a8316fd99336d8409a73b9571cf7685e5bd9dfda22d3550dc42e76b8608"
+    ),
 }
 
 

@@ -835,3 +835,9 @@ no_browser_errors
 delete_user
 cancel_user_deletion
 _.delete_after
+
+# D780: Flask invokes the follow-up POST and file-download routes.
+inspection_work_add
+inspection_work_file
+# Entry.author_tenant is rendered by inspections/_work.html.
+_.author_tenant
