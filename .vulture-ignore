@@ -829,3 +829,9 @@ _foreign_checklist_write
 
 # pytest autouse: asserts real browser drafts emit no JavaScript page errors.
 no_browser_errors
+
+# D778: Flask calls these POST handlers; Jinja reads AccountRow.delete_after
+# in the people list, person card and selected workspace page.
+delete_user
+cancel_user_deletion
+_.delete_after
