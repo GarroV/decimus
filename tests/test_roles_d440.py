@@ -158,7 +158,12 @@ def _действие(client: FlaskClient, действие: str) -> Any:
         ),
         "user_add_developer": (
             "/users/add",
-            {"login": "newbie", "tenant": "HQ", "role": "developer"},
+            {
+                "login": "newbie",
+                "email": "newbie@test.invalid",
+                "tenant": "HQ",
+                "role": "developer",
+            },
         ),
         "space_add": ("/users/spaces/add", {"code": "AM", "name": "Партнёр", "countries": "AM"}),
     }

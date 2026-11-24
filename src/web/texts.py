@@ -31,6 +31,7 @@ from .texts_demo import DEMO_TEXTS
 from .texts_dodois import DODOIS_TEXTS
 from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
+from .texts_inspection_followup import WORK_TEXTS
 from .texts_inspection_timeline import TIMELINE_TEXTS
 from .texts_journal import JOURNAL_TEXTS
 from .texts_mailings import MAILINGS_TEXTS
@@ -2017,6 +2018,7 @@ def lang_or_default(lang: str | None, *, fallback: str) -> str:
 # Общая история проверок на стране и в рейтингах.
 
 TEXTS.update(TIMELINE_TEXTS)
+TEXTS.update(WORK_TEXTS)
 
 TEXTS.update(CONTACT_TEXTS)
 

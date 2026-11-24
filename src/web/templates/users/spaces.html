@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">
 {% endblock %}
-{% block page_heading %}<header class="page-heading"><h1>{{ t('users.tab.spaces') }}</h1></header>{% endblock %}
+{% block page_heading %}<header class="page-heading"><h1 class="shead__title">{{ t('users.tab.spaces') }}</h1></header>{% endblock %}
 {% block body %}
 <div class="sadmin">{{ admin_nav() }}<section class="sadmin__main partner-people">
   {% if not partner_spaces_known %}<div class="note note--warn">{{ t('users.spaces.unknown') }}</div>

@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 232 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 234 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -146,6 +146,8 @@
 | `/inspections/<inspection_id>/report` | GET | `report` | `src/web/app.py` |
 | `/inspections/<inspection_id>/retract` | POST | `do_retract` | `src/web/app.py` |
 | `/inspections/<inspection_id>/suggest` | POST | `do_suggest` | `src/web/app.py` |
+| `/inspections/<inspection_id>/work` | POST | `inspection_work_add` | `src/web/inspection_followup.py` |
+| `/inspections/<inspection_id>/work/<entry_id>/file` | GET | `inspection_work_file` | `src/web/inspection_followup.py` |
 | `/login` | GET, POST | `login` | `src/web/auth.py` |
 | `/login/google` | GET | `google_start` | `src/web/auth.py` |
 | `/login/passkey/options` | POST | `passkey_login_options` | `src/web/passkey_login.py` |
@@ -676,6 +678,7 @@
 | `0131_mailing_templates_lang.sql` | — |
 | `0132_photo_backfill_fairness.sql` | — |
 | `0133_user_deletion.sql` | — |
+| `0134_inspection_followup.sql` | `inspection_followup` |
 <!-- map:end -->
 
 ## Makefile

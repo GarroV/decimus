@@ -39,6 +39,8 @@ LOCKED_ENDPOINTS = frozenset(
         "country_contact_delete",
         "freeze_user",
         "unfreeze_user",
+        "delete_user",
+        "cancel_user_deletion",
         "user_role",
         "user_email",
         "user_name_latin",
@@ -123,6 +125,8 @@ LOCKED_ENDPOINTS = frozenset(
 #: стоит в одном из двух списков — новое не проскочит в демо незамеченным (тест).
 OPEN_ENDPOINTS = frozenset(
     {
+        # D780: файлы и обсуждение синтетической проверки доступны в демо.
+        "inspection_work_add",
         "demo_enter",
         "login",
         "logout",
