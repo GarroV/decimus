@@ -38,6 +38,7 @@ from src import domain
 from src.domain.log_ids import log_id
 
 from . import (
+    account_cleanup,
     agg_loader,
     calendar_loader,
     dodois_loader,
@@ -435,6 +436,7 @@ async def start_polling() -> None:
     dodois_metrics = asyncio.create_task(dodois_metrics_loader.run_forever())
     # Событие срока отчёта в календаре проверяющего — сводка раз в 5 минут (D740, #1590).
     calendar_deadline = asyncio.create_task(calendar_loader.run_forever())
+    account_deletions = asyncio.create_task(account_cleanup.run_forever())
     try:
         await run_polling(dispatcher, bot)
     finally:
@@ -449,6 +451,7 @@ async def start_polling() -> None:
         dodois.cancel()
         dodois_metrics.cancel()
         calendar_deadline.cancel()
+        account_deletions.cancel()
         await bot.session.close()
 
 

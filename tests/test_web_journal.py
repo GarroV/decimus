@@ -90,6 +90,7 @@ def test_пароль_из_формы_в_журнал_не_попадает(monk
     client.post(
         "/users/add",
         data={
+            "email": "new-person@test.invalid",
             "login": "newbie",
             "password": ПАРОЛЬ_ИЗ_ФОРМЫ,
             "new_password": ПАРОЛЬ_ИЗ_ФОРМЫ,

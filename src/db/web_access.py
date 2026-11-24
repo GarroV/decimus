@@ -131,10 +131,10 @@ _SELECT_USER_BY_EMAIL_FOR_LOGIN_SQL = """
 #: (D286). Условие в тексте неизменно, охват приходит параметром (S608).
 _LIST_USERS_SQL = """
     select u.login, u.created_at, u.disabled_at, u.role, u.tenant_code, u.id, u.email,
-           f.login, u.display_name_latin
+           f.login, u.display_name_latin, u.delete_after
       from web_users u
       left join web_users f on f.id = u.disabled_by
-     where (%(tenant)s::text is null or u.tenant_code = %(tenant)s)
+     where u.deleted_at is null and (%(tenant)s::text is null or u.tenant_code = %(tenant)s)
      order by u.tenant_code, u.login
 """
 
@@ -455,6 +455,7 @@ class AccountRow:
     #: Имя проверяющего латиницей (D644, `0100`); `None` — не задано, в отчёт идёт
     #: автоперевод имени из Google.
     name_latin: str | None = None
+    delete_after: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -648,7 +649,9 @@ def _require_tenant(tenant: str) -> None:
         require_space(cur, tenant, error=AccessError)
 
 
-def create_account(login: str, *, tenant: str, password: str, role: str | None = None) -> Account:
+def create_account(
+    login: str, *, tenant: str, password: str, role: str | None = None, email: str | None = None
+) -> Account:
     """Завести учётку. Роль владельца схемы, повтор логина — отказ.
 
     Пароль сюда приходит от человека, который учётку заводит, и в репозитории
@@ -666,14 +669,21 @@ def create_account(login: str, *, tenant: str, password: str, role: str | None =
     _require_tenant(tenant)
     with _managing("завести учётку") as conn, conn.cursor() as cur:
         try:
-            cur.execute(_INSERT_USER_SQL, (tenant, имя, хеш, роль))
+            if email is None:
+                cur.execute(_INSERT_USER_SQL, (tenant, имя, хеш, роль))
+            else:
+                cur.execute(
+                    "insert into web_users (tenant_code, login, password_hash, role, email) "
+                    "values (%s, %s, %s, %s, %s) returning id",
+                    (tenant, имя, хеш, роль, normalize_email(email)),
+                )
         except psycopg.errors.UniqueViolation as exc:
             raise AccessError(
                 f"Логин «{имя}» уже занят — логины единые на всю систему. Возьмите другой"
             ) from exc
         row = cur.fetchone()
     assert row is not None  # noqa: S101 — insert ... returning без строки не бывает
-    return Account(id=str(row[0]), login=имя, tenant=tenant, role=роль)
+    return Account(id=str(row[0]), login=имя, tenant=tenant, role=роль, email=email)
 
 
 def list_accounts(*, tenant: str | None) -> tuple[AccountRow, ...]:
@@ -692,6 +702,7 @@ def list_accounts(*, tenant: str | None) -> tuple[AccountRow, ...]:
             email=None if r[6] is None else str(r[6]),
             disabled_by=None if r[7] is None else str(r[7]),
             name_latin=None if r[8] is None else str(r[8]),
+            delete_after=r[9],
         )
         for r in строки
     )

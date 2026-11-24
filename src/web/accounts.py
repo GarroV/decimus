@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import secrets
+import uuid
 from dataclasses import dataclass
 
 from src.db.web_access import (
@@ -83,6 +84,7 @@ class Added:
     login: str
     role: str
     password: str
+    email: str | None = None
 
 
 def everyone(*, tenant: str | None) -> tuple[AccountRow, ...]:
@@ -94,11 +96,17 @@ def everyone(*, tenant: str | None) -> tuple[AccountRow, ...]:
     return list_accounts(tenant=tenant)
 
 
-def add(login: str, *, tenant: str, role: str | None = None) -> Added:
+def add(login: str, *, tenant: str, role: str | None = None, email: str | None = None) -> Added:
     """Завести человека и вернуть его пароль — единственный раз, когда он виден."""
     пароль = secrets.token_urlsafe(_PASSWORD_BYTES)
-    заведённая = create_account(login, tenant=tenant, password=пароль, role=role)
-    return Added(login=заведённая.login, role=заведённая.role, password=пароль)
+    # Public sign-in identity is the full email. The internal key never needs
+    # to be inferred from its local part (two domains may have the same name).
+    if email:
+        login = "u-" + uuid.uuid4().hex
+        заведённая = create_account(login, tenant=tenant, password=пароль, role=role, email=email)
+    else:
+        заведённая = create_account(login, tenant=tenant, password=пароль, role=role)
+    return Added(login=заведённая.login, role=заведённая.role, password=пароль, email=email)
 
 
 def spaces() -> tuple[str, ...]:

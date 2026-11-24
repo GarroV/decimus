@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 230 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 232 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -242,6 +242,8 @@
 | `/users` | GET | `users` | `src/web/users_screen.py` |
 | `/users/add` | POST | `add_user` | `src/web/users_screen.py` |
 | `/users/bot-unlink` | POST | `bot_unlink` | `src/web/users_screen.py` |
+| `/users/cancel-deletion` | POST | `cancel_user_deletion` | `src/web/users_deletion_screen.py` |
+| `/users/delete` | POST | `delete_user` | `src/web/users_deletion_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
 | `/users/freeze` | POST | `freeze_user` | `src/web/users_screen.py` |
 | `/users/name-latin` | POST | `user_name_latin` | `src/web/users_screen.py` |
@@ -673,6 +675,7 @@
 | `0130_close_invariants.sql` | — |
 | `0131_mailing_templates_lang.sql` | — |
 | `0132_photo_backfill_fairness.sql` | — |
+| `0133_user_deletion.sql` | — |
 <!-- map:end -->
 
 ## Makefile

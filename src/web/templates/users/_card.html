@@ -19,7 +19,7 @@
 
 {% macro person_card(kind, row) %}
   {% set свой = kind == 'me' %}
-  {% set логин = row.login if row else me.login %}
+  {% set логин = (row.email or row.login) if row else (me.email or me.login) %}
   {% set пространство = row.tenant if row else me.tenant %}
   {% set роль = row.role if row else me.role %}
   {% set варианты = role_choices(row) if row and not свой else () %}
@@ -126,7 +126,7 @@
         <h3 class="ssec__title">{{ t('users.panel.access_title') }}</h3>
         {% if row.disabled_at %}
           <p class="ssec__text"><span class="sdot"></span>{% if row.disabled_by %}{{ t('users.panel.frozen', date=row.disabled_at.strftime('%Y-%m-%d'), by=row.disabled_by) }}{% else %}{{ t('users.panel.frozen_nobody', date=row.disabled_at.strftime('%Y-%m-%d')) }}{% endif %}</p>
-          {% if may_unfreeze %}
+          {% if may_unfreeze and not row.delete_after %}
             <form method="post" action="{{ users_url }}/unfreeze?lang={{ lang }}" class="sform">
               <input type="hidden" name="login" value="{{ row.login }}">
               <input type="hidden" name="tenant" value="{{ row.tenant }}">
@@ -142,6 +142,11 @@
           {{ confirm('off-' ~ row.id, t('users.freeze.open'), t('users.freeze.confirm', login=row.login), t('users.freeze.yes'),
                      users_url ~ '/freeze?lang=' ~ lang, [('login', row.login), ('tenant', row.tenant)]) }}
         {% endif %}
+        {% if may_delete and not свой %}
+          {% if row.delete_after %}<p>{{ t('users.delete.due', date=row.delete_after.strftime('%d.%m.%Y')) }}</p>
+            <form method="post" action="{{ users_url }}/cancel-deletion?lang={{ lang }}"><input type="hidden" name="login" value="{{ row.login }}"><input type="hidden" name="tenant" value="{{ row.tenant }}"><button class="sbtn">{{ t('users.delete.cancel') }}</button></form>
+          {% else %}{{ confirm('delete-' ~ row.id, t('users.delete.open'), t('users.delete.confirm', login=row.email or row.login), t('users.delete.yes'), users_url ~ '/delete?lang=' ~ lang, [('login',row.login),('tenant',row.tenant)]) }}{% endif %}
+        {% endif %}
       </section>
     {% endif %}
   </article>
@@ -151,7 +156,7 @@
   <article class="sdetail" aria-labelledby="add-title">
     <header class="sdetail__head">
       <div class="sdetail__who">
-        <h2 class="sdetail__title" id="add-title">{{ t('users.added.title', login=show.added.login) if show.added else t('users.add.title') }}</h2>
+        <h2 class="sdetail__title" id="add-title">{{ t('users.added.title', login=show.added.email or request.form.get('email') or show.added.login) if show.added else t('users.add.title') }}</h2>
         <p class="sdetail__hint">{{ t('users.added.text') if show.added else t('users.add.hint') }}</p>
       </div>
     </header>
