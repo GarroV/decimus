@@ -123,6 +123,8 @@ LOCKED_ENDPOINTS = frozenset(
 #: стоит в одном из двух списков — новое не проскочит в демо незамеченным (тест).
 OPEN_ENDPOINTS = frozenset(
     {
+        # D780: файлы и обсуждение синтетической проверки доступны в демо.
+        "inspection_work_add",
         "demo_enter",
         "login",
         "logout",

@@ -47,6 +47,10 @@ _WEB: dict[str, tuple[str, str]] = {
     "service_key_delete": ("Удалён ключ сервиса", "Service key removed"),
     "service_key_save": ("Задан ключ сервиса", "Service key set"),
     "do_accept": ("Принята проверка", "Inspection accepted"),
+    "inspection_work_add": (
+        "Добавлены материалы или комментарий проверки",
+        "Inspection follow-up added",
+    ),
     "do_add_finding": ("Добавлено нарушение", "Finding added"),
     "do_add_photo": ("Добавлено фото", "Photo added"),
     "do_delete_finding": ("Удалено нарушение", "Finding deleted"),

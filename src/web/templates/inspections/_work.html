@@ -1,0 +1,38 @@
+{% if c.work_visible %}
+<section class="ov-card ov-card--wide" id="inspection-work">
+  <div class="ov-card__head"><h2 class="ov-card__title">{{ t('work.title') }}</h2></div>
+  <div class="ov-card__body">
+    <p class="field-note">{{ t('work.help') }}</p>
+    {% if not c.work_known %}
+      <p role="alert">{{ t('work.error.load') }}</p>
+    {% else %}
+      {% if c.work_may_add %}
+      <form class="pf" method="post" enctype="multipart/form-data"
+            action="{{ url('/inspections/' ~ head.id ~ '/work') }}?lang={{ lang }}"{% if panel %} data-panel-form{% endif %}>
+        <label class="pf__row"><span class="field-label">{{ t('work.body') }}</span>
+          <textarea class="input" name="body" maxlength="5000" rows="3"></textarea></label>
+        <label class="pf__row"><span class="field-label">{{ t('work.file') }}</span>
+          <input class="input" type="file" name="file"></label>
+        <p class="field-note">{{ t('work.hint', mb=c.work_max_mb) }}</p>
+        <div class="pf__actions"><button class="btn" type="submit">{{ t('work.add') }}</button></div>
+      </form>
+      {% endif %}
+      {% for entry in c.work_page.entries %}
+      <article class="mt-gap">
+        <p class="field-note">{{ entry.author }} · {{ t('work.hq') if entry.author_tenant == 'HQ' else t('work.partner') }} · <time datetime="{{ entry.created_at.isoformat() }}">{{ day(entry.created_at.date()) }} {{ entry.created_at.strftime('%H:%M') }} UTC</time></p>
+        {% if entry.body %}<p>{% for line in entry.body.splitlines() %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>{% endif %}
+        {% if entry.file_name %}
+        <p><a href="{{ url('/inspections/' ~ head.id ~ '/work/' ~ entry.id ~ '/file') }}?lang={{ lang }}">{{ t('work.download', name=entry.file_name) }}</a> <span class="muted">({{ t('work.size', kb=(entry.size_bytes + 1023) // 1024) }})</span></p>
+        {% endif %}
+      </article>
+      {% else %}<p class="muted">{{ t('work.empty') }}</p>{% endfor %}
+      {% if c.work_page.more %}
+      <p><a href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}&amp;work_before={{ c.work_page.entries[-1].id }}#inspection-work">{{ t('work.older') }}</a></p>
+      {% endif %}
+      {% if request.args.get('work_before') %}
+      <p><a href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}#inspection-work">{{ t('work.latest') }}</a></p>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>
+{% endif %}

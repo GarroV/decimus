@@ -125,7 +125,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_scope,ratings_trends,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_scope,ratings_trends,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,inspection_followup,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -152,6 +152,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/home_ratings.py` | Блоки «Стандарты · РС» и «Клиентский опыт · РКО» на «Главной» (D378) |
 | `src/web/home_ratings_block.py` | Блок «Рейтинги» на «Главной» (D418): РС, РКО, карты и агрегаторы (D557) — по кластерам (D502) |
 | `src/web/home_settings.py` | Вкладка «Главная» раздела «Администрирование» (D728): настройки сети для главной |
+| `src/web/inspection_followup.py` | Работа по проверке: исходные файлы и общая лента комментариев в карточке |
 | `src/web/inspection_timeline.py` | Динамика проверок по датам; количество отдельно по годам или месяцам |
 | `src/web/inspection_titles.py` | Формулировки пунктов методики по коду — для деталей проверки в API Swarm (D391) |
 | `src/web/inspections.py` | Раздел «Проверки»: что показать и чем это взято |
@@ -202,7 +203,7 @@ Flask-приложение управляющей компании и партн
 «Подключения» (состояние подключений, D638) и «Ключи и API» (ключи сервисов и ключи API, D650), подключение
 Claude входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,calendar_connect,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,peek,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,calendar_connect,photo_upload,dodois_connect,dodois_screen,account_menu,accounts,auth,notifications,connections_form,demo_entry,landing,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,login_alert,oauth,service_keys_screen,origin,administration,admin_health,partner_spaces,people,profile,passkey_login,peek,proxy,remote,security_headers,reauth,prove_return,second_step,security_screen,settings_screen,ui_lang,usage_screen,usage_view,users_claude,users_mcp,users_page,users_screen,users_deletion_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -247,6 +248,7 @@ Claude входом через сайт (OAuth).
 | `src/web/usage_screen.py` | Экран «Расход модели» (D537): сколько токенов и денег ушло на модель |
 | `src/web/usage_view.py` | Расход модели (D537): из сумм базы — то, что рисует экран «Расход модели» |
 | `src/web/users_claude.py` | Плитка «Нейросети» в «Настройках» (D417, D695): адрес MCP и подключения через сайт |
+| `src/web/users_deletion_screen.py` | Удаление людей: только главный админ, срок и повторная проверка прав — в БД |
 | `src/web/users_mcp.py` | Личный токен Claude в «Настройках»: выпустить себе и отозвать (D447, D448) |
 | `src/web/users_page.py` | Сборка страницы «Пользователи»: список слева, карточка выбранного справа |
 | `src/web/users_screen.py` | Действия экрана «Люди» (`/users/*`): один экран доступа, охват по роли (#585) |
@@ -286,6 +288,7 @@ Claude входом через сайт (OAuth).
 | `src/web/texts_grade.py` | Тексты «почему такая буква» и «расшифровка оценки» на карточке проверки (D490) |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры |
+| `src/web/texts_inspection_followup.py` | Подписи файлов проведённой работы и обсуждения проверки, RU/EN |
 | `src/web/texts_inspection_timeline.py` | Подписи общей истории проверок: страна и раздел рейтингов |
 | `src/web/texts_journal.py` | Тексты журналов входов и действий (D462): подписи действий и экран «Журнал» |
 | `src/web/texts_level.py` | A selected item's severity is a read-only criterion check, never a fallback guess |
@@ -368,7 +371,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/country/` | 9 | _batch.html, _contacts.html, _head.html, _mine.html, _parts.html, _reference.html, _settings.html, _summary.html, … (+1) |
 | `src/web/templates/demo/` | 3 | app.html, locked.html, pick.html |
 | `src/web/templates/dodois/` | 1 | connect.html |
-| `src/web/templates/inspections/` | 12 | _card_body.html, _card_parts.html, _letter_form.html, _panel.html, _panel_fragment.html, _row.html, _split_history.html, _walk_log.html, … (+4) |
+| `src/web/templates/inspections/` | 13 | _card_body.html, _card_parts.html, _letter_form.html, _panel.html, _panel_fragment.html, _row.html, _split_history.html, _walk_log.html, … (+5) |
 | `src/web/templates/journal/` | 1 | page.html |
 | `src/web/templates/mailings/` | 2 | document.html, plan_letter.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
@@ -382,7 +385,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/training/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/usage/` | 1 | page.html |
-| `src/web/templates/users/` | 8 | _card.html, _connections.html, _key_refusal.html, _service_key_panel.html, _service_keys.html, _spaces.html, forbidden.html, index.html |
+| `src/web/templates/users/` | 9 | _card.html, _connections.html, _key_refusal.html, _service_key_panel.html, _service_keys.html, _spaces.html, forbidden.html, index.html, … (+1) |
 <!-- map:end -->
 
 <!-- map:begin tree src/web/static -->
@@ -471,7 +474,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,maps_reviews_store,model_key,model_usage,walk_log,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_violations,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,inspection_followup,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,maps_reviews_store,model_key,model_usage,walk_log,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_violations,ratings_sync,second_factor,secret_crypto,web_access,user_deletion,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -486,6 +489,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/dodois_metrics.py` | Чтение данных Dodo IS для страницы «Качество» (D671, миграция `0105`): продажи, агрегаторы, КР |
 | `src/db/dodois_metrics_store.py` | Запись данных Dodo IS для «Качества» (D671, миграция `0105`): замена месяца и журнал загрузки |
 | `src/db/health_store.py` | Двери базы для вкладки «Подключения» (D638): исходы проб и последние заходы сборов |
+| `src/db/inspection_followup.py` | Файлы проведённой работы и комментарии к принятой проверке: неизменяемая история |
 | `src/db/inspection_timeline.py` | История принятых проверок по датам и месяцам, без лимита реестра |
 | `src/db/job_lock.py` | Замки плановых загрузчиков бота (F-125): один процесс на загрузку |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
@@ -518,6 +522,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/source_units.py` | Официальный реестр для чтения метрик: первичен справочник рейтингов (#1391) |
 | `src/db/training_names.py` | Столбцы счётчиков обучения (миграция 0085) — общие для записи и чтения |
 | `src/db/training_read.py` | Чтение обучения для экрана «Обучение» (схема `learning`, миграция 0085; D574, D578) |
+| `src/db/user_deletion.py` | Удаление аккаунта с 30-дневным сроком отмены; сроки назначает только БД |
 | `src/db/walk_log.py` | Журнал шагов обхода (D710, `0119`): запись шага и чтение для карточки проверки |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
 | `src/db/web_own_profile.py` | Свой профиль с экрана «Настройки» (D447): почта Google и язык сайта — уровень базы |
@@ -667,6 +672,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0131_mailing_templates_lang.sql` | Язык шаблона письма больше не пара `ru`/`en` (#541, #1619): список языков отчёта живёт в коде (`src/domain/models.py: REPORT_LANGS`), и третий язык не должен упираться в… |
 | `0132_photo_backfill_fairness.sql` | Отметка задаёт порядок попыток, а не бессрочную аренду |
 | `0133_user_deletion.sql` | История проверок и журнал остаются связаны с обезличенным техническим UUID |
+| `0134_inspection_followup.sql` | Дополнения хранятся отдельно от замороженного отчёта |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

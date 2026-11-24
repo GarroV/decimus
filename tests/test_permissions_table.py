@@ -29,6 +29,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
 
 РАБОТА_УК = {
     "inspection.read",
+    "inspection.followup",
     "inspection.conduct",
     "inspection.accept",
     "inspection.revise",
@@ -70,6 +71,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
 )
 СОТРУДНИК_ПАРТНЁРА = ВИДЫ_ПАРТНЁРА | {
     "inspection.read",
+    "inspection.followup",
     "inspection.conduct",
     "inspection.letter",
     "prescription.reply",
