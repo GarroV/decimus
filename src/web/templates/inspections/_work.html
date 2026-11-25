@@ -1,31 +1,53 @@
 {% if c.work_visible %}
-<section class="ov-card ov-card--wide" id="inspection-work">
+<section class="ov-card ov-card--wide inspection-work" id="inspection-work">
   <div class="ov-card__head"><h2 class="ov-card__title">{{ t('work.title') }}</h2></div>
   <div class="ov-card__body">
-    <p class="field-note">{{ t('work.help') }}</p>
     {% if not c.work_known %}
       <p role="alert">{{ t('work.error.load') }}</p>
     {% else %}
-      {% if c.work_may_add %}
-      <form class="pf" method="post" enctype="multipart/form-data"
-            action="{{ url('/inspections/' ~ head.id ~ '/work') }}?lang={{ lang }}"{% if panel %} data-panel-form{% endif %}>
-        <label class="pf__row"><span class="field-label">{{ t('work.body') }}</span>
-          <textarea class="input" name="body" maxlength="5000" rows="3"></textarea></label>
-        <label class="pf__row"><span class="field-label">{{ t('work.file') }}</span>
-          <input class="input" type="file" name="file"></label>
+      {% set files = c.work_page.entries|selectattr('file_name')|list %}
+      {% set comments = c.work_page.entries|rejectattr('file_name')|list %}
+      <section class="iw-section" aria-label="{{ t('work.plans') }}">
+        <div class="iw-head">
+          <h3>{{ t('work.plans') }}</h3>
+          {% if c.work_may_add %}
+          <form class="iw-upload" method="post" enctype="multipart/form-data"
+                action="{{ url('/inspections/' ~ head.id ~ '/work') }}?lang={{ lang }}"
+                data-work-upload data-work-pending="{{ t('work.uploading') }}"{% if panel %} data-panel-form{% endif %}>
+            <button class="btn iw-upload__choose" type="button" data-work-choose>{{ icon('plus') }} {{ t('work.more') if files else t('work.attach') }}</button>
+            <label class="iw-upload__native"><span class="field-label">{{ t('work.file') }}</span>
+              <input class="input" type="file" name="file" required aria-label="{{ t('work.attach') }}"></label>
+            <button class="btn iw-upload__submit" type="submit">{{ t('work.attach') }}</button>
+            <output class="field-note" data-work-status aria-live="polite"></output>
+          </form>
+          {% endif %}
+        </div>
         <p class="field-note">{{ t('work.hint', mb=c.work_max_mb) }}</p>
-        <div class="pf__actions"><button class="btn" type="submit">{{ t('work.add') }}</button></div>
-      </form>
-      {% endif %}
-      {% for entry in c.work_page.entries %}
-      <article class="mt-gap">
-        <p class="field-note">{{ entry.author }} · {{ t('work.hq') if entry.author_tenant == 'HQ' else t('work.partner') }} · <time datetime="{{ entry.created_at.isoformat() }}">{{ day(entry.created_at.date()) }} {{ entry.created_at.strftime('%H:%M') }} UTC</time></p>
-        {% if entry.body %}<p>{% for line in entry.body.splitlines() %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>{% endif %}
-        {% if entry.file_name %}
-        <p><a href="{{ url('/inspections/' ~ head.id ~ '/work/' ~ entry.id ~ '/file') }}?lang={{ lang }}">{{ t('work.download', name=entry.file_name) }}</a> <span class="muted">({{ t('work.size', kb=(entry.size_bytes + 1023) // 1024) }})</span></p>
+        {% for entry in files %}
+        <article class="iw-entry">
+          <a class="iw-file" href="{{ url('/inspections/' ~ head.id ~ '/work/' ~ entry.id ~ '/file') }}?lang={{ lang }}">{{ entry.file_name }}</a>
+          <p class="field-note">{{ t('work.size', kb=(entry.size_bytes + 1023) // 1024) }} · {{ entry.author }} · {{ t('work.hq') if entry.author_tenant == 'HQ' else t('work.partner') }} · <time datetime="{{ entry.created_at.isoformat() }}">{{ day(entry.created_at.date()) }} {{ entry.created_at.strftime('%H:%M') }} UTC</time></p>
+          {% if entry.body %}<p class="iw-text">{{ entry.body }}</p>{% endif %}
+        </article>
+        {% else %}<p class="muted iw-empty">{{ t('work.plans.empty') }}</p>{% endfor %}
+      </section>
+      <section class="iw-section" aria-label="{{ t('work.comments') }}">
+        <h3>{{ t('work.comments') }}</h3>
+        <p class="field-note">{{ t('work.comments.hint') }}</p>
+        {% if c.work_may_add %}
+        <form class="iw-comment" method="post" action="{{ url('/inspections/' ~ head.id ~ '/work') }}?lang={{ lang }}"{% if panel %} data-panel-form{% endif %}>
+          <label class="iw-comment__field"><span class="sr-only">{{ t('work.body') }}</span>
+            <textarea class="input" name="body" maxlength="5000" rows="2" required placeholder="{{ t('work.comment.placeholder') }}" aria-label="{{ t('work.body') }}"></textarea></label>
+          <button class="btn" type="submit">{{ t('work.comment.add') }}</button>
+        </form>
         {% endif %}
-      </article>
-      {% else %}<p class="muted">{{ t('work.empty') }}</p>{% endfor %}
+        {% for entry in comments %}
+        <article class="iw-entry">
+          <p class="field-note">{{ entry.author }} · {{ t('work.hq') if entry.author_tenant == 'HQ' else t('work.partner') }} · <time datetime="{{ entry.created_at.isoformat() }}">{{ day(entry.created_at.date()) }} {{ entry.created_at.strftime('%H:%M') }} UTC</time></p>
+          <p class="iw-text">{{ entry.body }}</p>
+        </article>
+        {% else %}<p class="muted iw-empty">{{ t('work.comments.empty') }}</p>{% endfor %}
+      </section>
       {% if c.work_page.more %}
       <p><a href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}&amp;work_before={{ c.work_page.entries[-1].id }}#inspection-work">{{ t('work.older') }}</a></p>
       {% endif %}
