@@ -8,7 +8,9 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
+from html import unescape
 
 import pytest
 from flask.testing import FlaskClient
@@ -171,7 +173,7 @@ def test_города_показаны_словом_а_не_кодом(
 def test_страна_где_всё_на_приёмке_есть_в_списке_стран(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """#1047: у Беларуси обе проверки ждали приёмки — страны в рейле не было вовсе."""
+    """#1047: страна только с ожидающими приёмки проверками доступна в фильтре."""
     # Arrange — принятые есть только в Грузии и Турции, белорусская ждёт приёмки.
     ждёт = шапка(unit_name="Polotsk-1", pct=87.5, grade="C")
     monkeypatch.setattr(
@@ -181,10 +183,13 @@ def test_страна_где_всё_на_приёмке_есть_в_списке
 
     # Act
     страница = стенд.get("/inspections?period=all&lang=ru").get_data(as_text=True)
-    рейл = страница.split('class="rg-countries pk-rail', 1)[1].split("</aside>", 1)[0]
-
-    # Assert — страна в рейле и счёт равен тому, что покажет щелчок.
-    assert "Беларусь" in рейл
-    беларусь = рейл.split(">Беларусь</span>", 1)[1]
-    assert беларусь.split("</a>", 1)[0].count("проверок: 1") == 1
-    assert "Грузия" in рейл
+    country = re.search(r'<select[^>]*aria-label="Страна"[^>]*>(.*?)</select>', страница, re.S)
+    assert country is not None
+    options = {
+        unescape(title.strip()): unescape(href)
+        for href, title in re.findall(r'<option value="([^"]+)"[^>]*>(.*?)</option>', country[1])
+    }
+    assert "Беларусь · 1" in options
+    assert "country=BY" in options["Беларусь · 1"]
+    assert any("Грузия" in title for title in options)
+    assert 'class="rg-countries' not in страница

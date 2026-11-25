@@ -12,12 +12,12 @@
   мелкая, — вид проверки и аудитор. Процент и буква печатаются такими, какими
   лежат в базе, — на экран приходит уже подготовленная строка (`view.py`).
 
-  Слева — блок отбора и колонка стран (D498), справа два блока сверху вниз (D466). «На приёмке» — всё, что ждёт вычитки и
+  Над списками — компактный блок фильтров; ниже два блока сверху вниз (D466). «На приёмке» — всё, что ждёт вычитки и
   подтверждения (D199): мимо периода и отбора, давно ждущие первыми, у каждой
   строки — сколько она ждёт. «Принятые» — история сети за выбранный период,
   новые сверху; период и отбор (буква, вид, страна, город, пиццерия) действуют
   только на неё, это подписано на блоке. «Где не проведено» — по галочке «Пиццерии без проверки»
-  слева (D532): вместо этих двух блоков правая часть показывает только его.
+  в фильтрах (D532): вместо этих двух блоков показан только он.
 
   Период — «с — по» по дате обхода со стрелками ← →, по умолчанию всё время
   (D404; `registry_period.py`).
@@ -25,7 +25,6 @@
 {% from "_info_tip.html" import info_tip %}
 
 {% from "_pick.html" import pick %}
-{% from "_pick_ui.html" import pick_item %}
 {% from "_period.html" import period_picker with context %}
 {% from "inspections/_panel.html" import inspection_panel with context %}
 {% from "inspections/_row.html" import inspection_row with context %}
@@ -68,18 +67,10 @@
 {% endblock %}
 
 {% block body %}
-{# Раскладка D498: слева блок отбора и под ним колонка стран (как в «Стране» и
-   «Методике»), справа — «На приёмке» и «Принятые». На узком экране колонка
-   стран сворачивается обратно в чип отбора. #}
-<div class="mx-shell rg-shell">
-  <aside class="mx-rail rg-rail" aria-label="{{ t('registry.filters.title') }}">
-    <div class="rg-filters pk-rail pk-rail--inline">
-      <div class="mx-rail__head mx-rail__head--list"><span>{{ t('registry.filters.title') }}</span></div>
-      {# Период: стрелки листают на длину выбранного, по заголовку — календарь (`_period.html`). #}
+<div class="rg-filters" role="group" aria-label="{{ t('registry.filters.title') }}">
+      {% for chip in picks %}{{ pick(chip) }}{% endfor %}
       {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
                        period_hidden) }}
-      {% if country_pick %}<div class="rg-country-chip">{{ pick(country_pick) }}</div>{% endif %}
-      {% for chip in picks %}{{ pick(chip) }}{% endfor %}
       <form class="rg-search" method="get" action="{{ url(current_path) }}" role="search">
         {{ hidden_filters(skip=('q',)) }}
         {% for name, value in period.params().items() if value %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
@@ -103,24 +94,8 @@
       </form>
       {% endif %}
       {% if filters.active %}<a class="sbtn sbtn--ghost rg-reset" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
-    </div>
-    {% if country_pick %}
-      <div class="rg-countries pk-rail pk-rail--inline">
-        <div class="mx-rail__head mx-rail__head--list"><span>{{ t('country.rail.title') }}</span></div>
-        <div class="pk-rail__list">
-          {% for option in country_pick.options %}
-            {{ pick_item(option.href, option.title,
-                         ((t('registry.rail.inspections', n=option.count) if option.count else t('registry.rail.none')) if option.count is not none else ''),
-                         '', option.selected, code=(option.code or 'Σ')) }}
-          {% endfor %}
-        </div>
-      </div>
-    {% endif %}
-  </aside>
-  <div class="mx-main">
-{{ super() }}
-  </div>
 </div>
+{{ super() }}
 {% endblock %}
 
 {% block split_list %}
