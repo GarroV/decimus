@@ -66,7 +66,9 @@ def _number(value: object, field: str, *, count: bool = False) -> Decimal:
 
 
 def _indexed(
-    body: object, key: str, expected: list[str],
+    body: object,
+    key: str,
+    expected: list[str],
 ) -> dict[str, Mapping[str, object]]:
     result: dict[str, Mapping[str, object]] = {}
     allowed = set(expected)
@@ -79,22 +81,42 @@ def _indexed(
 
 
 def _observation(
-    country: str, unit: str, metric: str, period: Window, timezone: str, source: str, *,
-    value: Decimal | None = None, numerator: Decimal | None = None,
-    denominator: Decimal | None = None, currency: str | None = None,
-    status: str = "complete", reason: str | None = None,
+    country: str,
+    unit: str,
+    metric: str,
+    period: Window,
+    timezone: str,
+    source: str,
+    *,
+    value: Decimal | None = None,
+    numerator: Decimal | None = None,
+    denominator: Decimal | None = None,
+    currency: str | None = None,
+    status: str = "complete",
+    reason: str | None = None,
 ) -> Observation:
     available = status != "unavailable"
     return Observation(
-        country=country, subject_id=unit, metric=metric, period=period,
-        timezone=timezone, source=source, covered_units=int(available), expected_units=1,
-        value=value, numerator=numerator, denominator=denominator, currency=currency,
-        status=status, reason=reason,
+        country=country,
+        subject_id=unit,
+        metric=metric,
+        period=period,
+        timezone=timezone,
+        source=source,
+        covered_units=int(available),
+        expected_units=1,
+        value=value,
+        numerator=numerator,
+        denominator=denominator,
+        currency=currency,
+        status=status,
+        reason=reason,
     )
 
 
-def sales(body: object, country: str, period: Window, timezone: str,
-          expected: list[str]) -> list[Observation]:
+def sales(
+    body: object, country: str, period: Window, timezone: str, expected: list[str]
+) -> list[Observation]:
     """Итоги /finances/sales/units; отсутствие строки не означает нулевые продажи."""
     country, units = _context(country, timezone, expected)
     rows = _indexed(body, "result", units)
@@ -110,26 +132,47 @@ def sales(body: object, country: str, period: Window, timezone: str,
     result = []
     for unit in units:
         row = rows.get(unit)
-        values = None if row is None else {
-            "revenue": _number(row.get("sales"), "sales"),
-            "orders": _number(row.get("ordersCount"), "ordersCount", count=True),
-        }
+        values = (
+            None
+            if row is None
+            else {
+                "revenue": _number(row.get("sales"), "sales"),
+                "orders": _number(row.get("ordersCount"), "ordersCount", count=True),
+            }
+        )
         for metric in ("revenue", "orders"):
             reason = (
                 "missing_unit" if row is None else currency_reason if metric == "revenue" else None
             )
-            result.append(_observation(
-                country, unit, metric, period, timezone, "dodois/finances/sales/units",
-                value=values[metric] if values is not None and reason is None else None,
-                currency=currency if metric == "revenue" else None,
-                status="unavailable" if reason else "complete", reason=reason,
-            ))
+            result.append(
+                _observation(
+                    country,
+                    unit,
+                    metric,
+                    period,
+                    timezone,
+                    "dodois/finances/sales/units",
+                    value=values[metric] if values is not None and reason is None else None,
+                    currency=currency if metric == "revenue" else None,
+                    status="unavailable" if reason else "complete",
+                    reason=reason,
+                )
+            )
     return result
 
 
 def _mean(
-    body: object, country: str, period: Window, timezone: str, expected: list[str], *,
-    key: str, metric: str, field: str, count: str, source: str,
+    body: object,
+    country: str,
+    period: Window,
+    timezone: str,
+    expected: list[str],
+    *,
+    key: str,
+    metric: str,
+    field: str,
+    count: str,
+    source: str,
 ) -> list[Observation]:
     country, units = _context(country, timezone, expected)
     rows = _indexed(body, key, units)
@@ -151,35 +194,59 @@ def _mean(
             reason = "missing_unit"
         elif not weight:
             reason = "no_orders"
-        result.append(_observation(
-            country, unit, metric, period, timezone, source,
-            numerator=average * weight if average is not None and weight else None,
-            denominator=weight if weight else None,
-            status="complete" if weight else "unavailable", reason=reason,
-        ))
+        result.append(
+            _observation(
+                country,
+                unit,
+                metric,
+                period,
+                timezone,
+                source,
+                numerator=average * weight if average is not None and weight else None,
+                denominator=weight if weight else None,
+                status="complete" if weight else "unavailable",
+                reason=reason,
+            )
+        )
     return result
 
 
-def cooking(body: object, country: str, period: Window, timezone: str,
-            expected: list[str]) -> list[Observation]:
+def cooking(
+    body: object, country: str, period: Window, timezone: str, expected: list[str]
+) -> list[Observation]:
     """Только ответ запроса salesChannels=DineIn, вес — filtered ordersCount."""
     return _mean(
-        body, country, period, timezone, expected, key="ordersHandoverStatistics",
-        metric="restaurant_cooking_seconds", field="avgCookingTime", count="ordersCount",
+        body,
+        country,
+        period,
+        timezone,
+        expected,
+        key="ordersHandoverStatistics",
+        metric="restaurant_cooking_seconds",
+        field="avgCookingTime",
+        count="ordersCount",
         source="dodois/production/orders-handover-statistics:DineIn:weighted_rounded",
     )
 
 
-def delivery(body: object, country: str, period: Window, timezone: str,
-             expected: list[str]) -> list[Observation]:
+def delivery(
+    body: object, country: str, period: Window, timezone: str, expected: list[str]
+) -> list[Observation]:
     """Вес deliveryOrdersCount той же исключённой выборки, не общий finances count.
 
     Восстановленный numerator приближён: исходное среднее округлено до секунд.
     """
     return _mean(
-        body, country, period, timezone, expected, key="unitsStatistics",
-        metric="delivery_seconds", field="avgDeliveryOrderFulfillmentTime",
-        count="deliveryOrdersCount", source="dodois/delivery/statistics:weighted_rounded",
+        body,
+        country,
+        period,
+        timezone,
+        expected,
+        key="unitsStatistics",
+        metric="delivery_seconds",
+        field="avgDeliveryOrderFulfillmentTime",
+        count="deliveryOrdersCount",
+        source="dodois/delivery/statistics:weighted_rounded",
     )
 
 
@@ -195,8 +262,9 @@ def _local(value: object, field: str, zone: ZoneInfo) -> datetime:
     return stamp.replace(tzinfo=zone)
 
 
-def stops(body: object, country: str, period: Window, timezone: str,
-          expected: list[str]) -> list[Observation]:
+def stops(
+    body: object, country: str, period: Window, timezone: str, expected: list[str]
+) -> list[Observation]:
     """Объединение Complete-стопов каналов; Redirection не прибавляется к простою.
 
     stops_seconds — время хотя бы одного полностью остановленного канала;
@@ -212,8 +280,12 @@ def stops(body: object, country: str, period: Window, timezone: str,
     for row in _rows(body, "stopSalesBySalesChannels"):
         unit = _unit(row.get("unitId"))
         identity = row.get("id")
-        if (unit not in intervals or not isinstance(identity, str) or not identity
-                or (unit, identity) in seen):
+        if (
+            unit not in intervals
+            or not isinstance(identity, str)
+            or not identity
+            or (unit, identity) in seen
+        ):
             raise ShapeError("unexpected or duplicate stop")
         seen.add((unit, identity))
         if row.get("salesChannelName") not in {"Dine-in", "Takeaway", "Delivery"}:
@@ -224,8 +296,11 @@ def stops(body: object, country: str, period: Window, timezone: str,
         start = _local(row.get("startedAtLocal"), "startedAtLocal", zone)
         if "endedAtLocal" not in row:
             raise ShapeError("missing endedAtLocal")
-        end = (right if row["endedAtLocal"] is None
-               else _local(row["endedAtLocal"], "endedAtLocal", zone))
+        end = (
+            right
+            if row["endedAtLocal"] is None
+            else _local(row["endedAtLocal"], "endedAtLocal", zone)
+        )
         if end < start and row["endedAtLocal"] is not None:
             raise ShapeError("stop end precedes start")
         start, end = max(start, left), min(end, right)
@@ -240,19 +315,29 @@ def stops(body: object, country: str, period: Window, timezone: str,
             else:
                 merged.append((start, end))
         # UTC subtraction preserves actual elapsed seconds across DST changes.
-        seconds = sum((Decimal(str(end.timestamp() - start.timestamp()))
-                       for start, end in merged), Decimal(0))
+        seconds = sum(
+            (Decimal(str(end.timestamp() - start.timestamp())) for start, end in merged), Decimal(0)
+        )
         for metric, value in (("stops_seconds", seconds), ("stops_count", Decimal(len(events)))):
-            result.append(_observation(
-                country, unit, metric, period, timezone,
-                "dodois/production/stop-sales-channels:Complete:union_local",
-                value=value, status="partial", reason="boundary_semantics_unverified",
-            ))
+            result.append(
+                _observation(
+                    country,
+                    unit,
+                    metric,
+                    period,
+                    timezone,
+                    "dodois/production/stop-sales-channels:Complete:union_local",
+                    value=value,
+                    status="partial",
+                    reason="boundary_semantics_unverified",
+                )
+            )
     return result
 
 
-def vouchers(body: object, country: str, period: Window, timezone: str,
-             expected: list[str]) -> list[Observation]:
+def vouchers(
+    body: object, country: str, period: Window, timezone: str, expected: list[str]
+) -> list[Observation]:
     """Все завершённые страницы batch; сохраняются только счётчики по unit.
 
     Повтор одного orderId внутри одного unit удаляется. Коллизия между unit —
@@ -273,15 +358,29 @@ def vouchers(body: object, country: str, period: Window, timezone: str,
         if order not in seen:
             counts[unit] += 1
             seen[order] = unit
-    return [_observation(
-        country, unit, "certificates_count", period, timezone,
-        "dodois/delivery/vouchers:dedup_order",
-        value=Decimal(count),
-    ) for unit, count in counts.items()]
+    return [
+        _observation(
+            country,
+            unit,
+            "certificates_count",
+            period,
+            timezone,
+            "dodois/delivery/vouchers:dedup_order",
+            value=Decimal(count),
+        )
+        for unit, count in counts.items()
+    ]
 
 
-def native_lfl(body: object, country: str, period: Window, granularity: str,
-               expected: list[str], *, by_country: bool = False) -> list[NativeLfl]:
+def native_lfl(
+    body: object,
+    country: str,
+    period: Window,
+    granularity: str,
+    expected: list[str],
+    *,
+    by_country: bool = False,
+) -> list[NativeLfl]:
     """Raw LFL, без ×100, свёртки buckets или предположения о базовом периоде."""
     if by_country:
         if not isinstance(country, str) or not re.fullmatch(r"[A-Za-z]{2}", country):

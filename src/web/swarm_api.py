@@ -535,7 +535,6 @@ def _sales(_: Settings) -> dict[str, Any]:
     }
 
 
-
 def _performance(_: Settings) -> dict[str, Any]:
     countries = _countries_or_imf(_countries())
     requested = _day("as_of")
@@ -551,15 +550,20 @@ def _performance(_: Settings) -> dict[str, Any]:
         if as_of.year < 2001:
             raise ApiRefusal(400, "bad_date", "as_of: supported dates start in 2001")
         windows = performance_domain.comparison_windows(as_of)
-        rows = performance.read_observations(
-            [cc], min(w.start for w in windows.values()), as_of
+        rows = performance.read_observations([cc], min(w.start for w in windows.values()), as_of)
+        payload.append(
+            performance_feed.country_json(
+                cc,
+                name=country_names.get(cc, cc),
+                as_of=as_of,
+                timezone=zone,
+                timezone_fallback=fallback,
+                rows=rows,
+                lfl=performance.read_lfl([cc], windows["current"]),
+                names=names,
+                loads=performance.load_states([cc], windows["current"]),
+            )
         )
-        payload.append(performance_feed.country_json(
-            cc, name=country_names.get(cc, cc), as_of=as_of, timezone=zone,
-            timezone_fallback=fallback, rows=rows,
-            lfl=performance.read_lfl([cc], windows["current"]), names=names,
-            loads=performance.load_states([cc], windows["current"]),
-        ))
     return {"as_of": requested.isoformat() if requested else None, "countries": payload}
 
 
