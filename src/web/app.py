@@ -814,9 +814,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             unit_href=lambda item: _unit_href(item, lang=язык),
             review_wait=ждёт_дней,
             rows=строки,
-            # Страна — колонкой слева (D498), остальные размерности — в блоке фильтров.
-            picks=tuple(ч for ч in чипы if ч.key != "country"),
-            country_pick=next((ч for ч in чипы if ч.key == "country"), None),
+            # Все размерности — в общем компактном блоке над списками.
+            picks=чипы,
             grade_tone=view.grade_tone,
             kind_title=_kind_title,
             # Чек-лист в строке называется, только когда их в реестре больше
