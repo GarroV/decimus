@@ -89,6 +89,20 @@ _SCOPES: dict[str, tuple[tuple[str, str], tuple[str, str], tuple[str, str]]] = {
             "Revenue and order count of each pizzeria for a month from Dodo IS, in local currency.",
         ),
     ),
+    "performance:read": (
+        ("Операционные показатели", "Operating performance"),
+        ("Показатели стран и пиццерий", "Country and pizzeria performance"),
+        (
+            (
+                "Выручка, заказы, время, стопы и сертификаты; "
+                "сравнения месяцев и лет, охват и свежесть."
+            ),
+            (
+                "Revenue, orders, times, stops and vouchers; "
+                "monthly and yearly comparisons, coverage and freshness."
+            ),
+        ),
+    ),
 }
 
 

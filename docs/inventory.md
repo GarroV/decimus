@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 234 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 235 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -101,6 +101,7 @@
 | `/api/v1/inspections/<inspection_id>` | GET | `swarm_api_inspection` | `src/web/swarm_api.py` |
 | `/api/v1/inspections/violations` | GET | `swarm_api_inspection_violations` | `src/web/swarm_api.py` |
 | `/api/v1/maps/ratings` | GET | `swarm_api_maps` | `src/web/swarm_api.py` |
+| `/api/v1/performance` | GET | `swarm_api_performance` | `src/web/swarm_api.py` |
 | `/api/v1/ratings/checkups` | GET | `swarm_api_checkups` | `src/web/swarm_api.py` |
 | `/api/v1/ratings/scores` | GET | `swarm_api_scores` | `src/web/swarm_api.py` |
 | `/api/v1/ratings/violations` | GET | `swarm_api_violations` | `src/web/swarm_api.py` |
@@ -679,6 +680,7 @@
 | `0132_photo_backfill_fairness.sql` | — |
 | `0133_user_deletion.sql` | — |
 | `0134_inspection_followup.sql` | `inspection_followup` |
+| `0135_performance.sql` | `dodois.performance_windows`, `dodois.performance_lfl`, `dodois.performance_loads` |
 <!-- map:end -->
 
 ## Makefile

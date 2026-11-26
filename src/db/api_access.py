@@ -47,6 +47,7 @@ SCOPE_INSPECTION_LIST = "inspections:list"
 SCOPE_INSPECTION_DETAIL = "inspections:detail"
 SCOPE_INSPECTION_VIOLATIONS = "inspections:violations"
 SCOPE_SALES = "sales:month"
+SCOPE_PERFORMANCE = "performance:read"
 #: Закрытый перечень прав — по праву на метод API (D425). Тот же список держит
 #: ограничение схемы (`0052`); порядок — порядок переключателей на «Подключениях».
 SCOPES = (
@@ -59,6 +60,7 @@ SCOPES = (
     SCOPE_INSPECTION_DETAIL,
     SCOPE_INSPECTION_VIOLATIONS,
     SCOPE_SALES,
+    SCOPE_PERFORMANCE,
 )
 
 #: Сколько хранится журнал. Старше — удаляется попутно с записью.
