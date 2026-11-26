@@ -1,4 +1,5 @@
 -- Language-specific PDFs and reproducible drafts; originals remain immutable.
+-- Переводы и заготовки сохраняются отдельно от исходного текста проверки.
 alter table reports add column lang text check (lang ~ '^[a-z]{2}$');
 create index reports_by_language on reports (inspection_id, lang, created_at desc);
 

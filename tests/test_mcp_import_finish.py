@@ -105,6 +105,18 @@ def мир(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr("src.db.accept.accept_inspection", принять)
     monkeypatch.setattr("src.db.reports.upload_report", выгрузить)
     monkeypatch.setattr(detail_pdf, "build_bytes", lambda *_, **__: b"%PDF-1.7 test")
+    # The document storage/translation path is verified against the isolated database;
+    # this fixture keeps the MCP response and its existing photo-failure contract local.
+    from src.db.reach import Reach
+    from src.mcp import letters as mcp_letters
+    from src.report import documents
+
+    monkeypatch.setattr(documents, "prepare", lambda *_, **__: {})
+    monkeypatch.setattr(mcp_letters, "reach_of", lambda tenant: Reach(tenant, (tenant,), None))
+    monkeypatch.setattr(
+        mcp_letters, "_build",
+        lambda detail, *, reach, **kwargs: letters.build(detail, **kwargs),
+    )
     return мир
 
 

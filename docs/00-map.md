@@ -405,7 +405,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{batch_letters,calendar_store,checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
+<!-- map:begin files src/db/{batch_letters,calendar_store,checksum,config,database_target,document_cache,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,service_settings,space,space_guard,stamp,storage,storage_reconcile,target_refusal,timeouts}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/batch_letters.py` | D739 (#1579): общее письмо партнёру по нескольким проверкам, зафиксированное человеком |
@@ -413,6 +413,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
 | `src/db/config.py` | Окружение блока: где Postgres |
 | `src/db/database_target.py` | Куда ведёт строка подключения — и все ли подключения ведут в одну базу (#487) |
+| `src/db/document_cache.py` | Immutable derived translations and letter drafts, scoped to their inspection |
 | `src/db/errors.py` | Отказы блока `db` |
 | `src/db/migrate.py` | Накат SQL-миграций |
 | `src/db/models.py` | Типы, которыми блок `db` разговаривает наружу |
@@ -474,7 +475,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,inspection_followup,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,maps_reviews_store,model_key,model_usage,walk_log,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_violations,ratings_sync,second_factor,secret_crypto,web_access,user_deletion,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,inspection_followup,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,maps_reviews_store,model_key,model_usage,walk_log,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_violations,ratings_sync,second_factor,secret_crypto,web_access,user_deletion,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,performance,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -502,6 +503,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/model_usage.py` | Расход модели (D537, `0078`): запись вызова и чтение сводки для экрана |
 | `src/db/notifications.py` | Уведомления в приложении (#1129, D604, D614): запись событий и чтение своих |
 | `src/db/oauth_store.py` | Хранилище OAuth: клиенты, коды, подключения и токены (D417, миграция `0054`) |
+| `src/db/performance.py` | Оконный кеш операционных метрик, native LFL и состояние загрузки для Swarm |
 | `src/db/plan_backfill.py` | Догон строк для старых открытых запросов плана (#1168, спека «Что со старыми запросами») |
 | `src/db/plan_file.py` | Файл «туда и обратно» электронного плана: сверка строк файла с планом (шаг 3 эпика #1168) |
 | `src/db/plan_flow.py` | Ход электронного плана исправлений: заполнение, согласование, выполнение (#1168) |
@@ -674,7 +676,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0133_user_deletion.sql` | История проверок и журнал остаются связаны с обезличенным техническим UUID |
 | `0134_inspection_followup.sql` | Дополнения хранятся отдельно от замороженного отчёта |
 | `0135_performance.sql` | знаменатели средних, валюты, покрытие и происхождение без строк заказов и клиентов |
-| `0136_report_languages.sql` | (нет описания) |
+| `0136_report_languages.sql` | Переводы и заготовки сохраняются отдельно от исходного текста проверки |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

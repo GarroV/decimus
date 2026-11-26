@@ -1177,27 +1177,30 @@ def _finish(ident: str, *, tenant: str) -> dict[str, object]:
     выгрузки PDF называется в `pdf_error`, сбой письма — в `letter_error`.
     Ничего никуда не отправляется — всё возвращается в ответе.
     """
+    from ..db import reports
     from ..db.errors import DbError
-    from ..db.reach import own_reach
-    from ..report import current_pdf, documents
+    from ..report import detail_pdf
     from ..report.errors import ReportError
     from .letters import build, sources
 
     итог: dict[str, object] = {"report_url": None, "pdf_error": None, "pdf_warning": None}
     try:
-        итог["document_errors"] = documents.prepare(ident, reach=own_reach(tenant))
-    except (ReportError, ToolError, DbError, OSError) as exc:
-        итог["document_errors"] = {"ru": str(exc), "en": str(exc)}
-    try:
         detail, _ = _read(ident, tenant=tenant)
-        current_pdf.ensure_report(detail, reach=own_reach(tenant))
+        papers = sources()
+        фото, не_скачано = _report_photos(detail, tenant=tenant)
+        if не_скачано:
+            итог["pdf_warning"] = (
+                "Some photos could not be fetched from storage — the PDF is built without them"
+            )
+        данные = detail_pdf.build_bytes(detail, lang=None, papers=papers, photos=фото)
+        with _db(accept=True):
+            reports.upload_report(ident, data=данные)
         итог["report_url"] = _report_url(ident)
         if итог["report_url"] is None:
             итог["pdf_error"] = "PDF saved, but ADMIN_PUBLIC_URL is not set — no absolute link"
     except (ReportError, ToolError, DbError, OSError) as exc:
-        logger.warning("отчёт принятой проверки %s не собран: %s", ident, type(exc).__name__)
+        logger.warning("отчёт принятой проверки %s не собран: %s", ident, exc)
         итог["pdf_error"] = str(exc)
-
     try:
         detail, _ = _read(ident, tenant=tenant)
         письмо = build(detail, lang=None, papers=sources())
@@ -1208,6 +1211,13 @@ def _finish(ident: str, *, tenant: str) -> dict[str, object]:
         logger.warning("письмо принятой проверки %s не собрано: %s", ident, exc)
         итог["letter"] = None
         итог["letter_error"] = str(exc)
+    from ..db.reach import own_reach
+    from ..report import documents
+
+    try:
+        итог["document_errors"] = documents.prepare(ident, reach=own_reach(tenant))
+    except (ReportError, ToolError, DbError, OSError) as exc:
+        итог["document_errors"] = {"ru": str(exc), "en": str(exc)}
     return итог
 
 
