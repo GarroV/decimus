@@ -34,10 +34,11 @@ from src.db.reach import Reach, reach_of
 from src.domain.models import REPORT_LANGS
 from src.domain.permissions import SIDE_HQ, side_of
 from src.domain.tenants import HQ_TENANT, canonical_tenant
-from src.report import current_pdf, info_titles, letter_markup, plan_terms
+from src.report import current_pdf, documents, info_titles, letter_markup, plan_terms
+from src.report.documents import letter as build_letter
+from src.report.errors import ReportError
 from src.report.letters import TEMPLATES as letter_templates
 from src.report.letters import LetterError
-from src.report.letters import build as build_letter
 from src.report.letters import sources as letter_sources
 
 logger = logging.getLogger(__name__)
@@ -272,8 +273,9 @@ def load_letter(
             papers=letter_sources(),
             template=template,
             bodies=stored_letter_bodies(detail.inspection.tenant_code),
+            reach=reach_of(detail.inspection.tenant_code),
         )
-    except LetterError as отказ:
+    except (LetterError, ReportError, DbError) as отказ:
         return Letter(
             text=None, lang=None, source=None, ready=False, caveats=(), failure=str(отказ)
         )
@@ -294,7 +296,7 @@ def load_letter(
     )
 
 
-def accept_card(inspection_id: str, *, tenant: str, actor: str) -> None:
+def accept_card(inspection_id: str, *, tenant: str, actor: str) -> dict[str, str]:
     """Подтвердить проверку своего пространства на приёмке (D199).
 
     Отказ — `AcceptError` блока `db`; проверка чужого пространства отвечает
@@ -303,6 +305,11 @@ def accept_card(inspection_id: str, *, tenant: str, actor: str) -> None:
     """
     terms = plan_terms_for(reach_of(tenant))
     accept.accept_inspection(inspection_id, tenant=tenant, actor=actor, terms=terms)
+    try:
+        return documents.prepare(inspection_id, reach=reach_of(tenant))
+    except (DbError, ReportError, OSError):
+        logger.warning("Документы принятой проверки не подготовлены", exc_info=True)
+        return {language: "retry" for language in documents.PREPARED_LANGS}
 
 
 def plan_terms_for(reach: Reach) -> TermsProvider:
@@ -502,9 +509,9 @@ def load_report(inspection_id: str, *, reach: Reach) -> reports.ReportRef | None
     return reports.latest_report(inspection_id, reach=reach)
 
 
-def report_name(head: InspectionRow) -> str:
+def report_name(head: InspectionRow, *, lang: str | None = None) -> str:
     """Единое безопасное имя PDF для скачивания и почтового вложения."""
-    return current_pdf.report_name(head)
+    return current_pdf.report_name(head, lang=lang)
 
 
 def report_bytes(ref: reports.ReportRef) -> bytes:
@@ -512,9 +519,11 @@ def report_bytes(ref: reports.ReportRef) -> bytes:
     return reports.fetch_report(ref)
 
 
-def ensure_report(detail: InspectionDetail, *, reach: Reach) -> reports.ReportRef:
+def ensure_report(
+    detail: InspectionDetail, *, reach: Reach, lang: str | None = None
+) -> reports.ReportRef:
     """Общий актуальный PDF для скачивания и почты; старые версии остаются историей."""
-    return current_pdf.ensure_report(detail, reach=reach)
+    return current_pdf.ensure_report(detail, reach=reach, lang=lang)
 
 
 def load_previews(inspection_id: str, *, reach: Reach) -> dict[str, previews.FindingShots]:

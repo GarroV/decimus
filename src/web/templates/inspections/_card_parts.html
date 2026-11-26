@@ -106,7 +106,14 @@
        отдаёт только сохранённый: без него ссылка вела бы в отказ. Ответ —
        вложение: щелчок скачивает файл и страницу не меняет. #}
     {% if c.report or not head.is_legacy %}
-      {{ _link(full ~ '/report?lang=' ~ lang, 'download', t('card.report.download'), panel) }}
+      {% if head.is_legacy %}
+        {{ _link(full ~ '/report?lang=' ~ lang, 'download', t('card.report.download'), panel) }}
+      {% else %}
+        {% for report_language in report_langs %}
+          {{ _link(full ~ '/report?lang=' ~ lang ~ '&report_lang=' ~ report_language,
+                   'download', t('card.report.download') ~ ' ' ~ report_language|upper, panel) }}
+        {% endfor %}
+      {% endif %}
     {% endif %}
     {# Письмо партнёру — запись от имени пространства: у проверки, которую
        вошедший только читает (УК у партнёра, D283), кнопки нет. У заведённой

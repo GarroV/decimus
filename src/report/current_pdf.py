@@ -18,18 +18,21 @@ from src.db.models import InspectionDetail, InspectionRow
 from src.db.reach import Reach
 from src.db.storage import S3PhotoStorage, key_of_uri
 
-from . import detail_pdf
-from .letters import AUDIT_SCRIPT, REPORT_SCRIPT, state_json
+from . import detail_pdf, localized
+from .letters import AUDIT_SCRIPT, REPORT_SCRIPT, _lang, state_json
 from .letters import sources as letter_sources
 
 
-def report_name(head: InspectionRow) -> str:
+def report_name(head: InspectionRow, *, lang: str | None = None) -> str:
     """Единое безопасное имя PDF для скачивания, вложения и повторной выдачи."""
     unit = "".join(char for char in head.unit_name if char.isprintable() and char not in '"\\/')
-    return f"{unit.strip() or 'inspection'} {head.inspection_date}.pdf"
+    suffix = f" {lang.upper()}" if lang else ""
+    return f"{unit.strip() or 'inspection'} {head.inspection_date}{suffix}.pdf"
 
 
-def ensure_report(detail: InspectionDetail, *, reach: Reach) -> reports.ReportRef:
+def ensure_report(
+    detail: InspectionDetail, *, reach: Reach, lang: str | None = None
+) -> reports.ReportRef:
     """Актуальный PDF для скачивания и почты, с сохранением прежних версий.
 
     Снимок перечитывается в охвате вызывающего, а перед публикацией проверяется
@@ -41,13 +44,14 @@ def ensure_report(detail: InspectionDetail, *, reach: Reach) -> reports.ReportRe
     current = queries.get_inspection(head.id, reach=reach, include_on_review=True)
     if current is None:
         raise StorageError("Проверка не найдена или недоступна для актуального PDF")
-    ref = reports.latest_report(head.id, reach=reach)
+    language = _lang(current, lang)
+    ref = reports.latest_report(head.id, reach=reach, lang=None if head.is_legacy else language)
     if current.inspection.is_legacy:
         if ref is None:
             raise StorageError("Сохранённого отчёта исторической проверки нет")
         return ref
     shots = previews.report_photos(head.id, reach=reach)
-    fingerprint = _report_fingerprint(current, shots)
+    fingerprint = _report_fingerprint(current, shots, lang=language)
     if ref is not None and f"/reports/{fingerprint}/" in ref.storage_path:
         return ref
     hold = busy_lock.try_hold(busy_lock.REPORT_REFRESH, head.id)
@@ -56,10 +60,10 @@ def ensure_report(detail: InspectionDetail, *, reach: Reach) -> reports.ReportRe
         raise StorageError("Актуальный PDF уже собирается или замок недоступен — повторите запрос")
     try:
         # Пока брали замок, другой процесс мог уже закончить тот же снимок.
-        ref = reports.latest_report(head.id, reach=reach)
+        ref = reports.latest_report(head.id, reach=reach, lang=language)
         if ref is not None and f"/reports/{fingerprint}/" in ref.storage_path:
             return ref
-        return _rebuild_report(current, shots, fingerprint=fingerprint, reach=reach)
+        return _rebuild_report(current, shots, fingerprint=fingerprint, reach=reach, lang=lang)
     finally:
         hold.release()
 
@@ -70,6 +74,7 @@ def _rebuild_report(
     *,
     fingerprint: str,
     reach: Reach,
+    lang: str | None,
 ) -> reports.ReportRef:
     store = S3PhotoStorage(load_storage_settings(), fail_fast=True)
     photos: dict[int, list[bytes]] = {}
@@ -87,34 +92,45 @@ def _rebuild_report(
             info_photos.setdefault(shot.info_code, []).append(data)
         else:
             raise StorageError("Не определено место фотографии в актуальном PDF")
+    language = _lang(detail, lang)
+    rendered = localized.detail_in(detail, lang=language, reach=reach)
     data = detail_pdf.build_bytes(
-        detail, lang=None, papers=letter_sources(), photos=photos, info_photos=info_photos
+        rendered, lang=lang, papers=letter_sources(), photos=photos, info_photos=info_photos
     )
     head = detail.inspection
-    _assert_report_source(head.id, fingerprint=fingerprint, reach=reach)
-    reports.upload_report(head.id, data=data, storage=store, source_fingerprint=fingerprint)
+    _assert_report_source(head.id, fingerprint=fingerprint, reach=reach, lang=language)
+    reports.upload_report(
+        head.id, data=data, storage=store, source_fingerprint=fingerprint, lang=language
+    )
     # Смена источника во время загрузки оставляет снимок в истории, но запрещает
     # выдать его вызывающему. Следующий ensure проверит и заменит latest.
-    _assert_report_source(head.id, fingerprint=fingerprint, reach=reach)
-    updated = reports.latest_report(head.id, reach=reach)
+    _assert_report_source(head.id, fingerprint=fingerprint, reach=reach, lang=language)
+    updated = reports.latest_report(head.id, reach=reach, lang=language)
     if updated is None or f"/reports/{fingerprint}/" not in updated.storage_path:
         raise StorageError("Актуальный PDF не сохранён — повторите запрос")
     return updated
 
 
-def _assert_report_source(inspection_id: str, *, fingerprint: str, reach: Reach) -> None:
+def _assert_report_source(
+    inspection_id: str, *, fingerprint: str, reach: Reach, lang: str | None = None
+) -> None:
     current = queries.get_inspection(inspection_id, reach=reach, include_on_review=True)
     if (
         current is None
-        or _report_fingerprint(current, previews.report_photos(inspection_id, reach=reach))
+        or _report_fingerprint(
+            current, previews.report_photos(inspection_id, reach=reach), lang=lang
+        )
         != fingerprint
     ):
         raise StorageError("Проверка изменилась во время сборки PDF — повторите запрос")
 
 
-def _report_fingerprint(detail: InspectionDetail, shots: tuple[previews.ReportPhoto, ...]) -> str:
+def _report_fingerprint(
+    detail: InspectionDetail, shots: tuple[previews.ReportPhoto, ...], *, lang: str | None = None
+) -> str:
     payload = {
         "detail": asdict(detail),
+        "lang": lang or detail.inspection.report_lang,
         # Фото и копии после загрузки неизменяемы (0004); замена создаёт новый
         # id/путь. Удалённый кадр исчезает из перечня, незагруженный меняет путь.
         "photos": [asdict(value) for value in shots],

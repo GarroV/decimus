@@ -815,6 +815,16 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.fact.city": {"ru": "Город", "en": "City"},
     "card.fact.partner": {"ru": "Партнёр", "en": "Partner"},
     "card.fact.report_lang": {"ru": "Язык отчёта", "en": "Report language"},
+    "accept.documents_pending": {
+        "ru": (
+            "Проверка принята. Не все языковые версии подготовлены. "
+            "Повторите скачивание PDF или открытие письма: подготовка повторится автоматически."
+        ),
+        "en": (
+            "Inspection accepted. Some language versions could not be prepared. "
+            "Download the PDF or open the letter again to retry preparation."
+        ),
+    },
     "card.score.unit": {"ru": "%", "en": "%"},
     "card.score.note": {
         "ru": "Вычтено {deductions} %",

@@ -679,6 +679,7 @@
 | `0132_photo_backfill_fairness.sql` | — |
 | `0133_user_deletion.sql` | — |
 | `0134_inspection_followup.sql` | `inspection_followup` |
+| `0136_report_languages.sql` | `inspection_document_cache` |
 <!-- map:end -->
 
 ## Makefile

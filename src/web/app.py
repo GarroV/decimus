@@ -62,6 +62,7 @@ from src.domain.second_factor import passkey_auto_enroll
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.domain.uploads import MAX_UPLOAD_BYTES
 from src.report import letter_markup
+from src.report.errors import ReportError
 from src.report.info_titles import FOUND
 from src.report.letters import LetterError
 
@@ -859,10 +860,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
+        report_language = request.args.get("report_lang")
+        if report_language is not None and report_language not in REPORT_LANGS:
+            abort(400)
         try:
             ref = data.load_report(inspection_id, reach=auth.current_reach())
             if not detail.inspection.is_legacy:
-                ref = data.ensure_report(detail, reach=auth.current_reach())
+                ref = data.ensure_report(detail, reach=auth.current_reach(), lang=report_language)
             if ref is None:
                 return _card_refusal(
                     inspection_id, conf=conf, text=t("card.report.none", lang), status=404
@@ -879,7 +883,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 не_изменён.headers["Cache-Control"] = REPORT_CACHE_CONTROL
                 return не_изменён
             файл = data.report_bytes(ref)
-        except (DbError, LetterError) as exc:
+        except (DbError, LetterError, ReportError) as exc:
             logger.warning("отчёт проверки %s не выдан: %s", inspection_id, exc)
             return _card_refusal(
                 inspection_id, conf=conf, text=t("card.report.failed", lang), status=503
@@ -888,7 +892,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             io.BytesIO(файл),
             mimetype=ref.content_type,
             as_attachment=True,
-            download_name=_report_name(detail.inspection),
+            download_name=data.report_name(
+                detail.inspection, lang=report_language if not detail.inspection.is_legacy else None
+            ),
         )
         ответ.set_etag(метка)
         ответ.headers["Cache-Control"] = REPORT_CACHE_CONTROL
@@ -1024,7 +1030,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         notice: str | None = None
         failure: str | None = None
         try:
-            data.accept_card(
+            document_failures = data.accept_card(
                 inspection_id,
                 tenant=auth.current_tenant(),
                 actor=вошедший.login if вошедший else "",
@@ -1033,6 +1039,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             failure = t("accept.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
         else:
             notice = t("accept.done", _lang(conf))
+            if document_failures:
+                failure = t("accept.documents_pending", _lang(conf))
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
     @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/revise")

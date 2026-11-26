@@ -673,6 +673,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0132_photo_backfill_fairness.sql` | Отметка задаёт порядок попыток, а не бессрочную аренду |
 | `0133_user_deletion.sql` | История проверок и журнал остаются связаны с обезличенным техническим UUID |
 | `0134_inspection_followup.sql` | Дополнения хранятся отдельно от замороженного отчёта |
+| `0136_report_languages.sql` | (нет описания) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -1116,6 +1117,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/report/build.py` | Сборка отчёта и письма партнёру |
 | `src/report/current_pdf.py` | Актуальный сохранённый PDF проверки для веба, почты и повторной выдачи ботом |
 | `src/report/detail_pdf.py` | PDF-отчёт из актуального снимка проверки в базе, по её версии методики |
+| `src/report/documents.py` | Prepare RU/EN documents once, retaining the inspection and sent-letter history |
 | `src/report/engine.py` | Вызов `engine/report.py` подпроцессом — единственный способ собрать отчёт |
 | `src/report/engine_call.py` | Общее для тех, кто зовёт движок подпроцессом: где он лежит, сколько ждать, что печатать |
 | `src/report/errors.py` | Отказы блока `report` |
@@ -1123,6 +1125,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/report/info_titles.py` | Подписи полей информационной части — формулировки вопросов по кодам |
 | `src/report/letter_markup.py` | Разметка письма партнёру: белый список из четырёх элементов (T353, D169, #332) |
 | `src/report/letters.py` | Письмо партнёру по уже записанной проверке — пересборка, а не пересчёт |
+| `src/report/localized.py` | Language-specific document text; the recorded inspection is never overwritten |
 | `src/report/notice.py` | Отбор нарушений для предписания по проверке (D602, D606, шаг 3 спеки 2026-10-21) |
 | `src/report/notice_pdf.py` | PDF предписания по проверке: текст шаблона, таблица нарушений, приложение с фото (шаг 3) |
 | `src/report/photos.py` | Где взять кадр, приложенный к записи или к информационному полю, и что считать его пропажей |

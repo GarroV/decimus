@@ -44,8 +44,8 @@ limit 1
 """
 
 _INSERT_REPORT_SQL = """
-insert into reports (inspection_id, storage_path, content_type, size_bytes)
-values (%(inspection_id)s, %(storage_path)s, %(content_type)s, %(size_bytes)s)
+insert into reports (inspection_id, storage_path, content_type, size_bytes, lang)
+values (%(inspection_id)s, %(storage_path)s, %(content_type)s, %(size_bytes)s, %(lang)s)
 returning id
 """
 
@@ -88,6 +88,7 @@ def upload_report(
     storage: PhotoStorage | None = None,
     content_type: str = REPORT_CONTENT_TYPE,
     source_fingerprint: str | None = None,
+    lang: str | None = None,
 ) -> StoredReport:
     """Положить готовый отчёт в хранилище и записать ссылку на него.
 
@@ -103,6 +104,8 @@ def upload_report(
     """
     if not data:
         raise PushError("Отчёт не сохранён: пришли пустые байты, а не документ")
+    if lang is not None and re.fullmatch(r"[a-z]{2}", lang) is None:
+        raise PushError("Неверный язык отчёта")
 
     settings = check_environment()
     store = (
@@ -138,6 +141,7 @@ def upload_report(
                     "storage_path": uri,
                     "content_type": content_type,
                     "size_bytes": len(data),
+                    "lang": lang,
                 },
             )
         conn.commit()
@@ -158,6 +162,7 @@ from reports r
 join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
 where r.inspection_id = %(id)s
+  and coalesce(r.lang, i.report_lang) = coalesce(%(lang)s, i.report_lang)
   and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
 order by r.created_at desc
@@ -181,7 +186,7 @@ class ReportReader(Protocol):
     def get(self, key: str) -> bytes: ...
 
 
-def latest_report(inspection_id: str, *, reach: Reach) -> ReportRef | None:
+def latest_report(inspection_id: str, *, reach: Reach, lang: str | None = None) -> ReportRef | None:
     """Последний отчёт проверки из охвата читающего, или `None`, если его нет.
 
     `None` — это ответ «отчёт не сохранён» (проверка проведена до T336 или
@@ -190,7 +195,10 @@ def latest_report(inspection_id: str, *, reach: Reach) -> ReportRef | None:
     settings = check_environment()
     try:
         with connection(settings.dsn) as conn, conn.cursor() as cur:
-            cur.execute(_LATEST_REPORT_SQL, {"id": inspection_id, **require_reach(reach).params()})
+            cur.execute(
+                _LATEST_REPORT_SQL,
+                {"id": inspection_id, "lang": lang, **require_reach(reach).params()},
+            )
             row = cur.fetchone()
     except psycopg.Error as exc:
         raise DbError(f"Не удалось прочитать отчёт проверки ({type(exc).__name__})") from exc
