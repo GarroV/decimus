@@ -20,7 +20,7 @@ from datetime import timedelta
 from src.db.errors import DbError
 from src.db.job_lock import DODOIS_METRICS_LOCK_KEY, job_lock
 from src.db.space import SYSTEM_SPACE, acting_space
-from src.dodois import metrics
+from src.dodois import metrics, performance
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ def run_once() -> None:
             logger.info("Данные Dodo IS: сбор ведёт другой процесс — заход пропущен")
             return
         metrics.run_pass()
+        performance.run_pass()
 
 
 async def run_forever() -> None:

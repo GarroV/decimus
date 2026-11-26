@@ -489,6 +489,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0134_inspection_followup.sql": (
         "sql1:9af99a8316fd99336d8409a73b9571cf7685e5bd9dfda22d3550dc42e76b8608"
     ),
+    "0135_performance.sql": (
+        "sql1:6c9bcea101826179185faa1ef5f0634c2cbf875de2cc055ea23e7da2f60ae137"
+    ),
 }
 
 

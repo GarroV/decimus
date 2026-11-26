@@ -673,6 +673,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0132_photo_backfill_fairness.sql` | Отметка задаёт порядок попыток, а не бессрочную аренду |
 | `0133_user_deletion.sql` | История проверок и журнал остаются связаны с обезличенным техническим UUID |
 | `0134_inspection_followup.sql` | Дополнения хранятся отдельно от замороженного отчёта |
+| `0135_performance.sql` | знаменатели средних, валюты, покрытие и происхождение без строк заказов и клиентов |
 | `0136_report_languages.sql` | (нет описания) |
 <!-- map:end -->
 
@@ -913,6 +914,8 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/dodois/client.py` | Разговор с Dodo IS: вход устройства, продление, имя учётки, счёт открытых пиццерий (D640b) |
 | `src/dodois/flow.py` | Вход по ссылке: сервер начинает device flow, сам опрашивает Dodo IS и пишет вход (D640b) |
 | `src/dodois/metrics.py` | Суточный сбор данных Dodo IS для «Качества» по странам (D671): продажи, агрегаторы, КР |
+| `src/dodois/performance.py` | Bounded background collection of exact operating windows; no OAuth refresh |
+| `src/dodois/performance_parse.py` | Строгий разбор операционных ответов Dodo IS без сети и персональных данных |
 | `src/dodois/refresh_outbox.py` | Encrypted durable refresh handoff, serialized per country across processes |
 | `src/dodois/service.py` | Входы в Dodo IS по странам: записать вход, продлить, проверить «открыто X из Y» (D640b) |
 <!-- map:end -->
@@ -1032,6 +1035,8 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
 | `src/domain/peek.py` | Переключатель пространств главного админа: куда можно заглянуть и кому (D726) |
+| `src/domain/performance.py` | Окна операционной аналитики и точные сравнения без сети и базы |
+| `src/domain/performance_feed.py` | JSON операционных метрик: точные окна, отсутствующие данные и native LFL |
 | `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |
 | `src/domain/photo_upload_link.py` | Адрес загрузки кадров к черновику загрузки проверки: подписанный токен без срока |
 | `src/domain/plan_due.py` | Срок ответа партнёра планом исправлений — один на письмо, бот и веб (D617) |
