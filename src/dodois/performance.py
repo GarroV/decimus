@@ -32,6 +32,7 @@ from src.domain.performance import (
 from . import client
 from . import performance_parse as parse
 from .metrics import _each_batch
+from .performance_daily import collect_finance
 
 logger = logging.getLogger(__name__)
 FRESH_FOR = timedelta(hours=20)
@@ -380,6 +381,26 @@ def collect_country(
         )
         return [Outcome(login.country, "country_attempt", windows["current"], 0, _error(exc))]
     outcomes: list[Outcome] = []
+    daily_throttle = Throttle(sleep, budget)
+    for period in windows.values():
+        states = store.load_states([login.country], period)
+        if not _due(states, "finance_daily", moment, historical=False):
+            continue
+        try:
+            count = collect_finance(
+                login.country,
+                period,
+                timezone,
+                lambda path, query: _get(login, tokens.access, path, query, daily_throttle),
+            )
+            error = None
+        except BudgetExhausted:
+            store.record_load(login.country, "finance_daily", period, error_code="request_budget")
+            return outcomes
+        except (client.DodoisError, ValueError, DbError) as exc:
+            count, error = 0, _error(exc)
+        store.record_load(login.country, "finance_daily", period, error_code=error)
+        outcomes.append(Outcome(login.country, "finance_daily", period, count, error))
     processed = 0
     for period in planned_windows(cutoff):
         states = store.load_states([login.country], period)
@@ -424,6 +445,33 @@ def collect_country(
                 logger.warning("Operating metrics %s/%s failed (%s)", login.country, kind, error)
             store.record_load(login.country, kind, period, error_code=error)
             outcomes.append(Outcome(login.country, kind, period, count, error))
+    try:
+        daily_window = windows["current"]
+        expected_metrics = {
+            "delivery_seconds",
+            "restaurant_cooking_seconds",
+            "stops_seconds",
+            "certificates_count",
+        }
+        for candidate in windows.values():
+            rows = store.read_observations([login.country], candidate.start, candidate.end)
+            keys = {
+                (r.period.start, r.metric)
+                for r in rows
+                if r.subject_id == login.country and r.period.start == r.period.end
+            }
+            if any(
+                (candidate.start + timedelta(days=i), metric) not in keys
+                for i in range((candidate.end - candidate.start).days + 1)
+                for metric in expected_metrics
+            ):
+                daily_window = candidate
+                break
+        outcomes.extend(
+            collect_metric_days(login, daily_window, budget=budget, sleep=sleep, now=moment)
+        )
+    except BudgetExhausted:
+        pass
     if fallback:
         logger.info("Operating metrics %s use explicit UTC fallback", login.country)
     store.record_load(login.country, "country_attempt", windows["current"])
@@ -445,12 +493,31 @@ def run_pass(*, now: datetime | None = None, sleep: Sleep = time.sleep) -> list[
         marker = next((row for row in states if row["kind"] == "country_attempt"), None)
         if marker and moment - datetime.fromisoformat(marker["attempted_at"]) < RETRY_AFTER:
             continue
-        needs_work = False
+        daily_rows = store.read_observations([login.country], period.start, period.end)
+        daily_keys = {
+            (r.period.start, r.metric)
+            for r in daily_rows
+            if r.subject_id == login.country and r.period.start == r.period.end
+        }
+        needs_work = any(
+            (period.start + timedelta(days=i), metric) not in daily_keys
+            for i in range((period.end - period.start).days + 1)
+            for metric in (
+                "delivery_seconds",
+                "restaurant_cooking_seconds",
+                "stops_seconds",
+                "certificates_count",
+            )
+        )
         for window in planned_windows(cutoff):
             window_states = (
                 states if window == period else store.load_states([login.country], window)
             )
-            kinds = [*PATHS, "lfl_day", "lfl_month"] if window == period else list(PATHS)
+            kinds = (
+                [*PATHS, "finance_daily", "lfl_day", "lfl_month"]
+                if window == period
+                else [*PATHS, "finance_daily"]
+            )
             historical = window not in comparison_windows(cutoff).values()
             if any(_due(window_states, kind, moment, historical=historical) for kind in kinds):
                 needs_work = True
@@ -467,4 +534,68 @@ def run_pass(*, now: datetime | None = None, sleep: Sleep = time.sleep) -> list[
             break
         except (client.DodoisError, ValueError, DbError) as exc:
             logger.warning("Operating metrics %s unavailable (%s)", login.country, _error(exc))
+    return outcomes
+
+
+def collect_metric_days(
+    login: Login,
+    period: Window,
+    *,
+    budget: Budget,
+    day_limit: int = 12,
+    sleep: Sleep = time.sleep,
+    now: datetime | None = None,
+) -> list[Outcome]:
+    """Read actual single-day metrics, with the same weights, boundaries and request budget."""
+    moment = now or datetime.now(UTC)
+    timezone, _ = country_timezone(login.country)
+    tokens = logins.read_tokens(login.country)
+    if tokens is None:
+        return []
+    budget.charge()
+    active = {unit_id(value) for value in client.working_pizzerias(login.country)} - {None}
+    units = sorted(
+        active | {unit_id(value) for value in metrics_store.country_units(login.country)} - {None}
+    )
+    if not units:
+        return []
+    throttle = Throttle(sleep, budget)
+    outcomes, pending = [], []
+    historical = period.end < last_complete_day([timezone], now=moment).replace(day=1)
+    for offset in range((period.end - period.start).days + 1):
+        day = period.end - timedelta(days=offset)
+        window = Window(day, day)
+        states = store.load_states([login.country], window)
+        kinds = [
+            kind
+            for kind in ("delivery", "cooking", "stops", "vouchers")
+            if _due(states, kind, moment, historical=historical)
+        ]
+        if kinds:
+            attempted = max(
+                (str(row["attempted_at"]) for row in states if row.get("kind") in kinds), default=""
+            )
+            pending.append((attempted, -day.toordinal(), window, kinds))
+    for _, _, window, kinds in sorted(pending)[:day_limit]:
+        for kind in kinds:
+            try:
+                count = _save_kind(
+                    kind,
+                    login,
+                    tokens.access,
+                    units,
+                    active,
+                    window,
+                    timezone,
+                    throttle,
+                    current=(window.start.year, window.start.month) == (moment.year, moment.month),
+                )
+                error = None
+            except BudgetExhausted:
+                store.record_load(login.country, kind, window, error_code="request_budget")
+                return outcomes
+            except (client.DodoisError, ValueError, DbError) as exc:
+                count, error = 0, _error(exc)
+            store.record_load(login.country, kind, window, error_code=error)
+            outcomes.append(Outcome(login.country, kind, window, count, error))
     return outcomes

@@ -209,7 +209,7 @@ def observation_json(row: Observation | None, *, now: datetime | None = None) ->
             status = "partial"
     source_country = (
         row.subject_id == row.country
-        and row.source == "dodois/finances/sales/country"
+        and row.source in {"dodois/finances/sales/country", "dodois/finances/sales/country/daily"}
         and row.metric in {"revenue", "orders"}
     )
     if (
