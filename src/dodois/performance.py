@@ -553,14 +553,24 @@ def collect_metric_days(
     if tokens is None:
         return []
     budget.charge()
-    active = {unit_id(value) for value in client.working_pizzerias(login.country)} - {None}
+    active = {
+        normal
+        for value in client.working_pizzerias(login.country)
+        if (normal := unit_id(value)) is not None
+    }
     units = sorted(
-        active | {unit_id(value) for value in metrics_store.country_units(login.country)} - {None}
+        active
+        | {
+            normal
+            for value in metrics_store.country_units(login.country)
+            if (normal := unit_id(value)) is not None
+        }
     )
     if not units:
         return []
     throttle = Throttle(sleep, budget)
-    outcomes, pending = [], []
+    outcomes: list[Outcome] = []
+    pending: list[tuple[str, int, Window, list[str]]] = []
     historical = period.end < last_complete_day([timezone], now=moment).replace(day=1)
     for offset in range((period.end - period.start).days + 1):
         day = period.end - timedelta(days=offset)

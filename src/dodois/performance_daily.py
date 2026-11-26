@@ -40,7 +40,7 @@ def collect_finance(
             if not period.start <= day <= period.end:
                 continue
             try:
-                values = tuple(Decimal(str(raw[key])) for key in ("sales", "ordersCount"))
+                values = (Decimal(str(raw["sales"])), Decimal(str(raw["ordersCount"])))
             except (KeyError, InvalidOperation) as exc:
                 raise ValueError("daily sales values") from exc
             if not all(value.is_finite() for value in values):
