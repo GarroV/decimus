@@ -122,8 +122,8 @@ MCP, переменных окружения и целей `make` — в [`docs/
 | `docs/furca/questions.md` | Вопросы владельцу и ответы на них |
 | `docs/furca/intake.md` | Анкета проекта, с которой началась подготовка |
 | `docs/furca/research-report.md`, `docs/furca/research/` | Исследование перед стройкой: готовые решения, рынок, стек, зонд разбора |
-| `docs/furca/meeting-2026-09-01.md` | Конспект встречи 01.09.2026 по сервису |
-| `docs/furca/retro-draft.md` | Черновик заметок к ретро стройки |
+| `docs/furca/meeting-2026-09-01.md` | Указатель на актуальные требования сервиса |
+| `docs/furca/retro-draft.md` | Указатель на решения по итогам разработки |
 | `docs/furca/blocks/*.md` | Контракты блоков: что блок обещает, API, состояние (`db`, `domain`, `bot`, `mcp`, `web`, `recognize`, `report`, `spaces`, `infra` и др.) |
 | `docs/superpowers/` | Планы и дизайн-спеки волн работ по датам (`plans/`, `specs/`) |
 | `progress.md` | Журнал стройки: что и когда сделано, по строке на событие |
