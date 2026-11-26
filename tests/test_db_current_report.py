@@ -57,12 +57,18 @@ def test_same_source_deduplicates_and_new_source_preserves_old_version(
     assert same.storage_path == first.storage_path
     assert changed.storage_path != first.storage_path
     assert len(store.objects) == 2
+    # A later source PDF must not hide an already prepared language revision.
+    reports.upload_report(ident, data=b"%PDF-later-original", storage=store)
+    prepared = reports.latest_report(
+        ident, reach=Reach("HQ", None, None), lang="ru", source_fingerprint="a" * 64
+    )
+    assert prepared is not None and prepared.storage_path == first.storage_path
     with psycopg.connect(pg_dsn) as conn:
         assert (
             conn.execute(
                 "select count(*) from reports where inspection_id=%s", (ident,)
             ).fetchone()[0]
-            == 2
+            == 3
         )
 
 

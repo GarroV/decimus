@@ -45,13 +45,14 @@ def ensure_report(
     if current is None:
         raise StorageError("Проверка не найдена или недоступна для актуального PDF")
     language = _lang(current, lang)
-    ref = reports.latest_report(head.id, reach=reach, lang=None if head.is_legacy else language)
     if current.inspection.is_legacy:
+        ref = reports.latest_report(head.id, reach=reach)
         if ref is None:
             raise StorageError("Сохранённого отчёта исторической проверки нет")
         return ref
     shots = previews.report_photos(head.id, reach=reach)
     fingerprint = _report_fingerprint(current, shots, lang=language)
+    ref = reports.latest_report(head.id, reach=reach, lang=language, source_fingerprint=fingerprint)
     if ref is not None and f"/reports/{fingerprint}/" in ref.storage_path:
         return ref
     hold = busy_lock.try_hold(busy_lock.REPORT_REFRESH, head.id)
@@ -60,7 +61,9 @@ def ensure_report(
         raise StorageError("Актуальный PDF уже собирается или замок недоступен — повторите запрос")
     try:
         # Пока брали замок, другой процесс мог уже закончить тот же снимок.
-        ref = reports.latest_report(head.id, reach=reach, lang=language)
+        ref = reports.latest_report(
+            head.id, reach=reach, lang=language, source_fingerprint=fingerprint
+        )
         if ref is not None and f"/reports/{fingerprint}/" in ref.storage_path:
             return ref
         return _rebuild_report(current, shots, fingerprint=fingerprint, reach=reach, lang=lang)
@@ -105,7 +108,9 @@ def _rebuild_report(
     # Смена источника во время загрузки оставляет снимок в истории, но запрещает
     # выдать его вызывающему. Следующий ensure проверит и заменит latest.
     _assert_report_source(head.id, fingerprint=fingerprint, reach=reach, lang=language)
-    updated = reports.latest_report(head.id, reach=reach, lang=language)
+    updated = reports.latest_report(
+        head.id, reach=reach, lang=language, source_fingerprint=fingerprint
+    )
     if updated is None or f"/reports/{fingerprint}/" not in updated.storage_path:
         raise StorageError("Актуальный PDF не сохранён — повторите запрос")
     return updated

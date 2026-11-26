@@ -163,6 +163,7 @@ join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
 where r.inspection_id = %(id)s
   and coalesce(r.lang, i.report_lang) = coalesce(%(lang)s, i.report_lang)
+  and (%(source_pattern)s::text is null or r.storage_path like %(source_pattern)s)
   and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
 order by r.created_at desc
@@ -186,18 +187,32 @@ class ReportReader(Protocol):
     def get(self, key: str) -> bytes: ...
 
 
-def latest_report(inspection_id: str, *, reach: Reach, lang: str | None = None) -> ReportRef | None:
+def latest_report(
+    inspection_id: str,
+    *,
+    reach: Reach,
+    lang: str | None = None,
+    source_fingerprint: str | None = None,
+) -> ReportRef | None:
     """Последний отчёт проверки из охвата читающего, или `None`, если его нет.
 
     `None` — это ответ «отчёт не сохранён» (проверка проведена до T336 или
     отчёт не доехал), и он честно отличается от отказа базы: отказ — `DbError`.
     """
+    if source_fingerprint is not None and re.fullmatch(r"[0-9a-f]{64}", source_fingerprint) is None:
+        raise DbError("Неверный отпечаток исходных данных отчёта")
+    pattern = f"%/reports/{source_fingerprint}/%" if source_fingerprint else None
     settings = check_environment()
     try:
         with connection(settings.dsn) as conn, conn.cursor() as cur:
             cur.execute(
                 _LATEST_REPORT_SQL,
-                {"id": inspection_id, "lang": lang, **require_reach(reach).params()},
+                {
+                    "id": inspection_id,
+                    "lang": lang,
+                    "source_pattern": pattern,
+                    **require_reach(reach).params(),
+                },
             )
             row = cur.fetchone()
     except psycopg.Error as exc:
