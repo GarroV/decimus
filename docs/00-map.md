@@ -915,6 +915,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/dodois/flow.py` | Вход по ссылке: сервер начинает device flow, сам опрашивает Dodo IS и пишет вход (D640b) |
 | `src/dodois/metrics.py` | Суточный сбор данных Dodo IS для «Качества» по странам (D671): продажи, агрегаторы, КР |
 | `src/dodois/performance.py` | Bounded background collection of exact operating windows; no OAuth refresh |
+| `src/dodois/performance_daily.py` | Actual country sales by day; source gaps are never distributed from monthly totals |
 | `src/dodois/performance_parse.py` | Строгий разбор операционных ответов Dodo IS без сети и персональных данных |
 | `src/dodois/refresh_outbox.py` | Encrypted durable refresh handoff, serialized per country across processes |
 | `src/dodois/service.py` | Входы в Dodo IS по странам: записать вход, продлить, проверить «открыто X из Y» (D640b) |
@@ -1037,6 +1038,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/peek.py` | Переключатель пространств главного админа: куда можно заглянуть и кому (D726) |
 | `src/domain/performance.py` | Окна операционной аналитики и точные сравнения без сети и базы |
 | `src/domain/performance_feed.py` | JSON операционных метрик: точные окна, отсутствующие данные и native LFL |
+| `src/domain/performance_series.py` | Calendar-aligned daily series from recorded observations, including explicit gaps |
 | `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |
 | `src/domain/photo_upload_link.py` | Адрес загрузки кадров к черновику загрузки проверки: подписанный токен без срока |
 | `src/domain/plan_due.py` | Срок ответа партнёра планом исправлений — один на письмо, бот и веб (D617) |

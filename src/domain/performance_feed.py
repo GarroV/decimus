@@ -19,6 +19,7 @@ from .performance import (
     comparison_windows,
     observation_json,
 )
+from .performance_series import daily_json
 
 
 def _metrics(
@@ -101,6 +102,7 @@ def country_json(
         "timezone_fallback": timezone_fallback,
         "periods": {key: period.json() for key, period in windows.items()},
         "metrics": _metrics(data, country, windows),
+        "daily": daily_json(country, windows, rows),
         "lfl": [r.json() for r in lfl if r.country == country and r.subject_id == country],
         "loads": list(loads),
         "units": [

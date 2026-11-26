@@ -73,6 +73,7 @@ def test_early_failures_persist_attempt_and_rotate_past_first_three(monkeypatch,
     monkeypatch.setattr(collector.client, "working_pizzerias", discovery)
     monkeypatch.setattr(collector.store, "record_load", record)
     monkeypatch.setattr(collector.store, "load_states", states)
+    monkeypatch.setattr(collector.store, "read_observations", lambda *_: [])
 
     first = collector.run_pass(now=clock[0], sleep=lambda _: None)
     clock[0] += timedelta(hours=2)
@@ -134,6 +135,8 @@ def test_empty_sales_keeps_old_unit_and_records_safe_incomplete_response(monkeyp
         return len(rows)
 
     def api(_contour, path, _query, _access, **_kwargs):
+        if path.endswith("/sales/country/daily"):
+            return response(200, {"result": []})
         if path.endswith("/sales/units"):
             return response(200, {"result": []})
         assert path.endswith("/sales/country")
@@ -163,7 +166,9 @@ def test_empty_sales_keeps_old_unit_and_records_safe_incomplete_response(monkeyp
 
     assert saved[A, "revenue"] is previous
     assert saved[A, "revenue"].loaded_at == NOW - timedelta(days=2)
-    assert [(out.kind, out.error) for out in outcomes] == [("sales", "incomplete_response")]
+    assert [(out.kind, out.error) for out in outcomes if out.kind == "sales"] == [
+        ("sales", "incomplete_response")
+    ]
     assert ("sales", "incomplete_response") in recorded
     assert all(error in {None, "in_progress", "incomplete_response"} for _, error in recorded)
 
