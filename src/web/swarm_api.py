@@ -47,6 +47,7 @@ from src.db import (
     agg_store,
     api_access,
     maps_store,
+    performance,
     queries,
     ratings_read,
     swarm_read,
@@ -55,6 +56,8 @@ from src.db import (
 from src.db.errors import DbError
 from src.db.reach import Reach
 from src.db.space import SYSTEM_SPACE, acting_space
+from src.domain import performance as performance_domain
+from src.domain import performance_feed
 from src.domain.tenants import HQ_TENANT
 from src.ratings import feed, maps
 from src.ratings.model import RKO, RS
@@ -75,6 +78,7 @@ MAPS_PATH = f"{PREFIX}/maps/ratings"
 AGGREGATORS_PATH = f"{PREFIX}/aggregators/ratings"
 INSPECTION_VIOLATIONS_PATH = f"{PREFIX}/inspections/violations"
 SALES_PATH = f"{PREFIX}/sales"
+PERFORMANCE_PATH = f"{PREFIX}/performance"
 
 SCORES_ENDPOINT = "swarm_api_scores"
 CHECKUPS_ENDPOINT = "swarm_api_checkups"
@@ -85,6 +89,7 @@ MAPS_ENDPOINT = "swarm_api_maps"
 AGGREGATORS_ENDPOINT = "swarm_api_aggregators"
 INSPECTION_VIOLATIONS_ENDPOINT = "swarm_api_inspection_violations"
 SALES_ENDPOINT = "swarm_api_sales"
+PERFORMANCE_ENDPOINT = "swarm_api_performance"
 #: Открыты заслону входа (`auth.OPEN_ENDPOINTS`): опознаёт токен, а не кука.
 ENDPOINTS = frozenset(
     {
@@ -97,6 +102,7 @@ ENDPOINTS = frozenset(
         AGGREGATORS_ENDPOINT,
         INSPECTION_VIOLATIONS_ENDPOINT,
         SALES_ENDPOINT,
+        PERFORMANCE_ENDPOINT,
     }
 )
 
@@ -529,6 +535,38 @@ def _sales(_: Settings) -> dict[str, Any]:
     }
 
 
+def _performance(_: Settings) -> dict[str, Any]:
+    countries = _countries_or_imf(_countries())
+    requested = _day("as_of")
+    names = performance.unit_names(countries)
+    country_names = {r.code: r.name_en or r.name_ru for r in ratings_read.countries()}
+    payload = []
+    for cc in countries:
+        zone, fallback = performance_domain.country_timezone(cc)
+        completed = performance_domain.last_complete_day([zone])
+        as_of = requested or completed
+        if as_of > completed:
+            raise ApiRefusal(400, "incomplete_day", "as_of must be a completed source-local day")
+        if as_of.year < 2001:
+            raise ApiRefusal(400, "bad_date", "as_of: supported dates start in 2001")
+        windows = performance_domain.comparison_windows(as_of)
+        rows = performance.read_observations([cc], min(w.start for w in windows.values()), as_of)
+        payload.append(
+            performance_feed.country_json(
+                cc,
+                name=country_names.get(cc, cc),
+                as_of=as_of,
+                timezone=zone,
+                timezone_fallback=fallback,
+                rows=rows,
+                lfl=performance.read_lfl([cc], windows["current"]),
+                names=names,
+                loads=performance.load_states([cc], windows["current"]),
+            )
+        )
+    return {"as_of": requested.isoformat() if requested else None, "countries": payload}
+
+
 def _respond(
     conf: Settings, scope: str, build: Callable[[Settings], dict[str, Any]]
 ) -> tuple[Response, int, int | None]:
@@ -600,6 +638,7 @@ def routes() -> tuple[tuple[str, str, str, Callable[[Settings], dict[str, Any]]]
         ),
         (INSPECTION_PATH, INSPECTION_ENDPOINT, api_access.SCOPE_INSPECTION_DETAIL, _inspection),
         (SALES_PATH, SALES_ENDPOINT, api_access.SCOPE_SALES, _sales),
+        (PERFORMANCE_PATH, PERFORMANCE_ENDPOINT, api_access.SCOPE_PERFORMANCE, _performance),
     )
 
 

@@ -474,7 +474,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,inspection_followup,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,maps_reviews_store,model_key,model_usage,walk_log,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_violations,ratings_sync,second_factor,secret_crypto,web_access,user_deletion,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
+<!-- map:begin files src/db/{action_plans,plan_backfill,plan_file,plan_flow,plan_notify,plan_rows,agg_store,dodois_logins,country_contacts,country_report_langs,inspection_timeline,inspection_followup,mailing_cc,mailing_templates,prescription_notice,api_access,busy_lock,job_lock,journals,maps_store,maps_reviews_store,model_key,model_usage,walk_log,notifications,service_keys,health_store,coverage_store,oauth_store,prescriptions,prescriptions_write,rate_window,ratings,ratings_read,ratings_violations,ratings_sync,second_factor,secret_crypto,web_access,user_deletion,web_own_profile,web_throttle,web_unlock,learning_store,training_names,training_read,quality_read,performance,dodois_metrics,dodois_metrics_store,customer_ratings,source_units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274); строки плана (#1168) |
@@ -502,6 +502,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/model_usage.py` | Расход модели (D537, `0078`): запись вызова и чтение сводки для экрана |
 | `src/db/notifications.py` | Уведомления в приложении (#1129, D604, D614): запись событий и чтение своих |
 | `src/db/oauth_store.py` | Хранилище OAuth: клиенты, коды, подключения и токены (D417, миграция `0054`) |
+| `src/db/performance.py` | Оконный кеш операционных метрик, native LFL и состояние загрузки для Swarm |
 | `src/db/plan_backfill.py` | Догон строк для старых открытых запросов плана (#1168, спека «Что со старыми запросами») |
 | `src/db/plan_file.py` | Файл «туда и обратно» электронного плана: сверка строк файла с планом (шаг 3 эпика #1168) |
 | `src/db/plan_flow.py` | Ход электронного плана исправлений: заполнение, согласование, выполнение (#1168) |
@@ -673,6 +674,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0132_photo_backfill_fairness.sql` | Отметка задаёт порядок попыток, а не бессрочную аренду |
 | `0133_user_deletion.sql` | История проверок и журнал остаются связаны с обезличенным техническим UUID |
 | `0134_inspection_followup.sql` | Дополнения хранятся отдельно от замороженного отчёта |
+| `0135_performance.sql` | знаменатели средних, валюты, покрытие и происхождение без строк заказов и клиентов |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -912,6 +914,8 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/dodois/client.py` | Разговор с Dodo IS: вход устройства, продление, имя учётки, счёт открытых пиццерий (D640b) |
 | `src/dodois/flow.py` | Вход по ссылке: сервер начинает device flow, сам опрашивает Dodo IS и пишет вход (D640b) |
 | `src/dodois/metrics.py` | Суточный сбор данных Dodo IS для «Качества» по странам (D671): продажи, агрегаторы, КР |
+| `src/dodois/performance.py` | Bounded background collection of exact operating windows; no OAuth refresh |
+| `src/dodois/performance_parse.py` | Строгий разбор операционных ответов Dodo IS без сети и персональных данных |
 | `src/dodois/refresh_outbox.py` | Encrypted durable refresh handoff, serialized per country across processes |
 | `src/dodois/service.py` | Входы в Dodo IS по странам: записать вход, продлить, проверить «открыто X из Y» (D640b) |
 <!-- map:end -->
@@ -1031,6 +1035,8 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/model_usage.py` | Расход модели (D537, `0078`): виды вызова и кто за ним стоит |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
 | `src/domain/peek.py` | Переключатель пространств главного админа: куда можно заглянуть и кому (D726) |
+| `src/domain/performance.py` | Окна операционной аналитики и точные сравнения без сети и базы |
+| `src/domain/performance_feed.py` | JSON операционных метрик: точные окна, отсутствующие данные и native LFL |
 | `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |
 | `src/domain/photo_upload_link.py` | Адрес загрузки кадров к черновику загрузки проверки: подписанный токен без срока |
 | `src/domain/plan_due.py` | Срок ответа партнёра планом исправлений — один на письмо, бот и веб (D617) |
