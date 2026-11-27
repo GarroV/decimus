@@ -1211,6 +1211,13 @@ def _finish(ident: str, *, tenant: str) -> dict[str, object]:
         logger.warning("письмо принятой проверки %s не собрано: %s", ident, exc)
         итог["letter"] = None
         итог["letter_error"] = str(exc)
+    from ..db.reach import own_reach
+    from ..report import documents
+
+    try:
+        итог["document_errors"] = documents.prepare(ident, reach=own_reach(tenant))
+    except (ReportError, ToolError, DbError, OSError) as exc:
+        итог["document_errors"] = {"ru": str(exc), "en": str(exc)}
     return итог
 
 

@@ -69,6 +69,7 @@ from . import (
     ratings_trends,
     ratings_words,
     ui_lang,
+    unit_links,
 )
 from . import ratings_line as rl_chart
 from .action_plans import FORM_OVERHEAD_BYTES
@@ -498,6 +499,7 @@ def _section_data(
             "risk": risk,
             "risk_short": summary.risk_short,
             "risk_hint": (
+                t("ratings.risk.hint.lead", lang),
                 t(
                     "ratings.risk.hint.rs",
                     lang,
@@ -636,6 +638,11 @@ def render_section(
     agg_failures = _agg_failures() if key == ratings_nav.AGG else ()
     data = _section_data(key, frame, agg_failures=agg_failures)
     agg_names = _agg_names(lang)
+    # Имена пиццерий и стран ведут на их экраны (#1603): справочник читается только там, где
+    # на экране есть пиццерии с именами.
+    targets = (
+        unit_links.by_code() if key in (ratings_nav.RS, ratings_nav.RKO, ratings_nav.RISK) else {}
+    )
     clients_view = data.get("clients")
     clients_status = clients_view.status if isinstance(clients_view, ratings_clients.View) else None
 
@@ -778,7 +785,7 @@ def render_section(
         section_dot=clients_status
         if key == ratings_nav.CLIENTS
         else ratings_freshness.section_status(rows, key),
-        freshness=ratings_freshness.lines_of(rows, lang, agg_names),
+        freshness=ratings_freshness.lines_of(rows, lang, agg_names, key),
         notice=notice,
         failure=failure,
         clusters=report.CLUSTERS,
@@ -789,6 +796,8 @@ def render_section(
         previous_title=_period_title(previous, found, lang),
         may_manage=may_manage(),
         unit_url=unit_rating_url,
+        unit_href=lambda code: unit_links.unit_href(targets.get(code), lang=lang),
+        country_href=lambda code: unit_links.country_href(code, lang=lang),
         country_name=country_name,
         ratings_path=root,
         at_format=_AT,

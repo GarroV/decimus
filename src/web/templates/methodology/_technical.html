@@ -1,0 +1,45 @@
+<div class="mx-block">
+  <div class="mx-block__title">{{ t('methodology.technical.title') }}</div>
+  <p class="field-note">{{ t('methodology.technical.hint') }}</p>
+  {% for point in technical_points + ([{}] if editable else []) %}
+    <details class="mx-block" {% if not point %}data-technical-new{% endif %}>
+      <summary>{{ (point.get('title_' ~ lang) or point.get('title_ru')) if point else t('methodology.technical.add') }}{% if point and not point.get('enabled', true) %} · {{ t('methodology.technical.disabled') }}{% endif %}</summary>
+      {% if editable %}
+        <form method="post" action="{{ action('methodology_technical', code=code) }}" class="form-grid" data-mx-form data-technical-form>
+          <input type="hidden" name="check_id" value="{{ point.get('id', '') }}">
+          <input type="hidden" name="expected_version" value="{{ composition.version }}">
+          <label><input type="checkbox" name="enabled" value="1" {% if point.get('enabled', true) %}checked{% endif %}> {{ t('methodology.technical.enabled') }}</label>
+          {% for field in ['title_ru', 'title_en', 'guidance_ru', 'guidance_en', 'applicability_ru', 'applicability_en'] %}
+            <label><span class="field-label">{{ t('methodology.technical.' ~ field) }}</span>
+              <textarea class="input" name="{{ field }}" rows="2" maxlength="5000" {% if field.startswith('title_') %}required{% endif %}>{{ point.get(field, '') }}</textarea>
+            </label>
+          {% endfor %}
+          <fieldset class="mx-fieldset">
+            <legend class="field-label">{{ t('methodology.technical.zones') }}</legend>
+            {% for zone, name in zone_names.items() %}
+              <label><input type="checkbox" name="zones" value="{{ zone }}" {% if zone in point.get('zones', []) %}checked{% endif %}> {{ name }}</label>
+            {% endfor %}
+          </fieldset>
+          <label><span class="field-label">{{ t('methodology.technical.countries') }}</span>
+            <input class="input" type="text" name="countries" value="{{ point.get('countries', [])|join(', ') }}" placeholder="RS, BY" maxlength="1000">
+            <span class="field-note">{{ t('methodology.technical.countries_hint') }}</span>
+          </label>
+          <label><span class="field-label">{{ t('methodology.technical.kind') }}</span>
+            <select class="input" name="kind">
+              {% for kind in ['violation', 'info'] %}<option value="{{ kind }}" {% if point.get('kind', 'violation') == kind %}selected{% endif %}>{{ t('methodology.technical.kind.' ~ kind) }}</option>{% endfor %}
+            </select>
+          </label>
+          <label><input type="checkbox" name="required" value="1" {% if point.get('required', true) %}checked{% endif %}> {{ t('methodology.technical.required') }}</label>
+          <label><input type="checkbox" name="requires_photo" value="1" {% if point.get('requires_photo', false) %}checked{% endif %}> {{ t('methodology.technical.photo') }}</label>
+          {{ record_foot('methodology.technical.save', hint=false) }}
+        </form>
+      {% else %}
+        <p>{{ point.get('guidance_' ~ lang) or point.get('guidance_ru', '') }}</p>
+        <p>{{ point.get('applicability_' ~ lang) or point.get('applicability_ru', '') }}</p>
+        <p>{{ t('methodology.technical.zones') }}: {% for zone in point['zones'] %}{{ zone_names.get(zone, zone) }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+        <p>{{ t('methodology.technical.countries') }}: {{ point.get('countries', [])|join(', ') or t('methodology.technical.all_countries') }}</p>
+        <p>{{ t('methodology.technical.kind.' ~ point.get('kind', 'violation')) }}{% if point['required'] %} · {{ t('methodology.technical.required') }}{% endif %}{% if point.get('requires_photo') %} · {{ t('methodology.technical.photo') }}{% endif %}</p>
+      {% endif %}
+    </details>
+  {% endfor %}
+</div>

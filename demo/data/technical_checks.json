@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "checks": [
+    {
+      "id": "DEMO_TC01",
+      "item_codes": ["DEM01"],
+      "zones": ["facade"],
+      "title_ru": "Entrance waste bins",
+      "title_en": "Entrance waste bins",
+      "guidance_ru": "Demonstration: inspect the condition of the entrance waste bins.",
+      "guidance_en": "Demonstration: inspect the condition of the entrance waste bins.",
+      "required": true,
+      "requires_photo": false
+    },
+    {
+      "id": "DEMO_TC02",
+      "item_codes": ["DEM03"],
+      "zones": ["dining"],
+      "title_ru": "Dining furniture",
+      "title_en": "Dining furniture",
+      "guidance_ru": "Demonstration: inspect tables and chairs in the dining area.",
+      "guidance_en": "Demonstration: inspect tables and chairs in the dining area.",
+      "required": true,
+      "requires_photo": false
+    }
+  ]
+}

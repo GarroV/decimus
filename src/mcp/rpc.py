@@ -49,7 +49,7 @@ from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, exists, space_of
 from .checklist_layout import for_code as for_checklist
 from .checklists import PROTECTED_APPLIED, protection_of
-from .confirm import TOKEN_ARGUMENT, challenge, verify
+from .confirm import TOKEN_ARGUMENT, challenge, effect_of, requires_confirmation, verify
 from .errors import McpError, ToolError
 from .instructions import GENERAL_INSTRUCTIONS, IMPORT_INSTRUCTIONS
 from .plans import READ_TOOLS as READ_PLAN_TOOLS
@@ -497,14 +497,21 @@ def _call_tool(
             # Проверка по ПОДСТАВЛЕННОМУ хранилищу, а не по названному коду: код
             # может быть не назван вовсе, и правка ушла бы в применённый к проду.
             raise ToolError(APPLIED_READONLY if причина == PROTECTED_APPLIED else MASTER_READONLY)
-        if spec.confirm_effect:
-            # Двухшаговое подтверждение (F-130, #1006) — В ДОПОЛНЕНИЕ к роли и
-            # заслонам выше: отказанный ими вызов токена не получает. Стоит
-            # последним перед обработчиком, а проверяется по аргументам ДО
-            # снятия `checklist`: код чек-листа входит в подпись.
+        if requires_confirmation(spec.name):
+            # Двухшаговое подтверждение каждого правящего инструмента (F-130,
+            # #1006; кому — `confirm.requires_confirmation`) — В ДОПОЛНЕНИЕ к
+            # роли и заслонам выше: отказанный ими вызов токена не получает.
+            # Стоит последним перед обработчиком, а проверяется по аргументам
+            # ДО снятия `checklist`: код чек-листа входит в подпись.
             if not isinstance(token, str):
+                эффект, уровень = effect_of(spec.name, spec.confirm_effect)
                 return challenge(
-                    spec.name, spec.confirm_effect, tenant=tenant, actor=actor, arguments=подпись
+                    spec.name,
+                    эффект,
+                    tenant=tenant,
+                    actor=actor,
+                    arguments=подпись,
+                    level=уровень,
                 )
             if not verify(token, spec.name, tenant=tenant, actor=actor, arguments=подпись):
                 return _tool_text(CONFIRMATION_REFUSED.format(инструмент=spec.name), failed=True)

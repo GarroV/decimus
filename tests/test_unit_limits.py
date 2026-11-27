@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from src.db import unit_limits
@@ -34,16 +36,22 @@ def test_историческая_загрузка_не_режется_лими�
 
 
 class _Курсор:
-    """Курсор, который отвечает на подсчёт заданным числом и помнит запросы."""
+    """Курсор: на подсчёт отвечает заданным числом, на настройки пространства — заданной
+    строкой (`None` — строки нет, действует умолчание); помнит запросы."""
 
-    def __init__(self, сколько: int) -> None:
+    def __init__(self, сколько: int, настройка: tuple[int | None, object] | None = None) -> None:
         self.сколько = сколько
+        self.настройка = настройка
         self.запросы: list[str] = []
+        self._последний = ""
 
     def execute(self, sql: str, params: object = None) -> None:
         self.запросы.append(sql)
+        self._последний = sql
 
-    def fetchone(self) -> tuple[int]:
+    def fetchone(self) -> tuple[Any, ...] | None:
+        if "space_limits" in self._последний:
+            return self.настройка
         return (self.сколько,)
 
 
@@ -65,6 +73,43 @@ def test_пятая_проходит_без_отказа() -> None:
     refuse_over_limit(
         _Курсор(PARTNER_INSPECTIONS_PER_UNIT - 1), tenant="GE", unit_id="u1", unit_name="Batumi-1"
     )
+
+
+def test_лимит_из_настройки_пространства_а_не_константа() -> None:
+    """Настройка 3: четвёртая проверка — отказ, и в тексте стоит 3, а не 5."""
+    курсор = _Курсор(3, настройка=(3, None))
+
+    with pytest.raises(HistoryImportError, match="лимит тестового периода: 3 проверок"):
+        refuse_over_limit(курсор, tenant="GE", unit_id="u1", unit_name="Batumi-1")
+    refuse_over_limit(
+        _Курсор(2, настройка=(3, None)), tenant="GE", unit_id="u1", unit_name="Batumi-1"
+    )
+
+
+def test_настройка_выше_умолчания_шестую_пускает() -> None:
+    refuse_over_limit(
+        _Курсор(5, настройка=(10, None)), tenant="GE", unit_id="u1", unit_name="Batumi-1"
+    )
+
+
+def test_пустое_значение_настройки_значит_без_лимита_и_подсчёта_нет() -> None:
+    курсор = _Курсор(10_000, настройка=(None, None))
+
+    refuse_over_limit(курсор, tenant="GE", unit_id="u1", unit_name="Batumi-1")
+
+    assert not any("count(*)" in sql for sql in курсор.запросы)
+
+
+def test_нет_строки_настройки_действует_умолчание_пять() -> None:
+    with pytest.raises(HistoryImportError):
+        refuse_over_limit(_Курсор(5, настройка=None), tenant="GE", unit_id="u1", unit_name="B")
+
+
+def test_чистая_функция_знает_лимит_и_его_отсутствие() -> None:
+    assert limit_reached("GE", existing=3, limit=3)
+    assert not limit_reached("GE", existing=2, limit=3)
+    assert not limit_reached("GE", existing=10_000, limit=None)
+    assert not limit_reached("HQ", existing=10_000, limit=1)
 
 
 def test_ук_и_историческая_не_ходят_в_базу() -> None:

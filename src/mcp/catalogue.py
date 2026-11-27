@@ -46,7 +46,7 @@ from . import (
     tools,
 )
 from .annotations import annotations_for
-from .confirm import TOKEN_ARGUMENT
+from .confirm import TOKEN_ARGUMENT, requires_confirmation
 from .import_catalogue import IMPORT_TOOLS
 from .lang_fields import text_properties
 
@@ -171,10 +171,12 @@ class ToolSpec:
     #: именно этот список и держит `tests/test_mcp_catalogue.py` в
     #: `ИМЕНА_ЧИТАЮЩИХ_МЕТОДИКУ`, а не угадывает его отсюда.
     writes: bool = True
-    #: Опасный инструмент: с первого вызова не выполняется, а отвечает этим
-    #: описанием эффекта и токеном подтверждения (`confirm.py`, F-130, #1006).
-    #: Пустая строка — подтверждение не нужно. Аргумент-токен дописывается в
-    #: схему ниже, одним местом, как «какой чек-лист».
+    #: Описание эффекта для ответа-подтверждения уровня «спросить человека»
+    #: (`confirm.py`, F-130, #1006): методика всей сети, указатель прода,
+    #: необратимое. Пустая строка — подтверждение всё равно есть у каждого
+    #: правящего инструмента (`confirm.requires_confirmation`, по классу из
+    #: `annotations.py`), но уровня «если человек уже попросил ровно это —
+    #: повторить сразу». Аргумент-токен дописывается в схему ниже, одним местом.
     confirm_effect: str = ""
 
 
@@ -1987,6 +1989,10 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=retraction.retract_inspection,
         kind=KIND_RETRACTION,
+        confirm_effect=(
+            "Снимет проверку из истории партнёра: она пропадёт из отчётов и оценок, "
+            "вернуть её нельзя."
+        ),
         history=True,
     ),
     ToolSpec(
@@ -2641,7 +2647,7 @@ for _спец in TOOLS:
             _свойства.setdefault("checklist", _CHECKLIST_CODE_PROPERTY)
 
 for _спец in TOOLS:
-    if _спец.confirm_effect:
+    if requires_confirmation(_спец.name):
         _свойства = _спец.input_schema.setdefault("properties", {})
         if isinstance(_свойства, dict):
             _свойства.setdefault(TOKEN_ARGUMENT, _CONFIRMATION_PROPERTY)

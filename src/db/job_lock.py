@@ -24,7 +24,7 @@ import psycopg
 
 from .config import check_environment
 from .errors import RatingsError
-from .timeouts import timed_dsn
+from .timeouts import timed_connect
 
 #: Замок сборщика агрегаторов (#788) живёт в `agg_store.COLLECTOR_LOCK_KEY` = 788_0001.
 #: Новые номера берутся от номера аудита (F-125), чтобы владельца замка было видно в `pg_locks`.
@@ -52,7 +52,7 @@ def job_lock(key: int, *, what: str) -> Iterator[bool]:
     как у соседних дверей загрузчиков.
     """
     try:
-        conn = psycopg.connect(timed_dsn(check_environment().dsn, batch=True), autocommit=True)
+        conn = timed_connect(check_environment().dsn, batch=True, autocommit=True)
     except psycopg.Error as exc:
         raise RatingsError(
             f"Замок загрузки «{what}» не взят: база отказала ({exc.__class__.__name__})"

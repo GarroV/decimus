@@ -355,7 +355,7 @@ def install(app: Flask, conf: Settings) -> None:
 
         try:
             токен = _токен_вошедшего(реквизиты, код)
-            отчёт = data.ensure_report(detail, reach=auth.current_reach())
+            отчёт = data.ensure_report(detail, reach=auth.current_reach(), lang=записанное.lang)
             файл = data.report_bytes(отчёт)
             if not файл.startswith(b"%PDF-"):
                 raise LetterError("отчёт пуст или не является PDF")

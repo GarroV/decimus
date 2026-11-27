@@ -23,3 +23,30 @@
   .iw-comment { align-items: stretch; flex-direction: column; }
   .iw-comment > button { align-self: end; }
 }
+
+/* Матрица технического состояния: названия и даты видны при прокрутке. */
+.technical-matrix { max-height: min(70vh, 640px); margin-block: 12px; }
+.technical-matrix .table { min-width: 100%; }
+.technical-matrix col:first-child { width: 320px; }
+.technical-matrix col:not(:first-child) { width: 112px; }
+.technical-matrix th:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); text-align: left; }
+.technical-matrix thead th { position: sticky; top: 0; z-index: 2; background: var(--surface); }
+.technical-matrix thead th:first-child { z-index: 3; }
+.technical-matrix th, .technical-matrix td { overflow-wrap: anywhere; white-space: normal; overflow: visible; text-overflow: clip; }
+.technical-matrix thead th:not(:first-child), .technical-matrix td { text-align: center; vertical-align: middle; padding: 10px 8px; }
+.technical-matrix .technical-matrix__zone th { position: static; padding: 14px 12px 8px; background: var(--surface-2); border-top: 1px solid var(--line-control); font-weight: var(--w-semibold); }
+.technical-matrix__zone th > span { position: sticky; left: 12px; }
+.technical-point { display: block; width: 100%; padding: 8px 0; border: 0; background: none; color: inherit; text-align: left; font: inherit; font-weight: var(--w-medium); cursor: help; }
+.technical-point__info { color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+.technical-point:hover, .technical-point:focus-visible { text-decoration: underline dotted; text-underline-offset: 4px; }
+.technical-state { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; vertical-align: middle; color: var(--ink-3); font-size: 21px; font-weight: var(--w-semibold); line-height: 1; }
+.technical-state svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.technical-state--ok { color: var(--ok); }
+.technical-state--issue { color: var(--err); }
+.technical-state--recorded { color: var(--ink-2); }
+.technical-matrix-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-block: 10px; color: var(--ink-3); font-size: var(--fs-meta); }
+.technical-matrix-legend > span { display: inline-flex; align-items: center; gap: 4px; }
+.technical-guidance { position: fixed; z-index: 1000; box-sizing: border-box; width: min(440px, calc(100vw - 24px)); max-height: min(360px, 50vh); overflow: auto; padding: 14px 16px; color: var(--ink); font-size: var(--fs-dense); line-height: 1.5; }
+.technical-guidance strong { display: block; margin-bottom: 6px; }
+.technical-guidance p { margin: 0; white-space: pre-line; }
+@media (max-width: 600px) { .technical-matrix col:first-child { width: 160px; } }

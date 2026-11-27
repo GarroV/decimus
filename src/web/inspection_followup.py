@@ -86,6 +86,7 @@ def install(
                 file_name=upload.filename or "" if upload else "",
                 data=data,
                 max_bytes=limit,
+                finding_id=request.form.get("repair") or None,
             )
         except RequestEntityTooLarge:
             return t("work.error.file", lang, mb=limit // (1024 * 1024)), 413
@@ -98,7 +99,18 @@ def install(
         if request.headers.get("X-Panel") == "1":
             return render_card(inspection_id)
         return redirect(
-            url_for("card", inspection_id=inspection_id, lang=lang) + "#inspection-work", code=303
+            url_for(
+                "card",
+                inspection_id=inspection_id,
+                lang=lang,
+                repair=request.form.get("repair") or None,
+            )
+            + (
+                "#repair-" + request.form["repair"]
+                if request.form.get("repair")
+                else "#inspection-work"
+            ),
+            code=303,
         )
 
     @app.get("/inspections/<inspection_id>/work/<entry_id>/file")
@@ -131,6 +143,28 @@ def install(
             download_name=entry.file_name,
             max_age=0,
         )
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @app.get("/inspections/<inspection_id>/work/<entry_id>/preview")
+    def inspection_work_preview(inspection_id: str, entry_id: str) -> Response | tuple[str, int]:
+        lang = ui_lang.request_lang(conf.ui_lang)
+        try:
+            entry = store.get_file(
+                inspection_id,
+                entry_id,
+                reach=auth.current_reach(),
+                as_admin=inspections.sees_retracted(auth.current_reach()),
+            )
+            if entry is None or entry.preview_path is None:
+                abort(404)
+            data = S3PhotoStorage(load_storage_settings()).get(key_of_uri(entry.preview_path))
+        except ValueError:
+            abort(404)
+        except (DbError, StorageError):
+            return t("work.error.download", lang), 503
+        response = send_file(io.BytesIO(data), mimetype="image/jpeg", max_age=0)
         response.headers["Cache-Control"] = "private, no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response

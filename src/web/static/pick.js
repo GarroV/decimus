@@ -6,6 +6,13 @@
 // `name` — без скрипта.
 (function () {
   "use strict";
+  // Язык интерфейса (`_langpick.html`, D743): выбрал код — форма ушла.
+  document.addEventListener("change", function (event) {
+    var lang = event.target;
+    if (lang && lang.matches && lang.matches("select[data-lang-submit]") && lang.form) {
+      if (lang.form.requestSubmit) lang.form.requestSubmit(); else lang.form.submit();
+    }
+  });
   document.addEventListener("change", function (event) {
     var select = event.target;
     if (select && select.matches && select.matches("select[data-pick-nav]") && select.value) {

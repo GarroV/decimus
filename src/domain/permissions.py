@@ -81,6 +81,7 @@ ACTIONS: tuple[Action, ...] = (
     # Проверки
     Action("inspection.read", "inspection", writes=False),
     Action("inspection.followup", "inspection"),
+    Action("inspection.remediation.review", "inspection", own_space=True),
     Action("inspection.conduct", "inspection"),
     # Запись по проверке — только в своём пространстве и у УК (D283, D341).
     # Открыть УК запись в проверки партнёров (D406) — отдельный шаг вместе с
@@ -187,6 +188,7 @@ _ALL_VIEWS_PARTNER = frozenset(
 #: Работа с проверками в УК: проводить, вычитывать, принимать, править, снимать,
 #: переносить, письма, предписания, экшн-планы (D440 — и у девелопера).
 _HQ_WORK = _codes(
+    "inspection.remediation.review",
     "inspection.read",
     "inspection.followup",
     "inspection.conduct",
@@ -288,6 +290,7 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     | _CHECKLISTS
     | _codes("checklist.master")
     | _codes(
+        "inspection.remediation.review",
         "inspection.accept",
         "inspection.revise",
         "people.manage",

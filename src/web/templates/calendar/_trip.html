@@ -24,7 +24,7 @@
   <fieldset class="trip-visit sform" data-trip-visit>
     <div class="trip-dates">
       <label><span class="sform__label">{{ t('trip.step.day') }}</span>
-        <input class="sinput" type="date" name="visit_day" value="{{ row.day }}"></label>
+        <input class="sinput" type="date" name="visit_day" data-trip-date value="{{ row.day }}"></label>
       <label><span class="sform__label">{{ t('trip.step.at') }}</span>
         <input class="sinput" type="time" name="visit_at" value="{{ row.at }}"></label>
     </div>
@@ -64,7 +64,7 @@
              value="{{ value('executor', current.executor_name if current else '') }}">
     </label>
     <datalist id="trip-people">{% for login in trip_people %}<option value="{{ login }}">{% endfor %}</datalist>
-    <p class="ssec__note">{{ t('trip.who.hint') }}</p>
+    <p class="ssec__note">{{ t('trip.who.hint_hq' if trip_developers_only else 'trip.who.hint') }}</p>
   {% endif %}
   <label><span class="sform__label">{{ t('trip.country') }}</span>
     {% set chosen = value('country', current.country if current and current.country else '') %}
@@ -73,12 +73,18 @@
       {% for code in trip_countries %}<option value="{{ code }}"{% if code == chosen %} selected{% endif %}>{{ country_title(code) }}</option>{% endfor %}
     </select>
   </label>
+  {% if not current %}
+  <details class="trip-period"{% if trip_form.get('from') or trip_form.get('to') %} open{% endif %}>
+    <summary>{{ t('trip.period.optional') }}</summary>
+    <p class="ssec__note">{{ t('trip.period.hint') }}</p>
+  {% endif %}
   <div class="trip-dates">
     <label><span class="sform__label">{{ t('trip.from') }}</span>
-      <input class="sinput" type="date" name="from" required value="{{ value('from', current.date_from.isoformat() if current else '') }}"></label>
+      <input class="sinput" type="date" name="from" data-trip-date{% if current %} required{% endif %} value="{{ value('from', current.date_from.isoformat() if current else '') }}"></label>
     <label><span class="sform__label">{{ t('trip.to') }}</span>
-      <input class="sinput" type="date" name="to" required value="{{ value('to', current.date_to.isoformat() if current else '') }}"></label>
+      <input class="sinput" type="date" name="to" data-trip-date{% if current %} required{% endif %} value="{{ value('to', current.date_to.isoformat() if current else '') }}"></label>
   </div>
+  {% if not current %}</details>{% endif %}
   {% if current %}
     {% set st = value('status', current.status) %}
     <label><span class="sform__label">{{ t('trip.status') }}</span>

@@ -218,6 +218,9 @@ def add_finding(
             raise EngineError(
                 f"Движок завёл запись #{n}, но кадры в неё не легли", code=0, command="add"
             )
+        from .technical import invalidate_new
+
+        invalidate_new(path, after.code, after.zone)
         return after
 
     if class_context is None and expected_run_id is None:

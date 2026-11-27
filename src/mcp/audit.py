@@ -32,6 +32,9 @@ OUTCOME_OK = "ok"
 OUTCOME_FAILED = "failed"
 #: Запрос отклонён до инструмента: роль, неверные параметры, неизвестное имя.
 OUTCOME_REJECTED = "rejected"
+#: Первый шаг подтверждения (`confirm.py`): ничего не выполнено, выдан токен.
+#: В журнал действий не ложится — действия не было; в stderr остаётся след.
+OUTCOME_PENDING = "pending"
 
 
 #: Инструменты, которые ничего не меняют, хотя каталог по осторожности помечает их
@@ -48,6 +51,9 @@ def _outcome(answer: dict[str, Any] | None) -> str:
     result = answer.get("result")
     if isinstance(result, dict) and result.get("isError"):
         return OUTCOME_FAILED
+    structured = result.get("structuredContent") if isinstance(result, dict) else None
+    if isinstance(structured, dict) and structured.get("status") == "confirmation_required":
+        return OUTCOME_PENDING
     return OUTCOME_OK
 
 
@@ -83,6 +89,9 @@ def journal_write_call(
     spec = find(name) if isinstance(name, str) else None
     if spec is None or not spec.writes or spec.name in READ_ONLY_TOOLS:
         return
+    outcome = _outcome(answer)
+    if outcome == OUTCOME_PENDING:
+        return
     arguments = params.get("arguments") if isinstance(params, dict) else None
     try:
         from src.db import journals
@@ -95,7 +104,7 @@ def journal_write_call(
         tenant=access.tenant,
         action=spec.name,
         target=summarize_target(arguments if isinstance(arguments, dict) else {}),
-        outcome=_outcome(answer),
+        outcome=outcome,
         ip=ip,
         credential=access.credential or None,
         door=DOOR_MCP,

@@ -9,6 +9,7 @@ from pathlib import Path
 from src import db
 from src.domain import completion
 from src.domain.errors import DomainError
+from src.report import snapshot_text
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ async def retry_once() -> None:
             )
             report = completion.report_path(chat_id, env)
             await asyncio.to_thread(db.upload_report, inspection_id, data=report.read_bytes())
+            await asyncio.to_thread(snapshot_text.archive, chat_id, env, inspection_id)
             await asyncio.to_thread(completion.mark, chat_id, env, "archived")
         except (db.DbError, DomainError, OSError):
             logger.exception("Сдача из сохранённого снимка не записана; будет повторена")

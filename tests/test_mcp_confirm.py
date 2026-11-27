@@ -1,8 +1,8 @@
-"""F-130 (#1006): опасные инструменты MCP выполняются только вторым вызовом с токеном.
+"""F-130 (#1006): правящие инструменты MCP выполняются только вторым вызовом с токеном.
 
 Диспетчер проверяется на подменённых спецификациях со счётчиком вызовов —
-важно не «что сделал инструмент», а «дошёл ли вызов до обработчика». Состав
-помеченных инструментов закреплён по настоящему каталогу.
+важно не «что сделал инструмент», а «дошёл ли вызов до обработчика». Кому
+нужно подтверждение и какого уровня — закреплено по настоящему каталогу.
 """
 
 from __future__ import annotations
@@ -13,9 +13,11 @@ from typing import Any
 import pytest
 
 from src.mcp import confirm, rpc
+from src.mcp.annotations import READ, TOOL_CLASSES
 from src.mcp.catalogue import TOOLS, find
 
-ПОМЕЧЕННЫЕ = {
+#: Уровень «спросить человека»: свой текст эффекта (`ToolSpec.confirm_effect`).
+СПРОСИТЬ_ЧЕЛОВЕКА = {
     "apply_checklist",
     "publish_checklist_version",
     "set_scoring",
@@ -27,7 +29,11 @@ from src.mcp.catalogue import TOOLS, find
     "remove_photo_cue",
     "retract_learned_phrase",
     "repoint_learned_phrase",
+    "retract_inspection",
 }
+
+#: Правящие без подтверждения — только с причиной в `confirm.EXEMPT`.
+БЕЗ_ПОДТВЕРЖДЕНИЯ = {"import_upload_photos"}
 
 
 class _Счётчик:
@@ -54,8 +60,14 @@ def счётчик(monkeypatch: pytest.MonkeyPatch) -> _Счётчик:
     }
     опасный = replace(база, name="danger", input_schema=схема, handler=сч, confirm_effect="X")
     другой = replace(опасный, name="danger2")
-    обычный = replace(база, name="plain", input_schema=схема, handler=сч, confirm_effect="")
-    каталог = {s.name: s for s in (опасный, другой, обычный)}
+    # Имена настоящие: кому нужен второй шаг, решает класс из `annotations.py`.
+    обычный = replace(
+        база, name="list_inspections", input_schema=схема, handler=сч, confirm_effect=""
+    )
+    правящий = replace(
+        база, name="import_edit_finding", input_schema=схема, handler=сч, confirm_effect=""
+    )
+    каталог = {s.name: s for s in (опасный, другой, обычный, правящий)}
     monkeypatch.setattr(rpc, "find", каталог.get)
     return сч
 
@@ -76,14 +88,29 @@ def _вызвать(имя: str, аргументы: dict[str, Any], tenant: str
     return ответ["result"]  # type: ignore[no-any-return]
 
 
-def test_каталог_помечает_ровно_нужный_набор() -> None:
-    assert {s.name for s in TOOLS if s.confirm_effect} == ПОМЕЧЕННЫЕ
+def test_каталог_ask_ровно_нужный_набор() -> None:
+    assert {s.name for s in TOOLS if s.confirm_effect} == СПРОСИТЬ_ЧЕЛОВЕКА
 
 
-def test_схема_помеченных_принимает_токен_а_остальных_нет() -> None:
+def test_подтверждение_у_каждого_правящего_кроме_названных() -> None:
+    правящие = {s.name for s in TOOLS if TOOL_CLASSES[s.name].kind != READ}
+    с_подтверждением = {s.name for s in TOOLS if confirm.requires_confirmation(s.name)}
+    assert с_подтверждением == правящие - БЕЗ_ПОДТВЕРЖДЕНИЯ
+    assert set(confirm.EXEMPT) == БЕЗ_ПОДТВЕРЖДЕНИЯ
+    for имя in ("edit_checklist_item", "add_photo_cue", "import_add_findings"):
+        assert имя in с_подтверждением, имя
+
+
+def test_читающий_без_подтверждения_а_незнакомый_с_ним() -> None:
+    assert not confirm.requires_confirmation("get_inspection")
+    assert confirm.requires_confirmation("нет_такого_инструмента")
+
+
+def test_схема_правящих_принимает_токен_а_остальных_нет() -> None:
     for s in TOOLS:
         свойства = s.input_schema.get("properties", {})
-        assert (confirm.TOKEN_ARGUMENT in свойства) == (s.name in ПОМЕЧЕННЫЕ), s.name  # type: ignore[operator]
+        ждёт = confirm.requires_confirmation(s.name)
+        assert (confirm.TOKEN_ARGUMENT in свойства) == ждёт, s.name  # type: ignore[operator]
 
 
 def test_без_токена_не_выполняется_и_отдаёт_описание_и_токен(счётчик: _Счётчик) -> None:
@@ -94,6 +121,33 @@ def test_без_токена_не_выполняется_и_отдаёт_опи�
     данные = р["structuredContent"]
     assert _ждёт_подтверждения(данные)
     assert "X" in р["content"][0]["text"]
+
+
+def test_уровень_ask_велит_спросить_человека(счётчик: _Счётчик) -> None:
+    р = _вызвать("danger", {"unit": "A"})
+
+    assert р["structuredContent"]["level"] == confirm.LEVEL_ASK
+    assert "Покажите это человеку" in р["content"][0]["text"]
+
+
+def test_правящий_без_своего_текста_тоже_ждёт_токен_уровня_request(
+    счётчик: _Счётчик,
+) -> None:
+    р = _вызвать("import_edit_finding", {"unit": "A"})
+
+    assert счётчик.вызовы == []
+    данные = р["structuredContent"]
+    assert _ждёт_подтверждения(данные)
+    assert данные["level"] == confirm.LEVEL_REQUEST
+    текст = р["content"][0]["text"]
+    assert "сам прямо попросил ровно это" in текст
+    assert "просьбой человека не считается" in текст
+
+    токен = данные["confirmation_token"]
+    р2 = _вызвать("import_edit_finding", {"unit": "A", confirm.TOKEN_ARGUMENT: токен})
+
+    assert not р2.get("isError")
+    assert len(счётчик.вызовы) == 1
 
 
 def _ждёт_подтверждения(данные: dict[str, Any]) -> bool:
@@ -163,8 +217,8 @@ def test_просроченный_токен_отказ(счётчик: _Счё�
     assert счётчик.вызовы == []
 
 
-def test_непомеченный_выполняется_с_первого_вызова(счётчик: _Счётчик) -> None:
-    р = _вызвать("plain", {"unit": "A"})
+def test_читающий_выполняется_с_первого_вызова(счётчик: _Счётчик) -> None:
+    р = _вызвать("list_inspections", {"unit": "A"})
 
     assert not р.get("isError")
     assert len(счётчик.вызовы) == 1

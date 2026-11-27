@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 235 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 251 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -70,6 +70,7 @@
 | `/admin/items/<code>` | POST | `methodology_edit` | `src/web/app.py` |
 | `/admin/items/<code>/disable` | POST | `methodology_disable` | `src/web/app.py` |
 | `/admin/items/<code>/restore` | POST | `methodology_restore` | `src/web/app.py` |
+| `/admin/items/<code>/technical` | POST | `methodology_technical` | `src/web/app.py` |
 | `/admin/publish` | POST | `methodology_publish` | `src/web/app.py` |
 | `/admin/route` | POST | `methodology_route` | `src/web/app.py` |
 | `/admin/scoring` | POST | `methodology_scoring` | `src/web/app.py` |
@@ -90,6 +91,9 @@
 | `/administration/dodois/<country>/disconnect` | POST | `dodois_disconnect` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite` | POST | `dodois_invite_issue` | `src/web/dodois_screen.py` |
 | `/administration/dodois/invite/<int:invite_id>/revoke` | POST | `dodois_invite_revoke` | `src/web/dodois_screen.py` |
+| `/administration/feedback/<feedback_id>/review` | POST | `feedback_review` | `src/web/feedback.py` |
+| `/administration/feedback/chat` | POST | `feedback_chat` | `src/web/feedback.py` |
+| `/administration/feedback/photo/<photo_id>` | GET | `feedback_photo` | `src/web/feedback.py` |
 | `/administration/home/settings` | POST | `home_setting` | `src/web/home_settings.py` |
 | `/administration/mailings/<kind>/cc/add` | POST | `mailing_cc_add` | `src/web/mailings_screen.py` |
 | `/administration/mailings/<kind>/cc/remove` | POST | `mailing_cc_remove` | `src/web/mailings_screen.py` |
@@ -115,6 +119,7 @@
 | `/calendar/trips/<trip_id>/steps` | POST | `trip_step_add` | `src/web/calendar_screen.py` |
 | `/calendar/trips/<trip_id>/steps/<step_id>` | POST | `trip_step_update` | `src/web/calendar_screen.py` |
 | `/calendar/trips/<trip_id>/steps/<step_id>/delete` | POST | `trip_step_delete` | `src/web/calendar_screen.py` |
+| `/countries` | GET | `countries_alias` | `src/web/app.py` |
 | `/country` | GET | `country_index` | `src/web/app.py` |
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
 | `/country/<code>/batch-letter/draft` | POST | `batch_letter_draft` | `src/web/batch_letter.py` |
@@ -131,6 +136,7 @@
 | `/dodois/connect/<token>` | GET | `dodois_connect` | `src/web/dodois_connect.py` |
 | `/dodois/connect/<token>/start` | POST | `dodois_connect_start` | `src/web/dodois_connect.py` |
 | `/dodois/connect/<token>/status` | GET | `dodois_connect_status` | `src/web/dodois_connect.py` |
+| `/feedback` | POST | `feedback_send` | `src/web/feedback.py` |
 | `/inspections` | GET | `registry` | `src/web/app.py` |
 | `/inspections/<inspection_id>` | GET | `card` | `src/web/app.py` |
 | `/inspections/<inspection_id>/accept` | POST | `do_accept` | `src/web/app.py` |
@@ -144,11 +150,15 @@
 | `/inspections/<inspection_id>/move` | POST | `do_move` | `src/web/app.py` |
 | `/inspections/<inspection_id>/photos/<photo_id>` | GET | `photo` | `src/web/app.py` |
 | `/inspections/<inspection_id>/photos/<photo_id>/delete` | POST | `do_delete_photo` | `src/web/app.py` |
+| `/inspections/<inspection_id>/repairs/<finding_id>/review/<decision>` | POST | `inspection_repair_review` | `src/web/inspection_remediation.py` |
+| `/inspections/<inspection_id>/repairs/<finding_id>/submit` | POST | `inspection_repair_submit` | `src/web/inspection_remediation.py` |
 | `/inspections/<inspection_id>/report` | GET | `report` | `src/web/app.py` |
 | `/inspections/<inspection_id>/retract` | POST | `do_retract` | `src/web/app.py` |
 | `/inspections/<inspection_id>/suggest` | POST | `do_suggest` | `src/web/app.py` |
+| `/inspections/<inspection_id>/technical` | POST | `do_technical_confirm` | `src/web/app.py` |
 | `/inspections/<inspection_id>/work` | POST | `inspection_work_add` | `src/web/inspection_followup.py` |
 | `/inspections/<inspection_id>/work/<entry_id>/file` | GET | `inspection_work_file` | `src/web/inspection_followup.py` |
+| `/inspections/<inspection_id>/work/<entry_id>/preview` | GET | `inspection_work_preview` | `src/web/inspection_followup.py` |
 | `/login` | GET, POST | `login` | `src/web/auth.py` |
 | `/login/google` | GET | `google_start` | `src/web/auth.py` |
 | `/login/passkey/options` | POST | `passkey_login_options` | `src/web/passkey_login.py` |
@@ -210,6 +220,7 @@
 | `/settings/notifications` | GET | `notifications_menu` | `src/web/notifications.py` |
 | `/settings/notifications/<int:notification_id>/read` | POST | `notifications_read` | `src/web/notifications.py` |
 | `/settings/notifications/read-all` | POST | `notifications_read_all` | `src/web/notifications.py` |
+| `/settings/onboarding` | POST | `settings_onboarding` | `src/web/onboarding_screen.py` |
 | `/settings/password` | POST | `settings_own_password` | `src/web/settings_screen.py` |
 | `/settings/security` | GET | `security_page` | `src/web/security_screen.py` |
 | `/settings/security/backup/generate` | POST | `security_backup_generate` | `src/web/security_screen.py` |
@@ -237,6 +248,7 @@
 | `/tg/walk/photo/view` | POST | `walk_photo_view` | `src/web/walk_proxy.py` |
 | `/tg/walk/start` | POST | `walk_start` | `src/web/walk_proxy.py` |
 | `/tg/walk/suggest` | POST | `walk_suggest` | `src/web/walk_proxy.py` |
+| `/tg/walk/technical` | POST | `walk_technical` | `src/web/walk_proxy.py` |
 | `/tg/walk/transcribe` | POST | `walk_voice` | `src/web/walk_proxy.py` |
 | `/tg/walk/translate` | POST | `walk_translate` | `src/web/walk_proxy.py` |
 | `/training` | GET | `training_index` | `src/web/training_page.py` |
@@ -248,16 +260,20 @@
 | `/users/cancel-deletion` | POST | `cancel_user_deletion` | `src/web/users_deletion_screen.py` |
 | `/users/delete` | POST | `delete_user` | `src/web/users_deletion_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
+| `/users/events/seen` | POST | `partner_event_seen` | `src/web/users_screen.py` |
 | `/users/freeze` | POST | `freeze_user` | `src/web/users_screen.py` |
 | `/users/name-latin` | POST | `user_name_latin` | `src/web/users_screen.py` |
 | `/users/reset-second-factor` | POST | `reset_second_factor` | `src/web/users_screen.py` |
 | `/users/role` | POST | `user_role` | `src/web/users_screen.py` |
 | `/users/spaces/add` | POST | `add_space` | `src/web/users_screen.py` |
 | `/users/spaces/countries` | POST | `space_countries` | `src/web/users_screen.py` |
+| `/users/spaces/freeze` | POST | `freeze_space` | `src/web/users_screen.py` |
+| `/users/spaces/limits` | POST | `space_limits_save` | `src/web/users_screen.py` |
+| `/users/spaces/unfreeze` | POST | `unfreeze_space` | `src/web/users_screen.py` |
 | `/users/unfreeze` | POST | `unfreeze_user` | `src/web/users_screen.py` |
 | `/welcome` | GET | `landing` | `src/web/landing.py` |
 
-**Мини-апп обхода (`src/web/walk_app.py: create_walk_app`)** — 15 маршрутов
+**Мини-апп обхода (`src/web/walk_app.py: create_walk_app`)** — 16 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -274,6 +290,7 @@
 | `/tg/walk/photo/view` | POST | `walk_photo_view` | `src/web/walk_write.py` |
 | `/tg/walk/start` | POST | `walk_start` | `src/web/walk_start.py` |
 | `/tg/walk/suggest` | POST | `walk_suggest` | `src/web/walk_suggest.py` |
+| `/tg/walk/technical` | POST | `walk_technical` | `src/web/walk_technical.py` |
 | `/tg/walk/transcribe` | POST | `walk_voice` | `src/web/walk_voice.py` |
 | `/tg/walk/translate` | POST | `walk_translate` | `src/web/walk_translate.py` |
 <!-- map:end -->
@@ -402,7 +419,7 @@
 | `API_TOKEN_BY` | `tools/api_token.py` | да |
 | `ATTACHMENT_MAX_MB` | `src/db/config.py` | да |
 | `AUDITOR_NAMES` | `src/bot/config.py` | да |
-| `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 8 | да |
+| `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 11 | да |
 | `BACKUP_DIR` | `tools/state_backup.py` | да |
 | `BACKUP_KEEP_DAYS` | `tools/state_backup.py` | да |
 | `BOT_MCP_URL` | `src/bot/mcp_setup.py`, `tools/mcp_outside.py` | да |
@@ -425,6 +442,7 @@
 | `DB_STATEMENT_TIMEOUT_S` | `src/db/timeouts.py` | да |
 | `DECIMUS_MCP_TOKEN` | `tools/mcp_outside.py` | да |
 | `DECIMUS_MCP_URL` | `tools/mcp_outside.py` | да |
+| `DECIMUS_TECHNICAL_SNAPSHOT` | `engine/report.py` | нет — путь временного закреплённого снимка, передаётся подпроцессу отчёта |
 | `DEMO_PHOTOS_DIR` | `tools/seed_open_demo.py` | да |
 | `DEMO_STATE_DIR` | `tools/seed_demo.py` | да |
 | `DODO_MCP_TOKEN` | `tools/mcp_outside.py` | да |
@@ -444,7 +462,7 @@
 | `LANDING_SHOTS_ONLY` | `tools/landing_shots.py` | да |
 | `LANDING_SHOTS_WALK_BASE` | `tools/landing_shots.py` | да |
 | `LOG_ID_SALT` | `src/domain/log_ids.py` | да |
-| `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 3 | да |
+| `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 4 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_CONFIRM_SECRET` | `src/mcp/confirm.py` | да |
 | `MCP_FRONT_KEY` | `src/mcp/config.py` | да |
@@ -481,7 +499,8 @@
 | `SECRETS_KEY` | `src/db/secret_crypto.py` | да |
 | `SEED_WEB_DEMO_FORCE` | `tools/seed_web_demo.py` | да |
 | `STATE_DIR` | `src/dodois/refresh_outbox.py`, `src/domain/config.py`, `src/report/letters.py` и ещё 1 | да |
-| `TELEGRAM_BOT_TOKEN` | `src/bot/config.py`, `src/health/checks.py`, `src/web/walk_auth.py` | да |
+| `TECHNICAL_PREVIEW_SEED` | `tools/seed_technical_preview.py` | нет — разрешение синтетического посева отдельного технического стенда |
+| `TELEGRAM_BOT_TOKEN` | `src/bot/config.py`, `src/health/checks.py`, `src/web/feedback_telegram.py` и ещё 1 | да |
 | `WALK_MOCKUP_ZONES` | `tools/walk_mockup/build.py` | нет — ручной рычаг сборки макета (tools/walk_mockup/build.py), не настройка |
 | `WALK_MODEL_MAX_CONCURRENT` | `src/web/server_limits.py` | да |
 | `WALK_USERS` | `src/domain/walk_users.py` | да |
@@ -490,7 +509,7 @@
 | `WEB_BOT_USERNAME` | `src/web/config.py` | да |
 | `WEB_CHANNEL_TIMEOUT_SEC` | `src/web/server_limits.py` | да |
 | `WEB_CONNECTION_LIMIT` | `src/web/server_limits.py` | да |
-| `WEB_DEMO` | `src/domain/demo.py` | да |
+| `WEB_DEMO` | `src/domain/demo.py`, `tools/seed_technical_preview.py` | да |
 | `WEB_DEMO_URL` | `src/domain/demo.py` | да |
 | `WEB_FRONT_KEY` | `src/web/config.py` | да |
 | `WEB_HOST` | `src/web/config.py` | да |
@@ -681,6 +700,14 @@
 | `0133_user_deletion.sql` | — |
 | `0134_inspection_followup.sql` | `inspection_followup` |
 | `0135_performance.sql` | `dodois.performance_windows`, `dodois.performance_lfl`, `dodois.performance_loads` |
+| `0136_inspection_remediation.sql` | `inspection_remediation`, `inspection_remediation_events` |
+| `0137_report_languages.sql` | `inspection_document_cache` |
+| `0138_technical_snapshot.sql` | — |
+| `0139_technical_confirmation_edits.sql` | — |
+| `0140_partner_space_safety.sql` | `partner_account_events`, `partner_event_seen` |
+| `0141_space_limits.sql` | `space_limits` |
+| `0142_web_onboarding.sql` | — |
+| `0143_feedback.sql` | `feedback`, `feedback_photos`, `feedback_chat`, `feedback_attempts` |
 <!-- map:end -->
 
 ## Makefile

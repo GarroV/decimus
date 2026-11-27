@@ -25,6 +25,10 @@
 }
 .rt a { text-decoration: none; }
 .rt a:hover { text-decoration: underline; }
+/* Внешняя ссылка в Dodo IS рядом с именем пиццерии: второстепенная, значком (#1603). */
+.rt-ext { display: inline-flex; vertical-align: middle; color: var(--ink-3); }
+.rt-ext:hover { color: var(--accent); text-decoration: none; }
+.rt-ext svg { width: 12px; height: 12px; }
 .rt .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* ── Шапка ──────────────────────────────────────────────────── */

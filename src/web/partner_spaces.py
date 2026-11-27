@@ -7,9 +7,20 @@
 
 from __future__ import annotations
 
+from src.db.space_freeze import FrozenSpace, freeze_space, frozen_spaces, unfreeze_space
 from src.db.spaces import SpaceRow, add_countries, create_partner_space, overview
 
-__all__ = ["SpaceRow", "add_countries", "create_partner_space", "overview", "parse_countries"]
+__all__ = [
+    "FrozenSpace",
+    "SpaceRow",
+    "add_countries",
+    "create_partner_space",
+    "freeze_space",
+    "frozen_spaces",
+    "overview",
+    "parse_countries",
+    "unfreeze_space",
+]
 
 
 def parse_countries(text: str) -> tuple[str, ...]:

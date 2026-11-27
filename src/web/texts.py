@@ -29,15 +29,19 @@ from .texts_country import COUNTRY_TEXTS
 from .texts_country_contacts import CONTACT_TEXTS
 from .texts_demo import DEMO_TEXTS
 from .texts_dodois import DODOIS_TEXTS
+from .texts_feedback import FEEDBACK_TEXTS
 from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_inspection_followup import WORK_TEXTS
+from .texts_inspection_remediation import REPAIR_TEXTS
 from .texts_inspection_timeline import TIMELINE_TEXTS
 from .texts_journal import JOURNAL_TEXTS
 from .texts_mailings import MAILINGS_TEXTS
 from .texts_master import MASTER_TEXTS
+from .texts_methodology_technical import TEXTS as METHODOLOGY_TECHNICAL_TEXTS
 from .texts_notifications import NOTIFICATION_TEXTS
 from .texts_oauth import OAUTH_TEXTS
+from .texts_onboarding import ONBOARDING_TEXTS
 from .texts_peek import PEEK_TEXTS
 from .texts_plan_file import PLAN_FILE_TEXTS
 from .texts_plan_rows import PLAN_ROW_TEXTS
@@ -50,6 +54,7 @@ from .texts_registry import REGISTRY_TEXTS
 from .texts_second_factor import SECOND_FACTOR_TEXTS
 from .texts_service_keys import SERVICE_KEYS_TEXTS
 from .texts_settings import SETTINGS_TEXTS
+from .texts_technical import TECHNICAL_TEXTS
 from .texts_training import TRAINING_TEXTS
 from .texts_trips import TRIP_TEXTS
 from .texts_units import UNIT_TEXTS
@@ -77,6 +82,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.wip": {"ru": "в разработке", "en": "in progress"},
     "nav.lang": {"ru": "Язык интерфейса", "en": "Interface language"},
     # Название языка — на нём самом: ищущий свой язык читает его, а не перевод.
+    "nav.lang.apply": {"ru": "Выбрать", "en": "Apply"},
     "nav.lang.ru": {"ru": "Русский", "en": "Русский"},
     "nav.lang.en": {"ru": "English", "en": "English"},
     "nav.lang.tr": {"ru": "Türkçe", "en": "Türkçe"},
@@ -519,29 +525,15 @@ TEXTS: dict[str, dict[str, str]] = {
     "registry.review.title": {"ru": "На приёмке", "en": "Awaiting review"},
     "registry.review.empty": {"ru": "Ничего не ждёт приёмки", "en": "Nothing is awaiting review"},
     "registry.review.wait": {"ru": "ждёт {days} дн.", "en": "waiting {days} d"},
+    "registry.review.no_findings": {"ru": "без нарушений", "en": "no violations"},
     "registry.review.wait_new": {"ru": "ждёт меньше суток", "en": "waiting under a day"},
     "registry.review.hint": {
         "ru": (
-            "Обход закончен, но проверка ещё не вычитана. В историю сети, обзор и "
-            "карточки точек она попадёт после подтверждения. Страна и город "
-            "отбирают и здесь, период — нет: приёмка не ждёт конца месяца."
+            "Ждут вычитки. Город и страна отбирают и здесь; период, оценка и вид — только принятые."
         ),
         "en": (
-            "The visit is over, but nobody has reviewed the inspection yet. It joins the "
-            "network history, the overview and unit cards once it is accepted. Country "
-            "and city filter this list too; the period does not: review never waits "
-            "for the month to end."
-        ),
-    },
-    "accept.banner.title": {"ru": "Проверка на приёмке", "en": "Inspection awaiting review"},
-    "accept.banner.text": {
-        "ru": (
-            "Вычитайте записи и подтвердите проверку. До подтверждения она не входит в "
-            "историю сети, а её записи можно исправить."
-        ),
-        "en": (
-            "Review the records and accept the inspection. Until then it is not part of "
-            "the network history, and its records can still be corrected."
+            "Awaiting review. City and country filter here too; period, grade and type "
+            "apply to accepted only."
         ),
     },
     "accept.foreign": {
@@ -554,7 +546,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Here it is read-only."
         ),
     },
-    "accept.title": {"ru": "Принять проверку", "en": "Accept inspection"},
+    "accept.title": {"ru": "Принять", "en": "Accept"},
     "accept.hint": {
         "ru": (
             "После подтверждения проверка входит в историю сети, а её записи больше не "
@@ -589,7 +581,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Принята до появления приёмки",
         "en": "Accepted before the review step existed",
     },
-    "card.accepted.waiting": {"ru": "Ждёт приёмки", "en": "Awaiting acceptance"},
+    "card.findings.repeat": {"ru": "повтор", "en": "repeat"},
+    "card.findings.repeat_hint": {
+        "ru": "Повтор нарушения прошлой проверки: вычет удвоен",
+        "en": "Repeat of a violation from the previous inspection: the deduction counts double",
+    },
     "review.photo.alt": {"ru": "Кадр к записи {n}", "en": "Photo for record {n}"},
     # --- правка записи на приёмке (D200) ---------------------------------------
     "revise.level": {"ru": "Класс", "en": "Class"},
@@ -750,6 +746,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Подбор уже идёт — подождите ответа.",
         "en": "A search is already running — wait for its answer.",
     },
+    "proofread.suggest.limit": {
+        "ru": (
+            "Месячный лимит расхода пространства исчерпан. Обратитесь в управляющую компанию. "
+            "Найдите пункт поиском ниже — запись можно добавить и так."
+        ),
+        "en": (
+            "The space's monthly spending limit has been reached. Please contact the management "
+            "company. Look for the item with the search below — you can still add the record."
+        ),
+    },
     "proofread.suggest.failed": {
         "ru": (
             "Подобрать пункт не получилось. Найдите его поиском ниже — запись можно добавить и так."
@@ -815,20 +821,28 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.fact.city": {"ru": "Город", "en": "City"},
     "card.fact.partner": {"ru": "Партнёр", "en": "Partner"},
     "card.fact.report_lang": {"ru": "Язык отчёта", "en": "Report language"},
-    "card.score.unit": {"ru": "%", "en": "%"},
-    "card.score.note": {
-        "ru": "Вычтено {deductions} %",
-        "en": "Deducted {deductions} %",
+    "accept.documents_pending": {
+        "ru": (
+            "Проверка принята. Не все языковые версии подготовлены. "
+            "Повторите скачивание PDF или открытие письма: подготовка повторится автоматически."
+        ),
+        "en": (
+            "Inspection accepted. Some language versions could not be prepared. "
+            "Download the PDF or open the letter again to retry preparation."
+        ),
     },
+    "card.score.unit": {"ru": "%", "en": "%"},
     "card.zones.title": {"ru": "Потери по зонам", "en": "Loss by zone"},
     "card.zones.none": {"ru": "Потерь по зонам нет", "en": "No loss in any zone"},
     "card.actions.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
-    "card.act.move": {"ru": "Исправить", "en": "Correct"},
+    "card.actions.decide": {"ru": "Решение по проверке", "en": "Decision on the inspection"},
+    "card.actions.more": {"ru": "Отчёт, письма, план", "en": "Report, letters, plan"},
+    "card.act.move": {"ru": "Исправить", "en": "Fix"},
     "card.act.rx": {"ru": "Сформировать предписание", "en": "Create compliance notice"},
     "card.act.rx_short": {"ru": "Предписание", "en": "Notice"},
     "card.act.letter": {"ru": "Письмо", "en": "Letter"},
     "card.act.plan": {"ru": "План", "en": "Plan"},
-    "card.zones.total": {"ru": "итого потеряно: {loss}", "en": "total lost: {loss}"},
+    "card.zones.total": {"ru": "Списано {loss} %", "en": "Deducted {loss} %"},
     "card.zones.zeroed": {"ru": "обнулена", "en": "zeroed"},
     "card.findings.title": {"ru": "Нарушения", "en": "Violations"},
     "card.findings.col.n": {"ru": "№", "en": "No."},
@@ -988,20 +1002,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "The correction history is unavailable — corrections are disabled until it is back.",
     },
     # --- отклонение проверки (код остаётся retract, D194) ------------------
-    "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
+    "retract.title": {"ru": "Отклонить", "en": "Reject"},
     "retract.hint": {
         "ru": (
-            "Отклонение — пометка, а не удаление: строка остаётся в истории вместе с причиной, "
-            "обычной роли не видна, кадры убираются из хранилища. Причина обязательна."
+            "Проверка уходит из списков и аналитики, кадры убираются из хранилища; "
+            "в истории остаётся строка с причиной. Причина обязательна."
         ),
         "en": (
-            "Rejection marks, it does not delete: the row stays in history with its reason, "
-            "is invisible to the ordinary role, and the photos are purged from storage. "
-            "A reason is required."
+            "The inspection leaves the lists and analytics and its photos are purged; "
+            "a row with the reason stays in history. A reason is required."
         ),
     },
     "retract.reason_label": {"ru": "Причина отклонения", "en": "Reason for rejection"},
-    "retract.submit": {"ru": "Отклонить проверку", "en": "Reject inspection"},
+    "retract.submit": {"ru": "Отклонить", "en": "Reject"},
     "retract.done": {
         "ru": "Проверка отклонена. Кадров убрано: {photos}.",
         "en": "The inspection is rejected. Photos purged: {photos}.",
@@ -1893,6 +1906,7 @@ _ЧАСТИ = (
     TEXTS,
     DEMO_TEXTS,
     DODOIS_TEXTS,
+    FEEDBACK_TEXTS,
     OAUTH_TEXTS,
     PEEK_TEXTS,
     CONNECTIONS_TEXTS,
@@ -1921,6 +1935,7 @@ _ЧАСТИ = (
     WALK_LOG_TEXTS,
     ADMINISTRATION_TEXTS,
     MAILINGS_TEXTS,
+    ONBOARDING_TEXTS,
 )
 _ПЕРЕСЕЧЕНИЕ = {
     ключ
@@ -1937,6 +1952,7 @@ TEXTS = {
     **DEMO_TEXTS,
     **DODOIS_TEXTS,
     **GRADE_TEXTS,
+    **FEEDBACK_TEXTS,
     **HOME_TEXTS,
     **JOURNAL_TEXTS,
     **MASTER_TEXTS,
@@ -1963,7 +1979,22 @@ TEXTS = {
     **WALK_LOG_TEXTS,
     **ADMINISTRATION_TEXTS,
     **MAILINGS_TEXTS,
+    **ONBOARDING_TEXTS,
 }
+
+
+def extra_status(stage: str, status: str) -> str:
+    """Сырой статус свода пиццерий, если он не пересказывает стадию на любом языке.
+
+    «Работает» рядом с «Open» — одно и то же, второе слово лишнее (#1608); «Ресторан открыт»
+    или «Строится» стадию уточняют и остаются."""
+    shown = (status or "").strip()
+    known = {
+        str(TEXTS[f"unit.stage.{stage}"][lang]).casefold()
+        for lang in ("ru", "en")
+        if f"unit.stage.{stage}" in TEXTS
+    }
+    return "" if shown.casefold() in known else shown
 
 
 def t(key: str, lang: str, /, **params: object) -> str:
@@ -2018,8 +2049,12 @@ def lang_or_default(lang: str | None, *, fallback: str) -> str:
 # Общая история проверок на стране и в рейтингах.
 
 TEXTS.update(TIMELINE_TEXTS)
+TEXTS.update(TECHNICAL_TEXTS)
 TEXTS.update(WORK_TEXTS)
+TEXTS.update(REPAIR_TEXTS)
 
 TEXTS.update(CONTACT_TEXTS)
 
 TEXTS.update(BATCH_LETTER_TEXTS)
+
+TEXTS.update(METHODOLOGY_TECHNICAL_TEXTS)

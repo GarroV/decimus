@@ -1,4 +1,4 @@
-"""CFT DOM evidence assignment: explicit confirmation, stale mappings, shared evidence."""
+"""CFT DOM evidence assignment: selected frames, stale mappings, shared evidence."""
 
 # ruff: noqa: F811
 from __future__ import annotations
@@ -10,29 +10,25 @@ from test_web_walk_candidate_identity_browser import card, load_sheet, row_for_z
 PHOTOS = ["synthetic-first-ref", "synthetic-second-ref"]
 
 
-def candidates(second_indices=(1,)):
+def candidates(second_indices=(1,), refs=PHOTOS):
     return [
         {
             **card("zone_a", "Synthetic A"),
             "frame_indices": [0],
-            "frame_count": 2,
-            "frame_refs": PHOTOS,
+            "frame_count": len(refs),
+            "frame_refs": refs,
         },
         {
             **card("zone_b", "Synthetic B"),
             "frame_indices": list(second_indices),
-            "frame_count": 2,
-            "frame_refs": PHOTOS,
+            "frame_count": len(refs),
+            "frame_refs": refs,
         },
     ]
 
 
 def box(page, index):
     return page.locator("[data-photo-assignment]").nth(index)
-
-
-def confirm(page, index):
-    box(page, index).locator("[data-photo-confirm]").check()
 
 
 def save_two(page):
@@ -48,9 +44,8 @@ def test_each_finding_receives_only_its_confirmed_model_frames(browser_page, sou
     row_for_zone(page, "Zone B").locator(".walk-found__also").click()
     assert box(page, 0).locator('[data-frame-index="0"]').is_checked()
     assert not box(page, 0).locator('[data-frame-index="1"]').is_checked()
-    assert page.get_by_role("button", name="Save 2", exact=True).is_disabled()
-    confirm(page, 0)
-    confirm(page, 1)
+    assert page.get_by_role("button", name="Save 2", exact=True).is_enabled()
+    assert page.locator("[data-photo-confirm]").count() == 0
     ops = save_two(page)
     assert [op["photos"] for op in ops] == [[PHOTOS[0]], [PHOTOS[1]]]
     assert [op["photo_assignment"]["model_frame_indices"] for op in ops] == [[0], [1]]
@@ -61,12 +56,10 @@ def test_unknown_model_evidence_requires_manual_selection_and_can_be_shared(brow
     page = browser_page
     load_sheet(page, candidates((True,)), photos=PHOTOS, confirm=False)
     row_for_zone(page, "Zone B").locator(".walk-found__also").click()
-    assert box(page, 1).locator("[data-photo-confirm]").is_disabled()
+    assert page.get_by_role("button", name="Save 2", exact=True).is_disabled()
     assert box(page, 1).locator("input[data-frame-index]:checked").count() == 0
-    confirm(page, 0)
     # The auditor deliberately assigns the same supporting frame to both findings.
     box(page, 1).locator('[data-frame-index="0"]').check()
-    confirm(page, 1)
     ops = save_two(page)
     assert [op["photos"] for op in ops] == [[PHOTOS[0]], [PHOTOS[0]]]
     assert ops[1]["photo_assignment"]["model_frame_indices"] is None
@@ -75,32 +68,29 @@ def test_unknown_model_evidence_requires_manual_selection_and_can_be_shared(brow
 
 def test_removing_a_photo_invalidates_index_mapping_instead_of_reusing_index_zero(browser_page):
     page = browser_page
-    load_sheet(page, candidates(), photos=PHOTOS, confirm=False)
+    three = [*PHOTOS, "synthetic-third-ref"]
+    load_sheet(page, candidates(refs=three), photos=three, confirm=False)
     row_for_zone(page, "Zone B").locator(".walk-found__also").click()
-    confirm(page, 0)
-    confirm(page, 1)
     page.get_by_role("button", name="Remove frame 0", exact=True).click()
     assert box(page, 0).locator("input[data-frame-index]:checked").count() == 0
     assert box(page, 1).locator("input[data-frame-index]:checked").count() == 0
     assert page.get_by_role("button", name="Save", exact=True).is_disabled()
     assert page.evaluate("ops") == []
     box(page, 0).locator('[data-frame-index="0"]').check()
-    confirm(page, 0)
     page.get_by_role("button", name="Save", exact=True).click()
     page.wait_for_function("ops.length === 1")
     op = page.evaluate("ops[0]")
     assert op["photos"] == [PHOTOS[1]]
-    assert op["photo_assignment"]["model_source_photos"] == PHOTOS
+    assert op["photo_assignment"]["model_source_photos"] == three
     assert op["photo_assignment"]["model_frame_indices"] == [0]
-    assert op["photo_assignment"]["source_photos"] == [PHOTOS[1]]
+    assert op["photo_assignment"]["source_photos"] == three[1:]
     assert op["photo_assignment"]["assigned_frame_indices"] == [0]
 
 
-def test_editing_words_resets_confirmation_without_modifying_raw_proposal(browser_page):
+def test_editing_words_resets_assignment_without_modifying_raw_proposal(browser_page):
     page = browser_page
     load_sheet(page, candidates(), photos=PHOTOS, confirm=False)
     row_for_zone(page, "Zone B").locator(".walk-found__also").click()
-    confirm(page, 0)
     page.locator(".walk-area--words").fill("Changed synthetic words")
     assert box(page, 0).locator("input[data-frame-index]:checked").count() == 0
     assert page.get_by_role("button", name="Save", exact=True).is_disabled()
@@ -113,8 +103,6 @@ def test_existing_primary_receives_only_its_assigned_new_frame(browser_page):
     load_sheet(page, candidates(), photos=PHOTOS, confirm=False)
     row_for_zone(page, "Zone B").locator(".walk-found__also").click()
     page.evaluate("DecimusWalk.state.data.zones[0].recorded = [{n:1, code:'SYN01',level:'D1'}]")
-    confirm(page, 0)
-    confirm(page, 1)
     ops = save_two(page)
     assert ops[0]["op"] == "attach"
     assert ops[0]["n"] == 1 and ops[0]["ref"] == PHOTOS[0]
@@ -122,19 +110,19 @@ def test_existing_primary_receives_only_its_assigned_new_frame(browser_page):
     assert ops[1]["op"] == "add" and ops[1]["photos"] == [PHOTOS[1]]
 
 
-def test_new_search_with_same_photos_needs_a_new_confirmation(browser_page):
+def test_new_search_with_same_photos_resets_manual_assignment(browser_page):
     page = browser_page
     cards = candidates()
     cards[0]["reading_c"] = 5
     load_sheet(page, cards, photos=PHOTOS, confirm=False)
     row_for_zone(page, "Zone B").locator(".walk-found__also").click()
-    confirm(page, 0)
+    box(page, 0).locator('[data-frame-index="1"]').check()
     page.locator(".walk-area--words").fill("New synthetic search facts")
     page.get_by_role("button", name="walk.sheet.find_again", exact=True).click()
     page.locator(".walk-found__card").first.click()
     row_for_zone(page, "Zone B").locator(".walk-found__also").click()
-    assert not box(page, 0).locator("[data-photo-confirm]").is_checked()
-    assert page.get_by_role("button", name="Save 2", exact=True).is_disabled()
+    assert box(page, 0).locator('[data-frame-index="0"]').is_checked()
+    assert not box(page, 0).locator('[data-frame-index="1"]').is_checked()
     assert page.evaluate("ops") == []
 
 
@@ -156,3 +144,14 @@ def test_single_manual_finding_does_not_require_second_photo_confirmation(browse
     page.wait_for_function("ops.length === 1")
     assert page.evaluate("ops[0].photos") == PHOTOS
     assert page.evaluate("ops[0].photo_assignment") is None
+
+
+def test_one_frame_is_shared_without_a_second_confirmation(browser_page):
+    page = browser_page
+    one = [PHOTOS[0]]
+    load_sheet(page, candidates(refs=one), photos=one, confirm=False)
+    row_for_zone(page, "Zone B").locator(".walk-found__also").click()
+    assert page.locator("[data-photo-assignment]").count() == 0
+    assert page.locator("[data-photo-confirm]").count() == 0
+    ops = save_two(page)
+    assert [op["photos"] for op in ops] == [one, one]

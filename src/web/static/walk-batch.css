@@ -1,12 +1,14 @@
 /* Пакетный ввод нарушений в обходе: карточки в листе поверх экрана зоны. */
 
-/* Сплит-кнопка дока: «+ Нарушение» слева, «Несколько» справа за тонким разделителем. */
+/* Сплит-кнопка дока: «+ Нарушение» — 2/3 ширины, «Серия фото» — 1/3.
+   Высота обеих частей и соседней кнопки — 40 px. */
 .walk-dock__row .walk-dock__split {
-  flex: 1.9;
+  flex: 2.45;
   display: flex;
+  min-height: 40px;
   width: auto;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   cursor: default;
 }
 .walk-dock__split .walk-dock__add {
@@ -14,7 +16,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: 44px;
+  min-height: 40px;
   margin: 0;
   border: 0;
   background: transparent;
@@ -25,16 +27,23 @@
   cursor: pointer;
 }
 .walk-dock__split .walk-dock__add:active { background: var(--accent-press); }
-.walk-dock__split .walk-dock__add--main { flex: 1 1 auto; min-width: 0; padding: 0 5px; font-size: 14px; }
+.walk-dock__split .walk-dock__add--main { flex: 2 1 0; min-width: 0; padding: 0 5px; font-size: 14px; }
 .walk-dock__split .walk-dock__add--several {
-  flex: none;
+  flex: 1 1 0;
+  min-width: 0;
   gap: 4px;
-  padding: 0 7px 0 6px;
-  border-left: 1px solid rgb(255 255 255 / .45);
+  padding: 0 4px;
+  border-left: 1px solid rgb(255 255 255 / .3);
   font-size: 12px;
 }
-.walk-dock__add--several .walk-icon { width: 16px; height: 16px; }
+.walk-dock__add--several .walk-icon { flex: none; width: 14px; height: 14px; }
 .walk-dock__split .walk-dock__add:focus-visible { outline: 2px solid var(--ink-inverse); outline-offset: -4px; }
+
+.walk-dock__split .walk-dock__add { position: relative; }
+.walk-dock__split .walk-dock__add::after, .walk-dock__next::after {
+  content: ""; position: absolute; inset: -3px 0;
+}
+.walk-dock__next { position: relative; }
 
 .walk-batch { z-index: 10; }
 /* Длинное слово без пробелов (формулировка модели, прежний комментарий, адрес) не должно раздвигать лист:
@@ -81,9 +90,17 @@
 /* Узкий экран (360 px): камеру перед «+ Нарушение» убираем, подпись важнее. */
 @media (max-width: 413px) { .walk-dock__split .walk-dock__add--main .walk-icon { display: none; } }
 /* 399 px и уже (360 и 390): шрифты шире системных (Verdana, DejaVu на Linux) не умещали «+ Нарушение» на 360 —
-   подпись, «Несколько» и «Осмотрено →» чуть мельче, отступы уже. */
+   подпись, «Серия фото» и «Зона готова →» чуть мельче, отступы уже. */
 @media (max-width: 399px) {
   .walk-dock__split .walk-dock__add--main { padding: 0 3px; font-size: 13px; }
-  .walk-dock__split .walk-dock__add--several { gap: 3px; padding: 0 5px; font-size: 11px; }
+  .walk-dock__split .walk-dock__add--several { gap: 2px; padding: 0 1px; font-size: 11px; }
+  .walk-dock__row { gap: 6px; }
+  .walk-dock__add--several .walk-icon { width: 13px; height: 13px; }
   .walk-dock__row .walk-dock__next { padding: 0 8px; font-size: 14px; }
+}
+
+@media (max-width: 375px) {
+  .walk-dock__row .walk-dock__split { flex: 2.6; }
+  .walk-dock__next { min-width: 105px; }
+  .walk-dock__split .walk-dock__add--main { flex: 1.8 1 0; }
 }

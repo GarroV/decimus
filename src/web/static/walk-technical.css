@@ -1,0 +1,24 @@
+/* Контрольные точки обхода: существующие токены forma, серверные ответы. */
+.walk-technical { margin-block: 16px; border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.walk-technical__heading { margin: 0 0 8px; font-size: 16px; }
+.walk-technical__progress { display: grid; gap: 4px; margin-block: 12px; font-size: 13px; }
+.walk-technical__progress span, .walk-technical__hint, .walk-technical__guidance { color: var(--ink-3); }
+.walk-technical__progress progress { width: 100%; height: 6px; margin-top: 6px; accent-color: var(--ink); }
+.walk-technical__filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-block: 16px; }
+.walk-technical__select-label, .walk-technical__reason-label { display: grid; gap: 5px; font-size: 13px; }
+.walk-technical__select, .walk-technical__input { width: 100%; box-sizing: border-box; min-height: 40px; border: 1px solid var(--line-control); border-radius: 8px; background: var(--surface); color: var(--ink); padding: 8px; font: inherit; font-size: 16px; }
+.walk-technical__zone { margin: 24px 0 8px; font-size: 16px; }
+.walk-technical__check { padding-block: 14px; border-bottom: 1px solid var(--line); }
+.walk-technical__meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; color: var(--ink-3); font-size: 12px; }
+.walk-technical__title { margin: 6px 0 8px; font-size: 15px; line-height: 21px; font-weight: 600; overflow-wrap: anywhere; }
+.walk-technical__guidance { font-size: 13px; }
+.walk-technical__guidance summary { cursor: pointer; }
+.walk-technical__guidance p { white-space: pre-line; }
+.walk-technical__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 12px; }
+.walk-technical__actions .walk-link { margin: 0; }
+.walk-technical__reason { white-space: pre-wrap; overflow-wrap: anywhere; }
+.walk-technical__check.is-ok .walk-technical__meta, .walk-technical__check.is-recorded .walk-technical__meta { color: var(--ink-2); }
+.walk-technical__check.is-issue { border-left: 3px solid var(--ink); padding-left: 12px; }
+.walk-technical__input { resize: vertical; }
+.walk-technical__reason-label { margin-top: 12px; }
+@media (max-width: 360px) { .walk-technical__filters { grid-template-columns: minmax(0, 1fr); } }

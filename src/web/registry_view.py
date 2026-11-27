@@ -6,9 +6,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import TYPE_CHECKING
 
 from src.db.models import InspectionRow
 
@@ -16,6 +17,9 @@ from . import registry_period
 from .dates import human_day
 from .registry_period import Period
 from .texts import t
+
+if TYPE_CHECKING:
+    from .inspections import Registry
 
 #: «Пиццерии без проверки» на «Проверках» скрыты (D549): руководство не поняло,
 #: «за период или вообще», а признак «ни разу не проверялась» живёт в карточке
@@ -180,3 +184,54 @@ def period_quick_months(
             ("calendar.period.next_month", следующий),
         )
     )
+
+
+def place_totals(
+    registry: Registry, current: Filter, place: Callable[[InspectionRow], tuple[str, str]]
+) -> dict[tuple[str, str], int]:
+    """Принятые периода по месту `{(страна, город): число}` — с отбором, но без места.
+
+    Буква, вид и название режут счёт, страна и город нет: по ним он и разбит, и
+    щелчок по стране оставляет остальной отбор. Счёт приходит из базы
+    (`Registry.place_counts`) целиком; нет его — считается по строкам, что есть.
+    """
+    if registry.place_counts is not None:
+        return {(страна, город): число for страна, город, число in registry.place_counts}
+    без_места = Filter(grade=current.grade, kind=current.kind, q=current.q)
+    итог: dict[tuple[str, str], int] = {}
+    for row in registry.rows:
+        if без_места.keeps(row, ("", "")):
+            итог[place(row)] = итог.get(place(row), 0) + 1
+    return итог
+
+
+#: Классы записей в строке «На приёмке» — по убыванию тяжести. Прочие уровни
+#: (`D0`, `R`, `NC`) нарушениями не считаются.
+REVIEW_CLASSES = ("D3", "D2", "D1")
+
+
+def review_classes_lines(
+    rows: tuple[InspectionRow, ...],
+    counts: Mapping[str, Mapping[str, int]] | None,
+    lang: str,
+) -> dict[str, str]:
+    """Что внутри ждущей проверки: «D3: 1 · D2: 2 · D1: 4» или «без нарушений».
+
+    Числа записей по классу берутся из тех же записей, что у карточки, — оценка
+    не считается. Нет данных (`counts is None`) — пусто: строка молчит, а не
+    говорит «без нарушений» там, где просто не прочиталось.
+    """
+    if counts is None:
+        return {}
+    строки: dict[str, str] = {}
+    for row in rows:
+        by_class = counts.get(row.id, {})
+        части = [f"{код}: {by_class[код]}" for код in REVIEW_CLASSES if by_class.get(код)]
+        строки[row.id] = " · ".join(части) if части else t("registry.review.no_findings", lang)
+    return строки
+
+
+def filters_changed(current: Filter, period: Period) -> int:
+    """Сколько полей отбора не по умолчанию: период (умолчание — всё время) и пять отборов."""
+    изменено = (current.grade, current.kind, current.country, current.city, current.q)
+    return sum(1 for value in изменено if value) + (0 if period.is_all else 1)

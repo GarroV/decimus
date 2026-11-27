@@ -11,6 +11,9 @@ from src.ratings import freshness as f
 TODAY = date(2026, 10, 27)
 
 
+NOW = datetime.combine(TODAY, time(1, 30), UTC)
+
+
 def _at(days_ago: int, hour: int = 8) -> datetime:
     return datetime.combine(TODAY - timedelta(days=days_ago), time(hour), UTC)
 
@@ -45,6 +48,37 @@ def test_routine_counts_calendar_days_not_hours() -> None:
     assert f.classify_age(_at(1, hour=23), TODAY) is f.Status.LAG
 
 
+@pytest.mark.parametrize(
+    ("hours", "want"),
+    [
+        (8, f.Status.FRESH),
+        (36, f.Status.FRESH),
+        (37, f.Status.LAG),
+        (96, f.Status.LAG),
+        (97, f.Status.STALE),
+    ],
+)
+def test_daily_source_is_judged_by_age_in_hours_not_by_date(hours: int, want: f.Status) -> None:
+    # Сбор пришёл вчера в 17:25, на экране 01:30 — календарно «вчера», но возраст 8 часов.
+    assert f.classify_daily(NOW - timedelta(hours=hours), NOW) is want
+
+
+def test_collapse_aggregators_keeps_worst_color_and_oldest_arrival() -> None:
+    rows = f.build(
+        today=TODAY,
+        now=NOW,
+        rs=None,
+        rko=None,
+        sheet_checked=None,
+        maps_loaded=_at(0),
+        aggregators={"wolt": NOW - timedelta(hours=8), "glovo": NOW - timedelta(hours=50)},
+    )
+    one = [r for r in f.collapse_aggregators(rows) if r.kind == "agg"]
+    assert len(one) == 1
+    assert (one[0].count, one[0].status) == (2, f.Status.LAG)
+    assert one[0].arrived == NOW - timedelta(hours=50)
+
+
 def test_worst_takes_the_reddest() -> None:
     assert f.worst([f.Status.FRESH, f.Status.STALE, f.Status.LAG]) is f.Status.STALE
     assert f.worst([f.Status.FRESH, f.Status.LAG]) is f.Status.LAG
@@ -54,6 +88,7 @@ def test_worst_takes_the_reddest() -> None:
 def test_build_has_fixed_order_and_missing_data_is_red() -> None:
     rows = f.build(
         today=TODAY,
+        now=NOW,
         rs=f.PeriodFact(date(2026, 10, 1), date(2026, 10, 15), _at(5)),
         rko=None,
         sheet_checked=_at(0),
@@ -71,12 +106,18 @@ def test_build_has_fixed_order_and_missing_data_is_red() -> None:
         ("agg", "zzz"),
     ]
     assert [r.status.value for r in rows] == [
-        *("fresh", "stale", "fresh", "lag", "lag", "fresh", "stale", "fresh"),
+        *("fresh", "stale", "fresh", "lag", "fresh", "fresh", "stale", "fresh"),
     ]
 
 
 def test_unconnected_control_sheet_has_no_row() -> None:
     rows = f.build(
-        today=TODAY, rs=None, rko=None, sheet_checked=None, maps_loaded=_at(0), aggregators={}
+        today=TODAY,
+        now=NOW,
+        rs=None,
+        rko=None,
+        sheet_checked=None,
+        maps_loaded=_at(0),
+        aggregators={},
     )
     assert [r.kind for r in rows] == ["rs", "rko", "maps"]

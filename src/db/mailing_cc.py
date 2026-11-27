@@ -20,6 +20,7 @@ from .config import check_environment, load_retraction_settings
 from .errors import MailingCcError, MailingCcInputError, PrescriptionError
 from .pool import connection
 from .prescriptions import parse_recipients
+from .timeouts import timed_connect
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ def counts() -> dict[str, int]:
 
 def _run(sql: str, params: tuple[object, ...]) -> int:
     try:
-        with psycopg.connect(load_retraction_settings().dsn) as conn:
+        with timed_connect(load_retraction_settings().dsn) as conn:
             return conn.execute(sql, params).rowcount
     except psycopg.errors.IntegrityError as exc:
         raise MailingCcError("Адрес не сохранён: база отказала в значении") from exc

@@ -30,6 +30,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
 РАБОТА_УК = {
     "inspection.read",
     "inspection.followup",
+    "inspection.remediation.review",
     "inspection.conduct",
     "inspection.accept",
     "inspection.revise",
@@ -126,6 +127,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
     # Админ партнёра: сотрудник + люди, свои чек-листы, вычитка свежих (D346, D367).
     (SIDE_PARTNER, "admin"): СОТРУДНИК_ПАРТНЁРА
     | {
+        "inspection.remediation.review",
         "inspection.accept",
         "inspection.revise",
         "checklist.edit",

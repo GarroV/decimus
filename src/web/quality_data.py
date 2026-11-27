@@ -260,6 +260,23 @@ def _unit_values(
     }
 
 
+def _sheet_periods(
+    dodo_id: str, scores: Sequence[quality_read.PeriodScore], have: set[str]
+) -> list[dodois_metrics.UnitRatingPeriod]:
+    """Периоды РКО и РС из `ratings.scores` — для блока «Периоды», когда периодов Dodo IS нет.
+
+    Только то, что записано: оценка периода и статус публикации как есть, ничего не считается
+    заново. Виды, по которым периоды Dodo IS есть (`have`), не дублируются. Строка без границ
+    периода (источник их не принёс) в блок не попадает."""
+    return [
+        dodois_metrics.UnitRatingPeriod(
+            dodo_id, r.rating_type, r.begin_on, r.end_on, r.score, r.status, r.checkups
+        )
+        for r in scores
+        if r.rating_type not in have and r.begin_on is not None and r.end_on is not None
+    ]
+
+
 def _unit(
     dodo_id: str,
     name: str,
@@ -344,7 +361,7 @@ def _unit(
         dict(revenue),
         dict(by_source),
         tuple(sorted(lines.values(), key=lambda x: -x.orders)),
-        tuple(periods),
+        (*periods, *_sheet_periods(dodo_id, scores, {p.kind for p in periods})),
         source,
         overall,
         maps_carried,

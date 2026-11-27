@@ -39,6 +39,7 @@ from .config import check_environment
 from .database_target import managing_dsn
 from .errors import AccessError, DbError
 from .pool import connection
+from .timeouts import timed_connect
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ def _fail(what: str, exc: psycopg.Error) -> DbError:
 
 def _managing() -> Any:
     _, dsn = managing_dsn("поменять вход Dodo IS")
-    return psycopg.connect(dsn)
+    return timed_connect(dsn)
 
 
 def _read(sql: str, params: tuple[Any, ...], what: str) -> list[Any]:

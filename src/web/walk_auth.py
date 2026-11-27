@@ -77,6 +77,7 @@ MAX_VOICE_BYTES = 5 * 1024 * 1024
 APP_ENDPOINT = "walk_app"
 #: Начало проверки из мини-аппа (D392): мастер с полями вместо чата.
 START_ENDPOINT = "walk_start"
+TECHNICAL_ENDPOINT = "walk_technical"
 #: Пути тех же адресов. Здесь, а не в `walk.py`: их вешают и сервис обхода
 #: (`walk.py`, `walk_write.py`), и админка, передающая ему запросы
 #: (`walk_proxy.py`), — две копии путей разошлись бы молча.
@@ -94,6 +95,7 @@ TRANSLATE_PATH = "/tg/walk/translate"
 VOICE_PATH = "/tg/walk/transcribe"
 APP_PATH = "/tg/walk/app"
 START_PATH = "/tg/walk/start"
+TECHNICAL_PATH = "/tg/walk/technical"
 ENDPOINTS = frozenset(
     {
         PAGE_ENDPOINT,
@@ -110,6 +112,7 @@ ENDPOINTS = frozenset(
         VOICE_ENDPOINT,
         APP_ENDPOINT,
         START_ENDPOINT,
+        TECHNICAL_ENDPOINT,
     }
 )
 

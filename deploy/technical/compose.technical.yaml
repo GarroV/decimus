@@ -1,0 +1,40 @@
+# Изолированный стенд технического контроля поверх deploy/preview.
+# Проект только decimus-technical-1126, данные методики вне Git.
+x-technical-storage: &technical-storage
+  S3_ENDPOINT_URL: http://storage:9090
+  S3_BUCKET: inspection-frames
+  # S3Mock не проверяет ключи; это публичные фиктивные значения стенда.
+  S3_ACCESS_KEY_ID: s3mock
+  S3_SECRET_ACCESS_KEY: s3mock
+  S3_REGION: us-east-1
+
+services:
+  web:
+    environment: *technical-storage
+    ports: !override
+      - "127.0.0.1:8316:8268"
+    volumes:
+      - ./src:/app/src:ro
+      - ./engine:/app/engine:ro
+      - ./tools:/app/tools:ro
+  walk:
+    environment: *technical-storage
+    volumes:
+      - ./src:/app/src:ro
+      - ./engine:/app/engine:ro
+      - ./tools:/app/tools:ro
+  migrate:
+    image: decimus-technical-1126-web
+    build: !reset null
+    volumes:
+      - ./src:/app/src:ro
+  seed:
+    environment:
+      <<: *technical-storage
+      TELEGRAM_BOT_TOKEN: ""
+    volumes:
+      - ${AUDIT_DATA_DIR:?отдельное издание методики}:/app/data:ro
+      - ./src:/app/src:ro
+      - ./engine:/app/engine:ro
+      - ./tools:/app/tools:ro
+      - ./tests:/app/tests:ro

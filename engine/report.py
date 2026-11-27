@@ -25,6 +25,7 @@ from audit import (  # noqa: E402
     load_state,
     load_zones, state_dir,
 )
+from technical_report import render as technical_html  # noqa: E402
 
 # Каталог вывода по умолчанию — рядом с состоянием проверки, но не в соседи
 # ему: там же лежат эталонные отчёты (examples/), и сборка их затирала (T104).
@@ -560,7 +561,7 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
             # не попавшей в цену, пометка молчит — удваивать там нечего.
             if f.get("repeat") and f["counted"] and f["level"] != "D3":
                 nc += f' · {t["repeat"]}'
-            h.append('<div class="f">')
+            h.append(f'<div class="f" id="finding-{f["n"]}">')
             h.append(f'<div class="h"><span class="badge {f["level"]}">{f["level"]}</span> '
                      f'{esc(item_title(f, qk))}</div>')
             # Условие стоит на самом печатаемом тексте, а не на наличии поля:
@@ -624,7 +625,7 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
                      + "".join(src.html(ref, t) for ref in shots) + '</div></div>')
         for f in sorted(notes, key=lambda x: x["n"]):
             if True:
-                h.append('<div class="f">')
+                h.append(f'<div class="f" id="finding-{f["n"]}">')
                 h.append(f'<div class="h">{esc(item_title(f, qk))}</div>')
                 записано = recorded_text(f, qk)
                 if записано:
@@ -638,13 +639,16 @@ def build_html(res, lang, photos, src=None, speech_lang=None):
         h.append(f'<h2 class="sec-findings">{esc(t["notes"])}</h2>')
         h.append(f'<div class="note">{esc(t["notes_note"])}</div>')
         for f in sorted(general, key=lambda x: x["n"]):
-            h.append('<div class="f">')
+            h.append(f'<div class="f" id="finding-{f["n"]}">')
             h.append(f'<div class="m">{esc(f[zk])}</div>')
             h.append(f'<div class="c">{esc((f.get("evidence") or "").strip())}</div>')
             if f.get("photos"):
                 h.extend(shots_html(f, t, src))
             h.append("</div>")
 
+    h.append(technical_html(res.get("technical_snapshot"), lang,
+                           {code: z.get(nk) or z.get("name_ru") or code
+                            for code, z in res["zones"].items()}))
     h.append(f'<div class="note"><b>{esc(t["method"])}.</b> '
              + esc(t["method_text"].format(d1=cfg["penalty"]["D1"], d2=cfg["penalty"]["D2"])) + "</div>")
     return "<html><head><meta charset='utf-8'/></head><body>" + "".join(h) + "</body></html>"
@@ -1282,6 +1286,11 @@ def main():
     # на промах разбором методики значит показать человеку не ту причину.
     lang = report_lang(a.lang, st["meta"])
     res = compute(st, load_checklist(), load_zones(), load_cfg())
+    res["technical_snapshot"] = (st.get("domain") or {}).get("technical_snapshot")
+    technical_file = os.environ.get("DECIMUS_TECHNICAL_SNAPSHOT")
+    if technical_file:
+        with open(technical_file, encoding="utf-8") as f:
+            res["technical_snapshot"] = json.load(f)
     if a.cmd == "letter-parts":
         bad = letter_problems("-", res)
         if bad:

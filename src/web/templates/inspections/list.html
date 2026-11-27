@@ -45,13 +45,13 @@
     </div>
 </header>{% endblock %}
 
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}"><script src="{{ url_for('static', filename='proofread.js') }}" data-swap-safe defer></script><script src="{{ url_for('static', filename='letter.js') }}" data-swap-safe defer></script>{% endblock %}
+{% block split_assets %}<script src="{{ url_for('static', filename='registry-filters.js') }}" data-swap-safe defer></script><link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}"><script src="{{ url_for('static', filename='proofread.js') }}" data-swap-safe defer></script><script src="{{ url_for('static', filename='letter.js') }}" data-swap-safe defer></script>{% endblock %}
 
 {% macro row_link(row, review=false) %}
   {% set текущая = split_open and picked == row.id %}
   {% call inspection_row(row, select_url(inspection=row.id), current=текущая,
                          checklist=(checklist_names.get(row.checklist_code, row.checklist_code) if checklist_names is not none else none)) %}
-    {%- if review %} · <span class="srow__warn">{% if review_wait[row.id] %}{{ t('registry.review.wait', days=review_wait[row.id]) }}{% else %}{{ t('registry.review.wait_new') }}{% endif %}</span>{% endif %}
+    {%- if review %} · <span class="srow__warn">{% if review_wait[row.id] %}{{ t('registry.review.wait', days=review_wait[row.id]) }}{% else %}{{ t('registry.review.wait_new') }}{% endif %}</span>{% if review_classes.get(row.id) %} · {{ review_classes[row.id] }}{% endif %}{% endif %}
   {% endcall %}
 {% endmacro %}
 
@@ -67,7 +67,8 @@
 {% endblock %}
 
 {% block body %}
-<div class="rg-filters" role="group" aria-label="{{ t('registry.filters.title') }}">
+<details class="rg-fold" open data-registry-fold><summary class="rg-fold__sum">{{ t('registry.filters.title') }}{% if filters_changed %} · {{ filters_changed }}{% endif %}</summary>
+<div class="rg-filters rg-fold__body" role="group" aria-label="{{ t('registry.filters.title') }}">
       {% for chip in picks %}{{ pick(chip) }}{% endfor %}
       {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
                        period_hidden) }}
@@ -94,7 +95,7 @@
       </form>
       {% endif %}
       {% if filters.active %}<a class="sbtn sbtn--ghost rg-reset" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
-</div>
+</div></details>
 {{ super() }}
 {% endblock %}
 
@@ -147,7 +148,7 @@
     {# «Принятые» — единственный блок, на который действуют период и отбор. #}
     <div class="slist slist--registry">
       <div class="slist__group">
-        <span>{{ t('registry.accepted.title') }}</span><span class="sbadge">{{ rows|length }}</span>
+        <span>{{ t('registry.accepted.title') }}</span><span class="sbadge">{% if accepted_total > accepted_limit %}{{ t('registry.accepted.of_total', shown=rows|length, total=accepted_total) }}{% else %}{{ rows|length }}{% endif %}</span>
       </div>
       <p class="slist__note">{{ t('registry.accepted.hint') }}</p>
       {% if rows %}
@@ -158,6 +159,7 @@
           <span class="is-num">{{ t('registry.col.date') }}</span>
         </div>
         <ul class="slist__rows">{% for row in rows %}{{ row_link(row) }}{% endfor %}</ul>
+      {% if accepted_total > accepted_limit %}<p class="slist__note">{{ t('registry.accepted.limit_note', n=accepted_limit) }}</p>{% endif %}
       {% elif registry.rows %}
         {# Строки есть, но отбор их все отсёк — это другое состояние, чем пустой
            реестр, и говорить о нём надо иначе: тут виноват отбор, а не база. #}

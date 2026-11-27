@@ -2,6 +2,7 @@
 {% extends "base.html" %}
 {% from "_info_tip.html" import info_tip %}
 {% from "administration/_nav.html" import admin_nav with context %}
+{% from "administration/_parts.html" import sec_title with context %}
 {% block title %}{{ t('administration.tab.home') }} · {{ t('section.administration.title') }}{% endblock %}
 {% block page_heading %}<header class="page-heading">
 <div class="shead__main">
@@ -17,20 +18,21 @@
 <div class="sadmin">
   {{ admin_nav() }}
   <div class="sadmin__main">
-    <h2>{{ t('home.setting.attention.title') }}</h2>
-    {% if not known %}<p role="alert">{{ t('home.setting.unavailable') }}</p>{% endif %}
-    {% if save_failed %}<p role="alert">{{ t('plans.setting.failed') }}</p>{% endif %}
-    {% if outcome == 'ok' %}<p role="status">{{ t('plans.setting.saved') }}</p>{% endif %}
-    <p>{{ t('home.setting.attention.note') }}</p>
-    <form method="post" action="{{ request.script_root }}/administration/home/settings?lang={{ lang }}">
-      <label for="home-attention-units">{{ t('home.setting.attention.label') }}</label>
-      <select id="home-attention-units" name="attention_units"{% if demo_mode %} disabled{% endif %}>
-        <option value="0"{% if not attention_units %} selected{% endif %}>{{ t('home.setting.off') }}</option>
-        <option value="1"{% if attention_units %} selected{% endif %}>{{ t('home.setting.on') }}</option>
-      </select>
-      <button class="btn" type="submit"{% if demo_mode %} disabled{% endif %}>{{ t('plans.setting.save') }}</button>
-    </form>
-    {% if saved %}<p>{{ t('plans.setting.changed', actor=saved.changed_by, at=saved.changed_at) }}</p>{% endif %}
+    <section class="ssec ssec--first apanel">
+      {{ sec_title(t('home.setting.attention.title'), [t('home.setting.attention.note')], 'home-attention') }}
+      {% if not known %}<p role="alert">{{ t('home.setting.unavailable') }}</p>{% endif %}
+      {% if save_failed %}<p role="alert">{{ t('plans.setting.failed') }}</p>{% endif %}
+      {% if outcome == 'ok' %}<p role="status">{{ t('plans.setting.saved') }}</p>{% endif %}
+      <form class="aform" method="post" action="{{ request.script_root }}/administration/home/settings?lang={{ lang }}">
+        <label for="home-attention-units">{{ t('home.setting.attention.label') }}</label>
+        <select id="home-attention-units" name="attention_units"{% if demo_mode %} disabled{% endif %}>
+          <option value="0"{% if not attention_units %} selected{% endif %}>{{ t('home.setting.off') }}</option>
+          <option value="1"{% if attention_units %} selected{% endif %}>{{ t('home.setting.on') }}</option>
+        </select>
+        <button class="btn btn--sm" type="submit"{% if demo_mode %} disabled{% endif %}>{{ t('plans.setting.save') }}</button>
+      </form>
+      {% if saved %}<p class="ssec__note">{{ t('plans.setting.changed', actor=saved.changed_by, at=saved.changed_at) }}</p>{% endif %}
+    </section>
   </div>
 </div>
 {% endblock %}

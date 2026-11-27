@@ -23,10 +23,12 @@
       if (details.dataset.dialogBound) return;
       details.dataset.dialogBound = '1';
       var panel = details.querySelector('.rt-violations__panel');
-      var trigger = details.querySelector('summary');
-      function close() { details.open = false; trigger.focus(); }
+      // Кнопки «Нарушения» больше нет: открывает плитка, фокус после закрытия возвращается ей.
+      var summary = details.querySelector('summary');
+      function opener() { return document.querySelector('[data-open-violations]') || summary; }
+      function close() { details.open = false; opener().focus(); }
       details.addEventListener('toggle', function () {
-        trigger.setAttribute('aria-expanded', String(details.open));
+        summary.setAttribute('aria-expanded', String(details.open));
         if (details.open) panel.querySelector('[data-close-violations]').focus();
       });
       details.querySelector('[data-close-violations]').addEventListener('click', close);
@@ -82,7 +84,7 @@
       event.preventDefault();
       event.stopPropagation();
       details.open = false;
-      details.querySelector('summary').focus();
+      (document.querySelector('[data-open-violations]') || details.querySelector('summary')).focus();
     }, true);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

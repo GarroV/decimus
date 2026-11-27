@@ -11,6 +11,8 @@
   </header>
   {% if coverage is none %}
     <div class="note note--warn"><div class="note__text">{{ t('coverage.err') }}</div></div>
+  {% elif not coverage.rows %}
+    <p class="ssec__note">{{ t('coverage.none') }}</p>
   {% else %}
     <div class="scover__wrap">
       <table class="scover__table">

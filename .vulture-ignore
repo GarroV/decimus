@@ -841,3 +841,24 @@ inspection_work_add
 inspection_work_file
 # Entry.author_tenant is rendered by inspections/_work.html.
 _.author_tenant
+
+inspection_work_preview
+inspection_repair_submit
+inspection_repair_review
+
+# Flask invokes registered routes and context processors.
+countries_alias
+do_technical_confirm
+methodology_technical
+_feedback_limits
+feedback_send
+feedback_photo
+feedback_review
+feedback_chat
+settings_onboarding
+partner_event_seen
+space_limits_save
+acknowledge
+# Jinja reads these dataclass fields in users/_spaces.html.
+_.frozen_at
+_.is_default

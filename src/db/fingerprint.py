@@ -98,6 +98,8 @@ def _payload(
         # совпали бы там, где информационной части нет, и совместимость стало
         # бы нечем проверить.
         payload["info"] = _info_payload(inspection)
+    if inspection.technical_snapshot is not None:
+        payload["technical_snapshot"] = inspection.technical_snapshot
     return payload
 
 
@@ -135,6 +137,10 @@ def previous_fingerprints(
     никогда. Лишний рецепт стоил бы лишнего запроса на каждом сливе и делал бы
     вид, что где-то лежат строки, которых не существует.
     """
+    # No pre-feature record contains explicit technical confirmations. Matching
+    # it by an older recipe would silently discard this new evidence.
+    if inspection.technical_snapshot is not None:
+        return ()
     return (
         _digest(
             _payload(inspection, score, tenant_code=tenant_code, with_source=False, with_info=False)

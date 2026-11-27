@@ -21,9 +21,9 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, СВОЙ, войти, подменить_двери, собрать
 
-from src.db import bot_links
+from src.db import bot_links, space_limits
 from src.db.errors import AccessError, EmailTakenError
-from src.web import accounts, partner_spaces
+from src.web import accounts, partner_spaces, space_limits_view
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 
@@ -63,6 +63,7 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         "email": [],
         "space": [],
         "countries": [],
+        "limits": [],
     }
 
     def everyone(*, tenant: str | None) -> tuple[Any, ...]:
@@ -95,6 +96,11 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         зовы["countries"].append((code, countries))
         return countries
 
+    def set_limits(code: str, **kw: Any) -> Any:
+        зовы["limits"].append((code, kw))
+
+    monkeypatch.setattr(space_limits, "set_limits", set_limits)
+    monkeypatch.setattr(space_limits_view, "build", lambda code, **_k: None)
     monkeypatch.setattr(accounts, "everyone", everyone)
     monkeypatch.setattr(accounts, "spaces", lambda: ("AM", "GE", "HQ"))
     monkeypatch.setattr(accounts, "add", add)
@@ -149,6 +155,7 @@ def _записи(база: dict[str, list[Any]]) -> dict[str, list[Any]]:
     "email": [],
     "space": [],
     "countries": [],
+    "limits": [],
 }
 
 
@@ -454,6 +461,8 @@ def test_админ_партнёра_ведёт_людей_своего_прос
         # Пространства — не его.
         ("/users/spaces/add", {"code": "KZ", "countries": "KZ"}),
         ("/users/spaces/countries", {"code": "GE", "countries": "AZ"}),
+        # Лимиты — только УК; админ партнёра не поднимет потолок и своему пространству (D759).
+        ("/users/spaces/limits", {"code": "GE", "inspections": "999", "spend": "99999"}),
     ],
 )
 def test_админ_партнёра_вне_своего_пространства_отказ(
@@ -495,10 +504,11 @@ def test_сотрудник_партнёра_и_аудитор_уК_не_упр�
                 ("/users/email", {"login": "gia", "tenant": "GE", "email": "a@b.example"}),
                 ("/users/spaces/add", {"code": "KZ", "countries": "KZ"}),
                 ("/users/spaces/countries", {"code": "GE", "countries": "AZ"}),
+                ("/users/spaces/limits", {"code": "GE", "inspections": "999", "spend": "9"}),
             )
         ]
 
-        assert ответы == [403] * 6
+        assert ответы == [403] * 7
         for чужое in ("gia", "nino", "petr", "@mail.example"):
             assert чужое not in страница, чужое
         assert 'action="/users/add' not in страница
@@ -582,3 +592,65 @@ def test_админ_ук_по_занятой_почте_видит_причин�
 
     assert ответ.status_code == 409
     assert "уже привязана" in ответ.get_data(as_text=True)
+
+
+# --- «Готовность к работе» в карточке пространства (D756) ---------------------
+
+
+def _готовность(monkeypatch: pytest.MonkeyPatch, **факты: bool | None) -> None:
+    from src.web import onboarding, onboarding_facts
+
+    base = {"countries": True, "units": True, "checklist": True} | факты
+    monkeypatch.setattr(onboarding_facts, "space_facts", lambda _t: onboarding.SpaceFacts(**base))
+
+
+def test_у_ук_в_карточке_пространства_три_строки_готовности(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _готовность(monkeypatch, units=False)
+
+    страница = главный.get("/administration?tab=spaces&space_code=GE&lang=ru").get_data(
+        as_text=True
+    )
+
+    assert "Готовность к работе" in страница
+    строки = страница.split("data-readiness-row=")[1:]
+    assert [s.split('"')[1] for s in строки] == ["countries", "units", "checklist"]
+    assert 'data-readiness-row="units" data-state="waiting"' in страница
+    assert 'data-readiness-row="countries" data-state="done"' in страница
+    assert "Пространство готово." not in страница
+
+
+def test_готовое_пространство_подписано_готовым(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _готовность(monkeypatch)
+
+    страница = главный.get("/administration?tab=spaces&space_code=GE&lang=ru").get_data(
+        as_text=True
+    )
+
+    assert "Пространство готово." in страница
+
+
+def test_готовность_не_прочиталась_не_выдаётся_за_нет(
+    главный: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _готовность(monkeypatch, checklist=None)
+
+    страница = главный.get("/administration?tab=spaces&space_code=GE&lang=ru").get_data(
+        as_text=True
+    )
+
+    assert 'data-readiness-row="checklist" data-state="unknown"' in страница
+    assert "не прочиталось" in страница
+
+
+def test_партнёру_готовность_в_его_карточке_не_показывается(
+    админ_GE: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _готовность(monkeypatch)
+
+    страница = админ_GE.get("/administration?tab=spaces&lang=ru").get_data(as_text=True)
+
+    assert "data-readiness" not in страница

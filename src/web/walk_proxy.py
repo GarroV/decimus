@@ -55,6 +55,8 @@ from .walk_auth import (
     START_PATH,
     SUGGEST_ENDPOINT,
     SUGGEST_PATH,
+    TECHNICAL_ENDPOINT,
+    TECHNICAL_PATH,
     TRANSLATE_ENDPOINT,
     TRANSLATE_PATH,
     VOICE_ENDPOINT,
@@ -168,3 +170,4 @@ def install(app: Flask, *, upstream: str | None, ui_lang: str) -> None:
     route(VOICE_PATH, VOICE_ENDPOINT, "POST", max_body=MAX_VOICE_BYTES)
     route(APP_PATH, APP_ENDPOINT, "POST")
     route(START_PATH, START_ENDPOINT, "POST")
+    route(TECHNICAL_PATH, TECHNICAL_ENDPOINT, "POST")

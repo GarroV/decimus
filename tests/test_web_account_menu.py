@@ -177,7 +177,7 @@ def test_в_меню_тема_язык_все_настройки_и_выход_�
     меню = меню[: меню.index("</nav>")] if "</nav>" in меню else меню
 
     assert "data-theme-value" in меню
-    assert "langpill" in меню
+    assert "langsel" in меню
     assert "Все настройки" in меню
     assert '<form class="acct-menu__logout" method="post"' in меню
     for плитка in ("tile=claude", "tile=bot", "tile=google"):
@@ -189,7 +189,7 @@ def test_в_подвале_панели_тема_язык_и_кнопка_нас
     строка = страница[страница.index('class="sidenav__prefs"') :]
     строка = строка[: строка.index('class="sidenav__user"')]
 
-    assert "data-theme-value" in строка and "langpill" in строка
+    assert "data-theme-value" in строка and "langsel" in строка
     assert 'class="sidenav__gear is-current"' in строка, "на «Настройках» кнопка не подсвечена"
     assert 'class="logout"' not in страница, "стрелка выхода осталась в блоке учётки"
 

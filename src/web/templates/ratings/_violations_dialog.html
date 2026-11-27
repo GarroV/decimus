@@ -1,5 +1,6 @@
 <details class="rt-violations" id="source-violations" data-violations-dialog>
-  <summary class="btn btn--sm">{{ t('ratings.d746.open_violations') }}{% if violation_data and violation_data.has_data %} · {{ violation_data.total_cases }}{% endif %}</summary>
+  {#- Кнопки в странице нет: диалог открывает плитка «Нарушений» (`data-open-violations`). -#}
+  <summary hidden>{{ t('ratings.d746.open_violations') }}</summary>
   <div class="rt-violations__panel" role="dialog" aria-modal="true" aria-label="{{ t('ratings.d746.open_violations') }}">
     <header><h2>{{ t('ratings.d746.top_violations') }} · {{ t('ratings.' ~ src.kind) }}</h2><div class="rt-violations__actions"><button class="btn btn--sm" type="button" data-export-violations>{{ t('ratings.d746.export') }}</button><button class="btn btn--sm" type="button" data-close-violations aria-label="{{ t('ratings.d746.close') }}">×</button></div></header>
     <p>{{ calendar.title }} · {% if selection.group == 'country' %}{{ country_name(selection.value) }}{% elif selection.group == 'cluster' %}{{ t('ratings.cluster.' ~ selection.value) }}{% else %}{{ t('ratings.group.' ~ selection.group) }}{% endif %}</p>

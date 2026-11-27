@@ -149,7 +149,8 @@ def test_пилюля_вошедшего_сохраняет_а_до_входа_�
     with собрать(tenant="HQ").test_client() as client:
         вход = client.get(auth.LOGIN_PATH).get_data(as_text=True)
 
-    assert 'class="langpill" method="get"' in вход
+    assert 'class="langsel login__lang" method="get"' in вход
+    assert '<option value="ru" lang="ru"' in вход and ">RU</option>" in вход
 
 
 def test_в_демо_язык_живёт_в_браузере_а_не_в_общей_учётке(

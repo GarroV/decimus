@@ -41,14 +41,15 @@
     if (event.target.name === "country") {
       form.querySelectorAll("[data-trip-unit-picker]").forEach(function (picker) { filterUnits(picker, true); });
     }
-    if (event.target.name === "from" || event.target.name === "to") {
-      form.querySelectorAll('[name="visit_day"]').forEach(function (input) {
-        input.min = form.elements.from.value;
-        input.max = form.elements.to.value;
-      });
-    }
   });
   document.addEventListener("click", function (event) {
+    var date = event.target.closest("input[data-trip-date]");
+    if (date && typeof date.showPicker === "function") {
+      try {
+        date.showPicker();
+        event.preventDefault();
+      } catch (_) { /* Старый браузер сохраняет обычный ввод и системный значок. */ }
+    }
     var add = event.target.closest("[data-trip-visit-add]");
     var remove = event.target.closest("[data-trip-visit-remove]");
     if (add) {
@@ -57,9 +58,8 @@
       if (rows.children.length >= Number(form.dataset.maxSteps)) return;
       var row = form.querySelector("[data-trip-visit-template]").content.cloneNode(true);
       var day = row.querySelector('[name="visit_day"]');
-      day.value = form.elements.from.value;
-      day.min = form.elements.from.value;
-      day.max = form.elements.to.value;
+      var previous = rows.querySelector('[data-trip-visit]:last-child [name="visit_day"]');
+      day.value = (previous && previous.value) || form.elements.from.value;
       rows.appendChild(row);
       init();
       rows.lastElementChild.querySelector("input").focus();

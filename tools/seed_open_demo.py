@@ -43,6 +43,7 @@ import os
 import secrets
 import shutil
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from datetime import date, time, timedelta
 from pathlib import Path
@@ -727,6 +728,26 @@ def _build(
         )
 
 
+def _build_historical(
+    chat_id: int,
+    visit: Visit,
+    unit: Unit,
+    seen: set[str],
+    photos_dir: Path | None,
+) -> None:
+    """Pin historical demo visits before technical evidence was introduced."""
+    current = os.environ["AUDIT_DATA_DIR"]
+    with tempfile.TemporaryDirectory(prefix="demo-historical-") as temporary:
+        data = Path(temporary) / "data"
+        shutil.copytree(seed_demo.DEMO_DATA_DIR, data)
+        (data / "technical_checks.json").unlink(missing_ok=True)
+        os.environ["AUDIT_DATA_DIR"] = str(data)
+        try:
+            _build(chat_id, visit, unit, seen, photos_dir)
+        finally:
+            os.environ["AUDIT_DATA_DIR"] = current
+
+
 def _read_frame(ref: str) -> bytes | None:
     path = upload_file(ref, domain.check_environment())
     return path.read_bytes() if path is not None else None
@@ -919,7 +940,7 @@ def seed() -> int:
     for i, visit in enumerate(sorted(VISITS, key=lambda v: v.date)):
         chat_id = FIRST_CHAT + i
         prior = seen.setdefault(visit.unit, set())
-        _build(chat_id, visit, units[visit.unit], prior, photos_dir)
+        _build_historical(chat_id, visit, units[visit.unit], prior, photos_dir)
         ident = push_inspection(chat_id, allow_unknown_version=True)
         if upload:
             upload_photos(ident, fetch=_read_frame)

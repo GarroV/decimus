@@ -21,7 +21,7 @@ from urllib.parse import urlencode
 
 from flask import abort, render_template, request
 
-from src.db import bot_links
+from src.db import bot_links, partner_events
 from src.db.errors import DbError
 from src.domain.geo import COUNTRIES
 from src.domain.tenants import HQ_TENANT, canonical_tenant
@@ -31,8 +31,11 @@ from . import (
     accounts,
     administration,
     auth,
+    onboarding,
+    onboarding_facts,
     partner_spaces,
     people,
+    space_limits_view,
 )
 from .access_policy import Scope
 from .db_refusal import note_target_mismatch
@@ -302,14 +305,14 @@ def _render_partner_people(
         "users/spaces.html",
         **administration.nav(TAB_SPACES),
         **_people_context(scope, members, members, Filters(off=True), known, {}),
-        tab=TAB_SPACES,
-        partner_spaces=spaces,
-        partner_spaces_known=spaces_known,
-        space_pick=picked,
+        **_space_context(
+            scope,
+            replace(show, space=picked.code if picked else ""),
+            spaces,
+            spaces_known,
+            TAB_SPACES,
+        ),
         space_label=label,
-        space_add=adding,
-        manages_spaces=access_policy.manages_spaces(scope),
-        country_options=country_options(spaces),
         role_choices=lambda row: role_choices(scope, row),
         grantable=lambda space: access_policy.grantable_roles(scope, space),
         show=show,
@@ -349,6 +352,59 @@ def _people_context(
     }
 
 
+def _frozen(круг: Scope | None, вкладка: str) -> tuple[dict[str, Any], bool]:
+    """Замороженные пространства для вкладки «Пространства» и признак «прочиталось».
+
+    Не прочиталось — кнопки заморозки не рисуются: «не заморожено» по умолчанию было бы враньём.
+    """
+    if круг is None or вкладка != TAB_SPACES or not access_policy.manages_spaces(круг):
+        return {}, True
+    try:
+        return dict(partner_spaces.frozen_spaces()), True
+    except DbError as exc:
+        note_target_mismatch(exc)
+        return {}, False
+
+
+def _partner_events(круг: Scope | None, вкладка: str) -> tuple[tuple[Any, ...], int, bool]:
+    """Непросмотренные события пространств партнёров: (строки, всего, прочиталось ли).
+
+    Только тем, кто ведёт пространства (D759): остальным блок не строится вовсе.
+    """
+    вошедший = auth.current_account()
+    if круг is None or вкладка != TAB_PEOPLE or вошедший is None:
+        return (), 0, True
+    if not access_policy.manages_spaces(круг):
+        return (), 0, True
+    try:
+        строки, всего = partner_events.unseen(вошедший.id)
+    except DbError as exc:
+        note_target_mismatch(exc)
+        return (), 0, False
+    return строки, всего, True
+
+
+def _limits_context(
+    круг: Scope | None, пространства: tuple[Any, ...], pick: Any, вкладка: str
+) -> dict[str, Any]:
+    """Лимиты и расход (D759): выбранного пространства и, у админа партнёра, своего.
+
+    Только для тех, кто пространство видит (перечень уже сужен). База молчит — `None`
+    в виде, экран говорит об этом словами, а не рисует нули.
+    """
+    свой = None
+    if круг is not None and круг.kind == access_policy.PARTNER_ADMIN and круг.tenant:
+        свой = space_limits_view.build(canonical_tenant(круг.tenant))
+    выбранное = None
+    if вкладка == TAB_SPACES and pick is not None:
+        выбранное = space_limits_view.build(pick.code)
+    return {
+        "limits_view": выбранное,
+        "limits_asked": вкладка == TAB_SPACES and pick is not None,
+        "own_limits": свой,
+    }
+
+
 def _space_context(
     круг: Scope | None,
     show: Show,
@@ -356,16 +412,43 @@ def _space_context(
     известны: bool,
     вкладка: str,
 ) -> dict[str, Any]:
+    pick = _space_pick(show, пространства)
+    замороженные, заморозка_известна = _frozen(круг, вкладка)
+    события, события_всего, события_известны = _partner_events(круг, вкладка)
     return {
+        "space_frozen": замороженные,
+        "space_frozen_known": заморозка_известна,
+        "partner_events": события,
+        "partner_events_total": события_всего,
+        "partner_events_known": события_известны,
+        **_limits_context(круг, пространства, pick, вкладка),
         "tab": вкладка,
         "partner_spaces": пространства,
         "partner_spaces_known": известны,
         "manages_spaces": круг is not None and access_policy.manages_spaces(круг),
-        "space_pick": _space_pick(show, пространства),
+        "space_pick": pick,
         "space_add": вкладка == TAB_SPACES
         and (show.add_space or request.args.get("add_space") == "1"),
         "country_options": country_options(пространства),
+        "space_readiness": (
+            _space_readiness(вкладка, _space_pick(show, пространства))
+            if круг is not None and access_policy.manages_spaces(круг)
+            else ()
+        ),
     }
+
+
+def _space_readiness(вкладка: str, выбрано: Any) -> tuple[onboarding.Step, ...]:
+    """Готовность выбранного пространства (D756): страны, пиццерии, чек-лист.
+
+    Те же три строки, по которым партнёр видит «ждёт управляющую компанию»: одна функция
+    `onboarding.space_rows`. Показывается управляющей компании (партнёру в своей карточке
+    она ни к чему). Читаем только на вкладке «Пространства», чтобы остальные вкладки не
+    платили за три запроса.
+    """
+    if вкладка != TAB_SPACES or выбрано is None:
+        return ()
+    return onboarding.space_rows(onboarding_facts.space_facts(выбрано.code))
 
 
 def country_options(

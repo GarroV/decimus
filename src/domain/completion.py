@@ -66,7 +66,17 @@ def snapshot(chat_id: int, run_id: str, expected_revision: str) -> Settings:
         kept = edition_snapshot(env, current.checklist_version, current.checklist_code)
         if kept is not None:
             pinned = replace(pinned, data_dir=kept)
-        _commit(dest, _read_raw(source))
+        from .technical import TechnicalRefused, manifest, snapshot_from
+
+        technical = snapshot_from(
+            current, manifest(pinned.data_dir) if current.technical_enabled else []
+        )
+        if technical["required_pending"]:
+            raise TechnicalRefused("pending")
+        raw = _read_raw(source)
+        if technical["enabled"]:
+            raw[DOMAIN_KEY]["technical_snapshot"] = technical
+        _commit(dest, raw)
         for directory in (dest.parent.parent, env.state_dir / JOBS_DIR, env.state_dir):
             _sync_directory(directory)
     return replace(pinned, state_dir=target.state_dir)

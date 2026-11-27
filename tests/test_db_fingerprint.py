@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from src.db.fingerprint import compute_fingerprint
+from src.db.fingerprint import compute_fingerprint, previous_fingerprints
 from src.domain.models import Finding, Inspection, LangTexts, Score
 
 
@@ -62,6 +62,15 @@ def test_одинаковое_содержимое_даёт_одинаковый
     a = compute_fingerprint(_inspection(), _score(), tenant_code="default")
     b = compute_fingerprint(_inspection(), _score(), tenant_code="default")
     assert a == b
+
+
+def test_technical_confirmations_change_archive_identity_without_legacy_collision() -> None:
+    old = _inspection()
+    confirmed = _inspection(technical_snapshot={"enabled": True, "checks": [{"status": "ok"}]})
+    assert compute_fingerprint(old, _score(), tenant_code="HQ") != compute_fingerprint(
+        confirmed, _score(), tenant_code="HQ"
+    )
+    assert previous_fingerprints(confirmed, _score(), tenant_code="HQ") == ()
 
 
 def test_порядок_находок_в_файле_не_влияет_на_отпечаток() -> None:

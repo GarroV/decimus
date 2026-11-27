@@ -17,7 +17,7 @@ import hashlib
 import io
 import logging
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import date
@@ -62,6 +62,7 @@ from src.domain.second_factor import passkey_auto_enroll
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.domain.uploads import MAX_UPLOAD_BYTES
 from src.report import letter_markup
+from src.report.errors import ReportError
 from src.report.info_titles import FOUND
 from src.report.letters import LetterError
 
@@ -83,6 +84,7 @@ from . import (
     guard,
     home_page,
     inspection_followup,
+    inspection_remediation,
     item_labels,
     journal,
     letter_draft,
@@ -90,6 +92,7 @@ from . import (
     navigation,
     notifications,
     oauth,
+    onboarding_screen,
     osb,
     peek,
     photo_upload,
@@ -106,6 +109,7 @@ from . import (
     security_screen,
     settings_screen,
     swarm_api,
+    technical_condition,
     to_inspect,
     training_page,
     ui_lang,
@@ -139,7 +143,7 @@ from .sections import (
     visible_sections,
 )
 from .security_screen import SECURITY_PATH, is_fresh
-from .texts import UI_LANGS, t
+from .texts import UI_LANGS, extra_status, t
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +256,13 @@ def create_app(settings: Settings | None = None) -> Flask:
         conf,
         render_card=lambda ident: _render_card(ident, conf=conf, notice=None, failure=None),
     )
+    inspection_remediation.install(
+        app,
+        conf,
+        render_card=lambda ident: _render_card(ident, conf=conf, notice=None, failure=None),
+    )
     country_filter.install(app)
+    onboarding_screen.install(app)
     country_settings.install(app)
     country_contacts_actions.install(app, conf.ui_lang)
     mailings_screen.install(app, conf.ui_lang)
@@ -338,6 +348,8 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "t": lambda key, **params: t(key, lang, **params),
             # Страна и город в справочнике — коды; на экран они идут словом.
             "city_title": lambda code: city_title(code, lang),
+            # Сырой статус свода («Open») рядом со стадией — только если он что-то добавляет.
+            "extra_status": lambda stage, status: extra_status(stage, status),
             "country_title": lambda code: country_title(code, lang),
             # Дата на экран — месяцем словом: `10.12.2026` путают с октябрём (#963).
             "day": lambda value: human_day(value, lang),
@@ -405,6 +417,8 @@ def _register_context(app: Flask, conf: Settings) -> None:
                 and not conf.demo
                 and account.real is None
             ),
+            # Тур по интерфейсу и ссылка «Начало работы» в меню учётки (D756).
+            **onboarding_screen.shell_context(account, lang),
         }
 
 
@@ -505,13 +519,14 @@ def _pick(
     href: Callable[[str], str],
     title: Callable[[str], str] = str,
     key: str = "",
+    empty_count: int | None = None,
 ) -> Pick:
     """Собрать чип отбора. Вариант «не сужать» всегда первый.
 
     Снять отбор должно быть так же легко, как поставить: если «все» спрятано
     в конце списка или его нет вовсе, человек снимает фильтр правкой адреса.
     """
-    опции = [PickOption(title=empty_title, href=href(""), selected=not current)]
+    опции = [PickOption(title=empty_title, href=href(""), selected=not current, count=empty_count)]
     опции += [
         PickOption(
             title=title(value),
@@ -601,6 +616,10 @@ def _register_country(app: Flask, conf: Settings) -> None:
     @app.get(section("country").path, endpoint="country_index")
     def country_index() -> Any:
         язык = _lang(conf)
+        # Страна в параметре (`?country=XX`, #1606) — на экран этой страны.
+        по_параметру = country_page.country_param_redirect()
+        if по_параметру is not None:
+            return по_параметру
         # Язык переезжает, только если его выбрали в адресе: иначе переход в
         # единственную страну вешал бы `?lang=` умолчания.
         переход = country_page.index_redirect(bool(request.args.get("lang")), язык)
@@ -617,6 +636,11 @@ def _register_country(app: Flask, conf: Settings) -> None:
             kind_title=_kind_title,
             card=_registry_panel(request.args.get("inspection", "").strip()[:64], conf=conf),
         )
+
+    @app.get("/countries")
+    def countries_alias() -> Response:
+        # Старый адрес списка стран (был 404): список теперь — левая колонка «Стран».
+        return redirect(url_for("country_index") + country_page.slice_query(), 301)
 
     @app.get(section("country").path + "/<code>", endpoint="country")
     def country(code: str) -> Any:
@@ -737,12 +761,6 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # «Проверки» открываются всем временем (D487 вернул умолчание D404 поверх
         # D466): месяц прятал проверки, и их искали; месяц — одной кнопкой.
         период = registry_period.read(request.args, today=date.today(), default_all=True)
-        registry_data = data.load_registry(
-            reach=auth.current_reach(),
-            limit=REGISTRY_LIMIT,
-            date_from=период.start,
-            date_to=период.end,
-        )
         отбор_в = registry_view.Filter(
             grade=request.args.get("grade", "").strip().upper()[:1],
             kind=request.args.get("kind", "").strip()[:20],
@@ -756,14 +774,40 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             unchecked=registry_view.UNCHECKED_SHOWN
             and request.args.get("unchecked", "").strip() == "1",
         )
+        registry_data = data.load_registry(
+            reach=auth.current_reach(),
+            limit=REGISTRY_LIMIT,
+            date_from=период.start,
+            date_to=период.end,
+            country=отбор_в.country,
+            city=отбор_в.city,
+            grade=отбор_в.grade,
+            kind=отбор_в.kind,
+            q=отбор_в.q,
+        )
         гео = data.load_geography(reach=auth.current_reach())
 
         def место(row: InspectionRow) -> tuple[str, str]:
             страна_точки, город_точки = гео.get(row.unit_name, ("", ""))
             return страна_точки or "", город_точки or ""
 
-        строки = tuple(row for row in registry_data.rows if отбор_в.keeps(row, место(row)))
+        принятые = (
+            registry_data.accepted if registry_data.accepted is not None else registry_data.rows
+        )
+        строки = tuple(row for row in принятые if отбор_в.keeps(row, место(row)))
         язык = _lang(conf)
+        # Сколько принятых откроется списком: настоящее число по тем же условиям,
+        # а не длина первой страницы (предел `REGISTRY_LIMIT`, #5 «Лимит молчит»).
+        места_счёт = registry_view.place_totals(registry_data, отбор_в, место)
+        принятых_всего = sum(
+            n
+            for (страна_м, город_м), n in места_счёт.items()
+            if (not отбор_в.country or страна_м == отбор_в.country)
+            and (not отбор_в.city or город_м == отбор_в.city)
+        )
+        # Счёт по месту не прочитан (подмена в тестах) или расходится со списком —
+        # верим тому, что видно: подсказки о пределе тогда нет.
+        сколько_принятых = max(принятых_всего, len(строки))
 
         def отбор(**изменения: str) -> str:
             параметры = {**отбор_в.params(), **период.params(), "lang": язык, **изменения}
@@ -787,7 +831,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # по стране (D548), и страна, где всё ещё на приёмке, иначе пропадала из
         # рейла — выбрать её было нельзя (#1047). Буква и вид — только по принятым.
         чипы = _registry_picks(
-            registry_data.rows, отбор_в, место, отбор, язык, review=registry_data.review
+            registry_data.rows,
+            отбор_в,
+            место,
+            отбор,
+            язык,
+            review=registry_data.review,
+            totals=места_счёт,
         )
         # Буква и вид — про проверки, у точек без проверки их нет: чипов нет.
         чипы = tuple(ч for ч in чипы if not отбор_в.unchecked or ч.key in ("country", "city"))
@@ -813,9 +863,15 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             to_check=без_проверки,
             unit_href=lambda item: _unit_href(item, lang=язык),
             review_wait=ждёт_дней,
+            review_classes=registry_view.review_classes_lines(
+                на_приёмке, registry_data.review_classes, язык
+            ),
             rows=строки,
             # Все размерности — в общем компактном блоке над списками.
             picks=чипы,
+            accepted_total=сколько_принятых,
+            accepted_limit=REGISTRY_LIMIT,
+            filters_changed=registry_view.filters_changed(отбор_в, период),
             grade_tone=view.grade_tone,
             kind_title=_kind_title,
             # Чек-лист в строке называется, только когда их в реестре больше
@@ -859,10 +915,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
+        report_language = request.args.get("report_lang")
+        if report_language is not None and report_language not in REPORT_LANGS:
+            abort(400)
         try:
             ref = data.load_report(inspection_id, reach=auth.current_reach())
             if not detail.inspection.is_legacy:
-                ref = data.ensure_report(detail, reach=auth.current_reach())
+                ref = data.ensure_report(detail, reach=auth.current_reach(), lang=report_language)
             if ref is None:
                 return _card_refusal(
                     inspection_id, conf=conf, text=t("card.report.none", lang), status=404
@@ -879,7 +938,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 не_изменён.headers["Cache-Control"] = REPORT_CACHE_CONTROL
                 return не_изменён
             файл = data.report_bytes(ref)
-        except (DbError, LetterError) as exc:
+        except (DbError, LetterError, ReportError) as exc:
             logger.warning("отчёт проверки %s не выдан: %s", inspection_id, exc)
             return _card_refusal(
                 inspection_id, conf=conf, text=t("card.report.failed", lang), status=503
@@ -888,7 +947,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             io.BytesIO(файл),
             mimetype=ref.content_type,
             as_attachment=True,
-            download_name=_report_name(detail.inspection),
+            download_name=data.report_name(
+                detail.inspection, lang=report_language if not detail.inspection.is_legacy else None
+            ),
         )
         ответ.set_etag(метка)
         ответ.headers["Cache-Control"] = REPORT_CACHE_CONTROL
@@ -1024,7 +1085,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         notice: str | None = None
         failure: str | None = None
         try:
-            data.accept_card(
+            document_failures = data.accept_card(
                 inspection_id,
                 tenant=auth.current_tenant(),
                 actor=вошедший.login if вошедший else "",
@@ -1033,7 +1094,40 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             failure = t("accept.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
         else:
             notice = t("accept.done", _lang(conf))
+            if document_failures:
+                failure = t("accept.documents_pending", _lang(conf))
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
+    @app.post(f"{section('registry').path}/<inspection_id>/technical")
+    @guard.action("inspection.revise", object_in_route=True)
+    def do_technical_confirm(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
+        refusal = _permit_inspection("inspection.revise", inspection_id)
+        if refusal is not None:
+            return refusal
+        refuse_foreign_origin()
+        failure = None
+        try:
+            if request.form.get("confirmed") != "1":
+                raise ValueError("technical confirmation required")
+            number = request.form.get("finding_number", "")
+            technical_condition.confirm_review(
+                inspection_id,
+                tenant=auth.current_tenant(),
+                editor=_editor(),
+                check_id=request.form.get("check_id", ""),
+                zone=request.form.get("zone", ""),
+                status=request.form.get("status", ""),
+                reason=request.form.get("reason", ""),
+                finding_number=int(number) if number else None,
+            )
+        except (ValueError, DbError, psycopg.Error):
+            failure = t("technical.failed", _lang(conf))
+        return _render_card(
+            inspection_id,
+            conf=conf,
+            notice=None if failure else t("technical.saved", _lang(conf)),
+            failure=failure,
+        )
 
     @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/revise")
     @guard.action("inspection.revise", object_in_route=True)
@@ -1627,30 +1721,33 @@ def _registry_picks(
     select: Callable[..., str],
     lang: str,
     review: tuple[InspectionRow, ...] = (),
+    totals: Mapping[tuple[str, str], int] | None = None,
 ) -> tuple[Pick, ...]:
     """Чипы отбора реестра — страна, город, буква, вид — со счётом по периоду.
 
-    Страна и город считают и `review` — ждущие приёмки: счёт равен тому, что
-    покажет щелчок (принятые за период плюс блок «На приёмке»).
+    Счёт страны и города — принятые проверки в выбранном периоде и отборе, ровно
+    то, что откроет щелчок по списку «Принятые» (`totals`, #registry-ux). Ждущие
+    приёмки в счёт не входят, но страна или город, где всё ещё на приёмке, остаются
+    в списке с нулём: блок «На приёмке» режется по ним (D548, #1047).
     """
     чипы = []
-    места = rows + review
-    страны = tuple(
-        (код, sum(1 for row in места if place(row)[0] == код))
-        for код in sorted({place(row)[0] for row in места} - {""})
-    )
+    итоги = totals if totals is not None else {}
+    ждущие = {place(row) for row in review}
+    по_странам: dict[str, int] = {}
+    for (код, _), число in итоги.items():
+        по_странам[код] = по_странам.get(код, 0) + число
+    for код, _ in ждущие:
+        по_странам.setdefault(код, 0)
+    страны = tuple((код, по_странам[код]) for код in sorted(по_странам.keys() - {""}))
     # Города — только выбранной страны, как и на «Обзоре».
-    города = tuple(
-        (код, sum(1 for row in места if place(row)[1] == код))
-        for код in sorted(
-            {
-                place(row)[1]
-                for row in места
-                if not current.country or place(row)[0] == current.country
-            }
-            - {""}
-        )
-    )
+    по_городам: dict[str, int] = {}
+    for (код_страны, код), число in итоги.items():
+        if not current.country or код_страны == current.country:
+            по_городам[код] = по_городам.get(код, 0) + число
+    for код_страны, код in ждущие:
+        if not current.country or код_страны == current.country:
+            по_городам.setdefault(код, 0)
+    города = tuple((код, по_городам[код]) for код in sorted(по_городам.keys() - {""}))
     if страны:
         чипы.append(
             _pick(
@@ -1661,6 +1758,7 @@ def _registry_picks(
                 href=lambda значение: select(country=значение, city=""),
                 title=lambda код: country_title(код, lang),
                 key="country",
+                empty_count=sum(итоги.values()),
             )
         )
     if города:
@@ -1833,6 +1931,8 @@ def _card_context(
     без_страны = план_нужен and action_plans.unit_without_country(inspection_id)
     return dict(
         **журнал_обхода,
+        **inspection_remediation.card_context(detail),
+        **technical_condition.card_context(detail, lang=lang, reach=auth.current_reach()),
         **inspection_followup.card_context(
             inspection_id,
             finalized=not detail.inspection.on_review,
@@ -1894,6 +1994,8 @@ def _card_context(
         grade_explain=grade_explain.build(detail, lang),
         loss_zones=view.loss_zones(zone_lines),
         counts=view.count_lines(detail.counts),
+        # Перечень допустимых классов убран из вопроса; класс записи показан отдельно.
+        plain=mview.plain_question,
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
         kind=_kind_title(detail.inspection.kind, lang),
@@ -2013,6 +2115,44 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             ),
         )
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
+
+    @app.post(f"{путь}/items/<code>/technical")
+    @guard.action("checklist.edit")
+    def methodology_technical(code: str) -> str:
+        refuse_foreign_origin()
+        form = request.form
+        fields: dict[str, Any] = {
+            key: (form.get(key) or "").strip()
+            for key in (
+                "title_ru",
+                "title_en",
+                "guidance_ru",
+                "guidance_en",
+                "applicability_ru",
+                "applicability_en",
+                "kind",
+            )
+        }
+        fields.update(
+            zones=form.getlist("zones"),
+            countries=(form.get("countries") or "").upper().replace(",", " ").split(),
+            **{key: form.get(key) == "1" for key in ("enabled", "required", "requires_photo")},
+        )
+        result = _apply(
+            conf,
+            lambda store, author: method.edit_technical(
+                store,
+                tenant=auth.current_tenant(),
+                author=author,
+                code=code,
+                check_id=form.get("check_id", ""),
+                expected_version=form.get("expected_version", ""),
+                fields=fields,
+                version_name=form.get("version_name"),
+                note=form.get("note"),
+            ),
+        )
+        return _render_methodology(conf, notice=result.notice, failure=result.failure, item=code)
 
     @app.post(f"{путь}/items/<code>/disable")
     @guard.action("checklist.edit")
@@ -2440,9 +2580,12 @@ def _render_checklists(conf: Settings, *, notice: str | None, failure: str | Non
         "methodology/checklists.html",
         checklists=перечень,
         states=method.CHECKLIST_STATES,
-        own_space=method.own_space(auth.current_tenant()),
         notice=notice,
         failure=failure,
+        # Состояние меняется только у своих чек-листов:
+        # строки эталона у партнёра и партнёрские у УК — без формы, которая откажет.
+        own_space=method.own_space(auth.current_tenant()),
+        can_create=guard.may("checklist.manage"),
     )
 
 
@@ -2629,6 +2772,10 @@ def _render_methodology(
     # колонке и пропадали, как только выбирали пункт.
     панель = panel or (request.args.get("panel") or "").strip()
     панель = панель if панель in METHODOLOGY_PANELS and not выбран and not новый else ""
+    заводит = guard.may("checklist.manage")
+    if панель == "new" and not заводит:
+        # Создание доступно только ролям с правом checklist.manage.
+        панель = ""
 
     def адрес(**изменения: str) -> str:
         """Адрес этого экрана с тем же чек-листом, версией и отбором.
@@ -2680,6 +2827,12 @@ def _render_methodology(
             )["item"]
         except MethodologyRefused as отказ:
             failure = failure or method.refusal_text(отказ, _lang(conf))
+    technical_points: list[dict[str, Any]] = []
+    if карточка is not None and выбран:
+        try:
+            technical_points = method.load_technical(склад, version=состав.version, code=выбран)
+        except MethodologyRefused as отказ:
+            failure = failure or method.refusal_text(отказ, lang)
     # Разница действующей и свежей записанной — по запросу: чтение каждого
     # пункта целиком дорого, а полоса версии и так говорит, что она есть.
     разница: tuple[mview.Change, ...] | None = None
@@ -2740,6 +2893,8 @@ def _render_methodology(
         # Своё пространство вошедшего: ссылки на чек-листы другого пространства
         # несут его в адресе, а переключатели бота — только у своих (D283).
         own_space=method.own_space(auth.current_tenant()),
+        # Новый чек-лист заводит только УК (D283): у партнёра кнопки нет — дверь откажет.
+        can_create=заводит,
         picking=not _который(request),
         checklist_code=код,
         needs_name=method.needs_set_name(состав),
@@ -2760,12 +2915,14 @@ def _render_methodology(
         plain=mview.plain_question,
         selected=выбран,
         card=карточка,
+        technical_points=technical_points,
         usage=сводка,
         changes=разница,
         route_zones=обход,
         zone_card=зона,
         zone_items=dict(mview.zone_options(состав.items, состав.zones)).get(открыта_зона, 0),
-        adding=новый,
+        # Форма нового пункта — только там, где запись пройдёт (эталон у партнёра — нет).
+        adding=новый and правит,
         panel=панель,
         missing_item=пропал,
         prev_href=адрес(item=раньше) if раньше else None,
@@ -2860,11 +3017,6 @@ def report_etag(ref: ReportRef) -> str:
     """Метка версии отчёта: путь в хранилище, время и размер сохранения (#697)."""
     основа = f"{ref.storage_path}|{ref.created_at.isoformat()}|{ref.size_bytes}"
     return hashlib.sha256(основа.encode()).hexdigest()[:32]
-
-
-def _report_name(head: InspectionRow) -> str:
-    """Имя PDF для скачивания и вложения берётся из одного правила."""
-    return data.report_name(head)
 
 
 def _kind_title(code: str, lang: str) -> str:

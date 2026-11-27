@@ -26,8 +26,9 @@ from flask import redirect as flask_redirect
 from werkzeug.wrappers import Response
 
 from src.domain.features import action_plans_enabled
+from src.domain.tenants import HQ_TENANT
 
-from . import guard, ui_lang
+from . import auth, guard, ui_lang
 from .config import Settings
 from .sections import section
 from .texts import t
@@ -128,6 +129,7 @@ def _page(conf: Settings, tab: str, picked: str, panel: dict[str, Any]) -> dict[
         "panel_retry": screen["select_url"](id=picked),
         "actions_path": section("actions").path,
         "registry_path": section("registry").path,
+        "plans_paused": auth.current_tenant() != HQ_TENANT and not action_plans_enabled(),
     }
 
 

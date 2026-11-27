@@ -195,16 +195,16 @@ def test_главный_админ_видит_блок(главный: FlaskClie
     assert "Словения" in html and "Болгария" in html
     assert "Входа нет" in html
     # D653: каркас «Стран»: строки-ссылки, кнопок в строках и панели без выбора нет.
-    assert 'class="sdtiles"' in html and "<table" not in html and "slist__head" not in html
+    assert "dodois-rail" in html and "<table" not in html and "slist__head" not in html
     assert "Сгенерировать ссылку" not in html and 'class="stile' not in html
     assert 'class="sdrawer' not in html
     # Плитка страны: код крупно, огонёк — серый, пока входа нет (зелёный ок, красный сбой).
     плитка = re.search(
-        r'<a class="shealth__tile sdtile" id="dodois-SI" href="[^"]*country=SI"[^>]*>(.*?)</a>',
+        r'id="dodois-SI">\s*<a [^>]*country=SI[^>]*>(.*?)</a>',
         html,
         re.S,
     )
-    assert плитка and "shealth__dot--grey" in плитка.group(1) and ">SI</b>" in плитка.group(1)
+    assert плитка and "shealth__dot--grey" in плитка.group(1) and ">SI</span>" in плитка.group(1)
 
 
 def test_огонёк_плитки_зелёный_красный_серый(
@@ -224,7 +224,7 @@ def test_огонёк_плитки_зелёный_красный_серый(
     html = главный.get(ВКЛАДКА).get_data(as_text=True)
 
     def огонёк(код: str) -> str:
-        плитка = re.search(rf'id="dodois-{код}"[^>]*>(.*?)</a>', html, re.S)
+        плитка = re.search(rf'id="dodois-{код}">\s*<a [^>]*>(.*?)</a>', html, re.S)
         assert плитка, код
         return re.search(r"shealth__dot--(\w+)", плитка.group(1)).group(1)  # type: ignore[union-attr]
 
@@ -250,11 +250,11 @@ def test_на_плитке_видно_за_кем_вход_и_контур_по_
     html = главный.get(ВКЛАДКА).get_data(as_text=True)
 
     def плитка(код: str) -> str:
-        found = re.search(rf'id="dodois-{код}"[^>]*>(.*?)</a>', html, re.S)
+        found = re.search(rf'id="dodois-{код}">\s*<a [^>]*>(.*?)</a>', html, re.S)
         assert found, код
         return found.group(1)
 
-    assert "Ana Novak" in плитка("SI") and "sdtile__who" in плитка("SI")
+    assert "Ana Novak" in плитка("SI")
     assert "ops@dodo.bg" in плитка("BG")
     assert "СНГ" in плитка("BG") or "CIS" in плитка("BG")
     assert "СНГ" not in плитка("SI") and "CIS" not in плитка("SI")
@@ -280,7 +280,8 @@ def test_блок_не_остался_во_вкладке_подключения
 def test_вкладка_стоит_после_подключений_и_ключей(главный: FlaskClient) -> None:
     html = главный.get(ВКЛАДКА).get_data(as_text=True)
     assert 'aria-current="page"' in html
-    вкладки = re.findall(r'class="pk-item[^"]*" href="[^"]*\?tab=(\w+)', html)
+    меню = html.split("sadmin__nav", 1)[1].split("</nav>", 1)[0]  # строки стран ниже тоже pk-item
+    вкладки = re.findall(r'class="pk-item[^"]*" href="[^"]*\?tab=(\w+)', меню)
     assert вкладки[-3:] == ["connections", "keys", "dodois"]
 
 
