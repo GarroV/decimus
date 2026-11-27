@@ -13,7 +13,7 @@ from decimal import Decimal as D
 from src.db import dodois_metrics as dm
 from src.domain import dodois_metrics as parse
 from src.domain import quality as q
-from src.web import quality_data
+from src.ratings import quality_data
 
 U = "000d3a23750ca95c11e915ab0763c302"
 SEPTEMBER = date(2026, 9, 1)

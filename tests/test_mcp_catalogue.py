@@ -195,6 +195,8 @@ from src.mcp.catalogue import (
 
 #: Чтение рейтингов (D420): открыто любому токену, охват ставит обработчик; записи нет.
 ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ = {
+    "sales_summary",
+    "quality_summary",
     "ratings_summary",
     "ratings_units",
     "ratings_unit_periods",
@@ -240,6 +242,8 @@ from src.mcp.catalogue import (
 #: открыл бы правку эталона под видом чтения. Список — тот же явный якорь, что
 #: у `ИМЕНА_ЧИТАЮЩИХ_ИСТОРИЮ` чуть выше, и для того же риска.
 ИМЕНА_ЧИТАЮЩИХ_МЕТОДИКУ = {
+    "sales_summary",
+    "quality_summary",
     "checklists",
     "checklist_meta",
     "checklist_versions",
@@ -265,7 +269,7 @@ def test_каталог_содержит_ровно_восемьдесят_ин�
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 83
+    assert len(TOOLS) == 85
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -467,7 +471,7 @@ def test_as_list_отдаёт_ровно_четыре_нужных_ключа_н
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 83
+    assert len(перечень) == 85
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema", "annotations"}
 

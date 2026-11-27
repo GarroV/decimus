@@ -5,7 +5,7 @@ from decimal import Decimal as D
 
 from src.db.dodois_metrics import UnitKr
 from src.domain.quality import Orders
-from src.web.quality_data import UnitHealth, _fold_unit
+from src.ratings.quality_data import UnitHealth, _fold_unit
 
 
 def month(score: str | None, count: int, *, total: str = "50") -> UnitHealth:

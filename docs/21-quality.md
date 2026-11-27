@@ -114,7 +114,7 @@
 (сумма внутри `products`, форма в документации не расписана), поэтому `unit_aggregator_month.revenue`
 пуста, а страница показывает заказы и доли.
 
-Сборка входов — `src/web/quality_data.py`, ячейки — `src/web/quality_cells.py`, экран —
+Сборка входов — `src/ratings/quality_data.py`, ячейки — `src/web/quality_cells.py`, экран —
 `src/web/quality_page.py`, шаблон `templates/quality/index.html`, стили
 `static/decimus-quality.css`, тексты `src/web/texts_quality.py`.
 

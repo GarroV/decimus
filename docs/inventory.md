@@ -298,7 +298,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **83** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 7, letter — 2, move — 1, plan — 11, ratings — 2, ratings_read — 5, retraction — 1).
+Всего **85** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 7, letter — 2, move — 1, plan — 11, ratings — 2, ratings_read — 7, retraction — 1).
 
 | Инструмент | Вид | Класс | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|---|
@@ -381,9 +381,11 @@
 | `request_aggregators_update` | ratings | write | Запросить внеочередное обновление оценок пиццерий в агрегаторах доставки (Wolt, Glovo, Bolt Food, Yemeksepeti, Trendyol… | `src/mcp/ratings_tools.py` |
 | `aggregators_status` | ratings_read | read | Состояние сбора оценок в агрегаторах доставки: по каждому — когда был последний сбор, чем кончился (ok, failed или… | `src/mcp/ratings_read.py` |
 | `dodois_status` | ratings_read | read | Состояние подключений Dodo IS по странам: подключена ли страна, когда привязана, через кого, состояние и причина, когда… | `src/mcp/dodois_read.py` |
+| `quality_summary` | ratings_read | read | Read the full monthly Quality page data by country and pizzeria: RS/RKO, customer ratings (overall and dine-in/delivery… | `src/mcp/ratings_read.py` |
 | `ratings_summary` | ratings_read | read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
 | `ratings_unit_periods` | ratings_read | read | Разбивка одной пиццерии по периодам рейтинга РС и РКО — рейтингов Dodo из таблицы контроля «база рейтингов» и выгрузок… | `src/mcp/ratings_read.py` |
 | `ratings_units` | ratings_read | read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
+| `sales_summary` | ratings_read | read | Read monthly Dodo IS sales by country and pizzeria: revenue with currency, orders, average check… | `src/mcp/ratings_read.py` |
 | `retract_inspection` | retraction | destructive | Retract a finalized inspection from the history | `src/mcp/retraction.py` |
 <!-- map:end -->
 
@@ -440,8 +442,8 @@
 | `DB_POOL_MAX` | `src/db/pool.py` | да |
 | `DB_POOL_TIMEOUT_S` | `src/db/pool.py` | да |
 | `DB_STATEMENT_TIMEOUT_S` | `src/db/timeouts.py` | да |
-| `DECIMUS_MCP_TOKEN` | `tools/mcp_outside.py` | да |
-| `DECIMUS_MCP_URL` | `tools/mcp_outside.py` | да |
+| `DECIMUS_MCP_TOKEN` | `tools/mcp_business_smoke.py`, `tools/mcp_outside.py` | да |
+| `DECIMUS_MCP_URL` | `tools/mcp_business_smoke.py`, `tools/mcp_outside.py` | да |
 | `DECIMUS_TECHNICAL_SNAPSHOT` | `engine/report.py` | нет — путь временного закреплённого снимка, передаётся подпроцессу отчёта |
 | `DEMO_PHOTOS_DIR` | `tools/seed_open_demo.py` | да |
 | `DEMO_STATE_DIR` | `tools/seed_demo.py` | да |
@@ -473,6 +475,9 @@
 | `MCP_PORT` | `src/mcp/config.py` | да |
 | `MCP_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/oauth_smoke.py` | да |
 | `MCP_RETRACTION_TOKENS` | `src/mcp/config.py` | да |
+| `MCP_SMOKE_COUNTRY` | `tools/mcp_business_smoke.py` | да |
+| `MCP_SMOKE_FORBIDDEN_COUNTRY` | `tools/mcp_business_smoke.py` | да |
+| `MCP_SMOKE_MONTH` | `tools/mcp_business_smoke.py` | да |
 | `MCP_TOKENS` | `src/mcp/config.py` | да |
 | `MCP_TOKEN_TTL_DAYS` | `src/db/mcp_access.py` | да |
 | `MCP_TRUSTED_PROXIES` | `src/mcp/config.py` | да |

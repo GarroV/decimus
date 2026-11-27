@@ -56,6 +56,8 @@ from src.mcp.errors import McpError
 #: Годные аргументы каждого инструмента: доводят до успеха там, где стенд
 #: собран, и до отказа окружения там, где он сломан.
 ГОДНЫЕ: dict[str, dict[str, Any]] = {
+    "sales_summary": {},
+    "quality_summary": {},
     # Страна не из словаря: отказ правила имени до записи — стенд не пополняется.
     "create_unit": {"country": "XX", "name": "Белград-1"},
     "import_create_inspection": {
@@ -309,6 +311,10 @@ from src.mcp.errors import McpError
 #: Инструменты методики здесь отказывают ДО движка намеренно: отказ движка
 #: стоит трёх подпроцессов, а годные аргументы через него и так проходят.
 НЕГОДНЫЕ: dict[str, dict[str, Any]] = {
+    "sales_summary": {"month": "invalid"},
+    "quality_summary": {"month": "invalid"},
+    "sales_summary": {},
+    "quality_summary": {},
     "create_unit": {"country": "XX", "name": "Белград-1"},
     "import_create_inspection": {
         "unit": "Белград-1",

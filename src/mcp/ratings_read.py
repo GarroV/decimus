@@ -75,6 +75,40 @@ _GROUP_VALUES = ("imf", "cluster", "developer", "country")
 _HEX32_LEN = 32
 
 
+def sales_summary(
+    *,
+    tenant: str,
+    month: str | None = None,
+    country: str | None = None,
+    unit: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict[str, object]:
+    """Продажи из общей с вебом модели, с тем же охватом, что рейтинги."""
+    from .business_read import sales_summary as read_sales
+
+    return read_sales(
+        tenant=tenant, month=month, country=country, unit=unit, limit=limit, offset=offset
+    )
+
+
+def quality_summary(
+    *,
+    tenant: str,
+    month: str | None = None,
+    country: str | None = None,
+    unit: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict[str, object]:
+    """Полная месячная сводка «Качества» без доступа к содержимому проверок."""
+    from .business_read import quality_summary as read_quality
+
+    return read_quality(
+        tenant=tenant, month=month, country=country, unit=unit, limit=limit, offset=offset
+    )
+
+
 @contextmanager
 def _ratings() -> Iterator[None]:
     """Отказ окружения базы и самой базы — отказом инструмента, а не сбоем разбора."""

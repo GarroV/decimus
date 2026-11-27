@@ -66,6 +66,8 @@ TOOL_CLASSES: dict[str, ToolClass] = {
     "ratings_summary": _read(),
     "ratings_units": _read(),
     "ratings_unit_periods": _read(),
+    "sales_summary": _read(),
+    "quality_summary": _read(),
     "aggregators_status": _read(),
     "dodois_status": _read(),
     # Чтение при загрузке проверки (подбор пункта сам ничего не пишет).

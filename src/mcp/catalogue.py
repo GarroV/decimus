@@ -2237,6 +2237,65 @@ TOOLS: tuple[ToolSpec, ...] = (
         kind=KIND_RATINGS,
     ),
     ToolSpec(
+        name="sales_summary",
+        description=(
+            "Read monthly Dodo IS sales by country and pizzeria: revenue with currency, orders, "
+            "average check, dine-in/takeaway/delivery breakdown and order-source shares. "
+            "Includes previous month and the same month last year; countries' currencies are "
+            "never added together. Uses the same sales calculation as the Quality page. "
+            "month is YYYY-MM (defaults to current), country is ISO code, unit is an id or name "
+            "substring. Missing data is null, not zero. Current-month changes are suppressed "
+            "because comparison months are complete. limit/offset paginate units; next_offset "
+            "is null on the final page. Read-only; partner sees only its assigned countries. "
+            "For customer ratings, Google/Yandex maps and quality scores use quality_summary; "
+            "for inspections use list_inspections/get_inspection."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "month": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$"},
+                "country": {"type": "string", "minLength": 2, "maxLength": 2},
+                "unit": {"type": "string", "minLength": 1, "maxLength": 200},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50},
+                "offset": {"type": "integer", "minimum": 0, "maximum": 100000, "default": 0},
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=ratings_read.sales_summary,
+        kind=KIND_RATINGS_READ,
+        writes=False,
+    ),
+    ToolSpec(
+        name="quality_summary",
+        description=(
+            "Read the full monthly Quality page data by country and pizzeria: RS/RKO, "
+            "customer ratings (overall and dine-in/delivery counts), Google and Yandex maps, "
+            "aggregators with native and normalized scales, order-source shares, weights and "
+            "overall quality score. Includes previous month and the same month last year. "
+            "month is YYYY-MM (defaults to current); country is ISO code, unit is an id or "
+            "name substring. limit/offset paginate units; next_offset is null at the end. "
+            "Read-only, same calculations as the website and same country scope as ratings. "
+            "For sales and average check use sales_summary; for inspection findings use "
+            "list_inspections/get_inspection; for RS/RKO periods use ratings_unit_periods."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "month": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$"},
+                "country": {"type": "string", "minLength": 2, "maxLength": 2},
+                "unit": {"type": "string", "minLength": 1, "maxLength": 200},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50},
+                "offset": {"type": "integer", "minimum": 0, "maximum": 100000, "default": 0},
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=ratings_read.quality_summary,
+        kind=KIND_RATINGS_READ,
+        writes=False,
+    ),
+    ToolSpec(
         name="ratings_summary",
         description=(
             "РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, "
