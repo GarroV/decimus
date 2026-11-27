@@ -126,6 +126,9 @@ class _Unit:
     orders: q.Orders
     channels: dict[str, Decimal]
     currency: str | None
+    #: Заказы из строк продаж — только те, у которых есть выручка. Средний чек делится на них:
+    #: счёт агрегаторов без выручки (`unit_aggregator_orders`) занизил бы чек.
+    paid_orders: int
 
 
 def _units(
@@ -143,6 +146,7 @@ def _units(
             sv.unit_orders(own, agg_total),
             channels,
             next((s.currency for s in own if s.currency), None),
+            sum(s.orders for s in own),
         )
     return out
 
@@ -152,10 +156,11 @@ class _Total:
     revenue: Decimal
     orders: q.Orders
     channels: dict[str, Decimal]
+    paid_orders: int
 
     @property
     def avg_check(self) -> Decimal | None:
-        return sv.avg_check(self.revenue, self.orders.total)
+        return sv.avg_check(self.revenue, self.paid_orders)
 
 
 def _total(units: Sequence[_Unit]) -> _Total:
@@ -171,6 +176,7 @@ def _total(units: Sequence[_Unit]) -> _Total:
             sum(u.orders.other for u in units),
         ),
         dict(channels),
+        sum(u.paid_orders for u in units),
     )
 
 
@@ -245,7 +251,7 @@ def _unit_row(
         "currency": unit.currency,
         "revenue": _money(unit.revenue),
         "orders": unit.orders.total,
-        "avg_check": _money(sv.avg_check(unit.revenue, unit.orders.total)),
+        "avg_check": _money(sv.avg_check(unit.revenue, unit.paid_orders)),
         "revenue_dine_in": _money(unit.channels.get("dine_in")),
         "revenue_delivery": _money(unit.channels.get("delivery")),
         "prev_month_revenue": None if before is None else _money(before.revenue),
