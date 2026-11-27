@@ -21,7 +21,11 @@ def rpc(url: str, token: str, method: str, params: dict[str, Any]) -> dict[str, 
     request = urllib.request.Request(  # noqa: S310 — scheme checked above
         url,
         json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode(),
-        {"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "User-Agent": "decimus-business-smoke/1",
+        },
     )
     with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 — checked URL
         answer = json.load(response)
