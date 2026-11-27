@@ -809,6 +809,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/mcp/retraction.py` | Инструмент «отклонить проверку из истории» (T211, решения D086 и D089) |
 | `src/mcp/route.py` | Порядок обхода точки: правка `route.csv` через агента (T317, хвост T313) |
 | `src/mcp/rpc.py` | Разбор сообщений MCP: JSON-RPC 2.0 поверх одного POST-запроса |
+| `src/mcp/sales_read.py` | Продажи пиццерий Dodo IS через Claude: `sales_summary` (только чтение) |
 | `src/mcp/scoring.py` | Ставки вычетов и начальный процент версии методики — чтение (T348) |
 | `src/mcp/server.py` | Транспорт MCP-сервера: HTTP на локальной петле, личный токен в заголовке |
 | `src/mcp/suggestions.py` | Предложения для управляющей компании: где модель промахнулась и что дописать в карту слов |
@@ -1127,6 +1128,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/revision.py` | Отпечаток состояния проверки: поймать правку между «увидел» и «запечатал» |
 | `src/domain/revisions.py` | Stable record identity shared by manual edits and human splits |
 | `src/domain/route.py` | Маршрут обхода: в каком порядке аудитор идёт по зонам и по пунктам внутри них |
+| `src/domain/sales_view.py` | Продажи пиццерий Dodo IS: разбор источника и канала, заказы по группам, выручка, средний чек |
 | `src/domain/scoring.py` | Оценка проверки |
 | `src/domain/second_factor.py` | Вторая ступень входа (D463): правила без базы и без веба |
 | `src/domain/service_keys.py` | Реестр ключей внешних сервисов, которые главный админ ставит на экране (D576, #906) |

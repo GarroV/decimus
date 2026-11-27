@@ -83,6 +83,7 @@ ratings_summary(group_by?, value?, period?, date_from?, date_to?)   # РС и Р
 ratings_units(country?, city?, unit?, period?, date_from?, date_to?, limit?)   # пиццерии: РС, РКО, карта Google, агрегаторы (as_of, stale)
 ratings_unit_periods(unit, rating_type?, period?, date_from?, date_to?)   # одна пиццерия по периодам РС и РКО: балл, флаги Д3, загрузка, period_open (#958)
 aggregators_status()                       # последний сбор, исход, ошибка, заявка в очереди
+sales_summary(country?, month?, by_unit?, limit?)   # продажи Dodo IS за месяц: выручка, заказы, средний чек, доли, сравнения; те же числа, что «Качество» (src/domain/sales_view.py); валюты не складываются, идущий месяц не сравнивается
 
 # электронный план исправлений (#1168, D620) — вид KIND_PLAN: всё, что веб и бот, делается и здесь
 list_action_plans(status?, country?, limit?)   # по строке на план: статус, срок, overdue, строки по статусам; без status — открытые

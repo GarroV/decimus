@@ -20,6 +20,8 @@ _INSTRUCTIONS_RU = "\n".join(
         "Оценку не считай сам: проценты, букву и разбивку по зонам бери из ответа get_inspection.",
         "Рейтинги РС и РКО (рейтинги Dodo, не наши проверки): ratings_summary, ratings_units, "
         "ratings_unit_periods; сбор оценок в агрегаторах: aggregators_status.",
+        "Продажи пиццерий из Dodo IS (выручка, заказы, средний чек, сравнения): sales_summary. "
+        "Выручку разных валют не складывай.",
         "Планы исправлений: list_action_plans, get_action_plan. Управляющая компания "
         "принимает и возвращает план и строки (accept_action_plan, return_action_plan, "
         "confirm_plan_row, return_plan_row, set_plan_count_from); партнёр заполняет строки и "
@@ -47,6 +49,8 @@ _INSTRUCTIONS_EN = "\n".join(
         "SS and CX ratings (Dodo ratings, not our inspections): ratings_summary, "
         "ratings_units, ratings_unit_periods; delivery-aggregator collection: "
         "aggregators_status.",
+        "Pizzeria sales from Dodo IS (revenue, orders, average check, comparisons): "
+        "sales_summary. Never add up revenue across currencies.",
         "Correction plans: list_action_plans, get_action_plan. The management company "
         "accepts and returns a plan and its rows (accept_action_plan, return_action_plan, "
         "confirm_plan_row, return_plan_row, set_plan_count_from); the partner fills rows and "

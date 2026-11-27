@@ -43,6 +43,7 @@ from . import (
     ratings_read,
     ratings_tools,
     retraction,
+    sales_read,
     tools,
 )
 from .annotations import annotations_for
@@ -2416,6 +2417,52 @@ TOOLS: tuple[ToolSpec, ...] = (
             "additionalProperties": False,
         },
         handler=dodois_read.dodois_status,
+        kind=KIND_RATINGS_READ,
+    ),
+    ToolSpec(
+        name="sales_summary",
+        description=(
+            "Продажи пиццерий из Dodo IS за месяц: выручка, заказы, средний чек, выручка зала "
+            "и доставки, доли заказов агрегаторов, приложения и сайта — по странам, а по "
+            "просьбе и по пиццериям. Те же числа, что на странице «Качество»; собираются "
+            "ботом ежечасно, loaded_at — последняя удачная загрузка продаж страны. Звать на "
+            "«какая выручка в Сербии», «кто в Турции продаёт больше всех», «как изменились "
+            "заказы к прошлому году». Рядом с каждой страной — prev_month и "
+            "same_month_last_year (выручка, заказы, средний чек и их движение в процентах; "
+            "нет месяца в базе — null). Аргументы: country — код страны, не задан — все "
+            "страны охвата; month — ГГГГ-ММ, не задан — текущий; by_unit — добавить список "
+            "пиццерий (по стране, затем по выручке по убыванию), не больше limit (1–200, "
+            "по умолчанию 50), 'truncated' говорит, что есть ещё. Правила: выручка в разных "
+            "валютах не складывается — общего итога выручки по сети нет, заказы по сети "
+            "есть (network_orders); если month_open — месяц ещё идёт, данные неполные, и "
+            "сравнения с прошлыми месяцами не считаются (null). Партнёру показываются только "
+            "страны его пространства."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string",
+                    "description": "Код страны из двух букв, например RS; не задан — все.",
+                },
+                "month": {
+                    "type": "string",
+                    "description": "Месяц, ГГГГ-ММ, например 2026-09; не задан — текущий.",
+                },
+                "by_unit": {
+                    "type": "boolean",
+                    "description": "Добавить список пиццерий; по умолчанию false.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Сколько пиццерий вернуть, от 1 до 200; по умолчанию 50.",
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=sales_read.sales_summary,
         kind=KIND_RATINGS_READ,
     ),
 )

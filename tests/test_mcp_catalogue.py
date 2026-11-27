@@ -204,6 +204,9 @@ from src.mcp.catalogue import (
 #: Подключения Dodo IS: вид тот же (чтение), но право — действие `keys.manage`, не `ratings.read`.
 ИМЯ_СТАТУСА_DODOIS = "dodois_status"
 
+#: Продажи Dodo IS: вид тот же (чтение), обработчик свой — `src.mcp.sales_read`.
+ИМЯ_ПРОДАЖ = "sales_summary"
+
 ИМЕНА_ИНСТРУМЕНТОВ = (
     ИМЕНА_ИНСТРУМЕНТОВ_ПРОВЕРОК
     | ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ
@@ -217,7 +220,7 @@ from src.mcp.catalogue import (
     | ИМЕНА_ИНСТРУМЕНТОВ_ПИСЬМА
     | ИМЕНА_ИНСТРУМЕНТОВ_ПЛАНА
     | ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ
-    | {ИМЯ_СТАТУСА_DODOIS}
+    | {ИМЯ_СТАТУСА_DODOIS, ИМЯ_ПРОДАЖ}
 )
 
 #: Кто ходит в базу проверок. Инструменты проверок — все, и с ними один
@@ -259,13 +262,14 @@ def test_каталог_содержит_ровно_восемьдесят_ин�
     инструмент, к которому агент внезапно теряет доступ.
     42 + 9 загрузки (D305) + 2 управления рейтингами (D320, D420) + 3 чтения
     рейтингов (D420) + 1 разбивка по периодам (#958) + 11 плана исправлений (#1168)
-    + 2 снятия кадров (D627) + 1 сохранение письма (D665) + 1 подключения Dodo IS."""
+    + 2 снятия кадров (D627) + 1 сохранение письма (D665) + 1 подключения Dodo IS
+    + 1 продажи Dodo IS."""
     сверить(
         "tests/test_mcp_catalogue.py: ИМЕНА_ИНСТРУМЕНТОВ_*",
         ИМЕНА_ИНСТРУМЕНТОВ,
         {spec.name for spec in TOOLS},
     )
-    assert len(TOOLS) == 83
+    assert len(TOOLS) == 84
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:
@@ -360,7 +364,7 @@ def test_вид_инструмента_соответствует_его_гру�
             assert spec.kind == KIND_PLAN, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ:
             assert spec.kind == KIND_RATINGS, spec.name
-        elif spec.name in ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ | {ИМЯ_СТАТУСА_DODOIS}:
+        elif spec.name in ИМЕНА_ЧТЕНИЯ_РЕЙТИНГОВ | {ИМЯ_СТАТУСА_DODOIS, ИМЯ_ПРОДАЖ}:
             assert spec.kind == KIND_RATINGS_READ, spec.name
         else:
             assert spec.kind == KIND_INSPECTIONS, spec.name
@@ -446,6 +450,8 @@ def test_обработчик_взят_из_правильного_модуля(
             assert spec.handler.__module__ == "src.mcp.ratings_read", spec.name
         elif spec.name == ИМЯ_СТАТУСА_DODOIS:
             assert spec.handler.__module__ == "src.mcp.dodois_read", spec.name
+        elif spec.name == ИМЯ_ПРОДАЖ:
+            assert spec.handler.__module__ == "src.mcp.sales_read", spec.name
         else:
             assert spec.handler.__module__ == tools_module.__name__, spec.name
 
@@ -467,7 +473,7 @@ def test_as_list_отдаёт_ровно_четыре_нужных_ключа_н
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 83
+    assert len(перечень) == 84
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema", "annotations"}
 

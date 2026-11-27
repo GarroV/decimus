@@ -298,7 +298,7 @@
 ## Инструменты MCP
 
 <!-- map:begin mcp -->
-Всего **83** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 7, letter — 2, move — 1, plan — 11, ratings — 2, ratings_read — 5, retraction — 1).
+Всего **84** инструментов (checklist — 33, checklist_source — 2, import — 19, inspections — 7, letter — 2, move — 1, plan — 11, ratings — 2, ratings_read — 6, retraction — 1).
 
 | Инструмент | Вид | Класс | Что делает (описание для агента) | Обработчик |
 |---|---|---|---|---|
@@ -384,6 +384,7 @@
 | `ratings_summary` | ratings_read | read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
 | `ratings_unit_periods` | ratings_read | read | Разбивка одной пиццерии по периодам рейтинга РС и РКО — рейтингов Dodo из таблицы контроля «база рейтингов» и выгрузок… | `src/mcp/ratings_read.py` |
 | `ratings_units` | ratings_read | read | РС и РКО — рейтинги Dodo из таблицы контроля «база рейтингов» и выгрузок Dodo IS, а не наши выездные проверки по… | `src/mcp/ratings_read.py` |
+| `sales_summary` | ratings_read | read | Продажи пиццерий из Dodo IS за месяц: выручка, заказы, средний чек, выручка зала и доставки, доли заказов агрегаторов… | `src/mcp/sales_read.py` |
 | `retract_inspection` | retraction | destructive | Retract a finalized inspection from the history | `src/mcp/retraction.py` |
 <!-- map:end -->
 
