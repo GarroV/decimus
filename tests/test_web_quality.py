@@ -412,7 +412,7 @@ def _registry_only_units(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_unit_with_only_aggregator_or_map_rating_is_not_lost(
     monkeypatch: pytest.MonkeyPatch, чтения: None
 ) -> None:
-    from src.web import quality_data
+    from src.ratings import quality_data
 
     _registry_only_units(monkeypatch)
     found = quality_data.load_month(Reach("HQ", None, ("BG",)), ("BG",), MONTH)["BG"]
@@ -493,7 +493,7 @@ def test_compact_top_has_one_h1_no_kicker_and_filters_in_strip(ук: FlaskClient
 
 def test_country_filter_keeps_period_and_sort(ук: FlaskClient) -> None:
     html = ук.get("/quality?month=2026-09&sort=total&dir=desc").get_data(as_text=True)
-    select = _between(html, "<select", "</select>")
+    select = _between(html, '<select class="pickselect" data-pick-nav', "</select>")
 
     assert "country=PL" in select and "from=2026-09-01" in select
     assert "sort=total" in select and "dir=desc" in select
@@ -569,7 +569,7 @@ def test_filters_in_english(ук: FlaskClient) -> None:
 def test_period_sums_orders_and_revenue_and_shares_come_from_the_sums(
     monkeypatch: pytest.MonkeyPatch, чтения: None
 ) -> None:
-    from src.web import quality_data
+    from src.ratings import quality_data
 
     october = date(2026, 10, 1)
     monkeypatch.setattr(

@@ -135,7 +135,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{space_limits_view,onboarding_tour,onboarding_screen,onboarding_facts,onboarding,feedback_telegram,feedback,unit_links,trip_dates,technical_condition,plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_scope,ratings_trends,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,inspection_followup,inspection_remediation,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_data,quality_cells}.py -->
+<!-- map:begin files src/web/{space_limits_view,onboarding_tour,onboarding_screen,onboarding_facts,onboarding,feedback_telegram,feedback,unit_links,trip_dates,technical_condition,plan_archive,action_plans,plan_roundtrip,plan_rows,plan_sheet,actions_columns,actions_screen,osb,calendar_screen,calendar_view,country,country_filter,country_page,country_settings,country_contacts_actions,countries_screen,mailings_screen,mailings_template,mailing_copy,country_summary,country_units,edition,geo_names,google_mail,grade_explain,connect_reminder,home_board,item_labels,home_page,home_settings,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,batch_letter,methodology,methodology_view,overview,plan_template,prescriptions,proofread,ratings,ratings_scope,ratings_trends,ratings_calendar,ratings_freshness,ratings_line,ratings_risk,ratings_sheet,ratings_nav,ratings_platforms,ratings_words,inspection_timeline,inspection_followup,inspection_remediation,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card,training_page,quality_page,quality_cells}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: вкладка «Экшн-планы» раздела «Действия» (волна 2, D263–D274, D526) |
@@ -190,7 +190,6 @@ Flask-приложение управляющей компании и партн
 | `src/web/prescriptions.py` | Предписания в вебе: вкладка «Предписания» «Действий» и записи (D266, D270, D275, D526, D599) |
 | `src/web/proofread.py` | «Добавить нарушение» на вычитке: подбор пункта по словам и кадрам (D535) |
 | `src/web/quality_cells.py` | Ячейки таблицы «Качества»: текст значения, движение к прошлому месяцу, подсветка |
-| `src/web/quality_data.py` | Сборка данных «Качества» за месяц: из чтений — пиццерии и страны (docs/21-quality.md) |
 | `src/web/quality_page.py` | Экран «Качество»: рабочая страница здоровья по странам и пиццериям за период |
 | `src/web/ratings.py` | Раздел «Рейтинги» (спека 2026-10-08) и подраздел «Загрузки» |
 | `src/web/ratings_calendar.py` | Период раздела «Рейтинги»: «‹ 2026 Q3 ›», по щелчку — календарь «с — по» |
@@ -767,6 +766,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/mcp/annotations.py` | Классы инструментов MCP и их аннотации в `tools/list` (#1338; образец — Swarm `annotations.ts`) |
 | `src/mcp/audit.py` | Журнал изменяющих вызовов MCP: кто, какой инструмент, чем кончилось |
 | `src/mcp/batch_letter.py` | Общее письмо партнёру по нескольким проверкам одной страны для протокола MCP (D739) |
+| `src/mcp/business_read.py` | Продажи и месячное «Качество» через MCP: общий расчёт с вебом, только чтение |
 | `src/mcp/catalogue.py` | Каталог инструментов MCP: чем агент партнёра может спросить у базы проверок и чем поправить |
 | `src/mcp/checklist.py` | Хранилище версий методики: правка через агента идёт в новую версию, а не поверх боевой |
 | `src/mcp/checklist_layout.py` | Раскладка хранилища методик: пространство, чек-лист, издания |
@@ -1026,8 +1026,10 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/ratings/model.py` | Общие типы рейтингов РС и РКО: что разборщики отдают импортёру |
 | `src/ratings/periods.py` | Период отчёта: месяц, квартал, период рейтинга РС (спека «Словарь», решение плана 12) или произвольный отрезок «с — по» из календаря |
 | `src/ratings/pointer.py` | Клиент Pointer API: сети и филиалы с текущими оценками на картах |
+| `src/ratings/quality_data.py` | Сборка данных «Качества» за месяц: из чтений — пиццерии и страны (docs/21-quality.md) |
 | `src/ratings/report.py` | Сводка раздела «Рейтинги» (D324): отбор → чтение → расчёты `summary` |
 | `src/ratings/risk_sources.py` | Раздел «Пиццерии в зоне риска» (D658) по любому источнику: РС, РКО, агрегаторы, наши проверки |
+| `src/ratings/sales.py` | Единые группы источников и каналы продаж для «Качества» и MCP |
 | `src/ratings/sheet.py` | Лист «Качество по пиццериям» таблиц контроля (`sheet-scores`, D324) |
 | `src/ratings/sheet_sync.py` | Забор общей таблицы контроля «база рейтингов» самим decimus (D464) |
 | `src/ratings/snapshot.py` | Снимок рейтинга Dodo IS (JSON) — то, что Claude собирает в браузере сотрудника |
@@ -1261,6 +1263,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/loadcheck.py` | Замер потолка нагрузки: сколько одновременных проверок продукт держит |
 | `tools/loadcheck_live.py` | Живой замер: настоящие вызовы модели, настоящие кадры (T101, решение D062) |
 | `tools/mcp_bridge.sh` | Мост stdio ↔ HTTP для MCP-сервера проверок (T095) |
+| `tools/mcp_business_smoke.py` | Read-only HTTP smoke for monthly sales/Quality and existing MCP read tools |
 | `tools/mcp_healthcheck.py` | Проба здоровья MCP-сервера — изнутри его контейнера (задача T255, #210) |
 | `tools/mcp_install.sh` | Установщик подключения к MCP-серверу проверок (#244, решение D112) |
 | `tools/mcp_install_chatgpt.sh` | Установщик decimus для настольного ChatGPT на Mac (D695, #1439) |

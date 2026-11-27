@@ -15,7 +15,7 @@ from decimal import Decimal as D
 import pytest
 
 from src.domain import quality as q
-from src.web import quality_data as qd
+from src.ratings import quality_data as qd
 
 
 def _unit(

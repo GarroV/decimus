@@ -34,12 +34,13 @@ from src.db import dodois_metrics, quality_read
 from src.db import ratings_read as read
 from src.db.errors import DbError, RatingsError
 from src.domain import quality as q
+from src.ratings import quality_data
 from src.ratings.countries import country_names
+from src.ratings.quality_data import CountryHealth
 
 from . import (
     auth,
     guard,
-    quality_data,
     ratings_freshness,
     registry_period,
     registry_view,
@@ -49,7 +50,6 @@ from . import (
 from .config import Settings
 from .geo_names import country_title as geo_title
 from .quality_cells import COLUMNS, DASH, cells, group_starts, money, num, pct, shown
-from .quality_data import CountryHealth
 from .sections import section
 from .texts import t
 

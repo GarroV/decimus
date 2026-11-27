@@ -23,6 +23,8 @@ from src.domain import maps_month
 from src.domain import quality as q
 from src.ratings import pointer
 from src.ratings.aggregators import collect
+from src.ratings.sales import sales_channel as sales_channel
+from src.ratings.sales import sales_totals
 
 log = logging.getLogger(__name__)
 
@@ -32,8 +34,6 @@ SALES_CHANNELS = ("dine_in", "takeaway", "delivery")
 DODOIS_OK = "ok"
 DODOIS_NOT_CONNECTED = "not_connected"
 DODOIS_NOT_COLLECTED = "not_collected"
-
-_APP_SITE = frozenset({"mobileapp", "website", "app", "web", "site"})
 
 
 @dataclass(frozen=True)
@@ -158,22 +158,6 @@ def agg_key(name: str) -> str | None:
         if flat == own or own.startswith(flat) or flat.startswith(own):
             return key
     return None
-
-
-def _group(source: str) -> str:
-    low = source.lower()
-    if "aggregator" in low:
-        return "aggregators"
-    return "app_site" if re.sub(r"[^a-z]", "", low) in _APP_SITE else "other"
-
-
-def sales_channel(name: str) -> str:
-    low = name.lower()
-    if "dine" in low:
-        return "dine_in"
-    if "take" in low or "pickup" in low:
-        return "takeaway"
-    return "delivery" if "deliver" in low else "other"
 
 
 def _mean(values: Iterable[Decimal]) -> Decimal | None:
@@ -306,13 +290,6 @@ def _unit(
     if checks is None:
         checks = _checks_per_week(rko_rows)
     source = "dodois" if d_rko or d_rs else ("sheet" if scores else "")
-    by_group: dict[str, int] = defaultdict(int)
-    revenue: dict[str, Decimal] = defaultdict(Decimal)
-    by_source: dict[str, Decimal] = defaultdict(Decimal)
-    for s in sales:
-        by_group[_group(s.order_source)] += s.orders
-        revenue[sales_channel(s.sales_channel)] += s.revenue
-        by_source[s.order_source] += s.revenue
     lines: dict[str, AggLine] = {}
     for a in agg_orders:
         key = agg_key(a.aggregator)
@@ -325,8 +302,8 @@ def _unit(
             rated[0] if rated else None,
             rated[1] if rated else None,
         )
-    n_orders = by_group["aggregators"] or sum(a.orders for a in lines.values())
-    orders = q.Orders(n_orders, by_group["app_site"], by_group["other"])
+    totals = sales_totals(sales, aggregator_orders=sum(a.orders for a in lines.values()))
+    orders, revenue, by_source = totals.orders, totals.revenue, totals.revenue_by_source
     aggs5 = q.aggregator_score([(line.score5, line.orders) for line in lines.values()])
     if not lines:
         # Заказов агрегаторов нет (Dodo IS не собран или не подключён): веса взять неоткуда,
