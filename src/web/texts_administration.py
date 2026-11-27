@@ -184,6 +184,7 @@ ADMINISTRATION_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Не удалось прочитать данные рейтингов: база не ответила.",
         "en": "Could not read the ratings data: the database did not respond.",
     },
+    "coverage.none": {"ru": "Нет данных.", "en": "No data."},
     "coverage.country": {"ru": "Страна", "en": "Country"},
     "coverage.src.rs": {"ru": "Рейтинг стандартов", "en": "Standards rating"},
     "coverage.src.rko": {"ru": "Рейтинг контроля", "en": "Control rating"},

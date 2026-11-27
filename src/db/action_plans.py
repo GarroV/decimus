@@ -54,6 +54,7 @@ from .plan_rows import PlanRow, TermsProvider, insert_rows, prepare_rows, read_r
 from .pool import connection
 from .reach import Reach, require_reach
 from .storage import PhotoStorage, S3PhotoStorage, key_of_uri
+from .timeouts import timed_connect
 
 logger = logging.getLogger(__name__)
 
@@ -723,7 +724,7 @@ def _actor(actor: str) -> str:
 
 def _admin_write(what: str) -> psycopg.Connection[Any]:
     try:
-        return psycopg.connect(load_retraction_settings().dsn)
+        return timed_connect(load_retraction_settings().dsn)
     except psycopg.Error as exc:
         raise ActionPlanError(f"{what}: база не на связи ({type(exc).__name__})") from exc
 

@@ -633,7 +633,10 @@ def test_публикация_переставляет_текущую_верси
 
 
 def test_публикация_отказывает_если_движок_читает_не_хранилище(
-    хранилище: Store, методика: Path, capsys: pytest.CaptureFixture[str]
+    хранилище: Store,
+    методика: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Публикация, которую движок не увидит, — молчаливый сбой: агент скажет
     «опубликовано», а проверки продолжат считаться по старой методике.
@@ -644,6 +647,7 @@ def test_публикация_отказывает_если_движок_чит�
     """
     итог = _добавить(хранилище)
     capsys.readouterr()
+    monkeypatch.setenv("MCP_CHECKLIST_STORE", str(методика))
 
     with pytest.raises(ChecklistError) as отказ:
         publish(хранилище, tenant=АРЕНДАТОР, version=итог.version)
@@ -651,7 +655,7 @@ def test_публикация_отказывает_если_движок_чит�
     сказано = str(отказ.value)
     assert str(методика) not in сказано
     assert str(хранилище.root) not in сказано
-    assert "AUDIT_DATA_DIR" in сказано
+    assert "MCP_CHECKLIST_STORE" in сказано
     assert str(методика) in capsys.readouterr().err
 
 

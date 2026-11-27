@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from datetime import date
 
@@ -92,9 +93,25 @@ def test_проценты_не_среднее_процентов(ук: FlaskClie
     assert "30.0%" in page
 
 
-def test_страна_раскрывается_пиццериями_и_худшая_сверху(ук: FlaskClient) -> None:
+def test_страна_и_пиццерия_выбираются_фильтрами_без_левого_столбца(ук: FlaskClient) -> None:
+    page = ук.get("/training/RO?unit=d-ro-1").get_data(as_text=True)
+    assert "pk-rail" not in page and "pk-item" not in page
+    assert "pk-shell--solo" in page  # без этого класса рабочая область сжимается в узкую колонку
+    assert page.count("data-pick-nav") == 2
+    assert '<option value="/training/RO" selected>Румыния · 30.0%</option>' in page
+    assert '<option value="/training">Все страны · 34.0%</option>' in page
+    assert '<option value="/training/RO?unit=d-ro-1" selected>Brasov-1 · 10.0%</option>' in page
+    assert '<option value="/training/RO">Все пиццерии</option>' in page
+    # Несопоставленная пиццерия в списке выбора не нужна: у неё нет обученности.
+    assert "Bucharest-12 ·" not in page
+
+
+def test_пиццерии_в_фильтре_только_у_выбранной_страны(ук: FlaskClient) -> None:
+    assert ук.get("/training").get_data(as_text=True).count("data-pick-nav") == 1
+
+
+def test_худшая_пиццерия_сверху(ук: FlaskClient) -> None:
     page = ук.get("/training/RO").get_data(as_text=True)
-    assert "pk-item--sub" in page
     table = page.split("tr-table", 1)[1]
     assert table.index("Brasov-1") < table.index("Iasi-1")
 
@@ -103,6 +120,16 @@ def test_несопоставленные_показаны_отдельным_б
     page = ук.get("/training").get_data(as_text=True)
     assert "Не сопоставлены" in page and "Bucharest-12" in page
     assert "tr-table--lost" in page
+
+
+def test_обучение_считает_только_сопоставленные_пиццерии(ук: FlaskClient) -> None:
+    network = ук.get("/training").get_data(as_text=True)
+    assert "пиццерий: 2" in network and "пиццерий: 3" not in network
+    country = ук.get("/training/RO").get_data(as_text=True)
+    assert '<option value="/training/RO" selected>Румыния · 30.0%</option>' in country
+    filters = re.findall(r"<select.*?</select>", country, re.S)
+    assert "Bucharest-12" not in "".join(filters)
+    assert "Не сопоставлены" in country and "Bucharest-12" in country
 
 
 def test_пиццерия_выбирается_адресом_и_курсы_читаются_по_её_подразделению(
@@ -133,7 +160,7 @@ def test_английский_язык(ук: FlaskClient) -> None:
 
 def test_пункт_меню_в_группе_статистики_рядом_с_рейтингами(ук: FlaskClient) -> None:
     page = ук.get("/training").get_data(as_text=True)
-    assert 'href="/training"' in page and "Обучение" in page
+    assert 'href="/training?lang=ru"' in page and "Обучение" in page
 
 
 def test_пустое_состояние_без_загрузки(monkeypatch: pytest.MonkeyPatch) -> None:

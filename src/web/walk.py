@@ -68,6 +68,7 @@ from . import (
     walk_settings,
     walk_start,
     walk_suggest,
+    walk_technical,
     walk_translate,
     walk_unseen,
     walk_voice,
@@ -349,6 +350,9 @@ def walk_payload(
     from src.domain.measurement_sets import public_sets
 
     payload["measurement_sets"] = public_sets(inspection)
+    from src.domain.technical import public_payload
+
+    payload["technical"] = public_payload(chat_id, lang)
     payload["item_search_tags"] = walk_search_tags.search_tags(items, chat_id=chat_id)
     payload["item_aliases"] = walk_aliases.item_aliases(
         inspection, (item["code"] for item in payload["items"])
@@ -521,6 +525,7 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
         return respond(who, ui_lang)
 
     walk_write.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
+    walk_technical.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
     walk_settings.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
     model_session = ModelSession()
     walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify, session=model_session)

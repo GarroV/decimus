@@ -44,6 +44,18 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
 #: после этого не меняется никогда. Правка комментария к применённой миграции
 #: отпечаток не двигает намеренно: раскатка 17.09.2026 встала именно на ней.
 ОТПЕЧАТКИ: dict[str, str] = {
+    "0139_technical_confirmation_edits.sql": (
+        "sql1:90fe08b493b48df9c256fda9de9e3b685973198e0421fba42d04fbf740ae80af"
+    ),
+    "0138_technical_snapshot.sql": (
+        "sql1:4b3b84f7d59b8ee8f65594886bdbdb6a39cd11505ec749ab21741ad07d122752"
+    ),
+    "0137_report_languages.sql": (
+        "sql1:dc4fd45e8d0f8bc13d9dd9deef32484c07bae19e8caac1f8a388febb4f196fef"
+    ),
+    "0136_inspection_remediation.sql": (
+        "sql1:6098a0672d8d7cff5f3c527881c9bc7827ae3a1c9c57704b536315bf400a96ac"
+    ),
     "0001_initial_schema.sql": (
         "sql1:c68eb1b448da2143443f5d5145cd75dcd27bd4f0df745599c1514965f39ee335"
     ),
@@ -492,6 +504,16 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0135_performance.sql": (
         "sql1:6c9bcea101826179185faa1ef5f0634c2cbf875de2cc055ea23e7da2f60ae137"
     ),
+    "0140_partner_space_safety.sql": (
+        "sql1:e232cc8f1179839da7406c5c06aa93cd09cd8b3959c87daafb6c7a33d1492924"
+    ),
+    "0141_space_limits.sql": (
+        "sql1:debf9ce865b3c244311e8276e01e742cad7fa4ef2cef76ff496e4e7312a67d86"
+    ),
+    "0142_web_onboarding.sql": (
+        "sql1:277ce90a69b55aef04b44b7389254c4241716dd6fb2cd976c1a04dba12dad844"
+    ),
+    "0143_feedback.sql": ("sql1:3056ada2d995412ac8b7c60bb781dd65d8ce4c24c1165c9b5663296932432977"),
 }
 
 

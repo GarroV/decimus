@@ -64,6 +64,7 @@ from .engine_call import check_version as _check_version
 from .engine_call import clean as _clean
 from .engine_call import to_log as _log_paths_common
 from .errors import ReportError
+from .technical import snapshot_for_export
 
 
 class LetterError(ReportError):
@@ -512,6 +513,13 @@ def state_json(
                 }
                 for поле in detail.info
             },
+            # Keep the actual checkpoint wording and explicit confirmations,
+            # independent of today's methodology and of score calculation.
+            **(
+                {"domain": {"technical_snapshot": snapshot_for_export(строка.technical_snapshot)}}
+                if строка.technical_snapshot is not None
+                else {}
+            ),
         },
         ensure_ascii=False,
     )

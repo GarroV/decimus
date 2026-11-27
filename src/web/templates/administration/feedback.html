@@ -1,0 +1,79 @@
+{# D761: вкладка «Обратная связь» — отзывы из кнопки, новые сверху. Видят главный админ и админ УК;
+   чат Telegram задаёт только главный админ. Фото — со своего адреса, открываются в том же окне (`photo-zoom.js`). #}
+{% extends "base.html" %}
+{% from "_info_tip.html" import info_tip %}
+{% from "administration/_nav.html" import admin_nav with context %}
+{% block title %}{{ t('administration.tab.feedback') }} · {{ t('section.administration.title') }}{% endblock %}
+{% block page_heading %}<header class="page-heading">
+<div class="shead__main">
+  <div class="info-row">
+    <h1 class="shead__title">{{ t('administration.tab.feedback') }}</h1>
+    {{ info_tip(t('tip.hint'), '', [t('feedback.admin.sub')], 'feedback-admin') }}
+  </div>
+</div>
+</header>{% endblock %}
+
+{% block head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-pick.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-administration.css') }}">{% endblock %}
+{% block body %}
+{% set notes = {'chat_saved': 'feedback.admin.chat.saved', 'chat_off': 'feedback.admin.chat.disabled'} %}
+{% set alerts = {'chat_bad': 'feedback.admin.chat.bad', 'chat_failed': 'feedback.admin.chat.failed', 'review_failed': 'feedback.admin.review.failed'} %}
+<div class="sadmin">
+  {{ admin_nav() }}
+  <div class="sadmin__main fbadmin">
+    {% if notice in notes %}<p role="status">{{ t(notes[notice]) }}</p>{% endif %}
+    {% if notice in alerts %}<p role="alert">{{ t(alerts[notice]) }}</p>{% endif %}
+
+    {% if may_set_chat %}
+    <section class="fbchat">
+      <h2>{{ t('feedback.admin.chat.title') }}</h2>
+      <p>{{ t('feedback.admin.chat.note') }}</p>
+      <p>{{ t('feedback.admin.chat.current', chat=chat) if chat else t('feedback.admin.chat.off') }}</p>
+      <form method="post" action="{{ url('/administration/feedback/chat') }}?lang={{ lang }}">
+        <div>
+          <label class="field-label" for="feedback-chat">{{ t('feedback.admin.chat.label') }}</label>
+          <input class="input" id="feedback-chat" name="chat_id" inputmode="numeric" autocomplete="off"
+                 pattern="-?[0-9]{5,20}" value="{{ chat or '' }}"{% if demo_mode %} disabled{% endif %}>
+        </div>
+        <button class="btn btn--primary" type="submit"{% if demo_mode %} disabled{% endif %}>{{ t('feedback.admin.chat.save') }}</button>
+        {% if chat %}<button class="btn" type="submit" name="disable" value="1"{% if demo_mode %} disabled{% endif %}>{{ t('feedback.admin.chat.disable') }}</button>{% endif %}
+      </form>
+    </section>
+    {% endif %}
+
+    {% if failed %}
+      <p role="alert">{{ t('feedback.admin.unavailable') }}</p>
+    {% elif not entries %}
+      <p class="is-muted">{{ t('feedback.admin.none') }}</p>
+    {% else %}
+      {% for e in entries %}
+      <article class="fbitem{% if e.reviewed_at %} is-done{% endif %}" id="fb-{{ e.id }}">
+        <div class="fbitem__head">
+          <span class="fbitem__who">{{ t('feedback.admin.who', login=e.login, role=t(role_key(e.role, e.tenant)), space=e.tenant) }}</span>
+          <span class="fbitem__meta">{{ at(e.created_at) }} UTC · {{ t('feedback.admin.lang', lang=e.lang) }}</span>
+        </div>
+        <p class="fbitem__page">{{ t('feedback.admin.page') }}: {{ e.page }}</p>
+        <p class="fbitem__body">{{ e.body }}</p>
+        {% if e.photo_ids %}
+        <div class="fbitem__photos">
+          {% for pid in e.photo_ids %}
+            {% set photo_url = url('/administration/feedback/photo/' ~ pid) %}
+            <a href="{{ photo_url }}" data-zoom><img src="{{ photo_url }}" alt="{{ t('feedback.admin.photo', n=loop.index) }}" loading="lazy" decoding="async"></a>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="fbitem__foot">
+          <span>
+            {% if e.reviewed_at %}{{ t('feedback.admin.reviewed', by=e.reviewed_by, at=at(e.reviewed_at)) }}{% endif %}
+            {% if e.telegram_sent_at %} · {{ t('feedback.admin.tg.sent') }}{% elif e.telegram_error %} · {{ t('feedback.admin.tg.error', code=e.telegram_error) }}{% endif %}
+          </span>
+          <form method="post" action="{{ url('/administration/feedback/' ~ e.id ~ '/review') }}?lang={{ lang }}">
+            <input type="hidden" name="reviewed" value="{{ '0' if e.reviewed_at else '1' }}">
+            <button class="btn btn--sm" type="submit"{% if demo_mode %} disabled{% endif %}>{{ t('feedback.admin.unreview') if e.reviewed_at else t('feedback.admin.review') }}</button>
+          </form>
+        </div>
+      </article>
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

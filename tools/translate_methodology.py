@@ -12,6 +12,10 @@
 Коды, классы и числа не трогаются: связь идёт кодами, переводится только слово. Класс в начале
 вопроса — «(D1, D2) …» — отрезается до перевода и ставится обратно как был.
 
+Основа по умолчанию — ДЕЙСТВУЮЩЕЕ издание (на него смотрит указатель `current` чек-листа), а не
+последнее в журнале: чужая неопубликованная правка в перевод не попадает. Другую основу —
+`--base`. Нет имени набора у основы — `--version-name`.
+
 Издание проходит ту же проверку, что и любая правка методики (`src/mcp/checklist.py:
 apply_edit` → `manage.py validate`, `audit.py init` и `score`): не принятого движком издания не
 появляется. Опубликовать его — отдельный шаг (`publish_checklist_version`), инструмент
@@ -50,7 +54,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.domain.checklist_store import VERSIONS_DIR  # noqa: E402
 from src.domain.model_usage import KIND_TRANSLATE  # noqa: E402
 from src.domain.models import REPORT_LANGS  # noqa: E402
-from src.mcp.checklist import Outcome, Store, apply_edit, tip_version  # noqa: E402
+from src.mcp.checklist import Outcome, Store, apply_edit, current_version  # noqa: E402
+from src.mcp.errors import ChecklistError  # noqa: E402
 from src.recognize.client import ask_model  # noqa: E402
 from src.recognize.config import RecognizeSettings, load_recognize_settings  # noqa: E402
 from src.recognize.errors import ModelUnavailable  # noqa: E402
@@ -65,6 +70,8 @@ SOURCE_LANG = "ru"
 HINT_LANG = "en"
 #: Класс в начале вопроса: «(D1, D2) …» — служебная пометка, не слова.
 CLASS_PREFIX = re.compile(r"^\(\s*D[0-3](?:\s*,\s*D[0-3])*\s*\)\s*")
+#: Код отказа хранилища «у методики нет имени набора» (`src/mcp/checklist.py: _resolve_name`).
+SET_NAME_MISSING = "set_name_missing"
 #: Пометка комментария в `checklist.csv`: такие строки движок пропускает.
 COMMENT_PREFIX = "#"
 
@@ -390,7 +397,7 @@ def translate_edition(
         raise TranslateError(f"Язык «{lang}» не заведён. Доступны: {', '.join(REPORT_LANGS)}")
     if lang == SOURCE_LANG:
         raise TranslateError(f"«{SOURCE_LANG}» — язык оригинала: переводить на него нечего")
-    base_version = tip_version(store) if base is None else base
+    base_version = current_version(store) if base is None else base
     base_dir = store.home / VERSIONS_DIR / base_version
     plan = make_plan(base_dir, lang, force=force)
     if not plan.todo:
@@ -402,16 +409,24 @@ def translate_edition(
         _apply_texts(candidate, lang, texts, force=force)
         return None, f"translated {len(texts)} phrases into {lang}"
 
-    return apply_edit(
-        store,
-        tenant=tenant,
-        tool=TOOL_NAME,
-        mutate=mutate,
-        base=base_version,
-        version_name=version_name,
-        note=note or f"translate methodology into {lang}",
-        today=today,
-    )
+    try:
+        return apply_edit(
+            store,
+            tenant=tenant,
+            tool=TOOL_NAME,
+            mutate=mutate,
+            base=base_version,
+            version_name=version_name,
+            note=note or f"translate methodology into {lang}",
+            today=today,
+        )
+    except ChecklistError as exc:
+        if exc.refusal != SET_NAME_MISSING:
+            raise
+        raise TranslateError(
+            f"У издания-основы {base_version} нет имени набора, и новому изданию нечего "
+            f"наследовать. Назовите набор: --version-name <имя>, например «imf»"
+        ) from exc
 
 
 # --- командная строка -------------------------------------------------------------------------
@@ -435,7 +450,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--space", default="hq", help="пространство чек-листа (по умолчанию hq)")
     parser.add_argument("--code", default="bizdev", help="код чек-листа (по умолчанию bizdev)")
     parser.add_argument("--lang", default=DEFAULT_LANG, help="язык перевода (по умолчанию tr)")
-    parser.add_argument("--base", help="издание-основа (по умолчанию последнее в журнале)")
+    parser.add_argument(
+        "--base",
+        help="издание-основа (по умолчанию действующее: указатель current)",
+    )
     parser.add_argument(
         "--version-name",
         help="имя набора, если у основы его нет (обычно подхватывается от основы само)",
@@ -449,7 +467,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     store = _store_from(args)
     try:
         if args.dry_run:
-            base = tip_version(store) if args.base is None else args.base
+            base = current_version(store) if args.base is None else args.base
             plan = make_plan(store.home / VERSIONS_DIR / base, args.lang, force=args.force)
             print(
                 f"издание-основа {base}: к переводу {len(plan.todo)}, "

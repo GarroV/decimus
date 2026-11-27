@@ -34,6 +34,7 @@ from src.web import (
     administration,
     country,
     country_summary,
+    feedback,
     journal_screen,
     partner_spaces,
     usage_screen,
@@ -160,6 +161,7 @@ def test_старый_адрес_вкладки_перенаправляет(г�
         "aggregators",
         "mailings",
         "home",
+        "feedback",
         "plans",
         "journal",
         "usage",
@@ -175,6 +177,7 @@ def test_старый_адрес_вкладки_перенаправляет(г�
         "aggregators",
         "mailings",
         "home",
+        "feedback",
         "plans",
         "usage",
     ],
@@ -374,6 +377,8 @@ def test_каждая_вкладка_с_шапкой_каркаса(monkeypatch:
     """Ломали: «Dodo IS» без `h1.shead__title` и с `<table>` — не как «Страны» и «Ключи»."""
     _без_базы(monkeypatch)
     monkeypatch.setattr(usage_screen, "_read", lambda *_a, **_k: ())
+    monkeypatch.setattr(feedback.db_feedback, "entries", lambda **_k: ())
+    monkeypatch.setattr(feedback.db_feedback, "chat_id", lambda: None)
     monkeypatch.setattr(journal_screen.journals, "read_actions", lambda *_a, **_k: ())
     monkeypatch.setattr(journal_screen.journals, "read_logins", lambda *_a, **_k: ())
     monkeypatch.setattr(journal_screen.journals, "journal_people", lambda *_a, **_k: ())

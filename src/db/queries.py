@@ -101,6 +101,8 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(city)s::text is null or u.city = %(city)s)
   and (%(country)s::text is null or u.country = %(country)s)
   and (%(grade)s::text is null or i.grade = %(grade)s)
+  and (%(kind)s::text is null or i.kind = %(kind)s)
+  and (%(q)s::text is null or position(lower(%(q)s) in lower(u.name)) > 0)
   and __STAGE__
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
@@ -137,6 +139,8 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(city)s::text is null or u.city = %(city)s)
   and (%(country)s::text is null or u.country = %(country)s)
   and (%(grade)s::text is null or i.grade = %(grade)s)
+  and (%(kind)s::text is null or i.kind = %(kind)s)
+  and (%(q)s::text is null or position(lower(%(q)s) in lower(u.name)) > 0)
   and __STAGE__
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
@@ -168,7 +172,7 @@ select
     -- Разбор строки — по именам колонок (#338): у каждого выражения имя.
     i.checklist_code,
     i.status, i.accepted_at, i.accepted_by,
-    i.origin, i.speech_lang, i.finding_history, i.measurement_sets,
+    i.origin, i.speech_lang, i.finding_history, i.measurement_sets, i.technical_snapshot,
     i.deductions, i.counts, i.by_zone, i.by_process,
     i.reported_status, i.legacy_method
 from inspections i
@@ -307,6 +311,7 @@ def _row_to_inspection(row: Mapping[str, Any]) -> InspectionRow:
         unit_country=str(row.get("unit_country") or ""),
         finding_history=row.get("finding_history"),
         measurement_sets=row.get("measurement_sets"),
+        technical_snapshot=row.get("technical_snapshot"),
         # Шапка письма (T176). Колонки объявлены `not null default ''`, но
         # `or ""` здесь не украшение: историю за прошлые годы зальют программно
         # из чужой выгрузки (D035), и `None` в подписи письма партнёру
@@ -478,6 +483,8 @@ def list_inspections(
     city: str = "",
     country: str = "",
     grade: str = "",
+    kind: str = "",
+    q: str = "",
 ) -> list[InspectionRow]:
     """Проверки в охвате читающего, свежие по дате обхода — первыми.
 
@@ -515,6 +522,10 @@ def list_inspections(
     по тем же правилам, что у агрегатов (`_narrowing`): пусто — «все». Отбор
     поверх прочитанной страницы терял бы проверки среза старше `limit`-й по
     всей сети, и экран показывал бы другое множество, чем соседние блоки.
+
+    `kind` — вид проверки кодом, `q` — часть названия пиццерии без учёта регистра:
+    те же два отбора реестра, что и у `count_by_place`, чтобы список и счётчики
+    читали одно множество.
     """
     охват = _require_reach(reach)
     rows_limit = _require_limit(limit)
@@ -525,6 +536,8 @@ def list_inspections(
         "date_from": date_from,
         "date_to": date_to,
         **_narrowing(city, country, grade),
+        "kind": kind or None,
+        "q": q or None,
     }
     with (
         _reading("список проверок", as_admin=include_retracted) as conn,
@@ -613,6 +626,12 @@ def _read_detail(
     # `checklist_code` (T345) однажды сдвинула её на единицу, и чтение карточки
     # падало разбором «could not convert string to float: 'bizdev'».
     deductions, counts, by_zone = _detail_parts(row)
+    if row.get("technical_snapshot") and row["status"] == "draft":
+        from .technical import reconcile
+
+        row["technical_snapshot"] = reconcile(
+            cur, ident, str(row["tenant_code"]), row["technical_snapshot"]
+        )
     return InspectionDetail(
         inspection=_row_to_inspection(row),
         deductions=deductions,
@@ -1014,13 +1033,36 @@ from findings f
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
-  and i.status = 'finalized'
+  and __STAGE__
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
   and (%(country)s::text is null or u.country = %(country)s)
   and (%(grade)s::text is null or i.grade = %(grade)s)
 group by f.inspection_id, f.level
+"""
+_CLASS_COUNTS_SQL_REVIEW = _CLASS_COUNTS_SQL.replace("__STAGE__", _QUEUE_STAGE)
+_CLASS_COUNTS_SQL = _CLASS_COUNTS_SQL.replace("__STAGE__", _HISTORY_STAGE)
+
+# Сколько принятых проверок в каждом месте — те же условия, что у списка
+# «Принятые» (`_LIST_ALL_TEMPLATE`), но без предела и без строк: счётчик страны
+# и «100 из N» обязаны называть то, что откроется по клику, а не то, что вошло
+# в первую страницу. Страна и город — отдельные ключи группы, чтобы один запрос
+# отвечал и по странам, и по городам, и по сумме.
+_COUNT_BY_PLACE_SQL = """
+select coalesce(u.country, '') as country, coalesce(u.city, '') as city, count(*) as inspections
+from inspections i
+join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(reader)s::text <> 'HQ' or i.tenant_code = 'HQ' or i.status <> 'finalized')
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
+  and (%(kind)s::text is null or i.kind = %(kind)s)
+  and (%(q)s::text is null or position(lower(%(q)s) in lower(u.name)) > 0)
+  and i.status = 'finalized'
+group by 1, 2
 """
 
 
@@ -1045,20 +1087,79 @@ def class_counts(
     """
     охват = _require_reach(reach)
     _require_window(date_from, date_to)
+    return _read_class_counts(
+        _CLASS_COUNTS_SQL,
+        {
+            **охват.params(),
+            "date_from": date_from,
+            "date_to": date_to,
+            **_narrowing(city, country, grade),
+        },
+    )
+
+
+def review_class_counts(*, reach: Reach) -> dict[str, dict[str, int]]:
+    """Те же счётчики классов у ждущих приёмки (D199), вся очередь одним запросом.
+
+    Строка «На приёмке» показывает, что внутри проверки, и не считает оценку
+    заново: это записи, как их хранит база. Период и отбор очередь не режут.
+    """
+    охват = _require_reach(reach)
+    return _read_class_counts(
+        _CLASS_COUNTS_SQL_REVIEW,
+        {
+            **охват.params(),
+            "date_from": None,
+            "date_to": None,
+            **_narrowing("", "", ""),
+        },
+    )
+
+
+def _read_class_counts(sql: str, params: dict[str, object]) -> dict[str, dict[str, int]]:
     with _reading("счётчики классов") as conn, conn.cursor() as cur:
-        cur.execute(
-            _CLASS_COUNTS_SQL,
-            {
-                **охват.params(),
-                "date_from": date_from,
-                "date_to": date_to,
-                **_narrowing(city, country, grade),
-            },
-        )
+        cur.execute(sql, params)
         счёт: dict[str, dict[str, int]] = {}
         for inspection_id, level, records in cur.fetchall():
             счёт.setdefault(str(inspection_id), {})[str(level)] = int(records)
         return счёт
+
+
+def count_by_place(
+    *,
+    reach: Reach,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    grade: str = "",
+    kind: str = "",
+    q: str = "",
+    include_retracted: bool = False,
+) -> dict[tuple[str, str], int]:
+    """Принятые проверки периода по месту: `{(страна, город): число}`.
+
+    Отбор — период, буква, вид и часть названия; страны и города среди условий
+    нет намеренно: по ним счёт и режется. Сумма значений — «Принятые» без отбора
+    по месту, сумма по стране — то, что откроется по клику на неё.
+    `include_retracted` — та же роль администратора истории, что у списка.
+    """
+    охват = _require_reach(reach)
+    _require_window(date_from, date_to)
+    with (
+        _reading("счёт проверок по месту", as_admin=include_retracted) as conn,
+        conn.cursor() as cur,
+    ):
+        cur.execute(
+            _COUNT_BY_PLACE_SQL,
+            {
+                **охват.params(),
+                "date_from": date_from,
+                "date_to": date_to,
+                "grade": grade or None,
+                "kind": kind or None,
+                "q": q or None,
+            },
+        )
+        return {(str(c), str(g)): int(n) for c, g, n in cur.fetchall()}
 
 
 _UNIT_GEOGRAPHY_SQL = """

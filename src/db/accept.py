@@ -144,6 +144,9 @@ def _apply(
         )
         if происхождение in UPLOADED_ORIGINS and not allow_duplicate:
             _refuse_duplicate(cur, ident)
+        from .technical import assert_ready
+
+        assert_ready(cur, ident, tenant)
         cur.execute(_ACCEPT_SQL, {"id": ident, "tenant": tenant, "actor": автор})
         if cur.rowcount != 1:
             raise AcceptError(

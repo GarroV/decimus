@@ -8,7 +8,6 @@
 <section class="scard shealth" id="health" aria-labelledby="health-title">
   <header class="shealth__head">
     <h2 class="shealth__title" id="health-title">{{ t('health.title') }}</h2>
-    {{ info_tip(t('tip.hint'), '', [t('health.sub')], 'health') }}
   </header>
   {% if health_flash %}
     <div class="note {{ 'note--ok' if health_flash.ok else 'note--warn' }}"><div class="note__text">
@@ -32,28 +31,22 @@
     {% endif %}
     {% for group, members in health_groups %}
       <h3 class="shealth__group">{{ t('health.group.' ~ group) }}</h3>
-      <ul class="shealth__tiles">
+      <ul class="shealth__rows">
         {% for row in members %}
           {% set s = row.status %}
-          <li class="shealth__tile">
-            <span class="shealth__name">
-              <span class="shealth__dot shealth__dot--{{ s.light }}" role="img" aria-label="{{ t('health.light.' ~ s.light) }}"></span>
-              <b>{% if row.country %}<a href="{{ admin_url('dodois', country=row.country) }}">{{ t('health.conn.dodo_is_country', name=country_title(row.country)) }}</a>{% else %}{{ t('health.conn.' ~ row.code) }}{% endif %}</b>
+          <li class="shealth__row">
+            <span class="shealth__dot shealth__dot--{{ s.light }}" role="img" aria-label="{{ t('health.light.' ~ s.light) }}"></span>
+            <b class="shealth__rname">{% if row.country %}<a href="{{ admin_url('dodois', country=row.country) }}">{{ t('health.conn.dodo_is_country', name=country_title(row.country)) }}</a>{% else %}{{ t('health.conn.' ~ row.code) }}{% endif %}</b>
+            <small class="shealth__reason">{{ t(s.reason, **s.params) }}</small>
+            <small class="shealth__when">{% if s.checked_at %}{{ t('health.ran' if row.kind == 'load' else 'health.checked', at=health_stamp(s.checked_at)) }}{% endif %}</small>
+            <span class="shealth__acts">
+              {% if row.code in ('openai', 'pointer', 'ispring') %}<a class="shealth__key" href="{{ admin_url('keys', key=row.code) }}#service-keys">{{ t('health.key_link') }}</a>{% endif %}
+              {% if row.checkable %}
+                <form method="post" action="{{ users_url }}/connections/health/{{ row.code }}/check?lang={{ lang }}" class="shealth__act">
+                  <button class="sbtn" type="submit">{{ t('health.check_now') }}</button>
+                </form>
+              {% endif %}
             </span>
-            <small>{{ t(s.reason, **s.params) }}</small>
-            {% if s.checked_at or row.checkable %}
-              <span class="shealth__foot">
-                {% if s.checked_at %}<small>{{ t('health.ran' if row.kind == 'load' else 'health.checked', at=health_stamp(s.checked_at)) }}</small>{% endif %}
-                {% if row.code in ('openai', 'pointer', 'ispring') %}
-                  <a class="shealth__key" href="{{ admin_url('keys', key=row.code) }}#service-keys">{{ t('health.key_link') }}</a>
-                {% endif %}
-                {% if row.checkable %}
-                  <form method="post" action="{{ users_url }}/connections/health/{{ row.code }}/check?lang={{ lang }}" class="shealth__act">
-                    <button class="sbtn" type="submit">{{ t('health.check_now') }}</button>
-                  </form>
-                {% endif %}
-              </span>
-            {% endif %}
           </li>
         {% endfor %}
       </ul>

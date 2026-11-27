@@ -187,7 +187,7 @@
   {% set lost = entry.missing if entry else 0 %}
   {% set editable = can_proof and finding.level in c.levels %}
   {% set pick = (sheet.picks|selectattr('code', 'equalto', finding.code)|first) if sheet else None %}
-  <div class="find-item{% if can_proof %} find-item--acts{% endif %}" data-finding="{{ finding.id }}">
+  <div class="find-item{% if can_proof %} find-item--acts{% endif %}" id="finding-{{ finding.n }}" data-finding="{{ finding.id }}">
   {% if shots %}<details class="find-row find-row--photos"><summary class="find-row__summary">{% else %}<div class="find-row">{% endif %}
     {% if informational %}
       <span class="tag tag--neutral find-row__level" aria-label="{{ t('card.findings.advice') if finding.level == 'R' else t('card.info.record') }}" title="{{ t('card.findings.advice') if finding.level == 'R' else t('card.info.record') }}">i</span>
@@ -196,9 +196,10 @@
     {% endif %}
     <span class="find-row__num">{{ finding.n }}</span>
     <span class="find-row__main">
-      {% if can_proof and not informational %}<span class="find-row__title">{{ pick.question if pick else (t('card.findings.note') if finding.code == 'NOTE' else item_label(finding.code)) }}</span>{% endif %}
+      {% if can_proof and not informational %}<span class="find-row__title">{{ c.plain(pick.question) if pick else (t('card.findings.note') if finding.code == 'NOTE' else item_label(finding.code)) }}</span>{% endif %}
       {% if informational or not can_proof or not shots %}<span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>{% endif %}
       <span class="find-row__meta">
+        {% if finding.repeat and not informational %}<b class="find-row__repeat" title="{{ t('card.findings.repeat_hint') }}">{{ t('card.findings.repeat') }}</b> · {% endif %}
         {% if informational and finding.level == 'R' %}{{ t('card.findings.advice') }} · {% endif %}
         {#- Маркеры исторической записи (D332): LEGACY — пункт не назван, пустая зона — не названа. #}
         {{ t('card.findings.note') if finding.code == 'NOTE' else (t('card.findings.no_item') if finding.code == 'LEGACY' else item_label(finding.code)) }} · {{ zone_names.get(finding.zone, finding.zone) if finding.zone else t('card.findings.no_zone') }}
@@ -216,6 +217,9 @@
   {% else %}
     {% if lost %}<span class="find-row__shots find-row__lost">{{ t('card.findings.photos_lost', n=lost) }}</span>{% endif %}
   </div>
+  {% endif %}
+  {% if finding.id in c.repairs %}
+  <p class="field-note"><a href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}&amp;repair={{ finding.id }}#repair-{{ finding.id }}">{{ t('repair.link') }} · {{ t('repair.status.' ~ c.repairs[finding.id].status) }}</a></p>
   {% endif %}
   {% if can_proof %}
     {#- Пиктограммы у строки: правка (D535; у D0, R, без класса её нет — D624) и удаление (любой класс). -#}
@@ -287,6 +291,8 @@
   </section>
   {% endif %}
 
+  {% include 'inspections/_technical.html' %}
+
   {# ── Записи ────────────────────────────────────────────────────────────
      Списком, а не таблицей: главное в записи — её формулировка, и в колонке
      таблицы она сжималась до ширины ячейки. Класс нарушения стоит слева
@@ -300,7 +306,7 @@
      поэтому кавычки атрибута — одинарные. #}
   {% if can_proof %}
     {% set pick_items = [] %}
-    {% for pick in sheet.picks %}{% set _ = pick_items.append({'c': pick.code, 'n': pick.label, 'q': pick.question, 'l': pick.levels, 'z': pick.zones}) %}{% endfor %}
+    {% for pick in sheet.picks %}{% set _ = pick_items.append({'c': pick.code, 'n': pick.label, 'q': c.plain(pick.question), 'l': pick.levels, 'z': pick.zones}) %}{% endfor %}
     {% set proof_data = {
       'items': pick_items,
       'busy': t('proofread.suggest.busy_label'),
@@ -421,6 +427,7 @@
 
   {% include "inspections/_split_history.html" %}
 
+  {% include "inspections/_repairs.html" %}
   {% include "inspections/_work.html" %}
   {% include "inspections/_walk_log.html" %}
 
@@ -429,7 +436,7 @@
      он нужен только при разборе расхождений. #}
   <details class="mx-more">
     <summary>{{ t('card.build.title') }}</summary>
-    <dl class="kv mt-gap">
+    <dl class="kv kv--card">
       <div><dt class="muted">{{ t('card.build.checklist') }}</dt><dd>{{ checklist_name }}</dd></div>
       {% if head.is_legacy %}
       <div><dt class="muted">{{ t('card.legacy.method') }}</dt><dd>{{ detail.legacy_method or t('card.legacy.unlabelled') }}</dd></div>

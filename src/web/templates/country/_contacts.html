@@ -11,16 +11,16 @@
 
 {% macro contact_block(s, kind) %}
 {% set cancel_url = url('/administration') ~ '?tab=countries&country=' ~ s.code ~ '&lang=' ~ lang %}
-<section class="cblock cblock--wide" aria-labelledby="contacts-{{ kind }}">
+<section class="cblock" aria-labelledby="contacts-{{ kind }}">
   <div class="info-row cblock__head">
     <h3 class="cblock__title" id="contacts-{{ kind }}">{{ t('contacts.' ~ kind) }}</h3>
     {{ info_tip(t('tip.hint'), '', [t('contacts.' ~ kind ~ '_note')], 'contacts-' ~ kind) }}
   </div>
+  <div class="cblock__body">
   {% if not s.contacts_known %}<p role="status">{{ t('contacts.unavailable') }}</p>
   {% else %}
     {% set rows = s.contacts|selectattr('kind', 'equalto', kind)|list %}
-    {% if not rows %}<p class="cblock__note is-muted">{{ t('contacts.empty') }}</p>
-    {% else %}
+    {% if rows %}
       <ul class="clist">
         {% for row in rows %}
           {% set text %}{% if row.name %}<b>{{ row.name }}</b>{% endif %}{% if row.name and row.email %} — {% endif %}{% if row.email %}<span>{{ row.email }}</span>{% endif %}{% endset %}
@@ -48,8 +48,8 @@
     {% endif %}
     {% if s.can_edit %}
       {% set rejected = contact_error and contact_draft and contact_draft.kind == kind and (not contact_ident or not (rows|selectattr('id', 'equalto', contact_ident)|list)) %}
-      <details class="cadd"{% if rejected %} open{% endif %}>
-        <summary class="sbtn clist__btn">{{ t('contacts.add') }}</summary>
+      <details class="cadd{% if not rows %} cadd--empty{% endif %}"{% if rejected %} open{% endif %}>
+        <summary>{% if not rows %}<span class="cblock__value cblock__value--none">{{ t('country.card.unset') }}</span>{% endif %}<span class="sbtn clist__btn">{{ t('contacts.add') }}</span></summary>
         <form class="cform" method="post" action="{{ url('/country/' ~ s.code ~ '/settings/contacts') }}?lang={{ lang }}">
           {% if rejected and contact_ident %}<input type="hidden" name="id" value="{{ contact_ident }}">{% endif %}
           {{ fields(kind, contact_draft.name if rejected else '', contact_draft.email if rejected else '') }}
@@ -59,7 +59,9 @@
           </div>
         </form>
       </details>
+    {% elif not rows %}<p class="cblock__value cblock__value--none">{{ t('country.card.unset') }}</p>
     {% endif %}
   {% endif %}
+  </div>
 </section>
 {% endmacro %}

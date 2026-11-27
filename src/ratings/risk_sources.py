@@ -1,4 +1,4 @@
-"""Плитка «Стабильно ниже порога» по любому источнику (D658): РС, РКО, агрегаторы, наши проверки.
+"""Раздел «Пиццерии в зоне риска» (D658) по любому источнику: РС, РКО, агрегаторы, наши проверки.
 
 Чистые правила, без базы: что считать «стабильно ниже» у каждого источника и как
 склеить источники в один список пиццерий. Оценки приходят готовыми — из зоны риска
@@ -56,6 +56,8 @@ class Source:
 
     code: str
     scores: tuple[float, ...]
+    #: Родная шкала площадки (5, 10, 100); `0` — источник не из агрегаторов (РС, РКО, проверки).
+    scale: int = 0
 
 
 @dataclass(frozen=True)
@@ -78,7 +80,7 @@ def _aggregator_flag(point: PointScores) -> Source | None:
     digits = 1 if point.scale >= _COARSE_SCALE else 2
     limit = agg_threshold(point.aggregator, point.scale)
     if all(round(s, digits) < limit for s in window):
-        return Source(point.aggregator, tuple(reversed(window)))
+        return Source(point.aggregator, tuple(reversed(window)), point.scale)
     return None
 
 

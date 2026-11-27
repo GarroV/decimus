@@ -127,6 +127,8 @@ class InspectionRow:
     unit_country: str = ""
     finding_history: list[dict[str, Any]] | None = None
     measurement_sets: dict[str, Any] | None = None
+    #: Frozen technical checkpoints and explicit answers; NULL means not collected.
+    technical_snapshot: dict[str, Any] | None = None
 
     @property
     def duration_seconds(self) -> float | None:

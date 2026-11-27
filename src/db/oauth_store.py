@@ -39,7 +39,7 @@ from src.domain.public_urls import OAUTH_SCOPE
 
 from .config import check_environment
 from .errors import AccessError, OAuthGrantError
-from .timeouts import timed_dsn
+from .timeouts import timed_connect
 
 #: Сколько живёт код авторизации (спека D417): на «Разрешить» и обмен хватает.
 CODE_TTL = timedelta(minutes=10)
@@ -364,7 +364,7 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """Подключение роли приложения. Отказ базы — `AccessError` с типом, без текста драйвера."""
     settings = check_environment()
     try:
-        with psycopg.connect(timed_dsn(settings.dsn)) as conn:
+        with timed_connect(settings.dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc

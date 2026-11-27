@@ -24,6 +24,7 @@ import psycopg
 
 from .config import check_environment
 from .errors import AccessError
+from .timeouts import timed_connect
 
 #: Сколько ждать установления связи с базой, секунд (минимум libpq — 2).
 CONNECT_TIMEOUT_S = 3
@@ -45,7 +46,7 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """
     settings = check_environment()
     try:
-        with psycopg.connect(settings.dsn, connect_timeout=CONNECT_TIMEOUT_S) as conn:
+        with timed_connect(settings.dsn, connect_timeout=CONNECT_TIMEOUT_S) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc

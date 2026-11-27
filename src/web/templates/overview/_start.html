@@ -1,0 +1,38 @@
+{#
+  «Начало работы» (D756, D759 п.6): карточка партнёра на «Главной». Вопрос карточки —
+  «что настроить, чтобы начать работать». Шаги и их состояние решает `onboarding.py`;
+  здесь только показ. Шаг, который делает управляющая компания, подписан «Ждём управляющую
+  компанию», а не «Сделайте»: партнёр сам завести страны и пиццерии не может.
+  Скрыть — обычная форма, без скрипта; вернуть можно из меню учётки.
+#}
+<section class="hm-card hm-start" id="start" aria-labelledby="start-title">
+  <header class="hm-card__head">
+    <h2 class="hm-label" id="start-title">{{ t('onboarding.title') }}</h2>
+    <span class="hm-meta">{{ t('onboarding.progress', done=start_card.done, total=start_card.total) }}</span>
+    <form class="hm-card__tools" method="post" action="{{ start_card.action }}">
+      <input type="hidden" name="next" value="{{ current_path }}">
+      {% if start_card.hidden %}
+        <button class="btn btn--sm" type="submit" name="start" value="show">{{ t('onboarding.show') }}</button>
+      {% else %}
+        <button class="btn btn--sm" type="submit" name="start" value="hide">{{ t('onboarding.hide') }}</button>
+      {% endif %}
+    </form>
+  </header>
+  <p class="hm-start__lead">{{ t('onboarding.all_done') if start_card.finished else t('onboarding.lead') }}</p>
+  <ol class="hm-start__list">
+    {% for r in start_card.rows %}
+      <li class="hm-start__row hm-start__row--{{ r.state }}">
+        <span class="hm-start__mark" aria-hidden="true">{{ '✓' if r.state == 'done' else loop.index }}</span>
+        <div class="hm-start__main">
+          <div class="hm-start__title">{{ r.title }}{% if not r.required %} <span class="hm-meta">· {{ t('onboarding.optional') }}</span>{% endif %}</div>
+          <div class="hm-start__text">{{ r.text }}</div>
+        </div>
+        <div class="hm-start__side">
+          <span class="hm-start__state">{{ t('onboarding.state.' ~ r.state) }}</span>
+          {% if r.href and r.state != 'done' %}<a class="btn btn--sm{% if r.state == 'todo' %} btn--primary{% endif %}" href="{{ r.href }}">{{ r.cta }}</a>{% endif %}
+        </div>
+      </li>
+    {% endfor %}
+  </ol>
+  <p class="hm-meta">{{ t('onboarding.hide_note') }}</p>
+</section>

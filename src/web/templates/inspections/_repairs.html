@@ -1,0 +1,78 @@
+{% if c.repairs_visible %}
+<section class="ov-card ov-card--wide inspection-work" id="inspection-repairs">
+  <div class="ov-card__head"><h2 class="ov-card__title">{{ t('repair.title') }}</h2>{% if c.repairs_known %}<span class="tag tag--neutral">{{ t('repair.progress', closed=c.repairs_closed, total=c.repair_items|length) }}</span>{% endif %}</div>
+  <div class="ov-card__body">
+  {% if not c.repairs_known %}<p role="alert">{{ t('work.error.load') }}</p>
+  {% else %}
+    <p class="field-note">{{ t('repair.hint') }}</p>
+    {% for finding in c.repair_items %}
+      {% set state = c.repairs[finding.id] %}
+      {% set selected = c.repair_active and c.repair_active.id == finding.id %}
+      <article class="iw-entry" id="repair-{{ finding.id }}">
+        <div class="iw-head">
+          <h3><a href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}&amp;repair={{ finding.id }}#repair-{{ finding.id }}">{{ '✓' if state.status == 'confirmed' else '○' }} {{ finding.n }}. {{ c.item_label(finding.code) }}</a></h3>
+          <span class="tag {{ 'tag--ok' if state.status == 'confirmed' else 'tag--neutral' }}">{{ t('repair.status.' ~ state.status) }}</span>
+        </div>
+        <p class="iw-text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</p>
+        {% if selected %}
+          {% set shots = c.photos.get(finding.id) %}
+          {% if shots and shots.shown %}<p class="field-note">{{ t('repair.original') }}</p>{{ photo_gallery(head.id, shots.shown, finding.text or '', c.item_label(finding.code)) }}{% endif %}
+          <h4>{{ t('repair.evidence') }}</h4>
+          {% for entry in c.repair_page.entries %}
+          <div class="iw-entry">
+            <p class="field-note">{{ entry.author }} · {{ t('work.hq') if entry.author_tenant == 'HQ' else t('work.partner') }} · <time datetime="{{ entry.created_at.isoformat() }}">{{ day(entry.created_at.date()) }} {{ entry.created_at.strftime('%H:%M') }} UTC</time></p>
+            {% if entry.preview_path %}
+            {% set image = url('/inspections/' ~ head.id ~ '/work/' ~ entry.id ~ '/preview') %}
+            <div class="find-row__gallery"><a href="{{ image }}" data-zoom data-caption="{{ entry.body }}"><img src="{{ image }}" loading="lazy" alt="{{ t('repair.photo') }}"></a></div>
+            {% endif %}
+            {% if entry.file_name %}<a class="iw-file" href="{{ url('/inspections/' ~ head.id ~ '/work/' ~ entry.id ~ '/file') }}?lang={{ lang }}">{{ entry.file_name }}</a>{% endif %}
+            {% if entry.body %}<p class="iw-text">{{ entry.body }}</p>{% endif %}
+          </div>
+          {% else %}<p class="muted">{{ t('repair.no_evidence') }}</p>{% endfor %}
+          {% if c.repair_page.more %}<p><a href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}&amp;repair={{ finding.id }}&amp;repair_before={{ c.repair_page.entries[-1].id }}#repair-{{ finding.id }}">{{ t('work.older') }}</a></p>{% endif %}
+          {% if request.args.get('repair_before') or request.args.get('event_before') %}<p><a href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}&amp;repair={{ finding.id }}#repair-{{ finding.id }}">{{ t('work.latest') }}</a></p>{% endif %}
+          {% if c.repair_may_add and state.status != 'confirmed' %}
+          <form class="iw-section" method="post" enctype="multipart/form-data" action="{{ url('/inspections/' ~ head.id ~ '/work') }}?lang={{ lang }}"{% if panel %} data-panel-form{% endif %}>
+            <input type="hidden" name="repair" value="{{ finding.id }}">
+            <label><span class="field-label">{{ t('repair.comment') }}</span><textarea class="input" name="body" maxlength="5000" rows="2" placeholder="{{ t('repair.comment.hint') }}"></textarea></label>
+            <label><span class="field-label">{{ t('repair.file') }}</span><input class="input" type="file" name="file"></label>
+            <p class="field-note">{{ t('work.hint', mb=c.work_max_mb) }}</p>
+            <button class="btn" type="submit">{{ t('repair.add') }}</button>
+          </form>
+          {% endif %}
+          {% if c.repair_may_add and state.status == 'open' and state.revision > 0 %}
+          <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/repairs/' ~ finding.id ~ '/submit') }}?lang={{ lang }}"{% if panel %} data-panel-form{% endif %}>
+            <input type="hidden" name="repair" value="{{ finding.id }}"><input type="hidden" name="revision" value="{{ state.revision }}">
+            <button class="btn" type="submit">{{ t('repair.submit') }}</button>
+          </form>
+          {% endif %}
+          {% if c.repair_may_review and state.status == 'submitted' %}
+          <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/repairs/' ~ finding.id ~ '/review/confirm') }}?lang={{ lang }}"{% if panel %} data-panel-form{% endif %}>
+            <input type="hidden" name="repair" value="{{ finding.id }}"><input type="hidden" name="revision" value="{{ state.revision }}">
+            <button class="btn" type="submit">{{ t('repair.confirm') }}</button>
+          </form>
+          {% endif %}
+          {% if c.repair_may_review and state.status in ('submitted', 'confirmed') %}
+          {% set decision = 'reopen' if state.status == 'confirmed' else 'return' %}
+          <details class="iw-section"><summary>{{ t('repair.' ~ decision) }}</summary>
+            <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/repairs/' ~ finding.id ~ '/review/' ~ decision) }}?lang={{ lang }}"{% if panel %} data-panel-form{% endif %}>
+              <input type="hidden" name="repair" value="{{ finding.id }}"><input type="hidden" name="revision" value="{{ state.revision }}">
+              <label><span class="field-label">{{ t('repair.reason') }}</span><textarea class="input" name="reason" maxlength="5000" rows="2" required></textarea></label>
+              <button class="btn" type="submit">{{ t('repair.' ~ decision) }}</button>
+            </form>
+          </details>
+          {% endif %}
+          {% if state.status == 'confirmed' %}<p class="field-note">{{ t('repair.closed_hint') }}</p>{% endif %}
+          {% if c.repair_history.entries %}
+          <details class="iw-section"><summary>{{ t('repair.history') }}</summary>
+            {% for event in c.repair_history.entries %}<div class="iw-entry"><p>{{ t('repair.event.' ~ event.kind) }} · {{ event.actor }} · {{ day(event.created_at.date()) }} {{ event.created_at.strftime('%H:%M') }} UTC</p>{% if event.reason %}<p class="iw-text">{{ event.reason }}</p>{% endif %}</div>{% endfor %}
+            {% if c.repair_history.more %}<a href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}&amp;repair={{ finding.id }}&amp;event_before={{ c.repair_history.entries[-1].revision }}#repair-{{ finding.id }}">{{ t('work.older') }}</a>{% endif %}
+          </details>
+          {% endif %}
+        {% endif %}
+      </article>
+    {% else %}<p class="muted">{{ t('repair.empty') }}</p>{% endfor %}
+  {% endif %}
+  </div>
+</section>
+{% endif %}

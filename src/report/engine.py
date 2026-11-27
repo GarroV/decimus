@@ -26,10 +26,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 from collections.abc import Sequence
 from pathlib import Path
@@ -49,6 +51,7 @@ from src.domain.state import read_state, settings_for
 
 from .engine_call import FALLBACK_DIR_VAR, current_edition_dir
 from .errors import ReportError
+from .snapshot_text import render_state
 
 logger = logging.getLogger(__name__)
 
@@ -111,17 +114,36 @@ def run_report(
         env[FALLBACK_DIR_VAR] = str(current)
     env.update(env_extra or {})
 
-    for attempt in range(1, ENGINE_ATTEMPTS + 1):
-        done = _launch(args, work=work, env=env, settings=settings)
-        if done.returncode == 0:
-            return done.stdout
-        output = f"{done.stderr}\n{done.stdout}"
-        if RUNTIME_FATAL in output:
-            _refuse_no_verdict(args, output=output, attempt=attempt, chat_id=chat_id)
-            pause_before_retry(attempt)
-            continue
-        message = (done.stderr or done.stdout).strip() or "движок отказал без объяснения"
-        raise ReportError(message)
+    from src.domain.technical import snapshot as technical_snapshot
+
+    # The live visit is not changed just to render a report. The subprocess
+    # receives one frozen evidence snapshot, also used by durable completion.
+    with tempfile.TemporaryDirectory(prefix="decimus-technical-report-") as temp:
+        technical = technical_snapshot(chat_id, settings=settings)
+        snapshot_path = Path(temp) / "technical.json"
+        snapshot_path.write_text(json.dumps(technical, ensure_ascii=False), encoding="utf-8")
+        env["DECIMUS_TECHNICAL_SNAPSHOT"] = str(snapshot_path)
+        rendered, feedback_lang = render_state(chat_id, settings)
+        if rendered is not None:
+            render_path = Path(temp) / "inspection.json"
+            render_path.write_text(json.dumps(rendered, ensure_ascii=False), encoding="utf-8")
+            env["INSPECTION_FILE"] = str(render_path)
+            if args and args[0] == "pdf" and not any(arg.startswith("--out") for arg in args):
+                args = [*args, "--out-dir", str(work / "reports")]
+            if feedback_lang:
+                args = [arg for arg in args if not arg.startswith("--speech-lang=")]
+                args = [*args, f"--speech-lang={feedback_lang}"]
+        for attempt in range(1, ENGINE_ATTEMPTS + 1):
+            done = _launch(args, work=work, env=env, settings=settings)
+            if done.returncode == 0:
+                return done.stdout
+            output = f"{done.stderr}\n{done.stdout}"
+            if RUNTIME_FATAL in output:
+                _refuse_no_verdict(args, output=output, attempt=attempt, chat_id=chat_id)
+                pause_before_retry(attempt)
+                continue
+            message = (done.stderr or done.stdout).strip() or "движок отказал без объяснения"
+            raise ReportError(message)
     raise AssertionError("недостижимо: цикл попыток выходит возвратом или отказом")
 
 

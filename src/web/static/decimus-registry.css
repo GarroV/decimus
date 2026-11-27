@@ -179,3 +179,15 @@
 .trip-step__edit .sform { margin-top: var(--space-3); }
 [data-trip-unit-picker] { display: grid; gap: var(--space-2); }
 .trip-day[data-trip-selected-day] { color: var(--ink); }
+.trip-period summary { cursor: pointer; font-size: var(--fs-meta); color: var(--ink-2); }
+.trip-period[open] .trip-dates { margin-top: var(--space-3); }
+
+/* The compact filter row can collapse on a phone. */
+.rg-fold { margin-bottom: var(--space-6); }
+a.srow:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
+.rg-fold__sum { display: none; cursor: pointer; padding: var(--space-4); }
+.rg-fold > .rg-filters { margin-bottom: 0; }
+@media (max-width: 719px) {
+  .rg-fold__sum { display: list-item; border: 1px solid var(--line); border-radius: var(--r-block); }
+  .rg-fold[open] > .rg-fold__sum { margin-bottom: var(--space-3); }
+}

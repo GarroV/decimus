@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from psycopg.conninfo import conninfo_to_dict
 
 from src.db import web_access
 from src.db.database_target import managing_target, same_database_or_refuse, target_of
@@ -118,7 +119,11 @@ def test_учётки_при_одной_базе_идут_ролью_истор�
     with pytest.raises(_Подключился) as дошло:
         web_access.list_accounts(tenant="demo")
 
-    assert дошло.value.args[0] == ИСТОРИЯ_ТА_ЖЕ
+    # Строка та же, к ней дописаны только сроки ожидания (`src/db/timeouts.py`).
+    пришла = conninfo_to_dict(дошло.value.args[0])
+    assert "statement_timeout" in пришла.pop("options")
+    assert пришла.pop("connect_timeout") == "10"
+    assert пришла == conninfo_to_dict(ИСТОРИЯ_ТА_ЖЕ)
 
 
 def test_пространства_при_расхождении_баз_не_подключаются(

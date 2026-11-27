@@ -15,7 +15,7 @@ from src.domain.errors import DomainError, ValidationError
 from src.domain.handover import HandedOverError
 from src.domain.measurement_sets import MeasurementSetConflict
 from src.domain.model_usage import KIND_SUGGEST, usage_scope
-from src.recognize.errors import RecognizeError
+from src.recognize.errors import ModelLimitReached, RecognizeError
 from src.recognize.selected_level import (
     MAX_LEVEL_PHOTOS,
     MissingFacts,
@@ -183,6 +183,9 @@ def install(
             return refused("invalid_request", str(exc), lang)
         except ValidationError:
             return refused("invalid_selection", "walk.err.rejected", lang)
+        except ModelLimitReached:
+            walk_steps.note_error("ModelLimitReached")
+            return refused("unavailable", "walk.err.model_limit", lang, 503)
         except (RecognizeError, DomainError, OSError) as exc:
             # Numerical timing only: criteria, raw facts and model output are
             # deliberately absent from logs, including failure paths.

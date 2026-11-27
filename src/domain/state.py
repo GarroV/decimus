@@ -45,6 +45,8 @@ from .errors import (
 from .kinds import kind_title
 from .measurement_sets import read_sets
 from .models import REPORT_LANGS, SOURCES, Finding, InfoAnswer, Inspection, Suggestion
+from .technical import manifest as technical_manifest
+from .technical import read_answers
 from .tenants import HQ_TENANT, canonical_tenant
 from .timing import duration_seconds, parse_timestamp, utc_now
 
@@ -567,6 +569,9 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
         finished_at=parse_timestamp(block.get("finished_at")),
         finding_history=list(block.get("finding_history") or []),
         measurement_sets=read_sets(block.get("measurement_sets")),
+        technical_enabled=block.get("technical_enabled") is True,
+        technical_checks=read_answers(block.get("technical_checks")),
+        technical_snapshot=block.get("technical_snapshot"),
     )
 
 
@@ -663,6 +668,7 @@ def start_inspection(
     источник = Path(os.path.realpath(выбран.source))
     version = edition.keep(settings, выбран.code, источник)
     init_settings = replace(settings, data_dir=источник)
+    technical_checks = technical_manifest(источник)
     # Свои языки проверяем до вызова: иначе проверка окажется начатой, а поля
     # блока — нет, и состояние останется наполовину заполненным.
     block = {
@@ -677,6 +683,7 @@ def start_inspection(
         # Личность проверки (D392): по ней память бота узнаёт, что проверку
         # начали заново, и не отдаёт новой предложения и слова старой.
         "run_id": uuid.uuid4().hex,
+        "technical_enabled": bool(technical_checks),
     }
     run_audit(args, chat_id=chat_id, settings=init_settings, create=True)
     block["started_at"] = utc_now().isoformat()
@@ -701,6 +708,15 @@ def finish_inspection(chat_id: int, run_id: str, finished_at: datetime) -> Inspe
         block = dict(raw.get(DOMAIN_KEY) or {})
         if block.get("run_id", "") != run_id:
             raise DomainError("Сменился запуск проверки во время завершения")
+        from .technical import snapshot
+
+        technical = snapshot(chat_id)
+        if technical["required_pending"]:
+            from .technical import TechnicalRefused
+
+            raise TechnicalRefused("pending")
+        if technical["enabled"]:
+            block["technical_snapshot"] = technical
         started_at = parse_timestamp(block.get("started_at"))
         if started_at is not None and block.get("finished_at") is None:
             end = parse_timestamp(finished_at)

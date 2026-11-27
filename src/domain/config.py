@@ -44,7 +44,7 @@ REQUIRED_DATA_FILES = ("checklist.csv", "zones.csv", "scoring.json", "criteria.m
 #: `checklist.csv` и `zones.csv`, потому что `engine/manage.py` перезаписывает
 #: оба файла фиксированным списком колонок (`FIELDS`, `write_rows`): любая
 #: правка методики через него молча стёрла бы весь маршрут.
-OPTIONAL_DATA_FILES = ("route.csv", "photo-cues.md")
+OPTIONAL_DATA_FILES = ("route.csv", "photo-cues.md", "technical_checks.json")
 
 #: Всё, что образует методику, — в том порядке, в котором идёт в отпечаток версии.
 DATA_FILES = REQUIRED_DATA_FILES + OPTIONAL_DATA_FILES

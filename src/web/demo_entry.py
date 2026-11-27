@@ -41,6 +41,9 @@ LOCKED_ENDPOINTS = frozenset(
         "unfreeze_user",
         "delete_user",
         "cancel_user_deletion",
+        "freeze_space",
+        "unfreeze_space",
+        "partner_event_seen",
         "user_role",
         "user_email",
         "user_name_latin",
@@ -67,6 +70,10 @@ LOCKED_ENDPOINTS = frozenset(
         # Общая настройка живого workflow не меняется посетителем демо.
         "action_plan_setting",
         "home_setting",
+        # Обратная связь (D761): в демо ничего не уходит команде, чат Telegram не меняется.
+        "feedback_send",
+        "feedback_review",
+        "feedback_chat",
         "service_key_check",
         # «Проверить сейчас» (D638) — проба настоящих провайдеров настоящими ключами.
         "connection_health_check",
@@ -94,6 +101,8 @@ LOCKED_ENDPOINTS = frozenset(
         "add_user",
         "add_space",
         "space_countries",
+        # Лимиты партнёра (D759): общий для всех посетителей демо потолок расхода и проверок.
+        "space_limits_save",
         # Языки отчёта страны общие для всех пространств и задают отчёт настоящего бота.
         "country_set_report_langs",
         # Почты сотрудников УК в копии писем (D608): персональные данные, общий список.
@@ -127,6 +136,8 @@ OPEN_ENDPOINTS = frozenset(
     {
         # D780: файлы и обсуждение синтетической проверки доступны в демо.
         "inspection_work_add",
+        "inspection_repair_submit",
+        "inspection_repair_review",
         "demo_enter",
         "login",
         "logout",
@@ -141,6 +152,8 @@ OPEN_ENDPOINTS = frozenset(
         "notifications_read",
         "notifications_read_all",
         "country_filter",
+        # Онбординг (D756): в демо пометка тура лежит в куке браузера, а не в общей учётке.
+        "settings_onboarding",
         "photo_upload_post",
         "rx_create",
         "rx_close",
@@ -170,6 +183,7 @@ OPEN_ENDPOINTS = frozenset(
         "checklists_state",
         "methodology_add",
         "methodology_edit",
+        "methodology_technical",
         "methodology_disable",
         "methodology_restore",
         "methodology_publish",
@@ -190,6 +204,7 @@ OPEN_ENDPOINTS = frozenset(
         "unit_create",
         "unit_profile_save",
         "do_accept",
+        "do_technical_confirm",
         "do_add_finding",
         "do_add_photo",
         "do_revise",

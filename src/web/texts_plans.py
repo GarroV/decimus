@@ -8,6 +8,14 @@
 from __future__ import annotations
 
 PLAN_TEXTS: dict[str, dict[str, str]] = {
+    "actions.plans_paused.title": {
+        "ru": "Электронные экшн-планы в разработке",
+        "en": "Electronic action plans are in development",
+    },
+    "actions.plans_paused.text": {
+        "ru": "Исправления, подтверждения и обсуждение сохраняются в карточке проверки.",
+        "en": "Corrections, evidence and discussion are saved on the inspection page.",
+    },
     "section.actions.title": {"ru": "Действия", "en": "Actions"},
     # --- состояние и версии ------------------------------------------------
     "plans.state.requested": {"ru": "Ждём план", "en": "Awaiting plan"},

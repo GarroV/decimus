@@ -42,6 +42,7 @@ import re
 import secrets
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Literal
@@ -57,6 +58,7 @@ from .errors import AccessError, EmailTakenError, SecondStepRequiredError
 from .pool import connection
 from .reading import reading
 from .space_guard import require_space
+from .timeouts import timed_connect
 
 #: Сколько живёт сессия. Рабочий день с запасом: короче — человек вводит пароль
 #: посреди работы, длиннее — забытая на чужом экране вкладка переживает ночь.
@@ -149,6 +151,13 @@ _FREEZE_USER_SQL = """
      where tenant_code = %(tenant)s and login = %(login)s and disabled_at is null
        and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
 """
+
+#: Учётка, замороженная кнопкой пространства (`0140`) и затем заморожена ОТДЕЛЬНО: `disabled_at`
+#: уже стоит, и основной запрос её не трогает, а отметка `space_frozen_at` оживила бы её
+#: разморозкой пространства. Снимает отметку функция базы: права писать её у роли нет.
+_FREEZE_SPACE_FROZEN_USER_SQL = (
+    "select freeze_account_apart(%(tenant)s, %(login)s, %(roles)s, %(by)s)"
+)
 
 #: Разморозка снимает только отметку: закрытое заморозкой (`0063`) остаётся
 #: закрытым. Условие на роль цели — то же, что у заморозки.
@@ -284,7 +293,8 @@ _RESOLVE_SESSION_SQL = """
             or exists (select 1 from web_totp t
                         where t.user_id = u.id and t.confirmed_at is not null)),
            s.second_step_at is not null,
-           u.country_filter, k.tenant_code, coalesce(t.name, '')
+           u.country_filter, k.tenant_code, coalesce(t.name, ''),
+           u.tour_seen_at, u.start_hidden_at
       from web_sessions s
       join web_users u on u.id = s.user_id
       left join web_session_peeks k on k.session_id = s.id
@@ -408,6 +418,11 @@ class Account:
     acting_tenant: str | None = None
     #: Название того пространства для плашки «вы смотрите как партнёр» (`tenants.name`).
     acting_name: str = ""
+    #: Когда человек прошёл или закрыл тур по интерфейсу (`web_users.tour_seen_at`, `0142`,
+    #: D756); `None` — не видел. Приезжает с сессией, как язык.
+    tour_seen_at: datetime | None = None
+    #: Когда скрыл карточку «Начало работы» (`web_users.start_hidden_at`, `0142`); `None` — нет.
+    start_hidden_at: datetime | None = None
     #: НАСТОЯЩАЯ учётка, пока человек смотрит чужими глазами (D726): у «глаз партнёра»
     #: `id` тот же, а `tenant` и `role` — партнёрские. Безопасность (вторая ступень,
     #: свежий вход, настройки входа) и журнал берут `actual`, а не эту подмену.
@@ -553,6 +568,23 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
 
 
+#: Кто правит учётки в этом запросе (`web_users.id`); `None` — команда с машины. Дверь пишет
+#: его в транзакцию (`dodo.actor`), и триггер событий пространств партнёров (`0140`) подпишет
+#: «кто завёл админа / сменил почту». Контекстная переменная, а не параметр: подпись
+#: заведения, роли и почты остаётся прежней, а забыть передать «кто» на новом пути нельзя.
+_ACTOR: ContextVar[str | None] = ContextVar("web_access_actor", default=None)
+
+
+@contextmanager
+def acting_as(user_id: str | None) -> Iterator[None]:
+    """Править учётки от имени `user_id`: правка внутри блока подписывается им в базе."""
+    метка = _ACTOR.set(user_id)
+    try:
+        yield
+    finally:
+        _ACTOR.reset(метка)
+
+
 @contextmanager
 def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """Подключение, которым МОЖНО тронуть строку учётки.
@@ -576,7 +608,11 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """
     _, dsn = managing_dsn(зачем)
     try:
-        with psycopg.connect(dsn) as conn:
+        with timed_connect(dsn) as conn:
+            актор = _ACTOR.get()
+            if актор:
+                # Локально для транзакции: до её конца подпись видит триггер `0140`.
+                conn.execute("select set_config('dodo.actor', %s, true)", (актор,))
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
@@ -750,7 +786,19 @@ def freeze_account(
                     "by": by,
                 },
             )
-        return cur.rowcount > 0
+            if cur.rowcount > 0:
+                return True
+        cur.execute(
+            _FREEZE_SPACE_FROZEN_USER_SQL,
+            {
+                "tenant": tenant,
+                "login": login.strip().lower(),
+                "roles": _roles_param(only_roles),
+                "by": by,
+            },
+        )
+        строка = cur.fetchone()
+        return bool(строка and строка[0])
 
 
 def unfreeze_account(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:
@@ -1231,6 +1279,8 @@ def resolve_session(token: str) -> Account | None:
         country_filter=tuple(row[12]) if row[12] else None,
         acting_tenant=row[13],
         acting_name=str(row[14] or ""),
+        tour_seen_at=row[15],
+        start_hidden_at=row[16],
     )
 
 

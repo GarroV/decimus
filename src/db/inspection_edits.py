@@ -20,7 +20,7 @@ from psycopg.types.json import Json
 from ..domain.models import Score
 from .models import FindingRow, InspectionDetail
 
-EditKind = Literal["revise", "add", "delete"]
+EditKind = Literal["revise", "add", "delete", "technical"]
 
 _INSERT_SQL = """
 insert into inspection_edits
@@ -92,7 +92,7 @@ def record_edit(
     cur: Any,
     *,
     inspection_id: str,
-    finding_id: str,
+    finding_id: str | None,
     tenant: str,
     editor: Editor,
     kind: EditKind,

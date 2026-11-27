@@ -56,6 +56,7 @@ from . import (
     home_board,
     home_ratings,
     home_ratings_block,
+    onboarding_screen,
     registry_period,
     registry_view,
     view,
@@ -96,13 +97,20 @@ def _board_href(kind: str) -> str:
     return куда[kind]
 
 
-def _board(reach: Any) -> tuple[tuple[home_board.Sticker, ...], bool]:
-    """Стикеры и то, не отказала ли база (у роли без доски — пусто и без отказа)."""
+def _board(
+    reach: Any, *, connect_in_card: bool = False
+) -> tuple[tuple[home_board.Sticker, ...], bool]:
+    """Стикеры и то, не отказала ли база (у роли без доски — пусто и без отказа).
+
+    `connect_in_card` — те же «привяжите бота» и «подключите Claude» уже стоят шагами карточки
+    «Начало работы» (D756): дублировать их стикерами не нужно.
+    """
     вошедший = auth.current_account()
     if вошедший is None or not home_board.SHOWN:
         return (), False
     who = home_board.Who(вошедший.role, auth.current_tenant())
-    объявления = (*_connect_stickers(), *_announcements(вошедший.id))
+    напоминания = () if connect_in_card else _connect_stickers()
+    объявления = (*напоминания, *_announcements(вошедший.id))
     if not home_board.kinds_for(who):
         return объявления, False
     try:
@@ -241,7 +249,8 @@ def render(
 
     codes = (selection.country,) if selection.country else reach.countries
     рейтинги, рейтинги_отказ = _latest_ratings(codes, min(period.end or today, today))
-    стикеры, доска_отказ = _board(full_reach)
+    start_card = onboarding_screen.card(lang)
+    стикеры, доска_отказ = _board(full_reach, connect_in_card=start_card is not None)
     # Блок «Рейтинги» (D418): среднее группы считают «Рейтинги», здесь — только показ.
     # Колонки разворачиваются по срезу (D583, D584): кластер — по странам, страна — по
     # пиццериям в штатном порядке РС; пиццерия ведёт в «Страны» по id её проверок.
@@ -332,6 +341,7 @@ def render(
         process_rows=PROCESS_ROWS,
         registry_all=в_реестр(),
         stickers=стикеры,
+        start_card=start_card,
         board_failed=доска_отказ,
         ratings_href=ratings_href,
         ratings_block=блок_рейтингов,

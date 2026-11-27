@@ -245,6 +245,7 @@ exclude = [".venv"]
 known_first_party = [
     "src",
     "audit",
+    "technical_report",  # соседний модуль engine/report.py
     "seed_demo",
     "seed_web_demo",
     "seed_ratings_demo",

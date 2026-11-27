@@ -36,6 +36,7 @@ from .config import load_retraction_settings
 from .errors import RetractionError, StorageError
 from .queries import _require_inspection_id, _require_tenant
 from .storage import PhotoStorage, S3PhotoStorage
+from .timeouts import timed_connect
 
 #: Ссылка на объект в хранилище так, как её записала выгрузка (`storage.put`).
 #: Разбирается, а не собирается заново из идентификаторов: убирать надо ровно
@@ -309,7 +310,7 @@ def retract_inspection(
     settings = load_retraction_settings()
 
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with timed_connect(settings.dsn) as conn:
             причина, снята = _mark_retracted(
                 conn, ident, tenant=tenant_code, reason=записанная_причина
             )

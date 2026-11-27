@@ -67,9 +67,11 @@ _BAR: dict[str, dict[str, str]] = {
     "registry.rail.none": {"ru": "проверок за период нет", "en": "no inspections in the period"},
     "registry.head.period": {"ru": "Период: {period}", "en": "Period: {period}"},
     "registry.accepted.title": {"ru": "Принятые", "en": "Accepted"},
-    "registry.accepted.hint": {
-        "ru": "Период и отбор действуют на принятые проверки, новые — сверху.",
-        "en": "The period and filters apply to accepted inspections, newest first.",
+    "registry.accepted.hint": {"ru": "Новые сверху.", "en": "Newest first."},
+    "registry.accepted.of_total": {"ru": "{shown} из {total}", "en": "{shown} of {total}"},
+    "registry.accepted.limit_note": {
+        "ru": "Показаны последние {n} — сузьте период или отбор",
+        "en": "Showing the latest {n} — narrow the period or filters",
     },
     "registry.unchecked.label": {
         "ru": "Пиццерии без проверки",

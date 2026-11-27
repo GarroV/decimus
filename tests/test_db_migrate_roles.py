@@ -171,6 +171,8 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # Страны пространства (`0029`, #340) — только чтение: их заводит команда,
     # а продукт по ним считает охват чтения и сторож точки проверки.
     "space_countries": {"SELECT"},
+    # Лимиты пространства (`0141`, D759): приложение сверяет, пишет администратор истории.
+    "space_limits": {"SELECT"},
     "units": {"SELECT", "INSERT", "UPDATE"},
     "unit_aliases": {"SELECT", "INSERT", "UPDATE"},
     # Документ проверки: полный набор выдан НАМЕРЕННО, держит политика (`0004`).
@@ -191,6 +193,12 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "calendar_grants": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "calendar_events": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "batch_letter_inspections": {"SELECT", "INSERT"},
+    # Отзывы из кнопки «Обратная связь» (`0143`, D761): только добавляются; править можно
+    # лишь отметки колонками (`APP_COLUMN_GRANTS`). Журнал чата Telegram — только дописывается.
+    "feedback": {"SELECT", "INSERT"},
+    "feedback_photos": {"SELECT", "INSERT"},
+    "feedback_chat": {"SELECT", "INSERT"},
+    "feedback_attempts": {"SELECT", "INSERT"},
     # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`). Круг
     # (`mcp_admins`) снят миграцией `0059` (D448).
     "mcp_tokens": {"SELECT", "INSERT"},
@@ -316,6 +324,8 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
 #: Здесь заслон и стоит: `fingerprint`, владелец токена, арендатор и время
 #: выпуска не правятся ни одним запросом, потому что права на них нет (`0011`).
 APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
+    # Отзыв после записи не переписывается: только «разобрано» и итог отправки в Telegram (`0143`).
+    "feedback": {"UPDATE": {"reviewed_at", "reviewed_by", "telegram_sent_at", "telegram_error"}},
     "mcp_tokens": {"UPDATE": {"revoked_at", "revoked_by"}},
     # Вторая ступень (`0068`): ни владелец, ни открытый ключ, ни отпечаток не правятся —
     # только счётчик подписей и время использования, секрет и отметки приложения,
@@ -399,6 +409,9 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     # привязывает страны этой ролью. Ни UPDATE, ни DELETE: код пространства не
     # меняется, а снятая страна тихо сузила бы охват чтения партнёра.
     "space_countries": {"SELECT", "INSERT"},
+    # Лимиты пространства (`0141`, D759): правятся с экрана «Пространства» — без DELETE:
+    # снятие лимита — пустое значение в строке, а не пропажа строки (она вернула бы умолчание).
+    "space_limits": {"SELECT", "INSERT", "UPDATE"},
     "tenants": {"SELECT", "INSERT"},
     "inspections": {"SELECT"},
     "findings": {"SELECT"},
@@ -449,6 +462,10 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "country_report_langs": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "mailing_cc": {"SELECT", "INSERT", "DELETE"},
     "mailing_templates": {"SELECT", "INSERT"},
+    # События в пространствах партнёров и отметки «Видел» (`0140`, D759): события администратор
+    # только читает (пишет триггер), отметку — читает и дописывает.
+    "partner_account_events": {"SELECT"},
+    "partner_event_seen": {"SELECT", "INSERT"},
     "service_settings": {"SELECT", "INSERT", "UPDATE"},
 }
 
@@ -502,6 +519,7 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
             "created_at",
             "email",
             "display_name_latin",
+            "space_frozen_at",
         },
         "INSERT": {"tenant_code", "login", "password_hash", "role", "email"},
         "UPDATE": {

@@ -50,14 +50,14 @@
   {% endif %}
 {% endmacro %}
 
-{# «Где болит»: системные нарушения и потери по направлениям — одним блоком, только при проверках. #}
+{# «Где болит»: системные нарушения и потери по направлениям — одним блоком, только при проверках. Подзаголовок колонки — только когда колонок две: у единственной он повторял бы заголовок блока (#1608). #}
 {% macro hurt(data) %}
   {% if data.systemic or data.process_losses %}
   {% call pick_block(t('country.hurt.title'), period_title) %}
     <div class="cn-hurt">
       {% if data.systemic %}
       <div class="cn-hurt__col">
-        <div class="cn-sub">{{ t('country.hurt.systemic') }}</div>
+        {% if data.process_losses %}<div class="cn-sub">{{ t('country.hurt.systemic') }}</div>{% endif %}
         {% for item in data.systemic %}
           <div class="ov-row">
             <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
@@ -76,7 +76,7 @@
       {% endif %}
       {% if data.process_losses %}
       <div class="cn-hurt__col">
-        <div class="cn-sub">{{ t('country.hurt.processes') }}</div>
+        {% if data.systemic %}<div class="cn-sub">{{ t('country.hurt.processes') }}</div>{% endif %}
         {% for zone in data.process_losses %}
           <div class="ov-row" title="{{ t('overview.processes.spread', units=zone.units, inspections=zone.inspections) }}">
             <span class="ov-row__name">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>

@@ -42,6 +42,7 @@ from .config import check_environment
 from .database_target import managing_dsn
 from .errors import AccessError, DbError
 from .pool import connection
+from .timeouts import timed_connect
 
 logger = logging.getLogger(__name__)
 
@@ -264,7 +265,7 @@ def statuses() -> dict[str, KeyStatus]:
 
 def _managing() -> Any:
     _, dsn = managing_dsn("поменять ключ сервиса")
-    return psycopg.connect(dsn)
+    return timed_connect(dsn)
 
 
 def save_many(values: Mapping[str, str], *, provider: str, by: str) -> dict[str, KeyStatus]:

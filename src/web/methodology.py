@@ -27,17 +27,21 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from src.domain.permissions import role_may
+from src.domain.technical import FILE_NAME, TechnicalRefused, manifest
 from src.mcp import checklist_tools as door
 from src.mcp import checklists as lists_door
-from src.mcp.checklist import Store, current_version, tip_version
+from src.mcp.checklist import Store, apply_edit, current_version, technical_checks, tip_version
 from src.mcp.checklist_layout import (
     ACTIVE,
     DEFAULT_SPACE,
@@ -49,7 +53,7 @@ from src.mcp.checklist_layout import (
     space_of,
 )
 from src.mcp.config import DATA_DIR_VAR, MCP_CHECKLIST_STORE_VAR
-from src.mcp.errors import McpError
+from src.mcp.errors import ChecklistError, McpError
 
 from .errors import MethodologyRefused
 from .texts import t
@@ -1109,3 +1113,88 @@ def set_bot_access(
         )
     except McpError as отказ:
         raise _refusal(отказ) from None
+
+
+def load_technical(store: Store, *, version: str, code: str) -> list[dict[str, Any]]:
+    """Definitions for an item, retaining disabled checkpoints for reactivation."""
+    try:
+        return [c for c in technical_checks(store, version=version) if code in c["item_codes"]]
+    except McpError as exc:
+        raise _refusal(exc) from None
+
+
+def edit_technical(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    check_id: str,
+    expected_version: str,
+    fields: Mapping[str, Any],
+    version_name: str | None = None,
+    note: str | None = None,
+) -> Edit:
+    """Save one checkpoint through the common version store, without publishing."""
+
+    def mutate(candidate: Path, holder: Path) -> tuple[str | None, str]:
+        checks = manifest(candidate, include_disabled=True)
+        existing = next((c for c in checks if c["id"] == check_id), None)
+        if check_id and (existing is None or code not in existing["item_codes"]):
+            raise ChecklistError("Контрольная точка не найдена", refusal="technical_invalid")
+        check = (
+            dict(existing)
+            if existing is not None
+            else {
+                "id": "TC_" + uuid.uuid4().hex,
+                "item_codes": [code],
+            }
+        )
+        for field in (
+            "title_ru",
+            "title_en",
+            "guidance_ru",
+            "guidance_en",
+            "applicability_ru",
+            "applicability_en",
+            "zones",
+            "countries",
+            "required",
+            "requires_photo",
+            "enabled",
+            "kind",
+        ):
+            check[field] = fields.get(field)
+        if check != existing:
+            check["updated_at"] = datetime.now(UTC).isoformat()
+        if existing is None:
+            checks.append(check)
+        else:
+            checks[checks.index(existing)] = check
+        (candidate / FILE_NAME).write_text(
+            json.dumps({"version": 1, "checks": checks}, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return None, ""
+
+    try:
+        outcome = apply_edit(
+            store,
+            tenant=tenant,
+            tool="edit_technical_checkpoint",
+            mutate=mutate,
+            expected_version=expected_version,
+            note=_signed(author, note),
+            version_name=_maybe(version_name),
+        )
+    except TechnicalRefused:
+        raise MethodologyRefused(
+            "Некорректные параметры", key="refusal.technical_invalid"
+        ) from None
+    except McpError as exc:
+        raise _refusal(exc) from None
+    if not outcome.accepted:
+        raise MethodologyRefused(outcome.refusal or outcome.status)
+    return Edit(
+        base_version=outcome.base_version, version=str(outcome.version), status=outcome.status
+    )

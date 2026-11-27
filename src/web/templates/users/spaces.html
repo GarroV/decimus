@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "administration/_nav.html" import admin_nav with context %}
-{% from "users/_spaces.html" import space_card, country_select with context %}
+{% from "users/_spaces.html" import space_card, country_select, partner_settings with context %}
 {% from "_split_ui.html" import confirm %}
 {% block title %}{{ t('users.tab.spaces') }}{% endblock %}
 {% block head %}
@@ -79,6 +79,7 @@
     <p>{{ t('users.spaces.col.countries') }}: {% for country in space_pick.countries %}{{ country_title(country) }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
     <form method="post" action="{{ action('spaces/countries') }}" class="sform sform--row"><input type="hidden" name="code" value="{{ space_pick.code }}"><label><span class="sform__label">{{ t('users.spaces.countries.add') }}</span>{{ country_select(country_options) }}</label><button class="sbtn">{{ t('users.spaces.countries.submit') }}</button></form>
   </details>{% endif %}
+  {{ partner_settings(space_pick, manages_spaces, space_readiness) }}
   {% endif %}
 </section></div>
 {% endblock %}

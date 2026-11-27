@@ -93,13 +93,16 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     )
 
     class Строка:
-        def __init__(self, login: str, ident: str) -> None:
-            self.login, self.id, self.disabled_at = login, ident, None
+        def __init__(self, login: str, ident: str, role: str = "developer") -> None:
+            self.login, self.id, self.role, self.disabled_at = login, ident, role, None
 
     monkeypatch.setattr(
         cs.accounts,
         "everyone",
-        lambda **_: (Строка("nino", "66666666-6666-6666-6666-666666666666"),),
+        lambda **_: (
+            Строка("nino", "66666666-6666-6666-6666-666666666666"),
+            Строка("osb1", "77777777-7777-7777-7777-777777777777", "osb"),
+        ),
     )
     з["store"] = [хранилище]
     return з
@@ -217,6 +220,37 @@ def test_логин_своего_пространства_связывает_у�
     assert второй.executor_user_id is None and второй.executor_name == "Гость из офиса"
 
 
+def test_в_ук_едут_только_бизнес_девелоперы(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
+) -> None:
+    """10.11.2026: подсказка и сервер в УК берут только учётки с ролью developer."""
+    c = клиент(monkeypatch, tenant="HQ", role="admin")
+    форма = c.get("/calendar?trip=new").get_data(as_text=True)
+    assert 'value="nino"' in форма and 'value="osb1"' not in форма
+    for кто in ("osb1", "Гость из офиса"):
+        ответ = отправить(c, "/calendar/trips", **{**ФОРМА, "executor": кто})
+        assert ответ.status_code != 303
+    assert зовы["create"] == []
+    assert отправить(c, "/calendar/trips", **{**ФОРМА, "executor": "nino"}).status_code == 303
+
+
+def test_ук_может_править_поездку_с_прежним_исполнителем(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
+) -> None:
+    previous = "77777777-7777-7777-7777-777777777777"
+    зовы["store"][0][ПОЕЗДКА] = поездка(
+        tenant="HQ", executor_name="osb1", executor_user_id=previous
+    )
+    c = клиент(monkeypatch, tenant="HQ", role="admin")
+    path = f"/calendar/trips/{ПОЕЗДКА}"
+    assert отправить(c, path, **{**ФОРМА, "executor": "osb1"}).status_code == 303
+    assert зовы["update"][-1][1].executor_user_id == previous
+    assert отправить(c, path, **{**ФОРМА, "executor": "unknown"}).status_code == 400
+    assert len(зовы["update"]) == 1
+    assert отправить(c, path, **{**ФОРМА, "executor": "nino"}).status_code == 303
+    assert зовы["update"][-1][1].executor_user_id == "66666666-6666-6666-6666-666666666666"
+
+
 def test_пиццерия_и_страна_вне_охвата_отказ(
     monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
 ) -> None:
@@ -289,7 +323,7 @@ def test_создание_с_несколькими_посещениями_од�
 
 
 @pytest.mark.parametrize(
-    "field,value", [("visit_day", "2026-11-01"), ("visit_unit", ЧУЖАЯ_ТОЧКА), ("visit_at", "oops")]
+    "field,value", [("visit_day", "2027-01-01"), ("visit_unit", ЧУЖАЯ_ТОЧКА), ("visit_at", "oops")]
 )
 def test_ошибка_посещения_сохраняет_форму_и_не_создаёт_поездку(
     monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]], field: str, value: str
@@ -301,6 +335,70 @@ def test_ошибка_посещения_сохраняет_форму_и_не_�
     assert response.status_code == 400 and зовы["create"] == []
     html = response.get_data(as_text=True)
     assert 'value="Кто-то"' in html and f'value="{form["visit_day"]}"' in html
+
+
+@pytest.mark.parametrize(
+    "period,days,expected",
+    [
+        ({}, ["2026-10-25"], (date(2026, 10, 25), date(2026, 10, 25))),
+        ({}, ["2026-10-27", "2026-10-24"], (date(2026, 10, 24), date(2026, 10, 27))),
+        (
+            {"from": "2026-10-24", "to": "2026-10-24"},
+            ["2026-10-25"],
+            (date(2026, 10, 24), date(2026, 10, 25)),
+        ),
+    ],
+)
+def test_даты_поездки_из_посещений_без_повторного_ввода(
+    monkeypatch: pytest.MonkeyPatch,
+    зовы: dict[str, list[Any]],
+    period: dict[str, str],
+    days: list[str],
+    expected: tuple[date, date],
+) -> None:
+    c = клиент(monkeypatch, tenant="GE", role="admin")
+    response = c.post(
+        "/calendar/trips",
+        headers={"Origin": СВОЙ},
+        data={
+            "executor": "Кто-то",
+            "country": "GE",
+            **period,
+            "visit_day": days,
+            "visit_unit": [ТОЧКА] * len(days),
+            "visit_at": [""] * len(days),
+        },
+    )
+    assert response.status_code == 303
+    draft = зовы["create"][-1][0]
+    assert (draft.date_from, draft.date_to) == expected
+    assert len(зовы["visits"][-1]) == len(days)
+
+
+def test_поездка_без_плана_требует_одну_дату_а_пустые_даты_не_сохраняет(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
+) -> None:
+    c = клиент(monkeypatch, tenant="GE", role="admin")
+    assert отправить(c, "/calendar/trips", executor="Кто-то").status_code == 400
+    assert not зовы["create"]
+    assert (
+        отправить(c, "/calendar/trips", executor="Кто-то", **{"from": "2026-10-24"}).status_code
+        == 303
+    )
+    draft = зовы["create"][-1][0]
+    assert draft.date_from == draft.date_to == date(2026, 10, 24)
+    assert зовы["visits"][-1] == ()
+
+
+@pytest.mark.parametrize("day", ["", "not-a-date"])
+def test_посещение_без_корректной_даты_не_создаёт_поездку(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]], day: str
+) -> None:
+    c = клиент(monkeypatch, tenant="GE", role="admin")
+    response = отправить(
+        c, "/calendar/trips", executor="Кто-то", visit_day=day, visit_unit=ТОЧКА, visit_at=""
+    )
+    assert response.status_code == 400 and not зовы["create"]
 
 
 def test_календарь_показывает_точки_только_в_день_посещения(

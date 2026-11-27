@@ -210,12 +210,14 @@ REFUSAL_TEXTS: dict[str, dict[str, str]] = {
         "en": "The methodology folder on the server is incomplete: {missing} is missing. "
         "Details are in the server log.",
     },
-    "refusal.engine_reads_outside_store": {
-        "ru": "Движок читает методику не из хранилища версий: публикация переставит указатель "
-        "«{link}», а движок её не увидит. Это настройка сервера — подробности в логе сервера.",
-        "en": "The engine reads the methodology outside the version store: publishing would "
-        "move the “{link}” pointer, and the engine would not see it. This is a server setting — "
-        "details are in the server log.",
+    "refusal.bot_cannot_see_store": {
+        "ru": "Бот не увидит эту публикацию: он читает издания из указателя «{link}» чек-листа "
+        "в хранилище версий, а здесь хранилище не то или чек-лист в нём не найден. Это "
+        "настройка сервера — подробности в логе сервера.",
+        "en": "The bot would not see this publication: it reads editions from the “{link}” "
+        "pointer of the checklist in the version store, and here the store differs or the "
+        "checklist is not found in it. This is a server setting — details are in the "
+        "server log.",
     },
     "refusal.engine_died": {
         "ru": "Движок не дал ответа: {script} умер до ответа (попыток: {attempts}). Это отказ "

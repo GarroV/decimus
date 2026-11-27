@@ -46,6 +46,7 @@ import psycopg
 from .errors import ConfigError
 from .migrate import ADMIN_ROLE, DATABASE_ADMIN_URL_VAR
 from .space import SYSTEM_SPACE, acting_space, apply_space
+from .timeouts import timed_connect
 
 #: Миграция, которой появилась информационная часть проверки (T200). Всё, что
 #: слито до её наката, считано рецептом БЕЗ информационной части — то есть
@@ -186,7 +187,7 @@ def audit_legacy_recipes(dsn: str) -> LegacyRecipeReport:
 
 
 def _audit(dsn: str) -> LegacyRecipeReport:
-    with psycopg.connect(dsn) as conn:
+    with timed_connect(dsn, batch=True) as conn:
         apply_space(conn)
         database = _require_visibility(conn)
         row = conn.execute("select count(*) from inspections").fetchone()

@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Sequence
 from typing import Any
 
 from src.domain.model_usage import KIND_TRANSLATE
@@ -78,3 +80,42 @@ def translate_text(
     if not translated:
         raise ModelUnavailable("Перевод: модель вернула пустую строку")
     return translated
+
+
+def translate_texts(texts: Sequence[str], *, lang: str) -> list[str]:
+    """Translate a bounded document batch in source order, without changing identifiers."""
+    if not texts:
+        return []
+    cfg = load_recognize_settings()
+    count = len(texts)
+    answer = ask_model(
+        kind=KIND_TRANSLATE,
+        instructions=INSTRUCTIONS.format(lang=_LANG_NAMES.get(lang, lang))
+        + "\nThe input is a JSON array of notes. Translate each string separately, "
+        "keep their order and return exactly the same number of strings in texts.",
+        question=json.dumps(list(texts), ensure_ascii=False),
+        schema={
+            "type": "object",
+            "properties": {
+                "texts": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": count,
+                    "maxItems": count,
+                }
+            },
+            "required": ["texts"],
+            "additionalProperties": False,
+        },
+        photo=None,
+        settings=cfg,
+        model=cfg.merge_model,
+    )
+    result = answer.payload.get("texts")
+    if (
+        not isinstance(result, list)
+        or len(result) != count
+        or any(not isinstance(value, str) or not value.strip() for value in result)
+    ):
+        raise ModelUnavailable("Перевод документа: неполный ответ модели")
+    return [value.strip() for value in result]

@@ -73,6 +73,7 @@ SEALED = "sealed"
 STARTED = "started"
 LANG_GONE = "lang_gone"
 INFO_MISSING = "info_missing"
+TECHNICAL_MISSING = "technical_missing"
 BUSY = "busy"
 COMPLETED = "completed"
 STALE = "stale"
@@ -146,6 +147,12 @@ def send_summary(token: str, chat_id: int) -> str:
     try:
         if handed_over(chat_id):
             return SEALED
+        from src.domain.technical import TechnicalRefused, assert_complete
+
+        try:
+            assert_complete(chat_id)
+        except TechnicalRefused:
+            return TECHNICAL_MISSING
     except DomainError:
         logger.exception("Завершение из приложения: чат %s — заметки не читаются", log_id(chat_id))
         return FAILED
@@ -257,6 +264,12 @@ def start_report(
             return ReportStart(NO_INSPECTION)
         if handed_over(chat_id):
             return ReportStart(SEALED)
+        from src.domain.technical import TechnicalRefused, assert_complete
+
+        try:
+            assert_complete(chat_id)
+        except TechnicalRefused:
+            return ReportStart(TECHNICAL_MISSING)
         chosen = report_lang or (offered[0] if len(offered) == 1 else None)
         if chosen is None or chosen not in offered:
             return ReportStart(LANG_GONE)

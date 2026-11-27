@@ -86,8 +86,8 @@ def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[FlaskClient,
     monkeypatch.setattr(data, "load_card", lambda _id, *, reach: карточка())
     ref = ReportRef("report.pdf", "application/pdf", len(PDF), datetime.now())
 
-    def _ensure(detail: InspectionDetail, *, reach: Any) -> ReportRef:
-        следы["report"].append((detail, reach))
+    def _ensure(detail: InspectionDetail, *, reach: Any, lang: str | None = None) -> ReportRef:
+        следы["report"].append((detail, reach, lang))
         return ref
 
     # Общий helper интегрируется из соседней ветки PDF.
@@ -247,8 +247,9 @@ def test_invalid_pdf_does_not_create_draft(
     assert not следы["draft"]
 
 
+@pytest.mark.parametrize("language", ["ru", "en"])
 def test_callback_sends_current_pdf_in_gmail_mime(
-    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch, language: str
 ) -> None:
     from src.web import google_mail
 
@@ -275,7 +276,11 @@ def test_callback_sends_current_pdf_in_gmail_mime(
         "create_draft",
         lambda token, **fields: google_mail.create_draft(token, opener=opener, **fields),
     )
-    уход = увести(client)
+    уход = client.post(
+        f"/inspections/{ПРОВЕРКА}/letter/draft",
+        data={"text": "Letter", "letter_lang": language},
+        headers={"Origin": СВОЙ},
+    )
     # Между уходом и возвратом могли исправить проверку: helper получает
     # свежую карточку, а текст по-прежнему берётся из saved_letter.
     current = replace(карточка(), inspection=replace(карточка().inspection, city="Новый город"))
@@ -284,6 +289,7 @@ def test_callback_sends_current_pdf_in_gmail_mime(
     ответ = client.get("/auth/google/mail", query_string={"state": state, "code": "code"})
     assert "gmail=ok" in ответ.headers["Location"]
     assert следы["report"][0][0] is current
+    assert следы["report"][0][2] == language
     assert len(sent) == 1
     raw = json.loads(sent[0].data)["message"]["raw"]
     message = BytesParser(policy=email.policy.default).parsebytes(

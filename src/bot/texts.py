@@ -56,6 +56,16 @@ ALERT_TEXT_LIMIT = 200
 DEFAULT_UI_LANG = "ru"
 
 TEXTS: dict[str, dict[str, str]] = {
+    "finish.technical_pending": {
+        "ru": (
+            "Подтвердите обязательные пункты технического состояния "
+            "в приложении перед сдачей проверки."
+        ),
+        "en": (
+            "Confirm the required technical checkpoints in the app "
+            "before submitting the inspection."
+        ),
+    },
     # --- вход и мастер начала проверки (T050, T051, T063) ---
     # Строка про /lang и пункт меню — на ОБОИХ языках намеренно (D303): выход из
     # чужого языка должен найти тот, кто этот язык не читает.
@@ -789,6 +799,17 @@ TEXTS: dict[str, dict[str, str]] = {
     # документов, а на английском стенде ещё и русские слова. Он уходит в
     # журнал целиком (`logger.warning` в вызывающем коде), а в чат — то, что
     # нужно человеку на точке: что случилось и что делать.
+    # Месячный потолок расхода модели пространства исчерпан (D759): вызова не было.
+    "record.model_limit": {
+        "ru": (
+            "Месячный лимит расхода пространства исчерпан. Обратитесь в управляющую компанию. "
+            "Проверка продолжается вручную — пункт выберите сами."
+        ),
+        "en": (
+            "The space's monthly spending limit has been reached. Please contact the management "
+            "company. The inspection goes on by hand — pick the item yourself."
+        ),
+    },
     "record.degraded": {
         "ru": "Модель недоступна — проверка продолжается, пункт выберите сами.",
         "en": "The model is unavailable — the inspection goes on, pick the item.",

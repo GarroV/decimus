@@ -386,6 +386,11 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "partner to drafts. We do not store it, so there is no status here: Google asks "
         "again, and earlier grants are revoked in your Google account settings.",
     },
+    "settings.calendar.wip": {"ru": "В разработке", "en": "In development"},
+    "settings.calendar.wip_text": {
+        "ru": "Подключение Google Календаря для партнёров пока недоступно.",
+        "en": "Google Calendar connection is not available for partners yet.",
+    },
     "settings.calendar.title": {"ru": "Google Календарь", "en": "Google Calendar"},
     "settings.calendar.none": {
         "ru": "Календарь не подключён.",

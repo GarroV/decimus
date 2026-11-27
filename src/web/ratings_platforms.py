@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 
 from src.db import agg_store, maps_store
@@ -134,11 +134,25 @@ def build_agg(codes: Sequence[str], *, until: date, today: date) -> AggView | No
             hints=hints(units),
         )
         groups = [(c, (c,)) for c in codes] + [("", tuple(codes))]
-        _, found, later = ragg.for_groups(groups, until=until, today=today)
+        scored, found, later = ragg.for_groups(groups, until=until, today=today)
     except RatingsError:
         logger.warning("Охват агрегаторов не прочитался", exc_info=True)
         return None
+    # Колонки охвата выводятся из реестра пиццерий (`agg.units`) и привязанных точек; оценки —
+    # из `agg.ratings`. Реестр пуст или без работающих пиццерий — охват пустой, и раздел
+    # писал «оценок нет», когда те же оценки показывают «Качество» и «Стабильно ниже порога»
+    # (#1605). Площадки, у которых оценки есть, а охвата нет, добавляются колонками.
     platforms = tuple(p.key for p in cov.platforms)
+    extra = tuple(k for k in scored if k not in platforms)
+    if extra:
+        platforms += extra
+        cov = replace(
+            cov,
+            rows=tuple(
+                replace(r, cells={**r.cells, **{k: coverage.Cell(coverage.ABSENT) for k in extra}})
+                for r in cov.rows
+            ),
+        )
     *by_country, overall = found
     countries = tuple(
         CountryBlock(g.group, g.scores, tuple(r for r in cov.rows if r.unit.country == g.group))

@@ -315,6 +315,9 @@ class Inspection:
     finished_at: datetime.datetime | None = None
     finding_history: list[dict[str, Any]] = field(default_factory=list)
     measurement_sets: dict[str, Any] = field(default_factory=dict)
+    technical_enabled: bool = False
+    technical_checks: dict[str, Any] = field(default_factory=dict)
+    technical_snapshot: dict[str, Any] | None = None
 
     def visit_date(self) -> datetime.date | None:
         """Дата обхода датой; нечитаемая строка — `None` (сравнивать не с чем)."""

@@ -199,3 +199,26 @@ a.hm-row:hover { background: var(--surface-2); text-decoration: none; }
   .hm-filters__title { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .hm-sticker { transition: none; } }
+
+/* ── «Начало работы» (D756): карточка партнёра над доской ───────────── */
+.hm-start { margin-top: var(--space-4); }
+.hm-start__lead { margin: 0; font-size: 13px; color: var(--ink-2); }
+.hm-start__list { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; list-style: none; }
+.hm-start__row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; gap: 4px 12px;
+  padding: 10px 0; border-top: 1px solid var(--line); }
+.hm-start__row:first-child { border-top: 0; }
+.hm-start__mark { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;
+  border: 1px solid var(--line-control); font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); }
+.hm-start__row--done .hm-start__mark { border-color: var(--ok-line); background: var(--ok-soft); color: var(--ok); }
+.hm-start__row--waiting .hm-start__mark { border-color: var(--warn-line); background: var(--warn-soft); color: var(--warn); }
+.hm-start__title { font-size: 13.5px; font-weight: var(--w-semibold); color: var(--ink); }
+.hm-start__row--done .hm-start__title { color: var(--ink-2); }
+.hm-start__text { margin-top: 2px; font-size: 12.5px; color: var(--ink-2); }
+.hm-start__side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.hm-start__state { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.hm-start__row--waiting .hm-start__state { color: var(--warn); }
+.hm-start__row--done .hm-start__state { color: var(--ok); }
+@media (max-width: 719px) {
+  .hm-start__row { grid-template-columns: 28px minmax(0, 1fr); }
+  .hm-start__side { grid-column: 2; flex-direction: row; align-items: center; flex-wrap: wrap; justify-content: flex-start; }
+}

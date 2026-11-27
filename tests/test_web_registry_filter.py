@@ -189,7 +189,7 @@ def test_страна_где_всё_на_приёмке_есть_в_списке
         unescape(title.strip()): unescape(href)
         for href, title in re.findall(r'<option value="([^"]+)"[^>]*>(.*?)</option>', country[1])
     }
-    assert "Беларусь · 1" in options
-    assert "country=BY" in options["Беларусь · 1"]
+    assert "Беларусь · 0" in options
+    assert "country=BY" in options["Беларусь · 0"]
     assert any("Грузия" in title for title in options)
     assert 'class="rg-countries' not in страница

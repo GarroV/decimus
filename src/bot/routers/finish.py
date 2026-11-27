@@ -49,7 +49,7 @@ from src.domain.revision import revision
 from src.domain.state import read_state
 from src.domain.timing import utc_now
 from src.domain.translation import untranslated
-from src.report import PhotoMissing, ReportError, build_letter_notes, build_pdf
+from src.report import PhotoMissing, ReportError, build_letter_notes, build_pdf, snapshot_text
 
 from .. import item_labels, sealed, sidecar, stops, view
 from ..errors import BotNotesError, ChangedSinceReviewError
@@ -286,6 +286,14 @@ async def archive(
         await stops.refuse(message, lang, step="finish.archive", key="finish.not_archived")
         return False
 
+    translation_saved = True
+    if source_settings is not None:
+        try:
+            await asyncio.to_thread(snapshot_text.archive, chat_id, source_settings, inspection_id)
+        except (db.DbError, OSError):
+            logger.exception("Перевод сдачи не перенесён в кэш документов")
+            translation_saved = False
+
     try:
         await asyncio.to_thread(
             db.upload_photos,
@@ -320,7 +328,7 @@ async def archive(
         return False
 
     if report is None:
-        return True
+        return translation_saved
 
     # Готовый отчёт уезжает в хранилище (T336, #317). Тот самый файл, что
     # получил аудитор, а не пересобранный: пересборка дала бы второй документ,
@@ -348,7 +356,7 @@ async def archive(
             ", уже лежал" if stored.already else "",
         )
 
-    return True
+    return translation_saved
 
 
 async def warn_untranslated(message: Message, inspection: domain.Inspection, lang: str) -> None:
@@ -475,6 +483,13 @@ async def deliver(
         await stops.refuse(message, lang, step="finish.build", key="material.no_inspection")
         return
     if await refuse_if_sealed(message, chat_id, lang):
+        return
+    from src.domain.technical import TechnicalRefused, assert_complete
+
+    try:
+        assert_complete(chat_id)
+    except TechnicalRefused:
+        await stops.refuse(message, lang, step="finish.build", key="finish.technical_pending")
         return
     source_revision = revision(inspection)
     if expected_revision is not None and expected_revision != source_revision:

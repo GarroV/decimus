@@ -44,7 +44,7 @@ from src.domain.errors import DomainError, ValidationError
 from src.domain.log_ids import log_id
 from src.domain.model_usage import KIND_SUGGEST, usage_scope
 from src.domain.models import Inspection
-from src.recognize.errors import RecognizeError
+from src.recognize.errors import ModelLimitReached, RecognizeError
 from src.recognize.selected_level import (
     MissingFacts,
     evaluate_selected_level,
@@ -419,6 +419,8 @@ def _guarded(
         return card
     except WalkRefused as exc:
         text, code = _said(str(exc), lang), str(exc)
+    except ModelLimitReached:
+        text, code = _said("walk.err.model_limit", lang), "ModelLimitReached"
     except (RecognizeError, DomainError, CriteriaUnavailable, ValidationError, OSError) as exc:
         # Только тип: слова аудитора и текст модели в журнал не идут.
         logger.warning("Обход: карточка пакета не подобрана: %s", type(exc).__name__)

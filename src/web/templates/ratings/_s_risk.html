@@ -1,10 +1,10 @@
-{% from "ratings/_macros.html" import unit_link with context %}
+{% from "ratings/_macros.html" import unit_link, agg_score with context %}
 {# D746: supplied risk sources grouped without inventing maps history or new thresholds. #}
 {% macro source_card(s) %}{% set history = trend(s.scores) %}
   <div class="rt-risk-source rt-risk-source--{{ s.code }}">
     <b class="rt-risk-source__name">{{ risk_sources.get(s.code, s.code) }}</b>
     <div class="rt-risk-source__values">{% for point in history.scores %}
-      <span class="rt-risk-source__value">{% if point.value is none %}<span class="is-empty">—</span>{% else %}<span>{{ point.formatted }}</span>{% if point.delta is not none %}<span class="rt-delta rt-delta--{{ point.tone }}" title="{{ t('ratings.col.delta') }} {{ point.delta_text }}"><span class="rt-delta__arrow">{{ point.arrow }}</span></span>{% endif %}{% endif %}</span>
+      <span class="rt-risk-source__value">{% if point.value is none %}<span class="is-empty">—</span>{% else %}<span>{% if s.scale %}{{ agg_score(point.value, s.scale) }}{% else %}{{ point.formatted }}{% endif %}</span>{% if point.delta is not none %}<span class="rt-delta rt-delta--{{ point.tone }}" title="{{ t('ratings.col.delta') }} {{ point.delta_text }}"><span class="rt-delta__arrow">{{ point.arrow }}</span></span>{% endif %}{% endif %}</span>
     {% endfor %}</div>
     {% if history.points %}<svg class="rt-sparkline" viewBox="0 0 {{ history.width }} {{ history.height }}" role="img" aria-label="{{ risk_sources.get(s.code, s.code) }}: {% for point in history.scores %}{{ point.value if point.value is not none else '—' }}{% if not loop.last %}, {% endif %}{% endfor %}">
       <line class="rt-sparkline__guide" x1="0" y1="{{ history.height / 2 }}" x2="{{ history.width }}" y2="{{ history.height / 2 }}"></line>
@@ -13,6 +13,7 @@
     </svg>{% endif %}
   </div>
 {% endmacro %}
+
 <div class="rt-sec">
 {% if risk.rows %}
   {% set count = namespace(ratings=0, aggregators=0, inspections=0) %}
@@ -27,7 +28,7 @@
     <div class="rt-risk-stat rt-risk-stat--aggregators"><span>{{ t('ratings.sec.agg') }}</span><b data-risk-count="aggregators">{{ count.aggregators }}</b></div>
     <div class="rt-risk-stat rt-risk-stat--inspections"><span>{{ t('ratings.risk.src.inspections') }}</span><b data-risk-count="inspections">{{ count.inspections }}</b></div>
   </div>
-  <div class="rt-card rt-scroll"><table class="rt-maps rt-list rt-risk-list">
+  <div class="rt-card rt-scroll rt-risk-card"><table class="rt-maps rt-list rt-risk-list">
     <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col" class="rt-risk-group-head rt-risk-group-head--ratings">{{ t('section.ratings.title') }}</th><th scope="col" class="rt-risk-group-head rt-risk-group-head--aggregators">{{ t('ratings.sec.agg') }}</th><th scope="col" class="rt-risk-group-head rt-risk-group-head--inspections">{{ t('ratings.risk.src.inspections') }}</th></tr></thead>
     <tbody>{% for u in risk.rows %}<tr data-country="{{ u.country }}">
       <th scope="row">{{ unit_link(u.unit, u.unit_name, 'rko' if u.sources[0].code == 'rko' else 'rs') }}<small>{% if country_topic_url is defined %}<a href="{{ country_topic_url(u.country, 'risk') }}">{{ country_name(u.country) }}</a>{% else %}{{ country_name(u.country) }}{% endif %}</small></th>
@@ -37,6 +38,7 @@
         ('inspections', u.sources|selectattr('code', 'equalto', 'inspections')|list)
       ) %}
       {% for group, sources in groups %}<td class="rt-risk-group rt-risk-group--{{ group }}">{% if sources %}<div class="rt-risk-sources">{% for s in sources %}{{ source_card(s) }}{% endfor %}</div>{% else %}<span class="is-empty">—</span>{% endif %}</td>{% endfor %}
+
     </tr>{% endfor %}</tbody>
   </table></div>
 {% else %}<div class="rt-empty">{{ t('ratings.empty.risk') }}</div>{% endif %}

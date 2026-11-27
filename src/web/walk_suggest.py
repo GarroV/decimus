@@ -36,7 +36,7 @@ from src.domain import check_environment, get_state, handed_over, upload_file
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
 from src.domain.model_usage import KIND_SUGGEST, usage_scope
-from src.recognize.errors import ModelUnavailable, RecognizeError
+from src.recognize.errors import ModelLimitReached, ModelUnavailable, RecognizeError
 from src.recognize.models import Candidate
 from src.recognize.provenance import frame_indices
 from src.recognize.timing import collect, measure, report
@@ -274,6 +274,11 @@ def install(
                 )
         except WalkRefused as exc:
             return refused(str(exc), lang)
+        except ModelLimitReached:
+            # Потолок расхода пространства (D759): вызова не было, пункт — вручную.
+            walk_steps.note_via(walk_steps.VIA_FALLBACK)
+            walk_steps.note_error("ModelLimitReached")
+            return refused("walk.err.model_limit", lang, 503)
         except ModelUnavailable as exc:
             # Модель недоступна — обход не встаёт: аудитор выбирает пункт
             # вручную, как в боте. Сырой текст исключения — в журнал.

@@ -26,6 +26,7 @@ from src.domain import mailing_content
 from .config import check_environment, load_retraction_settings
 from .errors import MailingTemplateError, MailingTemplateInputError
 from .pool import connection
+from .timeouts import timed_connect
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +149,7 @@ def save(
         if why:
             raise MailingTemplateInputError(why)
     try:
-        with psycopg.connect(load_retraction_settings().dsn) as conn:
+        with timed_connect(load_retraction_settings().dsn) as conn:
             row = conn.execute(
                 "insert into mailing_templates (kind, slot, lang, version, body, "
                 "saved_by, subject) "

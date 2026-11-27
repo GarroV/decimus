@@ -430,6 +430,89 @@ _SPACES: dict[str, dict[str, str]] = {
         "ru": "Страны пространства меняет главный админ или админ УК.",
         "en": "A super admin or an HQ admin changes the space's countries.",
     },
+    # Лимиты пространства (D759 п.5, #1670): раздел карточки и предупреждения. Только на экране.
+    "users.limits.title": {"ru": "Лимиты", "en": "Limits"},
+    "users.limits.unknown": {
+        "ru": "Лимиты и расход не загрузились: база не ответила.",
+        "en": "Limits and spending did not load: the database did not answer.",
+    },
+    "users.limits.spend": {
+        "ru": "{spent} $ из {cap} $ в этом месяце",
+        "en": "${spent} of ${cap} this month",
+    },
+    "users.limits.spend_nocap": {
+        "ru": "в этом месяце, потолка нет",
+        "en": "this month, no cap",
+    },
+    "users.limits.partial": {
+        "ru": "Расход — оценка по прейскуранту; модели без цены в сумму не вошли.",
+        "en": "Spending is an estimate from the price list; models without a price "
+        "are not counted.",
+    },
+    "users.limits.warn": {
+        "ru": "Израсходовано больше 80 % месячного потолка. Когда он будет достигнут, "
+        "модель в этом пространстве отключится до следующего месяца — ручной ввод останется.",
+        "en": "More than 80% of the monthly cap is spent. Once it is reached, the model stops in "
+        "this space until next month — manual entry keeps working.",
+    },
+    "users.limits.over": {
+        "ru": "Месячный потолок достигнут: модель в этом пространстве отключена до следующего "
+        "месяца или до повышения потолка. Ручной ввод работает.",
+        "en": "The monthly cap is reached: the model is off in this space until next month or "
+        "until the cap is raised. Manual entry keeps working.",
+    },
+    "users.limits.own_warn": {
+        "ru": "Расход модели вашего пространства — больше 80 % месячного потолка. После потолка "
+        "модель отключится до следующего месяца; ручной ввод останется. Поднять потолок может "
+        "управляющая компания.",
+        "en": "Your space has used over 80% of its monthly model cap. After the cap the model "
+        "stops until next month; manual entry stays. The management company can raise the cap.",
+    },
+    "users.limits.own_over": {
+        "ru": "Месячный лимит расхода пространства исчерпан. Обратитесь в управляющую компанию. "
+        "Ручной ввод работает.",
+        "en": "The space's monthly spending limit has been reached. Please contact the management "
+        "company. Manual entry keeps working.",
+    },
+    "users.limits.inspections": {"ru": "Проверок на пиццерию", "en": "Inspections per pizzeria"},
+    "users.limits.inspections_hint": {
+        "ru": "Целое от 1. Пусто — без лимита.",
+        "en": "A whole number from 1. Empty — no limit.",
+    },
+    "users.limits.spend_cap": {
+        "ru": "Порог расхода модели в месяц, $",
+        "en": "Monthly model spending threshold, $",
+    },
+    "users.limits.recorded_spend": {
+        "ru": "Порог останавливает новые запросы по уже учтённому расходу. Начатые запросы "
+        "не отменяются, поэтому расход может превысить порог.",
+        "en": "New requests stop based on recorded spend. Requests already in progress are not "
+        "cancelled, so spending may exceed the threshold.",
+    },
+    "users.limits.spend_hint": {
+        "ru": "Календарный месяц (UTC). Пусто — без порога; 0 — новые запросы выключены.",
+        "en": "Calendar month (UTC). Empty — no threshold; 0 — new requests are off.",
+    },
+    "users.limits.none": {"ru": "без лимита", "en": "no limit"},
+    "users.limits.save": {"ru": "Сохранить", "en": "Save"},
+    "users.limits.readonly": {
+        "ru": "Лимиты меняет главный админ или админ УК.",
+        "en": "A super admin or an HQ admin changes the limits.",
+    },
+    "users.limits.is_default": {
+        "ru": "Свои настройки не заданы — действуют значения по умолчанию.",
+        "en": "No settings of its own — the defaults apply.",
+    },
+    "users.limits.changed": {
+        "ru": "Менял {who}, {when} UTC.",
+        "en": "Changed by {who}, {when} UTC.",
+    },
+    "users.limits.saved": {"ru": "Лимиты сохранены.", "en": "Limits saved."},
+    "users.limits.failed": {
+        "ru": "Лимиты не сохранены: проверки — целое от 1, потолок — число от 0 с копейками.",
+        "en": "Limits not saved: inspections — a whole number from 1, cap — a number from 0 "
+        "with cents.",
+    },
     "users.spaces.show_people": {"ru": "Показать людей", "en": "Show people"},
     "users.spaces.add.open": {"ru": "Добавить пространство", "en": "Add a space"},
     "users.spaces.add.title": {"ru": "Новое пространство", "en": "New space"},
@@ -458,6 +541,88 @@ _SPACES: dict[str, dict[str, str]] = {
             "Space not created: the code is taken or invalid, a country belongs to another "
             "partner, or the database did not answer. Nothing was saved."
         ),
+    },
+    "users.spaces.frozen_badge": {"ru": "заморожено", "en": "frozen"},
+    "users.spaces.freeze.title": {"ru": "Заморозка пространства", "en": "Freeze the space"},
+    "users.spaces.freeze.note": {
+        "ru": "Замораживает все действующие учётки пространства разом: сессии закроются, "
+        "подключения Claude и токены отзовутся, боты отвяжутся. Новые учётки в нём "
+        "не заводятся, пока пространство заморожено.",
+        "en": "Freezes every active account in the space at once: sessions close, Claude "
+        "connections and tokens are revoked, bots are unlinked. No new accounts can be "
+        "created in it while it is frozen.",
+    },
+    "users.spaces.freeze.open": {"ru": "Заморозить пространство", "en": "Freeze the space"},
+    "users.spaces.freeze.confirm": {
+        "ru": "Пространство {code}: все действующие учётки ({count}) потеряют вход сразу. "
+        "Вернуть их можно кнопкой «Разморозить пространство».",
+        "en": "Space {code}: all active accounts ({count}) lose access at once. "
+        "You can bring them back with “Unfreeze the space”.",
+    },
+    "users.spaces.freeze.yes": {"ru": "Да, заморозить пространство", "en": "Yes, freeze the space"},
+    "users.spaces.freeze.state": {
+        "ru": "Заморожено {date}, заморозил: {by}. Учёток заморожено кнопкой: {count}.",
+        "en": "Frozen {date} by {by}. Accounts frozen by the button: {count}.",
+    },
+    "users.spaces.unfreeze.open": {"ru": "Разморозить пространство", "en": "Unfreeze the space"},
+    "users.spaces.unfreeze.note": {
+        "ru": "Вернутся только учётки, замороженные этой кнопкой; замороженные раньше "
+        "по одной останутся замороженными. Люди входят заново, бота и Claude "
+        "подключают сами.",
+        "en": "Only accounts frozen by this button come back; accounts frozen one by one "
+        "earlier stay frozen. People sign in again and reconnect the bot and Claude "
+        "themselves.",
+    },
+    "users.spaces.frozen": {"ru": "Пространство заморожено.", "en": "The space is frozen."},
+    "users.spaces.already_frozen": {
+        "ru": "Пространство уже заморожено.",
+        "en": "The space is already frozen.",
+    },
+    "users.spaces.unfrozen": {"ru": "Пространство разморожено.", "en": "The space is unfrozen."},
+    "users.spaces.freeze_failed": {
+        "ru": "Не удалось заморозить пространство.",
+        "en": "Could not freeze the space.",
+    },
+    "users.spaces.unfreeze_failed": {
+        "ru": "Не удалось разморозить пространство.",
+        "en": "Could not unfreeze the space.",
+    },
+    "users.spaces.unfreeze_email_taken": {
+        "ru": "Не разморожено: почту одной из учёток за время заморозки привязали к другой "
+        "живой учётке. Снимите её у одной из двух и повторите.",
+        "en": "Not unfrozen: the email of one account was linked to another live account "
+        "while frozen. Remove it from one of the two and try again.",
+    },
+    "users.add.space_frozen": {
+        "ru": "Пространство заморожено: новых учёток в нём не заводят. Сначала разморозьте его.",
+        "en": "The space is frozen: no new accounts can be created in it. Unfreeze it first.",
+    },
+    "users.events.title": {
+        "ru": "Новое в пространствах партнёров: {count}",
+        "en": "New in partner spaces: {count}",
+    },
+    "users.events.admin_added": {
+        "ru": "В пространстве {space} новый админ: {login}",
+        "en": "New admin in space {space}: {login}",
+    },
+    "users.events.email_changed": {
+        "ru": "В пространстве {space} у учётки {login} сменилась почта",
+        "en": "In space {space} the email of account {login} was changed",
+    },
+    "users.events.by": {"ru": "завёл или изменил: {actor}", "en": "done by: {actor}"},
+    "users.events.by_none": {
+        "ru": "сама учётка или команда с сервера",
+        "en": "the account itself or a server command",
+    },
+    "users.events.seen": {"ru": "Видел", "en": "Seen"},
+    "users.events.more": {"ru": "Ещё событий: {count}", "en": "More events: {count}"},
+    "users.events.unknown": {
+        "ru": "Не удалось прочитать события пространств партнёров.",
+        "en": "Could not read the partner space events.",
+    },
+    "users.events.failed": {
+        "ru": "Не удалось отметить событие.",
+        "en": "Could not mark the event.",
     },
     "users.spaces.countries_added": {"ru": "Страны добавлены.", "en": "Countries added."},
     "users.spaces.countries_failed": {
@@ -517,13 +682,17 @@ _PROFILE: dict[str, dict[str, str]] = {
     "profile.password.submit": {"ru": "Сменить пароль", "en": "Change password"},
     "profile.password.hint": {
         "ru": "Не короче {min} знаков. После смены все остальные ваши входы закрываются, "
-        "этот остаётся.",
+        "этот остаётся. Ключ и подключение Claude отзываются: Claude нужно будет "
+        "подключить заново.",
         "en": "At least {min} characters. After the change all your other sessions are "
-        "signed out; this one stays.",
+        "signed out; this one stays. Your Claude key and connection are revoked: you will "
+        "need to reconnect Claude.",
     },
     "profile.password.ok": {
-        "ru": "Пароль сменён. Остальные ваши входы закрыты.",
-        "en": "Password changed. Your other sessions have been signed out.",
+        "ru": "Пароль сменён. Остальные входы закрыты, ключ Claude отозван: "
+        "подключите Claude заново.",
+        "en": "Password changed. Other sessions are signed out and your Claude key is "
+        "revoked: reconnect Claude.",
     },
     "profile.password.wrong": {
         "ru": "Пароль не сменён: проверьте текущий пароль.",

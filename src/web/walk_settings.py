@@ -147,12 +147,15 @@ def _finish(who: int, conf: WalkSettings, body: dict[str, Any], lang: str) -> tu
         raise Refused("walk.finish.err.none", 409)
     if outcome == walk_finish.SEALED:
         raise Refused("walk.sealed", 409)
+    if outcome == walk_finish.TECHNICAL_MISSING:
+        raise Refused("walk.technical.err.pending", 409)
     if outcome == walk_finish.FAILED:
         raise Refused("walk.finish.err.failed", 503)
     return jsonify({"sent": True, "mode": mode}), 200
 
 
 _REPORT_REFUSALS = {
+    walk_finish.TECHNICAL_MISSING: ("walk.technical.err.pending", 409),
     walk_finish.NO_INSPECTION: ("walk.finish.err.none", 409),
     walk_finish.LANG_GONE: ("walk.finish.err.lang", 409),
     walk_finish.INFO_MISSING: ("walk.finish.err.info", 409),

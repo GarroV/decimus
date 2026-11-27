@@ -1,0 +1,99 @@
+{% macro technical_state(status, reason='') -%}
+  {% set label = t('technical.matrix.ok') if status == 'ok' else t('technical.matrix.absent') if status == 'absent' else t('technical.' ~ status) %}
+  <span class="technical-state technical-state--{{ status }}" role="img" aria-label="{{ label }}" title="{{ label }}{% if reason %} — {{ reason }}{% endif %}">
+    {% if status == 'ok' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+    {% elif status == 'issue' %}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    {% else %}<span aria-hidden="true">{{ {'pending': '○', 'na': '—', 'absent': '?', 'recorded': 'ⓘ'}.get(status, '?') }}</span>{% endif %}
+  </span>
+{%- endmacro %}
+<section class="ov-card ov-card--wide" data-technical-report>
+  <div class="ov-card__head">
+    <div class="ov-card__title">{{ t('technical.title') }}</div>
+    {% if c.technical.enabled %}
+      <div class="ov-card__count">{{ t('technical.coverage', checked=c.technical.checked, total=c.technical.total) }}</div>
+    {% endif %}
+  </div>
+  <div class="ov-card__body">
+    {% if not c.technical.enabled %}
+      <p class="field-note">{{ t('technical.absent') }}</p>
+    {% else %}
+      <p class="field-note">{{ t('technical.note') }}</p>
+      {% if not c.technical.previous_known %}
+        <p class="field-note">{{ t('technical.previous_failed') }}</p>
+      {% elif c.technical.previous %}
+        <p class="field-note"><a href="{{ url('/inspections/' ~ c.technical.previous.inspection_id) }}?lang={{ lang }}">{{ t('technical.previous', date=day(c.technical.previous.inspection_date)) }}</a>
+          {% if not c.technical.comparison_available %} · {{ t('technical.previous_absent') }}{% endif %}</p>
+      {% else %}
+        <p class="field-note">{{ t('technical.no_previous') }}</p>
+      {% endif %}
+      {% if c.technical.matrix.rows %}
+      <details open>
+        <summary>{{ t('technical.matrix') }}</summary>
+        <p class="field-note">{{ t('technical.matrix.note') }}</p>
+        <div class="technical-matrix-legend">
+          {% for status in ('ok', 'issue', 'pending', 'na', 'recorded', 'absent') %}
+          <span>{{ technical_state(status) }}<span>{{ t('technical.matrix.ok') if status == 'ok' else t('technical.matrix.absent') if status == 'absent' else t('technical.' ~ status) }}</span></span>
+          {% endfor %}
+        </div>
+        <div class="ov-table technical-matrix" tabindex="0" aria-label="{{ t('technical.matrix') }}">
+          <table class="table">
+            <colgroup><col>{% for column in c.technical.matrix.columns %}<col>{% endfor %}</colgroup>
+            <thead><tr><th scope="col">{{ t('technical.matrix.point') }}</th>
+              {% for column in c.technical.matrix.columns %}<th scope="col"><a href="{{ url('/inspections/' ~ column.inspection_id) }}?lang={{ lang }}">{{ day(column.date) }}</a></th>{% endfor %}
+            </tr></thead>
+            {% for group in c.technical.matrix.groups %}<tbody data-technical-zone="{{ group.zone }}">
+              <tr class="technical-matrix__zone"><th scope="rowgroup" colspan="{{ c.technical.matrix.columns|length + 1 }}"><span>{{ c.zones|selectattr('code', 'equalto', group.zone)|map(attribute='name')|first|default(group.zone) }}</span></th></tr>
+              {% for row in group.rows %}<tr data-technical-row="{{ row.id }}:{{ row.zone }}">
+                <th scope="row"><button type="button" class="technical-point" data-technical-guidance="{{ row.guidance or row.title }}" data-technical-title="{{ row.title }}">{{ row.title }} <span class="technical-point__info" aria-hidden="true">ⓘ</span></button></th>
+                {% for cell in row.cells %}<td>{{ technical_state(cell.status, cell.reason) }}</td>{% endfor %}
+              </tr>{% endfor %}
+            </tbody>{% endfor %}
+          </table>
+        </div>
+      </details>
+      {% endif %}
+      <details{% if c.technical.issues or c.technical.pending %} open{% endif %}>
+        <summary>{{ t('technical.details') }}</summary>
+        <ul class="find-list">
+          {% for point in c.technical.rows %}
+          <li class="find-item">
+            <div class="find-row">
+              <span class="find-row__main">
+                <span class="find-row__text">{{ point.title }}</span>
+                <span class="find-row__meta">{{ c.zones|selectattr('code', 'equalto', point.zone)|map(attribute='name')|first|default(point.zone) }} · {{ t('technical.' ~ point.status) }}
+                  {% if c.technical.comparison_available %} · {{ t('technical.' ~ point.change) }}{% endif %}</span>
+                {% if point.reason %}<span class="find-row__text">{{ point.reason }}</span>{% endif %}
+                {% for n in point.finding_numbers %}<a href="#finding-{{ n }}">{{ t('technical.finding', n=n) }}</a>{% endfor %}
+                {% if c.may_revise and point.status == 'pending' %}
+                <form class="pf" method="post" action="{{ url('/inspections/' ~ c.head.id ~ '/technical') }}?lang={{ lang }}"{% if panel %} data-panel-form{% endif %}>
+                  <input type="hidden" name="check_id" value="{{ point.id }}">
+                  <input type="hidden" name="zone" value="{{ point.zone }}">
+                  <label class="pf__row"><span class="field-label">{{ t('technical.answer') }}</span>
+                    <select class="input" name="status">
+                      {% if not point.requires_photo %}<option value="ok">{{ t('technical.ok') }}</option>{% endif %}
+                      <option value="na">{{ t('technical.na') }}</option>
+                      {% if point.candidate_evidence|selectattr('level', 'in', ('D1', 'D2', 'D3'))|list %}<option value="issue">{{ t('technical.issue') }}</option>{% endif %}
+                      {% if point.kind == 'info' and point.candidate_evidence|selectattr('level', 'equalto', 'D0')|list %}<option value="recorded">{{ t('technical.recorded') }}</option>{% endif %}
+                    </select>
+                  </label>
+                  {% if point.candidate_evidence %}
+                  <label class="pf__row"><span class="field-label">{{ t('technical.evidence') }}</span>
+                    <select class="input" name="finding_number"><option value="">—</option>
+                      {% for record in point.candidate_evidence %}<option value="{{ record.n }}">{{ t('technical.finding', n=record.n) }} · {{ record.text }}</option>{% endfor %}
+                    </select>
+                  </label>
+                  {% endif %}
+                  <label class="pf__row"><span class="field-label">{{ t('technical.reason') }}</span><input class="input" name="reason" maxlength="1000"></label>
+                  <label><input type="checkbox" name="confirmed" value="1" required> {{ t('technical.reviewed') }}</label>
+                  <button class="btn btn--sm" type="submit">{{ t('technical.confirm') }}</button>
+                </form>
+                {% endif %}
+              </span>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+  </div>
+</section>

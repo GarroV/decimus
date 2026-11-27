@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date
 from typing import Any
 
@@ -61,14 +61,15 @@ _INSERT_INSPECTION_SQL = """
 insert into inspections (
     tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
     ui_lang, speech_lang, checklist_version, checklist_code, auditor, city, partner, contact,
-    started_at, finished_at, finding_history, measurement_sets,
+    started_at, finished_at, finding_history, measurement_sets, technical_snapshot,
     pct, grade, deductions, counts, by_zone, by_process,
     source_fingerprint, status
 ) values (
     %(tenant_code)s, %(unit_id)s, %(chat_id)s, %(kind)s, %(inspection_date)s,
     %(report_lang)s, %(ui_lang)s, %(speech_lang)s, %(checklist_version)s,
     %(checklist_code)s, %(auditor)s, %(city)s, %(partner)s, %(contact)s,
-    %(started_at)s, %(finished_at)s, %(finding_history)s, %(measurement_sets)s, %(pct)s, %(grade)s,
+    %(started_at)s, %(finished_at)s, %(finding_history)s, %(measurement_sets)s,
+    %(technical_snapshot)s, %(pct)s, %(grade)s,
     %(deductions)s, %(counts)s, %(by_zone)s, %(by_process)s, %(source_fingerprint)s, 'draft'
 )
 on conflict (source_fingerprint) where retracted_at is null do nothing
@@ -389,6 +390,9 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
                     if inspection.finding_history
                     else None,
                     "measurement_sets": Json(inspection.measurement_sets),
+                    "technical_snapshot": Json(inspection.technical_snapshot)
+                    if inspection.technical_snapshot is not None
+                    else None,
                     "report_lang": inspection.report_lang,
                     "ui_lang": inspection.ui_lang,
                     "speech_lang": inspection.speech_lang,
@@ -511,6 +515,11 @@ def push_inspection(
             inspection = read_state(chat_id, source_settings)
         if inspection is None:
             raise PushError(f"В чате {chat_id} нет проверки — сливать нечего")
+        from src.domain.technical import snapshot as technical_snapshot
+
+        technical = technical_snapshot(chat_id, settings=source_settings)
+        if technical.get("enabled"):
+            inspection = replace(inspection, technical_snapshot=technical)
         if not (inspection.checklist_version or "").strip() and not allow_unknown_version:
             raise PushError(
                 f"В проверке чата {chat_id} не записана версия методики. Такая "

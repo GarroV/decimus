@@ -72,6 +72,10 @@ ENV_ALLOWLIST: dict[str, str] = {
         "подставляется кодом в окружение подпроцесса движка (src/report/engine_call.py)"
     ),
     "INSPECTION_FILE": "подставляется кодом в окружение подпроцесса движка (src/domain/engine.py)",
+    "DECIMUS_TECHNICAL_SNAPSHOT": (
+        "путь временного закреплённого снимка, передаётся подпроцессу отчёта"
+    ),
+    "TECHNICAL_PREVIEW_SEED": "разрешение синтетического посева отдельного технического стенда",
     "WALK_MOCKUP_ZONES": "ручной рычаг сборки макета (tools/walk_mockup/build.py), не настройка",
 }
 
