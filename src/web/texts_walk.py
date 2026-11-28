@@ -5,7 +5,7 @@
 язык добавляется строками каталога, а не правкой скрипта.
 
 Числа — после двоеточия («Замечаний: 3»), а не перед существительным: так
-русская форма не зависит от числа, и склонение не нужно ни на одном языке.
+русская форма не зависит от числа. Исключение — счётчик пунктов: формы выбирает `txCount`.
 """
 
 from __future__ import annotations
@@ -124,6 +124,8 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.rec.advice": {"ru": "Рек.", "en": "Rec."},
     "walk.cl.title": {"ru": "Чек-лист зоны", "en": "Zone checklist"},
     "walk.cl.count": {"ru": "{count} пунктов", "en": "{count} items"},
+    "walk.cl.count.one": {"ru": "{count} пункт", "en": "{count} item"},
+    "walk.cl.count.few": {"ru": "{count} пункта", "en": "{count} items"},
     "walk.cl.hint": {
         "ru": "Нажмите пункт, чтобы записать по нему нарушение.",
         "en": "Tap an item to record a finding against it.",
