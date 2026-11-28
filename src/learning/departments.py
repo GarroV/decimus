@@ -26,9 +26,6 @@ from .ispring import Department
 
 BRAND = "Dodo Pizza"
 COUNTRY_PREFIX = "Dodo Pizza - "
-#: Страны, которых нет в справочнике сети (`ratings.countries`), но есть в iSpring: без
-#: записи подразделение страны и все её пиццерии выпали бы из загрузки.
-_EXTRA_COUNTRIES = {"Moldova": "MD"}
 _POINT_NUMBER = re.compile(r"-\s*\d+$")
 
 KIND_COUNTRY = "country"
@@ -83,7 +80,7 @@ def map_departments(
             continue
         if len(path) == 3:
             title = dept.name.removeprefix(COUNTRY_PREFIX)
-            code = country_code(title) or _EXTRA_COUNTRIES.get(title)
+            code = country_code(title)
             if code is None:
                 ignored += 1
                 continue

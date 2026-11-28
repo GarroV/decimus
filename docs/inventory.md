@@ -713,6 +713,7 @@
 | `0141_space_limits.sql` | `space_limits` |
 | `0142_web_onboarding.sql` | — |
 | `0143_feedback.sql` | `feedback`, `feedback_photos`, `feedback_chat`, `feedback_attempts` |
+| `0145_moldova.sql` | — |
 <!-- map:end -->
 
 ## Makefile
