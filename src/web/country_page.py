@@ -550,10 +550,15 @@ def slice_query() -> str:
 def country_param_redirect() -> Response | None:
     """`/country?country=XX` — страна в параметре, а не в пути (#1606): ведёт на `/country/XX`.
 
-    Переезжает только срез из `SLICE_KEYS`. Чужая страна и несуществующий код разбирает уже
-    экран страны: 404 вне охвата, пустой экран на непонятное."""
+    Переезжает только срез из `SLICE_KEYS`. Неизвестный код или страна вне охвата
+    оставляет обычный выбор страны по умолчанию; явный путь по-прежнему защищён 404."""
     code = country_data.normalize_code(request.args.get("country", ""))
     if not code:
+        return None
+    reach = auth.current_reach()
+    if reach.countries is not None and code not in reach.countries:
+        return None
+    if code not in {c for c, _ in country_data.countries(reach=reach)}:
         return None
     return redirect(url_for("country", code=code) + slice_query())
 
@@ -562,6 +567,5 @@ def index_redirect(lang_in_url: bool, lang: str) -> Response | None:
     """Единственная страна (после отбора «Мои страны») без отбора девелопера — сразу в неё."""
     страны, _ = _filtered(country_data.countries(reach=auth.current_reach()), None, lang)
     if len(страны) == 1 and not request.args.get("dev"):
-        язык = {"lang": lang} if lang_in_url else {}
-        return redirect(_url("country", code=страны[0][0], **язык))
+        return redirect(url_for("country", code=страны[0][0]) + slice_query())
     return None
