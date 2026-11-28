@@ -6,7 +6,8 @@
 
 **Как.** Раз в час: если удачной загрузки не было `FRESH_FOR_SEC`, загрузить.
 Неудача пишется в журнал `maps.loads` и в лог; следующая попытка — через час.
-Ключа нет — задача молча не работает и говорит об этом один раз при старте.
+Ключ разрешается из базы или окружения на каждом круге. Пока ключа нет,
+задача пишет причину и ждёт следующего круга.
 
 **История (#616).** Тем же циклом каждый час доливается история оценок филиалов на
 `HISTORY_MONTHS` месяцев — порциями до `HISTORY_REQUESTS_PER_CYCLE` запросов. Что
@@ -31,7 +32,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
@@ -194,12 +194,19 @@ async def load_forever() -> None:
 
 async def _load_forever() -> None:
     """Задача бота: держит снимок оценок карт не старше суток."""
-    if not os.environ.get(maps.KEY_ENV, "").strip():
-        logger.info("Оценки карт: %s не задан — загрузка выключена", maps.KEY_ENV)
-        return
     history = HistoryState()
     reviews = ReviewsState()
     while True:
+        try:
+            key = await asyncio.to_thread(service_keys.resolve, "pointer", "api_key")
+        except DbError:
+            logger.warning("Оценки карт: ключ недоступен, повторим в следующий круг")
+            await asyncio.sleep(CHECK_EVERY_SEC)
+            continue
+        if not key:
+            logger.info("Оценки карт: ключ Pointer не настроен, повторим в следующий круг")
+            await asyncio.sleep(CHECK_EVERY_SEC)
+            continue
         try:
             await asyncio.to_thread(_load_if_due, history)
         except (PointerError, RatingsError) as exc:
