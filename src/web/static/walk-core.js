@@ -79,6 +79,13 @@
     return s;
   };
 
+  W.txCount = function (key, count) {
+    var form = new Intl.PluralRules(document.documentElement.lang).select(count);
+    var specific = key + "." + form;
+    var texts = W.state.data && W.state.data.texts;
+    return W.tx(texts && texts[specific] ? specific : key, { count: count });
+  };
+
   W.el = function (tag, cls, text) {
     var node = document.createElement(tag);
     if (cls) node.className = cls;

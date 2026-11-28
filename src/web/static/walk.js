@@ -486,7 +486,7 @@
     var wrap = el("div", "walk-cl__wrap");
     var head = el("h3", "walk-cl__head walk-cl__head--static");
     head.appendChild(el("span", "walk-cl__title", tx("walk.cl.title")));
-    head.appendChild(el("span", "walk-cl__count", tx("walk.cl.count", { count: items.length })));
+    head.appendChild(el("span", "walk-cl__count", W.txCount("walk.cl.count", items.length)));
     box.appendChild(head);
 
     var inner = el("div", "walk-cl__inner");
